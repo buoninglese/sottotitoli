@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Sottotitoli Overlay</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #030712;
+      --card: rgba(15, 23, 42, 0.92);
+      --line: rgba(96, 165, 250, 0.18);
+      --text: #eff6ff;
+      --muted: #93c5fd;
+      --accent: #60a5fa;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: transparent;
+      font-family: Inter, sans-serif;
+      color: var(--text);
+    }
+    .overlay {
+      max-width: 980px;
+      margin: 0 auto;
+      padding: 24px;
+    }
+    .stack {
+      display: grid;
+      gap: 16px;
+    }
+    .card {
+      border-radius: 20px;
+      background: var(--card);
+      border: 1px solid var(--line);
+      box-shadow: 0 20px 60px rgba(0,0,0,.28);
+      padding: 20px;
+      backdrop-filter: blur(10px);
+    }
+    .label {
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: .12em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 10px;
+    }
+    .text {
+      font-size: clamp(24px, 3.2vw, 42px);
+      line-height: 1.25;
+      font-weight: 700;
+      white-space: pre-wrap;
+    }
+    .subtext {
+      font-size: clamp(18px, 2.2vw, 30px);
+      line-height: 1.35;
+      font-weight: 600;
+      white-space: pre-wrap;
+      color: #dbeafe;
+    }
+    .status {
+      margin-top: 12px;
+      font-size: 13px;
+      color: var(--muted);
+    }
+  </style>
+</head>
+<body>
+  <div class="overlay">
+    <div class="stack">
+      <div class="card">
+        <div class="label">Original</div>
+        <div id="sourceText" class="text">Waiting for captions…</div>
+      </div>
+      <div class="card">
+        <div class="label">Translation</div>
+        <div id="translatedText" class="subtext">Translated output will appear here.</div>
+        <div class="status">Room: <span id="roomLabel"></span> · Socket: <span id="socketState">connecting</span></div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const params = new URLSearchParams(window.location.search);
+    const room = params.get('room') || 'default';
+    const socketUrl = "wss://sottotitoli-websocket.onrender.com?room=" + encodeURIComponent(room);
+
+    const sourceText = document.getElementById('sourceText');
+    const translatedText = document.getElementById('translatedText');
+    const roomLabel = document.getElementById('roomLabel');
+    const socketState = document.getElementById('socketState');
+
+    roomLabel.textContent = room;
+
+    const socket = new WebSocket(socketUrl);
+
+    socket.addEventListener('open', function () {
+      socketState.textContent = 'connected';
+    });
+
+    socket.addEventListener('close', function () {
+      socketState.textContent = 'closed';
+    });
+
+    socket.addEventListener('error', function () {
+      socketState.textContent = 'error';
+    });
+
+    socket.addEventListener('message', function (event) {
+      try {
+        const payload = JSON.parse(event.data);
+
+        if (payload.final) {
+          sourceText.textContent = payload.final;
+        } else if (payload.interm) {
+          sourceText.textContent = payload.interm;
+        }
+
+        if (payload.translated) {
+          translatedText.textContent = payload.translated;
+        }
+      } catch (e) {}
+    });
+  </script>
+</body>
+</html>
