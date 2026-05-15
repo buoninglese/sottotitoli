@@ -8,6 +8,7 @@
 
   const SpeechRecognition = w.SpeechRecognition || w.webkitSpeechRecognition;
   const DIARIZE_URL = 'https://sottotitoli-websocket.onrender.com/analyze-speakers';
+  const SPEAKER_ANALYSIS_MARKER = '=== Speaker Analysis ===';
 
   let recognition = null;
   let wsPublisher = null;
@@ -24,6 +25,10 @@
   let audioChunks = [];
   let lastAudioBlob = null;
   let isRecordingAudio = false;
+
+  let isAnalyzingSpeakers = false;
+  let speakerAnalysisCompleted = false;
+  let analyzeBtnRef = null;
 
   function $(id) {
     return document.getElementById(id);
@@ -88,6 +93,42 @@
     const dot = $('micDot');
     if (!dot) return;
     dot.classList.toggle('connected', !!live);
+  }
+
+  function updateAnalyzeButtonState() {
+    if (!analyzeBtnRef) return;
+
+    if (speakerAnalysisCompleted) {
+      analyzeBtnRef.disabled = true;
+      analyzeBtnRef.textContent = 'Speaker analysis completed';
+      analyzeBtnRef.classList.remove('btn');
+      analyzeBtnRef.classList.remove('ghost');
+      analyzeBtnRef.classList.add('btn');
+      analyzeBtnRef.classList.add('secondary');
+      analyzeBtnRef.style.opacity = '0.75';
+      analyzeBtnRef.style.cursor = 'not-allowed';
+      return;
+    }
+
+    if (isAnalyzingSpeakers) {
+      analyzeBtnRef.disabled = true;
+      analyzeBtnRef.textContent = 'Analyzing speakers...';
+      analyzeBtnRef.style.opacity = '0.75';
+      analyzeBtnRef.style.cursor = 'progress';
+      return;
+    }
+
+    analyzeBtnRef.disabled = false;
+    analyzeBtnRef.textContent = 'Analyze speakers';
+    analyzeBtnRef.style.opacity = '';
+    analyzeBtnRef.style.cursor = '';
+  }
+
+  function removeExistingSpeakerAnalysis(reportText) {
+    if (!reportText) return '';
+    const markerIndex = reportText.indexOf(SPEAKER_ANALYSIS_MARKER);
+    if (markerIndex === -1) return reportText.trim();
+    return reportText.slice(0, markerIndex).trim();
   }
 
   async function maybeTranslate(text) {
@@ -268,6 +309,8 @@
       audioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
       audioChunks = [];
       lastAudioBlob = null;
+      speakerAnalysisCompleted = false;
+      updateAnalyzeButtonState();
 
       let mimeType = '';
       if (w.MediaRecorder && MediaRecorder.isTypeSupported('audio/webm;codecs=opus')) {
@@ -374,7 +417,8 @@
   async function generateLessonReport() {
     const report = await w.SottotitoliLessonReport.generateLessonReport(transcriptLines);
     latestReportText = w.SottotitoliLessonReport.formatLessonReport(report);
-    setText('lessonReport', latestReportText);
+    latestReportText = removeExistingSpeakerAnalysis(latestReportText);
+    setText('lessonReport', latestReportText || 'No report yet.');
   }
 
   async function copyOverlayLink() {
@@ -405,6 +449,21 @@
 
   function newRoom() {
     room = w.SottotitoliSessionUtils.randomRoom();
+    transcriptLines = [];
+    latestReportText = '';
+    lastInterimSent = '';
+    audioChunks = [];
+    lastAudioBlob = null;
+    isAnalyzingSpeakers = false;
+    speakerAnalysisCompleted = false;
+    updateAnalyzeButtonState();
+
+    setText('interimOutput', '');
+    setText('sourceOutput', '');
+    setText('translatedOutput', '');
+    setText('lessonReport', 'No report yet.');
+    updateStats();
+
     updateRoomUI();
     if (wsPublisher) wsPublisher.disconnect();
     connectSocket();
@@ -484,6 +543,16 @@
   }
 
   async function analyzeSpeakers() {
+    if (speakerAnalysisCompleted) {
+      setText('statusText', 'Speaker analysis has already been completed for this session.');
+      return;
+    }
+
+    if (isAnalyzingSpeakers) {
+      setText('statusText', 'Speaker analysis is already running.');
+      return;
+    }
+
     if (isRecordingAudio) {
       setText('statusText', 'Stop the microphone first so the lesson recording can finish.');
       return;
@@ -494,6 +563,8 @@
       return;
     }
 
+    isAnalyzingSpeakers = true;
+    updateAnalyzeButtonState();
     setText('statusText', 'Uploading lesson audio for speaker analysis...');
 
     try {
@@ -517,15 +588,22 @@
       const data = await response.json();
       const diarizationText = formatDiarizationResult(data);
 
-      if (!latestReportText || latestReportText === 'No report yet.') {
-        latestReportText = '=== Lesson Report ===\n\nNo written lesson report generated yet.';
+      let baseReport = removeExistingSpeakerAnalysis(latestReportText);
+
+      if (!baseReport || baseReport === 'No report yet.') {
+        baseReport = '=== Lesson Report ===\n\nNo written lesson report generated yet.';
       }
 
-      latestReportText += '\n\n=== Speaker Analysis ===\n' + diarizationText;
+      latestReportText = baseReport + '\n\n' + SPEAKER_ANALYSIS_MARKER + '\n' + diarizationText;
       setText('lessonReport', latestReportText);
+
+      speakerAnalysisCompleted = true;
       setText('statusText', 'Speaker analysis completed.');
     } catch (err) {
       setText('statusText', 'Speaker analysis failed: ' + err.message);
+    } finally {
+      isAnalyzingSpeakers = false;
+      updateAnalyzeButtonState();
     }
   }
 
@@ -566,11 +644,12 @@
       $('reportBtn').addEventListener('click', generateLessonReport);
       $('downloadReportBtn').addEventListener('click', downloadReport);
 
-      const analyzeBtn = document.createElement('button');
-      analyzeBtn.className = 'btn ghost';
-      analyzeBtn.textContent = 'Analyze speakers';
-      analyzeBtn.addEventListener('click', analyzeSpeakers);
-      $('lessonActions').appendChild(analyzeBtn);
+      analyzeBtnRef = document.createElement('button');
+      analyzeBtnRef.className = 'btn ghost';
+      analyzeBtnRef.textContent = 'Analyze speakers';
+      analyzeBtnRef.addEventListener('click', analyzeSpeakers);
+      $('lessonActions').appendChild(analyzeBtnRef);
+      updateAnalyzeButtonState();
     }
   });
 })(window);
