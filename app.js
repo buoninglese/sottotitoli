@@ -13,6 +13,7 @@
   let transcriptLines = [];
   let room = params.get('room') || w.SottotitoliSessionUtils.randomRoom();
   let latestReportText = '';
+  let lastInterimSent = '';
 
   function $(id) {
     return document.getElementById(id);
@@ -86,10 +87,14 @@
     }
   }
 
-  async function publishPayload(payload) {
-    if (!wsPublisher) return;
+  function sendPayload(payload, statusMessage) {
+    if (!wsPublisher) {
+      setText('statusText', 'No websocket publisher available.');
+      return;
+    }
+
     wsPublisher.publish(payload);
-    setText('statusText', 'Sent to websocket room.');
+    if (statusMessage) setText('statusText', statusMessage);
   }
 
   async function handleFinalTranscript(text) {
@@ -110,7 +115,8 @@
       mode: modeKey,
       final: text,
       timestamp,
-      sourceLang: modeConfig.sourceLang
+      sourceLang: modeConfig.sourceLang,
+      kind: modeConfig.translate ? 'translation' : 'caption'
     };
 
     if (modeConfig.translate) {
@@ -121,11 +127,34 @@
         payload.translated = translated;
         payload.targetLang = modeConfig.targetLang;
       }
+    } else {
+      payload.translated = '';
     }
 
     transcriptLines.push(entry);
     updateStats();
-    await publishPayload(payload);
+    lastInterimSent = '';
+    sendPayload(payload, 'Final caption sent to overlay.');
+  }
+
+  function handleInterimTranscript(text) {
+    const clean = (text || '').trim();
+    setText('interimOutput', clean);
+
+    if (!clean) return;
+    if (clean === lastInterimSent) return;
+    lastInterimSent = clean;
+
+    const payload = {
+      type: 'caption',
+      room,
+      mode: modeKey,
+      interim: clean,
+      sourceLang: modeConfig.sourceLang,
+      kind: modeConfig.translate ? 'translation' : 'caption'
+    };
+
+    sendPayload(payload, 'Interim caption sent to overlay.');
   }
 
   function startRecognition() {
@@ -145,7 +174,7 @@
     recognition.lang = modeConfig.sourceLang || 'en-US';
 
     recognition.onstart = function () {
-      setText('statusText', 'Listening...');
+      setText('statusText', `Listening in ${modeConfig.sourceLang}...`);
       updateMicState('live', true);
     };
 
@@ -165,26 +194,16 @@
       }
 
       const cleanInterim = interim.trim();
-      setText('interimOutput', cleanInterim);
-
-      if (cleanInterim && wsPublisher) {
-        wsPublisher.publish({
-          type: 'caption',
-          room,
-          mode: modeKey,
-          interim: cleanInterim,
-          sourceLang: modeConfig.sourceLang
-        });
-      }
+      handleInterimTranscript(cleanInterim);
     };
 
     recognition.onerror = function (event) {
-      setText('statusText', 'Speech error: ' + event.error);
+      setText('statusText', `Speech error (${modeConfig.sourceLang}): ` + event.error);
       updateMicState('error', false);
     };
 
     recognition.onend = function () {
-      setText('statusText', 'Stopped');
+      setText('statusText', 'Recognition stopped.');
       updateMicState('stopped', false);
     };
 
@@ -259,13 +278,16 @@
       type: 'caption',
       room,
       mode: modeKey,
-      final: 'Test caption from Sottotitoli.',
-      translated: modeConfig.translate ? 'Messaggio di test da Sottotitoli.' : '',
+      final: modeConfig.sourceLang === 'it-IT' ? 'Questo è un test.' : 'This is a test.',
+      translated: modeConfig.translate
+        ? (modeConfig.targetLang === 'it' ? 'Questo è un test.' : 'This is a test.')
+        : '',
       timestamp: new Date().toISOString(),
-      sourceLang: modeConfig.sourceLang
+      sourceLang: modeConfig.sourceLang,
+      kind: modeConfig.translate ? 'translation' : 'caption'
     };
 
-    publishPayload(payload);
+    sendPayload(payload, 'Test message sent.');
   }
 
   function describeMode() {
@@ -275,7 +297,7 @@
       : 'Live mode is active with overlay publishing.';
     const translation = modeConfig.translate
       ? 'Translation mode is enabled.'
-      : 'Captions only.';
+      : 'Caption mode is enabled.';
     setText('modeTitle', title);
     setText('modeDescription', `${lesson} ${translation}`);
   }
