@@ -18,6 +18,9 @@
   let restartTimer = null;
   let hasStartedOnce = false;
 
+  let audioRecorder = null;
+  let audioStream = null;
+
   function $(id) {
     return document.getElementById(id);
   }
@@ -40,14 +43,14 @@
     const url = new URL(window.location.href);
     url.searchParams.set('mode', modeKey);
     url.searchParams.set('room', room);
-    if (!url.searchParams.has('v')) url.searchParams.set('v', '8');
+    url.searchParams.set('v', '10');
     history.replaceState({}, '', url.toString());
   }
 
   function currentOverlayUrl() {
     const url = new URL('overlay.html', window.location.href);
     url.searchParams.set('room', room);
-    url.searchParams.set('v', '8');
+    url.searchParams.set('v', '10');
     return url.toString();
   }
 
@@ -356,6 +359,10 @@
     }, 'Test message sent to room: ' + room);
   }
 
+  async function analyzeSpeakers() {
+    setText('statusText', 'Speaker analysis is not yet configured.');
+  }
+
   function describeMode() {
     const title = modeConfig.title || 'Sottotitoli Session';
     const lesson = modeConfig.lessonMode
@@ -392,6 +399,12 @@
       $('lessonActions').style.display = 'block';
       $('reportBtn').addEventListener('click', generateLessonReport);
       $('downloadReportBtn').addEventListener('click', downloadReport);
+
+      const analyzeBtn = document.createElement('button');
+      analyzeBtn.className = 'btn ghost';
+      analyzeBtn.textContent = 'Analyze speakers';
+      analyzeBtn.addEventListener('click', analyzeSpeakers);
+      $('lessonActions').appendChild(analyzeBtn);
     }
   });
 })(window);
