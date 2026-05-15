@@ -33,18 +33,31 @@
     box.prepend(div);
   }
 
+  function syncUrl() {
+    const url = new URL(window.location.href);
+    url.searchParams.set('mode', modeKey);
+    url.searchParams.set('room', room);
+    if (!url.searchParams.has('v')) {
+      url.searchParams.set('v', '7');
+    }
+    history.replaceState({}, '', url.toString());
+  }
+
   function currentOverlayUrl() {
     const url = new URL('overlay.html', window.location.href);
     url.searchParams.set('room', room);
+    url.searchParams.set('v', '7');
     return url.toString();
   }
 
   function updateRoomUI() {
+    syncUrl();
     setText('roomValue', room);
     const link = $('overlayLink');
     if (link) {
-      link.href = currentOverlayUrl();
-      link.textContent = currentOverlayUrl();
+      const overlayUrl = currentOverlayUrl();
+      link.href = overlayUrl;
+      link.textContent = overlayUrl;
     }
   }
 
@@ -193,8 +206,7 @@
         }
       }
 
-      const cleanInterim = interim.trim();
-      handleInterimTranscript(cleanInterim);
+      handleInterimTranscript(interim.trim());
     };
 
     recognition.onerror = function (event) {
@@ -223,7 +235,7 @@
       room,
       onStateChange: function (state) {
         updateSocketState(state);
-        setText('statusText', 'Socket state: ' + state);
+        setText('statusText', 'Socket state: ' + state + ' · room: ' + room);
       },
       onError: function (error) {
         setText('statusText', 'Socket error: ' + error);
@@ -270,7 +282,7 @@
     updateRoomUI();
     if (wsPublisher) wsPublisher.disconnect();
     connectSocket();
-    setText('statusText', 'New room created.');
+    setText('statusText', 'New room created: ' + room);
   }
 
   function sendTestMessage() {
@@ -287,7 +299,7 @@
       kind: modeConfig.translate ? 'translation' : 'caption'
     };
 
-    sendPayload(payload, 'Test message sent.');
+    sendPayload(payload, 'Test message sent to room: ' + room);
   }
 
   function describeMode() {
