@@ -79,12 +79,17 @@
         modeConfig.sourceCode,
         modeConfig.targetLang
       );
-
       return result && result.translatedText ? result.translatedText : null;
     } catch (err) {
       setText('statusText', 'Translation error: ' + err.message);
       return null;
     }
+  }
+
+  async function publishPayload(payload) {
+    if (!wsPublisher) return;
+    wsPublisher.publish(payload);
+    setText('statusText', 'Sent to websocket room.');
   }
 
   async function handleFinalTranscript(text) {
@@ -120,10 +125,7 @@
 
     transcriptLines.push(entry);
     updateStats();
-
-    if (wsPublisher) {
-      wsPublisher.publish(payload);
-    }
+    await publishPayload(payload);
   }
 
   function startRecognition() {
@@ -202,6 +204,10 @@
       room,
       onStateChange: function (state) {
         updateSocketState(state);
+        setText('statusText', 'Socket state: ' + state);
+      },
+      onError: function (error) {
+        setText('statusText', 'Socket error: ' + error);
       }
     });
 
@@ -243,11 +249,23 @@
   function newRoom() {
     room = w.SottotitoliSessionUtils.randomRoom();
     updateRoomUI();
-    if (wsPublisher) {
-      wsPublisher.disconnect();
-    }
+    if (wsPublisher) wsPublisher.disconnect();
     connectSocket();
     setText('statusText', 'New room created.');
+  }
+
+  function sendTestMessage() {
+    const payload = {
+      type: 'caption',
+      room,
+      mode: modeKey,
+      final: 'Test caption from Sottotitoli.',
+      translated: modeConfig.translate ? 'Messaggio di test da Sottotitoli.' : '',
+      timestamp: new Date().toISOString(),
+      sourceLang: modeConfig.sourceLang
+    };
+
+    publishPayload(payload);
   }
 
   function describeMode() {
@@ -275,6 +293,12 @@
     $('newRoomBtn').addEventListener('click', newRoom);
     $('copyTranscriptBtn').addEventListener('click', copyTranscript);
     $('downloadTranscriptBtn').addEventListener('click', downloadTranscript);
+
+    const extraBtn = document.createElement('button');
+    extraBtn.className = 'btn ghost';
+    extraBtn.textContent = 'Send test message';
+    extraBtn.addEventListener('click', sendTestMessage);
+    $('startBtn').parentNode.appendChild(extraBtn);
 
     if (modeConfig.lessonMode) {
       $('lessonActions').style.display = 'block';
