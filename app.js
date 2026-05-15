@@ -7,6 +7,7 @@
   const modeConfig = (configRoot.modes && configRoot.modes[modeKey]) || configRoot.modes['caption-en'];
 
   const SpeechRecognition = w.SpeechRecognition || w.webkitSpeechRecognition;
+  const DIARIZE_URL = 'https://sottotitoli-websocket.onrender.com/analyze-speakers';
 
   let recognition = null;
   let wsPublisher = null;
@@ -427,34 +428,64 @@
 
   function formatDiarizationResult(data) {
     if (!data) return 'No speaker analysis result returned.';
-    if (typeof data === 'string') return data;
 
-    if (Array.isArray(data.utterances) && data.utterances.length) {
-      return data.utterances.map(function (u, index) {
-        const speaker = u.speaker || u.label || ('Speaker ' + ((u.speaker_id || 0) + 1));
-        const start = u.start != null ? String(u.start) : '?';
-        const end = u.end != null ? String(u.end) : '?';
-        const text = u.text || '';
-        return `${index + 1}. ${speaker} [${start} - ${end}]\n${text}`;
-      }).join('\n\n');
+    const lines = [];
+
+    if (typeof data.text === 'string' && data.text.trim()) {
+      lines.push('Transcript');
+      lines.push(data.text.trim());
+      lines.push('');
     }
 
-    if (Array.isArray(data.segments) && data.segments.length) {
-      return data.segments.map(function (s, index) {
-        const speaker = s.speaker || s.label || ('Speaker ' + ((s.speaker_id || 0) + 1));
-        const start = s.start != null ? String(s.start) : '?';
-        const end = s.end != null ? String(s.end) : '?';
-        const text = s.text || '';
-        return `${index + 1}. ${speaker} [${start} - ${end}]\n${text}`;
-      }).join('\n\n');
+    if (data.analytics) {
+      lines.push('Speaker summary');
+
+      if (Array.isArray(data.analytics.speakers) && data.analytics.speakers.length) {
+        data.analytics.speakers.forEach(function (speaker, index) {
+          const share = speaker.shareOfTime != null
+            ? Math.round(Number(speaker.shareOfTime) * 100)
+            : 0;
+
+          lines.push(
+            `${index + 1}. ${speaker.speaker}: turns ${speaker.turns}, words ${speaker.words}, duration ${Number(speaker.duration || 0).toFixed(1)}s, share ${share}%`
+          );
+        });
+      }
+
+      if (data.analytics.interruptions != null) {
+        lines.push('');
+        lines.push(`Interruptions: ${data.analytics.interruptions}`);
+      }
+
+      if (data.analytics.totalDuration != null) {
+        lines.push(`Total duration: ${Number(data.analytics.totalDuration).toFixed(1)}s`);
+      }
+
+      lines.push('');
     }
 
-    return JSON.stringify(data, null, 2);
+    const segments = Array.isArray(data.segments) ? data.segments : [];
+
+    if (segments.length) {
+      lines.push('Segments');
+
+      segments.forEach(function (seg, index) {
+        const speaker = seg.speaker || 'Unknown speaker';
+        const start = seg.start != null ? Number(seg.start).toFixed(1) : '?';
+        const end = seg.end != null ? Number(seg.end).toFixed(1) : '?';
+        const text = (seg.text || '').trim();
+        lines.push(`${index + 1}. ${speaker} [${start}s - ${end}s]`);
+        if (text) lines.push(text);
+        lines.push('');
+      });
+    }
+
+    return lines.join('\n').trim() || JSON.stringify(data, null, 2);
   }
 
   async function analyzeSpeakers() {
     if (isRecordingAudio) {
-      setText('statusText', 'Stop the microphone first so the lesson recording can finalize.');
+      setText('statusText', 'Stop the microphone first so the lesson recording can finish.');
       return;
     }
 
@@ -468,24 +499,29 @@
     try {
       const ext = lastAudioBlob.type && lastAudioBlob.type.indexOf('ogg') !== -1 ? 'ogg' : 'webm';
       const formData = new FormData();
-      formData.append('audio', lastAudioBlob, `lesson-${room}.${ext}`);
+      formData.append('file', lastAudioBlob, `lesson-${room}.${ext}`);
       formData.append('room', room);
       formData.append('mode', modeKey);
       formData.append('sourceLang', modeConfig.sourceLang || '');
 
-      const response = await fetch('/api/diarize', {
+      const response = await fetch(DIARIZE_URL, {
         method: 'POST',
         body: formData
       });
 
       if (!response.ok) {
-        throw new Error('Diarization request failed with status ' + response.status);
+        const errorText = await response.text();
+        throw new Error(errorText || ('Speaker analysis failed with status ' + response.status));
       }
 
       const data = await response.json();
       const diarizationText = formatDiarizationResult(data);
 
-      latestReportText = (latestReportText || 'No report yet.') + '\n\n=== Speaker Analysis ===\n' + diarizationText;
+      if (!latestReportText || latestReportText === 'No report yet.') {
+        latestReportText = '=== Lesson Report ===\n\nNo written lesson report generated yet.';
+      }
+
+      latestReportText += '\n\n=== Speaker Analysis ===\n' + diarizationText;
       setText('lessonReport', latestReportText);
       setText('statusText', 'Speaker analysis completed.');
     } catch (err) {
