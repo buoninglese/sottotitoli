@@ -3,87 +3,127 @@
 
   const params = new URLSearchParams(window.location.search);
   const modeKey = params.get('mode') || 'caption-en';
-  const config = (w.SOTTOTITOLI_CONFIG && w.SOTTOTITOLI_CONFIG.modes[modeKey]) || w.SOTTOTITOLI_CONFIG.modes['caption-en'];
+  const configRoot = w.SOTTOTITOLI_CONFIG || {};
+  const modeConfig = (configRoot.modes && configRoot.modes[modeKey]) || configRoot.modes['caption-en'];
 
-  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  const SpeechRecognition = w.SpeechRecognition || w.webkitSpeechRecognition;
+
   let recognition = null;
   let wsPublisher = null;
-  let transcriptBuffer = [];
+  let transcriptLines = [];
+  let room = params.get('room') || w.SottotitoliSessionUtils.randomRoom();
+  let latestReportText = '';
 
   function $(id) {
     return document.getElementById(id);
   }
-
-  function randomRoom() {
-    return Math.random().toString(36).slice(2, 10);
-  }
-
-  const room = params.get('room') || randomRoom();
 
   function setText(id, text) {
     const el = $(id);
     if (el) el.textContent = text;
   }
 
-  function appendLine(id, text) {
-    const el = $(id);
-    if (!el) return;
+  function appendLine(targetId, text) {
+    const box = $(targetId);
+    if (!box || !text) return;
     const div = document.createElement('div');
     div.className = 'line';
     div.textContent = text;
-    el.prepend(div);
+    box.prepend(div);
   }
 
-  function updateOverlayLink() {
+  function currentOverlayUrl() {
+    const url = new URL('overlay.html', window.location.href);
+    url.searchParams.set('room', room);
+    return url.toString();
+  }
+
+  function updateRoomUI() {
+    setText('roomValue', room);
     const link = $('overlayLink');
-    if (!link) return;
-    link.href = `overlay.html?room=${encodeURIComponent(room)}`;
-    link.textContent = link.href;
+    if (link) {
+      link.href = currentOverlayUrl();
+      link.textContent = currentOverlayUrl();
+    }
+  }
+
+  function updateStats() {
+    const plain = transcriptLines.map(x => x.text).join(' ').trim();
+    setText('statLines', String(transcriptLines.length));
+    setText('statWords', String(w.SottotitoliSessionUtils.countWords(plain)));
+    setText('statChars', String(plain.length));
+  }
+
+  function updateSocketState(state) {
+    setText('socketStatus', state);
+    const dot = $('socketDot');
+    if (!dot) return;
+    dot.classList.toggle('connected', state === 'connected');
+  }
+
+  function updateMicState(stateText, live) {
+    setText('micStatus', stateText);
+    const dot = $('micDot');
+    if (!dot) return;
+    dot.classList.toggle('connected', !!live);
   }
 
   async function maybeTranslate(text) {
-    if (!config.translate) return null;
+    if (!modeConfig.translate) return null;
 
     try {
-      const providerConfig = window.CaptionTranslationProviders.resolveConfig(new URLSearchParams(window.location.search), {
-        forceLocal: true
-      });
-
-      const result = await window.CaptionTranslationProviders.translateText(
+      const providerConfig = w.CaptionTranslationProviders.resolveConfig();
+      const result = await w.CaptionTranslationProviders.translateText(
         providerConfig,
         text,
-        config.sourceLang,
-        config.targetLang
+        modeConfig.sourceCode,
+        modeConfig.targetLang
       );
 
-      return result ? result.translatedText : null;
+      return result && result.translatedText ? result.translatedText : null;
     } catch (err) {
+      setText('statusText', 'Translation error: ' + err.message);
       return null;
     }
   }
 
   async function handleFinalTranscript(text) {
-    transcriptBuffer.push(text);
+    if (!text) return;
+
+    const timestamp = w.SottotitoliSessionUtils.formatTimestamp(new Date());
+    const entry = {
+      timestamp,
+      text,
+      translated: null
+    };
+
     appendLine('sourceOutput', text);
 
     const payload = {
       type: 'caption',
+      room,
       mode: modeKey,
-      room: room,
       final: text,
-      sourceLang: config.sourceLang
+      timestamp,
+      sourceLang: modeConfig.sourceLang
     };
 
-    if (config.translate) {
+    if (modeConfig.translate) {
       const translated = await maybeTranslate(text);
       if (translated) {
+        entry.translated = translated;
         appendLine('translatedOutput', translated);
         payload.translated = translated;
-        payload.targetLang = config.targetLang;
+        payload.targetLang = modeConfig.targetLang;
       }
     }
 
-    if (wsPublisher) wsPublisher.publish(payload);
+    transcriptLines.push(entry);
+    updateStats();
+
+    if (wsPublisher) {
+      wsPublisher.publish(payload);
+    }
   }
 
   function startRecognition() {
@@ -92,20 +132,26 @@
       return;
     }
 
+    if (recognition) {
+      try { recognition.stop(); } catch (e) {}
+      recognition = null;
+    }
+
     recognition = new SpeechRecognition();
     recognition.continuous = true;
     recognition.interimResults = true;
-    recognition.lang = config.sourceLang;
+    recognition.lang = modeConfig.sourceLang || 'en-US';
 
     recognition.onstart = function () {
       setText('statusText', 'Listening...');
+      updateMicState('live', true);
     };
 
     recognition.onresult = function (event) {
       let interim = '';
 
       for (let i = event.resultIndex; i < event.results.length; i++) {
-        const text = event.results[i][0].transcript.trim();
+        const text = (event.results[i][0] && event.results[i][0].transcript || '').trim();
         if (!text) continue;
 
         if (event.results[i].isFinal) {
@@ -116,66 +162,124 @@
         }
       }
 
-      if (interim.trim()) {
-        setText('interimOutput', interim.trim());
-        if (wsPublisher) {
-          wsPublisher.publish({
-            type: 'caption',
-            mode: modeKey,
-            room: room,
-            interim: interim.trim(),
-            sourceLang: config.sourceLang
-          });
-        }
+      const cleanInterim = interim.trim();
+      setText('interimOutput', cleanInterim);
+
+      if (cleanInterim && wsPublisher) {
+        wsPublisher.publish({
+          type: 'caption',
+          room,
+          mode: modeKey,
+          interim: cleanInterim,
+          sourceLang: modeConfig.sourceLang
+        });
       }
     };
 
     recognition.onerror = function (event) {
       setText('statusText', 'Speech error: ' + event.error);
+      updateMicState('error', false);
     };
 
     recognition.onend = function () {
       setText('statusText', 'Stopped');
+      updateMicState('stopped', false);
     };
 
     recognition.start();
   }
 
   function stopRecognition() {
-    if (recognition) recognition.stop();
+    if (recognition) {
+      try { recognition.stop(); } catch (e) {}
+    }
+    updateMicState('stopped', false);
   }
 
   function connectSocket() {
-    wsPublisher = createWSPublisher({
-      url: window.SOTTOTITOLI_CONFIG.websocketUrl,
-      room: room,
+    wsPublisher = w.createWSPublisher({
+      url: w.SOTTOTITOLI_CONFIG.websocketUrl,
+      room,
       onStateChange: function (state) {
-        setText('socketStatus', state);
+        updateSocketState(state);
       }
     });
+
     wsPublisher.connect();
   }
 
   async function generateLessonReport() {
-    const output = $('lessonReport');
-    if (!output) return;
+    const report = await w.SottotitoliLessonReport.generateLessonReport(transcriptLines);
+    latestReportText = w.SottotitoliLessonReport.formatLessonReport(report);
+    setText('lessonReport', latestReportText);
+  }
 
-    const report = await window.SottotitoliLessonReport.generateLessonReport(transcriptBuffer.join(' '));
-    output.textContent = JSON.stringify(report, null, 2);
+  async function copyOverlayLink() {
+    const ok = await w.SottotitoliSessionUtils.copyToClipboard(currentOverlayUrl());
+    setText('statusText', ok ? 'Overlay link copied.' : 'Could not copy overlay link.');
+  }
+
+  async function copyTranscript() {
+    const text = w.SottotitoliSessionUtils.transcriptToPlainText(transcriptLines);
+    const ok = await w.SottotitoliSessionUtils.copyToClipboard(text || 'No transcript yet.');
+    setText('statusText', ok ? 'Transcript copied.' : 'Could not copy transcript.');
+  }
+
+  function downloadTranscript() {
+    const text = w.SottotitoliSessionUtils.transcriptToPlainText(transcriptLines);
+    w.SottotitoliSessionUtils.downloadText(`sottotitoli-transcript-${room}.txt`, text || 'No transcript yet.');
+    setText('statusText', 'Transcript downloaded.');
+  }
+
+  function downloadReport() {
+    w.SottotitoliSessionUtils.downloadText(`sottotitoli-lesson-report-${room}.txt`, latestReportText || 'No report yet.');
+    setText('statusText', 'Report downloaded.');
+  }
+
+  function openOverlay() {
+    window.open(currentOverlayUrl(), '_blank', 'noopener');
+  }
+
+  function newRoom() {
+    room = w.SottotitoliSessionUtils.randomRoom();
+    updateRoomUI();
+    if (wsPublisher) {
+      wsPublisher.disconnect();
+    }
+    connectSocket();
+    setText('statusText', 'New room created.');
+  }
+
+  function describeMode() {
+    const title = modeConfig.title || 'Sottotitoli Session';
+    const lesson = modeConfig.lessonMode
+      ? 'Lesson mode is active with report generation.'
+      : 'Live mode is active with overlay publishing.';
+    const translation = modeConfig.translate
+      ? 'Translation mode is enabled.'
+      : 'Captions only.';
+    setText('modeTitle', title);
+    setText('modeDescription', `${lesson} ${translation}`);
   }
 
   document.addEventListener('DOMContentLoaded', function () {
-    setText('modeTitle', config.title);
-    setText('modeMeta', config.lessonMode ? 'Lesson mode with report' : 'Live mode');
-    updateOverlayLink();
+    describeMode();
+    updateRoomUI();
     connectSocket();
+    updateStats();
 
     $('startBtn').addEventListener('click', startRecognition);
     $('stopBtn').addEventListener('click', stopRecognition);
+    $('openOverlayBtn').addEventListener('click', openOverlay);
+    $('copyOverlayBtn').addEventListener('click', copyOverlayLink);
+    $('newRoomBtn').addEventListener('click', newRoom);
+    $('copyTranscriptBtn').addEventListener('click', copyTranscript);
+    $('downloadTranscriptBtn').addEventListener('click', downloadTranscript);
 
-    if (config.lessonMode) {
+    if (modeConfig.lessonMode) {
       $('lessonActions').style.display = 'block';
       $('reportBtn').addEventListener('click', generateLessonReport);
+      $('downloadReportBtn').addEventListener('click', downloadReport);
     }
   });
 })(window);
