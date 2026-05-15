@@ -20,6 +20,9 @@
 
   let audioRecorder = null;
   let audioStream = null;
+  let audioChunks = [];
+  let lastAudioBlob = null;
+  let isRecordingAudio = false;
 
   function $(id) {
     return document.getElementById(id);
@@ -185,9 +188,7 @@
 
     restartTimer = setTimeout(() => {
       try {
-        if (recognition) {
-          recognition.start();
-        }
+        if (recognition) recognition.start();
       } catch (e) {
         setText('statusText', 'Recognition restart waiting...');
         scheduleRestart(1200);
@@ -254,6 +255,69 @@
     return rec;
   }
 
+  async function startAudioCapture() {
+    if (audioRecorder && audioRecorder.state === 'recording') return;
+
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      setText('statusText', 'Audio recording is not supported in this browser.');
+      return;
+    }
+
+    try {
+      audioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      audioChunks = [];
+      lastAudioBlob = null;
+
+      let mimeType = '';
+      if (w.MediaRecorder && MediaRecorder.isTypeSupported('audio/webm;codecs=opus')) {
+        mimeType = 'audio/webm;codecs=opus';
+      } else if (w.MediaRecorder && MediaRecorder.isTypeSupported('audio/webm')) {
+        mimeType = 'audio/webm';
+      }
+
+      audioRecorder = mimeType
+        ? new MediaRecorder(audioStream, { mimeType })
+        : new MediaRecorder(audioStream);
+
+      audioRecorder.ondataavailable = function (event) {
+        if (event.data && event.data.size > 0) {
+          audioChunks.push(event.data);
+        }
+      };
+
+      audioRecorder.onstop = function () {
+        const actualType = (audioRecorder && audioRecorder.mimeType) || 'audio/webm';
+        lastAudioBlob = new Blob(audioChunks, { type: actualType });
+        isRecordingAudio = false;
+
+        if (audioStream) {
+          audioStream.getTracks().forEach(track => track.stop());
+          audioStream = null;
+        }
+
+        setText('statusText', lastAudioBlob.size > 0
+          ? 'Lesson audio captured and ready for speaker analysis.'
+          : 'Recording stopped, but no audio was captured.');
+      };
+
+      audioRecorder.start();
+      isRecordingAudio = true;
+      setText('statusText', 'Recording lesson audio for later speaker analysis...');
+    } catch (err) {
+      setText('statusText', 'Could not start audio capture: ' + err.message);
+    }
+  }
+
+  function stopAudioCapture() {
+    if (!audioRecorder || audioRecorder.state !== 'recording') return;
+
+    try {
+      audioRecorder.stop();
+    } catch (err) {
+      setText('statusText', 'Could not stop audio recorder: ' + err.message);
+    }
+  }
+
   function startRecognition() {
     if (!SpeechRecognition) {
       setText('statusText', 'Speech recognition is not supported in this browser.');
@@ -270,6 +334,7 @@
 
     try {
       recognition.start();
+      startAudioCapture();
     } catch (e) {
       setText('statusText', 'Recognition start retrying...');
       scheduleRestart(900);
@@ -284,6 +349,7 @@
       try { recognition.stop(); } catch (e) {}
     }
 
+    stopAudioCapture();
     updateMicState('stopped', false);
     setText('statusText', 'Recognition stopped by user.');
   }
@@ -359,8 +425,72 @@
     }, 'Test message sent to room: ' + room);
   }
 
+  function formatDiarizationResult(data) {
+    if (!data) return 'No speaker analysis result returned.';
+    if (typeof data === 'string') return data;
+
+    if (Array.isArray(data.utterances) && data.utterances.length) {
+      return data.utterances.map(function (u, index) {
+        const speaker = u.speaker || u.label || ('Speaker ' + ((u.speaker_id || 0) + 1));
+        const start = u.start != null ? String(u.start) : '?';
+        const end = u.end != null ? String(u.end) : '?';
+        const text = u.text || '';
+        return `${index + 1}. ${speaker} [${start} - ${end}]\n${text}`;
+      }).join('\n\n');
+    }
+
+    if (Array.isArray(data.segments) && data.segments.length) {
+      return data.segments.map(function (s, index) {
+        const speaker = s.speaker || s.label || ('Speaker ' + ((s.speaker_id || 0) + 1));
+        const start = s.start != null ? String(s.start) : '?';
+        const end = s.end != null ? String(s.end) : '?';
+        const text = s.text || '';
+        return `${index + 1}. ${speaker} [${start} - ${end}]\n${text}`;
+      }).join('\n\n');
+    }
+
+    return JSON.stringify(data, null, 2);
+  }
+
   async function analyzeSpeakers() {
-    setText('statusText', 'Speaker analysis is not yet configured.');
+    if (isRecordingAudio) {
+      setText('statusText', 'Stop the microphone first so the lesson recording can finalize.');
+      return;
+    }
+
+    if (!lastAudioBlob || !lastAudioBlob.size) {
+      setText('statusText', 'No recorded lesson audio is available yet. Start and stop a session first.');
+      return;
+    }
+
+    setText('statusText', 'Uploading lesson audio for speaker analysis...');
+
+    try {
+      const ext = lastAudioBlob.type && lastAudioBlob.type.indexOf('ogg') !== -1 ? 'ogg' : 'webm';
+      const formData = new FormData();
+      formData.append('audio', lastAudioBlob, `lesson-${room}.${ext}`);
+      formData.append('room', room);
+      formData.append('mode', modeKey);
+      formData.append('sourceLang', modeConfig.sourceLang || '');
+
+      const response = await fetch('/api/diarize', {
+        method: 'POST',
+        body: formData
+      });
+
+      if (!response.ok) {
+        throw new Error('Diarization request failed with status ' + response.status);
+      }
+
+      const data = await response.json();
+      const diarizationText = formatDiarizationResult(data);
+
+      latestReportText = (latestReportText || 'No report yet.') + '\n\n=== Speaker Analysis ===\n' + diarizationText;
+      setText('lessonReport', latestReportText);
+      setText('statusText', 'Speaker analysis completed.');
+    } catch (err) {
+      setText('statusText', 'Speaker analysis failed: ' + err.message);
+    }
   }
 
   function describeMode() {
