@@ -14,6 +14,9 @@
   let room = params.get('room') || w.SottotitoliSessionUtils.randomRoom();
   let latestReportText = '';
   let lastInterimSent = '';
+  let shouldKeepListening = false;
+  let restartTimer = null;
+  let hasStartedOnce = false;
 
   function $(id) {
     return document.getElementById(id);
@@ -37,16 +40,14 @@
     const url = new URL(window.location.href);
     url.searchParams.set('mode', modeKey);
     url.searchParams.set('room', room);
-    if (!url.searchParams.has('v')) {
-      url.searchParams.set('v', '7');
-    }
+    if (!url.searchParams.has('v')) url.searchParams.set('v', '8');
     history.replaceState({}, '', url.toString());
   }
 
   function currentOverlayUrl() {
     const url = new URL('overlay.html', window.location.href);
     url.searchParams.set('room', room);
-    url.searchParams.set('v', '7');
+    url.searchParams.set('v', '8');
     return url.toString();
   }
 
@@ -158,40 +159,52 @@
     if (clean === lastInterimSent) return;
     lastInterimSent = clean;
 
-    const payload = {
+    sendPayload({
       type: 'caption',
       room,
       mode: modeKey,
       interim: clean,
       sourceLang: modeConfig.sourceLang,
       kind: modeConfig.translate ? 'translation' : 'caption'
-    };
-
-    sendPayload(payload, 'Interim caption sent to overlay.');
+    }, 'Interim caption sent to overlay.');
   }
 
-  function startRecognition() {
-    if (!SpeechRecognition) {
-      setText('statusText', 'Speech recognition is not supported in this browser.');
-      return;
+  function clearRestartTimer() {
+    if (restartTimer) {
+      clearTimeout(restartTimer);
+      restartTimer = null;
     }
+  }
 
-    if (recognition) {
-      try { recognition.stop(); } catch (e) {}
-      recognition = null;
-    }
+  function scheduleRestart(delay = 700) {
+    clearRestartTimer();
+    if (!shouldKeepListening) return;
 
-    recognition = new SpeechRecognition();
-    recognition.continuous = true;
-    recognition.interimResults = true;
-    recognition.lang = modeConfig.sourceLang || 'en-US';
+    restartTimer = setTimeout(() => {
+      try {
+        if (recognition) {
+          recognition.start();
+        }
+      } catch (e) {
+        setText('statusText', 'Recognition restart waiting...');
+        scheduleRestart(1200);
+      }
+    }, delay);
+  }
 
-    recognition.onstart = function () {
+  function buildRecognition() {
+    const rec = new SpeechRecognition();
+    rec.continuous = true;
+    rec.interimResults = true;
+    rec.lang = modeConfig.sourceLang || 'en-US';
+
+    rec.onstart = function () {
+      hasStartedOnce = true;
       setText('statusText', `Listening in ${modeConfig.sourceLang}...`);
       updateMicState('live', true);
     };
 
-    recognition.onresult = function (event) {
+    rec.onresult = function (event) {
       let interim = '';
 
       for (let i = event.resultIndex; i < event.results.length; i++) {
@@ -209,24 +222,67 @@
       handleInterimTranscript(interim.trim());
     };
 
-    recognition.onerror = function (event) {
-      setText('statusText', `Speech error (${modeConfig.sourceLang}): ` + event.error);
-      updateMicState('error', false);
+    rec.onerror = function (event) {
+      const err = event.error || 'unknown';
+      setText('statusText', `Speech error (${modeConfig.sourceLang}): ${err}`);
+
+      if (err === 'not-allowed' || err === 'service-not-allowed' || err === 'audio-capture') {
+        shouldKeepListening = false;
+        updateMicState('blocked', false);
+        return;
+      }
+
+      updateMicState('recovering', false);
     };
 
-    recognition.onend = function () {
-      setText('statusText', 'Recognition stopped.');
-      updateMicState('stopped', false);
+    rec.onend = function () {
+      updateMicState(shouldKeepListening ? 'restarting' : 'stopped', false);
+
+      if (shouldKeepListening) {
+        setText('statusText', hasStartedOnce
+          ? 'Recognition ended, restarting...'
+          : 'Recognition did not stay active, retrying...');
+        scheduleRestart();
+      } else {
+        setText('statusText', 'Recognition stopped.');
+      }
     };
 
-    recognition.start();
+    return rec;
+  }
+
+  function startRecognition() {
+    if (!SpeechRecognition) {
+      setText('statusText', 'Speech recognition is not supported in this browser.');
+      return;
+    }
+
+    clearRestartTimer();
+    shouldKeepListening = true;
+    hasStartedOnce = false;
+
+    if (!recognition) {
+      recognition = buildRecognition();
+    }
+
+    try {
+      recognition.start();
+    } catch (e) {
+      setText('statusText', 'Recognition start retrying...');
+      scheduleRestart(900);
+    }
   }
 
   function stopRecognition() {
+    shouldKeepListening = false;
+    clearRestartTimer();
+
     if (recognition) {
       try { recognition.stop(); } catch (e) {}
     }
+
     updateMicState('stopped', false);
+    setText('statusText', 'Recognition stopped by user.');
   }
 
   function connectSocket() {
@@ -286,7 +342,7 @@
   }
 
   function sendTestMessage() {
-    const payload = {
+    sendPayload({
       type: 'caption',
       room,
       mode: modeKey,
@@ -297,9 +353,7 @@
       timestamp: new Date().toISOString(),
       sourceLang: modeConfig.sourceLang,
       kind: modeConfig.translate ? 'translation' : 'caption'
-    };
-
-    sendPayload(payload, 'Test message sent to room: ' + room);
+    }, 'Test message sent to room: ' + room);
   }
 
   function describeMode() {
