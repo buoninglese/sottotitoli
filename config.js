@@ -5,6 +5,9 @@ window.SOTTOTITOLI_CONFIG = {
     provider: "mymemory",
     myMemoryBase: "https://api.mymemory.translated.net/get"
   },
+  analysis: {
+    speakerEndpoint: "https://sottotitoli-websocket.onrender.com/analyze-speakers"
+  },
   modes: {
     "caption-en": {
       title: "Live Caption English",
