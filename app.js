@@ -4,7 +4,10 @@
   const params = new URLSearchParams(window.location.search);
   const modeKey = params.get('mode') || 'caption-en';
   const configRoot = w.SOTTOTITOLI_CONFIG || {};
-  const modeConfig = (configRoot.modes && configRoot.modes[modeKey]) || configRoot.modes['caption-en'];
+  const modeConfig =
+    (configRoot.modes && configRoot.modes[modeKey]) ||
+    (configRoot.modes && configRoot.modes['caption-en']) ||
+    {};
 
   const SpeechRecognition = w.SpeechRecognition || w.webkitSpeechRecognition;
   const DIARIZE_URL = 'https://sottotitoli-websocket.onrender.com/analyze-speakers';
@@ -13,7 +16,9 @@
   let recognition = null;
   let wsPublisher = null;
   let transcriptLines = [];
-  let room = params.get('room') || w.SottotitoliSessionUtils.randomRoom();
+  let room =
+    params.get('room') ||
+    (w.SottotitoliSessionUtils ? w.SottotitoliSessionUtils.randomRoom() : 'room-demo');
   let latestReportText = '';
   let lastInterimSent = '';
   let shouldKeepListening = false;
@@ -39,8 +44,25 @@
     if (el) el.textContent = text;
   }
 
+  function clearBox(id, placeholder) {
+    const el = $(id);
+    if (!el) return;
+    el.textContent = placeholder || '';
+    el.dataset.placeholderActive = 'true';
+  }
+
+  function ensureBoxReady(id) {
+    const el = $(id);
+    if (!el) return null;
+    if (el.dataset.placeholderActive === 'true') {
+      el.textContent = '';
+      el.dataset.placeholderActive = 'false';
+    }
+    return el;
+  }
+
   function appendLine(targetId, text) {
-    const box = $(targetId);
+    const box = ensureBoxReady(targetId);
     if (!box || !text) return;
     const div = document.createElement('div');
     div.className = 'line';
@@ -98,7 +120,7 @@
   function updateAnalyzeButtonState() {
     if (!analyzeBtnRef) return;
 
-    analyzeBtnRef.className = 'btn';
+    analyzeBtnRef.className = 'btn btn-primary';
     analyzeBtnRef.style.opacity = '';
     analyzeBtnRef.style.cursor = '';
     analyzeBtnRef.style.background = '';
@@ -164,7 +186,6 @@
       setText('statusText', 'No websocket publisher available.');
       return;
     }
-
     wsPublisher.publish(payload);
     if (statusMessage) setText('statusText', statusMessage);
   }
@@ -173,11 +194,7 @@
     if (!text) return;
 
     const timestamp = w.SottotitoliSessionUtils.formatTimestamp(new Date());
-    const entry = {
-      timestamp,
-      text,
-      translated: null
-    };
+    const entry = { timestamp, text, translated: null };
 
     appendLine('sourceOutput', text);
 
@@ -198,33 +215,45 @@
         appendLine('translatedOutput', translated);
         payload.translated = translated;
         payload.targetLang = modeConfig.targetLang;
+      } else {
+        payload.translated = '';
       }
-    } else {
-      payload.translated = '';
     }
 
     transcriptLines.push(entry);
     updateStats();
     lastInterimSent = '';
+    clearBox('interimOutput', 'Interim');
     sendPayload(payload, 'Final caption sent to overlay.');
   }
 
   function handleInterimTranscript(text) {
     const clean = (text || '').trim();
-    setText('interimOutput', clean);
+    const interimBox = $('interimOutput');
+    if (!interimBox) return;
 
-    if (!clean) return;
+    if (!clean) {
+      clearBox('interimOutput', 'Interim');
+      return;
+    }
+
+    interimBox.textContent = clean;
+    interimBox.dataset.placeholderActive = 'false';
+
     if (clean === lastInterimSent) return;
     lastInterimSent = clean;
 
-    sendPayload({
-      type: 'caption',
-      room,
-      mode: modeKey,
-      interim: clean,
-      sourceLang: modeConfig.sourceLang,
-      kind: modeConfig.translate ? 'translation' : 'caption'
-    }, 'Interim caption sent to overlay.');
+    sendPayload(
+      {
+        type: 'caption',
+        room,
+        mode: modeKey,
+        interim: clean,
+        sourceLang: modeConfig.sourceLang,
+        kind: modeConfig.translate ? 'translation' : 'caption'
+      },
+      'Interim caption sent to overlay.'
+    );
   }
 
   function clearRestartTimer() {
@@ -234,7 +263,7 @@
     }
   }
 
-  function scheduleRestart(delay = 700) {
+  function scheduleRestart(delay) {
     clearRestartTimer();
     if (!shouldKeepListening) return;
 
@@ -245,7 +274,7 @@
         setText('statusText', 'Recognition restart waiting...');
         scheduleRestart(1200);
       }
-    }, delay);
+    }, delay || 700);
   }
 
   function buildRecognition() {
@@ -254,21 +283,21 @@
     rec.interimResults = true;
     rec.lang = modeConfig.sourceLang || 'en-US';
 
-    rec.onstart = function () {
+    rec.onstart = () => {
       hasStartedOnce = true;
-      setText('statusText', `Listening in ${modeConfig.sourceLang}...`);
+      setText('statusText', 'Listening in ' + (modeConfig.sourceLang || 'en-US') + '...');
       updateMicState('live', true);
     };
 
-    rec.onresult = function (event) {
+    rec.onresult = event => {
       let interim = '';
 
       for (let i = event.resultIndex; i < event.results.length; i++) {
-        const text = (event.results[i][0] && event.results[i][0].transcript || '').trim();
+        const text =
+          (event.results[i][0] && event.results[i][0].transcript || '').trim();
         if (!text) continue;
 
         if (event.results[i].isFinal) {
-          setText('interimOutput', '');
           handleFinalTranscript(text);
         } else {
           interim += ' ' + text;
@@ -278,11 +307,18 @@
       handleInterimTranscript(interim.trim());
     };
 
-    rec.onerror = function (event) {
+    rec.onerror = event => {
       const err = event.error || 'unknown';
-      setText('statusText', `Speech error (${modeConfig.sourceLang}): ${err}`);
+      setText(
+        'statusText',
+        'Speech error (' + (modeConfig.sourceLang || 'en-US') + '): ' + err
+      );
 
-      if (err === 'not-allowed' || err === 'service-not-allowed' || err === 'audio-capture') {
+      if (
+        err === 'not-allowed' ||
+        err === 'service-not-allowed' ||
+        err === 'audio-capture'
+      ) {
         shouldKeepListening = false;
         updateMicState('blocked', false);
         return;
@@ -291,13 +327,16 @@
       updateMicState('recovering', false);
     };
 
-    rec.onend = function () {
+    rec.onend = () => {
       updateMicState(shouldKeepListening ? 'restarting' : 'stopped', false);
 
       if (shouldKeepListening) {
-        setText('statusText', hasStartedOnce
-          ? 'Recognition ended, restarting...'
-          : 'Recognition did not stay active, retrying...');
+        setText(
+          'statusText',
+          hasStartedOnce
+            ? 'Recognition ended, restarting...'
+            : 'Recognition did not stay active, retrying...'
+        );
         scheduleRestart();
       } else {
         setText('statusText', 'Recognition stopped.');
@@ -311,7 +350,10 @@
     if (audioRecorder && audioRecorder.state === 'recording') return;
 
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-      setText('statusText', 'Audio recording is not supported in this browser.');
+      setText(
+        'statusText',
+        'Audio recording is not supported in this browser.'
+      );
       return;
     }
 
@@ -334,14 +376,15 @@
         ? new MediaRecorder(audioStream, { mimeType })
         : new MediaRecorder(audioStream);
 
-      audioRecorder.ondataavailable = function (event) {
+      audioRecorder.ondataavailable = event => {
         if (event.data && event.data.size > 0) {
           audioChunks.push(event.data);
         }
       };
 
-      audioRecorder.onstop = function () {
-        const actualType = (audioRecorder && audioRecorder.mimeType) || 'audio/webm';
+      audioRecorder.onstop = () => {
+        const actualType =
+          (audioRecorder && audioRecorder.mimeType) || 'audio/webm';
         lastAudioBlob = new Blob(audioChunks, { type: actualType });
         isRecordingAudio = false;
 
@@ -350,14 +393,20 @@
           audioStream = null;
         }
 
-        setText('statusText', lastAudioBlob.size > 0
-          ? 'Lesson audio captured and ready for speaker analysis.'
-          : 'Recording stopped, but no audio was captured.');
+        setText(
+          'statusText',
+          lastAudioBlob.size > 0
+            ? 'Lesson audio captured and ready for speaker analysis.'
+            : 'Recording stopped, but no audio was captured.'
+        );
       };
 
       audioRecorder.start();
       isRecordingAudio = true;
-      setText('statusText', 'Recording lesson audio for later speaker analysis...');
+      setText(
+        'statusText',
+        'Recording lesson audio for later speaker analysis...'
+      );
     } catch (err) {
       setText('statusText', 'Could not start audio capture: ' + err.message);
     }
@@ -365,17 +414,22 @@
 
   function stopAudioCapture() {
     if (!audioRecorder || audioRecorder.state !== 'recording') return;
-
     try {
       audioRecorder.stop();
     } catch (err) {
-      setText('statusText', 'Could not stop audio recorder: ' + err.message);
+      setText(
+        'statusText',
+        'Could not stop audio recorder: ' + err.message
+      );
     }
   }
 
   function startRecognition() {
     if (!SpeechRecognition) {
-      setText('statusText', 'Speech recognition is not supported in this browser.');
+      setText(
+        'statusText',
+        'Speech recognition is not supported in this browser.'
+      );
       return;
     }
 
@@ -401,7 +455,9 @@
     clearRestartTimer();
 
     if (recognition) {
-      try { recognition.stop(); } catch (e) {}
+      try {
+        recognition.stop();
+      } catch (e) {}
     }
 
     stopAudioCapture();
@@ -413,11 +469,14 @@
     wsPublisher = w.createWSPublisher({
       url: w.SOTTOTITOLI_CONFIG.websocketUrl,
       room,
-      onStateChange: function (state) {
+      onStateChange: state => {
         updateSocketState(state);
-        setText('statusText', 'Socket state: ' + state + ' · room: ' + room);
+        setText(
+          'statusText',
+          'Socket state: ' + state + ' · room: ' + room
+        );
       },
-      onError: function (error) {
+      onError: error => {
         setText('statusText', 'Socket error: ' + error);
       }
     });
@@ -426,31 +485,52 @@
   }
 
   async function generateLessonReport() {
-    const report = await w.SottotitoliLessonReport.generateLessonReport(transcriptLines);
-    latestReportText = w.SottotitoliLessonReport.formatLessonReport(report);
+    const report = await w.SottotitoliLessonReport.generateLessonReport(
+      transcriptLines
+    );
+    latestReportText =
+      w.SottotitoliLessonReport.formatLessonReport(report);
     latestReportText = removeExistingSpeakerAnalysis(latestReportText);
     setText('lessonReport', latestReportText || 'No report yet.');
   }
 
   async function copyOverlayLink() {
-    const ok = await w.SottotitoliSessionUtils.copyToClipboard(currentOverlayUrl());
-    setText('statusText', ok ? 'Overlay link copied.' : 'Could not copy overlay link.');
+    const ok = await w.SottotitoliSessionUtils.copyToClipboard(
+      currentOverlayUrl()
+    );
+    setText(
+      'statusText',
+      ok ? 'Overlay link copied.' : 'Could not copy overlay link.'
+    );
   }
 
   async function copyTranscript() {
-    const text = w.SottotitoliSessionUtils.transcriptToPlainText(transcriptLines);
-    const ok = await w.SottotitoliSessionUtils.copyToClipboard(text || 'No transcript yet.');
-    setText('statusText', ok ? 'Transcript copied.' : 'Could not copy transcript.');
+    const text =
+      w.SottotitoliSessionUtils.transcriptToPlainText(transcriptLines);
+    const ok = await w.SottotitoliSessionUtils.copyToClipboard(
+      text || 'No transcript yet.'
+    );
+    setText(
+      'statusText',
+      ok ? 'Transcript copied.' : 'Could not copy transcript.'
+    );
   }
 
   function downloadTranscript() {
-    const text = w.SottotitoliSessionUtils.transcriptToPlainText(transcriptLines);
-    w.SottotitoliSessionUtils.downloadText(`sottotitoli-transcript-${room}.txt`, text || 'No transcript yet.');
+    const text =
+      w.SottotitoliSessionUtils.transcriptToPlainText(transcriptLines);
+    w.SottotitoliSessionUtils.downloadText(
+      `sottotitoli-transcript-${room}.txt`,
+      text || 'No transcript yet.'
+    );
     setText('statusText', 'Transcript downloaded.');
   }
 
   function downloadReport() {
-    w.SottotitoliSessionUtils.downloadText(`sottotitoli-lesson-report-${room}.txt`, latestReportText || 'No report yet.');
+    w.SottotitoliSessionUtils.downloadText(
+      `sottotitoli-lesson-report-${room}.txt`,
+      latestReportText || 'No report yet.'
+    );
     setText('statusText', 'Report downloaded.');
   }
 
@@ -469,9 +549,9 @@
     speakerAnalysisCompleted = false;
     updateAnalyzeButtonState();
 
-    setText('interimOutput', '');
-    setText('sourceOutput', '');
-    setText('translatedOutput', '');
+    clearBox('interimOutput', 'Interim');
+    clearBox('sourceOutput', 'Source output');
+    clearBox('translatedOutput', 'Translated output');
     setText('lessonReport', 'No report yet.');
     updateStats();
 
@@ -482,23 +562,30 @@
   }
 
   function sendTestMessage() {
-    sendPayload({
-      type: 'caption',
-      room,
-      mode: modeKey,
-      final: modeConfig.sourceLang === 'it-IT' ? 'Questo è un test.' : 'This is a test.',
-      translated: modeConfig.translate
-        ? (modeConfig.targetLang === 'it' ? 'Questo è un test.' : 'This is a test.')
-        : '',
-      timestamp: new Date().toISOString(),
-      sourceLang: modeConfig.sourceLang,
-      kind: modeConfig.translate ? 'translation' : 'caption'
-    }, 'Test message sent to room: ' + room);
+    sendPayload(
+      {
+        type: 'caption',
+        room,
+        mode: modeKey,
+        final:
+          modeConfig.sourceLang === 'it-IT'
+            ? 'Questo è un test.'
+            : 'This is a test.',
+        translated: modeConfig.translate
+          ? modeConfig.targetLang === 'it'
+            ? 'Questo è un test.'
+            : 'This is a test.'
+          : '',
+        timestamp: new Date().toISOString(),
+        sourceLang: modeConfig.sourceLang,
+        kind: modeConfig.translate ? 'translation' : 'caption'
+      },
+      'Test message sent to room: ' + room
+    );
   }
 
   function formatDiarizationResult(data) {
     if (!data) return 'No speaker analysis result returned.';
-
     const lines = [];
 
     if (typeof data.text === 'string' && data.text.trim()) {
@@ -511,37 +598,42 @@
       lines.push('Speaker summary');
 
       if (Array.isArray(data.analytics.speakers) && data.analytics.speakers.length) {
-        data.analytics.speakers.forEach(function (speaker, index) {
-          const share = speaker.shareOfTime != null
-            ? Math.round(Number(speaker.shareOfTime) * 100)
-            : 0;
-
+        data.analytics.speakers.forEach((speaker, index) => {
+          const share =
+            speaker.shareOfTime != null
+              ? Math.round(Number(speaker.shareOfTime) * 100)
+              : 0;
           lines.push(
-            `${index + 1}. ${speaker.speaker}: turns ${speaker.turns}, words ${speaker.words}, duration ${Number(speaker.duration || 0).toFixed(1)}s, share ${share}%`
+            `${index + 1}. ${speaker.speaker}: turns ${speaker.turns}, words ${
+              speaker.words
+            }, duration ${Number(speaker.duration || 0).toFixed(
+              1
+            )}s, share ${share}%`
           );
         });
       }
 
       if (data.analytics.interruptions != null) {
         lines.push('');
-        lines.push(`Interruptions: ${data.analytics.interruptions}`);
+        lines.push('Interruptions: ' + data.analytics.interruptions);
       }
 
       if (data.analytics.totalDuration != null) {
-        lines.push(`Total duration: ${Number(data.analytics.totalDuration).toFixed(1)}s`);
+        lines.push(
+          'Total duration: ' + Number(data.analytics.totalDuration).toFixed(1) + 's'
+        );
       }
 
       lines.push('');
     }
 
     const segments = Array.isArray(data.segments) ? data.segments : [];
-
     if (segments.length) {
       lines.push('Segments');
-
-      segments.forEach(function (seg, index) {
+      segments.forEach((seg, index) => {
         const speaker = seg.speaker || 'Unknown speaker';
-        const start = seg.start != null ? Number(seg.start).toFixed(1) : '?';
+        const start =
+          seg.start != null ? Number(seg.start).toFixed(1) : '?';
         const end = seg.end != null ? Number(seg.end).toFixed(1) : '?';
         const text = (seg.text || '').trim();
         lines.push(`${index + 1}. ${speaker} [${start}s - ${end}s]`);
@@ -555,7 +647,10 @@
 
   async function analyzeSpeakers() {
     if (speakerAnalysisCompleted) {
-      setText('statusText', 'Speaker analysis has already been completed for this session.');
+      setText(
+        'statusText',
+        'Speaker analysis has already been completed for this session.'
+      );
       return;
     }
 
@@ -565,12 +660,18 @@
     }
 
     if (isRecordingAudio) {
-      setText('statusText', 'Stop the microphone first so the lesson recording can finish.');
+      setText(
+        'statusText',
+        'Stop the microphone first so the lesson recording can finish.'
+      );
       return;
     }
 
     if (!lastAudioBlob || !lastAudioBlob.size) {
-      setText('statusText', 'No recorded lesson audio is available yet. Start and stop a session first.');
+      setText(
+        'statusText',
+        'No recorded lesson audio is available yet. Start and stop a session first.'
+      );
       return;
     }
 
@@ -579,7 +680,10 @@
     setText('statusText', 'Uploading lesson audio for speaker analysis...');
 
     try {
-      const ext = lastAudioBlob.type && lastAudioBlob.type.indexOf('ogg') !== -1 ? 'ogg' : 'webm';
+      const ext =
+        lastAudioBlob.type && lastAudioBlob.type.indexOf('ogg') !== -1
+          ? 'ogg'
+          : 'webm';
       const formData = new FormData();
       formData.append('file', lastAudioBlob, `lesson-${room}.${ext}`);
       formData.append('room', room);
@@ -593,19 +697,22 @@
 
       if (!response.ok) {
         const errorText = await response.text();
-        throw new Error(errorText || ('Speaker analysis failed with status ' + response.status));
+        throw new Error(
+          errorText || 'Speaker analysis failed with status ' + response.status
+        );
       }
 
       const data = await response.json();
       const diarizationText = formatDiarizationResult(data);
 
       let baseReport = removeExistingSpeakerAnalysis(latestReportText);
-
       if (!baseReport || baseReport === 'No report yet.') {
-        baseReport = '=== Lesson Report ===\n\nNo written lesson report generated yet.';
+        baseReport =
+          '=== Lesson Report ===\n\nNo written lesson report generated yet.';
       }
 
-      latestReportText = baseReport + '\n\n' + SPEAKER_ANALYSIS_MARKER + '\n' + diarizationText;
+      latestReportText =
+        baseReport + '\n\n' + SPEAKER_ANALYSIS_MARKER + '\n' + diarizationText;
       setText('lessonReport', latestReportText);
 
       speakerAnalysisCompleted = true;
@@ -627,14 +734,18 @@
       ? 'Translation mode is enabled.'
       : 'Caption mode is enabled.';
     setText('modeTitle', title);
-    setText('modeDescription', `${lesson} ${translation}`);
+    setText('modeDescription', lesson + ' ' + translation);
   }
 
-  document.addEventListener('DOMContentLoaded', function () {
+  document.addEventListener('DOMContentLoaded', () => {
     describeMode();
     updateRoomUI();
     connectSocket();
     updateStats();
+
+    clearBox('interimOutput', 'Interim');
+    clearBox('sourceOutput', 'Source output');
+    clearBox('translatedOutput', 'Translated output');
 
     $('startBtn').addEventListener('click', startRecognition);
     $('stopBtn').addEventListener('click', stopRecognition);
@@ -645,7 +756,7 @@
     $('downloadTranscriptBtn').addEventListener('click', downloadTranscript);
 
     const extraBtn = document.createElement('button');
-    extraBtn.className = 'btn ghost';
+    extraBtn.className = 'btn btn-default';
     extraBtn.textContent = 'Send test message';
     extraBtn.addEventListener('click', sendTestMessage);
     $('startBtn').parentNode.appendChild(extraBtn);
@@ -656,10 +767,12 @@
       $('downloadReportBtn').addEventListener('click', downloadReport);
 
       analyzeBtnRef = document.createElement('button');
-      analyzeBtnRef.className = 'btn';
+      analyzeBtnRef.className = 'btn btn-primary';
       analyzeBtnRef.textContent = 'Analyze speakers';
       analyzeBtnRef.addEventListener('click', analyzeSpeakers);
-      $('lessonActions').appendChild(analyzeBtnRef);
+      $('lessonActions')
+        .querySelector('.studio-toolbar')
+        .appendChild(analyzeBtnRef);
       updateAnalyzeButtonState();
     }
   });
