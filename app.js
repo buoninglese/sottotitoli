@@ -52,14 +52,14 @@
     const url = new URL(window.location.href);
     url.searchParams.set('mode', modeKey);
     url.searchParams.set('room', room);
-    url.searchParams.set('v', '10');
+    url.searchParams.set('v', '11');
     history.replaceState({}, '', url.toString());
   }
 
   function currentOverlayUrl() {
     const url = new URL('overlay.html', window.location.href);
     url.searchParams.set('room', room);
-    url.searchParams.set('v', '10');
+    url.searchParams.set('v', '11');
     return url.toString();
   }
 
@@ -98,14 +98,20 @@
   function updateAnalyzeButtonState() {
     if (!analyzeBtnRef) return;
 
+    analyzeBtnRef.className = 'btn';
+    analyzeBtnRef.style.opacity = '';
+    analyzeBtnRef.style.cursor = '';
+    analyzeBtnRef.style.background = '';
+    analyzeBtnRef.style.border = '';
+    analyzeBtnRef.style.color = '';
+
     if (speakerAnalysisCompleted) {
       analyzeBtnRef.disabled = true;
       analyzeBtnRef.textContent = 'Speaker analysis completed';
-      analyzeBtnRef.classList.remove('btn');
-      analyzeBtnRef.classList.remove('ghost');
-      analyzeBtnRef.classList.add('btn');
-      analyzeBtnRef.classList.add('secondary');
-      analyzeBtnRef.style.opacity = '0.75';
+      analyzeBtnRef.style.background = '#16a34a';
+      analyzeBtnRef.style.border = '1px solid #16a34a';
+      analyzeBtnRef.style.color = '#ffffff';
+      analyzeBtnRef.style.opacity = '1';
       analyzeBtnRef.style.cursor = 'not-allowed';
       return;
     }
@@ -113,15 +119,19 @@
     if (isAnalyzingSpeakers) {
       analyzeBtnRef.disabled = true;
       analyzeBtnRef.textContent = 'Analyzing speakers...';
-      analyzeBtnRef.style.opacity = '0.75';
+      analyzeBtnRef.style.background = '#d97706';
+      analyzeBtnRef.style.border = '1px solid #d97706';
+      analyzeBtnRef.style.color = '#ffffff';
+      analyzeBtnRef.style.opacity = '1';
       analyzeBtnRef.style.cursor = 'progress';
       return;
     }
 
     analyzeBtnRef.disabled = false;
     analyzeBtnRef.textContent = 'Analyze speakers';
-    analyzeBtnRef.style.opacity = '';
-    analyzeBtnRef.style.cursor = '';
+    analyzeBtnRef.style.background = '#2563eb';
+    analyzeBtnRef.style.border = '1px solid #2563eb';
+    analyzeBtnRef.style.color = '#ffffff';
   }
 
   function removeExistingSpeakerAnalysis(reportText) {
@@ -310,6 +320,7 @@
       audioChunks = [];
       lastAudioBlob = null;
       speakerAnalysisCompleted = false;
+      isAnalyzingSpeakers = false;
       updateAnalyzeButtonState();
 
       let mimeType = '';
@@ -645,7 +656,7 @@
       $('downloadReportBtn').addEventListener('click', downloadReport);
 
       analyzeBtnRef = document.createElement('button');
-      analyzeBtnRef.className = 'btn ghost';
+      analyzeBtnRef.className = 'btn';
       analyzeBtnRef.textContent = 'Analyze speakers';
       analyzeBtnRef.addEventListener('click', analyzeSpeakers);
       $('lessonActions').appendChild(analyzeBtnRef);
