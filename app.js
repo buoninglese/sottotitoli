@@ -1,13 +1,5 @@
 (function (w) {
   'use strict';
-
-  const params = new URLSearchParams(window.location.search);
-  const modeKey = params.get('mode') || 'caption-en';
-  const configRoot = w.SOTTOTITOLI_CONFIG || {};
-  const modeConfig =
-    (configRoot.modes && configRoot.modes[modeKey]) ||
-    (configRoot.modes && configRoot.modes['caption-en']) ||
-    {};
 var LANGUAGES = [
   { code: "en", label: "English",  stt: "en-US" },
   { code: "it", label: "Italian",  stt: "it-IT" },
@@ -15,6 +7,43 @@ var LANGUAGES = [
   { code: "de", label: "German",   stt: "de-DE" }
   // add more if you want
 ];
+  const params = new URLSearchParams(window.location.search);
+  function populateLanguageSelectsFromMode() {
+  var srcSelect = document.getElementById("sourceLangSelect");
+  var tgtSelect = document.getElementById("targetLangSelect");
+  if (!srcSelect || !tgtSelect) return;
+
+  srcSelect.innerHTML = "";
+  tgtSelect.innerHTML = "";
+
+  LANGUAGES.forEach(function (lang) {
+    var opt1 = document.createElement("option");
+    opt1.value = lang.code;
+    opt1.textContent = lang.label;
+    srcSelect.appendChild(opt1);
+
+    var opt2 = document.createElement("option");
+    opt2.value = lang.code;
+    opt2.textContent = lang.label;
+    tgtSelect.appendChild(opt2);
+  });
+
+  var parts = (modeKey || "").split("-");
+  if (parts[0] === "caption") {
+    srcSelect.value = parts[1] || "en";
+    tgtSelect.value = srcSelect.value;
+  } else if (parts[0] === "translate") {
+    srcSelect.value = parts[1] || "en";
+    tgtSelect.value = parts[2] || "it";
+  }
+}
+  const modeKey = params.get('mode') || 'caption-en';
+  const configRoot = w.SOTTOTITOLI_CONFIG || {};
+  const modeConfig =
+    (configRoot.modes && configRoot.modes[modeKey]) ||
+    (configRoot.modes && configRoot.modes['caption-en']) ||
+    {};
+
   const SpeechRecognition = w.SpeechRecognition || w.webkitSpeechRecognition;
   const DIARIZE_URL = 'https://sottotitoli-websocket.onrender.com/analyze-speakers';
   const SPEAKER_ANALYSIS_MARKER = '=== Speaker Analysis ===';
