@@ -55,7 +55,6 @@ document.addEventListener('DOMContentLoaded', () => {
     if (logoutBtn) {
       logoutBtn.addEventListener('click', async () => {
         await supabase.auth.signOut();
-        // After sign-out, show the login button again
         renderSignedOut();
       });
     }
@@ -63,20 +62,30 @@ document.addEventListener('DOMContentLoaded', () => {
     const profileBtn = document.getElementById('profileBtn');
     if (profileBtn) {
       profileBtn.addEventListener('click', () => {
-        // For now, just show an alert.
-        // Later we can navigate to /account.html or similar.
         alert('Profile page is not implemented yet.');
       });
     }
   }
 
-  // Check current auth state
-  supabase.auth.getUser().then(({ data, error }) => {
+  async function initAuthUI() {
+    // Let Supabase hydrate session from URL / storage
+    const { data: sessionData, error: sessionError } =
+      await supabase.auth.getSession();
+
+    if (sessionError) {
+      console.error('getSession error', sessionError);
+    } else {
+      console.log('Session data', sessionData);
+    }
+
+    // Now safely ask for the user
+    const { data, error } = await supabase.auth.getUser();
     if (error) {
       console.error('getUser error', error);
       renderSignedOut();
       return;
     }
+
     const user = data?.user;
     if (user) {
       console.log('Logged in as', user.email);
@@ -85,5 +94,7 @@ document.addEventListener('DOMContentLoaded', () => {
       console.log('No Supabase user logged in');
       renderSignedOut();
     }
-  });
+  }
+
+  initAuthUI();
 });
