@@ -835,7 +835,15 @@ function updateModeFromUI() {
   describeMode();
   syncUrl();
 }
+function goToSelectedModePage() {
+  var mode = getCurrentModeKeyFromSelects();
+  if (!mode) return;
 
+  var url = new URL(window.location.href);
+  url.searchParams.set('mode', mode);
+  // keep room if present
+  window.location.href = url.toString();
+}
 document.addEventListener('DOMContentLoaded', () => {
   populateLanguageSelectsFromMode();
   describeMode();
@@ -864,7 +872,12 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     });
   }
-
+ var applyBtn = document.getElementById('applyLangModeBtn');
+  if (applyBtn) {
+    applyBtn.addEventListener('click', () => {
+      goToSelectedModePage();
+    });
+  }
   startBtn.addEventListener('click', startRecognition);
   stopBtn.addEventListener('click', stopRecognition);
   openOverlayBtn.addEventListener('click', openOverlay);
