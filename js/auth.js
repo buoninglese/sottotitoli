@@ -11,7 +11,7 @@ async function signInWithGoogle() {
   const { error } = await supabase.auth.signInWithOAuth({
     provider: 'google',
     options: {
-      redirectTo: 'https://buoninglese.github.io/studio.html' // or your local URL while testing
+      redirectTo: 'https://buoninglese.github.io/sottotitoli/index.html' // or your local URL while testing
     }
   });
   if (error) {
