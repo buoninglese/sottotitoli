@@ -77,7 +77,14 @@
     url.searchParams.set('v', '11');
     history.replaceState({}, '', url.toString());
   }
-
+function switchMode(newModeKey) {
+  const url = new URL(window.location.href);
+  url.searchParams.set('mode', newModeKey);
+  // preserve current room so overlay stays in sync
+  url.searchParams.set('room', room);
+  url.searchParams.set('v', '11');
+  window.location.href = url.toString();
+}
   function currentOverlayUrl() {
     const url = new URL('overlay.html', window.location.href);
     url.searchParams.set('room', room);
@@ -754,6 +761,26 @@
     $('newRoomBtn').addEventListener('click', newRoom);
     $('copyTranscriptBtn').addEventListener('click', copyTranscript);
     $('downloadTranscriptBtn').addEventListener('click', downloadTranscript);
+
+       const langToolbar = $('languageToolbar');
+    if (langToolbar) {
+      langToolbar.addEventListener('click', (evt) => {
+        const btn = evt.target.closest('button[data-mode]');
+        if (!btn) return;
+        const newMode = btn.getAttribute('data-mode');
+        if (!newMode) return;
+        switchMode(newMode);
+      });
+
+      // Highlight the active mode button
+      const activeBtn = langToolbar.querySelector(
+        `button[data-mode="${modeKey}"]`
+      );
+      if (activeBtn) {
+        activeBtn.classList.remove('btn-default');
+        activeBtn.classList.add('btn-primary');
+      }
+    } 
 
     const extraBtn = document.createElement('button');
     extraBtn.className = 'btn btn-default';
