@@ -68,7 +68,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   async function initAuthUI() {
-    // Let Supabase hydrate session from URL / storage
+    // 1) Let Supabase initialize session from URL / storage
     const { data: sessionData, error: sessionError } =
       await supabase.auth.getSession();
 
@@ -78,7 +78,7 @@ document.addEventListener('DOMContentLoaded', () => {
       console.log('Session data', sessionData);
     }
 
-    // Now safely ask for the user
+    // 2) Now ask for the user
     const { data, error } = await supabase.auth.getUser();
     if (error) {
       console.error('getUser error', error);
