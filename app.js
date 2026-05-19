@@ -781,37 +781,6 @@ function switchMode(newModeKey) {
     setText('modeTitle', title);
     setText('modeDescription', lesson + ' ' + translation);
   }
-function populateLanguageSelectsFromMode() {
-  var srcSelect = document.getElementById("sourceLangSelect");
-  var tgtSelect = document.getElementById("targetLangSelect");
-  if (!srcSelect || !tgtSelect) return;
-
-  srcSelect.innerHTML = "";
-  tgtSelect.innerHTML = "";
-
-  LANGUAGES.forEach(function (lang) {
-    var opt1 = document.createElement("option");
-    opt1.value = lang.code;
-    opt1.textContent = lang.label;
-    srcSelect.appendChild(opt1);
-
-    var opt2 = document.createElement("option");
-    opt2.value = lang.code;
-    opt2.textContent = lang.label;
-    tgtSelect.appendChild(opt2);
-  });
-
-  // default from URL mode (caption / translate)
-  // caption-en, translate-en-it, etc.
-  var parts = modeKey.split("-");
-  if (parts[0] === "caption") {
-    srcSelect.value = parts[1] || "en";
-    tgtSelect.value = srcSelect.value;
-  } else if (parts[0] === "translate") {
-    srcSelect.value = parts[1] || "en";
-    tgtSelect.value = parts[2] || "it";
-  }
-}
 
 function getCurrentModeKeyFromSelects() {
   var srcSelect = document.getElementById("sourceLangSelect");
