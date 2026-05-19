@@ -8,12 +8,14 @@ const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 // 2) Sign-in function used by the button
 async function signInWithGoogle() {
-  const { error } = await supabase.auth.signInWithOAuth({
+  console.log('Sign in with Google clicked');
+  const { data, error } = await supabase.auth.signInWithOAuth({
     provider: 'google',
     options: {
-      redirectTo: 'https://buoninglese.github.io/sottotitoli/index.html' // or your local URL while testing
+      redirectTo: 'https://buoninglese.github.io/sottotitoli/index.html'
     }
   });
+  console.log('signInWithOAuth result', { data, error });
   if (error) {
     console.error('Google sign-in error:', error.message);
     alert('Could not sign in with Google: ' + error.message);
