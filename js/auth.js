@@ -22,25 +22,68 @@ async function signInWithGoogle() {
   }
 }
 
-// 3) Wire the header button once DOM is ready
 document.addEventListener('DOMContentLoaded', () => {
-  const btn = document.getElementById('googleLoginBtn');
-  if (btn) {
-    btn.addEventListener('click', signInWithGoogle);
+  const authSection = document.getElementById('authSection');
+
+  function renderSignedOut() {
+    if (!authSection) return;
+    authSection.innerHTML = `
+      <button id="googleLoginBtn" class="btn btn-default navbar-btn" type="button">
+        Sign in with Google
+      </button>
+    `;
+    const btn = document.getElementById('googleLoginBtn');
+    if (btn) {
+      btn.addEventListener('click', signInWithGoogle);
+    }
   }
 
-  // OPTIONAL: quick test to see if user is already logged in
+  function renderSignedIn(user) {
+    if (!authSection) return;
+    const email = user.email || 'Account';
+    authSection.innerHTML = `
+      <span style="margin-right:12px;">Signed in as <strong>${email}</strong></span>
+      <button id="profileBtn" class="btn btn-default navbar-btn" type="button">
+        Profile
+      </button>
+      <button id="logoutBtn" class="btn btn-default navbar-btn" type="button">
+        Sign out
+      </button>
+    `;
+
+    const logoutBtn = document.getElementById('logoutBtn');
+    if (logoutBtn) {
+      logoutBtn.addEventListener('click', async () => {
+        await supabase.auth.signOut();
+        // After sign-out, show the login button again
+        renderSignedOut();
+      });
+    }
+
+    const profileBtn = document.getElementById('profileBtn');
+    if (profileBtn) {
+      profileBtn.addEventListener('click', () => {
+        // For now, just show an alert.
+        // Later we can navigate to /account.html or similar.
+        alert('Profile page is not implemented yet.');
+      });
+    }
+  }
+
+  // Check current auth state
   supabase.auth.getUser().then(({ data, error }) => {
     if (error) {
       console.error('getUser error', error);
+      renderSignedOut();
       return;
     }
     const user = data?.user;
     if (user) {
       console.log('Logged in as', user.email);
-      // later: here is where we will call /api/me to get subscription_status
+      renderSignedIn(user);
     } else {
       console.log('No Supabase user logged in');
+      renderSignedOut();
     }
   });
 });
