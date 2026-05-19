@@ -835,27 +835,28 @@ function updateModeFromUI() {
   describeMode();
   syncUrl();
 }
- document.addEventListener("DOMContentLoaded", () => {
+
+document.addEventListener('DOMContentLoaded', () => {
   populateLanguageSelectsFromMode();
   describeMode();
   updateRoomUI();
   connectSocket();
   updateStats();
-  clearBox("interimOutput", "Interim");
-  clearBox("sourceOutput", "Source output");
-  clearBox("translatedOutput", "Translated output");
+  clearBox('interimOutput', 'Interim');
+  clearBox('sourceOutput', 'Source output');
+  clearBox('translatedOutput', 'Translated output');
 
-  var srcSelect = document.getElementById("sourceLangSelect");
-  var tgtSelect = document.getElementById("targetLangSelect");
+  var srcSelect = document.getElementById('sourceLangSelect');
+  var tgtSelect = document.getElementById('targetLangSelect');
   if (srcSelect && tgtSelect) {
-    srcSelect.addEventListener("change", () => {
+    srcSelect.addEventListener('change', () => {
       updateModeFromUI();
       if (recognition) {
         stopRecognition();
         startRecognition();
       }
     });
-    tgtSelect.addEventListener("change", () => {
+    tgtSelect.addEventListener('change', () => {
       updateModeFromUI();
       if (recognition) {
         stopRecognition();
@@ -864,54 +865,53 @@ function updateModeFromUI() {
     });
   }
 
-  startBtn.addEventListener("click", startRecognition);
-  stopBtn.addEventListener("click", stopRecognition);
-  openOverlayBtn.addEventListener("click", openOverlay);
-  copyOverlayBtn.addEventListener("click", copyOverlayLink);
-  newRoomBtn.addEventListener("click", newRoom);
-  copyTranscriptBtn.addEventListener("click", copyTranscript);
-  downloadTranscriptBtn.addEventListener("click", downloadTranscript);
+  startBtn.addEventListener('click', startRecognition);
+  stopBtn.addEventListener('click', stopRecognition);
+  openOverlayBtn.addEventListener('click', openOverlay);
+  copyOverlayBtn.addEventListener('click', copyOverlayLink);
+  newRoomBtn.addEventListener('click', newRoom);
+  copyTranscriptBtn.addEventListener('click', copyTranscript);
+  downloadTranscriptBtn.addEventListener('click', downloadTranscript);
+
+  const langToolbar = $('languageToolbar');
+  if (langToolbar) {
+    langToolbar.addEventListener('click', evt => {
+      const btn = evt.target.closest('button[data-mode]');
+      if (!btn) return;
+      const newMode = btn.getAttribute('data-mode');
+      if (!newMode) return;
+      switchMode(newMode);
+    });
+
+    const activeBtn = langToolbar.querySelector(
+      `button[data-mode="${modeKey}"]`
+    );
+    if (activeBtn) {
+      activeBtn.classList.remove('btn-default');
+      activeBtn.classList.add('btn-primary');
+    }
+  }
+
+  const extraBtn = document.createElement('button');
+  extraBtn.className = 'btn btn-default';
+  extraBtn.textContent = 'Send test message';
+  extraBtn.addEventListener('click', sendTestMessage);
+  $('startBtn').parentNode.appendChild(extraBtn);
+
+  if (modeConfig.lessonMode) {
+    $('lessonActions').style.display = 'block';
+    $('reportBtn').addEventListener('click', generateLessonReport);
+    $('downloadReportBtn').addEventListener('click', downloadReport);
+
+    analyzeBtnRef = document.createElement('button');
+    analyzeBtnRef.className = 'btn btn-primary';
+    analyzeBtnRef.textContent = 'Analyze speakers';
+    analyzeBtnRef.addEventListener('click', analyzeSpeakers);
+    $('lessonActions')
+      .querySelector('.studio-toolbar')
+      .appendChild(analyzeBtnRef);
+    updateAnalyzeButtonState();
+  }
 });
 
-       const langToolbar = $('languageToolbar');
-    if (langToolbar) {
-      langToolbar.addEventListener('click', (evt) => {
-        const btn = evt.target.closest('button[data-mode]');
-        if (!btn) return;
-        const newMode = btn.getAttribute('data-mode');
-        if (!newMode) return;
-        switchMode(newMode);
-      });
-
-      // Highlight the active mode button
-      const activeBtn = langToolbar.querySelector(
-        `button[data-mode="${modeKey}"]`
-      );
-      if (activeBtn) {
-        activeBtn.classList.remove('btn-default');
-        activeBtn.classList.add('btn-primary');
-      }
-    } 
-
-    const extraBtn = document.createElement('button');
-    extraBtn.className = 'btn btn-default';
-    extraBtn.textContent = 'Send test message';
-    extraBtn.addEventListener('click', sendTestMessage);
-    $('startBtn').parentNode.appendChild(extraBtn);
-
-    if (modeConfig.lessonMode) {
-      $('lessonActions').style.display = 'block';
-      $('reportBtn').addEventListener('click', generateLessonReport);
-      $('downloadReportBtn').addEventListener('click', downloadReport);
-
-      analyzeBtnRef = document.createElement('button');
-      analyzeBtnRef.className = 'btn btn-primary';
-      analyzeBtnRef.textContent = 'Analyze speakers';
-      analyzeBtnRef.addEventListener('click', analyzeSpeakers);
-      $('lessonActions')
-        .querySelector('.studio-toolbar')
-        .appendChild(analyzeBtnRef);
-      updateAnalyzeButtonState();
-    }
-  });
 })(window);
