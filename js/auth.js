@@ -12,7 +12,7 @@ async function signInWithGoogle() {
   const { data, error } = await supabase.auth.signInWithOAuth({
     provider: 'google',
     options: {
-      redirectTo: 'https://buoninglese.github.io/sottotitoli/index.html'
+      redirectTo: 'https://buoninglese.github.io/sottotitoli/studio.html'
     }
   });
   console.log('signInWithOAuth result', { data, error });
