@@ -1,18 +1,28 @@
 // js/auth.js
 
-// 1) Initialize Supabase
+// 1) Initialize Supabase with session persistence
 const SUPABASE_URL = 'https://qzqmuegbpmvqrjrlfbgk.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_I-PG1wsO1FMWADK9GVBqoQ_0EtPA2K7';
 
-const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+window.sottotitoliSupabase = window.supabase.createClient(
+  SUPABASE_URL,
+  SUPABASE_ANON_KEY,
+  {
+    auth: {
+      persistSession: true,
+      detectSessionInUrl: true,   // handles OAuth redirect on studio.html
+      autoRefreshToken: true,
+    },
+  }
+);
 
 // 2) Sign-in function used by the button
 async function signInWithGoogle() {
-  const { error } = await supabase.auth.signInWithOAuth({
+  const { error } = await window.sottotitoliSupabase.auth.signInWithOAuth({
     provider: 'google',
     options: {
-      redirectTo: 'https://buoninglese.github.io/sottotitoli/studio.html'
-    }
+      redirectTo: 'https://buoninglese.github.io/sottotitoli/studio.html',
+    },
   });
   if (error) {
     console.error('Google sign-in error:', error.message);
@@ -20,8 +30,8 @@ async function signInWithGoogle() {
   }
 }
 
-// 3) Very simple header: sign in or sign out
-document.addEventListener('DOMContentLoaded', () => {
+// 3) Render header based on real Supabase session
+document.addEventListener('DOMContentLoaded', async () => {
   const authSection = document.getElementById('authSection');
   if (!authSection) return;
 
@@ -46,17 +56,20 @@ document.addEventListener('DOMContentLoaded', () => {
     const logoutBtn = document.getElementById('logoutBtn');
     if (logoutBtn) {
       logoutBtn.addEventListener('click', async () => {
-        await supabase.auth.signOut();
-        // Simple: reload the page after logout
+        await window.sottotitoliSupabase.auth.signOut();
+        // Redirect back to studio after logout
         window.location.href = 'https://buoninglese.github.io/sottotitoli/studio.html';
       });
     }
   }
 
-  // Super simple: if URL has #access_token, assume logged in
-  if (window.location.hash.includes('access_token=')) {
-    renderSignedIn();
-  } else {
+  // Ask Supabase if we have a stored session for this origin
+  const { data, error } = await window.sottotitoliSupabase.auth.getSession();
+  const session = data?.session;
+
+  if (error || !session) {
     renderSignedOut();
+  } else {
+    renderSignedIn();
   }
 });
