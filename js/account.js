@@ -42,12 +42,14 @@ document.addEventListener('DOMContentLoaded', () => {
         emailEl.textContent = 'Email: ' + (profile.email || user.email);
       }
       if (createdEl) {
-        createdEl.textContent = 'Joined: ' + (profile.created_at || '—');
+        createdEl.textContent = 'Joined: ' + joined;
       }
     } else {
       if (emailEl) emailEl.textContent = 'Email: ' + user.email;
-      if (createdEl) createdEl.textContent = 'Joined: —';
-    }
+      const joined = user.created_at || '—';
+      if (createdEl) {
+        createdEl.textContent = 'Joined: ' + joined;
+      }
 
     // 3. Load recent sessions
     const { data: sessions, error: sessionsError } = await accountSupabase
