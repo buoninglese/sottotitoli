@@ -73,10 +73,8 @@
   let speakerAnalysisCompleted = false;
   let analyzeBtnRef = null;
 
-  // ---- Sottotitoli sessions logging (Supabase) ----
-const SUPABASE_URL = 'https://qzqmuegbpmvqrjrlfbgk.supabase.co';
-const SUPABASE_ANON_KEY = 'sb_publishable_I-PG1wsO1FMWADK9GVBqoQ_0EtPA2K7';
-const sessionSupabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+// Reuse the global Supabase client set up in auth.js
+const sessionSupabase = window.sottotitoliSupabase;
 
 let currentSessionId = null;
 let currentSessionStart = null;
