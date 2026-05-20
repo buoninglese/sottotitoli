@@ -18,6 +18,8 @@ document.addEventListener('DOMContentLoaded', () => {
   const perfUniqueWordsEl = document.getElementById('perfUniqueWords');
   const perfUniqueWordsBarEl = document.getElementById('perfUniqueWordsBar');
   const perfFunFactEl = document.getElementById('perfFunFact');
+  const perfMinutesSparklineEl = document.getElementById('perfMinutesSparkline');
+  const perfStreakBadgeEl = document.getElementById('perfStreakBadge');
 
   let currentSessions = [];
 
@@ -121,157 +123,259 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function updatePerformanceDashboard(sessions) {
-    if (!sessions || sessions.length === 0) {
-      if (perfMinutesSpokenEl) perfMinutesSpokenEl.textContent = '0';
-      if (perfAverageWpmEl) perfAverageWpmEl.textContent = '–';
-      if (perfFillersPerMinuteEl) perfFillersPerMinuteEl.textContent = '–';
-      if (perfUniqueWordsEl) perfUniqueWordsEl.textContent = '0';
-      if (perfFunFactEl) perfFunFactEl.textContent = 'Inizia a usare Studio per vedere le prime letture del tuo inglese.';
-      return;
+  if (!sessions || sessions.length === 0) {
+    if (perfMinutesSpokenEl) perfMinutesSpokenEl.textContent = '0';
+    if (perfAverageWpmEl) perfAverageWpmEl.textContent = '–';
+    if (perfFillersPerMinuteEl) perfFillersPerMinuteEl.textContent = '–';
+    if (perfUniqueWordsEl) perfUniqueWordsEl.textContent = '0';
+    if (perfFunFactEl) perfFunFactEl.textContent = 'Inizia a usare Studio per vedere le prime letture del tuo inglese.';
+    if (perfStreakBadgeEl) {
+      perfStreakBadgeEl.textContent = '0‑day streak';
+      perfStreakBadgeEl.classList.remove('hot', 'cold');
+    }
+    if (perfMinutesSparklineEl) {
+      perfMinutesSparklineEl.innerHTML = '';
+    }
+    return;
+  }
+
+  const now = new Date();
+  const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+  const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+  const fourteenDaysAgo = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000);
+
+  let totalSecondsWeek = 0;
+  let totalWordsWeek = 0;
+  let sumWpm = 0;
+  let countWpm = 0;
+  let sumFillersPerMinute = 0;
+  let countFillers = 0;
+  let uniqueWordsLast30 = 0;
+
+  // For WPM trend: compare last 7 vs previous 7 days
+  let sumWpmPrevWeek = 0;
+  let countWpmPrevWeek = 0;
+  const sevenToFourteenDaysAgo = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000);
+
+  // For sparkline: minutes per day for last 14 days (array of 14 numbers)
+  const dailyMinutes = new Array(14).fill(0);
+
+  // For streak: set of days where user spoke
+  const spokenDates = new Set();
+
+  sessions.forEach((s) => {
+    if (!s.started_at) return;
+    const started = new Date(s.started_at);
+    const dayKey = started.toISOString().slice(0, 10); // YYYY-MM-DD
+
+    // Track days with any seconds spoken
+    if (typeof s.duration_seconds === 'number' && s.duration_seconds > 0) {
+      spokenDates.add(dayKey);
     }
 
-    const now = new Date();
-    const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-    const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-
-    let totalSecondsWeek = 0;
-    let totalWordsWeek = 0;
-    let sumWpm = 0;
-    let countWpm = 0;
-    let sumFillersPerMinute = 0;
-    let countFillers = 0;
-    let uniqueWordsLast30 = 0;
-
-    sessions.forEach((s) => {
-      const started = s.started_at ? new Date(s.started_at) : null;
-
-      if (started && started >= sevenDaysAgo) {
-        if (typeof s.duration_seconds === 'number') {
-          totalSecondsWeek += s.duration_seconds;
-        }
-        if (typeof s.words_count === 'number') {
-          totalWordsWeek += s.words_count;
-        }
-        if (typeof s.wpm === 'number') {
-          sumWpm += s.wpm;
-          countWpm += 1;
-        }
-        if (typeof s.fillers_per_minute === 'number') {
-          sumFillersPerMinute += s.fillers_per_minute;
-          countFillers += 1;
-        }
+    // Last 7 days aggregates
+    if (started >= sevenDaysAgo) {
+      if (typeof s.duration_seconds === 'number') {
+        totalSecondsWeek += s.duration_seconds;
       }
-
-      if (started && started >= thirtyDaysAgo) {
-        if (typeof s.unique_words_count === 'number') {
-          uniqueWordsLast30 += s.unique_words_count;
-        }
+      if (typeof s.words_count === 'number') {
+        totalWordsWeek += s.words_count;
       }
-    });
-
-    const minutesWeek = Math.round(totalSecondsWeek / 60);
-    const avgWpm = countWpm > 0 ? sumWpm / countWpm : null;
-    const avgFillersPerMin = countFillers > 0 ? sumFillersPerMinute / countFillers : null;
-
-    // Target thresholds (tune these freely)
-    const targetMinutesWeek = 120; // 2 hours
-    const maxMinutesWeek = 240;    // 4 hours for 100% bar
-    const maxWpm = 180;
-    const idealMinWpm = 90;
-    const idealMaxWpm = 160;
-    const maxFillersBad = 10;      // 10+ per minute is "bad"
-    const maxUniqueWords = 2000;   // simple scale cap
-
-    // Exposure: minutes spoken
-    if (perfMinutesSpokenEl) perfMinutesSpokenEl.textContent = String(minutesWeek);
-    if (perfMinutesSpokenBarEl) {
-      const ratio = Math.min(minutesWeek / maxMinutesWeek, 1);
-      perfMinutesSpokenBarEl.style.width = (ratio * 100).toFixed(0) + '%';
-      perfMinutesSpokenBarEl.classList.remove('bad', 'warn', 'good');
-      if (minutesWeek === 0) {
-        // leave default
-      } else if (minutesWeek < targetMinutesWeek / 2) {
-        perfMinutesSpokenBarEl.classList.add('warn');
-      } else if (minutesWeek >= targetMinutesWeek) {
-        perfMinutesSpokenBarEl.classList.add('good');
+      if (typeof s.wpm === 'number') {
+        sumWpm += s.wpm;
+        countWpm += 1;
+      }
+      if (typeof s.fillers_per_minute === 'number') {
+        sumFillersPerMinute += s.fillers_per_minute;
+        countFillers += 1;
       }
     }
 
-    // Fluency: average WPM
-    if (perfAverageWpmEl) {
-      perfAverageWpmEl.textContent = avgWpm != null ? Math.round(avgWpm).toString() : '–';
-    }
-    if (perfAverageWpmBarEl) {
-      if (avgWpm == null) {
-        perfAverageWpmBarEl.style.width = '0%';
-      } else {
-        const clamped = Math.max(0, Math.min(avgWpm, maxWpm));
-        perfAverageWpmBarEl.style.width = ((clamped / maxWpm) * 100).toFixed(0) + '%';
-        perfAverageWpmBarEl.classList.remove('bad', 'warn', 'good');
-        if (avgWpm < idealMinWpm) {
-          perfAverageWpmBarEl.classList.add('warn');
-        } else if (avgWpm > idealMaxWpm) {
-          perfAverageWpmBarEl.classList.add('warn');
-        } else {
-          perfAverageWpmBarEl.classList.add('good');
-        }
+    // Previous 7 days (for trend)
+    if (started >= sevenToFourteenDaysAgo && started < sevenDaysAgo) {
+      if (typeof s.wpm === 'number') {
+        sumWpmPrevWeek += s.wpm;
+        countWpmPrevWeek += 1;
       }
     }
 
-    // Fluency: fillers per minute
-    if (perfFillersPerMinuteEl) {
-      perfFillersPerMinuteEl.textContent =
-        avgFillersPerMin != null ? avgFillersPerMin.toFixed(1) : '–';
-    }
-    if (perfFillersPerMinuteBarEl) {
-      if (avgFillersPerMin == null) {
-        perfFillersPerMinuteBarEl.style.width = '0%';
-      } else {
-        const clamped = Math.min(avgFillersPerMin / maxFillersBad, 1);
-        perfFillersPerMinuteBarEl.style.width = (clamped * 100).toFixed(0) + '%';
-        perfFillersPerMinuteBarEl.classList.remove('bad', 'warn', 'good');
-        if (avgFillersPerMin <= 3) {
-          perfFillersPerMinuteBarEl.classList.add('good');
-        } else if (avgFillersPerMin <= 7) {
-          perfFillersPerMinuteBarEl.classList.add('warn');
-        } else {
-          perfFillersPerMinuteBarEl.classList.add('bad');
-        }
+    // Last 30 days lexicon
+    if (started >= thirtyDaysAgo) {
+      if (typeof s.unique_words_count === 'number') {
+        uniqueWordsLast30 += s.unique_words_count;
       }
     }
 
-    // Vocabulary: unique words (approx)
-    if (perfUniqueWordsEl) {
-      perfUniqueWordsEl.textContent = String(uniqueWordsLast30);
-    }
-    if (perfUniqueWordsBarEl) {
-      const ratio = Math.min(uniqueWordsLast30 / maxUniqueWords, 1);
-      perfUniqueWordsBarEl.style.width = (ratio * 100).toFixed(0) + '%';
-      perfUniqueWordsBarEl.classList.remove('bad', 'warn', 'good');
-      if (uniqueWordsLast30 === 0) {
-        // default
-      } else if (ratio < 0.3) {
-        perfUniqueWordsBarEl.classList.add('warn');
-      } else if (ratio >= 0.5) {
-        perfUniqueWordsBarEl.classList.add('good');
+    // Sparkline: last 14 days
+    if (started >= fourteenDaysAgo) {
+      const dayIndex = Math.floor(
+        (started.getTime() - fourteenDaysAgo.getTime()) / (24 * 60 * 60 * 1000)
+      );
+      if (dayIndex >= 0 && dayIndex < 14 && typeof s.duration_seconds === 'number') {
+        dailyMinutes[dayIndex] += s.duration_seconds / 60;
       }
     }
+  });
 
-    // Fun fact
-    if (perfFunFactEl) {
-      let fact = '';
+  const minutesWeek = Math.round(totalSecondsWeek / 60);
+  const avgWpm = countWpm > 0 ? sumWpm / countWpm : null;
+  const avgWpmPrevWeek = countWpmPrevWeek > 0 ? sumWpmPrevWeek / countWpmPrevWeek : null;
+  const avgFillersPerMin = countFillers > 0 ? sumFillersPerMinute / countFillers : null;
 
-      if (minutesWeek >= 60 && avgWpm != null) {
-        fact = `Nell’ultima settimana hai parlato per ${minutesWeek} minuti con una velocità media di ${Math.round(avgWpm)} parole al minuto.`;
-      } else if (minutesWeek > 0 && uniqueWordsLast30 > 0) {
-        fact = `Hai già usato circa ${uniqueWordsLast30} parole diverse negli ultimi 30 giorni di pratica.`;
-      } else {
-        fact = 'Continua a usare Studio: ogni sessione aggiunge dati al tuo cruscotto di inglese.';
-      }
+  // Target thresholds (tune these freely)
+  const targetMinutesWeek = 120; // 2 hours
+  const maxMinutesWeek = 240;    // 4 hours for 100% bar
+  const maxWpm = 180;
+  const idealMinWpm = 90;
+  const idealMaxWpm = 160;
+  const maxFillersBad = 10;      // 10+ per minute is "bad"
+  const maxUniqueWords = 2000;   // simple scale cap
 
-      perfFunFactEl.textContent = fact;
+  // Exposure: minutes spoken
+  if (perfMinutesSpokenEl) perfMinutesSpokenEl.textContent = String(minutesWeek);
+  if (perfMinutesSpokenBarEl) {
+    const ratio = Math.min(minutesWeek / maxMinutesWeek, 1);
+    perfMinutesSpokenBarEl.style.width = (ratio * 100).toFixed(0) + '%';
+    perfMinutesSpokenBarEl.classList.remove('bad', 'warn', 'good');
+    if (minutesWeek === 0) {
+      // leave default
+    } else if (minutesWeek < targetMinutesWeek / 2) {
+      perfMinutesSpokenBarEl.classList.add('warn');
+    } else if (minutesWeek >= targetMinutesWeek) {
+      perfMinutesSpokenBarEl.classList.add('good');
     }
   }
+
+  // Fluency: average WPM
+  if (perfAverageWpmEl) {
+    if (avgWpm != null) {
+      const arrow =
+        avgWpmPrevWeek != null
+          ? avgWpm > avgWpmPrevWeek + 5
+            ? ' ↑'
+            : avgWpm < avgWpmPrevWeek - 5
+            ? ' ↓'
+            : ' →'
+          : '';
+      perfAverageWpmEl.textContent = Math.round(avgWpm).toString() + arrow;
+    } else {
+      perfAverageWpmEl.textContent = '–';
+    }
+  }
+  if (perfAverageWpmBarEl) {
+    if (avgWpm == null) {
+      perfAverageWpmBarEl.style.width = '0%';
+    } else {
+      const clamped = Math.max(0, Math.min(avgWpm, maxWpm));
+      perfAverageWpmBarEl.style.width = ((clamped / maxWpm) * 100).toFixed(0) + '%';
+      perfAverageWpmBarEl.classList.remove('bad', 'warn', 'good');
+      if (avgWpm < idealMinWpm) {
+        perfAverageWpmBarEl.classList.add('warn');
+      } else if (avgWpm > idealMaxWpm) {
+        perfAverageWpmBarEl.classList.add('warn');
+      } else {
+        perfAverageWpmBarEl.classList.add('good');
+      }
+    }
+  }
+
+  // Fluency: fillers per minute
+  if (perfFillersPerMinuteEl) {
+    perfFillersPerMinuteEl.textContent =
+      avgFillersPerMin != null ? avgFillersPerMin.toFixed(1) : '–';
+  }
+  if (perfFillersPerMinuteBarEl) {
+    if (avgFillersPerMin == null) {
+      perfFillersPerMinuteBarEl.style.width = '0%';
+    } else {
+      const clamped = Math.min(avgFillersPerMin / maxFillersBad, 1);
+      perfFillersPerMinuteBarEl.style.width = (clamped * 100).toFixed(0) + '%';
+      perfFillersPerMinuteBarEl.classList.remove('bad', 'warn', 'good');
+      if (avgFillersPerMin <= 3) {
+        perfFillersPerMinuteBarEl.classList.add('good');
+      } else if (avgFillersPerMin <= 7) {
+        perfFillersPerMinuteBarEl.classList.add('warn');
+      } else {
+        perfFillersPerMinuteBarEl.classList.add('bad');
+      }
+    }
+  }
+
+  // Vocabulary: unique words (approx)
+  if (perfUniqueWordsEl) {
+    perfUniqueWordsEl.textContent = String(uniqueWordsLast30);
+  }
+  if (perfUniqueWordsBarEl) {
+    const ratio = Math.min(uniqueWordsLast30 / maxUniqueWords, 1);
+    perfUniqueWordsBarEl.style.width = (ratio * 100).toFixed(0) + '%';
+    perfUniqueWordsBarEl.classList.remove('bad', 'warn', 'good');
+    if (uniqueWordsLast30 === 0) {
+      // default
+    } else if (ratio < 0.3) {
+      perfUniqueWordsBarEl.classList.add('warn');
+    } else if (ratio >= 0.5) {
+      perfUniqueWordsBarEl.classList.add('good');
+    }
+  }
+
+  // Sparkline: 14 days of minutes spoken
+  if (perfMinutesSparklineEl) {
+    perfMinutesSparklineEl.innerHTML = '';
+    const maxMinutesDay = dailyMinutes.reduce((m, v) => Math.max(m, v), 0) || 1;
+    dailyMinutes.forEach((minutes) => {
+      const bar = document.createElement('div');
+      bar.className = 'perf-sparkline-bar';
+      const heightRatio = Math.min(minutes / maxMinutesDay, 1);
+      bar.style.height = (heightRatio * 100).toFixed(0) + '%';
+      if (minutes > 0) {
+        bar.classList.add('active');
+      }
+      perfMinutesSparklineEl.appendChild(bar);
+    });
+  }
+
+  // Streak calculation (consecutive days ending today)
+  if (perfStreakBadgeEl) {
+    let streak = 0;
+    let cursor = new Date(now);
+    // Normalize to date (no time)
+    cursor.setHours(0, 0, 0, 0);
+
+    while (streak < 365) {
+      const key = cursor.toISOString().slice(0, 10);
+      if (spokenDates.has(key)) {
+        streak += 1;
+        cursor = new Date(cursor.getTime() - 24 * 60 * 60 * 1000);
+      } else {
+        break;
+      }
+    }
+
+    perfStreakBadgeEl.textContent =
+      streak === 1 ? '1‑day streak' : streak + '‑day streak';
+    perfStreakBadgeEl.classList.remove('hot', 'cold');
+    if (streak >= 7) {
+      perfStreakBadgeEl.classList.add('hot');
+    } else if (streak === 0) {
+      perfStreakBadgeEl.classList.add('cold');
+    }
+  }
+
+  // Fun fact
+  if (perfFunFactEl) {
+    let fact = '';
+
+    if (minutesWeek >= 60 && avgWpm != null) {
+      fact = `Nell’ultima settimana hai parlato per ${minutesWeek} minuti con una velocità media di ${Math.round(avgWpm)} parole al minuto.`;
+    } else if (minutesWeek > 0 && uniqueWordsLast30 > 0) {
+      fact = `Hai già usato circa ${uniqueWordsLast30} parole diverse negli ultimi 30 giorni di pratica.`;
+    } else {
+      fact = 'Continua a usare Studio: ogni sessione aggiunge dati al tuo cruscotto di inglese.';
+    }
+
+    perfFunFactEl.textContent = fact;
+  }
+}
 
   function downloadSessionsCsv() {
     if (!currentSessions || currentSessions.length === 0) {
