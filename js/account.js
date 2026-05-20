@@ -1,9 +1,7 @@
 // js/account.js
 
-const SUPABASE_URL = 'https://qzqmuegbpmvqrjrlfbgk.supabase.co';
-const SUPABASE_ANON_KEY = 'sb_publishable_I-PG1wsO1FMWADK9GVBqoQ_0EtPA2K7';
-
-const accountSupabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+// Reuse the global client set up in auth.js
+const accountSupabase = window.sottotitoliSupabase;
 
 document.addEventListener('DOMContentLoaded', () => {
   const emailEl = document.getElementById('accountEmail');
@@ -11,9 +9,18 @@ document.addEventListener('DOMContentLoaded', () => {
   const sessionsEl = document.getElementById('sessionsList');
 
   async function loadAccount() {
-    // Get current user; if none, just show a message
-    const { data: sessionData, error: sessionError } = await accountSupabase.auth.getSession();
-    if (sessionError || !sessionData.session) {
+    if (!accountSupabase) {
+      console.warn('Supabase client not available on account page.');
+      return;
+    }
+
+    // 1. Get current auth session (shared across tabs)
+    const { data: sessionData, error: sessionError } =
+      await accountSupabase.auth.getSession();
+
+    if (sessionError || !sessionData || !sessionData.session) {
+      if (emailEl) emailEl.textContent = 'Email: — (not signed in)';
+      if (createdEl) createdEl.textContent = 'Joined: —';
       if (sessionsEl) sessionsEl.textContent = 'Please sign in to see your sessions.';
       return;
     }
@@ -21,7 +28,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const user = sessionData.session.user;
     const userId = user.id;
 
-    // Load profile row
+    // 2. Load profile row from `profiles`
     const { data: profiles, error: profileError } = await accountSupabase
       .from('profiles')
       .select('email, created_at')
@@ -30,14 +37,18 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (!profileError && profiles && profiles.length > 0) {
       const profile = profiles[0];
-      if (emailEl) emailEl.textContent = 'Email: ' + (profile.email || user.email);
-      if (createdEl) createdEl.textContent = 'Joined: ' + (profile.created_at || '—');
+      if (emailEl) {
+        emailEl.textContent = 'Email: ' + (profile.email || user.email);
+      }
+      if (createdEl) {
+        createdEl.textContent = 'Joined: ' + (profile.created_at || '—');
+      }
     } else {
       if (emailEl) emailEl.textContent = 'Email: ' + user.email;
       if (createdEl) createdEl.textContent = 'Joined: —';
     }
 
-    // Load sessions list (just last few for now)
+    // 3. Load recent sessions
     const { data: sessions, error: sessionsError } = await accountSupabase
       .from('sessions')
       .select('room, mode, started_at, duration_seconds, words_count')
@@ -55,18 +66,20 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
-    // Render simple list
     const list = document.createElement('ul');
     list.style.listStyle = 'none';
     list.style.paddingLeft = '0';
 
-    sessions.forEach(s => {
+    sessions.forEach((s) => {
       const li = document.createElement('li');
       li.style.marginBottom = '8px';
       const when = s.started_at ? new Date(s.started_at).toLocaleString() : '';
-      const duration = s.duration_seconds != null ? s.duration_seconds + 's' : '—';
-      const words = s.words_count != null ? s.words_count + ' words' : '—';
-      li.textContent = `[${s.mode || 'mode'}] Room ${s.room || ''} · ${when} · ${duration} · ${words}`;
+      const duration =
+        s.duration_seconds != null ? s.duration_seconds + 's' : '—';
+      const words =
+        s.words_count != null ? s.words_count + ' words' : '—';
+      li.textContent =
+        `[${s.mode || 'mode'}] Room ${s.room || ''} · ${when} · ${duration} · ${words}`;
       list.appendChild(li);
     });
 
