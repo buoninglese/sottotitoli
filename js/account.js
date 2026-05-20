@@ -41,6 +41,7 @@ document.addEventListener('DOMContentLoaded', () => {
       if (emailEl) {
         emailEl.textContent = 'Email: ' + (profile.email || user.email);
       }
+      const joined = profile.created_at || user.created_at || '—';
       if (createdEl) {
         createdEl.textContent = 'Joined: ' + joined;
       }
@@ -50,6 +51,7 @@ document.addEventListener('DOMContentLoaded', () => {
       if (createdEl) {
         createdEl.textContent = 'Joined: ' + joined;
       }
+    }
 
     // 3. Load recent sessions
     const { data: sessions, error: sessionsError } = await accountSupabase
