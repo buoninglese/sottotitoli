@@ -11,6 +11,7 @@ document.addEventListener('DOMContentLoaded', () => {
   async function loadAccount() {
     if (!accountSupabase) {
       console.warn('Supabase client not available on account page.');
+      if (sessionsEl) sessionsEl.textContent = 'Supabase client not available.';
       return;
     }
 

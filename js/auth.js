@@ -10,7 +10,7 @@ window.sottotitoliSupabase = window.supabase.createClient(
   {
     auth: {
       persistSession: true,
-      detectSessionInUrl: true,   // handles OAuth redirect on studio.html
+      detectSessionInUrl: true,   // lets Supabase read #access_token on studio.html
       autoRefreshToken: true,
     },
   }
@@ -30,7 +30,7 @@ async function signInWithGoogle() {
   }
 }
 
-// 3) Render header based on real Supabase session
+// 3) Render header based on real Supabase session (NOT URL hash)
 document.addEventListener('DOMContentLoaded', async () => {
   const authSection = document.getElementById('authSection');
   if (!authSection) return;
@@ -57,7 +57,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (logoutBtn) {
       logoutBtn.addEventListener('click', async () => {
         await window.sottotitoliSupabase.auth.signOut();
-        // Redirect back to studio after logout
+        // After logout, go back to studio page
         window.location.href = 'https://buoninglese.github.io/sottotitoli/studio.html';
       });
     }
