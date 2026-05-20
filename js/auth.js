@@ -2,7 +2,7 @@
 
 // 1) Initialize Supabase with session persistence
 const SUPABASE_URL = 'https://qzqmuegbpmvqrjrlfbgk.supabase.co';
-const SUPABASE_ANON_KEY = 'sb_publishable_I-PG1wsO1FMWADK9GVBqoQ_0EtPA2K7';
+const SUPABASE_ANON_KEY = 'sb_publishable_l-PG1wsO1FMWADK9GVBqoQ_0EtPA2K7';
 
 window.sottotitoliSupabase = window.supabase.createClient(
   SUPABASE_URL,
