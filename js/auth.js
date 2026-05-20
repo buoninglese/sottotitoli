@@ -63,13 +63,17 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   }
 
-  // Ask Supabase if we have a stored session for this origin
+  console.log('auth.js: calling getSession...');
   const { data, error } = await window.sottotitoliSupabase.auth.getSession();
+  console.log('auth.js: getSession result', { data, error });
+
   const session = data?.session;
 
   if (error || !session) {
+    console.log('auth.js: no active session, rendering signed out');
     renderSignedOut();
   } else {
+    console.log('auth.js: session found, rendering signed in');
     renderSignedIn();
   }
 });
