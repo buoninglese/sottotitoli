@@ -73,6 +73,13 @@
   let speakerAnalysisCompleted = false;
   let analyzeBtnRef = null;
 
+  // ---- Sottotitoli sessions logging (Supabase) ----
+const SUPABASE_URL = 'https://qzqmuegbpmvqrjrlfbgk.supabase.co';
+const SUPABASE_ANON_KEY = 'sb_publishable_I-PG1wsO1FMWADK9GVBqoQ_0EtPA2K7';
+const sessionSupabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+let currentSessionId = null;
+let currentSessionStart = null;
   function $(id) {
     return document.getElementById(id);
   }
@@ -148,6 +155,84 @@ function switchMode(newModeKey) {
     setText('statChars', String(plain.length));
   }
 
+  async function createSessionRow() {
+  try {
+    const { data: sessionData, error: sessionError } =
+      await sessionSupabase.auth.getSession();
+    if (sessionError || !sessionData || !sessionData.session) {
+      console.warn('No Supabase session; not logging Sottotitoli session.');
+      return;
+    }
+
+    const user = sessionData.session.user;
+    const userId = user.id;
+
+    currentSessionStart = new Date();
+
+    const { data, error } = await sessionSupabase
+      .from('sessions')
+      .insert([
+        {
+          user_id: userId,
+          room,
+          mode: modeKey,
+          started_at: currentSessionStart.toISOString()
+        }
+      ])
+      .select('id')
+      .single();
+
+    if (error) {
+      console.error('Error creating session row:', error);
+      return;
+    }
+
+    currentSessionId = data.id;
+    console.log('Created session row with id', currentSessionId);
+  } catch (e) {
+    console.error('Unexpected error creating session row:', e);
+  }
+}
+
+async function finalizeSessionRow() {
+  if (!currentSessionId || !currentSessionStart) {
+    // Nothing to update
+    return;
+  }
+
+  try {
+    const ended = new Date();
+    const durationSeconds = Math.round(
+      (ended.getTime() - currentSessionStart.getTime()) / 1000
+    );
+
+    // Simple stats from transcriptLines
+    const plain = transcriptLines.map(x => x.text).join(' ').trim();
+    const wordsCount = w.SottotitoliSessionUtils.countWords(plain);
+    const charsCount = plain.length;
+
+    const { error } = await sessionSupabase
+      .from('sessions')
+      .update({
+        ended_at: ended.toISOString(),
+        duration_seconds: durationSeconds,
+        words_count: wordsCount,
+        chars_count: charsCount
+      })
+      .eq('id', currentSessionId);
+
+    if (error) {
+      console.error('Error updating session row:', error);
+    } else {
+      console.log('Updated session row for', currentSessionId);
+    }
+  } catch (e) {
+    console.error('Unexpected error updating session row:', e);
+  } finally {
+    currentSessionId = null;
+    currentSessionStart = null;
+  }
+}
   function updateSocketState(state) {
     setText('socketStatus', state);
     const dot = $('socketDot');
@@ -469,46 +554,52 @@ function switchMode(newModeKey) {
     }
   }
 
-  function startRecognition() {
-    if (!SpeechRecognition) {
-      setText(
-        'statusText',
-        'Speech recognition is not supported in this browser.'
-      );
-      return;
-    }
+function startRecognition() {
+  if (!SpeechRecognition) {
+    setText(
+      'statusText',
+      'Speech recognition is not supported in this browser.'
+    );
+    return;
+  }
 
-    clearRestartTimer();
-    shouldKeepListening = true;
-    hasStartedOnce = false;
+  clearRestartTimer();
+  shouldKeepListening = true;
+  hasStartedOnce = false;
 
-    if (!recognition) {
-      recognition = buildRecognition();
-    }
+  if (!recognition) {
+    recognition = buildRecognition();
+  }
 
+  try {
+    recognition.start();
+    startAudioCapture();
+
+    // Log this session in Supabase
+    createSessionRow();
+  } catch (e) {
+    setText('statusText', 'Recognition start retrying...');
+    scheduleRestart(900);
+  }
+}
+
+function stopRecognition() {
+  shouldKeepListening = false;
+  clearRestartTimer();
+
+  if (recognition) {
     try {
-      recognition.start();
-      startAudioCapture();
-    } catch (e) {
-      setText('statusText', 'Recognition start retrying...');
-      scheduleRestart(900);
-    }
+      recognition.stop();
+    } catch (e) {}
   }
 
-  function stopRecognition() {
-    shouldKeepListening = false;
-    clearRestartTimer();
+  stopAudioCapture();
+  updateMicState('stopped', false);
+  setText('statusText', 'Recognition stopped by user.');
 
-    if (recognition) {
-      try {
-        recognition.stop();
-      } catch (e) {}
-    }
-
-    stopAudioCapture();
-    updateMicState('stopped', false);
-    setText('statusText', 'Recognition stopped by user.');
-  }
+  // Finalize Supabase session record
+  finalizeSessionRow();
+}
 
   function connectSocket() {
     wsPublisher = w.createWSPublisher({
