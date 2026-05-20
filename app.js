@@ -1,3 +1,5 @@
+// app.js
+
 (function (w) {
   'use strict';
 
@@ -73,11 +75,11 @@
   let speakerAnalysisCompleted = false;
   let analyzeBtnRef = null;
 
-// Reuse the global Supabase client set up in auth.js
-const sessionSupabase = window.sottotitoliSupabase;
+  // Reuse the global Supabase client set up in auth.js
+  const sessionSupabase = window.sottotitoliSupabase;
+  let currentSessionId = null;
+  let currentSessionStart = null;
 
-let currentSessionId = null;
-let currentSessionStart = null;
   function $(id) {
     return document.getElementById(id);
   }
@@ -120,14 +122,16 @@ let currentSessionStart = null;
     url.searchParams.set('v', '11');
     history.replaceState({}, '', url.toString());
   }
-function switchMode(newModeKey) {
-  const url = new URL(window.location.href);
-  url.searchParams.set('mode', newModeKey);
-  // preserve current room so overlay stays in sync
-  url.searchParams.set('room', room);
-  url.searchParams.set('v', '11');
-  window.location.href = url.toString();
-}
+
+  function switchMode(newModeKey) {
+    const url = new URL(window.location.href);
+    url.searchParams.set('mode', newModeKey);
+    // preserve current room so overlay stays in sync
+    url.searchParams.set('room', room);
+    url.searchParams.set('v', '11');
+    window.location.href = url.toString();
+  }
+
   function currentOverlayUrl() {
     const url = new URL('overlay.html', window.location.href);
     url.searchParams.set('room', room);
@@ -153,84 +157,151 @@ function switchMode(newModeKey) {
     setText('statChars', String(plain.length));
   }
 
+  // --- NEW METRIC HELPERS ---
+
+  function computeSentencesCount(text) {
+    if (!text) return 0;
+    const parts = text.split(/[.!?]+/).map(s => s.trim()).filter(Boolean);
+    return parts.length;
+  }
+
+  function computeFillersCount(text) {
+    if (!text) return 0;
+    const lower = text.toLowerCase();
+    const fillers = ['uh', 'um', 'ehm', 'erm', 'you know', 'like'];
+    let count = 0;
+    fillers.forEach(f => {
+      const regex = new RegExp('\\b' + f.replace(' ', '\\s+') + '\\b', 'g');
+      const matches = lower.match(regex);
+      if (matches) count += matches.length;
+    });
+    return count;
+  }
+
+  function computeUniqueWordsCount(text) {
+    if (!text) return 0;
+    const tokens = text
+      .toLowerCase()
+      .replace(/[^a-zA-Z\s']/g, ' ')
+      .split(/\s+/)
+      .filter(Boolean);
+    if (!tokens.length) return 0;
+    const set = new Set(tokens);
+    return set.size;
+  }
+
+  // --- SUPABASE SESSION LOGGING ---
+
   async function createSessionRow() {
-  try {
-    const { data: sessionData, error: sessionError } =
-      await sessionSupabase.auth.getSession();
-    if (sessionError || !sessionData || !sessionData.session) {
-      console.warn('No Supabase session; not logging Sottotitoli session.');
+    try {
+      const result = await sessionSupabase.auth.getSession();
+      const sessionData = result.data;
+      const sessionError = result.error;
+
+      if (sessionError || !sessionData || !sessionData.session) {
+        console.warn('No Supabase session; not logging Sottotitoli session.');
+        return;
+      }
+
+      const user = sessionData.session.user;
+      const userId = user.id;
+
+      currentSessionStart = new Date();
+
+      const languagePair =
+        modeKey.startsWith('translate-')
+          ? modeKey.replace('translate-', '').replace('-', '->')
+          : 'en-en';
+
+      const sessionType = 'solo';
+      const topicTag = null;
+
+      const { data, error } = await sessionSupabase
+        .from('sessions')
+        .insert([
+          {
+            user_id: userId,
+            room,
+            mode: modeKey,
+            started_at: currentSessionStart.toISOString(),
+            language_pair: languagePair,
+            session_type: sessionType,
+            topic_tag: topicTag
+          }
+        ])
+        .select('id')
+        .single();
+
+      if (error) {
+        console.error('Error creating session row:', error);
+        return;
+      }
+
+      currentSessionId = data.id;
+      console.log('Created session row with id', currentSessionId);
+    } catch (e) {
+      console.error('Unexpected error creating session row:', e);
+    }
+  }
+
+  async function finalizeSessionRow() {
+    if (!currentSessionId || !currentSessionStart) {
       return;
     }
 
-    const user = sessionData.session.user;
-    const userId = user.id;
+    try {
+      const ended = new Date();
+      const durationSeconds = Math.round(
+        (ended.getTime() - currentSessionStart.getTime()) / 1000
+      );
 
-    currentSessionStart = new Date();
+      const plain = transcriptLines.map(x => x.text).join(' ').trim();
+      const wordsCount = w.SottotitoliSessionUtils.countWords(plain);
+      const charsCount = plain.length;
 
-    const { data, error } = await sessionSupabase
-      .from('sessions')
-      .insert([
-        {
-          user_id: userId,
-          room,
-          mode: modeKey,
-          started_at: currentSessionStart.toISOString()
-        }
-      ])
-      .select('id')
-      .single();
+      const wpm =
+        durationSeconds > 0 ? wordsCount / (durationSeconds / 60) : null;
+      const sentencesCount = computeSentencesCount(plain);
+      const avgSentenceLength =
+        sentencesCount > 0 ? wordsCount / sentencesCount : null;
+      const fillersCount = computeFillersCount(plain);
+      const fillersPerMinute =
+        durationSeconds > 0 ? fillersCount / (durationSeconds / 60) : null;
+      const uniqueWordsCount = computeUniqueWordsCount(plain);
 
-    if (error) {
-      console.error('Error creating session row:', error);
-      return;
-    }
-
-    currentSessionId = data.id;
-    console.log('Created session row with id', currentSessionId);
-  } catch (e) {
-    console.error('Unexpected error creating session row:', e);
-  }
-}
-
-async function finalizeSessionRow() {
-  if (!currentSessionId || !currentSessionStart) {
-    // Nothing to update
-    return;
-  }
-
-  try {
-    const ended = new Date();
-    const durationSeconds = Math.round(
-      (ended.getTime() - currentSessionStart.getTime()) / 1000
-    );
-
-    // Simple stats from transcriptLines
-    const plain = transcriptLines.map(x => x.text).join(' ').trim();
-    const wordsCount = w.SottotitoliSessionUtils.countWords(plain);
-    const charsCount = plain.length;
-
-    const { error } = await sessionSupabase
-      .from('sessions')
-      .update({
+      const updatePayload = {
         ended_at: ended.toISOString(),
         duration_seconds: durationSeconds,
         words_count: wordsCount,
-        chars_count: charsCount
-      })
-      .eq('id', currentSessionId);
+        chars_count: charsCount,
+        wpm,
+        sentences_count: sentencesCount,
+        avg_sentence_length_words: avgSentenceLength,
+        fillers_count: fillersCount,
+        fillers_per_minute: fillersPerMinute,
+        unique_words_count: uniqueWordsCount
+      };
 
-    if (error) {
-      console.error('Error updating session row:', error);
-    } else {
-      console.log('Updated session row for', currentSessionId);
+      const { error } = await sessionSupabase
+        .from('sessions')
+        .update(updatePayload)
+        .eq('id', currentSessionId);
+
+      if (error) {
+        console.error('Error updating session row:', error);
+      } else {
+        console.log('Updated session row for', currentSessionId, updatePayload);
+      }
+    } catch (e) {
+      console.error('Unexpected error updating session row:', e);
+    } finally {
+      currentSessionId = null;
+      currentSessionStart = null;
     }
-  } catch (e) {
-    console.error('Unexpected error updating session row:', e);
-  } finally {
-    currentSessionId = null;
-    currentSessionStart = null;
   }
-}
+
+  // --- UI STATE HELPERS ---
+
   function updateSocketState(state) {
     setText('socketStatus', state);
     const dot = $('socketDot');
@@ -506,7 +577,7 @@ async function finalizeSessionRow() {
 
       audioRecorder.ondataavailable = event => {
         if (event.data && event.data.size > 0) {
-          audioChunks.push(event.data);
+          audioChunks.append(event.data);
         }
       };
 
@@ -552,52 +623,52 @@ async function finalizeSessionRow() {
     }
   }
 
-function startRecognition() {
-  if (!SpeechRecognition) {
-    setText(
-      'statusText',
-      'Speech recognition is not supported in this browser.'
-    );
-    return;
-  }
+  function startRecognition() {
+    if (!SpeechRecognition) {
+      setText(
+        'statusText',
+        'Speech recognition is not supported in this browser.'
+      );
+      return;
+    }
 
-  clearRestartTimer();
-  shouldKeepListening = true;
-  hasStartedOnce = false;
+    clearRestartTimer();
+    shouldKeepListening = true;
+    hasStartedOnce = false;
 
-  if (!recognition) {
-    recognition = buildRecognition();
-  }
+    if (!recognition) {
+      recognition = buildRecognition();
+    }
 
-  try {
-    recognition.start();
-    startAudioCapture();
-
-    // Log this session in Supabase
-    createSessionRow();
-  } catch (e) {
-    setText('statusText', 'Recognition start retrying...');
-    scheduleRestart(900);
-  }
-}
-
-function stopRecognition() {
-  shouldKeepListening = false;
-  clearRestartTimer();
-
-  if (recognition) {
     try {
-      recognition.stop();
-    } catch (e) {}
+      recognition.start();
+      startAudioCapture();
+
+      // Log this session in Supabase
+      createSessionRow();
+    } catch (e) {
+      setText('statusText', 'Recognition start retrying...');
+      scheduleRestart(900);
+    }
   }
 
-  stopAudioCapture();
-  updateMicState('stopped', false);
-  setText('statusText', 'Recognition stopped by user.');
+  function stopRecognition() {
+    shouldKeepListening = false;
+    clearRestartTimer();
 
-  // Finalize Supabase session record
-  finalizeSessionRow();
-}
+    if (recognition) {
+      try {
+        recognition.stop();
+      } catch (e) {}
+    }
+
+    stopAudioCapture();
+    updateMicState('stopped', false);
+    setText('statusText', 'Recognition stopped by user.');
+
+    // Finalize Supabase session record
+    finalizeSessionRow();
+  }
 
   function connectSocket() {
     wsPublisher = w.createWSPublisher({
@@ -871,121 +942,125 @@ function stopRecognition() {
     setText('modeDescription', lesson + ' ' + translation);
   }
 
-function getCurrentModeKeyFromSelects() {
-  var srcSelect = document.getElementById("sourceLangSelect");
-  var tgtSelect = document.getElementById("targetLangSelect");
-  if (!srcSelect || !tgtSelect) return modeKey;
+  function getCurrentModeKeyFromSelects() {
+    var srcSelect = document.getElementById("sourceLangSelect");
+    var tgtSelect = document.getElementById("targetLangSelect");
+    if (!srcSelect || !tgtSelect) return modeKey;
 
-  var src = srcSelect.value;
-  var tgt = tgtSelect.value;
+    var src = srcSelect.value;
+    var tgt = tgtSelect.value;
 
-  if (!src || !tgt) return modeKey;
+    if (!src || !tgt) return modeKey;
 
-  if (src === tgt) {
-    return "caption-" + src;
-  }
-  return "translate-" + src + "-" + tgt;
-}
-
-function updateModeFromUI() {
-  modeKey = getCurrentModeKeyFromSelects();
-  var cfgRoot = window.SOTTOTITOLI_CONFIG || window.SottotitoliConfig || configRoot;
-  if (cfgRoot && cfgRoot.modes && cfgRoot.modes[modeKey]) {
-    modeConfig = cfgRoot.modes[modeKey];
-  }
-  describeMode();
-  syncUrl();
-}
-function goToSelectedModePage() {
-  var mode = getCurrentModeKeyFromSelects();
-  if (!mode) return;
-
-  var url = new URL(window.location.href);
-  url.searchParams.set('mode', mode);
-  // keep room if present
-  window.location.href = url.toString();
-}
-document.addEventListener('DOMContentLoaded', () => {
-  populateLanguageSelectsFromMode();
-  describeMode();
-  updateRoomUI();
-  connectSocket();
-  updateStats();
-  clearBox('interimOutput', 'Interim');
-  clearBox('sourceOutput', 'Source output');
-  clearBox('translatedOutput', 'Translated output');
-
-  var srcSelect = document.getElementById('sourceLangSelect');
-  var tgtSelect = document.getElementById('targetLangSelect');
-  if (srcSelect && tgtSelect) {
-    srcSelect.addEventListener('change', () => {
-      updateModeFromUI();
-      if (recognition) {
-        stopRecognition();
-        startRecognition();
-      }
-    });
-    tgtSelect.addEventListener('change', () => {
-      updateModeFromUI();
-      if (recognition) {
-        stopRecognition();
-        startRecognition();
-      }
-    });
-  }
- var applyBtn = document.getElementById('applyLangModeBtn');
-  if (applyBtn) {
-    applyBtn.addEventListener('click', () => {
-      goToSelectedModePage();
-    });
-  }
-  startBtn.addEventListener('click', startRecognition);
-  stopBtn.addEventListener('click', stopRecognition);
-  openOverlayBtn.addEventListener('click', openOverlay);
-  copyOverlayBtn.addEventListener('click', copyOverlayLink);
-  newRoomBtn.addEventListener('click', newRoom);
-  copyTranscriptBtn.addEventListener('click', copyTranscript);
-  downloadTranscriptBtn.addEventListener('click', downloadTranscript);
-
-  const langToolbar = $('languageToolbar');
-  if (langToolbar) {
-    langToolbar.addEventListener('click', evt => {
-      const btn = evt.target.closest('button[data-mode]');
-      if (!btn) return;
-      const newMode = btn.getAttribute('data-mode');
-      if (!newMode) return;
-      switchMode(newMode);
-    });
-
-    const activeBtn = langToolbar.querySelector(
-      `button[data-mode="${modeKey}"]`
-    );
-    if (activeBtn) {
-      activeBtn.classList.remove('btn-default');
-      activeBtn.classList.add('btn-primary');
+    if (src === tgt) {
+      return "caption-" + src;
     }
+    return "translate-" + src + "-" + tgt;
   }
 
-  const extraBtn = document.createElement('button');
-  extraBtn.className = 'btn btn-default';
-  extraBtn.textContent = 'Send test message';
-  extraBtn.addEventListener('click', sendTestMessage);
-  $('startBtn').parentNode.appendChild(extraBtn);
-
-  if (modeConfig.lessonMode) {
-    $('lessonActions').style.display = 'block';
-    $('reportBtn').addEventListener('click', generateLessonReport);
-    $('downloadReportBtn').addEventListener('click', downloadReport);
-
-    analyzeBtnRef = document.createElement('button');
-    analyzeBtnRef.className = 'btn btn-primary';
-    analyzeBtnRef.textContent = 'Analyze speakers';
-    analyzeBtnRef.addEventListener('click', analyzeSpeakers);
-    $('lessonActions')
-      .querySelector('.studio-toolbar')
-      .appendChild(analyzeBtnRef);
-    updateAnalyzeButtonState();
+  function updateModeFromUI() {
+    modeKey = getCurrentModeKeyFromSelects();
+    var cfgRoot = window.SOTTOTITOLI_CONFIG || window.SottotitoliConfig || configRoot;
+    if (cfgRoot && cfgRoot.modes && cfgRoot.modes[modeKey]) {
+      modeConfig = cfgRoot.modes[modeKey];
+    }
+    describeMode();
+    syncUrl();
   }
-});
+
+  function goToSelectedModePage() {
+    var mode = getCurrentModeKeyFromSelects();
+    if (!mode) return;
+
+    var url = new URL(window.location.href);
+    url.searchParams.set('mode', mode);
+    // keep room if present
+    window.location.href = url.toString();
+  }
+
+  document.addEventListener('DOMContentLoaded', () => {
+    populateLanguageSelectsFromMode();
+    describeMode();
+    updateRoomUI();
+    connectSocket();
+    updateStats();
+    clearBox('interimOutput', 'Interim');
+    clearBox('sourceOutput', 'Source output');
+    clearBox('translatedOutput', 'Translated output');
+
+    var srcSelect = document.getElementById('sourceLangSelect');
+    var tgtSelect = document.getElementById('targetLangSelect');
+    if (srcSelect && tgtSelect) {
+      srcSelect.addEventListener('change', () => {
+        updateModeFromUI();
+        if (recognition) {
+          stopRecognition();
+          startRecognition();
+        }
+      });
+      tgtSelect.addEventListener('change', () => {
+        updateModeFromUI();
+        if (recognition) {
+          stopRecognition();
+          startRecognition();
+        }
+      });
+    }
+
+    var applyBtn = document.getElementById('applyLangModeBtn');
+    if (applyBtn) {
+      applyBtn.addEventListener('click', () => {
+        goToSelectedModePage();
+      });
+    }
+
+    startBtn.addEventListener('click', startRecognition);
+    stopBtn.addEventListener('click', stopRecognition);
+    openOverlayBtn.addEventListener('click', openOverlay);
+    copyOverlayBtn.addEventListener('click', copyOverlayLink);
+    newRoomBtn.addEventListener('click', newRoom);
+    copyTranscriptBtn.addEventListener('click', copyTranscript);
+    downloadTranscriptBtn.addEventListener('click', downloadTranscript);
+
+    const langToolbar = $('languageToolbar');
+    if (langToolbar) {
+      langToolbar.addEventListener('click', evt => {
+        const btn = evt.target.closest('button[data-mode]');
+        if (!btn) return;
+        const newMode = btn.getAttribute('data-mode');
+        if (!newMode) return;
+        switchMode(newMode);
+      });
+
+      const activeBtn = langToolbar.querySelector(
+        `button[data-mode="${modeKey}"]`
+      );
+      if (activeBtn) {
+        activeBtn.classList.remove('btn-default');
+        activeBtn.classList.add('btn-primary');
+      }
+    }
+
+    const extraBtn = document.createElement('button');
+    extraBtn.className = 'btn btn-default';
+    extraBtn.textContent = 'Send test message';
+    extraBtn.addEventListener('click', sendTestMessage);
+    $('startBtn').parentNode.appendChild(extraBtn);
+
+    if (modeConfig.lessonMode) {
+      $('lessonActions').style.display = 'block';
+      $('reportBtn').addEventListener('click', generateLessonReport);
+      $('downloadReportBtn').addEventListener('click', downloadReport);
+
+      analyzeBtnRef = document.createElement('button');
+      analyzeBtnRef.className = 'btn btn-primary';
+      analyzeBtnRef.textContent = 'Analyze speakers';
+      analyzeBtnRef.addEventListener('click', analyzeSpeakers);
+      $('lessonActions')
+        .querySelector('.studio-toolbar')
+        .appendChild(analyzeBtnRef);
+      updateAnalyzeButtonState();
+    }
+  });
 
 })(window);
