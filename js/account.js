@@ -173,7 +173,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
     const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
     const fourteenDaysAgo = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000);
-    const sevenToFourteenDaysAgo = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000);
+    const prevWeekStart = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000);
 
     let totalSecondsWeek = 0;
     let totalWordsWeek = 0;
@@ -227,7 +227,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
       }
 
-      if (started >= sevenToFourteenDaysAgo && started < sevenDaysAgo) {
+      if (started >= prevWeekStart && started < sevenDaysAgo) {
         if (typeof s.wpm === 'number') {
           sumWpmPrevWeek += s.wpm;
           countWpmPrevWeek += 1;
@@ -268,6 +268,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const maxUniqueWords = 2000;
 
     if (perfMinutesSpokenEl) perfMinutesSpokenEl.textContent = String(minutesWeek);
+
     if (perfMinutesSpokenBarEl) {
       const ratio = Math.min(minutesWeek / maxMinutesWeek, 1);
       perfMinutesSpokenBarEl.style.width = (ratio * 100).toFixed(0) + '%';
@@ -319,8 +320,8 @@ document.addEventListener('DOMContentLoaded', () => {
       if (avgFillersPerMin == null) {
         perfFillersPerMinuteBarEl.style.width = '0%';
       } else {
-        const clamped = Math.min(avgFillersPerMin / maxFillersBad, 1);
-        perfFillersPerMinuteBarEl.style.width = (clamped * 100).toFixed(0) + '%';
+        const ratio = Math.min(avgFillersPerMin / maxFillersBad, 1);
+        perfFillersPerMinuteBarEl.style.width = (ratio * 100).toFixed(0) + '%';
         perfFillersPerMinuteBarEl.classList.remove('bad', 'warn', 'good');
         if (avgFillersPerMin <= 3) {
           perfFillersPerMinuteBarEl.classList.add('good');
@@ -399,7 +400,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const bar = document.createElement('div');
         bar.className = 'perf-sparkline-bar';
         const heightRatio = Math.min(minutes / maxMinutesDay, 1);
-        bar.style.height = Math.max(3, (heightRatio * 100)) + '%';
+        bar.style.height = Math.max(3, heightRatio * 100) + '%';
         bar.title = `${minutes.toFixed(0)} min`;
         if (minutes > 0) {
           bar.classList.add('active');
@@ -411,11 +412,11 @@ document.addEventListener('DOMContentLoaded', () => {
     if (perfWpmTrendEl) {
       perfWpmTrendEl.innerHTML = '';
       const recentSessionsAsc = [...sessions]
-        .filter(s => s.started_at)
+        .filter((s) => s.started_at)
         .sort((a, b) => new Date(a.started_at) - new Date(b.started_at))
         .slice(-10);
 
-      const trendValues = recentSessionsAsc.map(s =>
+      const trendValues = recentSessionsAsc.map((s) =>
         typeof s.wpm === 'number' ? s.wpm : 0
       );
       const maxTrend = trendValues.reduce((m, v) => Math.max(m, v), 0) || 1;
@@ -425,7 +426,7 @@ document.addEventListener('DOMContentLoaded', () => {
         bar.className = 'perf-trend-bar';
         const value = typeof s.wpm === 'number' ? s.wpm : 0;
         const ratio = Math.min(value / maxTrend, 1);
-        bar.style.height = Math.max(4, (ratio * 100)) + '%';
+        bar.style.height = Math.max(4, ratio * 100) + '%';
         bar.title = s.started_at
           ? `${new Date(s.started_at).toLocaleString()} · ${Math.round(value)} WPM`
           : `${Math.round(value)} WPM`;
