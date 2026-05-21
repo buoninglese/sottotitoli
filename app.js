@@ -229,57 +229,57 @@ function computeQualityScore({ wpm, fillersPerMinute, lexicalDiversity }) {
 }
   // --- SUPABASE SESSION LOGGING ---
 
-  async function createSessionRow() {
-    try {
-      const result = await sessionSupabase.auth.getSession();
-      const sessionData = result.data;
-      const sessionError = result.error;
+async function createSessionRow() {
+  try {
+    const result = await sessionSupabase.auth.getSession();
+    const sessionData = result.data;
+    const sessionError = result.error;
 
-      if (sessionError || !sessionData || !sessionData.session) {
-        console.warn('No Supabase session; not logging Sottotitoli session.');
-        return;
-      }
-
-      const user = sessionData.session.user;
-      const userId = user.id;
-
-      currentSessionStart = new Date();
-
-      const languagePair =
-        modeKey.startsWith('translate-')
-          ? modeKey.replace('translate-', '').replace('-', '->')
-          : 'en-en';
-
-      const sessionType = 'solo';
-      const topicTag = null;
-
-      const { data, error } = await sessionSupabase
-        .from('sessions')
-        .insert([
-          {
-            user_id: userId,
-            room,
-            mode: modeKey,
-            started_at: currentSessionStart.toISOString(),
-            language_pair: languagePair,
-            session_type: sessionType,
-            topic_tag: topicTag
-          }
-        ])
-        .select('id')
-        .single();
-
-      if (error) {
-        console.error('Error creating session row:', error);
-        return;
-      }
-
-      currentSessionId = data.id;
-      console.log('Created session row with id', currentSessionId);
-    } catch (e) {
-      console.error('Unexpected error creating session row:', e);
+    if (sessionError || !sessionData || !sessionData.session) {
+      console.warn('No Supabase session; not logging Sottotitoli session.');
+      return;
     }
+
+    const user = sessionData.session.user;
+    const userId = user.id;
+    const startedAt = new Date();
+
+    const languagePair =
+      modeKey.startsWith('translate-')
+        ? modeKey.replace('translate-', '').replace('-', '->')
+        : modeKey.replace('caption-', '') + '->' + modeKey.replace('caption-', '');
+
+    const sessionType = 'solo';
+    const topicTag = null;
+
+    const { data, error } = await sessionSupabase
+      .from('sessions')
+      .insert([
+        {
+          user_id: userId,
+          room,
+          mode: modeKey,
+          started_at: startedAt.toISOString(),
+          language_pair: languagePair,
+          session_type: sessionType,
+          topic_tag: topicTag
+        }
+      ])
+      .select('id')
+      .single();
+
+    if (error) {
+      console.error('Error creating session row:', error);
+      return;
+    }
+
+    currentSessionId = data.id;
+    currentSessionStart = startedAt;
+    console.log('Created session row with id', currentSessionId);
+  } catch (e) {
+    console.error('Unexpected error creating session row:', e);
   }
+}
 
 async function finalizeSessionRow() {
   if (!currentSessionId || !currentSessionStart) {
@@ -318,22 +318,22 @@ async function finalizeSessionRow() {
       lexicalDiversity
     });
 
-    const updatePayload = {
-      ended_at: ended.toISOString(),
-      duration_seconds: durationSeconds,
-      transcript_text: plain.length ? plain : null,
-      words_count: wordsCount,
-      chars_count: charsCount,
-      wpm,
-      sentences_count: sentencesCount,
-      avg_sentence_length_words: avgSentenceLength,
-      fillers_count: fillersCount,
-      fillers_per_minute: fillersPerMinute,
-      unique_words_count: uniqueWordsCount,
-      lexical_diversity: lexicalDiversity,
-      quality_score: qualityScore,
-      last_ai_metrics_at: new Date().toISOString()
-    };
+const updatePayload = {
+  ended_at: ended.toISOString(),
+  duration_seconds: durationSeconds,
+  transcript_text: plain.length ? plain : null,
+  words_count: wordsCount,
+  chars_count: charsCount,
+  wpm,
+  sentences_count: sentencesCount,
+  avg_sentence_length_words: avgSentenceLength,
+  fillers_count: fillersCount,
+  fillers_per_minute: fillersPerMinute,
+  unique_words_count: uniqueWordsCount,
+  lexical_diversity: lexicalDiversity,
+  quality_score: qualityScore,
+  last_ai_metrics_at: new Date().toISOString()
+};
 
     const { error } = await sessionSupabase
       .from('sessions')
@@ -676,14 +676,32 @@ async function finalizeSessionRow() {
     }
   }
 
-  function startRecognition() {
-    if (!SpeechRecognition) {
-      setText(
-        'statusText',
-        'Speech recognition is not supported in this browser.'
-      );
-      return;
-    }
+  async function startRecognition() {
+  if (!SpeechRecognition) {
+    setText(
+      'statusText',
+      'Speech recognition is not supported in this browser.'
+    );
+    return;
+  }
+
+  clearRestartTimer();
+  shouldKeepListening = true;
+  hasStartedOnce = false;
+
+  if (!recognition) {
+    recognition = buildRecognition();
+  }
+
+  try {
+    await createSessionRow();
+    recognition.start();
+    startAudioCapture();
+  } catch (e) {
+    setText('statusText', 'Recognition start retrying...');
+    scheduleRestart(900);
+  }
+}
 
     clearRestartTimer();
     shouldKeepListening = true;
