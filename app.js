@@ -627,10 +627,10 @@ async function finalizeSessionRow() {
         : new MediaRecorder(audioStream);
 
       audioRecorder.ondataavailable = event => {
-        if (event.data && event.data.size > 0) {
-          audioChunks.append(event.data);
-        }
-      };
+  if (event.data && event.data.size > 0) {
+    audioChunks.push(event.data);
+  }
+};
 
       audioRecorder.onstop = () => {
         const actualType =
