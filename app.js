@@ -189,7 +189,44 @@
     const set = new Set(tokens);
     return set.size;
   }
+function computeQualityScore({ wpm, fillersPerMinute, lexicalDiversity }) {
+  let score = 50;
 
+  if (typeof wpm === 'number') {
+    if (wpm >= 90 && wpm <= 160) {
+      score += 15;
+    } else if (wpm >= 70 && wpm <= 180) {
+      score += 8;
+    }
+  }
+
+  if (typeof lexicalDiversity === 'number') {
+    if (lexicalDiversity >= 0.45) {
+      score += 20;
+    } else if (lexicalDiversity >= 0.35) {
+      score += 12;
+    } else if (lexicalDiversity >= 0.25) {
+      score += 6;
+    }
+  }
+
+  if (typeof fillersPerMinute === 'number') {
+    if (fillersPerMinute <= 3) {
+      score += 15;
+    } else if (fillersPerMinute <= 6) {
+      score += 8;
+    } else if (fillersPerMinute <= 9) {
+      score -= 4;
+    } else {
+      score -= 10;
+    }
+  }
+
+  if (score < 0) score = 0;
+  if (score > 100) score = 100;
+
+  return score;
+}
   // --- SUPABASE SESSION LOGGING ---
 
   async function createSessionRow() {
@@ -244,61 +281,75 @@
     }
   }
 
-  async function finalizeSessionRow() {
-    if (!currentSessionId || !currentSessionStart) {
-      return;
-    }
-
-    try {
-      const ended = new Date();
-      const durationSeconds = Math.round(
-        (ended.getTime() - currentSessionStart.getTime()) / 1000
-      );
-
-      const plain = transcriptLines.map(x => x.text).join(' ').trim();
-      const wordsCount = w.SottotitoliSessionUtils.countWords(plain);
-      const charsCount = plain.length;
-
-      const wpm =
-        durationSeconds > 0 ? wordsCount / (durationSeconds / 60) : null;
-      const sentencesCount = computeSentencesCount(plain);
-      const avgSentenceLength =
-        sentencesCount > 0 ? wordsCount / sentencesCount : null;
-      const fillersCount = computeFillersCount(plain);
-      const fillersPerMinute =
-        durationSeconds > 0 ? fillersCount / (durationSeconds / 60) : null;
-      const uniqueWordsCount = computeUniqueWordsCount(plain);
-
-      const updatePayload = {
-        ended_at: ended.toISOString(),
-        duration_seconds: durationSeconds,
-        words_count: wordsCount,
-        chars_count: charsCount,
-        wpm,
-        sentences_count: sentencesCount,
-        avg_sentence_length_words: avgSentenceLength,
-        fillers_count: fillersCount,
-        fillers_per_minute: fillersPerMinute,
-        unique_words_count: uniqueWordsCount
-      };
-
-      const { error } = await sessionSupabase
-        .from('sessions')
-        .update(updatePayload)
-        .eq('id', currentSessionId);
-
-      if (error) {
-        console.error('Error updating session row:', error);
-      } else {
-        console.log('Updated session row for', currentSessionId, updatePayload);
-      }
-    } catch (e) {
-      console.error('Unexpected error updating session row:', e);
-    } finally {
-      currentSessionId = null;
-      currentSessionStart = null;
-    }
+async function finalizeSessionRow() {
+  if (!currentSessionId || !currentSessionStart) {
+    return;
   }
+
+  try {
+    const ended = new Date();
+    const durationSeconds = Math.round(
+      (ended.getTime() - currentSessionStart.getTime()) / 1000
+    );
+
+    const plain = transcriptLines.map(x => x.text).join(' ').trim();
+    const wordsCount = w.SottotitoliSessionUtils.countWords(plain);
+    const charsCount = plain.length;
+
+    const wpm =
+      durationSeconds > 0 ? wordsCount / (durationSeconds / 60) : null;
+
+    const sentencesCount = computeSentencesCount(plain);
+    const avgSentenceLength =
+      sentencesCount > 0 ? wordsCount / sentencesCount : null;
+
+    const fillersCount = computeFillersCount(plain);
+    const fillersPerMinute =
+      durationSeconds > 0 ? fillersCount / (durationSeconds / 60) : null;
+
+    const uniqueWordsCount = computeUniqueWordsCount(plain);
+
+    const lexicalDiversity =
+      wordsCount > 0 ? uniqueWordsCount / wordsCount : null;
+
+    const qualityScore = computeQualityScore({
+      wpm,
+      fillersPerMinute,
+      lexicalDiversity
+    });
+
+    const updatePayload = {
+      ended_at: ended.toISOString(),
+      duration_seconds: durationSeconds,
+      words_count: wordsCount,
+      chars_count: charsCount,
+      wpm,
+      sentences_count: sentencesCount,
+      avg_sentence_length_words: avgSentenceLength,
+      fillers_count: fillersCount,
+      fillers_per_minute: fillersPerMinute,
+      unique_words_count: uniqueWordsCount,
+      lexical_diversity: lexicalDiversity,
+      quality_score: qualityScore
+    };
+
+    const { error } = await sessionSupabase
+      .from('sessions')
+      .update(updatePayload)
+      .eq('id', currentSessionId);
+
+    if (error) {
+      console.error('Error updating session row:', error);
+    } else {
+      console.log('Updated session row for', currentSessionId, updatePayload);
+    }
+  } catch (e) {
+    console.error('Unexpected error updating session row:', e);
+  } finally {
+    currentSessionId = null;
+    currentSessionStart = null;
+  }
+}
 
   // --- UI STATE HELPERS ---
 
