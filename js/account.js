@@ -51,6 +51,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
   let currentSessions = [];
 
+  function toLocalDayKey(date) {
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, '0');
+    const d = String(date.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  }
+
   async function loadAccount() {
     if (!accountSupabase) {
       console.warn('Supabase client not available on account page.');
@@ -132,7 +139,8 @@ document.addEventListener('DOMContentLoaded', () => {
       if (sessionsEl) sessionsEl.textContent = 'Could not load sessions yet.';
       if (downloadCsvBtn) downloadCsvBtn.disabled = true;
       if (perfFunFactEl) {
-        perfFunFactEl.textContent = 'Non riusciamo a caricare le tue sessioni al momento.';
+        perfFunFactEl.textContent =
+          'Non riusciamo a caricare le tue sessioni al momento.';
       }
       return;
     }
@@ -225,7 +233,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
     const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
     const fourteenDaysAgo = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000);
-    const sevenToFourteenDaysAgo = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000);
+    const previousWeekStart = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000);
 
     let totalSecondsWeek = 0;
     let totalWordsWeek = 0;
@@ -261,62 +269,66 @@ document.addEventListener('DOMContentLoaded', () => {
     sessions.forEach((s) => {
       if (!s.started_at) return;
       const started = new Date(s.started_at);
-      const dayKey = started.toISOString().slice(0, 10);
+      const dayKey = toLocalDayKey(started);
 
-      if (typeof s.duration_seconds === 'number' && s.duration_seconds > 0) {
+      const hasSpokenDuration =
+        typeof s.duration_seconds === 'number' && s.duration_seconds > 0;
+
+      if (hasSpokenDuration) {
         spokenDates.add(dayKey);
       }
 
       if (started >= sevenDaysAgo) {
-        if (typeof s.duration_seconds === 'number') {
+        if (hasSpokenDuration) {
           totalSecondsWeek += s.duration_seconds;
-        }
-        if (typeof s.words_count === 'number') {
-          totalWordsWeek += s.words_count;
-        }
-        if (typeof s.wpm === 'number') {
-          sumWpm += s.wpm;
-          countWpm += 1;
-        }
-        if (typeof s.fillers_per_minute === 'number') {
-          sumFillersPerMinute += s.fillers_per_minute;
-          countFillers += 1;
-        }
-        if (typeof s.lexical_diversity === 'number') {
-          sumLexicalDiversity += s.lexical_diversity;
-          countLexicalDiversity += 1;
-        }
-        if (typeof s.quality_score === 'number') {
-          sumQualityScore += s.quality_score;
-          countQualityScore += 1;
-        }
-        if (typeof s.question_count === 'number') {
-          sumQuestions += s.question_count;
-          countQuestions += 1;
-        }
-        if (typeof s.negation_count === 'number') {
-          sumNegations += s.negation_count;
-          countNegations += 1;
-        }
-        if (typeof s.repetition_rate === 'number') {
-          sumRepetitionRate += s.repetition_rate;
-          countRepetitionRate += 1;
-        }
-        if (typeof s.turn_count === 'number') {
-          sumTurns += s.turn_count;
-          countTurns += 1;
-        }
-        if (typeof s.interruption_count === 'number') {
-          sumInterruptions += s.interruption_count;
-          countInterruptions += 1;
-        }
-        if (typeof s.speaking_share_ratio === 'number') {
-          sumSpeakingShare += s.speaking_share_ratio;
-          countSpeakingShare += 1;
+
+          if (typeof s.words_count === 'number') {
+            totalWordsWeek += s.words_count;
+          }
+          if (typeof s.wpm === 'number') {
+            sumWpm += s.wpm;
+            countWpm += 1;
+          }
+          if (typeof s.fillers_per_minute === 'number') {
+            sumFillersPerMinute += s.fillers_per_minute;
+            countFillers += 1;
+          }
+          if (typeof s.lexical_diversity === 'number') {
+            sumLexicalDiversity += s.lexical_diversity;
+            countLexicalDiversity += 1;
+          }
+          if (typeof s.quality_score === 'number') {
+            sumQualityScore += s.quality_score;
+            countQualityScore += 1;
+          }
+          if (typeof s.question_count === 'number') {
+            sumQuestions += s.question_count;
+            countQuestions += 1;
+          }
+          if (typeof s.negation_count === 'number') {
+            sumNegations += s.negation_count;
+            countNegations += 1;
+          }
+          if (typeof s.repetition_rate === 'number') {
+            sumRepetitionRate += s.repetition_rate;
+            countRepetitionRate += 1;
+          }
+          if (typeof s.turn_count === 'number') {
+            sumTurns += s.turn_count;
+            countTurns += 1;
+          }
+          if (typeof s.interruption_count === 'number') {
+            sumInterruptions += s.interruption_count;
+            countInterruptions += 1;
+          }
+          if (typeof s.speaking_share_ratio === 'number') {
+            sumSpeakingShare += s.speaking_share_ratio;
+            countSpeakingShare += 1;
+          }
         }
       }
 
-      if (started >= sevenToFourteenDaysAgo && started < sevenDaysAgo) {
+      if (started >= previousWeekStart && started < sevenDaysAgo) {
         if (typeof s.wpm === 'number') {
           sumWpmPrevWeek += s.wpm;
           countWpmPrevWeek += 1;
@@ -341,8 +353,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const minutesWeek = Math.round(totalSecondsWeek / 60);
     const avgWpm = countWpm > 0 ? sumWpm / countWpm : null;
-    const avgWpmPrevWeek = countWpmPrevWeek > 0 ? sumWpmPrevWeek / countWpmPrevWeek : null;
-    const avgFillersPerMin = countFillers > 0 ? sumFillersPerMinute / countFillers : null;
+    const avgWpmPrevWeek =
+      countWpmPrevWeek > 0 ? sumWpmPrevWeek / countWpmPrevWeek : null;
+    const avgFillersPerMin =
+      countFillers > 0 ? sumFillersPerMinute / countFillers : null;
     const avgLexicalDiversity =
       countLexicalDiversity > 0 ? sumLexicalDiversity / countLexicalDiversity : null;
     const avgQualityScore =
@@ -503,7 +517,11 @@ document.addEventListener('DOMContentLoaded', () => {
       if (avgNegations == null) {
         setBarState(perfNegationCountBarEl, 0, null);
       } else {
-        setBarState(perfNegationCountBarEl, Math.min(avgNegations / 8, 1), 'warn');
+        setBarState(
+          perfNegationCountBarEl,
+          Math.min(avgNegations / 8, 1),
+          'warn'
+        );
       }
     }
 
@@ -518,7 +536,11 @@ document.addEventListener('DOMContentLoaded', () => {
         let state = 'good';
         if (avgRepetitionRate > 0.35) state = 'bad';
         else if (avgRepetitionRate > 0.2) state = 'warn';
-        setBarState(perfRepetitionRateBarEl, Math.min(avgRepetitionRate / 0.5, 1), state);
+        setBarState(
+          perfRepetitionRateBarEl,
+          Math.min(avgRepetitionRate / 0.5, 1),
+          state
+        );
       }
     }
 
@@ -533,7 +555,11 @@ document.addEventListener('DOMContentLoaded', () => {
         let state = 'warn';
         if (avgTurns >= 6) state = 'good';
         else if (avgTurns <= 2) state = 'bad';
-        setBarState(perfConversationTurnsBarEl, Math.min(avgTurns / 12, 1), state);
+        setBarState(
+          perfConversationTurnsBarEl,
+          Math.min(avgTurns / 12, 1),
+          state
+        );
       }
     }
 
@@ -548,7 +574,11 @@ document.addEventListener('DOMContentLoaded', () => {
         let state = 'good';
         if (avgInterruptions >= 3) state = 'bad';
         else if (avgInterruptions >= 1) state = 'warn';
-        setBarState(perfInterruptionsBarEl, Math.min(avgInterruptions / 5, 1), state);
+        setBarState(
+          perfInterruptionsBarEl,
+          Math.min(avgInterruptions / 5, 1),
+          state
+        );
       }
     }
 
@@ -561,10 +591,13 @@ document.addEventListener('DOMContentLoaded', () => {
         setBarState(perfSpeakingShareBarEl, 0, null);
       } else {
         const distanceFromBalanced = Math.abs(avgSpeakingShare - 0.5);
+        const balanceScore = 1 - Math.min(distanceFromBalanced / 0.5, 1);
+
         let state = 'good';
         if (distanceFromBalanced > 0.3) state = 'bad';
         else if (distanceFromBalanced > 0.18) state = 'warn';
-        setBarState(perfSpeakingShareBarEl, Math.min(avgSpeakingShare, 1), state);
+
+        setBarState(perfSpeakingShareBarEl, balanceScore, state);
       }
     }
 
@@ -618,8 +651,13 @@ document.addEventListener('DOMContentLoaded', () => {
       let cursor = new Date(now);
       cursor.setHours(0, 0, 0, 0);
 
+      const todayKey = toLocalDayKey(cursor);
+      if (!spokenDates.has(todayKey)) {
+        cursor = new Date(cursor.getTime() - 24 * 60 * 60 * 1000);
+      }
+
       while (streak < 365) {
-        const key = cursor.toISOString().slice(0, 10);
+        const key = toLocalDayKey(cursor);
         if (spokenDates.has(key)) {
           streak += 1;
           cursor = new Date(cursor.getTime() - 24 * 60 * 60 * 1000);
@@ -642,11 +680,19 @@ document.addEventListener('DOMContentLoaded', () => {
       let fact = '';
 
       if (avgTurns != null && avgTurns >= 6 && avgSpeakingShare != null) {
-        fact = `Your recent sessions look more dialogic: about ${avgTurns.toFixed(1)} turns per session with a speaking share near ${Math.round(avgSpeakingShare * 100)}%.`;
+        fact = `Your recent sessions look more dialogic: about ${avgTurns.toFixed(
+          1
+        )} turns per session with a speaking share near ${Math.round(
+          avgSpeakingShare * 100
+        )}%.`;
       } else if (avgQualityScore != null && avgQualityScore >= 70) {
-        fact = `Your recent session quality is strong at ${Math.round(avgQualityScore)}/100, with a healthy balance of fluency and lexical variety.`;
+        fact = `Your recent session quality is strong at ${Math.round(
+          avgQualityScore
+        )}/100, with a healthy balance of fluency and lexical variety.`;
       } else if (minutesWeek >= 60 && avgWpm != null) {
-        fact = `In the last 7 days you spoke for ${minutesWeek} minutes at an average speed of ${Math.round(avgWpm)} words per minute.`;
+        fact = `In the last 7 days you spoke for ${minutesWeek} minutes at an average speed of ${Math.round(
+          avgWpm
+        )} words per minute.`;
       } else if (uniqueWordsLast30 > 0) {
         fact = `You have produced roughly ${uniqueWordsLast30} unique spoken-word instances over the last 30 days.`;
       } else {
