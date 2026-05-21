@@ -321,6 +321,7 @@ async function finalizeSessionRow() {
     const updatePayload = {
       ended_at: ended.toISOString(),
       duration_seconds: durationSeconds,
+      transcript_text: plain.length ? plain : null,
       words_count: wordsCount,
       chars_count: charsCount,
       wpm,
@@ -330,7 +331,8 @@ async function finalizeSessionRow() {
       fillers_per_minute: fillersPerMinute,
       unique_words_count: uniqueWordsCount,
       lexical_diversity: lexicalDiversity,
-      quality_score: qualityScore
+      quality_score: qualityScore,
+      last_ai_metrics_at: new Date().toISOString()
     };
 
     const { error } = await sessionSupabase
