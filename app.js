@@ -1,13 +1,11 @@
-// app.js
-
 (function (w) {
   'use strict';
 
   var LANGUAGES = [
-    { code: 'en', label: 'English',  stt: 'en-US' },
-    { code: 'it', label: 'Italian',  stt: 'it-IT' },
-    { code: 'fr', label: 'French',   stt: 'fr-FR' },
-    { code: 'de', label: 'German',   stt: 'de-DE' }
+    { code: 'en', label: 'English', stt: 'en-US' },
+    { code: 'it', label: 'Italian', stt: 'it-IT' },
+    { code: 'fr', label: 'French', stt: 'fr-FR' },
+    { code: 'de', label: 'German', stt: 'de-DE' }
   ];
 
   const params = new URLSearchParams(window.location.search);
@@ -18,36 +16,6 @@
     (configRoot.modes && configRoot.modes[modeKey]) ||
     (configRoot.modes && configRoot.modes['caption-en']) ||
     {};
-
-  function populateLanguageSelectsFromMode() {
-    var srcSelect = document.getElementById('sourceLangSelect');
-    var tgtSelect = document.getElementById('targetLangSelect');
-    if (!srcSelect || !tgtSelect) return;
-
-    srcSelect.innerHTML = '';
-    tgtSelect.innerHTML = '';
-
-    LANGUAGES.forEach(function (lang) {
-      var opt1 = document.createElement('option');
-      opt1.value = lang.code;
-      opt1.textContent = lang.label;
-      srcSelect.appendChild(opt1);
-
-      var opt2 = document.createElement('option');
-      opt2.value = lang.code;
-      opt2.textContent = lang.label;
-      tgtSelect.appendChild(opt2);
-    });
-
-    var parts = modeKey.split('-');
-    if (parts[0] === 'caption') {
-      srcSelect.value = parts[1] || 'en';
-      tgtSelect.value = srcSelect.value;
-    } else if (parts[0] === 'translate') {
-      srcSelect.value = parts[1] || 'en';
-      tgtSelect.value = parts[2] || 'it';
-    }
-  }
 
   const SpeechRecognition = w.SpeechRecognition || w.webkitSpeechRecognition;
   const DIARIZE_URL = 'https://sottotitoli-websocket.onrender.com/analyze-speakers';
@@ -75,8 +43,7 @@
   let speakerAnalysisCompleted = false;
   let analyzeBtnRef = null;
 
-  // Reuse the global Supabase client set up in auth.js
-  const sessionSupabase = window.sottotitoliSupabase;
+  const sessionSupabase = w.sottotitoliSupabase;
   let currentSessionId = null;
   let currentSessionStart = null;
 
@@ -115,27 +82,56 @@
     box.prepend(div);
   }
 
+  function populateLanguageSelectsFromMode() {
+    const srcSelect = $('sourceLangSelect');
+    const tgtSelect = $('targetLangSelect');
+    if (!srcSelect || !tgtSelect) return;
+
+    srcSelect.innerHTML = '';
+    tgtSelect.innerHTML = '';
+
+    LANGUAGES.forEach(function (lang) {
+      const opt1 = document.createElement('option');
+      opt1.value = lang.code;
+      opt1.textContent = lang.label;
+      srcSelect.appendChild(opt1);
+
+      const opt2 = document.createElement('option');
+      opt2.value = lang.code;
+      opt2.textContent = lang.label;
+      tgtSelect.appendChild(opt2);
+    });
+
+    const parts = modeKey.split('-');
+    if (parts[0] === 'caption') {
+      srcSelect.value = parts[1] || 'en';
+      tgtSelect.value = srcSelect.value;
+    } else if (parts[0] === 'translate') {
+      srcSelect.value = parts[1] || 'en';
+      tgtSelect.value = parts[2] || 'it';
+    }
+  }
+
   function syncUrl() {
-    const url = new URL(window.location.href);
+    const url = new URL(w.location.href);
     url.searchParams.set('mode', modeKey);
     url.searchParams.set('room', room);
-    url.searchParams.set('v', '11');
+    url.searchParams.set('v', '13');
     history.replaceState({}, '', url.toString());
   }
 
   function switchMode(newModeKey) {
-    const url = new URL(window.location.href);
+    const url = new URL(w.location.href);
     url.searchParams.set('mode', newModeKey);
-    // preserve current room so overlay stays in sync
     url.searchParams.set('room', room);
-    url.searchParams.set('v', '11');
-    window.location.href = url.toString();
+    url.searchParams.set('v', '13');
+    w.location.href = url.toString();
   }
 
   function currentOverlayUrl() {
-    const url = new URL('overlay.html', window.location.href);
+    const url = new URL('overlay.html', w.location.href);
     url.searchParams.set('room', room);
-    url.searchParams.set('v', '11');
+    url.searchParams.set('v', '13');
     return url.toString();
   }
 
@@ -151,18 +147,15 @@
   }
 
   function updateStats() {
-    const plain = transcriptLines.map(x => x.text).join(' ').trim();
+    const plain = transcriptLines.map(function (x) { return x.text; }).join(' ').trim();
     setText('statLines', String(transcriptLines.length));
     setText('statWords', String(w.SottotitoliSessionUtils.countWords(plain)));
     setText('statChars', String(plain.length));
   }
 
-  // --- NEW METRIC HELPERS ---
-
   function computeSentencesCount(text) {
     if (!text) return 0;
-    const parts = text.split(/[.!?]+/).map(s => s.trim()).filter(Boolean);
-    return parts.length;
+    return text.split(/[.!?]+/).map(function (s) { return s.trim(); }).filter(Boolean).length;
   }
 
   function computeFillersCount(text) {
@@ -170,190 +163,192 @@
     const lower = text.toLowerCase();
     const fillers = ['uh', 'um', 'ehm', 'erm', 'you know', 'like'];
     let count = 0;
-    fillers.forEach(f => {
+
+    fillers.forEach(function (f) {
       const regex = new RegExp('\\b' + f.replace(' ', '\\s+') + '\\b', 'g');
       const matches = lower.match(regex);
       if (matches) count += matches.length;
     });
+
     return count;
   }
 
   function computeUniqueWordsCount(text) {
     if (!text) return 0;
+
     const tokens = text
       .toLowerCase()
-      .replace(/[^a-zA-Z\s']/g, ' ')
+      .replace(/[^a-zA-ZÀ-ÿ\s']/g, ' ')
       .split(/\s+/)
       .filter(Boolean);
+
     if (!tokens.length) return 0;
-    const set = new Set(tokens);
-    return set.size;
-  }
-function computeQualityScore({ wpm, fillersPerMinute, lexicalDiversity }) {
-  let score = 50;
-
-  if (typeof wpm === 'number') {
-    if (wpm >= 90 && wpm <= 160) {
-      score += 15;
-    } else if (wpm >= 70 && wpm <= 180) {
-      score += 8;
-    }
+    return new Set(tokens).size;
   }
 
-  if (typeof lexicalDiversity === 'number') {
-    if (lexicalDiversity >= 0.45) {
-      score += 20;
-    } else if (lexicalDiversity >= 0.35) {
-      score += 12;
-    } else if (lexicalDiversity >= 0.25) {
-      score += 6;
+  function computeQualityScore(metrics) {
+    let score = 50;
+    const wpm = metrics.wpm;
+    const fillersPerMinute = metrics.fillersPerMinute;
+    const lexicalDiversity = metrics.lexicalDiversity;
+
+    if (typeof wpm === 'number') {
+      if (wpm >= 90 && wpm <= 160) {
+        score += 15;
+      } else if (wpm >= 70 && wpm <= 180) {
+        score += 8;
+      }
     }
+
+    if (typeof lexicalDiversity === 'number') {
+      if (lexicalDiversity >= 0.45) {
+        score += 20;
+      } else if (lexicalDiversity >= 0.35) {
+        score += 12;
+      } else if (lexicalDiversity >= 0.25) {
+        score += 6;
+      }
+    }
+
+    if (typeof fillersPerMinute === 'number') {
+      if (fillersPerMinute <= 3) {
+        score += 15;
+      } else if (fillersPerMinute <= 6) {
+        score += 8;
+      } else if (fillersPerMinute <= 9) {
+        score -= 4;
+      } else {
+        score -= 10;
+      }
+    }
+
+    if (score < 0) score = 0;
+    if (score > 100) score = 100;
+
+    return score;
   }
 
-  if (typeof fillersPerMinute === 'number') {
-    if (fillersPerMinute <= 3) {
-      score += 15;
-    } else if (fillersPerMinute <= 6) {
-      score += 8;
-    } else if (fillersPerMinute <= 9) {
-      score -= 4;
-    } else {
-      score -= 10;
-    }
-  }
+  async function createSessionRow() {
+    try {
+      if (!sessionSupabase) {
+        console.warn('Supabase client not available; not logging session.');
+        return;
+      }
 
-  if (score < 0) score = 0;
-  if (score > 100) score = 100;
+      const result = await sessionSupabase.auth.getSession();
+      const sessionData = result.data;
+      const sessionError = result.error;
 
-  return score;
-}
-  // --- SUPABASE SESSION LOGGING ---
+      if (sessionError || !sessionData || !sessionData.session) {
+        console.warn('No Supabase session; not logging Sottotitoli session.');
+        return;
+      }
 
-async function createSessionRow() {
-  try {
-    const result = await sessionSupabase.auth.getSession();
-    const sessionData = result.data;
-    const sessionError = result.error;
+      const user = sessionData.session.user;
+      const userId = user.id;
+      currentSessionStart = new Date();
 
-    if (sessionError || !sessionData || !sessionData.session) {
-      console.warn('No Supabase session; not logging Sottotitoli session.');
-      return;
-    }
-
-    const user = sessionData.session.user;
-    const userId = user.id;
-    const startedAt = new Date();
-
-    const languagePair =
-      modeKey.startsWith('translate-')
+      const languagePair = modeKey.startsWith('translate-')
         ? modeKey.replace('translate-', '').replace('-', '->')
-        : modeKey.replace('caption-', '') + '->' + modeKey.replace('caption-', '');
+        : 'en-en';
 
-    const sessionType = 'solo';
-    const topicTag = null;
+      const sessionType = 'solo';
+      const topicTag = null;
 
-    const { data, error } = await sessionSupabase
-      .from('sessions')
-      .insert([
-        {
-          user_id: userId,
-          room,
-          mode: modeKey,
-          started_at: startedAt.toISOString(),
-          language_pair: languagePair,
-          session_type: sessionType,
-          topic_tag: topicTag
-        }
-      ])
-      .select('id')
-      .single();
+      const { data, error } = await sessionSupabase
+        .from('sessions')
+        .insert([
+          {
+            user_id: userId,
+            room: room,
+            mode: modeKey,
+            started_at: currentSessionStart.toISOString(),
+            language_pair: languagePair,
+            session_type: sessionType,
+            topic_tag: topicTag
+          }
+        ])
+        .select('id')
+        .single();
 
-    if (error) {
-      console.error('Error creating session row:', error);
+      if (error) {
+        console.error('Error creating session row:', error);
+        return;
+      }
+
+      currentSessionId = data.id;
+      console.log('Created session row with id', currentSessionId);
+    } catch (e) {
+      console.error('Unexpected error creating session row:', e);
+    }
+  }
+
+  async function finalizeSessionRow() {
+    if (!currentSessionId || !currentSessionStart || !sessionSupabase) {
       return;
     }
 
-    currentSessionId = data.id;
-    currentSessionStart = startedAt;
-    console.log('Created session row with id', currentSessionId);
-  } catch (e) {
-    console.error('Unexpected error creating session row:', e);
-  }
-}
+    try {
+      const ended = new Date();
+      const durationSeconds = Math.round(
+        (ended.getTime() - currentSessionStart.getTime()) / 1000
+      );
 
-async function finalizeSessionRow() {
-  if (!currentSessionId || !currentSessionStart) {
-    return;
-  }
+      const plain = transcriptLines.map(function (x) { return x.text; }).join(' ').trim();
+      const wordsCount = w.SottotitoliSessionUtils.countWords(plain);
+      const charsCount = plain.length;
 
-  try {
-    const ended = new Date();
-    const durationSeconds = Math.round(
-      (ended.getTime() - currentSessionStart.getTime()) / 1000
-    );
+      const wpm = durationSeconds > 0 ? wordsCount / (durationSeconds / 60) : null;
+      const sentencesCount = computeSentencesCount(plain);
+      const avgSentenceLength =
+        sentencesCount > 0 ? wordsCount / sentencesCount : null;
 
-    const plain = transcriptLines.map(x => x.text).join(' ').trim();
-    const wordsCount = w.SottotitoliSessionUtils.countWords(plain);
-    const charsCount = plain.length;
+      const fillersCount = computeFillersCount(plain);
+      const fillersPerMinute =
+        durationSeconds > 0 ? fillersCount / (durationSeconds / 60) : null;
 
-    const wpm =
-      durationSeconds > 0 ? wordsCount / (durationSeconds / 60) : null;
+      const uniqueWordsCount = computeUniqueWordsCount(plain);
+      const lexicalDiversity =
+        wordsCount > 0 ? uniqueWordsCount / wordsCount : null;
 
-    const sentencesCount = computeSentencesCount(plain);
-    const avgSentenceLength =
-      sentencesCount > 0 ? wordsCount / sentencesCount : null;
+      const qualityScore = computeQualityScore({
+        wpm: wpm,
+        fillersPerMinute: fillersPerMinute,
+        lexicalDiversity: lexicalDiversity
+      });
 
-    const fillersCount = computeFillersCount(plain);
-    const fillersPerMinute =
-      durationSeconds > 0 ? fillersCount / (durationSeconds / 60) : null;
+      const updatePayload = {
+        ended_at: ended.toISOString(),
+        duration_seconds: durationSeconds,
+        words_count: wordsCount,
+        chars_count: charsCount,
+        wpm: wpm,
+        sentences_count: sentencesCount,
+        avg_sentence_length_words: avgSentenceLength,
+        fillers_count: fillersCount,
+        fillers_per_minute: fillersPerMinute,
+        unique_words_count: uniqueWordsCount,
+        lexical_diversity: lexicalDiversity,
+        quality_score: qualityScore
+      };
 
-    const uniqueWordsCount = computeUniqueWordsCount(plain);
+      const { error } = await sessionSupabase
+        .from('sessions')
+        .update(updatePayload)
+        .eq('id', currentSessionId);
 
-    const lexicalDiversity =
-      wordsCount > 0 ? uniqueWordsCount / wordsCount : null;
-
-    const qualityScore = computeQualityScore({
-      wpm,
-      fillersPerMinute,
-      lexicalDiversity
-    });
-
-const updatePayload = {
-  ended_at: ended.toISOString(),
-  duration_seconds: durationSeconds,
-  transcript_text: plain.length ? plain : null,
-  words_count: wordsCount,
-  chars_count: charsCount,
-  wpm,
-  sentences_count: sentencesCount,
-  avg_sentence_length_words: avgSentenceLength,
-  fillers_count: fillersCount,
-  fillers_per_minute: fillersPerMinute,
-  unique_words_count: uniqueWordsCount,
-  lexical_diversity: lexicalDiversity,
-  quality_score: qualityScore,
-  last_ai_metrics_at: new Date().toISOString()
-};
-
-    const { error } = await sessionSupabase
-      .from('sessions')
-      .update(updatePayload)
-      .eq('id', currentSessionId);
-
-    if (error) {
-      console.error('Error updating session row:', error);
-    } else {
-      console.log('Updated session row for', currentSessionId, updatePayload);
+      if (error) {
+        console.error('Error updating session row:', error);
+      } else {
+        console.log('Updated session row for', currentSessionId, updatePayload);
+      }
+    } catch (e) {
+      console.error('Unexpected error updating session row:', e);
+    } finally {
+      currentSessionId = null;
+      currentSessionStart = null;
     }
-  } catch (e) {
-    console.error('Unexpected error updating session row:', e);
-  } finally {
-    currentSessionId = null;
-    currentSessionStart = null;
   }
-}
-
-  // --- UI STATE HELPERS ---
 
   function updateSocketState(state) {
     setText('socketStatus', state);
@@ -438,6 +433,7 @@ const updatePayload = {
       setText('statusText', 'No websocket publisher available.');
       return;
     }
+
     wsPublisher.publish(payload);
     if (statusMessage) setText('statusText', statusMessage);
   }
@@ -446,16 +442,16 @@ const updatePayload = {
     if (!text) return;
 
     const timestamp = w.SottotitoliSessionUtils.formatTimestamp(new Date());
-    const entry = { timestamp, text, translated: null };
+    const entry = { timestamp: timestamp, text: text, translated: null };
 
     appendLine('sourceOutput', text);
 
     const payload = {
       type: 'caption',
-      room,
+      room: room,
       mode: modeKey,
       final: text,
-      timestamp,
+      timestamp: timestamp,
       sourceLang: modeConfig.sourceLang,
       kind: modeConfig.translate ? 'translation' : 'caption'
     };
@@ -498,7 +494,7 @@ const updatePayload = {
     sendPayload(
       {
         type: 'caption',
-        room,
+        room: room,
         mode: modeKey,
         interim: clean,
         sourceLang: modeConfig.sourceLang,
@@ -519,7 +515,7 @@ const updatePayload = {
     clearRestartTimer();
     if (!shouldKeepListening) return;
 
-    restartTimer = setTimeout(() => {
+    restartTimer = setTimeout(function () {
       try {
         if (recognition) recognition.start();
       } catch (e) {
@@ -535,18 +531,17 @@ const updatePayload = {
     rec.interimResults = true;
     rec.lang = modeConfig.sourceLang || 'en-US';
 
-    rec.onstart = () => {
+    rec.onstart = function () {
       hasStartedOnce = true;
       setText('statusText', 'Listening in ' + (modeConfig.sourceLang || 'en-US') + '...');
       updateMicState('live', true);
     };
 
-    rec.onresult = event => {
+    rec.onresult = function (event) {
       let interim = '';
 
       for (let i = event.resultIndex; i < event.results.length; i++) {
-        const text =
-          (event.results[i][0] && event.results[i][0].transcript || '').trim();
+        const text = (((event.results[i][0] && event.results[i][0].transcript) || '')).trim();
         if (!text) continue;
 
         if (event.results[i].isFinal) {
@@ -559,7 +554,7 @@ const updatePayload = {
       handleInterimTranscript(interim.trim());
     };
 
-    rec.onerror = event => {
+    rec.onerror = function (event) {
       const err = event.error || 'unknown';
       setText(
         'statusText',
@@ -579,7 +574,7 @@ const updatePayload = {
       updateMicState('recovering', false);
     };
 
-    rec.onend = () => {
+    rec.onend = function () {
       updateMicState(shouldKeepListening ? 'restarting' : 'stopped', false);
 
       if (shouldKeepListening) {
@@ -602,10 +597,7 @@ const updatePayload = {
     if (audioRecorder && audioRecorder.state === 'recording') return;
 
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-      setText(
-        'statusText',
-        'Audio recording is not supported in this browser.'
-      );
+      setText('statusText', 'Audio recording is not supported in this browser.');
       return;
     }
 
@@ -625,23 +617,25 @@ const updatePayload = {
       }
 
       audioRecorder = mimeType
-        ? new MediaRecorder(audioStream, { mimeType })
+        ? new MediaRecorder(audioStream, { mimeType: mimeType })
         : new MediaRecorder(audioStream);
 
-      audioRecorder.ondataavailable = event => {
-  if (event.data && event.data.size > 0) {
-    audioChunks.push(event.data);
-  }
-};
+      audioRecorder.ondataavailable = function (event) {
+        if (event.data && event.data.size > 0) {
+          audioChunks.push(event.data);
+        }
+      };
 
-      audioRecorder.onstop = () => {
+      audioRecorder.onstop = function () {
         const actualType =
           (audioRecorder && audioRecorder.mimeType) || 'audio/webm';
         lastAudioBlob = new Blob(audioChunks, { type: actualType });
         isRecordingAudio = false;
 
         if (audioStream) {
-          audioStream.getTracks().forEach(track => track.stop());
+          audioStream.getTracks().forEach(function (track) {
+            track.stop();
+          });
           audioStream = null;
         }
 
@@ -655,10 +649,7 @@ const updatePayload = {
 
       audioRecorder.start();
       isRecordingAudio = true;
-      setText(
-        'statusText',
-        'Recording lesson audio for later speaker analysis...'
-      );
+      setText('statusText', 'Recording lesson audio for later speaker analysis...');
     } catch (err) {
       setText('statusText', 'Could not start audio capture: ' + err.message);
     }
@@ -666,42 +657,19 @@ const updatePayload = {
 
   function stopAudioCapture() {
     if (!audioRecorder || audioRecorder.state !== 'recording') return;
+
     try {
       audioRecorder.stop();
     } catch (err) {
-      setText(
-        'statusText',
-        'Could not stop audio recorder: ' + err.message
-      );
+      setText('statusText', 'Could not stop audio recorder: ' + err.message);
     }
   }
 
-  async function startRecognition() {
-  if (!SpeechRecognition) {
-    setText(
-      'statusText',
-      'Speech recognition is not supported in this browser.'
-    );
-    return;
-  }
-
-  clearRestartTimer();
-  shouldKeepListening = true;
-  hasStartedOnce = false;
-
-  if (!recognition) {
-    recognition = buildRecognition();
-  }
-
-  try {
-    await createSessionRow();
-    recognition.start();
-    startAudioCapture();
-  } catch (e) {
-    setText('statusText', 'Recognition start retrying...');
-    scheduleRestart(900);
-  }
-}
+  function startRecognition() {
+    if (!SpeechRecognition) {
+      setText('statusText', 'Speech recognition is not supported in this browser.');
+      return;
+    }
 
     clearRestartTimer();
     shouldKeepListening = true;
@@ -714,8 +682,6 @@ const updatePayload = {
     try {
       recognition.start();
       startAudioCapture();
-
-      // Log this session in Supabase
       createSessionRow();
     } catch (e) {
       setText('statusText', 'Recognition start retrying...');
@@ -736,23 +702,18 @@ const updatePayload = {
     stopAudioCapture();
     updateMicState('stopped', false);
     setText('statusText', 'Recognition stopped by user.');
-
-    // Finalize Supabase session record
     finalizeSessionRow();
   }
 
   function connectSocket() {
     wsPublisher = w.createWSPublisher({
       url: w.SOTTOTITOLI_CONFIG.websocketUrl,
-      room,
-      onStateChange: state => {
+      room: room,
+      onStateChange: function (state) {
         updateSocketState(state);
-        setText(
-          'statusText',
-          'Socket state: ' + state + ' · room: ' + room
-        );
+        setText('statusText', 'Socket state: ' + state + ' · room: ' + room);
       },
-      onError: error => {
+      onError: function (error) {
         setText('statusText', 'Socket error: ' + error);
       }
     });
@@ -761,42 +722,27 @@ const updatePayload = {
   }
 
   async function generateLessonReport() {
-    const report = await w.SottotitoliLessonReport.generateLessonReport(
-      transcriptLines
-    );
-    latestReportText =
-      w.SottotitoliLessonReport.formatLessonReport(report);
+    const report = await w.SottotitoliLessonReport.generateLessonReport(transcriptLines);
+    latestReportText = w.SottotitoliLessonReport.formatLessonReport(report);
     latestReportText = removeExistingSpeakerAnalysis(latestReportText);
     setText('lessonReport', latestReportText || 'No report yet.');
   }
 
   async function copyOverlayLink() {
-    const ok = await w.SottotitoliSessionUtils.copyToClipboard(
-      currentOverlayUrl()
-    );
-    setText(
-      'statusText',
-      ok ? 'Overlay link copied.' : 'Could not copy overlay link.'
-    );
+    const ok = await w.SottotitoliSessionUtils.copyToClipboard(currentOverlayUrl());
+    setText('statusText', ok ? 'Overlay link copied.' : 'Could not copy overlay link.');
   }
 
   async function copyTranscript() {
-    const text =
-      w.SottotitoliSessionUtils.transcriptToPlainText(transcriptLines);
-    const ok = await w.SottotitoliSessionUtils.copyToClipboard(
-      text || 'No transcript yet.'
-    );
-    setText(
-      'statusText',
-      ok ? 'Transcript copied.' : 'Could not copy transcript.'
-    );
+    const text = w.SottotitoliSessionUtils.transcriptToPlainText(transcriptLines);
+    const ok = await w.SottotitoliSessionUtils.copyToClipboard(text || 'No transcript yet.');
+    setText('statusText', ok ? 'Transcript copied.' : 'Could not copy transcript.');
   }
 
   function downloadTranscript() {
-    const text =
-      w.SottotitoliSessionUtils.transcriptToPlainText(transcriptLines);
+    const text = w.SottotitoliSessionUtils.transcriptToPlainText(transcriptLines);
     w.SottotitoliSessionUtils.downloadText(
-      `sottotitoli-transcript-${room}.txt`,
+      'sottotitoli-transcript-' + room + '.txt',
       text || 'No transcript yet.'
     );
     setText('statusText', 'Transcript downloaded.');
@@ -804,14 +750,14 @@ const updatePayload = {
 
   function downloadReport() {
     w.SottotitoliSessionUtils.downloadText(
-      `sottotitoli-lesson-report-${room}.txt`,
+      'sottotitoli-lesson-report-' + room + '.txt',
       latestReportText || 'No report yet.'
     );
     setText('statusText', 'Report downloaded.');
   }
 
   function openOverlay() {
-    window.open(currentOverlayUrl(), '_blank', 'noopener');
+    w.open(currentOverlayUrl(), '_blank', 'noopener');
   }
 
   function newRoom() {
@@ -841,16 +787,16 @@ const updatePayload = {
     sendPayload(
       {
         type: 'caption',
-        room,
+        room: room,
         mode: modeKey,
         final:
           modeConfig.sourceLang === 'it-IT'
             ? 'Questo è un test.'
             : 'This is a test.',
         translated: modeConfig.translate
-          ? modeConfig.targetLang === 'it'
-            ? 'Questo è un test.'
-            : 'This is a test.'
+          ? (modeConfig.targetLang === 'it'
+              ? 'Questo è un test.'
+              : 'This is a test.')
           : '',
         timestamp: new Date().toISOString(),
         sourceLang: modeConfig.sourceLang,
@@ -874,17 +820,19 @@ const updatePayload = {
       lines.push('Speaker summary');
 
       if (Array.isArray(data.analytics.speakers) && data.analytics.speakers.length) {
-        data.analytics.speakers.forEach((speaker, index) => {
+        data.analytics.speakers.forEach(function (speaker, index) {
           const share =
             speaker.shareOfTime != null
               ? Math.round(Number(speaker.shareOfTime) * 100)
               : 0;
+
           lines.push(
-            `${index + 1}. ${speaker.speaker}: turns ${speaker.turns}, words ${
-              speaker.words
-            }, duration ${Number(speaker.duration || 0).toFixed(
-              1
-            )}s, share ${share}%`
+            (index + 1) + '. ' +
+            speaker.speaker +
+            ': turns ' + speaker.turns +
+            ', words ' + speaker.words +
+            ', duration ' + Number(speaker.duration || 0).toFixed(1) + 's' +
+            ', share ' + share + '%'
           );
         });
       }
@@ -895,9 +843,7 @@ const updatePayload = {
       }
 
       if (data.analytics.totalDuration != null) {
-        lines.push(
-          'Total duration: ' + Number(data.analytics.totalDuration).toFixed(1) + 's'
-        );
+        lines.push('Total duration: ' + Number(data.analytics.totalDuration).toFixed(1) + 's');
       }
 
       lines.push('');
@@ -906,13 +852,14 @@ const updatePayload = {
     const segments = Array.isArray(data.segments) ? data.segments : [];
     if (segments.length) {
       lines.push('Segments');
-      segments.forEach((seg, index) => {
+
+      segments.forEach(function (seg, index) {
         const speaker = seg.speaker || 'Unknown speaker';
-        const start =
-          seg.start != null ? Number(seg.start).toFixed(1) : '?';
+        const start = seg.start != null ? Number(seg.start).toFixed(1) : '?';
         const end = seg.end != null ? Number(seg.end).toFixed(1) : '?';
         const text = (seg.text || '').trim();
-        lines.push(`${index + 1}. ${speaker} [${start}s - ${end}s]`);
+
+        lines.push((index + 1) + '. ' + speaker + ' [' + start + 's - ' + end + 's]');
         if (text) lines.push(text);
         lines.push('');
       });
@@ -923,10 +870,7 @@ const updatePayload = {
 
   async function analyzeSpeakers() {
     if (speakerAnalysisCompleted) {
-      setText(
-        'statusText',
-        'Speaker analysis has already been completed for this session.'
-      );
+      setText('statusText', 'Speaker analysis has already been completed for this session.');
       return;
     }
 
@@ -936,18 +880,12 @@ const updatePayload = {
     }
 
     if (isRecordingAudio) {
-      setText(
-        'statusText',
-        'Stop the microphone first so the lesson recording can finish.'
-      );
+      setText('statusText', 'Stop the microphone first so the lesson recording can finish.');
       return;
     }
 
     if (!lastAudioBlob || !lastAudioBlob.size) {
-      setText(
-        'statusText',
-        'No recorded lesson audio is available yet. Start and stop a session first.'
-      );
+      setText('statusText', 'No recorded lesson audio is available yet. Start and stop a session first.');
       return;
     }
 
@@ -960,8 +898,9 @@ const updatePayload = {
         lastAudioBlob.type && lastAudioBlob.type.indexOf('ogg') !== -1
           ? 'ogg'
           : 'webm';
+
       const formData = new FormData();
-      formData.append('file', lastAudioBlob, `lesson-${room}.${ext}`);
+      formData.append('file', lastAudioBlob, 'lesson-' + room + '.' + ext);
       formData.append('room', room);
       formData.append('mode', modeKey);
       formData.append('sourceLang', modeConfig.sourceLang || '');
@@ -973,9 +912,7 @@ const updatePayload = {
 
       if (!response.ok) {
         const errorText = await response.text();
-        throw new Error(
-          errorText || 'Speaker analysis failed with status ' + response.status
-        );
+        throw new Error(errorText || 'Speaker analysis failed with status ' + response.status);
       }
 
       const data = await response.json();
@@ -983,14 +920,13 @@ const updatePayload = {
 
       let baseReport = removeExistingSpeakerAnalysis(latestReportText);
       if (!baseReport || baseReport === 'No report yet.') {
-        baseReport =
-          '=== Lesson Report ===\n\nNo written lesson report generated yet.';
+        baseReport = '=== Lesson Report ===\n\nNo written lesson report generated yet.';
       }
 
       latestReportText =
         baseReport + '\n\n' + SPEAKER_ANALYSIS_MARKER + '\n' + diarizationText;
-      setText('lessonReport', latestReportText);
 
+      setText('lessonReport', latestReportText);
       speakerAnalysisCompleted = true;
       setText('statusText', 'Speaker analysis completed.');
     } catch (err) {
@@ -1009,29 +945,27 @@ const updatePayload = {
     const translation = modeConfig.translate
       ? 'Translation mode is enabled.'
       : 'Caption mode is enabled.';
+
     setText('modeTitle', title);
     setText('modeDescription', lesson + ' ' + translation);
   }
 
   function getCurrentModeKeyFromSelects() {
-    var srcSelect = document.getElementById("sourceLangSelect");
-    var tgtSelect = document.getElementById("targetLangSelect");
+    const srcSelect = $('sourceLangSelect');
+    const tgtSelect = $('targetLangSelect');
     if (!srcSelect || !tgtSelect) return modeKey;
 
-    var src = srcSelect.value;
-    var tgt = tgtSelect.value;
+    const src = srcSelect.value;
+    const tgt = tgtSelect.value;
 
     if (!src || !tgt) return modeKey;
-
-    if (src === tgt) {
-      return "caption-" + src;
-    }
-    return "translate-" + src + "-" + tgt;
+    if (src === tgt) return 'caption-' + src;
+    return 'translate-' + src + '-' + tgt;
   }
 
   function updateModeFromUI() {
     modeKey = getCurrentModeKeyFromSelects();
-    var cfgRoot = window.SOTTOTITOLI_CONFIG || window.SottotitoliConfig || configRoot;
+    const cfgRoot = w.SOTTOTITOLI_CONFIG || w.SottotitoliConfig || configRoot;
     if (cfgRoot && cfgRoot.modes && cfgRoot.modes[modeKey]) {
       modeConfig = cfgRoot.modes[modeKey];
     }
@@ -1040,62 +974,79 @@ const updatePayload = {
   }
 
   function goToSelectedModePage() {
-    var mode = getCurrentModeKeyFromSelects();
+    const mode = getCurrentModeKeyFromSelects();
     if (!mode) return;
 
-    var url = new URL(window.location.href);
+    const url = new URL(w.location.href);
     url.searchParams.set('mode', mode);
-    // keep room if present
-    window.location.href = url.toString();
+    url.searchParams.set('room', room);
+    url.searchParams.set('v', '13');
+    w.location.href = url.toString();
   }
 
-  document.addEventListener('DOMContentLoaded', () => {
+  document.addEventListener('DOMContentLoaded', function () {
     populateLanguageSelectsFromMode();
     describeMode();
     updateRoomUI();
     connectSocket();
     updateStats();
+
     clearBox('interimOutput', 'Interim');
     clearBox('sourceOutput', 'Source output');
     clearBox('translatedOutput', 'Translated output');
 
-    var srcSelect = document.getElementById('sourceLangSelect');
-    var tgtSelect = document.getElementById('targetLangSelect');
+    const srcSelect = $('sourceLangSelect');
+    const tgtSelect = $('targetLangSelect');
+    const applyBtn = $('applyLangModeBtn');
+
+    const startBtn = $('startBtn');
+    const stopBtn = $('stopBtn');
+    const openOverlayBtn = $('openOverlayBtn');
+    const copyOverlayBtn = $('copyOverlayBtn');
+    const newRoomBtn = $('newRoomBtn');
+    const copyTranscriptBtn = $('copyTranscriptBtn');
+    const downloadTranscriptBtn = $('downloadTranscriptBtn');
+    const reportBtn = $('reportBtn');
+    const downloadReportBtn = $('downloadReportBtn');
+    const lessonActions = $('lessonActions');
+    const langToolbar = $('languageToolbar');
+
     if (srcSelect && tgtSelect) {
-      srcSelect.addEventListener('change', () => {
+      srcSelect.addEventListener('change', function () {
         updateModeFromUI();
         if (recognition) {
           stopRecognition();
+          recognition = buildRecognition();
           startRecognition();
         }
       });
-      tgtSelect.addEventListener('change', () => {
+
+      tgtSelect.addEventListener('change', function () {
         updateModeFromUI();
         if (recognition) {
           stopRecognition();
+          recognition = buildRecognition();
           startRecognition();
         }
       });
     }
 
-    var applyBtn = document.getElementById('applyLangModeBtn');
     if (applyBtn) {
-      applyBtn.addEventListener('click', () => {
+      applyBtn.addEventListener('click', function () {
         goToSelectedModePage();
       });
     }
 
-    startBtn.addEventListener('click', startRecognition);
-    stopBtn.addEventListener('click', stopRecognition);
-    openOverlayBtn.addEventListener('click', openOverlay);
-    copyOverlayBtn.addEventListener('click', copyOverlayLink);
-    newRoomBtn.addEventListener('click', newRoom);
-    copyTranscriptBtn.addEventListener('click', copyTranscript);
-    downloadTranscriptBtn.addEventListener('click', downloadTranscript);
+    if (startBtn) startBtn.addEventListener('click', startRecognition);
+    if (stopBtn) stopBtn.addEventListener('click', stopRecognition);
+    if (openOverlayBtn) openOverlayBtn.addEventListener('click', openOverlay);
+    if (copyOverlayBtn) copyOverlayBtn.addEventListener('click', copyOverlayLink);
+    if (newRoomBtn) newRoomBtn.addEventListener('click', newRoom);
+    if (copyTranscriptBtn) copyTranscriptBtn.addEventListener('click', copyTranscript);
+    if (downloadTranscriptBtn) downloadTranscriptBtn.addEventListener('click', downloadTranscript);
 
-    const langToolbar = $('languageToolbar');
     if (langToolbar) {
-      langToolbar.addEventListener('click', evt => {
+      langToolbar.addEventListener('click', function (evt) {
         const btn = evt.target.closest('button[data-mode]');
         if (!btn) return;
         const newMode = btn.getAttribute('data-mode');
@@ -1103,35 +1054,35 @@ const updatePayload = {
         switchMode(newMode);
       });
 
-      const activeBtn = langToolbar.querySelector(
-        `button[data-mode="${modeKey}"]`
-      );
+      const activeBtn = langToolbar.querySelector('button[data-mode="' + modeKey + '"]');
       if (activeBtn) {
         activeBtn.classList.remove('btn-default');
         activeBtn.classList.add('btn-primary');
       }
     }
 
-    const extraBtn = document.createElement('button');
-    extraBtn.className = 'btn btn-default';
-    extraBtn.textContent = 'Send test message';
-    extraBtn.addEventListener('click', sendTestMessage);
-    $('startBtn').parentNode.appendChild(extraBtn);
+    if (startBtn && startBtn.parentNode) {
+      const extraBtn = document.createElement('button');
+      extraBtn.className = 'btn btn-default';
+      extraBtn.textContent = 'Send test message';
+      extraBtn.addEventListener('click', sendTestMessage);
+      startBtn.parentNode.appendChild(extraBtn);
+    }
 
     if (modeConfig.lessonMode) {
-      $('lessonActions').style.display = 'block';
-      $('reportBtn').addEventListener('click', generateLessonReport);
-      $('downloadReportBtn').addEventListener('click', downloadReport);
+      if (lessonActions) lessonActions.style.display = 'block';
+      if (reportBtn) reportBtn.addEventListener('click', generateLessonReport);
+      if (downloadReportBtn) downloadReportBtn.addEventListener('click', downloadReport);
 
-      analyzeBtnRef = document.createElement('button');
-      analyzeBtnRef.className = 'btn btn-primary';
-      analyzeBtnRef.textContent = 'Analyze speakers';
-      analyzeBtnRef.addEventListener('click', analyzeSpeakers);
-      $('lessonActions')
-        .querySelector('.studio-toolbar')
-        .appendChild(analyzeBtnRef);
-      updateAnalyzeButtonState();
+      const toolbar = lessonActions ? lessonActions.querySelector('.studio-toolbar') : null;
+      if (toolbar) {
+        analyzeBtnRef = document.createElement('button');
+        analyzeBtnRef.className = 'btn btn-primary';
+        analyzeBtnRef.textContent = 'Analyze speakers';
+        analyzeBtnRef.addEventListener('click', analyzeSpeakers);
+        toolbar.appendChild(analyzeBtnRef);
+        updateAnalyzeButtonState();
+      }
     }
   });
-
 })(window);
