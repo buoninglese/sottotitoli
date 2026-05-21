@@ -1,3 +1,5 @@
+// app.js
+
 (function (w) {
   'use strict';
 
@@ -16,6 +18,36 @@
     (configRoot.modes && configRoot.modes[modeKey]) ||
     (configRoot.modes && configRoot.modes['caption-en']) ||
     {};
+
+  function populateLanguageSelectsFromMode() {
+    var srcSelect = document.getElementById('sourceLangSelect');
+    var tgtSelect = document.getElementById('targetLangSelect');
+    if (!srcSelect || !tgtSelect) return;
+
+    srcSelect.innerHTML = '';
+    tgtSelect.innerHTML = '';
+
+    LANGUAGES.forEach(function (lang) {
+      var opt1 = document.createElement('option');
+      opt1.value = lang.code;
+      opt1.textContent = lang.label;
+      srcSelect.appendChild(opt1);
+
+      var opt2 = document.createElement('option');
+      opt2.value = lang.code;
+      opt2.textContent = lang.label;
+      tgtSelect.appendChild(opt2);
+    });
+
+    var parts = modeKey.split('-');
+    if (parts[0] === 'caption') {
+      srcSelect.value = parts[1] || 'en';
+      tgtSelect.value = srcSelect.value;
+    } else if (parts[0] === 'translate') {
+      srcSelect.value = parts[1] || 'en';
+      tgtSelect.value = parts[2] || 'it';
+    }
+  }
 
   const SpeechRecognition = w.SpeechRecognition || w.webkitSpeechRecognition;
   const DIARIZE_URL = 'https://sottotitoli-websocket.onrender.com/analyze-speakers';
@@ -43,7 +75,8 @@
   let speakerAnalysisCompleted = false;
   let analyzeBtnRef = null;
 
-  const sessionSupabase = w.sottotitoliSupabase;
+  // Reuse the global Supabase client set up in auth.js
+  const sessionSupabase = window.sottotitoliSupabase;
   let currentSessionId = null;
   let currentSessionStart = null;
 
@@ -82,56 +115,26 @@
     box.prepend(div);
   }
 
-  function populateLanguageSelectsFromMode() {
-    const srcSelect = $('sourceLangSelect');
-    const tgtSelect = $('targetLangSelect');
-    if (!srcSelect || !tgtSelect) return;
-
-    srcSelect.innerHTML = '';
-    tgtSelect.innerHTML = '';
-
-    LANGUAGES.forEach(function (lang) {
-      const opt1 = document.createElement('option');
-      opt1.value = lang.code;
-      opt1.textContent = lang.label;
-      srcSelect.appendChild(opt1);
-
-      const opt2 = document.createElement('option');
-      opt2.value = lang.code;
-      opt2.textContent = lang.label;
-      tgtSelect.appendChild(opt2);
-    });
-
-    const parts = modeKey.split('-');
-    if (parts[0] === 'caption') {
-      srcSelect.value = parts[1] || 'en';
-      tgtSelect.value = srcSelect.value;
-    } else if (parts[0] === 'translate') {
-      srcSelect.value = parts[1] || 'en';
-      tgtSelect.value = parts[2] || 'it';
-    }
-  }
-
   function syncUrl() {
-    const url = new URL(w.location.href);
+    const url = new URL(window.location.href);
     url.searchParams.set('mode', modeKey);
     url.searchParams.set('room', room);
-    url.searchParams.set('v', '13');
+    url.searchParams.set('v', '12');
     history.replaceState({}, '', url.toString());
   }
 
   function switchMode(newModeKey) {
-    const url = new URL(w.location.href);
+    const url = new URL(window.location.href);
     url.searchParams.set('mode', newModeKey);
     url.searchParams.set('room', room);
-    url.searchParams.set('v', '13');
-    w.location.href = url.toString();
+    url.searchParams.set('v', '12');
+    window.location.href = url.toString();
   }
 
   function currentOverlayUrl() {
-    const url = new URL('overlay.html', w.location.href);
+    const url = new URL('overlay.html', window.location.href);
     url.searchParams.set('room', room);
-    url.searchParams.set('v', '13');
+    url.searchParams.set('v', '12');
     return url.toString();
   }
 
@@ -147,15 +150,18 @@
   }
 
   function updateStats() {
-    const plain = transcriptLines.map(function (x) { return x.text; }).join(' ').trim();
+    const plain = transcriptLines.map(x => x.text).join(' ').trim();
     setText('statLines', String(transcriptLines.length));
     setText('statWords', String(w.SottotitoliSessionUtils.countWords(plain)));
     setText('statChars', String(plain.length));
   }
 
+  // --- METRIC HELPERS ---
+
   function computeSentencesCount(text) {
     if (!text) return 0;
-    return text.split(/[.!?]+/).map(function (s) { return s.trim(); }).filter(Boolean).length;
+    const parts = text.split(/[.!?]+/).map(s => s.trim()).filter(Boolean);
+    return parts.length;
   }
 
   function computeFillersCount(text) {
@@ -163,34 +169,194 @@
     const lower = text.toLowerCase();
     const fillers = ['uh', 'um', 'ehm', 'erm', 'you know', 'like'];
     let count = 0;
-
-    fillers.forEach(function (f) {
+    fillers.forEach(f => {
       const regex = new RegExp('\\b' + f.replace(' ', '\\s+') + '\\b', 'g');
       const matches = lower.match(regex);
       if (matches) count += matches.length;
     });
-
     return count;
   }
 
   function computeUniqueWordsCount(text) {
     if (!text) return 0;
-
     const tokens = text
       .toLowerCase()
       .replace(/[^a-zA-ZÀ-ÿ\s']/g, ' ')
       .split(/\s+/)
       .filter(Boolean);
-
     if (!tokens.length) return 0;
-    return new Set(tokens).size;
+    const set = new Set(tokens);
+    return set.size;
   }
 
-  function computeQualityScore(metrics) {
+  function tokenizeWords(text) {
+    if (!text) return [];
+    return text
+      .toLowerCase()
+      .replace(/[^a-zA-ZÀ-ÿ'\s]/g, ' ')
+      .split(/\s+/)
+      .filter(Boolean);
+  }
+
+  function countRegexMatches(text, regex) {
+    if (!text) return 0;
+    const matches = text.match(regex);
+    return matches ? matches.length : 0;
+  }
+
+  function computeQuestionCount(text) {
+    if (!text) return 0;
+    return countRegexMatches(text, /\?/g);
+  }
+
+  function computeNegationCount(text) {
+    if (!text) return 0;
+    return countRegexMatches(
+      text.toLowerCase(),
+      /\b(no|not|never|nothing|nobody|none|neither|nor|cannot|can't|don't|doesn't|didn't|won't|wouldn't|shouldn't|couldn't|isn't|aren't|wasn't|weren't|without)\b/g
+    );
+  }
+
+  function computeClauseEstimate(text) {
+    if (!text) return 0;
+    const base = computeSentencesCount(text);
+    const connectors = countRegexMatches(
+      text.toLowerCase(),
+      /\b(and|but|or|because|although|though|while|when|if|that|which|who|where|since|unless)\b/g
+    );
+    return base + connectors;
+  }
+
+  function computeRepetitionRate(text) {
+    const tokens = tokenizeWords(text);
+    if (!tokens.length) return null;
+    const counts = new Map();
+    tokens.forEach((t) => counts.set(t, (counts.get(t) || 0) + 1));
+    let repeatedOccurrences = 0;
+    counts.forEach((count) => {
+      if (count > 1) repeatedOccurrences += count - 1;
+    });
+    return repeatedOccurrences / tokens.length;
+  }
+
+  function computeMarkerCounts(text) {
+    const lower = (text || '').toLowerCase();
+
+    return {
+      present_marker_count: countRegexMatches(lower, /\b(am|is|are|do|does|have|has)\b/g),
+      past_marker_count: countRegexMatches(lower, /\b(was|were|did|had)\b/g),
+      future_marker_count: countRegexMatches(lower, /\b(will|going to|shall)\b/g),
+      conditional_marker_count: countRegexMatches(lower, /\b(would|could|should|might|if)\b/g)
+    };
+  }
+
+  function computeComparativeCount(text) {
+    const lower = (text || '').toLowerCase();
+    return countRegexMatches(lower, /\b(more|less|better|worse|faster|slower|bigger|smaller|than)\b/g);
+  }
+
+  function computeSuperlativeCount(text) {
+    const lower = (text || '').toLowerCase();
+    return countRegexMatches(lower, /\b(most|least|best|worst|fastest|slowest|biggest|smallest)\b/g);
+  }
+
+  function computePassiveEstimateCount(text) {
+    const lower = (text || '').toLowerCase();
+    return countRegexMatches(lower, /\b(am|is|are|was|were|be|been|being)\s+\w+(ed|en)\b/g);
+  }
+
+  function computeLexicalBuckets(text) {
+    const tokens = tokenizeWords(text);
+
+    const pronouns = new Set([
+      'i', 'you', 'he', 'she', 'it', 'we', 'they',
+      'me', 'him', 'her', 'us', 'them',
+      'my', 'your', 'his', 'its', 'our', 'their',
+      'mine', 'yours', 'hers', 'ours', 'theirs'
+    ]);
+    const prepositions = new Set([
+      'in', 'on', 'at', 'by', 'for', 'with', 'from', 'to', 'of',
+      'about', 'under', 'over', 'between', 'through', 'during',
+      'before', 'after', 'into', 'onto', 'against', 'without'
+    ]);
+    const conjunctions = new Set([
+      'and', 'but', 'or', 'so', 'yet', 'for', 'nor',
+      'although', 'because', 'since', 'unless', 'while', 'whereas'
+    ]);
+    const modals = new Set([
+      'can', 'could', 'may', 'might', 'must', 'shall', 'should', 'will', 'would'
+    ]);
+    const commonVerbs = new Set([
+      'be', 'am', 'is', 'are', 'was', 'were', 'been', 'being',
+      'do', 'does', 'did', 'done', 'have', 'has', 'had',
+      'say', 'go', 'get', 'make', 'know', 'think', 'take', 'see',
+      'come', 'want', 'look', 'use', 'find', 'give', 'tell',
+      'work', 'call', 'try', 'ask', 'need', 'feel', 'become',
+      'leave', 'put'
+    ]);
+    const commonAdverbs = new Set([
+      'very', 'really', 'quite', 'just', 'also', 'only', 'always',
+      'never', 'often', 'sometimes', 'quickly', 'slowly', 'well'
+    ]);
+    const commonAdjectives = new Set([
+      'good', 'bad', 'big', 'small', 'important', 'different',
+      'high', 'low', 'early', 'late', 'great', 'simple', 'hard'
+    ]);
+
+    let pronoun_count = 0;
+    let preposition_count = 0;
+    let conjunction_count = 0;
+    let modal_verb_count = 0;
+    let verb_count = 0;
+    let adjective_count = 0;
+    let adverb_count = 0;
+    let noun_count = 0;
+
+    tokens.forEach((token) => {
+      if (pronouns.has(token)) pronoun_count += 1;
+      if (prepositions.has(token)) preposition_count += 1;
+      if (conjunctions.has(token)) conjunction_count += 1;
+      if (modals.has(token)) modal_verb_count += 1;
+      if (commonVerbs.has(token) || /(ed|ing)$/.test(token)) verb_count += 1;
+      if (commonAdverbs.has(token) || /ly$/.test(token)) adverb_count += 1;
+      if (commonAdjectives.has(token) || /(ous|ful|ive|al|able|ible|ic)$/.test(token)) adjective_count += 1;
+    });
+
+    noun_count = Math.max(
+      0,
+      tokens.length -
+        pronoun_count -
+        preposition_count -
+        conjunction_count -
+        modal_verb_count -
+        verb_count -
+        adjective_count -
+        adverb_count
+    );
+
+    const functionWordCount =
+      pronoun_count + preposition_count + conjunction_count + modal_verb_count;
+
+    return {
+      noun_count,
+      verb_count,
+      adjective_count,
+      adverb_count,
+      pronoun_count,
+      preposition_count,
+      conjunction_count,
+      modal_verb_count,
+      function_words_ratio: tokens.length > 0 ? functionWordCount / tokens.length : null,
+      unique_lemmas_count: computeUniqueWordsCount(text),
+      nouns_count: noun_count,
+      verbs_count: verb_count,
+      adjectives_count: adjective_count,
+      adverbs_count: adverb_count
+    };
+  }
+
+  function computeQualityScore({ wpm, fillersPerMinute, lexicalDiversity }) {
     let score = 50;
-    const wpm = metrics.wpm;
-    const fillersPerMinute = metrics.fillersPerMinute;
-    const lexicalDiversity = metrics.lexicalDiversity;
 
     if (typeof wpm === 'number') {
       if (wpm >= 90 && wpm <= 160) {
@@ -228,13 +394,65 @@
     return score;
   }
 
+  function buildAiStatus(wordsCount, speakerMetricsPresent) {
+    if (!wordsCount || wordsCount < 5) return 'insufficient_data';
+    if (speakerMetricsPresent) return 'speaker_ready';
+    return 'text_ready';
+  }
+
+  function extractSpeakerMetrics(data) {
+    if (!data) {
+      return {
+        turn_count: null,
+        interruption_count: null,
+        speaking_share_ratio: null,
+        avg_turn_length_words: null
+      };
+    }
+
+    const analytics = data.analytics || {};
+    const speakers = Array.isArray(analytics.speakers) ? analytics.speakers : [];
+    const segments = Array.isArray(data.segments) ? data.segments : [];
+
+    let totalWords = 0;
+    let maxSpeakerWords = 0;
+
+    speakers.forEach((speaker) => {
+      const words = Number(speaker.words || 0);
+      totalWords += words;
+      if (words > maxSpeakerWords) maxSpeakerWords = words;
+    });
+
+    const totalTurns =
+      speakers.length > 0
+        ? speakers.reduce((sum, s) => sum + Number(s.turns || 0), 0)
+        : segments.length;
+
+    const totalSpeakerWords =
+      speakers.length > 0
+        ? speakers.reduce((sum, s) => sum + Number(s.words || 0), 0)
+        : 0;
+
+    const avgTurnLengthWords =
+      totalTurns > 0 ? totalSpeakerWords / totalTurns : null;
+
+    return {
+      turn_count: totalTurns || null,
+      interruption_count:
+        analytics.interruptions != null ? Number(analytics.interruptions) : null,
+      speaking_share_ratio:
+        totalWords > 0 ? maxSpeakerWords / totalWords : null,
+      avg_turn_length_words:
+        avgTurnLengthWords != null && Number.isFinite(avgTurnLengthWords)
+          ? avgTurnLengthWords
+          : null
+    };
+  }
+
+  // --- SUPABASE SESSION LOGGING ---
+
   async function createSessionRow() {
     try {
-      if (!sessionSupabase) {
-        console.warn('Supabase client not available; not logging session.');
-        return;
-      }
-
       const result = await sessionSupabase.auth.getSession();
       const sessionData = result.data;
       const sessionError = result.error;
@@ -246,11 +464,14 @@
 
       const user = sessionData.session.user;
       const userId = user.id;
-      currentSessionStart = new Date();
 
-      const languagePair = modeKey.startsWith('translate-')
-        ? modeKey.replace('translate-', '').replace('-', '->')
-        : 'en-en';
+      currentSessionStart = new Date();
+      currentSessionId = null;
+
+      const languagePair =
+        modeKey.startsWith('translate-')
+          ? modeKey.replace('translate-', '').replace('-', '->')
+          : 'en-en';
 
       const sessionType = 'solo';
       const topicTag = null;
@@ -260,7 +481,7 @@
         .insert([
           {
             user_id: userId,
-            room: room,
+            room,
             mode: modeKey,
             started_at: currentSessionStart.toISOString(),
             language_pair: languagePair,
@@ -284,7 +505,7 @@
   }
 
   async function finalizeSessionRow() {
-    if (!currentSessionId || !currentSessionStart || !sessionSupabase) {
+    if (!currentSessionId || !currentSessionStart) {
       return;
     }
 
@@ -294,11 +515,13 @@
         (ended.getTime() - currentSessionStart.getTime()) / 1000
       );
 
-      const plain = transcriptLines.map(function (x) { return x.text; }).join(' ').trim();
+      const plain = transcriptLines.map(x => x.text).join(' ').trim();
       const wordsCount = w.SottotitoliSessionUtils.countWords(plain);
       const charsCount = plain.length;
 
-      const wpm = durationSeconds > 0 ? wordsCount / (durationSeconds / 60) : null;
+      const wpm =
+        durationSeconds > 0 ? wordsCount / (durationSeconds / 60) : null;
+
       const sentencesCount = computeSentencesCount(plain);
       const avgSentenceLength =
         sentencesCount > 0 ? wordsCount / sentencesCount : null;
@@ -312,24 +535,70 @@
         wordsCount > 0 ? uniqueWordsCount / wordsCount : null;
 
       const qualityScore = computeQualityScore({
-        wpm: wpm,
-        fillersPerMinute: fillersPerMinute,
-        lexicalDiversity: lexicalDiversity
+        wpm,
+        fillersPerMinute,
+        lexicalDiversity
       });
+
+      const transcriptText = plain || null;
+      const questionCount = computeQuestionCount(plain);
+      const negationCount = computeNegationCount(plain);
+      const clauseEstimate = computeClauseEstimate(plain);
+      const repetitionRate = computeRepetitionRate(plain);
+      const markerCounts = computeMarkerCounts(plain);
+      const comparativeCount = computeComparativeCount(plain);
+      const superlativeCount = computeSuperlativeCount(plain);
+      const passiveEstimateCount = computePassiveEstimateCount(plain);
+      const lexicalBuckets = computeLexicalBuckets(plain);
 
       const updatePayload = {
         ended_at: ended.toISOString(),
         duration_seconds: durationSeconds,
         words_count: wordsCount,
         chars_count: charsCount,
-        wpm: wpm,
+        wpm,
         sentences_count: sentencesCount,
         avg_sentence_length_words: avgSentenceLength,
         fillers_count: fillersCount,
         fillers_per_minute: fillersPerMinute,
         unique_words_count: uniqueWordsCount,
         lexical_diversity: lexicalDiversity,
-        quality_score: qualityScore
+        quality_score: qualityScore,
+
+        transcript_text: transcriptText,
+
+        unique_lemmas_count: lexicalBuckets.unique_lemmas_count,
+        nouns_count: lexicalBuckets.nouns_count,
+        verbs_count: lexicalBuckets.verbs_count,
+        adjectives_count: lexicalBuckets.adjectives_count,
+        adverbs_count: lexicalBuckets.adverbs_count,
+
+        function_words_ratio: lexicalBuckets.function_words_ratio,
+        noun_count: lexicalBuckets.noun_count,
+        verb_count: lexicalBuckets.verb_count,
+        adjective_count: lexicalBuckets.adjective_count,
+        adverb_count: lexicalBuckets.adverb_count,
+        pronoun_count: lexicalBuckets.pronoun_count,
+        preposition_count: lexicalBuckets.preposition_count,
+        conjunction_count: lexicalBuckets.conjunction_count,
+        modal_verb_count: lexicalBuckets.modal_verb_count,
+
+        question_count: questionCount,
+        negation_count: negationCount,
+        clause_estimate: clauseEstimate,
+        repetition_rate: repetitionRate,
+
+        present_marker_count: markerCounts.present_marker_count,
+        past_marker_count: markerCounts.past_marker_count,
+        future_marker_count: markerCounts.future_marker_count,
+        conditional_marker_count: markerCounts.conditional_marker_count,
+
+        passive_estimate_count: passiveEstimateCount,
+        comparative_count: comparativeCount,
+        superlative_count: superlativeCount,
+
+        ai_status: buildAiStatus(wordsCount, false),
+        ai_last_error: null
       };
 
       const { error } = await sessionSupabase
@@ -345,10 +614,11 @@
     } catch (e) {
       console.error('Unexpected error updating session row:', e);
     } finally {
-      currentSessionId = null;
       currentSessionStart = null;
     }
   }
+
+  // --- UI STATE HELPERS ---
 
   function updateSocketState(state) {
     setText('socketStatus', state);
@@ -433,7 +703,6 @@
       setText('statusText', 'No websocket publisher available.');
       return;
     }
-
     wsPublisher.publish(payload);
     if (statusMessage) setText('statusText', statusMessage);
   }
@@ -442,16 +711,16 @@
     if (!text) return;
 
     const timestamp = w.SottotitoliSessionUtils.formatTimestamp(new Date());
-    const entry = { timestamp: timestamp, text: text, translated: null };
+    const entry = { timestamp, text, translated: null };
 
     appendLine('sourceOutput', text);
 
     const payload = {
       type: 'caption',
-      room: room,
+      room,
       mode: modeKey,
       final: text,
-      timestamp: timestamp,
+      timestamp,
       sourceLang: modeConfig.sourceLang,
       kind: modeConfig.translate ? 'translation' : 'caption'
     };
@@ -494,7 +763,7 @@
     sendPayload(
       {
         type: 'caption',
-        room: room,
+        room,
         mode: modeKey,
         interim: clean,
         sourceLang: modeConfig.sourceLang,
@@ -515,7 +784,7 @@
     clearRestartTimer();
     if (!shouldKeepListening) return;
 
-    restartTimer = setTimeout(function () {
+    restartTimer = setTimeout(() => {
       try {
         if (recognition) recognition.start();
       } catch (e) {
@@ -531,17 +800,18 @@
     rec.interimResults = true;
     rec.lang = modeConfig.sourceLang || 'en-US';
 
-    rec.onstart = function () {
+    rec.onstart = () => {
       hasStartedOnce = true;
       setText('statusText', 'Listening in ' + (modeConfig.sourceLang || 'en-US') + '...');
       updateMicState('live', true);
     };
 
-    rec.onresult = function (event) {
+    rec.onresult = event => {
       let interim = '';
 
       for (let i = event.resultIndex; i < event.results.length; i++) {
-        const text = (((event.results[i][0] && event.results[i][0].transcript) || '')).trim();
+        const text =
+          ((event.results[i][0] && event.results[i][0].transcript) || '').trim();
         if (!text) continue;
 
         if (event.results[i].isFinal) {
@@ -554,7 +824,7 @@
       handleInterimTranscript(interim.trim());
     };
 
-    rec.onerror = function (event) {
+    rec.onerror = event => {
       const err = event.error || 'unknown';
       setText(
         'statusText',
@@ -574,7 +844,7 @@
       updateMicState('recovering', false);
     };
 
-    rec.onend = function () {
+    rec.onend = () => {
       updateMicState(shouldKeepListening ? 'restarting' : 'stopped', false);
 
       if (shouldKeepListening) {
@@ -597,7 +867,10 @@
     if (audioRecorder && audioRecorder.state === 'recording') return;
 
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-      setText('statusText', 'Audio recording is not supported in this browser.');
+      setText(
+        'statusText',
+        'Audio recording is not supported in this browser.'
+      );
       return;
     }
 
@@ -617,25 +890,23 @@
       }
 
       audioRecorder = mimeType
-        ? new MediaRecorder(audioStream, { mimeType: mimeType })
+        ? new MediaRecorder(audioStream, { mimeType })
         : new MediaRecorder(audioStream);
 
-      audioRecorder.ondataavailable = function (event) {
+      audioRecorder.ondataavailable = event => {
         if (event.data && event.data.size > 0) {
           audioChunks.push(event.data);
         }
       };
 
-      audioRecorder.onstop = function () {
+      audioRecorder.onstop = () => {
         const actualType =
           (audioRecorder && audioRecorder.mimeType) || 'audio/webm';
         lastAudioBlob = new Blob(audioChunks, { type: actualType });
         isRecordingAudio = false;
 
         if (audioStream) {
-          audioStream.getTracks().forEach(function (track) {
-            track.stop();
-          });
+          audioStream.getTracks().forEach(track => track.stop());
           audioStream = null;
         }
 
@@ -649,7 +920,10 @@
 
       audioRecorder.start();
       isRecordingAudio = true;
-      setText('statusText', 'Recording lesson audio for later speaker analysis...');
+      setText(
+        'statusText',
+        'Recording lesson audio for later speaker analysis...'
+      );
     } catch (err) {
       setText('statusText', 'Could not start audio capture: ' + err.message);
     }
@@ -657,17 +931,22 @@
 
   function stopAudioCapture() {
     if (!audioRecorder || audioRecorder.state !== 'recording') return;
-
     try {
       audioRecorder.stop();
     } catch (err) {
-      setText('statusText', 'Could not stop audio recorder: ' + err.message);
+      setText(
+        'statusText',
+        'Could not stop audio recorder: ' + err.message
+      );
     }
   }
 
   function startRecognition() {
     if (!SpeechRecognition) {
-      setText('statusText', 'Speech recognition is not supported in this browser.');
+      setText(
+        'statusText',
+        'Speech recognition is not supported in this browser.'
+      );
       return;
     }
 
@@ -677,6 +956,8 @@
 
     if (!recognition) {
       recognition = buildRecognition();
+    } else {
+      recognition.lang = modeConfig.sourceLang || 'en-US';
     }
 
     try {
@@ -702,18 +983,22 @@
     stopAudioCapture();
     updateMicState('stopped', false);
     setText('statusText', 'Recognition stopped by user.');
+
     finalizeSessionRow();
   }
 
   function connectSocket() {
     wsPublisher = w.createWSPublisher({
       url: w.SOTTOTITOLI_CONFIG.websocketUrl,
-      room: room,
-      onStateChange: function (state) {
+      room,
+      onStateChange: state => {
         updateSocketState(state);
-        setText('statusText', 'Socket state: ' + state + ' · room: ' + room);
+        setText(
+          'statusText',
+          'Socket state: ' + state + ' · room: ' + room
+        );
       },
-      onError: function (error) {
+      onError: error => {
         setText('statusText', 'Socket error: ' + error);
       }
     });
@@ -722,27 +1007,42 @@
   }
 
   async function generateLessonReport() {
-    const report = await w.SottotitoliLessonReport.generateLessonReport(transcriptLines);
-    latestReportText = w.SottotitoliLessonReport.formatLessonReport(report);
+    const report = await w.SottotitoliLessonReport.generateLessonReport(
+      transcriptLines
+    );
+    latestReportText =
+      w.SottotitoliLessonReport.formatLessonReport(report);
     latestReportText = removeExistingSpeakerAnalysis(latestReportText);
     setText('lessonReport', latestReportText || 'No report yet.');
   }
 
   async function copyOverlayLink() {
-    const ok = await w.SottotitoliSessionUtils.copyToClipboard(currentOverlayUrl());
-    setText('statusText', ok ? 'Overlay link copied.' : 'Could not copy overlay link.');
+    const ok = await w.SottotitoliSessionUtils.copyToClipboard(
+      currentOverlayUrl()
+    );
+    setText(
+      'statusText',
+      ok ? 'Overlay link copied.' : 'Could not copy overlay link.'
+    );
   }
 
   async function copyTranscript() {
-    const text = w.SottotitoliSessionUtils.transcriptToPlainText(transcriptLines);
-    const ok = await w.SottotitoliSessionUtils.copyToClipboard(text || 'No transcript yet.');
-    setText('statusText', ok ? 'Transcript copied.' : 'Could not copy transcript.');
+    const text =
+      w.SottotitoliSessionUtils.transcriptToPlainText(transcriptLines);
+    const ok = await w.SottotitoliSessionUtils.copyToClipboard(
+      text || 'No transcript yet.'
+    );
+    setText(
+      'statusText',
+      ok ? 'Transcript copied.' : 'Could not copy transcript.'
+    );
   }
 
   function downloadTranscript() {
-    const text = w.SottotitoliSessionUtils.transcriptToPlainText(transcriptLines);
+    const text =
+      w.SottotitoliSessionUtils.transcriptToPlainText(transcriptLines);
     w.SottotitoliSessionUtils.downloadText(
-      'sottotitoli-transcript-' + room + '.txt',
+      `sottotitoli-transcript-${room}.txt`,
       text || 'No transcript yet.'
     );
     setText('statusText', 'Transcript downloaded.');
@@ -750,14 +1050,14 @@
 
   function downloadReport() {
     w.SottotitoliSessionUtils.downloadText(
-      'sottotitoli-lesson-report-' + room + '.txt',
+      `sottotitoli-lesson-report-${room}.txt`,
       latestReportText || 'No report yet.'
     );
     setText('statusText', 'Report downloaded.');
   }
 
   function openOverlay() {
-    w.open(currentOverlayUrl(), '_blank', 'noopener');
+    window.open(currentOverlayUrl(), '_blank', 'noopener');
   }
 
   function newRoom() {
@@ -769,6 +1069,8 @@
     lastAudioBlob = null;
     isAnalyzingSpeakers = false;
     speakerAnalysisCompleted = false;
+    currentSessionId = null;
+    currentSessionStart = null;
     updateAnalyzeButtonState();
 
     clearBox('interimOutput', 'Interim');
@@ -787,16 +1089,16 @@
     sendPayload(
       {
         type: 'caption',
-        room: room,
+        room,
         mode: modeKey,
         final:
           modeConfig.sourceLang === 'it-IT'
             ? 'Questo è un test.'
             : 'This is a test.',
         translated: modeConfig.translate
-          ? (modeConfig.targetLang === 'it'
-              ? 'Questo è un test.'
-              : 'This is a test.')
+          ? modeConfig.targetLang === 'it'
+            ? 'Questo è un test.'
+            : 'This is a test.'
           : '',
         timestamp: new Date().toISOString(),
         sourceLang: modeConfig.sourceLang,
@@ -820,19 +1122,13 @@
       lines.push('Speaker summary');
 
       if (Array.isArray(data.analytics.speakers) && data.analytics.speakers.length) {
-        data.analytics.speakers.forEach(function (speaker, index) {
+        data.analytics.speakers.forEach((speaker, index) => {
           const share =
             speaker.shareOfTime != null
               ? Math.round(Number(speaker.shareOfTime) * 100)
               : 0;
-
           lines.push(
-            (index + 1) + '. ' +
-            speaker.speaker +
-            ': turns ' + speaker.turns +
-            ', words ' + speaker.words +
-            ', duration ' + Number(speaker.duration || 0).toFixed(1) + 's' +
-            ', share ' + share + '%'
+            `${index + 1}. ${speaker.speaker}: turns ${speaker.turns}, words ${speaker.words}, duration ${Number(speaker.duration || 0).toFixed(1)}s, share ${share}%`
           );
         });
       }
@@ -843,7 +1139,9 @@
       }
 
       if (data.analytics.totalDuration != null) {
-        lines.push('Total duration: ' + Number(data.analytics.totalDuration).toFixed(1) + 's');
+        lines.push(
+          'Total duration: ' + Number(data.analytics.totalDuration).toFixed(1) + 's'
+        );
       }
 
       lines.push('');
@@ -852,14 +1150,12 @@
     const segments = Array.isArray(data.segments) ? data.segments : [];
     if (segments.length) {
       lines.push('Segments');
-
-      segments.forEach(function (seg, index) {
+      segments.forEach((seg, index) => {
         const speaker = seg.speaker || 'Unknown speaker';
         const start = seg.start != null ? Number(seg.start).toFixed(1) : '?';
         const end = seg.end != null ? Number(seg.end).toFixed(1) : '?';
         const text = (seg.text || '').trim();
-
-        lines.push((index + 1) + '. ' + speaker + ' [' + start + 's - ' + end + 's]');
+        lines.push(`${index + 1}. ${speaker} [${start}s - ${end}s]`);
         if (text) lines.push(text);
         lines.push('');
       });
@@ -870,7 +1166,10 @@
 
   async function analyzeSpeakers() {
     if (speakerAnalysisCompleted) {
-      setText('statusText', 'Speaker analysis has already been completed for this session.');
+      setText(
+        'statusText',
+        'Speaker analysis has already been completed for this session.'
+      );
       return;
     }
 
@@ -880,12 +1179,18 @@
     }
 
     if (isRecordingAudio) {
-      setText('statusText', 'Stop the microphone first so the lesson recording can finish.');
+      setText(
+        'statusText',
+        'Stop the microphone first so the lesson recording can finish.'
+      );
       return;
     }
 
     if (!lastAudioBlob || !lastAudioBlob.size) {
-      setText('statusText', 'No recorded lesson audio is available yet. Start and stop a session first.');
+      setText(
+        'statusText',
+        'No recorded lesson audio is available yet. Start and stop a session first.'
+      );
       return;
     }
 
@@ -900,7 +1205,7 @@
           : 'webm';
 
       const formData = new FormData();
-      formData.append('file', lastAudioBlob, 'lesson-' + room + '.' + ext);
+      formData.append('file', lastAudioBlob, `lesson-${room}.${ext}`);
       formData.append('room', room);
       formData.append('mode', modeKey);
       formData.append('sourceLang', modeConfig.sourceLang || '');
@@ -912,24 +1217,66 @@
 
       if (!response.ok) {
         const errorText = await response.text();
-        throw new Error(errorText || 'Speaker analysis failed with status ' + response.status);
+        throw new Error(
+          errorText || 'Speaker analysis failed with status ' + response.status
+        );
       }
 
       const data = await response.json();
       const diarizationText = formatDiarizationResult(data);
+      const speakerMetrics = extractSpeakerMetrics(data);
+
+      if (sessionSupabase && currentSessionId) {
+        const { error: speakerSaveError } = await sessionSupabase
+          .from('sessions')
+          .update({
+            speaker_analysis_json: data,
+            turn_count: speakerMetrics.turn_count,
+            interruption_count: speakerMetrics.interruption_count,
+            speaking_share_ratio: speakerMetrics.speaking_share_ratio,
+            avg_turn_length_words: speakerMetrics.avg_turn_length_words,
+            ai_status: buildAiStatus(
+              w.SottotitoliSessionUtils.countWords(
+                transcriptLines.map(x => x.text).join(' ').trim()
+              ),
+              true
+            ),
+            ai_last_error: null
+          })
+          .eq('id', currentSessionId);
+
+        if (speakerSaveError) {
+          console.error('Error saving speaker analysis:', speakerSaveError);
+        }
+      }
 
       let baseReport = removeExistingSpeakerAnalysis(latestReportText);
       if (!baseReport || baseReport === 'No report yet.') {
-        baseReport = '=== Lesson Report ===\n\nNo written lesson report generated yet.';
+        baseReport =
+          '=== Lesson Report ===\n\nNo written lesson report generated yet.';
       }
 
       latestReportText =
         baseReport + '\n\n' + SPEAKER_ANALYSIS_MARKER + '\n' + diarizationText;
-
       setText('lessonReport', latestReportText);
+
       speakerAnalysisCompleted = true;
       setText('statusText', 'Speaker analysis completed.');
     } catch (err) {
+      if (sessionSupabase && currentSessionId) {
+        try {
+          await sessionSupabase
+            .from('sessions')
+            .update({
+              ai_status: 'speaker_error',
+              ai_last_error: err.message || 'Unknown speaker analysis error'
+            })
+            .eq('id', currentSessionId);
+        } catch (saveErr) {
+          console.error('Could not persist speaker analysis error:', saveErr);
+        }
+      }
+
       setText('statusText', 'Speaker analysis failed: ' + err.message);
     } finally {
       isAnalyzingSpeakers = false;
@@ -945,27 +1292,29 @@
     const translation = modeConfig.translate
       ? 'Translation mode is enabled.'
       : 'Caption mode is enabled.';
-
     setText('modeTitle', title);
     setText('modeDescription', lesson + ' ' + translation);
   }
 
   function getCurrentModeKeyFromSelects() {
-    const srcSelect = $('sourceLangSelect');
-    const tgtSelect = $('targetLangSelect');
+    var srcSelect = document.getElementById('sourceLangSelect');
+    var tgtSelect = document.getElementById('targetLangSelect');
     if (!srcSelect || !tgtSelect) return modeKey;
 
-    const src = srcSelect.value;
-    const tgt = tgtSelect.value;
+    var src = srcSelect.value;
+    var tgt = tgtSelect.value;
 
     if (!src || !tgt) return modeKey;
-    if (src === tgt) return 'caption-' + src;
+
+    if (src === tgt) {
+      return 'caption-' + src;
+    }
     return 'translate-' + src + '-' + tgt;
   }
 
   function updateModeFromUI() {
     modeKey = getCurrentModeKeyFromSelects();
-    const cfgRoot = w.SOTTOTITOLI_CONFIG || w.SottotitoliConfig || configRoot;
+    var cfgRoot = window.SOTTOTITOLI_CONFIG || window.SottotitoliConfig || configRoot;
     if (cfgRoot && cfgRoot.modes && cfgRoot.modes[modeKey]) {
       modeConfig = cfgRoot.modes[modeKey];
     }
@@ -974,30 +1323,51 @@
   }
 
   function goToSelectedModePage() {
-    const mode = getCurrentModeKeyFromSelects();
+    var mode = getCurrentModeKeyFromSelects();
     if (!mode) return;
 
-    const url = new URL(w.location.href);
+    var url = new URL(window.location.href);
     url.searchParams.set('mode', mode);
     url.searchParams.set('room', room);
-    url.searchParams.set('v', '13');
-    w.location.href = url.toString();
+    url.searchParams.set('v', '12');
+    window.location.href = url.toString();
   }
 
-  document.addEventListener('DOMContentLoaded', function () {
+  document.addEventListener('DOMContentLoaded', () => {
     populateLanguageSelectsFromMode();
     describeMode();
     updateRoomUI();
     connectSocket();
     updateStats();
-
     clearBox('interimOutput', 'Interim');
     clearBox('sourceOutput', 'Source output');
     clearBox('translatedOutput', 'Translated output');
 
-    const srcSelect = $('sourceLangSelect');
-    const tgtSelect = $('targetLangSelect');
-    const applyBtn = $('applyLangModeBtn');
+    var srcSelect = document.getElementById('sourceLangSelect');
+    var tgtSelect = document.getElementById('targetLangSelect');
+    if (srcSelect && tgtSelect) {
+      srcSelect.addEventListener('change', () => {
+        updateModeFromUI();
+        if (recognition) {
+          stopRecognition();
+          startRecognition();
+        }
+      });
+      tgtSelect.addEventListener('change', () => {
+        updateModeFromUI();
+        if (recognition) {
+          stopRecognition();
+          startRecognition();
+        }
+      });
+    }
+
+    var applyBtn = document.getElementById('applyLangModeBtn');
+    if (applyBtn) {
+      applyBtn.addEventListener('click', () => {
+        goToSelectedModePage();
+      });
+    }
 
     const startBtn = $('startBtn');
     const stopBtn = $('stopBtn');
@@ -1006,47 +1376,18 @@
     const newRoomBtn = $('newRoomBtn');
     const copyTranscriptBtn = $('copyTranscriptBtn');
     const downloadTranscriptBtn = $('downloadTranscriptBtn');
-    const reportBtn = $('reportBtn');
-    const downloadReportBtn = $('downloadReportBtn');
-    const lessonActions = $('lessonActions');
+
+    startBtn.addEventListener('click', startRecognition);
+    stopBtn.addEventListener('click', stopRecognition);
+    openOverlayBtn.addEventListener('click', openOverlay);
+    copyOverlayBtn.addEventListener('click', copyOverlayLink);
+    newRoomBtn.addEventListener('click', newRoom);
+    copyTranscriptBtn.addEventListener('click', copyTranscript);
+    downloadTranscriptBtn.addEventListener('click', downloadTranscript);
+
     const langToolbar = $('languageToolbar');
-
-    if (srcSelect && tgtSelect) {
-      srcSelect.addEventListener('change', function () {
-        updateModeFromUI();
-        if (recognition) {
-          stopRecognition();
-          recognition = buildRecognition();
-          startRecognition();
-        }
-      });
-
-      tgtSelect.addEventListener('change', function () {
-        updateModeFromUI();
-        if (recognition) {
-          stopRecognition();
-          recognition = buildRecognition();
-          startRecognition();
-        }
-      });
-    }
-
-    if (applyBtn) {
-      applyBtn.addEventListener('click', function () {
-        goToSelectedModePage();
-      });
-    }
-
-    if (startBtn) startBtn.addEventListener('click', startRecognition);
-    if (stopBtn) stopBtn.addEventListener('click', stopRecognition);
-    if (openOverlayBtn) openOverlayBtn.addEventListener('click', openOverlay);
-    if (copyOverlayBtn) copyOverlayBtn.addEventListener('click', copyOverlayLink);
-    if (newRoomBtn) newRoomBtn.addEventListener('click', newRoom);
-    if (copyTranscriptBtn) copyTranscriptBtn.addEventListener('click', copyTranscript);
-    if (downloadTranscriptBtn) downloadTranscriptBtn.addEventListener('click', downloadTranscript);
-
     if (langToolbar) {
-      langToolbar.addEventListener('click', function (evt) {
+      langToolbar.addEventListener('click', evt => {
         const btn = evt.target.closest('button[data-mode]');
         if (!btn) return;
         const newMode = btn.getAttribute('data-mode');
@@ -1054,35 +1395,35 @@
         switchMode(newMode);
       });
 
-      const activeBtn = langToolbar.querySelector('button[data-mode="' + modeKey + '"]');
+      const activeBtn = langToolbar.querySelector(
+        `button[data-mode="${modeKey}"]`
+      );
       if (activeBtn) {
         activeBtn.classList.remove('btn-default');
         activeBtn.classList.add('btn-primary');
       }
     }
 
-    if (startBtn && startBtn.parentNode) {
-      const extraBtn = document.createElement('button');
-      extraBtn.className = 'btn btn-default';
-      extraBtn.textContent = 'Send test message';
-      extraBtn.addEventListener('click', sendTestMessage);
-      startBtn.parentNode.appendChild(extraBtn);
-    }
+    const extraBtn = document.createElement('button');
+    extraBtn.className = 'btn btn-default';
+    extraBtn.textContent = 'Send test message';
+    extraBtn.addEventListener('click', sendTestMessage);
+    $('startBtn').parentNode.appendChild(extraBtn);
 
     if (modeConfig.lessonMode) {
-      if (lessonActions) lessonActions.style.display = 'block';
-      if (reportBtn) reportBtn.addEventListener('click', generateLessonReport);
-      if (downloadReportBtn) downloadReportBtn.addEventListener('click', downloadReport);
+      $('lessonActions').style.display = 'block';
+      $('reportBtn').addEventListener('click', generateLessonReport);
+      $('downloadReportBtn').addEventListener('click', downloadReport);
 
-      const toolbar = lessonActions ? lessonActions.querySelector('.studio-toolbar') : null;
-      if (toolbar) {
-        analyzeBtnRef = document.createElement('button');
-        analyzeBtnRef.className = 'btn btn-primary';
-        analyzeBtnRef.textContent = 'Analyze speakers';
-        analyzeBtnRef.addEventListener('click', analyzeSpeakers);
-        toolbar.appendChild(analyzeBtnRef);
-        updateAnalyzeButtonState();
-      }
+      analyzeBtnRef = document.createElement('button');
+      analyzeBtnRef.className = 'btn btn-primary';
+      analyzeBtnRef.textContent = 'Analyze speakers';
+      analyzeBtnRef.addEventListener('click', analyzeSpeakers);
+      $('lessonActions')
+        .querySelector('.studio-toolbar')
+        .appendChild(analyzeBtnRef);
+      updateAnalyzeButtonState();
     }
   });
+
 })(window);
