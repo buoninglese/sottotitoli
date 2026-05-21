@@ -28,6 +28,24 @@ document.addEventListener('DOMContentLoaded', () => {
   const perfQualityScoreEl = document.getElementById('perfQualityScore');
   const perfQualityScoreBarEl = document.getElementById('perfQualityScoreBar');
 
+  const perfQuestionsUsedEl = document.getElementById('perfQuestionsUsed');
+  const perfQuestionsUsedBarEl = document.getElementById('perfQuestionsUsedBar');
+
+  const perfNegationCountEl = document.getElementById('perfNegationCount');
+  const perfNegationCountBarEl = document.getElementById('perfNegationCountBar');
+
+  const perfRepetitionRateEl = document.getElementById('perfRepetitionRate');
+  const perfRepetitionRateBarEl = document.getElementById('perfRepetitionRateBar');
+
+  const perfConversationTurnsEl = document.getElementById('perfConversationTurns');
+  const perfConversationTurnsBarEl = document.getElementById('perfConversationTurnsBar');
+
+  const perfInterruptionsEl = document.getElementById('perfInterruptions');
+  const perfInterruptionsBarEl = document.getElementById('perfInterruptionsBar');
+
+  const perfSpeakingShareEl = document.getElementById('perfSpeakingShare');
+  const perfSpeakingShareBarEl = document.getElementById('perfSpeakingShareBar');
+
   const perfFunFactEl = document.getElementById('perfFunFact');
   const perfStreakBadgeEl = document.getElementById('perfStreakBadge');
 
@@ -97,7 +115,14 @@ document.addEventListener('DOMContentLoaded', () => {
         fillers_per_minute,
         unique_words_count,
         lexical_diversity,
-        quality_score
+        quality_score,
+        question_count,
+        negation_count,
+        repetition_rate,
+        turn_count,
+        interruption_count,
+        speaking_share_ratio,
+        ai_status
       `)
       .eq('user_id', userId)
       .order('started_at', { ascending: false })
@@ -147,6 +172,13 @@ document.addEventListener('DOMContentLoaded', () => {
     updatePerformanceDashboard(currentSessions);
   }
 
+  function setBarState(el, ratio, state) {
+    if (!el) return;
+    el.style.width = (Math.max(0, Math.min(ratio, 1)) * 100).toFixed(0) + '%';
+    el.classList.remove('bad', 'warn', 'good');
+    if (state) el.classList.add(state);
+  }
+
   function updatePerformanceDashboard(sessions) {
     if (!sessions || sessions.length === 0) {
       if (perfMinutesSpokenEl) perfMinutesSpokenEl.textContent = '0';
@@ -155,6 +187,26 @@ document.addEventListener('DOMContentLoaded', () => {
       if (perfUniqueWordsEl) perfUniqueWordsEl.textContent = '0';
       if (perfLexicalDiversityEl) perfLexicalDiversityEl.textContent = '–';
       if (perfQualityScoreEl) perfQualityScoreEl.textContent = '–';
+      if (perfQuestionsUsedEl) perfQuestionsUsedEl.textContent = '–';
+      if (perfNegationCountEl) perfNegationCountEl.textContent = '–';
+      if (perfRepetitionRateEl) perfRepetitionRateEl.textContent = '–';
+      if (perfConversationTurnsEl) perfConversationTurnsEl.textContent = '–';
+      if (perfInterruptionsEl) perfInterruptionsEl.textContent = '–';
+      if (perfSpeakingShareEl) perfSpeakingShareEl.textContent = '–';
+
+      setBarState(perfMinutesSpokenBarEl, 0, null);
+      setBarState(perfAverageWpmBarEl, 0, null);
+      setBarState(perfFillersPerMinuteBarEl, 0, null);
+      setBarState(perfUniqueWordsBarEl, 0, null);
+      setBarState(perfLexicalDiversityBarEl, 0, null);
+      setBarState(perfQualityScoreBarEl, 0, null);
+      setBarState(perfQuestionsUsedBarEl, 0, null);
+      setBarState(perfNegationCountBarEl, 0, null);
+      setBarState(perfRepetitionRateBarEl, 0, null);
+      setBarState(perfConversationTurnsBarEl, 0, null);
+      setBarState(perfInterruptionsBarEl, 0, null);
+      setBarState(perfSpeakingShareBarEl, 0, null);
+
       if (perfFunFactEl) {
         perfFunFactEl.textContent =
           'Inizia a usare Studio per vedere le prime letture del tuo inglese.';
@@ -173,7 +225,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
     const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
     const fourteenDaysAgo = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000);
-    const prevWeekStart = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000);
+    const sevenToFourteenDaysAgo = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000);
 
     let totalSecondsWeek = 0;
     let totalWordsWeek = 0;
@@ -186,6 +238,19 @@ document.addEventListener('DOMContentLoaded', () => {
     let countLexicalDiversity = 0;
     let sumQualityScore = 0;
     let countQualityScore = 0;
+
+    let sumQuestions = 0;
+    let countQuestions = 0;
+    let sumNegations = 0;
+    let countNegations = 0;
+    let sumRepetitionRate = 0;
+    let countRepetitionRate = 0;
+    let sumTurns = 0;
+    let countTurns = 0;
+    let sumInterruptions = 0;
+    let countInterruptions = 0;
+    let sumSpeakingShare = 0;
+    let countSpeakingShare = 0;
 
     let sumWpmPrevWeek = 0;
     let countWpmPrevWeek = 0;
@@ -225,9 +290,33 @@ document.addEventListener('DOMContentLoaded', () => {
           sumQualityScore += s.quality_score;
           countQualityScore += 1;
         }
+        if (typeof s.question_count === 'number') {
+          sumQuestions += s.question_count;
+          countQuestions += 1;
+        }
+        if (typeof s.negation_count === 'number') {
+          sumNegations += s.negation_count;
+          countNegations += 1;
+        }
+        if (typeof s.repetition_rate === 'number') {
+          sumRepetitionRate += s.repetition_rate;
+          countRepetitionRate += 1;
+        }
+        if (typeof s.turn_count === 'number') {
+          sumTurns += s.turn_count;
+          countTurns += 1;
+        }
+        if (typeof s.interruption_count === 'number') {
+          sumInterruptions += s.interruption_count;
+          countInterruptions += 1;
+        }
+        if (typeof s.speaking_share_ratio === 'number') {
+          sumSpeakingShare += s.speaking_share_ratio;
+          countSpeakingShare += 1;
+        }
       }
 
-      if (started >= prevWeekStart && started < sevenDaysAgo) {
+      if (started >= sevenToFourteenDaysAgo && started < sevenDaysAgo) {
         if (typeof s.wpm === 'number') {
           sumWpmPrevWeek += s.wpm;
           countWpmPrevWeek += 1;
@@ -259,6 +348,16 @@ document.addEventListener('DOMContentLoaded', () => {
     const avgQualityScore =
       countQualityScore > 0 ? sumQualityScore / countQualityScore : null;
 
+    const avgQuestions = countQuestions > 0 ? sumQuestions / countQuestions : null;
+    const avgNegations = countNegations > 0 ? sumNegations / countNegations : null;
+    const avgRepetitionRate =
+      countRepetitionRate > 0 ? sumRepetitionRate / countRepetitionRate : null;
+    const avgTurns = countTurns > 0 ? sumTurns / countTurns : null;
+    const avgInterruptions =
+      countInterruptions > 0 ? sumInterruptions / countInterruptions : null;
+    const avgSpeakingShare =
+      countSpeakingShare > 0 ? sumSpeakingShare / countSpeakingShare : null;
+
     const targetMinutesWeek = 120;
     const maxMinutesWeek = 240;
     const maxWpm = 180;
@@ -268,16 +367,15 @@ document.addEventListener('DOMContentLoaded', () => {
     const maxUniqueWords = 2000;
 
     if (perfMinutesSpokenEl) perfMinutesSpokenEl.textContent = String(minutesWeek);
-
     if (perfMinutesSpokenBarEl) {
       const ratio = Math.min(minutesWeek / maxMinutesWeek, 1);
-      perfMinutesSpokenBarEl.style.width = (ratio * 100).toFixed(0) + '%';
-      perfMinutesSpokenBarEl.classList.remove('bad', 'warn', 'good');
+      let state = null;
       if (minutesWeek < targetMinutesWeek / 2 && minutesWeek > 0) {
-        perfMinutesSpokenBarEl.classList.add('warn');
+        state = 'warn';
       } else if (minutesWeek >= targetMinutesWeek) {
-        perfMinutesSpokenBarEl.classList.add('good');
+        state = 'good';
       }
+      setBarState(perfMinutesSpokenBarEl, ratio, state);
     }
 
     if (perfAverageWpmEl) {
@@ -298,16 +396,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (perfAverageWpmBarEl) {
       if (avgWpm == null) {
-        perfAverageWpmBarEl.style.width = '0%';
+        setBarState(perfAverageWpmBarEl, 0, null);
       } else {
         const clamped = Math.max(0, Math.min(avgWpm, maxWpm));
-        perfAverageWpmBarEl.style.width = ((clamped / maxWpm) * 100).toFixed(0) + '%';
-        perfAverageWpmBarEl.classList.remove('bad', 'warn', 'good');
-        if (avgWpm < idealMinWpm || avgWpm > idealMaxWpm) {
-          perfAverageWpmBarEl.classList.add('warn');
-        } else {
-          perfAverageWpmBarEl.classList.add('good');
-        }
+        const state =
+          avgWpm < idealMinWpm || avgWpm > idealMaxWpm ? 'warn' : 'good';
+        setBarState(perfAverageWpmBarEl, clamped / maxWpm, state);
       }
     }
 
@@ -318,18 +412,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (perfFillersPerMinuteBarEl) {
       if (avgFillersPerMin == null) {
-        perfFillersPerMinuteBarEl.style.width = '0%';
+        setBarState(perfFillersPerMinuteBarEl, 0, null);
       } else {
-        const ratio = Math.min(avgFillersPerMin / maxFillersBad, 1);
-        perfFillersPerMinuteBarEl.style.width = (ratio * 100).toFixed(0) + '%';
-        perfFillersPerMinuteBarEl.classList.remove('bad', 'warn', 'good');
-        if (avgFillersPerMin <= 3) {
-          perfFillersPerMinuteBarEl.classList.add('good');
-        } else if (avgFillersPerMin <= 7) {
-          perfFillersPerMinuteBarEl.classList.add('warn');
-        } else {
-          perfFillersPerMinuteBarEl.classList.add('bad');
-        }
+        let state = 'bad';
+        if (avgFillersPerMin <= 3) state = 'good';
+        else if (avgFillersPerMin <= 7) state = 'warn';
+        setBarState(
+          perfFillersPerMinuteBarEl,
+          Math.min(avgFillersPerMin / maxFillersBad, 1),
+          state
+        );
       }
     }
 
@@ -339,13 +431,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (perfUniqueWordsBarEl) {
       const ratio = Math.min(uniqueWordsLast30 / maxUniqueWords, 1);
-      perfUniqueWordsBarEl.style.width = (ratio * 100).toFixed(0) + '%';
-      perfUniqueWordsBarEl.classList.remove('bad', 'warn', 'good');
+      let state = null;
       if (uniqueWordsLast30 > 0 && ratio < 0.3) {
-        perfUniqueWordsBarEl.classList.add('warn');
+        state = 'warn';
       } else if (ratio >= 0.5) {
-        perfUniqueWordsBarEl.classList.add('good');
+        state = 'good';
       }
+      setBarState(perfUniqueWordsBarEl, ratio, state);
     }
 
     if (perfLexicalDiversityEl) {
@@ -355,18 +447,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (perfLexicalDiversityBarEl) {
       if (avgLexicalDiversity == null) {
-        perfLexicalDiversityBarEl.style.width = '0%';
+        setBarState(perfLexicalDiversityBarEl, 0, null);
       } else {
-        const ratio = Math.min(avgLexicalDiversity / 0.7, 1);
-        perfLexicalDiversityBarEl.style.width = (ratio * 100).toFixed(0) + '%';
-        perfLexicalDiversityBarEl.classList.remove('bad', 'warn', 'good');
-        if (avgLexicalDiversity < 0.3) {
-          perfLexicalDiversityBarEl.classList.add('bad');
-        } else if (avgLexicalDiversity < 0.45) {
-          perfLexicalDiversityBarEl.classList.add('warn');
-        } else {
-          perfLexicalDiversityBarEl.classList.add('good');
-        }
+        let state = 'good';
+        if (avgLexicalDiversity < 0.3) state = 'bad';
+        else if (avgLexicalDiversity < 0.45) state = 'warn';
+        setBarState(
+          perfLexicalDiversityBarEl,
+          Math.min(avgLexicalDiversity / 0.7, 1),
+          state
+        );
       }
     }
 
@@ -377,18 +467,104 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (perfQualityScoreBarEl) {
       if (avgQualityScore == null) {
-        perfQualityScoreBarEl.style.width = '0%';
+        setBarState(perfQualityScoreBarEl, 0, null);
       } else {
-        const ratio = Math.min(avgQualityScore / 100, 1);
-        perfQualityScoreBarEl.style.width = (ratio * 100).toFixed(0) + '%';
-        perfQualityScoreBarEl.classList.remove('bad', 'warn', 'good');
-        if (avgQualityScore < 50) {
-          perfQualityScoreBarEl.classList.add('bad');
-        } else if (avgQualityScore < 70) {
-          perfQualityScoreBarEl.classList.add('warn');
-        } else {
-          perfQualityScoreBarEl.classList.add('good');
-        }
+        let state = 'good';
+        if (avgQualityScore < 50) state = 'bad';
+        else if (avgQualityScore < 70) state = 'warn';
+        setBarState(
+          perfQualityScoreBarEl,
+          Math.min(avgQualityScore / 100, 1),
+          state
+        );
+      }
+    }
+
+    if (perfQuestionsUsedEl) {
+      perfQuestionsUsedEl.textContent =
+        avgQuestions != null ? avgQuestions.toFixed(1) : '–';
+    }
+    if (perfQuestionsUsedBarEl) {
+      if (avgQuestions == null) {
+        setBarState(perfQuestionsUsedBarEl, 0, null);
+      } else {
+        let state = 'warn';
+        if (avgQuestions >= 2) state = 'good';
+        else if (avgQuestions === 0) state = 'bad';
+        setBarState(perfQuestionsUsedBarEl, Math.min(avgQuestions / 6, 1), state);
+      }
+    }
+
+    if (perfNegationCountEl) {
+      perfNegationCountEl.textContent =
+        avgNegations != null ? avgNegations.toFixed(1) : '–';
+    }
+    if (perfNegationCountBarEl) {
+      if (avgNegations == null) {
+        setBarState(perfNegationCountBarEl, 0, null);
+      } else {
+        setBarState(perfNegationCountBarEl, Math.min(avgNegations / 8, 1), 'warn');
+      }
+    }
+
+    if (perfRepetitionRateEl) {
+      perfRepetitionRateEl.textContent =
+        avgRepetitionRate != null ? (avgRepetitionRate * 100).toFixed(0) + '%' : '–';
+    }
+    if (perfRepetitionRateBarEl) {
+      if (avgRepetitionRate == null) {
+        setBarState(perfRepetitionRateBarEl, 0, null);
+      } else {
+        let state = 'good';
+        if (avgRepetitionRate > 0.35) state = 'bad';
+        else if (avgRepetitionRate > 0.2) state = 'warn';
+        setBarState(perfRepetitionRateBarEl, Math.min(avgRepetitionRate / 0.5, 1), state);
+      }
+    }
+
+    if (perfConversationTurnsEl) {
+      perfConversationTurnsEl.textContent =
+        avgTurns != null ? avgTurns.toFixed(1) : '–';
+    }
+    if (perfConversationTurnsBarEl) {
+      if (avgTurns == null) {
+        setBarState(perfConversationTurnsBarEl, 0, null);
+      } else {
+        let state = 'warn';
+        if (avgTurns >= 6) state = 'good';
+        else if (avgTurns <= 2) state = 'bad';
+        setBarState(perfConversationTurnsBarEl, Math.min(avgTurns / 12, 1), state);
+      }
+    }
+
+    if (perfInterruptionsEl) {
+      perfInterruptionsEl.textContent =
+        avgInterruptions != null ? avgInterruptions.toFixed(1) : '–';
+    }
+    if (perfInterruptionsBarEl) {
+      if (avgInterruptions == null) {
+        setBarState(perfInterruptionsBarEl, 0, null);
+      } else {
+        let state = 'good';
+        if (avgInterruptions >= 3) state = 'bad';
+        else if (avgInterruptions >= 1) state = 'warn';
+        setBarState(perfInterruptionsBarEl, Math.min(avgInterruptions / 5, 1), state);
+      }
+    }
+
+    if (perfSpeakingShareEl) {
+      perfSpeakingShareEl.textContent =
+        avgSpeakingShare != null ? Math.round(avgSpeakingShare * 100) + '%' : '–';
+    }
+    if (perfSpeakingShareBarEl) {
+      if (avgSpeakingShare == null) {
+        setBarState(perfSpeakingShareBarEl, 0, null);
+      } else {
+        const distanceFromBalanced = Math.abs(avgSpeakingShare - 0.5);
+        let state = 'good';
+        if (distanceFromBalanced > 0.3) state = 'bad';
+        else if (distanceFromBalanced > 0.18) state = 'warn';
+        setBarState(perfSpeakingShareBarEl, Math.min(avgSpeakingShare, 1), state);
       }
     }
 
@@ -412,11 +588,11 @@ document.addEventListener('DOMContentLoaded', () => {
     if (perfWpmTrendEl) {
       perfWpmTrendEl.innerHTML = '';
       const recentSessionsAsc = [...sessions]
-        .filter((s) => s.started_at)
+        .filter(s => s.started_at)
         .sort((a, b) => new Date(a.started_at) - new Date(b.started_at))
         .slice(-10);
 
-      const trendValues = recentSessionsAsc.map((s) =>
+      const trendValues = recentSessionsAsc.map(s =>
         typeof s.wpm === 'number' ? s.wpm : 0
       );
       const maxTrend = trendValues.reduce((m, v) => Math.max(m, v), 0) || 1;
@@ -465,7 +641,9 @@ document.addEventListener('DOMContentLoaded', () => {
     if (perfFunFactEl) {
       let fact = '';
 
-      if (avgQualityScore != null && avgQualityScore >= 70) {
+      if (avgTurns != null && avgTurns >= 6 && avgSpeakingShare != null) {
+        fact = `Your recent sessions look more dialogic: about ${avgTurns.toFixed(1)} turns per session with a speaking share near ${Math.round(avgSpeakingShare * 100)}%.`;
+      } else if (avgQualityScore != null && avgQualityScore >= 70) {
         fact = `Your recent session quality is strong at ${Math.round(avgQualityScore)}/100, with a healthy balance of fluency and lexical variety.`;
       } else if (minutesWeek >= 60 && avgWpm != null) {
         fact = `In the last 7 days you spoke for ${minutesWeek} minutes at an average speed of ${Math.round(avgWpm)} words per minute.`;
@@ -498,7 +676,14 @@ document.addEventListener('DOMContentLoaded', () => {
       'fillers_per_minute',
       'unique_words_count',
       'lexical_diversity',
-      'quality_score'
+      'quality_score',
+      'question_count',
+      'negation_count',
+      'repetition_rate',
+      'turn_count',
+      'interruption_count',
+      'speaking_share_ratio',
+      'ai_status'
     ];
 
     const rows = currentSessions.map((s) => [
@@ -514,7 +699,14 @@ document.addEventListener('DOMContentLoaded', () => {
       s.fillers_per_minute != null ? Number(s.fillers_per_minute).toFixed(2) : '',
       s.unique_words_count != null ? s.unique_words_count : '',
       s.lexical_diversity != null ? Number(s.lexical_diversity).toFixed(3) : '',
-      s.quality_score != null ? Number(s.quality_score).toFixed(1) : ''
+      s.quality_score != null ? Number(s.quality_score).toFixed(1) : '',
+      s.question_count != null ? s.question_count : '',
+      s.negation_count != null ? s.negation_count : '',
+      s.repetition_rate != null ? Number(s.repetition_rate).toFixed(4) : '',
+      s.turn_count != null ? s.turn_count : '',
+      s.interruption_count != null ? s.interruption_count : '',
+      s.speaking_share_ratio != null ? Number(s.speaking_share_ratio).toFixed(4) : '',
+      s.ai_status || ''
     ]);
 
     const csvLines = [];
