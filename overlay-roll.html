@@ -55,11 +55,27 @@
       font-size: 11px;
       color: var(--muted);
       margin-bottom: 8px;
+      gap: 12px;
+      flex-wrap: wrap;
     }
     .label {
       letter-spacing: .12em;
       text-transform: uppercase;
       font-weight: 800;
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+    .speaker-pill {
+      font-size: 11px;
+      text-transform: none;
+      letter-spacing: 0;
+      padding: 2px 8px;
+      border-radius: 999px;
+      background: rgba(15, 23, 42, 0.9);
+      border: 1px solid rgba(148, 163, 184, 0.6);
+      color: var(--sub);
     }
     .meta {
       display: flex;
@@ -80,6 +96,9 @@
       gap: 4px;
       transform: translateY(0);
       transition: transform 0.35s ease-out;
+    }
+    .line-group {
+      display: block;
     }
     .line {
       font-size: clamp(22px, 3vw, var(--font-base));
@@ -102,7 +121,10 @@
   <div class="wrap">
     <div class="card">
       <div class="header-row">
-        <div class="label">Live captions · Rolling</div>
+        <div class="label">
+          <span>Live captions · Rolling</span>
+          <span id="currentSpeaker" class="speaker-pill" style="display:none;"></span>
+        </div>
         <div class="meta">
           <span>Room: <strong id="roomLabel"></strong></span>
           <span>Socket: <strong id="socketState">connecting</strong></span>
@@ -117,7 +139,6 @@
   <script>
     const params = new URLSearchParams(window.location.search);
 
-    // Style params reused
     (function applyStyleParams() {
       const root = document.documentElement;
 
@@ -150,6 +171,7 @@
     const roomLabel = document.getElementById('roomLabel');
     const socketState = document.getElementById('socketState');
     const linesContainer = document.getElementById('lines');
+    const currentSpeakerEl = document.getElementById('currentSpeaker');
 
     roomLabel.textContent = room;
 
@@ -159,8 +181,7 @@
     const maxDelay = 30000;
     let reconnectTimer = null;
 
-    // Rolling config
-    const maxLines = 8;  // keep last N lines
+    const maxLines = 8;
 
     function getRetryDelay() {
       if (retryCount === 0) return 0;
@@ -185,32 +206,41 @@
       }, delay);
     }
 
+    function updateCurrentSpeaker(label) {
+      const text = typeof label === 'string' ? label.trim() : '';
+      if (!text) {
+        currentSpeakerEl.style.display = 'none';
+        currentSpeakerEl.textContent = '';
+        return;
+      }
+      currentSpeakerEl.style.display = 'inline-flex';
+      currentSpeakerEl.textContent = '· ' + text;
+    }
+
     function appendLine(text, speaker) {
       if (!text || !text.trim()) return;
 
-      const wrapper = document.createElement('div');
+      const group = document.createElement('div');
+      group.className = 'line-group';
 
       if (speaker && speaker.trim()) {
         const labelEl = document.createElement('div');
         labelEl.className = 'line-speaker';
         labelEl.textContent = speaker.trim();
-        wrapper.appendChild(labelEl);
+        group.appendChild(labelEl);
       }
 
       const lineEl = document.createElement('div');
       lineEl.className = 'line';
       lineEl.textContent = text.trim();
-      wrapper.appendChild(lineEl);
+      group.appendChild(lineEl);
 
-      // Add to container
-      linesContainer.appendChild(wrapper);
+      linesContainer.appendChild(group);
 
-      // Trim old lines
       while (linesContainer.children.length > maxLines) {
         linesContainer.removeChild(linesContainer.firstChild);
       }
 
-      // Trigger a small translate to simulate smooth movement
       linesContainer.style.transform = 'translateY(6px)';
       requestAnimationFrame(() => {
         linesContainer.style.transform = 'translateY(0)';
@@ -225,9 +255,10 @@
           return;
         }
 
-        // Only final lines roll; interim is ignored
+        const speaker = typeof payload.label === 'string' ? payload.label : '';
+        updateCurrentSpeaker(speaker);
+
         if (typeof payload.final === 'string' && payload.final.trim()) {
-          const speaker = typeof payload.label === 'string' ? payload.label : '';
           appendLine(payload.final, speaker);
         }
       } catch (e) {
