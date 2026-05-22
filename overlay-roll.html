@@ -1,0 +1,280 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Sottotitoli Rolling Overlay</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="cache-control" content="no-cache">
+  <meta http-equiv="expires" content="0">
+  <meta http-equiv="pragma" content="no-cache">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --card: rgba(8, 15, 31, 0.9);
+      --line: rgba(96, 165, 250, 0.18);
+      --text: #f8fbff;
+      --muted: #9ec5ff;
+      --sub: #dbeafe;
+      --radius: 22px;
+      --font-base: 40px;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: transparent;
+      font-family: Inter, sans-serif;
+      color: var(--text);
+    }
+    .wrap {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 20px;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-end;
+    }
+    .card {
+      border-radius: var(--radius);
+      background: var(--card);
+      border: 1px solid var(--line);
+      backdrop-filter: blur(12px);
+      box-shadow: 0 18px 50px rgba(0,0,0,.24);
+      padding: 16px 20px;
+      max-height: 70vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    .header-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 11px;
+      color: var(--muted);
+      margin-bottom: 8px;
+    }
+    .label {
+      letter-spacing: .12em;
+      text-transform: uppercase;
+      font-weight: 800;
+    }
+    .meta {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+    .meta span {
+      opacity: 0.8;
+    }
+    .feed {
+      position: relative;
+      overflow: hidden;
+      padding-top: 4px;
+    }
+    .lines {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      transform: translateY(0);
+      transition: transform 0.35s ease-out;
+    }
+    .line {
+      font-size: clamp(22px, 3vw, var(--font-base));
+      line-height: 1.25;
+      font-weight: 700;
+      color: var(--text);
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+    .line-speaker {
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: .12em;
+      color: var(--muted);
+      margin-bottom: 2px;
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="card">
+      <div class="header-row">
+        <div class="label">Live captions · Rolling</div>
+        <div class="meta">
+          <span>Room: <strong id="roomLabel"></strong></span>
+          <span>Socket: <strong id="socketState">connecting</strong></span>
+        </div>
+      </div>
+      <div class="feed">
+        <div id="lines" class="lines"></div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const params = new URLSearchParams(window.location.search);
+
+    // Style params reused
+    (function applyStyleParams() {
+      const root = document.documentElement;
+
+      const fontSize = parseInt(params.get('fontsize'), 10);
+      if (!isNaN(fontSize) && fontSize > 0) {
+        root.style.setProperty('--font-base', fontSize + 'px');
+      }
+
+      const color = params.get('color');
+      if (color) {
+        const val = color.startsWith('#') ? color : '#' + color;
+        root.style.setProperty('--text', val);
+      }
+
+      const bg = params.get('bg');
+      if (bg) {
+        const val = bg.startsWith('#') ? bg : '#' + bg;
+        root.style.setProperty('--card', val);
+      }
+
+      const radius = parseInt(params.get('radius'), 10);
+      if (!isNaN(radius) && radius >= 0) {
+        root.style.setProperty('--radius', radius + 'px');
+      }
+    })();
+
+    const room = params.get('room') || 'default';
+    const socketUrlBase = "wss://sottotitoli-websocket.onrender.com?room=" + encodeURIComponent(room);
+
+    const roomLabel = document.getElementById('roomLabel');
+    const socketState = document.getElementById('socketState');
+    const linesContainer = document.getElementById('lines');
+
+    roomLabel.textContent = room;
+
+    let socket = null;
+    let retryCount = 0;
+    const baseDelay = 1000;
+    const maxDelay = 30000;
+    let reconnectTimer = null;
+
+    // Rolling config
+    const maxLines = 8;  // keep last N lines
+
+    function getRetryDelay() {
+      if (retryCount === 0) return 0;
+      return Math.min(baseDelay * Math.pow(2, retryCount - 1), maxDelay);
+    }
+
+    function clearReconnectTimer() {
+      if (reconnectTimer) {
+        clearTimeout(reconnectTimer);
+        reconnectTimer = null;
+      }
+    }
+
+    function scheduleReconnect() {
+      if (reconnectTimer) return;
+      const delay = getRetryDelay();
+      socketState.textContent = 'reconnecting in ' + (delay / 1000).toFixed(1) + 's';
+      reconnectTimer = setTimeout(() => {
+        reconnectTimer = null;
+        retryCount++;
+        connectWebSocket();
+      }, delay);
+    }
+
+    function appendLine(text, speaker) {
+      if (!text || !text.trim()) return;
+
+      const wrapper = document.createElement('div');
+
+      if (speaker && speaker.trim()) {
+        const labelEl = document.createElement('div');
+        labelEl.className = 'line-speaker';
+        labelEl.textContent = speaker.trim();
+        wrapper.appendChild(labelEl);
+      }
+
+      const lineEl = document.createElement('div');
+      lineEl.className = 'line';
+      lineEl.textContent = text.trim();
+      wrapper.appendChild(lineEl);
+
+      // Add to container
+      linesContainer.appendChild(wrapper);
+
+      // Trim old lines
+      while (linesContainer.children.length > maxLines) {
+        linesContainer.removeChild(linesContainer.firstChild);
+      }
+
+      // Trigger a small translate to simulate smooth movement
+      linesContainer.style.transform = 'translateY(6px)';
+      requestAnimationFrame(() => {
+        linesContainer.style.transform = 'translateY(0)';
+      });
+    }
+
+    function handleMessage(event) {
+      try {
+        const payload = JSON.parse(event.data);
+
+        if (payload.type === 'system') {
+          return;
+        }
+
+        // Only final lines roll; interim is ignored
+        if (typeof payload.final === 'string' && payload.final.trim()) {
+          const speaker = typeof payload.label === 'string' ? payload.label : '';
+          appendLine(payload.final, speaker);
+        }
+      } catch (e) {
+        // ignore parse errors
+      }
+    }
+
+    function connectWebSocket() {
+      if (socket && (socket.readyState === WebSocket.OPEN || socket.readyState === WebSocket.CONNECTING)) {
+        return;
+      }
+
+      const ws = new WebSocket(socketUrlBase);
+      socket = ws;
+
+      socketState.textContent = 'connecting';
+
+      ws.addEventListener('open', function () {
+        if (socket !== ws) return;
+        socketState.textContent = 'connected';
+        retryCount = 0;
+        clearReconnectTimer();
+      });
+
+      ws.addEventListener('close', function () {
+        if (socket !== ws) return;
+        socketState.textContent = 'closed';
+        scheduleReconnect();
+      });
+
+      ws.addEventListener('error', function () {
+        if (socket !== ws) return;
+        socketState.textContent = 'error';
+      });
+
+      ws.addEventListener('message', handleMessage);
+    }
+
+    window.addEventListener('beforeunload', () => {
+      clearReconnectTimer();
+      if (socket) {
+        try { socket.close(); } catch (e) {}
+        socket = null;
+      }
+    });
+
+    connectWebSocket();
+  </script>
+</body>
+</html>
