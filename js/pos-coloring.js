@@ -4,11 +4,11 @@
 
   function posToClass(pos) {
     if (!pos) return null;
-    const p = pos.toLowerCase();
-    if (p.startsWith("v")) return "pos-verb";
-    if (p.startsWith("n")) return "pos-noun";
-    if (p.startsWith("adj")) return "pos-adj";
-    if (p.startsWith("adv")) return "pos-adv";
+    const p = String(pos).toLowerCase();
+    if (p === "verb" || p.startsWith("v")) return "pos-verb";
+    if (p === "noun" || p.startsWith("n")) return "pos-noun";
+    if (p === "adj" || p === "adjective") return "pos-adj";
+    if (p === "adv" || p === "adverb") return "pos-adv";
     return null;
   }
 
@@ -16,7 +16,7 @@
     if (!container) return;
     container.innerHTML = "";
 
-    tokens.forEach((tok, idx) => {
+    tokens.forEach(function (tok, idx) {
       const span = document.createElement("span");
       const cls = posToClass(tok.pos);
       if (cls) span.className = cls;
@@ -29,6 +29,6 @@
   }
 
   w.SottotitoliPosColoring = {
-    renderColoredCaption
+    renderColoredCaption: renderColoredCaption
   };
 })(window);
