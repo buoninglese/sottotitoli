@@ -5,6 +5,7 @@
   <title>Sottotitoli Overlay</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
 
+  <!-- Favicon and CSS (adjust paths only if your folders differ) -->
   <link rel="icon" type="image/png" href="img/favicon.png" />
   <link rel="stylesheet" href="css/normalize.css" />
   <link rel="stylesheet" href="css/bootstrap.min.css" />
@@ -39,21 +40,10 @@
       word-break: break-word;
     }
 
-    .pos-verb {
-      color: #2563eb;
-    }
-
-    .pos-noun {
-      color: #16a34a;
-    }
-
-    .pos-adj {
-      color: #f97316;
-    }
-
-    .pos-adv {
-      color: #7c3aed;
-    }
+    .pos-verb { color: #2563eb; }
+    .pos-noun { color: #16a34a; }
+    .pos-adj  { color: #f97316; }
+    .pos-adv  { color: #7c3aed; }
   </style>
 </head>
 <body>
@@ -61,126 +51,135 @@
     <div id="captionBox" class="caption-box"></div>
   </div>
 
-  <!-- Core scripts from your app -->
+  <!-- Core scripts (adjust paths only if your files live elsewhere) -->
   <script src="js/jquery.min.js"></script>
-  <script src="config.js?v12"></script>
-  <script src="ws-publisher.js?v12"></script>
+  <script src="config.js"></script>
+  <script src="ws-publisher.js"></script>
 
   <!-- POS colouring and map -->
-  <script src="js/lemma-pos-map.js?v1"></script>
-  <script src="js/pos-coloring.js?v1"></script>
+  <script src="js/lemma-pos-map.js"></script>
+  <script src="js/pos-coloring.js"></script>
 
   <script>
-  (function (w) {
-    "use strict";
+    (function (w) {
+      "use strict";
 
-    const params = new URLSearchParams(window.location.search);
-    const room = params.get("room");
-    const modeFromQuery = params.get("mode") || "caption-en";
+      const params = new URLSearchParams(window.location.search);
+      const room = params.get("room");
+      const modeFromQuery = params.get("mode") || "caption-en";
 
-    const captionBox = document.getElementById("captionBox");
+      const captionBox = document.getElementById("captionBox");
 
-    function modeIsEnglishLesson(modeKey) {
-      if (!modeKey) return false;
-      return modeKey.indexOf("lesson") !== -1 && modeKey.indexOf("caption") === -1;
-    }
-
-    function tokenizeCaption(text) {
-      const rawTokens = text.match(/[A-Za-z']+|\S/g) || [];
-      return rawTokens.map(function (t) {
-        const lemma = t.toLowerCase();
-        const pos =
-          (w.LEMMA_POS_MAP && w.LEMMA_POS_MAP[lemma]) || null;
-        return {
-          text: t,
-          lemma: lemma,
-          pos: pos
-        };
-      });
-    }
-
-    function handleCaptionPayload(payload) {
-      if (!payload) return;
-
-      const text = payload.final || payload.interim || "";
-      const modeKey = payload.mode || modeFromQuery;
-
-      if (!text) {
-        captionBox.textContent = "";
-        return;
+      function modeIsEnglishLesson(modeKey) {
+        if (!modeKey) return false;
+        return modeKey.indexOf("lesson") !== -1 && modeKey.indexOf("caption") === -1;
       }
 
-      if (modeIsEnglishLesson(modeKey)) {
-        const tokens = tokenizeCaption(text);
-        if (w.SottotitoliPosColoring) {
-          w.SottotitoliPosColoring.renderColoredCaption(captionBox, tokens);
+      function tokenizeCaption(text) {
+        const rawTokens = text.match(/[A-Za-z']+|\S/g) || [];
+        return rawTokens.map(function (t) {
+          const lemma = t.toLowerCase();
+          const pos =
+            (w.LEMMA_POS_MAP && w.LEMMA_POS_MAP[lemma]) || null;
+          return {
+            text: t,
+            lemma,
+            pos
+          };
+        });
+      }
+
+      function handleCaptionPayload(payload) {
+        if (!payload) return;
+
+        const text = payload.final || payload.interim || "";
+        const modeKey = payload.mode || modeFromQuery;
+
+        if (!text) {
+          captionBox.textContent = "";
+          return;
+        }
+
+        if (modeIsEnglishLesson(modeKey)) {
+          const tokens = tokenizeCaption(text);
+          if (w.SottotitoliPosColoring) {
+            w.SottotitoliPosColoring.renderColoredCaption(captionBox, tokens);
+          } else {
+            captionBox.textContent = text;
+          }
         } else {
           captionBox.textContent = text;
         }
-      } else {
-        captionBox.textContent = text;
-      }
-    }
-
-    function handleOverlayState(state) {
-      if (state === "disconnected" || state === "error") {
-        captionBox.textContent = "Overlay connection lost.";
-      }
-    }
-
-    document.addEventListener("DOMContentLoaded", function () {
-      if (!room) {
-        captionBox.textContent = "No room specified.";
-        return;
       }
 
-      const cfgRoot =
-        w.SOTTOTITOLI_CONFIG ||
-        w.SOTTOTITOLICONFIG ||
-        w.SottotitoliConfig ||
-        {};
-
-      const wsUrl = cfgRoot.websocketUrl || cfgRoot.websocket_url || "";
-
-      if (!wsUrl) {
-        captionBox.textContent =
-          "Overlay not connected (no websocket URL in config).";
-        return;
-      }
-
-      let socket;
-      try {
-        socket = new WebSocket(wsUrl + "?room=" + encodeURIComponent(room));
-      } catch (err) {
-        captionBox.textContent =
-          "Overlay not connected (websocket error).";
-        return;
-      }
-
-      socket.onopen = function () {
-        // Optional: you could show “connected” somewhere if you add a status element.
-      };
-
-      socket.onmessage = function (event) {
-        try {
-          const payload = JSON.parse(event.data);
-          if (payload && payload.type === "caption") {
-            handleCaptionPayload(payload);
-          }
-        } catch (e) {
-          // ignore malformed messages
+      function handleOverlayState(state) {
+        if (state === "disconnected" || state === "error") {
+          captionBox.textContent = "Overlay connection lost.";
         }
-      };
+      }
 
-      socket.onclose = function () {
-        handleOverlayState("disconnected");
-      };
+      document.addEventListener("DOMContentLoaded", function () {
+        console.log("[Overlay] DOMContentLoaded handler starting");
 
-      socket.onerror = function () {
-        handleOverlayState("error");
-      };
-    });
-  })(window);
-</script>
+        if (!room) {
+          console.log("[Overlay] No room in URL");
+          captionBox.textContent = "No room specified.";
+          return;
+        }
+
+        const cfgRoot =
+          w.SOTTOTITOLI_CONFIG ||
+          w.SOTTOTITOLICONFIG ||
+          w.SottotitoliConfig ||
+          {};
+
+        const wsUrl = cfgRoot.websocketUrl || cfgRoot.websocket_url || "";
+
+        console.log("[Overlay] room =", room, "wsUrl =", wsUrl);
+
+        if (!wsUrl) {
+          captionBox.textContent =
+            "Overlay not connected (no websocket URL in config).";
+          return;
+        }
+
+        let socket;
+        try {
+          socket = new WebSocket(wsUrl + "?room=" + encodeURIComponent(room));
+        } catch (err) {
+          console.error("[Overlay] WebSocket create error", err);
+          captionBox.textContent =
+            "Overlay not connected (websocket error).";
+          return;
+        }
+
+        socket.onopen = function () {
+          console.log("[Overlay] WebSocket open");
+        };
+
+        socket.onmessage = function (event) {
+          console.log("[Overlay] Raw message:", event.data);
+          try {
+            const payload = JSON.parse(event.data);
+            if (payload && payload.type === "caption") {
+              handleCaptionPayload(payload);
+            }
+          } catch (e) {
+            console.error("[Overlay] Failed to parse message", e);
+          }
+        };
+
+        socket.onclose = function () {
+          console.log("[Overlay] WebSocket closed");
+          handleOverlayState("disconnected");
+        };
+
+        socket.onerror = function (e) {
+          console.error("[Overlay] WebSocket error", e);
+          handleOverlayState("error");
+        };
+      });
+    })(window);
+  </script>
 </body>
 </html>
