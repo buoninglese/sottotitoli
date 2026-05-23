@@ -142,24 +142,43 @@
 
       const wsUrl = cfgRoot.websocketUrl || cfgRoot.websocket_url || "";
 
-      if (!wsUrl || !w.createWSSubscriber) {
+      if (!wsUrl) {
         captionBox.textContent =
-          "Overlay not connected (missing config or subscriber script).";
+          "Overlay not connected (no websocket URL in config).";
         return;
       }
 
-      const subscriber = w.createWSSubscriber({
-        url: wsUrl,
-        room,
-        onCaption(payload) {
-          handleCaptionPayload(payload);
-        },
-        onStateChange(state) {
-          handleOverlayState(state);
-        }
-      });
+      let socket;
+      try {
+        socket = new WebSocket(wsUrl + "?room=" + encodeURIComponent(room));
+      } catch (err) {
+        captionBox.textContent =
+          "Overlay not connected (websocket error).";
+        return;
+      }
 
-      subscriber.connect();
+      socket.onopen = function () {
+        // Optional: you could show “connected” somewhere if you add a status element.
+      };
+
+      socket.onmessage = function (event) {
+        try {
+          const payload = JSON.parse(event.data);
+          if (payload && payload.type === "caption") {
+            handleCaptionPayload(payload);
+          }
+        } catch (e) {
+          // ignore malformed messages
+        }
+      };
+
+      socket.onclose = function () {
+        handleOverlayState("disconnected");
+      };
+
+      socket.onerror = function () {
+        handleOverlayState("error");
+      };
     });
   })(window);
 </script>
