@@ -5,7 +5,6 @@
   <title>Sottotitoli Overlay (Roll)</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
 
-  <!-- Favicon and CSS (adjust paths only if your folders differ) -->
   <link rel="icon" type="image/png" href="img/favicon.png" />
   <link rel="stylesheet" href="css/normalize.css" />
   <link rel="stylesheet" href="css/bootstrap.min.css" />
@@ -13,50 +12,137 @@
   <link rel="stylesheet" href="style.css" />
 
   <style>
+    :root {
+      --roll-bg: rgba(5, 12, 24, 0.96);
+      --roll-line: rgba(148, 163, 184, 0.25);
+      --roll-muted: #94a3b8;
+    }
+
     body {
       margin: 0;
       padding: 0;
-      background: rgba(0, 0, 0, 0.85);
-      color: #ffffff;
+      background: radial-gradient(circle at top left, rgba(59, 130, 246, .22), transparent 50%),
+                  linear-gradient(180deg, #020617, #020617);
+      color: #e5edff;
       font-family: "Montserrat", system-ui, -apple-system, BlinkMacSystemFont,
         "Segoe UI", sans-serif;
     }
 
     .overlay-root {
+      min-height: 100vh;
       display: flex;
       align-items: flex-end;
       justify-content: center;
-      min-height: 100vh;
-      padding: 16px 24px;
+      padding: 16px 20px;
     }
 
-    .caption-box {
-      max-width: 100%;
+    .roll-card {
       width: 100%;
-      font-size: 28px;
-      line-height: 1.6;
-      text-align: left;
-      word-wrap: break-word;
-      word-break: break-word;
+      max-width: 1200px;
+      background: var(--roll-bg);
+      border-radius: 18px 18px 0 0;
+      border-top: 1px solid rgba(148, 163, 184, .45);
+      border-left: 1px solid rgba(30, 64, 175, .5);
+      border-right: 1px solid rgba(30, 64, 175, .5);
+      box-shadow:
+        0 -18px 50px rgba(0, 0, 0, .55),
+        0 -1px 0 rgba(15, 23, 42, 1);
+      padding: 10px 18px 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .roll-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 12px;
+      color: var(--roll-muted);
+    }
+
+    .roll-status {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .roll-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 999px;
+      background: #f97316;
+    }
+
+    .roll-dot.connected {
+      background: #22c55e;
+    }
+
+    .roll-room {
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 12px;
+      padding: 2px 8px;
+      border-radius: 999px;
+      border: 1px solid rgba(148, 163, 184, .55);
+      color: #dbeafe;
+    }
+
+    .roll-list {
+      margin-top: 2px;
+      max-height: 38vh;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column-reverse;
+      gap: 4px;
+    }
+
+    .roll-line {
+      font-size: 22px;
+      line-height: 1.5;
+      border-top: 1px solid rgba(148, 163, 184, .15);
+      padding-top: 4px;
+    }
+
+    .roll-placeholder {
+      font-size: 14px;
+      color: var(--roll-muted);
     }
 
     .pos-verb { color: #2563eb; }
     .pos-noun { color: #16a34a; }
     .pos-adj  { color: #f97316; }
     .pos-adv  { color: #7c3aed; }
+
+    @media (max-width: 720px) {
+      .roll-card {
+        padding: 8px 12px 10px;
+      }
+      .roll-line {
+        font-size: 18px;
+      }
+    }
   </style>
 </head>
 <body>
   <div class="overlay-root">
-    <div id="captionBox" class="caption-box"></div>
+    <div class="roll-card">
+      <div class="roll-header">
+        <div>Rolling captions</div>
+        <div class="roll-status">
+          <span class="roll-dot" id="rollDot"></span>
+          <span id="rollStatusText">Connecting…</span>
+          <span class="roll-room" id="rollRoomLabel"></span>
+        </div>
+      </div>
+      <div class="roll-list" id="captionBox">
+        <div class="roll-placeholder">Waiting for captions…</div>
+      </div>
+    </div>
   </div>
 
-  <!-- Core scripts (adjust paths only if your files live elsewhere) -->
   <script src="js/jquery.min.js"></script>
   <script src="config.js"></script>
   <script src="ws-publisher.js"></script>
-
-  <!-- POS colouring and map -->
   <script src="js/lemma-pos-map.js"></script>
   <script src="js/pos-coloring.js"></script>
 
@@ -69,6 +155,9 @@
       const modeFromQuery = params.get("mode") || "caption-en";
 
       const captionBox = document.getElementById("captionBox");
+      const rollDot = document.getElementById("rollDot");
+      const rollStatusText = document.getElementById("rollStatusText");
+      const rollRoomLabel = document.getElementById("rollRoomLabel");
 
       function modeIsEnglishLesson(modeKey) {
         if (!modeKey) return false;
@@ -89,56 +178,68 @@
         });
       }
 
-      // For roll overlay, append each final caption as a new line
-      function handleCaptionPayload(payload) {
+      function clearPlaceholder() {
+        const ph = captionBox.querySelector(".roll-placeholder");
+        if (ph) ph.remove();
+      }
+
+      function appendRollLine(payload) {
         if (!payload) return;
 
         const text = payload.final || payload.interim || "";
         const modeKey = payload.mode || modeFromQuery;
 
         if (!text) return;
+        clearPlaceholder();
 
-        let displayText = text;
+        const line = document.createElement("div");
+        line.className = "roll-line";
 
         if (modeIsEnglishLesson(modeKey)) {
           const tokens = tokenizeCaption(text);
           if (w.SottotitoliPosColoring) {
-            // Render into a temporary container so we can append HTML
             const temp = document.createElement("span");
             w.SottotitoliPosColoring.renderColoredCaption(temp, tokens);
-            displayText = temp.innerHTML;
+            line.innerHTML = temp.innerHTML;
+          } else {
+            line.textContent = text;
           }
-        }
-
-        const line = document.createElement("div");
-        if (modeIsEnglishLesson(modeKey) && w.SottotitoliPosColoring) {
-          line.innerHTML = displayText;
         } else {
-          line.textContent = displayText;
+          line.textContent = text;
         }
-        captionBox.appendChild(line);
 
-        // Optional: keep only the last N lines (e.g. 8) so it doesn't grow forever
-        const maxLines = 8;
+        captionBox.prepend(line);
+
+        const maxLines = 10;
         while (captionBox.childNodes.length > maxLines) {
-          captionBox.removeChild(captionBox.firstChild);
+          captionBox.removeChild(captionBox.lastChild);
         }
       }
 
-      function handleOverlayState(state) {
-        if (state === "disconnected" || state === "error") {
-          const line = document.createElement("div");
-          line.textContent = "Overlay connection lost.";
-          captionBox.appendChild(line);
+      function setRollState(state) {
+        if (!rollDot || !rollStatusText) return;
+        if (state === "connected") {
+          rollDot.classList.add("connected");
+          rollStatusText.textContent = "Connected";
+        } else if (state === "connecting") {
+          rollDot.classList.remove("connected");
+          rollStatusText.textContent = "Connecting…";
+        } else if (state === "error") {
+          rollDot.classList.remove("connected");
+          rollStatusText.textContent = "Error";
+        } else {
+          rollDot.classList.remove("connected");
+          rollStatusText.textContent = "Disconnected";
         }
       }
 
       document.addEventListener("DOMContentLoaded", function () {
-        console.log("[Overlay-roll] DOMContentLoaded handler starting");
+        if (rollRoomLabel) {
+          rollRoomLabel.textContent = room ? ("room " + room) : "no room";
+        }
 
         if (!room) {
-          console.log("[Overlay-roll] No room in URL");
-          captionBox.textContent = "No room specified.";
+          captionBox.innerHTML = '<div class="roll-placeholder">No room specified.</div>';
           return;
         }
 
@@ -150,34 +251,31 @@
 
         const wsUrl = cfgRoot.websocketUrl || cfgRoot.websocket_url || "";
 
-        console.log("[Overlay-roll] room =", room, "wsUrl =", wsUrl);
-
         if (!wsUrl) {
-          captionBox.textContent =
-            "Overlay not connected (no websocket URL in config).";
+          captionBox.innerHTML = '<div class="roll-placeholder">No websocket URL in config.</div>';
+          setRollState("error");
           return;
         }
 
         let socket;
         try {
+          setRollState("connecting");
           socket = new WebSocket(wsUrl + "?room=" + encodeURIComponent(room));
         } catch (err) {
-          console.error("[Overlay-roll] WebSocket create error", err);
-          captionBox.textContent =
-            "Overlay not connected (websocket error).";
+          captionBox.innerHTML = '<div class="roll-placeholder">WebSocket error.</div>';
+          setRollState("error");
           return;
         }
 
         socket.onopen = function () {
-          console.log("[Overlay-roll] WebSocket open");
+          setRollState("connected");
         };
 
         socket.onmessage = function (event) {
-          console.log("[Overlay-roll] Raw message:", event.data);
           try {
             const payload = JSON.parse(event.data);
-            if (payload && payload.type === "caption") {
-              handleCaptionPayload(payload);
+            if (payload && payload.type === "caption" && payload.final) {
+              appendRollLine(payload);
             }
           } catch (e) {
             console.error("[Overlay-roll] Failed to parse message", e);
@@ -185,13 +283,11 @@
         };
 
         socket.onclose = function () {
-          console.log("[Overlay-roll] WebSocket closed");
-          handleOverlayState("disconnected");
+          setRollState("disconnected");
         };
 
-        socket.onerror = function (e) {
-          console.error("[Overlay-roll] WebSocket error", e);
-          handleOverlayState("error");
+        socket.onerror = function () {
+          setRollState("error");
         };
       });
     })(window);
