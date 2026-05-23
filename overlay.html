@@ -71,81 +71,97 @@
   <script src="js/pos-coloring.js?v1"></script>
 
   <script>
-    (function (w) {
-      "use strict";
+  (function (w) {
+    "use strict";
 
-      const params = new URLSearchParams(window.location.search);
-      const room = params.get("room");
-      const modeFromQuery = params.get("mode") || "caption-en";
+    const params = new URLSearchParams(window.location.search);
+    const room = params.get("room");
+    const modeFromQuery = params.get("mode") || "caption-en";
 
-      const captionBox = document.getElementById("captionBox");
+    const captionBox = document.getElementById("captionBox");
 
-      function modeIsEnglishLesson(modeKey) {
-        if (!modeKey) return false;
-        // Your lesson modes all include "lesson" in the key on studio.html.[file:2173]
-        return modeKey.indexOf("lesson") !== -1 && modeKey.indexOf("caption") === -1;
+    function modeIsEnglishLesson(modeKey) {
+      if (!modeKey) return false;
+      return modeKey.indexOf("lesson") !== -1 && modeKey.indexOf("caption") === -1;
+    }
+
+    function tokenizeCaption(text) {
+      const rawTokens = text.match(/[A-Za-z']+|\S/g) || [];
+      return rawTokens.map(function (t) {
+        const lemma = t.toLowerCase();
+        const pos =
+          (w.LEMMA_POS_MAP && w.LEMMA_POS_MAP[lemma]) || null;
+        return {
+          text: t,
+          lemma: lemma,
+          pos: pos
+        };
+      });
+    }
+
+    function handleCaptionPayload(payload) {
+      if (!payload) return;
+
+      const text = payload.final || payload.interim || "";
+      const modeKey = payload.mode || modeFromQuery;
+
+      if (!text) {
+        captionBox.textContent = "";
+        return;
       }
 
-      function tokenizeCaption(text) {
-        const rawTokens = text.match(/[A-Za-z']+|\S/g) || [];
-        return rawTokens.map(function (t) {
-          const lemma = t.toLowerCase();
-          const pos =
-            (w.LEMMA_POS_MAP && w.LEMMA_POS_MAP[lemma]) || null;
-          return {
-            text: t,
-            lemma: lemma,
-            pos: pos
-          };
-        });
-      }
-
-      function handleCaptionPayload(payload) {
-        if (!payload || !payload.final) return;
-
-        const text = payload.final;
-        const modeKey = payload.mode || modeFromQuery;
-
-        if (modeIsEnglishLesson(modeKey)) {
-          const tokens = tokenizeCaption(text);
-          if (w.SottotitoliPosColoring) {
-            w.SottotitoliPosColoring.renderColoredCaption(captionBox, tokens);
-          } else {
-            captionBox.textContent = text;
-          }
+      if (modeIsEnglishLesson(modeKey)) {
+        const tokens = tokenizeCaption(text);
+        if (w.SottotitoliPosColoring) {
+          w.SottotitoliPosColoring.renderColoredCaption(captionBox, tokens);
         } else {
           captionBox.textContent = text;
         }
+      } else {
+        captionBox.textContent = text;
+      }
+    }
+
+    function handleOverlayState(state) {
+      if (state === "disconnected" || state === "error") {
+        captionBox.textContent = "Overlay connection lost.";
+      }
+    }
+
+    document.addEventListener("DOMContentLoaded", function () {
+      if (!room) {
+        captionBox.textContent = "No room specified.";
+        return;
       }
 
-      function handleOverlayState(state) {
-        if (state === "disconnected" || state === "error") {
-          captionBox.textContent = "Overlay connection lost.";
-        }
+      const cfgRoot =
+        w.SOTTOTITOLI_CONFIG ||
+        w.SOTTOTITOLICONFIG ||
+        w.SottotitoliConfig ||
+        {};
+
+      const wsUrl = cfgRoot.websocketUrl || cfgRoot.websocket_url || "";
+
+      if (!wsUrl || !w.createWSSubscriber) {
+        captionBox.textContent =
+          "Overlay not connected (missing config or subscriber script).";
+        return;
       }
 
-      document.addEventListener("DOMContentLoaded", function () {
-        if (!room) {
-          captionBox.textContent = "No room specified.";
-          return;
+      const subscriber = w.createWSSubscriber({
+        url: wsUrl,
+        room,
+        onCaption(payload) {
+          handleCaptionPayload(payload);
+        },
+        onStateChange(state) {
+          handleOverlayState(state);
         }
-        if (!w.createWSOverlaySubscriber || !w.SOTTOTITOLICONFIG) {
-          captionBox.textContent = "Overlay not connected (missing config or subscriber script).";
-          return;
-        }
-
-        w.createWSOverlaySubscriber(
-          w.SOTTOTITOLICONFIG.websocketUrl,
-          room,
-          function onCaption(payload) {
-            handleCaptionPayload(payload);
-          },
-          function onStateChange(state) {
-            handleOverlayState(state);
-          }
-        );
       });
-    })(window);
-  </script>
+
+      subscriber.connect();
+    });
+  })(window);
+</script>
 </body>
 </html>
