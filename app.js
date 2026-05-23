@@ -67,6 +67,7 @@
   let transcriptLines = [];
   let latestReportText = "";
   let lastInterimSent = "";
+  let lastFinalSent = "";
   let shouldKeepListening = false;
   let restartTimer = null;
   let hasStartedOnce = false;
@@ -84,9 +85,6 @@
   const sessionSupabase = window.sottotitoliSupabase;
   let currentSessionId = null;
   let currentSessionStart = null;
-
-  // coalescing state: we keep one “current utterance” and update it
-  let currentUtterance = null;
 
   function $(id) {
     return document.getElementById(id);
@@ -187,7 +185,7 @@
   function updateAnalyzeButtonState() {
     if (!analyzeBtnRef) return;
 
-    analyzeBtnRef.className = "btn btn-primary";
+    analyzeBtnRef.className = "btn";
     analyzeBtnRef.style.opacity = "";
     analyzeBtnRef.style.cursor = "";
     analyzeBtnRef.style.background = "";
@@ -232,6 +230,7 @@
 
   async function maybeTranslate(text) {
     if (!modeConfig || !modeConfig.translate) return null;
+    if (!w.CaptionTranslationProviders) return null;
     try {
       const providerConfig = w.CaptionTranslationProviders.resolveConfig();
       const result = await w.CaptionTranslationProviders.translateText(
@@ -258,44 +257,32 @@
 
   function annotateLineWithNgsl(text) {
     if (!w.LEMMA_POS_MAP || !text) return null;
-
     const tokens = text.split(/\s+/);
-    return tokens.map((token) => {
+    return tokens.map(function (token) {
       const surface = token;
       const lemmaKey = surface.toLowerCase().replace(/[^a-z']/g, "");
       if (!lemmaKey) {
-        return {
-          surface,
-          lemmaKey: null,
-          inNgsl: false
-        };
+        return { surface, lemmaKey: null, inNgsl: false };
       }
       const inNgsl = !!w.LEMMA_POS_MAP[lemmaKey];
-      return {
-        surface,
-        lemmaKey,
-        inNgsl
-      };
+      return { surface, lemmaKey, inNgsl };
     });
   }
 
   async function commitUtteranceFinal(text) {
     if (!text) return;
+    if (text === lastFinalSent) return;
+    lastFinalSent = text;
+
     const timestamp = w.SottotitoliSessionUtils.formatTimestamp(new Date());
 
-    // If we already have a current utterance, update its text instead of pushing a new entry
-    if (currentUtterance) {
-      currentUtterance.text = text;
-    } else {
-      currentUtterance = {
-        timestamp,
-        text,
-        translated: null,
-        learning: annotateLineWithNgsl(text)
-      };
-      transcriptLines.push(currentUtterance);
-    }
-
+    const entry = {
+      timestamp,
+      text,
+      translated: null,
+      learning: annotateLineWithNgsl(text)
+    };
+    transcriptLines.push(entry);
     replaceTopLine("sourceOutput", text);
 
     const payload = {
@@ -311,7 +298,7 @@
     if (modeConfig && modeConfig.translate) {
       const translated = await maybeTranslate(text);
       if (translated) {
-        currentUtterance.translated = translated;
+        entry.translated = translated;
         replaceTopLine("translatedOutput", translated);
         payload.translated = translated;
         payload.targetLang = modeConfig.targetLang;
@@ -323,9 +310,6 @@
     clearBox("interimOutput", "Interim");
 
     sendPayload(payload, "Final caption sent to overlay.");
-
-    // Start a fresh utterance for the next sentence
-    currentUtterance = null;
   }
 
   function handleInterimTranscript(text) {
@@ -390,18 +374,24 @@
 
     rec.onresult = function (event) {
       let interim = "";
+      let lastFinal = "";
+
       for (let i = event.resultIndex; i < event.results.length; i++) {
         const res = event.results[i];
         const text = res[0].transcript.trim();
         if (!text) continue;
 
         if (res.isFinal) {
-          // Coalesce: treat the whole utterance as one line
-          commitUtteranceFinal(text);
+          lastFinal = text; // only keep the latest final part
         } else {
-          interim = text;
+          interim = text;   // latest interim
         }
       }
+
+      if (lastFinal) {
+        commitUtteranceFinal(lastFinal);
+      }
+
       handleInterimTranscript(interim.trim());
     };
 
@@ -533,7 +523,8 @@
     clearRestartTimer();
     shouldKeepListening = true;
     hasStartedOnce = false;
-    currentUtterance = null;
+    lastFinalSent = "";
+    transcriptLines = [];
 
     if (!recognition) recognition = buildRecognition();
 
@@ -550,7 +541,6 @@
   function stopRecognition() {
     shouldKeepListening = false;
     clearRestartTimer();
-    currentUtterance = null;
     if (recognition) {
       try {
         recognition.stop();
@@ -597,6 +587,10 @@
   }
 
   async function generateLessonReport() {
+    if (!w.SottotitoliLessonReport) {
+      setText("statusText", "Lesson reporting not available (script missing).");
+      return;
+    }
     try {
       const report =
         await w.SottotitoliLessonReport.generateLessonReport(transcriptLines);
@@ -607,6 +601,7 @@
       setText("lessonReport", latestReportText || "No report yet.");
       setText("statusText", "Lesson report generated.");
     } catch (e) {
+      console.error("Lesson report error", e);
       setText("statusText", "Could not generate report: " + e.message);
     }
   }
@@ -670,11 +665,11 @@
     transcriptLines = [];
     latestReportText = "";
     lastInterimSent = "";
+    lastFinalSent = "";
     audioChunks = [];
     lastAudioBlob = null;
     isAnalyzingSpeakers = false;
     speakerAnalysisCompleted = false;
-    currentUtterance = null;
     updateAnalyzeButtonState();
     clearBox("interimOutput", "Interim");
     clearBox("sourceOutput", "Source output");
@@ -955,7 +950,6 @@
     return inNgsl / total;
   }
 
-  // Simple metrics helpers (stubs if not defined elsewhere)
   function computeSentencesCount(text) {
     if (!text) return 0;
     return (text.match(/[.!?]/g) || []).length || 1;
@@ -976,9 +970,7 @@
 
   function computeUniqueWordsCount(text) {
     if (!text) return 0;
-    const tokens = text
-      .toLowerCase()
-      .match(/[a-z']+/g);
+    const tokens = text.toLowerCase().match(/[a-z']+/g);
     if (!tokens) return 0;
     return new Set(tokens).size;
   }
@@ -1205,10 +1197,10 @@
         downloadReportBtn.addEventListener("click", downloadReport);
 
       analyzeBtnRef = document.createElement("button");
-      analyzeBtnRef.className = "btn btn-primary";
+      analyzeBtnRef.className = "btn";
       analyzeBtnRef.textContent = "Analyze speakers";
       analyzeBtnRef.addEventListener("click", analyzeSpeakers);
-      const toolbar = lessonActions.querySelector(".studio-toolbar");
+      const toolbar = lessonActions.querySelector(".row");
       if (toolbar) toolbar.appendChild(analyzeBtnRef);
       updateAnalyzeButtonState();
     }
