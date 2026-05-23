@@ -5,7 +5,6 @@
   <title>Sottotitoli Overlay</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
 
-  <!-- Favicon and CSS (adjust paths only if your folders differ) -->
   <link rel="icon" type="image/png" href="img/favicon.png" />
   <link rel="stylesheet" href="css/normalize.css" />
   <link rel="stylesheet" href="css/bootstrap.min.css" />
@@ -13,50 +12,145 @@
   <link rel="stylesheet" href="style.css" />
 
   <style>
+    :root {
+      --overlay-bg: rgba(5, 12, 24, 0.94);
+      --overlay-card: rgba(15, 29, 52, 0.96);
+      --overlay-border: rgba(96, 165, 250, 0.35);
+      --overlay-muted: #9fb4d3;
+      --overlay-accent: #60a5fa;
+    }
+
     body {
       margin: 0;
       padding: 0;
-      background: rgba(0, 0, 0, 0.65);
-      color: #ffffff;
+      background: radial-gradient(circle at top left, rgba(96, 165, 250, .28), transparent 55%),
+                  linear-gradient(180deg, #020617, #020617);
+      color: #e5edff;
       font-family: "Montserrat", system-ui, -apple-system, BlinkMacSystemFont,
         "Segoe UI", sans-serif;
     }
 
-    .overlay-root {
+    .overlay-shell {
+      min-height: 100vh;
       display: flex;
       align-items: center;
       justify-content: center;
-      min-height: 100vh;
       padding: 24px;
     }
 
-    .caption-box {
-      max-width: 960px;
+    .overlay-card {
       width: 100%;
-      font-size: 32px;
+      max-width: 1080px;
+      background: var(--overlay-card);
+      border-radius: 22px;
+      border: 1px solid var(--overlay-border);
+      box-shadow:
+        0 18px 50px rgba(0, 0, 0, .55),
+        0 0 0 1px rgba(15, 23, 42, .9);
+      padding: 18px 20px 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .overlay-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      gap: 10px;
+      font-size: 13px;
+      color: var(--overlay-muted);
+    }
+
+    .overlay-room {
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 13px;
+      padding: 4px 8px;
+      border-radius: 999px;
+      background: rgba(15, 23, 42, .9);
+      border: 1px solid rgba(148, 163, 184, .7);
+      color: #dbeafe;
+    }
+
+    .overlay-status {
+      font-size: 12px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .overlay-dot {
+      width: 9px;
+      height: 9px;
+      border-radius: 999px;
+      background: #f97316;
+      box-shadow: 0 0 0 4px rgba(248, 150, 70, .22);
+    }
+
+    .overlay-dot.connected {
+      background: #22c55e;
+      box-shadow: 0 0 0 4px rgba(34, 197, 94, .25);
+    }
+
+    .overlay-caption-box {
+      margin-top: 4px;
+      border-radius: 18px;
+      background: radial-gradient(circle at top left, rgba(59, 130, 246, .20), transparent 45%),
+                  rgba(15, 23, 42, .96);
+      border: 1px solid rgba(148, 163, 184, .35);
+      padding: 18px 20px;
+      font-size: 30px;
       line-height: 1.6;
       text-align: center;
       word-wrap: break-word;
       word-break: break-word;
+      min-height: 96px;
+    }
+
+    .caption-placeholder {
+      color: rgba(148, 163, 184, .8);
+      font-size: 16px;
     }
 
     .pos-verb { color: #2563eb; }
     .pos-noun { color: #16a34a; }
     .pos-adj  { color: #f97316; }
     .pos-adv  { color: #7c3aed; }
+
+    @media (max-width: 720px) {
+      .overlay-card {
+        padding: 14px 14px 16px;
+      }
+      .overlay-caption-box {
+        font-size: 22px;
+        padding: 14px 14px;
+      }
+    }
   </style>
 </head>
 <body>
-  <div class="overlay-root">
-    <div id="captionBox" class="caption-box"></div>
+  <div class="overlay-shell">
+    <div class="overlay-card">
+      <div class="overlay-header">
+        <div>
+          <span style="text-transform: uppercase; letter-spacing: .14em; font-size: 11px; color: var(--overlay-accent); font-weight: 700;">Sottotitoli overlay</span>
+          <span id="overlayModeLabel" style="margin-left: 8px; color: var(--overlay-muted);"></span>
+        </div>
+        <div class="overlay-status">
+          <span class="overlay-dot" id="overlayDot"></span>
+          <span id="overlayStatusText">Connecting…</span>
+          <span class="overlay-room" id="overlayRoomLabel"></span>
+        </div>
+      </div>
+      <div class="overlay-caption-box" id="captionBox">
+        <span class="caption-placeholder">Waiting for captions…</span>
+      </div>
+    </div>
   </div>
 
-  <!-- Core scripts (adjust paths only if your files live elsewhere) -->
   <script src="js/jquery.min.js"></script>
   <script src="config.js"></script>
   <script src="ws-publisher.js"></script>
-
-  <!-- POS colouring and map -->
   <script src="js/lemma-pos-map.js"></script>
   <script src="js/pos-coloring.js"></script>
 
@@ -69,6 +163,10 @@
       const modeFromQuery = params.get("mode") || "caption-en";
 
       const captionBox = document.getElementById("captionBox");
+      const overlayDot = document.getElementById("overlayDot");
+      const overlayStatusText = document.getElementById("overlayStatusText");
+      const overlayRoomLabel = document.getElementById("overlayRoomLabel");
+      const overlayModeLabel = document.getElementById("overlayModeLabel");
 
       function modeIsEnglishLesson(modeKey) {
         if (!modeKey) return false;
@@ -89,6 +187,11 @@
         });
       }
 
+      function clearPlaceholder() {
+        const ph = captionBox.querySelector(".caption-placeholder");
+        if (ph) ph.remove();
+      }
+
       function handleCaptionPayload(payload) {
         if (!payload) return;
 
@@ -97,8 +200,11 @@
 
         if (!text) {
           captionBox.textContent = "";
+          captionBox.innerHTML = '<span class="caption-placeholder">Waiting for captions…</span>';
           return;
         }
+
+        clearPlaceholder();
 
         if (modeIsEnglishLesson(modeKey)) {
           const tokens = tokenizeCaption(text);
@@ -112,17 +218,32 @@
         }
       }
 
-      function handleOverlayState(state) {
-        if (state === "disconnected" || state === "error") {
-          captionBox.textContent = "Overlay connection lost.";
+      function setOverlayState(state) {
+        if (!overlayDot || !overlayStatusText) return;
+        if (state === "connected") {
+          overlayDot.classList.add("connected");
+          overlayStatusText.textContent = "Connected";
+        } else if (state === "connecting") {
+          overlayDot.classList.remove("connected");
+          overlayStatusText.textContent = "Connecting…";
+        } else if (state === "error") {
+          overlayDot.classList.remove("connected");
+          overlayStatusText.textContent = "Error";
+        } else {
+          overlayDot.classList.remove("connected");
+          overlayStatusText.textContent = "Disconnected";
         }
       }
 
       document.addEventListener("DOMContentLoaded", function () {
-        console.log("[Overlay] DOMContentLoaded handler starting");
+        if (overlayRoomLabel) {
+          overlayRoomLabel.textContent = room ? ("room " + room) : "no room";
+        }
+        if (overlayModeLabel) {
+          overlayModeLabel.textContent = "(" + (modeFromQuery || "caption-en") + ")";
+        }
 
         if (!room) {
-          console.log("[Overlay] No room in URL");
           captionBox.textContent = "No room specified.";
           return;
         }
@@ -135,30 +256,29 @@
 
         const wsUrl = cfgRoot.websocketUrl || cfgRoot.websocket_url || "";
 
-        console.log("[Overlay] room =", room, "wsUrl =", wsUrl);
-
         if (!wsUrl) {
           captionBox.textContent =
             "Overlay not connected (no websocket URL in config).";
+          setOverlayState("error");
           return;
         }
 
         let socket;
         try {
+          setOverlayState("connecting");
           socket = new WebSocket(wsUrl + "?room=" + encodeURIComponent(room));
         } catch (err) {
-          console.error("[Overlay] WebSocket create error", err);
           captionBox.textContent =
             "Overlay not connected (websocket error).";
+          setOverlayState("error");
           return;
         }
 
         socket.onopen = function () {
-          console.log("[Overlay] WebSocket open");
+          setOverlayState("connected");
         };
 
         socket.onmessage = function (event) {
-          console.log("[Overlay] Raw message:", event.data);
           try {
             const payload = JSON.parse(event.data);
             if (payload && payload.type === "caption") {
@@ -170,13 +290,11 @@
         };
 
         socket.onclose = function () {
-          console.log("[Overlay] WebSocket closed");
-          handleOverlayState("disconnected");
+          setOverlayState("disconnected");
         };
 
-        socket.onerror = function (e) {
-          console.error("[Overlay] WebSocket error", e);
-          handleOverlayState("error");
+        socket.onerror = function () {
+          setOverlayState("error");
         };
       });
     })(window);
