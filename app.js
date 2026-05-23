@@ -1,7 +1,8 @@
+// app.js
+
 (function (w) {
   "use strict";
 
-  // Language options for the Studio UI
   var LANGUAGES = [
     { code: "en", label: "English", stt: "en-US" },
     { code: "it", label: "Italian", stt: "it-IT" },
@@ -10,12 +11,13 @@
   ];
 
   const params = new URLSearchParams(window.location.search);
-  let modeKey = params.get("mode") || "caption-en";
 
-  const configRoot = w.SOTTOTITOLICONFIG || w.SottotitoliConfig;
+  let modeKey = params.get("mode") || "caption-en";
+  const configRoot = w.SOTTOTITOLICONFIG || w.SottotitoliConfig || {};
   let modeConfig =
-    (configRoot && configRoot.modes && configRoot.modes[modeKey]) ||
-    (configRoot && configRoot.modes && configRoot.modes["caption-en"]);
+    (configRoot.modes && configRoot.modes[modeKey]) ||
+    (configRoot.modes && configRoot.modes["caption-en"]) ||
+    {};
 
   // Room: keep URL param if present, otherwise randomRoom, finally fallback
   let room = params.get("room");
@@ -69,11 +71,13 @@
   let shouldKeepListening = false;
   let restartTimer = null;
   let hasStartedOnce = false;
+
   let audioRecorder = null;
   let audioStream = null;
   let audioChunks = [];
   let lastAudioBlob = null;
   let isRecordingAudio = false;
+
   let isAnalyzingSpeakers = false;
   let speakerAnalysisCompleted = false;
   let analyzeBtnRef = null;
@@ -83,24 +87,24 @@
   let currentSessionId = null;
   let currentSessionStart = null;
 
-  function id(idStr) {
-    return document.getElementById(idStr);
+  function $(id) {
+    return document.getElementById(id);
   }
 
-  function setText(idStr, text) {
-    const el = id(idStr);
+  function setText(id, text) {
+    const el = $(id);
     if (el) el.textContent = text;
   }
 
-  function clearBox(idStr, placeholder) {
-    const el = id(idStr);
+  function clearBox(id, placeholder) {
+    const el = $(id);
     if (!el) return;
-    el.textContent = placeholder;
+    el.textContent = placeholder || "";
     el.dataset.placeholderActive = "true";
   }
 
-  function ensureBoxReady(idStr) {
-    const el = id(idStr);
+  function ensureBoxReady(id) {
+    const el = $(id);
     if (!el) return null;
     if (el.dataset.placeholderActive === "true") {
       el.textContent = "";
@@ -126,6 +130,14 @@
     history.replaceState({}, "", url.toString());
   }
 
+  function switchMode(newModeKey) {
+    const url = new URL(window.location.href);
+    url.searchParams.set("mode", newModeKey);
+    url.searchParams.set("room", room);
+    url.searchParams.set("v", "12");
+    window.location.href = url.toString();
+  }
+
   function currentOverlayUrl() {
     const url = new URL("overlay.html", window.location.href);
     url.searchParams.set("room", room);
@@ -136,7 +148,7 @@
   function updateRoomUI() {
     syncUrl();
     setText("roomValue", room);
-    const link = id("overlayLink");
+    const link = $("overlayLink");
     if (link) {
       const overlayUrl = currentOverlayUrl();
       link.href = overlayUrl;
@@ -147,23 +159,93 @@
   function updateStats() {
     const plain = transcriptLines.map((x) => x.text).join(" ").trim();
     setText("statLines", String(transcriptLines.length));
-    setText(
-      "statWords",
-      String(w.SottotitoliSessionUtils.countWords(plain))
-    );
+    setText("statWords", String(w.SottotitoliSessionUtils.countWords(plain)));
     setText("statChars", String(plain.length));
+  }
+
+  function computeSentencesCount(text) {
+    if (!text) return 0;
+    const parts = text
+      .split(/[.!?]+/)
+      .map((s) => s.trim())
+      .filter(Boolean);
+    return parts.length;
+  }
+
+  function computeFillersCount(text) {
+    if (!text) return 0;
+    const lower = text.toLowerCase();
+    const fillers = ["uh", "um", "ehm", "erm", "you know", "like"];
+    let count = 0;
+    fillers.forEach((f) => {
+      const regex = new RegExp("\\b" + f.replace(" ", "\\s+") + "\\b", "g");
+      const matches = lower.match(regex);
+      if (matches) count += matches.length;
+    });
+    return count;
+  }
+
+  function computeUniqueWordsCount(text) {
+    if (!text) return 0;
+    const tokens = text
+      .toLowerCase()
+      .replace(/[^a-zA-Z\s']/g, " ")
+      .split(/\s+/)
+      .filter(Boolean);
+    if (!tokens.length) return 0;
+    const set = new Set(tokens);
+    return set.size;
+  }
+
+  function computeQualityScore({ wpm, fillersPerMinute, lexicalDiversity }) {
+    let score = 50;
+
+    if (typeof wpm === "number") {
+      if (wpm >= 90 && wpm <= 160) {
+        score += 15;
+      } else if (wpm >= 70 && wpm <= 180) {
+        score += 8;
+      }
+    }
+
+    if (typeof lexicalDiversity === "number") {
+      if (lexicalDiversity >= 0.45) {
+        score += 20;
+      } else if (lexicalDiversity >= 0.35) {
+        score += 12;
+      } else if (lexicalDiversity >= 0.25) {
+        score += 6;
+      }
+    }
+
+    if (typeof fillersPerMinute === "number") {
+      if (fillersPerMinute <= 3) {
+        score += 15;
+      } else if (fillersPerMinute <= 6) {
+        score += 8;
+      } else if (fillersPerMinute <= 9) {
+        score -= 4;
+      } else {
+        score -= 10;
+      }
+    }
+
+    if (score < 0) score = 0;
+    if (score > 100) score = 100;
+
+    return score;
   }
 
   function updateSocketState(state) {
     setText("socketStatus", state);
-    const dot = id("socketDot");
+    const dot = $("socketDot");
     if (!dot) return;
     dot.classList.toggle("connected", state === "connected");
   }
 
   function updateMicState(stateText, live) {
     setText("micStatus", stateText);
-    const dot = id("micDot");
+    const dot = $("micDot");
     if (!dot) return;
     dot.classList.toggle("connected", !!live);
   }
@@ -310,7 +392,7 @@
 
   function handleInterimTranscript(text) {
     const clean = (text || "").trim();
-    const interimBox = id("interimOutput");
+    const interimBox = $("interimOutput");
     if (!interimBox) return;
     if (!clean) {
       clearBox("interimOutput", "Interim");
@@ -404,10 +486,7 @@
     };
 
     rec.onend = function () {
-      updateMicState(
-        shouldKeepListening ? "restarting" : "stopped",
-        false
-      );
+      updateMicState(shouldKeepListening ? "restarting" : "stopped", false);
       if (shouldKeepListening) {
         setText(
           "statusText",
@@ -488,10 +567,7 @@
         "Recording lesson audio for later speaker analysis..."
       );
     } catch (err) {
-      setText(
-        "statusText",
-        "Could not start audio capture: " + err.message
-      );
+      setText("statusText", "Could not start audio capture: " + err.message);
     }
   }
 
@@ -500,10 +576,7 @@
     try {
       audioRecorder.stop();
     } catch (err) {
-      setText(
-        "statusText",
-        "Could not stop audio recorder: " + err.message
-      );
+      setText("statusText", "Could not stop audio recorder: " + err.message);
     }
   }
 
@@ -767,10 +840,12 @@
       );
       return;
     }
+
     if (isAnalyzingSpeakers) {
       setText("statusText", "Speaker analysis is already running.");
       return;
     }
+
     if (isRecordingAudio) {
       setText(
         "statusText",
@@ -778,6 +853,7 @@
       );
       return;
     }
+
     if (!lastAudioBlob || !lastAudioBlob.size) {
       setText(
         "statusText",
@@ -864,97 +940,38 @@
     var srcSelect = document.getElementById("sourceLangSelect");
     var tgtSelect = document.getElementById("targetLangSelect");
     if (!srcSelect || !tgtSelect) return modeKey;
+
     var src = srcSelect.value;
     var tgt = tgtSelect.value;
+
     if (!src || !tgt) return modeKey;
-    if (src === tgt) return "caption-" + src;
+
+    if (src === tgt) {
+      return "caption-" + src;
+    }
     return "translate-" + src + "-" + tgt;
   }
 
   function updateModeFromUI() {
     modeKey = getCurrentModeKeyFromSelects();
-    var cfgRoot = window.SOTTOTITOLICONFIG || window.SottotitoliConfig;
+    var cfgRoot = window.SOTTOTITOLICONFIG || window.SottotitoliConfig || configRoot;
     if (cfgRoot && cfgRoot.modes && cfgRoot.modes[modeKey]) {
       modeConfig = cfgRoot.modes[modeKey];
-      describeMode();
-      syncUrl();
     }
+    describeMode();
+    syncUrl();
   }
 
   function goToSelectedModePage() {
     var mode = getCurrentModeKeyFromSelects();
     if (!mode) return;
+
     var url = new URL(window.location.href);
     url.searchParams.set("mode", mode);
     window.location.href = url.toString();
   }
 
-  // --- METRIC HELPERS (existing ones plus NGSL coverage) ---
-
-  function computeSentencesCount(text) {
-    if (!text) return 0;
-    const parts = text
-      .split(/[.!?]+/)
-      .map((s) => s.trim())
-      .filter(Boolean);
-    return parts.length;
-  }
-
-  function computeFillersCount(text) {
-    if (!text) return 0;
-    const lower = text.toLowerCase();
-    const fillers = ["uh", "um", "ehm", "erm", "you know", "like"];
-    let count = 0;
-    fillers.forEach((f) => {
-      const regex = new RegExp(f.replace(" ", "\\s+"), "g");
-      const matches = lower.match(regex);
-      if (matches) count += matches.length;
-    });
-    return count;
-  }
-
-  function computeUniqueWordsCount(text) {
-    if (!text) return 0;
-    const tokens = text
-      .toLowerCase()
-      .replace(/[^a-zA-Z]+/g, " ")
-      .split(/\s+/)
-      .filter(Boolean);
-    if (!tokens.length) return 0;
-    const set = new Set(tokens);
-    return set.size;
-  }
-
-  function computeQualityScore(wpm, fillersPerMinute, lexicalDiversity) {
-    let score = 50;
-
-    if (typeof wpm === "number") {
-      if (wpm >= 90 && wpm <= 160) {
-        score += 15;
-      } else if (wpm >= 70 && wpm <= 180) {
-        score += 8;
-      }
-    }
-
-    if (typeof lexicalDiversity === "number") {
-      if (lexicalDiversity >= 0.45) score += 20;
-      else if (lexicalDiversity >= 0.35) score += 12;
-      else if (lexicalDiversity >= 0.25) score += 6;
-    }
-
-    if (typeof fillersPerMinute === "number") {
-      if (fillersPerMinute <= 3) score += 15;
-      else if (fillersPerMinute <= 6) score += 8;
-      else if (fillersPerMinute <= 9) score -= 4;
-      else score -= 10;
-    }
-
-    if (score < 0) score = 0;
-    if (score > 100) score = 100;
-    return score;
-  }
-
-  // NEW: compute NGSL coverage across the whole session
+  // NGSL coverage across the whole session
   function computeNgslCoverage(lines) {
     if (!Array.isArray(lines) || lines.length === 0) return null;
     let total = 0;
@@ -973,26 +990,29 @@
     return inNgsl / total;
   }
 
-  // --- SUPABASE SESSION LOGGING ---
+  // SUPABASE SESSION LOGGING
 
   async function createSessionRow() {
     try {
       const result = await sessionSupabase.auth.getSession();
       const sessionData = result.data;
       const sessionError = result.error;
+
       if (sessionError || !sessionData || !sessionData.session) {
-        console.warn(
-          "No Supabase session; not logging Sottotitoli session."
-        );
+        console.warn("No Supabase session; not logging Sottotitoli session.");
         return;
       }
 
       const user = sessionData.session.user;
       const userId = user.id;
+
       currentSessionStart = new Date();
-      const languagePair = modeKey.startsWith("translate-")
-        ? modeKey.replace("translate-", "").replace("-", "->")
-        : "en-en";
+
+      const languagePair =
+        modeKey.startsWith("translate-")
+          ? modeKey.replace("translate-", "").replace("-", "->")
+          : "en-en";
+
       const sessionType = "solo";
       const topicTag = null;
 
@@ -1051,13 +1071,12 @@
       const lexicalDiversity =
         wordsCount > 0 ? uniqueWordsCount / wordsCount : null;
 
-      const qualityScore = computeQualityScore(
+      const qualityScore = computeQualityScore({
         wpm,
         fillersPerMinute,
         lexicalDiversity
-      );
+      });
 
-      // NEW: NGSL coverage for this session
       const ngslCoverage = computeNgslCoverage(transcriptLines);
 
       const updatePayload = {
@@ -1098,9 +1117,7 @@
     }
   }
 
-  // --- DOM READY: wire UI, but don't let mode errors kill startup ---
-
-  document.addEventListener("DOMContentLoaded", function () {
+  document.addEventListener("DOMContentLoaded", () => {
     try {
       populateLanguageSelectsFromMode();
       describeMode();
@@ -1118,14 +1135,14 @@
     var srcSelect = document.getElementById("sourceLangSelect");
     var tgtSelect = document.getElementById("targetLangSelect");
     if (srcSelect && tgtSelect) {
-      srcSelect.addEventListener("change", function () {
+      srcSelect.addEventListener("change", () => {
         updateModeFromUI();
         if (recognition) {
           stopRecognition();
           startRecognition();
         }
       });
-      tgtSelect.addEventListener("change", function () {
+      tgtSelect.addEventListener("change", () => {
         updateModeFromUI();
         if (recognition) {
           stopRecognition();
@@ -1138,17 +1155,17 @@
       }
     }
 
-    const startBtn = id("startBtn");
-    const stopBtn = id("stopBtn");
-    const openOverlayBtn = id("openOverlayBtn");
-    const copyOverlayBtn = id("copyOverlayBtn");
-    const newRoomBtn = id("newRoomBtn");
-    const copyTranscriptBtn = id("copyTranscriptBtn");
-    const downloadTranscriptBtn = id("downloadTranscriptBtn");
-    const reportBtn = id("reportBtn");
-    const downloadReportBtn = id("downloadReportBtn");
-    const lessonActions = id("lessonActions");
-    const languageToolbar = id("languageToolbar");
+    const startBtn = $("startBtn");
+    const stopBtn = $("stopBtn");
+    const openOverlayBtn = $("openOverlayBtn");
+    const copyOverlayBtn = $("copyOverlayBtn");
+    const newRoomBtn = $("newRoomBtn");
+    const copyTranscriptBtn = $("copyTranscriptBtn");
+    const downloadTranscriptBtn = $("downloadTranscriptBtn");
+    const reportBtn = $("reportBtn");
+    const downloadReportBtn = $("downloadReportBtn");
+    const lessonActions = $("lessonActions");
+    const languageToolbar = $("languageToolbar");
 
     if (startBtn) startBtn.addEventListener("click", startRecognition);
     if (stopBtn) stopBtn.addEventListener("click", stopRecognition);
