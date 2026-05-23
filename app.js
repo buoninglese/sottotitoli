@@ -121,20 +121,6 @@
     box.prepend(div);
   }
 
-  function replaceTopLine(targetId, text) {
-    const box = ensureBoxReady(targetId);
-    if (!box) return;
-    if (!text) {
-      box.firstChild && box.removeChild(box.firstChild);
-      return;
-    }
-    if (box.firstChild && box.firstChild.classList.contains("line")) {
-      box.firstChild.textContent = text;
-    } else {
-      appendLine(targetId, text);
-    }
-  }
-
   function syncUrl() {
     const url = new URL(window.location.href);
     url.searchParams.set("mode", modeKey);
@@ -283,7 +269,9 @@
       learning: annotateLineWithNgsl(text)
     };
     transcriptLines.push(entry);
-    replaceTopLine("sourceOutput", text);
+
+    // Append one line per utterance in Source output
+    appendLine("sourceOutput", text);
 
     const payload = {
       type: "caption",
@@ -299,7 +287,8 @@
       const translated = await maybeTranslate(text);
       if (translated) {
         entry.translated = translated;
-        replaceTopLine("translatedOutput", translated);
+        // Append translated line as well
+        appendLine("translatedOutput", translated);
         payload.translated = translated;
         payload.targetLang = modeConfig.targetLang;
       }
@@ -323,20 +312,8 @@
     interimBox.textContent = clean;
     interimBox.dataset.placeholderActive = "false";
 
-    if (clean === lastInterimSent) return;
+    // Calm behaviour: keep interim only in Studio, not overlay
     lastInterimSent = clean;
-
-    sendPayload(
-      {
-        type: "caption",
-        room,
-        mode: modeKey,
-        interim: clean,
-        sourceLang: modeConfig ? modeConfig.sourceLang : "en-US",
-        kind: modeConfig && modeConfig.translate ? "translation" : "caption"
-      },
-      "Interim caption sent to overlay."
-    );
   }
 
   function clearRestartTimer() {
@@ -382,7 +359,7 @@
         if (!text) continue;
 
         if (res.isFinal) {
-          lastFinal = text; // only keep the latest final part
+          lastFinal = text; // only latest final part per event
         } else {
           interim = text;   // latest interim
         }
