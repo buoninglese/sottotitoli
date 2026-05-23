@@ -1,6 +1,7 @@
 (function (w) {
   "use strict";
 
+  // Language options for the Studio UI
   var LANGUAGES = [
     { code: "en", label: "English", stt: "en-US" },
     { code: "it", label: "Italian", stt: "it-IT" },
@@ -10,10 +11,20 @@
 
   const params = new URLSearchParams(window.location.search);
   let modeKey = params.get("mode") || "caption-en";
+
   const configRoot = w.SOTTOTITOLICONFIG || w.SottotitoliConfig;
   let modeConfig =
     (configRoot && configRoot.modes && configRoot.modes[modeKey]) ||
     (configRoot && configRoot.modes && configRoot.modes["caption-en"]);
+
+  // Room: keep URL param if present, otherwise randomRoom, finally fallback
+  let room = params.get("room");
+  if (!room && w.SottotitoliSessionUtils) {
+    room = w.SottotitoliSessionUtils.randomRoom();
+  }
+  if (!room) {
+    room = "room-demo";
+  }
 
   function populateLanguageSelectsFromMode() {
     var srcSelect = document.getElementById("sourceLangSelect");
@@ -46,13 +57,13 @@
   }
 
   const SpeechRecognition = w.SpeechRecognition || w.webkitSpeechRecognition;
-  const DIARIZE_URL = "https://sottotitoli-websocket.onrender.com/analyze-speakers";
+  const DIARIZE_URL =
+    "https://sottotitoli-websocket.onrender.com/analyze-speakers";
   const SPEAKER_ANALYSIS_MARKER = "\n\n=== Speaker Analysis ===\n\n";
 
   let recognition = null;
   let wsPublisher = null;
   let transcriptLines = [];
-  let room = params.get("room") || (w.SottotitoliSessionUtils ? w.SottotitoliSessionUtils.randomRoom() : "room-demo");
   let latestReportText = "";
   let lastInterimSent = "";
   let shouldKeepListening = false;
@@ -72,8 +83,8 @@
   let currentSessionId = null;
   let currentSessionStart = null;
 
-  function id(id) {
-    return document.getElementById(id);
+  function id(idStr) {
+    return document.getElementById(idStr);
   }
 
   function setText(idStr, text) {
@@ -136,7 +147,10 @@
   function updateStats() {
     const plain = transcriptLines.map((x) => x.text).join(" ").trim();
     setText("statLines", String(transcriptLines.length));
-    setText("statWords", String(w.SottotitoliSessionUtils.countWords(plain)));
+    setText(
+      "statWords",
+      String(w.SottotitoliSessionUtils.countWords(plain))
+    );
     setText("statChars", String(plain.length));
   }
 
@@ -201,7 +215,7 @@
   }
 
   async function maybeTranslate(text) {
-    if (!modeConfig.translate) return null;
+    if (!modeConfig || !modeConfig.translate) return null;
     try {
       const providerConfig = w.CaptionTranslationProviders.resolveConfig();
       const result = await w.CaptionTranslationProviders.translateText(
@@ -228,7 +242,7 @@
 
   // === NEW: annotate each token with NGSL membership ===
   function annotateLineWithNgsl(text) {
-    if (!window.LEMMA_POS_MAP || !text) return null;
+    if (!w.LEMMA_POS_MAP || !text) return null;
 
     const tokens = text.split(/\s+/);
     return tokens.map((token) => {
@@ -241,7 +255,7 @@
           inNgsl: false
         };
       }
-      const inNgsl = !!window.LEMMA_POS_MAP[lemmaKey];
+      const inNgsl = !!w.LEMMA_POS_MAP[lemmaKey];
       return {
         surface,
         lemmaKey,
@@ -270,11 +284,11 @@
       mode: modeKey,
       final: text,
       timestamp,
-      sourceLang: modeConfig.sourceLang,
-      kind: modeConfig.translate ? "translation" : "caption"
+      sourceLang: modeConfig ? modeConfig.sourceLang : "en-US",
+      kind: modeConfig && modeConfig.translate ? "translation" : "caption"
     };
 
-    if (modeConfig.translate) {
+    if (modeConfig && modeConfig.translate) {
       const translated = await maybeTranslate(text);
       if (translated) {
         entry.translated = translated;
@@ -314,8 +328,8 @@
         room,
         mode: modeKey,
         interim: clean,
-        sourceLang: modeConfig.sourceLang,
-        kind: modeConfig.translate ? "translation" : "caption"
+        sourceLang: modeConfig ? modeConfig.sourceLang : "en-US",
+        kind: modeConfig && modeConfig.translate ? "translation" : "caption"
       },
       "Interim caption sent to overlay."
     );
@@ -343,11 +357,14 @@
     const rec = new SpeechRecognition();
     rec.continuous = true;
     rec.interimResults = true;
-    rec.lang = modeConfig.sourceLang || "en-US";
+    rec.lang = (modeConfig && modeConfig.sourceLang) || "en-US";
 
     rec.onstart = function () {
       hasStartedOnce = true;
-      setText("statusText", "Listening in " + (modeConfig.sourceLang || "en-US"));
+      setText(
+        "statusText",
+        "Listening in " + ((modeConfig && modeConfig.sourceLang) || "en-US")
+      );
       updateMicState("live", true);
     };
 
@@ -369,9 +386,16 @@
       const err = event.error || "unknown";
       setText(
         "statusText",
-        "Speech error (" + (modeConfig.sourceLang || "en-US") + "): " + err
+        "Speech error (" +
+          ((modeConfig && modeConfig.sourceLang) || "en-US") +
+          "): " +
+          err
       );
-      if (err === "not-allowed" || err === "service-not-allowed" || err === "audio-capture") {
+      if (
+        err === "not-allowed" ||
+        err === "service-not-allowed" ||
+        err === "audio-capture"
+      ) {
         shouldKeepListening = false;
         updateMicState("blocked", false);
         return;
@@ -380,7 +404,10 @@
     };
 
     rec.onend = function () {
-      updateMicState(shouldKeepListening ? "restarting" : "stopped", false);
+      updateMicState(
+        shouldKeepListening ? "restarting" : "stopped",
+        false
+      );
       if (shouldKeepListening) {
         setText(
           "statusText",
@@ -414,9 +441,15 @@
       updateAnalyzeButtonState();
 
       let mimeType;
-      if (w.MediaRecorder && MediaRecorder.isTypeSupported("audio/webm;codecs=opus")) {
+      if (
+        w.MediaRecorder &&
+        MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
+      ) {
         mimeType = "audio/webm;codecs=opus";
-      } else if (w.MediaRecorder && MediaRecorder.isTypeSupported("audio/webm")) {
+      } else if (
+        w.MediaRecorder &&
+        MediaRecorder.isTypeSupported("audio/webm")
+      ) {
         mimeType = "audio/webm";
       }
 
@@ -450,9 +483,15 @@
 
       audioRecorder.start();
       isRecordingAudio = true;
-      setText("statusText", "Recording lesson audio for later speaker analysis...");
+      setText(
+        "statusText",
+        "Recording lesson audio for later speaker analysis..."
+      );
     } catch (err) {
-      setText("statusText", "Could not start audio capture: " + err.message);
+      setText(
+        "statusText",
+        "Could not start audio capture: " + err.message
+      );
     }
   }
 
@@ -461,13 +500,19 @@
     try {
       audioRecorder.stop();
     } catch (err) {
-      setText("statusText", "Could not stop audio recorder: " + err.message);
+      setText(
+        "statusText",
+        "Could not stop audio recorder: " + err.message
+      );
     }
   }
 
   async function startRecognition() {
     if (!SpeechRecognition) {
-      setText("statusText", "Speech recognition is not supported in this browser.");
+      setText(
+        "statusText",
+        "Speech recognition is not supported in this browser."
+      );
       return;
     }
 
@@ -480,7 +525,6 @@
     try {
       recognition.start();
       startAudioCapture();
-      // Log this session in Supabase
       await createSessionRow();
     } catch (e) {
       setText("statusText", "Recognition start retrying...");
@@ -501,7 +545,6 @@
     stopAudioCapture();
     updateMicState("stopped", false);
     setText("statusText", "Recognition stopped by user.");
-    // Finalize Supabase session record
     finalizeSessionRow();
   }
 
@@ -511,7 +554,10 @@
       room,
       onStateChange(state) {
         updateSocketState(state);
-        setText("statusText", "Socket state: " + state + " (room " + room + ")");
+        setText(
+          "statusText",
+          "Socket state: " + state + " (room " + room + ")"
+        );
       },
       onError(error) {
         setText("statusText", "Socket error: " + error);
@@ -521,34 +567,50 @@
   }
 
   async function generateLessonReport() {
-    const report = await w.SottotitoliLessonReport.generateLessonReport(transcriptLines);
-    latestReportText = w.SottotitoliLessonReport.formatLessonReport(report);
-    latestReportText = removeExistingSpeakerAnalysis(latestReportText);
+    const report =
+      await w.SottotitoliLessonReport.generateLessonReport(transcriptLines);
+    latestReportText =
+      w.SottotitoliLessonReport.formatLessonReport(report);
+    latestReportText =
+      removeExistingSpeakerAnalysis(latestReportText);
     setText("lessonReport", latestReportText || "No report yet.");
   }
 
   async function copyOverlayLink() {
-    const ok = await w.SottotitoliSessionUtils.copyToClipboard(currentOverlayUrl());
-    setText("statusText", ok ? "Overlay link copied." : "Could not copy overlay link.");
+    const ok = await w.SottotitoliSessionUtils.copyToClipboard(
+      currentOverlayUrl()
+    );
+    setText(
+      "statusText",
+      ok ? "Overlay link copied." : "Could not copy overlay link."
+    );
   }
 
   async function copyTranscript() {
-    const text = w.SottotitoliSessionUtils.transcriptToPlainText(transcriptLines);
+    const text =
+      w.SottotitoliSessionUtils.transcriptToPlainText(transcriptLines);
     if (!text) {
       setText("statusText", "No transcript yet.");
       return;
     }
     const ok = await w.SottotitoliSessionUtils.copyToClipboard(text);
-    setText("statusText", ok ? "Transcript copied." : "Could not copy transcript.");
+    setText(
+      "statusText",
+      ok ? "Transcript copied." : "Could not copy transcript."
+    );
   }
 
   function downloadTranscript() {
-    const text = w.SottotitoliSessionUtils.transcriptToPlainText(transcriptLines);
+    const text =
+      w.SottotitoliSessionUtils.transcriptToPlainText(transcriptLines);
     if (!text) {
       setText("statusText", "No transcript yet.");
       return;
     }
-    w.SottotitoliSessionUtils.downloadText("sottotitoli-transcript-" + room + ".txt", text);
+    w.SottotitoliSessionUtils.downloadText(
+      "sottotitoli-transcript-" + room + ".txt",
+      text
+    );
     setText("statusText", "Transcript downloaded.");
   }
 
@@ -592,20 +654,27 @@
   }
 
   function sendTestMessage() {
+    const useIt =
+      modeConfig && modeConfig.sourceLang === "it-IT";
+    const finalText = useIt
+      ? "Questo è un test. This is a test."
+      : "This is a test.";
+    const translated =
+      modeConfig && modeConfig.translate
+        ? modeConfig.targetLang === "it"
+          ? "Questo è un test. This is a test."
+          : "This is a test."
+        : null;
     sendPayload(
       {
         type: "caption",
         room,
         mode: modeKey,
-        final: modeConfig.sourceLang === "it-IT" ? "Questo è un test. This is a test." : "This is a test.",
-        translated: modeConfig.translate
-          ? (modeConfig.targetLang === "it"
-              ? "Questo è un test. This is a test."
-              : "This is a test.")
-          : null,
+        final: finalText,
+        translated,
         timestamp: new Date().toISOString(),
-        sourceLang: modeConfig.sourceLang,
-        kind: modeConfig.translate ? "translation" : "caption"
+        sourceLang: modeConfig ? modeConfig.sourceLang : "en-US",
+        kind: modeConfig && modeConfig.translate ? "translation" : "caption"
       },
       "Test message sent to room " + room
     );
@@ -623,10 +692,15 @@
 
     if (data.analytics) {
       lines.push("Speaker summary...");
-      if (Array.isArray(data.analytics.speakers) && data.analytics.speakers.length) {
+      if (
+        Array.isArray(data.analytics.speakers) &&
+        data.analytics.speakers.length
+      ) {
         data.analytics.speakers.forEach((speaker, index) => {
           const share =
-            speaker.shareOfTime != null ? Math.round(Number(speaker.shareOfTime) * 100) : 0;
+            speaker.shareOfTime != null
+              ? Math.round(Number(speaker.shareOfTime) * 100)
+              : 0;
           lines.push(
             (index + 1) +
               ". " +
@@ -648,7 +722,11 @@
         lines.push("Interruptions: " + data.analytics.interruptions);
       }
       if (data.analytics.totalDuration != null) {
-        lines.push("Total duration: " + Number(data.analytics.totalDuration).toFixed(1) + "s");
+        lines.push(
+          "Total duration: " +
+            Number(data.analytics.totalDuration).toFixed(1) +
+            "s"
+        );
       }
       lines.push("");
     }
@@ -658,10 +736,21 @@
       lines.push("Segments");
       segments.forEach((seg, index) => {
         const speaker = seg.speaker || "Unknown speaker";
-        const start = seg.start != null ? Number(seg.start).toFixed(1) : "?";
-        const end = seg.end != null ? Number(seg.end).toFixed(1) : "?";
+        const start =
+          seg.start != null ? Number(seg.start).toFixed(1) : "?";
+        const end =
+          seg.end != null ? Number(seg.end).toFixed(1) : "?";
         const text = (seg.text || "").trim();
-        lines.push((index + 1) + ". " + speaker + " " + start + "s - " + end + "s");
+        lines.push(
+          (index + 1) +
+            ". " +
+            speaker +
+            " " +
+            start +
+            "s - " +
+            end +
+            "s"
+        );
         if (text) lines.push(text);
         lines.push("");
       });
@@ -699,16 +788,25 @@
 
     isAnalyzingSpeakers = true;
     updateAnalyzeButtonState();
-    setText("statusText", "Uploading lesson audio for speaker analysis...");
+    setText(
+      "statusText",
+      "Uploading lesson audio for speaker analysis..."
+    );
 
     try {
       const ext =
-        lastAudioBlob.type && lastAudioBlob.type.indexOf("ogg") !== -1 ? "ogg" : "webm";
+        lastAudioBlob.type &&
+        lastAudioBlob.type.indexOf("ogg") !== -1
+          ? "ogg"
+          : "webm";
       const formData = new FormData();
       formData.append("file", lastAudioBlob, "lesson-" + room + "." + ext);
       formData.append("room", room);
       formData.append("mode", modeKey);
-      formData.append("sourceLang", modeConfig.sourceLang);
+      formData.append(
+        "sourceLang",
+        modeConfig ? modeConfig.sourceLang : "en-US"
+      );
 
       const response = await fetch(DIARIZE_URL, {
         method: "POST",
@@ -717,7 +815,10 @@
       if (!response.ok) {
         const errorText = await response.text();
         throw new Error(
-          "Speaker analysis failed with status " + response.status + ": " + errorText
+          "Speaker analysis failed with status " +
+            response.status +
+            ": " +
+            errorText
         );
       }
 
@@ -744,11 +845,14 @@
   }
 
   function describeMode() {
-    const title = modeConfig.title || "Sottotitoli Session";
-    const lesson = modeConfig.lessonMode
+    const cfg = modeConfig || {};
+    const title = cfg.title || "Sottotitoli Session";
+
+    const lesson = cfg.lessonMode
       ? "Lesson mode is active with report generation."
       : "Live mode is active with overlay publishing.";
-    const translation = modeConfig.translate
+
+    const translation = cfg.translate
       ? "Translation mode is enabled."
       : "Caption mode is enabled.";
 
@@ -782,11 +886,10 @@
     if (!mode) return;
     var url = new URL(window.location.href);
     url.searchParams.set("mode", mode);
-    // keep room if present
     window.location.href = url.toString();
   }
 
-  // --- NEW METRIC HELPERS (existing ones plus NGSL coverage) ---
+  // --- METRIC HELPERS (existing ones plus NGSL coverage) ---
 
   function computeSentencesCount(text) {
     if (!text) return 0;
@@ -878,7 +981,9 @@
       const sessionData = result.data;
       const sessionError = result.error;
       if (sessionError || !sessionData || !sessionData.session) {
-        console.warn("No Supabase session; not logging Sottotitoli session.");
+        console.warn(
+          "No Supabase session; not logging Sottotitoli session."
+        );
         return;
       }
 
@@ -927,7 +1032,8 @@
       );
 
       const plain = transcriptLines.map((x) => x.text).join(" ").trim();
-      const wordsCount = w.SottotitoliSessionUtils.countWords(plain);
+      const wordsCount =
+        w.SottotitoliSessionUtils.countWords(plain);
       const charsCount = plain.length;
 
       const wpm =
@@ -951,7 +1057,7 @@
         lexicalDiversity
       );
 
-      // NEW: compute NGSL coverage for this session
+      // NEW: NGSL coverage for this session
       const ngslCoverage = computeNgslCoverage(transcriptLines);
 
       const updatePayload = {
@@ -967,7 +1073,7 @@
         uniquewordscount: uniqueWordsCount,
         lexicaldiversity: lexicalDiversity,
         qualityscore: qualityScore,
-        ngslcoverage: ngslCoverage // NEW field
+        ngslcoverage: ngslCoverage
       };
 
       const { error } = await sessionSupabase
@@ -978,7 +1084,11 @@
       if (error) {
         console.error("Error updating session row:", error);
       } else {
-        console.log("Updated session row for", currentSessionId, updatePayload);
+        console.log(
+          "Updated session row for",
+          currentSessionId,
+          updatePayload
+        );
       }
     } catch (e) {
       console.error("Unexpected error updating session row:", e);
@@ -988,12 +1098,17 @@
     }
   }
 
-  // --- DOM READY ---
+  // --- DOM READY: wire UI, but don't let mode errors kill startup ---
 
   document.addEventListener("DOMContentLoaded", function () {
-    populateLanguageSelectsFromMode();
-    describeMode();
-    updateRoomUI();
+    try {
+      populateLanguageSelectsFromMode();
+      describeMode();
+      updateRoomUI();
+    } catch (e) {
+      console.error("Mode initialisation error:", e);
+    }
+
     connectSocket();
     updateStats();
     clearBox("interimOutput", "Interim");
@@ -1038,7 +1153,8 @@
     if (startBtn) startBtn.addEventListener("click", startRecognition);
     if (stopBtn) stopBtn.addEventListener("click", stopRecognition);
     if (openOverlayBtn) openOverlayBtn.addEventListener("click", openOverlay);
-    if (copyOverlayBtn) copyOverlayBtn.addEventListener("click", copyOverlayLink);
+    if (copyOverlayBtn)
+      copyOverlayBtn.addEventListener("click", copyOverlayLink);
     if (newRoomBtn) newRoomBtn.addEventListener("click", newRoom);
     if (copyTranscriptBtn)
       copyTranscriptBtn.addEventListener("click", copyTranscript);
@@ -1071,9 +1187,10 @@
       }
     }
 
-    if (modeConfig.lessonMode && lessonActions) {
+    if (modeConfig && modeConfig.lessonMode && lessonActions) {
       lessonActions.style.display = "block";
-      if (reportBtn) reportBtn.addEventListener("click", generateLessonReport);
+      if (reportBtn)
+        reportBtn.addEventListener("click", generateLessonReport);
       if (downloadReportBtn)
         downloadReportBtn.addEventListener("click", downloadReport);
 
@@ -1087,7 +1204,6 @@
     }
   });
 
-  // Expose some things if needed
   w.SottotitoliApp = {
     startRecognition,
     stopRecognition,
