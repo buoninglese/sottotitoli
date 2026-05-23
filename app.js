@@ -3,6 +3,7 @@
 (function (w) {
   "use strict";
 
+  // Language options for Studio UI dropdowns
   var LANGUAGES = [
     { code: "en", label: "English", stt: "en-US" },
     { code: "it", label: "Italian", stt: "it-IT" },
@@ -12,14 +13,16 @@
 
   const params = new URLSearchParams(window.location.search);
 
+  // Mode config from global config object
   let modeKey = params.get("mode") || "caption-en";
-  const configRoot = w.SOTTOTITOLICONFIG || w.SottotitoliConfig || {};
+  const configRoot =
+    w.SOTTOTITOLI_CONFIG || w.SOTTOTITOLICONFIG || w.SottotitoliConfig || {};
   let modeConfig =
     (configRoot.modes && configRoot.modes[modeKey]) ||
     (configRoot.modes && configRoot.modes["caption-en"]) ||
     {};
 
-  // Room: keep URL param if present, otherwise randomRoom, finally fallback
+  // Room: URL param → randomRoom → fallback
   let room = params.get("room");
   if (!room && w.SottotitoliSessionUtils) {
     room = w.SottotitoliSessionUtils.randomRoom();
@@ -60,6 +63,7 @@
 
   const SpeechRecognition = w.SpeechRecognition || w.webkitSpeechRecognition;
   const DIARIZE_URL =
+    (configRoot.analysis && configRoot.analysis.speakerEndpoint) ||
     "https://sottotitoli-websocket.onrender.com/analyze-speakers";
   const SPEAKER_ANALYSIS_MARKER = "\n\n=== Speaker Analysis ===\n\n";
 
@@ -82,7 +86,7 @@
   let speakerAnalysisCompleted = false;
   let analyzeBtnRef = null;
 
-  // Reuse the global Supabase client set up in auth.js
+  // Supabase client from auth.js
   const sessionSupabase = window.sottotitoliSupabase;
   let currentSessionId = null;
   let currentSessionStart = null;
@@ -130,14 +134,6 @@
     history.replaceState({}, "", url.toString());
   }
 
-  function switchMode(newModeKey) {
-    const url = new URL(window.location.href);
-    url.searchParams.set("mode", newModeKey);
-    url.searchParams.set("room", room);
-    url.searchParams.set("v", "12");
-    window.location.href = url.toString();
-  }
-
   function currentOverlayUrl() {
     const url = new URL("overlay.html", window.location.href);
     url.searchParams.set("room", room);
@@ -161,79 +157,6 @@
     setText("statLines", String(transcriptLines.length));
     setText("statWords", String(w.SottotitoliSessionUtils.countWords(plain)));
     setText("statChars", String(plain.length));
-  }
-
-  function computeSentencesCount(text) {
-    if (!text) return 0;
-    const parts = text
-      .split(/[.!?]+/)
-      .map((s) => s.trim())
-      .filter(Boolean);
-    return parts.length;
-  }
-
-  function computeFillersCount(text) {
-    if (!text) return 0;
-    const lower = text.toLowerCase();
-    const fillers = ["uh", "um", "ehm", "erm", "you know", "like"];
-    let count = 0;
-    fillers.forEach((f) => {
-      const regex = new RegExp("\\b" + f.replace(" ", "\\s+") + "\\b", "g");
-      const matches = lower.match(regex);
-      if (matches) count += matches.length;
-    });
-    return count;
-  }
-
-  function computeUniqueWordsCount(text) {
-    if (!text) return 0;
-    const tokens = text
-      .toLowerCase()
-      .replace(/[^a-zA-Z\s']/g, " ")
-      .split(/\s+/)
-      .filter(Boolean);
-    if (!tokens.length) return 0;
-    const set = new Set(tokens);
-    return set.size;
-  }
-
-  function computeQualityScore({ wpm, fillersPerMinute, lexicalDiversity }) {
-    let score = 50;
-
-    if (typeof wpm === "number") {
-      if (wpm >= 90 && wpm <= 160) {
-        score += 15;
-      } else if (wpm >= 70 && wpm <= 180) {
-        score += 8;
-      }
-    }
-
-    if (typeof lexicalDiversity === "number") {
-      if (lexicalDiversity >= 0.45) {
-        score += 20;
-      } else if (lexicalDiversity >= 0.35) {
-        score += 12;
-      } else if (lexicalDiversity >= 0.25) {
-        score += 6;
-      }
-    }
-
-    if (typeof fillersPerMinute === "number") {
-      if (fillersPerMinute <= 3) {
-        score += 15;
-      } else if (fillersPerMinute <= 6) {
-        score += 8;
-      } else if (fillersPerMinute <= 9) {
-        score -= 4;
-      } else {
-        score -= 10;
-      }
-    }
-
-    if (score < 0) score = 0;
-    if (score > 100) score = 100;
-
-    return score;
   }
 
   function updateSocketState(state) {
@@ -354,8 +277,7 @@
       timestamp,
       text,
       translated: null,
-      // NEW: attach learning annotation for this line
-      learning: annotateLineWithNgsl(text)
+      learning: annotateLineWithNgsl(text) // NEW
     };
 
     appendLine("sourceOutput", text);
@@ -622,8 +544,23 @@
   }
 
   function connectSocket() {
+    const cfgRoot =
+      w.SOTTOTITOLI_CONFIG ||
+      w.SOTTOTITOLICONFIG ||
+      w.SottotitoliConfig ||
+      configRoot ||
+      {};
+
+    const wsUrl = cfgRoot.websocketUrl || cfgRoot.websocket_url || "";
+
+    if (!wsUrl) {
+      console.warn("No websocket URL configured in SOTTOTITOLI_CONFIG.");
+      setText("statusText", "No websocket URL configured.");
+      return;
+    }
+
     wsPublisher = w.createWSPublisher({
-      url: w.SOTTOTITOLICONFIG.websocketUrl,
+      url: wsUrl,
       room,
       onStateChange(state) {
         updateSocketState(state);
@@ -636,6 +573,7 @@
         setText("statusText", "Socket error: " + error);
       }
     });
+
     wsPublisher.connect();
   }
 
@@ -954,7 +892,11 @@
 
   function updateModeFromUI() {
     modeKey = getCurrentModeKeyFromSelects();
-    var cfgRoot = window.SOTTOTITOLICONFIG || window.SottotitoliConfig || configRoot;
+    const cfgRoot =
+      w.SOTTOTITOLI_CONFIG ||
+      w.SOTTOTITOLICONFIG ||
+      w.SottotitoliConfig ||
+      configRoot;
     if (cfgRoot && cfgRoot.modes && cfgRoot.modes[modeKey]) {
       modeConfig = cfgRoot.modes[modeKey];
     }
@@ -965,7 +907,6 @@
   function goToSelectedModePage() {
     var mode = getCurrentModeKeyFromSelects();
     if (!mode) return;
-
     var url = new URL(window.location.href);
     url.searchParams.set("mode", mode);
     window.location.href = url.toString();
