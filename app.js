@@ -3,7 +3,6 @@
 (function (w) {
   "use strict";
 
-  // Language options for Studio UI dropdowns
   var LANGUAGES = [
     { code: "en", label: "English", stt: "en-US" },
     { code: "it", label: "Italian", stt: "it-IT" },
@@ -13,7 +12,6 @@
 
   const params = new URLSearchParams(window.location.search);
 
-  // Mode config from global config object
   let modeKey = params.get("mode") || "caption-en";
   const configRoot =
     w.SOTTOTITOLI_CONFIG || w.SOTTOTITOLICONFIG || w.SottotitoliConfig || {};
@@ -22,14 +20,11 @@
     (configRoot.modes && configRoot.modes["caption-en"]) ||
     {};
 
-  // Room: URL param → randomRoom → fallback
   let room = params.get("room");
   if (!room && w.SottotitoliSessionUtils) {
     room = w.SottotitoliSessionUtils.randomRoom();
   }
-  if (!room) {
-    room = "room-demo";
-  }
+  if (!room) room = "room-demo";
 
   function populateLanguageSelectsFromMode() {
     var srcSelect = document.getElementById("sourceLangSelect");
@@ -86,10 +81,12 @@
   let speakerAnalysisCompleted = false;
   let analyzeBtnRef = null;
 
-  // Supabase client from auth.js
   const sessionSupabase = window.sottotitoliSupabase;
   let currentSessionId = null;
   let currentSessionStart = null;
+
+  // coalescing state: we keep one “current utterance” and update it
+  let currentUtterance = null;
 
   function $(id) {
     return document.getElementById(id);
@@ -124,6 +121,20 @@
     div.className = "line";
     div.textContent = text;
     box.prepend(div);
+  }
+
+  function replaceTopLine(targetId, text) {
+    const box = ensureBoxReady(targetId);
+    if (!box) return;
+    if (!text) {
+      box.firstChild && box.removeChild(box.firstChild);
+      return;
+    }
+    if (box.firstChild && box.firstChild.classList.contains("line")) {
+      box.firstChild.textContent = text;
+    } else {
+      appendLine(targetId, text);
+    }
   }
 
   function syncUrl() {
@@ -245,7 +256,6 @@
     if (statusMessage) setText("statusText", statusMessage);
   }
 
-  // === NEW: annotate each token with NGSL membership ===
   function annotateLineWithNgsl(text) {
     if (!w.LEMMA_POS_MAP || !text) return null;
 
@@ -269,18 +279,24 @@
     });
   }
 
-  async function handleFinalTranscript(text) {
+  async function commitUtteranceFinal(text) {
     if (!text) return;
-
     const timestamp = w.SottotitoliSessionUtils.formatTimestamp(new Date());
-    const entry = {
-      timestamp,
-      text,
-      translated: null,
-      learning: annotateLineWithNgsl(text) // NEW
-    };
 
-    appendLine("sourceOutput", text);
+    // If we already have a current utterance, update its text instead of pushing a new entry
+    if (currentUtterance) {
+      currentUtterance.text = text;
+    } else {
+      currentUtterance = {
+        timestamp,
+        text,
+        translated: null,
+        learning: annotateLineWithNgsl(text)
+      };
+      transcriptLines.push(currentUtterance);
+    }
+
+    replaceTopLine("sourceOutput", text);
 
     const payload = {
       type: "caption",
@@ -295,21 +311,21 @@
     if (modeConfig && modeConfig.translate) {
       const translated = await maybeTranslate(text);
       if (translated) {
-        entry.translated = translated;
-        appendLine("translatedOutput", translated);
+        currentUtterance.translated = translated;
+        replaceTopLine("translatedOutput", translated);
         payload.translated = translated;
         payload.targetLang = modeConfig.targetLang;
       }
-    } else {
-      payload.translated = null;
     }
 
-    transcriptLines.push(entry);
     updateStats();
     lastInterimSent = "";
     clearBox("interimOutput", "Interim");
 
     sendPayload(payload, "Final caption sent to overlay.");
+
+    // Start a fresh utterance for the next sentence
+    currentUtterance = null;
   }
 
   function handleInterimTranscript(text) {
@@ -375,10 +391,13 @@
     rec.onresult = function (event) {
       let interim = "";
       for (let i = event.resultIndex; i < event.results.length; i++) {
-        const text = event.results[i][0].transcript.trim();
+        const res = event.results[i];
+        const text = res[0].transcript.trim();
         if (!text) continue;
-        if (event.results[i].isFinal) {
-          handleFinalTranscript(text);
+
+        if (res.isFinal) {
+          // Coalesce: treat the whole utterance as one line
+          commitUtteranceFinal(text);
         } else {
           interim = text;
         }
@@ -514,6 +533,7 @@
     clearRestartTimer();
     shouldKeepListening = true;
     hasStartedOnce = false;
+    currentUtterance = null;
 
     if (!recognition) recognition = buildRecognition();
 
@@ -530,12 +550,11 @@
   function stopRecognition() {
     shouldKeepListening = false;
     clearRestartTimer();
+    currentUtterance = null;
     if (recognition) {
       try {
         recognition.stop();
-      } catch (e) {
-        // ignore
-      }
+      } catch (e) {}
     }
     stopAudioCapture();
     updateMicState("stopped", false);
@@ -578,13 +597,18 @@
   }
 
   async function generateLessonReport() {
-    const report =
-      await w.SottotitoliLessonReport.generateLessonReport(transcriptLines);
-    latestReportText =
-      w.SottotitoliLessonReport.formatLessonReport(report);
-    latestReportText =
-      removeExistingSpeakerAnalysis(latestReportText);
-    setText("lessonReport", latestReportText || "No report yet.");
+    try {
+      const report =
+        await w.SottotitoliLessonReport.generateLessonReport(transcriptLines);
+      latestReportText =
+        w.SottotitoliLessonReport.formatLessonReport(report);
+      latestReportText =
+        removeExistingSpeakerAnalysis(latestReportText);
+      setText("lessonReport", latestReportText || "No report yet.");
+      setText("statusText", "Lesson report generated.");
+    } catch (e) {
+      setText("statusText", "Could not generate report: " + e.message);
+    }
   }
 
   async function copyOverlayLink() {
@@ -650,6 +674,7 @@
     lastAudioBlob = null;
     isAnalyzingSpeakers = false;
     speakerAnalysisCompleted = false;
+    currentUtterance = null;
     updateAnalyzeButtonState();
     clearBox("interimOutput", "Interim");
     clearBox("sourceOutput", "Source output");
@@ -912,7 +937,6 @@
     window.location.href = url.toString();
   }
 
-  // NGSL coverage across the whole session
   function computeNgslCoverage(lines) {
     if (!Array.isArray(lines) || lines.length === 0) return null;
     let total = 0;
@@ -931,7 +955,42 @@
     return inNgsl / total;
   }
 
-  // SUPABASE SESSION LOGGING
+  // Simple metrics helpers (stubs if not defined elsewhere)
+  function computeSentencesCount(text) {
+    if (!text) return 0;
+    return (text.match(/[.!?]/g) || []).length || 1;
+  }
+
+  function computeFillersCount(text) {
+    if (!text) return 0;
+    const fillers = ["uh", "um", "eh", "like", "you know"];
+    const lower = text.toLowerCase();
+    let count = 0;
+    fillers.forEach((f) => {
+      const re = new RegExp("\\b" + f.replace(" ", "\\s+") + "\\b", "g");
+      const matches = lower.match(re);
+      if (matches) count += matches.length;
+    });
+    return count;
+  }
+
+  function computeUniqueWordsCount(text) {
+    if (!text) return 0;
+    const tokens = text
+      .toLowerCase()
+      .match(/[a-z']+/g);
+    if (!tokens) return 0;
+    return new Set(tokens).size;
+  }
+
+  function computeQualityScore(metrics) {
+    const { wpm, fillersPerMinute, lexicalDiversity } = metrics;
+    let score = 0;
+    if (wpm != null && wpm >= 80 && wpm <= 170) score += 0.4;
+    if (fillersPerMinute != null && fillersPerMinute < 4) score += 0.3;
+    if (lexicalDiversity != null && lexicalDiversity > 0.35) score += 0.3;
+    return score;
+  }
 
   async function createSessionRow() {
     try {
@@ -977,7 +1036,6 @@
       }
 
       currentSessionId = data.id;
-      console.log("Created session row with id", currentSessionId);
     } catch (e) {
       console.error("Unexpected error creating session row:", e);
     }
@@ -1043,12 +1101,6 @@
 
       if (error) {
         console.error("Error updating session row:", error);
-      } else {
-        console.log(
-          "Updated session row for",
-          currentSessionId,
-          updatePayload
-        );
       }
     } catch (e) {
       console.error("Unexpected error updating session row:", e);
@@ -1139,10 +1191,10 @@
       const extraBtn = document.createElement("button");
       extraBtn.className = "btn btn-default";
       extraBtn.textContent = "Send test message";
-      extraBtn.addEventListener("click", sendTestMessage);
       if (startBtn && startBtn.parentNode) {
         startBtn.parentNode.appendChild(extraBtn);
       }
+      extraBtn.addEventListener("click", sendTestMessage);
     }
 
     if (modeConfig && modeConfig.lessonMode && lessonActions) {
