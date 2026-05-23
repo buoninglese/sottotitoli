@@ -1,188 +1,132 @@
-<!doctype html>
-<html lang="en">
+<!DOCTYPE html>
+<html lang="en" class="no-js">
 <head>
-  <meta charset="utf-8">
+  <meta charset="utf-8" />
   <title>Sottotitoli Overlay</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta http-equiv="cache-control" content="no-cache">
-  <meta http-equiv="expires" content="0">
-  <meta http-equiv="pragma" content="no-cache">
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@500;600;700;800&display=swap" rel="stylesheet">
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <link rel="icon" type="image/png" href="img/favicon.png" />
+  <link rel="stylesheet" href="css/normalize.css" />
+  <link rel="stylesheet" href="css/bootstrap.min.css" />
+  <link rel="stylesheet" href="css/responsive.css" />
+  <link rel="stylesheet" href="css/style.css" />
+
   <style>
-    :root {
-      --card: rgba(8, 15, 31, 0.82);
-      --line: rgba(96, 165, 250, 0.18);
-      --text: #f8fbff;
-      --muted: #9ec5ff;
-      --sub: #dbeafe;
-      --ok: #22c55e;
-    }
-    * { box-sizing: border-box; }
     body {
       margin: 0;
-      background: transparent;
-      font-family: Inter, sans-serif;
-      color: var(--text);
+      padding: 0;
+      background: rgba(0, 0, 0, 0.65);
+      color: #ffffff;
+      font-family: "Montserrat", system-ui, -apple-system, BlinkMacSystemFont,
+        "Segoe UI", sans-serif;
     }
-    .wrap {
-      max-width: 1100px;
-      margin: 0 auto;
-      padding: 20px;
-    }
-    .stage {
-      display: grid;
-      gap: 14px;
-    }
-    .card {
-      border-radius: 22px;
-      background: var(--card);
-      border: 1px solid var(--line);
-      backdrop-filter: blur(12px);
-      box-shadow: 0 18px 50px rgba(0,0,0,.24);
-      padding: 20px;
-    }
-    .live-original {
-      font-size: clamp(30px, 4vw, 52px);
-      line-height: 1.18;
-      font-weight: 800;
-      white-space: pre-wrap;
-      word-break: break-word;
-    }
-    .live-translation {
-      font-size: clamp(22px, 2.6vw, 34px);
-      line-height: 1.3;
-      font-weight: 700;
-      color: var(--sub);
-      white-space: pre-wrap;
-      word-break: break-word;
-    }
-    .label {
-      margin-bottom: 10px;
-      font-size: 12px;
-      letter-spacing: .12em;
-      text-transform: uppercase;
-      color: var(--muted);
-      font-weight: 800;
-    }
-    .meta {
-      font-size: 12px;
-      line-height: 1.6;
-      color: var(--muted);
+
+    .overlay-root {
       display: flex;
-      gap: 14px;
-      flex-wrap: wrap;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      padding: 24px;
     }
+
+    .caption-box {
+      max-width: 960px;
+      width: 100%;
+      font-size: 32px;
+      line-height: 1.6;
+      text-align: center;
+      word-wrap: break-word;
+      word-break: break-word;
+    }
+
     .pos-verb {
-  color: #2563eb;
-}
+      color: #2563eb;
+    }
 
-.pos-noun {
-  color: #16a34a;
-}
+    .pos-noun {
+      color: #16a34a;
+    }
 
-.pos-adj {
-  color: #f97316;
-}
+    .pos-adj {
+      color: #f97316;
+    }
 
-.pos-adv {
-  color: #7c3aed;
-}
+    .pos-adv {
+      color: #7c3aed;
+    }
   </style>
 </head>
 <body>
-  <div class="wrap">
-    <div class="stage">
-      <div class="card">
-        <div class="label">
-          <span>Live caption</span>
-          <span id="speakerLabel" style="margin-left: 10px; opacity: .8;"></span>
-        </div>
-        <div id="sourceText" class="live-original">Waiting for captions…</div>
-      </div>
-
-      <div class="card">
-        <div class="label">Live translation</div>
-        <div id="translatedText" class="live-translation">Translated output will appear here.</div>
-      </div>
-
-      <div class="card">
-        <div class="meta">
-          <span>Room: <strong id="roomLabel"></strong></span>
-          <span>Socket: <strong id="socketState">connecting</strong></span>
-          <span>Last update: <strong id="lastEvent">none</strong></span>
-          <span>Version: <strong>v7</strong></span>
-        </div>
-      </div>
-    </div>
+  <div class="overlay-root">
+    <div id="captionBox" class="caption-box"></div>
   </div>
 
+  <script src="js/jquery.min.js"></script>
+  <script src="js/ws-publisher.js?v11"></script>
+  <script src="js/pos-coloring.js?v1"></script>
   <script>
-    const params = new URLSearchParams(window.location.search);
-    const room = params.get('room') || 'default';
-    const socketUrl = "wss://sottotitoli-websocket.onrender.com?room=" + encodeURIComponent(room);
+    (function (w) {
+      "use strict";
 
-    const sourceText = document.getElementById('sourceText');
-    const translatedText = document.getElementById('translatedText');
-    const roomLabel = document.getElementById('roomLabel');
-    const socketState = document.getElementById('socketState');
-    const lastEvent = document.getElementById('lastEvent');
-    const speakerLabelEl = document.getElementById('speakerLabel');
+      const params = new URLSearchParams(window.location.search);
+      const room = params.get("room");
+      const mode = params.get("mode") || "caption-en";
 
-    roomLabel.textContent = room;
+      const captionBox = document.getElementById("captionBox");
 
-    const socket = new WebSocket(socketUrl);
+      function modeIsEnglishLesson(modeKey) {
+        if (!modeKey) return false;
+        return modeKey.indexOf("lesson") !== -1 && modeKey.indexOf("caption") === -1;
+      }
 
-    socket.addEventListener('open', function () {
-      socketState.textContent = 'connected';
-      lastEvent.textContent = 'socket open';
-    });
+      function tokenizeCaption(text) {
+        const rawTokens = text.match(/[A-Za-z']+|\S/g) || [];
+        return rawTokens.map((t) => ({
+          text: t,
+          lemma: t.toLowerCase(),
+          pos: null
+        }));
+      }
 
-    socket.addEventListener('close', function () {
-      socketState.textContent = 'closed';
-      lastEvent.textContent = 'socket closed';
-    });
+      function handleCaptionPayload(payload) {
+        if (!payload || !payload.final) return;
 
-    socket.addEventListener('error', function () {
-      socketState.textContent = 'error';
-      lastEvent.textContent = 'socket error';
-    });
+        const text = payload.final;
 
-    socket.addEventListener('message', function (event) {
-      try {
-        const payload = JSON.parse(event.data);
+        if (modeIsEnglishLesson(payload.mode)) {
+          const tokens = tokenizeCaption(text);
+          if (w.SottotitoliPosColoring) {
+            w.SottotitoliPosColoring.renderColoredCaption(captionBox, tokens);
+          } else {
+            captionBox.textContent = text;
+          }
+        } else {
+          captionBox.textContent = text;
+        }
+      }
 
-        if (payload.type === 'system') {
-          lastEvent.textContent = payload.event || 'system';
+      document.addEventListener("DOMContentLoaded", function () {
+        if (!room || !w.createWSOverlaySubscriber) {
+          captionBox.textContent = room
+            ? "Overlay not connected (missing subscriber script)."
+            : "No room specified.";
           return;
         }
 
-        lastEvent.textContent = payload.serverTs || 'message received';
-
-        const speaker = typeof payload.label === 'string' && payload.label.trim()
-          ? payload.label.trim()
-          : '';
-
-        if (speakerLabelEl) {
-          speakerLabelEl.textContent = speaker ? '· ' + speaker : '';
-        }
-
-        if (typeof payload.final === 'string' && payload.final.trim()) {
-          sourceText.textContent = payload.final;
-        } else if (typeof payload.interim === 'string' && payload.interim.trim()) {
-          sourceText.textContent = payload.interim;
-        }
-
-        if (typeof payload.translated === 'string' && payload.translated.trim()) {
-          translatedText.textContent = payload.translated;
-        } else {
-          translatedText.textContent = '—';
-        }
-      } catch (e) {
-        lastEvent.textContent = 'parse error';
-      }
-    });
+        w.createWSOverlaySubscriber(
+          w.SOTTOTITOLICONFIG.websocketUrl,
+          room,
+          function onCaption(payload) {
+            handleCaptionPayload(payload);
+          },
+          function onStateChange(state) {
+            if (state === "disconnected" || state === "error") {
+              captionBox.textContent = "Overlay connection lost.";
+            }
+          }
+        );
+      });
+    })(window);
   </script>
 </body>
 </html>
