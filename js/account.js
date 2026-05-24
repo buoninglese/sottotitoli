@@ -31,11 +31,11 @@ document.addEventListener('DOMContentLoaded', () => {
   const perfQuestionsUsedEl = document.getElementById('perfQuestionsUsed');
   const perfQuestionsUsedBarEl = document.getElementById('perfQuestionsUsedBar');
 
-  const perfNegationCountEl = document.getElementById('perfNegationCount');
-  const perfNegationCountBarEl = document.getElementById('perfNegationCountBar');
+  const perfnegation_countEl = document.getElementById('perfnegation_count');
+  const perfnegation_countBarEl = document.getElementById('perfnegation_countBar');
 
-  const perfRepetitionRateEl = document.getElementById('perfRepetitionRate');
-  const perfRepetitionRateBarEl = document.getElementById('perfRepetitionRateBar');
+  const perfrepetition_rateEl = document.getElementById('perfrepetition_rate');
+  const perfrepetition_rateBarEl = document.getElementById('perfrepetition_rateBar');
 
   const perfConversationTurnsEl = document.getElementById('perfConversationTurns');
   const perfConversationTurnsBarEl = document.getElementById('perfConversationTurnsBar');
@@ -102,8 +102,7 @@ document.addEventListener('DOMContentLoaded', () => {
       if (createdEl) {
         createdEl.textContent = 'Joined: ' + joined;
       }
-    }
-
+fix(account): complete snake_case migration for remaining columns
     const { data: sessions, error: sessionsError } = await accountSupabase
       .from('sessions')
       .select(`
@@ -120,13 +119,13 @@ document.addEventListener('DOMContentLoaded', () => {
         uniquewords_count,
         lexical_diversity,
         quality_score,
-        questioncount,
-        negationcount,
-        repetitionrate,
-        turncount,
-        interruptioncount,
-        speakingshareratio,
-        aistatus
+        question_count,
+        negation_count,
+        repetition_rate,
+        turn_count,
+        interruption_count,
+        speaking_share_ratio,
+        ai_status
       `)
       .eq('user_id', user_id)
       .order('started_at', { ascending: false })
@@ -190,8 +189,8 @@ document.addEventListener('DOMContentLoaded', () => {
       if (perflexical_diversityEl) perflexical_diversityEl.textContent = '–';
       if (perfquality_scoreEl) perfquality_scoreEl.textContent = '–';
       if (perfQuestionsUsedEl) perfQuestionsUsedEl.textContent = '–';
-      if (perfNegationCountEl) perfNegationCountEl.textContent = '–';
-      if (perfRepetitionRateEl) perfRepetitionRateEl.textContent = '–';
+      if (perfnegation_countEl) perfnegation_countEl.textContent = '–';
+      if (perfrepetition_rateEl) perfrepetition_rateEl.textContent = '–';
       if (perfConversationTurnsEl) perfConversationTurnsEl.textContent = '–';
       if (perfInterruptionsEl) perfInterruptionsEl.textContent = '–';
       if (perfSpeakingShareEl) perfSpeakingShareEl.textContent = '–';
@@ -203,8 +202,8 @@ document.addEventListener('DOMContentLoaded', () => {
       setBarState(perflexical_diversityBarEl, 0, null);
       setBarState(perfquality_scoreBarEl, 0, null);
       setBarState(perfQuestionsUsedBarEl, 0, null);
-      setBarState(perfNegationCountBarEl, 0, null);
-      setBarState(perfRepetitionRateBarEl, 0, null);
+      setBarState(perfnegation_countBarEl, 0, null);
+      setBarState(perfrepetition_rateBarEl, 0, null);
       setBarState(perfConversationTurnsBarEl, 0, null);
       setBarState(perfInterruptionsBarEl, 0, null);
       setBarState(perfSpeakingShareBarEl, 0, null);
@@ -245,8 +244,8 @@ document.addEventListener('DOMContentLoaded', () => {
     let countQuestions = 0;
     let sumNegations = 0;
     let countNegations = 0;
-    let sumRepetitionRate = 0;
-    let countRepetitionRate = 0;
+    let sumrepetition_rate = 0;
+    let countrepetition_rate = 0;
     let sumTurns = 0;
     let countTurns = 0;
     let sumInterruptions = 0;
@@ -291,28 +290,28 @@ document.addEventListener('DOMContentLoaded', () => {
             sumquality_score += s.quality_score;
             countquality_score += 1;
           }
-          if (typeof s.questioncount === 'number') {
-            sumQuestions += s.questioncount;
+          if (typeof s.question_count === 'number') {
+            sumQuestions += s.question_count;
             countQuestions += 1;
           }
-          if (typeof s.negationcount === 'number') {
-            sumNegations += s.negationcount;
+          if (typeof s.negation_count === 'number') {
+            sumNegations += s.negation_count;
             countNegations += 1;
           }
-          if (typeof s.repetitionrate === 'number') {
-            sumRepetitionRate += s.repetitionrate;
-            countRepetitionRate += 1;
+          if (typeof s.repetition_rate === 'number') {
+            sumrepetition_rate += s.repetition_rate;
+            countrepetition_rate += 1;
           }
-          if (typeof s.turncount === 'number') {
-            sumTurns += s.turncount;
+          if (typeof s.turn_count === 'number') {
+            sumTurns += s.turn_count;
             countTurns += 1;
           }
-          if (typeof s.interruptioncount === 'number') {
-            sumInterruptions += s.interruptioncount;
+          if (typeof s.interruption_count === 'number') {
+            sumInterruptions += s.interruption_count;
             countInterruptions += 1;
           }
-          if (typeof s.speakingshareratio === 'number') {
-            sumSpeakingShare += s.speakingshareratio;
+          if (typeof s.speaking_share_ratio === 'number') {
+            sumSpeakingShare += s.speaking_share_ratio;
             countSpeakingShare += 1;
           }
         }
@@ -350,8 +349,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const avgquality_score = countquality_score > 0 ? sumquality_score / countquality_score : null;
     const avgQuestions = countQuestions > 0 ? sumQuestions / countQuestions : null;
     const avgNegations = countNegations > 0 ? sumNegations / countNegations : null;
-    const avgRepetitionRate =
-      countRepetitionRate > 0 ? sumRepetitionRate / countRepetitionRate : null;
+    const avgrepetition_rate =
+      countrepetition_rate > 0 ? sumrepetition_rate / countrepetition_rate : null;
     const avgTurns = countTurns > 0 ? sumTurns / countTurns : null;
     const avgInterruptions = countInterruptions > 0 ? sumInterruptions / countInterruptions : null;
     const avgSpeakingShare =
@@ -488,36 +487,36 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     }
 
-    if (perfNegationCountEl) {
-      perfNegationCountEl.textContent =
+    if (perfnegation_countEl) {
+      perfnegation_countEl.textContent =
         avgNegations != null ? avgNegations.toFixed(1) : '–';
     }
-    if (perfNegationCountBarEl) {
+    if (perfnegation_countBarEl) {
       if (avgNegations == null) {
-        setBarState(perfNegationCountBarEl, 0, null);
+        setBarState(perfnegation_countBarEl, 0, null);
       } else {
         setBarState(
-          perfNegationCountBarEl,
+          perfnegation_countBarEl,
           Math.min(avgNegations / 8, 1),
           'warn'
         );
       }
     }
 
-    if (perfRepetitionRateEl) {
-      perfRepetitionRateEl.textContent =
-        avgRepetitionRate != null ? (avgRepetitionRate * 100).toFixed(0) + '%' : '–';
+    if (perfrepetition_rateEl) {
+      perfrepetition_rateEl.textContent =
+        avgrepetition_rate != null ? (avgrepetition_rate * 100).toFixed(0) + '%' : '–';
     }
-    if (perfRepetitionRateBarEl) {
-      if (avgRepetitionRate == null) {
-        setBarState(perfRepetitionRateBarEl, 0, null);
+    if (perfrepetition_rateBarEl) {
+      if (avgrepetition_rate == null) {
+        setBarState(perfrepetition_rateBarEl, 0, null);
       } else {
         let state = 'good';
-        if (avgRepetitionRate > 0.35) state = 'bad';
-        else if (avgRepetitionRate > 0.2) state = 'warn';
+        if (avgrepetition_rate > 0.35) state = 'bad';
+        else if (avgrepetition_rate > 0.2) state = 'warn';
         setBarState(
-          perfRepetitionRateBarEl,
-          Math.min(avgRepetitionRate / 0.5, 1),
+          perfrepetition_rateBarEl,
+          Math.min(avgrepetition_rate / 0.5, 1),
           state
         );
       }
@@ -691,13 +690,13 @@ document.addEventListener('DOMContentLoaded', () => {
       'uniquewords_count',
       'lexical_diversity',
       'quality_score',
-      'questioncount',
-      'negationcount',
-      'repetitionrate',
-      'turncount',
-      'interruptioncount',
-      'speakingshareratio',
-      'aistatus'
+      'question_count',
+      'negation_count',
+      'repetition_rate',
+      'turn_count',
+      'interruption_count',
+      'speaking_share_ratio',
+      'ai_status'
     ];
 
     const rows = currentSessions.map((s) => [
@@ -714,13 +713,13 @@ document.addEventListener('DOMContentLoaded', () => {
       s.uniquewords_count != null ? s.uniquewords_count : '',
       s.lexical_diversity != null ? Number(s.lexical_diversity).toFixed(3) : '',
       s.quality_score != null ? Number(s.quality_score).toFixed(1) : '',
-      s.questioncount != null ? s.questioncount : '',
-      s.negationcount != null ? s.negationcount : '',
-      s.repetitionrate != null ? Number(s.repetitionrate).toFixed(4) : '',
-      s.turncount != null ? s.turncount : '',
-      s.interruptioncount != null ? s.interruptioncount : '',
-      s.speakingshareratio != null ? Number(s.speakingshareratio).toFixed(4) : '',
-      s.aistatus || ''
+      s.question_count != null ? s.question_count : '',
+      s.negation_count != null ? s.negation_count : '',
+      s.repetition_rate != null ? Number(s.repetition_rate).toFixed(4) : '',
+      s.turn_count != null ? s.turn_count : '',
+      s.interruption_count != null ? s.interruption_count : '',
+      s.speaking_share_ratio != null ? Number(s.speaking_share_ratio).toFixed(4) : '',
+      s.ai_status || ''
     ]);
 
     const csvLines = [];
