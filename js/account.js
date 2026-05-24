@@ -96,30 +96,41 @@ document.addEventListener('DOMContentLoaded', () => {
       if (createdEl) {
         createdEl.textContent = 'Joined: ' + joined;
       }
-    } else {
-      if (emailEl) emailEl.textContent = 'Email: ' + user.email;
-      const joined = user.created_at || '—';
-      if (createdEl) {
-        createdEl.textContent = 'Joined: ' + joined;
-      }
-fix(account): complete snake_case migration for remaining columns
-    const { data: sessions, error: sessionsError } = await accountSupabase
-      .from('sessions')
-      .select(`
-        id,
-        room,
-        mode,
-        started_at,
-        ended_at,
-        duration_seconds,
-        words_count,
-        chars_count,
-        wpm,
-        fillers_per_minute,
-      unique_words_count, 
-            lexical_diversity,
-       quality_score       
-        imit(200);
+   } else {
+  if (emailEl) emailEl.textContent = 'Email: ' + user.email;
+  const joined = user.created_at || '—';
+  if (createdEl) {
+    createdEl.textContent = 'Joined: ' + joined;
+  }
+}
+
+const { data: sessions, error: sessionsError } = await accountSupabase
+  .from('sessions')
+  .select(`
+    id,
+    room,
+    mode,
+    started_at,
+    ended_at,
+    duration_seconds,
+    words_count,
+    chars_count,
+    wpm,
+    fillers_per_minute,
+    unique_words_count,
+    lexical_diversity,
+    quality_score,
+    question_count,
+    negation_count,
+    repetition_rate,
+    turn_count,
+    interruption_count,
+    speaking_share_ratio,
+    ai_status
+  `)
+  .eq('user_id', user_id)
+  .order('started_at', { ascending: false })
+  .limit(200);
 
     if (sessionsError) {
       if (sessionsEl) sessionsEl.textContent = 'Could not load sessions yet.';
@@ -315,8 +326,8 @@ fix(account): complete snake_case migration for remaining columns
       }
 
       if (started >= thirtyDaysAgo) {
-        if (typeof s.uniquewords_count === 'number') {
-          uniqueWordsLast30 += s.uniquewords_count;
+        if (typeof s.unique_words_count === 'number') {
+          uniqueWordsLast30 += s.unique_words_count;
         }
       }
 
@@ -677,7 +688,7 @@ fix(account): complete snake_case migration for remaining columns
       'chars_count',
       'wpm',
       'fillers_per_minute',
-      'uniquewords_count',
+      'unique_words_count',
       'lexical_diversity',
       'quality_score',
       'question_count',
@@ -700,7 +711,7 @@ fix(account): complete snake_case migration for remaining columns
       s.chars_count != null ? s.chars_count : '',
       s.wpm != null ? Number(s.wpm).toFixed(2) : '',
       s.fillers_per_minute != null ? Number(s.fillers_per_minute).toFixed(2) : '',
-      s.uniquewords_count != null ? s.uniquewords_count : '',
+      s.unique_words_count != null ? s.unique_words_count : '',
       s.lexical_diversity != null ? Number(s.lexical_diversity).toFixed(3) : '',
       s.quality_score != null ? Number(s.quality_score).toFixed(1) : '',
       s.question_count != null ? s.question_count : '',
