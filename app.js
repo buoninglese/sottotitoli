@@ -30,11 +30,13 @@
 
   // ─── interim-flush state ────────────────────────────────────────────────────
   // If an interim hasn't been superseded by a browser-final within
-  // INTERIM_FLUSH_MS, we treat it as final ourselves.onst INTERIM_FLUSH_MS = 1200;
+  // INTERIM_FLUSH_MS, we treat it as final ourselves.
+  // FIX #1: removed dead `const INTERIM_FLUSH_MS = 1200` that was
+  // accidentally embedded in the comment above, causing a duplicate const.
   let interimFlushTimer = null;
   let pendingInterimText = "";
 
-const INTERIM_FLUSH_MS = 3500;  // an interim that the browser hasn't yet marked as final.
+  const INTERIM_FLUSH_MS = 3500; // an interim that the browser hasn't yet marked as final.
   const SENTENCE_END_RE = /[.!?。！？]\s*$/;
 
   function clearInterimFlushTimer() {
@@ -545,11 +547,14 @@ const INTERIM_FLUSH_MS = 3500;  // an interim that the browser hasn't yet marked
   }
 
   async function startRecognition() {
+    // FIX #2: explicit unsupported-browser check with a user-visible message.
     if (!SpeechRecognition) {
       setText(
         "statusText",
-        "Speech recognition is not supported in this browser."
+        "⚠️ Speech recognition is not supported in this browser. Please use Chrome or Edge."
       );
+      const startBtn = $("startBtn");
+      if (startBtn) startBtn.disabled = true;
       return;
     }
 
@@ -573,7 +578,9 @@ const INTERIM_FLUSH_MS = 3500;  // an interim that the browser hasn't yet marked
     }
   }
 
-  function stopRecognition() {
+  // FIX #5: stopRecognition is now async so it can await finalizeSessionRow,
+  // preventing the Supabase update from being aborted if the tab closes quickly.
+  async function stopRecognition() {
     shouldKeepListening = false;
     clearRestartTimer();
     clearInterimFlushTimer();
@@ -586,11 +593,15 @@ const INTERIM_FLUSH_MS = 3500;  // an interim that the browser hasn't yet marked
       try {
         recognition.stop();
       } catch (e) {}
+      // FIX #4: null the recognition instance so buildRecognition() is called
+      // fresh on the next startRecognition(), picking up any language change.
+      recognition = null;
     }
     stopAudioCapture();
     updateMicState("stopped", false);
+    setText("statusText", "Saving session...");
+    await finalizeSessionRow();
     setText("statusText", "Recognition stopped by user.");
-    finalizeSessionRow();
   }
 
   function connectSocket() {
@@ -1154,6 +1165,16 @@ const INTERIM_FLUSH_MS = 3500;  // an interim that the browser hasn't yet marked
       console.error("Mode initialisation error:", e);
     }
 
+    // FIX #2 (cont.): also disable startBtn at load time if browser is unsupported.
+    if (!SpeechRecognition) {
+      setText(
+        "statusText",
+        "⚠️ Speech recognition is not supported in this browser. Please use Chrome or Edge."
+      );
+      const startBtn = $("startBtn");
+      if (startBtn) startBtn.disabled = true;
+    }
+
     connectSocket();
     updateStats();
     clearBox("interimOutput", "Interim");
@@ -1223,13 +1244,16 @@ const INTERIM_FLUSH_MS = 3500;  // an interim that the browser hasn't yet marked
         activeBtn.classList.remove("btn-default");
         activeBtn.classList.add("btn-primary");
       }
-      const extraBtn = document.createElement("button");
-      extraBtn.className = "btn btn-default";
-      extraBtn.textContent = "Send test message";
-      if (startBtn && startBtn.parentNode) {
-        startBtn.parentNode.appendChild(extraBtn);
+      // FIX #3: only inject the test button in local dev or when devMode is set.
+      if (location.hostname === "localhost" || location.hostname === "127.0.0.1" || configRoot.devMode) {
+        const extraBtn = document.createElement("button");
+        extraBtn.className = "btn btn-default";
+        extraBtn.textContent = "Send test message";
+        if (startBtn && startBtn.parentNode) {
+          startBtn.parentNode.appendChild(extraBtn);
+        }
+        extraBtn.addEventListener("click", sendTestMessage);
       }
-      extraBtn.addEventListener("click", sendTestMessage);
     }
 
     if (modeConfig && modeConfig.lessonMode && lessonActions) {
