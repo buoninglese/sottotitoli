@@ -10,7 +10,8 @@
   <link href="https://fonts.googleapis.com/css?family=Montserrat:300,400,500,600,700,700i,800,900&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="css/bootstrap.min.css">
   <link rel="stylesheet" href="css/bootstrap-theme.min.css">
-  <link rel="stylesheet" href="css/fontawesome.min.css">
+  <!-- FIX #2: replaced local fontawesome.min.css (broken webfont paths) with CDN -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" crossorigin="anonymous" referrerpolicy="no-referrer">
   <link rel="stylesheet" href="css/slicknav.min.css">
   <link rel="stylesheet" href="css/animate.min.css">
   <link rel="stylesheet" href="css/magnific-popup.css">
@@ -234,6 +235,8 @@
   <script src="js/wow.min.js"></script>
   <script src="js/easing.min.js"></script>
   <script src="js/jquery.magnific-popup.min.js"></script>
+  <!-- FIX #1: typed.min.js must load before main.js or typed.typed() throws -->
+  <script src="js/typed.min.js"></script>
   <script src="js/main.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="js/auth.js?v=5"></script>
@@ -246,6 +249,8 @@
     var allModules = [];
     var existingReports = {};
     var activeFamily = 'all';
+    // FIX #4: userId hoisted to module scope so requestReport() can access it.
+    var userId = null;
 
     var FAMILY_LABELS = {
       cambridge:  { label: 'Cambridge',          tagClass: '' },
@@ -280,7 +285,7 @@
       setTimeout(function() { document.body.removeChild(a); URL.revokeObjectURL(url); }, 200);
     }
 
-    /* ── apply button state to a card's action row ── */
+    /* ── apply button state to a card’s action row ── */
     function applyBtnState(moduleId, report) {
       var btn       = el('mbtn-'      + moduleId);
       var regenBtn  = el('mregen-'    + moduleId);
@@ -475,7 +480,8 @@
     }
 
     async function requestReport(moduleId) {
-      if (!supabase || !currentSessionId || !moduleId) return;
+      // FIX #4 (cont.): userId is now the module-scoped variable, not a local.
+      if (!supabase || !currentSessionId || !moduleId || !userId) return;
 
       var btn      = el('mbtn-'    + moduleId);
       var regenBtn = el('mregen-'  + moduleId);
@@ -487,7 +493,7 @@
 
       var { error } = await supabase
         .from('ai_report_requests')
-            .insert([{ user_id: userId, session_ids: [currentSessionId], module_key: moduleId, scope_type: 'session' }]);
+        .insert([{ user_id: userId, session_ids: [currentSessionId], module_key: moduleId, scope_type: 'session' }]);
       if (error) {
         if (btn) { btn.disabled = false; btn.textContent = 'Errore – riprova'; btn.classList.remove('queued'); }
         if (statusEl) statusEl.textContent = 'Errore nell\'invio della richiesta.';
@@ -502,8 +508,8 @@
         created_at:  new Date().toISOString()
       };
 
-          /* start polling */
-    setTimeout(pollReportStatus, 2000);
+      /* start polling */
+      setTimeout(pollReportStatus, 2000);
     }
 
     async function init() {
@@ -521,7 +527,8 @@
         return;
       }
 
-      var userId = sessionData.session.user.id;
+      // FIX #4 (cont.): assign to the module-scoped userId variable.
+      userId = sessionData.session.user.id;
 
       var { data: modules } = await supabase
         .from('ai_report_modules')
@@ -538,63 +545,68 @@
         .limit(20);
 
       renderRoot(sessions);
-          setTimeout(pollReportStatus, 1000);
+      setTimeout(pollReportStatus, 1000);
     }
 
-      /* — poll report status — */
-  async function pollReportStatus() {
-    if (!supabase || !currentSessionId) return;
+    /* ── poll report status ── */
+    async function pollReportStatus() {
+      if (!supabase || !currentSessionId) return;
 
-    const { data: reports, error } = await supabase
-      .from('session_ai_reports')
-      .select('id, module_id, status, summary_text, error_message')
-      .eq('session_id', currentSessionId);
+      // FIX #3: use report_text (real column) instead of summary_text (non-existent).
+      const { data: reports, error } = await supabase
+        .from('session_ai_reports')
+        .select('id, module_id, status, report_text, error_message')
+        .eq('session_id', currentSessionId);
 
-    if (error) {
-      console.error('Poll error:', error);
-      return;
-    }
-
-    if (!reports || reports.length === 0) return;
-
-    reports.forEach(function(rep) {
-      var moduleId = rep.module_id;
-      var btn = el('mbtn-' + moduleId);
-      var regenBtn = el('mregen-' + moduleId);
-      var statusEl = el('mstatus-' + moduleId);
-      var reportBox = el('mreport-' + moduleId);
-
-      if (rep.status === 'done' && rep.summary_text) {
-        /* update existingReports cache */
-        existingReports[moduleId] = rep;
-        /* update button */
-        if (btn) {
-          btn.disabled = false;
-        btn.textContent = 'Scarica report';          btn.classList.add('done');
-          btn.classList.remove('queued');
-        }
-        if (regenBtn) regenBtn.classList.add('visible');
-        if (statusEl) statusEl.textContent = 'Nessun report ancora generato.';
-        if (reportBox) {
-          reportBox.innerHTML = '<div style="white-space:pre-wrap;font-size:14px;line-height:1.6;color:#374151;padding:16px;background:#f9fafb;border-radius:8px;margin-top:12px;">' + escHtml(rep.summary_text || '') + '</div>';
-        }      } else if (rep.status === 'error') {
-        if (btn) {
-          btn.disabled = false;
-          btn.textContent = 'Errore — riprova';
-          btn.classList.remove('queued', 'done');
-        }
-        if (statusEl) statusEl.textContent = 'Errore nell\'invio della richiesta.';
-      } else if (rep.status === 'processing') {
-        if (statusEl) statusEl.textContent = 'Report in elaborazione — attendi...';
+      if (error) {
+        console.error('Poll error:', error);
+        return;
       }
-    });
 
-    /* check if we should continue polling */
-    var hasPending = reports.some(function(r) { return r.status === 'pending' || r.status === 'processing'; });
-    if (hasPending) {
-      setTimeout(pollReportStatus, 5000);
+      if (!reports || reports.length === 0) return;
+
+      reports.forEach(function(rep) {
+        var moduleId  = rep.module_id;
+        var btn       = el('mbtn-'    + moduleId);
+        var regenBtn  = el('mregen-'  + moduleId);
+        var statusEl  = el('mstatus-' + moduleId);
+        var reportBox = el('mreport-' + moduleId);
+
+        if (rep.status === 'done' && rep.report_text) {
+          /* update existingReports cache */
+          existingReports[moduleId] = rep;
+          if (btn) {
+            btn.disabled = false;
+            btn.textContent = 'Scarica report';
+            btn.classList.add('done');
+            btn.classList.remove('queued');
+          }
+          if (regenBtn) regenBtn.classList.add('visible');
+          if (statusEl) statusEl.textContent = rep.created_at
+            ? 'Completato: ' + new Date(rep.created_at).toLocaleString()
+            : 'Completato.';
+          if (reportBox) {
+            reportBox.textContent = rep.report_text;
+            reportBox.classList.add('visible');
+          }
+        } else if (rep.status === 'error') {
+          if (btn) {
+            btn.disabled = false;
+            btn.textContent = 'Errore — riprova';
+            btn.classList.remove('queued', 'done');
+          }
+          if (statusEl) statusEl.textContent = rep.error_message || 'Errore nell\'elaborazione.';
+        } else if (rep.status === 'processing') {
+          if (statusEl) statusEl.textContent = 'Report in elaborazione — attendi...';
+        }
+      });
+
+      /* continue polling if anything is still in flight */
+      var hasPending = reports.some(function(r) { return r.status === 'pending' || r.status === 'processing'; });
+      if (hasPending) {
+        setTimeout(pollReportStatus, 5000);
+      }
     }
-  }
 
     document.addEventListener('DOMContentLoaded', function() {
       setTimeout(init, 600);
