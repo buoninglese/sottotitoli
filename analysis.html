@@ -69,31 +69,44 @@
       letter-spacing: .07em; background: #e5f0ff; color: #2563eb;
       margin-bottom: 8px;
     }
-    .module-tag.token { background: #fce7f3; color: #be185d; }
+    .module-tag.token    { background: #fce7f3; color: #be185d; }
     .module-tag.business { background: #fef3c7; color: #b45309; }
     .module-tag.academic { background: #d1fae5; color: #065f46; }
     .module-tag.linguistic { background: #ede9fe; color: #6d28d9; }
     .module-card h4 { font-size: 15px; font-weight: 700; margin: 0 0 6px; }
     .module-card p  { font-size: 13px; color: #4b5563; margin-bottom: 10px; flex: 1; }
+
     .module-report-box {
       background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 7px;
       padding: 12px 14px; font-size: 13px; color: #374151;
       white-space: pre-wrap; word-break: break-word;
+      max-height: 180px; overflow-y: auto;
       min-height: 56px; margin-bottom: 10px;
       display: none;
     }
     .module-report-box.visible { display: block; }
+
+    /* button states */
+    .module-btn-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 4px; }
     .module-run-btn {
-      display: inline-block; padding: 8px 18px; background: #2563eb; color: #fff;
-      border: none; border-radius: 6px; font-size: 13px; font-weight: 700;
-      cursor: pointer; transition: background .2s;
+      padding: 8px 18px; border: none; border-radius: 6px;
+      font-size: 13px; font-weight: 700; cursor: pointer; transition: background .2s;
+      background: #2563eb; color: #fff;
     }
-    .module-run-btn:hover { background: #1d4ed8; }
+    .module-run-btn:hover:not(:disabled) { background: #1d4ed8; }
     .module-run-btn:disabled { background: #9ca3af; cursor: not-allowed; }
-    .module-run-btn.done { background: #16a34a; cursor: default; }
+    .module-run-btn.queued   { background: #d97706; color: #fff; cursor: default; }
+    .module-run-btn.done     { background: #16a34a; color: #fff; cursor: pointer; }
+    .module-run-btn.done:hover { background: #15803d; }
+    .module-rigenera {
+      font-size: 12px; color: #6b7280; cursor: pointer;
+      text-decoration: underline; border: none; background: none; padding: 0;
+      display: none;
+    }
+    .module-rigenera.visible { display: inline; }
     .module-status { font-size: 12px; color: #6b7280; margin-top: 6px; }
 
-    /* loading state */
+    /* loading / auth notes */
     .analysis-loading { font-size: 14px; color: #6b7280; padding: 20px 0; }
     .analysis-signin-note {
       background: #fff; border-radius: 10px; padding: 28px 28px 24px;
@@ -154,11 +167,9 @@
 
   <section class="analysis-section">
     <div class="container">
-
       <div id="analysisRoot">
         <div class="analysis-loading">Caricamento…</div>
       </div>
-
     </div>
   </section>
 
@@ -233,13 +244,13 @@
     var supabase;
     var currentSessionId = null;
     var allModules = [];
-    var existingReports = {}; // moduleId -> report row
+    var existingReports = {};
     var activeFamily = 'all';
 
     var FAMILY_LABELS = {
-      cambridge:  { label: 'Cambridge', tagClass: '' },
-      business:   { label: 'Business',  tagClass: 'business' },
-      academic:   { label: 'Academic',  tagClass: 'academic' },
+      cambridge:  { label: 'Cambridge',          tagClass: '' },
+      business:   { label: 'Business',            tagClass: 'business' },
+      academic:   { label: 'Academic',            tagClass: 'academic' },
       linguistic: { label: 'Linguistic Analysis', tagClass: 'linguistic' }
     };
     var FAMILY_ORDER = ['cambridge', 'business', 'academic', 'linguistic'];
@@ -255,11 +266,72 @@
     function familyTagClass(family) {
       return (FAMILY_LABELS[family] && FAMILY_LABELS[family].tagClass) || '';
     }
-
     function familyLabel(family) {
       return (FAMILY_LABELS[family] && FAMILY_LABELS[family].label) || family;
     }
 
+    /* ── download helper ── */
+    function downloadText(filename, text) {
+      var blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+      var url  = URL.createObjectURL(blob);
+      var a    = document.createElement('a');
+      a.href = url; a.download = filename;
+      document.body.appendChild(a); a.click();
+      setTimeout(function() { document.body.removeChild(a); URL.revokeObjectURL(url); }, 200);
+    }
+
+    /* ── apply button state to a card's action row ── */
+    function applyBtnState(moduleId, report) {
+      var btn       = el('mbtn-'      + moduleId);
+      var regenBtn  = el('mregen-'    + moduleId);
+      var statusEl  = el('mstatus-'   + moduleId);
+      var reportBox = el('mreport-'   + moduleId);
+      if (!btn) return;
+
+      // clear all state classes
+      btn.classList.remove('queued', 'done');
+      btn.disabled = false;
+
+      if (!report) {
+        /* no report yet */
+        btn.textContent = 'Genera report';
+        if (regenBtn)  regenBtn.classList.remove('visible');
+        if (statusEl)  statusEl.textContent = 'Nessun report ancora generato.';
+        if (reportBox) { reportBox.textContent = ''; reportBox.classList.remove('visible'); }
+        return;
+      }
+
+      if (report.status === 'pending') {
+        btn.textContent = 'In coda…';
+        btn.classList.add('queued');
+        btn.disabled = true;
+        if (regenBtn)  regenBtn.classList.remove('visible');
+        if (statusEl)  statusEl.textContent = 'Report in elaborazione — ricarica la pagina tra qualche secondo.';
+        if (reportBox) { reportBox.textContent = ''; reportBox.classList.remove('visible'); }
+        return;
+      }
+
+      if (report.status === 'done' && report.report_text) {
+        btn.textContent = 'Scarica report';
+        btn.classList.add('done');
+        btn.disabled = false;
+        if (regenBtn)  regenBtn.classList.add('visible');
+        if (statusEl)  statusEl.textContent = 'Completato: ' + new Date(report.created_at).toLocaleString();
+        if (reportBox) {
+          reportBox.textContent = report.report_text;
+          reportBox.classList.add('visible');
+        }
+        return;
+      }
+
+      /* fallback: report exists but status unclear */
+      btn.textContent = 'Genera report';
+      if (statusEl) statusEl.textContent = report.created_at
+        ? 'Ultimo: ' + new Date(report.created_at).toLocaleString()
+        : '';
+    }
+
+    /* ── render ── */
     function renderRoot(sessions) {
       var root = el('analysisRoot');
       if (!root) return;
@@ -269,7 +341,6 @@
         return;
       }
 
-      // Build session selector
       var selectorHtml = '<div class="session-select-wrap">' +
         '<span class="session-select-label">Sessione</span>' +
         '<select id="sessionSelect" class="session-select">';
@@ -282,7 +353,6 @@
       });
       selectorHtml += '</select></div>';
 
-      // Build family tabs
       var tabsHtml = '<div class="family-tabs" id="familyTabs">' +
         '<button class="family-tab active" data-family="all">Tutti</button>';
       FAMILY_ORDER.forEach(function(f) {
@@ -290,27 +360,18 @@
       });
       tabsHtml += '</div>';
 
-      // Module grid placeholder
-      var modulesHtml = '<div id="modulesGrid"></div>';
+      root.innerHTML = selectorHtml + tabsHtml + '<div id="modulesGrid"></div>';
 
-      root.innerHTML = selectorHtml + tabsHtml + modulesHtml;
-
-      // Bind session select
       var selectEl = el('sessionSelect');
       if (selectEl) {
         currentSessionId = sessions[0].id;
         selectEl.addEventListener('change', function() {
           currentSessionId = this.value;
-          loadReportsForSession(currentSessionId).then(function() {
-            renderModules();
-          });
+          loadReportsForSession(currentSessionId).then(renderModules);
         });
-        loadReportsForSession(currentSessionId).then(function() {
-          renderModules();
-        });
+        loadReportsForSession(currentSessionId).then(renderModules);
       }
 
-      // Bind family tabs
       document.querySelectorAll('.family-tab').forEach(function(btn) {
         btn.addEventListener('click', function() {
           document.querySelectorAll('.family-tab').forEach(function(b) { b.classList.remove('active'); });
@@ -328,9 +389,7 @@
         .from('session_ai_reports')
         .select('module_id, report_text, status, created_at')
         .eq('session_id', sessionId);
-      (data || []).forEach(function(r) {
-        existingReports[r.module_id] = r;
-      });
+      (data || []).forEach(function(r) { existingReports[r.module_id] = r; });
     }
 
     function renderModules() {
@@ -346,7 +405,6 @@
         return;
       }
 
-      // Group by family for display
       var byFamily = {};
       filtered.forEach(function(m) {
         if (!byFamily[m.family]) byFamily[m.family] = [];
@@ -357,50 +415,29 @@
       var families = activeFamily === 'all' ? FAMILY_ORDER : [activeFamily];
 
       families.forEach(function(fam) {
-        if (!byFamily[fam] || byFamily[fam].length === 0) return;
+        if (!byFamily[fam] || !byFamily[fam].length) return;
         html += '<h4 style="font-size:16px;font-weight:700;color:#111827;margin:24px 0 14px;">' + familyLabel(fam) + '</h4>';
         html += '<div class="row">';
         byFamily[fam].forEach(function(m) {
-          var report = existingReports[m.id];
-          var isToken = m.default_rule === 'token';
-          var tagExtra = isToken ? ' token' : '';
-          var tagLabel = isToken ? 'Token' : 'Incluso';
+          var isToken     = m.default_rule === 'token';
+          var tagExtra    = isToken ? ' token' : '';
+          var tagLabel    = isToken ? 'Token'  : 'Incluso';
           var famTagClass = familyTagClass(fam);
-
-          var reportBoxDisplay = '';
-          var reportBoxContent = '';
-          if (report && report.report_text) {
-            reportBoxDisplay = ' visible';
-            reportBoxContent = escHtml(report.report_text);
-          }
-
-          var btnLabel = report ? 'Rigenera report' : 'Genera report';
-          var btnDisabled = '';
-          var btnExtra = '';
-          if (report && report.status === 'pending') {
-            btnLabel = 'In coda…'; btnDisabled = ' disabled'; btnExtra = '';
-          } else if (report && report.status === 'done') {
-            btnExtra = '';
-          }
-
-          var statusNote = '';
-          if (report && report.created_at) {
-            statusNote = '<div class="module-status">Ultimo report: ' + escHtml(new Date(report.created_at).toLocaleString()) + '</div>';
-          }
 
           html += '<div class="col-md-4 col-sm-6 col-xs-12">' +
             '<div class="module-card" id="mcard-' + escHtml(m.id) + '">' +
-            '<div>' +
-            '<span class="module-tag ' + famTagClass + tagExtra + '">' + tagLabel + '</span>' +
-            ' <span class="module-tag ' + famTagClass + '">' + familyLabel(fam) + '</span>' +
-            '<h4>' + escHtml(m.label) + '</h4>' +
-            '<p>' + escHtml(m.description || '') + '</p>' +
-            '<div class="module-report-box' + reportBoxDisplay + '" id="mreport-' + escHtml(m.id) + '">' + reportBoxContent + '</div>' +
-            statusNote +
-            '</div>' +
-            '<div>' +
-            '<button class="module-run-btn" id="mbtn-' + escHtml(m.id) + '"' + btnDisabled + ' data-module-id="' + escHtml(m.id) + '">' + btnLabel + '</button>' +
-            '</div>' +
+              '<div>' +
+                '<span class="module-tag ' + famTagClass + tagExtra + '">' + tagLabel + '</span>' +
+                ' <span class="module-tag ' + famTagClass + '">' + familyLabel(fam) + '</span>' +
+                '<h4>' + escHtml(m.label) + '</h4>' +
+                '<p>'  + escHtml(m.description || '') + '</p>' +
+                '<div class="module-report-box" id="mreport-' + escHtml(m.id) + '"></div>' +
+                '<div class="module-status"    id="mstatus-' + escHtml(m.id) + '">Nessun report ancora generato.</div>' +
+              '</div>' +
+              '<div class="module-btn-row">' +
+                '<button class="module-run-btn" id="mbtn-'   + escHtml(m.id) + '" data-module-id="' + escHtml(m.id) + '">Genera report</button>' +
+                '<button class="module-rigenera"             id="mregen-' + escHtml(m.id) + '" data-module-id="' + escHtml(m.id) + '">Rigenera</button>' +
+              '</div>' +
             '</div></div>';
         });
         html += '</div>';
@@ -408,45 +445,63 @@
 
       grid.innerHTML = html;
 
-      // Bind run buttons
+      /* apply saved states */
+      filtered.forEach(function(m) {
+        applyBtnState(m.id, existingReports[m.id] || null);
+      });
+
+      /* bind primary buttons */
       grid.querySelectorAll('.module-run-btn').forEach(function(btn) {
         btn.addEventListener('click', function() {
           var moduleId = btn.dataset.moduleId;
-          requestReport(moduleId, btn);
+          var report   = existingReports[moduleId];
+          if (report && report.status === 'done' && report.report_text) {
+            /* download */
+            var fname = 'analysis-' + moduleId + '-' + currentSessionId + '.txt';
+            downloadText(fname, report.report_text);
+          } else {
+            requestReport(moduleId);
+          }
+        });
+      });
+
+      /* bind rigenera buttons */
+      grid.querySelectorAll('.module-rigenera').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+          var moduleId = btn.dataset.moduleId;
+          requestReport(moduleId);
         });
       });
     }
 
-    async function requestReport(moduleId, btn) {
+    async function requestReport(moduleId) {
       if (!supabase || !currentSessionId || !moduleId) return;
-      btn.disabled = true;
-      btn.textContent = 'In coda…';
+
+      var btn      = el('mbtn-'    + moduleId);
+      var regenBtn = el('mregen-'  + moduleId);
+      var statusEl = el('mstatus-' + moduleId);
+
+      if (btn) { btn.disabled = true; btn.textContent = 'In coda…'; btn.classList.add('queued'); btn.classList.remove('done'); }
+      if (regenBtn) regenBtn.classList.remove('visible');
+      if (statusEl) statusEl.textContent = 'Report in elaborazione — ricarica la pagina tra qualche secondo.';
 
       var { error } = await supabase
         .from('ai_report_requests')
         .insert([{ session_id: currentSessionId, module_id: moduleId }]);
 
       if (error) {
-        btn.disabled = false;
-        btn.textContent = 'Errore – riprova';
+        if (btn) { btn.disabled = false; btn.textContent = 'Errore – riprova'; btn.classList.remove('queued'); }
+        if (statusEl) statusEl.textContent = 'Errore nell\'invio della richiesta.';
         return;
       }
 
-      btn.textContent = 'Richiesta inviata';
-      btn.classList.add('done');
-
-      var statusEl = document.querySelector('#mcard-' + moduleId + ' .module-status');
-      if (statusEl) {
-        statusEl.textContent = 'Report richiesto. Aggiorna la pagina tra qualche secondo per vederlo.';
-      } else {
-        var card = document.getElementById('mcard-' + moduleId);
-        if (card) {
-          var d = document.createElement('div');
-          d.className = 'module-status';
-          d.textContent = 'Report richiesto. Aggiorna la pagina per vederlo.';
-          card.querySelector('div').appendChild(d);
-        }
-      }
+      /* optimistic: mark as pending in local cache */
+      existingReports[moduleId] = {
+        module_id:   moduleId,
+        status:      'pending',
+        report_text: null,
+        created_at:  new Date().toISOString()
+      };
     }
 
     async function init() {
@@ -466,16 +521,13 @@
 
       var userId = sessionData.session.user.id;
 
-      // Load modules
       var { data: modules } = await supabase
         .from('ai_report_modules')
         .select('id, label, description, family, default_rule')
         .order('family')
         .order('label');
-
       allModules = modules || [];
 
-      // Load recent sessions
       var { data: sessions } = await supabase
         .from('sessions')
         .select('id, mode, started_at, duration_seconds, wpm')
@@ -487,7 +539,6 @@
     }
 
     document.addEventListener('DOMContentLoaded', function() {
-      // Small delay to let auth.js set up the Supabase client
       setTimeout(init, 600);
     });
   })();
