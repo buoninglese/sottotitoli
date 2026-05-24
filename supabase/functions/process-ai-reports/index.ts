@@ -56,6 +56,7 @@ serve(async (req) => {
           .single();
 
         // Call OpenAI API
+        const prompt = getModulePrompt(request.module_id, session?.transcript_text);
         const aiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
           method: 'POST',
           headers: {
@@ -64,7 +65,6 @@ serve(async (req) => {
           },
           body: JSON.stringify({
             model: 'gpt-4',
-                    const prompt = getModulePrompt(request.module_id, session?.transcript_text);
             messages: [
               {
                 role: 'system',
