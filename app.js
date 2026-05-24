@@ -30,13 +30,11 @@
 
   // ─── interim-flush state ────────────────────────────────────────────────────
   // If an interim hasn't been superseded by a browser-final within
-  // INTERIM_FLUSH_MS, we treat it as final ourselves.
-  const INTERIM_FLUSH_MS = 1200;
+  // INTERIM_FLUSH_MS, we treat it as final ourselves.onst INTERIM_FLUSH_MS = 1200;
   let interimFlushTimer = null;
   let pendingInterimText = "";
 
-  // Sentence-ending punctuation regex used to detect natural breaks inside
-  // an interim that the browser hasn't yet marked as final.
+const INTERIM_FLUSH_MS = 3500;  // an interim that the browser hasn't yet marked as final.
   const SENTENCE_END_RE = /[.!?。！？]\s*$/;
 
   function clearInterimFlushTimer() {
