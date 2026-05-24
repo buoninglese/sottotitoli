@@ -501,6 +501,9 @@
         report_text: null,
         created_at:  new Date().toISOString()
       };
+
+          /* start polling */
+    setTimeout(pollReportStatus, 2000);
     }
 
     async function init() {
@@ -535,7 +538,63 @@
         .limit(20);
 
       renderRoot(sessions);
+          setTimeout(pollReportStatus, 1000);
     }
+
+      /* — poll report status — */
+  async function pollReportStatus() {
+    if (!supabase || !currentSessionId) return;
+
+    const { data: reports, error } = await supabase
+      .from('session_ai_reports')
+      .select('id, module_key, status, report_text, error_message')
+      .eq('session_id', currentSessionId);
+
+    if (error) {
+      console.error('Poll error:', error);
+      return;
+    }
+
+    if (!reports || reports.length === 0) return;
+
+    reports.forEach(function(rep) {
+      var moduleId = rep.module_key;
+      var btn = el('mbtn-' + moduleId);
+      var regenBtn = el('mregen-' + moduleId);
+      var statusEl = el('mstatus-' + moduleId);
+      var reportBox = el('mreport-' + moduleId);
+
+      if (rep.status === 'done' && rep.report_text) {
+        /* update existingReports cache */
+        existingReports[moduleId] = rep;
+        /* update button */
+        if (btn) {
+          btn.disabled = false;
+          btn.textContent = 'Genera report';
+          btn.classList.add('done');
+          btn.classList.remove('queued');
+        }
+        if (regenBtn) regenBtn.classList.add('visible');
+        if (statusEl) statusEl.textContent = 'Nessun report ancora generato.';
+        if (reportBox) reportBox.textContent = '';
+      } else if (rep.status === 'error') {
+        if (btn) {
+          btn.disabled = false;
+          btn.textContent = 'Errore — riprova';
+          btn.classList.remove('queued', 'done');
+        }
+        if (statusEl) statusEl.textContent = 'Errore nell\'invio della richiesta.';
+      } else if (rep.status === 'processing') {
+        if (statusEl) statusEl.textContent = 'Report in elaborazione — attendi...';
+      }
+    });
+
+    /* check if we should continue polling */
+    var hasPending = reports.some(function(r) { return r.status === 'pending' || r.status === 'processing'; });
+    if (hasPending) {
+      setTimeout(pollReportStatus, 5000);
+    }
+  }
 
     document.addEventListener('DOMContentLoaded', function() {
       setTimeout(init, 600);
