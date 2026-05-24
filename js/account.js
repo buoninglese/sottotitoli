@@ -16,17 +16,17 @@ document.addEventListener('DOMContentLoaded', () => {
   const perfAverageWpmBarEl = document.getElementById('perfAverageWpmBar');
   const perfWpmTrendEl = document.getElementById('perfWpmTrend');
 
-  const perfFillersPerMinuteEl = document.getElementById('perfFillersPerMinute');
-  const perfFillersPerMinuteBarEl = document.getElementById('perfFillersPerMinuteBar');
+  const perffillers_per_minuteEl = document.getElementById('perffillers_per_minute');
+  const perffillers_per_minuteBarEl = document.getElementById('perffillers_per_minuteBar');
 
   const perfUniqueWordsEl = document.getElementById('perfUniqueWords');
   const perfUniqueWordsBarEl = document.getElementById('perfUniqueWordsBar');
 
-  const perfLexicalDiversityEl = document.getElementById('perfLexicalDiversity');
-  const perfLexicalDiversityBarEl = document.getElementById('perfLexicalDiversityBar');
+  const perflexical_diversityEl = document.getElementById('perflexical_diversity');
+  const perflexical_diversityBarEl = document.getElementById('perflexical_diversityBar');
 
-  const perfQualityScoreEl = document.getElementById('perfQualityScore');
-  const perfQualityScoreBarEl = document.getElementById('perfQualityScoreBar');
+  const perfquality_scoreEl = document.getElementById('perfquality_score');
+  const perfquality_scoreBarEl = document.getElementById('perfquality_scoreBar');
 
   const perfQuestionsUsedEl = document.getElementById('perfQuestionsUsed');
   const perfQuestionsUsedBarEl = document.getElementById('perfQuestionsUsedBar');
@@ -79,12 +79,12 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     const user = sessionData.session.user;
-    const userId = user.id;
+    const user_id = user.id;
 
     const { data: profiles, error: profileError } = await accountSupabase
       .from('profiles')
       .select('email, created_at')
-      .eq('id', userId)
+      .eq('id', user_id)
       .limit(1);
 
     if (!profileError && profiles && profiles.length > 0) {
@@ -110,16 +110,16 @@ document.addEventListener('DOMContentLoaded', () => {
         id,
         room,
         mode,
-        startedat,
-        endedat,
-        durationseconds,
-        wordscount,
-        charscount,
+        started_at,
+        ended_at,
+        duration_seconds,
+        words_count,
+        chars_count,
         wpm,
-        fillersperminute,
-        uniquewordscount,
-        lexicaldiversity,
-        qualityscore,
+        fillers_per_minute,
+        uniquewords_count,
+        lexical_diversity,
+        quality_score,
         questioncount,
         negationcount,
         repetitionrate,
@@ -128,8 +128,8 @@ document.addEventListener('DOMContentLoaded', () => {
         speakingshareratio,
         aistatus
       `)
-      .eq('userid', userId)
-      .order('startedat', { ascending: false })
+      .eq('user_id', user_id)
+      .order('started_at', { ascending: false })
       .limit(200);
 
     if (sessionsError) {
@@ -152,9 +152,9 @@ document.addEventListener('DOMContentLoaded', () => {
       list.className = 'sessions-list';
       sessions.forEach((s) => {
         const li = document.createElement('li');
-        const when = s.startedat ? new Date(s.startedat).toLocaleString() : '';
-        const duration = s.durationseconds != null ? s.durationseconds + 's' : '—';
-        const words = s.wordscount != null ? s.wordscount + ' words' : '—';
+        const when = s.started_at ? new Date(s.started_at).toLocaleString() : '';
+        const duration = s.duration_seconds != null ? s.duration_seconds + 's' : '—';
+        const words = s.words_count != null ? s.words_count + ' words' : '—';
         li.innerHTML = `
           <span class="sessions-room">[${s.mode || 'mode'}] Room ${s.room || ''}</span>
           <span class="sessions-meta"> · ${when} · ${duration} · ${words}</span>
@@ -185,10 +185,10 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!sessions || sessions.length === 0) {
       if (perfMinutesSpokenEl) perfMinutesSpokenEl.textContent = '0';
       if (perfAverageWpmEl) perfAverageWpmEl.textContent = '–';
-      if (perfFillersPerMinuteEl) perfFillersPerMinuteEl.textContent = '–';
+      if (perffillers_per_minuteEl) perffillers_per_minuteEl.textContent = '–';
       if (perfUniqueWordsEl) perfUniqueWordsEl.textContent = '0';
-      if (perfLexicalDiversityEl) perfLexicalDiversityEl.textContent = '–';
-      if (perfQualityScoreEl) perfQualityScoreEl.textContent = '–';
+      if (perflexical_diversityEl) perflexical_diversityEl.textContent = '–';
+      if (perfquality_scoreEl) perfquality_scoreEl.textContent = '–';
       if (perfQuestionsUsedEl) perfQuestionsUsedEl.textContent = '–';
       if (perfNegationCountEl) perfNegationCountEl.textContent = '–';
       if (perfRepetitionRateEl) perfRepetitionRateEl.textContent = '–';
@@ -198,10 +198,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
       setBarState(perfMinutesSpokenBarEl, 0, null);
       setBarState(perfAverageWpmBarEl, 0, null);
-      setBarState(perfFillersPerMinuteBarEl, 0, null);
+      setBarState(perffillers_per_minuteBarEl, 0, null);
       setBarState(perfUniqueWordsBarEl, 0, null);
-      setBarState(perfLexicalDiversityBarEl, 0, null);
-      setBarState(perfQualityScoreBarEl, 0, null);
+      setBarState(perflexical_diversityBarEl, 0, null);
+      setBarState(perfquality_scoreBarEl, 0, null);
       setBarState(perfQuestionsUsedBarEl, 0, null);
       setBarState(perfNegationCountBarEl, 0, null);
       setBarState(perfRepetitionRateBarEl, 0, null);
@@ -234,13 +234,13 @@ document.addEventListener('DOMContentLoaded', () => {
     let totalWordsWeek = 0;
     let sumWpm = 0;
     let countWpm = 0;
-    let sumFillersPerMinute = 0;
+    let sumfillers_per_minute = 0;
     let countFillers = 0;
     let uniqueWordsLast30 = 0;
-    let sumLexicalDiversity = 0;
-    let countLexicalDiversity = 0;
-    let sumQualityScore = 0;
-    let countQualityScore = 0;
+    let sumlexical_diversity = 0;
+    let countlexical_diversity = 0;
+    let sumquality_score = 0;
+    let countquality_score = 0;
     let sumQuestions = 0;
     let countQuestions = 0;
     let sumNegations = 0;
@@ -260,10 +260,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const spokenDates = new Set();
 
     sessions.forEach((s) => {
-      if (!s.startedat) return;
-      const started = new Date(s.startedat);
+      if (!s.started_at) return;
+      const started = new Date(s.started_at);
       const dayKey = toLocalDayKey(started);
-      const hasSpokenDuration = typeof s.durationseconds === 'number' && s.durationseconds > 0;
+      const hasSpokenDuration = typeof s.duration_seconds === 'number' && s.duration_seconds > 0;
 
       if (hasSpokenDuration) {
         spokenDates.add(dayKey);
@@ -271,25 +271,25 @@ document.addEventListener('DOMContentLoaded', () => {
 
       if (started >= sevenDaysAgo) {
         if (hasSpokenDuration) {
-          totalSecondsWeek += s.durationseconds;
-          if (typeof s.wordscount === 'number') {
-            totalWordsWeek += s.wordscount;
+          totalSecondsWeek += s.duration_seconds;
+          if (typeof s.words_count === 'number') {
+            totalWordsWeek += s.words_count;
           }
           if (typeof s.wpm === 'number') {
             sumWpm += s.wpm;
             countWpm += 1;
           }
-          if (typeof s.fillersperminute === 'number') {
-            sumFillersPerMinute += s.fillersperminute;
+          if (typeof s.fillers_per_minute === 'number') {
+            sumfillers_per_minute += s.fillers_per_minute;
             countFillers += 1;
           }
-          if (typeof s.lexicaldiversity === 'number') {
-            sumLexicalDiversity += s.lexicaldiversity;
-            countLexicalDiversity += 1;
+          if (typeof s.lexical_diversity === 'number') {
+            sumlexical_diversity += s.lexical_diversity;
+            countlexical_diversity += 1;
           }
-          if (typeof s.qualityscore === 'number') {
-            sumQualityScore += s.qualityscore;
-            countQualityScore += 1;
+          if (typeof s.quality_score === 'number') {
+            sumquality_score += s.quality_score;
+            countquality_score += 1;
           }
           if (typeof s.questioncount === 'number') {
             sumQuestions += s.questioncount;
@@ -326,8 +326,8 @@ document.addEventListener('DOMContentLoaded', () => {
       }
 
       if (started >= thirtyDaysAgo) {
-        if (typeof s.uniquewordscount === 'number') {
-          uniqueWordsLast30 += s.uniquewordscount;
+        if (typeof s.uniquewords_count === 'number') {
+          uniqueWordsLast30 += s.uniquewords_count;
         }
       }
 
@@ -335,8 +335,8 @@ document.addEventListener('DOMContentLoaded', () => {
         const dayIndex = Math.floor(
           (started.getTime() - fourteenDaysAgo.getTime()) / (24 * 60 * 60 * 1000)
         );
-        if (dayIndex >= 0 && dayIndex < 14 && typeof s.durationseconds === 'number') {
-          dailyMinutes[dayIndex] += s.durationseconds / 60;
+        if (dayIndex >= 0 && dayIndex < 14 && typeof s.duration_seconds === 'number') {
+          dailyMinutes[dayIndex] += s.duration_seconds / 60;
         }
       }
     });
@@ -344,10 +344,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const minutesWeek = Math.round(totalSecondsWeek / 60);
     const avgWpm = countWpm > 0 ? sumWpm / countWpm : null;
     const avgWpmPrevWeek = countWpmPrevWeek > 0 ? sumWpmPrevWeek / countWpmPrevWeek : null;
-    const avgFillersPerMin = countFillers > 0 ? sumFillersPerMinute / countFillers : null;
-    const avgLexicalDiversity =
-      countLexicalDiversity > 0 ? sumLexicalDiversity / countLexicalDiversity : null;
-    const avgQualityScore = countQualityScore > 0 ? sumQualityScore / countQualityScore : null;
+    const avgFillersPerMin = countFillers > 0 ? sumfillers_per_minute / countFillers : null;
+    const avglexical_diversity =
+      countlexical_diversity > 0 ? sumlexical_diversity / countlexical_diversity : null;
+    const avgquality_score = countquality_score > 0 ? sumquality_score / countquality_score : null;
     const avgQuestions = countQuestions > 0 ? sumQuestions / countQuestions : null;
     const avgNegations = countNegations > 0 ? sumNegations / countNegations : null;
     const avgRepetitionRate =
@@ -402,19 +402,19 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     }
 
-    if (perfFillersPerMinuteEl) {
-      perfFillersPerMinuteEl.textContent =
+    if (perffillers_per_minuteEl) {
+      perffillers_per_minuteEl.textContent =
         avgFillersPerMin != null ? avgFillersPerMin.toFixed(1) : '–';
     }
-    if (perfFillersPerMinuteBarEl) {
+    if (perffillers_per_minuteBarEl) {
       if (avgFillersPerMin == null) {
-        setBarState(perfFillersPerMinuteBarEl, 0, null);
+        setBarState(perffillers_per_minuteBarEl, 0, null);
       } else {
         let state = 'bad';
         if (avgFillersPerMin <= 3) state = 'good';
         else if (avgFillersPerMin <= 7) state = 'warn';
         setBarState(
-          perfFillersPerMinuteBarEl,
+          perffillers_per_minuteBarEl,
           Math.min(avgFillersPerMin / maxFillersBad, 1),
           state
         );
@@ -435,39 +435,39 @@ document.addEventListener('DOMContentLoaded', () => {
       setBarState(perfUniqueWordsBarEl, ratio, state);
     }
 
-    if (perfLexicalDiversityEl) {
-      perfLexicalDiversityEl.textContent =
-        avgLexicalDiversity != null ? avgLexicalDiversity.toFixed(2) : '–';
+    if (perflexical_diversityEl) {
+      perflexical_diversityEl.textContent =
+        avglexical_diversity != null ? avglexical_diversity.toFixed(2) : '–';
     }
-    if (perfLexicalDiversityBarEl) {
-      if (avgLexicalDiversity == null) {
-        setBarState(perfLexicalDiversityBarEl, 0, null);
+    if (perflexical_diversityBarEl) {
+      if (avglexical_diversity == null) {
+        setBarState(perflexical_diversityBarEl, 0, null);
       } else {
         let state = 'good';
-        if (avgLexicalDiversity < 0.3) state = 'bad';
-        else if (avgLexicalDiversity < 0.45) state = 'warn';
+        if (avglexical_diversity < 0.3) state = 'bad';
+        else if (avglexical_diversity < 0.45) state = 'warn';
         setBarState(
-          perfLexicalDiversityBarEl,
-          Math.min(avgLexicalDiversity / 0.7, 1),
+          perflexical_diversityBarEl,
+          Math.min(avglexical_diversity / 0.7, 1),
           state
         );
       }
     }
 
-    if (perfQualityScoreEl) {
-      perfQualityScoreEl.textContent =
-        avgQualityScore != null ? Math.round(avgQualityScore).toString() : '–';
+    if (perfquality_scoreEl) {
+      perfquality_scoreEl.textContent =
+        avgquality_score != null ? Math.round(avgquality_score).toString() : '–';
     }
-    if (perfQualityScoreBarEl) {
-      if (avgQualityScore == null) {
-        setBarState(perfQualityScoreBarEl, 0, null);
+    if (perfquality_scoreBarEl) {
+      if (avgquality_score == null) {
+        setBarState(perfquality_scoreBarEl, 0, null);
       } else {
         let state = 'good';
-        if (avgQualityScore < 50) state = 'bad';
-        else if (avgQualityScore < 70) state = 'warn';
+        if (avgquality_score < 50) state = 'bad';
+        else if (avgquality_score < 70) state = 'warn';
         setBarState(
-          perfQualityScoreBarEl,
-          Math.min(avgQualityScore / 100, 1),
+          perfquality_scoreBarEl,
+          Math.min(avgquality_score / 100, 1),
           state
         );
       }
@@ -597,8 +597,8 @@ document.addEventListener('DOMContentLoaded', () => {
     if (perfWpmTrendEl) {
       perfWpmTrendEl.innerHTML = '';
       const recentSessionsAsc = [...sessions]
-        .filter(s => s.startedat)
-        .sort((a, b) => new Date(a.startedat) - new Date(b.startedat))
+        .filter(s => s.started_at)
+        .sort((a, b) => new Date(a.started_at) - new Date(b.started_at))
         .slice(-10);
       const trendValues = recentSessionsAsc.map(s =>
         typeof s.wpm === 'number' ? s.wpm : 0
@@ -610,8 +610,8 @@ document.addEventListener('DOMContentLoaded', () => {
         const value = typeof s.wpm === 'number' ? s.wpm : 0;
         const ratio = Math.min(value / maxTrend, 1);
         bar.style.height = Math.max(4, ratio * 100) + '%';
-        bar.title = s.startedat
-          ? `${new Date(s.startedat).toLocaleString()} · ${Math.round(value)} WPM`
+        bar.title = s.started_at
+          ? `${new Date(s.started_at).toLocaleString()} · ${Math.round(value)} WPM`
           : `${Math.round(value)} WPM`;
         if (value > 0) {
           bar.classList.add('active');
@@ -654,9 +654,9 @@ document.addEventListener('DOMContentLoaded', () => {
         )} turns per session with a speaking share near ${Math.round(
           avgSpeakingShare * 100
         )}%.`;
-      } else if (avgQualityScore != null && avgQualityScore >= 70) {
+      } else if (avgquality_score != null && avgquality_score >= 70) {
         fact = `Your recent session quality is strong at ${Math.round(
-          avgQualityScore
+          avgquality_score
         )}/100, with a healthy balance of fluency and lexical variety.`;
       } else if (minutesWeek >= 60 && avgWpm != null) {
         fact = `In the last 7 days you spoke for ${minutesWeek} minutes at an average speed of ${Math.round(
@@ -681,16 +681,16 @@ document.addEventListener('DOMContentLoaded', () => {
       'id',
       'room',
       'mode',
-      'startedat',
-      'endedat',
-      'durationseconds',
-      'wordscount',
-      'charscount',
+      'started_at',
+      'ended_at',
+      'duration_seconds',
+      'words_count',
+      'chars_count',
       'wpm',
-      'fillersperminute',
-      'uniquewordscount',
-      'lexicaldiversity',
-      'qualityscore',
+      'fillers_per_minute',
+      'uniquewords_count',
+      'lexical_diversity',
+      'quality_score',
       'questioncount',
       'negationcount',
       'repetitionrate',
@@ -704,16 +704,16 @@ document.addEventListener('DOMContentLoaded', () => {
       s.id || '',
       s.room || '',
       s.mode || '',
-      s.startedat || '',
-      s.endedat || '',
-      s.durationseconds != null ? s.durationseconds : '',
-      s.wordscount != null ? s.wordscount : '',
-      s.charscount != null ? s.charscount : '',
+      s.started_at || '',
+      s.ended_at || '',
+      s.duration_seconds != null ? s.duration_seconds : '',
+      s.words_count != null ? s.words_count : '',
+      s.chars_count != null ? s.chars_count : '',
       s.wpm != null ? Number(s.wpm).toFixed(2) : '',
-      s.fillersperminute != null ? Number(s.fillersperminute).toFixed(2) : '',
-      s.uniquewordscount != null ? s.uniquewordscount : '',
-      s.lexicaldiversity != null ? Number(s.lexicaldiversity).toFixed(3) : '',
-      s.qualityscore != null ? Number(s.qualityscore).toFixed(1) : '',
+      s.fillers_per_minute != null ? Number(s.fillers_per_minute).toFixed(2) : '',
+      s.uniquewords_count != null ? s.uniquewords_count : '',
+      s.lexical_diversity != null ? Number(s.lexical_diversity).toFixed(3) : '',
+      s.quality_score != null ? Number(s.quality_score).toFixed(1) : '',
       s.questioncount != null ? s.questioncount : '',
       s.negationcount != null ? s.negationcount : '',
       s.repetitionrate != null ? Number(s.repetitionrate).toFixed(4) : '',
