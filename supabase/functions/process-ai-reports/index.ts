@@ -3,6 +3,7 @@
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { getModulePrompt } from './prompts.ts';
 
 const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY')!;
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
@@ -63,15 +64,14 @@ serve(async (req) => {
           },
           body: JSON.stringify({
             model: 'gpt-4',
+                    const prompt = getModulePrompt(request.module_id, session?.transcript_text);
             messages: [
               {
                 role: 'system',
-                content: `You are an expert English language assessor analyzing speaking transcripts.`
-              },
+          content: prompt.system,              },
               {
                 role: 'user',
-                content: `Analyze this transcript for ${module?.label}:\n\n${session.transcript_text}\n\nProvide detailed assessment.`
-              }
+          content: prompt.user              }
             ],
             temperature: 0.7,
             max_tokens: 800
