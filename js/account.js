@@ -116,20 +116,10 @@ fix(account): complete snake_case migration for remaining columns
         chars_count,
         wpm,
         fillers_per_minute,
-        uniquewords_count,
-        lexical_diversity,
-        quality_score,
-        question_count,
-        negation_count,
-        repetition_rate,
-        turn_count,
-        interruption_count,
-        speaking_share_ratio,
-        ai_status
-      `)
-      .eq('user_id', user_id)
-      .order('started_at', { ascending: false })
-      .limit(200);
+      unique_words_count, 
+            lexical_diversity,
+       quality_score       
+        imit(200);
 
     if (sessionsError) {
       if (sessionsEl) sessionsEl.textContent = 'Could not load sessions yet.';
