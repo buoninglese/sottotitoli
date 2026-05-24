@@ -4,10 +4,12 @@
   "use strict";
 
   var LANGUAGES = [
-    { code: "en", label: "English", stt: "en-US" },
-    { code: "it", label: "Italian", stt: "it-IT" },
-    { code: "fr", label: "French", stt: "fr-FR" },
-    { code: "de", label: "German", stt: "de-DE" }
+    { code: "en", label: "English",  stt: "en-US" },
+    { code: "it", label: "Italian",  stt: "it-IT" },
+    { code: "fr", label: "French",   stt: "fr-FR" },
+    { code: "de", label: "German",   stt: "de-DE" },
+    { code: "es", label: "Spanish",  stt: "es-ES" },
+    { code: "pt", label: "Portuguese", stt: "pt-PT" }
   ];
 
   const params = new URLSearchParams(window.location.search);
@@ -25,6 +27,35 @@
     room = w.SottotitoliSessionUtils.randomRoom();
   }
   if (!room) room = "room-demo";
+
+  // ─── interim-flush state ────────────────────────────────────────────────────
+  // If an interim hasn't been superseded by a browser-final within
+  // INTERIM_FLUSH_MS, we treat it as final ourselves.
+  const INTERIM_FLUSH_MS = 1200;
+  let interimFlushTimer = null;
+  let pendingInterimText = "";
+
+  // Sentence-ending punctuation regex used to detect natural breaks inside
+  // an interim that the browser hasn't yet marked as final.
+  const SENTENCE_END_RE = /[.!?。！？]\s*$/;
+
+  function clearInterimFlushTimer() {
+    if (interimFlushTimer) clearTimeout(interimFlushTimer);
+    interimFlushTimer = null;
+  }
+
+  function scheduleInterimFlush(text) {
+    clearInterimFlushTimer();
+    pendingInterimText = text;
+    interimFlushTimer = setTimeout(function () {
+      if (pendingInterimText) {
+        commitUtteranceFinal(pendingInterimText);
+        pendingInterimText = "";
+        clearBox("interimOutput", "Interim");
+      }
+    }, INTERIM_FLUSH_MS);
+  }
+  // ────────────────────────────────────────────────────────────────────────────
 
   function populateLanguageSelectsFromMode() {
     var srcSelect = document.getElementById("sourceLangSelect");
@@ -125,14 +156,14 @@
     const url = new URL(window.location.href);
     url.searchParams.set("mode", modeKey);
     url.searchParams.set("room", room);
-    url.searchParams.set("v", "12");
+    url.searchParams.set("v", "13");
     history.replaceState({}, "", url.toString());
   }
 
   function currentOverlayUrl() {
     const url = new URL("overlay.html", window.location.href);
     url.searchParams.set("room", room);
-    url.searchParams.set("v", "12");
+    url.searchParams.set("v", "13");
     return url.toString();
   }
 
@@ -257,37 +288,41 @@
 
   async function commitUtteranceFinal(text) {
     if (!text) return;
-    if (text === lastFinalSent) return;
-    lastFinalSent = text;
+    const clean = text.trim();
+    if (!clean) return;
+    if (clean === lastFinalSent) return;
+    lastFinalSent = clean;
+
+    // Cancel any pending interim flush for this text
+    clearInterimFlushTimer();
+    pendingInterimText = "";
 
     const timestamp = w.SottotitoliSessionUtils.formatTimestamp(new Date());
 
     const entry = {
       timestamp,
-      text,
+      text: clean,
       translated: null,
-      learning: annotateLineWithNgsl(text)
+      learning: annotateLineWithNgsl(clean)
     };
     transcriptLines.push(entry);
 
-    // Append one line per utterance in Source output
-    appendLine("sourceOutput", text);
+    appendLine("sourceOutput", clean);
 
     const payload = {
       type: "caption",
       room,
       mode: modeKey,
-      final: text,
+      final: clean,
       timestamp,
       sourceLang: modeConfig ? modeConfig.sourceLang : "en-US",
       kind: modeConfig && modeConfig.translate ? "translation" : "caption"
     };
 
     if (modeConfig && modeConfig.translate) {
-      const translated = await maybeTranslate(text);
+      const translated = await maybeTranslate(clean);
       if (translated) {
         entry.translated = translated;
-        // Append translated line as well
         appendLine("translatedOutput", translated);
         payload.translated = translated;
         payload.targetLang = modeConfig.targetLang;
@@ -305,15 +340,27 @@
     const clean = (text || "").trim();
     const interimBox = $("interimOutput");
     if (!interimBox) return;
+
     if (!clean) {
+      clearInterimFlushTimer();
+      pendingInterimText = "";
       clearBox("interimOutput", "Interim");
       return;
     }
+
     interimBox.textContent = clean;
     interimBox.dataset.placeholderActive = "false";
-
-    // Calm behaviour: keep interim only in Studio, not overlay
     lastInterimSent = clean;
+
+    // If the interim already ends with sentence-terminating punctuation,
+    // flush it to final immediately without waiting for the timer.
+    if (SENTENCE_END_RE.test(clean)) {
+      commitUtteranceFinal(clean);
+      return;
+    }
+
+    // Otherwise arm the silence-based flush timer.
+    scheduleInterimFlush(clean);
   }
 
   function clearRestartTimer() {
@@ -359,17 +406,21 @@
         if (!text) continue;
 
         if (res.isFinal) {
-          lastFinal = text; // only latest final part per event
+          lastFinal = text;
         } else {
-          interim = text;   // latest interim
+          interim = text;
         }
       }
 
       if (lastFinal) {
+        // Browser gave us a proper final — commit it and cancel any timer.
         commitUtteranceFinal(lastFinal);
       }
 
-      handleInterimTranscript(interim.trim());
+      // Show / flush interim only when there is no concurrent final.
+      if (interim && !lastFinal) {
+        handleInterimTranscript(interim);
+      }
     };
 
     rec.onerror = function (event) {
@@ -394,6 +445,13 @@
     };
 
     rec.onend = function () {
+      // Flush any lingering interim before restarting
+      if (pendingInterimText) {
+        commitUtteranceFinal(pendingInterimText);
+        pendingInterimText = "";
+      }
+      clearInterimFlushTimer();
+
       updateMicState(shouldKeepListening ? "restarting" : "stopped", false);
       if (shouldKeepListening) {
         setText(
@@ -498,6 +556,8 @@
     }
 
     clearRestartTimer();
+    clearInterimFlushTimer();
+    pendingInterimText = "";
     shouldKeepListening = true;
     hasStartedOnce = false;
     lastFinalSent = "";
@@ -518,6 +578,12 @@
   function stopRecognition() {
     shouldKeepListening = false;
     clearRestartTimer();
+    clearInterimFlushTimer();
+    // Flush any pending interim as a final line before stopping
+    if (pendingInterimText) {
+      commitUtteranceFinal(pendingInterimText);
+      pendingInterimText = "";
+    }
     if (recognition) {
       try {
         recognition.stop();
@@ -643,6 +709,8 @@
     latestReportText = "";
     lastInterimSent = "";
     lastFinalSent = "";
+    pendingInterimText = "";
+    clearInterimFlushTimer();
     audioChunks = [];
     lastAudioBlob = null;
     isAnalyzingSpeakers = false;
