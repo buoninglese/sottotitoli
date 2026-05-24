@@ -66,17 +66,14 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
-    const { data: sessionData, error: sessionError } =
-      await accountSupabase.auth.getSession();
-
+    const { data: sessionData, error: sessionError } = await accountSupabase.auth.getSession();
     if (sessionError || !sessionData || !sessionData.session) {
       if (emailEl) emailEl.textContent = 'Email: — (not signed in)';
       if (createdEl) createdEl.textContent = 'Joined: —';
       if (sessionsEl) sessionsEl.textContent = 'Please sign in to see your sessions.';
       if (downloadCsvBtn) downloadCsvBtn.disabled = true;
       if (perfFunFactEl) {
-        perfFunFactEl.textContent =
-          'Accedi e usa Studio per vedere le statistiche del tuo inglese.';
+        perfFunFactEl.textContent = 'Accedi e usa Studio per vedere le statistiche del tuo inglese.';
       }
       return;
     }
@@ -113,34 +110,33 @@ document.addEventListener('DOMContentLoaded', () => {
         id,
         room,
         mode,
-        started_at,
-        ended_at,
-        duration_seconds,
-        words_count,
-        chars_count,
+        startedat,
+        endedat,
+        durationseconds,
+        wordscount,
+        charscount,
         wpm,
-        fillers_per_minute,
-        unique_words_count,
-        lexical_diversity,
-        quality_score,
-        question_count,
-        negation_count,
-        repetition_rate,
-        turn_count,
-        interruption_count,
-        speaking_share_ratio,
-        ai_status
+        fillersperminute,
+        uniquewordscount,
+        lexicaldiversity,
+        qualityscore,
+        questioncount,
+        negationcount,
+        repetitionrate,
+        turncount,
+        interruptioncount,
+        speakingshareratio,
+        aistatus
       `)
-      .eq('user_id', userId)
-      .order('started_at', { ascending: false })
+      .eq('userid', userId)
+      .order('startedat', { ascending: false })
       .limit(200);
 
     if (sessionsError) {
       if (sessionsEl) sessionsEl.textContent = 'Could not load sessions yet.';
       if (downloadCsvBtn) downloadCsvBtn.disabled = true;
       if (perfFunFactEl) {
-        perfFunFactEl.textContent =
-          'Non riusciamo a caricare le tue sessioni al momento.';
+        perfFunFactEl.textContent = 'Non riusciamo a caricare le tue sessioni al momento.';
       }
       return;
     }
@@ -152,25 +148,23 @@ document.addEventListener('DOMContentLoaded', () => {
       if (downloadCsvBtn) downloadCsvBtn.disabled = true;
     } else {
       if (downloadCsvBtn) downloadCsvBtn.disabled = false;
-
       const list = document.createElement('ul');
       list.className = 'sessions-list';
-
       sessions.forEach((s) => {
         const li = document.createElement('li');
-        const when = s.started_at ? new Date(s.started_at).toLocaleString() : '';
-        const duration =
-          s.duration_seconds != null ? s.duration_seconds + 's' : '—';
-        const words =
-          s.words_count != null ? s.words_count + ' words' : '—';
-
-        li.innerHTML =
-          `<span class="sessions-room">[${s.mode || 'mode'}]</span> ` +
-          `<span class="sessions-meta">Room ${s.room || ''} · ${when} · ${duration} · ${words}</span>`;
-
+        const when = s.startedat ? new Date(s.startedat).toLocaleString() : '';
+        const duration = s.durationseconds != null ? s.durationseconds + 's' : '—';
+        const words = s.wordscount != null ? s.wordscount + ' words' : '—';
+        li.innerHTML = `
+          <span class="sessions-room">[${s.mode || 'mode'}] Room ${s.room || ''}</span>
+          <span class="sessions-meta"> · ${when} · ${duration} · ${words}</span>
+          <span class="sessions-meta"> · 
+            <a href="transcript.html?session=${s.id}">Transcript</a> · 
+            <a href="analysis.html?session=${s.id}">Analysis</a>
+          </span>
+        `;
         list.appendChild(li);
       });
-
       if (sessionsEl) {
         sessionsEl.textContent = '';
         sessionsEl.appendChild(list);
@@ -216,14 +210,15 @@ document.addEventListener('DOMContentLoaded', () => {
       setBarState(perfSpeakingShareBarEl, 0, null);
 
       if (perfFunFactEl) {
-        perfFunFactEl.textContent =
-          'Inizia a usare Studio per vedere le prime letture del tuo inglese.';
+        perfFunFactEl.textContent = 'Inizia a usare Studio per vedere le prime letture del tuo inglese.';
       }
+
       if (perfStreakBadgeEl) {
         perfStreakBadgeEl.textContent = '0-day streak';
         perfStreakBadgeEl.classList.remove('hot', 'cold');
         perfStreakBadgeEl.classList.add('cold');
       }
+
       if (perfMinutesSparklineEl) perfMinutesSparklineEl.innerHTML = '';
       if (perfWpmTrendEl) perfWpmTrendEl.innerHTML = '';
       return;
@@ -246,7 +241,6 @@ document.addEventListener('DOMContentLoaded', () => {
     let countLexicalDiversity = 0;
     let sumQualityScore = 0;
     let countQualityScore = 0;
-
     let sumQuestions = 0;
     let countQuestions = 0;
     let sumNegations = 0;
@@ -259,7 +253,6 @@ document.addEventListener('DOMContentLoaded', () => {
     let countInterruptions = 0;
     let sumSpeakingShare = 0;
     let countSpeakingShare = 0;
-
     let sumWpmPrevWeek = 0;
     let countWpmPrevWeek = 0;
 
@@ -267,12 +260,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const spokenDates = new Set();
 
     sessions.forEach((s) => {
-      if (!s.started_at) return;
-      const started = new Date(s.started_at);
+      if (!s.startedat) return;
+      const started = new Date(s.startedat);
       const dayKey = toLocalDayKey(started);
-
-      const hasSpokenDuration =
-        typeof s.duration_seconds === 'number' && s.duration_seconds > 0;
+      const hasSpokenDuration = typeof s.durationseconds === 'number' && s.durationseconds > 0;
 
       if (hasSpokenDuration) {
         spokenDates.add(dayKey);
@@ -280,49 +271,48 @@ document.addEventListener('DOMContentLoaded', () => {
 
       if (started >= sevenDaysAgo) {
         if (hasSpokenDuration) {
-          totalSecondsWeek += s.duration_seconds;
-
-          if (typeof s.words_count === 'number') {
-            totalWordsWeek += s.words_count;
+          totalSecondsWeek += s.durationseconds;
+          if (typeof s.wordscount === 'number') {
+            totalWordsWeek += s.wordscount;
           }
           if (typeof s.wpm === 'number') {
             sumWpm += s.wpm;
             countWpm += 1;
           }
-          if (typeof s.fillers_per_minute === 'number') {
-            sumFillersPerMinute += s.fillers_per_minute;
+          if (typeof s.fillersperminute === 'number') {
+            sumFillersPerMinute += s.fillersperminute;
             countFillers += 1;
           }
-          if (typeof s.lexical_diversity === 'number') {
-            sumLexicalDiversity += s.lexical_diversity;
+          if (typeof s.lexicaldiversity === 'number') {
+            sumLexicalDiversity += s.lexicaldiversity;
             countLexicalDiversity += 1;
           }
-          if (typeof s.quality_score === 'number') {
-            sumQualityScore += s.quality_score;
+          if (typeof s.qualityscore === 'number') {
+            sumQualityScore += s.qualityscore;
             countQualityScore += 1;
           }
-          if (typeof s.question_count === 'number') {
-            sumQuestions += s.question_count;
+          if (typeof s.questioncount === 'number') {
+            sumQuestions += s.questioncount;
             countQuestions += 1;
           }
-          if (typeof s.negation_count === 'number') {
-            sumNegations += s.negation_count;
+          if (typeof s.negationcount === 'number') {
+            sumNegations += s.negationcount;
             countNegations += 1;
           }
-          if (typeof s.repetition_rate === 'number') {
-            sumRepetitionRate += s.repetition_rate;
+          if (typeof s.repetitionrate === 'number') {
+            sumRepetitionRate += s.repetitionrate;
             countRepetitionRate += 1;
           }
-          if (typeof s.turn_count === 'number') {
-            sumTurns += s.turn_count;
+          if (typeof s.turncount === 'number') {
+            sumTurns += s.turncount;
             countTurns += 1;
           }
-          if (typeof s.interruption_count === 'number') {
-            sumInterruptions += s.interruption_count;
+          if (typeof s.interruptioncount === 'number') {
+            sumInterruptions += s.interruptioncount;
             countInterruptions += 1;
           }
-          if (typeof s.speaking_share_ratio === 'number') {
-            sumSpeakingShare += s.speaking_share_ratio;
+          if (typeof s.speakingshareratio === 'number') {
+            sumSpeakingShare += s.speakingshareratio;
             countSpeakingShare += 1;
           }
         }
@@ -336,8 +326,8 @@ document.addEventListener('DOMContentLoaded', () => {
       }
 
       if (started >= thirtyDaysAgo) {
-        if (typeof s.unique_words_count === 'number') {
-          uniqueWordsLast30 += s.unique_words_count;
+        if (typeof s.uniquewordscount === 'number') {
+          uniqueWordsLast30 += s.uniquewordscount;
         }
       }
 
@@ -345,30 +335,25 @@ document.addEventListener('DOMContentLoaded', () => {
         const dayIndex = Math.floor(
           (started.getTime() - fourteenDaysAgo.getTime()) / (24 * 60 * 60 * 1000)
         );
-        if (dayIndex >= 0 && dayIndex < 14 && typeof s.duration_seconds === 'number') {
-          dailyMinutes[dayIndex] += s.duration_seconds / 60;
+        if (dayIndex >= 0 && dayIndex < 14 && typeof s.durationseconds === 'number') {
+          dailyMinutes[dayIndex] += s.durationseconds / 60;
         }
       }
     });
 
     const minutesWeek = Math.round(totalSecondsWeek / 60);
     const avgWpm = countWpm > 0 ? sumWpm / countWpm : null;
-    const avgWpmPrevWeek =
-      countWpmPrevWeek > 0 ? sumWpmPrevWeek / countWpmPrevWeek : null;
-    const avgFillersPerMin =
-      countFillers > 0 ? sumFillersPerMinute / countFillers : null;
+    const avgWpmPrevWeek = countWpmPrevWeek > 0 ? sumWpmPrevWeek / countWpmPrevWeek : null;
+    const avgFillersPerMin = countFillers > 0 ? sumFillersPerMinute / countFillers : null;
     const avgLexicalDiversity =
       countLexicalDiversity > 0 ? sumLexicalDiversity / countLexicalDiversity : null;
-    const avgQualityScore =
-      countQualityScore > 0 ? sumQualityScore / countQualityScore : null;
-
+    const avgQualityScore = countQualityScore > 0 ? sumQualityScore / countQualityScore : null;
     const avgQuestions = countQuestions > 0 ? sumQuestions / countQuestions : null;
     const avgNegations = countNegations > 0 ? sumNegations / countNegations : null;
     const avgRepetitionRate =
       countRepetitionRate > 0 ? sumRepetitionRate / countRepetitionRate : null;
     const avgTurns = countTurns > 0 ? sumTurns / countTurns : null;
-    const avgInterruptions =
-      countInterruptions > 0 ? sumInterruptions / countInterruptions : null;
+    const avgInterruptions = countInterruptions > 0 ? sumInterruptions / countInterruptions : null;
     const avgSpeakingShare =
       countSpeakingShare > 0 ? sumSpeakingShare / countSpeakingShare : null;
 
@@ -407,14 +392,12 @@ document.addEventListener('DOMContentLoaded', () => {
         perfAverageWpmEl.textContent = '–';
       }
     }
-
     if (perfAverageWpmBarEl) {
       if (avgWpm == null) {
         setBarState(perfAverageWpmBarEl, 0, null);
       } else {
         const clamped = Math.max(0, Math.min(avgWpm, maxWpm));
-        const state =
-          avgWpm < idealMinWpm || avgWpm > idealMaxWpm ? 'warn' : 'good';
+        const state = avgWpm < idealMinWpm || avgWpm > idealMaxWpm ? 'warn' : 'good';
         setBarState(perfAverageWpmBarEl, clamped / maxWpm, state);
       }
     }
@@ -423,7 +406,6 @@ document.addEventListener('DOMContentLoaded', () => {
       perfFillersPerMinuteEl.textContent =
         avgFillersPerMin != null ? avgFillersPerMin.toFixed(1) : '–';
     }
-
     if (perfFillersPerMinuteBarEl) {
       if (avgFillersPerMin == null) {
         setBarState(perfFillersPerMinuteBarEl, 0, null);
@@ -442,7 +424,6 @@ document.addEventListener('DOMContentLoaded', () => {
     if (perfUniqueWordsEl) {
       perfUniqueWordsEl.textContent = String(uniqueWordsLast30);
     }
-
     if (perfUniqueWordsBarEl) {
       const ratio = Math.min(uniqueWordsLast30 / maxUniqueWords, 1);
       let state = null;
@@ -458,7 +439,6 @@ document.addEventListener('DOMContentLoaded', () => {
       perfLexicalDiversityEl.textContent =
         avgLexicalDiversity != null ? avgLexicalDiversity.toFixed(2) : '–';
     }
-
     if (perfLexicalDiversityBarEl) {
       if (avgLexicalDiversity == null) {
         setBarState(perfLexicalDiversityBarEl, 0, null);
@@ -478,7 +458,6 @@ document.addEventListener('DOMContentLoaded', () => {
       perfQualityScoreEl.textContent =
         avgQualityScore != null ? Math.round(avgQualityScore).toString() : '–';
     }
-
     if (perfQualityScoreBarEl) {
       if (avgQualityScore == null) {
         setBarState(perfQualityScoreBarEl, 0, null);
@@ -592,11 +571,9 @@ document.addEventListener('DOMContentLoaded', () => {
       } else {
         const distanceFromBalanced = Math.abs(avgSpeakingShare - 0.5);
         const balanceScore = 1 - Math.min(distanceFromBalanced / 0.5, 1);
-
         let state = 'good';
         if (distanceFromBalanced > 0.3) state = 'bad';
         else if (distanceFromBalanced > 0.18) state = 'warn';
-
         setBarState(perfSpeakingShareBarEl, balanceScore, state);
       }
     }
@@ -604,7 +581,6 @@ document.addEventListener('DOMContentLoaded', () => {
     if (perfMinutesSparklineEl) {
       perfMinutesSparklineEl.innerHTML = '';
       const maxMinutesDay = dailyMinutes.reduce((m, v) => Math.max(m, v), 0) || 1;
-
       dailyMinutes.forEach((minutes) => {
         const bar = document.createElement('div');
         bar.className = 'perf-sparkline-bar';
@@ -621,23 +597,21 @@ document.addEventListener('DOMContentLoaded', () => {
     if (perfWpmTrendEl) {
       perfWpmTrendEl.innerHTML = '';
       const recentSessionsAsc = [...sessions]
-        .filter(s => s.started_at)
-        .sort((a, b) => new Date(a.started_at) - new Date(b.started_at))
+        .filter(s => s.startedat)
+        .sort((a, b) => new Date(a.startedat) - new Date(b.startedat))
         .slice(-10);
-
       const trendValues = recentSessionsAsc.map(s =>
         typeof s.wpm === 'number' ? s.wpm : 0
       );
       const maxTrend = trendValues.reduce((m, v) => Math.max(m, v), 0) || 1;
-
       recentSessionsAsc.forEach((s) => {
         const bar = document.createElement('div');
         bar.className = 'perf-trend-bar';
         const value = typeof s.wpm === 'number' ? s.wpm : 0;
         const ratio = Math.min(value / maxTrend, 1);
         bar.style.height = Math.max(4, ratio * 100) + '%';
-        bar.title = s.started_at
-          ? `${new Date(s.started_at).toLocaleString()} · ${Math.round(value)} WPM`
+        bar.title = s.startedat
+          ? `${new Date(s.startedat).toLocaleString()} · ${Math.round(value)} WPM`
           : `${Math.round(value)} WPM`;
         if (value > 0) {
           bar.classList.add('active');
@@ -650,12 +624,10 @@ document.addEventListener('DOMContentLoaded', () => {
       let streak = 0;
       let cursor = new Date(now);
       cursor.setHours(0, 0, 0, 0);
-
       const todayKey = toLocalDayKey(cursor);
       if (!spokenDates.has(todayKey)) {
         cursor = new Date(cursor.getTime() - 24 * 60 * 60 * 1000);
       }
-
       while (streak < 365) {
         const key = toLocalDayKey(cursor);
         if (spokenDates.has(key)) {
@@ -665,9 +637,7 @@ document.addEventListener('DOMContentLoaded', () => {
           break;
         }
       }
-
-      perfStreakBadgeEl.textContent =
-        streak === 1 ? '1-day streak' : `${streak}-day streak`;
+      perfStreakBadgeEl.textContent = streak === 1 ? '1-day streak' : `${streak}-day streak`;
       perfStreakBadgeEl.classList.remove('hot', 'cold');
       if (streak >= 7) {
         perfStreakBadgeEl.classList.add('hot');
@@ -678,7 +648,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (perfFunFactEl) {
       let fact = '';
-
       if (avgTurns != null && avgTurns >= 6 && avgSpeakingShare != null) {
         fact = `Your recent sessions look more dialogic: about ${avgTurns.toFixed(
           1
@@ -698,7 +667,6 @@ document.addEventListener('DOMContentLoaded', () => {
       } else {
         fact = 'Keep using Studio: each session adds more telemetry to your language dashboard.';
       }
-
       perfFunFactEl.textContent = fact;
     }
   }
@@ -713,51 +681,50 @@ document.addEventListener('DOMContentLoaded', () => {
       'id',
       'room',
       'mode',
-      'started_at',
-      'ended_at',
-      'duration_seconds',
-      'words_count',
-      'chars_count',
+      'startedat',
+      'endedat',
+      'durationseconds',
+      'wordscount',
+      'charscount',
       'wpm',
-      'fillers_per_minute',
-      'unique_words_count',
-      'lexical_diversity',
-      'quality_score',
-      'question_count',
-      'negation_count',
-      'repetition_rate',
-      'turn_count',
-      'interruption_count',
-      'speaking_share_ratio',
-      'ai_status'
+      'fillersperminute',
+      'uniquewordscount',
+      'lexicaldiversity',
+      'qualityscore',
+      'questioncount',
+      'negationcount',
+      'repetitionrate',
+      'turncount',
+      'interruptioncount',
+      'speakingshareratio',
+      'aistatus'
     ];
 
     const rows = currentSessions.map((s) => [
       s.id || '',
       s.room || '',
       s.mode || '',
-      s.started_at || '',
-      s.ended_at || '',
-      s.duration_seconds != null ? s.duration_seconds : '',
-      s.words_count != null ? s.words_count : '',
-      s.chars_count != null ? s.chars_count : '',
+      s.startedat || '',
+      s.endedat || '',
+      s.durationseconds != null ? s.durationseconds : '',
+      s.wordscount != null ? s.wordscount : '',
+      s.charscount != null ? s.charscount : '',
       s.wpm != null ? Number(s.wpm).toFixed(2) : '',
-      s.fillers_per_minute != null ? Number(s.fillers_per_minute).toFixed(2) : '',
-      s.unique_words_count != null ? s.unique_words_count : '',
-      s.lexical_diversity != null ? Number(s.lexical_diversity).toFixed(3) : '',
-      s.quality_score != null ? Number(s.quality_score).toFixed(1) : '',
-      s.question_count != null ? s.question_count : '',
-      s.negation_count != null ? s.negation_count : '',
-      s.repetition_rate != null ? Number(s.repetition_rate).toFixed(4) : '',
-      s.turn_count != null ? s.turn_count : '',
-      s.interruption_count != null ? s.interruption_count : '',
-      s.speaking_share_ratio != null ? Number(s.speaking_share_ratio).toFixed(4) : '',
-      s.ai_status || ''
+      s.fillersperminute != null ? Number(s.fillersperminute).toFixed(2) : '',
+      s.uniquewordscount != null ? s.uniquewordscount : '',
+      s.lexicaldiversity != null ? Number(s.lexicaldiversity).toFixed(3) : '',
+      s.qualityscore != null ? Number(s.qualityscore).toFixed(1) : '',
+      s.questioncount != null ? s.questioncount : '',
+      s.negationcount != null ? s.negationcount : '',
+      s.repetitionrate != null ? Number(s.repetitionrate).toFixed(4) : '',
+      s.turncount != null ? s.turncount : '',
+      s.interruptioncount != null ? s.interruptioncount : '',
+      s.speakingshareratio != null ? Number(s.speakingshareratio).toFixed(4) : '',
+      s.aistatus || ''
     ]);
 
     const csvLines = [];
     csvLines.push(header.join(','));
-
     rows.forEach((cols) => {
       const escaped = cols.map((value) => {
         const str = String(value);
@@ -772,7 +739,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const csvContent = csvLines.join('\n');
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
-
     const a = document.createElement('a');
     a.href = url;
     const now = new Date().toISOString().slice(0, 10);
