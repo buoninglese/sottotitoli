@@ -1056,13 +1056,13 @@
       const { data, error } = await sessionSupabase
         .from("sessions")
         .insert({
-          userid: userId,
+          user_id: userId,
           room,
           mode: modeKey,
-          startedat: currentSessionStart.toISOString(),
-          languagepair: languagePair,
-          sessiontype: sessionType,
-          topictag: topicTag
+          started_at: currentSessionStart.toISOString(),
+          language_pair: languagePair,
+          session_type: sessionType,
+          topic_tag: topicTag
         })
         .select("id")
         .single();
@@ -1116,19 +1116,19 @@
       const ngslCoverage = computeNgslCoverage(transcriptLines);
 
       const updatePayload = {
-        endedat: ended.toISOString(),
-        durationseconds: durationSeconds,
-        wordscount: wordsCount,
-        charscount: charsCount,
+        ended_at: ended.toISOString(),
+        duration_seconds: durationSeconds,
+        words_count: wordsCount,
+        chars_count: charsCount,
         wpm,
-        sentencescount: sentencesCount,
-        avgsentencelengthwords: avgSentenceLength,
-        fillerscount: fillersCount,
-        fillersperminute: fillersPerMinute,
-        uniquewordscount: uniqueWordsCount,
-        lexicaldiversity: lexicalDiversity,
-        qualityscore: qualityScore,
-        ngslcoverage: ngslCoverage
+        sentences_count: sentencesCount,
+        avg_sentence_length_words: avgSentenceLength,
+        fillers_count: fillersCount,
+        fillers_per_minute: fillersPerMinute,
+        uniquewords_count: uniqueWordsCount,
+        lexical_diversity: lexicalDiversity,
+        quality_score: qualityScore,
+        ngsl_coverage: ngslCoverage
       };
 
       const { error } = await sessionSupabase
