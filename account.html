@@ -500,61 +500,79 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="js/auth.js?v=5"></script>
     <script src="js/account.js?v=12"></script>
-    <script>
-    // Objectives block: reads from localStorage (same key as goals.html) + Supabase session data
-    (function() {
-      var STORAGE_KEY = 'sottotitoli_goals_v1';
-      function loadGoals() {
-        try { var r = localStorage.getItem(STORAGE_KEY); return r ? JSON.parse(r) : { targetMinutes:120, targetSessions:5, cefr:'B1' }; }
-        catch(e) { return { targetMinutes:120, targetSessions:5, cefr:'B1' }; }
+<script>
+// Objectives block: reads from localStorage (same key as goals.html) + Supabase session data
+(function() {
+  var STORAGE_KEY = 'sottotitoli_goals_v1';
+
+  function loadGoals() {
+    try {
+      var r = localStorage.getItem(STORAGE_KEY);
+      return r ? JSON.parse(r) : { targetMinutes:120, targetSessions:5, cefr:'B1' };
+    } catch(e) {
+      return { targetMinutes:120, targetSessions:5, cefr:'B1' };
+    }
+  }
+
+  function setObjBar(barId, labelId, current, target, unit) {
+    var bar = document.getElementById(barId);
+    var lbl = document.getElementById(labelId);
+    if (!bar) return;
+    var ratio = target > 0 ? Math.min(current / target, 1) : 0;
+    bar.style.width = (ratio * 100).toFixed(0) + '%';
+    bar.classList.remove('bad','warn','good');
+    if (ratio >= 1) bar.classList.add('good');
+    else if (ratio >= 0.5) bar.classList.add('warn');
+    else if (current > 0) bar.classList.add('bad');
+    if (lbl) lbl.textContent = current + ' / ' + target + ' ' + unit + ' (' + Math.round(ratio*100) + '%)';
+  }
+
+  async function loadObjectives() {
+    var goals = loadGoals();
+    var chipEl = document.getElementById('objCefrChip');
+    if (chipEl) chipEl.textContent = goals.cefr || 'B1';
+
+    var supabase = window.sottotitoliSupabase;
+    if (!supabase) {
+      setObjBar('objMinutesBar','objMinutesLabel',0,goals.targetMinutes,'min');
+      setObjBar('objSessionsBar','objSessionsLabel',0,goals.targetSessions,'sessioni');
+      return;
+    }
+
+    var res = await supabase.auth.getSession();
+    if (!res.data || !res.data.session) {
+      setObjBar('objMinutesBar','objMinutesLabel',0,goals.targetMinutes,'min');
+      setObjBar('objSessionsBar','objSessionsLabel',0,goals.targetSessions,'sessioni');
+      return;
+    }
+
+    var userId = res.data.session.user.id;
+    var sevenDaysAgo = new Date(Date.now() - 7*24*60*60*1000);
+
+    var { data: rows } = await supabase
+      .from('sessions')
+      .select('durationseconds, startedat')
+      .eq('userid', userId)
+      .gte('startedat', sevenDaysAgo.toISOString());
+
+    var totalSec = 0;
+    var count = 0;
+    (rows || []).forEach(function(s) {
+      if (typeof s.durationseconds === 'number' && s.durationseconds > 0) {
+        totalSec += s.durationseconds;
+        count++;
       }
-      function setObjBar(barId, labelId, current, target, unit) {
-        var bar = document.getElementById(barId);
-        var lbl = document.getElementById(labelId);
-        if (!bar) return;
-        var ratio = target > 0 ? Math.min(current / target, 1) : 0;
-        bar.style.width = (ratio * 100).toFixed(0) + '%';
-        bar.classList.remove('bad','warn','good');
-        if (ratio >= 1) bar.classList.add('good');
-        else if (ratio >= 0.5) bar.classList.add('warn');
-        else if (current > 0) bar.classList.add('bad');
-        if (lbl) lbl.textContent = current + ' / ' + target + ' ' + unit + ' (' + Math.round(ratio*100) + '%)';
-      }
-      async function loadObjectives() {
-        var goals = loadGoals();
-        var chipEl = document.getElementById('objCefrChip');
-        if (chipEl) chipEl.textContent = goals.cefr || 'B1';
-        var supabase = window.sottotitoliSupabase;
-        if (!supabase) {
-          setObjBar('objMinutesBar','objMinutesLabel',0,goals.targetMinutes,'min'); 
-          setObjBar('objSessionsBar','objSessionsLabel',0,goals.targetSessions,'sessioni');
-          return;
-        }
-        var res = await supabase.auth.getSession();
-        if (!res.data || !res.data.session) {
-          setObjBar('objMinutesBar','objMinutesLabel',0,goals.targetMinutes,'min');
-          setObjBar('objSessionsBar','objSessionsLabel',0,goals.targetSessions,'sessioni');
-          return;
-        }
-        var userId = res.data.session.user.id;
-        var sevenDaysAgo = new Date(Date.now() - 7*24*60*60*1000);
-        var { data: rows } = await supabase
-          .from('sessions')
-          .select('duration_seconds, started_at')
-          .eq('user_id', userId)
-          .gte('started_at', sevenDaysAgo.toISOString());
-        var totalSec = 0; var count = 0;
-        (rows || []).forEach(function(s) {
-          if (typeof s.duration_seconds === 'number' && s.duration_seconds > 0) { totalSec += s.duration_seconds; count++; }
-        });
-        var mins = Math.round(totalSec / 60);
-        setObjBar('objMinutesBar','objMinutesLabel',mins,goals.targetMinutes,'min');
-        setObjBar('objSessionsBar','objSessionsLabel',count,goals.targetSessions,'sessioni');
-      }
-      document.addEventListener('DOMContentLoaded', function() {
-        setTimeout(loadObjectives, 800);
-      });
-    })();
-    </script>
+    });
+
+    var mins = Math.round(totalSec / 60);
+    setObjBar('objMinutesBar','objMinutesLabel',mins,goals.targetMinutes,'min');
+    setObjBar('objSessionsBar','objSessionsLabel',count,goals.targetSessions,'sessioni');
+  }
+
+  document.addEventListener('DOMContentLoaded', function() {
+    setTimeout(loadObjectives, 800);
+  });
+})();
+</script>
   </body>
 </html>
