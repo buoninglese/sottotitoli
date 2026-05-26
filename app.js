@@ -181,10 +181,8 @@
   function syncUrl() {
     const url = new URL(window.location.href);
     url.searchParams.set("mode", modeKey);
-    url.searchParams.set("room", room);
     url.searchParams.set("v", "13");
     history.replaceState({}, "", url.toString());
-  }
 
   function currentOverlayUrl() {
     const url = new URL("overlay.html", window.location.href);
