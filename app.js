@@ -85,6 +85,16 @@
       srcSelect.value = parts[1] || "en";
       tgtSelect.value = parts[2] || "it";
     }
+
+    // Also populate the Translate tab dropdowns
+    var transSrc = document.getElementById("transSourceSelect");
+    var transTgt = document.getElementById("transTargetSelect");
+    if (transSrc) {
+      transSrc.value = parts[0] === "translate" ? (parts[1] || "en") : (parts[1] || "en");
+    }
+    if (transTgt) {
+      transTgt.value = parts[0] === "translate" ? (parts[2] || "it") : "it";
+    }
   }
 
   const SpeechRecognition = w.SpeechRecognition || w.webkitSpeechRecognition;
