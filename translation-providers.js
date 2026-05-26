@@ -8,9 +8,9 @@
   function normalizeLangCode(value) {
     const input = safeString(value).toLowerCase();
     if (!input) return '';
-    if (input.startsWith('en')) return 'en';
-    if (input.startsWith('it')) return 'it';
-    return input.split('-')[0];
+    const base = input.split('-')[0];
+    const allowed = ['en', 'it', 'fr', 'de', 'es', 'pt', 'nl', 'pl'];
+    return allowed.indexOf(base) !== -1 ? base : '';
   }
 
   function htmlDecode(input) {

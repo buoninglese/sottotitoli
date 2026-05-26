@@ -9,7 +9,9 @@
     { code: "fr", label: "French",   stt: "fr-FR" },
     { code: "de", label: "German",   stt: "de-DE" },
     { code: "es", label: "Spanish",  stt: "es-ES" },
-    { code: "pt", label: "Portuguese", stt: "pt-PT" }
+    { code: "pt", label: "Portuguese", stt: "pt-PT" },
+    { code: "nl", label: "Dutch",     stt: "nl-NL" },
+    { code: "pl", label: "Polish",    stt: "pl-PL" }
   ];
 
   const params = new URLSearchParams(window.location.search);
@@ -86,13 +88,27 @@
       tgtSelect.value = parts[2] || "it";
     }
 
-    // Also populate the Translate tab dropdowns
+    // Also populate the Translate tab dropdowns with all languages
     var transSrc = document.getElementById("transSourceSelect");
     var transTgt = document.getElementById("transTargetSelect");
     if (transSrc) {
+      transSrc.innerHTML = "";
+      LANGUAGES.forEach(function (lang) {
+        var opt = document.createElement("option");
+        opt.value = lang.code;
+        opt.textContent = lang.label;
+        transSrc.appendChild(opt);
+      });
       transSrc.value = parts[0] === "translate" ? (parts[1] || "en") : (parts[1] || "en");
     }
     if (transTgt) {
+      transTgt.innerHTML = "";
+      LANGUAGES.forEach(function (lang) {
+        var opt = document.createElement("option");
+        opt.value = lang.code;
+        opt.textContent = lang.label;
+        transTgt.appendChild(opt);
+      });
       transTgt.value = parts[0] === "translate" ? (parts[2] || "it") : "it";
     }
   }
