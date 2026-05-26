@@ -189,6 +189,7 @@
   function currentOverlayUrl() {
     const url = new URL("overlay.html", window.location.href);
     url.searchParams.set("room", room);
+    url.searchParams.set("mode", modeKey);
     url.searchParams.set("v", "13");
     return url.toString();
   }
