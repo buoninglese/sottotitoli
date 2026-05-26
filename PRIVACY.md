@@ -29,3 +29,24 @@
 - Users can delete sessions and reports from the analysis page
 - Account deletion can be requested via the account page
 - Contact the repository maintainer for data removal requests
+
+## GDPR Information
+
+This application processes personal data as described above. For users in the European Union:
+
+**Lawful basis**: Consent (user initiates session/transcription) and legitimate interest (providing language learning feedback).
+
+**Data controller**: The repository owner/maintainer.
+
+**Your rights under GDPR**:
+- **Access**: Request a copy of your data by contacting the maintainer
+- **Rectification**: Correct inaccurate data through your account page
+- **Erasure**: Delete sessions/reports via the analysis page, or request full account deletion
+- **Restrict processing**: Stop using the service to halt data processing
+- **Data portability**: Export your transcripts and reports (use the download features)
+- **Object**: Object to processing by discontinuing use of the service
+
+**Third-country transfers**: Data sent to OpenAI (US) and MyMemory (EU) is subject to their respective data processing agreements.
+
+**Supervisory authority**: You have the right to lodge a complaint with your local data protection authority.
+

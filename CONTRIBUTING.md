@@ -34,3 +34,10 @@ Thanks for contributing! This project has three repositories working together.
 - [ ] `.env.example` updated if needed
 - [ ] README updated if needed
 - [ ] Related issues referenced
+
+## Branch Protection
+
+- The `main` branch is protected from direct pushes
+- All changes must go through a pull request
+- This applies to all three repositories
+

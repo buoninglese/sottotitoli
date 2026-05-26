@@ -29,3 +29,14 @@ This file helps future AI coding agents understand the project and avoid common 
 
 - issues1.csv: Cleaned up gitignore, env examples, READMEs, CORS, auth redirects, branding, CI/CD
 - issues2.csv (in progress): Security policy, contributing guide, changelog, issue/PR templates, privacy notes
+
+## Do Not Touch (Fragile Files)
+
+These files contain production configuration or deployed assumptions. Do not modify without understanding the consequences:
+
+- `config.js` — production URLs for WebSocket, learning service, Supabase
+- `js/auth.js` — Supabase anon key and OAuth redirect logic
+- `security-utils.js` — if any security invariants are encoded here
+- Render environment variables (set via dashboard, not committed)
+- `.github/workflows/` — CI/CD pipeline definitions
+
