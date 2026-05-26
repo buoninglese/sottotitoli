@@ -185,21 +185,21 @@
     history.replaceState({}, "", url.toString());
 
   function currentOverlayUrl() {
-<<<<<<< HEAD
+
 const url = new URL("overlay.html", window.location.href);
 url.searchParams.set("room", room);
 url.searchParams.set("mode", modeKey);
 url.searchParams.set("v", "13");
 return url.toString();
 }
-=======
+
     const url = new URL("overlay.html", window.location.href);
     url.searchParams.set("room", room);
     url.searchParams.set("mode", modeKey);
     url.searchParams.set("v", "13");
     return url.toString();
   }
->>>>>>> c3b4b080769c7b34d09dd552d525c2dfae3fa9a8
+
 
   function updateRoomUI() {
     syncUrl();
