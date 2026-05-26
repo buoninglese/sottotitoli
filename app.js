@@ -178,6 +178,15 @@
     box.prepend(div);
   }
 
+<<<<<<< HEAD
+function syncUrl() {
+const url = new URL(window.location.href);
+url.searchParams.set("mode", modeKey);
+url.searchParams.set("v", "13");
+history.replaceState({}, "", url.toString());
+}
+function currentOverlayUrl() {
+=======
   function syncUrl() {
     const url = new URL(window.location.href);
     url.searchParams.set("mode", modeKey);
@@ -186,12 +195,15 @@
 
   function currentOverlayUrl() {
 
+>>>>>>> b51b16c65b5f4dec9f5384f3958c769471bafc83
 const url = new URL("overlay.html", window.location.href);
 url.searchParams.set("room", room);
 url.searchParams.set("mode", modeKey);
 url.searchParams.set("v", "13");
 return url.toString();
 }
+<<<<<<< HEAD
+=======
 
     const url = new URL("overlay.html", window.location.href);
     url.searchParams.set("room", room);
@@ -201,6 +213,7 @@ return url.toString();
   }
 
 
+>>>>>>> b51b16c65b5f4dec9f5384f3958c769471bafc83
   function updateRoomUI() {
     syncUrl();
     // Caption tab
