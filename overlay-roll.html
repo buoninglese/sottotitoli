@@ -108,6 +108,11 @@
       color: var(--roll-muted);
     }
 
+    #interimPreview {
+      border-top: 1px solid rgba(96, 165, 250, 0.25);
+      color: #93c5fd;
+    }
+
     .pos-verb { color: #2563eb; }
     .pos-noun { color: #16a34a; }
     .pos-adj  { color: #f97316; }
@@ -274,8 +279,26 @@
         socket.onmessage = function (event) {
           try {
             const payload = JSON.parse(event.data);
-            if (payload && payload.type === "caption" && payload.final) {
-              appendRollLine(payload);
+            if (payload && payload.type === "caption") {
+              // Show final captions as rolling lines, and interim in a preview line
+              if (payload.final) {
+                appendRollLine(payload);
+                // Clear interim display when a final arrives
+                var interimPreview = document.getElementById("interimPreview");
+                if (interimPreview) interimPreview.remove();
+              } else if (payload.interim) {
+                // Show interim in a special preview line at the top
+                var interimPreview = document.getElementById("interimPreview");
+                if (!interimPreview) {
+                  interimPreview = document.createElement("div");
+                  interimPreview.id = "interimPreview";
+                  interimPreview.className = "roll-line";
+                  interimPreview.style.opacity = "0.6";
+                  interimPreview.style.fontStyle = "italic";
+                  captionBox.prepend(interimPreview);
+                }
+                interimPreview.textContent = payload.interim;
+              }
             }
           } catch (e) {
             console.error("[Overlay-roll] Failed to parse message", e);

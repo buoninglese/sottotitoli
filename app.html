@@ -495,10 +495,12 @@
       </div>
       <div class="top-actions">
         <a href="studio.html" class="btn secondary" style="font-size:12px; padding:8px 12px;">Full workspace →</a>
-        <button id="googleSignInBtn" class="btn google-btn">
-          <img src="img/google-icon.svg" alt="Google" />
-          <span>Sign in with Google</span>
-        </button>
+        <div id="authSection" class="top-actions" style="margin:0; gap:10px;">
+          <button id="googleLoginBtn" class="btn google-btn">
+            <img src="img/google-icon.svg" alt="Google" />
+            <span>Sign in with Google</span>
+          </button>
+        </div>
       </div>
     </header>
 
@@ -720,12 +722,16 @@
     </main>
   </div>
 
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="config.js?v=12"></script>
   <script src="ws-publisher.js?v=12"></script>
   <script src="translation-providers.js?v=12"></script>
   <script src="text-rules.js?v=12"></script>
   <script src="session-utils.js?v=12"></script>
   <script src="lesson-report.js?v=12"></script>
+  <script src="js/lemma-pos-map.js?v=1"></script>
+  <script src="js/pos-coloring.js?v=1"></script>
+  <script src="js/auth.js?v=5"></script>
   <script src="app.js?v=12"></script>
 
   <script>
@@ -748,6 +754,142 @@
       });
       observer.observe(overlayLink, { attributes: true, attributeFilter: ["href"] });
     });
+  </script>
+
+  <!-- ═══ Sidebar live population ═══ -->
+  <script>
+  (function() {
+    'use strict';
+
+    function $(id) { return document.getElementById(id); }
+
+    // Update the sidebar cards from Supabase session data
+    // This polls every 3s after a session starts, and updates the
+    // Obiettivi / Training / Analysis panels with live metrics.
+    var pollTimer = null;
+
+    function updateSidebar() {
+      var linesEl = $('statLines');
+      var wordsEl = $('statWords');
+      var statusEl = $('statusText');
+      var micStatusEl = $('micStatus');
+      var socketStatusEl = $('socketStatus');
+
+      // Read live counts from the displayed stats
+      var lines = linesEl ? parseInt(linesEl.textContent) || 0 : 0;
+      var words = wordsEl ? parseInt(wordsEl.textContent) || 0 : 0;
+      var isListening = micStatusEl && micStatusEl.textContent === 'live';
+      var isConnected = socketStatusEl && socketStatusEl.textContent === 'connected';
+
+      // ── Obiettivi panel ──
+      var goalsPanel = $('goalsPanel');
+      if (goalsPanel) {
+        if (isListening) {
+          goalsPanel.innerHTML =
+            '<div style="display:flex; gap:8px; flex-wrap:wrap;">' +
+              '<span class="badge-soft" style="background:rgba(34,197,94,.14); color:#4ade80;">● In session</span>' +
+            '</div>' +
+            '<div style="margin-top:8px; font-size:13px;">' +
+              '<div><strong>Words this session:</strong> ' + words + '</div>' +
+              '<div style="margin-top:4px; color:var(--muted);">' +
+                'Vai su <a href="goals.html" style="color:var(--accent2);">Obiettivi</a> per impostare target settimanali.' +
+              '</div>' +
+            '</div>';
+        } else if (words > 0) {
+          goalsPanel.innerHTML =
+            '<div style="display:flex; gap:8px; flex-wrap:wrap;">' +
+              '<span class="badge-soft" style="background:rgba(251,191,36,.12); color:#fbbf24;">● Last session</span>' +
+            '</div>' +
+            '<div style="margin-top:8px; font-size:13px;">' +
+              '<div><strong>Words recorded:</strong> ' + words + '</div>' +
+              '<div style="margin-top:4px; color:var(--muted);">' +
+                '<a href="goals.html" style="color:var(--accent2);">Set weekly targets →</a>' +
+              '</div>' +
+            '</div>';
+        } else {
+          goalsPanel.innerHTML =
+            '<div style="font-size:13px; color:var(--muted);">' +
+              'Start a session to begin tracking progress toward your weekly goals.' +
+              ' <a href="goals.html" style="color:var(--accent2);">Set goals →</a>' +
+            '</div>';
+        }
+      }
+
+      // ── Training panel ──
+      var trainingPanel = $('trainingPanel');
+      if (trainingPanel) {
+        if (isListening) {
+          var wpm = 0;
+          if (words > 0) {
+            wpm = Math.round(words * 60 / 60); // rough, updated each poll
+          }
+          trainingPanel.innerHTML =
+            '<div style="font-size:13px;">' +
+              '<div class="label" style="font-size:11px;">Live metrics</div>' +
+              '<div style="display:grid; grid-template-columns:1fr 1fr; gap:6px; margin-top:6px;">' +
+                '<div style="background:rgba(255,255,255,.03); border-radius:10px; padding:8px;">' +
+                  '<div style="font-size:11px; color:var(--muted);">Words</div>' +
+                  '<div style="font-size:18px; font-weight:700;">' + words + '</div>' +
+                '</div>' +
+                '<div style="background:rgba(255,255,255,.03); border-radius:10px; padding:8px;">' +
+                  '<div style="font-size:11px; color:var(--muted);">Lines</div>' +
+                  '<div style="font-size:18px; font-weight:700;">' + lines + '</div>' +
+                '</div>' +
+              '</div>' +
+              '<div style="margin-top:8px; color:var(--muted); font-size:12px;">' +
+                'Now recording. Stop to generate a lesson report with WPM, fillers, and lexical diversity.' +
+              '</div>' +
+            '</div>';
+        } else if (words > 0) {
+          trainingPanel.innerHTML =
+            '<div style="font-size:13px;">' +
+              '<div style="display:flex; gap:8px; align-items:center; margin-bottom:6px;">' +
+                '<span class="badge-soft" style="background:rgba(59,130,246,.14); color:#60a5fa;">Session complete</span>' +
+              '</div>' +
+              '<div style="color:var(--muted);">' +
+                words + ' words · ' + lines + ' lines recorded. ' +
+                'Visit <a href="training.html" style="color:var(--accent2);">Training</a> to start a structured lesson.' +
+              '</div>' +
+            '</div>';
+        } else {
+          trainingPanel.innerHTML =
+            '<div style="font-size:13px; color:var(--muted);">' +
+              'Start a session to see live NGSL coverage, pacing, and suggestions. ' +
+              'Or go to <a href="training.html" style="color:var(--accent2);">Training</a> for a structured lesson mode.' +
+            '</div>';
+        }
+      }
+
+      // ── Analysis panel ──
+      var analysisPanel = $('analysisPanel');
+      if (analysisPanel) {
+        if (words > 0) {
+          analysisPanel.innerHTML =
+            '<div style="font-size:13px;">' +
+              '<div style="display:flex; gap:8px; align-items:center; margin-bottom:6px;">' +
+                '<span class="badge-soft" style="background:rgba(168,85,247,.14); color:#c084fc;">' + lines + ' lines</span>' +
+              '</div>' +
+              '<div style="color:var(--muted);">' +
+                'Session data is ready for deeper review. ' +
+                '<a href="analysis.html" style="color:var(--accent2);">Go to Analysis →</a>' +
+              '</div>' +
+            '</div>';
+        } else {
+          analysisPanel.innerHTML =
+            '<div style="font-size:13px; color:var(--muted);">' +
+              'After a session, use <a href="analysis.html" style="color:var(--accent2);">Analysis</a> ' +
+              'for AI reports on vocabulary, grammar, speaking patterns, and more (28 modules in 4 families).' +
+            '</div>';
+        }
+      }
+    }
+
+    // Poll every 2s to pick up stat changes from app.js
+    pollTimer = setInterval(updateSidebar, 2000);
+
+    // Also run once on load
+    document.addEventListener('DOMContentLoaded', updateSidebar);
+  })();
   </script>
 </body>
 </html>
