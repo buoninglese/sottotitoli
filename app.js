@@ -169,34 +169,65 @@
 
   function updateRoomUI() {
     syncUrl();
+    // Caption tab
     setText("roomValue", room);
+    // Translate tab
+    setText("roomValueTranslate", room);
+    // Session tab
+    setText("sessionRoomValue", room);
+    setText("sessionModeValue", modeKey);
     const link = $("overlayLink");
     if (link) {
       const overlayUrl = currentOverlayUrl();
       link.href = overlayUrl;
       link.textContent = overlayUrl;
     }
+    const linkS = $("overlayLinkSession");
+    if (linkS) {
+      const overlayUrl = currentOverlayUrl();
+      linkS.href = overlayUrl;
+      linkS.textContent = overlayUrl;
+    }
   }
 
   function updateStats() {
     const plain = transcriptLines.map((x) => x.text).join(" ").trim();
+    const wc = w.SottotitoliSessionUtils.countWords(plain);
+    const cc = plain.length;
     setText("statLines", String(transcriptLines.length));
-    setText("statWords", String(w.SottotitoliSessionUtils.countWords(plain)));
-    setText("statChars", String(plain.length));
+    setText("statWords", String(wc));
+    setText("statChars", String(cc));
+    // Translate tab stats
+    setText("statLinesTranslate", String(transcriptLines.length));
+    setText("statWordsTranslate", String(wc));
+    setText("statCharsTranslate", String(cc));
+    // Report metrics
+    const fillerCount = computeFillersCount(plain);
+    const uniqueCount = computeUniqueWordsCount(plain);
+    const lexDiv = wc > 0 ? uniqueCount / wc : 0;
+    setText("reportWords", String(wc));
+    setText("reportUnique", String(uniqueCount));
+    setText("reportLexDiv", lexDiv.toFixed(2));
+    setText("reportFillers", String(fillerCount));
+    // WPM and quality require duration; updated separately via updateReportMetrics
   }
 
   function updateSocketState(state) {
     setText("socketStatus", state);
+    setText("socketStatusSession", state);
     const dot = $("socketDot");
-    if (!dot) return;
-    dot.classList.toggle("connected", state === "connected");
+    if (dot) dot.classList.toggle("connected", state === "connected");
+    const dotS = $("socketDotSession");
+    if (dotS) dotS.classList.toggle("connected", state === "connected");
   }
 
   function updateMicState(stateText, live) {
     setText("micStatus", stateText);
+    setText("micStatusSession", stateText);
     const dot = $("micDot");
-    if (!dot) return;
-    dot.classList.toggle("connected", !!live);
+    if (dot) dot.classList.toggle("connected", !!live);
+    const dotS = $("micDotSession");
+    if (dotS) dotS.classList.toggle("connected", !!live);
   }
 
   function updateAnalyzeButtonState() {
@@ -708,6 +739,15 @@
     setText("statusText", "Report downloaded.");
   }
 
+  async function copyReport() {
+    if (!latestReportText) {
+      setText("statusText", "No report yet.");
+      return;
+    }
+    const ok = await w.SottotitoliSessionUtils.copyToClipboard(latestReportText);
+    setText("statusText", ok ? "Report copied." : "Could not copy report.");
+  }
+
   function openOverlay() {
     window.open(currentOverlayUrl(), "_blank", "noopener");
   }
@@ -728,6 +768,9 @@
     clearBox("interimOutput", "Interim");
     clearBox("sourceOutput", "Source output");
     clearBox("translatedOutput", "Translated output");
+    clearBox("sourceOutputTranslate", "Source output");
+    clearBox("interimOutputTranslate", "Interim");
+    clearBox("lessonReport", "No report yet.");
     setText("lessonReport", "No report yet.");
     updateStats();
     updateRoomUI();
@@ -1124,6 +1167,11 @@
 
       const ngslCoverage = computeNgslCoverage(transcriptLines);
 
+      // Update Report tab metrics with these computed values
+      if (wpm != null) setText("reportWpm", Math.round(wpm));
+      if (fillersPerMinute != null) setText("reportFillers", fillersPerMinute.toFixed(1));
+      setText("reportQuality", qualityScore != null ? qualityScore.toFixed(2) : "0");
+
       const updatePayload = {
         ended_at: ended.toISOString(),
         duration_seconds: durationSeconds,
@@ -1182,50 +1230,52 @@
     clearBox("translatedOutput", "Translated output");
 
     var srcSelect = document.getElementById("sourceLangSelect");
-    var tgtSelect = document.getElementById("targetLangSelect");
-    if (srcSelect && tgtSelect) {
-      srcSelect.addEventListener("change", () => {
+    if (srcSelect) {
+      srcSelect.addEventListener("change", function () {
         updateModeFromUI();
         if (recognition) {
           stopRecognition();
           startRecognition();
         }
       });
-      tgtSelect.addEventListener("change", () => {
-        updateModeFromUI();
-        if (recognition) {
-          stopRecognition();
-          startRecognition();
-        }
-      });
-      var applyBtn = document.getElementById("applyLangModeBtn");
-      if (applyBtn) {
-        applyBtn.addEventListener("click", goToSelectedModePage);
-      }
+    }
+    var applyBtn = document.getElementById("applyLangModeBtn");
+    if (applyBtn) {
+      applyBtn.addEventListener("click", goToSelectedModePage);
     }
 
-    const startBtn = $("startBtn");
-    const stopBtn = $("stopBtn");
-    const openOverlayBtn = $("openOverlayBtn");
-    const copyOverlayBtn = $("copyOverlayBtn");
-    const newRoomBtn = $("newRoomBtn");
-    const copyTranscriptBtn = $("copyTranscriptBtn");
-    const downloadTranscriptBtn = $("downloadTranscriptBtn");
-    const reportBtn = $("reportBtn");
-    const downloadReportBtn = $("downloadReportBtn");
-    const lessonActions = $("lessonActions");
-    const languageToolbar = $("languageToolbar");
+    // --- Bind new tab buttons ---
+    function bindBtn(id, fn) { var el = $(id); if (el) el.addEventListener('click', fn); }
 
-    if (startBtn) startBtn.addEventListener("click", startRecognition);
-    if (stopBtn) stopBtn.addEventListener("click", stopRecognition);
-    if (openOverlayBtn) openOverlayBtn.addEventListener("click", openOverlay);
-    if (copyOverlayBtn)
-      copyOverlayBtn.addEventListener("click", copyOverlayLink);
-    if (newRoomBtn) newRoomBtn.addEventListener("click", newRoom);
-    if (copyTranscriptBtn)
-      copyTranscriptBtn.addEventListener("click", copyTranscript);
-    if (downloadTranscriptBtn)
-      downloadTranscriptBtn.addEventListener("click", downloadTranscript);
+    // Caption tab buttons (existing IDs unchanged)
+    bindBtn('startBtn', startRecognition);
+    bindBtn('stopBtn', stopRecognition);
+    bindBtn('openOverlayBtn', openOverlay);
+    bindBtn('newRoomBtn', newRoom);
+    bindBtn('copyTranscriptBtn', copyTranscript);
+    bindBtn('downloadTranscriptBtn', downloadTranscript);
+
+    // Translate tab buttons
+    bindBtn('startBtnTranslate', startRecognition);
+    bindBtn('stopBtnTranslate', stopRecognition);
+    bindBtn('openOverlayBtnTranslate', openOverlay);
+    bindBtn('copyOverlayBtnTranslate', copyOverlayLink);
+
+    // Report tab buttons
+    bindBtn('reportBtn', generateLessonReport);
+    bindBtn('downloadReportBtn', downloadReport);
+    bindBtn('copyReportBtn', copyReport);
+    bindBtn('analyzeSpeakersBtn', analyzeSpeakers);
+
+    // Session tab buttons
+    bindBtn('copyTranscriptBtnSession', copyTranscript);
+    bindBtn('downloadTranscriptBtnSession', downloadTranscript);
+    bindBtn('downloadReportBtnSession', downloadReport);
+    bindBtn('copyOverlayBtnSession', copyOverlayLink);
+    bindBtn('copyOverlayBtnSession2', copyOverlayLink);
+    bindBtn('newRoomBtnSession', newRoom);
+
+    var languageToolbar = $("languageToolbar");
 
     if (languageToolbar) {
       languageToolbar.addEventListener("click", function (evt) {
@@ -1233,29 +1283,56 @@
         if (!btn) return;
         const newMode = btn.getAttribute("data-mode");
         if (!newMode) return;
+        // Update mode in-place, reload with tab=caption
         const url = new URL(window.location.href);
         url.searchParams.set("mode", newMode);
+        url.searchParams.set("tab", "caption");
         window.location.href = url.toString();
       });
-      const activeBtn = languageToolbar.querySelector(
+      var activeBtn = languageToolbar.querySelector(
         "button[data-mode='" + modeKey + "']"
       );
       if (activeBtn) {
         activeBtn.classList.remove("btn-default");
         activeBtn.classList.add("btn-primary");
       }
-      // FIX #3: only inject the test button in local dev or when devMode is set.
+      // ... send test message
       if (location.hostname === "localhost" || location.hostname === "127.0.0.1" || configRoot.devMode) {
-        const extraBtn = document.createElement("button");
+        var extraBtn = document.createElement("button");
         extraBtn.className = "btn btn-default";
         extraBtn.textContent = "Send test message";
-        if (startBtn && startBtn.parentNode) {
-          startBtn.parentNode.appendChild(extraBtn);
+        var startBtn2 = $("startBtn");
+        if (startBtn2 && startBtn2.parentNode) {
+          startBtn2.parentNode.appendChild(extraBtn);
         }
         extraBtn.addEventListener("click", sendTestMessage);
       }
     }
 
+    // Handle translate mode → switch to translate tab
+    if (modeKey.indexOf("translate-") === 0 && typeof window.studioSwitchTab === "function") {
+      window.studioSwitchTab("translate");
+    }
+
+    // Wire apply translation button
+    var applyTransBtn = document.getElementById("applyTransBtn");
+    if (applyTransBtn) {
+      applyTransBtn.addEventListener("click", function () {
+        var src = document.getElementById("transSourceSelect");
+        var tgt = document.getElementById("transTargetSelect");
+        if (!src || !tgt) return;
+        var newMode = "translate-" + src.value + "-" + tgt.value;
+        var url = new URL(window.location.href);
+        url.searchParams.set("mode", newMode);
+        url.searchParams.set("tab", "translate");
+        window.location.href = url.toString();
+      });
+    }
+
+    // Wire lessonActions and analyze button (existing)
+    var lessonActions = $("lessonActions");
+    var reportBtn = $("reportBtn");
+    var downloadReportBtn = $("downloadReportBtn");
     if (modeConfig && modeConfig.lessonMode && lessonActions) {
       lessonActions.style.display = "block";
       if (reportBtn)
@@ -1267,8 +1344,7 @@
       analyzeBtnRef.className = "btn";
       analyzeBtnRef.textContent = "Analyze speakers";
       analyzeBtnRef.addEventListener("click", analyzeSpeakers);
-      const toolbar = lessonActions.querySelector(".row");
-      if (toolbar) toolbar.appendChild(analyzeBtnRef);
+      if (lessonActions) lessonActions.appendChild(analyzeBtnRef);
       updateAnalyzeButtonState();
     }
   });
