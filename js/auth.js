@@ -6,8 +6,12 @@ const SUPABASE_ANON_KEY = 'sb_publishable_l-PG1wsO1FMWADK9GVBqoQ_0EtPA2K7';
 
 // Redirect target — change this if deploying to a different domain
 // IMPORTANT: This must be whitelisted in Supabase Auth settings
-const AUTH_REDIRECT_TO = 'https://buoninglese.github.io/sottotitoli/app.html';
-const POST_LOGOUT_URL = 'https://buoninglese.github.io/sottotitoli/app.html';
+function getAuthRedirectUrl() {
+  return window.SOTTOTITOLI_CONFIG?.AUTH_REDIRECT_URL || 'https://buoninglese.github.io/sottotitoli/app.html';
+}
+function getPostLogoutUrl() {
+  return window.SOTTOTITOLI_CONFIG?.AUTH_REDIRECT_URL || 'https://buoninglese.github.io/sottotitoli/app.html';
+}
 
 window.sottotitoliSupabase = window.supabase.createClient(
   SUPABASE_URL,
@@ -26,7 +30,7 @@ async function signInWithGoogle() {
   const { error } = await window.sottotitoliSupabase.auth.signInWithOAuth({
     provider: 'google',
     options: {
-      redirectTo: AUTH_REDIRECT_TO,
+      redirectTo: getAuthRedirectUrl(),
     },
   });
   if (error) {
@@ -63,7 +67,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       logoutBtn.addEventListener('click', async () => {
         await window.sottotitoliSupabase.auth.signOut();
         // After logout, go back to studio page
-        window.location.href = POST_LOGOUT_URL;
+        window.location.href = getPostLogoutUrl();
       });
     }
   }
