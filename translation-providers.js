@@ -80,7 +80,7 @@
     throw new Error(`Unsupported provider: ${provider}`);
   }
 
-  global.CaptionTranslationProviders = {
+  global.SottotitoliTranslationProviders = {
     resolveConfig,
     normalizeLangCode,
     translateText
