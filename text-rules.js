@@ -445,7 +445,7 @@
     };
   }
 
-  w.CaptionTextRules = {
+  w.SottotitoliTextRules = {
     parseRulesFromUrlParams: parseRulesFromUrlParams,
     createEngine: createEngine,
     decodeRulesParam: decodeRulesParam,

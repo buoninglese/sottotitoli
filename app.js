@@ -247,10 +247,10 @@
 
   async function maybeTranslate(text) {
     if (!modeConfig || !modeConfig.translate) return null;
-    if (!w.CaptionTranslationProviders) return null;
+    if (!w.SottotitoliTranslationProviders) return null;
     try {
-      const providerConfig = w.CaptionTranslationProviders.resolveConfig();
-      const result = await w.CaptionTranslationProviders.translateText(
+      const providerConfig = w.SottotitoliTranslationProviders.resolveConfig();
+      const result = await w.SottotitoliTranslationProviders.translateText(
         providerConfig,
         text,
         modeConfig.sourceCode,

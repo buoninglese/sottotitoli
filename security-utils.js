@@ -1,4 +1,4 @@
-// Security utility functions for caption.ninja
+// Security utility functions for Sottotitoli
 
 /**
  * Checks if a stream ID is considered insecure based on common patterns
