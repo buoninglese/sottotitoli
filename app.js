@@ -178,27 +178,19 @@
     box.prepend(div);
   }
 
-  function syncUrl() {
-    const url = new URL(window.location.href);
-    url.searchParams.set("mode", modeKey);
-    url.searchParams.set("v", "13");
-    history.replaceState({}, "", url.toString());
-
-  function currentOverlayUrl() {
-
+function syncUrl() {
+const url = new URL(window.location.href);
+url.searchParams.set("mode", modeKey);
+url.searchParams.set("v", "13");
+history.replaceState({}, "", url.toString());
+}
+function currentOverlayUrl() {
 const url = new URL("overlay.html", window.location.href);
 url.searchParams.set("room", room);
 url.searchParams.set("mode", modeKey);
 url.searchParams.set("v", "13");
 return url.toString();
 }
-
-    const url = new URL("overlay.html", window.location.href);
-    url.searchParams.set("room", room);
-    url.searchParams.set("mode", modeKey);
-    url.searchParams.set("v", "13");
-    return url.toString();
-  }
 
 
   function updateRoomUI() {
