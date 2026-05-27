@@ -886,7 +886,7 @@
       });
     }
 
-    // ── 3. Analysis modules (port from analysis.html) ──
+        // ── 3. Analysis modules (rewritten for Supabase schema) ──
     var supabase = window.sottotitoliSupabase;
     var currentSessionId = null;
     var allModules = [];
@@ -921,6 +921,42 @@
       setTimeout(function() { document.body.removeChild(a); URL.revokeObjectURL(url); }, 200);
     }
 
+    function formatReportHTML(report) {
+      var html = '';
+      if (report.summary_text) {
+        html += '<p style="font-size:14px;margin-bottom:8px;">' + escHtml(report.summary_text) + '</p>';
+      } else if (report.summary) {
+        html += '<p style="font-size:14px;margin-bottom:8px;">' + escHtml(report.summary) + '</p>';
+      }
+      if (report.overall_score != null) {
+        var pct = Math.round(Number(report.overall_score) * 100);
+        var color = pct >= 70 ? '#16a34a' : pct >= 40 ? '#d97706' : '#dc2626';
+        html += '<div style="margin-bottom:8px;"><strong>Score:</strong> <span style="font-weight:700;color:' + color + ';">' + pct + '%</span></div>';
+      }
+      if (report.strengths && Array.isArray(report.strengths) && report.strengths.length) {
+        html += '<div style="margin-bottom:6px;"><strong style="color:#16a34a;">Strengths</strong></div><ul style="margin:0 0 10px 16px;padding:0;">';
+        report.strengths.forEach(function(s) {
+          html += '<li style="font-size:13px;color:#374151;">' + escHtml(typeof s === 'string' ? s : s.text || JSON.stringify(s)) + '</li>';
+        });
+        html += '</ul>';
+      }
+      if (report.issues && Array.isArray(report.issues) && report.issues.length) {
+        html += '<div style="margin-bottom:6px;"><strong style="color:#dc2626;">Issues</strong></div><ul style="margin:0 0 10px 16px;padding:0;">';
+        report.issues.forEach(function(issue) {
+          html += '<li style="font-size:13px;color:#374151;">' + escHtml(typeof issue === 'string' ? issue : issue.text || JSON.stringify(issue)) + '</li>';
+        });
+        html += '</ul>';
+      }
+      if (report.recommendations && Array.isArray(report.recommendations) && report.recommendations.length) {
+        html += '<div style="margin-bottom:6px;"><strong style="color:#2563eb;">Recommendations</strong></div><ul style="margin:0 0 10px 16px;padding:0;">';
+        report.recommendations.forEach(function(rec) {
+          html += '<li style="font-size:13px;color:#374151;">' + escHtml(typeof rec === 'string' ? rec : rec.text || JSON.stringify(rec)) + '</li>';
+        });
+        html += '</ul>';
+      }
+      return html || '<em style="color:#6b7280;">No report content available.</em>';
+    }
+
     function applyBtnState(moduleId, report) {
       var btn       = el('mbtn-'      + moduleId);
       var regenBtn  = el('mregen-'    + moduleId);
@@ -933,26 +969,26 @@
         btn.textContent = 'Genera report';
         if (regenBtn)  regenBtn.classList.remove('visible');
         if (statusEl)  statusEl.textContent = 'Nessun report ancora generato.';
-        if (reportBox) { reportBox.textContent = ''; reportBox.classList.remove('visible'); }
+        if (reportBox) { reportBox.innerHTML = ''; reportBox.classList.remove('visible'); }
         return;
       }
       if (report.status === 'pending') {
-        btn.textContent = 'In coda…';
+        btn.textContent = 'In coda...';
         btn.classList.add('queued');
         btn.disabled = true;
         if (regenBtn)  regenBtn.classList.remove('visible');
-        if (statusEl)  statusEl.textContent = 'Report in elaborazione — ricarica la pagina tra qualche secondo.';
-        if (reportBox) { reportBox.textContent = ''; reportBox.classList.remove('visible'); }
+        if (statusEl)  statusEl.textContent = 'Report in elaborazione - ricarica la pagina tra qualche secondo.';
+        if (reportBox) { reportBox.innerHTML = ''; reportBox.classList.remove('visible'); }
         return;
       }
-      if (report.status === 'done' && report.report_text) {
-        btn.textContent = 'Scarica report';
+      if (report.status === 'done') {
+        btn.textContent = 'Vedi report';
         btn.classList.add('done');
         btn.disabled = false;
         if (regenBtn)  regenBtn.classList.add('visible');
         if (statusEl)  statusEl.textContent = 'Completato: ' + new Date(report.created_at).toLocaleString();
         if (reportBox) {
-          reportBox.textContent = report.report_text;
+          reportBox.innerHTML = formatReportHTML(report);
           reportBox.classList.add('visible');
         }
         return;
@@ -975,7 +1011,7 @@
         var when = s.started_at ? new Date(s.started_at).toLocaleString() : '';
         var dur  = s.duration_seconds != null ? Math.round(s.duration_seconds) + 's' : '';
         var wpm  = s.wpm != null ? Math.round(s.wpm) + ' WPM' : '';
-        var label = '[' + (s.mode || '—') + '] ' + when + (dur ? ' · ' + dur : '') + (wpm ? ' · ' + wpm : '');
+        var label = '[' + (s.mode || '-') + '] ' + when + (dur ? ' . ' + dur : '') + (wpm ? ' . ' + wpm : '');
         selectorHtml += '<option value="' + escHtml(s.id) + '">' + escHtml(label) + '</option>';
       });
       selectorHtml += '</select></div>';
@@ -1010,7 +1046,7 @@
       if (!supabase || !sessionId) return;
       var { data } = await supabase
         .from('session_ai_reports')
-        .select('module_id, report_text, status, created_at')
+        .select('module_id, summary, summary_text, overall_score, confidence, strengths, issues, recommendations, status, created_at')
         .eq('session_id', sessionId);
       (data || []).forEach(function(r) { existingReports[r.module_id] = r; });
     }
@@ -1065,9 +1101,12 @@
         btn.addEventListener('click', function() {
           var moduleId = btn.dataset.moduleId;
           var report   = existingReports[moduleId];
-          if (report && report.status === 'done' && report.report_text) {
-            var fname = 'analysis-' + moduleId + '-' + currentSessionId + '.txt';
-            downloadText(fname, report.report_text);
+          if (report && report.status === 'done') {
+            var reportBox = el('mreport-' + moduleId);
+            if (reportBox) {
+              reportBox.innerHTML = formatReportHTML(report);
+              reportBox.classList.add('visible');
+            }
           } else {
             requestReport(moduleId);
           }
@@ -1080,21 +1119,29 @@
 
     async function requestReport(moduleId) {
       if (!supabase || !currentSessionId || !moduleId || !userId) return;
+      var mod = allModules.find(function(m) { return String(m.id) === String(moduleId); });
+      if (!mod) {
+        console.error('Module not found:', moduleId);
+        return;
+      }
       var btn      = el('mbtn-'    + moduleId);
       var regenBtn = el('mregen-'  + moduleId);
       var statusEl = el('mstatus-' + moduleId);
-      if (btn) { btn.disabled = true; btn.textContent = 'In coda…'; btn.classList.add('queued'); btn.classList.remove('done'); }
+      if (btn) { btn.disabled = true; btn.textContent = 'In coda...'; btn.classList.add('queued'); btn.classList.remove('done'); }
       if (regenBtn) regenBtn.classList.remove('visible');
-      if (statusEl) statusEl.textContent = 'Report in elaborazione — ricarica la pagina tra qualche secondo.';
+      if (statusEl) statusEl.textContent = 'Report in elaborazione - ricarica la pagina tra qualche secondo.';
+      var familyKey = mod.family || 'cambridge';
+      var moduleKey = mod.label || String(moduleId);
       var { error } = await supabase
         .from('ai_report_requests')
-        .insert([{ user_id: userId, session_ids: [currentSessionId], module_key: moduleId, scope_type: 'session' }]);
+        .insert([{ user_id: userId, family_key: familyKey, module_key: moduleKey, session_ids: [currentSessionId], scope_type: 'session' }]);
       if (error) {
-        if (btn) { btn.disabled = false; btn.textContent = 'Errore – riprova'; btn.classList.remove('queued'); }
-        if (statusEl) statusEl.textContent = 'Errore nell\'invio della richiesta.';
+        console.error('Request error:', error);
+        if (btn) { btn.disabled = false; btn.textContent = 'Errore - riprova'; btn.classList.remove('queued'); }
+        if (statusEl) statusEl.textContent = 'Errore: ' + error.message;
         return;
       }
-      existingReports[moduleId] = { module_id: moduleId, status: 'pending', report_text: null, created_at: new Date().toISOString() };
+      existingReports[moduleId] = { module_id: moduleId, status: 'pending', created_at: new Date().toISOString() };
       setTimeout(pollReportStatus, 2000);
     }
 
@@ -1102,7 +1149,7 @@
       if (!supabase || !currentSessionId) return;
       var { data: reports, error } = await supabase
         .from('session_ai_reports')
-        .select('id, module_id, status, report_text, error_message')
+        .select('module_id, summary, summary_text, overall_score, confidence, strengths, issues, recommendations, status, error_message, created_at')
         .eq('session_id', currentSessionId);
       if (error) { console.error('Poll error:', error); return; }
       if (!reports || reports.length === 0) return;
@@ -1112,17 +1159,17 @@
         var regenBtn  = el('mregen-'  + moduleId);
         var statusEl  = el('mstatus-' + moduleId);
         var reportBox = el('mreport-' + moduleId);
-        if (rep.status === 'done' && rep.report_text) {
+        if (rep.status === 'done') {
           existingReports[moduleId] = rep;
-          if (btn) { btn.disabled = false; btn.textContent = 'Scarica report'; btn.classList.add('done'); btn.classList.remove('queued'); }
+          if (btn) { btn.disabled = false; btn.textContent = 'Vedi report'; btn.classList.add('done'); btn.classList.remove('queued'); }
           if (regenBtn) regenBtn.classList.add('visible');
           if (statusEl) statusEl.textContent = rep.created_at ? 'Completato: ' + new Date(rep.created_at).toLocaleString() : 'Completato.';
-          if (reportBox) { reportBox.textContent = rep.report_text; reportBox.classList.add('visible'); }
+          if (reportBox) { reportBox.innerHTML = formatReportHTML(rep); reportBox.classList.add('visible'); }
         } else if (rep.status === 'error') {
-          if (btn) { btn.disabled = false; btn.textContent = 'Errore — riprova'; btn.classList.remove('queued', 'done'); }
-          if (statusEl) statusEl.textContent = rep.error_message || 'Errore nell\'elaborazione.';
-        } else if (rep.status === 'processing') {
-          if (statusEl) statusEl.textContent = 'Report in elaborazione — attendi...';
+          if (btn) { btn.disabled = false; btn.textContent = 'Errore - riprova'; btn.classList.remove('queued', 'done'); }
+          if (statusEl) statusEl.textContent = rep.error_message || 'Errore.';
+        } else if (rep.status === 'processing' || rep.status === 'pending') {
+          if (statusEl) statusEl.textContent = 'Report in elaborazione - attendi...';
         }
       });
       var hasPending = reports.some(function(r) { return r.status === 'pending' || r.status === 'processing'; });
@@ -1157,7 +1204,7 @@
       setTimeout(pollReportStatus, 1000);
     }
 
-    // ── 4. Progress dashboard ──
+// ── 4. Progress dashboard ──
     async function loadProgress() {
       var root = el('progressRoot');
       if (!root) return;

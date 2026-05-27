@@ -242,12 +242,12 @@
   (function() {
     'use strict';
 
-    var supabase;
+    // ── 3. Analysis modules (rewritten for Supabase schema) ──
+    var supabase = window.sottotitoliSupabase;
     var currentSessionId = null;
     var allModules = [];
     var existingReports = {};
     var activeFamily = 'all';
-    // FIX #4: userId hoisted to module scope so requestReport() can access it.
     var userId = null;
 
     var FAMILY_LABELS = {
@@ -259,21 +259,15 @@
     var FAMILY_ORDER = ['cambridge', 'business', 'academic', 'linguistic'];
 
     function el(id) { return document.getElementById(id); }
-
     function escHtml(str) {
-      return String(str || '')
-        .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
-        .replace(/"/g,'&quot;');
+      return String(str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
     }
-
     function familyTagClass(family) {
       return (FAMILY_LABELS[family] && FAMILY_LABELS[family].tagClass) || '';
     }
     function familyLabel(family) {
       return (FAMILY_LABELS[family] && FAMILY_LABELS[family].label) || family;
     }
-
-    /* ── download helper ── */
     function downloadText(filename, text) {
       var blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
       var url  = URL.createObjectURL(blob);
@@ -283,67 +277,89 @@
       setTimeout(function() { document.body.removeChild(a); URL.revokeObjectURL(url); }, 200);
     }
 
-    /* ── apply button state to a card’s action row ── */
+    function formatReportHTML(report) {
+      var html = '';
+      if (report.summary_text) {
+        html += '<p style="font-size:14px;margin-bottom:8px;">' + escHtml(report.summary_text) + '</p>';
+      } else if (report.summary) {
+        html += '<p style="font-size:14px;margin-bottom:8px;">' + escHtml(report.summary) + '</p>';
+      }
+      if (report.overall_score != null) {
+        var pct = Math.round(Number(report.overall_score) * 100);
+        var color = pct >= 70 ? '#16a34a' : pct >= 40 ? '#d97706' : '#dc2626';
+        html += '<div style="margin-bottom:8px;"><strong>Score:</strong> <span style="font-weight:700;color:' + color + ';">' + pct + '%</span></div>';
+      }
+      if (report.strengths && Array.isArray(report.strengths) && report.strengths.length) {
+        html += '<div style="margin-bottom:6px;"><strong style="color:#16a34a;">Strengths</strong></div><ul style="margin:0 0 10px 16px;padding:0;">';
+        report.strengths.forEach(function(s) {
+          html += '<li style="font-size:13px;color:#374151;">' + escHtml(typeof s === 'string' ? s : s.text || JSON.stringify(s)) + '</li>';
+        });
+        html += '</ul>';
+      }
+      if (report.issues && Array.isArray(report.issues) && report.issues.length) {
+        html += '<div style="margin-bottom:6px;"><strong style="color:#dc2626;">Issues</strong></div><ul style="margin:0 0 10px 16px;padding:0;">';
+        report.issues.forEach(function(issue) {
+          html += '<li style="font-size:13px;color:#374151;">' + escHtml(typeof issue === 'string' ? issue : issue.text || JSON.stringify(issue)) + '</li>';
+        });
+        html += '</ul>';
+      }
+      if (report.recommendations && Array.isArray(report.recommendations) && report.recommendations.length) {
+        html += '<div style="margin-bottom:6px;"><strong style="color:#2563eb;">Recommendations</strong></div><ul style="margin:0 0 10px 16px;padding:0;">';
+        report.recommendations.forEach(function(rec) {
+          html += '<li style="font-size:13px;color:#374151;">' + escHtml(typeof rec === 'string' ? rec : rec.text || JSON.stringify(rec)) + '</li>';
+        });
+        html += '</ul>';
+      }
+      return html || '<em style="color:#6b7280;">No report content available.</em>';
+    }
+
     function applyBtnState(moduleId, report) {
       var btn       = el('mbtn-'      + moduleId);
       var regenBtn  = el('mregen-'    + moduleId);
       var statusEl  = el('mstatus-'   + moduleId);
       var reportBox = el('mreport-'   + moduleId);
       if (!btn) return;
-
-      // clear all state classes
       btn.classList.remove('queued', 'done');
       btn.disabled = false;
-
       if (!report) {
-        /* no report yet */
         btn.textContent = 'Genera report';
         if (regenBtn)  regenBtn.classList.remove('visible');
         if (statusEl)  statusEl.textContent = 'Nessun report ancora generato.';
-        if (reportBox) { reportBox.textContent = ''; reportBox.classList.remove('visible'); }
+        if (reportBox) { reportBox.innerHTML = ''; reportBox.classList.remove('visible'); }
         return;
       }
-
       if (report.status === 'pending') {
-        btn.textContent = 'In coda…';
+        btn.textContent = 'In coda...';
         btn.classList.add('queued');
         btn.disabled = true;
         if (regenBtn)  regenBtn.classList.remove('visible');
-        if (statusEl)  statusEl.textContent = 'Report in elaborazione — ricarica la pagina tra qualche secondo.';
-        if (reportBox) { reportBox.textContent = ''; reportBox.classList.remove('visible'); }
+        if (statusEl)  statusEl.textContent = 'Report in elaborazione - ricarica la pagina tra qualche secondo.';
+        if (reportBox) { reportBox.innerHTML = ''; reportBox.classList.remove('visible'); }
         return;
       }
-
-      if (report.status === 'done' && report.report_text) {
-        btn.textContent = 'Scarica report';
+      if (report.status === 'done') {
+        btn.textContent = 'Vedi report';
         btn.classList.add('done');
         btn.disabled = false;
         if (regenBtn)  regenBtn.classList.add('visible');
         if (statusEl)  statusEl.textContent = 'Completato: ' + new Date(report.created_at).toLocaleString();
         if (reportBox) {
-          reportBox.textContent = report.report_text;
+          reportBox.innerHTML = formatReportHTML(report);
           reportBox.classList.add('visible');
         }
         return;
       }
-
-      /* fallback: report exists but status unclear */
       btn.textContent = 'Genera report';
-      if (statusEl) statusEl.textContent = report.created_at
-        ? 'Ultimo: ' + new Date(report.created_at).toLocaleString()
-        : '';
+      if (statusEl) statusEl.textContent = report.created_at ? 'Ultimo: ' + new Date(report.created_at).toLocaleString() : '';
     }
 
-    /* ── render ── */
     function renderRoot(sessions) {
       var root = el('analysisRoot');
       if (!root) return;
-
       if (!sessions || sessions.length === 0) {
         root.innerHTML = '<div class="analysis-signin-note"><strong>Nessuna sessione trovata.</strong><br>Vai su Studio, avvia il microfono e completa una sessione per poi analizzarla qui.</div>';
         return;
       }
-
       var selectorHtml = '<div class="session-select-wrap">' +
         '<span class="session-select-label">Sessione</span>' +
         '<select id="sessionSelect" class="session-select">';
@@ -351,20 +367,17 @@
         var when = s.started_at ? new Date(s.started_at).toLocaleString() : '';
         var dur  = s.duration_seconds != null ? Math.round(s.duration_seconds) + 's' : '';
         var wpm  = s.wpm != null ? Math.round(s.wpm) + ' WPM' : '';
-        var label = '[' + (s.mode || '—') + '] ' + when + (dur ? ' · ' + dur : '') + (wpm ? ' · ' + wpm : '');
+        var label = '[' + (s.mode || '-') + '] ' + when + (dur ? ' . ' + dur : '') + (wpm ? ' . ' + wpm : '');
         selectorHtml += '<option value="' + escHtml(s.id) + '">' + escHtml(label) + '</option>';
       });
       selectorHtml += '</select></div>';
-
       var tabsHtml = '<div class="family-tabs" id="familyTabs">' +
         '<button class="family-tab active" data-family="all">Tutti</button>';
       FAMILY_ORDER.forEach(function(f) {
         tabsHtml += '<button class="family-tab" data-family="' + f + '">' + familyLabel(f) + '</button>';
       });
       tabsHtml += '</div>';
-
       root.innerHTML = selectorHtml + tabsHtml + '<div id="modulesGrid"></div>';
-
       var selectEl = el('sessionSelect');
       if (selectEl) {
         currentSessionId = sessions[0].id;
@@ -374,7 +387,6 @@
         });
         loadReportsForSession(currentSessionId).then(renderModules);
       }
-
       document.querySelectorAll('.family-tab').forEach(function(btn) {
         btn.addEventListener('click', function() {
           document.querySelectorAll('.family-tab').forEach(function(b) { b.classList.remove('active'); });
@@ -390,7 +402,7 @@
       if (!supabase || !sessionId) return;
       var { data } = await supabase
         .from('session_ai_reports')
-        .select('module_id, report_text, status, created_at')
+        .select('module_id, summary, summary_text, overall_score, confidence, strengths, issues, recommendations, status, created_at')
         .eq('session_id', sessionId);
       (data || []).forEach(function(r) { existingReports[r.module_id] = r; });
     }
@@ -398,25 +410,18 @@
     function renderModules() {
       var grid = el('modulesGrid');
       if (!grid) return;
-
-      var filtered = activeFamily === 'all'
-        ? allModules
-        : allModules.filter(function(m) { return m.family === activeFamily; });
-
+      var filtered = activeFamily === 'all' ? allModules : allModules.filter(function(m) { return m.family === activeFamily; });
       if (filtered.length === 0) {
         grid.innerHTML = '<p style="color:#6b7280;font-size:14px;">Nessun modulo per questa famiglia.</p>';
         return;
       }
-
       var byFamily = {};
       filtered.forEach(function(m) {
         if (!byFamily[m.family]) byFamily[m.family] = [];
         byFamily[m.family].push(m);
       });
-
       var html = '';
       var families = activeFamily === 'all' ? FAMILY_ORDER : [activeFamily];
-
       families.forEach(function(fam) {
         if (!byFamily[fam] || !byFamily[fam].length) return;
         html += '<h4 style="font-size:16px;font-weight:700;color:#111827;margin:24px 0 14px;">' + familyLabel(fam) + '</h4>';
@@ -426,7 +431,6 @@
           var tagExtra    = isToken ? ' token' : '';
           var tagLabel    = isToken ? 'Token'  : 'Incluso';
           var famTagClass = familyTagClass(fam);
-
           html += '<div class="col-md-4 col-sm-6 col-xs-12">' +
             '<div class="module-card" id="mcard-' + escHtml(m.id) + '">' +
               '<div>' +
@@ -445,165 +449,115 @@
         });
         html += '</div>';
       });
-
       grid.innerHTML = html;
-
-      /* apply saved states */
       filtered.forEach(function(m) {
         applyBtnState(m.id, existingReports[m.id] || null);
       });
-
-      /* bind primary buttons */
       grid.querySelectorAll('.module-run-btn').forEach(function(btn) {
         btn.addEventListener('click', function() {
           var moduleId = btn.dataset.moduleId;
           var report   = existingReports[moduleId];
-          if (report && report.status === 'done' && report.report_text) {
-            /* download */
-            var fname = 'analysis-' + moduleId + '-' + currentSessionId + '.txt';
-            downloadText(fname, report.report_text);
+          if (report && report.status === 'done') {
+            var reportBox = el('mreport-' + moduleId);
+            if (reportBox) {
+              reportBox.innerHTML = formatReportHTML(report);
+              reportBox.classList.add('visible');
+            }
           } else {
             requestReport(moduleId);
           }
         });
       });
-
-      /* bind rigenera buttons */
       grid.querySelectorAll('.module-rigenera').forEach(function(btn) {
-        btn.addEventListener('click', function() {
-          var moduleId = btn.dataset.moduleId;
-          requestReport(moduleId);
-        });
+        btn.addEventListener('click', function() { requestReport(btn.dataset.moduleId); });
       });
     }
 
     async function requestReport(moduleId) {
-      // FIX #4 (cont.): userId is now the module-scoped variable, not a local.
       if (!supabase || !currentSessionId || !moduleId || !userId) return;
-
+      var mod = allModules.find(function(m) { return String(m.id) === String(moduleId); });
+      if (!mod) {
+        console.error('Module not found:', moduleId);
+        return;
+      }
       var btn      = el('mbtn-'    + moduleId);
       var regenBtn = el('mregen-'  + moduleId);
       var statusEl = el('mstatus-' + moduleId);
-
-      if (btn) { btn.disabled = true; btn.textContent = 'In coda…'; btn.classList.add('queued'); btn.classList.remove('done'); }
+      if (btn) { btn.disabled = true; btn.textContent = 'In coda...'; btn.classList.add('queued'); btn.classList.remove('done'); }
       if (regenBtn) regenBtn.classList.remove('visible');
-      if (statusEl) statusEl.textContent = 'Report in elaborazione — ricarica la pagina tra qualche secondo.';
-
+      if (statusEl) statusEl.textContent = 'Report in elaborazione - ricarica la pagina tra qualche secondo.';
+      var familyKey = mod.family || 'cambridge';
+      var moduleKey = mod.label || String(moduleId);
       var { error } = await supabase
         .from('ai_report_requests')
-        .insert([{ user_id: userId, session_ids: [currentSessionId], module_key: moduleId, scope_type: 'session' }]);
+        .insert([{ user_id: userId, family_key: familyKey, module_key: moduleKey, session_ids: [currentSessionId], scope_type: 'session' }]);
       if (error) {
-        if (btn) { btn.disabled = false; btn.textContent = 'Errore – riprova'; btn.classList.remove('queued'); }
-        if (statusEl) statusEl.textContent = 'Errore nell\'invio della richiesta.';
+        console.error('Request error:', error);
+        if (btn) { btn.disabled = false; btn.textContent = 'Errore - riprova'; btn.classList.remove('queued'); }
+        if (statusEl) statusEl.textContent = 'Errore: ' + error.message;
         return;
       }
-
-      /* optimistic: mark as pending in local cache */
-      existingReports[moduleId] = {
-        module_id:   moduleId,
-        status:      'pending',
-        report_text: null,
-        created_at:  new Date().toISOString()
-      };
-
-      /* start polling */
+      existingReports[moduleId] = { module_id: moduleId, status: 'pending', created_at: new Date().toISOString() };
       setTimeout(pollReportStatus, 2000);
     }
 
-    async function init() {
-      supabase = window.sottotitoliSupabase;
-      var root = el('analysisRoot');
-
-      if (!supabase) {
-        if (root) root.innerHTML = '<div class="analysis-signin-note">Supabase non disponibile.</div>';
-        return;
-      }
-
-      var { data: sessionData } = await supabase.auth.getSession();
-      if (!sessionData || !sessionData.session) {
-        if (root) root.innerHTML = '<div class="analysis-signin-note"><strong>Accedi con Google</strong> per vedere le tue sessioni e generare i report AI.</div>';
-        return;
-      }
-
-      // FIX #4 (cont.): assign to the module-scoped userId variable.
-      userId = sessionData.session.user.id;
-
-      var { data: modules } = await supabase
-        .from('ai_report_modules')
-        .select('id, label, description, family, default_rule')
-        .order('family')
-        .order('label');
-      allModules = modules || [];
-
-      var { data: sessions } = await supabase
-        .from('sessions')
-        .select('id, mode, started_at, duration_seconds, wpm')
-        .eq('user_id', userId)
-        .order('started_at', { ascending: false })
-        .limit(20);
-
-      renderRoot(sessions);
-      setTimeout(pollReportStatus, 1000);
-    }
-
-    /* ── poll report status ── */
     async function pollReportStatus() {
       if (!supabase || !currentSessionId) return;
-
-      // FIX #3: use report_text (real column) instead of summary_text (non-existent).
-      const { data: reports, error } = await supabase
+      var { data: reports, error } = await supabase
         .from('session_ai_reports')
-        .select('id, module_id, status, report_text, error_message')
+        .select('module_id, summary, summary_text, overall_score, confidence, strengths, issues, recommendations, status, error_message, created_at')
         .eq('session_id', currentSessionId);
-
-      if (error) {
-        console.error('Poll error:', error);
-        return;
-      }
-
+      if (error) { console.error('Poll error:', error); return; }
       if (!reports || reports.length === 0) return;
-
       reports.forEach(function(rep) {
         var moduleId  = rep.module_id;
         var btn       = el('mbtn-'    + moduleId);
         var regenBtn  = el('mregen-'  + moduleId);
         var statusEl  = el('mstatus-' + moduleId);
         var reportBox = el('mreport-' + moduleId);
-
-        if (rep.status === 'done' && rep.report_text) {
-          /* update existingReports cache */
+        if (rep.status === 'done') {
           existingReports[moduleId] = rep;
-          if (btn) {
-            btn.disabled = false;
-            btn.textContent = 'Scarica report';
-            btn.classList.add('done');
-            btn.classList.remove('queued');
-          }
+          if (btn) { btn.disabled = false; btn.textContent = 'Vedi report'; btn.classList.add('done'); btn.classList.remove('queued'); }
           if (regenBtn) regenBtn.classList.add('visible');
-          if (statusEl) statusEl.textContent = rep.created_at
-            ? 'Completato: ' + new Date(rep.created_at).toLocaleString()
-            : 'Completato.';
-          if (reportBox) {
-            reportBox.textContent = rep.report_text;
-            reportBox.classList.add('visible');
-          }
+          if (statusEl) statusEl.textContent = rep.created_at ? 'Completato: ' + new Date(rep.created_at).toLocaleString() : 'Completato.';
+          if (reportBox) { reportBox.innerHTML = formatReportHTML(rep); reportBox.classList.add('visible'); }
         } else if (rep.status === 'error') {
-          if (btn) {
-            btn.disabled = false;
-            btn.textContent = 'Errore — riprova';
-            btn.classList.remove('queued', 'done');
-          }
-          if (statusEl) statusEl.textContent = rep.error_message || 'Errore nell\'elaborazione.';
-        } else if (rep.status === 'processing') {
-          if (statusEl) statusEl.textContent = 'Report in elaborazione — attendi...';
+          if (btn) { btn.disabled = false; btn.textContent = 'Errore - riprova'; btn.classList.remove('queued', 'done'); }
+          if (statusEl) statusEl.textContent = rep.error_message || 'Errore.';
+        } else if (rep.status === 'processing' || rep.status === 'pending') {
+          if (statusEl) statusEl.textContent = 'Report in elaborazione - attendi...';
         }
       });
-
-      /* continue polling if anything is still in flight */
       var hasPending = reports.some(function(r) { return r.status === 'pending' || r.status === 'processing'; });
-      if (hasPending) {
-        setTimeout(pollReportStatus, 5000);
+      if (hasPending) setTimeout(pollReportStatus, 5000);
+    }
+
+    async function initAnalysis() {
+      supabase = window.sottotitoliSupabase;
+      var root = el('analysisRoot');
+      if (!supabase) {
+        if (root) root.innerHTML = '<div class="analysis-signin-note">Supabase non disponibile.</div>';
+        return;
       }
+      var { data: sessionData } = await supabase.auth.getSession();
+      if (!sessionData || !sessionData.session) {
+        if (root) root.innerHTML = '<div class="analysis-signin-note"><strong>Accedi con Google</strong> per vedere le tue sessioni e generare i report AI.</div>';
+        return;
+      }
+      userId = sessionData.session.user.id;
+      var { data: modules } = await supabase
+        .from('ai_report_modules')
+        .select('id, label, description, family, default_rule')
+        .order('family').order('label');
+      allModules = modules || [];
+      var { data: sessions } = await supabase
+        .from('sessions')
+        .select('id, mode, started_at, duration_seconds, wpm')
+        .eq('user_id', userId)
+        .order('started_at', { ascending: false })
+        .limit(20);
+      renderRoot(sessions);
+      setTimeout(pollReportStatus, 1000);
     }
 
     document.addEventListener('DOMContentLoaded', function() {
