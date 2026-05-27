@@ -1204,7 +1204,7 @@
       setTimeout(pollReportStatus, 1000);
     }
 
-// ── 4. Progress dashboard ──
+    // ── 4. Progress dashboard (using real sessions metrics) ──
     async function loadProgress() {
       var root = el('progressRoot');
       if (!root) return;
@@ -1214,111 +1214,75 @@
 
       var { data: sessionData } = await sb.auth.getSession();
       if (!sessionData || !sessionData.session) {
-        root.innerHTML = '<div class="analysis-signin-note"><strong>Accedi con Google</strong> per vedere il tuo vocabolario.</div>';
+        root.innerHTML = '<div class="analysis-signin-note"><strong>Accedi con Google</strong> per vedere le tue statistiche.</div>';
         return;
       }
 
       var uid = sessionData.session.user.id;
 
-      // Fetch all transcripts
+      // Fetch session metrics
       var { data: sessions } = await sb
         .from('sessions')
-        .select('id, transcript_text')
+        .select('id, words_count, unique_words_count, wpm, fillers_per_minute, lexical_diversity, quality_score, started_at, duration_seconds, mode')
         .eq('user_id', uid)
         .order('started_at', { ascending: false })
         .limit(50);
 
-      // Aggregate all words
-      var allTokens = [];
-      var allLines = [];
+      // Aggregate
+      var totalSessions = sessions ? sessions.length : 0;
+      var totalWords = 0;
+      var totalDuration = 0;
+      var sumWpm = 0;
+      var wpmCount = 0;
       if (sessions && sessions.length) {
         sessions.forEach(function(s) {
-          if (s.transcript_text) {
-            allLines.push(s.transcript_text);
-            var tokens = s.transcript_text.toLowerCase().match(/[a-z']+/g) || [];
-            allTokens = allTokens.concat(tokens);
-          }
+          if (s.words_count) totalWords += s.words_count;
+          if (s.duration_seconds) totalDuration += s.duration_seconds;
+          if (s.wpm != null) { sumWpm += s.wpm; wpmCount++; }
         });
       }
 
-      var uniqueWords = new Set(allTokens).size;
-      var totalWords = allTokens.length;
-
-      // POS mapping (basic heuristic or from lemma-pos-map.js)
-      var posMap = window.lemmaPosMap || {};
-      var verbs = new Set();
-      var nouns = new Set();
-      var adjectives = new Set();
-      allTokens.forEach(function(w) {
-        var entry = posMap[w];
-        if (entry) {
-          if (entry.pos === 'verb') verbs.add(w);
-          else if (entry.pos === 'noun') nouns.add(w);
-          else if (entry.pos === 'adj') adjectives.add(w);
-        }
-      });
-
-      // NGSL / Oxford counts
-      var ngslWords = new Set();
-      var oxfordWords = new Set();
-      var allUniqueList = Array.from(new Set(allTokens));
-      allUniqueList.forEach(function(w) {
-        if (posMap[w]) {
-          if (posMap[w].ngsl) ngslWords.add(w);
-          if (posMap[w].oxford) oxfordWords.add(w);
-        }
-      });
+      var avgWpm = wpmCount > 0 ? Math.round(sumWpm / wpmCount) : 0;
+      var avgDuration = totalSessions > 0 ? Math.round(totalDuration / totalSessions) : 0;
 
       var html = '';
 
       // Stats cards
       html += '<div class="row" style="margin-bottom:24px;">';
+      html += '<div class="col-md-3 col-sm-6 col-xs-12"><div class="progress-stat"><span class="number">' + totalSessions + '</span><span class="label">Sessions</span><span class="sub">completate</span></div></div>';
       html += '<div class="col-md-3 col-sm-6 col-xs-12"><div class="progress-stat"><span class="number">' + totalWords + '</span><span class="label">Total Words</span><span class="sub">in tutte le sessioni</span></div></div>';
-      html += '<div class="col-md-3 col-sm-6 col-xs-12"><div class="progress-stat"><span class="number">' + uniqueWords + '</span><span class="label">Unique Words</span><span class="sub">lessico totale</span></div></div>';
-      html += '<div class="col-md-3 col-sm-6 col-xs-12"><div class="progress-stat"><span class="number">' + verbs.size + '</span><span class="label">Unique Verbs</span><span class="sub">NGSL rilevati</span></div></div>';
-      html += '<div class="col-md-3 col-sm-6 col-xs-12"><div class="progress-stat"><span class="number">' + nouns.size + '</span><span class="label">Unique Nouns</span><span class="sub">NGSL rilevati</span></div></div>';
+      html += '<div class="col-md-3 col-sm-6 col-xs-12"><div class="progress-stat"><span class="number">' + avgWpm + '</span><span class="label">Avg WPM</span><span class="sub">velocita media</span></div></div>';
+      html += '<div class="col-md-3 col-sm-6 col-xs-12"><div class="progress-stat"><span class="number">' + formatDuration(avgDuration) + '</span><span class="label">Avg Duration</span><span class="sub">per sessione</span></div></div>';
       html += '</div>';
 
-      // Vocabulary list tables
-      html += '<div class="row">';
-      html += '<div class="col-md-6"><div class="progress-table-wrap"><h4><i class="fas fa-book" style="color:#2563eb;"></i>&nbsp; NGSL List Coverage</h4>';
-      html += '<table class="progress-table"><thead><tr><th>Word</th><th>POS</th><th>Frequency Band</th></tr></thead><tbody>';
-      var ngslItems = [];
-      allUniqueList.forEach(function(w) {
-        var entry = posMap[w];
-        if (entry && entry.ngsl) {
-          ngslItems.push({ word: w, pos: entry.pos || '?', band: entry.freqBand || '—' });
-        }
-      });
-      ngslItems.sort(function(a, b) { return a.word.localeCompare(b.word); });
-      ngslItems.slice(0, 60).forEach(function(item) {
-        html += '<tr><td>' + escHtml(item.word) + '</td><td>' + escHtml(item.pos) + '</td><td>' + escHtml(item.band) + '</td></tr>';
-      });
-      if (ngslItems.length === 0) html += '<tr><td colspan="3" style="color:#9ca3af;">Nessun dato NGSL ancora</td></tr>';
-      html += '</tbody></table><p style="font-size:12px;color:#6b7280;margin-top:10px;">' + ngslItems.length + ' parole NGSL uniche trovate</p></div></div>';
-
-      html += '<div class="col-md-6"><div class="progress-table-wrap"><h4><i class="fas fa-graduation-cap" style="color:#7c3aed;"></i>&nbsp; Oxford 3000 List Coverage</h4>';
-      html += '<table class="progress-table"><thead><tr><th>Word</th><th>POS</th><th>Level</th></tr></thead><tbody>';
-      var oxItems = [];
-      allUniqueList.forEach(function(w) {
-        var entry = posMap[w];
-        if (entry && entry.oxford) {
-          oxItems.push({ word: w, pos: entry.pos || '?', level: entry.level || '—' });
-        }
-      });
-      oxItems.sort(function(a, b) { return a.word.localeCompare(b.word); });
-      oxItems.slice(0, 60).forEach(function(item) {
-        html += '<tr><td>' + escHtml(item.word) + '</td><td>' + escHtml(item.pos) + '</td><td>' + escHtml(item.level) + '</td></tr>';
-      });
-      if (oxItems.length === 0) html += '<tr><td colspan="3" style="color:#9ca3af;">Nessun dato Oxford ancora</td></tr>';
-      html += '</tbody></table><p style="font-size:12px;color:#6b7280;margin-top:10px;">' + oxItems.length + ' parole Oxford 3000 uniche trovate</p></div></div>';
-
-      html += '</div>';
+      // Recent sessions table
+      html += '<div class="row"><div class="col-md-12"><div class="progress-table-wrap"><h4><i class="fas fa-history" style="color:#2563eb;"></i>&nbsp; Recent Sessions</h4>';
+      html += '<table class="progress-table"><thead><tr><th>Date</th><th>Mode</th><th>Words</th><th>WPM</th><th>Duration</th><th>Quality</th></tr></thead><tbody>';
+      if (sessions && sessions.length) {
+        sessions.slice(0, 20).forEach(function(s) {
+          var when = s.started_at ? new Date(s.started_at).toLocaleDateString() : '-';
+          var mode = s.mode || '-';
+          var words = s.words_count != null ? s.words_count : '-';
+          var wpm = s.wpm != null ? Math.round(s.wpm) : '-';
+          var dur = s.duration_seconds ? formatDuration(s.duration_seconds) : '-';
+          var q = s.quality_score != null ? (Math.round(Number(s.quality_score) * 100) + '%') : '-';
+          html += '<tr><td>' + escHtml(when) + '</td><td>' + escHtml(mode) + '</td><td>' + words + '</td><td>' + wpm + '</td><td>' + dur + '</td><td>' + q + '</td></tr>';
+        });
+      } else {
+        html += '<tr><td colspan="6" style="color:#9ca3af;">Nessuna sessione trovata. Avvia il microfono in Studio.</td></tr>';
+      }
+      html += '</tbody></table></div></div></div>';
 
       root.innerHTML = html;
     }
 
-    // ── 5. Init ──
+    function formatDuration(seconds) {
+      if (!seconds || seconds <= 0) return '0s';
+      var m = Math.floor(seconds / 60);
+      var s = seconds % 60;
+      if (m > 0) return m + 'm ' + s + 's';
+      return s + 's';
+    }// ── 5. Init ──
     document.addEventListener('DOMContentLoaded', function() {
       setTimeout(initAnalysis, 600);
       setTimeout(loadProgress, 700);
