@@ -237,31 +237,30 @@
     </div>
 
     <!-- Report families -->
-    <div class="report-families" id="reportFamilies">
-      <div class="family-card" data-family="cambridge">
+    <div class="family-tabs" id="reportFamilies">
+      <div class="family-tab active" data-family="cambridge" onclick="switchFamily('cambridge')">
         <div class="family-icon">🎓</div>
         <h3>Cambridge</h3>
         <p>Allineamento al CEFR, analisi grammaticale e copertura delle strutture richieste per gli esami Cambridge.</p>
-        <div class="family-modules" id="family-cambridge"></div>
       </div>
-      <div class="family-card" data-family="business">
+      <div class="family-tab" data-family="business" onclick="switchFamily('business')">
         <div class="family-icon">💼</div>
         <h3>Business</h3>
         <p>Lessico professionale, fluency in contesti aziendali, efficacia comunicativa in meeting e presentazioni.</p>
-        <div class="family-modules" id="family-business"></div>
       </div>
-      <div class="family-card" data-family="academic">
+      <div class="family-tab" data-family="academic" onclick="switchFamily('academic')">
         <div class="family-icon">📚</div>
         <h3>Academic</h3>
         <p>Struttura argomentativa, registro formale, lessico accademico e preparazione per IELTS/TOEFL.</p>
-        <div class="family-modules" id="family-academic"></div>
       </div>
-      <div class="family-card" data-family="linguistic">
+      <div class="family-tab" data-family="linguistic" onclick="switchFamily('linguistic')">
         <div class="family-icon">🔤</div>
         <h3>Linguistic</h3>
         <p>Analisi grammaticale dettagliata, pattern di errori, fillers, negazioni e diversità lessicale.</p>
-        <div class="family-modules" id="family-linguistic"></div>
       </div>
+    </div>
+    <div id="familyModulesContainer" class="family-modules-container">
+      <div class="family-placeholder" id="familyPlaceholder">Seleziona una famiglia di report qui sopra per vedere i moduli disponibili.</div>
     </div>
 
     <!-- Root for dynamic content (kept for backward compat) -->
@@ -699,6 +698,77 @@
     var navbar = document.getElementById('navbar');
     if(navbar) window.addEventListener('scroll',function(){navbar.classList.toggle('hidden',window.scrollY>200)},{passive:true});
   })();
+</script>
+<script>
+    // ── Family tab switching ──
+    function switchFamily(name) {
+      document.querySelectorAll('.family-tab').forEach(function(t){
+        t.classList.remove('active');
+      });
+      document.querySelector('.family-tab[data-family="'+name+'"]').classList.add('active');
+      
+      var container = document.getElementById('familyModulesContainer');
+      var placeholder = document.getElementById('familyPlaceholder');
+      
+      // Filter visible modules based on selected family
+      if (typeof allModules !== 'undefined' && allModules.length > 0) {
+        var filtered = allModules.filter(function(m) { return m.family === name; });
+        if (filtered.length === 0) {
+          container.innerHTML = '<div class="family-placeholder">Nessun modulo disponibile per questa famiglia.</div>';
+          return;
+        }
+        var html = '<div class="family-modules-list">';
+        filtered.forEach(function(mod) {
+          var btnId = 'mbtn-' + mod.id;
+          var statusId = 'mstatus-' + mod.id;
+          var reportId = 'mreport-' + mod.id;
+          var regenId = 'mregen-' + mod.id;
+          html += '<div class="fam-module">';
+          html += '<div class="fam-module-header"><span class="fam-module-label">' + mod.label + '</span><span class="fam-module-desc">' + (mod.description || '') + '</span></div>';
+          html += '<div class="fam-module-actions">';
+          html += '<button id="' + btnId + '" class="fam-btn" onclick="runModule('' + mod.id + '')" disabled><i class="fas fa-magic"></i> Genera report</button>';
+          html += '<button id="' + regenId + '" class="fam-btn fam-btn-regen" onclick="runModule('' + mod.id + '')" style="display:none"><i class="fas fa-redo"></i> Rigenera</button>';
+          html += '</div>';
+          html += '<div id="' + statusId + '" class="fam-status"></div>';
+          html += '<div id="' + reportId + '" class="fam-report"></div>';
+          html += '</div>';
+        });
+        html += '</div>';
+        container.innerHTML = html;
+        
+        // Restore existing reports from polled data
+        filtered.forEach(function(mod) {
+          if (existingReports && existingReports[mod.id]) {
+            var rep = existingReports[mod.id];
+            var btn = document.getElementById('mbtn-' + mod.id);
+            var regenBtn = document.getElementById('mregen-' + mod.id);
+            var reportBox = document.getElementById('mreport-' + mod.id);
+            if (btn) { btn.disabled = false; btn.textContent = 'Vedi report'; btn.classList.add('done'); }
+            if (regenBtn) regenBtn.style.display = 'inline-flex';
+            if (reportBox) { reportBox.innerHTML = formatReportHTML(rep); reportBox.classList.add('visible'); }
+          }
+        });
+      } else {
+        container.innerHTML = '<div class="family-placeholder">Carica una sessione per vedere i moduli disponibili.</div>';
+      }
+    }
+    
+    // Override the module buttons to work with family tabs too
+    function runModule(moduleId) {
+      // Find the session select and trigger existing handler
+      var sel = document.getElementById('sessionSelect');
+      if (sel && sel.value) {
+        // Call the existing runModule function from the old code
+        if (typeof window.runSingleModule === 'function') {
+          window.runSingleModule(moduleId);
+        } else {
+          // Fall back to the old initRunModule
+          initRunModule(moduleId);
+        }
+      } else {
+        alert('Seleziona prima una sessione.');
+      }
+    }
 </script>
 </body>
 </html>
