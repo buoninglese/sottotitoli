@@ -749,6 +749,142 @@ const { data: sessions, error: sessionsError } = await accountSupabase
     URL.revokeObjectURL(url);
   }
 
+
+  // ── User preferences: load & save ──
+  const nativeLangEl = document.getElementById('prefNativeLang');
+  const targetLang1El = document.getElementById('prefTargetLang1');
+  const targetLang2El = document.getElementById('prefTargetLang2');
+  const levelEl = document.getElementById('prefLevel');
+  const goalEl = document.getElementById('prefGoal');
+  const sessionsPerWeekEl = document.getElementById('prefSessionsPerWeek');
+  const dailyRemindersEl = document.getElementById('prefDailyReminders');
+  const weeklyReportsEl = document.getElementById('prefWeeklyReports');
+  const saveBtnEl = document.getElementById('prefSaveBtn');
+  const statusEl = document.getElementById('prefStatus');
+
+  function loadPreferences(prefs) {
+    if (!prefs) return;
+    if (nativeLangEl && prefs.native_lang) nativeLangEl.value = prefs.native_lang;
+    if (targetLang1El && prefs.target_lang_1) targetLang1El.value = prefs.target_lang_1;
+    if (targetLang2El && prefs.target_lang_2) targetLang2El.value = prefs.target_lang_2 || '';
+    if (levelEl && prefs.level) levelEl.value = prefs.level;
+    if (goalEl && prefs.goal) goalEl.value = prefs.goal;
+    if (sessionsPerWeekEl && prefs.sessions_per_week) sessionsPerWeekEl.value = prefs.sessions_per_week;
+    if (dailyRemindersEl) {
+      dailyRemindersEl.classList.toggle('on', prefs.daily_reminders !== false);
+    }
+    if (weeklyReportsEl) {
+      weeklyReportsEl.classList.toggle('on', prefs.weekly_reports === true);
+    }
+  }
+
+  function getPreferences() {
+    return {
+      native_lang: nativeLangEl ? nativeLangEl.value : 'en',
+      target_lang_1: targetLang1El ? targetLang1El.value || null : null,
+      target_lang_2: targetLang2El ? targetLang2El.value || null : null,
+      level: levelEl ? levelEl.value : 'B1',
+      goal: goalEl ? goalEl.value : 'b2_6m',
+      sessions_per_week: sessionsPerWeekEl ? parseInt(sessionsPerWeekEl.value) || 4 : 4,
+      daily_reminders: dailyRemindersEl ? dailyRemindersEl.classList.contains('on') : true,
+      weekly_reports: weeklyReportsEl ? weeklyReportsEl.classList.contains('on') : false
+    };
+  }
+
+  async function savePreferences() {
+    if (!accountSupabase) {
+      if (statusEl) { statusEl.textContent = '❌ Supabase non disponibile'; statusEl.className = 'status error'; }
+      return;
+    }
+    const { data: sessionData } = await accountSupabase.auth.getSession();
+    if (!sessionData || !sessionData.session) {
+      if (statusEl) { statusEl.textContent = '❌ Devi aver effettuato l'accesso'; statusEl.className = 'status error'; }
+      return;
+    }
+    const user_id = sessionData.session.user.id;
+    const prefs = getPreferences();
+
+    const { error } = await accountSupabase
+      .from('user_preferences')
+      .upsert({ user_id: user_id, ...prefs, updated_at: new Date().toISOString() }, { onConflict: 'user_id' });
+
+    if (error) {
+      if (statusEl) { statusEl.textContent = '❌ Errore salvataggio: ' + error.message; statusEl.className = 'status error'; }
+    } else {
+      if (statusEl) { statusEl.textContent = '✓ Impostazioni salvate'; statusEl.className = 'status'; }
+      setTimeout(function() { if (statusEl) statusEl.textContent = ''; }, 3000);
+    }
+  }
+
+  async function loadPreferencesFromDB() {
+    if (!accountSupabase) return;
+    const { data: sessionData } = await accountSupabase.auth.getSession();
+    if (!sessionData || !sessionData.session) return;
+    const user_id = sessionData.session.user.id;
+
+    const { data, error } = await accountSupabase
+      .from('user_preferences')
+      .select('*')
+      .eq('user_id', user_id)
+      .limit(1)
+      .maybeSingle();
+
+    if (!error && data) {
+      loadPreferences(data);
+    }
+  }
+
+  if (saveBtnEl) {
+    saveBtnEl.addEventListener('click', savePreferences);
+  }
+
+  // Toggle click handler
+  document.querySelectorAll('.toggle').forEach(function(el) {
+    el.addEventListener('click', function() {
+      if (el.id === 'accThemeToggle') return; // handled by theme toggle
+      el.classList.toggle('on');
+    });
+  });
+
+  // Prevent selecting same language for both targets
+  if (targetLang1El && targetLang2El) {
+    function enforceUniqueTargets() {
+      var v1 = targetLang1El.value;
+      var v2 = targetLang2El.value;
+      if (v1 && v1 === v2) {
+        targetLang2El.value = '';
+      }
+      // Disable options in target 2 that match target 1
+      Array.from(targetLang2El.options).forEach(function(opt) {
+        opt.disabled = opt.value && opt.value === v1;
+      });
+    }
+    targetLang1El.addEventListener('change', enforceUniqueTargets);
+    targetLang2El.addEventListener('change', function() {
+      var v1 = targetLang1El.value;
+      var v2 = targetLang2El.value;
+      if (v1 && v1 === v2) {
+        targetLang1El.value = '';
+      }
+    });
+    // Also prevent native == target
+    if (nativeLangEl) {
+      nativeLangEl.addEventListener('change', function() {
+        var nv = nativeLangEl.value;
+        if (targetLang1El.value === nv) targetLang1El.value = '';
+        if (targetLang2El.value === nv) targetLang2El.value = '';
+      });
+    }
+  }
+
+  // Load preferences after account data
+  // This is called at the end of loadAccount()
+  var origLoadAccount = loadAccount;
+  loadAccount = function() {
+    origLoadAccount();
+    loadPreferencesFromDB();
+  };
+
   if (downloadCsvBtn) {
     downloadCsvBtn.addEventListener('click', downloadSessionsCsv);
   }

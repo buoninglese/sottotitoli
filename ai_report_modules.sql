@@ -50,3 +50,37 @@ INSERT INTO ai_report_modules (label, description, family, default_rule) VALUES
 --  • Business: 3 modules
 --  • Academic: 3 modules
 --  • Linguistic Analysis: 4 modules
+
+-- ============================================================
+-- user_preferences table
+-- Stores per-user language learning preferences
+-- ============================================================
+CREATE TABLE IF NOT EXISTS public.user_preferences (
+  user_id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
+  native_lang TEXT NOT NULL DEFAULT 'en',
+  target_lang_1 TEXT,
+  target_lang_2 TEXT,
+  level TEXT NOT NULL DEFAULT 'B1',
+  goal TEXT NOT NULL DEFAULT 'b2_6m',
+  sessions_per_week INTEGER NOT NULL DEFAULT 4,
+  daily_reminders BOOLEAN NOT NULL DEFAULT true,
+  weekly_reports BOOLEAN NOT NULL DEFAULT false,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+ALTER TABLE public.user_preferences ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users can view own preferences"
+  ON public.user_preferences FOR SELECT
+  USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can insert own preferences"
+  ON public.user_preferences FOR INSERT
+  WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Users can update own preferences"
+  ON public.user_preferences FOR UPDATE
+  USING (auth.uid() = user_id);
+
+-- Grant access to authenticated users
+GRANT SELECT, INSERT, UPDATE ON public.user_preferences TO authenticated;
