@@ -841,8 +841,17 @@ const { data: sessions, error: sessionsError } = await accountSupabase
   // Toggle click handler
   document.querySelectorAll('.toggle').forEach(function(el) {
     el.addEventListener('click', function() {
-      if (el.id === 'accThemeToggle') return; // handled by theme toggle
       el.classList.toggle('on');
+      // If this is the dark mode toggle, also apply the theme
+      if (el.id === 'accThemeToggle') {
+        var html = document.documentElement;
+        var isDark = el.classList.contains('on');
+        html.setAttribute('data-theme', isDark ? 'dark' : 'light');
+        localStorage.setItem('sottotitoli-theme', isDark ? 'dark' : 'light');
+        // Sync the navbar theme button icon
+        var navBtn = document.getElementById('themeToggle');
+        if (navBtn) navBtn.textContent = isDark ? '☀️' : '🌙';
+      }
     });
   });
 
