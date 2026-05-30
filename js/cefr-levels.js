@@ -352,12 +352,12 @@ window.getCEFRLevel = function(word) {
   return 'C2';
 };
 
-// Color map for CEFR levels
+// Color map for CEFR levels — clearly distinguishable
 window.CEFR_COLORS = {
-  'A1': { bg: '#dbeafe', text: '#1e40af', label: 'A1 · Principiante' },
-  'A2': { bg: '#d1fae5', text: '#065f46', label: 'A2 · Elementare' },
-  'B1': { bg: '#fef3c7', text: '#92400e', label: 'B1 · Intermedio' },
-  'B2': { bg: '#e0e7ff', text: '#3730a3', label: 'B2 · Intermedio superiore' },
-  'C1': { bg: '#fce7f3', text: '#9d174d', label: 'C1 · Avanzato' },
-  'C2': { bg: '#ede9fe', text: '#5b21b6', label: 'C2 · Padronanza' }
+  'A1': { bg: '#e2e8f0', text: '#475569', label: 'A1 · Principiante' },
+  'A2': { bg: '#bbf7d0', text: '#15803d', label: 'A2 · Elementare' },
+  'B1': { bg: '#fef08a', text: '#854d0e', label: 'B1 · Intermedio' },
+  'B2': { bg: '#bfdbfe', text: '#1d4ed8', label: 'B2 · Intermedio sup.' },
+  'C1': { bg: '#e9d5ff', text: '#6b21a8', label: 'C1 · Avanzato' },
+  'C2': { bg: '#fbcfe8', text: '#9d174d', label: 'C2 · Padronanza' }
 };
