@@ -1,28 +1,13 @@
 // AI Analysis Module Prompts
-// Maps module IDs to specialized assessment prompts
+// Maps module IDs (1-14, matching ai_report_modules.sql INSERT order) to specialized assessment prompts
 
 export const MODULE_PROMPTS: Record<number, { system: string; user: (transcript: string) => string }> = {
-  // === CAMBRIDGE MODULES ===
-  
-  // 1. Fluency & Coherence
-  3: {
-    system: `You are an expert Cambridge English examiner specializing in Fluency & Coherence assessment for speaking tests (B1-C2 levels).`,
-    user: (transcript: string) => `Analyze this speaking transcript for Fluency & Coherence:
+  // ========================================================
+  // CAMBRIDGE MODULES (SQL rows 1-4)
+  // ========================================================
 
-${transcript}
-
-Provide:
-1. Overall Fluency Score (rate of speech, hesitations, pauses)
-2. Coherence Assessment (logical organization, discourse markers)
-3. Specific Examples from transcript
-4. Improvement Recommendations
-5. CEFR Level Estimate (B1-C2)
-
-Format: Professional, concise, actionable.`
-  },
-
-  // 2. Grammar & Accuracy
-  4: {
+  // 1. Grammar & Accuracy
+  1: {
     system: `You are an expert Cambridge English examiner specializing in Grammatical Range & Accuracy assessment.`,
     user: (transcript: string) => `Analyze this speaking transcript for Grammar & Accuracy:
 
@@ -39,8 +24,42 @@ Provide:
 Be specific with examples from the transcript.`
   },
 
-  // 3. Pronunciation
-  5: {
+  // 2. Vocabulary Range
+  2: {
+    system: `You are an expert Cambridge English examiner specializing in Lexical Resource assessment.`,
+    user: (transcript: string) => `Analyze this speaking transcript for Vocabulary Range:
+
+${transcript}
+
+Provide:
+1. Lexical Range Score (variety and sophistication)
+2. Topic-Specific Vocabulary usage
+3. Collocations and Phrases identified
+4. Overused words/phrases
+5. Vocabulary gaps
+6. Recommendations for expansion
+7. CEFR Level Estimate`
+  },
+
+  // 3. Fluency & Coherence
+  3: {
+    system: `You are an expert Cambridge English examiner specializing in Fluency & Coherence assessment for speaking tests (B1-C2 levels).`,
+    user: (transcript: string) => `Analyze this speaking transcript for Fluency & Coherence:
+
+${transcript}
+
+Provide:
+1. Overall Fluency Score (rate of speech, hesitations, pauses)
+2. Coherence Assessment (logical organization, discourse markers)
+3. Specific Examples from transcript
+4. Improvement Recommendations
+5. CEFR Level Estimate (B1-C2)
+
+Format: Professional, concise, actionable.`
+  },
+
+  // 4. Pronunciation
+  4: {
     system: `You are an expert Cambridge English examiner specializing in Pronunciation assessment.`,
     user: (transcript: string) => `Analyze this speaking transcript for Pronunciation features:
 
@@ -57,29 +76,14 @@ Provide:
 Note: Base analysis on text patterns that suggest pronunciation issues (repeated words, discourse markers suggesting uncertainty).`
   },
 
-  // 4. Vocabulary Range
-  6: {
-    system: `You are an expert Cambridge English examiner specializing in Lexical Resource assessment.`,
-    user: (transcript: string) => `Analyze this speaking transcript for Vocabulary Range:
+  // ========================================================
+  // BUSINESS MODULES (SQL rows 5-7)
+  // ========================================================
 
-${transcript}
-
-Provide:
-1. Lexical Range Score (variety and sophistication)
-2. Topic-Specific Vocabulary usage
-3. Collocations and Phrases identified
-4. Overused words/phrases
-5. Vocabulary gaps
-6. Recommendations for expansion
-7. CEFR Level Estimate`
-  },
-
-  // === BUSINESS MODULES ===
-
-  // 5. Formal Register
-  7: {
+  // 5. Professional Communication
+  5: {
     system: `You are an expert business English assessor specializing in formal register and professional communication.`,
-    user: (transcript: string) => `Analyze this speaking transcript for Business Formal Register:
+    user: (transcript: string) => `Analyze this speaking transcript for Business Professional Communication:
 
 ${transcript}
 
@@ -92,10 +96,10 @@ Provide:
 6. Suitability for business settings`
   },
 
-  // 6. Presentation Skills
-  8: {
+  // 6. Meetings & Presentations
+  6: {
     system: `You are an expert business communication coach specializing in presentation skills assessment.`,
-    user: (transcript: string) => `Analyze this speaking transcript for Presentation Skills:
+    user: (transcript: string) => `Analyze this speaking transcript for Meetings & Presentations:
 
 ${transcript}
 
@@ -108,12 +112,30 @@ Provide:
 6. Recommendations for business presentations`
   },
 
-  // === ACADEMIC MODULES ===
+  // 7. Business Vocabulary
+  7: {
+    system: `You are an expert business English assessor specializing in industry-specific terminology and business idioms.`,
+    user: (transcript: string) => `Analyze this speaking transcript for Business Vocabulary:
 
-  // 7. Academic Register
-  9: {
+${transcript}
+
+Provide:
+1. Industry and field-specific terminology usage
+2. Business idioms and phrasal verbs
+3. Financial/commercial language
+4. Formal vs informal business register
+5. Suggestions for expanding professional lexicon
+6. Comparison to business communication standards`
+  },
+
+  // ========================================================
+  // ACADEMIC MODULES (SQL rows 8-10)
+  // ========================================================
+
+  // 8. Academic Discourse
+  8: {
     system: `You are an expert academic English assessor specializing in academic discourse analysis.`,
-    user: (transcript: string) => `Analyze this speaking transcript for Academic Register:
+    user: (transcript: string) => `Analyze this speaking transcript for Academic Discourse:
 
 ${transcript}
 
@@ -126,28 +148,46 @@ Provide:
 6. Suitability for academic contexts`
   },
 
-  // 8. Critical Thinking
-  10: {
+  // 9. Research Communication
+  9: {
     system: `You are an expert academic skills assessor specializing in critical thinking evaluation.`,
-    user: (transcript: string) => `Analyze this speaking transcript for Critical Thinking:
+    user: (transcript: string) => `Analyze this speaking transcript for Research Communication:
 
 ${transcript}
 
 Provide:
-1. Depth of Analysis
-2. Evidence of reasoning (cause-effect, comparison)
-3. Evaluation of ideas
-4. Perspective-taking
-5. Argument structure
+1. Methodology description clarity
+2. Results and data presentation
+3. Limitations and implications discussion
+4. Technical terminology accuracy
+5. Ability to respond to academic questioning
 6. Recommendations for academic development`
   },
 
-  // === LINGUISTIC ANALYSIS MODULES ===
+  // 10. Academic Vocabulary
+  10: {
+    system: `You are an expert academic English assessor specializing in academic vocabulary and terminology.`,
+    user: (transcript: string) => `Analyze this speaking transcript for Academic Vocabulary:
 
-  // 9. Discourse Markers
+${transcript}
+
+Provide:
+1. Academic word list coverage
+2. Subject-specific terminology
+3. Abstract noun usage
+4. Nominalization patterns
+5. Formal register maintenance
+6. Comparison against academic corpus standards`
+  },
+
+  // ========================================================
+  // LINGUISTIC ANALYSIS MODULES (SQL rows 11-14)
+  // ========================================================
+
+  // 11. Discourse Analysis
   11: {
     system: `You are an expert linguist specializing in discourse analysis and cohesion.`,
-    user: (transcript: string) => `Analyze this speaking transcript for Discourse Markers:
+    user: (transcript: string) => `Analyze this speaking transcript for Discourse Analysis:
 
 ${transcript}
 
@@ -160,10 +200,10 @@ Provide:
 6. Recommendations for balanced usage`
   },
 
-  // 10. Complexity Metrics
+  // 12. Syntax & Complexity
   12: {
     system: `You are an expert computational linguist specializing in language complexity measurement.`,
-    user: (transcript: string) => `Analyze this speaking transcript for Linguistic Complexity:
+    user: (transcript: string) => `Analyze this speaking transcript for Syntax & Complexity:
 
 ${transcript}
 
@@ -176,79 +216,45 @@ Provide:
 6. Comparison to CEFR benchmarks`
   },
 
-  // 11. Error Analysis
+  // 13. Lexical Analysis
   13: {
     system: `You are an expert error analysis specialist in second language acquisition.`,
-    user: (transcript: string) => `Perform comprehensive Error Analysis on this transcript:
+    user: (transcript: string) => `Perform comprehensive Lexical Analysis on this transcript:
 
 ${transcript}
 
 Provide:
-1. Error Categories (grammar, lexical, discourse)
-2. Error Frequency by type
-3. Developmental vs Fossilized errors
-4. Interlanguage patterns
-5. Prioritized correction areas
-6. Learning implications`
+1. Type-token ratio interpretation
+2. Lexical density metrics
+3. Word frequency distribution
+4. Semantic fields and domains
+5. Lexical sophistication indices
+6. Recommendations for vocabulary development`
   },
 
-  // 12. Interaction Patterns
+  // 14. Filler Analysis
   14: {
     system: `You are an expert conversation analyst specializing in interactive competence.`,
-    user: (transcript: string) => `Analyze this speaking transcript for Interaction Patterns:
+    user: (transcript: string) => `Analyze this speaking transcript for Filler Analysis:
 
 ${transcript}
 
 Provide:
-1. Turn-taking ability
-2. Topic development and maintenance
-3. Repair strategies
-4. Backchanneling
-5. Collaborative communication
-6. Conversational competence level`
-  },
-
-  // 13. Pragmatic Competence
-  15: {
-    system: `You are an expert pragmatics specialist analyzing communicative effectiveness.`,
-    user: (transcript: string) => `Analyze this speaking transcript for Pragmatic Competence:
-
-${transcript}
-
-Provide:
-1. Speech act realization (requests, apologies, etc.)
-2. Politeness strategies
-3. Appropriateness to context
-4. Implicature and inference
-5. Sociolinguistic awareness
-6. Communicative effectiveness`
-  },
-
-  // 14. Narrative Structure
-  16: {
-    system: `You are an expert narrative analysis specialist in discourse studies.`,
-    user: (transcript: string) => `Analyze this speaking transcript for Narrative Structure:
-
-${transcript}
-
-Provide:
-1. Narrative organization (orientation, complication, resolution)
-2. Temporal sequencing
-3. Character and setting development
-4. Evaluation and reflection
-5. Narrative coherence
-6. Storytelling effectiveness`
+1. Filler word distribution (um, uh, er, like, you know, etc.)
+2. False starts and self-repairs
+3. Pause patterns (estimated from transcript)
+4. Repetition types and frequency
+5. Strategic vs problematic disfluencies
+6. Recommendations for reducing fillers and improving fluency`
   }
 };
 
-// Helper function to get prompt for a module
-export function getModulePrompt(moduleId: number, transcript: string) {
-  const prompt = MODULE_PROMPTS[moduleId];
-  if (!prompt) {
-    throw new Error(`No prompt found for module ID: ${moduleId}`);
-  }
+// Helper function to get the prompt for a specific module
+export function getModulePrompt(moduleId: number, transcript: string): { system: string; user: string } | null {
+  const module = MODULE_PROMPTS[moduleId];
+  if (!module) return null;
   return {
-    system: prompt.system,
-    user: prompt.user(transcript)
+    system: module.system,
+    user: module.user(transcript)
   };
 }
