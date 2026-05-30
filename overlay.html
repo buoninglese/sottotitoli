@@ -1,399 +1,306 @@
 <!DOCTYPE html>
-<html lang="en" class="no-js">
+<html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <title>Sottotitoli Overlay</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta charset="utf-8" />
+<title>Sottotitoli Overlay</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="icon" type="image/png" href="img/favicon.png" />
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 
-  <link rel="icon" type="image/png" href="img/favicon.png" />
-  <link rel="stylesheet" href="css/normalize.css" />
-  <link rel="stylesheet" href="css/bootstrap.min.css" />
-  <link rel="stylesheet" href="css/responsive.css" />
-  <link rel="stylesheet" href="style.css" />
+/* ═══════════════════════════════════════ */
+/* BASE — no-box single caption           */
+/* ═══════════════════════════════════════ */
+body {
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  background: #000;
+  color: #fff;
+  min-height: 100vh;
+  overflow: hidden;
+  -webkit-font-smoothing: antialiased;
+  transition: background .6s;
+}
 
-  <style>
-    :root {
-      --overlay-bg: rgba(5, 12, 24, 0.94);
-      --overlay-card: rgba(15, 29, 52, 0.96);
-      --overlay-border: rgba(96, 165, 250, 0.35);
-      --overlay-muted: #9fb4d3;
-      --overlay-accent: #60a5fa;
-    }
+/* ── Aurora layer ── */
+.aurora{position:fixed;inset:0;z-index:0;opacity:0.7;pointer-events:none;}
+.aurora::before,.aurora::after{content:'';position:absolute;border-radius:50%;filter:blur(120px);}
+.aurora::before{width:60vw;height:60vw;top:-20%;left:10%;animation:auroraFloat 14s ease-in-out infinite;}
+.aurora::after{width:50vw;height:50vw;bottom:-15%;right:5%;animation:auroraFloat 18s ease-in-out infinite reverse;}
+@keyframes auroraFloat{0%,100%{transform:translate(0,0) scale(1)}25%{transform:translate(8%,5%) scale(1.1)}50%{transform:translate(-3%,-4%) scale(.95)}75%{transform:translate(-6%,2%) scale(1.05)}}
 
-    body {
-      margin: 0;
-      padding: 0;
-      background: radial-gradient(circle at top left, rgba(96, 165, 250, .28), transparent 55%),
-                  linear-gradient(180deg, #020617, #020617);
-      color: #e5edff;
-      font-family: "Montserrat", system-ui, -apple-system, BlinkMacSystemFont,
-        "Segoe UI", sans-serif;
-    }
+/* ── Grid overlay ── */
+.grid-overlay{position:fixed;inset:0;z-index:0;pointer-events:none;
+  background-image:radial-gradient(circle at 30% 40%,rgba(255,255,255,.015) 1px,transparent 1px),radial-gradient(circle at 70% 60%,rgba(255,255,255,.01) 1px,transparent 1px);
+  background-size:60px 60px,80px 80px;}
 
-    .overlay-shell {
-      min-height: 100vh;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      padding: 24px;
-    }
+/* ── Caption stage ── */
+.caption-stage{position:fixed;inset:0;z-index:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:60px 40px;pointer-events:none;gap:16px;}
+.caption-box{font-size:clamp(32px,5.5vw,68px);font-weight:600;line-height:1.3;text-align:center;letter-spacing:-0.03em;min-height:1.3em;word-break:break-word;max-width:90vw;animation:textReveal .5s ease-out;transition:opacity .3s;}
+@keyframes textReveal{from{opacity:0;transform:translateY(8px);filter:blur(4px)}to{opacity:1;transform:translateY(0);filter:blur(0)}}
+.caption-placeholder{font-size:clamp(16px,2.5vw,22px);font-weight:300;letter-spacing:.04em;text-align:center;position:absolute;}
 
-    .overlay-card {
-      width: 100%;
-      max-width: 1080px;
-      background: var(--overlay-card);
-      border-radius: 22px;
-      border: 1px solid var(--overlay-border);
-      box-shadow:
-        0 18px 50px rgba(0, 0, 0, .55),
-        0 0 0 1px rgba(15, 23, 42, .9);
-      padding: 18px 20px 20px;
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
-    }
+/* ── POS coloring (lesson mode) ── */
+.pos-verb{color:#3b82f6;}
+.pos-noun{color:#22c55e;}
+.pos-adj{color:#f59e0b;}
+.pos-adv{color:#a855f7;}
 
-    .overlay-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: baseline;
-      gap: 10px;
-      font-size: 13px;
-      color: var(--overlay-muted);
-    }
+/* ── Translation box ── */
+.translation-box{margin-top:8px;padding:10px 0;display:none;text-align:center;max-width:90vw;}
+.translation-box.visible{display:block;}
+.translation-box .t-label{display:block;font-size:10px;text-transform:uppercase;letter-spacing:.16em;font-weight:700;margin-bottom:6px;}
+.translation-box .t-text{font-size:clamp(24px,4vw,48px);font-weight:400;line-height:1.35;word-break:break-word;}
 
-    .overlay-room {
-      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-      font-size: 13px;
-      padding: 4px 8px;
-      border-radius: 999px;
-      background: rgba(15, 23, 42, .9);
-      border: 1px solid rgba(148, 163, 184, .7);
-      color: #dbeafe;
-    }
+/* ── Status pill ── */
+.status-pill{position:fixed;bottom:28px;right:32px;z-index:10;display:flex;align-items:center;gap:8px;padding:6px 14px;border-radius:100px;background:rgba(255,255,255,.04);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border:1px solid rgba(255,255,255,.08);font-size:11px;font-weight:500;transition:all .4s;pointer-events:auto;}
+.status-pill .dot{width:6px;height:6px;border-radius:50%;background:rgba(255,255,255,.2);transition:background .4s,box-shadow .4s;}
+.status-pill.connected{border-color:rgba(34,197,94,.2);}
+.status-pill.connected .dot{background:#22c55e;box-shadow:0 0 8px rgba(34,197,94,.5);}
+.status-pill .room-id{font-family:ui-monospace,monospace;font-size:10px;margin-left:4px;}
 
-    .overlay-status {
-      font-size: 12px;
-      display: flex;
-      align-items: center;
-      gap: 6px;
-    }
+/* ── Corner badges ── */
+.mode-badge{position:fixed;top:28px;left:32px;z-index:10;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.2em;pointer-events:auto;}
+.style-toggle{position:fixed;top:28px;right:32px;z-index:10;padding:6px 16px;border-radius:100px;font-family:inherit;font-size:12px;font-weight:600;cursor:pointer;pointer-events:auto;transition:all .25s;border:1px solid;}
+.style-toggle:hover{transform:scale(1.05);}
 
-    .overlay-dot {
-      width: 9px;
-      height: 9px;
-      border-radius: 999px;
-      background: #f97316;
-      box-shadow: 0 0 0 4px rgba(248, 150, 70, .22);
-    }
+@media(max-width:640px){.caption-stage{padding:40px 20px}.status-pill{bottom:16px;right:16px;font-size:10px}.mode-badge{top:16px;left:16px}.style-toggle{top:16px;right:16px;font-size:11px;padding:5px 12px}}
 
-    .overlay-dot.connected {
-      background: #22c55e;
-      box-shadow: 0 0 0 4px rgba(34, 197, 94, .25);
-    }
+/* ═══════════════════════════════════════ */
+/* STYLE 1 — AURORA (purple/blue)         */
+/* ═══════════════════════════════════════ */
+[data-style="1"] .caption-box{color:rgba(255,255,255,.92);text-shadow:0 0 40px rgba(255,255,255,.15),0 0 80px rgba(124,58,237,.1),0 2px 4px rgba(0,0,0,.5);}
+[data-style="1"] .caption-placeholder{color:rgba(255,255,255,.18);}
+[data-style="1"] .t-label{color:rgba(167,139,250,.6);}
+[data-style="1"] .t-text{color:rgba(196,181,253,.85);}
+[data-style="1"] .aurora::before{background:radial-gradient(circle,rgba(124,58,237,.25),transparent 70%);}
+[data-style="1"] .aurora::after{background:radial-gradient(circle,rgba(37,99,235,.2),transparent 70%);}
+[data-style="1"] .status-pill{color:rgba(255,255,255,.4);}
+[data-style="1"] .status-pill.connected{color:rgba(255,255,255,.6);}
+[data-style="1"] .mode-badge{color:rgba(255,255,255,.2);}
+[data-style="1"] .style-toggle{background:rgba(124,58,237,.1);color:rgba(255,255,255,.5);border-color:rgba(124,58,237,.25);}
 
-    .overlay-caption-box {
-      margin-top: 4px;
-      border-radius: 18px;
-      background: radial-gradient(circle at top left, rgba(59, 130, 246, .20), transparent 45%),
-                  rgba(15, 23, 42, .96);
-      border: 1px solid rgba(148, 163, 184, .35);
-      padding: 18px 20px;
-      font-size: 30px;
-      line-height: 1.6;
-      text-align: center;
-      word-wrap: break-word;
-      word-break: break-word;
-      min-height: 96px;
-    }
+/* ═══════════════════════════════════════ */
+/* STYLE 2 — NEON (hot pink / cyan)       */
+/* ═══════════════════════════════════════ */
+[data-style="2"] body{background:#050510;}
+[data-style="2"] .caption-box{color:#fff;font-weight:700;text-shadow:0 0 30px rgba(236,72,153,.6),0 0 60px rgba(6,182,212,.4),0 0 100px rgba(236,72,153,.3);}
+[data-style="2"] .caption-placeholder{color:rgba(236,72,153,.15);}
+[data-style="2"] .t-label{color:rgba(6,182,212,.7);}
+[data-style="2"] .t-text{color:rgba(6,182,212,.8);}
+[data-style="2"] .aurora::before{background:radial-gradient(circle,rgba(236,72,153,.22),transparent 70%);width:50vw;height:50vw;top:10%;left:30%;}
+[data-style="2"] .aurora::after{background:radial-gradient(circle,rgba(6,182,212,.18),transparent 70%);width:55vw;height:55vw;bottom:5%;right:10%;}
+[data-style="2"] .status-pill{color:rgba(236,72,153,.5);border-color:rgba(236,72,153,.12);background:rgba(236,72,153,.03);}
+[data-style="2"] .status-pill.connected{color:rgba(6,182,212,.7);}
+[data-style="2"] .mode-badge{color:rgba(236,72,153,.3);}
+[data-style="2"] .style-toggle{background:rgba(236,72,153,.08);color:rgba(236,72,153,.7);border-color:rgba(236,72,153,.2);}
 
-    .overlay-translation-box {
-      margin-top: 8px;
-      border-radius: 18px;
-      background: radial-gradient(circle at top left, rgba(124, 58, 237, .18), transparent 45%),
-                  rgba(15, 23, 42, .96);
-      border: 1px solid rgba(167, 139, 250, .35);
-      padding: 14px 18px;
-      font-size: 26px;
-      line-height: 1.5;
-      text-align: center;
-      word-wrap: break-word;
-      word-break: break-word;
-      min-height: 60px;
-      display: none;
-    }
+/* ═══════════════════════════════════════ */
+/* STYLE 3 — MINIMAL (pure black & white) */
+/* ═══════════════════════════════════════ */
+[data-style="3"] .aurora{display:none;}
+[data-style="3"] .grid-overlay{display:none;}
+[data-style="3"] .caption-box{color:#fff;font-weight:500;text-shadow:none;animation:none;}
+[data-style="3"] .caption-placeholder{color:rgba(255,255,255,.1);}
+[data-style="3"] .t-label{color:rgba(255,255,255,.2);}
+[data-style="3"] .t-text{color:rgba(255,255,255,.55);}
+[data-style="3"] .status-pill{color:rgba(255,255,255,.25);background:transparent;border-color:rgba(255,255,255,.05);}
+[data-style="3"] .status-pill.connected{color:rgba(255,255,255,.4);}
+[data-style="3"] .mode-badge{color:rgba(255,255,255,.12);}
+[data-style="3"] .style-toggle{background:transparent;color:rgba(255,255,255,.25);border-color:rgba(255,255,255,.08);}
 
-    .overlay-translation-box.visible { display: block; }
+/* ═══════════════════════════════════════ */
+/* STYLE 4 — WARM (amber / gold)          */
+/* ═══════════════════════════════════════ */
+[data-style="4"] body{background:#0a0800;}
+[data-style="4"] .caption-box{color:rgba(255,248,230,.9);font-weight:700;text-shadow:0 0 30px rgba(251,191,36,.25),0 0 60px rgba(245,158,11,.15),0 2px 8px rgba(0,0,0,.6);}
+[data-style="4"] .caption-placeholder{color:rgba(251,191,36,.12);}
+[data-style="4"] .t-label{color:rgba(251,191,36,.5);}
+[data-style="4"] .t-text{color:rgba(251,191,36,.7);}
+[data-style="4"] .aurora::before{background:radial-gradient(circle,rgba(245,158,11,.2),transparent 70%);}
+[data-style="4"] .aurora::after{background:radial-gradient(circle,rgba(251,191,36,.15),transparent 70%);}
+[data-style="4"] .status-pill{color:rgba(251,191,36,.4);border-color:rgba(251,191,36,.1);}
+[data-style="4"] .status-pill.connected{color:rgba(251,191,36,.6);}
+[data-style="4"] .mode-badge{color:rgba(251,191,36,.25);}
+[data-style="4"] .style-toggle{background:rgba(251,191,36,.08);color:rgba(251,191,36,.6);border-color:rgba(251,191,36,.2);}
 
-    .overlay-translation-box .t-label {
-      display: block;
-      font-size: 9px;
-      text-transform: uppercase;
-      letter-spacing: .14em;
-      color: rgba(167, 139, 250, .8);
-      margin-bottom: 6px;
-      font-weight: 700;
-    }
-
-    .caption-placeholder {
-      color: rgba(148, 163, 184, .8);
-      font-size: 16px;
-    }
-
-    .pos-verb { color: #2563eb; }
-    .pos-noun { color: #16a34a; }
-    .pos-adj  { color: #f97316; }
-    .pos-adv  { color: #7c3aed; }
-
-    @media (max-width: 720px) {
-      .overlay-card {
-        padding: 14px 14px 16px;
-      }
-      .overlay-caption-box {
-        font-size: 22px;
-        padding: 14px 14px;
-      }
-    }
-  </style>
+/* ═══════════════════════════════════════ */
+/* STYLE 5 — MATRIX (green / digital)     */
+/* ═══════════════════════════════════════ */
+[data-style="5"] body{background:#000a00;font-family:'SF Mono','Fira Code','JetBrains Mono',ui-monospace,monospace;}
+[data-style="5"] .caption-box{color:#4ade80;font-weight:600;font-family:inherit;letter-spacing:.02em;text-shadow:0 0 20px rgba(34,197,94,.5),0 0 60px rgba(34,197,94,.2);}
+[data-style="5"] .caption-placeholder{color:rgba(34,197,94,.1);font-family:inherit;}
+[data-style="5"] .t-label{color:rgba(34,197,94,.4);font-family:inherit;}
+[data-style="5"] .t-text{color:rgba(34,197,94,.65);font-family:inherit;}
+[data-style="5"] .aurora::before{background:radial-gradient(circle,rgba(34,197,94,.12),transparent 70%);}
+[data-style="5"] .aurora::after{background:radial-gradient(circle,rgba(34,197,94,.08),transparent 70%);}
+[data-style="5"] .grid-overlay{background-image:linear-gradient(rgba(34,197,94,.03) 1px,transparent 1px),linear-gradient(90deg,rgba(34,197,94,.02) 1px,transparent 1px);background-size:40px 40px;}
+[data-style="5"] .status-pill{color:rgba(34,197,94,.4);border-color:rgba(34,197,94,.12);font-family:monospace;}
+[data-style="5"] .status-pill.connected{color:rgba(34,197,94,.6);}
+[data-style="5"] .mode-badge{color:rgba(34,197,94,.2);font-family:monospace;}
+[data-style="5"] .style-toggle{background:rgba(34,197,94,.06);color:rgba(34,197,94,.6);border-color:rgba(34,197,94,.2);font-family:monospace;}
+</style>
 </head>
-<body>
-  <div class="overlay-shell">
-    <div class="overlay-card">
-      <div class="overlay-header">
-        <div>
-          <span style="text-transform: uppercase; letter-spacing: .14em; font-size: 11px; color: var(--overlay-accent); font-weight: 700;">Sottotitoli overlay</span>
-          <span id="overlayModeLabel" style="margin-left: 8px; color: var(--overlay-muted);"></span>
-        </div>
-        <div class="overlay-status">
-          <span class="overlay-dot" id="overlayDot"></span>
-          <span id="overlayStatusText">Connecting…</span>
-          <span class="overlay-room" id="overlayRoomLabel"></span>
-        </div>
-      </div>
-      <div class="overlay-caption-box" id="captionBox">
-        <span class="caption-placeholder">Waiting for captions…</span>
-      </div>
-      <div class="overlay-translation-box" id="translationBox">
-        <span class="t-label">🌐 Translation</span>
-        <span id="translationText"></span>
-      </div>
-    </div>
+<body data-style="1">
+
+<div class="aurora"></div>
+<div class="grid-overlay"></div>
+
+<div class="caption-stage">
+  <div class="translation-box" id="translationBox">
+    <span class="t-label">🌐 Translation</span>
+    <div class="t-text" id="translationText"></div>
   </div>
+  <div class="caption-box" id="captionBox">
+    <span class="caption-placeholder">Waiting for captions…</span>
+  </div>
+</div>
 
-  <script src="js/jquery.min.js"></script>
-  <script src="config.js"></script>
-  <script src="ws-publisher.js"></script>
-  <script src="js/lemma-pos-map.js"></script>
-  <script src="js/pos-coloring.js"></script>
+<div class="mode-badge" id="modeBadge"></div>
+<button class="style-toggle" id="styleToggle" title="Cycle style (1-5)">🎬 1 · Aurora</button>
+<div class="status-pill" id="statusPill">
+  <span class="dot"></span>
+  <span id="statusLabel">Disconnected</span>
+  <span class="room-id" id="roomLabel"></span>
+</div>
 
-  <script>
-    (function (w) {
-      "use strict";
+<script src="config.js"></script>
+<script src="js/lemma-pos-map.js"></script>
+<script src="js/pos-coloring.js"></script>
 
-      const params = new URLSearchParams(window.location.search);
-      const room = params.get("room");
-      const modeFromQuery = params.get("mode") || "caption-en";
+<script>
+(function(w){
+  "use strict";
 
-      const captionBox = document.getElementById("captionBox");
-      const translationBox = document.getElementById("translationBox");
-      const translationText = document.getElementById("translationText");
-      const overlayDot = document.getElementById("overlayDot");
-      const overlayStatusText = document.getElementById("overlayStatusText");
-      const overlayRoomLabel = document.getElementById("overlayRoomLabel");
-      const overlayModeLabel = document.getElementById("overlayModeLabel");
+  var params = new URLSearchParams(location.search);
+  var room = params.get("room");
+  var modeFromQuery = params.get("mode") || "caption-en";
 
-      function modeIsEnglishLesson(modeKey) {
-        if (!modeKey) return false;
-        return modeKey.indexOf("lesson") !== -1 && modeKey.indexOf("caption") === -1;
-      }
+  var captionBox = document.getElementById("captionBox");
+  var translationBox = document.getElementById("translationBox");
+  var translationText = document.getElementById("translationText");
+  var statusPill = document.getElementById("statusPill");
+  var statusLabel = document.getElementById("statusLabel");
+  var roomLabel = document.getElementById("roomLabel");
+  var modeBadge = document.getElementById("modeBadge");
+  var styleToggle = document.getElementById("styleToggle");
 
-      function tokenizeCaption(text) {
-        const rawTokens = text.match(/[A-Za-z']+|\S/g) || [];
-        return rawTokens.map(function (t) {
-          const lemma = t.toLowerCase();
-          const pos =
-            (w.LEMMA_POS_MAP && w.LEMMA_POS_MAP[lemma]) || null;
-          return {
-            text: t,
-            lemma,
-            pos
-          };
-        });
-      }
+  var reconnectTimer = null;
+  var retryCount = 0;
+  var manualClose = false;
+  var socket = null;
 
-      function clearPlaceholder() {
-        const ph = captionBox.querySelector(".caption-placeholder");
-        if (ph) ph.remove();
-      }
+  // ── 5-style toggle ──
+  var STYLES = [
+    { num:1, label:'1 · Aurora', emoji:'🎬' },
+    { num:2, label:'2 · Neon', emoji:'💜' },
+    { num:3, label:'3 · Minimal', emoji:'⬜' },
+    { num:4, label:'4 · Warm', emoji:'🔥' },
+    { num:5, label:'5 · Matrix', emoji:'💚' }
+  ];
+  var curStyle = parseInt(localStorage.getItem('sottotitoli-overlay-style')) || 1;
 
-      function handleCaptionPayload(payload) {
-        if (!payload) return;
+  function applyStyle(n) {
+    curStyle = n;
+    document.body.setAttribute('data-style', String(n));
+    var s = STYLES[n-1] || STYLES[0];
+    if (styleToggle) styleToggle.textContent = s.emoji + ' ' + s.label;
+    localStorage.setItem('sottotitoli-overlay-style', n);
+  }
+  applyStyle(curStyle);
 
-        const text = payload.final || payload.interim || "";
-        const modeKey = payload.mode || modeFromQuery;
-        const isTranslation = payload.kind === "translation" || !!payload.translated || !!payload.targetLang;
+  if (styleToggle) {
+    styleToggle.addEventListener('click', function(){
+      applyStyle(curStyle % 5 + 1);
+    });
+  }
 
-        // Show/hide translation box based on mode
-        if (translationBox) {
-          translationBox.classList.toggle("visible", isTranslation);
-        }
+  function modeIsEnglishLesson(modeKey) {
+    if (!modeKey) return false;
+    return modeKey.indexOf("lesson") !== -1 && modeKey.indexOf("caption") === -1;
+  }
 
-        if (!text && !payload.translated) {
-          captionBox.textContent = "";
-          captionBox.innerHTML = '<span class="caption-placeholder">Waiting for captions…</span>';
-          if (translationText) translationText.textContent = "";
-          return;
-        }
+  function tokenizeCaption(text) {
+    var rawTokens = text.match(/[A-Za-z']+|\S/g) || [];
+    return rawTokens.map(function(t){
+      var lemma = t.toLowerCase();
+      var pos = (w.LEMMA_POS_MAP && w.LEMMA_POS_MAP[lemma]) || null;
+      return { text:t, lemma:lemma, pos:pos };
+    });
+  }
 
-        // Source caption
-        if (text) {
-          clearPlaceholder();
-          if (modeIsEnglishLesson(modeKey)) {
-            const tokens = tokenizeCaption(text);
-            if (w.SottotitoliPosColoring) {
-              w.SottotitoliPosColoring.renderColoredCaption(captionBox, tokens);
-            } else {
-              captionBox.textContent = text;
-            }
-          } else {
-            captionBox.textContent = text;
-          }
-        }
+  function clearPlaceholder() {
+    var ph = captionBox.querySelector(".caption-placeholder");
+    if (ph) ph.remove();
+  }
 
-        // Translated text
-        if (isTranslation && translationText) {
-          translationText.textContent = payload.translated || payload.interim_translated || "";
-        } else if (translationText) {
-          translationText.textContent = "";
-        }
-      }
+  function handleCaptionPayload(payload) {
+    if (!payload) return;
 
-      function setOverlayState(state) {
-        if (!overlayDot || !overlayStatusText) return;
-        if (state === "connected") {
-          overlayDot.classList.add("connected");
-          overlayStatusText.textContent = "Connected";
-        } else if (state === "connecting") {
-          overlayDot.classList.remove("connected");
-          overlayStatusText.textContent = "Connecting…";
-        } else if (state === "error") {
-          overlayDot.classList.remove("connected");
-          overlayStatusText.textContent = "Error";
+    var text = payload.final || payload.interim || "";
+    var modeKey = payload.mode || modeFromQuery;
+    var isTranslation = payload.kind === "translation" || !!payload.translated || !!payload.targetLang;
+
+    if (translationBox) translationBox.classList.toggle("visible", isTranslation);
+
+    if (!text && !payload.translated) {
+      captionBox.textContent = "";
+      captionBox.innerHTML = '<span class="caption-placeholder">Waiting for captions…</span>';
+      if (translationText) translationText.textContent = "";
+      return;
+    }
+
+    if (text) {
+      clearPlaceholder();
+      if (modeIsEnglishLesson(modeKey)) {
+        var tokens = tokenizeCaption(text);
+        if (w.SottotitoliPosColoring) {
+          w.SottotitoliPosColoring.renderColoredCaption(captionBox, tokens);
         } else {
-          overlayDot.classList.remove("connected");
-          overlayStatusText.textContent = "Disconnected";
+          captionBox.textContent = text;
         }
+      } else {
+        captionBox.textContent = text;
       }
+    }
 
-      var reconnectTimer = null;
-      var retryCount = 0;
-      var manualClose = false;
-      var socket = null;
+    if (isTranslation && translationText) {
+      translationText.textContent = payload.translated || payload.interim_translated || "";
+    } else if (translationText) {
+      translationText.textContent = "";
+    }
+  }
 
-      function getRetryDelay() {
-        if (retryCount === 0) return 0;
-        return Math.min(1000 * Math.pow(2, retryCount - 1), 30000);
-      }
+  function setStatus(state) {
+    if (!statusPill || !statusLabel) return;
+    statusPill.classList.remove("connected");
+    if (state==="connected"){ statusPill.classList.add("connected"); statusLabel.textContent="Live"; }
+    else if (state==="connecting"){ statusLabel.textContent="Connecting…"; }
+    else { statusLabel.textContent="Disconnected"; }
+  }
 
-      function clearReconnectTimer() {
-        if (reconnectTimer) { clearTimeout(reconnectTimer); reconnectTimer = null; }
-      }
+  function getDelay(){ if(retryCount===0) return 0; return Math.min(1000*Math.pow(2,retryCount-1),30000); }
+  function clearTimer(){ if(reconnectTimer){clearTimeout(reconnectTimer);reconnectTimer=null;} }
+  function scheduleReconnect(){ if(manualClose) return; var d=getDelay(); retryCount++; reconnectTimer=setTimeout(connect,d); }
 
-      function connect() {
-        if (manualClose) return;
-        clearReconnectTimer();
+  function connect() {
+    if(manualClose) return; clearTimer();
+    var cfg=w.SOTTOTITOLI_CONFIG||{}; var wsUrl=cfg.websocketUrl||"";
+    if(!wsUrl){ setStatus("error"); return; }
+    try{ setStatus("connecting"); socket=new WebSocket(wsUrl+"?room="+encodeURIComponent(room)); }
+    catch(e){ setStatus("error"); scheduleReconnect(); return; }
+    socket.onopen=function(){ retryCount=0; setStatus("connected"); try{socket.send(JSON.stringify({join:room}));}catch(e){} };
+    socket.onmessage=function(evt){ try{ var p=JSON.parse(evt.data); if(p&&(p.type==="caption"||p.msg===true)){ if(p.msg===true&&!p.type){p.type="caption";} handleCaptionPayload(p); } }catch(e){} };
+    socket.onclose=function(){ if(manualClose){setStatus("disconnected");return;} setStatus("disconnected"); scheduleReconnect(); };
+    socket.onerror=function(){ setStatus("error"); };
+  }
 
-        const cfgRoot =
-          w.SOTTOTITOLI_CONFIG ||
-          w.SOTTOTITOLICONFIG ||
-          w.SottotitoliConfig ||
-          {};
-
-        const wsUrl = cfgRoot.websocketUrl || cfgRoot.websocket_url || "";
-
-        if (!wsUrl) {
-          captionBox.textContent =
-            "Overlay not connected (no websocket URL in config).";
-          setOverlayState("error");
-          return;
-        }
-
-        try {
-          setOverlayState("connecting");
-          socket = new WebSocket(wsUrl + "?room=" + encodeURIComponent(room));
-        } catch (err) {
-          captionBox.textContent =
-            "Overlay not connected (websocket error).";
-          setOverlayState("error");
-          scheduleReconnect();
-          return;
-        }
-
-        socket.onopen = function () {
-          retryCount = 0;
-          setOverlayState("connected");
-          try {
-            socket.send(JSON.stringify({ join: room }));
-          } catch (err) {
-            console.error("[Overlay] Failed to join room", err);
-          }
-        };
-
-        socket.onmessage = function (event) {
-          try {
-            const payload = JSON.parse(event.data);
-            // Accept both new format (type: "caption") and legacy format (msg: true)
-            if (payload && (payload.type === "caption" || payload.msg === true)) {
-              // Normalize legacy format to new format
-              if (payload.msg === true && !payload.type) {
-                payload.type = "caption";
-                if (payload.final) payload.final = payload.final;
-                if (payload.interim) payload.interim = payload.interim;
-              }
-              handleCaptionPayload(payload);
-            }
-          } catch (e) {
-            console.error("[Overlay] Failed to parse message", e);
-          }
-        };
-
-        socket.onclose = function () {
-          if (manualClose) {
-            setOverlayState("disconnected");
-            return;
-          }
-          setOverlayState("disconnected");
-          scheduleReconnect();
-        };
-
-        socket.onerror = function () {
-          setOverlayState("error");
-        };
-      }
-
-      function scheduleReconnect() {
-        if (manualClose) return;
-        var delay = getRetryDelay();
-        retryCount += 1;
-        reconnectTimer = setTimeout(connect, delay);
-      }
-
-      document.addEventListener("DOMContentLoaded", function () {
-        if (overlayRoomLabel) {
-          overlayRoomLabel.textContent = room ? ("room " + room) : "no room";
-        }
-        if (overlayModeLabel) {
-          overlayModeLabel.textContent = "(" + (modeFromQuery || "caption-en") + ")";
-        }
-
-        if (!room) {
-          captionBox.textContent = "No room specified.";
-          return;
-        }
-
-        connect();
-      });
-    })(window);
-  </script>
+  document.addEventListener("DOMContentLoaded",function(){
+    if(modeBadge) modeBadge.textContent=modeFromQuery;
+    if(roomLabel) roomLabel.textContent=room?("#"+room):"";
+    if(!room){ setStatus("error"); captionBox.textContent="No room specified."; return; }
+    connect();
+  });
+})(window);
+</script>
 </body>
 </html>
