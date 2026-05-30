@@ -268,6 +268,8 @@
       setText("cefrLevel", cefrScore);
       var gauge = document.getElementById('cefrGauge');
       if (gauge) gauge.style.height = cefrPct + '%';
+      // Update gauge lab if present
+      if (w.updateGaugeLab) w.updateGaugeLab(cefrPct);
     }
 
     // WPM and quality require duration; updated separately via updateReportMetrics
