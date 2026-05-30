@@ -1,0 +1,527 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>CEFR Gauge Lab · 20 Variants</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{--bg:#0b1120;--card:rgba(255,255,255,.03);--line:rgba(255,255,255,.06);--text:#e2e8f0;--muted:#64748b;--accent:#3b82f6}
+body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;-webkit-font-smoothing:antialiased}
+.topbar{display:flex;justify-content:space-between;align-items:center;padding:16px 24px;border-bottom:1px solid var(--line);position:sticky;top:0;background:var(--bg);z-index:10}
+.topbar h1{font-size:20px;font-weight:700;letter-spacing:-.5px}
+.topbar .live-indicator{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--muted)}
+.topbar .live-dot{width:8px;height:8px;border-radius:50%;background:#ef4444;transition:background .3s}
+.topbar .live-dot.active{background:#22c55e;box-shadow:0 0 10px rgba(34,197,94,.5)}
+.topbar .lang-select{padding:6px 14px;border-radius:8px;border:1px solid var(--line);background:var(--card);color:var(--text);font-family:inherit;font-size:13px}
+.gauge-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;padding:20px 24px}
+@media(max-width:1400px){.gauge-grid{grid-template-columns:repeat(4,1fr)}}
+@media(max-width:1000px){.gauge-grid{grid-template-columns:repeat(3,1fr)}}
+@media(max-width:700px){.gauge-grid{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:450px){.gauge-grid{grid-template-columns:1fr}}
+.gauge-card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:18px 16px;display:flex;flex-direction:column;align-items:center;gap:10px;transition:border-color .3s}
+.gauge-card:hover{border-color:rgba(255,255,255,.12)}
+.gauge-card .gc-label{font-size:10px;text-transform:uppercase;letter-spacing:.12em;color:var(--muted);font-weight:600}
+.gauge-card .gc-value{font-size:28px;font-weight:800;letter-spacing:-1px;line-height:1}
+.gauge-stage{position:relative;width:100%;display:flex;align-items:center;justify-content:center}
+
+/* ── 1. Circular Speedometer ── */
+.g-speedo{width:100px;height:100px;position:relative}
+.g-speedo svg{transform:rotate(-90deg)}
+.g-speedo .bg{fill:none;stroke:rgba(255,255,255,.08);stroke-width:8}
+.g-speedo .fill{fill:none;stroke:var(--accent);stroke-width:8;stroke-linecap:round;transition:stroke-dashoffset .6s}
+.g-speedo .center-val{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:800}
+
+/* ── 2. Vertical Thermometer ── */
+.g-thermo{width:24px;height:100px;background:rgba(255,255,255,.06);border-radius:12px;overflow:hidden;position:relative}
+.g-thermo .fill{position:absolute;bottom:0;left:0;right:0;border-radius:12px;transition:height .6s;background:linear-gradient(180deg,#22c55e,#3b82f6)}
+
+/* ── 3. Horizontal progress bar ── */
+.g-hbar{width:100%;height:8px;background:rgba(255,255,255,.06);border-radius:4px;overflow:hidden}
+.g-hbar .fill{height:100%;border-radius:4px;transition:width .6s;background:linear-gradient(90deg,#3b82f6,#a855f7)}
+
+/* ── 4. Ring / Donut ── */
+.g-ring{width:90px;height:90px;position:relative}
+.g-ring svg{transform:rotate(-90deg)}
+.g-ring .bg{fill:none;stroke:rgba(255,255,255,.06);stroke-width:6}
+.g-ring .fill{fill:none;stroke:linear-gradient(135deg,#f59e0b,#ef4444);stroke-width:6;stroke-linecap:round;transition:stroke-dashoffset .6s}
+
+/* ── 5. Wave fill ── */
+.g-wave{width:80px;height:80px;border-radius:50%;background:rgba(255,255,255,.04);overflow:hidden;position:relative}
+.g-wave .water{position:absolute;bottom:0;left:0;right:0;transition:height .6s;background:rgba(59,130,246,.3)}
+.g-wave .water::after{content:'';position:absolute;top:-10px;left:-25%;width:150%;height:20px;background:rgba(59,130,246,.2);border-radius:40%;animation:wave 2s ease-in-out infinite}
+@keyframes wave{0%,100%{transform:translateX(-5%)}50%{transform:translateX(5%)}}
+
+/* ── 6. Dot Matrix ── */
+.g-dots{display:flex;flex-wrap:wrap;gap:3px;width:72px}
+.g-dot{width:10px;height:10px;border-radius:2px;background:rgba(255,255,255,.06);transition:background .3s}
+.g-dot.on{background:var(--accent)}
+
+/* ── 7. Arc meter ── */
+.g-arc{width:110px;height:55px;overflow:hidden;position:relative}
+.g-arc .bg{width:110px;height:110px;border-radius:50%;border:8px solid rgba(255,255,255,.06);border-bottom-color:transparent;border-left-color:transparent;transform:rotate(-45deg)}
+.g-arc .fill-wrap{position:absolute;top:0;left:0;width:110px;height:110px;transform:rotate(-45deg)}
+.g-arc .fill-wrap .arc-fill{width:110px;height:110px;border-radius:50%;border:8px solid transparent;border-bottom-color:var(--accent);border-left-color:var(--accent);transition:transform .6s}
+
+/* ── 8. Segmented LED bar ── */
+.g-leds{display:flex;gap:3px;width:100%}
+.g-led{flex:1;height:12px;border-radius:2px;background:rgba(255,255,255,.06);transition:background .3s}
+
+/* ── 9. Glow pulse circle ── */
+.g-pulse{width:70px;height:70px;border-radius:50%;display:flex;align-items:center;justify-content:center;transition:box-shadow .6s,background .6s}
+.g-pulse .inner{font-size:20px;font-weight:800;color:#fff}
+
+/* ── 10. Battery style ── */
+.g-battery{width:60px;height:100px;border:3px solid rgba(255,255,255,.15);border-radius:8px;position:relative;overflow:hidden}
+.g-battery::after{content:'';position:absolute;top:-6px;left:50%;transform:translateX(-50%);width:20px;height:6px;background:rgba(255,255,255,.15);border-radius:3px 3px 0 0}
+.g-battery .fill{position:absolute;bottom:0;left:0;right:0;border-radius:4px;transition:height .6s}
+
+/* ── 11. Radial bars ── */
+.g-radial{display:flex;gap:4px;align-items:flex-end;height:70px}
+.g-radial .bar{width:8px;border-radius:4px;transition:height .4s;background:var(--accent)}
+.g-radial .bar:nth-child(odd){transition-delay:.05s}
+
+/* ── 12. Compass needle ── */
+.g-compass{width:80px;height:80px;position:relative}
+.g-compass .needle{position:absolute;bottom:50%;left:50%;width:2px;height:35px;background:#ef4444;transform-origin:bottom center;transition:transform .6s;border-radius:2px}
+.g-compass .needle::after{content:'';position:absolute;top:-4px;left:-3px;width:8px;height:8px;border-radius:50%;background:#ef4444}
+.g-compass .dial{width:80px;height:80px;border-radius:50%;border:2px solid rgba(255,255,255,.08)}
+
+/* ── 13. Step ladder ── */
+.g-steps{display:flex;flex-direction:column-reverse;gap:3px;width:50px}
+.g-step{height:6px;border-radius:3px;background:rgba(255,255,255,.06);transition:background .3s}
+.g-step.on{background:var(--accent)}
+
+/* ── 14. Pyramid fill ── */
+.g-pyramid{display:flex;flex-direction:column;align-items:center;gap:2px}
+.g-pyramid .row{display:flex;gap:2px}
+.g-pyramid .cell{width:12px;height:12px;border-radius:2px;background:rgba(255,255,255,.06);transition:background .3s}
+.g-pyramid .cell.on{background:var(--accent)}
+
+/* ── 15. Pendulum arc ── */
+.g-pend{width:80px;height:60px;position:relative;overflow:hidden}
+.g-pend .ball{position:absolute;bottom:0;width:12px;height:12px;border-radius:50%;background:var(--accent);transition:left .6s, bottom .6s}
+
+/* ── 16. Spiral dots ── */
+.g-spiral{width:70px;height:70px;position:relative}
+.g-spiral .dot{position:absolute;width:6px;height:6px;border-radius:50%;background:rgba(255,255,255,.06);transition:background .2s}
+
+/* ── 17. Gradient word ── */
+.g-word{font-size:36px;font-weight:900;letter-spacing:-1px;transition:all .6s}
+
+/* ── 18. Litmus strip ── */
+.g-litmus{width:30px;height:100px;border-radius:4px;display:flex;flex-direction:column;overflow:hidden}
+.g-litmus .band{flex:1;transition:opacity .4s;opacity:.15}
+
+/* ── 19. Confidence meter (like a fuel gauge) ── */
+.g-fuel{width:80px;height:40px;border-radius:40px 40px 0 0;background:rgba(255,255,255,.04);position:relative;overflow:hidden;border:2px solid rgba(255,255,255,.08);border-bottom:none}
+.g-fuel .fill{position:absolute;bottom:0;left:0;right:0;border-radius:40px 40px 0 0;transition:height .6s;background:linear-gradient(180deg,#22c55e,#eab308,#ef4444)}
+
+/* ── 20. Blob morph ── */
+.g-blob{width:70px;height:70px;border-radius:60% 40% 50% 45%;transition:border-radius .6s,background .6s,box-shadow .6s}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div>
+    <h1>🧪 CEFR Gauge Lab</h1>
+    <span style="font-size:12px;color:var(--muted)">20 variants · speak to test all simultaneously</span>
+  </div>
+  <div class="live-indicator">
+    <select class="lang-select" id="langSelect">
+      <option value="en-US">🇬🇧 English</option>
+      <option value="it-IT">🇮🇹 Italiano</option>
+      <option value="fr-FR">🇫🇷 Français</option>
+      <option value="de-DE">🇩🇪 Deutsch</option>
+      <option value="es-ES">🇪🇸 Español</option>
+    </select>
+    <span class="live-dot" id="liveDot"></span>
+    <span id="liveStatus">Idle</span>
+    <button id="micBtn" style="padding:8px 18px;border-radius:100px;border:1px solid var(--line);background:var(--card);color:var(--text);font-family:inherit;font-size:13px;cursor:pointer;font-weight:600">🎤 Start Mic</button>
+  </div>
+</div>
+
+<div class="gauge-grid" id="gaugeGrid"></div>
+
+<script>
+(function(){
+  "use strict";
+
+  var recognition = null;
+  var isListening = false;
+  var transcriptText = "";
+  var wordCount = 0;
+  var uniqueWords = new Set();
+
+  // Shared value (0-100) derived from lexical diversity + word count
+  var sharedValue = 0;
+
+  function getCEFRLevel(v) {
+    if (v >= 85) return 'C2';
+    if (v >= 70) return 'C1';
+    if (v >= 55) return 'B2';
+    if (v >= 40) return 'B1';
+    if (v >= 20) return 'A2';
+    return 'A1';
+  }
+
+  function computeValue() {
+    if (wordCount < 5) return 0;
+    var lexDiv = uniqueWords.size / Math.max(wordCount, 1);
+    var wcBonus = Math.min(1, wordCount / 200);
+    return Math.min(95, Math.round((lexDiv * 90 + wcBonus * 20) * 1.1));
+  }
+
+  var gEls = {};
+
+  // Build 20 gauge variants
+  function buildGauges() {
+    var grid = document.getElementById('gaugeGrid');
+    var html = '';
+
+    // 1. Circular Speedometer
+    html += ga('1. Speedometer', '<div class="g-speedo"><svg viewBox="0 0 100 100" width="100" height="100"><circle class="bg" cx="50" cy="50" r="42"/><circle class="fill" id="g1" cx="50" cy="50" r="42" stroke-dasharray="264" stroke-dashoffset="264"/></svg><div class="center-val" id="g1v">—</div></div>');
+
+    // 2. Vertical Thermometer
+    html += ga('2. Thermometer', '<div class="g-thermo"><div class="fill" id="g2" style="height:0%"></div></div>');
+
+    // 3. Horizontal progress bar
+    html += ga('3. Progress Bar', '<div class="g-hbar"><div class="fill" id="g3" style="width:0%"></div></div>');
+
+    // 4. Ring / Donut
+    html += ga('4. Ring', '<div class="g-ring"><svg viewBox="0 0 90 90" width="90" height="90"><circle class="bg" cx="45" cy="45" r="38"/><circle class="fill" id="g4" cx="45" cy="45" r="38" stroke="#f59e0b" stroke-dasharray="239" stroke-dashoffset="239"/></svg><div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:800" id="g4v">—</div></div>');
+
+    // 5. Wave fill
+    html += ga('5. Wave', '<div class="g-wave"><div class="water" id="g5" style="height:0%"></div></div>');
+
+    // 6. Dot Matrix (6x6)
+    var dots6 = '';
+    for (var i=0;i<36;i++) dots6 += '<div class="g-dot" data-g="6" data-i="'+i+'"></div>';
+    html += ga('6. Dot Matrix', '<div class="g-dots">'+dots6+'</div>');
+
+    // 7. Arc meter
+    html += ga('7. Arc', '<div class="g-arc"><div class="bg"></div><div class="fill-wrap"><div class="arc-fill" id="g7" style="transform:rotate(0deg)"></div></div></div>');
+
+    // 8. Segmented LED (20 segments)
+    var leds = '';
+    for (var j=0;j<20;j++) leds += '<div class="g-led" data-g="8" data-i="'+j+'"></div>';
+    html += ga('8. LED Bar', '<div class="g-leds">'+leds+'</div>');
+
+    // 9. Glow pulse circle
+    html += ga('9. Pulse', '<div class="g-pulse" id="g9"><span class="inner" id="g9v">—</span></div>');
+
+    // 10. Battery style
+    html += ga('10. Battery', '<div class="g-battery"><div class="fill" id="g10" style="height:0%"></div></div>');
+
+    // 11. Radial bars (8 bars)
+    var rbars = '';
+    for (var k=0;k<8;k++) rbars += '<div class="bar" data-g="11" data-i="'+k+'" style="height:'+(4+k*6)+'px"></div>';
+    html += ga('11. Radial Bars', '<div class="g-radial">'+rbars+'</div>');
+
+    // 12. Compass needle
+    html += ga('12. Compass', '<div class="g-compass"><div class="dial"></div><div class="needle" id="g12" style="transform:rotate(-90deg)"></div></div>');
+
+    // 13. Step ladder (10 steps)
+    var steps = '';
+    for (var s=0;s<10;s++) steps += '<div class="g-step" data-g="13" data-i="'+s+'"></div>';
+    html += ga('13. Step Ladder', '<div class="g-steps">'+steps+'</div>');
+
+    // 14. Pyramid fill (bottom row 5 cells)
+    var pyr = '';
+    for (var row=0;row<5;row++) {
+      pyr += '<div class="row">';
+      for (var c=0;c<=row;c++) {
+        pyr += '<div class="cell" data-g="14" data-row="'+row+'" data-col="'+c+'"></div>';
+      }
+      pyr += '</div>';
+    }
+    html += ga('14. Pyramid', '<div class="g-pyramid">'+pyr+'</div>');
+
+    // 15. Pendulum
+    html += ga('15. Pendulum', '<div class="g-pend"><div class="ball" id="g15" style="left:0;bottom:0"></div></div>');
+
+    // 16. Spiral dots (16 dots)
+    var spiral = '';
+    for (var sp=0;sp<16;sp++) {
+      var angle = (sp/16)*Math.PI*4;
+      var r = 8+sp*2;
+      var x = 35+Math.cos(angle)*r;
+      var y = 35+Math.sin(angle)*r;
+      spiral += '<div class="dot" data-g="16" data-i="'+sp+'" style="left:'+x+'px;top:'+y+'px"></div>';
+    }
+    html += ga('16. Spiral', '<div class="g-spiral">'+spiral+'</div>');
+
+    // 17. Gradient word
+    html += ga('17. Gradient Word', '<div class="g-word" id="g17" style="color:rgba(255,255,255,.1)">CEFR</div>');
+
+    // 18. Litmus strip (5 bands)
+    var litmus = '';
+    var lColors = ['#ef4444','#f59e0b','#eab308','#22c55e','#3b82f6'];
+    for (var li=0;li<5;li++) {
+      litmus += '<div class="band" data-g="18" data-i="'+li+'" style="background:'+lColors[li]+'"></div>';
+    }
+    html += ga('18. Litmus', '<div class="g-litmus">'+litmus+'</div>');
+
+    // 19. Fuel gauge
+    html += ga('19. Fuel', '<div class="g-fuel"><div class="fill" id="g19" style="height:0%"></div></div>');
+
+    // 20. Blob morph
+    html += ga('20. Blob', '<div class="g-blob" id="g20"></div>');
+
+    grid.innerHTML = html;
+    cacheEls();
+  }
+
+  function ga(label, inner) {
+    return '<div class="gauge-card"><div class="gc-label">'+label+'</div><div class="gauge-stage">'+inner+'</div><div class="gc-value" data-gv="'+label+'">—</div></div>';
+  }
+
+  function cacheEls() {
+    // Circle speedo (1)
+    gEls.g1 = document.getElementById('g1');
+    gEls.g1v = document.getElementById('g1v');
+    // Thermo (2)
+    gEls.g2 = document.getElementById('g2');
+    // Hbar (3)
+    gEls.g3 = document.getElementById('g3');
+    // Ring (4)
+    gEls.g4 = document.getElementById('g4');
+    gEls.g4v = document.getElementById('g4v');
+    // Wave (5)
+    gEls.g5 = document.getElementById('g5');
+    // Arc (7)
+    gEls.g7 = document.getElementById('g7');
+    // Pulse (9)
+    gEls.g9 = document.getElementById('g9');
+    gEls.g9v = document.getElementById('g9v');
+    // Battery (10)
+    gEls.g10 = document.getElementById('g10');
+    // Compass (12)
+    gEls.g12 = document.getElementById('g12');
+    // Pendulum (15)
+    gEls.g15 = document.getElementById('g15');
+    // Gradient word (17)
+    gEls.g17 = document.getElementById('g17');
+    // Fuel (19)
+    gEls.g19 = document.getElementById('g19');
+    // Blob (20)
+    gEls.g20 = document.getElementById('g20');
+  }
+
+  function updateAllGauges(v) {
+    sharedValue = v;
+    var pct = v / 100;
+    var level = getCEFRLevel(v);
+    var levelColors = {A1:'#ef4444',A2:'#f59e0b',B1:'#eab308',B2:'#22c55e',C1:'#3b82f6',C2:'#a855f7'};
+    var lc = levelColors[level] || '#3b82f6';
+
+    // Update all value displays
+    document.querySelectorAll('[data-gv]').forEach(function(el){
+      el.textContent = level + ' · ' + v + '%';
+    });
+
+    // 1. Speedometer
+    if (gEls.g1) { var dash = 264*(1-pct); gEls.g1.setAttribute('stroke-dashoffset', dash); gEls.g1.setAttribute('stroke', lc); }
+    if (gEls.g1v) gEls.g1v.textContent = level;
+
+    // 2. Thermometer
+    if (gEls.g2) gEls.g2.style.height = v + '%';
+
+    // 3. Progress bar
+    if (gEls.g3) gEls.g3.style.width = v + '%';
+
+    // 4. Ring
+    if (gEls.g4) { var rdash = 239*(1-pct); gEls.g4.setAttribute('stroke-dashoffset', rdash); }
+    if (gEls.g4v) gEls.g4v.textContent = level;
+
+    // 5. Wave
+    if (gEls.g5) gEls.g5.style.height = v + '%';
+
+    // 6. Dot Matrix (36 dots)
+    var activeDots = Math.round(pct * 36);
+    document.querySelectorAll('[data-g="6"]').forEach(function(d){
+      d.classList.toggle('on', parseInt(d.dataset.i) < activeDots);
+      if (d.classList.contains('on')) d.style.background = lc;
+    });
+
+    // 7. Arc (rotate 0-180 based on v)
+    if (gEls.g7) gEls.g7.style.transform = 'rotate('+(pct*180)+'deg)';
+
+    // 8. LED bar (20 segments)
+    var activeLeds = Math.round(pct * 20);
+    document.querySelectorAll('[data-g="8"]').forEach(function(l){
+      l.classList.toggle('on', parseInt(l.dataset.i) < activeLeds);
+      if (parseInt(l.dataset.i) < activeLeds) l.style.background = lc;
+      else l.style.background = '';
+    });
+
+    // 9. Pulse circle
+    if (gEls.g9) {
+      gEls.g9.style.boxShadow = '0 0 '+Math.round(pct*40)+'px '+lc;
+      gEls.g9.style.background = lc;
+      gEls.g9.style.opacity = 0.15 + pct * 0.35;
+    }
+    if (gEls.g9v) gEls.g9v.textContent = level;
+
+    // 10. Battery
+    if (gEls.g10) gEls.g10.style.height = v + '%';
+
+    // 11. Radial bars
+    var maxBarH = 60;
+    document.querySelectorAll('[data-g="11"]').forEach(function(b){
+      var i = parseInt(b.dataset.i);
+      var barPct = Math.min(1, pct * (1 + i * 0.08));
+      b.style.height = Math.round(4 + barPct * maxBarH) + 'px';
+      b.style.background = lc;
+    });
+
+    // 12. Compass (-90 to +90)
+    if (gEls.g12) gEls.g12.style.transform = 'rotate('+(-90+pct*180)+'deg)';
+
+    // 13. Step ladder
+    var activeSteps = Math.round(pct * 10);
+    document.querySelectorAll('[data-g="13"]').forEach(function(s){
+      s.classList.toggle('on', parseInt(s.dataset.i) < activeSteps);
+      if (s.classList.contains('on')) s.style.background = lc;
+      else s.style.background = '';
+    });
+
+    // 14. Pyramid (bottom row fills first)
+    var totalCells = 15;
+    var activePyramid = Math.round(pct * totalCells);
+    var cellIdx = 0;
+    document.querySelectorAll('[data-g="14"]').forEach(function(c){
+      c.classList.toggle('on', cellIdx < activePyramid);
+      if (c.classList.contains('on')) c.style.background = lc;
+      else c.style.background = '';
+      cellIdx++;
+    });
+
+    // 15. Pendulum
+    if (gEls.g15) {
+      var leftPct = pct * 80;
+      var bottomPct = pct * 50;
+      gEls.g15.style.left = (34 + leftPct - 6) + 'px';
+      gEls.g15.style.bottom = bottomPct + 'px';
+      gEls.g15.style.background = lc;
+    }
+
+    // 16. Spiral dots
+    var activeSpiral = Math.round(pct * 16);
+    document.querySelectorAll('[data-g="16"]').forEach(function(d){
+      d.classList.toggle('on', parseInt(d.dataset.i) < activeSpiral);
+      if (parseInt(d.dataset.i) < activeSpiral) d.style.background = lc;
+      else d.style.background = '';
+    });
+
+    // 17. Gradient word
+    if (gEls.g17) {
+      gEls.g17.style.color = lc;
+      gEls.g17.style.textShadow = '0 0 '+Math.round(pct*30)+'px '+lc;
+      gEls.g17.textContent = level;
+      gEls.g17.style.opacity = 0.3 + pct * 0.7;
+    }
+
+    // 18. Litmus
+    var activeBands = Math.round(pct * 5);
+    document.querySelectorAll('[data-g="18"]').forEach(function(b){
+      b.style.opacity = parseInt(b.dataset.i) < activeBands ? '1' : '0.1';
+    });
+
+    // 19. Fuel gauge
+    if (gEls.g19) gEls.g19.style.height = v + '%';
+
+    // 20. Blob morph
+    if (gEls.g20) {
+      gEls.g20.style.background = lc;
+      gEls.g20.style.boxShadow = '0 0 '+Math.round(pct*30)+'px '+lc;
+      var br = (60-pct*20)+'% '+(40+pct*20)+'% '+(50-pct*10)+'% '+(45+pct*15)+'%';
+      gEls.g20.style.borderRadius = br;
+      gEls.g20.style.opacity = 0.2 + pct * 0.6;
+    }
+  }
+
+  function processTranscript(text) {
+    if (!text) return;
+    transcriptText += ' ' + text;
+    var words = text.toLowerCase().match(/[a-zà-ÿ']+/gi) || [];
+    wordCount += words.length;
+    words.forEach(function(w){ uniqueWords.add(w); });
+    sharedValue = computeValue();
+    updateAllGauges(sharedValue);
+  }
+
+  // ── Web Speech API ──
+  var micBtn = document.getElementById('micBtn');
+  var liveDot = document.getElementById('liveDot');
+  var liveStatus = document.getElementById('liveStatus');
+
+  function startMic() {
+    if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+      alert('Speech recognition not supported in this browser. Use Chrome or Edge.');
+      return;
+    }
+    var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    recognition = new SR();
+    recognition.continuous = true;
+    recognition.interimResults = true;
+    var lang = document.getElementById('langSelect').value;
+    recognition.lang = lang;
+
+    recognition.onresult = function(event){
+      for (var i=event.resultIndex;i<event.results.length;i++){
+        if (event.results[i].isFinal){
+          processTranscript(event.results[i][0].transcript);
+        }
+      }
+    };
+
+    recognition.onstart = function(){
+      isListening = true;
+      liveDot.classList.add('active');
+      liveStatus.textContent = 'Live · speaking…';
+      micBtn.textContent = '⏹ Stop Mic';
+    };
+
+    recognition.onend = function(){
+      if (isListening) {
+        try { recognition.start(); } catch(e){}
+      } else {
+        liveDot.classList.remove('active');
+        liveStatus.textContent = 'Idle';
+        micBtn.textContent = '🎤 Start Mic';
+      }
+    };
+
+    recognition.onerror = function(e){
+      liveStatus.textContent = 'Error: ' + e.error;
+      liveDot.classList.remove('active');
+    };
+
+    recognition.start();
+    micBtn.onclick = stopMic;
+  }
+
+  function stopMic() {
+    isListening = false;
+    if (recognition) {
+      recognition.onend = null;
+      recognition.stop();
+    }
+    recognition = null;
+    liveDot.classList.remove('active');
+    liveStatus.textContent = 'Idle';
+    micBtn.textContent = '🎤 Start Mic';
+    micBtn.onclick = startMic;
+  }
+
+  micBtn.addEventListener('click', startMic);
+
+  // Init
+  buildGauges();
+  updateAllGauges(0);
+})();
+</script>
+</body>
+</html>

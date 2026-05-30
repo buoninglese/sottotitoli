@@ -24,6 +24,12 @@
     (configRoot.modes && configRoot.modes["caption-en"]) ||
     {};
 
+  // Hide NGSL coverage row for non-English source languages
+  if (modeConfig.sourceCode && modeConfig.sourceCode !== 'en') {
+    var ngslRow = document.getElementById('ngslRow');
+    if (ngslRow) ngslRow.style.display = 'none';
+  }
+
   let room = params.get("room");
   if (!room && w.SottotitoliSessionUtils) {
     room = w.SottotitoliSessionUtils.randomRoom();
@@ -239,6 +245,31 @@
     setText("liveFillers", String(fillerCount));
     setText("liveLexDiv", lexDiv.toFixed(2));
     setText("liveQuestions", String(computeQuestionCount(plain)));
+
+    // POS counts from LEMMA_POS_MAP
+    if (w.LEMMA_POS_MAP) {
+      var tokens = plain.toLowerCase().match(/[a-z']+/g) || [];
+      var verbs=0, nouns=0, adjs=0;
+      tokens.forEach(function(t){
+        var pos = w.LEMMA_POS_MAP[t];
+        if (pos==='verb') verbs++;
+        else if (pos==='noun') nouns++;
+        else if (pos==='adj') adjs++;
+      });
+      setText("liveVerbCount", String(verbs));
+      setText("liveNounCount", String(nouns));
+      setText("liveAdjCount", String(adjs));
+    }
+
+    // CEFR level estimate from lexical diversity
+    if (wc > 10) {
+      var cefrScore = lexDiv > 0.55 ? 'C1' : lexDiv > 0.45 ? 'B2' : lexDiv > 0.35 ? 'B1' : lexDiv > 0.25 ? 'A2' : 'A1';
+      var cefrPct = Math.min(95, Math.round(lexDiv * 150 + 20));
+      setText("cefrLevel", cefrScore);
+      var gauge = document.getElementById('cefrGauge');
+      if (gauge) gauge.style.height = cefrPct + '%';
+    }
+
     // WPM and quality require duration; updated separately via updateReportMetrics
   }
 
