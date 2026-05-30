@@ -44,7 +44,7 @@
   let interimFlushTimer = null;
   let pendingInterimText = "";
 
-  const INTERIM_FLUSH_MS = 3500; // an interim that the browser hasn't yet marked as final.
+  const INTERIM_FLUSH_MS = 1200; // an interim that the browser hasn't yet marked as final.
   const SENTENCE_END_RE = /[.!?。！？]\s*$/;
 
   function clearInterimFlushTimer() {
@@ -518,28 +518,39 @@
     };
 
     rec.onerror = function (event) {
-      const err = event.error || "unknown";
-      setText(
-        "statusText",
-        "Speech error (" +
-          ((modeConfig && modeConfig.sourceLang) || "en-US") +
-          "): " +
-          err
-      );
-      if (
-        err === "not-allowed" ||
-        err === "service-not-allowed" ||
-        err === "audio-capture"
-      ) {
+      var err = event.error || "unknown";
+      if (err === "not-allowed" || err === "service-not-allowed") {
         shouldKeepListening = false;
         updateMicState("blocked", false);
+        setText("statusText", "Microphone access denied. Check browser permissions.");
         return;
+      }
+      if (err === "audio-capture") {
+        shouldKeepListening = false;
+        updateMicState("blocked", false);
+        setText("statusText", "No microphone found. Connect a mic and try again.");
+        return;
+      }
+      if (err !== "no-speech" && err !== "aborted") {
+        setText("statusText", "Speech error: " + err);
       }
       updateMicState("recovering", false);
     };
 
+    rec.onspeechend = function () {
+      if (pendingInterimText) {
+        clearInterimFlushTimer();
+        interimFlushTimer = setTimeout(function () {
+          if (pendingInterimText) {
+            commitUtteranceFinal(pendingInterimText);
+            pendingInterimText = "";
+            clearBox("captionInterim", "");
+          }
+        }, 400);
+      }
+    };
+
     rec.onend = function () {
-      // Flush any lingering interim before restarting
       if (pendingInterimText) {
         commitUtteranceFinal(pendingInterimText);
         pendingInterimText = "";
@@ -548,13 +559,7 @@
 
       updateMicState(shouldKeepListening ? "restarting" : "stopped", false);
       if (shouldKeepListening) {
-        setText(
-          "statusText",
-          hasStartedOnce
-            ? "Recognition ended, restarting..."
-            : "Recognition did not stay active, retrying..."
-        );
-        scheduleRestart();
+        scheduleRestart(300);
       } else {
         setText("statusText", "Recognition stopped.");
       }
