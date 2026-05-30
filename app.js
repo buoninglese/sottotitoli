@@ -53,7 +53,7 @@
       if (pendingInterimText) {
         commitUtteranceFinal(pendingInterimText);
         pendingInterimText = "";
-        clearBox("interimOutput", "Interim");
+        clearBox("captionInterim", "");
       }
     }, INTERIM_FLUSH_MS);
   }
@@ -227,7 +227,7 @@
     setText("statLinesTranslate", String(transcriptLines.length));
     setText("statWordsTranslate", String(wc));
     setText("statCharsTranslate", String(cc));
-    // Report metrics
+    // Report metrics (also update live cockpit IDs)
     const fillerCount = computeFillersCount(plain);
     const uniqueCount = computeUniqueWordsCount(plain);
     const lexDiv = wc > 0 ? uniqueCount / wc : 0;
@@ -235,6 +235,10 @@
     setText("reportUnique", String(uniqueCount));
     setText("reportLexDiv", lexDiv.toFixed(2));
     setText("reportFillers", String(fillerCount));
+    setText("liveWords", String(wc));
+    setText("liveFillers", String(fillerCount));
+    setText("liveLexDiv", lexDiv.toFixed(2));
+    setText("liveQuestions", String(computeQuestionCount(plain)));
     // WPM and quality require duration; updated separately via updateReportMetrics
   }
 
@@ -364,7 +368,7 @@
     };
     transcriptLines.push(entry);
 
-    appendLine("sourceOutput", clean);
+    appendLine("captionTranscript", clean);
 
     const payload = {
       type: "caption",
@@ -380,7 +384,7 @@
       const translated = await maybeTranslate(clean);
       if (translated) {
         entry.translated = translated;
-        appendLine("translatedOutput", translated);
+        appendLine("captionTranslated", translated);
         payload.translated = translated;
         payload.targetLang = modeConfig.targetLang;
       }
@@ -388,20 +392,20 @@
 
     updateStats();
     lastInterimSent = "";
-    clearBox("interimOutput", "Interim");
+    clearBox("captionInterim", "");
 
     sendPayload(payload, "Final caption sent to overlay.");
   }
 
   function handleInterimTranscript(text) {
     const clean = (text || "").trim();
-    const interimBox = $("interimOutput");
+    const interimBox = $("captionInterim");
     if (!interimBox) return;
 
     if (!clean) {
       clearInterimFlushTimer();
       pendingInterimText = "";
-      clearBox("interimOutput", "Interim");
+      clearBox("captionInterim", "");
       return;
     }
 
@@ -791,11 +795,9 @@
     isAnalyzingSpeakers = false;
     speakerAnalysisCompleted = false;
     updateAnalyzeButtonState();
-    clearBox("interimOutput", "Interim");
-    clearBox("sourceOutput", "Source output");
-    clearBox("translatedOutput", "Translated output");
-    clearBox("sourceOutputTranslate", "Source output");
-    clearBox("interimOutputTranslate", "Interim");
+    clearBox("captionInterim", "");
+    clearBox("captionTranscript", "");
+    clearBox("captionTranslated", "");
     clearBox("lessonReport", "No report yet.");
     setText("lessonReport", "No report yet.");
     updateStats();
@@ -1243,10 +1245,12 @@
       const repetitionRate = computeRepetitionRate(plain);
       const turnCount = computeTurnCount(plain);
 
-      // Update Report tab metrics with these computed values
-      if (wpm != null) setText("reportWpm", Math.round(wpm));
-      if (fillersPerMinute != null) setText("reportFillers", fillersPerMinute.toFixed(1));
-      setText("reportQuality", qualityScore != null ? qualityScore.toFixed(2) : "0");
+      // Update live cockpit metrics
+      if (wpm != null) { setText("reportWpm", Math.round(wpm)); setText("liveWpm", Math.round(wpm)); }
+      if (fillersPerMinute != null) { setText("reportFillers", fillersPerMinute.toFixed(1)); setText("liveFillers", fillersPerMinute.toFixed(1)); }
+      if (qualityScore != null) { setText("reportQuality", qualityScore.toFixed(2)); setText("liveQuality", qualityScore.toFixed(2)); }
+      if (ngslCoverage != null) setText("liveNgsl", (ngslCoverage * 100).toFixed(0) + '%');
+      setText("liveQuestions", String(questionCount));
 
       const updatePayload = {
         ended_at: ended.toISOString(),
@@ -1308,9 +1312,9 @@
 
     connectSocket();
     updateStats();
-    clearBox("interimOutput", "Interim");
-    clearBox("sourceOutput", "Source output");
-    clearBox("translatedOutput", "Translated output");
+    clearBox("captionInterim", "");
+    clearBox("captionTranscript", "");
+    clearBox("captionTranslated", "");
 
     var srcSelect = document.getElementById("sourceLangSelect");
     if (srcSelect) {
