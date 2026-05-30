@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Sottotitoli Cinema</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="icon" type="image/png" href="img/favicon.png" />
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+
+:root {
+  --text-glow: rgba(255,255,255,0.92);
+  --text-interim: rgba(255,255,255,0.55);
+  --accent: #7c3aed;
+}
+
+body {
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  background: #000;
+  color: #fff;
+  min-height: 100vh;
+  overflow: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ── Animated aurora background ── */
+.aurora {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  opacity: 0.7;
+}
+.aurora::before, .aurora::after {
+  content: '';
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(120px);
+}
+.aurora::before {
+  width: 60vw; height: 60vw;
+  background: radial-gradient(circle, rgba(124,58,237,.25), transparent 70%);
+  top: -20%; left: 10%;
+  animation: auroraFloat 14s ease-in-out infinite;
+}
+.aurora::after {
+  width: 50vw; height: 50vw;
+  background: radial-gradient(circle, rgba(37,99,235,.2), transparent 70%);
+  bottom: -15%; right: 5%;
+  animation: auroraFloat 18s ease-in-out infinite reverse;
+}
+@keyframes auroraFloat {
+  0%,100% { transform: translate(0,0) scale(1); }
+  25% { transform: translate(8%,5%) scale(1.1); }
+  50% { transform: translate(-3%,-4%) scale(0.95); }
+  75% { transform: translate(-6%,2%) scale(1.05); }
+}
+
+/* ── Particle grid overlay ── */
+.grid-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  background-image:
+    radial-gradient(circle at 30% 40%, rgba(255,255,255,.015) 1px, transparent 1px),
+    radial-gradient(circle at 70% 60%, rgba(255,255,255,.01) 1px, transparent 1px);
+  background-size: 60px 60px, 80px 80px;
+}
+
+/* ── Main caption stage ── */
+.caption-stage {
+  position: fixed;
+  inset: 0;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 60px 40px;
+  pointer-events: none;
+}
+
+/* ── Interim text (ghost preview) ── */
+.caption-interim {
+  font-size: clamp(28px, 5vw, 56px);
+  font-weight: 300;
+  line-height: 1.3;
+  text-align: center;
+  color: var(--text-interim);
+  letter-spacing: -0.02em;
+  min-height: 1.3em;
+  transition: opacity 0.3s ease;
+  word-break: break-word;
+  max-width: 90vw;
+}
+.caption-interim:empty { display: none; }
+
+/* ── Final text (cinematic reveal) ── */
+.caption-final {
+  font-size: clamp(36px, 6vw, 72px);
+  font-weight: 600;
+  line-height: 1.25;
+  text-align: center;
+  letter-spacing: -0.03em;
+  color: var(--text-glow);
+  min-height: 1.25em;
+  word-break: break-word;
+  max-width: 90vw;
+  text-shadow:
+    0 0 40px rgba(255,255,255,.15),
+    0 0 80px rgba(124,58,237,.1),
+    0 2px 4px rgba(0,0,0,.5);
+  animation: textReveal 0.5s ease-out;
+}
+.caption-final:empty { display: none; }
+
+@keyframes textReveal {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+    filter: blur(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+    filter: blur(0);
+  }
+}
+
+/* ── Word-by-word staggering ── */
+.caption-final .word {
+  display: inline-block;
+  animation: wordPop 0.4s ease-out both;
+}
+@keyframes wordPop {
+  from { opacity: 0; transform: translateY(12px) scale(0.95); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+/* ── Placeholder ── */
+.caption-placeholder {
+  font-size: clamp(16px, 2.5vw, 22px);
+  font-weight: 300;
+  color: rgba(255,255,255,.18);
+  letter-spacing: 0.04em;
+  text-align: center;
+}
+.caption-placeholder.hidden { display: none; }
+
+/* ── Status micro-pill (bottom right) ── */
+.status-pill {
+  position: fixed;
+  bottom: 28px;
+  right: 32px;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 14px;
+  border-radius: 100px;
+  background: rgba(255,255,255,.04);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255,255,255,.08);
+  font-size: 11px;
+  font-weight: 500;
+  color: rgba(255,255,255,.4);
+  transition: all .4s;
+  pointer-events: auto;
+}
+.status-pill .dot {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: rgba(255,255,255,.2);
+  transition: background .4s, box-shadow .4s;
+}
+.status-pill.connected {
+  color: rgba(255,255,255,.6);
+  border-color: rgba(34,197,94,.2);
+}
+.status-pill.connected .dot {
+  background: #22c55e;
+  box-shadow: 0 0 8px rgba(34,197,94,.5);
+}
+.status-pill .room-id {
+  font-family: ui-monospace, SFMono-Regular, monospace;
+  font-size: 10px;
+  color: rgba(255,255,255,.25);
+  margin-left: 4px;
+}
+
+/* ── Mode badge (top left) ── */
+.mode-badge {
+  position: fixed;
+  top: 28px;
+  left: 32px;
+  z-index: 10;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: .2em;
+  color: rgba(255,255,255,.2);
+  pointer-events: auto;
+}
+
+@media (max-width: 640px) {
+  .caption-stage { padding: 40px 20px; }
+  .status-pill { bottom: 16px; right: 16px; font-size: 10px; }
+  .mode-badge { top: 16px; left: 16px; }
+}
+</style>
+</head>
+<body>
+
+<div class="aurora"></div>
+<div class="grid-overlay"></div>
+
+<div class="caption-stage">
+  <div class="caption-interim" id="captionInterim"></div>
+  <div class="caption-final" id="captionFinal"></div>
+  <div class="caption-placeholder" id="captionPlaceholder">Waiting for captions…</div>
+</div>
+
+<div class="mode-badge" id="modeBadge"></div>
+<div class="status-pill" id="statusPill">
+  <span class="dot"></span>
+  <span id="statusLabel">Disconnected</span>
+  <span class="room-id" id="roomLabel"></span>
+</div>
+
+<script src="config.js"></script>
+
+<script>
+(function(w){
+  "use strict";
+
+  var params = new URLSearchParams(location.search);
+  var room = params.get("room");
+  var modeFromQuery = params.get("mode") || "caption-en";
+
+  var interimEl = document.getElementById("captionInterim");
+  var finalEl = document.getElementById("captionFinal");
+  var placeholderEl = document.getElementById("captionPlaceholder");
+  var statusPill = document.getElementById("statusPill");
+  var statusLabel = document.getElementById("statusLabel");
+  var roomLabel = document.getElementById("roomLabel");
+  var modeBadge = document.getElementById("modeBadge");
+
+  var reconnectTimer = null;
+  var retryCount = 0;
+  var manualClose = false;
+  var socket = null;
+  var lastFinalText = "";
+
+  // ── Render final text with word-by-word animation ──
+  function renderFinal(text) {
+    if (!text || text === lastFinalText) return;
+    lastFinalText = text;
+    placeholderEl.classList.add("hidden");
+    interimEl.textContent = "";
+
+    var words = text.split(/\s+/);
+    var html = words.map(function(w, i){
+      return '<span class="word" style="animation-delay:' + (i * 0.03) + 's">' + w + '</span>';
+    }).join(' ');
+    finalEl.innerHTML = html;
+  }
+
+  // ── Render interim text ──
+  function renderInterim(text) {
+    if (!text) { interimEl.textContent = ""; return; }
+    placeholderEl.classList.add("hidden");
+    interimEl.textContent = text;
+  }
+
+  // ── Clear all ──
+  function clearAll() {
+    interimEl.textContent = "";
+    finalEl.textContent = "";
+    lastFinalText = "";
+    placeholderEl.classList.remove("hidden");
+  }
+
+  // ── Handle payload ──
+  function handlePayload(payload) {
+    if (!payload) return;
+    if (payload.final) {
+      renderFinal(payload.final);
+      interimEl.textContent = "";
+    }
+    if (payload.interim || payload.interm) {
+      renderInterim(payload.interim || payload.interm || "");
+    }
+    if (!payload.final && !payload.interim && !payload.interm) {
+      clearAll();
+    }
+  }
+
+  // ── Status updates ──
+  function setStatus(state) {
+    if (!statusPill || !statusLabel) return;
+    statusPill.classList.remove("connected");
+    if (state === "connected") {
+      statusPill.classList.add("connected");
+      statusLabel.textContent = "Live";
+    } else if (state === "connecting") {
+      statusLabel.textContent = "Connecting…";
+    } else {
+      statusLabel.textContent = "Disconnected";
+    }
+  }
+
+  // ── Exponential backoff ──
+  function getDelay() {
+    if (retryCount === 0) return 0;
+    return Math.min(1000 * Math.pow(2, retryCount - 1), 30000);
+  }
+
+  function clearTimer() {
+    if (reconnectTimer) { clearTimeout(reconnectTimer); reconnectTimer = null; }
+  }
+
+  function scheduleReconnect() {
+    if (manualClose) return;
+    var d = getDelay();
+    retryCount++;
+    reconnectTimer = setTimeout(connect, d);
+  }
+
+  // ── WebSocket connect ──
+  function connect() {
+    if (manualClose) return;
+    clearTimer();
+
+    var cfg = w.SOTTOTITOLI_CONFIG || {};
+    var wsUrl = cfg.websocketUrl || "";
+
+    if (!wsUrl) {
+      setStatus("error");
+      return;
+    }
+
+    try {
+      setStatus("connecting");
+      socket = new WebSocket(wsUrl + "?room=" + encodeURIComponent(room));
+    } catch(e) {
+      setStatus("error");
+      scheduleReconnect();
+      return;
+    }
+
+    socket.onopen = function(){
+      retryCount = 0;
+      setStatus("connected");
+      try { socket.send(JSON.stringify({ join: room })); } catch(e){}
+    };
+
+    socket.onmessage = function(evt){
+      try {
+        var p = JSON.parse(evt.data);
+        if (p && (p.type === "caption" || p.msg === true)) {
+          handlePayload(p);
+        }
+      } catch(e){}
+    };
+
+    socket.onclose = function(){
+      if (manualClose) { setStatus("disconnected"); return; }
+      setStatus("disconnected");
+      scheduleReconnect();
+    };
+
+    socket.onerror = function(){ setStatus("error"); };
+  }
+
+  // ── Init ──
+  document.addEventListener("DOMContentLoaded", function(){
+    if (modeBadge) modeBadge.textContent = modeFromQuery;
+    if (roomLabel) roomLabel.textContent = room ? ("#" + room) : "";
+    if (!room) {
+      setStatus("error");
+      renderFinal("No room specified.");
+      return;
+    }
+    connect();
+  });
+})(window);
+</script>
+</body>
+</html>
