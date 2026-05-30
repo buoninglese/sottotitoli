@@ -798,7 +798,7 @@ const { data: sessions, error: sessionsError } = await accountSupabase
     }
     const { data: sessionData } = await accountSupabase.auth.getSession();
     if (!sessionData || !sessionData.session) {
-      if (statusEl) { statusEl.textContent = '❌ Devi aver effettuato l'accesso'; statusEl.className = 'status error'; }
+      if (statusEl) { statusEl.textContent = '❌ Devi aver effettuato l\u2019accesso'; statusEl.className = 'status error'; }
       return;
     }
     const user_id = sessionData.session.user.id;
