@@ -1,406 +1,294 @@
 <!DOCTYPE html>
-<html lang="en" class="no-js">
+<html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <title>Sottotitoli Overlay (Roll)</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta charset="utf-8" />
+<title>Sottotitoli Roll</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="icon" type="image/png" href="img/favicon.png" />
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 
-  <link rel="icon" type="image/png" href="img/favicon.png" />
-  <link rel="stylesheet" href="css/normalize.css" />
-  <link rel="stylesheet" href="css/bootstrap.min.css" />
-  <link rel="stylesheet" href="css/responsive.css" />
-  <link rel="stylesheet" href="style.css" />
+/* ═══════════════════════════════════════ */
+/* BASE — no-box rolling captions         */
+/* ═══════════════════════════════════════ */
+body {
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  background: #000;
+  color: #fff;
+  min-height: 100vh;
+  overflow: hidden;
+  -webkit-font-smoothing: antialiased;
+  transition: background .6s;
+}
 
-  <style>
-    :root {
-      --roll-bg: rgba(5, 12, 24, 0.96);
-      --roll-line: rgba(148, 163, 184, 0.25);
-      --roll-muted: #94a3b8;
-    }
+/* ── Aurora layer ── */
+.aurora{position:fixed;inset:0;z-index:0;opacity:.6;pointer-events:none;}
+.aurora::before,.aurora::after{content:'';position:absolute;border-radius:50%;filter:blur(100px);}
+.aurora::before{width:50vw;height:50vw;top:-10%;left:20%;animation:auroraFloat 16s ease-in-out infinite;}
+.aurora::after{width:40vw;height:40vw;bottom:-10%;right:15%;animation:auroraFloat 20s ease-in-out infinite reverse;}
+@keyframes auroraFloat{0%,100%{transform:translate(0,0) scale(1)}25%{transform:translate(6%,4%) scale(1.08)}50%{transform:translate(-2%,-3%) scale(.94)}75%{transform:translate(-5%,2%) scale(1.04)}}
 
-    body {
-      margin: 0;
-      padding: 0;
-      background: radial-gradient(circle at top left, rgba(59, 130, 246, .22), transparent 50%),
-                  linear-gradient(180deg, #020617, #020617);
-      color: #e5edff;
-      font-family: "Montserrat", system-ui, -apple-system, BlinkMacSystemFont,
-        "Segoe UI", sans-serif;
-    }
+/* ── Grid overlay ── */
+.grid-overlay{position:fixed;inset:0;z-index:0;pointer-events:none;
+  background-image:radial-gradient(circle at 25% 35%,rgba(255,255,255,.012) 1px,transparent 1px),radial-gradient(circle at 65% 55%,rgba(255,255,255,.008) 1px,transparent 1px);
+  background-size:50px 50px,70px 70px;}
 
-    .overlay-root {
-      min-height: 100vh;
-      display: flex;
-      align-items: flex-end;
-      justify-content: center;
-      padding: 16px 20px;
-    }
+/* ── Roll stage ── */
+.roll-stage{position:fixed;inset:0;z-index:1;display:flex;flex-direction:column;justify-content:flex-end;padding:40px 48px 120px;pointer-events:none;}
+.roll-list{display:flex;flex-direction:column-reverse;gap:6px;max-height:70vh;overflow:hidden;}
+.roll-line{font-size:clamp(22px,4vw,48px);font-weight:500;line-height:1.35;letter-spacing:-0.02em;animation:lineIn .4s ease-out;opacity:.85;word-break:break-word;}
+.roll-line:nth-child(1){opacity:1;font-weight:600;}
+.roll-line:nth-child(2){opacity:.75;}
+.roll-line:nth-child(3){opacity:.55;}
+.roll-line:nth-child(4){opacity:.38;}
+.roll-line:nth-child(5){opacity:.24;}
+.roll-line:nth-child(n+6){opacity:.14;}
+@keyframes lineIn{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
+.roll-placeholder{font-size:clamp(16px,2.5vw,24px);font-weight:300;letter-spacing:.04em;}
+.roll-placeholder.hidden{display:none;}
 
-    .roll-card {
-      width: 100%;
-      max-width: 1200px;
-      background: var(--roll-bg);
-      border-radius: 18px 18px 0 0;
-      border-top: 1px solid rgba(148, 163, 184, .45);
-      border-left: 1px solid rgba(30, 64, 175, .5);
-      border-right: 1px solid rgba(30, 64, 175, .5);
-      box-shadow:
-        0 -18px 50px rgba(0, 0, 0, .55),
-        0 -1px 0 rgba(15, 23, 42, 1);
-      padding: 10px 18px 14px;
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
-    }
+/* ── Translation box ── */
+.roll-translation-box{margin-top:12px;padding:10px 0;display:none;}
+.roll-translation-box.visible{display:block;}
+.t-label{display:block;font-size:10px;text-transform:uppercase;letter-spacing:.16em;font-weight:700;margin-bottom:6px;}
+.roll-translation-list{display:flex;flex-direction:column-reverse;gap:4px;max-height:25vh;overflow:hidden;}
+.roll-tline{font-size:clamp(18px,3.2vw,38px);font-weight:400;line-height:1.3;animation:lineIn .4s ease-out;opacity:.8;word-break:break-word;}
+.roll-tline:nth-child(1){opacity:.9;font-weight:500;}
+.roll-tline:nth-child(2){opacity:.6;}
+.roll-tline:nth-child(3){opacity:.4;}
+.roll-tline:nth-child(4){opacity:.25;}
+.roll-tline:nth-child(n+5){opacity:.14;}
 
-    .roll-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      font-size: 12px;
-      color: var(--roll-muted);
-    }
+/* ── Status pill ── */
+.status-pill{position:fixed;bottom:28px;right:32px;z-index:10;display:flex;align-items:center;gap:8px;padding:6px 14px;border-radius:100px;background:rgba(255,255,255,.04);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border:1px solid rgba(255,255,255,.08);font-size:11px;font-weight:500;transition:all .4s;pointer-events:auto;}
+.status-pill .dot{width:6px;height:6px;border-radius:50%;background:rgba(255,255,255,.2);transition:background .4s,box-shadow .4s;}
+.status-pill.connected{border-color:rgba(34,197,94,.2);}
+.status-pill.connected .dot{background:#22c55e;box-shadow:0 0 8px rgba(34,197,94,.5);}
+.status-pill .room-id{font-family:ui-monospace,monospace;font-size:10px;margin-left:4px;}
 
-    .roll-status {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-    }
+/* ── Corner badges ── */
+.mode-badge{position:fixed;top:28px;left:32px;z-index:10;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.2em;pointer-events:auto;}
+.style-toggle{position:fixed;top:28px;right:32px;z-index:10;padding:6px 16px;border-radius:100px;font-family:inherit;font-size:12px;font-weight:600;cursor:pointer;pointer-events:auto;transition:all .25s;border:1px solid;}
+.style-toggle:hover{transform:scale(1.05);}
 
-    .roll-dot {
-      width: 8px;
-      height: 8px;
-      border-radius: 999px;
-      background: #f97316;
-    }
+@media(max-width:640px){.roll-stage{padding:30px 20px 100px}.status-pill{bottom:16px;right:16px;font-size:10px}.mode-badge{top:16px;left:16px}.style-toggle{top:16px;right:16px;font-size:11px;padding:5px 12px}}
 
-    .roll-dot.connected {
-      background: #22c55e;
-    }
+/* ═══════════════════════════════════════ */
+/* STYLE 1 — AURORA (purple/blue)         */
+/* ═══════════════════════════════════════ */
+[data-style="1"] .roll-line{color:rgba(255,255,255,.85);text-shadow:0 0 20px rgba(124,58,237,.08);}
+[data-style="1"] .roll-placeholder{color:rgba(255,255,255,.15);}
+[data-style="1"] .t-label{color:rgba(167,139,250,.6);}
+[data-style="1"] .roll-tline{color:rgba(196,181,253,.8);}
+[data-style="1"] .aurora::before{background:radial-gradient(circle,rgba(124,58,237,.2),transparent 70%);}
+[data-style="1"] .aurora::after{background:radial-gradient(circle,rgba(37,99,235,.15),transparent 70%);}
+[data-style="1"] .status-pill{color:rgba(255,255,255,.4);}
+[data-style="1"] .status-pill.connected{color:rgba(255,255,255,.6);}
+[data-style="1"] .mode-badge{color:rgba(255,255,255,.2);}
+[data-style="1"] .style-toggle{background:rgba(124,58,237,.1);color:rgba(255,255,255,.5);border-color:rgba(124,58,237,.25);}
 
-    .roll-room {
-      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-      font-size: 12px;
-      padding: 2px 8px;
-      border-radius: 999px;
-      border: 1px solid rgba(148, 163, 184, .55);
-      color: #dbeafe;
-    }
+/* ═══════════════════════════════════════ */
+/* STYLE 2 — NEON (hot pink / cyan)       */
+/* ═══════════════════════════════════════ */
+[data-style="2"] body{background:#050510;}
+[data-style="2"] .roll-line{color:#fff;text-shadow:0 0 16px rgba(236,72,153,.35);font-weight:600;}
+[data-style="2"] .roll-placeholder{color:rgba(236,72,153,.12);}
+[data-style="2"] .t-label{color:rgba(6,182,212,.7);}
+[data-style="2"] .roll-tline{color:rgba(6,182,212,.8);}
+[data-style="2"] .aurora::before{background:radial-gradient(circle,rgba(236,72,153,.18),transparent 70%);}
+[data-style="2"] .aurora::after{background:radial-gradient(circle,rgba(6,182,212,.14),transparent 70%);}
+[data-style="2"] .status-pill{color:rgba(236,72,153,.5);border-color:rgba(236,72,153,.12);background:rgba(236,72,153,.03);}
+[data-style="2"] .status-pill.connected{color:rgba(6,182,212,.7);}
+[data-style="2"] .mode-badge{color:rgba(236,72,153,.3);}
+[data-style="2"] .style-toggle{background:rgba(236,72,153,.08);color:rgba(236,72,153,.7);border-color:rgba(236,72,153,.2);}
 
-    .roll-list {
-      margin-top: 2px;
-      max-height: 38vh;
-      overflow: hidden;
-      display: flex;
-      flex-direction: column-reverse;
-      gap: 4px;
-    }
+/* ═══════════════════════════════════════ */
+/* STYLE 3 — MINIMAL (pure black & white) */
+/* ═══════════════════════════════════════ */
+[data-style="3"] .aurora{display:none;}
+[data-style="3"] .grid-overlay{display:none;}
+[data-style="3"] .roll-line{color:#fff;text-shadow:none;font-weight:400;animation:none;}
+[data-style="3"] .roll-placeholder{color:rgba(255,255,255,.08);}
+[data-style="3"] .t-label{color:rgba(255,255,255,.2);}
+[data-style="3"] .roll-tline{color:rgba(255,255,255,.5);}
+[data-style="3"] .status-pill{color:rgba(255,255,255,.25);background:transparent;border-color:rgba(255,255,255,.05);}
+[data-style="3"] .status-pill.connected{color:rgba(255,255,255,.4);}
+[data-style="3"] .mode-badge{color:rgba(255,255,255,.12);}
+[data-style="3"] .style-toggle{background:transparent;color:rgba(255,255,255,.25);border-color:rgba(255,255,255,.08);}
 
-    .roll-line {
-      font-size: 22px;
-      line-height: 1.5;
-      border-top: 1px solid rgba(148, 163, 184, .15);
-      padding-top: 4px;
-    }
+/* ═══════════════════════════════════════ */
+/* STYLE 4 — WARM (amber / gold)          */
+/* ═══════════════════════════════════════ */
+[data-style="4"] body{background:#0a0800;}
+[data-style="4"] .roll-line{color:rgba(255,248,230,.9);text-shadow:0 0 20px rgba(251,191,36,.15);font-weight:600;}
+[data-style="4"] .roll-placeholder{color:rgba(251,191,36,.1);}
+[data-style="4"] .t-label{color:rgba(251,191,36,.5);}
+[data-style="4"] .roll-tline{color:rgba(251,191,36,.7);}
+[data-style="4"] .aurora::before{background:radial-gradient(circle,rgba(245,158,11,.16),transparent 70%);}
+[data-style="4"] .aurora::after{background:radial-gradient(circle,rgba(251,191,36,.12),transparent 70%);}
+[data-style="4"] .status-pill{color:rgba(251,191,36,.4);border-color:rgba(251,191,36,.1);}
+[data-style="4"] .status-pill.connected{color:rgba(251,191,36,.6);}
+[data-style="4"] .mode-badge{color:rgba(251,191,36,.25);}
+[data-style="4"] .style-toggle{background:rgba(251,191,36,.08);color:rgba(251,191,36,.6);border-color:rgba(251,191,36,.2);}
 
-    .roll-placeholder {
-      font-size: 14px;
-      color: var(--roll-muted);
-    }
-
-    #interimPreview {
-      border-top: 1px solid rgba(96, 165, 250, 0.25);
-      color: #93c5fd;
-    }
-
-    .roll-translation-box {
-      margin-top: 6px;
-      padding: 6px 10px;
-      border-radius: 14px;
-      background: rgba(124, 58, 237, .08);
-      border: 1px solid rgba(167, 139, 250, .25);
-      display: none;
-    }
-
-    .roll-translation-box.visible { display: block; }
-
-    .roll-translation-box .rt-label {
-      font-size: 9px;
-      text-transform: uppercase;
-      letter-spacing: .14em;
-      color: rgba(167, 139, 250, .7);
-      font-weight: 700;
-      margin-bottom: 2px;
-    }
-
-    .roll-translation-line {
-      font-size: 20px;
-      line-height: 1.5;
-      color: #c4b5fd;
-      border-top: 1px solid rgba(167, 139, 250, .12);
-      padding-top: 3px;
-    }
-
-    .pos-verb { color: #2563eb; }
-    .pos-noun { color: #16a34a; }
-    .pos-adj  { color: #f97316; }
-    .pos-adv  { color: #7c3aed; }
-
-    @media (max-width: 720px) {
-      .roll-card {
-        padding: 8px 12px 10px;
-      }
-      .roll-line {
-        font-size: 18px;
-      }
-    }
-  </style>
+/* ═══════════════════════════════════════ */
+/* STYLE 5 — MATRIX (green / digital)     */
+/* ═══════════════════════════════════════ */
+[data-style="5"] body{background:#000a00;font-family:'SF Mono','Fira Code','JetBrains Mono',ui-monospace,monospace;}
+[data-style="5"] .roll-line{color:#4ade80;font-family:inherit;letter-spacing:.02em;text-shadow:0 0 16px rgba(34,197,94,.35);}
+[data-style="5"] .roll-placeholder{color:rgba(34,197,94,.1);font-family:inherit;}
+[data-style="5"] .t-label{color:rgba(34,197,94,.4);font-family:inherit;}
+[data-style="5"] .roll-tline{color:rgba(34,197,94,.65);font-family:inherit;}
+[data-style="5"] .aurora::before{background:radial-gradient(circle,rgba(34,197,94,.1),transparent 70%);}
+[data-style="5"] .aurora::after{background:radial-gradient(circle,rgba(34,197,94,.06),transparent 70%);}
+[data-style="5"] .grid-overlay{background-image:linear-gradient(rgba(34,197,94,.025) 1px,transparent 1px),linear-gradient(90deg,rgba(34,197,94,.015) 1px,transparent 1px);background-size:40px 40px;}
+[data-style="5"] .status-pill{color:rgba(34,197,94,.4);border-color:rgba(34,197,94,.12);font-family:monospace;}
+[data-style="5"] .status-pill.connected{color:rgba(34,197,94,.6);}
+[data-style="5"] .mode-badge{color:rgba(34,197,94,.2);font-family:monospace;}
+[data-style="5"] .style-toggle{background:rgba(34,197,94,.06);color:rgba(34,197,94,.6);border-color:rgba(34,197,94,.2);font-family:monospace;}
+</style>
 </head>
-<body>
-  <div class="overlay-root">
-    <div class="roll-card">
-      <div class="roll-header">
-        <div>Rolling captions</div>
-        <div class="roll-status">
-          <span class="roll-dot" id="rollDot"></span>
-          <span id="rollStatusText">Connecting…</span>
-          <span class="roll-room" id="rollRoomLabel"></span>
-        </div>
-      </div>
-      <div class="roll-list" id="captionBox">
-        <div class="roll-placeholder">Waiting for captions…</div>
-      </div>
-      <div class="roll-translation-box" id="translationBox">
-        <div class="rt-label">🌐 Translation</div>
-        <div id="translationLines"></div>
-      </div>
-    </div>
+<body data-style="1">
+
+<div class="aurora"></div>
+<div class="grid-overlay"></div>
+
+<div class="roll-stage">
+  <div class="roll-translation-box" id="translationBox">
+    <span class="t-label">🌐 Translation</span>
+    <div class="roll-translation-list" id="translationLines"></div>
   </div>
+  <div class="roll-list" id="captionBox">
+    <div class="roll-placeholder">Waiting for captions…</div>
+  </div>
+</div>
 
-  <script src="js/jquery.min.js"></script>
-  <script src="config.js"></script>
-  <script src="ws-publisher.js"></script>
-  <script src="js/lemma-pos-map.js"></script>
-  <script src="js/pos-coloring.js"></script>
+<div class="mode-badge" id="modeBadge"></div>
+<button class="style-toggle" id="styleToggle" title="Cycle style (1-5)">🎬 1 · Aurora</button>
+<div class="status-pill" id="statusPill">
+  <span class="dot"></span>
+  <span id="statusLabel">Disconnected</span>
+  <span class="room-id" id="roomLabel"></span>
+</div>
 
-  <script>
-    (function (w) {
-      "use strict";
+<script src="config.js"></script>
 
-      const params = new URLSearchParams(window.location.search);
-      const room = params.get("room");
-      const modeFromQuery = params.get("mode") || "caption-en";
+<script>
+(function(w){
+  "use strict";
 
-      const captionBox = document.getElementById("captionBox");
-      const translationBox = document.getElementById("translationBox");
-      const translationLines = document.getElementById("translationLines");
-      const rollDot = document.getElementById("rollDot");
-      const rollStatusText = document.getElementById("rollStatusText");
-      const rollRoomLabel = document.getElementById("rollRoomLabel");
+  var params = new URLSearchParams(location.search);
+  var room = params.get("room");
+  var modeFromQuery = params.get("mode") || "caption-en";
 
-      function modeIsEnglishLesson(modeKey) {
-        if (!modeKey) return false;
-        return modeKey.indexOf("lesson") !== -1 && modeKey.indexOf("caption") === -1;
+  var captionBox = document.getElementById("captionBox");
+  var translationBox = document.getElementById("translationBox");
+  var translationLines = document.getElementById("translationLines");
+  var statusPill = document.getElementById("statusPill");
+  var statusLabel = document.getElementById("statusLabel");
+  var roomLabel = document.getElementById("roomLabel");
+  var modeBadge = document.getElementById("modeBadge");
+  var styleToggle = document.getElementById("styleToggle");
+
+  var reconnectTimer = null;
+  var retryCount = 0;
+  var manualClose = false;
+  var socket = null;
+
+  // ── 5-style toggle ──
+  var STYLES = [
+    { num:1, label:'1 · Aurora', emoji:'🎬' },
+    { num:2, label:'2 · Neon', emoji:'💜' },
+    { num:3, label:'3 · Minimal', emoji:'⬜' },
+    { num:4, label:'4 · Warm', emoji:'🔥' },
+    { num:5, label:'5 · Matrix', emoji:'💚' }
+  ];
+  var curStyle = parseInt(localStorage.getItem('sottotitoli-roll-style')) || 1;
+
+  function applyStyle(n) {
+    curStyle = n;
+    document.body.setAttribute('data-style', String(n));
+    var s = STYLES[n-1] || STYLES[0];
+    if (styleToggle) styleToggle.textContent = s.emoji + ' ' + s.label;
+    localStorage.setItem('sottotitoli-roll-style', n);
+  }
+  applyStyle(curStyle);
+
+  if (styleToggle) {
+    styleToggle.addEventListener('click', function(){
+      applyStyle(curStyle % 5 + 1);
+    });
+  }
+
+  function clearPlaceholder() {
+    var ph = captionBox.querySelector(".roll-placeholder");
+    if (ph) ph.classList.add("hidden");
+  }
+
+  function appendRollLine(payload) {
+    if (!payload) return;
+    var text = payload.final || payload.interim || payload.interm || "";
+    var isTranslation = payload.kind === "translation" || !!payload.translated || !!payload.targetLang;
+
+    if (translationBox) translationBox.classList.toggle("visible", isTranslation);
+
+    if (text) {
+      clearPlaceholder();
+      var line = document.createElement("div");
+      line.className = "roll-line";
+      line.textContent = text;
+      captionBox.prepend(line);
+      var maxLines = 10;
+      while (captionBox.children.length > maxLines + 1) {
+        var last = captionBox.lastChild;
+        if (last && last.classList && last.classList.contains("roll-placeholder")) break;
+        captionBox.removeChild(captionBox.lastChild);
       }
+    }
 
-      function tokenizeCaption(text) {
-        const rawTokens = text.match(/[A-Za-z']+|\S/g) || [];
-        return rawTokens.map(function (t) {
-          const lemma = t.toLowerCase();
-          const pos =
-            (w.LEMMA_POS_MAP && w.LEMMA_POS_MAP[lemma]) || null;
-          return {
-            text: t,
-            lemma,
-            pos
-          };
-        });
+    if (isTranslation && translationLines && payload.translated) {
+      var tLine = document.createElement("div");
+      tLine.className = "roll-tline";
+      tLine.textContent = payload.translated;
+      translationLines.prepend(tLine);
+      var maxTLines = 5;
+      while (translationLines.children.length > maxTLines) {
+        translationLines.removeChild(translationLines.lastChild);
       }
+    }
+  }
 
-      function clearPlaceholder() {
-        const ph = captionBox.querySelector(".roll-placeholder");
-        if (ph) ph.remove();
-      }
+  function setStatus(state) {
+    if (!statusPill || !statusLabel) return;
+    statusPill.classList.remove("connected");
+    if (state==="connected"){ statusPill.classList.add("connected"); statusLabel.textContent="Live"; }
+    else if (state==="connecting"){ statusLabel.textContent="Connecting…"; }
+    else { statusLabel.textContent="Disconnected"; }
+  }
 
-      function appendRollLine(payload) {
-        if (!payload) return;
+  function getDelay(){ if(retryCount===0) return 0; return Math.min(1000*Math.pow(2,retryCount-1),30000); }
+  function clearTimer(){ if(reconnectTimer){clearTimeout(reconnectTimer);reconnectTimer=null;} }
+  function scheduleReconnect(){ if(manualClose) return; var d=getDelay(); retryCount++; reconnectTimer=setTimeout(connect,d); }
 
-        const text = payload.final || payload.interim || "";
-        const modeKey = payload.mode || modeFromQuery;
-        const isTranslation = payload.kind === "translation" || !!payload.translated || !!payload.targetLang;
+  function connect() {
+    if(manualClose) return; clearTimer();
+    var cfg=w.SOTTOTITOLI_CONFIG||{}; var wsUrl=cfg.websocketUrl||"";
+    if(!wsUrl){ setStatus("error"); return; }
+    try{ setStatus("connecting"); socket=new WebSocket(wsUrl+"?room="+encodeURIComponent(room)); }
+    catch(e){ setStatus("error"); scheduleReconnect(); return; }
+    socket.onopen=function(){ retryCount=0; setStatus("connected"); try{socket.send(JSON.stringify({join:room}));}catch(e){} };
+    socket.onmessage=function(evt){ try{ var p=JSON.parse(evt.data); if(p&&(p.type==="caption"||p.msg===true)){ appendRollLine(p); } }catch(e){} };
+    socket.onclose=function(){ if(manualClose){ setStatus("disconnected"); return; } setStatus("disconnected"); scheduleReconnect(); };
+    socket.onerror=function(){ setStatus("error"); };
+  }
 
-        // Show/hide translation box
-        if (translationBox) {
-          translationBox.classList.toggle("visible", isTranslation);
-        }
-
-        // Source caption lines
-        if (text) {
-          clearPlaceholder();
-          const line = document.createElement("div");
-          line.className = "roll-line";
-          if (modeIsEnglishLesson(modeKey)) {
-            const tokens = tokenizeCaption(text);
-            if (w.SottotitoliPosColoring) {
-              const temp = document.createElement("span");
-              w.SottotitoliPosColoring.renderColoredCaption(temp, tokens);
-              line.innerHTML = temp.innerHTML;
-            } else {
-              line.textContent = text;
-            }
-          } else {
-            line.textContent = text;
-          }
-          captionBox.prepend(line);
-          const maxLines = 10;
-          while (captionBox.childNodes.length > maxLines) {
-            captionBox.removeChild(captionBox.lastChild);
-          }
-        }
-
-        // Translation lines
-        if (isTranslation && translationLines && payload.translated) {
-          const tLine = document.createElement("div");
-          tLine.className = "roll-translation-line";
-          tLine.textContent = payload.translated;
-          translationLines.prepend(tLine);
-          const maxTLines = 5;
-          while (translationLines.childNodes.length > maxTLines) {
-            translationLines.removeChild(translationLines.lastChild);
-          }
-        }
-      }
-
-      function setRollState(state) {
-        if (!rollDot || !rollStatusText) return;
-        if (state === "connected") {
-          rollDot.classList.add("connected");
-          rollStatusText.textContent = "Connected";
-        } else if (state === "connecting") {
-          rollDot.classList.remove("connected");
-          rollStatusText.textContent = "Connecting…";
-        } else if (state === "error") {
-          rollDot.classList.remove("connected");
-          rollStatusText.textContent = "Error";
-        } else {
-          rollDot.classList.remove("connected");
-          rollStatusText.textContent = "Disconnected";
-        }
-      }
-
-      var reconnectTimer = null;
-      var retryCount = 0;
-      var manualClose = false;
-      var socket = null;
-
-      function getRetryDelay() {
-        if (retryCount === 0) return 0;
-        return Math.min(1000 * Math.pow(2, retryCount - 1), 30000);
-      }
-
-      function clearReconnectTimer() {
-        if (reconnectTimer) { clearTimeout(reconnectTimer); reconnectTimer = null; }
-      }
-
-      function connect() {
-        if (manualClose) return;
-        clearReconnectTimer();
-
-        const cfgRoot =
-          w.SOTTOTITOLI_CONFIG ||
-          w.SOTTOTITOLICONFIG ||
-          w.SottotitoliConfig ||
-          {};
-
-        const wsUrl = cfgRoot.websocketUrl || cfgRoot.websocket_url || "";
-
-        if (!wsUrl) {
-          captionBox.innerHTML = '<div class="roll-placeholder">No websocket URL in config.</div>';
-          setRollState("error");
-          return;
-        }
-
-        try {
-          setRollState("connecting");
-          socket = new WebSocket(wsUrl + "?room=" + encodeURIComponent(room));
-        } catch (err) {
-          captionBox.innerHTML = '<div class="roll-placeholder">WebSocket error.</div>';
-          setRollState("error");
-          scheduleReconnect();
-          return;
-        }
-
-        socket.onopen = function () {
-          retryCount = 0;
-          setRollState("connected");
-          try {
-            socket.send(JSON.stringify({ join: room }));
-          } catch (err) {
-            console.error("[Overlay-roll] Failed to join room", err);
-          }
-        };
-
-        socket.onmessage = function (event) {
-          try {
-            const payload = JSON.parse(event.data);
-            // Accept both new format (type: "caption") and legacy format (msg: true)
-            if (payload && (payload.type === "caption" || payload.msg === true)) {
-              if (payload.msg === true && !payload.type) {
-                payload.type = "caption";
-              }
-              if (payload.final) {
-                appendRollLine(payload);
-                var interimPreview = document.getElementById("interimPreview");
-                if (interimPreview) interimPreview.remove();
-              } else if (payload.interim) {
-                var interimPreview = document.getElementById("interimPreview");
-                if (!interimPreview) {
-                  interimPreview = document.createElement("div");
-                  interimPreview.id = "interimPreview";
-                  interimPreview.className = "roll-line";
-                  interimPreview.style.opacity = "0.6";
-                  interimPreview.style.fontStyle = "italic";
-                  captionBox.prepend(interimPreview);
-                }
-                interimPreview.textContent = payload.interim;
-              }
-            }
-          } catch (e) {
-            console.error("[Overlay-roll] Failed to parse message", e);
-          }
-        };
-
-        socket.onclose = function () {
-          if (manualClose) { setRollState("disconnected"); return; }
-          setRollState("disconnected");
-          scheduleReconnect();
-        };
-
-        socket.onerror = function () {
-          setRollState("error");
-        };
-      }
-
-      function scheduleReconnect() {
-        if (manualClose) return;
-        var delay = getRetryDelay();
-        retryCount += 1;
-        reconnectTimer = setTimeout(connect, delay);
-      }
-
-      document.addEventListener("DOMContentLoaded", function () {
-        if (rollRoomLabel) {
-          rollRoomLabel.textContent = room ? ("room " + room) : "no room";
-        }
-
-        if (!room) {
-          captionBox.innerHTML = '<div class="roll-placeholder">No room specified.</div>';
-          return;
-        }
-
-        connect();
-      });
-    })(window);
-  </script>
+  document.addEventListener("DOMContentLoaded",function(){
+    if(modeBadge) modeBadge.textContent=modeFromQuery;
+    if(roomLabel) roomLabel.textContent=room?("#"+room):"";
+    if(!room){ setStatus("error"); appendRollLine({final:"No room specified."}); return; }
+    connect();
+  });
+})(window);
+</script>
 </body>
 </html>
