@@ -261,15 +261,69 @@
       setText("liveAdjCount", String(adjs));
     }
 
-    // CEFR level estimate from lexical diversity
-    if (wc > 10) {
-      var cefrScore = lexDiv > 0.55 ? 'C1' : lexDiv > 0.45 ? 'B2' : lexDiv > 0.35 ? 'B1' : lexDiv > 0.25 ? 'A2' : 'A1';
-      var cefrPct = Math.min(95, Math.round(lexDiv * 150 + 20));
+    // CEFR level estimate — grammar + vocab + complexity weighted scoring
+    // Does NOT jump to advanced levels from a single word
+    if (wc >= 3) {
+      var plainLower = plain.toLowerCase();
+
+      // ── Vocabulary signals ──
+      var uniqueRatio = wc > 0 ? uniqueCount / wc : 0;
+      var avgWordLen = wc > 0 ? plain.replace(/\s+/g,'').length / wc : 0;
+      // Count longer/sophisticated words (7+ chars)
+      var longWords = (plainLower.match(/\b[a-z]{7,}\b/g) || []).length;
+      var longWordRatio = wc > 0 ? longWords / wc : 0;
+
+      // ── Grammar signals ──
+      var hasPassive = /\b(is|are|was|were|been|being|get|got)\s+(being\s+)?[a-z]+(ed|en|t)\b/i.test(plain);
+      var hasPerfect = /\b(has|have|had)\s+[a-z]+(ed|en|d|t)\b/i.test(plain);
+      var hasConditional = /\b(if|unless|would|could|might)\b.*\b(would|could|might|will|shall)\b/i.test(plain);
+      var hasSubordinate = /(\b(although|because|since|while|whereas|unless|until|after|before|when|if|that|which|who|whom|whose)\b)/gi;
+      var subordCount = (plainLower.match(hasSubordinate) || []).length;
+      var sentenceCount = Math.max(1, (plain.match(/[.!?]+\s/g) || []).length + 1);
+      var avgSentenceLen = wc / sentenceCount;
+      var hasComplexSentences = avgSentenceLen > 10 && subordCount >= 2;
+
+      // ── Error signals (basic) ──
+      var fillerRatio = wc > 0 ? fillerCount / wc : 0;
+
+      // ── Weighted CEFR scoring ──
+      var cefrPts = 0;
+      // A1 baseline: short simple words, many fillers
+      if (wc >= 5) cefrPts += 5;
+      // A2: some lexical variety, basic sentences
+      if (uniqueRatio > 0.35) cefrPts += 8;
+      if (avgSentenceLen >= 6) cefrPts += 5;
+      // B1: decent vocabulary range, longer sentences, some subordination
+      if (uniqueRatio > 0.45) cefrPts += 10;
+      if (avgSentenceLen >= 10) cefrPts += 6;
+      if (subordCount >= 1 && wc > 20) cefrPts += 5;
+      // B2: good vocabulary, complex sentences, grammatical variety
+      if (uniqueRatio > 0.55 && wc > 40) cefrPts += 8;
+      if (hasComplexSentences && wc > 50) cefrPts += 8;
+      if (hasPassive && wc > 30) cefrPts += 6;
+      if (hasPerfect && wc > 30) cefrPts += 5;
+      // C1: rich vocabulary, sophisticated grammar, low filler rate
+      if (longWordRatio > 0.12 && wc > 100) cefrPts += 8;
+      if (hasConditional && wc > 80) cefrPts += 6;
+      if (fillerRatio < 0.03 && wc > 60) cefrPts += 5;
+      if (uniqueRatio > 0.65 && wc > 120) cefrPts += 8;
+
+      var cefrPct = Math.min(95, cefrPts * 1.8);
+      var cefrScore;
+      if (cefrPts >= 55) cefrScore = 'C2';
+      else if (cefrPts >= 38) cefrScore = 'C1';
+      else if (cefrPts >= 25) cefrScore = 'B2';
+      else if (cefrPts >= 14) cefrScore = 'B1';
+      else if (cefrPts >= 6) cefrScore = 'A2';
+      else cefrScore = 'A1';
+
       setText("cefrLevel", cefrScore);
       var gauge = document.getElementById('cefrGauge');
       if (gauge) gauge.style.height = cefrPct + '%';
-      // Update gauge lab if present
       if (w.updateGaugeLab) w.updateGaugeLab(cefrPct);
+    } else {
+      // Still update gauges with zero/default state
+      if (w.updateGaugeLab) w.updateGaugeLab(0);
     }
 
     // WPM and quality require duration; updated separately via updateReportMetrics
