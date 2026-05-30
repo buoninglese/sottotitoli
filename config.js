@@ -52,6 +52,12 @@ window.SOTTOTITOLI_CONFIG = {
       sourceCode: "de",
       translate: false
     },
+    "caption-pt": {
+      title: "Live Caption Portuguese",
+      sourceLang: "pt-PT",
+      sourceCode: "pt",
+      translate: false
+    },
 
     "translate-en-it": {
       title: "Live Translation English to Italian",
@@ -266,6 +272,99 @@ window.SOTTOTITOLI_CONFIG = {
       sourceCode: "nl",
       translate: true,
       targetLang: "de"
+    },
+
+    "translate-pt-en": {
+      title: "Live Translation Portuguese to English",
+      sourceLang: "pt-PT",
+      sourceCode: "pt",
+      translate: true,
+      targetLang: "en"
+    },
+    "translate-pt-it": {
+      title: "Live Translation Portuguese to Italian",
+      sourceLang: "pt-PT",
+      sourceCode: "pt",
+      translate: true,
+      targetLang: "it"
+    },
+    "translate-pt-fr": {
+      title: "Live Translation Portuguese to French",
+      sourceLang: "pt-PT",
+      sourceCode: "pt",
+      translate: true,
+      targetLang: "fr"
+    },
+    "translate-pt-de": {
+      title: "Live Translation Portuguese to German",
+      sourceLang: "pt-PT",
+      sourceCode: "pt",
+      translate: true,
+      targetLang: "de"
+    },
+    "translate-pt-es": {
+      title: "Live Translation Portuguese to Spanish",
+      sourceLang: "pt-PT",
+      sourceCode: "pt",
+      translate: true,
+      targetLang: "es"
+    },
+    "translate-pt-nl": {
+      title: "Live Translation Portuguese to Dutch",
+      sourceLang: "pt-PT",
+      sourceCode: "pt",
+      translate: true,
+      targetLang: "nl"
+    },
+    "translate-pt-pl": {
+      title: "Live Translation Portuguese to Polish",
+      sourceLang: "pt-PT",
+      sourceCode: "pt",
+      translate: true,
+      targetLang: "pl"
+    },
+
+    "translate-en-pt": {
+      title: "Live Translation English to Portuguese",
+      sourceLang: "en-US",
+      sourceCode: "en",
+      translate: true,
+      targetLang: "pt"
+    },
+    "translate-it-pt": {
+      title: "Live Translation Italian to Portuguese",
+      sourceLang: "it-IT",
+      sourceCode: "it",
+      translate: true,
+      targetLang: "pt"
+    },
+    "translate-fr-pt": {
+      title: "Live Translation French to Portuguese",
+      sourceLang: "fr-FR",
+      sourceCode: "fr",
+      translate: true,
+      targetLang: "pt"
+    },
+    "translate-de-pt": {
+      title: "Live Translation German to Portuguese",
+      sourceLang: "de-DE",
+      sourceCode: "de",
+      translate: true,
+      targetLang: "pt"
+    },
+    "translate-es-pt": {
+      title: "Live Translation Spanish to Portuguese",
+      sourceLang: "es-ES",
+      sourceCode: "es",
+      translate: true,
+      targetLang: "pt"
+    },
+    "translate-nl-pt": {
+      title: "Live Translation Dutch to Portuguese",
+      sourceLang: "nl-NL",
+      sourceCode: "nl",
+      translate: true,
+      targetLang: "pt"
     },
 
     "translate-pl-en": {
