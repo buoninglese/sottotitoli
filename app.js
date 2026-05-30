@@ -178,19 +178,19 @@
     box.prepend(div);
   }
 
-function syncUrl() {
-const url = new URL(window.location.href);
-url.searchParams.set("mode", modeKey);
-url.searchParams.set("v", "13");
-history.replaceState({}, "", url.toString());
-}
-function currentOverlayUrl() {
-const url = new URL("overlay.html", window.location.href);
-url.searchParams.set("room", room);
-url.searchParams.set("mode", modeKey);
-url.searchParams.set("v", "13");
-return url.toString();
-}
+  function syncUrl() {
+    const url = new URL(window.location.href);
+    url.searchParams.set("mode", modeKey);
+    url.searchParams.set("v", "13");
+    history.replaceState({}, "", url.toString());
+  }
+  function currentOverlayUrl() {
+    const url = new URL("overlay.html", window.location.href);
+    url.searchParams.set("room", room);
+    url.searchParams.set("mode", modeKey);
+    url.searchParams.set("v", "13");
+    return url.toString();
+  }
 
 
   function updateRoomUI() {
@@ -1080,7 +1080,7 @@ return url.toString();
 
   function computeFillersCount(text) {
     if (!text) return 0;
-    const fillers = ["uh", "um", "eh", "like", "you know"];
+    const fillers = ["uh", "um", "eh", "you know"];
     const lower = text.toLowerCase();
     let count = 0;
     fillers.forEach((f) => {
@@ -1098,6 +1098,37 @@ return url.toString();
     return new Set(tokens).size;
   }
 
+  function computeQuestionCount(text) {
+    if (!text) return 0;
+    return (text.match(/\?/g) || []).length;
+  }
+
+  function computeNegationCount(text) {
+    if (!text) return 0;
+    const negations = /\b(?:not|n't|never|no|nobody|nothing|nowhere)\b/gi;
+    const matches = text.match(negations);
+    return matches ? matches.length : 0;
+  }
+
+  function computeRepetitionRate(text) {
+    if (!text) return null;
+    const words = text.toLowerCase().match(/[a-z']+/g);
+    if (!words || words.length < 4) return null;
+    let repeatCount = 0;
+    for (let i = 0; i < words.length - 2; i++) {
+      if (words[i] === words[i + 2] && words[i + 1] === words[i + 3]) {
+        repeatCount++;
+      }
+    }
+    return repeatCount / (words.length - 3);
+  }
+
+  function computeTurnCount(text) {
+    if (!text) return 0;
+    // Estimate turns from sentence boundaries and natural pauses
+    return Math.max(1, (text.match(/[.!?]\s+/g) || []).length + 1);
+  }
+
   function computeQualityScore(metrics) {
     const { wpm, fillersPerMinute, lexicalDiversity } = metrics;
     let score = 0;
@@ -1108,6 +1139,10 @@ return url.toString();
   }
 
   async function createSessionRow() {
+    if (!sessionSupabase) {
+      console.warn("Supabase not available; skipping session row creation.");
+      return;
+    }
     try {
       const result = await sessionSupabase.auth.getSession();
       const sessionData = result.data;
@@ -1158,6 +1193,12 @@ return url.toString();
 
   async function finalizeSessionRow() {
     if (!currentSessionId || !currentSessionStart) return;
+    if (!sessionSupabase) {
+      console.warn("Supabase not available; skipping session row finalization.");
+      currentSessionId = null;
+      currentSessionStart = null;
+      return;
+    }
 
     try {
       const ended = new Date();
@@ -1193,6 +1234,15 @@ return url.toString();
 
       const ngslCoverage = computeNgslCoverage(transcriptLines);
 
+      // Compute extended metrics for the account dashboard
+      const plainWithTimestamps = transcriptLines
+        .map(function (entry) { return entry.timestamp ? "[" + entry.timestamp + "] " + entry.text : entry.text; })
+        .join("\n");
+      const questionCount = computeQuestionCount(plain);
+      const negationCount = computeNegationCount(plain);
+      const repetitionRate = computeRepetitionRate(plain);
+      const turnCount = computeTurnCount(plain);
+
       // Update Report tab metrics with these computed values
       if (wpm != null) setText("reportWpm", Math.round(wpm));
       if (fillersPerMinute != null) setText("reportFillers", fillersPerMinute.toFixed(1));
@@ -1211,7 +1261,14 @@ return url.toString();
         uniquewords_count: uniqueWordsCount,
         lexical_diversity: lexicalDiversity,
         quality_score: qualityScore,
-        ngsl_coverage: ngslCoverage
+        ngsl_coverage: ngslCoverage,
+        transcript_text: plainWithTimestamps,
+        question_count: questionCount,
+        negation_count: negationCount,
+        repetition_rate: repetitionRate,
+        turn_count: turnCount,
+        interruption_count: null,
+        speaking_share_ratio: null
       };
 
       const { error } = await sessionSupabase
@@ -1335,7 +1392,7 @@ return url.toString();
       }
     }
 
-    // Handle translate mode → switch to translate tab
+    // Handle translate mode — toggle the translated output card on app.html
     if (modeKey.indexOf("translate-") === 0 && typeof window.studioSwitchTab === "function") {
       window.studioSwitchTab("translate");
     }

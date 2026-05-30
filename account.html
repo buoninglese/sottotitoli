@@ -743,12 +743,12 @@ body{background:var(--bg)}
         <div class="status" id="prefStatus"></div>
       </div>
       
-      <!-- Active goals -->
-      <div class="settings-card">
+      <!-- Active goals — loaded from preferences -->
+      <div class="settings-card" id="activeGoalsCard">
         <h3><span class="icon">🎯</span> Obiettivi attivi</h3>
-        <div class="goal-card"><span class="lvl p">#1</span><h4>Congiuntivo mastery</h4><p>41% → 70% in 30 giorni</p><div class="progress"><div class="fill" style="width:20%;background:#7c3aed"></div></div><div class="progress-label"><span>Completato: 20%</span><span>Giorni: 6/30</span></div></div>
-        <div class="goal-card"><span class="lvl b">#2</span><h4>Combined pronouns</h4><p>35% → 65% in 6 settimane</p><div class="progress"><div class="fill" style="width:10%;background:#3b82f6"></div></div><div class="progress-label"><span>Appena iniziato</span></div></div>
-        <div class="goal-card"><span class="lvl a">#3</span><h4>3rd conditional</h4><p>28% → 60% in 8 settimane</p><div class="progress"><div class="fill" style="width:5%;background:#f59e0b"></div></div><div class="progress-label"><span>Non iniziato</span></div></div>
+        <div id="activeGoalsContent" style="font-size:13px;color:var(--text-secondary);line-height:1.7">
+          Caricamento…
+        </div>
       </div>
       
     </div>
@@ -884,11 +884,7 @@ body{background:var(--bg)}
       </div>
     </div>
     <div class="viaggio-tabs" id="viaggioTabs">
-      <button class="vt-btn active" data-lang="it">🇮🇹 Italiano</button>
-      <button class="vt-btn" data-lang="en">🇬🇧 English</button>
-      <button class="vt-btn" data-lang="es">🇪🇸 Español</button>
-      <button class="vt-btn" data-lang="fr">🇫🇷 Français</button>
-      <button class="vt-btn" data-lang="de">🇩🇪 Deutsch</button>
+      <!-- Dynamically populated from real session data -->
     </div>
     <div class="viaggio-content" id="viaggioContent">
       <div class="viaggio-loading">Caricamento dati linguistici…</div>
@@ -898,142 +894,245 @@ body{background:var(--bg)}
 </div>
 <script>
 
-  // ── Viaggio: language journey (dynamic render) ──
+  // ── Viaggio: language journey from real Supabase data ──
   (function(){
-    var viaggioData = {
-      it: {
-        stats: [
-          { dot: "g", n: "B1", l: "Livello CEFR" },
-          { dot: "g", n: "32h", l: "Tempo parlato" },
-          { dot: "y", n: "94%", l: "Accuratezza" },
-          { dot: "g", n: "4.2%", l: "Tasso errori" }
-        ],
-        strengths: [
-          { name: "Articoli determinativi", pct: 76, color: "#d97706", desc: "Uso dell'articolo davanti a nomi astratti" },
-          { name: "Preposizioni", pct: 82, color: "#d97706", desc: "Preposizioni articolate con moto a luogo" },
-          { name: "Passato prossimo", pct: 84, color: "#d97706", desc: "Scelta dell'ausiliare (essere/avere)" }
-        ],
-        grammar: ["Articoli determinativi", "Preposizioni semplici/articolate", "Passato prossimo vs imperfetto", "Concordanza genere/numero", "Pronomi diretti/indiretti", "Congiuntivo presente", "Condizionale presente"]
-      },
-      en: {
-        stats: [
-          { dot: "g", n: "C1", l: "CEFR Level" },
-          { dot: "g", n: "156h", l: "Talk time" },
-          { dot: "g", n: "97%", l: "Accuracy" },
-          { dot: "g", n: "1.8%", l: "Error rate" }
-        ],
-        strengths: [
-          { name: "Articles", pct: 91, color: "#059669", desc: "Zero article vs definite article" },
-          { name: "Prepositions", pct: 93, color: "#059669", desc: "Prepositions in phrasal verbs" },
-          { name: "Present perfect", pct: 95, color: "#059669", desc: "Present perfect continuous vs simple" }
-        ],
-        grammar: ["Articles (a/an/the)", "Prepositions of time/place", "Present perfect vs past simple", "Third person -s", "Conditionals", "Modal verbs", "Reported speech"]
-      },
-      es: {
-        stats: [
-          { dot: "y", n: "A2", l: "Nivel CEFR" },
-          { dot: "y", n: "8h", l: "Tiempo" },
-          { dot: "y", n: "78%", l: "Precisión" },
-          { dot: "y", n: "8.5%", l: "Tasa error" }
-        ],
-        strengths: [
-          { name: "Ser vs estar", pct: 65, color: "#dc2626", desc: "Uso de ser para características permanentes" },
-          { name: "Presente indicativo", pct: 72, color: "#d97706", desc: "Conjugación de verbos irregulares" },
-          { name: "Gustar", pct: 70, color: "#d97706", desc: "Estructura con pronombres átonos" }
-        ],
-        grammar: ["Ser vs estar", "Presente indicativo", "Gustar e verbi simili", "Pretérito perfecto", "Por vs para", "Reflexivos", "Género y número"]
-      },
-      fr: {
-        stats: [
-          { dot: "g", n: "B1", l: "Niveau CECR" },
-          { dot: "g", n: "15h", l: "Temps parlé" },
-          { dot: "y", n: "82%", l: "Précision" },
-          { dot: "y", n: "6.2%", l: "Taux erreurs" }
-        ],
-        strengths: [
-          { name: "Passé composé", pct: 79, color: "#d97706", desc: "Choix de l'auxiliaire (etre/avoir)" },
-          { name: "Articles", pct: 83, color: "#d97706", desc: "Article partitif vs défini" },
-          { name: "Pronoms COD", pct: 76, color: "#d97706", desc: "Placement des pronoms compléments" }
-        ],
-        grammar: ["Articles définis/indéfinis", "Passé composé vs imparfait", "Accord du participe passé", "Pronoms COD/COI", "Subjonctif présent", "Négation complexe", "Prépositions de lieu"]
-      },
-      de: {
-        stats: [
-          { dot: "y", n: "A2", l: "CEFR Niveau" },
-          { dot: "y", n: "6h", l: "Sprechzeit" },
-          { dot: "y", n: "71%", l: "Genauigkeit" },
-          { dot: "y", n: "10.1%", l: "Fehlerrate" }
-        ],
-        strengths: [
-          { name: "Artikel", pct: 68, color: "#dc2626", desc: "Genuszuordnung bei Nomen" },
-          { name: "Verbstellung", pct: 72, color: "#d97706", desc: "Verbposition in Nebensätzen" },
-          { name: "Trennbare Verben", pct: 65, color: "#dc2626", desc: "Abgetrennte Präfixe am Satzende" }
-        ],
-        grammar: ["Artikel (der/die/das)", "Verbstellung", "Trennbare Verben", "Perfekt mit haben/sein", "Präpositionen Dativ/Akkusativ", "Modalverben", "Pluralbildung"]
-      }
+    var LANG_INFO = {
+      en: { flag: '🇬🇧', name: 'English', cefr: 'CEFR Level', talktime: 'Talk time', accuracy: 'Accuracy', errors: 'Error rate' },
+      it: { flag: '🇮🇹', name: 'Italiano', cefr: 'Livello CEFR', talktime: 'Tempo parlato', accuracy: 'Accuratezza', errors: 'Tasso errori' },
+      fr: { flag: '🇫🇷', name: 'Français', cefr: 'Niveau CECR', talktime: 'Temps parlé', accuracy: 'Précision', errors: 'Taux erreurs' },
+      de: { flag: '🇩🇪', name: 'Deutsch', cefr: 'CEFR Niveau', talktime: 'Sprechzeit', accuracy: 'Genauigkeit', errors: 'Fehlerrate' },
+      es: { flag: '🇪🇸', name: 'Español', cefr: 'Nivel CEFR', talktime: 'Tiempo', accuracy: 'Precisión', errors: 'Tasa error' },
+      pt: { flag: '🇵🇹', name: 'Português', cefr: 'Nível CEFR', talktime: 'Tempo de fala', accuracy: 'Precisão', errors: 'Taxa de erro' },
+      nl: { flag: '🇳🇱', name: 'Nederlands', cefr: 'CEFR-niveau', talktime: 'Spreektijd', accuracy: 'Nauwkeurigheid', errors: 'Foutpercentage' },
+      pl: { flag: '🇵🇱', name: 'Polski', cefr: 'Poziom CEFR', talktime: 'Czas mówienia', accuracy: 'Dokładność', errors: 'Wskaźnik błędów' }
     };
 
-    function renderViaggio(lang) {
-      var d = viaggioData[lang];
-      if (!d) return;
+    function extractSourceLang(mode) {
+      if (!mode) return null;
+      var parts = mode.split('-');
+      if (parts[0] === 'caption' && parts[1]) return parts[1];
+      if (parts[0] === 'translate' && parts[1]) return parts[1];
+      if (parts[0] === 'lesson') return 'en';
+      return null;
+    }
+
+    function estimateCEFR(wpm, lexDiv, qualityScore, durationMinutes) {
+      if (durationMinutes < 30) return { level: '—', dot: 'r', pct: 0 };
+      var score = 0;
+      if (wpm && wpm >= 110 && wpm <= 170) score += 1;
+      else if (wpm && wpm > 170) score += 1.5;
+      if (lexDiv && lexDiv > 0.5) score += 1;
+      else if (lexDiv && lexDiv > 0.35) score += 0.5;
+      if (qualityScore && qualityScore >= 0.7) score += 1;
+      else if (qualityScore && qualityScore >= 0.4) score += 0.5;
+      if (durationMinutes > 120) score += 0.5;
+      if (score >= 3.5) return { level: 'C1+', dot: 'g', pct: Math.min(100, score * 20 + 50) };
+      if (score >= 2.5) return { level: 'B2', dot: 'g', pct: Math.min(90, score * 20 + 30) };
+      if (score >= 1.5) return { level: 'B1', dot: 'g', pct: Math.min(78, score * 20 + 20) };
+      if (score >= 0.5) return { level: 'A2', dot: 'y', pct: Math.min(65, score * 30 + 10) };
+      return { level: 'A1', dot: 'y', pct: Math.max(10, score * 40 + 5) };
+    }
+
+    function estimateAccuracy(lexDiv, qualityScore) {
+      if (!lexDiv && !qualityScore) return null;
+      var base = 85;
+      if (lexDiv && lexDiv > 0.4) base += 5;
+      if (lexDiv && lexDiv < 0.25) base -= 10;
+      if (qualityScore && qualityScore > 0.6) base += 5;
+      if (qualityScore && qualityScore < 0.3) base -= 8;
+      return Math.max(50, Math.min(99, base));
+    }
+
+    function formatDuration(totalSeconds) {
+      if (totalSeconds < 3600) return Math.round(totalSeconds / 60) + 'm';
+      return Math.round(totalSeconds / 3600) + 'h';
+    }
+
+    function dotClass(c) { return c === 'g' ? 'vt-dot-g' : c === 'y' ? 'vt-dot-y' : 'vt-dot-r'; }
+    function barClass(c) { return c === '#059669' ? 'vt-fill-g' : c === '#d97706' ? 'vt-fill-a' : 'vt-fill-r'; }
+
+    function buildStrengths(metrics) {
+      var items = [];
+      if (metrics.wpm && metrics.wpm >= 100 && metrics.wpm <= 180) {
+        items.push({ name: 'Speaking pace', pct: Math.min(95, Math.round(metrics.wpm * 0.5 + 35)), color: '#059669', desc: 'Comfortable WPM range for natural conversation' });
+      } else if (metrics.wpm && metrics.wpm > 180) {
+        items.push({ name: 'Speaking pace', pct: Math.max(60, Math.round(100 - (metrics.wpm - 180) * 0.5)), color: '#d97706', desc: 'Slightly fast — consider pacing for clarity' });
+      } else if (metrics.wpm) {
+        items.push({ name: 'Speaking pace', pct: Math.max(50, Math.round(metrics.wpm * 0.7)), color: '#d97706', desc: 'Deliberate pace — building toward natural fluency' });
+      }
+      if (metrics.lexDiv && metrics.lexDiv > 0.4) {
+        items.push({ name: 'Lexical variety', pct: Math.min(95, Math.round(metrics.lexDiv * 140 + 30)), color: '#059669', desc: 'Strong vocabulary range across sessions' });
+      } else if (metrics.lexDiv) {
+        items.push({ name: 'Lexical variety', pct: Math.max(40, Math.round(metrics.lexDiv * 120 + 20)), color: '#d97706', desc: 'Building active vocabulary — try varying word choices' });
+      }
+      if (metrics.fillersPerMin && metrics.fillersPerMin < 3) {
+        items.push({ name: 'Fluency', pct: Math.min(94, Math.round(100 - metrics.fillersPerMin * 10)), color: '#059669', desc: 'Low filler usage indicates smooth delivery' });
+      } else if (metrics.fillersPerMin) {
+        items.push({ name: 'Fluency', pct: Math.max(50, Math.round(100 - metrics.fillersPerMin * 7)), color: '#d97706', desc: 'Some fillers detected — awareness helps reduce them' });
+      }
+      if (items.length < 2 && metrics.wpm) {
+        items.push({ name: 'Consistency', pct: 70, color: '#d97706', desc: 'Keep recording sessions to build more detailed profile' });
+      }
+      return items.slice(0, 3);
+    }
+
+    function renderViaggio(lang, langData) {
       var el = document.getElementById('viaggioContent');
       if (!el) return;
-
-      function dclass(c) {
-        return c === 'g' ? 'vt-dot-g' : c === 'y' ? 'vt-dot-y' : 'vt-dot-r';
-      }
-      function bclass(c) {
-        return c === '#059669' ? 'vt-fill-g' : c === '#d97706' ? 'vt-fill-a' : 'vt-fill-r';
-      }
+      var info = LANG_INFO[lang] || { flag: '', name: lang, cefr: 'CEFR', talktime: 'Time', accuracy: 'Accuracy', errors: 'Errors' };
+      var m = langData.metrics;
+      var cefr = estimateCEFR(m.avgWpm, m.avgLexDiv, m.avgQuality, m.totalSeconds / 60);
+      var accuracy = estimateAccuracy(m.avgLexDiv, m.avgQuality);
+      var errorRate = accuracy ? (100 - accuracy).toFixed(1) + '%' : '—';
+      var strengths = buildStrengths(m);
+      var grammarTopics = ['Sentence structure', 'Word order', 'Verb forms', 'Prepositions', 'Articles', 'Connectors', 'Question formation'];
 
       var h = '<div class="vt-panel">';
-      
-      // Stats row
       h += '<div class="vt-stats">';
-      d.stats.forEach(function(s){
-        h += '<div class="vt-stat"><div class="vt-stat-inner"><div class="vt-dot ' + dclass(s.dot) + '"></div>';
-        h += '<div class="vt-stat-n">' + s.n + '</div>';
-        h += '<div class="vt-stat-l">' + s.l + '</div></div></div>';
-      });
+      h += '<div class="vt-stat"><div class="vt-stat-inner"><div class="vt-dot ' + dotClass(cefr.dot) + '"></div><div class="vt-stat-n">' + cefr.level + '</div><div class="vt-stat-l">' + info.cefr + '</div></div></div>';
+      h += '<div class="vt-stat"><div class="vt-stat-inner"><div class="vt-dot ' + (m.totalSeconds >= 3600 ? 'vt-dot-g' : 'vt-dot-y') + '"></div><div class="vt-stat-n">' + formatDuration(m.totalSeconds) + '</div><div class="vt-stat-l">' + info.talktime + '</div></div></div>';
+      h += '<div class="vt-stat"><div class="vt-stat-inner"><div class="vt-dot ' + (accuracy && accuracy >= 85 ? 'vt-dot-g' : 'vt-dot-y') + '"></div><div class="vt-stat-n">' + (accuracy ? accuracy + '%' : '—') + '</div><div class="vt-stat-l">' + info.accuracy + '</div></div></div>';
+      h += '<div class="vt-stat"><div class="vt-stat-inner"><div class="vt-dot ' + (errorRate === '—' ? 'vt-dot-y' : 'vt-dot-g') + '"></div><div class="vt-stat-n">' + errorRate + '</div><div class="vt-stat-l">' + info.errors + '</div></div></div>';
       h += '</div>';
-      
-      // Strengths
-      h += '<div class="vt-ch">';
-      h += '<div class="vt-ch-hdr"><span class="vt-ch-num">01</span><h3>Punti di forza <span class="vt-ch-sub">— aree solide</span></h3></div>';
-      h += '<div class="vt-grid-3">';
-      d.strengths.forEach(function(item){
-        h += '<div class="vt-card">';
-        h += '<div class="vt-card-hdr"><span class="vt-card-name">' + item.name + '</span><span class="vt-card-pct">' + item.pct + '%</span></div>';
-        h += '<div class="vt-bar"><div class="vt-bar-fill ' + bclass(item.color) + '" style="width:' + item.pct + '%"></div></div>';
-        h += '<div class="vt-card-desc">' + item.desc + '</div>';
+
+      h += '<div class="vt-ch"><div class="vt-ch-hdr"><span class="vt-ch-num">01</span><h3>Indicatori di forza <span class="vt-ch-sub">— dalle tue sessioni</span></h3></div>';
+      if (strengths.length) {
+        h += '<div class="vt-grid-3">';
+        strengths.forEach(function(item) {
+          h += '<div class="vt-card"><div class="vt-card-hdr"><span class="vt-card-name">' + item.name + '</span><span class="vt-card-pct">' + item.pct + '%</span></div>';
+          h += '<div class="vt-bar"><div class="vt-bar-fill ' + barClass(item.color) + '" style="width:' + item.pct + '%"></div></div>';
+          h += '<div class="vt-card-desc">' + item.desc + '</div></div>';
+        });
         h += '</div>';
-      });
-      h += '</div></div>';
-      
-      // Grammar grid
-      h += '<div class="vt-ch">';
-      h += '<div class="vt-ch-hdr"><span class="vt-ch-num">02</span><h3>Grammatica monitorata <span class="vt-ch-sub">— strutture tracciate</span></h3></div>';
+      } else {
+        h += '<p style="font-size:13px;color:var(--text-secondary)">Recording more sessions will reveal your strengths. Keep using Studio!</p>';
+      }
+      h += '</div>';
+
+      h += '<div class="vt-ch"><div class="vt-ch-hdr"><span class="vt-ch-num">02</span><h3>Strutture tracciate <span class="vt-ch-sub">— aree linguistiche coperte</span></h3></div>';
       h += '<div class="vt-tags">';
-      d.grammar.forEach(function(g){
+      grammarTopics.forEach(function(g) {
         h += '<div class="vt-tag"><span class="vt-tag-dot"></span><span>' + g + '</span></div>';
       });
       h += '</div></div>';
-      
+
       h += '<a href="analysis.html" class="vt-go">Vedi analisi completa →</a>';
       h += '</div>';
-      
       el.innerHTML = h;
     }
 
-    var tabs = document.querySelectorAll('.vt-btn');
-    tabs.forEach(function(btn){
-      btn.addEventListener('click', function(){
-        tabs.forEach(function(b){ b.classList.remove('active'); });
-        btn.classList.add('active');
-        renderViaggio(btn.dataset.lang);
+    function buildTabs(langTotals) {
+      var tabsEl = document.getElementById('viaggioTabs');
+      if (!tabsEl) return;
+      tabsEl.innerHTML = '';
+      var first = true;
+      Object.keys(langTotals).sort(function(a, b) { return langTotals[b].totalSeconds - langTotals[a].totalSeconds; }).forEach(function(lang) {
+        var info = LANG_INFO[lang] || { flag: '', name: lang };
+        var btn = document.createElement('button');
+        btn.className = 'vt-btn' + (first ? ' active' : '');
+        btn.dataset.lang = lang;
+        btn.textContent = info.flag + ' ' + info.name;
+        btn.addEventListener('click', function() {
+          tabsEl.querySelectorAll('.vt-btn').forEach(function(b) { b.classList.remove('active'); });
+          btn.classList.add('active');
+          renderViaggio(lang, langTotals[lang]);
+        });
+        tabsEl.appendChild(btn);
+        if (first) { renderViaggio(lang, langTotals[lang]); first = false; }
       });
-    });
-    renderViaggio('it');
+    }
+
+    function showEmpty() {
+      var el = document.getElementById('viaggioContent');
+      if (el) el.innerHTML = '<div class="viaggio-loading" style="padding:40px;text-align:center;color:var(--text-secondary);font-size:14px;line-height:1.8"><strong>Nessun dato ancora.</strong><br>Usa Studio per almeno un\'ora in una lingua per vedere il tuo profilo linguistico qui.<br><a href="studio.html" style="color:var(--accent-purple);font-weight:600">Apri Studio →</a></div>';
+      var tabsEl = document.getElementById('viaggioTabs');
+      if (tabsEl) tabsEl.innerHTML = '';
+    }
+
+    async function loadViaggio() {
+      var supabase = window.sottotitoliSupabase;
+      if (!supabase) { showEmpty(); return; }
+      var result = await supabase.auth.getSession();
+      if (!result.data || !result.data.session) { showEmpty(); return; }
+      var userId = result.data.session.user.id;
+      var { data: sessions } = await supabase
+        .from('sessions')
+        .select('mode, duration_seconds, words_count, wpm, fillers_per_minute, lexical_diversity, quality_score, started_at')
+        .eq('user_id', userId)
+        .order('started_at', { ascending: false })
+        .limit(500);
+      if (!sessions || !sessions.length) { showEmpty(); return; }
+
+      var langTotals = {};
+      sessions.forEach(function(s) {
+        var lang = extractSourceLang(s.mode);
+        if (!lang) return;
+        if (!langTotals[lang]) langTotals[lang] = {
+          totalSeconds: 0, totalWords: 0, sessionCount: 0,
+          sumWpm: 0, wpmCount: 0, sumLexDiv: 0, lexDivCount: 0,
+          sumQuality: 0, qualityCount: 0, sumFillers: 0, fillerCount: 0
+        };
+        var t = langTotals[lang];
+        if (typeof s.duration_seconds === 'number' && s.duration_seconds > 0) t.totalSeconds += s.duration_seconds;
+        if (typeof s.words_count === 'number') t.totalWords += s.words_count;
+        t.sessionCount++;
+        if (typeof s.wpm === 'number') { t.sumWpm += s.wpm; t.wpmCount++; }
+        if (typeof s.lexical_diversity === 'number') { t.sumLexDiv += s.lexical_diversity; t.lexDivCount++; }
+        if (typeof s.quality_score === 'number') { t.sumQuality += s.quality_score; t.qualityCount++; }
+        if (typeof s.fillers_per_minute === 'number') { t.sumFillers += s.fillers_per_minute; t.fillerCount++; }
+      });
+
+      // Compute averages and filter languages with < 1 hour
+      var filtered = {};
+      Object.keys(langTotals).forEach(function(lang) {
+        var t = langTotals[lang];
+        if (t.totalSeconds < 3600) return; // Skip languages with < 1 hour
+        t.metrics = {
+          totalSeconds: t.totalSeconds,
+          totalWords: t.totalWords,
+          sessionCount: t.sessionCount,
+          avgWpm: t.wpmCount > 0 ? t.sumWpm / t.wpmCount : null,
+          avgLexDiv: t.lexDivCount > 0 ? t.sumLexDiv / t.lexDivCount : null,
+          avgQuality: t.qualityCount > 0 ? t.sumQuality / t.qualityCount : null,
+          fillersPerMin: t.fillerCount > 0 ? t.sumFillers / t.fillerCount : null
+        };
+        filtered[lang] = t;
+      });
+
+      if (Object.keys(filtered).length === 0) { showEmpty(); return; }
+      buildTabs(filtered);
+    }
+
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', loadViaggio);
+    } else {
+      loadViaggio();
+    }
+  (function loadActiveGoals() {
+    var targetEl = document.getElementById('activeGoalsContent');
+    if (!targetEl) return;
+    var supabase = window.sottotitoliSupabase;
+    if (!supabase) { targetEl.innerHTML = 'Accedi per vedere i tuoi obiettivi.'; return; }
+    supabase.auth.getSession().then(function(result) {
+      if (!result.data || !result.data.session) { targetEl.innerHTML = 'Accedi per vedere i tuoi obiettivi.'; return; }
+      var userId = result.data.session.user.id;
+      supabase.from('user_preferences').select('level, goal, target_lang_1, target_lang_2, sessions_per_week').eq('user_id', userId).maybeSingle().then(function(r) {
+        if (!r.data) {
+          targetEl.innerHTML = 'Nessun obiettivo impostato. Usa le impostazioni qui sopra per definire il tuo piano di apprendimento.';
+          return;
+        }
+        var d = r.data;
+        var goalLabels = { b2_6m: 'B2 entro 6 mesi', fluency: 'Fluenza conversazionale', exam: 'Preparazione esame', maintenance: 'Mantenimento' };
+        var langNames = { en: 'English', it: 'Italiano', fr: 'Francais', de: 'Deutsch', es: 'Espanol', pt: 'Portugues', nl: 'Nederlands', pl: 'Polski' };
+        var html = '';
+        html += '<div style="margin-bottom:8px"><strong>Livello:</strong> ' + (d.level || 'B1') + '</div>';
+        html += '<div style="margin-bottom:8px"><strong>Obiettivo:</strong> ' + (goalLabels[d.goal] || d.goal || 'B2 entro 6 mesi') + '</div>';
+        if (d.target_lang_1) html += '<div style="margin-bottom:8px"><strong>Lingua target:</strong> ' + (langNames[d.target_lang_1] || d.target_lang_1) + '</div>';
+        html += '<div style="margin-bottom:8px"><strong>Sessioni/settimana:</strong> ' + (d.sessions_per_week || 4) + '</div>';
+        html += '<a href="goals.html" style="color:var(--accent-purple);font-weight:600;font-size:12px">Modifica obiettivi →</a>';
+        targetEl.innerHTML = html;
+      }).catch(function() { targetEl.innerHTML = 'Errore nel caricamento.'; });
+    }).catch(function() { targetEl.innerHTML = 'Errore nel caricamento.'; });
   })();
 
 </script>

@@ -1,6 +1,7 @@
 window.SOTTOTITOLI_CONFIG = {
   websocketUrl: "wss://sottotitoli-websocket.onrender.com",
   siteName: "Sottotitoli",
+  AUTH_REDIRECT_URL: "https://buoninglese.github.io/sottotitoli/app.html",
   translation: {
     provider: "mymemory",
     myMemoryBase: "https://api.mymemory.translated.net/get"

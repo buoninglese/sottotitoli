@@ -38,8 +38,11 @@
     var queue = [];
     var retryCount = 0;
     var reconnectTimer = null;
+    var heartbeatTimer = null;
     var manualClose = false;
     var state = 'idle';
+
+    var HEARTBEAT_INTERVAL_MS = 30000; // send a keepalive every 30s
 
     function now() {
       return Date.now();
@@ -79,7 +82,28 @@
       onStats(getSnapshot());
     }
 
+    function startHeartbeat() {
+      stopHeartbeat();
+      heartbeatTimer = setInterval(function () {
+        if (socket && socket.readyState === WebSocket.OPEN) {
+          try {
+            socket.send(JSON.stringify({ type: 'heartbeat', ts: Date.now() }));
+          } catch (e) {
+            // If sending fails, the socket is probably dead — reconnect will handle it
+          }
+        }
+      }, HEARTBEAT_INTERVAL_MS);
+    }
+
+    function stopHeartbeat() {
+      if (heartbeatTimer) {
+        clearInterval(heartbeatTimer);
+        heartbeatTimer = null;
+      }
+    }
+
     function cleanupSocket() {
+      stopHeartbeat();
       if (!socket) return;
       try {
         socket.onopen = null;
@@ -130,6 +154,7 @@
       socket.onopen = function () {
         retryCount = 0;
         emitState('connected');
+        startHeartbeat();
         if (room) {
           try {
             socket.send(JSON.stringify({ join: room }));
@@ -192,6 +217,7 @@
     function disconnect() {
       manualClose = true;
       clearReconnectTimer();
+      stopHeartbeat();
       cleanupSocket();
       emitState('closed');
     }

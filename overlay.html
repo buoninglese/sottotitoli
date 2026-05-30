@@ -235,18 +235,23 @@
         }
       }
 
-      document.addEventListener("DOMContentLoaded", function () {
-        if (overlayRoomLabel) {
-          overlayRoomLabel.textContent = room ? ("room " + room) : "no room";
-        }
-        if (overlayModeLabel) {
-          overlayModeLabel.textContent = "(" + (modeFromQuery || "caption-en") + ")";
-        }
+      var reconnectTimer = null;
+      var retryCount = 0;
+      var manualClose = false;
+      var socket = null;
 
-        if (!room) {
-          captionBox.textContent = "No room specified.";
-          return;
-        }
+      function getRetryDelay() {
+        if (retryCount === 0) return 0;
+        return Math.min(1000 * Math.pow(2, retryCount - 1), 30000);
+      }
+
+      function clearReconnectTimer() {
+        if (reconnectTimer) { clearTimeout(reconnectTimer); reconnectTimer = null; }
+      }
+
+      function connect() {
+        if (manualClose) return;
+        clearReconnectTimer();
 
         const cfgRoot =
           w.SOTTOTITOLI_CONFIG ||
@@ -263,7 +268,6 @@
           return;
         }
 
-        let socket;
         try {
           setOverlayState("connecting");
           socket = new WebSocket(wsUrl + "?room=" + encodeURIComponent(room));
@@ -271,12 +275,13 @@
           captionBox.textContent =
             "Overlay not connected (websocket error).";
           setOverlayState("error");
+          scheduleReconnect();
           return;
         }
 
-                socket.onopen = function () {
+        socket.onopen = function () {
+          retryCount = 0;
           setOverlayState("connected");
-          // Subscribe to the room
           try {
             socket.send(JSON.stringify({ join: room }));
           } catch (err) {
@@ -287,7 +292,14 @@
         socket.onmessage = function (event) {
           try {
             const payload = JSON.parse(event.data);
-            if (payload && payload.type === "caption") {
+            // Accept both new format (type: "caption") and legacy format (msg: true)
+            if (payload && (payload.type === "caption" || payload.msg === true)) {
+              // Normalize legacy format to new format
+              if (payload.msg === true && !payload.type) {
+                payload.type = "caption";
+                if (payload.final) payload.final = payload.final;
+                if (payload.interim) payload.interim = payload.interim;
+              }
               handleCaptionPayload(payload);
             }
           } catch (e) {
@@ -296,12 +308,40 @@
         };
 
         socket.onclose = function () {
+          if (manualClose) {
+            setOverlayState("disconnected");
+            return;
+          }
           setOverlayState("disconnected");
+          scheduleReconnect();
         };
 
         socket.onerror = function () {
           setOverlayState("error");
         };
+      }
+
+      function scheduleReconnect() {
+        if (manualClose) return;
+        var delay = getRetryDelay();
+        retryCount += 1;
+        reconnectTimer = setTimeout(connect, delay);
+      }
+
+      document.addEventListener("DOMContentLoaded", function () {
+        if (overlayRoomLabel) {
+          overlayRoomLabel.textContent = room ? ("room " + room) : "no room";
+        }
+        if (overlayModeLabel) {
+          overlayModeLabel.textContent = "(" + (modeFromQuery || "caption-en") + ")";
+        }
+
+        if (!room) {
+          captionBox.textContent = "No room specified.";
+          return;
+        }
+
+        connect();
       });
     })(window);
   </script>

@@ -6,10 +6,10 @@
   <meta name="copyright" content="© 2020 Steve Seguin" />
   <link rel="icon" type="image/svg+xml" href="favicon.svg" />
   <link rel="shortcut icon" href="favicon.svg" />
-  <title>CAPTION.Ninja: Transcript Playlist</title>
-  <meta name="title" content="CAPTION.Ninja: Transcript Playlist" />
+  <title>Sottotitoli: Transcript Playlist</title>
+  <meta name="title" content="Sottotitoli: Transcript Playlist" />
   <meta name="description" content="Feed a long transcript in sections; edit, reorder, and auto-play as captions." />
-  <meta name="author" content="Steve Seguin" />
+  <meta name="author" content="Sottotitoli" />
   <style>
     @font-face {
       font-family: 'Cousine';
@@ -242,7 +242,7 @@
 
     let socket; let counter=0; let label = urlParams.get('label') || false;
     function connectWebSocket(){
-      socket = new WebSocket("wss://api.caption.ninja:443");
+      socket = new WebSocket(window.SOTTOTITOLI_CONFIG?.websocketUrl || 'wss://sottotitoli-websocket.onrender.com');
       socket.onopen = function(){ socket.send(JSON.stringify({join: roomID})); };
       socket.onclose = function(){ setTimeout(connectWebSocket, 1000); };
       socket.onerror = function(){ setTimeout(connectWebSocket, 2000); };
@@ -409,6 +409,68 @@
 
     // Initialize with one empty section
     sections.push({ id: uid(), title: '', text: '' }); currentId = sections[0].id; renderList(); loadEditor(currentId);
+
+    // ═══ Session loader from Supabase ═══
+    async function loadSessionFromSupabase(sessionId) {
+      if (!window.sottotitoliSupabase) {
+        setStatus('Supabase not available for session loading.');
+        return;
+      }
+      setStatus('Loading session ' + sessionId + '…');
+      var { data, error } = await window.sottotitoliSupabase
+        .from('sessions')
+        .select('transcript_text, mode, started_at')
+        .eq('id', sessionId)
+        .single();
+      if (error || !data || !data.transcript_text) {
+        setStatus('Could not load session: ' + (error ? error.message : 'no transcript'));
+        return;
+      }
+      var mode = data.mode || 'unknown';
+      var date = data.started_at ? new Date(data.started_at).toLocaleString() : '';
+      setStatus('Loaded session: ' + mode + ' · ' + date);
+
+      // Parse transcript into sections
+      var lines = data.transcript_text.split('\n').filter(Boolean);
+      sections = [];
+      lines.forEach(function (line) {
+        var text = line.replace(/^\[.*?\]\s*/, '').trim();
+        if (!text) return;
+        var timestamp = line.match(/^\[(.*?)\]/);
+        var title = timestamp ? 'Line ' + timestamp[1] : 'Line ' + (sections.length + 1);
+        sections.push({ id: uid(), title: title, text: text });
+      });
+      if (sections.length === 0) {
+        sections.push({ id: uid(), title: 'Full Transcript', text: data.transcript_text });
+      }
+      currentId = sections[0]?.id || null;
+      renderList();
+      loadEditor(currentId);
+    }
+
+    // Check for ?session= param
+    if (urlParams.has('session')) {
+      var sessionId = urlParams.get('session');
+      // Lazy-load Supabase if needed
+      if (!window.sottotitoliSupabase) {
+        var supabaseScript = document.createElement('script');
+        supabaseScript.src = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2';
+        supabaseScript.onload = function () {
+          if (window.supabase) {
+            var SUPABASE_URL = 'https://qzqmuegbpmvqrjrlfbgk.supabase.co';
+            var SUPABASE_ANON_KEY = 'sb_publishable_l-PG1wsO1FMWADK9GVBqoQ_0EtPA2K7';
+            window.sottotitoliSupabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+          }
+          loadSessionFromSupabase(sessionId);
+        };
+        supabaseScript.onerror = function () {
+          setStatus('Failed to load Supabase SDK.');
+        };
+        document.head.appendChild(supabaseScript);
+      } else {
+        loadSessionFromSupabase(sessionId);
+      }
+    }
   </script>
 </body>
 </html>

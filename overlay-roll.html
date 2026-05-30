@@ -238,15 +238,23 @@
         }
       }
 
-      document.addEventListener("DOMContentLoaded", function () {
-        if (rollRoomLabel) {
-          rollRoomLabel.textContent = room ? ("room " + room) : "no room";
-        }
+      var reconnectTimer = null;
+      var retryCount = 0;
+      var manualClose = false;
+      var socket = null;
 
-        if (!room) {
-          captionBox.innerHTML = '<div class="roll-placeholder">No room specified.</div>';
-          return;
-        }
+      function getRetryDelay() {
+        if (retryCount === 0) return 0;
+        return Math.min(1000 * Math.pow(2, retryCount - 1), 30000);
+      }
+
+      function clearReconnectTimer() {
+        if (reconnectTimer) { clearTimeout(reconnectTimer); reconnectTimer = null; }
+      }
+
+      function connect() {
+        if (manualClose) return;
+        clearReconnectTimer();
 
         const cfgRoot =
           w.SOTTOTITOLI_CONFIG ||
@@ -262,19 +270,19 @@
           return;
         }
 
-        let socket;
         try {
           setRollState("connecting");
           socket = new WebSocket(wsUrl + "?room=" + encodeURIComponent(room));
         } catch (err) {
           captionBox.innerHTML = '<div class="roll-placeholder">WebSocket error.</div>';
           setRollState("error");
+          scheduleReconnect();
           return;
         }
 
         socket.onopen = function () {
+          retryCount = 0;
           setRollState("connected");
-          // Subscribe to the room
           try {
             socket.send(JSON.stringify({ join: room }));
           } catch (err) {
@@ -285,15 +293,16 @@
         socket.onmessage = function (event) {
           try {
             const payload = JSON.parse(event.data);
-            if (payload && payload.type === "caption") {
-              // Show final captions as rolling lines, and interim in a preview line
+            // Accept both new format (type: "caption") and legacy format (msg: true)
+            if (payload && (payload.type === "caption" || payload.msg === true)) {
+              if (payload.msg === true && !payload.type) {
+                payload.type = "caption";
+              }
               if (payload.final) {
                 appendRollLine(payload);
-                // Clear interim display when a final arrives
                 var interimPreview = document.getElementById("interimPreview");
                 if (interimPreview) interimPreview.remove();
               } else if (payload.interim) {
-                // Show interim in a special preview line at the top
                 var interimPreview = document.getElementById("interimPreview");
                 if (!interimPreview) {
                   interimPreview = document.createElement("div");
@@ -312,12 +321,34 @@
         };
 
         socket.onclose = function () {
+          if (manualClose) { setRollState("disconnected"); return; }
           setRollState("disconnected");
+          scheduleReconnect();
         };
 
         socket.onerror = function () {
           setRollState("error");
         };
+      }
+
+      function scheduleReconnect() {
+        if (manualClose) return;
+        var delay = getRetryDelay();
+        retryCount += 1;
+        reconnectTimer = setTimeout(connect, delay);
+      }
+
+      document.addEventListener("DOMContentLoaded", function () {
+        if (rollRoomLabel) {
+          rollRoomLabel.textContent = room ? ("room " + room) : "no room";
+        }
+
+        if (!room) {
+          captionBox.innerHTML = '<div class="roll-placeholder">No room specified.</div>';
+          return;
+        }
+
+        connect();
       });
     })(window);
   </script>

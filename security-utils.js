@@ -1,143 +1,151 @@
-// Security utility functions for Sottotitoli
+// security-utils.js — Sottotitoli room security
+// Validates room IDs and warns when a predictable ID is in use.
 
-/**
- * Checks if a stream ID is considered insecure based on common patterns
- * @param {string} streamId - The stream ID to check
- * @returns {boolean} - True if the stream ID is insecure, false otherwise
- */
-function isInsecureStreamId(streamId) {
-    // Common insecure stream IDs
-    const insecurePatterns = [
-        'test', 'demo', 'guest', 'user', 'admin', 'default', 
-        'sample', 'example', 'temp', 'temporary', 'public',
-        'room', 'stream', 'live', 'broadcast', 'channel',
-        'password', '1234', '0000', 'abcd', 'qwerty',
-        'welcome', 'hello', 'anonymous', 'anon', 'visitor',
-        'cc', 'caption', 'captions', 'english', 'show', 'a',
-        'video', 'audio', 'media', 'session', 'meeting',
-        'class', 'lecture', 'presentation', 'webinar', 'event',
-        'host', 'presenter', 'speaker', 'viewer', 'audience',
-        'main', 'primary', 'secondary', 'backup', 'alt',
-        'new', 'old', 'first', 'last', 'next', 'previous',
-        'home', 'office', 'work', 'personal', 'private',
-        'monday', 'tuesday', 'wednesday', 'thursday', 'friday',
-        'saturday', 'sunday', 'weekend', 'weekday', 'today',
-        'morning', 'afternoon', 'evening', 'night', 'daily',
-        'jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul',
-        'aug', 'sep', 'oct', 'nov', 'dec', 'january',
-        'february', 'march', 'april', 'june', 'july',
-        'august', 'september', 'october', 'november', 'december'
-    ];
-    
-    // Convert to lowercase for case-insensitive comparison
-    const lowerStreamId = streamId.toLowerCase().trim();
-    
-    // Check exact matches
-    if (insecurePatterns.includes(lowerStreamId)) {
-        return true;
+(function (w) {
+  'use strict';
+
+  var INSECURE_PATTERNS = [
+    'test', 'demo', 'guest', 'user', 'admin', 'default',
+    'sample', 'example', 'temp', 'temporary', 'public',
+    'room', 'stream', 'live', 'broadcast', 'channel',
+    'password', '1234', '0000', 'abcd', 'qwerty',
+    'welcome', 'hello', 'anonymous', 'anon', 'visitor',
+    'caption', 'captions', 'english', 'show', 'a',
+    'video', 'audio', 'media', 'session', 'meeting',
+    'class', 'lecture', 'presentation', 'webinar', 'event',
+    'main', 'primary', 'secondary', 'backup', 'alt',
+    'new', 'old', 'first', 'last', 'next', 'previous'
+  ];
+
+  function validateRoom(roomId) {
+    if (!roomId) return { valid: false, warning: 'No room ID specified.' };
+    var lower = String(roomId).toLowerCase().trim();
+    if (lower.length < 4) return { valid: false, warning: 'Room ID is too short. Use a longer, unpredictable ID.' };
+    if (/^\d+$/.test(lower)) return { valid: false, warning: 'Room ID is purely numeric. Use letters too.' };
+    if (/^(.)\1{3,}$/.test(lower)) return { valid: false, warning: 'Room ID is repetitive. Use a more random ID.' };
+    for (var i = 0; i < INSECURE_PATTERNS.length; i++) {
+      if (lower === INSECURE_PATTERNS[i]) return { valid: false, warning: '"' + roomId + '" is too predictable. Anyone can guess it.' };
+      var escaped = INSECURE_PATTERNS[i].replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      if (new RegExp('^' + escaped + '\\d+$', 'i').test(lower)) {
+        return { valid: false, warning: '"' + roomId + '" looks predictable. Use a random ID instead.' };
+      }
     }
-    
-    // Check patterns with numbers appended (e.g., guest1, user123)
-    for (const pattern of insecurePatterns) {
-        // Check if streamId starts with pattern followed by numbers
-        const regex = new RegExp(`^${pattern}\\d+$`, 'i');
-        if (regex.test(lowerStreamId)) {
-            return true;
+    return { valid: true, warning: null };
+  }
+
+  var warningStylesInjected = false;
+  var activeWarning = null;
+
+  function injectStyles() {
+    if (warningStylesInjected) return;
+    warningStylesInjected = true;
+    var style = document.createElement('style');
+    style.id = 'sottotitoli-security-styles';
+    style.textContent = [
+      '.sottotitoli-security-banner {',
+      '  position:fixed;top:20px;left:50%;transform:translateX(-50%);',
+      '  background:#dc3545;color:#fff;padding:14px 20px;border-radius:10px;',
+      '  box-shadow:0 6px 24px rgba(220,53,69,.35);z-index:10000;',
+      '  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;',
+      '  font-size:14px;line-height:1.5;max-width:min(90vw,520px);',
+      '  display:flex;align-items:flex-start;gap:10px;',
+      '  animation:sottotitoli-slide-in .35s ease-out;',
+      '}',
+      '@keyframes sottotitoli-slide-in{from{opacity:0;transform:translateX(-50%) translateY(-20px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}',
+      '.sottotitoli-security-banner .s-msg{flex:1;font-weight:500}',
+      '.sottotitoli-security-banner .s-dismiss{background:none;border:1px solid rgba(255,255,255,.4);color:#fff;cursor:pointer;font-size:16px;width:26px;height:26px;border-radius:6px;display:flex;align-items:center;justify-content:center;flex-shrink:0;line-height:1;padding:0;transition:background .15s}',
+      '.sottotitoli-security-banner .s-dismiss:hover{background:rgba(255,255,255,.15)}',
+      '.sottotitoli-security-banner .s-fix-btn{background:rgba(255,255,255,.15);color:#fff;border:1px solid rgba(255,255,255,.3);border-radius:6px;padding:6px 12px;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;transition:background .15s}',
+      '.sottotitoli-security-banner .s-fix-btn:hover{background:rgba(255,255,255,.25)}',
+      '@media(max-width:600px){.sottotitoli-security-banner{top:10px;left:10px;right:10px;transform:none;max-width:none;flex-wrap:wrap}}'
+    ].join('\n');
+    document.head.appendChild(style);
+  }
+
+  function showWarning(message, options) {
+    options = options || {};
+    dismissWarning();
+    injectStyles();
+
+    var banner = document.createElement('div');
+    banner.className = 'sottotitoli-security-banner';
+    banner.id = 'sottotitoli-security-banner';
+
+    var icon = document.createElement('span');
+    icon.textContent = '\u26A0\uFE0F';
+    icon.style.cssText = 'font-size:18px;flex-shrink:0;line-height:1.4';
+
+    var msg = document.createElement('span');
+    msg.className = 's-msg';
+    msg.textContent = message;
+
+    var actions = document.createElement('div');
+    actions.style.cssText = 'display:flex;gap:6px;align-items:center;flex-shrink:0';
+
+    if (typeof options.onFix === 'function') {
+      var fixBtn = document.createElement('button');
+      fixBtn.className = 's-fix-btn';
+      fixBtn.textContent = options.fixLabel || 'Fix';
+      fixBtn.onclick = function () { banner.remove(); activeWarning = null; options.onFix(); };
+      actions.appendChild(fixBtn);
+    }
+
+    var dismissBtn = document.createElement('button');
+    dismissBtn.className = 's-dismiss';
+    dismissBtn.textContent = '\u00D7';
+    dismissBtn.title = 'Dismiss';
+    dismissBtn.onclick = function () { banner.remove(); activeWarning = null; };
+    actions.appendChild(dismissBtn);
+
+    banner.appendChild(icon);
+    banner.appendChild(msg);
+    banner.appendChild(actions);
+    document.body.appendChild(banner);
+    activeWarning = banner;
+
+    if (options.duration > 0) {
+      setTimeout(function () {
+        if (activeWarning === banner) { banner.remove(); activeWarning = null; }
+      }, options.duration);
+    }
+
+    return banner;
+  }
+
+  function dismissWarning() {
+    if (activeWarning) { activeWarning.remove(); activeWarning = null; }
+  }
+
+  function autoCheck() {
+    var params = new URLSearchParams(window.location.search);
+    var room = params.get('room');
+    if (!room) return;
+    var result = validateRoom(room);
+    if (!result.valid) {
+      showWarning(result.warning, {
+        duration: 12000,
+        fixLabel: 'New room',
+        onFix: function () {
+          var url = new URL(window.location.href);
+          url.searchParams.delete('room');
+          window.location.href = url.toString();
         }
+      });
     }
-    
-    // Check for very short IDs (less than 4 characters)
-    if (lowerStreamId.length < 4) {
-        return true;
-    }
-    
-    // Check for sequential numbers only
-    if (/^\d+$/.test(lowerStreamId)) {
-        return true;
-    }
-    
-    // Check for single repeated character
-    if (/^(.)\1+$/.test(lowerStreamId)) {
-        return true;
-    }
-    
-    return false;
-}
+  }
 
-/**
- * Creates and displays a security warning for insecure stream IDs
- * @param {string} message - The warning message to display
- * @param {number} duration - How long to show the warning (0 = until dismissed)
- * @returns {HTMLElement} - The warning element
- */
-function showSecurityWarning(message, duration = 0) {
-    // Remove any existing warnings
-    const existingWarning = document.getElementById('stream-security-warning');
-    if (existingWarning) {
-        existingWarning.remove();
-    }
-    
-    // Create warning container
-    const warning = document.createElement('div');
-    warning.id = 'stream-security-warning';
-    warning.className = 'security-warning';
-    // Add critical inline styles as fallback
-    warning.style.cssText = 'position: fixed; top: 20px; left: 50%; transform: translateX(-50%); background-color: #dc3545; color: white; padding: 16px 24px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15); z-index: 10000; font-family: Arial, sans-serif; min-width: 350px; border: 2px solid #c82333;';
-    
-    // Create warning content
-    const content = document.createElement('div');
-    content.className = 'security-warning-content';
-    content.style.cssText = 'display: flex; align-items: center; gap: 12px;';
-    
-    // Add warning icon
-    const icon = document.createElement('span');
-    icon.className = 'security-warning-icon';
-    icon.innerHTML = '⚠️';
-    icon.style.cssText = 'font-size: 24px; flex-shrink: 0;';
-    
-    // Add message
-    const messageElement = document.createElement('span');
-    messageElement.className = 'security-warning-message';
-    messageElement.textContent = message;
-    messageElement.style.cssText = 'flex-grow: 1; font-size: 16px; line-height: 1.5; font-weight: 500;';
-    
-    // Add dismiss button
-    const dismissButton = document.createElement('button');
-    dismissButton.className = 'security-warning-dismiss';
-    dismissButton.innerHTML = '×';
-    dismissButton.title = 'Dismiss warning';
-    dismissButton.style.cssText = 'background: none; border: none; color: white; font-size: 28px; cursor: pointer; padding: 0; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; opacity: 0.8; line-height: 1;';
-    dismissButton.onmouseover = () => dismissButton.style.opacity = '1';
-    dismissButton.onmouseout = () => dismissButton.style.opacity = '0.8';
-    dismissButton.onclick = () => warning.remove();
-    
-    // Assemble warning
-    content.appendChild(icon);
-    content.appendChild(messageElement);
-    content.appendChild(dismissButton);
-    warning.appendChild(content);
-    
-    // Add to page
-    document.body.appendChild(warning);
-    
-    // Auto-dismiss after duration if specified
-    if (duration > 0) {
-        setTimeout(() => {
-            if (document.getElementById('stream-security-warning')) {
-                warning.style.animation = 'fadeOut 0.3s ease-out';
-                setTimeout(() => warning.remove(), 300);
-            }
-        }, duration);
-    }
-    
-    return warning;
-}
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', autoCheck);
+  } else {
+    autoCheck();
+  }
 
-/**
- * CSS styles for the security warning
- * This should be added to the page's stylesheet or injected dynamically
- */
-const securityWarningStyles = `
+  w.SottotitoliSecurity = {
+    validateRoom: validateRoom,
+    showWarning: showWarning,
+    dismissWarning: dismissWarning
+  };
+})(window);
 <style>
 .security-warning {
     position: fixed;
