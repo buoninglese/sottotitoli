@@ -107,6 +107,34 @@
       min-height: 96px;
     }
 
+    .overlay-translation-box {
+      margin-top: 8px;
+      border-radius: 18px;
+      background: radial-gradient(circle at top left, rgba(124, 58, 237, .18), transparent 45%),
+                  rgba(15, 23, 42, .96);
+      border: 1px solid rgba(167, 139, 250, .35);
+      padding: 14px 18px;
+      font-size: 26px;
+      line-height: 1.5;
+      text-align: center;
+      word-wrap: break-word;
+      word-break: break-word;
+      min-height: 60px;
+      display: none;
+    }
+
+    .overlay-translation-box.visible { display: block; }
+
+    .overlay-translation-box .t-label {
+      display: block;
+      font-size: 9px;
+      text-transform: uppercase;
+      letter-spacing: .14em;
+      color: rgba(167, 139, 250, .8);
+      margin-bottom: 6px;
+      font-weight: 700;
+    }
+
     .caption-placeholder {
       color: rgba(148, 163, 184, .8);
       font-size: 16px;
@@ -145,6 +173,10 @@
       <div class="overlay-caption-box" id="captionBox">
         <span class="caption-placeholder">Waiting for captions…</span>
       </div>
+      <div class="overlay-translation-box" id="translationBox">
+        <span class="t-label">🌐 Translation</span>
+        <span id="translationText"></span>
+      </div>
     </div>
   </div>
 
@@ -163,6 +195,8 @@
       const modeFromQuery = params.get("mode") || "caption-en";
 
       const captionBox = document.getElementById("captionBox");
+      const translationBox = document.getElementById("translationBox");
+      const translationText = document.getElementById("translationText");
       const overlayDot = document.getElementById("overlayDot");
       const overlayStatusText = document.getElementById("overlayStatusText");
       const overlayRoomLabel = document.getElementById("overlayRoomLabel");
@@ -197,24 +231,40 @@
 
         const text = payload.final || payload.interim || "";
         const modeKey = payload.mode || modeFromQuery;
+        const isTranslation = payload.kind === "translation" || !!payload.translated || !!payload.targetLang;
 
-        if (!text) {
+        // Show/hide translation box based on mode
+        if (translationBox) {
+          translationBox.classList.toggle("visible", isTranslation);
+        }
+
+        if (!text && !payload.translated) {
           captionBox.textContent = "";
           captionBox.innerHTML = '<span class="caption-placeholder">Waiting for captions…</span>';
+          if (translationText) translationText.textContent = "";
           return;
         }
 
-        clearPlaceholder();
-
-        if (modeIsEnglishLesson(modeKey)) {
-          const tokens = tokenizeCaption(text);
-          if (w.SottotitoliPosColoring) {
-            w.SottotitoliPosColoring.renderColoredCaption(captionBox, tokens);
+        // Source caption
+        if (text) {
+          clearPlaceholder();
+          if (modeIsEnglishLesson(modeKey)) {
+            const tokens = tokenizeCaption(text);
+            if (w.SottotitoliPosColoring) {
+              w.SottotitoliPosColoring.renderColoredCaption(captionBox, tokens);
+            } else {
+              captionBox.textContent = text;
+            }
           } else {
             captionBox.textContent = text;
           }
-        } else {
-          captionBox.textContent = text;
+        }
+
+        // Translated text
+        if (isTranslation && translationText) {
+          translationText.textContent = payload.translated || payload.interim_translated || "";
+        } else if (translationText) {
+          translationText.textContent = "";
         }
       }
 

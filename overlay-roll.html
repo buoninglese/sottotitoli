@@ -113,6 +113,34 @@
       color: #93c5fd;
     }
 
+    .roll-translation-box {
+      margin-top: 6px;
+      padding: 6px 10px;
+      border-radius: 14px;
+      background: rgba(124, 58, 237, .08);
+      border: 1px solid rgba(167, 139, 250, .25);
+      display: none;
+    }
+
+    .roll-translation-box.visible { display: block; }
+
+    .roll-translation-box .rt-label {
+      font-size: 9px;
+      text-transform: uppercase;
+      letter-spacing: .14em;
+      color: rgba(167, 139, 250, .7);
+      font-weight: 700;
+      margin-bottom: 2px;
+    }
+
+    .roll-translation-line {
+      font-size: 20px;
+      line-height: 1.5;
+      color: #c4b5fd;
+      border-top: 1px solid rgba(167, 139, 250, .12);
+      padding-top: 3px;
+    }
+
     .pos-verb { color: #2563eb; }
     .pos-noun { color: #16a34a; }
     .pos-adj  { color: #f97316; }
@@ -142,6 +170,10 @@
       <div class="roll-list" id="captionBox">
         <div class="roll-placeholder">Waiting for captions…</div>
       </div>
+      <div class="roll-translation-box" id="translationBox">
+        <div class="rt-label">🌐 Translation</div>
+        <div id="translationLines"></div>
+      </div>
     </div>
   </div>
 
@@ -160,6 +192,8 @@
       const modeFromQuery = params.get("mode") || "caption-en";
 
       const captionBox = document.getElementById("captionBox");
+      const translationBox = document.getElementById("translationBox");
+      const translationLines = document.getElementById("translationLines");
       const rollDot = document.getElementById("rollDot");
       const rollStatusText = document.getElementById("rollStatusText");
       const rollRoomLabel = document.getElementById("rollRoomLabel");
@@ -193,31 +227,47 @@
 
         const text = payload.final || payload.interim || "";
         const modeKey = payload.mode || modeFromQuery;
+        const isTranslation = payload.kind === "translation" || !!payload.translated || !!payload.targetLang;
 
-        if (!text) return;
-        clearPlaceholder();
+        // Show/hide translation box
+        if (translationBox) {
+          translationBox.classList.toggle("visible", isTranslation);
+        }
 
-        const line = document.createElement("div");
-        line.className = "roll-line";
-
-        if (modeIsEnglishLesson(modeKey)) {
-          const tokens = tokenizeCaption(text);
-          if (w.SottotitoliPosColoring) {
-            const temp = document.createElement("span");
-            w.SottotitoliPosColoring.renderColoredCaption(temp, tokens);
-            line.innerHTML = temp.innerHTML;
+        // Source caption lines
+        if (text) {
+          clearPlaceholder();
+          const line = document.createElement("div");
+          line.className = "roll-line";
+          if (modeIsEnglishLesson(modeKey)) {
+            const tokens = tokenizeCaption(text);
+            if (w.SottotitoliPosColoring) {
+              const temp = document.createElement("span");
+              w.SottotitoliPosColoring.renderColoredCaption(temp, tokens);
+              line.innerHTML = temp.innerHTML;
+            } else {
+              line.textContent = text;
+            }
           } else {
             line.textContent = text;
           }
-        } else {
-          line.textContent = text;
+          captionBox.prepend(line);
+          const maxLines = 10;
+          while (captionBox.childNodes.length > maxLines) {
+            captionBox.removeChild(captionBox.lastChild);
+          }
         }
 
-        captionBox.prepend(line);
-
-        const maxLines = 10;
-        while (captionBox.childNodes.length > maxLines) {
-          captionBox.removeChild(captionBox.lastChild);
+        // Translation lines
+        if (isTranslation && translationLines && payload.translated) {
+          const tLine = document.createElement("div");
+          tLine.className = "roll-translation-line";
+          tLine.textContent = payload.translated;
+          translationLines.prepend(tLine);
+          const maxTLines = 5;
+          while (translationLines.childNodes.length > maxTLines) {
+            translationLines.removeChild(translationLines.lastChild);
+          }
         }
       }
 
