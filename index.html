@@ -839,5 +839,49 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="js/auth.js?v=5"></script>
 <script src="js/preferences.js?v=5"></script>
+
+<script>
+// ── Newsletter form ──
+(function(){
+  var btn = document.getElementById('newsletterBtn');
+  var emailEl = document.getElementById('newsletterEmail');
+  var msgEl = document.getElementById('newsletterMsg');
+  if (!btn || !emailEl) return;
+
+  btn.addEventListener('click', async function() {
+    var email = emailEl.value.trim();
+    if (!email || !email.includes('@')) {
+      if (msgEl) { msgEl.textContent = 'Inserisci un indirizzo email valido.'; msgEl.style.color = '#dc2626'; }
+      return;
+    }
+    btn.disabled = true;
+    btn.textContent = 'Invio…';
+    
+    // Try Supabase first
+    var saved = false;
+    var supabase = window.sottotitoliSupabase;
+    if (supabase) {
+      try {
+        var { error } = await supabase.from('newsletter_subscribers').insert([{ email: email, subscribed_at: new Date().toISOString() }]);
+        if (!error) saved = true;
+      } catch(e) {}
+    }
+    
+    // Store in localStorage as fallback
+    if (!saved) {
+      try {
+        var subs = JSON.parse(localStorage.getItem('sottotitoli_newsletter') || '[]');
+        if (subs.indexOf(email) === -1) { subs.push(email); localStorage.setItem('sottotitoli_newsletter', JSON.stringify(subs)); }
+      } catch(e) {}
+    }
+    
+    btn.textContent = 'Fatto!';
+    if (msgEl) { msgEl.textContent = 'Grazie! Ti terremo aggiornato.'; msgEl.style.color = 'var(--accent-green)'; }
+    emailEl.value = '';
+    setTimeout(function() { btn.textContent = 'Iscriviti'; btn.disabled = false; }, 3000);
+  });
+})();
+</script>
+
 </body>
 </html>
