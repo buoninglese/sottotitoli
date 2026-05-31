@@ -702,7 +702,7 @@
   async function startRecognition() {
     if (!SpeechRecognition) {
       // ── Safari fallback: MediaRecorder + Deepgram via WebSocket ──
-      if (navigator.mediaDevices?.getUserMedia && window.wsPublisher && window.wsPublisher.ws && typeof window.wsPublisher.ws.send === 'function') {
+      if (navigator.mediaDevices?.getUserMedia && wsPublisher && wsPublisher.ws && typeof wsPublisher.ws.send === 'function') {
         setText("statusText", "Starting Safari audio capture...");
         await startSafariDeepgramCapture();
         return;
@@ -854,7 +854,7 @@
 
     // Tell relay to open Deepgram
     var lang = (modeConfig && modeConfig.sourceLang) || "en-US";
-    window.wsPublisher.ws.send(JSON.stringify({ type: "audio-start", lang: lang }));
+    wsPublisher.ws.send(JSON.stringify({ type: "audio-start", lang: lang }));
 
     safariMediaRecorder.ondataavailable = function(event) {
       if (!event.data || event.data.size === 0) return;
@@ -864,8 +864,8 @@
       var reader = new FileReader();
       reader.onloadend = function() {
         var base64 = reader.result.split(',')[1];
-        if (base64 && window.wsPublisher?.ws?.readyState === WebSocket.OPEN) {
-          window.wsPublisher.ws.send(JSON.stringify({ type: "audio", data: base64 }));
+        if (base64 && wsPublisher?.ws?.readyState === WebSocket.OPEN) {
+          wsPublisher.ws.send(JSON.stringify({ type: "audio", data: base64 }));
         }
       };
       reader.readAsDataURL(event.data);
@@ -893,8 +893,8 @@
     if (safariMediaRecorder && safariMediaRecorder.state !== 'inactive') {
       try { safariMediaRecorder.stop(); } catch(e) {}
     }
-    if (window.wsPublisher?.ws?.readyState === WebSocket.OPEN) {
-      window.wsPublisher.ws.send(JSON.stringify({ type: "audio-stop" }));
+    if (wsPublisher?.ws?.readyState === WebSocket.OPEN) {
+      wsPublisher.ws.send(JSON.stringify({ type: "audio-stop" }));
     }
     safariMediaRecorder = null;
     safariAudioStream = null;

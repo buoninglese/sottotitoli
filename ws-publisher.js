@@ -237,7 +237,8 @@
       flush: flushQueue,
       getSnapshot: getSnapshot,
       isOpen: isOpen,
-      setRoom: setRoom
+      setRoom: setRoom,
+      get ws() { return socket; }
     };
   }
 
