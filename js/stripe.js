@@ -36,7 +36,7 @@
       } catch(e) {}
     }
 
-    // Option A: Use Supabase Edge Function to create Checkout Session
+    // Edge Function (server-side) — the only method we use
     if (CHECKOUT_FUNCTION_URL) {
       try {
         var resp = await fetch(CHECKOUT_FUNCTION_URL, {
@@ -55,32 +55,17 @@
           window.location.href = data.url;
           return;
         }
+        if (data.error) {
+          console.error('Stripe error:', data.error);
+          alert('Payment error: ' + data.error);
+          return;
+        }
       } catch(e) {
         console.error('Stripe Checkout error:', e);
       }
     }
 
-    // Option B: Direct Stripe.js redirect (if you set up price IDs above)
-    var priceId = PRICES[productKey];
-    if (priceId) {
-      var stripe = await getStripe();
-      if (stripe) {
-        var result = await stripe.redirectToCheckout({
-          lineItems: [{ price: priceId, quantity: 1 }],
-          mode: 'payment',
-          successUrl: window.location.origin + '/app.html?payment=success',
-          cancelUrl: window.location.origin + '/studio.html?payment=cancelled',
-          customerEmail: email || undefined,
-          clientReferenceId: userId || undefined
-        });
-        if (result.error) {
-          alert('Payment error: ' + result.error.message);
-        }
-        return;
-      }
-    }
-
-    alert('Payment system is being set up. Please check back soon or contact support.');
+    alert('Payment system is being set up. Please try again or contact support.');
   }
 
   // Wire up all buy buttons
