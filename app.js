@@ -727,6 +727,7 @@
             return;
           }
           setText("creditBalance", formatCredit(remaining));
+          setText("minuteCounter", "0m usati");
 
           // Load token balance too
           var tokResp = await sessionSupabase.from('user_tokens').select('balance').eq('user_id', uid).maybeSingle();
@@ -1425,6 +1426,7 @@
             reference: currentSessionId, balance_after: newBalance
           });
           setText("creditBalance", formatCredit(newBalance));
+        setText("minuteCounter", Math.round(durationSeconds/60) + 'm usati');
           if (newBalance < 300 && newBalance > 0) setText("statusText", "⏰ Meno di 5 minuti rimanenti.");
         } catch(e) { /* non-critical */ }
       }
