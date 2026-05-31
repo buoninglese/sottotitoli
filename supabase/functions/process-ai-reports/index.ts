@@ -89,14 +89,12 @@ serve(async (req) => {
           .insert({
             session_id: request.session_ids[0],
             user_id: request.user_id,
-            module_id: request.module_id,
+            module_id: moduleId,
             provider: 'openai',
             model: 'gpt-4',
-            prompt_version: 'v1.0',
             status: 'done',
             summary_text: summaryText,
-            raw_json: aiData,
-            tokens_used: tokensUsed
+            raw_json: aiData
           });
 
         // Mark request as completed
