@@ -208,10 +208,12 @@ body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--t
     }
 
     var html='<div class="analysis-toolbar" id="analysisToolbar" style="display:none;margin-bottom:16px;gap:10px;align-items:center;flex-wrap:wrap">'+
-      '<label style="font-size:13px;color:var(--muted);cursor:pointer"><input type="checkbox" id="selectAll" onchange="toggleSelectAll(this)"> Seleziona tutti</label>'+
+      '<label style="font-size:13px;color:var(--muted);cursor:pointer;display:flex;align-items:center;gap:6px"><input type="checkbox" id="selectAll" onchange="toggleSelectAll(this)"> Seleziona tutti</label>'+
       '<span style="font-size:12px;color:var(--muted2)" id="selectedCount">0 selezionati</span>'+
       '<button class="toolbar-btn" onclick="favoriteSelected()" style="background:var(--amber);color:#fff">⭐ Preferiti</button>'+
-      '<button class="toolbar-btn" onclick="deleteSelected()" style="background:var(--danger);color:#fff">🗑 Elimina</button>'+
+      '<button class="toolbar-btn" onclick="buyReportForSelected()" style="background:var(--accent-purple);color:#fff">📊 Compra report</button>'+
+      '<button class="toolbar-btn" onclick="deleteSelected()" style="background:var(--danger);color:#fff">🗑 Elimina selezionati</button>'+
+      '<button class="toolbar-btn" onclick="deleteAllSessions()" style="background:var(--danger);color:#fff;opacity:.7">🗑 Elimina tutto</button>'+
       '</div>'+
       '<div class="session-grid">';
     sessions.forEach(function(s){
@@ -261,14 +263,17 @@ body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--t
   };
 
   // ── Toolbar ──
-  var toolbar=document.getElementById('analysisToolbar');
 
   window.updateToolbar=function(){
+    var toolbar=document.getElementById('analysisToolbar');
     var checked=document.querySelectorAll('.session-check:checked');
     var count=checked.length;
     var countEl=document.getElementById('selectedCount');
     if(countEl) countEl.textContent=count+' selezionati';
     if(toolbar) toolbar.style.display=count>0?'flex':'none';
+    // Reset select all checkbox if nothing selected
+    var selectAll=document.getElementById('selectAll');
+    if(selectAll&&count===0) selectAll.checked=false;
   };
 
   window.toggleSelectAll=function(cb){
@@ -300,6 +305,18 @@ body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--t
     window.updateToolbar();
   };
 
+  window.buyReportForSelected=function(){
+    var checked=document.querySelectorAll('.session-check:checked');
+    if(checked.length===0){ alert('Seleziona almeno una sessione.'); return; }
+    // Expand the first selected session to show report options
+    var sid=checked[0].dataset.sid;
+    var card=document.querySelector('.session-card[data-sid="'+sid+'"]');
+    if(card){ card.classList.add('expanded'); }
+    var expand=document.getElementById('expand-'+sid);
+    if(expand&&!expand.innerHTML) buildExpand(sid,expand);
+    expand.scrollIntoView({behavior:'smooth'});
+  };
+
   window.deleteSelected=async function(){
     var checked=document.querySelectorAll('.session-check:checked');
     if(checked.length===0) return;
@@ -311,13 +328,23 @@ body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--t
       if(card) card.remove();
     }
     window.updateToolbar();
-    // Show empty state if no cards left
     if(document.querySelectorAll('.session-card').length===0){
       content.innerHTML='<div class="empty-state"><div class="empty-icon">📭</div>Nessuna sessione trovata.<br><a href="app.html">Vai al Dashboard →</a> e inizia a parlare.</div>';
     }
   };
 
+  window.deleteAllSessions=async function(){
+    if(!confirm('Eliminare TUTTE le sessioni? Questa azione non può essere annullata.')) return;
+    var d=window.__analysisData;
+    if(!d||!supabase) return;
+    for(var i=0;i<d.sessions.length;i++){
+      await supabase.from('sessions').delete().eq('id',d.sessions[i].id);
+    }
+    content.innerHTML='<div class="empty-state"><div class="empty-icon">📭</div>Tutte le sessioni eliminate.<br><a href="app.html">Vai al Dashboard →</a> e inizia a parlare.</div>';
+  };
+
   function buildExpand(sid,el){
+    window.buildExpand = buildExpand;
     var d=window.__analysisData;
     var s=null;
     d.sessions.forEach(function(x){ if(x.id===sid) s=x; });
