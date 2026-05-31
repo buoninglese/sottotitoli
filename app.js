@@ -1668,6 +1668,40 @@
     updateStats();
     clearBox("captionInterim", "");
     clearBox("captionTranscript", "");
+
+    // ── Mode quick-switch dropdown ──
+    var modeSwitch = $("modeQuickSwitch");
+    if (modeSwitch) {
+      modeSwitch.value = modeKey;
+      modeSwitch.addEventListener("change", function(){
+        var newMode = modeSwitch.value;
+        if (newMode && newMode !== modeKey) {
+          // Update modeKey and reinitialize
+          modeKey = newMode;
+          modeConfig = cfgModes[modeKey] || null;
+          localStorage.setItem("sottotitoli-mode", modeKey);
+          setText("modeBadge", modeKey);
+          describeMode();
+          // If currently recording, warn user
+          if (sessionActive) {
+            setText("statusText", "⏳ Mode will apply on next session. Stop current session first.");
+          }
+        }
+      });
+    }
+
+    // ── Hide onboarding hint on first session ──
+    var origStartFn = window.startRecognitionOverride;
+    if (!$("startBtn")) return;
+    // Watch for session start to hide onboarding
+    var observer = new MutationObserver(function(){
+      var hint = $("onboardHint");
+      if (hint && !hint.classList.contains('hidden') && ($("startBtn").classList.contains('recording') || $("startBtn").disabled)) {
+        hint.classList.add('hidden');
+      }
+    });
+    var startBtn = $("startBtn");
+    if (startBtn) observer.observe(startBtn, { attributes: true, attributeFilter: ['class','disabled'] });
     clearBox("captionTranslated", "");
 
     var srcSelect = document.getElementById("sourceLangSelect");

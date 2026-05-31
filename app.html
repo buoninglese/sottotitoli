@@ -43,6 +43,7 @@ body {
 .brand a { text-decoration: none; color: var(--text); font-size: 18px; font-weight: 800; letter-spacing: -.3px; }
 .brand a span { color: var(--accent); }
 .mode-badge { font-size: 11px; padding: 4px 12px; border-radius: 100px; background: var(--accent); color: #fff; font-weight: 600; white-space: nowrap; }
+.mode-quick-switch { font-family: inherit; font-size: 12px; padding: 6px 10px; border-radius: 8px; border: 1px solid var(--line); background: var(--card); color: var(--text); cursor: pointer; margin-left: 6px; max-width: 160px; }
 .top-actions { display: flex; align-items: center; gap: 8px; }
 .t-btn { font-family: inherit; padding: 7px 14px; border-radius: 8px; font-size: 12px; font-weight: 600; cursor: pointer; border: 1px solid var(--line); background: var(--card); color: var(--text); transition: all .15s; white-space: nowrap; }
 .t-btn:hover { border-color: var(--accent); color: var(--accent); }
@@ -69,6 +70,7 @@ body {
 .metrics-panel { display: flex; flex-direction: column; gap: 10px; }
 .m-card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 14px; }
 .m-card .m-title { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .14em; color: var(--muted2); margin-bottom: 8px; }
+.cefr-help { display:inline-flex; align-items:center; justify-content:center; width:16px; height:16px; border-radius:50%; background:var(--gauge-bg); color:var(--muted2); font-size:10px; cursor:help; margin-left:4px; font-weight:700 }
 .metric-row { display: flex; justify-content: space-between; align-items: baseline; padding: 5px 0; border-bottom: 1px solid var(--line); }
 .metric-row:last-child { border-bottom: none; }
 .metric-row .m-label { font-size: 12px; color: var(--muted); }
@@ -145,6 +147,15 @@ body {
 .credit-warn { background: rgba(217,119,6,.1); border: 1px solid rgba(217,119,6,.3); border-radius: 10px; padding: 10px 16px; margin-bottom: 12px; font-size: 13px; color: var(--amber); display: none; }
 .credit-warn.visible { display: flex; align-items: center; gap: 8px; }
 .credit-warn a { color: var(--amber); font-weight: 600; }
+
+/* ── Onboarding hint ── */
+.onboard-hint {
+  background: linear-gradient(135deg, rgba(124,58,237,.06), rgba(37,99,235,.06));
+  border: 1px solid rgba(124,58,237,.15); border-radius: 14px;
+  padding: 20px 24px; margin-bottom: 14px; text-align: center;
+  font-size: 14px; color: var(--text); transition: opacity .3s;
+}
+.onboard-hint.hidden { display: none; }
 
 /* ═══════════════════════════════════════ */
 /* 🧒 KIDS LAYOUT — playful & simplified  */
@@ -300,6 +311,26 @@ body {
     <div class="brand">
       <a href="index.html" class="logo">Sotto<span>titoli</span></a>
       <span class="mode-badge" id="modeBadge">caption-en</span>
+      <select class="mode-quick-switch" id="modeQuickSwitch" title="Cambia lingua/modalità">
+        <optgroup label="Solo caption">
+          <option value="caption-en">🇬🇧 English</option>
+          <option value="caption-it">🇮🇹 Italiano</option>
+          <option value="caption-fr">🇫🇷 Français</option>
+          <option value="caption-es">🇪🇸 Español</option>
+          <option value="caption-de">🇩🇪 Deutsch</option>
+          <option value="caption-nl">🇳🇱 Nederlands</option>
+          <option value="caption-pt">🇵🇹 Português</option>
+          <option value="caption-pl">🇵🇱 Polski</option>
+        </optgroup>
+        <optgroup label="Con traduzione">
+          <option value="translate-en-it">🇬🇧→🇮🇹 EN → IT</option>
+          <option value="translate-it-en">🇮🇹→🇬🇧 IT → EN</option>
+          <option value="translate-en-fr">🇬🇧→🇫🇷 EN → FR</option>
+          <option value="translate-en-es">🇬🇧→🇪🇸 EN → ES</option>
+          <option value="translate-en-de">🇬🇧→🇩🇪 EN → DE</option>
+          <option value="translate-en-pt">🇬🇧→🇵🇹 EN → PT</option>
+        </optgroup>
+      </select>
     </div>
     <div class="top-actions">
       <button class="layout-btn" id="layoutToggle" title="Cambia layout dashboard">🎨</button>
@@ -325,7 +356,7 @@ body {
     <!-- LEFT: Live metrics -->
     <aside class="metrics-panel">
       <div class="m-card">
-        <div class="m-title">📊 CEFR Level</div>
+        <div class="m-title">📊 CEFR Level <span class="cefr-help" title="CEFR = Quadro comune europeo per le lingue. A1=principiante, C2=padronanza. Stima basata su vocabolario e complessità grammaticale.">?</span></div>
         <div class="gauge-wrap"><div class="gauge-bg"></div><div class="gauge-fill" id="cefrGauge" style="height:10%;background:linear-gradient(180deg,var(--good),var(--accent))"></div></div>
         <div class="gauge-center"><div class="gauge-value" id="cefrLevel">—</div><div class="gauge-label">Estimated level</div></div>
       </div>
@@ -358,12 +389,20 @@ body {
       <div class="credit-warn" id="creditWarn">
         ⚠️ Meno di 5 minuti rimanenti. <a href="studio.html" target="_blank">Acquista minuti →</a>
       </div>
+
+      <!-- First-time welcome -->
+      <div class="onboard-hint" id="onboardHint">
+        <div style="font-size:28px;margin-bottom:8px">👋</div>
+        <strong>Benvenuto in Sottotitoli!</strong>
+        <p style="margin:6px 0 0;font-size:13px;color:var(--muted)">Scegli la lingua, clicca <em>Start Session</em> e inizia a parlare.<br>I sottotitoli appaiono in tempo reale. Hai <strong>15 minuti gratis</strong>.</p>
+      </div>
       <div class="action-row">
         <button class="start-btn" id="startBtn">🎤 Start Session</button>
         <button class="stop-btn" id="stopBtn" disabled>⏹ Stop</button>
         <button class="t-btn" id="openOverlayBtn">🖥 Overlay</button>
         <button class="t-btn" id="copyOverlayBtn">📋 Copy link</button>
         <button class="t-btn" id="newRoomBtn">🔄 New room</button>
+        <span style="font-size:10px;color:var(--muted2);margin-left:4px" title="Apri l'overlay su un altro schermo o condividi il link. I sottotitoli appariranno in tempo reale.">ℹ️ Per lo streaming</span>
       </div>
 
       <!-- Session complete panel (hidden until stop) -->
@@ -391,6 +430,9 @@ body {
           </button>
         </div>
         <p style="font-size:11px;color:var(--muted2);text-align:center;margin-bottom:16px" id="reportBuyMsg"></p>
+        <div style="text-align:center;margin-bottom:16px">
+          <a href="analysis.html" style="font-size:13px;color:var(--accent);font-weight:600;text-decoration:none">📊 Vedi tutti i tuoi report →</a>
+        </div>
         <div class="new-session-row">
           <button class="new-session-btn" id="newSessionBtn">🔄 Nuova sessione</button>
         </div>
@@ -420,7 +462,8 @@ body {
       <div class="m-card">
         <div class="m-title">💾 Actions</div>
         <button class="t-btn" id="copyTranscriptBtn" style="width:100%;margin-bottom:4px">Copy transcript</button>
-        <button class="t-btn" id="downloadTranscriptBtn" style="width:100%">Download transcript</button>
+        <button class="t-btn" id="downloadTranscriptBtn" style="width:100%;margin-bottom:4px">Download transcript</button>
+        <a href="training.html" class="t-btn" style="width:100%;display:block;text-align:center;text-decoration:none;margin-bottom:4px">🎯 Training mode</a>
       </div>
     </aside>
   </div>
