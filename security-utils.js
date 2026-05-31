@@ -145,8 +145,11 @@
     showWarning: showWarning,
     dismissWarning: dismissWarning
   };
-})(window);
-<style>
+
+  // Inject warning banner CSS
+  var styleEl = document.createElement('style');
+  styleEl.id = 'security-warning-styles';
+  styleEl.textContent = `
 .security-warning {
     position: fixed;
     top: 20px;
@@ -260,16 +263,6 @@
         }
     }
 }
-</style>
 `;
-
-// Function to inject styles if not already present
-function injectSecurityStyles() {
-    if (!document.getElementById('security-warning-styles')) {
-        // Create a proper style element
-        const styleElement = document.createElement('style');
-        styleElement.id = 'security-warning-styles';
-        styleElement.textContent = securityWarningStyles.replace('<style>', '').replace('</style>', '');
-        document.head.appendChild(styleElement);
-    }
-}
+  document.head.appendChild(styleEl);
+})(window);
