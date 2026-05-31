@@ -40,19 +40,22 @@ serve(async (req) => {
     const stripeResp = await fetch('https://api.stripe.com/v1/checkout/sessions', {
       method: 'POST',
       headers: { 'Authorization': 'Bearer ' + STRIPE_SECRET_KEY, 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: new URLSearchParams({
-        'line_items[0][price]': productConfig.priceId,
-        'line_items[0][quantity]': '1',
-        'mode': 'payment',
-        'success_url': successUrl || 'https://buoninglese.github.io/sottotitoli/app.html?payment=success',
-        'cancel_url': cancelUrl || 'https://buoninglese.github.io/sottotitoli/studio.html?payment=cancelled',
-        'customer_email': email || '',
-        'client_reference_id': userId || '',
-        'metadata[product]': product,
-        'metadata[user_id]': userId || 'anonymous',
-        'metadata[credits_seconds]': String(productConfig.creditsSeconds),
-        'metadata[tokens]': String(productConfig.tokens),
-      }).toString(),
+      body: (() => {
+        const params: Record<string, string> = {
+          'line_items[0][price]': productConfig.priceId,
+          'line_items[0][quantity]': '1',
+          'mode': 'payment',
+          'success_url': successUrl || 'https://buoninglese.github.io/sottotitoli/app.html?payment=success',
+          'cancel_url': cancelUrl || 'https://buoninglese.github.io/sottotitoli/studio.html?payment=cancelled',
+          'metadata[product]': product,
+          'metadata[user_id]': userId || 'anonymous',
+          'metadata[credits_seconds]': String(productConfig.creditsSeconds),
+          'metadata[tokens]': String(productConfig.tokens),
+        };
+        if (email) params['customer_email'] = email;
+        if (userId) params['client_reference_id'] = userId;
+        return new URLSearchParams(params).toString();
+      })(),
     });
 
     const session = await stripeResp.json();
