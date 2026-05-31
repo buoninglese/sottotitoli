@@ -27,6 +27,11 @@ window.sottotitoliSupabase = window.supabase.createClient(
 
 // 2) Sign-in function used by the button
 async function signInWithGoogle() {
+  // Remember where the user was so we can bring them back after login
+  var currentPage = window.location.pathname.split('/').pop() || 'index.html';
+  if (currentPage !== 'app.html' && currentPage !== 'index.html') {
+    sessionStorage.setItem('sottotitoli_return_page', currentPage);
+  }
   const { error } = await window.sottotitoliSupabase.auth.signInWithOAuth({
     provider: 'google',
     options: {
@@ -88,5 +93,11 @@ document.addEventListener('DOMContentLoaded', async () => {
   } else {
     console.log('auth.js: session found, rendering signed in');
     renderSignedIn();
+    // If user came from another page (e.g. studio), redirect back
+    var returnPage = sessionStorage.getItem('sottotitoli_return_page');
+    if (returnPage && window.location.pathname.indexOf(returnPage) === -1) {
+      sessionStorage.removeItem('sottotitoli_return_page');
+      window.location.replace(returnPage + window.location.search);
+    }
   }
 });
