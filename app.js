@@ -1585,6 +1585,24 @@
       const repetitionRate = computeRepetitionRate(plain);
       const turnCount = computeTurnCount(plain);
 
+      // POS counts
+      var posNouns=0, posVerbs=0, posAdjs=0, posAdvs=0, posPronouns=0, posPreps=0, posConjs=0, posModals=0;
+      if (w.LEMMA_POS_MAP) {
+        var tokens = plain.toLowerCase().match(/[a-z']+/g) || [];
+        var posMap = w.LEMMA_POS_MAP;
+        tokens.forEach(function(t){
+          var p = posMap[t];
+          if (p==='noun'||p==='n') posNouns++;
+          else if (p==='verb'||p==='v') posVerbs++;
+          else if (p==='adj') posAdjs++;
+          else if (p==='adv') posAdvs++;
+          else if (p==='pron') posPronouns++;
+          else if (p==='prep') posPreps++;
+          else if (p==='conj') posConjs++;
+          else if (p==='modal') posModals++;
+        });
+      }
+
       // Update live cockpit metrics
       if (wpm != null) { setText("reportWpm", Math.round(wpm)); setText("liveWpm", Math.round(wpm)); }
       if (fillersPerMinute != null) { setText("reportFillers", fillersPerMinute.toFixed(1)); setText("liveFillers", fillersPerMinute.toFixed(1)); }
@@ -1612,7 +1630,15 @@
         repetition_rate: repetitionRate,
         turn_count: turnCount,
         interruption_count: null,
-        speaking_share_ratio: null
+        speaking_share_ratio: null,
+        noun_count: posNouns || null,
+        verb_count: posVerbs || null,
+        adjective_count: posAdjs || null,
+        adverb_count: posAdvs || null,
+        pronoun_count: posPronouns || null,
+        preposition_count: posPreps || null,
+        conjunction_count: posConjs || null,
+        modal_verb_count: posModals || null
       };
 
       const { error } = await sessionSupabase

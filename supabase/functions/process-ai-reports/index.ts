@@ -97,6 +97,42 @@ serve(async (req) => {
             raw_json: aiData
           });
 
+        // ── Write scores back to sessions table ──
+        const scoreUpdates: Record<string, any> = { last_ai_metrics_at: new Date().toISOString() };
+
+        // Extract scores from AI response text (look for patterns like "Score: 7/10" or "Overall: 8.5")
+        const scorePatterns = [
+          { regex: /fluency[:\s]*(\d+(?:\.\d+)?)/i, col: 'fluency_score' },
+          { regex: /vocabulary[:\s]*(\d+(?:\.\d+)?)/i, col: 'vocabulary_score' },
+          { regex: /grammar[:\s]*(\d+(?:\.\d+)?)/i, col: 'grammar_score' },
+          { regex: /interaction[:\s]*(\d+(?:\.\d+)?)/i, col: 'interaction_score' },
+          { regex: /business[:\s]*clarity[:\s]*(\d+(?:\.\d+)?)/i, col: 'business_clarity_score' },
+          { regex: /academic[:\s]*participation[:\s]*(\d+(?:\.\d+)?)/i, col: 'academic_participation_score' },
+          { regex: /overall[:\s]*score[:\s]*(\d+(?:\.\d+)?)/i, col: 'quality_score' },
+        ];
+
+        scorePatterns.forEach(({ regex, col }) => {
+          const match = summaryText.match(regex);
+          if (match) scoreUpdates[col] = parseFloat(match[1]);
+        });
+
+        if (Object.keys(scoreUpdates).length > 1) {
+          await supabase
+            .from('sessions')
+            .update(scoreUpdates)
+            .eq('id', request.session_ids[0]);
+        }
+
+        // ── Grant entitlement ──
+        await supabase.from('user_ai_entitlements').insert({
+          user_id: request.user_id,
+          entitlement_key: 'report_' + request.family_key,
+          period_type: 'unlimited',
+          uses_allowed: 1,
+          uses_consumed: 1,
+          is_active: true
+        });
+
         // Mark request as completed
         await supabase
           .from('ai_report_requests')
