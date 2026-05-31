@@ -460,5 +460,20 @@ window.SOTTOTITOLI_CONFIG = {
       translate: false,
       lessonMode: true
     }
+  },
+
+  /** Stripe payment integration */
+  stripe: {
+    publishableKey: "pk_test_51Tcwid1xvn5NIk3eLYEU3IQK0N4q09aU5lggFCr7TkRb2WJsm7pZJ668mUykb9N1gCnDLksDJpLa0QwP6tpE6oms00m7tQIVsx",
+    checkoutFunctionUrl: "https://qzqmuegbpmvqrjrlfbgk.supabase.co/functions/v1/create-checkout-session",
+    prices: {
+      "2hours":   "price_1Tcwmm1xvn5NIk3eiKIus3c5",
+      "20hours":  "price_1TcwoX1xvn5NIk3eJuqF8V1j",
+      "50hours":  null,
+      "90tokens": null,
+      "studente": null,
+      "professionale": null,
+      "completo": null
+    }
   }
 };
