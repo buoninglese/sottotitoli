@@ -528,25 +528,22 @@
   </div>
 </nav>
 
-<!-- HERO (logged out: sign-in CTA / logged in: minimal) -->
+<!-- HERO -->
 <section class="page-hero" id="studioHero">
   <div class="inner">
-    <div class="page-hero-tag">Studio</div>
-    <h1>Benvenuto in Studio</h1>
+    <div class="page-hero-tag" id="heroTag">Studio</div>
+    <h1 id="heroTitle">Benvenuto in Studio</h1>
     <p class="page-hero-sub" id="heroSub">Avvia una sessione di sottotitoli, attiva la traduzione live, consulta i report AI o segui i tuoi progressi. Ogni sessione viene salvata automaticamente.</p>
     <div id="heroLoggedOut" style="margin-top:20px">
       <a href="#" onclick="signInWithGoogle()" class="hero-login-btn" style="font-size:17px;padding:16px 36px">Accedi o registrati <span style="font-weight:400;opacity:.8">— 15 min gratis</span> →</a>
     </div>
-    <div id="heroLoggedIn" style="display:none;margin-top:12px">
-      <a href="app.html" class="hero-cta-btn" style="display:inline-flex;align-items:center;gap:10px;padding:14px 32px;background:var(--accent-purple);color:#fff;border-radius:100px;font-size:16px;font-weight:700;text-decoration:none;transition:all .2s;box-shadow:0 6px 24px rgba(124,58,237,.35)">🎤 Continua a sottotitolare →</a>
-    </div>
+    <div id="heroLoggedIn" style="display:none"></div>
   </div>
 </section>
 
-<!-- TABS (visible for all, fills viewport when logged in) -->
-<div class="section-head" id="sectionHead">
+<!-- TABS — hidden when logged out, shown when logged in -->
+<div class="section-head" id="sectionHead" style="display:none">
   <div class="inner">
-    <span class="section-label">Workspace</span>
     <h2>Scegli la tua modalità</h2>
     <p class="section-subtitle">Ogni modalità apre Studio con strumenti e impostazioni specifiche.</p>
   </div>
@@ -771,18 +768,42 @@
   (function(){
     var loggedOut = document.getElementById('heroLoggedOut');
     var loggedIn = document.getElementById('heroLoggedIn');
-    if (!loggedOut || !loggedIn) return;
+    var heroTitle = document.getElementById('heroTitle');
+    var heroSub = document.getElementById('heroSub');
+    var hero = document.getElementById('studioHero');
+    var sectionHead = document.getElementById('sectionHead');
+    var tabBar = document.getElementById('tabBar');
+    if (!loggedOut || !sectionHead) return;
+
     var supabase = window.sottotitoliSupabase;
+    function applyState(isLoggedIn) {
+      if (isLoggedIn) {
+        // Logged in: hide hero text+buttons, show tabs as main content
+        if (loggedOut) loggedOut.style.display = 'none';
+        if (loggedIn) loggedIn.style.display = 'none';
+        if (heroTitle) heroTitle.style.display = 'none';
+        if (heroSub) heroSub.style.display = 'none';
+        if (hero) hero.style.minHeight = 'auto';
+        if (sectionHead) sectionHead.style.display = 'block';
+        if (tabBar) tabBar.style.display = 'flex';
+      } else {
+        // Logged out: ONLY hero with sign-in CTA
+        if (loggedOut) loggedOut.style.display = 'block';
+        if (heroTitle) heroTitle.style.display = 'block';
+        if (heroSub) heroSub.style.display = 'block';
+        if (hero) hero.style.minHeight = '100vh';
+        if (sectionHead) sectionHead.style.display = 'none';
+        if (tabBar) tabBar.style.display = 'none';
+        // Hide all tab panels
+        document.querySelectorAll('.tab-panel').forEach(function(p){ p.style.display = 'none'; });
+      }
+    }
+
     if (supabase) {
-      supabase.auth.getSession().then(function(r){
-        if (r.data?.session) {
-          loggedOut.style.display = 'none';
-          loggedIn.style.display = 'block';
-        } else {
-          loggedOut.style.display = 'block';
-          loggedIn.style.display = 'none';
-        }
-      });
+      supabase.auth.getSession().then(function(r){ applyState(!!r.data?.session); });
+      supabase.auth.onAuthStateChange(function(event,session){ applyState(!!session); });
+    } else {
+      applyState(false);
     }
   })();
   (function(){
