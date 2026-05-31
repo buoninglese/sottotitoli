@@ -94,6 +94,8 @@ async function saveUserPreferences(prefs) {
       sessions_per_week: prefs.sessions_per_week || 4,
       daily_reminders: !!prefs.daily_reminders,
       weekly_reports: !!prefs.weekly_reports,
+      dark_mode: !!prefs.dark_mode,
+      display_name: prefs.display_name || null,
       updated_at: new Date().toISOString()
     }, { onConflict: 'user_id' });
 
