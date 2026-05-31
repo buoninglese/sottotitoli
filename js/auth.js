@@ -54,6 +54,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (btn) {
       btn.addEventListener('click', signInWithGoogle);
     }
+    // Hide wallet links for logged-out users
+    document.querySelectorAll('.wallet-link').forEach(function(el){ el.style.display = 'none'; });
   }
 
   function renderSignedIn() {
@@ -70,6 +72,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         window.location.href = getPostLogoutUrl();
       });
     }
+    // Show wallet links for logged-in users
+    document.querySelectorAll('.wallet-link').forEach(function(el){ el.style.display = ''; });
   }
 
   console.log('auth.js: calling getSession...');
