@@ -1518,6 +1518,7 @@
       }
 
       currentSessionId = data.id;
+      window.currentSessionId = currentSessionId; // expose for report purchase
     } catch (e) {
       console.error("Unexpected error creating session row:", e);
     }
@@ -1642,6 +1643,7 @@
     } finally {
       currentSessionId = null;
       currentSessionStart = null;
+      window.currentSessionId = null;
     }
   }
 

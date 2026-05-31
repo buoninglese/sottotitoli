@@ -430,6 +430,15 @@ body {
           </button>
         </div>
         <p style="font-size:11px;color:var(--muted2);text-align:center;margin-bottom:16px" id="reportBuyMsg"></p>
+        <div class="report-progress" id="reportProgress" style="display:none;margin-bottom:16px">
+          <div style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted)">
+            <span>⏳</span> <span id="reportProgressLabel">Generazione report in corso…</span>
+          </div>
+          <div style="background:var(--gauge-bg);border-radius:4px;height:6px;margin-top:8px">
+            <div id="reportProgressBar" style="background:var(--accent);height:100%;border-radius:4px;width:0%;transition:width .5s"></div>
+          </div>
+        </div>
+        <div id="reportResult" style="display:none;margin-bottom:16px;font-size:13px"></div>
         <div style="text-align:center;margin-bottom:16px">
           <a href="analysis.html" style="font-size:13px;color:var(--accent);font-weight:600;text-decoration:none">📊 Vedi tutti i tuoi report →</a>
         </div>
@@ -856,54 +865,55 @@ document.addEventListener("DOMContentLoaded", function() {
   }
 
   // Direct report purchase buttons
+  var reportModuleMap = { cambridge: 1, academic: 5, linguistic: 9, business: 11 };
+  var reportFamilyMap = { cambridge: 'cambridge', academic: 'academic', linguistic: 'linguistic', business: 'business' };
+
   document.querySelectorAll('.report-buy-btn').forEach(function(btn){
     btn.addEventListener('click', async function(){
       var reportType = btn.dataset.report;
       var tokensNeeded = parseInt(btn.dataset.tokens);
       var msgEl = document.getElementById('reportBuyMsg');
+      var progressEl = document.getElementById('reportProgress');
+      var progressBar = document.getElementById('reportProgressBar');
+      var progressLabel = document.getElementById('reportProgressLabel');
+      var resultEl = document.getElementById('reportResult');
       
       if (!window.sottotitoliSupabase) {
         if (msgEl) { msgEl.textContent = 'Accedi per acquistare report.'; msgEl.style.color = 'var(--warn)'; }
         return;
       }
 
-      var session = await window.sottotitoliSupabase.auth.getSession();
-      if (!session.data?.session) {
+      var sessionResp = await window.sottotitoliSupabase.auth.getSession();
+      if (!sessionResp.data?.session) {
         if (msgEl) { msgEl.textContent = 'Accedi per acquistare report.'; msgEl.style.color = 'var(--warn)'; }
         return;
       }
 
-      var userId = session.data.session.user.id;
+      var userId = sessionResp.data.session.user.id;
+      var sessionId = window.currentSessionId;
+      if (!sessionId) {
+        if (msgEl) { msgEl.textContent = 'Nessuna sessione attiva. Avvia e ferma una sessione prima.'; msgEl.style.color = 'var(--warn)'; }
+        return;
+      }
 
       // Check token balance
       var tokResp = await window.sottotitoliSupabase.from('user_tokens').select('balance').eq('user_id', userId).maybeSingle();
       var balance = tokResp.data?.balance ?? 0;
       if (balance < tokensNeeded) {
-        if (msgEl) { msgEl.textContent = 'Token insufficienti. Ne hai ' + balance + ', servono ' + tokensNeeded + '. Acquista token su Studio.'; msgEl.style.color = 'var(--danger)'; }
-        return;
-      }
-
-      // Get transcript text
-      var transcriptEl = document.getElementById('captionTranscript');
-      var transcript = transcriptEl ? transcriptEl.textContent.trim() : '';
-      if (!transcript) {
-        if (msgEl) { msgEl.textContent = 'Nessun transcript disponibile.'; msgEl.style.color = 'var(--warn)'; }
+        if (msgEl) { msgEl.textContent = 'Token insufficienti. Ne hai ' + balance + ', servono ' + tokensNeeded + '.'; msgEl.style.color = 'var(--danger)'; }
         return;
       }
 
       btn.disabled = true;
       btn.style.opacity = '0.5';
-      if (msgEl) { msgEl.textContent = 'Acquisto in corso…'; msgEl.style.color = 'var(--muted)'; }
+      btn.textContent = '⏳…';
 
       // Deduct tokens
       var newBalance = balance - tokensNeeded;
       var updateResp = await window.sottotitoliSupabase.from('user_tokens').update({ balance: newBalance, updated_at: new Date().toISOString() }).eq('user_id', userId);
-
       if (updateResp.error) {
         if (msgEl) { msgEl.textContent = 'Errore: ' + updateResp.error.message; msgEl.style.color = 'var(--danger)'; }
-        btn.disabled = false;
-        btn.style.opacity = '1';
-        return;
+        btn.disabled = false; btn.style.opacity = '1'; return;
       }
 
       // Log transaction
@@ -916,9 +926,83 @@ document.addEventListener("DOMContentLoaded", function() {
       var tokDisp = document.getElementById('tokenBalanceApp');
       if (tokDisp) tokDisp.textContent = newBalance + ' tok';
 
-      if (msgEl) { msgEl.textContent = '✅ Report ' + reportType + ' acquistato! Sarà elaborato a breve. (' + newBalance + ' token rimanenti)'; msgEl.style.color = 'var(--good)'; }
-      btn.textContent = '✅ Acquistato';
-      setTimeout(function(){ btn.textContent = btn.querySelector('.rb-name') ? btn.querySelector('.rb-name').textContent : reportType; btn.disabled = false; btn.style.opacity = '1'; }, 3000);
+      // Create AI report request
+      var moduleId = reportModuleMap[reportType] || 1;
+      var familyKey = reportFamilyMap[reportType] || reportType;
+      var reqResp = await window.sottotitoliSupabase.from('ai_report_requests').insert({
+        user_id: userId, family_key: familyKey, module_key: String(moduleId),
+        scope_type: 'session', session_ids: [sessionId],
+        status: 'pending', tokens_spent: tokensNeeded, billing_rule_applied: 'per_report'
+      }).select('id').single();
+
+      if (reqResp.error) {
+        if (msgEl) { msgEl.textContent = 'Errore richiesta: ' + reqResp.error.message; msgEl.style.color = 'var(--danger)'; }
+        btn.disabled = false; btn.style.opacity = '1'; return;
+      }
+
+      var requestId = reqResp.data.id;
+
+      // Trigger the edge function to process the report
+      try {
+        await fetch('https://qzqmuegbpmvqrjrlfbgk.supabase.co/functions/v1/process-ai-reports', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + sessionResp.data.session.access_token }
+        });
+      } catch(e) { /* Edge function call may fail silently; poll will still work */ }
+
+      // Show progress bar
+      if (progressEl) progressEl.style.display = 'block';
+      if (progressBar) progressBar.style.width = '10%';
+      if (progressLabel) progressLabel.textContent = 'Richiesta inviata…';
+      if (msgEl) { msgEl.textContent = ''; }
+
+      // Poll for results
+      var attempts = 0, maxAttempts = 20;
+      var pollInterval = setInterval(async function(){
+        attempts++;
+        var pct = Math.min(90, 10 + attempts * 4);
+        if (progressBar) progressBar.style.width = pct + '%';
+        if (progressLabel) progressLabel.textContent = 'Elaborazione… (' + attempts + 's)';
+
+        // Check for failure
+        var checkResp = await window.sottotitoliSupabase.from('ai_report_requests').select('status,error_message').eq('id', requestId).single();
+        if (checkResp.data?.status === 'failed') {
+          clearInterval(pollInterval);
+          if (progressEl) progressEl.style.display = 'none';
+          if (msgEl) { msgEl.textContent = '❌ Fallito: ' + (checkResp.data.error_message || 'errore'); msgEl.style.color = 'var(--danger)'; }
+          btn.disabled = false; btn.style.opacity = '1'; btn.textContent = 'Riprova'; return;
+        }
+
+        // Check for completed report
+        var reportResp = await window.sottotitoliSupabase.from('session_ai_reports').select('summary_text,overall_score').eq('session_id', sessionId).eq('user_id', userId).not('summary_text', 'is', null).order('created_at', {ascending:false}).limit(1).maybeSingle();
+
+        if (reportResp.data?.summary_text) {
+          clearInterval(pollInterval);
+          if (progressBar) progressBar.style.width = '100%';
+          if (progressLabel) progressLabel.textContent = '✅ Completato!';
+          setTimeout(function(){ if (progressEl) progressEl.style.display = 'none'; }, 2000);
+
+          var summary = reportResp.data.summary_text;
+          var score = reportResp.data.overall_score;
+          if (resultEl) {
+            resultEl.style.display = 'block';
+            resultEl.innerHTML = '<div style="background:rgba(22,163,74,.08);border:1px solid rgba(22,163,74,.2);border-radius:10px;padding:16px">' +
+              '<strong>✅ Report pronto!</strong>' + (score ? ' <span style="color:var(--muted)">Punteggio: ' + Number(score).toFixed(1) + '/10</span>' : '') +
+              '<p style="margin:8px 0 0;font-size:12px;color:var(--muted);max-height:120px;overflow-y:auto;white-space:pre-wrap">' + summary.substring(0, 400) + (summary.length>400?'…':'') + '</p>' +
+              '<a href="analysis.html" style="display:inline-block;margin-top:8px;font-size:12px;color:var(--accent);font-weight:600">📊 Vedi report completo →</a></div>';
+          }
+          btn.textContent = '✅ Fatto'; btn.style.opacity = '1';
+          setTimeout(function(){ btn.disabled = false; }, 3000);
+          return;
+        }
+
+        if (attempts >= maxAttempts) {
+          clearInterval(pollInterval);
+          if (progressEl) progressEl.style.display = 'none';
+          if (msgEl) { msgEl.textContent = '⏰ In elaborazione — lo troverai su Analysis tra poco.'; msgEl.style.color = 'var(--amber)'; }
+          btn.textContent = 'In coda'; btn.style.opacity = '1'; btn.disabled = false;
+        }
+      }, 3000);
     });
   });
 })();

@@ -49,14 +49,15 @@ serve(async (req) => {
         }
 
         // Get module details
+        const moduleId = parseInt(request.module_key || '1');
         const { data: module } = await supabase
           .from('ai_report_modules')
           .select('*')
-          .eq('id', request.module_id)
+          .eq('id', moduleId)
           .single();
 
         // Call OpenAI API
-        const prompt = getModulePrompt(request.module_id, session?.transcript_text);
+        const prompt = getModulePrompt(moduleId, session?.transcript_text);
         const aiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
           method: 'POST',
           headers: {
