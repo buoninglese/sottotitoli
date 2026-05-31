@@ -15,15 +15,26 @@ const PRICE_MAP: Record<string, { priceId: string; creditsSeconds: number; token
 };
 
 serve(async (req) => {
+  // Handle CORS preflight
+  if (req.method === 'OPTIONS') {
+    return new Response(null, {
+      headers: {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Methods': 'POST, OPTIONS',
+        'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+      }
+    });
+  }
+
   try {
-    if (req.method !== 'POST') return new Response('Method not allowed', { status: 405 });
+    if (req.method !== 'POST') return new Response('Method not allowed', { status: 405, headers: corsHeaders() });
 
     const body = await req.json();
     const { product, userId, email, successUrl, cancelUrl } = body;
     const productConfig = PRICE_MAP[product];
 
     if (!product || !productConfig?.priceId) {
-      return new Response(JSON.stringify({ error: 'Invalid product: ' + product }), { status: 400, headers: { 'Content-Type': 'application/json' } });
+      return new Response(JSON.stringify({ error: 'Invalid product: ' + product }), { status: 400, headers: corsHeaders() });
     }
 
     const stripeResp = await fetch('https://api.stripe.com/v1/checkout/sessions', {
@@ -45,9 +56,18 @@ serve(async (req) => {
     });
 
     const session = await stripeResp.json();
-    if (session.error) return new Response(JSON.stringify({ error: session.error.message }), { status: 400, headers: { 'Content-Type': 'application/json' } });
-    return new Response(JSON.stringify({ url: session.url }), { headers: { 'Content-Type': 'application/json' } });
+    if (session.error) return new Response(JSON.stringify({ error: session.error.message }), { status: 400, headers: corsHeaders() });
+    return new Response(JSON.stringify({ url: session.url }), { headers: corsHeaders() });
   } catch (err) {
-    return new Response(JSON.stringify({ error: err.message }), { status: 500, headers: { 'Content-Type': 'application/json' } });
+    return new Response(JSON.stringify({ error: err.message }), { status: 500, headers: corsHeaders() });
   }
 });
+
+function corsHeaders() {
+  return {
+    'Content-Type': 'application/json',
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+  };
+}
