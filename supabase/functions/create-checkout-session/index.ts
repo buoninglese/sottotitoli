@@ -8,8 +8,8 @@ const STRIPE_SECRET_KEY = Deno.env.get('STRIPE_SECRET_KEY')!;
 
 // Product → Price ID mapping (set in config.js + Stripe Dashboard)
 const PRICE_MAP: Record<string, { priceId: string; creditsSeconds: number; tokens: number }> = {
-  '2hours':   { priceId: Deno.env.get('STRIPE_PRICE_2HOURS') || '', creditsSeconds: 7200, tokens: 5 },
-  '20hours':  { priceId: Deno.env.get('STRIPE_PRICE_20HOURS') || '', creditsSeconds: 72000, tokens: 50 },
+  '2hours':   { priceId: 'price_1Tcwmm1xvn5NIk3eiKIus3c5', creditsSeconds: 7200, tokens: 5 },
+  '20hours':  { priceId: 'price_1TcwoX1xvn5NIk3eJuqF8V1j', creditsSeconds: 72000, tokens: 50 },
   '50hours':  { priceId: Deno.env.get('STRIPE_PRICE_50HOURS') || '', creditsSeconds: 180000, tokens: 150 },
   '90tokens': { priceId: Deno.env.get('STRIPE_PRICE_90TOKENS') || '', creditsSeconds: 0, tokens: 90 },
 };
