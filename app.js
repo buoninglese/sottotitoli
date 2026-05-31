@@ -727,6 +727,10 @@
             return;
           }
           setText("creditBalance", formatCredit(remaining));
+
+          // Load token balance too
+          var tokResp = await sessionSupabase.from('user_tokens').select('balance').eq('user_id', uid).maybeSingle();
+          setText("tokenBalanceApp", (tokResp.data?.balance ?? 0) + ' tok');
         }
       } catch(e) { /* non-critical */ }
     }

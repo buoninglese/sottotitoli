@@ -276,6 +276,7 @@
     <div class="page-hero-tag">Report AI</div>
     <h1>Analisi AI delle tue sessioni</h1>
     <p>Seleziona una sessione e scegli i moduli AI che vuoi eseguire. I report sono organizzati per famiglia: Cambridge, Business, Academic e Analisi Linguistica.</p>
+    <div style="margin-top:12px"><span style="display:inline-flex;align-items:center;gap:6px;padding:6px 16px;border-radius:100px;background:rgba(124,58,237,0.08);border:1px solid rgba(124,58,237,0.2);font-size:13px;font-weight:600;color:var(--text-primary))">🪙 <span id="tokenBalance">—</span></span></div>
   </div>
 </section>
 
@@ -587,16 +588,26 @@
     async function requestReport(moduleId) {
       if (!supabase || !currentSessionId || !moduleId || !userId) return;
       var mod = allModules.find(function(m) { return String(m.id) === String(moduleId); });
-      if (!mod) {
-        console.error('Module not found:', moduleId);
+      if (!mod) { console.error('Module not found:', moduleId); return; }
+
+      // Token cost by family
+      var tokenCost = { cambridge: 3, academic: 2, linguistic: 2, business: 1 };
+      var cost = tokenCost[mod.family] || 2;
+
+      // Check token balance
+      var tokenResp = await supabase.from('user_tokens').select('balance').eq('user_id', userId).maybeSingle();
+      var tokenBal = tokenResp.data?.balance ?? 0;
+      if (tokenBal < cost) {
+        alert('🪙 Non hai abbastanza token. Ti servono ' + cost + ' token per questo report. Ne hai ' + tokenBal + '. Acquista token su Studio → Marketplace.');
         return;
       }
+
       var btn      = el('mbtn-'    + moduleId);
       var regenBtn = el('mregen-'  + moduleId);
       var statusEl = el('mstatus-' + moduleId);
-      if (btn) { btn.disabled = true; btn.textContent = 'In coda...'; btn.classList.add('queued'); btn.classList.remove('done'); }
+      if (btn) { btn.disabled = true; btn.textContent = '🪙 -'+cost+' token...'; btn.classList.add('queued'); btn.classList.remove('done'); }
       if (regenBtn) regenBtn.classList.remove('visible');
-      if (statusEl) statusEl.textContent = 'Report in elaborazione - ricarica la pagina tra qualche secondo.';
+      if (statusEl) statusEl.textContent = 'Report in elaborazione...';
       var familyKey = mod.family || 'cambridge';
       var { error } = await supabase
         .from('ai_report_requests')
@@ -607,8 +618,27 @@
         if (statusEl) statusEl.textContent = 'Errore: ' + error.message;
         return;
       }
+
+      // Deduct tokens
+      var newBal = tokenBal - cost;
+      await supabase.from('user_tokens').update({ balance: newBal, updated_at: new Date().toISOString() }).eq('user_id', userId);
+      await supabase.from('token_transactions').insert({ user_id: userId, amount: -cost, type: 'report_usage', reference: currentSessionId + '_' + moduleId, balance_after: newBal });
+      updateTokenDisplay(newBal);
+
       existingReports[moduleId] = { module_id: moduleId, status: 'pending', created_at: new Date().toISOString() };
       setTimeout(pollReportStatus, 2000);
+    }
+
+    function updateTokenDisplay(bal) {
+      var el = document.getElementById('tokenBalance');
+      if (el) el.textContent = (bal ?? '—') + ' token';
+    }
+
+    // Load token balance on page load
+    async function loadTokenBalance() {
+      if (!supabase || !userId) return;
+      var { data } = await supabase.from('user_tokens').select('balance').eq('user_id', userId).maybeSingle();
+      updateTokenDisplay(data?.balance ?? 0);
     }
 
     async function pollReportStatus() {
@@ -655,6 +685,7 @@
         return;
       }
       userId = sessionData.session.user.id;
+      loadTokenBalance();
       var { data: modules } = await supabase
         .from('ai_report_modules')
         .select('id, label, description, family, default_rule')
