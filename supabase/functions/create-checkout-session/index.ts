@@ -6,45 +6,31 @@ import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 
 const STRIPE_SECRET_KEY = Deno.env.get('STRIPE_SECRET_KEY')!;
 
-// Map product keys to Stripe Price IDs — set these in your Stripe Dashboard
-// Go to: https://dashboard.stripe.com/products
-const PRICE_MAP: Record<string, string> = {
-  '5hours':   Deno.env.get('STRIPE_PRICE_5HOURS')   || '',
-  '20hours':  Deno.env.get('STRIPE_PRICE_20HOURS')  || '',
-  '50hours':  Deno.env.get('STRIPE_PRICE_50HOURS')  || '',
-  '90tokens': Deno.env.get('STRIPE_PRICE_90TOKENS') || '',
-  'studente': Deno.env.get('STRIPE_PRICE_BUNDLE_STUDENTE') || '',
-  'professionale': Deno.env.get('STRIPE_PRICE_BUNDLE_PROFESSIONALE') || '',
-  'completo': Deno.env.get('STRIPE_PRICE_BUNDLE_COMPLETO') || '',
+// Product → Price ID mapping (set in config.js + Stripe Dashboard)
+const PRICE_MAP: Record<string, { priceId: string; creditsSeconds: number; tokens: number }> = {
+  '2hours':   { priceId: Deno.env.get('STRIPE_PRICE_2HOURS') || '', creditsSeconds: 7200, tokens: 5 },
+  '20hours':  { priceId: Deno.env.get('STRIPE_PRICE_20HOURS') || '', creditsSeconds: 72000, tokens: 50 },
+  '50hours':  { priceId: Deno.env.get('STRIPE_PRICE_50HOURS') || '', creditsSeconds: 180000, tokens: 150 },
+  '90tokens': { priceId: Deno.env.get('STRIPE_PRICE_90TOKENS') || '', creditsSeconds: 0, tokens: 90 },
 };
 
 serve(async (req) => {
   try {
-    if (req.method !== 'POST') {
-      return new Response('Method not allowed', { status: 405 });
-    }
+    if (req.method !== 'POST') return new Response('Method not allowed', { status: 405 });
 
     const body = await req.json();
     const { product, userId, email, successUrl, cancelUrl } = body;
+    const productConfig = PRICE_MAP[product];
 
-    if (!product || !PRICE_MAP[product]) {
-      return new Response(
-        JSON.stringify({ error: 'Invalid product key: ' + product }),
-        { status: 400, headers: { 'Content-Type': 'application/json' } }
-      );
+    if (!product || !productConfig?.priceId) {
+      return new Response(JSON.stringify({ error: 'Invalid product: ' + product }), { status: 400, headers: { 'Content-Type': 'application/json' } });
     }
 
-    const priceId = PRICE_MAP[product];
-
-    // Create Stripe Checkout Session
     const stripeResp = await fetch('https://api.stripe.com/v1/checkout/sessions', {
       method: 'POST',
-      headers: {
-        'Authorization': 'Bearer ' + STRIPE_SECRET_KEY,
-        'Content-Type': 'application/x-www-form-urlencoded',
-      },
+      headers: { 'Authorization': 'Bearer ' + STRIPE_SECRET_KEY, 'Content-Type': 'application/x-www-form-urlencoded' },
       body: new URLSearchParams({
-        'line_items[0][price]': priceId,
+        'line_items[0][price]': productConfig.priceId,
         'line_items[0][quantity]': '1',
         'mode': 'payment',
         'success_url': successUrl || 'https://buoninglese.github.io/sottotitoli/app.html?payment=success',
@@ -53,27 +39,15 @@ serve(async (req) => {
         'client_reference_id': userId || '',
         'metadata[product]': product,
         'metadata[user_id]': userId || 'anonymous',
+        'metadata[credits_seconds]': String(productConfig.creditsSeconds),
+        'metadata[tokens]': String(productConfig.tokens),
       }).toString(),
     });
 
     const session = await stripeResp.json();
-
-    if (session.error) {
-      return new Response(
-        JSON.stringify({ error: session.error.message }),
-        { status: 400, headers: { 'Content-Type': 'application/json' } }
-      );
-    }
-
-    return new Response(
-      JSON.stringify({ url: session.url }),
-      { headers: { 'Content-Type': 'application/json' } }
-    );
-
+    if (session.error) return new Response(JSON.stringify({ error: session.error.message }), { status: 400, headers: { 'Content-Type': 'application/json' } });
+    return new Response(JSON.stringify({ url: session.url }), { headers: { 'Content-Type': 'application/json' } });
   } catch (err) {
-    return new Response(
-      JSON.stringify({ error: err.message }),
-      { status: 500, headers: { 'Content-Type': 'application/json' } }
-    );
+    return new Response(JSON.stringify({ error: err.message }), { status: 500, headers: { 'Content-Type': 'application/json' } });
   }
 });

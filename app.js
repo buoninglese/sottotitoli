@@ -700,15 +700,27 @@
   }
 
   async function startRecognition() {
-    // FIX #2: explicit unsupported-browser check with a user-visible message.
     if (!SpeechRecognition) {
-      setText(
-        "statusText",
-        "⚠️ Speech recognition is not supported in this browser. Please use Chrome or Edge."
-      );
-      const startBtn = $("startBtn");
-      if (startBtn) startBtn.disabled = true;
+      setText("statusText", "⚠️ Speech recognition is not supported. Use Chrome or Edge.");
+      var startBtn = $("startBtn"); if (startBtn) startBtn.disabled = true;
       return;
+    }
+
+    // ── Credit check ──
+    if (sessionSupabase) {
+      try {
+        var sessionResp = await sessionSupabase.auth.getSession();
+        if (sessionResp.data?.session?.user?.id) {
+          var uid = sessionResp.data.session.user.id;
+          var creditResp = await sessionSupabase.from('user_credits').select('balance_seconds').eq('user_id', uid).maybeSingle();
+          var remaining = creditResp.data?.balance_seconds ?? 900; // default 15min free
+          if (remaining <= 0) {
+            setText("statusText", "⏰ Nessun credito residuo. Acquista minuti su Studio → Marketplace.");
+            return;
+          }
+          setText("creditBalance", formatCredit(remaining));
+        }
+      } catch(e) { /* non-critical */ }
     }
 
     clearRestartTimer();
@@ -1197,6 +1209,14 @@
     return (text.match(/\?/g) || []).length;
   }
 
+  function formatCredit(seconds) {
+    if (!seconds || seconds <= 0) return '0m';
+    if (seconds < 3600) return Math.round(seconds / 60) + 'm';
+    var h = Math.floor(seconds / 3600);
+    var m = Math.round((seconds % 3600) / 60);
+    return m > 0 ? h + 'h ' + m + 'm' : h + 'h';
+  }
+
   function computeNegationCount(text) {
     if (!text) return 0;
     const negations = /\b(?:not|n't|never|no|nobody|nothing|nowhere)\b/gi;
@@ -1374,6 +1394,23 @@
 
       if (error) {
         console.error("Error updating session row:", error);
+      }
+
+      // ── Deduct credits ──
+      if (sessionSupabase && durationSeconds > 0) {
+        try {
+          var credResp = await sessionSupabase.from('user_credits').select('balance_seconds').eq('user_id', userId).maybeSingle();
+          if (credResp.data) {
+            var newBalance = Math.max(0, (credResp.data.balance_seconds || 0) - durationSeconds);
+            await sessionSupabase.from('user_credits').update({ balance_seconds: newBalance, updated_at: new Date().toISOString() }).eq('user_id', userId);
+            await sessionSupabase.from('credit_transactions').insert({
+              user_id: userId, amount_seconds: -durationSeconds, type: 'session_usage',
+              reference: currentSessionId, balance_after: newBalance
+            });
+            setText("creditBalance", formatCredit(newBalance));
+            if (newBalance < 300) setText("statusText", "⏰ Meno di 5 minuti rimanenti.");
+          }
+        } catch(e) { /* non-critical */ }
       }
     } catch (e) {
       console.error("Unexpected error updating session row:", e);

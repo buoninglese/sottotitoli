@@ -2,7 +2,8 @@
 -- SOTTOTITOLI — Complete Supabase Setup (safe to re-run, any number of times)
 -- ============================================================================
 
--- 1. TABLES (CREATE IF NOT EXISTS)
+-- 1. CORE TABLES
+-- ============================================================================
 CREATE TABLE IF NOT EXISTS newsletter_subscribers (
   id BIGSERIAL PRIMARY KEY, email TEXT NOT NULL UNIQUE, subscribed_at TIMESTAMPTZ DEFAULT now()
 );
@@ -39,14 +40,65 @@ CREATE TABLE IF NOT EXISTS session_ai_reports (
   model TEXT DEFAULT 'gpt-4o', created_at TIMESTAMPTZ DEFAULT now()
 );
 
--- 2. ENABLE RLS ON ALL TABLES (idempotent)
+-- 2. CREDIT & TOKEN SYSTEM
+-- ============================================================================
+
+-- Credit balances (seconds of usage time)
+CREATE TABLE IF NOT EXISTS user_credits (
+  id BIGSERIAL PRIMARY KEY,
+  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE UNIQUE,
+  balance_seconds INTEGER NOT NULL DEFAULT 900,  -- 15 min free on signup
+  lifetime_seconds INTEGER NOT NULL DEFAULT 0,   -- total ever purchased
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+-- Token balances (for AI reports)
+CREATE TABLE IF NOT EXISTS user_tokens (
+  id BIGSERIAL PRIMARY KEY,
+  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE UNIQUE,
+  balance INTEGER NOT NULL DEFAULT 3,            -- 3 free tokens on signup
+  lifetime_tokens INTEGER NOT NULL DEFAULT 0,     -- total ever purchased
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+-- Credit transaction log (every add/deduct)
+CREATE TABLE IF NOT EXISTS credit_transactions (
+  id BIGSERIAL PRIMARY KEY,
+  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+  amount_seconds INTEGER NOT NULL,               -- positive=credit, negative=debit
+  type TEXT NOT NULL CHECK (type IN ('purchase','signup_bonus','session_usage','refund','manual')),
+  reference TEXT,                                  -- Stripe session ID, session UUID, etc.
+  balance_after INTEGER NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+-- Token transaction log
+CREATE TABLE IF NOT EXISTS token_transactions (
+  id BIGSERIAL PRIMARY KEY,
+  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+  amount INTEGER NOT NULL,                        -- positive=credit, negative=debit
+  type TEXT NOT NULL CHECK (type IN ('purchase','signup_bonus','report_usage','refund','manual')),
+  reference TEXT,
+  balance_after INTEGER NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+-- 3. RLS
+-- ============================================================================
 ALTER TABLE newsletter_subscribers ENABLE ROW LEVEL SECURITY;
 ALTER TABLE user_preferences ENABLE ROW LEVEL SECURITY;
 ALTER TABLE ai_report_requests ENABLE ROW LEVEL SECURITY;
 ALTER TABLE session_ai_reports ENABLE ROW LEVEL SECURITY;
 ALTER TABLE sessions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE user_credits ENABLE ROW LEVEL SECURITY;
+ALTER TABLE user_tokens ENABLE ROW LEVEL SECURITY;
+ALTER TABLE credit_transactions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE token_transactions ENABLE ROW LEVEL SECURITY;
 
--- 3. POLICIES — drop and recreate (DROP IF EXISTS + CREATE)
+-- 4. POLICIES (error-proof DO blocks)
+-- ============================================================================
 DO $$ BEGIN DROP POLICY IF EXISTS "Allow public inserts" ON newsletter_subscribers; EXCEPTION WHEN others THEN null; END $$;
 DO $$ BEGIN CREATE POLICY "Allow public inserts" ON newsletter_subscribers FOR INSERT WITH CHECK (true); EXCEPTION WHEN others THEN null; END $$;
 DO $$ BEGIN DROP POLICY IF EXISTS "Allow authenticated select" ON newsletter_subscribers; EXCEPTION WHEN others THEN null; END $$;
@@ -74,7 +126,17 @@ DO $$ BEGIN CREATE POLICY "Users insert own sessions" ON sessions FOR INSERT WIT
 DO $$ BEGIN DROP POLICY IF EXISTS "Users update own sessions" ON sessions; EXCEPTION WHEN others THEN null; END $$;
 DO $$ BEGIN CREATE POLICY "Users update own sessions" ON sessions FOR UPDATE USING (auth.uid() = user_id); EXCEPTION WHEN others THEN null; END $$;
 
--- 4. AI REPORT MODULES (14 rows, skips existing IDs)
+DO $$ BEGIN DROP POLICY IF EXISTS "Users read own credits" ON user_credits; EXCEPTION WHEN others THEN null; END $$;
+DO $$ BEGIN CREATE POLICY "Users read own credits" ON user_credits FOR SELECT USING (auth.uid() = user_id); EXCEPTION WHEN others THEN null; END $$;
+DO $$ BEGIN DROP POLICY IF EXISTS "Users read own tokens" ON user_tokens; EXCEPTION WHEN others THEN null; END $$;
+DO $$ BEGIN CREATE POLICY "Users read own tokens" ON user_tokens FOR SELECT USING (auth.uid() = user_id); EXCEPTION WHEN others THEN null; END $$;
+DO $$ BEGIN DROP POLICY IF EXISTS "Users read own credit log" ON credit_transactions; EXCEPTION WHEN others THEN null; END $$;
+DO $$ BEGIN CREATE POLICY "Users read own credit log" ON credit_transactions FOR SELECT USING (auth.uid() = user_id); EXCEPTION WHEN others THEN null; END $$;
+DO $$ BEGIN DROP POLICY IF EXISTS "Users read own token log" ON token_transactions; EXCEPTION WHEN others THEN null; END $$;
+DO $$ BEGIN CREATE POLICY "Users read own token log" ON token_transactions FOR SELECT USING (auth.uid() = user_id); EXCEPTION WHEN others THEN null; END $$;
+
+-- 5. AI REPORT MODULES (14 rows, skips existing IDs)
+-- ============================================================================
 INSERT INTO ai_report_modules (id, label, description, family, default_rule) VALUES
 (1,'Grammar & Accuracy','Grammar for Cambridge B1-C2','cambridge','Complex structures, verb tenses, errors.'),
 (2,'Vocabulary Range','Lexical resource for Cambridge','cambridge','Range, collocations, idioms, topic deployment.'),
@@ -92,7 +154,8 @@ INSERT INTO ai_report_modules (id, label, description, family, default_rule) VAL
 (14,'Filler Analysis','Fillers and disfluency','linguistic','Filler distribution, false starts, self-repairs.')
 ON CONFLICT (id) DO NOTHING;
 
--- 5. MIGRATIONS — add missing columns (safe)
+-- 6. MIGRATIONS
+-- ============================================================================
 ALTER TABLE sessions ADD COLUMN IF NOT EXISTS ngsl_coverage NUMERIC(4,3);
 ALTER TABLE sessions ADD COLUMN IF NOT EXISTS unique_words_count INTEGER;
 ALTER TABLE sessions ADD COLUMN IF NOT EXISTS question_count INTEGER DEFAULT 0;
@@ -102,10 +165,15 @@ ALTER TABLE sessions ADD COLUMN IF NOT EXISTS turn_count INTEGER DEFAULT 0;
 ALTER TABLE sessions ADD COLUMN IF NOT EXISTS interruption_count INTEGER;
 ALTER TABLE sessions ADD COLUMN IF NOT EXISTS speaking_share_ratio NUMERIC(4,3);
 
--- 6. VERIFY
-SELECT '✅ newsletter_subscribers' FROM pg_tables WHERE tablename='newsletter_subscribers'
-UNION ALL SELECT '✅ user_preferences' FROM pg_tables WHERE tablename='user_preferences'
-UNION ALL SELECT '✅ ai_report_modules ('||(SELECT COUNT(*) FROM ai_report_modules)||' rows)' FROM pg_tables WHERE tablename='ai_report_modules'
-UNION ALL SELECT '✅ ai_report_requests' FROM pg_tables WHERE tablename='ai_report_requests'
-UNION ALL SELECT '✅ session_ai_reports' FROM pg_tables WHERE tablename='session_ai_reports'
-UNION ALL SELECT '✅ sessions' FROM pg_tables WHERE tablename='sessions';
+-- 7. VERIFY
+-- ============================================================================
+SELECT 'newsletter_subscribers' AS tbl FROM pg_tables WHERE tablename='newsletter_subscribers'
+UNION ALL SELECT 'user_preferences' FROM pg_tables WHERE tablename='user_preferences'
+UNION ALL SELECT 'ai_report_modules ('||(SELECT COUNT(*) FROM ai_report_modules)||' rows)' FROM pg_tables WHERE tablename='ai_report_modules'
+UNION ALL SELECT 'ai_report_requests' FROM pg_tables WHERE tablename='ai_report_requests'
+UNION ALL SELECT 'session_ai_reports' FROM pg_tables WHERE tablename='session_ai_reports'
+UNION ALL SELECT 'sessions' FROM pg_tables WHERE tablename='sessions'
+UNION ALL SELECT 'user_credits' FROM pg_tables WHERE tablename='user_credits'
+UNION ALL SELECT 'user_tokens' FROM pg_tables WHERE tablename='user_tokens'
+UNION ALL SELECT 'credit_transactions' FROM pg_tables WHERE tablename='credit_transactions'
+UNION ALL SELECT 'token_transactions' FROM pg_tables WHERE tablename='token_transactions';
