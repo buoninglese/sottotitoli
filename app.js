@@ -737,6 +737,13 @@
           setText("creditBalance", formatCredit(remaining));
           setText("minuteCounter", "0m usati");
 
+          // Show credit warning if low
+          var creditWarn = $("creditWarn");
+          if (creditWarn) {
+            if (remaining < 300 && remaining > 0) creditWarn.classList.add('visible');
+            else creditWarn.classList.remove('visible');
+          }
+
           // Load token balance too
           var tokResp = await sessionSupabase.from('user_tokens').select('balance').eq('user_id', uid).maybeSingle();
           setText("tokenBalanceApp", (tokResp.data?.balance ?? 0) + ' tok');
@@ -751,6 +758,8 @@
     hasStartedOnce = false;
     lastFinalSent = "";
     transcriptLines = [];
+
+    setSessionUI('starting');
 
     if (!recognition) recognition = buildRecognition();
 
@@ -789,10 +798,50 @@
     updateMicState("stopped", false);
     setText("statusText", "Saving session...");
     await finalizeSessionRow();
+    setSessionUI('complete');
     setText("statusText", "Recognition stopped by user.");
   }
 
-  // ── Safari Deepgram fallback (MediaRecorder → WebSocket → relay → Deepgram) ──
+  // ── Session UI state management ──
+  var sessionActive = false;
+
+  function setSessionUI(state) {
+    var startBtn = $("startBtn");
+    var stopBtn = $("stopBtn");
+    var completePanel = $("sessionComplete");
+    var creditWarn = $("creditWarn");
+
+    if (state === 'starting') {
+      sessionActive = true;
+      if (startBtn) { startBtn.classList.add('recording'); startBtn.textContent = '🎤 Recording…'; startBtn.disabled = true; }
+      if (stopBtn) { stopBtn.disabled = false; stopBtn.textContent = '⏹ Stop Session'; }
+      if (completePanel) completePanel.classList.remove('visible');
+      if (creditWarn) creditWarn.classList.remove('visible');
+      setText("statusText", "Session started.");
+    } else if (state === 'stopped') {
+      sessionActive = false;
+      if (startBtn) { startBtn.classList.remove('recording'); startBtn.textContent = '🎤 Start Session'; startBtn.disabled = false; }
+      if (stopBtn) { stopBtn.disabled = true; stopBtn.textContent = '⏹ Stop'; }
+    } else if (state === 'complete') {
+      sessionActive = false;
+      if (startBtn) { startBtn.classList.remove('recording'); startBtn.textContent = '🎤 Start Session'; startBtn.disabled = false; }
+      if (stopBtn) { stopBtn.disabled = true; stopBtn.textContent = '⏹ Stop'; }
+      // Show completion panel
+      if (completePanel) {
+        var plain = transcriptLines.map(function(x){ return x.text; }).join(" ").trim();
+        var wc = w.SottotitoliSessionUtils.countWords(plain);
+        var durationMin = currentSessionStart ? Math.round((Date.now() - currentSessionStart.getTime()) / 60000) : 0;
+        var cefr = $("cefrLevel") ? $("cefrLevel").textContent : '—';
+        var quality = $("liveQuality") ? $("liveQuality").textContent : '—';
+        setText("sumDuration", (durationMin > 0 ? durationMin + 'm' : '—'));
+        setText("sumWords", String(wc));
+        setText("sumCefr", cefr);
+        setText("sumQuality", quality);
+        completePanel.classList.add('visible');
+        completePanel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      }
+    }
+  }
 
   var safariMediaRecorder = null;
   var safariAudioStream = null;
@@ -822,6 +871,12 @@
           }
           setText("creditBalance", formatCredit(remaining));
           setText("minuteCounter", "0m usati");
+          // Show credit warning if low
+          var creditWarn2 = $("creditWarn");
+          if (creditWarn2) {
+            if (remaining < 300 && remaining > 0) creditWarn2.classList.add('visible');
+            else creditWarn2.classList.remove('visible');
+          }
           var tokResp = await sessionSupabase.from('user_tokens').select('balance').eq('user_id', uid).maybeSingle();
           setText("tokenBalanceApp", (tokResp.data?.balance ?? 0) + ' tok');
         }
@@ -854,6 +909,8 @@
     hasStartedOnce = false;
     lastFinalSent = "";
     transcriptLines = [];
+
+    setSessionUI('starting');
 
     // Tell relay to open Deepgram
     var lang = (modeConfig && modeConfig.sourceLang) || "en-US";

@@ -106,6 +106,46 @@ body {
 /* ── Buttons row ── */
 .action-row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
 
+/* ── Prominent session buttons ── */
+.start-btn, .stop-btn {
+  font-family: inherit; font-size: 15px; font-weight: 700; padding: 14px 32px;
+  border-radius: 14px; border: none; cursor: pointer; transition: all .2s;
+  display: inline-flex; align-items: center; gap: 8px; letter-spacing: -.2px;
+}
+.start-btn { background: var(--good); color: #fff; box-shadow: 0 4px 14px rgba(22,163,74,.35); }
+.start-btn:hover { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(22,163,74,.45); }
+.start-btn:disabled { background: var(--gauge-bg); color: var(--muted2); box-shadow: none; cursor: not-allowed; transform: none; }
+.stop-btn { background: var(--danger); color: #fff; box-shadow: 0 4px 14px rgba(220,38,38,.35); }
+.stop-btn:hover { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(220,38,38,.45); }
+.stop-btn:disabled { background: var(--gauge-bg); color: var(--muted2); box-shadow: none; cursor: not-allowed; transform: none; }
+.start-btn.recording { background: var(--danger); animation: pulse-rec 1.8s ease-in-out infinite; }
+@keyframes pulse-rec { 0%,100% { box-shadow: 0 0 0 0 rgba(220,38,38,.4); } 50% { box-shadow: 0 0 0 12px rgba(220,38,38,0); } }
+
+/* ── Session complete panel ── */
+.session-complete { display: none; background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 24px; margin-top: 16px; animation: fadeIn .35s; }
+.session-complete.visible { display: block; }
+@keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+.session-complete h3 { font-size: 20px; font-weight: 700; margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
+.session-complete .summary-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 10px; margin-bottom: 20px; }
+@media(max-width:600px){ .session-complete .summary-grid { grid-template-columns: repeat(2,1fr); } }
+.session-complete .sum-item { background: var(--bg2); border-radius: 10px; padding: 12px; text-align: center; }
+.session-complete .sum-item .sv { font-size: 24px; font-weight: 800; letter-spacing: -.5px; }
+.session-complete .sum-item .sl { font-size: 11px; color: var(--muted2); text-transform: uppercase; letter-spacing: .08em; margin-top: 2px; }
+.report-buy-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 10px; margin-bottom: 16px; }
+@media(max-width:700px){ .report-buy-grid { grid-template-columns: repeat(2,1fr); } }
+.report-buy-btn { font-family: inherit; font-size: 13px; font-weight: 600; padding: 14px 12px; border-radius: 12px; border: 1px solid var(--line); background: var(--card); color: var(--text); cursor: pointer; transition: all .15s; text-align: center; display: flex; flex-direction: column; align-items: center; gap: 6px; }
+.report-buy-btn:hover { border-color: var(--accent); background: var(--glow); }
+.report-buy-btn .rb-icon { font-size: 24px; }
+.report-buy-btn .rb-name { font-size: 12px; font-weight: 700; }
+.report-buy-btn .rb-cost { font-size: 11px; color: var(--muted2); }
+.report-buy-btn:disabled { opacity: .4; cursor: not-allowed; }
+.new-session-row { display: flex; gap: 10px; align-items: center; justify-content: center; padding-top: 16px; border-top: 1px solid var(--line); }
+.new-session-btn { font-family: inherit; font-size: 14px; font-weight: 600; padding: 12px 28px; border-radius: 100px; border: 1px solid var(--line); background: var(--card); color: var(--text); cursor: pointer; transition: all .15s; }
+.new-session-btn:hover { border-color: var(--accent); color: var(--accent); }
+.credit-warn { background: rgba(217,119,6,.1); border: 1px solid rgba(217,119,6,.3); border-radius: 10px; padding: 10px 16px; margin-bottom: 12px; font-size: 13px; color: var(--amber); display: none; }
+.credit-warn.visible { display: flex; align-items: center; gap: 8px; }
+.credit-warn a { color: var(--amber); font-weight: 600; }
+
 /* ═══════════════════════════════════════ */
 /* 🧒 KIDS LAYOUT — playful & simplified  */
 /* ═══════════════════════════════════════ */
@@ -315,12 +355,45 @@ body {
         <div class="t-label">🌐 Traduzione live</div>
         <div id="captionTranslated"></div>
       </div>
+      <div class="credit-warn" id="creditWarn">
+        ⚠️ Meno di 5 minuti rimanenti. <a href="studio.html" target="_blank">Acquista minuti →</a>
+      </div>
       <div class="action-row">
-        <button class="t-btn primary" id="startBtn">🎤 Start</button>
-        <button class="t-btn danger" id="stopBtn">⏹ Stop</button>
+        <button class="start-btn" id="startBtn">🎤 Start Session</button>
+        <button class="stop-btn" id="stopBtn" disabled>⏹ Stop</button>
         <button class="t-btn" id="openOverlayBtn">🖥 Overlay</button>
         <button class="t-btn" id="copyOverlayBtn">📋 Copy link</button>
         <button class="t-btn" id="newRoomBtn">🔄 New room</button>
+      </div>
+
+      <!-- Session complete panel (hidden until stop) -->
+      <div class="session-complete" id="sessionComplete">
+        <h3>✅ Sessione completata</h3>
+        <div class="summary-grid">
+          <div class="sum-item"><div class="sv" id="sumDuration">—</div><div class="sl">Durata</div></div>
+          <div class="sum-item"><div class="sv" id="sumWords">—</div><div class="sl">Parole</div></div>
+          <div class="sum-item"><div class="sv" id="sumCefr">—</div><div class="sl">Livello CEFR</div></div>
+          <div class="sum-item"><div class="sv" id="sumQuality">—</div><div class="sl">Qualità</div></div>
+        </div>
+        <p style="font-size:13px;color:var(--muted);margin-bottom:16px">Analizza questa sessione con un report AI:</p>
+        <div class="report-buy-grid">
+          <button class="report-buy-btn" data-report="cambridge" data-tokens="3">
+            <span class="rb-icon">🎓</span><span class="rb-name">Cambridge</span><span class="rb-cost">3 token</span>
+          </button>
+          <button class="report-buy-btn" data-report="academic" data-tokens="2">
+            <span class="rb-icon">📚</span><span class="rb-name">Academic</span><span class="rb-cost">2 token</span>
+          </button>
+          <button class="report-buy-btn" data-report="linguistic" data-tokens="2">
+            <span class="rb-icon">📖</span><span class="rb-name">Linguistic</span><span class="rb-cost">2 token</span>
+          </button>
+          <button class="report-buy-btn" data-report="business" data-tokens="1">
+            <span class="rb-icon">💼</span><span class="rb-name">Business</span><span class="rb-cost">1 token</span>
+          </button>
+        </div>
+        <p style="font-size:11px;color:var(--muted2);text-align:center;margin-bottom:16px" id="reportBuyMsg"></p>
+        <div class="new-session-row">
+          <button class="new-session-btn" id="newSessionBtn">🔄 Nuova sessione</button>
+        </div>
       </div>
     </main>
 
@@ -747,6 +820,102 @@ document.addEventListener("DOMContentLoaded", function() {
   });
   observer.observe(overlayLink, { attributes: true, attributeFilter: ["href"] });
 });
+</script>
+
+<script>
+// ── Session completion + report purchases ──
+(function(){
+  'use strict';
+
+  // New session confirmation
+  var newBtn = document.getElementById('newSessionBtn');
+  if (newBtn) {
+    newBtn.addEventListener('click', function(){
+      if (confirm('Iniziare una nuova sessione? Il transcript corrente sarà cancellato.')) {
+        var completePanel = document.getElementById('sessionComplete');
+        if (completePanel) completePanel.classList.remove('visible');
+        var transcriptEl = document.getElementById('captionTranscript');
+        var translEl = document.getElementById('captionTranslated');
+        var bubblesEl = document.getElementById('cefrBubbles');
+        if (transcriptEl) transcriptEl.innerHTML = '';
+        if (translEl) translEl.innerHTML = '';
+        if (bubblesEl) bubblesEl.innerHTML = '<span style="font-size:12px;color:var(--muted2)">Avvia il microfono…</span>';
+        // Reset stats display
+        ['statLines','statWords','statChars','liveWpm','liveWords','liveSentences','liveLexDiv','liveFillers','liveNgsl','liveQuality','liveVerbCount','liveNounCount','liveAdjCount','liveQuestions','cefrLevel','cefrGauge','reportQuality','reportWpm','reportFillers'].forEach(function(id){
+          var el = document.getElementById(id);
+          if (el) { el.textContent = id === 'cefrGauge' ? '' : (el.tagName === 'DIV' ? '' : '—'); }
+        });
+      }
+    });
+  }
+
+  // Direct report purchase buttons
+  document.querySelectorAll('.report-buy-btn').forEach(function(btn){
+    btn.addEventListener('click', async function(){
+      var reportType = btn.dataset.report;
+      var tokensNeeded = parseInt(btn.dataset.tokens);
+      var msgEl = document.getElementById('reportBuyMsg');
+      
+      if (!window.sottotitoliSupabase) {
+        if (msgEl) { msgEl.textContent = 'Accedi per acquistare report.'; msgEl.style.color = 'var(--warn)'; }
+        return;
+      }
+
+      var session = await window.sottotitoliSupabase.auth.getSession();
+      if (!session.data?.session) {
+        if (msgEl) { msgEl.textContent = 'Accedi per acquistare report.'; msgEl.style.color = 'var(--warn)'; }
+        return;
+      }
+
+      var userId = session.data.session.user.id;
+
+      // Check token balance
+      var tokResp = await window.sottotitoliSupabase.from('user_tokens').select('balance').eq('user_id', userId).maybeSingle();
+      var balance = tokResp.data?.balance ?? 0;
+      if (balance < tokensNeeded) {
+        if (msgEl) { msgEl.textContent = 'Token insufficienti. Ne hai ' + balance + ', servono ' + tokensNeeded + '. Acquista token su Studio.'; msgEl.style.color = 'var(--danger)'; }
+        return;
+      }
+
+      // Get transcript text
+      var transcriptEl = document.getElementById('captionTranscript');
+      var transcript = transcriptEl ? transcriptEl.textContent.trim() : '';
+      if (!transcript) {
+        if (msgEl) { msgEl.textContent = 'Nessun transcript disponibile.'; msgEl.style.color = 'var(--warn)'; }
+        return;
+      }
+
+      btn.disabled = true;
+      btn.style.opacity = '0.5';
+      if (msgEl) { msgEl.textContent = 'Acquisto in corso…'; msgEl.style.color = 'var(--muted)'; }
+
+      // Deduct tokens
+      var newBalance = balance - tokensNeeded;
+      var updateResp = await window.sottotitoliSupabase.from('user_tokens').update({ balance: newBalance, updated_at: new Date().toISOString() }).eq('user_id', userId);
+
+      if (updateResp.error) {
+        if (msgEl) { msgEl.textContent = 'Errore: ' + updateResp.error.message; msgEl.style.color = 'var(--danger)'; }
+        btn.disabled = false;
+        btn.style.opacity = '1';
+        return;
+      }
+
+      // Log transaction
+      await window.sottotitoliSupabase.from('token_transactions').insert({
+        user_id: userId, amount: -tokensNeeded, type: 'report_purchase',
+        reference: reportType, balance_after: newBalance
+      });
+
+      // Update token display
+      var tokDisp = document.getElementById('tokenBalanceApp');
+      if (tokDisp) tokDisp.textContent = newBalance + ' tok';
+
+      if (msgEl) { msgEl.textContent = '✅ Report ' + reportType + ' acquistato! Sarà elaborato a breve. (' + newBalance + ' token rimanenti)'; msgEl.style.color = 'var(--good)'; }
+      btn.textContent = '✅ Acquistato';
+      setTimeout(function(){ btn.textContent = btn.querySelector('.rb-name') ? btn.querySelector('.rb-name').textContent : reportType; btn.disabled = false; btn.style.opacity = '1'; }, 3000);
+    });
+  });
+})();
 </script>
 </body>
 </html>
