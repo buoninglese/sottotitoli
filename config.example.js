@@ -65,5 +65,23 @@ window.SOTTOTITOLI_CONFIG = {
       translate: false,
       lessonMode: true
     }
+  },
+
+  /** Stripe payment integration */
+  stripe: {
+    /** Your Stripe publishable key (pk_test_... for testing, pk_live_... for production) */
+    publishableKey: "pk_test_YOUR_STRIPE_PUBLISHABLE_KEY",
+    /** Supabase Edge Function URL for creating Checkout Sessions */
+    checkoutFunctionUrl: null,
+    /** Stripe Price IDs — create these in your Stripe Dashboard */
+    prices: {
+      "5hours":   "price_xxxxxxxxxxxxx",
+      "20hours":  "price_xxxxxxxxxxxxx",
+      "50hours":  "price_xxxxxxxxxxxxx",
+      "90tokens": "price_xxxxxxxxxxxxx",
+      "studente": "price_xxxxxxxxxxxxx",
+      "professionale": "price_xxxxxxxxxxxxx",
+      "completo": "price_xxxxxxxxxxxxx"
+    }
   }
 };

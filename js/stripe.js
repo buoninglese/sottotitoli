@@ -1,26 +1,15 @@
 // js/stripe.js — Stripe payment integration
 // Uses Stripe Checkout (hosted payment page) via Supabase Edge Function
+// Configuration in config.js → window.SOTTOTITOLI_CONFIG.stripe
 
 (function(w){
   'use strict';
 
-  // Your Stripe publishable key — replace with your own from https://dashboard.stripe.com/apikeys
-  // This is safe to expose in client-side code
-  var STRIPE_PUBLISHABLE_KEY = 'pk_live_xxxxxxxxxxxxxxxxxxxxxxxx';
-  // For testing, use: 'pk_test_xxxxxxxxxxxxxxxxxxxxxxxx'
+  var cfg = (w.SOTTOTITOLI_CONFIG && w.SOTTOTITOLI_CONFIG.stripe) || {};
 
-  // Price IDs from your Stripe Dashboard (Products → select product → Pricing)
-  // Format: price_xxxxxxxxxxxxxxxxxxxxxxxxx
-  var PRICES = {
-    '5hours':   null, // ~5 €  — 5 hours + 10 tokens
-    '20hours':  null, // ~15 € — 20 hours + 50 tokens
-    '50hours':  null, // ~30 € — 50 hours + 150 tokens
-    '90tokens': null  // ~10 € — 90 tokens only
-  };
-
-  // Supabase Edge Function URL that creates Stripe Checkout Sessions
-  // Deploy: supabase/functions/create-checkout-session/
-  var CHECKOUT_FUNCTION_URL = null; // Set to your Supabase Edge Function URL
+  var STRIPE_PUBLISHABLE_KEY = cfg.publishableKey || 'pk_test_placeholder';
+  var CHECKOUT_FUNCTION_URL = cfg.checkoutFunctionUrl || null;
+  var PRICES = cfg.prices || {};
 
   var stripePromise = null;
 
