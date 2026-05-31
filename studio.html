@@ -775,10 +775,8 @@
     var tabBar = document.getElementById('tabBar');
     if (!loggedOut || !sectionHead) return;
 
-    var supabase = window.sottotitoliSupabase;
     function applyState(isLoggedIn) {
       if (isLoggedIn) {
-        // Logged in: hide hero text+buttons, show tabs as main content
         if (loggedOut) loggedOut.style.display = 'none';
         if (loggedIn) loggedIn.style.display = 'none';
         if (heroTitle) heroTitle.style.display = 'none';
@@ -786,25 +784,32 @@
         if (hero) hero.style.minHeight = 'auto';
         if (sectionHead) sectionHead.style.display = 'block';
         if (tabBar) tabBar.style.display = 'flex';
+        // Show tab panels
+        document.querySelectorAll('.tab-panel').forEach(function(p){ p.style.display = ''; });
+        // Show first tab
+        var firstTab = document.querySelector('.tab-panel.active');
+        if (!firstTab) { var p = document.querySelector('.tab-panel'); if (p) p.classList.add('active'); }
       } else {
-        // Logged out: ONLY hero with sign-in CTA
         if (loggedOut) loggedOut.style.display = 'block';
         if (heroTitle) heroTitle.style.display = 'block';
         if (heroSub) heroSub.style.display = 'block';
         if (hero) hero.style.minHeight = '100vh';
         if (sectionHead) sectionHead.style.display = 'none';
         if (tabBar) tabBar.style.display = 'none';
-        // Hide all tab panels
         document.querySelectorAll('.tab-panel').forEach(function(p){ p.style.display = 'none'; });
       }
     }
 
-    if (supabase) {
-      supabase.auth.getSession().then(function(r){ applyState(!!r.data?.session); });
-      supabase.auth.onAuthStateChange(function(event,session){ applyState(!!session); });
-    } else {
-      applyState(false);
+    function tryDetect() {
+      var supabase = window.sottotitoliSupabase;
+      if (!supabase) { setTimeout(tryDetect, 200); return; }
+      supabase.auth.getSession().then(function(r){
+        applyState(!!r.data?.session);
+        // Also listen for changes
+        supabase.auth.onAuthStateChange(function(event,session){ applyState(!!session); });
+      }).catch(function(){ applyState(false); });
     }
+    tryDetect();
   })();
   (function(){
     var tabBar = document.getElementById('tabBar');
