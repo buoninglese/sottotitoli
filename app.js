@@ -713,7 +713,15 @@
         if (sessionResp.data?.session?.user?.id) {
           var uid = sessionResp.data.session.user.id;
           var creditResp = await sessionSupabase.from('user_credits').select('balance_seconds').eq('user_id', uid).maybeSingle();
-          var remaining = creditResp.data?.balance_seconds ?? 900; // default 15min free
+          var remaining;
+          if (!creditResp.data) {
+            // First-time user — create credit row with 15min free
+            remaining = 900;
+            await sessionSupabase.from('user_credits').insert({ user_id: uid, balance_seconds: 900, lifetime_seconds: 0 });
+            await sessionSupabase.from('credit_transactions').insert({ user_id: uid, amount_seconds: 900, type: 'signup_bonus', reference: 'signup', balance_after: 900 });
+          } else {
+            remaining = creditResp.data.balance_seconds;
+          }
           if (remaining <= 0) {
             setText("statusText", "⏰ Nessun credito residuo. Acquista minuti su Studio → Marketplace.");
             return;
@@ -1400,16 +1408,20 @@
       if (sessionSupabase && durationSeconds > 0) {
         try {
           var credResp = await sessionSupabase.from('user_credits').select('balance_seconds').eq('user_id', userId).maybeSingle();
-          if (credResp.data) {
-            var newBalance = Math.max(0, (credResp.data.balance_seconds || 0) - durationSeconds);
-            await sessionSupabase.from('user_credits').update({ balance_seconds: newBalance, updated_at: new Date().toISOString() }).eq('user_id', userId);
-            await sessionSupabase.from('credit_transactions').insert({
-              user_id: userId, amount_seconds: -durationSeconds, type: 'session_usage',
-              reference: currentSessionId, balance_after: newBalance
-            });
-            setText("creditBalance", formatCredit(newBalance));
-            if (newBalance < 300) setText("statusText", "⏰ Meno di 5 minuti rimanenti.");
+          var curBalance = credResp.data?.balance_seconds ?? 0;
+          // If no row exists, create one with signup bonus first
+          if (!credResp.data) {
+            curBalance = 900;
+            await sessionSupabase.from('user_credits').insert({ user_id: userId, balance_seconds: 900, lifetime_seconds: 0 });
           }
+          var newBalance = Math.max(0, curBalance - durationSeconds);
+          await sessionSupabase.from('user_credits').update({ balance_seconds: newBalance, updated_at: new Date().toISOString() }).eq('user_id', userId);
+          await sessionSupabase.from('credit_transactions').insert({
+            user_id: userId, amount_seconds: -durationSeconds, type: 'session_usage',
+            reference: currentSessionId, balance_after: newBalance
+          });
+          setText("creditBalance", formatCredit(newBalance));
+          if (newBalance < 300 && newBalance > 0) setText("statusText", "⏰ Meno di 5 minuti rimanenti.");
         } catch(e) { /* non-critical */ }
       }
     } catch (e) {

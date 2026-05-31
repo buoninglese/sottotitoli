@@ -40,6 +40,13 @@ serve(async (req) => {
       return new Response(JSON.stringify({ skipped: true, reason: 'no user' }), { headers: { 'Content-Type': 'application/json' } });
     }
 
+    // Idempotency check — don't process the same Stripe session twice
+    const { data: existingTx } = await supabase.from('credit_transactions').select('id').eq('reference', stripeSessionId).maybeSingle();
+    if (existingTx) {
+      console.log('Duplicate webhook — already processed session ' + stripeSessionId);
+      return new Response(JSON.stringify({ skipped: true, reason: 'duplicate' }), { headers: { 'Content-Type': 'application/json' } });
+    }
+
     // Grant credits
     if (creditsSeconds > 0) {
       // Upsert user_credits
