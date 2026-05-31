@@ -49,34 +49,32 @@ CREATE TABLE IF NOT EXISTS ai_report_modules (
   created_at TIMESTAMPTZ DEFAULT now()
 );
 
--- Clear and re-insert to ensure correct IDs
-TRUNCATE ai_report_modules RESTART IDENTITY CASCADE;
+-- Insert all 14 modules with explicit IDs (safe to re-run — skips existing)
+INSERT INTO ai_report_modules (id, label, description, family, default_rule) VALUES
 
--- Cambridge (IDs 1-4)
-INSERT INTO ai_report_modules (label, description, family, default_rule) VALUES
-('Grammar & Accuracy', 'Analyze grammatical structures, verb tenses, and accuracy for Cambridge English exams (B1-C2)', 'cambridge', 'Evaluate grammatical range and accuracy. Identify complex structures, verb tense variety, common errors with corrections, and Cambridge-aligned suggestions.'),
-('Vocabulary Range', 'Assess lexical resource, collocations, and topic-specific vocabulary for Cambridge standards', 'cambridge', 'Analyze vocabulary: range (basic→advanced), collocations, idioms, topic-specific deployment, repetition patterns, expansion recommendations for Cambridge exams.'),
-('Fluency & Coherence', 'Evaluate speaking flow, hesitations, and logical organization for Cambridge speaking tests', 'cambridge', 'Examine fluency: speech flow, discourse markers, logical organization, hesitations, self-corrections, overall coherence. Provide Cambridge band descriptor alignment.'),
-('Pronunciation', 'Assessment of pronunciation features relevant to Cambridge speaking criteria', 'cambridge', 'Evaluate: individual sounds, word stress, sentence intonation, connected speech, intelligibility. Note: based on transcription patterns.');
+-- Cambridge (1-4)
+(1, 'Grammar & Accuracy', 'Analyze grammatical structures, verb tenses, and accuracy for Cambridge English exams (B1-C2)', 'cambridge', 'Evaluate grammatical range and accuracy. Identify complex structures, verb tense variety, common errors with corrections, and Cambridge-aligned suggestions.'),
+(2, 'Vocabulary Range', 'Assess lexical resource, collocations, and topic-specific vocabulary for Cambridge standards', 'cambridge', 'Analyze vocabulary: range (basic→advanced), collocations, idioms, topic-specific deployment, repetition patterns, expansion recommendations for Cambridge exams.'),
+(3, 'Fluency & Coherence', 'Evaluate speaking flow, hesitations, and logical organization for Cambridge speaking tests', 'cambridge', 'Examine fluency: speech flow, discourse markers, logical organization, hesitations, self-corrections, overall coherence. Provide Cambridge band descriptor alignment.'),
+(4, 'Pronunciation', 'Assessment of pronunciation features relevant to Cambridge speaking criteria', 'cambridge', 'Evaluate: individual sounds, word stress, sentence intonation, connected speech, intelligibility. Note: based on transcription patterns.'),
 
--- Business (IDs 5-7)
-INSERT INTO ai_report_modules (label, description, family, default_rule) VALUES
-('Professional Communication', 'Evaluate business communication: formality, clarity, professional tone', 'business', 'Analyze: register appropriateness, professional tone, business vocabulary, formal/informal balance, suitability for business contexts.'),
-('Meetings & Presentations', 'Assessment of skills for business meetings, presentations, and negotiations', 'business', 'Evaluate: opening/closing, turn-taking, persuasion, question handling, signposting language. Provide actionable business tips.'),
-('Business Vocabulary', 'Analysis of industry-specific terminology and business idioms', 'business', 'Review: industry terminology, business idioms, financial/commercial language, formal vs informal register, professional lexicon suggestions.');
+-- Business (5-7)
+(5, 'Professional Communication', 'Evaluate business communication: formality, clarity, professional tone', 'business', 'Analyze: register appropriateness, professional tone, business vocabulary, formal/informal balance, suitability for business contexts.'),
+(6, 'Meetings & Presentations', 'Assessment of skills for business meetings, presentations, and negotiations', 'business', 'Evaluate: opening/closing, turn-taking, persuasion, question handling, signposting language. Provide actionable business tips.'),
+(7, 'Business Vocabulary', 'Analysis of industry-specific terminology and business idioms', 'business', 'Review: industry terminology, business idioms, financial/commercial language, formal vs informal register, professional lexicon suggestions.'),
 
--- Academic (IDs 8-10)
-INSERT INTO ai_report_modules (label, description, family, default_rule) VALUES
-('Academic Discourse', 'Evaluate academic speaking for lectures, seminars, and presentations', 'academic', 'Analyze: hedging, academic qualifiers, citation language, critical thinking, abstract expression, objective vs subjective balance.'),
-('Research Communication', 'Assessment of ability to discuss research, methodology, and findings', 'academic', 'Evaluate: methodology clarity, results presentation, limitations discussion, technical terminology, academic questioning response.'),
-('Academic Vocabulary', 'Analysis of subject-specific terminology and academic word list coverage', 'academic', 'Review: academic word list coverage, subject terminology, abstract nouns, nominalization, formal register. Compare against academic corpus standards.');
+-- Academic (8-10)
+(8, 'Academic Discourse', 'Evaluate academic speaking for lectures, seminars, and presentations', 'academic', 'Analyze: hedging, academic qualifiers, citation language, critical thinking, abstract expression, objective vs subjective balance.'),
+(9, 'Research Communication', 'Assessment of ability to discuss research, methodology, and findings', 'academic', 'Evaluate: methodology clarity, results presentation, limitations discussion, technical terminology, academic questioning response.'),
+(10, 'Academic Vocabulary', 'Analysis of subject-specific terminology and academic word list coverage', 'academic', 'Review: academic word list coverage, subject terminology, abstract nouns, nominalization, formal register. Compare against academic corpus standards.'),
 
--- Linguistic (IDs 11-14)
-INSERT INTO ai_report_modules (label, description, family, default_rule) VALUES
-('Discourse Analysis', 'Detailed linguistic analysis of discourse markers, cohesion, and pragmatics', 'linguistic', 'Analyze: discourse markers, cohesion devices, topic management, reference patterns, pragmatic features (politeness, indirectness).'),
-('Syntax & Complexity', 'Analysis of syntactic structures and sentence complexity metrics', 'linguistic', 'Analyze: sentence length variation, clause types, subordination, syntactic complexity index, passive/active distribution. Include quantitative metrics.'),
-('Lexical Analysis', 'Comprehensive lexical statistics including type-token ratio and frequency patterns', 'linguistic', 'Perform: type-token ratio interpretation, lexical density, word frequency distribution, semantic fields, sophistication indices. Provide comparative benchmarks.'),
-('Filler Analysis', 'Detailed examination of fillers, hesitations, and disfluency patterns', 'linguistic', 'Examine: filler distribution (um, uh, er, like), false starts, self-repairs, pause patterns, repetition types, strategic vs problematic disfluencies.');
+-- Linguistic (11-14)
+(11, 'Discourse Analysis', 'Detailed linguistic analysis of discourse markers, cohesion, and pragmatics', 'linguistic', 'Analyze: discourse markers, cohesion devices, topic management, reference patterns, pragmatic features (politeness, indirectness).'),
+(12, 'Syntax & Complexity', 'Analysis of syntactic structures and sentence complexity metrics', 'linguistic', 'Analyze: sentence length variation, clause types, subordination, syntactic complexity index, passive/active distribution. Include quantitative metrics.'),
+(13, 'Lexical Analysis', 'Comprehensive lexical statistics including type-token ratio and frequency patterns', 'linguistic', 'Perform: type-token ratio interpretation, lexical density, word frequency distribution, semantic fields, sophistication indices. Provide comparative benchmarks.'),
+(14, 'Filler Analysis', 'Detailed examination of fillers, hesitations, and disfluency patterns', 'linguistic', 'Examine: filler distribution (um, uh, er, like), false starts, self-repairs, pause patterns, repetition types, strategic vs problematic disfluencies.')
+
+ON CONFLICT (id) DO NOTHING;
 
 
 -- 4. AI REPORT REQUESTS (tracks which modules user requested)
