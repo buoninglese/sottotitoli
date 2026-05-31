@@ -134,6 +134,7 @@
   let shouldKeepListening = false;
   let restartTimer = null;
   let hasStartedOnce = false;
+  let currentUserId = null;
 
   let audioRecorder = null;
   let audioStream = null;
@@ -718,6 +719,7 @@
         var sessionResp = await sessionSupabase.auth.getSession();
         if (sessionResp.data?.session?.user?.id) {
           var uid = sessionResp.data.session.user.id;
+          currentUserId = uid;
           var creditResp = await sessionSupabase.from('user_credits').select('balance_seconds').eq('user_id', uid).maybeSingle();
           var remaining;
           if (!creditResp.data) {
@@ -804,6 +806,7 @@
         var sessionResp = await sessionSupabase.auth.getSession();
         if (sessionResp.data?.session?.user?.id) {
           var uid = sessionResp.data.session.user.id;
+          currentUserId = uid;
           var creditResp = await sessionSupabase.from('user_credits').select('balance_seconds').eq('user_id', uid).maybeSingle();
           var remaining;
           if (!creditResp.data) {
@@ -1426,6 +1429,7 @@
 
       const user = sessionData.session.user;
       const userId = user.id;
+      currentUserId = userId;
 
       currentSessionStart = new Date();
 
@@ -1554,24 +1558,26 @@
       }
 
       // ── Deduct credits ──
-      if (sessionSupabase && durationSeconds > 0) {
+      if (sessionSupabase && durationSeconds > 0 && currentUserId) {
         try {
-          var credResp = await sessionSupabase.from('user_credits').select('balance_seconds').eq('user_id', userId).maybeSingle();
+          var credResp = await sessionSupabase.from('user_credits').select('balance_seconds').eq('user_id', currentUserId).maybeSingle();
           var curBalance = credResp.data?.balance_seconds ?? 0;
-          // If no row exists, create one with signup bonus first
           if (!credResp.data) {
             curBalance = 900;
-            await sessionSupabase.from('user_credits').insert({ user_id: userId, balance_seconds: 900, lifetime_seconds: 0 });
+            await sessionSupabase.from('user_credits').insert({ user_id: currentUserId, balance_seconds: 900, lifetime_seconds: 0 });
           }
           var newBalance = Math.max(0, curBalance - durationSeconds);
-          await sessionSupabase.from('user_credits').update({ balance_seconds: newBalance, updated_at: new Date().toISOString() }).eq('user_id', userId);
+          await sessionSupabase.from('user_credits').update({ balance_seconds: newBalance, updated_at: new Date().toISOString() }).eq('user_id', currentUserId);
           await sessionSupabase.from('credit_transactions').insert({
-            user_id: userId, amount_seconds: -durationSeconds, type: 'session_usage',
+            user_id: currentUserId, amount_seconds: -durationSeconds, type: 'session_usage',
             reference: currentSessionId, balance_after: newBalance
           });
           setText("creditBalance", formatCredit(newBalance));
         setText("minuteCounter", Math.round(durationSeconds/60) + 'm usati');
           if (newBalance < 300 && newBalance > 0) setText("statusText", "⏰ Meno di 5 minuti rimanenti.");
+          // Refresh token balance too
+          var tokResp = await sessionSupabase.from('user_tokens').select('balance').eq('user_id', currentUserId).maybeSingle();
+          setText("tokenBalanceApp", (tokResp.data?.balance ?? 0) + ' tok');
         } catch(e) { /* non-critical */ }
       }
     } catch (e) {
