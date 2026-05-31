@@ -1354,7 +1354,7 @@
         avg_sentence_length_words: avgSentenceLength,
         fillers_count: fillersCount,
         fillers_per_minute: fillersPerMinute,
-        uniquewords_count: uniqueWordsCount,
+        unique_words_count: uniqueWordsCount,
         lexical_diversity: lexicalDiversity,
         quality_score: qualityScore,
         ngsl_coverage: ngslCoverage,

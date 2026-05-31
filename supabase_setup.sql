@@ -120,6 +120,22 @@ ALTER TABLE session_ai_reports ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Users read own reports" ON session_ai_reports FOR SELECT USING (auth.uid() = user_id);
 
 
+-- 6. MIGRATIONS: Add missing columns to existing sessions table (safe if they exist)
+-- ============================================================================
+ALTER TABLE sessions ADD COLUMN IF NOT EXISTS ngsl_coverage NUMERIC(4,3);
+ALTER TABLE sessions ADD COLUMN IF NOT EXISTS unique_words_count INTEGER;
+ALTER TABLE sessions ADD COLUMN IF NOT EXISTS question_count INTEGER DEFAULT 0;
+ALTER TABLE sessions ADD COLUMN IF NOT EXISTS negation_count INTEGER DEFAULT 0;
+ALTER TABLE sessions ADD COLUMN IF NOT EXISTS repetition_rate NUMERIC(4,3);
+ALTER TABLE sessions ADD COLUMN IF NOT EXISTS turn_count INTEGER DEFAULT 0;
+ALTER TABLE sessions ADD COLUMN IF NOT EXISTS interruption_count INTEGER;
+ALTER TABLE sessions ADD COLUMN IF NOT EXISTS speaking_share_ratio NUMERIC(4,3);
+ALTER TABLE sessions ADD COLUMN IF NOT EXISTS transcript_text TEXT;
+
+
+-- 7. USER PREFERENCES
+
+
 -- 6. SESSIONS (captions + metrics)
 -- ============================================================================
 CREATE TABLE IF NOT EXISTS sessions (
