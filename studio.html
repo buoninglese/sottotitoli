@@ -212,11 +212,13 @@
 
     /* ── Panels ── */
     .tab-panel { display: none; }
-    .tab-panel.active { display: block; animation: fadeIn 0.25s ease; }
+    .tab-panel.active { display: flex; flex-direction: column; animation: fadeIn 0.25s ease; }
+    .tab-panel .studio-card { flex: 1; overflow: hidden; display: flex; flex-direction: column; }
+    .tab-panel .studio-card .lm-grid { flex: 1; align-content: flex-start; }
 
     /* Full-viewport tab layout */
-    .platform-section { min-height: calc(100vh - 200px); display: flex; flex-direction: column; justify-content: flex-start; padding-top: 20px; }
-    @media(max-width:768px){ .platform-section { min-height: calc(100vh - 140px); padding-top: 12px; } }
+    .platform-section { min-height: calc(100vh - 180px); display: flex; flex-direction: column; justify-content: flex-start; padding: 12px 0 0; }
+    @media(max-width:768px){ .platform-section { min-height: calc(100vh - 120px); padding: 8px 0 0; } }
     #studioContent { min-height: 100vh; }
     @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
 
@@ -233,6 +235,9 @@
     .studio-card-header { margin-bottom: 16px; }
     .studio-card-header h3 { font-size: 20px; font-weight: 700; color: var(--text-primary); }
     .guidance-text { font-size: 14.5px; color: var(--text-secondary); margin-bottom: 22px; max-width: 680px; }
+
+    .lang-picker-row { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; }
+    .lang-flag-btn.active { border-color: var(--accent-blue) !important; box-shadow: 0 0 0 2px rgba(37,99,235,.2); }
 
     /* ── Lang grid ── */
     .lang-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 10px; }
@@ -589,40 +594,14 @@
       <div class="studio-card-header">
         <h3><i class="fas fa-exchange-alt" style="color:var(--accent-blue);"></i>&nbsp; Traduzione live</h3>
       </div>
-      <p class="guidance-text">Scegli la lingua in cui parli e quella in cui vuoi i sottotitoli.</p>
-      <form id="translationRouterForm" class="translation-form">
-        <div class="form-group">
-          <label for="routerSourceLang">Parlo in</label>
-          <select id="routerSourceLang" class="form-control">
-            <option value="EN">Inglese</option><option value="IT">Italiano</option><option value="FR">Francese</option><option value="DE">Tedesco</option><option value="ES">Spagnolo</option><option value="NL">Olandese</option><option value="PT">Portoghese</option><option value="PL">Polacco</option>
-          </select>
-        </div>
-        <div class="form-group">
-          <label for="routerTargetLang">Sottotitoli in</label>
-          <select id="routerTargetLang" class="form-control">
-            <option value="EN">Inglese</option><option value="IT">Italiano</option><option value="FR">Francese</option><option value="DE">Tedesco</option><option value="ES">Spagnolo</option><option value="NL">Olandese</option><option value="PT">Portoghese</option><option value="PL">Polacco</option>
-          </select>
-        </div>
-        <div class="form-group">
-          <button type="submit" class="btn">Vai a Studio &rarr;</button>
-        </div>
-      </form>
-    </div>
-
-    <!-- Translation Carousel -->
-    <div class="qp-header" style="margin-top:28px;">
-      <h4><i class="fas fa-language"></i> Coppie di traduzione</h4>
-      <p>Parla in una lingua, leggi i sottotitoli in un'altra. Il carosello ruota automaticamente — clicca una coppia per iniziare.</p>
-    </div>
-    <div class="translate-carousel" id="translateCarousel">
-      <button class="carousel-arrow carousel-prev" id="carouselPrev" aria-label="Lingua precedente">‹</button>
-      <div class="carousel-stage" id="carouselStage">
-        <!-- filled by JS -->
+      <p class="guidance-text" style="margin-bottom:12px">Io parlo in…</p>
+      <div class="lang-picker-row" id="sourceFlags"></div>
+      <p class="guidance-text" style="margin:16px 0 8px">Sottotitoli in…</p>
+      <div class="lang-picker-row" id="targetFlags"></div>
+      <div style="text-align:center;margin-top:16px">
+        <a href="#" id="translateGoBtn" class="btn" style="display:inline-flex;padding:10px 28px;background:var(--accent-blue);color:#fff;border-radius:100px;font-weight:600;text-decoration:none">Vai →</a>
       </div>
-      <button class="carousel-arrow carousel-next" id="carouselNext" aria-label="Lingua successiva">›</button>
-      <div class="carousel-dots" id="carouselDots"></div>
     </div>
-  </div><!-- ANALYSIS -->
   <div class="tab-panel" id="tabAnalysis">
     <div class="studio-card">
       <div class="studio-card-header">
@@ -844,83 +823,42 @@
     });
   })();
 
-  // ── Translation carousel ──
+  // ── Translation picker (two rows of flags) ──
   (function(){
-    var langs = [
-      { code:'en', flag:'🇬🇧', name:'Inglese',   targets:[{code:'it',flag:'🇮🇹',name:'Italiano'},{code:'fr',flag:'🇫🇷',name:'Francese'},{code:'de',flag:'🇩🇪',name:'Tedesco'},{code:'es',flag:'🇪🇸',name:'Spagnolo'},{code:'nl',flag:'🇳🇱',name:'Olandese'},{code:'pt',flag:'🇵🇹',name:'Portoghese'},{code:'pl',flag:'🇵🇱',name:'Polacco'}] },
-      { code:'it', flag:'🇮🇹', name:'Italiano',   targets:[{code:'en',flag:'🇬🇧',name:'Inglese'},{code:'fr',flag:'🇫🇷',name:'Francese'},{code:'de',flag:'🇩🇪',name:'Tedesco'},{code:'es',flag:'🇪🇸',name:'Spagnolo'},{code:'nl',flag:'🇳🇱',name:'Olandese'},{code:'pt',flag:'🇵🇹',name:'Portoghese'},{code:'pl',flag:'🇵🇱',name:'Polacco'}] },
-      { code:'fr', flag:'🇫🇷', name:'Francese',   targets:[{code:'en',flag:'🇬🇧',name:'Inglese'},{code:'it',flag:'🇮🇹',name:'Italiano'},{code:'de',flag:'🇩🇪',name:'Tedesco'},{code:'es',flag:'🇪🇸',name:'Spagnolo'},{code:'nl',flag:'🇳🇱',name:'Olandese'},{code:'pt',flag:'🇵🇹',name:'Portoghese'},{code:'pl',flag:'🇵🇱',name:'Polacco'}] },
-      { code:'de', flag:'🇩🇪', name:'Tedesco',    targets:[{code:'en',flag:'🇬🇧',name:'Inglese'},{code:'it',flag:'🇮🇹',name:'Italiano'},{code:'fr',flag:'🇫🇷',name:'Francese'},{code:'es',flag:'🇪🇸',name:'Spagnolo'},{code:'nl',flag:'🇳🇱',name:'Olandese'},{code:'pt',flag:'🇵🇹',name:'Portoghese'},{code:'pl',flag:'🇵🇱',name:'Polacco'}] },
-      { code:'es', flag:'🇪🇸', name:'Spagnolo',   targets:[{code:'en',flag:'🇬🇧',name:'Inglese'},{code:'it',flag:'🇮🇹',name:'Italiano'},{code:'fr',flag:'🇫🇷',name:'Francese'},{code:'de',flag:'🇩🇪',name:'Tedesco'},{code:'nl',flag:'🇳🇱',name:'Olandese'},{code:'pt',flag:'🇵🇹',name:'Portoghese'},{code:'pl',flag:'🇵🇱',name:'Polacco'}] },
-      { code:'nl', flag:'🇳🇱', name:'Olandese',   targets:[{code:'en',flag:'🇬🇧',name:'Inglese'},{code:'it',flag:'🇮🇹',name:'Italiano'},{code:'fr',flag:'🇫🇷',name:'Francese'},{code:'de',flag:'🇩🇪',name:'Tedesco'},{code:'es',flag:'🇪🇸',name:'Spagnolo'},{code:'pt',flag:'🇵🇹',name:'Portoghese'},{code:'pl',flag:'🇵🇱',name:'Polacco'}] },
-      { code:'pt', flag:'🇵🇹', name:'Portoghese', targets:[{code:'en',flag:'🇬🇧',name:'Inglese'},{code:'it',flag:'🇮🇹',name:'Italiano'},{code:'fr',flag:'🇫🇷',name:'Francese'},{code:'de',flag:'🇩🇪',name:'Tedesco'},{code:'es',flag:'🇪🇸',name:'Spagnolo'},{code:'nl',flag:'🇳🇱',name:'Olandese'},{code:'pl',flag:'🇵🇱',name:'Polacco'}] },
-      { code:'pl', flag:'🇵🇱', name:'Polacco',    targets:[{code:'en',flag:'🇬🇧',name:'Inglese'},{code:'it',flag:'🇮🇹',name:'Italiano'},{code:'fr',flag:'🇫🇷',name:'Francese'},{code:'de',flag:'🇩🇪',name:'Tedesco'},{code:'es',flag:'🇪🇸',name:'Spagnolo'},{code:'nl',flag:'🇳🇱',name:'Olandese'},{code:'pt',flag:'🇵🇹',name:'Portoghese'}] }
+    var flags = [
+      {code:'en',flag:'🇬🇧',name:'Inglese'},{code:'it',flag:'🇮🇹',name:'Italiano'},{code:'fr',flag:'🇫🇷',name:'Francese'},
+      {code:'de',flag:'🇩🇪',name:'Tedesco'},{code:'es',flag:'🇪🇸',name:'Spagnolo'},{code:'nl',flag:'🇳🇱',name:'Olandese'},
+      {code:'pt',flag:'🇵🇹',name:'Portoghese'},{code:'pl',flag:'🇵🇱',name:'Polacco'}
     ];
+    var selSrc = 'en', selTgt = 'it';
+    var srcEl = document.getElementById('sourceFlags');
+    var tgtEl = document.getElementById('targetFlags');
+    var goBtn = document.getElementById('translateGoBtn');
+    if (!srcEl || !tgtEl) return;
 
-    var stage = document.getElementById('carouselStage');
-    var dots  = document.getElementById('carouselDots');
-    var prev  = document.getElementById('carouselPrev');
-    var next  = document.getElementById('carouselNext');
-    if (!stage || !dots) return;
-
-    var idx = 0;
-    var timer = null;
-    var INTERVAL = 5000;
-
-    function buildSlide(l, i) {
-      var tgtHtml = l.targets.map(function(t){
-        return '<a class="carousel-target" href="app.html?mode=translate-'+l.code+'-'+t.code+'"><span class="ct-flag">'+t.flag+'</span><span class="ct-name">'+t.name+'</span></a>';
+    function buildRow(container, selected, onClick){
+      container.innerHTML = flags.map(function(f){
+        return '<button class="lang-flag-btn'+(f.code===selected?' active':'')+'" data-code="'+f.code+'" style="font-family:inherit;font-size:18px;padding:8px 12px;border-radius:10px;border:1px solid var(--line);background:var(--card);cursor:pointer;transition:all .15s">'+f.flag+'</button>';
       }).join('');
-      return '<div class="carousel-slide'+(i===0?' active':'')+'" data-idx="'+i+'"><div class="carousel-src"><div class="carousel-src-flag">'+l.flag+'</div><div class="carousel-src-name">'+l.name+'</div></div><div class="carousel-targets">'+tgtHtml+'</div></div>';
+      container.querySelectorAll('button').forEach(function(b){
+        b.addEventListener('click', function(){
+          container.querySelectorAll('button').forEach(function(x){x.classList.remove('active');x.style.borderColor='var(--line)';});
+          b.classList.add('active');b.style.borderColor='var(--accent)';
+          onClick(b.dataset.code);
+        });
+      });
     }
 
-    function buildDots() {
-      return langs.map(function(_, i){ return '<button class="carousel-dot'+(i===0?' active':'')+'" data-dot="'+i+'" aria-label="Lingua '+(i+1)+'"></button>'; }).join('');
-    }
+    buildRow(srcEl, 'en', function(c){ selSrc = c; });
+    buildRow(tgtEl, 'it', function(c){ selTgt = c; });
 
-    stage.innerHTML = langs.map(buildSlide).join('');
-    dots.innerHTML = buildDots();
-
-    function show(i) {
-      var slides = stage.querySelectorAll('.carousel-slide');
-      var dotEls = dots.querySelectorAll('.carousel-dot');
-      slides.forEach(function(s){ s.classList.remove('active'); });
-      dotEls.forEach(function(d){ d.classList.remove('active'); });
-      if (slides[i]) slides[i].classList.add('active');
-      if (dotEls[i]) dotEls[i].classList.add('active');
-      idx = i;
-    }
-
-    function go(dir) {
-      var n = (idx + dir + langs.length) % langs.length;
-      show(n);
-      resetTimer();
-    }
-
-    function resetTimer() {
-      clearInterval(timer);
-      timer = setInterval(function(){ go(1); }, INTERVAL);
-    }
-
-    if (prev) prev.addEventListener('click', function(){ go(-1); });
-    if (next) next.addEventListener('click', function(){ go(1); });
-
-    dots.addEventListener('click', function(e){
-      var dot = e.target.closest('.carousel-dot');
-      if (!dot) return;
-      show(parseInt(dot.dataset.dot));
-      resetTimer();
+    if (goBtn) goBtn.addEventListener('click', function(e){
+      e.preventDefault();
+      if (selSrc === selTgt) { window.location.href = 'app.html?mode=caption-'+selSrc; }
+      else { window.location.href = 'app.html?mode=translate-'+selSrc+'-'+selTgt; }
     });
-
-    // Pause on hover
-    var carousel = document.getElementById('translateCarousel');
-    if (carousel) {
-      carousel.addEventListener('mouseenter', function(){ clearInterval(timer); });
-      carousel.addEventListener('mouseleave', resetTimer);
-    }
-
-    resetTimer();
   })();
+
 </script>
 
 <script src="config.js?v=12"></script>
