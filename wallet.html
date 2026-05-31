@@ -197,16 +197,15 @@ body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--t
     (sess.data||[]).forEach(function(s){ totalMin += (s.duration_seconds||0); });
     document.getElementById('totalSessions').textContent = (sess.data||[]).length + ' sessioni · ' + (totalMin < 3600 ? Math.round(totalMin/60)+'m' : Math.floor(totalMin/3600)+'h');
 
-    // Vouchers — count from existing session_ai_reports for now (simplified)
+    // Vouchers — count from existing session_ai_reports
     var reps = await supabase.from('session_ai_reports').select('module_id').eq('user_id',userId);
     var counts = {cambridge:0,academic:0,linguistic:0,business:0};
-    // Map module_id to family (1-4=cambridge, 5-7=business, 8-10=academic, 11-14=linguistic)
     (reps.data||[]).forEach(function(r){
       var id = r.module_id;
       if (id>=1 && id<=4) counts.cambridge++;
-      else if (id>=5 && id<=7) counts.business++;
-      else if (id>=8 && id<=10) counts.academic++;
-      else if (id>=11 && id<=14) counts.linguistic++;
+      else if (id>=5 && id<=8) counts.academic++;
+      else if (id>=9 && id<=12) counts.linguistic++;
+      else if (id>=13 && id<=14) counts.business++;
     });
     document.getElementById('vCambridge').textContent = counts.cambridge;
     document.getElementById('vAcademic').textContent = counts.academic;
@@ -217,12 +216,49 @@ body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--t
     var hist = [];
     var ct = await supabase.from('credit_transactions').select('*').eq('user_id',userId).order('created_at',{ascending:false}).limit(20);
     var tt = await supabase.from('token_transactions').select('*').eq('user_id',userId).order('created_at',{ascending:false}).limit(20);
-    (ct.data||[]).forEach(function(t){ hist.push({date:t.created_at,type:'Credito: '+t.type,amount:t.amount_seconds>0?'+'+Math.round(t.amount_seconds/60)+'m':Math.round(t.amount_seconds/60)+'m',credit:t.amount_seconds>0,ts:new Date(t.created_at).getTime()}); });
-    (tt.data||[]).forEach(function(t){ hist.push({date:t.created_at,type:'Token: '+t.type,amount:(t.amount>0?'+':'')+t.amount+' tok',credit:t.amount>0,ts:new Date(t.created_at).getTime()}); });
+
+    // Build a session mode lookup for credit transactions
+    var sessionIds = [];
+    (ct.data||[]).forEach(function(t){ if (t.reference && t.reference.length > 10) sessionIds.push(t.reference); });
+    var modeMap = {};
+    if (sessionIds.length > 0) {
+      var sessData = await supabase.from('sessions').select('id,mode').in('id', sessionIds.slice(0,50));
+      (sessData.data||[]).forEach(function(s){ modeMap[s.id] = s.mode || '—'; });
+    }
+
+    function modeLabel(m) {
+      if (!m||m==='—') return '';
+      if (m.indexOf('translate-')===0) { var parts=m.replace('translate-','').split('-'); return '🌐 '+parts[0].toUpperCase()+'→'+parts[1].toUpperCase(); }
+      if (m.indexOf('caption-')===0) return '🎤 '+m.replace('caption-','').toUpperCase();
+      return m;
+    }
+
+    (ct.data||[]).forEach(function(t){
+      var mode = modeMap[t.reference] || '';
+      var typeLabel = t.type === 'session_usage' ? 'Sessione' : (t.type === 'purchase' ? 'Acquisto' : t.type);
+      if (mode) typeLabel += ' · ' + modeLabel(mode);
+      var minutes = t.amount_seconds ? Math.round(Math.abs(t.amount_seconds)/60) : 0;
+      hist.push({
+        date: t.created_at,
+        type: '⏱ '+typeLabel,
+        amount: (t.amount_seconds>0?'+':'−') + minutes + 'm',
+        credit: t.amount_seconds > 0,
+        ts: new Date(t.created_at).getTime()
+      });
+    });
+    (tt.data||[]).forEach(function(t){
+      hist.push({
+        date: t.created_at,
+        type: '🪙 Token: '+t.type,
+        amount: (t.amount>0?'+':'')+t.amount+' tok',
+        credit: t.amount > 0,
+        ts: new Date(t.created_at).getTime()
+      });
+    });
     hist.sort(function(a,b){ return b.ts - a.ts; });
     var histEl = document.getElementById('historyList');
     if (hist.length===0){ histEl.innerHTML='<div class="empty-state">Nessuna transazione ancora. Inizia a usare Sottotitoli!</div>'; return; }
-    histEl.innerHTML = hist.slice(0,20).map(function(h){
+    histEl.innerHTML = hist.slice(0,30).map(function(h){
       return '<div class="history-row"><div><div>'+h.type+'</div><div class="h-date">'+new Date(h.date).toLocaleDateString('it-IT',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})+'</div></div><div class="h-amount '+(h.credit?'credit':'debit')+'">'+h.amount+'</div></div>';
     }).join('');
   }
