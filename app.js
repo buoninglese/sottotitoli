@@ -701,6 +701,12 @@
 
   async function startRecognition() {
     if (!SpeechRecognition) {
+      // ── Safari fallback: MediaRecorder + Deepgram via WebSocket ──
+      if (navigator.mediaDevices?.getUserMedia && window.wsPublisher && window.wsPublisher.ws && typeof window.wsPublisher.ws.send === 'function') {
+        setText("statusText", "Starting Safari audio capture...");
+        await startSafariDeepgramCapture();
+        return;
+      }
       setText("statusText", "⚠️ Speech recognition is not supported. Use Chrome or Edge.");
       var startBtn = $("startBtn"); if (startBtn) startBtn.disabled = true;
       return;
@@ -775,11 +781,124 @@
       // fresh on the next startRecognition(), picking up any language change.
       recognition = null;
     }
+    // Stop Safari Deepgram capture if active
+    stopSafariDeepgramCapture();
     stopAudioCapture();
     updateMicState("stopped", false);
     setText("statusText", "Saving session...");
     await finalizeSessionRow();
     setText("statusText", "Recognition stopped by user.");
+  }
+
+  // ── Safari Deepgram fallback (MediaRecorder → WebSocket → relay → Deepgram) ──
+
+  var safariMediaRecorder = null;
+  var safariAudioStream = null;
+  var safariChunkInterval = null;
+  var SEND_CHUNK_MS = 300; // send audio chunk every 300ms
+
+  async function startSafariDeepgramCapture() {
+    // Credit check (same as Chrome path)
+    if (sessionSupabase) {
+      try {
+        var sessionResp = await sessionSupabase.auth.getSession();
+        if (sessionResp.data?.session?.user?.id) {
+          var uid = sessionResp.data.session.user.id;
+          var creditResp = await sessionSupabase.from('user_credits').select('balance_seconds').eq('user_id', uid).maybeSingle();
+          var remaining;
+          if (!creditResp.data) {
+            remaining = 900;
+            await sessionSupabase.from('user_credits').insert({ user_id: uid, balance_seconds: 900, lifetime_seconds: 0 });
+            await sessionSupabase.from('credit_transactions').insert({ user_id: uid, amount_seconds: 900, type: 'signup_bonus', reference: 'signup', balance_after: 900 });
+          } else {
+            remaining = creditResp.data.balance_seconds;
+          }
+          if (remaining <= 0) {
+            setText("statusText", "⏰ Nessun credito residuo. Acquista minuti su Studio → Marketplace.");
+            return;
+          }
+          setText("creditBalance", formatCredit(remaining));
+          setText("minuteCounter", "0m usati");
+          var tokResp = await sessionSupabase.from('user_tokens').select('balance').eq('user_id', uid).maybeSingle();
+          setText("tokenBalanceApp", (tokResp.data?.balance ?? 0) + ' tok');
+        }
+      } catch(e) {}
+    }
+
+    // Use a single stream and recorder for both Deepgram + session saving
+    try {
+      safariAudioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    } catch(e) {
+      setText("statusText", "Microphone access denied. Check browser permissions.");
+      return;
+    }
+
+    // Also set the global audio stream so stopAudioCapture can clean it up
+    audioStream = safariAudioStream;
+    audioChunks = [];
+    lastAudioBlob = null;
+    speakerAnalysisCompleted = false;
+    isAnalyzingSpeakers = false;
+
+    safariMediaRecorder = new MediaRecorder(safariAudioStream, { mimeType: 'audio/webm;codecs=opus' });
+    if (safariMediaRecorder.mimeType !== 'audio/webm;codecs=opus') {
+      safariMediaRecorder = new MediaRecorder(safariAudioStream);
+    }
+
+    shouldKeepListening = true;
+    clearRestartTimer();
+    pendingInterimText = "";
+    hasStartedOnce = false;
+    lastFinalSent = "";
+    transcriptLines = [];
+
+    // Tell relay to open Deepgram
+    var lang = (modeConfig && modeConfig.sourceLang) || "en-US";
+    window.wsPublisher.ws.send(JSON.stringify({ type: "audio-start", lang: lang }));
+
+    safariMediaRecorder.ondataavailable = function(event) {
+      if (!event.data || event.data.size === 0) return;
+      // Save for session recording
+      audioChunks.push(event.data);
+      // Send to Deepgram via WebSocket
+      var reader = new FileReader();
+      reader.onloadend = function() {
+        var base64 = reader.result.split(',')[1];
+        if (base64 && window.wsPublisher?.ws?.readyState === WebSocket.OPEN) {
+          window.wsPublisher.ws.send(JSON.stringify({ type: "audio", data: base64 }));
+        }
+      };
+      reader.readAsDataURL(event.data);
+    };
+
+    safariMediaRecorder.onstop = function() {
+      var actualType = safariMediaRecorder.mimeType || "audio/webm";
+      lastAudioBlob = new Blob(audioChunks, { type: actualType });
+      if (safariAudioStream) {
+        safariAudioStream.getTracks().forEach(function(t){ t.stop(); });
+        safariAudioStream = null;
+        audioStream = null;
+      }
+    };
+
+    safariMediaRecorder.start(SEND_CHUNK_MS);
+    isRecordingAudio = true;
+    await createSessionRow();
+
+    setText("statusText", "🎤 Safari — Deepgram (" + lang + ")");
+    updateMicState("live", true);
+  }
+
+  function stopSafariDeepgramCapture() {
+    if (safariMediaRecorder && safariMediaRecorder.state !== 'inactive') {
+      try { safariMediaRecorder.stop(); } catch(e) {}
+    }
+    if (window.wsPublisher?.ws?.readyState === WebSocket.OPEN) {
+      window.wsPublisher.ws.send(JSON.stringify({ type: "audio-stop" }));
+    }
+    safariMediaRecorder = null;
+    safariAudioStream = null;
+    isRecordingAudio = false;
   }
 
   function connectSocket() {
