@@ -929,6 +929,31 @@
       },
       onError(error) {
         setText("statusText", "Socket error: " + error);
+      },
+      onMessage(event) {
+        try {
+          var p = JSON.parse(event.data);
+          // Only handle Deepgram caption messages (msg===true, from safari fallback)
+          if (!p || p.msg !== true) return;
+          if (p.interm) {
+            // Interim — just display
+            var el = $("captionInterim");
+            if (el) { el.textContent = p.interm; el.dataset.placeholderActive = "false"; }
+            pendingInterimText = p.interm;
+          }
+          if (p.final) {
+            var clean = p.final.trim();
+            if (!clean || clean === lastFinalSent) return;
+            lastFinalSent = clean;
+            pendingInterimText = "";
+            clearBox("captionInterim", "");
+            var timestamp = w.SottotitoliSessionUtils.formatTimestamp(new Date());
+            transcriptLines.push({ timestamp: timestamp, text: clean, translated: null, learning: annotateLineWithNgsl(clean) });
+            appendLine("captionTranscript", clean);
+            updateStats();
+            lastInterimSent = "";
+          }
+        } catch(e) {}
       }
     });
 
