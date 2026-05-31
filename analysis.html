@@ -58,6 +58,14 @@ body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--t
 .badge-mode{background:var(--bg2);color:var(--muted);border:1px solid var(--line)}
 .badge-score{background:rgba(22,163,74,.08);color:var(--accent-green);border:1px solid rgba(22,163,74,.2);font-size:11px}
 
+.card-check{display:flex;align-items:center;margin-right:6px;cursor:pointer}
+.card-check input{width:16px;height:16px;accent-color:var(--accent-purple);cursor:pointer}
+.fav-star{cursor:pointer;font-size:16px;user-select:none;transition:transform .15s}
+.fav-star:hover{transform:scale(1.2)}
+.fav-star.is-fav{color:#f59e0b}
+.toolbar-btn{font-family:inherit;font-size:12px;font-weight:600;padding:8px 18px;border-radius:8px;border:none;cursor:pointer;transition:opacity .15s}
+.toolbar-btn:hover{opacity:.9}
+
 .session-expand{display:none;margin-top:16px;padding-top:16px;border-top:1px solid var(--line)}
 .session-card.expanded .session-expand{display:block}
 .expand-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:12px}
@@ -187,7 +195,13 @@ body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--t
       return;
     }
 
-    var html='<div class="session-grid">';
+    var html='<div class="analysis-toolbar" id="analysisToolbar" style="display:none;margin-bottom:16px;gap:10px;align-items:center;flex-wrap:wrap">'+
+      '<label style="font-size:13px;color:var(--muted);cursor:pointer"><input type="checkbox" id="selectAll" onchange="toggleSelectAll(this)"> Seleziona tutti</label>'+
+      '<span style="font-size:12px;color:var(--muted2)" id="selectedCount">0 selezionati</span>'+
+      '<button class="toolbar-btn" onclick="favoriteSelected()" style="background:var(--amber);color:#fff">⭐ Preferiti</button>'+
+      '<button class="toolbar-btn" onclick="deleteSelected()" style="background:var(--danger);color:#fff">🗑 Elimina</button>'+
+      '</div>'+
+      '<div class="session-grid">';
     sessions.forEach(function(s){
       var name=s.name||s.mode||'Sessione';
       var date=s.started_at?new Date(s.started_at).toLocaleDateString('it-IT',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}):'—';
@@ -210,12 +224,13 @@ body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--t
       });
       if(!badges) badges='<span class="badge badge-mode">Nessun report</span>';
 
-      html+='<div class="session-card" data-sid="'+esc(sid)+'" onclick="event.stopPropagation();toggleCard(this)">';
+      html+='<div class="session-card" data-sid="'+esc(sid)+'">';
       html+='<div class="session-card-top">';
+      html+='<label class="card-check" onclick="event.stopPropagation()"><input type="checkbox" class="session-check" data-sid="'+esc(sid)+'" onchange="updateToolbar()"></label>';
       html+='<div class="session-name"><span class="sname-text">'+esc(name)+'</span> <span class="edit-icon" onclick="event.stopPropagation();startRename(this)" title="Rinomina">✏️</span></div>';
-      html+='<div class="session-meta"><span>📅 '+date+'</span><span>⏱ '+dur+'</span><span>📝 '+wc+' parole</span><span>🌐 '+esc(lang)+'</span></div>';
+      html+='<div class="session-meta"><span>📅 '+date+'</span><span>⏱ '+dur+'</span><span>📝 '+wc+' parole</span><span>🌐 '+esc(lang)+'</span><span class="fav-star'+(s.favorite?' is-fav':'')+'" data-sid="'+esc(sid)+'" onclick="event.stopPropagation();toggleFavorite(this)" title="Preferito">'+(s.favorite?'⭐':'☆')+'</span></div>';
       html+='</div>';
-      html+='<div class="session-badges">'+badges+'</div>';
+      html+='<div class="session-badges" onclick="event.stopPropagation();toggleCard(this.parentElement)">'+badges+'</div>';
       html+='<div class="session-expand" id="expand-'+esc(sid)+'"></div>';
       html+='</div>';
     });
@@ -231,6 +246,63 @@ body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--t
     if(!expand||expand.innerHTML){ card.classList.toggle('expanded'); return; }
     card.classList.add('expanded');
     buildExpand(sid,expand);
+  };
+
+  // ── Toolbar ──
+  var toolbar=document.getElementById('analysisToolbar');
+
+  window.updateToolbar=function(){
+    var checked=document.querySelectorAll('.session-check:checked');
+    var count=checked.length;
+    var countEl=document.getElementById('selectedCount');
+    if(countEl) countEl.textContent=count+' selezionati';
+    if(toolbar) toolbar.style.display=count>0?'flex':'none';
+  };
+
+  window.toggleSelectAll=function(cb){
+    document.querySelectorAll('.session-check').forEach(function(c){ c.checked=cb.checked; });
+    window.updateToolbar();
+  };
+
+  window.toggleFavorite=async function(star){
+    var sid=star.dataset.sid;
+    var isFav=star.classList.contains('is-fav');
+    star.classList.toggle('is-fav',!isFav);
+    star.textContent=isFav?'☆':'⭐';
+    if(supabase) await supabase.from('sessions').update({favorite:!isFav}).eq('id',sid);
+  };
+
+  window.favoriteSelected=async function(){
+    var checked=document.querySelectorAll('.session-check:checked');
+    if(checked.length===0) return;
+    for(var i=0;i<checked.length;i++){
+      var sid=checked[i].dataset.sid;
+      var star=document.querySelector('.fav-star[data-sid="'+sid+'"]');
+      if(star&&!star.classList.contains('is-fav')){
+        star.classList.add('is-fav');
+        star.textContent='⭐';
+      }
+      if(supabase) await supabase.from('sessions').update({favorite:true}).eq('id',sid);
+      checked[i].checked=false;
+    }
+    window.updateToolbar();
+  };
+
+  window.deleteSelected=async function(){
+    var checked=document.querySelectorAll('.session-check:checked');
+    if(checked.length===0) return;
+    if(!confirm('Eliminare '+checked.length+' sessione/i? Questa azione non può essere annullata.')) return;
+    for(var i=0;i<checked.length;i++){
+      var sid=checked[i].dataset.sid;
+      if(supabase) await supabase.from('sessions').delete().eq('id',sid);
+      var card=document.querySelector('.session-card[data-sid="'+sid+'"]');
+      if(card) card.remove();
+    }
+    window.updateToolbar();
+    // Show empty state if no cards left
+    if(document.querySelectorAll('.session-card').length===0){
+      content.innerHTML='<div class="empty-state"><div class="empty-icon">📭</div>Nessuna sessione trovata.<br><a href="app.html">Vai al Dashboard →</a> e inizia a parlare.</div>';
+    }
   };
 
   function buildExpand(sid,el){

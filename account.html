@@ -757,6 +757,14 @@ body{background:var(--bg)}
     <!-- MAIN: Sessions + Performance + Dashboard -->
     <div class="retreat-main">
       
+      <!-- Favorite Sessions -->
+      <div class="acard">
+        <h3>⭐ Sessioni preferite</h3>
+        <div id="favoriteSessions" style="font-size:13px;color:var(--text-secondary)">
+          Caricamento…
+        </div>
+      </div>
+
       <!-- Sessions (from old account) -->
       <div class="acard">
         <h3>📋 Ultime sessioni Studio</h3>
@@ -1136,6 +1144,32 @@ body{background:var(--bg)}
         targetEl.innerHTML = html;
       }).catch(function() { targetEl.innerHTML = 'Errore nel caricamento.'; });
     }).catch(function() { targetEl.innerHTML = 'Errore nel caricamento.'; });
+  })();
+
+  // ── Load favorite sessions ──
+  (async function(){
+    var el = document.getElementById('favoriteSessions');
+    if (!el) return;
+    var supabase = window.sottotitoliSupabase;
+    if (!supabase) { el.innerHTML = 'Accedi per vedere i preferiti.'; return; }
+    var session = await supabase.auth.getSession();
+    if (!session.data?.session) { el.innerHTML = 'Accedi per vedere i preferiti.'; return; }
+    var userId = session.data.session.user.id;
+    var { data } = await supabase.from('sessions').select('id,name,mode,duration_seconds,words_count,started_at').eq('user_id',userId).eq('favorite',true).order('started_at',{ascending:false}).limit(10);
+    if (!data||!data.length){ el.innerHTML='<span style="color:var(--text-muted)">Nessuna sessione preferita. Vai su <a href=\"analysis.html\" style=\"color:var(--accent-purple)\">Analysis</a> e clicca ☆ per aggiungerle.</span>'; return; }
+    var h='<div style="display:flex;flex-direction:column;gap:8px">';
+    data.forEach(function(s){
+      var name=s.name||s.mode||'Sessione';
+      var date=s.started_at?new Date(s.started_at).toLocaleDateString('it-IT',{day:'numeric',month:'short'}):'';
+      var dur=s.duration_seconds?Math.round(s.duration_seconds/60)+'m':'';
+      h+='<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;background:var(--bg-btn-subtle);border-radius:8px;font-size:13px">';
+      h+='<span><a href="analysis.html" style="color:var(--text-primary);text-decoration:none;font-weight:500">⭐ '+escHtml(name)+'</a> <span style="color:var(--text-muted);font-size:11px">'+escHtml(date)+' · '+dur+' · '+(s.words_count||0)+' parole</span></span>';
+      h+='<span style="color:var(--text-muted);font-size:11px">'+escHtml(s.mode||'')+'</span>';
+      h+='</div>';
+    });
+    h+='</div>';
+    el.innerHTML=h;
+    function escHtml(s){ var d=document.createElement('div'); d.textContent=s; return d.innerHTML; }
   })();
 
 </script>
