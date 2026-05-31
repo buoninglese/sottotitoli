@@ -817,15 +817,22 @@
       if (stopBtn) { stopBtn.disabled = false; stopBtn.textContent = '⏹ Stop Session'; }
       if (completePanel) completePanel.classList.remove('visible');
       if (creditWarn) creditWarn.classList.remove('visible');
+      // Disable new room during recording
+      var newRoomBtn = $("newRoomBtn");
+      if (newRoomBtn) { newRoomBtn.disabled = true; newRoomBtn.style.opacity = '0.4'; }
       setText("statusText", "Session started.");
     } else if (state === 'stopped') {
       sessionActive = false;
       if (startBtn) { startBtn.classList.remove('recording'); startBtn.textContent = '🎤 Start Session'; startBtn.disabled = false; }
       if (stopBtn) { stopBtn.disabled = true; stopBtn.textContent = '⏹ Stop'; }
+      var newRoomBtn2 = $("newRoomBtn");
+      if (newRoomBtn2) { newRoomBtn2.disabled = false; newRoomBtn2.style.opacity = '1'; }
     } else if (state === 'complete') {
       sessionActive = false;
       if (startBtn) { startBtn.classList.remove('recording'); startBtn.textContent = '🎤 Start Session'; startBtn.disabled = false; }
       if (stopBtn) { stopBtn.disabled = true; stopBtn.textContent = '⏹ Stop'; }
+      var newRoomBtn3 = $("newRoomBtn");
+      if (newRoomBtn3) { newRoomBtn3.disabled = false; newRoomBtn3.style.opacity = '1'; }
       // Show completion panel
       if (completePanel) {
         var plain = transcriptLines.map(function(x){ return x.text; }).join(" ").trim();
@@ -1104,6 +1111,8 @@
   }
 
   function newRoom() {
+    if (sessionActive) return; // blocked during recording
+    if (!confirm('Creare una nuova room? Il transcript corrente e il link overlay cambieranno.')) return;
     room = w.SottotitoliSessionUtils.randomRoom();
     transcriptLines = [];
     latestReportText = "";
