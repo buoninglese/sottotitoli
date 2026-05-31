@@ -1,27 +1,41 @@
 // Supabase Edge Function: Stripe Webhook Handler
-// Deploy: supabase functions deploy stripe-webhook
-// Requires secrets: STRIPE_WEBHOOK_SECRET, SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY
-// Stripe webhook URL: https://qzqmuegbpmvqrjrlfbgk.supabase.co/functions/v1/stripe-webhook
+// Deploy: supabase functions deploy stripe-webhook --no-verify-jwt
+// Requires secrets: STRIPE_WEBHOOK_SECRET, SB_URL, SB_SERVICE_ROLE_KEY, STRIPE_SECRET_KEY
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import Stripe from 'https://esm.sh/stripe@14';
 
 const STRIPE_WEBHOOK_SECRET = Deno.env.get('STRIPE_WEBHOOK_SECRET')!;
-const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
-const SUPABASE_SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+const STRIPE_SECRET_KEY = Deno.env.get('STRIPE_SECRET_KEY')!;
+const SUPABASE_URL = Deno.env.get('SB_URL')!;
+const SUPABASE_SERVICE_KEY = Deno.env.get('SB_SERVICE_ROLE_KEY')!;
 
-const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
+const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY); // service role — bypasses RLS
+const stripe = new Stripe(STRIPE_SECRET_KEY);
 
 serve(async (req) => {
   try {
     const signature = req.headers.get('stripe-signature');
-    if (!signature) return new Response('No signature', { status: 400 });
+    if (!signature) {
+      return new Response('No signature', { status: 400 });
+    }
 
     const body = await req.text();
-    
-    // Verify webhook signature (requires Stripe library — simplified here)
-    // In production, use: const event = stripe.webhooks.constructEvent(body, signature, STRIPE_WEBHOOK_SECRET);
-    const event = JSON.parse(body);
+
+    // Verify webhook signature — rejects forged events
+    let event: Stripe.Event;
+    try {
+      event = stripe.webhooks.constructEvent(body, signature, STRIPE_WEBHOOK_SECRET);
+    } catch (err) {
+      console.error('Signature verification failed:', err.message);
+      return new Response(JSON.stringify({ error: 'Invalid signature' }), {
+        status: 401,
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
+
+    console.log('Webhook event:', event.type, event.id);
 
     // Only handle successful checkout
     if (event.type !== 'checkout.session.completed') {

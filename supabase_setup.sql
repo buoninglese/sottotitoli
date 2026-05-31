@@ -128,12 +128,27 @@ DO $$ BEGIN CREATE POLICY "Users update own sessions" ON sessions FOR UPDATE USI
 
 DO $$ BEGIN DROP POLICY IF EXISTS "Users read own credits" ON user_credits; EXCEPTION WHEN others THEN null; END $$;
 DO $$ BEGIN CREATE POLICY "Users read own credits" ON user_credits FOR SELECT USING (auth.uid() = user_id); EXCEPTION WHEN others THEN null; END $$;
+DO $$ BEGIN DROP POLICY IF EXISTS "Users insert own credits" ON user_credits; EXCEPTION WHEN others THEN null; END $$;
+DO $$ BEGIN CREATE POLICY "Users insert own credits" ON user_credits FOR INSERT WITH CHECK (auth.uid() = user_id); EXCEPTION WHEN others THEN null; END $$;
+DO $$ BEGIN DROP POLICY IF EXISTS "Users update own credits" ON user_credits; EXCEPTION WHEN others THEN null; END $$;
+DO $$ BEGIN CREATE POLICY "Users update own credits" ON user_credits FOR UPDATE USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id); EXCEPTION WHEN others THEN null; END $$;
+
 DO $$ BEGIN DROP POLICY IF EXISTS "Users read own tokens" ON user_tokens; EXCEPTION WHEN others THEN null; END $$;
 DO $$ BEGIN CREATE POLICY "Users read own tokens" ON user_tokens FOR SELECT USING (auth.uid() = user_id); EXCEPTION WHEN others THEN null; END $$;
+DO $$ BEGIN DROP POLICY IF EXISTS "Users insert own tokens" ON user_tokens; EXCEPTION WHEN others THEN null; END $$;
+DO $$ BEGIN CREATE POLICY "Users insert own tokens" ON user_tokens FOR INSERT WITH CHECK (auth.uid() = user_id); EXCEPTION WHEN others THEN null; END $$;
+DO $$ BEGIN DROP POLICY IF EXISTS "Users update own tokens" ON user_tokens; EXCEPTION WHEN others THEN null; END $$;
+DO $$ BEGIN CREATE POLICY "Users update own tokens" ON user_tokens FOR UPDATE USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id); EXCEPTION WHEN others THEN null; END $$;
+
 DO $$ BEGIN DROP POLICY IF EXISTS "Users read own credit log" ON credit_transactions; EXCEPTION WHEN others THEN null; END $$;
 DO $$ BEGIN CREATE POLICY "Users read own credit log" ON credit_transactions FOR SELECT USING (auth.uid() = user_id); EXCEPTION WHEN others THEN null; END $$;
+DO $$ BEGIN DROP POLICY IF EXISTS "Users insert credit log" ON credit_transactions; EXCEPTION WHEN others THEN null; END $$;
+DO $$ BEGIN CREATE POLICY "Users insert credit log" ON credit_transactions FOR INSERT WITH CHECK (auth.uid() = user_id); EXCEPTION WHEN others THEN null; END $$;
+
 DO $$ BEGIN DROP POLICY IF EXISTS "Users read own token log" ON token_transactions; EXCEPTION WHEN others THEN null; END $$;
 DO $$ BEGIN CREATE POLICY "Users read own token log" ON token_transactions FOR SELECT USING (auth.uid() = user_id); EXCEPTION WHEN others THEN null; END $$;
+DO $$ BEGIN DROP POLICY IF EXISTS "Users insert token log" ON token_transactions; EXCEPTION WHEN others THEN null; END $$;
+DO $$ BEGIN CREATE POLICY "Users insert token log" ON token_transactions FOR INSERT WITH CHECK (auth.uid() = user_id); EXCEPTION WHEN others THEN null; END $$;
 
 -- 5. AI REPORT MODULES (14 rows, skips existing IDs)
 -- ============================================================================
