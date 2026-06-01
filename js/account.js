@@ -144,31 +144,23 @@ const { data: sessions, error: sessionsError } = await accountSupabase
     currentSessions = sessions || [];
 
     if (!sessions || sessions.length === 0) {
-      if (sessionsEl) sessionsEl.textContent = 'No sessions recorded yet.';
+      if (sessionsEl) sessionsEl.innerHTML = '<div style="text-align:center;padding:24px;color:var(--text-muted);font-size:13px"><div style="font-size:32px;margin-bottom:8px">🎤</div>Nessuna sessione ancora.<br>Apri <a href=\"studio.html\" style=\"color:var(--accent-purple);font-weight:600\">Studio</a>, avvia il microfono e torna qui.</div>';
       if (downloadCsvBtn) downloadCsvBtn.disabled = true;
     } else {
       if (downloadCsvBtn) downloadCsvBtn.disabled = false;
-      const list = document.createElement('ul');
-      list.className = 'sessions-list';
-      sessions.forEach((s) => {
-        const li = document.createElement('li');
-        const when = s.started_at ? new Date(s.started_at).toLocaleString() : '';
-        const duration = s.duration_seconds != null ? s.duration_seconds + 's' : '—';
-        const words = s.words_count != null ? s.words_count + ' words' : '—';
-        li.innerHTML = `
-          <span class="sessions-room">[${s.mode || 'mode'}] Room ${s.room || ''}</span>
-          <span class="sessions-meta"> · ${when} · ${duration} · ${words}</span>
-          <span class="sessions-meta"> · 
-            <a href="transcript.html?session=${s.id}">Transcript</a> · 
-            <a href="analysis.html?session=${s.id}">Analysis</a>
-          </span>
-        `;
-        list.appendChild(li);
+      var h = '<div style="display:flex;flex-direction:column;gap:6px">';
+      sessions.forEach(function(s){
+        var when = s.started_at ? new Date(s.started_at).toLocaleDateString('it-IT',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}) : '';
+        var dur = s.duration_seconds ? Math.round(s.duration_seconds/60)+'m' : '—';
+        var words = s.words_count || 0;
+        h += '<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:var(--bg-btn-subtle);border-radius:10px;font-size:13px;gap:8px;flex-wrap:wrap">';
+        h += '<span style="font-weight:600;color:var(--text-primary)">'+(s.mode||'session')+'</span>';
+        h += '<span style="color:var(--text-muted);font-size:11px">'+when+' · '+dur+' · '+words+' parole</span>';
+        h += '<span style="display:flex;gap:8px;font-size:11px"><a href="transcript.html?session='+s.id+'" style="color:var(--accent-blue);font-weight:500">Trascrizione</a><a href="analysis.html?session='+s.id+'" style="color:var(--accent-purple);font-weight:500">Analysis</a></span>';
+        h += '</div>';
       });
-      if (sessionsEl) {
-        sessionsEl.textContent = '';
-        sessionsEl.appendChild(list);
-      }
+      h += '</div>';
+      sessionsEl.innerHTML = h;
     }
 
     updatePerformanceDashboard(currentSessions);

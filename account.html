@@ -753,17 +753,22 @@ body{background:var(--bg)}
       <div class="acard">
         <h3>⭐ Sessioni preferite</h3>
         <div id="favoriteSessions" style="font-size:13px;color:var(--text-secondary)">
-          Caricamento…
+          <div style="display:flex;align-items:center;gap:8px;padding:12px;color:var(--text-muted)">
+            <span style="font-size:20px">⏳</span> Caricamento…
+          </div>
         </div>
       </div>
 
-      <!-- Sessions (from old account) -->
+      <!-- Sessions -->
       <div class="acard">
         <h3>📋 Ultime sessioni Studio</h3>
-        <button class="btn" id="downloadSessionsCsvBtn" style="margin-bottom:12px">Download CSV</button>
-        <div id="sessionsList" class="sessions-empty">
-          Nessuna sessione registrata ancora. Apri Sottotitoli Studio, avvia il microfono e poi torna qui per vedere l'elenco.
+        <div id="sessionsList" style="display:flex;flex-direction:column;gap:8px">
+          <div style="text-align:center;padding:24px;color:var(--text-muted);font-size:13px">
+            <div style="font-size:32px;margin-bottom:8px">🎤</div>
+            Nessuna sessione ancora.<br>Apri <a href="studio.html" style="color:var(--accent-purple);font-weight:600">Studio</a>, avvia il microfono e torna qui.
+          </div>
         </div>
+        <button class="btn" id="downloadSessionsCsvBtn" style="margin-top:10px;width:100%">📥 Download CSV</button>
       </div>
       
       <!-- Performance Dashboard (from old account, restyled) -->
@@ -1052,7 +1057,7 @@ body{background:var(--bg)}
 
     async function loadViaggio() {
       var supabase = window.sottotitoliSupabase;
-      if (!supabase) { showEmpty(); return; }
+      if (!supabase) { setTimeout(loadViaggio, 500); return; }
       var result = await supabase.auth.getSession();
       if (!result.data || !result.data.session) { showEmpty(); return; }
       var userId = result.data.session.user.id;
@@ -1142,26 +1147,30 @@ body{background:var(--bg)}
   (async function(){
     var el = document.getElementById('favoriteSessions');
     if (!el) return;
-    var supabase = window.sottotitoliSupabase;
-    if (!supabase) { el.innerHTML = 'Accedi per vedere i preferiti.'; return; }
-    var session = await supabase.auth.getSession();
-    if (!session.data?.session) { el.innerHTML = 'Accedi per vedere i preferiti.'; return; }
-    var userId = session.data.session.user.id;
-    var { data } = await supabase.from('sessions').select('id,name,mode,duration_seconds,words_count,started_at').eq('user_id',userId).eq('favorite',true).order('started_at',{ascending:false}).limit(10);
-    if (!data||!data.length){ el.innerHTML='<span style="color:var(--text-muted)">Nessuna sessione preferita. Vai su <a href=\"analysis.html\" style=\"color:var(--accent-purple)\">Analysis</a> e clicca ☆ per aggiungerle.</span>'; return; }
-    var h='<div style="display:flex;flex-direction:column;gap:8px">';
-    data.forEach(function(s){
-      var name=s.name||s.mode||'Sessione';
-      var date=s.started_at?new Date(s.started_at).toLocaleDateString('it-IT',{day:'numeric',month:'short'}):'';
-      var dur=s.duration_seconds?Math.round(s.duration_seconds/60)+'m':'';
-      h+='<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;background:var(--bg-btn-subtle);border-radius:8px;font-size:13px">';
-      h+='<span><a href="analysis.html" style="color:var(--text-primary);text-decoration:none;font-weight:500">⭐ '+escHtml(name)+'</a> <span style="color:var(--text-muted);font-size:11px">'+escHtml(date)+' · '+dur+' · '+(s.words_count||0)+' parole</span></span>';
-      h+='<span style="color:var(--text-muted);font-size:11px">'+escHtml(s.mode||'')+'</span>';
+
+    async function load(){
+      var supabase = window.sottotitoliSupabase;
+      if (!supabase) { setTimeout(load, 500); return; }
+      var session = await supabase.auth.getSession();
+      if (!session.data?.session) { el.innerHTML = '<div style="text-align:center;padding:12px;color:var(--text-muted);font-size:13px">🔐 Accedi per vedere i preferiti.</div>'; return; }
+      var userId = session.data.session.user.id;
+      var { data } = await supabase.from('sessions').select('id,name,mode,duration_seconds,words_count,started_at').eq('user_id',userId).eq('favorite',true).order('started_at',{ascending:false}).limit(10);
+      if (!data||!data.length){ el.innerHTML='<div style="text-align:center;padding:12px;color:var(--text-muted);font-size:13px">Nessuna sessione preferita. Vai su <a href=\"analysis.html\" style=\"color:var(--accent-purple);font-weight:600\">Analysis</a> e clicca ☆.</div>'; return; }
+      var h='<div style="display:flex;flex-direction:column;gap:6px">';
+      data.forEach(function(s){
+        var name=s.name||s.mode||'Sessione';
+        var date=s.started_at?new Date(s.started_at).toLocaleDateString('it-IT',{day:'numeric',month:'short'}):'';
+        var dur=s.duration_seconds?Math.round(s.duration_seconds/60)+'m':'';
+        h+='<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:var(--bg-btn-subtle);border-radius:10px;font-size:13px">';
+        h+='<span><a href="analysis.html" style="color:var(--text-primary);text-decoration:none;font-weight:500">⭐ '+escHtml(name)+'</a> <span style="color:var(--text-muted);font-size:11px">'+escHtml(date)+' · '+dur+' · '+(s.words_count||0)+' parole</span></span>';
+        h+='<span style="color:var(--text-muted);font-size:11px">'+escHtml(s.mode||'')+'</span>';
+        h+='</div>';
+      });
       h+='</div>';
-    });
-    h+='</div>';
-    el.innerHTML=h;
+      el.innerHTML=h;
+    }
     function escHtml(s){ var d=document.createElement('div'); d.textContent=s; return d.innerHTML; }
+    load();
   })();
 
 </script>
