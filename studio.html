@@ -604,6 +604,58 @@
     @media (max-width: 768px) {
       .scroll-hint { right: 8px; font-size: 28px; }
     }
+
+    /* ─── Panel gradients ─── */
+    .h-panel { background: linear-gradient(135deg, #0f1117 0%, #1a1040 50%, #0f1117 100%); }
+    .h-panel-alt { background: linear-gradient(135deg, #0f1117 0%, #0d2438 50%, #0f1117 100%); }
+    [data-theme="light"] .h-panel { background: linear-gradient(135deg, #f0f2f5 0%, #ede9fe 50%, #f0f2f5 100%); }
+    [data-theme="light"] .h-panel-alt { background: linear-gradient(135deg, #f0f2f5 0%, #e0f2fe 50%, #f0f2f5 100%); }
+
+    /* ─── Vertical flip transition ─── */
+    .h-panel .h-panel-inner {
+      animation: flipReveal .55s cubic-bezier(.4,0,.2,1) backwards;
+    }
+    @keyframes flipReveal {
+      0% { transform: translateY(40px) scale(.97); opacity: 0; }
+      100% { transform: translateY(0) scale(1); opacity: 1; }
+    }
+    /* Re-trigger animation when panel becomes active via JS */
+    .h-panel.flip-in .h-panel-inner {
+      animation: flipReveal .55s cubic-bezier(.4,0,.2,1) backwards;
+    }
+
+    /* ─── Arrow nav (left/right) ─── */
+    .h-nav-arrow {
+      position: fixed;
+      top: 50%;
+      transform: translateY(-50%);
+      z-index: 800;
+      width: 44px; height: 44px;
+      border-radius: 50%;
+      border: 1px solid rgba(255,255,255,.1);
+      background: rgba(15,17,23,.8);
+      color: #fff;
+      font-size: 20px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all .2s;
+      backdrop-filter: blur(8px);
+    }
+    .h-nav-arrow:hover { background: var(--accent-purple); border-color: var(--accent-purple); }
+    .h-nav-arrow.left { left: 12px; }
+    .h-nav-arrow.right { right: 12px; }
+    [data-theme="light"] .h-nav-arrow {
+      background: rgba(255,255,255,.85);
+      color: #111827;
+      border-color: rgba(0,0,0,.08);
+    }
+    @media (max-width: 768px) {
+      .h-nav-arrow { width: 36px; height: 36px; font-size: 16px; }
+      .h-nav-arrow.left { left: 4px; }
+      .h-nav-arrow.right { right: 4px; }
+    }
   </style>
 </head>
 <body class="snap-body">
@@ -659,6 +711,9 @@
 
 <!-- Horizontal mode panels (shown after login — replaces main-scroll) -->
 <div id="studioContent" style="display:none">
+
+<button class="h-nav-arrow left" id="hNavLeft" title="Precedente">◂</button>
+<button class="h-nav-arrow right" id="hNavRight" title="Successivo">▸</button>
 
 <div class="h-scroll" id="modeScroll">
 
@@ -746,30 +801,89 @@
 <script src="js/stripe.js?v=2"></script>
 <script src="js/theme.js"></script>
 <script>
-  // ── Horizontal dot tracking ──
+  // ── Horizontal dot tracking + infinite loop + flip animation ──
   (function(){
     var dots = document.querySelectorAll('.h-dots a');
     var panels = document.querySelectorAll('.h-panel');
-    if (!dots.length || !panels.length) return;
+    var scrollEl = document.getElementById('modeScroll');
+    var leftBtn = document.getElementById('hNavLeft');
+    var rightBtn = document.getElementById('hNavRight');
+    if (!scrollEl || !panels.length) return;
+
+    var totalPanels = panels.length;
+    var currentIndex = 0;
+    var scrolling = false;
+
+    function scrollToPanel(idx, smooth) {
+      if (idx < 0) idx = totalPanels - 1;
+      if (idx >= totalPanels) idx = 0;
+      currentIndex = idx;
+      var panel = panels[idx];
+      panel.scrollIntoView({ behavior: smooth ? 'smooth' : 'auto', block: 'nearest', inline: 'start' });
+      // Re-trigger flip animation
+      panels.forEach(function(p){ p.classList.remove('flip-in'); });
+      panel.classList.add('flip-in');
+      // Update dots
+      dots.forEach(function(d, i){ d.classList.toggle('active', i === idx); });
+    }
+
+    // Click dots
+    dots.forEach(function(d, i){
+      d.addEventListener('click', function(e){
+        e.preventDefault();
+        scrollToPanel(i, true);
+      });
+    });
+
+    // Arrow buttons
+    if (leftBtn) leftBtn.addEventListener('click', function(){ scrollToPanel(currentIndex - 1, true); });
+    if (rightBtn) rightBtn.addEventListener('click', function(){ scrollToPanel(currentIndex + 1, true); });
+
+    // IntersectionObserver for active dot
     var observer = new IntersectionObserver(function(entries){
       entries.forEach(function(e){
-        if (e.isIntersecting) {
-          dots.forEach(function(d){
-            d.classList.toggle('active', d.getAttribute('href') === '#' + e.target.id);
+        if (e.isIntersecting && !scrolling) {
+          panels.forEach(function(p, i){
+            if (p === e.target) {
+              currentIndex = i;
+              dots.forEach(function(d, j){ d.classList.toggle('active', j === i); });
+              // Flip animation
+              panels.forEach(function(pp){ pp.classList.remove('flip-in'); });
+              p.classList.add('flip-in');
+            }
           });
         }
       });
     }, { threshold: 0.5 });
     panels.forEach(function(p){ observer.observe(p); });
 
-    // Click dot → scroll to panel
-    dots.forEach(function(d){
-      d.addEventListener('click', function(e){
-        e.preventDefault();
-        var target = document.querySelector(d.getAttribute('href'));
-        if (target) target.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'start' });
-      });
+    // Infinite loop: detect scroll end and wrap
+    scrollEl.addEventListener('scroll', function(){
+      var sw = scrollEl.scrollWidth;
+      var sl = scrollEl.scrollLeft;
+      var cw = scrollEl.clientWidth;
+      // Near the end — wrap to start
+      if (sl + cw >= sw - 10) {
+        scrolling = true;
+        scrollToPanel(0, false);
+        setTimeout(function(){ scrolling = false; }, 600);
+      }
+      // Near the start — wrap to end
+      if (sl <= 10) {
+        scrolling = true;
+        scrollToPanel(totalPanels - 1, false);
+        setTimeout(function(){ scrolling = false; }, 600);
+      }
     });
+
+    // Keyboard nav
+    document.addEventListener('keydown', function(e){
+      if (e.key === 'ArrowRight') { e.preventDefault(); scrollToPanel(currentIndex + 1, true); }
+      if (e.key === 'ArrowLeft') { e.preventDefault(); scrollToPanel(currentIndex - 1, true); }
+    });
+
+    // Initial flip on first panel
+    if (panels[0]) panels[0].classList.add('flip-in');
   })();
 
   // ── Hero login state ──

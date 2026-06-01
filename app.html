@@ -343,6 +343,25 @@ body {
 [data-theme="light"] .h-dots a{background:rgba(0,0,0,.08);border:1px solid rgba(0,0,0,.06)}
 .h-dots a:hover,.h-dots a.active{background:var(--accent-purple);border-color:var(--accent-purple);transform:scale(1.4)}
 @media(max-width:768px){.h-dots{display:none}}
+
+/* ─── Panel gradients ─── */
+.h-panel{background:linear-gradient(135deg,#0f1117 0%,#1a1040 50%,#0f1117 100%)}
+.h-panel-alt{background:linear-gradient(135deg,#0f1117 0%,#0d2438 50%,#0f1117 100%)}
+[data-theme="light"] .h-panel{background:linear-gradient(135deg,#f0f2f5 0%,#ede9fe 50%,#f0f2f5 100%)}
+[data-theme="light"] .h-panel-alt{background:linear-gradient(135deg,#f0f2f5 0%,#e0f2fe 50%,#f0f2f5 100%)}
+
+/* ─── Vertical flip transition ─── */
+.h-panel .h-panel-inner{animation:flipReveal .55s cubic-bezier(.4,0,.2,1) backwards}
+@keyframes flipReveal{0%{transform:translateY(40px) scale(.97);opacity:0}100%{transform:translateY(0) scale(1);opacity:1}}
+.h-panel.flip-in .h-panel-inner{animation:flipReveal .55s cubic-bezier(.4,0,.2,1) backwards}
+
+/* ─── Arrow nav ─── */
+.h-nav-arrow{position:fixed;top:50%;transform:translateY(-50%);z-index:800;width:44px;height:44px;border-radius:50%;border:1px solid rgba(255,255,255,.1);background:rgba(15,17,23,.8);color:#fff;font-size:20px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .2s;backdrop-filter:blur(8px)}
+.h-nav-arrow:hover{background:var(--accent-purple);border-color:var(--accent-purple)}
+.h-nav-arrow.left{left:12px}
+.h-nav-arrow.right{right:12px}
+[data-theme="light"] .h-nav-arrow{background:rgba(255,255,255,.85);color:#111827;border-color:rgba(0,0,0,.08)}
+@media(max-width:768px){.h-nav-arrow{width:36px;height:36px;font-size:16px}.h-nav-arrow.left{left:4px}.h-nav-arrow.right{right:4px}}
 </style>
 </head>
 <body>
@@ -403,6 +422,8 @@ body {
 </div>
 
 <!-- Horizontal scroll -->
+<button class="h-nav-arrow left" id="hNavLeft" title="Precedente">◂</button>
+<button class="h-nav-arrow right" id="hNavRight" title="Successivo">▸</button>
 <div class="h-scroll" id="modeScroll">
 
   <!-- Panel 1: Live Transcript -->
@@ -567,28 +588,53 @@ body {
 <script src="app.js?v=12"></script>
 
 <script>
-// ── Horizontal dot tracking ──
+// ── Horizontal dot tracking + infinite loop + flip ──
 (function(){
   var dots = document.querySelectorAll('.h-dots a');
   var panels = document.querySelectorAll('.h-panel');
-  if (!dots.length || !panels.length) return;
+  var scrollEl = document.getElementById('modeScroll');
+  var leftBtn = document.getElementById('hNavLeft');
+  var rightBtn = document.getElementById('hNavRight');
+  if (!scrollEl || !panels.length) return;
+  var totalPanels = panels.length, currentIndex = 0, scrolling = false;
+
+  function scrollTo(idx, smooth) {
+    if (idx < 0) idx = totalPanels - 1;
+    if (idx >= totalPanels) idx = 0;
+    currentIndex = idx;
+    panels[idx].scrollIntoView({ behavior: smooth ? 'smooth' : 'auto', block: 'nearest', inline: 'start' });
+    panels.forEach(function(p){ p.classList.remove('flip-in'); });
+    panels[idx].classList.add('flip-in');
+    dots.forEach(function(d, i){ d.classList.toggle('active', i === idx); });
+  }
+
+  dots.forEach(function(d, i){ d.addEventListener('click', function(e){ e.preventDefault(); scrollTo(i, true); }); });
+  if (leftBtn) leftBtn.addEventListener('click', function(){ scrollTo(currentIndex - 1, true); });
+  if (rightBtn) rightBtn.addEventListener('click', function(){ scrollTo(currentIndex + 1, true); });
+
   var observer = new IntersectionObserver(function(entries){
     entries.forEach(function(e){
-      if (e.isIntersecting) {
-        dots.forEach(function(d){
-          d.classList.toggle('active', d.getAttribute('href') === '#' + e.target.id);
+      if (e.isIntersecting && !scrolling) {
+        panels.forEach(function(p, i){
+          if (p === e.target) { currentIndex = i; dots.forEach(function(d, j){ d.classList.toggle('active', j === i); }); panels.forEach(function(pp){ pp.classList.remove('flip-in'); }); p.classList.add('flip-in'); }
         });
       }
     });
   }, { threshold: 0.5 });
   panels.forEach(function(p){ observer.observe(p); });
-  dots.forEach(function(d){
-    d.addEventListener('click', function(e){
-      e.preventDefault();
-      var target = document.querySelector(d.getAttribute('href'));
-      if (target) target.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'start' });
-    });
+
+  scrollEl.addEventListener('scroll', function(){
+    var sw = scrollEl.scrollWidth, sl = scrollEl.scrollLeft, cw = scrollEl.clientWidth;
+    if (sl + cw >= sw - 10) { scrolling = true; scrollTo(0, false); setTimeout(function(){ scrolling = false; }, 600); }
+    if (sl <= 10) { scrolling = true; scrollTo(totalPanels - 1, false); setTimeout(function(){ scrolling = false; }, 600); }
   });
+
+  document.addEventListener('keydown', function(e){
+    if (e.key === 'ArrowRight') { e.preventDefault(); scrollTo(currentIndex + 1, true); }
+    if (e.key === 'ArrowLeft') { e.preventDefault(); scrollTo(currentIndex - 1, true); }
+  });
+
+  if (panels[0]) panels[0].classList.add('flip-in');
 })();
 
 // ── Layout toggle (3 dashboard layouts) ──
