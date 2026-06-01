@@ -100,8 +100,24 @@ body {
 .stop-btn { background: var(--danger); color: #fff; box-shadow: 0 4px 14px rgba(220,38,38,.35); }
 .stop-btn:hover { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(220,38,38,.45); }
 .stop-btn:disabled { background: var(--gauge-bg); color: var(--muted2); box-shadow: none; cursor: not-allowed; transform: none; }
-.start-btn.recording { background: linear-gradient(135deg, #7c3aed, #6366f1); animation: pulse-rec 1.8s ease-in-out infinite; }
+/* ── Session button states (used by app.js) ── */
+#startBtn.recording { background: linear-gradient(135deg, #7c3aed, #6366f1); animation: pulse-rec 1.8s ease-in-out infinite; }
 @keyframes pulse-rec { 0%,100% { box-shadow: 0 0 0 0 rgba(124,58,237,.4); } 50% { box-shadow: 0 0 0 12px rgba(124,58,237,0); } }
+#startBtn:disabled { background: var(--gauge-bg); color: var(--muted2); box-shadow: none; cursor: not-allowed; transform: none; }
+#stopBtn:disabled { background: var(--gauge-bg); color: var(--muted2); box-shadow: none; cursor: not-allowed; transform: none; }
+
+/* ── Status dots (used by app.js) ── */
+#micDot.live, #socketDot.live { background: var(--good); box-shadow: 0 0 6px var(--good); }
+#micDot.warn, #socketDot.warn { background: var(--warn); }
+#micDot.idle, #socketDot.idle { background: var(--muted2); }
+
+/* ── Transcript lines ── */
+#captionTranscript .line { padding: 5px 0; border-bottom: 1px solid rgba(128,128,128,.06); font-size: 15px; line-height: 1.7; }
+
+/* ── Session complete visibility ── */
+#sessionComplete.visible { display: block; }
+#creditWarn.visible { display: flex; align-items: center; gap: 8px; justify-content: center; }
+#onboardHint.hidden { display: none; }
 
 /* ── Session complete panel ── */
 .session-complete { display: none; background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 24px; margin-top: 16px; animation: fadeIn .35s; }
@@ -436,51 +452,83 @@ body {
     </div>
   </section>
 
-  <!-- Panel 1: Live Transcript -->
+  <!-- Panel 3: Live Transcript — main dashboard -->
   <section class="h-panel" id="transcriptPanel">
-    <div class="h-panel-inner" style="max-width:960px;text-align:left">
-      <div class="section-label" style="text-align:center">Live Transcript</div>
-      <div class="status-strip">
-        <div class="s-pill"><span class="dot idle" id="micDot"></span><strong id="micStatus">ready</strong></div>
-        <div class="s-pill"><span class="dot idle" id="socketDot"></span><strong id="socketStatus">idle</strong></div>
-        <div class="s-pill">⏱ <strong id="sessionTimer">00:00</strong></div>
-        <div class="s-pill">🪙 <strong id="creditBalance">—</strong></div>
-        <div class="s-pill">🎫 <strong id="tokenBalanceApp">—</strong></div>
-        <div class="s-pill overlay-url" id="overlayLinkShort">—</div>
+    <div class="h-panel-inner" style="max-width:900px;text-align:center;padding-top:90px;padding-bottom:40px">
+
+      <!-- Status bar -->
+      <div style="display:flex;gap:10px;margin-bottom:20px;flex-wrap:wrap;justify-content:center">
+        <div style="display:flex;align-items:center;gap:6px;padding:6px 14px;border-radius:100px;background:var(--card);border:1px solid var(--line);font-size:12px;font-weight:600">
+          <span style="width:8px;height:8px;border-radius:50%;background:var(--muted2);flex-shrink:0" id="micDot"></span>
+          <span id="micStatus" style="color:var(--text);font-size:11px">Ready</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:6px;padding:6px 14px;border-radius:100px;background:var(--card);border:1px solid var(--line);font-size:12px;font-weight:600">
+          <span style="width:8px;height:8px;border-radius:50%;background:var(--muted2);flex-shrink:0" id="socketDot"></span>
+          <span id="socketStatus" style="color:var(--text);font-size:11px">Idle</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:4px;padding:6px 14px;border-radius:100px;background:var(--card);border:1px solid var(--line);font-size:12px;font-weight:600;font-variant-numeric:tabular-nums">
+          <span style="color:var(--muted2)">⏱</span>
+          <span id="sessionTimer" style="color:var(--text)">00:00</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:4px;padding:6px 14px;border-radius:100px;background:var(--card);border:1px solid var(--line);font-size:12px;font-weight:600">
+          <span style="color:var(--muted2)">🪙</span>
+          <span id="creditBalance" style="color:var(--text)">—</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:4px;padding:6px 14px;border-radius:100px;background:var(--card);border:1px solid var(--line);font-size:12px;font-weight:600">
+          <span style="color:var(--muted2)">🎫</span>
+          <span id="tokenBalanceApp" style="color:var(--text)">—</span>
+        </div>
       </div>
 
-      <div class="caption-window" id="captionWindow" style="min-height:200px;border-radius:16px;padding:24px 28px">
-        <div class="caption-interim" id="captionInterim" style="font-size:clamp(20px,4vw,32px);min-height:50px"></div>
-        <div class="caption-transcript" id="captionTranscript" style="max-height:220px"></div>
+      <!-- Main caption area -->
+      <div style="background:var(--card);border:1px solid var(--line);border-radius:20px;padding:32px 32px 24px;margin-bottom:16px;text-align:left;min-height:180px">
+        <div style="font-size:clamp(22px,4vw,36px);font-weight:600;line-height:1.35;color:var(--accent-purple);min-height:40px;word-break:break-word" id="captionInterim">
+          <span style="color:var(--muted2);font-weight:400;font-style:italic">Parla per vedere i sottotitoli…</span>
+        </div>
+        <div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--line);font-size:15px;line-height:1.7;color:var(--text);max-height:180px;overflow-y:auto" id="captionTranscript"></div>
       </div>
 
-      <div class="translated-window" id="translatedWindow">
-        <div class="t-label">🌐 Traduzione live</div>
+      <!-- Translation output -->
+      <div style="display:none;background:var(--bg2);border:1px solid var(--line);border-radius:14px;padding:14px 18px;margin-bottom:14px;font-size:14px;color:var(--text-secondary);text-align:left" id="translatedWindow">
+        <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--accent-blue);margin-bottom:6px">🌐 Traduzione live</div>
         <div id="captionTranslated"></div>
       </div>
 
-      <div class="credit-warn" id="creditWarn">
-        ⚠️ Meno di 5 minuti rimanenti. <a href="account.html">Acquista minuti →</a>
+      <!-- Credit warning -->
+      <div style="display:none;align-items:center;gap:8px;background:rgba(217,119,6,.1);border:1px solid rgba(217,119,6,.3);border-radius:10px;padding:10px 16px;margin-bottom:12px;font-size:13px;color:var(--amber);justify-content:center" id="creditWarn">
+        ⚠️ Meno di 5 minuti rimanenti. <a href="account.html" style="color:var(--amber);font-weight:600">Acquista minuti →</a>
       </div>
 
-      <div class="onboard-hint" id="onboardHint">
-        <div style="font-size:24px;margin-bottom:6px">👋</div>
-        <strong>Benvenuto in Sottotitoli!</strong>
-        <p style="margin:4px 0 0;font-size:12px;color:var(--muted)">Scegli la lingua, clicca <em>Start Session</em> e inizia a parlare. I sottotitoli appaiono in tempo reale.</p>
+      <!-- Onboarding hint -->
+      <div style="background:linear-gradient(135deg,rgba(124,58,237,.06),rgba(37,99,235,.06));border:1px solid rgba(124,58,237,.15);border-radius:16px;padding:20px 24px;margin-bottom:16px;text-align:center" id="onboardHint">
+        <div style="font-size:32px;margin-bottom:6px">🎤</div>
+        <div style="font-size:16px;font-weight:700;color:var(--text);margin-bottom:4px">Pronto a iniziare?</div>
+        <div style="font-size:13px;color:var(--muted);line-height:1.5">Scegli la lingua nel menu in alto, poi clicca <strong>Start Session</strong> e parla.<br>I sottotitoli appariranno qui in tempo reale.</div>
       </div>
 
-      <div class="action-row" style="justify-content:center;margin-top:14px">
-        <button class="start-btn" id="startBtn" style="font-size:16px;padding:16px 36px">🎤 Start Session</button>
-        <button class="stop-btn" id="stopBtn" disabled style="font-size:16px;padding:16px 36px">⏹ Stop</button>
-      </div>
-      <div class="action-row" style="justify-content:center;margin-top:8px">
-        <button class="t-btn" id="openOverlayBtn">🖥 Overlay</button>
-        <button class="t-btn" id="copyOverlayBtn">📋 Copy link</button>
-        <button class="t-btn" id="newRoomBtn">🔄 New room</button>
-        <span style="font-size:10px;color:var(--muted2)" title="Apri l'overlay su un altro schermo.">ℹ️ Streaming</span>
+      <!-- Primary action: Start/Stop -->
+      <div style="display:flex;gap:10px;justify-content:center;margin-bottom:12px">
+        <button style="font-family:inherit;font-size:17px;font-weight:700;padding:16px 40px;border-radius:16px;border:none;cursor:pointer;background:var(--good);color:#fff;box-shadow:0 4px 20px rgba(22,163,74,.35);transition:all .2s;display:inline-flex;align-items:center;gap:8px" id="startBtn"
+          onmouseover="this.style.transform='translateY(-2px)';this.style.boxShadow='0 8px 28px rgba(22,163,74,.45)'"
+          onmouseout="this.style.transform='';this.style.boxShadow='0 4px 20px rgba(22,163,74,.35)'">
+          🎤 Start Session
+        </button>
+        <button style="font-family:inherit;font-size:17px;font-weight:700;padding:16px 40px;border-radius:16px;border:none;cursor:pointer;background:var(--danger);color:#fff;box-shadow:0 4px 20px rgba(220,38,38,.35);transition:all .2s;display:none;align-items:center;gap:8px" id="stopBtn" disabled
+          onmouseover="this.style.transform='translateY(-2px)';this.style.boxShadow='0 8px 28px rgba(220,38,38,.45)'"
+          onmouseout="this.style.transform='';this.style.boxShadow='0 4px 20px rgba(220,38,38,.35)'">
+          ⏹ Stop
+        </button>
       </div>
 
-      <div class="session-complete" id="sessionComplete">
+      <!-- Secondary actions -->
+      <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap">
+        <button style="font-family:inherit;font-size:12px;font-weight:600;padding:8px 16px;border-radius:10px;border:1px solid var(--line);background:var(--card);color:var(--text);cursor:pointer;transition:all .15s" id="openOverlayBtn">🖥 Overlay</button>
+        <button style="font-family:inherit;font-size:12px;font-weight:600;padding:8px 16px;border-radius:10px;border:1px solid var(--line);background:var(--card);color:var(--text);cursor:pointer;transition:all .15s" id="copyOverlayBtn">📋 Copy link</button>
+        <button style="font-family:inherit;font-size:12px;font-weight:600;padding:8px 16px;border-radius:10px;border:1px solid var(--line);background:var(--card);color:var(--text);cursor:pointer;transition:all .15s" id="newRoomBtn">🔄 New room</button>
+      </div>
+
+      <!-- Session complete (hidden until stop) -->
+      <div style="display:none;background:var(--card);border:1px solid var(--line);border-radius:16px;padding:24px;margin-top:16px;text-align:left" id="sessionComplete">
         <h3>✅ Sessione completata</h3>
         <div class="summary-grid">
           <div class="sum-item"><div class="sv" id="sumDuration">—</div><div class="sl">Durata</div></div>
