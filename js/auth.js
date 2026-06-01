@@ -51,22 +51,25 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   function renderSignedOut() {
     authSection.innerHTML = `
-      <button id="googleLoginBtn" class="btn btn-default navbar-btn" type="button">
-        Sign in with Google
+      <button id="googleLoginBtn" style="font-family:inherit;font-size:12px;font-weight:600;padding:8px 16px;border-radius:100px;border:1.5px solid var(--accent-purple);background:transparent;color:var(--accent-purple);cursor:pointer;transition:all .15s;white-space:nowrap" type="button"
+        onmouseover="this.style.background='var(--accent-purple)';this.style.color='#fff'"
+        onmouseout="this.style.background='transparent';this.style.color='var(--accent-purple)'">
+        Sign in
       </button>
     `;
     const btn = document.getElementById('googleLoginBtn');
     if (btn) {
       btn.addEventListener('click', signInWithGoogle);
     }
-    // Hide wallet links for logged-out users
     document.querySelectorAll('.wallet-link').forEach(function(el){ el.style.display = 'none'; });
   }
 
   function renderSignedIn() {
     authSection.innerHTML = `
-      <button id="logoutBtn" class="btn btn-default navbar-btn" type="button">
-        Sign out
+      <button id="logoutBtn" style="font-family:inherit;font-size:11px;font-weight:600;padding:6px 14px;border-radius:100px;border:1px solid var(--line);background:var(--card);color:var(--text-secondary);cursor:pointer;transition:all .15s;white-space:nowrap" type="button"
+        onmouseover="this.style.borderColor='var(--accent-purple)';this.style.color='var(--accent-purple)'"
+        onmouseout="this.style.borderColor='var(--line)';this.style.color='var(--text-secondary)'">
+        Esci
       </button>
     `;
     const logoutBtn = document.getElementById('logoutBtn');

@@ -179,9 +179,11 @@
   function appendLine(targetId, text) {
     const box = ensureBoxReady(targetId);
     if (!box || !text) return;
+    const now = new Date();
+    const ts = String(now.getHours()).padStart(2,'0') + ':' + String(now.getMinutes()).padStart(2,'0') + ':' + String(now.getSeconds()).padStart(2,'0');
     const div = document.createElement("div");
     div.className = "line";
-    div.textContent = text;
+    div.innerHTML = '<span style="font-size:10px;color:var(--muted2);margin-right:6px;font-variant-numeric:tabular-nums">' + ts + '</span>' + text;
     box.prepend(div);
   }
 
@@ -814,23 +816,22 @@
     if (state === 'starting') {
       sessionActive = true;
       if (startBtn) { startBtn.classList.add('recording'); startBtn.textContent = '🎤 Recording…'; startBtn.disabled = true; }
-      if (stopBtn) { stopBtn.disabled = false; stopBtn.textContent = '⏹ Stop Session'; }
+      if (stopBtn) { stopBtn.disabled = false; stopBtn.textContent = '⏹ Stop Session'; stopBtn.style.display = 'inline-flex'; }
       if (completePanel) completePanel.classList.remove('visible');
       if (creditWarn) creditWarn.classList.remove('visible');
-      // Disable new room during recording
       var newRoomBtn = $("newRoomBtn");
       if (newRoomBtn) { newRoomBtn.disabled = true; newRoomBtn.style.opacity = '0.4'; }
       setText("statusText", "Session started.");
     } else if (state === 'stopped') {
       sessionActive = false;
       if (startBtn) { startBtn.classList.remove('recording'); startBtn.textContent = '🎤 Start Session'; startBtn.disabled = false; }
-      if (stopBtn) { stopBtn.disabled = true; stopBtn.textContent = '⏹ Stop'; }
+      if (stopBtn) { stopBtn.disabled = true; stopBtn.textContent = '⏹ Stop'; stopBtn.style.display = 'none'; }
       var newRoomBtn2 = $("newRoomBtn");
       if (newRoomBtn2) { newRoomBtn2.disabled = false; newRoomBtn2.style.opacity = '1'; }
     } else if (state === 'complete') {
       sessionActive = false;
       if (startBtn) { startBtn.classList.remove('recording'); startBtn.textContent = '🎤 Start Session'; startBtn.disabled = false; }
-      if (stopBtn) { stopBtn.disabled = true; stopBtn.textContent = '⏹ Stop'; }
+      if (stopBtn) { stopBtn.disabled = true; stopBtn.textContent = '⏹ Stop'; stopBtn.style.display = 'none'; }
       var newRoomBtn3 = $("newRoomBtn");
       if (newRoomBtn3) { newRoomBtn3.disabled = false; newRoomBtn3.style.opacity = '1'; }
       // Show completion panel

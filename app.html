@@ -709,28 +709,53 @@ body {
   panels[2].scrollIntoView({ block: 'nearest', inline: 'start' });
   if (leftBtn) leftBtn.style.display = 'none';
 
-  // ── Sync overlay panels with live caption text ──
+  // ── Sync overlay panels with live caption text (cinematic) ──
+  var overlayHistory = [];
   setInterval(function(){
     var interim = document.getElementById('captionInterim');
+    var transcript = document.getElementById('captionTranscript');
     var roomEl = document.getElementById('roomValue');
     var timerEl = document.getElementById('sessionTimer');
-    var overlayRoll = document.getElementById('overlayRollText');
+
+    // Get latest text
+    var text = interim ? (interim.textContent || '').replace('Parla per vedere i sottotitoli…','').trim() : '';
+    if (!text && transcript) {
+      var lines = transcript.querySelectorAll('.line');
+      if (lines.length) text = lines[0].textContent.replace(/^\d{2}:\d{2}:\d{2}\s*/,'').trim();
+    }
+
+    // Build history (keep last 5)
+    if (text && (overlayHistory.length === 0 || overlayHistory[overlayHistory.length-1] !== text)) {
+      overlayHistory.push(text);
+      if (overlayHistory.length > 5) overlayHistory.shift();
+    }
+
+    // Overlay Cinema: current line only, large
     var overlayCinema = document.getElementById('overlayCinemaText');
-    var overlayRollRoom = document.getElementById('overlayRollRoom');
-    var overlayRollTimer = document.getElementById('overlayRollTimer');
-    var text = interim ? (interim.textContent || '').trim() : '';
-    if (!text) {
-      var transcript = document.getElementById('captionTranscript');
-      if (transcript) {
-        var lines = transcript.querySelectorAll('.line');
-        if (lines.length) text = lines[lines.length-1].textContent.trim();
+    if (overlayCinema) overlayCinema.textContent = text || 'In attesa del microfono…';
+
+    // Overlay Roll: current + fading history
+    var overlayRoll = document.getElementById('overlayRollText');
+    if (overlayRoll) {
+      if (overlayHistory.length === 0) {
+        overlayRoll.innerHTML = '<div style="opacity:.4">In attesa del microfono…</div>';
+      } else {
+        var html = '';
+        for (var i = overlayHistory.length - 1; i >= 0; i--) {
+          var opacity = 0.2 + (i / overlayHistory.length) * 0.8;
+          var size = 0.6 + (i / overlayHistory.length) * 0.4;
+          html += '<div style="opacity:' + opacity.toFixed(2) + ';font-size:' + (size*100).toFixed(0) + '%;margin-bottom:6px;transition:opacity .8s">' + overlayHistory[i] + '</div>';
+        }
+        overlayRoll.innerHTML = html;
       }
     }
-    if (overlayRoll) overlayRoll.textContent = text || 'In attesa del microfono…';
-    if (overlayCinema) overlayCinema.textContent = text || 'In attesa del microfono…';
-    if (overlayRollRoom && roomEl) overlayRollRoom.textContent = 'Room: ' + (roomEl.textContent || '—');
-    if (overlayRollTimer && timerEl) overlayRollTimer.textContent = timerEl.textContent || '00:00';
-  }, 500);
+
+    // Room + timer for roll
+    var rollRoom = document.getElementById('overlayRollRoom');
+    var rollTimer = document.getElementById('overlayRollTimer');
+    if (rollRoom && roomEl) rollRoom.textContent = 'Room: ' + (roomEl.textContent || '—');
+    if (rollTimer && timerEl) rollTimer.textContent = timerEl ? timerEl.textContent : '00:00';
+  }, 400);
 })();
 
 // ── Layout toggle (3 dashboard layouts) ──
