@@ -827,8 +827,9 @@ body {
     lastTap = now;
   });
 
-  // ── Sync overlay panels with live caption text (cinematic) ──
+  // ── Sync overlay panels with live caption text (cinematic + speakers) ──
   var overlayHistory = [];
+  var lastSpeaker = 'A';
   setInterval(function(){
     var interim = document.getElementById('captionInterim');
     var transcript = document.getElementById('captionTranscript');
@@ -1031,34 +1032,79 @@ body {
     var transcriptEl = $('captionTranscript');
     var text = transcriptEl ? (transcriptEl.textContent || '').trim() : '';
 
-    // Count verbs/nouns/adjectives using lemma-pos-map
-    var verbCount = 0, nounCount = 0, adjCount = 0, advCount = 0;
+    // Count verbs/nouns/adjectives using lemma-pos-map + suffix fallback
+    var verbCount = 0, nounCount = 0, adjCount = 0, advCount = 0, pronCount = 0, prepCount = 0;
     var chipHtml = '';
     var usedWords = {};
-    if (text && window.LEMMA_POS_MAP) {
+
+    // Language-specific suffix rules
+    var isItalian = mode.indexOf('it') !== -1;
+    var isEnglish = mode.indexOf('en') !== -1;
+    var suffixes = {
+      verb: isItalian ? ['are','ere','ire','ndo','ato','uto','ito','ava','evo','iva','ò','ai','à','ei','etti'] :
+            ['ing','ed','ize','ise','ate','ify','en'],
+      noun: isItalian ? ['ione','ore','trice','tà','tù','ezza','ura','mento','zione','sione','ista','logo','eria'] :
+            ['tion','sion','ment','ness','ity','ance','ence','er','or','ist','ism','dom','hood','ship'],
+      adj: isItalian ? ['oso','ale','ile','ico','istico','evole','bile','abile','ibile'] :
+            ['ous','ful','less','able','ible','ive','al','ial','ic','ical','ish','like','esque'],
+      adv: ['mente','ly','wise','wards'],
+      pron: isItalian ? ['io','tu','lui','lei','noi','voi','loro','mi','ti','si','ci','vi','lo','la','li','le','ne'] :
+             ['i','you','he','she','it','we','they','me','him','her','us','them','my','your','his','its','our','their'],
+      prep: isItalian ? ['di','a','da','in','con','su','per','tra','fra','sotto','sopra','dopo','prima','durante','senza'] :
+             ['in','on','at','to','for','with','from','by','about','into','through','during','before','after','over','under','between']
+    };
+
+    function detectPOS(word) {
+      var w = word.toLowerCase();
+      // Check lemma map first (English)
+      if (window.LEMMA_POS_MAP && window.LEMMA_POS_MAP[w]) {
+        var p = window.LEMMA_POS_MAP[w];
+        if (p === 'verb' || p === 'v') return 'verb';
+        if (p === 'noun' || p === 'n') return 'noun';
+        if (p === 'adj') return 'adj';
+        if (p === 'adv') return 'adv';
+      }
+      // Suffix fallback
+      for (var i = 0; i < suffixes.verb.length; i++) { if (w.endsWith(suffixes.verb[i]) && w.length > 3) return 'verb'; }
+      for (var i = 0; i < suffixes.noun.length; i++) { if (w.endsWith(suffixes.noun[i]) && w.length > 3) return 'noun'; }
+      for (var i = 0; i < suffixes.adj.length; i++) { if (w.endsWith(suffixes.adj[i]) && w.length > 3) return 'adj'; }
+      for (var i = 0; i < suffixes.adv.length; i++) { if (w.endsWith(suffixes.adv[i]) && w.length > 3) return 'adv'; }
+      return null;
+    }
+
+    if (text) {
       var tokens = text.split(/\s+/);
       tokens.forEach(function(t) {
-        var clean = t.toLowerCase().replace(/[^a-z']/g, '');
-        if (!clean || usedWords[clean]) return;
+        var clean = t.toLowerCase().replace(/[^a-zà-ù']/g, '');
+        if (!clean || clean.length < 2 || usedWords[clean]) return;
         usedWords[clean] = true;
-        var pos = window.LEMMA_POS_MAP[clean];
+        var pos = detectPOS(clean);
         if (!pos) return;
-        if (pos === 'verb' || pos === 'v') { verbCount++; chipHtml += '<span class="verb-chip">'+clean+'</span> '; }
-        else if (pos === 'noun' || pos === 'n') { nounCount++; chipHtml += '<span class="verb-chip noun">'+clean+'</span> '; }
-        else if (pos === 'adj') { adjCount++; chipHtml += '<span class="verb-chip adj">'+clean+'</span> '; }
-        else if (pos === 'adv') { advCount++; chipHtml += '<span class="verb-chip adv">'+clean+'</span> '; }
-        else { chipHtml += '<span class="verb-chip other">'+clean+'</span> '; }
+        if (pos === 'verb') { verbCount++; }
+        else if (pos === 'noun') { nounCount++; }
+        else if (pos === 'adj') { adjCount++; }
+        else if (pos === 'adv') { advCount++; }
       });
     }
 
-    if (chipHtml !== lastVerbChips) {
-      lastVerbChips = chipHtml;
-      var verbList = $('liveVerbList');
-      if (verbList) verbList.innerHTML = chipHtml || '<span style="font-size:12px;color:var(--muted2)">Parla per rilevare parole…</span>';
-      setText('liveVerbCount', verbCount);
-      setText('liveNounCount', nounCount);
-      setText('liveAdjCount', adjCount);
+    setText('liveVerbCount', verbCount);
+    setText('liveNounCount', nounCount);
+    setText('liveAdjCount', adjCount);
+    setText('liveAdvCount', advCount);
+    // Estimate pronouns and prepositions from common sets
+    var preps = suffixes.prep;
+    var prons = suffixes.pron;
+    var prepCount2 = 0, pronCount2 = 0;
+    if (text) {
+      var tokens2 = text.toLowerCase().split(/\s+/);
+      tokens2.forEach(function(t){
+        var clean = t.replace(/[^a-zà-ù']/g, '');
+        if (preps.indexOf(clean) !== -1) prepCount2++;
+        if (prons.indexOf(clean) !== -1) pronCount2++;
+      });
     }
+    setText('livePrepCount', prepCount2);
+    setText('livePronCount', pronCount2);
 
     // Read stats from DOM (populated by app.js)
     var words = parseInt(($('statWords')||{}).textContent) || 0;

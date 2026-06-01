@@ -131,6 +131,10 @@
   let latestReportText = "";
   let lastInterimSent = "";
   let lastFinalSent = "";
+  let currentSpeaker = "A";
+  let lastUtteranceTime = 0;
+  const SPEAKER_GAP_MS = 3000;
+  const SPEAKER_COLORS = { A: "#fff", B: "#a78bfa", C: "#60a5fa", D: "#34d399" };
   let shouldKeepListening = false;
   let restartTimer = null;
   let hasStartedOnce = false;
@@ -176,14 +180,19 @@
     return el;
   }
 
-  function appendLine(targetId, text) {
+  function appendLine(targetId, text, speaker) {
     const box = ensureBoxReady(targetId);
     if (!box || !text) return;
     const now = new Date();
     const ts = String(now.getHours()).padStart(2,'0') + ':' + String(now.getMinutes()).padStart(2,'0') + ':' + String(now.getSeconds()).padStart(2,'0');
     const div = document.createElement("div");
     div.className = "line";
-    div.innerHTML = '<span style="font-size:10px;color:var(--muted2);margin-right:6px;font-variant-numeric:tabular-nums">' + ts + '</span>' + text;
+    var speakerTag = '';
+    if (speaker) {
+      var sc = SPEAKER_COLORS[speaker] || '#fff';
+      speakerTag = '<span style="display:inline-block;width:18px;height:18px;border-radius:50%;background:'+sc+';color:#000;font-size:9px;font-weight:700;text-align:center;line-height:18px;margin-right:6px;flex-shrink:0" title="Speaker '+speaker+'">'+speaker+'</span>';
+    }
+    div.innerHTML = '<span style="font-size:10px;color:var(--muted2);margin-right:6px;font-variant-numeric:tabular-nums">' + ts + '</span>' + speakerTag + text;
     box.prepend(div);
   }
 
@@ -444,7 +453,13 @@
     if (clean === lastFinalSent) return;
     lastFinalSent = clean;
 
-    // Cancel any pending interim flush for this text
+    // Speaker detection: if >3s gap, toggle speaker
+    var now = Date.now();
+    if (lastUtteranceTime > 0 && (now - lastUtteranceTime) > SPEAKER_GAP_MS) {
+      currentSpeaker = currentSpeaker === "A" ? "B" : "A";
+    }
+    lastUtteranceTime = now;
+
     clearInterimFlushTimer();
     pendingInterimText = "";
 
@@ -453,12 +468,13 @@
     const entry = {
       timestamp,
       text: clean,
+      speaker: currentSpeaker,
       translated: null,
       learning: annotateLineWithNgsl(clean)
     };
     transcriptLines.push(entry);
 
-    appendLine("captionTranscript", clean);
+    appendLine("captionTranscript", clean, currentSpeaker);
 
     const payload = {
       type: "caption",
@@ -1040,11 +1056,17 @@
             var clean = p.final.trim();
             if (!clean || clean === lastFinalSent) return;
             lastFinalSent = clean;
+            // Speaker detection
+            var now2 = Date.now();
+            if (lastUtteranceTime > 0 && (now2 - lastUtteranceTime) > SPEAKER_GAP_MS) {
+              currentSpeaker = currentSpeaker === "A" ? "B" : "A";
+            }
+            lastUtteranceTime = now2;
             pendingInterimText = "";
             clearBox("captionInterim", "");
             var timestamp = w.SottotitoliSessionUtils.formatTimestamp(new Date());
-            transcriptLines.push({ timestamp: timestamp, text: clean, translated: null, learning: annotateLineWithNgsl(clean) });
-            appendLine("captionTranscript", clean);
+            transcriptLines.push({ timestamp: timestamp, text: clean, speaker: currentSpeaker, translated: null, learning: annotateLineWithNgsl(clean) });
+            appendLine("captionTranscript", clean, currentSpeaker);
             updateStats();
             lastInterimSent = "";
           }
