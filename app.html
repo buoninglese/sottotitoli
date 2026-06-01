@@ -12,7 +12,6 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" crossorigin="anonymous" referrerpolicy="no-referrer">
   <link rel="icon" type="image/png" href="img/favicon.png" />
   <link rel="stylesheet" href="css/normalize.css" />
-  <link rel="stylesheet" href="css/theme.css" />
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root {
@@ -345,6 +344,7 @@ body {
   -webkit-tap-highlight-color: transparent; }
 .ov-scheme-btn:hover { background: rgba(255,255,255,.2); border-color: rgba(255,255,255,.35); transform: scale(1.1); }
 </style>
+  <link rel="stylesheet" href="css/theme.css" />
 </head>
 <body>
 
@@ -640,7 +640,6 @@ body {
           <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--muted2);margin-bottom:4px">💾 Strumenti</div>
           <button id="copyTranscriptBtn" style="font-family:inherit;font-size:13px;font-weight:600;padding:10px 14px;border-radius:10px;border:1px solid var(--line);background:var(--card);color:var(--text);cursor:pointer;transition:all .15s;text-align:left">📋 Copia trascrizione</button>
           <button id="downloadTranscriptBtn" style="font-family:inherit;font-size:13px;font-weight:600;padding:10px 14px;border-radius:10px;border:1px solid var(--line);background:var(--card);color:var(--text);cursor:pointer;transition:all .15s;text-align:left">📥 Scarica trascrizione</button>
-          <a href="training.html" style="font-family:inherit;font-size:13px;font-weight:600;padding:10px 14px;border-radius:10px;border:1px solid var(--line);background:var(--card);color:var(--text);text-decoration:none;transition:all .15s;text-align:left">🎯 Training mode</a>
         </div>
       </div>
     </div>
@@ -737,34 +736,33 @@ body {
     var roomEl = document.getElementById('roomValue');
     var timerEl = document.getElementById('sessionTimer');
 
-    // Get latest text
-    var text = interim ? (interim.textContent || '').replace('Parla per vedere i sottotitoli…','').trim() : '';
-    if (!text && transcript) {
+    // Get latest FINAL text only (skip interim for overlay panels)
+    var text = '';
+    if (transcript) {
       var lines = transcript.querySelectorAll('.line');
-      if (lines.length) text = lines[0].textContent.replace(/^\d{2}:\d{2}:\d{2}\s*/,'').trim();
+      if (lines.length) text = lines[lines.length-1].textContent.replace(/^\d{2}:\d{2}:\d{2}\s*/,'').trim();
     }
 
-    // Build history (keep last 5)
-    if (text && (overlayHistory.length === 0 || overlayHistory[overlayHistory.length-1] !== text)) {
+    // Only push complete sentences (ending with .!?) to history
+    var isComplete = function(s){ return /[.!?]$/.test(s.trim()); };
+    if (text && isComplete(text) && (overlayHistory.length === 0 || overlayHistory[overlayHistory.length-1] !== text)) {
       overlayHistory.push(text);
       if (overlayHistory.length > 5) overlayHistory.shift();
     }
 
-  // Overlay Cinema: current line + 2 previous complete sentences
+  // Overlay Cinema: current final sentence + 2 previous complete sentences
     var overlayCinema = document.getElementById('overlayCinemaText');
     if (overlayCinema) {
-      var current = text || '';
+      var current = overlayHistory.length ? overlayHistory[overlayHistory.length-1] : '';
       var prev1 = overlayHistory.length > 1 ? overlayHistory[overlayHistory.length - 2] : '';
       var prev2 = overlayHistory.length > 2 ? overlayHistory[overlayHistory.length - 3] : '';
-      // Only show complete sentences (ending with .!?)
-      var isComplete = function(s){ return /[.!?]$/.test(s.trim()); };
       var html = '<div style="font-size:100%;font-weight:800;line-height:1.3;margin-bottom:4px">' + (current || 'In attesa del microfono…') + '</div>';
       if (prev2 && isComplete(prev2)) html += '<div style="font-size:55%;opacity:.35;line-height:1.4;margin-bottom:2px">' + prev2 + '</div>';
       if (prev1 && isComplete(prev1)) html += '<div style="font-size:55%;opacity:.35;line-height:1.4">' + prev1 + '</div>';
       overlayCinema.innerHTML = html;
     }
 
-    // Overlay Roll: current + fading history
+    // Overlay Roll: only final complete sentences, newest at top, older fade down
     var overlayRoll = document.getElementById('overlayRollText');
     if (overlayRoll) {
       if (overlayHistory.length === 0) {
