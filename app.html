@@ -418,6 +418,24 @@ body {
 <button class="h-nav-arrow right" id="hNavRight" title="Successivo">▸</button>
 <div class="h-scroll" id="modeScroll">
 
+  <!-- Overlay Roll — rolling captions view -->
+  <section class="h-panel" id="overlayRollPanel" style="background:#000">
+    <div class="h-panel-inner" style="max-width:100%;padding:60px 20px;text-align:center;display:flex;flex-direction:column;justify-content:flex-end">
+      <div style="font-size:clamp(24px,5vw,48px);font-weight:700;color:#fff;line-height:1.3;word-break:break-word;min-height:80px" id="overlayRollText">In attesa del microfono…</div>
+      <div style="margin-top:20px;font-size:11px;color:rgba(255,255,255,.3);display:flex;gap:16px;justify-content:center">
+        <span id="overlayRollRoom">Room: —</span>
+        <span id="overlayRollTimer">00:00</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- Overlay — cinema-style caption view -->
+  <section class="h-panel h-panel-alt" id="overlayPanel" style="background:#000">
+    <div class="h-panel-inner" style="max-width:100%;padding:60px 20px;text-align:center;display:flex;align-items:center;justify-content:center">
+      <div style="font-size:clamp(28px,6vw,56px);font-weight:800;color:#fff;line-height:1.2;letter-spacing:-1px;word-break:break-word;min-height:80px" id="overlayCinemaText">In attesa del microfono…</div>
+    </div>
+  </section>
+
   <!-- Panel 1: Live Transcript -->
   <section class="h-panel" id="transcriptPanel">
     <div class="h-panel-inner" style="max-width:960px;text-align:left">
@@ -564,6 +582,8 @@ body {
 
 <!-- Horizontal dots -->
 <nav class="h-dots" id="hSectionDots">
+  <a href="#overlayRollPanel"></a>
+  <a href="#overlayPanel"></a>
   <a href="#transcriptPanel" class="active"></a>
   <a href="#metricsPanel"></a>
   <a href="#vocabPanel"></a>
@@ -587,7 +607,7 @@ body {
 <script src="app.js?v=12"></script>
 
 <script>
-// ── Horizontal dot tracking + infinite loop + flip ──
+// ── Horizontal dot tracking + flip + overlay sync ──
 (function(){
   var dots = document.querySelectorAll('.h-dots a');
   var panels = document.querySelectorAll('.h-panel');
@@ -595,16 +615,18 @@ body {
   var leftBtn = document.getElementById('hNavLeft');
   var rightBtn = document.getElementById('hNavRight');
   if (!scrollEl || !panels.length) return;
-  var totalPanels = panels.length, currentIndex = 0, scrolling = false;
+  var totalPanels = panels.length, currentIndex = 2, scrolling = false; // Start at transcript panel
 
   function scrollTo(idx, smooth) {
-    if (idx < 0) idx = totalPanels - 1;
-    if (idx >= totalPanels) idx = 0;
+    if (idx < 0) idx = 0;
+    if (idx >= totalPanels) idx = totalPanels - 1;
     currentIndex = idx;
     panels[idx].scrollIntoView({ behavior: smooth ? 'smooth' : 'auto', block: 'nearest', inline: 'start' });
     panels.forEach(function(p){ p.classList.remove('flip-in'); });
     panels[idx].classList.add('flip-in');
     dots.forEach(function(d, i){ d.classList.toggle('active', i === idx); });
+    if (leftBtn) leftBtn.style.display = idx === 0 ? 'none' : '';
+    if (rightBtn) rightBtn.style.display = idx === totalPanels - 1 ? 'none' : '';
   }
 
   dots.forEach(function(d, i){ d.addEventListener('click', function(e){ e.preventDefault(); scrollTo(i, true); }); });
@@ -615,7 +637,14 @@ body {
     entries.forEach(function(e){
       if (e.isIntersecting && !scrolling) {
         panels.forEach(function(p, i){
-          if (p === e.target) { currentIndex = i; dots.forEach(function(d, j){ d.classList.toggle('active', j === i); }); panels.forEach(function(pp){ pp.classList.remove('flip-in'); }); p.classList.add('flip-in'); }
+          if (p === e.target) {
+            currentIndex = i;
+            dots.forEach(function(d, j){ d.classList.toggle('active', j === i); });
+            panels.forEach(function(pp){ pp.classList.remove('flip-in'); });
+            p.classList.add('flip-in');
+            if (leftBtn) leftBtn.style.display = i === 0 ? 'none' : '';
+            if (rightBtn) rightBtn.style.display = i === totalPanels - 1 ? 'none' : '';
+          }
         });
       }
     });
@@ -627,7 +656,33 @@ body {
     if (e.key === 'ArrowLeft') { e.preventDefault(); scrollTo(currentIndex - 1, true); }
   });
 
-  if (panels[0]) panels[0].classList.add('flip-in');
+  // Default: scroll to transcript panel (index 2), hide left arrow
+  panels[2].classList.add('flip-in');
+  panels[2].scrollIntoView({ block: 'nearest', inline: 'start' });
+  if (leftBtn) leftBtn.style.display = 'none';
+
+  // ── Sync overlay panels with live caption text ──
+  setInterval(function(){
+    var interim = document.getElementById('captionInterim');
+    var roomEl = document.getElementById('roomValue');
+    var timerEl = document.getElementById('sessionTimer');
+    var overlayRoll = document.getElementById('overlayRollText');
+    var overlayCinema = document.getElementById('overlayCinemaText');
+    var overlayRollRoom = document.getElementById('overlayRollRoom');
+    var overlayRollTimer = document.getElementById('overlayRollTimer');
+    var text = interim ? (interim.textContent || '').trim() : '';
+    if (!text) {
+      var transcript = document.getElementById('captionTranscript');
+      if (transcript) {
+        var lines = transcript.querySelectorAll('.line');
+        if (lines.length) text = lines[lines.length-1].textContent.trim();
+      }
+    }
+    if (overlayRoll) overlayRoll.textContent = text || 'In attesa del microfono…';
+    if (overlayCinema) overlayCinema.textContent = text || 'In attesa del microfono…';
+    if (overlayRollRoom && roomEl) overlayRollRoom.textContent = 'Room: ' + (roomEl.textContent || '—');
+    if (overlayRollTimer && timerEl) overlayRollTimer.textContent = timerEl.textContent || '00:00';
+  }, 500);
 })();
 
 // ── Layout toggle (3 dashboard layouts) ──
