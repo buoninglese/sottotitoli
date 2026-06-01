@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html lang="it" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Full-Page Slider Mockups</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,400;14..32,500;14..32,600;14..32,700;14..32,800;14..32,900&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Inter',system-ui,sans-serif;background:#0a0e1a;color:#e2e8f0;-webkit-font-smoothing:antialiased}
+
+/* ── Page divider ── */
+.page{border-bottom:2px solid rgba(255,255,255,.06)}
+.page-label{text-align:center;padding:12px;font-size:11px;text-transform:uppercase;letter-spacing:.2em;color:rgba(255,255,255,.2);background:rgba(0,0,0,.3)}
+
+/* ── Hero slider (full viewport) ── */
+.hero-stage{position:relative;height:100vh;overflow:hidden}
+
+/* ══════════════════════════════════════════ */
+/* SHARED: Counter, arrows, overlay text    */
+/* ══════════════════════════════════════════ */
+.slide-overlay{position:absolute;inset:0;z-index:10;pointer-events:none;display:flex;flex-direction:column;justify-content:flex-end;padding:60px 48px}
+.slide-overlay .tag{font-size:12px;text-transform:uppercase;letter-spacing:.14em;color:rgba(255,255,255,.45);margin-bottom:12px}
+.slide-overlay h2{font-size:clamp(36px,7vw,72px);font-weight:900;line-height:1.02;letter-spacing:-2px;max-width:700px;margin-bottom:16px}
+.slide-overlay p{font-size:clamp(14px,2vw,17px);color:rgba(255,255,255,.55);max-width:500px;line-height:1.6;margin-bottom:24px}
+.slide-overlay .btn{display:inline-flex;align-items:center;gap:8px;padding:14px 28px;border-radius:100px;font-weight:700;font-size:15px;text-decoration:none;color:#fff;pointer-events:auto;background:rgba(255,255,255,.12);backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,.15);transition:all .2s}
+.slide-overlay .btn:hover{background:rgba(255,255,255,.2);border-color:rgba(255,255,255,.3)}
+
+.h-counter{position:absolute;bottom:32px;left:50%;transform:translateX(-50%);display:flex;align-items:center;gap:10px;z-index:20}
+.h-counter .num{font-size:20px;font-weight:900;font-variant-numeric:tabular-nums;letter-spacing:-1px}
+.h-counter .sep{font-size:12px;color:rgba(255,255,255,.25)}
+.h-counter .total{font-size:13px;color:rgba(255,255,255,.2);font-weight:500}
+.h-arrow{position:absolute;z-index:20;width:44px;height:44px;border-radius:50%;border:1px solid rgba(255,255,255,.12);background:rgba(0,0,0,.35);color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:16px;transition:all .2s;backdrop-filter:blur(8px)}
+.h-arrow:hover{background:rgba(255,255,255,.12);border-color:rgba(255,255,255,.25)}
+.h-arrow.prev{bottom:36px;left:24px}
+.h-arrow.next{bottom:36px;right:24px}
+
+/* ── Content section below hero ── */
+.below{max-width:900px;margin:0 auto;padding:80px 24px}
+.below h3{font-size:clamp(24px,4vw,36px);font-weight:800;letter-spacing:-1px;margin-bottom:16px}
+.below p{font-size:16px;color:rgba(255,255,255,.5);line-height:1.7;margin-bottom:32px}
+.below .cards{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+@media(max-width:700px){.below .cards{grid-template-columns:1fr}}
+.below .card{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.06);border-radius:14px;padding:24px}
+.below .card h4{font-size:16px;font-weight:700;margin-bottom:8px}
+.below .card p{font-size:13px;margin-bottom:0}
+
+/* ══════════════════════════════════════════ */
+/* 1. DIAGONAL WIPE                           */
+/* ══════════════════════════════════════════ */
+.dw-slide{position:absolute;inset:0;transition:clip-path .8s cubic-bezier(.7,0,.3,1)}
+.dw-slide:nth-child(1){background:linear-gradient(135deg,#0f0c29,#302b63,#24243e);clip-path:polygon(0 0,100% 0,100% 100%,0 100%);z-index:3}
+.dw-slide:nth-child(2){background:linear-gradient(135deg,#134e4a,#0f766e,#115e59);clip-path:polygon(0 100%,100% 100%,100% 100%,0 100%);z-index:2}
+.dw-slide:nth-child(3){background:linear-gradient(135deg,#4a1942,#831843,#9d174d);clip-path:polygon(0 100%,100% 100%,100% 100%,0 100%);z-index:1}
+.dw-slide.active{clip-path:polygon(0 0,100% 0,100% 100%,0 100%);z-index:4}
+.dw-slide.exit-up{clip-path:polygon(0 0,100% 0,100% 0,0 0%)}
+.dw-slide.exit-down{clip-path:polygon(0 100%,100% 100%,100% 100%,0 100%)}
+
+/* ══════════════════════════════════════════ */
+/* 2. HORIZONTAL PUSH                         */
+/* ══════════════════════════════════════════ */
+.hp-track{display:flex;height:100%;transition:transform .65s cubic-bezier(.65,0,.35,1)}
+.hp-slide{min-width:100%;height:100%;display:flex;align-items:flex-end;padding:60px 48px}
+.hp-slide:nth-child(1){background:linear-gradient(135deg,#0c4a6e,#0369a1,#0284c7)}
+.hp-slide:nth-child(2){background:linear-gradient(135deg,#7c2d12,#9a3412,#c2410c)}
+.hp-slide:nth-child(3){background:linear-gradient(135deg,#064e3b,#047857,#059669)}
+
+/* ══════════════════════════════════════════ */
+/* 3. FADE + SCALE                            */
+/* ══════════════════════════════════════════ */
+.fs-slide{position:absolute;inset:0;display:flex;align-items:flex-end;padding:60px 48px;opacity:0;transform:scale(1.15);transition:opacity .8s ease,transform 1s cubic-bezier(.25,0,.15,1)}
+.fs-slide.active{opacity:1;transform:scale(1);z-index:2}
+.fs-slide:nth-child(1){background:linear-gradient(135deg,#1e1b4b,#3730a3,#4338ca)}
+.fs-slide:nth-child(2){background:linear-gradient(135deg,#4a1d6a,#7c3aed,#8b5cf6)}
+.fs-slide:nth-child(3){background:linear-gradient(135deg,#0c4a6e,#0ea5e9,#38bdf8)}
+
+/* ══════════════════════════════════════════ */
+/* 4. CURTAIN SPLIT                           */
+/* ══════════════════════════════════════════ */
+.curtain-stage{position:relative;width:100%;height:100%}
+.cs-left,.cs-right{position:absolute;top:0;width:50%;height:100%;transition:transform .75s cubic-bezier(.7,0,.3,1);z-index:3}
+.cs-left{left:0;transform:translateX(0);background:linear-gradient(135deg,#1e1b4b,#312e81)}
+.cs-right{right:0;transform:translateX(0);background:linear-gradient(225deg,#1e1b4b,#312e81)}
+.curtain-stage.open .cs-left{transform:translateX(-100%)}
+.curtain-stage.open .cs-right{transform:translateX(100%)}
+.cs-content{position:absolute;inset:0;display:flex;align-items:flex-end;padding:60px 48px;opacity:0;transition:opacity .4s .3s;z-index:1}
+.curtain-stage.open .cs-content{opacity:1}
+
+/* ══════════════════════════════════════════ */
+/* 6. VENETIAN BLINDS                         */
+/* ══════════════════════════════════════════ */
+.blinds-area{position:relative;width:100%;height:100%}
+.bl-bg{position:absolute;inset:0;display:flex;align-items:flex-end;padding:60px 48px;z-index:1}
+.bl-strip{position:absolute;top:0;width:20%;height:100%;transition:transform .55s ease;z-index:5}
+.bl-strip:nth-child(4){left:0;transition-delay:0s}
+.bl-strip:nth-child(5){left:20%;transition-delay:.06s}
+.bl-strip:nth-child(6){left:40%;transition-delay:.12s}
+.bl-strip:nth-child(7){left:60%;transition-delay:.18s}
+.bl-strip:nth-child(8){left:80%;transition-delay:.24s}
+.blinds-area.animating .bl-strip{transform:translateY(-100%)}
+
+/* ══════════════════════════════════════════ */
+/* 9. SKEW PARALLAX                           */
+/* ══════════════════════════════════════════ */
+.skp-slide{position:absolute;inset:0;display:flex;align-items:flex-end;padding:60px 48px;transform:skewY(6deg) translateY(40%);opacity:0;z-index:1;transition:transform .85s cubic-bezier(.7,0,.3,1),opacity .6s ease}
+.skp-slide:nth-child(1){background:linear-gradient(135deg,#1e1b4b,#6d28d9)}
+.skp-slide:nth-child(2){background:linear-gradient(135deg,#064e3b,#059669)}
+.skp-slide:nth-child(3){background:linear-gradient(135deg,#7c2d12,#ea580c)}
+.skp-slide.active{transform:skewY(0) translateY(0);opacity:1;z-index:3}
+.skp-slide.prev{transform:skewY(-6deg) translateY(-20%);opacity:.4;z-index:2}
+</style>
+</head>
+<body>
+
+<!-- ══════════════════════════════════════════════════ -->
+<!-- PAGE 1: DIAGONAL WIPE                               -->
+<!-- ══════════════════════════════════════════════════ -->
+<div class="page">
+  <div class="page-label">1 · Diagonal Wipe · clip-path polygon</div>
+  <div class="hero-stage" id="dwStage">
+    <div id="dwSlider">
+      <div class="dw-slide active" data-idx="0">
+        <div class="slide-overlay"><div class="tag">Live Captioning</div><h2>I tuoi sottotitoli<br>in tempo reale</h2><p>Microfono, voce, sottotitoli. In 8 lingue. Nessuna configurazione.</p><a href="#" class="btn">Prova gratis →</a></div>
+      </div>
+      <div class="dw-slide exit-down" data-idx="1">
+        <div class="slide-overlay"><div class="tag">Traduzione Live</div><h2>Parla italiano,<br>leggi in inglese</h2><p>Traduzione simultanea con un clic. Perfetto per lezioni e conferenze.</p><a href="#" class="btn">Scopri come →</a></div>
+      </div>
+      <div class="dw-slide exit-down" data-idx="2">
+        <div class="slide-overlay"><div class="tag">AI Reports</div><h2>Analisi vocale<br>dopo ogni sessione</h2><p>WPM, diversità lessicale, copertura NGSL. Tutto automatico.</p><a href="#" class="btn">Vedi esempio →</a></div>
+      </div>
+    </div>
+    <div class="h-counter"><span class="h-arrow prev" data-page="dw">▲</span><span class="num" id="dwNum">01</span><span class="sep">/</span><span class="total">03</span><span class="h-arrow next" data-page="dw">▼</span></div>
+  </div>
+  <div class="below">
+    <h3>Come funziona</h3>
+    <p>Apri il microfono, parla, e i sottotitoli appaiono in tempo reale sullo schermo. Nessun download, nessuna registrazione obbligatoria.</p>
+    <div class="cards">
+      <div class="card"><h4>🎤 1. Apri Studio</h4><p>Scegli lingua e modalità. Pronto in pochi secondi.</p></div>
+      <div class="card"><h4>⚡ 2. Parla</h4><p>I sottotitoli appaiono mentre parli. Precisione elevata.</p></div>
+      <div class="card"><h4>📊 3. Rivedi</h4><p>Trascrizioni, report AI e vocabolario da ogni sessione.</p></div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════ -->
+<!-- PAGE 2: HORIZONTAL PUSH                             -->
+<!-- ══════════════════════════════════════════════════ -->
+<div class="page">
+  <div class="page-label">2 · Horizontal Push · translateX track</div>
+  <div class="hero-stage" id="hpStage">
+    <div style="height:100%;overflow:hidden">
+      <div class="hp-track" id="hpTrack">
+        <div class="hp-slide"><div><div class="tag">Studio</div><h2>Registra la tua<br>sessione live</h2><p>Captions in tempo reale con timestamp. Export in TXT, SRT, JSON.</p><a href="#" class="btn">Inizia ora →</a></div></div>
+        <div class="hp-slide"><div><div class="tag">Overlay</div><h2>Sottotitoli<br>su qualsiasi schermo</h2><p>Modalità cinema o rolling. Perfetto per streaming e presentazioni.</p><a href="#" class="btn">Prova overlay →</a></div></div>
+        <div class="hp-slide"><div><div class="tag">Translate</div><h2>12 coppie<br>di lingue</h2><p>IT→EN, EN→IT, e molte altre. Traduzione via MyMemory API.</p><a href="#" class="btn">Vedi lingue →</a></div></div>
+      </div>
+    </div>
+    <div class="h-counter"><span class="h-arrow prev" data-page="hp">◀</span><span class="num" id="hpNum">01</span><span class="sep">/</span><span class="total">03</span><span class="h-arrow next" data-page="hp">▶</span></div>
+  </div>
+  <div class="below">
+    <h3>Zero configurazione</h3>
+    <p>Niente account obbligatorio. Apri il browser, concedi il microfono, e sei operativo. Le tue sessioni vengono salvate in locale.</p>
+    <div class="cards">
+      <div class="card"><h4>🆓 Gratis</h4><p>15 minuti al giorno senza registrazione. Per uso illimitato, accedi con Google.</p></div>
+      <div class="card"><h4>🔒 Privacy-first</h4><p>Audio processato nel browser. Trascrizioni salvate solo se lo desideri.</p></div>
+      <div class="card"><h4>🌍 8 lingue</h4><p>Italiano, inglese, spagnolo, francese, tedesco, portoghese, russo, giapponese.</p></div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════ -->
+<!-- PAGE 3: FADE + SCALE                                -->
+<!-- ══════════════════════════════════════════════════ -->
+<div class="page">
+  <div class="page-label">3 · Fade + Scale · opacity + transform scale</div>
+  <div class="hero-stage" id="fsStage">
+    <div id="fsSlider">
+      <div class="fs-slide active" data-idx="0"><div><div class="tag">Immersione</div><h2>Cinematic<br>caption overlay</h2><p>Testo che appare con una dissolvenza morbida. Elegante e non invasivo.</p><a href="#" class="btn">Guarda demo →</a></div></div>
+      <div class="fs-slide" data-idx="1"><div><div class="tag">Profondità</div><h2>Zoom sottile,<br>massimo impatto</h2><p>Lo scale crea profondità. Il testo emerge dallo sfondo con naturalezza.</p><a href="#" class="btn">Prova →</a></div></div>
+      <div class="fs-slide" data-idx="2"><div><div class="tag">Fluidità</div><h2>Una transizione<br>che non distrae</h2><p>Perfetta per contenuti dove il messaggio conta più dell'effetto.</p><a href="#" class="btn">Vedi →</a></div></div>
+    </div>
+    <div class="h-counter"><span class="h-arrow prev" data-page="fs">▲</span><span class="num" id="fsNum">01</span><span class="sep">/</span><span class="total">03</span><span class="h-arrow next" data-page="fs">▼</span></div>
+  </div>
+  <div class="below">
+    <h3>Pensato per l'apprendimento</h3>
+    <p>Ogni sessione genera automaticamente un report con copertura NGSL, parole nuove, WPM, e diversità lessicale. Tieni traccia dei tuoi progressi.</p>
+    <div class="cards">
+      <div class="card"><h4>📈 NGSL Coverage</h4><p>Percentuale di parole coperte dalla New General Service List.</p></div>
+      <div class="card"><h4>🆕 Parole nuove</h4><p>Vocaboli mai incontrati prima, con definizione Oxford integrata.</p></div>
+      <div class="card"><h4>🧠 Quality Score</h4><p>Indice di qualità del parlato basato su diversità e complessità.</p></div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════ -->
+<!-- PAGE 4: CURTAIN SPLIT                               -->
+<!-- ══════════════════════════════════════════════════ -->
+<div class="page">
+  <div class="page-label">4 · Curtain Split · translateX ×2</div>
+  <div class="hero-stage" id="csStage">
+    <div class="curtain-stage open" id="csSlider">
+      <div class="cs-left"></div><div class="cs-right"></div>
+      <div class="cs-content"><div><div class="tag">Sipario</div><h2>Il palco<br>si apre per te</h2><p>Due metà si separano per rivelare il contenuto. Drammatico, teatrale.</p><a href="#" class="btn">Entra in scena →</a></div></div>
+    </div>
+    <div class="h-counter"><span class="h-arrow prev" data-page="cs">◀</span><span class="num" id="csNum">01</span><span class="sep">/</span><span class="total">03</span><span class="h-arrow next" data-page="cs">▶</span></div>
+  </div>
+  <div class="below">
+    <h3>Per streaming e presentazioni</h3>
+    <p>L'overlay Sottotitoli funziona su qualsiasi schermo. Apri l'URL in un'altra finestra o dispositivo e i sottotitoli appaiono in sincrono.</p>
+    <div class="cards">
+      <div class="card"><h4>🎬 Overlay Cinema</h4><p>Testo grande centrato. Frase corrente + 2 precedenti in dissolvenza.</p></div>
+      <div class="card"><h4>📜 Overlay Roll</h4><p>Stile teleprompter. Le frasi completate scorrono verso l'alto.</p></div>
+      <div class="card"><h4>🔗 Room ID</h4><p>Ogni sessione ha un ID stanza. Condividilo per sincronizzare più display.</p></div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════ -->
+<!-- PAGE 6: VENETIAN BLINDS                             -->
+<!-- ══════════════════════════════════════════════════ -->
+<div class="page">
+  <div class="page-label">6 · Venetian Blinds · 5 strips stagger</div>
+  <div class="hero-stage" id="blStage">
+    <div class="blinds-area" id="blSlider">
+      <div class="bl-bg" style="background:linear-gradient(135deg,#1e1b4b,#4f46e5)">
+        <div><div class="tag">Architettura</div><h2>Linee<br>&amp; Luce</h2><p>Strisce verticali che cadono in sequenza. Ritmico, preciso, architettonico.</p><a href="#" class="btn">Esplora →</a></div>
+      </div>
+      <div class="bl-strip" style="background:linear-gradient(135deg,#1e1b4b,#4f46e5)"></div>
+      <div class="bl-strip" style="background:linear-gradient(135deg,#1e1b4b,#4f46e5)"></div>
+      <div class="bl-strip" style="background:linear-gradient(135deg,#1e1b4b,#4f46e5)"></div>
+      <div class="bl-strip" style="background:linear-gradient(135deg,#1e1b4b,#4f46e5)"></div>
+      <div class="bl-strip" style="background:linear-gradient(135deg,#1e1b4b,#4f46e5)"></div>
+    </div>
+    <div class="h-counter"><span class="h-arrow prev" data-page="bl">▲</span><span class="num" id="blNum">01</span><span class="sep">/</span><span class="total">03</span><span class="h-arrow next" data-page="bl">▼</span></div>
+  </div>
+  <div class="below">
+    <h3>API e integrazioni</h3>
+    <p>Sottotitoli offre WebSocket per connessioni in tempo reale e Supabase per autenticazione e storage.</p>
+    <div class="cards">
+      <div class="card"><h4>🔌 WebSocket</h4><p>Connessione persistente per trasmettere captions a tutti i client connessi.</p></div>
+      <div class="card"><h4>🗄️ Supabase</h4><p>Auth Google, database sessioni, e edge functions per AI reports.</p></div>
+      <div class="card"><h4>🤖 OpenAI</h4><p>Trascrizione via Whisper e report generati con GPT per analisi approfondite.</p></div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════ -->
+<!-- PAGE 9: SKEW PARALLAX                               -->
+<!-- ══════════════════════════════════════════════════ -->
+<div class="page">
+  <div class="page-label">9 · Skew Parallax · skewY + translateY</div>
+  <div class="hero-stage" id="skStage">
+    <div id="skSlider">
+      <div class="skp-slide active" data-idx="0"><div><div class="tag">Prospettiva</div><h2>Inclina il<br>tuo punto di vista</h2><p>Le slide si inclinano di 6° e scivolano via. L'effetto parallax più drammatico.</p><a href="#" class="btn">Prova l'effetto →</a></div></div>
+      <div class="skp-slide" data-idx="1"><div><div class="tag">Movimento</div><h2>Profondità<br>in ogni direzione</h2><p>SkewY crea un senso di movimento tridimensionale senza WebGL.</p><a href="#" class="btn">Guarda →</a></div></div>
+      <div class="skp-slide" data-idx="2"><div><div class="tag">Dinamismo</div><h2>Energia<br>puramente CSS</h2><p>Nessuna libreria. Solo transform, opacity, e cubic-bezier curati.</p><a href="#" class="btn">Sperimenta →</a></div></div>
+    </div>
+    <div class="h-counter"><span class="h-arrow prev" data-page="sk">▲</span><span class="num" id="skNum">01</span><span class="sep">/</span><span class="total">03</span><span class="h-arrow next" data-page="sk">▼</span></div>
+  </div>
+  <div class="below">
+    <h3>Pronto a cominciare?</h3>
+    <p>Sottotitoli è gratis, open source, e funziona in qualsiasi browser moderno. Nessuna installazione richiesta.</p>
+    <div class="cards">
+      <div class="card"><h4>🚀 Veloce</h4><p>Caricamento istantaneo. Nessun build step, puro HTML/CSS/JS.</p></div>
+      <div class="card"><h4>📱 Responsive</h4><p>Funziona su desktop, tablet e mobile. Layout adattivo.</p></div>
+      <div class="card"><h4>🛡️ Sicuro</h4><p>Audio processato in locale. I tuoi dati restano nel browser.</p></div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── Full-page slider engine ──
+
+var pages = {
+
+  // 1. Diagonal Wipe
+  dw: {
+    current:0, total:3,
+    go: function(idx){
+      var slides=document.querySelectorAll('#dwSlider .dw-slide');
+      slides.forEach(function(s,i){
+        s.classList.remove('active','exit-up','exit-down');
+        if(i===idx) s.classList.add('active');
+        else if(i<idx) s.classList.add('exit-up');
+        else s.classList.add('exit-down');
+      });
+      this.current=idx; document.getElementById('dwNum').textContent=String(idx+1).padStart(2,'0');
+    }
+  },
+
+  // 2. Horizontal Push
+  hp: {
+    current:0, total:3,
+    go: function(idx){
+      document.getElementById('hpTrack').style.transform='translateX(-'+ (idx*100) +'%)';
+      this.current=idx; document.getElementById('hpNum').textContent=String(idx+1).padStart(2,'0');
+    }
+  },
+
+  // 3. Fade + Scale
+  fs: {
+    current:0, total:3,
+    go: function(idx){
+      var slides=document.querySelectorAll('#fsSlider .fs-slide');
+      slides.forEach(function(s,i){ s.classList.toggle('active',i===idx); });
+      this.current=idx; document.getElementById('fsNum').textContent=String(idx+1).padStart(2,'0');
+    }
+  },
+
+  // 4. Curtain Split
+  cs: {
+    current:0, total:3,
+    themes:[
+      {bg:'linear-gradient(135deg,#1e1b4b,#312e81)',tag:'Sipario',title:'Il palco<br>si apre per te',sub:'Due metà si separano per rivelare il contenuto. Drammatico, teatrale.'},
+      {bg:'linear-gradient(135deg,#4a1d6a,#7c3aed)',tag:'Secondo Atto',title:'Nuova scena,<br>stessa energia',sub:'Il sipario si chiude e riapre su un nuovo capitolo della storia.'},
+      {bg:'linear-gradient(135deg,#0c4a6e,#0ea5e9)',tag:'Gran Finale',title:'Il pubblico<br>applaude',sub:'Transizione fluida tra i contenuti. Nessuna interruzione brusca.'}
+    ],
+    go: function(idx){
+      var el=document.getElementById('csSlider');
+      var t=this.themes[idx];
+      el.classList.remove('open');
+      clearTimeout(this._timer);
+      this._timer=setTimeout(function(){
+        el.querySelector('.cs-left').style.background=t.bg;
+        el.querySelector('.cs-right').style.background=t.bg.replace('135deg','225deg');
+        el.querySelector('.cs-content .tag').textContent=t.tag;
+        el.querySelector('.cs-content h2').innerHTML=t.title;
+        el.querySelector('.cs-content p').textContent=t.sub;
+        el.classList.add('open');
+      },750);
+      this.current=idx; document.getElementById('csNum').textContent=String(idx+1).padStart(2,'0');
+    }
+  },
+
+  // 6. Venetian Blinds
+  bl: {
+    current:0, total:3,
+    themes:[
+      {bg:'linear-gradient(135deg,#1e1b4b,#4f46e5)',tag:'Architettura',title:'Linee<br>&amp; Luce',sub:'Strisce verticali che cadono in sequenza. Ritmico, preciso.'},
+      {bg:'linear-gradient(135deg,#4a1d6a,#a855f7)',tag:'Interior',title:'Spazi<br>che respirano',sub:'La luce filtra tra le fessure. Minimalismo caldo e avvolgente.'},
+      {bg:'linear-gradient(135deg,#0c4a6e,#0284c7)',tag:'Urban',title:'Cemento<br>&amp; Vetro',sub:'Rigore geometrico. La città raccontata attraverso le sue linee.'}
+    ],
+    go: function(idx){
+      var el=document.getElementById('blSlider');
+      var t=this.themes[idx];
+      el.querySelectorAll('.bl-strip').forEach(function(s){ s.style.background=t.bg; });
+      el.querySelector('.bl-bg').style.background=t.bg;
+      el.querySelector('.bl-bg .tag').textContent=t.tag;
+      el.querySelector('.bl-bg h2').innerHTML=t.title;
+      el.querySelector('.bl-bg p').textContent=t.sub;
+      el.classList.add('animating');
+      var self=this;
+      clearTimeout(this._timer);
+      this._timer=setTimeout(function(){ el.classList.remove('animating'); },600);
+      this.current=idx; document.getElementById('blNum').textContent=String(idx+1).padStart(2,'0');
+    }
+  },
+
+  // 9. Skew Parallax
+  sk: {
+    current:0, total:3,
+    go: function(idx){
+      var slides=document.querySelectorAll('#skSlider .skp-slide');
+      slides.forEach(function(s,i){
+        s.classList.remove('active','prev');
+        if(i===idx) s.classList.add('active');
+        else if(i===idx-1) s.classList.add('prev');
+      });
+      this.current=idx; document.getElementById('skNum').textContent=String(idx+1).padStart(2,'0');
+    }
+  }
+
+};
+
+// Wire arrows
+document.querySelectorAll('.h-arrow').forEach(function(btn){
+  btn.addEventListener('click',function(e){
+    e.stopPropagation();
+    var name=this.dataset.page;
+    var s=pages[name]; if(!s) return;
+    var dir=this.classList.contains('next')?1:-1;
+    s.go((s.current+dir+s.total)%s.total);
+  });
+});
+
+// Click on hero stage cycles forward
+document.querySelectorAll('.hero-stage').forEach(function(stage){
+  stage.addEventListener('click',function(e){
+    if(e.target.closest('.h-arrow')||e.target.closest('.btn')) return;
+    var id=stage.id;
+    var name={dwStage:'dw',hpStage:'hp',fsStage:'fs',csStage:'cs',blStage:'bl',skStage:'sk'}[id];
+    if(!name) return;
+    var s=pages[name]; if(!s) return;
+    s.go((s.current+1)%s.total);
+  });
+});
+
+// Keyboard: up/down cycles all
+document.addEventListener('keydown',function(e){
+  if(e.key==='ArrowUp'||e.key==='ArrowDown'){
+    e.preventDefault();
+    var dir=e.key==='ArrowDown'?1:-1;
+    Object.keys(pages).forEach(function(k){
+      var s=pages[k];
+      s.go((s.current+dir+s.total)%s.total);
+    });
+  }
+});
+</script>
+</body>
+</html>
