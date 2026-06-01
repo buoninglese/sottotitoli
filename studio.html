@@ -761,6 +761,24 @@
       <div class="section-label">Analysis</div>
       <h2>Analisi AI<br>delle tue sessioni</h2>
       <p class="sub">Report dettagliati su grammatica, lessico, fluenza. 14 moduli in 4 famiglie (Cambridge, Business, Academic, Linguistic).</p>
+
+      <div id="analysisCredits" style="margin:20px 0;display:flex;gap:12px;flex-wrap:wrap;justify-content:center">
+        <div style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px 20px;text-align:center;min-width:140px">
+          <div style="font-size:24px;margin-bottom:2px">🪙</div>
+          <div style="font-size:22px;font-weight:800;letter-spacing:-.5px" id="creditBalanceStudio">—</div>
+          <div style="font-size:11px;color:var(--text-muted)">crediti</div>
+        </div>
+        <div style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px 20px;text-align:center;min-width:140px">
+          <div style="font-size:24px;margin-bottom:2px">🎫</div>
+          <div style="font-size:22px;font-weight:800;letter-spacing:-.5px" id="voucherCountStudio">—</div>
+          <div style="font-size:11px;color:var(--text-muted)">voucher report</div>
+        </div>
+      </div>
+      <div id="analysisVouchers" style="display:flex;gap:6px;flex-wrap:wrap;justify-content:center;margin-bottom:16px"></div>
+      <div id="analysisNoCredits" style="display:none;margin-bottom:12px">
+        <a href="account.html" class="cta-btn" style="font-size:13px;padding:8px 20px;background:transparent;color:var(--accent-purple);border:1.5px solid var(--accent-purple);box-shadow:none">🪙 Acquista crediti →</a>
+      </div>
+
       <a href="analysis.html" class="cta-btn" style="background:var(--amber);box-shadow:0 8px 30px rgba(217,119,6,.25)">Vai ad Analysis →</a>
     </div>
   </section>
@@ -899,6 +917,68 @@
       }).catch(function(){ applyState(false); });
     }
     tryDetect();
+  })();
+
+  // ── Fetch credits & vouchers for Analysis panel ──
+  (function(){
+    var credEl = document.getElementById('creditBalanceStudio');
+    var vouchCountEl = document.getElementById('voucherCountStudio');
+    var vouchListEl = document.getElementById('analysisVouchers');
+    var noCredEl = document.getElementById('analysisNoCredits');
+    if (!credEl) return;
+
+    var vouchers = {
+      cambridge: { icon: '🎓', label: 'Cambridge', color: 'var(--accent-green)' },
+      academic:   { icon: '📚', label: 'Academic', color: 'var(--accent-blue)' },
+      linguistic: { icon: '📖', label: 'Linguistic', color: 'var(--accent-purple)' },
+      business:   { icon: '💼', label: 'Business', color: 'var(--amber)' }
+    };
+
+    async function fetchData() {
+      var supabase = window.sottotitoliSupabase;
+      if (!supabase) { setTimeout(fetchData, 300); return; }
+      var r = await supabase.auth.getSession();
+      if (!r.data?.session) return;
+      var userId = r.data.session.user.id;
+
+      // Credits
+      var tok = await supabase.from('user_tokens').select('balance').eq('user_id', userId).maybeSingle();
+      var balance = tok.data?.balance || 0;
+      credEl.textContent = balance;
+      if (noCredEl) noCredEl.style.display = balance > 0 ? 'none' : 'inline-block';
+
+      // Vouchers
+      var ent = await supabase.from('user_ai_entitlements').select('report_type')
+        .eq('user_id', userId).eq('used', false);
+      var entitlements = ent.data || [];
+      vouchCountEl.textContent = entitlements.length;
+
+      if (vouchListEl && entitlements.length > 0) {
+        var counts = {};
+        entitlements.forEach(function(e){ counts[e.report_type] = (counts[e.report_type] || 0) + 1; });
+        var html = '';
+        Object.keys(counts).forEach(function(type){
+          var v = vouchers[type] || { icon: '📋', label: type, color: 'var(--text-muted)' };
+          html += '<span style="display:inline-flex;align-items:center;gap:4px;padding:4px 12px;border-radius:100px;font-size:11px;font-weight:600;background:'+v.color+'20;color:'+v.color+';border:1px solid '+v.color+'40">'+v.icon+' '+counts[type]+'× '+v.label+'</span>';
+        });
+        vouchListEl.innerHTML = html;
+      }
+    }
+
+    // Hook into login detection
+    var origTryDetect = window._studioCreditsFetch;
+    if (!origTryDetect) {
+      window._studioCreditsFetch = true;
+      var checkSupabase = setInterval(function(){
+        if (window.sottotitoliSupabase) { clearInterval(checkSupabase); fetchData(); }
+      }, 500);
+      // Re-fetch on auth change
+      setTimeout(function(){
+        var sup = window.sottotitoliSupabase;
+        if (sup) sup.auth.onAuthStateChange(function(){ fetchData(); });
+      }, 1000);
+    }
+    setTimeout(fetchData, 2000);
   })();
 
   // ── Translation picker (two rows of flags) ──
