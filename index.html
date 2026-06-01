@@ -341,21 +341,67 @@ body.logged-in .guest-only{display:none!important}
   });
 })();
 
-// ═══ Flipping words animation ═══
+// ═══ Typewriter effect for flipping words ═══
 (function(){
-  function flip(el, words, colors){
-    var i=0;
-    setInterval(function(){
-      i=(i+1)%words.length;
-      el.textContent=words[i];
-      el.style.color=colors[i];
-      el.style.transition="color .4s";
-    },2500);
+  function typewriter(el, words, colors, speed){
+    var wordIdx = 0;
+    var charIdx = 0;
+    var deleting = false;
+    var paused = false;
+    var typeSpeed = speed || 70;
+    var deleteSpeed = 35;
+    var pauseAfter = 1800;
+    var pauseBefore = 400;
+
+    function tick(){
+      var word = words[wordIdx];
+      var color = colors[wordIdx];
+
+      if(paused){ return; }
+
+      if(!deleting){
+        // Typing forward
+        if(charIdx < word.length){
+          charIdx++;
+          el.textContent = word.substring(0, charIdx);
+          el.style.color = color;
+        } else {
+          // Finished typing — pause then delete
+          paused = true;
+          setTimeout(function(){ paused = false; deleting = true; tick(); }, pauseAfter);
+          return;
+        }
+      } else {
+        // Deleting
+        if(charIdx > 0){
+          charIdx--;
+          el.textContent = word.substring(0, charIdx);
+        } else {
+          // Finished deleting — move to next word
+          deleting = false;
+          wordIdx = (wordIdx + 1) % words.length;
+          paused = true;
+          setTimeout(function(){ paused = false; tick(); }, pauseBefore);
+          return;
+        }
+      }
+
+      var delay = deleting ? deleteSpeed : (charIdx === word.length ? typeSpeed : (Math.random() * 40 + typeSpeed - 20));
+      setTimeout(tick, delay);
+    }
+
+    // Start with first word pre-typed
+    el.textContent = words[0];
+    el.style.color = colors[0];
+    charIdx = words[0].length;
+    // Start deleting after pause
+    setTimeout(function(){ deleting = true; tick(); }, pauseAfter);
   }
-  var langEl=document.getElementById("flipLang");
-  var modEl=document.getElementById("flipModuli");
-  if(langEl) flip(langEl, ["inglese","francese","spagnolo","tedesco","portoghese"], ["#f59e0b","#34d399","#60a5fa","#ef4444","#22c55e"]);
-  if(modEl) flip(modEl, ["scolastici","aziendali","personali"], ["#a78bfa","#f59e0b","#34d399"]);
+
+  var langEl = document.getElementById("flipLang");
+  var modEl = document.getElementById("flipModuli");
+  if(langEl) typewriter(langEl, ["inglese","francese","spagnolo","tedesco","portoghese"], ["#f59e0b","#34d399","#60a5fa","#ef4444","#22c55e"], 70);
+  if(modEl) typewriter(modEl, ["scolastici","aziendali","personali"], ["#a78bfa","#f59e0b","#34d399"], 80);
 })();
 
 // ═══ Auth gating ═══
