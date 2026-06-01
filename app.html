@@ -396,6 +396,18 @@ body {
 @media (min-width: 769px), (orientation: landscape), (hover: hover), (pointer: fine) {
   .mobile-rotate-hint { display: none !important; }
 }
+
+/* ─── Overlay style toggle ─── */
+.ov-style-toggle {
+  position: absolute; bottom: 16px; right: 16px;
+  width: 36px; height: 36px; border-radius: 50%;
+  border: 1px solid rgba(255,255,255,.2); background: rgba(0,0,0,.5);
+  color: #fff; font-size: 14px; cursor: pointer; z-index: 10;
+  display: flex; align-items: center; justify-content: center;
+  transition: all .2s; backdrop-filter: blur(4px);
+}
+.ov-style-toggle:hover { background: rgba(255,255,255,.2); }
+[data-ov-style="light"] .ov-style-toggle { border-color: rgba(0,0,0,.15); background: rgba(255,255,255,.7); color: #111; }
 </style>
 </head>
 <body>
@@ -469,7 +481,7 @@ body {
 <div class="h-scroll" id="modeScroll">
 
   <!-- Overlay Roll — rolling captions view -->
-  <section class="h-panel" id="overlayRollPanel" style="background:#000">
+  <section class="h-panel" id="overlayRollPanel" style="background:#000" data-ov-style="dark">
     <div class="h-panel-inner" style="max-width:100%;padding:60px 20px;text-align:center;display:flex;flex-direction:column;justify-content:flex-end">
       <div style="font-size:clamp(24px,5vw,48px);font-weight:700;color:#fff;line-height:1.3;word-break:break-word;min-height:80px" id="overlayRollText">In attesa del microfono…</div>
       <div style="margin-top:20px;font-size:11px;color:rgba(255,255,255,.3);display:flex;gap:16px;justify-content:center">
@@ -477,13 +489,15 @@ body {
         <span id="overlayRollTimer">00:00</span>
       </div>
     </div>
+    <button class="ov-style-toggle" onclick="toggleOverlayStyle('overlayRollPanel')" title="Cambia stile overlay">🎨</button>
   </section>
 
   <!-- Overlay — cinema-style caption view -->
-  <section class="h-panel h-panel-alt" id="overlayPanel" style="background:#000">
+  <section class="h-panel h-panel-alt" id="overlayPanel" style="background:#000" data-ov-style="dark">
     <div class="h-panel-inner" style="max-width:100%;padding:60px 20px;text-align:center;display:flex;align-items:center;justify-content:center">
-      <div style="font-size:clamp(28px,6vw,56px);font-weight:800;color:#fff;line-height:1.2;letter-spacing:-1px;word-break:break-word;min-height:80px" id="overlayCinemaText">In attesa del microfono…</div>
+      <div style="font-size:clamp(28px,6vw,56px);font-weight:800;color:#fff;line-height:1.2;letter-spacing:-1px;word-break:break-word;min-height:120px" id="overlayCinemaText">In attesa del microfono…</div>
     </div>
+    <button class="ov-style-toggle" onclick="toggleOverlayStyle('overlayPanel')" title="Cambia stile overlay">🎨</button>
   </section>
 
   <!-- Panel 3: Live Transcript — main dashboard -->
@@ -786,6 +800,32 @@ body {
   panels[2].classList.add('flip-in');
   panels[2].scrollIntoView({ block: 'nearest', inline: 'start' });
   if (leftBtn) leftBtn.style.display = 'none';
+
+  // ── Overlay style toggle ──
+  window.toggleOverlayStyle = function(panelId) {
+    var panel = document.getElementById(panelId);
+    if (!panel) return;
+    var current = panel.getAttribute('data-ov-style') || 'dark';
+    var next = current === 'dark' ? 'light' : 'dark';
+    panel.setAttribute('data-ov-style', next);
+    panel.style.background = next === 'light' ? '#fff' : '#000';
+    var textEl = panel.querySelector('#overlayRollText, #overlayCinemaText');
+    if (textEl) textEl.style.color = next === 'light' ? '#111' : '#fff';
+    var room = panel.querySelector('#overlayRollRoom');
+    if (room) room.style.color = next === 'light' ? 'rgba(0,0,0,.4)' : 'rgba(255,255,255,.3)';
+    var timer = panel.querySelector('#overlayRollTimer');
+    if (timer) timer.style.color = next === 'light' ? 'rgba(0,0,0,.4)' : 'rgba(255,255,255,.3)';
+  };
+
+  // Double-tap on overlay slides toggles style
+  var lastTap = 0;
+  document.addEventListener('click', function(e){
+    var panel = e.target.closest('#overlayRollPanel, #overlayPanel');
+    if (!panel) return;
+    var now = Date.now();
+    if (now - lastTap < 400) { toggleOverlayStyle(panel.id); }
+    lastTap = now;
+  });
 
   // ── Sync overlay panels with live caption text (cinematic) ──
   var overlayHistory = [];
