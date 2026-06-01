@@ -97,7 +97,8 @@ h1 em{font-style:normal;color:#a78bfa}
 
 /* ═══ 7. ZIGZAG ═══ */
 .zigzag-slider{position:relative;width:100%;height:100%}
-.zigzag-slider .zz-slide{position:absolute;inset:0;display:flex;align-items:flex-end;padding:24px;transition:clip-path .7s cubic-bezier(.7,0,.3,1)}
+.zigzag-slider .zz-slide{position:absolute;inset:0;display:flex;align-items:flex-end;padding:24px;
+  clip-path:polygon(0 100%,100% 100%,100% 100%,0 100%);transition:clip-path .7s cubic-bezier(.7,0,.3,1)}
 .zigzag-slider .zz-slide:nth-child(1){background:linear-gradient(135deg,#1e1b4b,#6366f1);z-index:3}
 .zigzag-slider .zz-slide:nth-child(2){background:linear-gradient(135deg,#064e3b,#10b981);z-index:2}
 .zigzag-slider .zz-slide:nth-child(3){background:linear-gradient(135deg,#7c2d12,#f97316);z-index:1}
@@ -119,10 +120,12 @@ h1 em{font-style:normal;color:#a78bfa}
 
 /* ═══ 9. SKEW + PARALLAX ═══ */
 .skew-slider{position:relative;width:100%;height:100%;overflow:hidden}
-.skew-slider .sk-slide{position:absolute;inset:0;display:flex;align-items:flex-end;padding:24px;transition:transform .8s cubic-bezier(.7,0,.3,1),opacity .6s ease}
-.skew-slider .sk-slide:nth-child(1){background:linear-gradient(135deg,#1e1b4b,#6d28d9);transform:skewY(0) translateY(0);opacity:1;z-index:3}
-.skew-slider .sk-slide:nth-child(2){background:linear-gradient(135deg,#064e3b,#059669);transform:skewY(6deg) translateY(20%);opacity:0;z-index:2}
-.skew-slider .sk-slide:nth-child(3){background:linear-gradient(135deg,#7c2d12,#ea580c);transform:skewY(6deg) translateY(40%);opacity:0;z-index:1}
+.skew-slider .sk-slide{position:absolute;inset:0;display:flex;align-items:flex-end;padding:24px;
+  transform:skewY(6deg) translateY(40%);opacity:0;z-index:1;
+  transition:transform .8s cubic-bezier(.7,0,.3,1),opacity .6s ease}
+.skew-slider .sk-slide:nth-child(1){background:linear-gradient(135deg,#1e1b4b,#6d28d9)}
+.skew-slider .sk-slide:nth-child(2){background:linear-gradient(135deg,#064e3b,#059669)}
+.skew-slider .sk-slide:nth-child(3){background:linear-gradient(135deg,#7c2d12,#ea580c)}
 .skew-slider .sk-slide.active{transform:skewY(0) translateY(0);opacity:1;z-index:3}
 .skew-slider .sk-slide.prev{transform:skewY(-6deg) translateY(-20%);opacity:.4;z-index:2}
 .skew-slider .sk-slide .sk-tag{font-size:11px;text-transform:uppercase;letter-spacing:.12em;color:rgba(255,255,255,.5);margin-bottom:8px}
@@ -235,8 +238,8 @@ h1 em{font-style:normal;color:#a78bfa}
   <div class="card-stage" id="zigzagStage">
     <div class="zigzag-slider" id="zigzagSlider">
       <div class="zz-slide active" data-idx="0"><div><div class="zz-tag">Editorial</div><h4>Jagged Narrative</h4></div></div>
-      <div class="zz-slide" data-idx="1"><div><div class="zz-tag">Typography</div><h4>Breaking Grids</h4></div></div>
-      <div class="zz-slide" data-idx="2"><div><div class="zz-tag">Mixed Media</div><h4>Cut & Paste</h4></div></div>
+      <div class="zz-slide exit-down" data-idx="1"><div><div class="zz-tag">Typography</div><h4>Breaking Grids</h4></div></div>
+      <div class="zz-slide exit-down" data-idx="2"><div><div class="zz-tag">Mixed Media</div><h4>Cut & Paste</h4></div></div>
     </div>
     <div class="slider-counter"><span class="slider-arrow prev" data-slider="zigzag">▲</span><span class="sc-num" id="zigNum">01</span><span class="sc-div">/</span><span class="sc-total">03</span><span class="slider-arrow next" data-slider="zigzag">▼</span></div>
   </div>
@@ -263,7 +266,7 @@ h1 em{font-style:normal;color:#a78bfa}
   <div class="card-stage" id="skewStage">
     <div class="skew-slider" id="skewSlider">
       <div class="sk-slide active" data-idx="0"><div><div class="sk-tag">Motion</div><h4>Shift Perspective</h4></div></div>
-      <div class="sk-slide prev" data-idx="1"><div><div class="sk-tag">Still</div><h4>Frozen Moment</h4></div></div>
+      <div class="sk-slide" data-idx="1"><div><div class="sk-tag">Still</div><h4>Frozen Moment</h4></div></div>
       <div class="sk-slide" data-idx="2"><div><div class="sk-tag">Blur</div><h4>Speed of Light</h4></div></div>
     </div>
     <div class="slider-counter"><span class="slider-arrow prev" data-slider="skew">▲</span><span class="sc-num" id="skewNum">01</span><span class="sc-div">/</span><span class="sc-total">03</span><span class="slider-arrow next" data-slider="skew">▼</span></div>
@@ -318,17 +321,17 @@ var sliders = {
     go: function(idx){
       var el=document.getElementById('curtainSlider');
       var t=this.themes[idx];
+      // Close curtains first
       el.classList.remove('open');
-      // Wait for the close animation to start, then swap content & reopen
-      requestAnimationFrame(function(){
-        requestAnimationFrame(function(){
-          el.querySelector('.cs-left').style.background=t.bg;
-          el.querySelector('.cs-right').style.background=t.bg.replace('135deg','225deg');
-          el.querySelector('.cs-tag').textContent=t.tag;
-          el.querySelector('h4').textContent=t.title;
-          el.classList.add('open');
-        });
-      });
+      // Wait for close animation (700ms CSS transition) then swap & reopen
+      clearTimeout(this._timer);
+      this._timer = setTimeout(function(){
+        el.querySelector('.cs-left').style.background=t.bg;
+        el.querySelector('.cs-right').style.background=t.bg.replace('135deg','225deg');
+        el.querySelector('.cs-tag').textContent=t.tag;
+        el.querySelector('h4').textContent=t.title;
+        el.classList.add('open');
+      },750);
       this.current=idx; document.getElementById('curtNum').textContent=String(idx+1).padStart(2,'0');
     }
   },
