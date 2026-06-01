@@ -839,6 +839,18 @@
         var plain = transcriptLines.map(function(x){ return x.text; }).join(" ").trim();
         var wc = w.SottotitoliSessionUtils.countWords(plain);
         var durationMin = currentSessionStart ? Math.round((Date.now() - currentSessionStart.getTime()) / 60000) : 0;
+        setText('sumDuration', durationMin + ' min');
+        setText('sumWords', wc);
+        var cefrEl = $('cefrLevel');
+        setText('sumCefr', cefrEl ? cefrEl.textContent : '—');
+        var qEl = $('liveQuality');
+        setText('sumQuality', qEl ? qEl.textContent : '—');
+        completePanel.classList.add('visible');
+        // Show post-session scroll arrow
+        var postArrow = $('postSessionScroll');
+        if (postArrow) postArrow.style.display = 'block';
+        // Populate post-session credits
+        fetchPostSessionData();
         var cefr = $("cefrLevel") ? $("cefrLevel").textContent : '—';
         var quality = $("liveQuality") ? $("liveQuality").textContent : '—';
         setText("sumDuration", (durationMin > 0 ? durationMin + 'm' : '—'));
@@ -849,6 +861,21 @@
         completePanel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
       }
     }
+  }
+
+  async function fetchPostSessionData() {
+    if (!sessionSupabase) return;
+    try {
+      var r = await sessionSupabase.auth.getSession();
+      if (!r.data?.session?.user?.id) return;
+      var uid = r.data.session.user.id;
+      var tok = await sessionSupabase.from('user_tokens').select('balance').eq('user_id',uid).maybeSingle();
+      setText('psCredits', tok.data?.balance ?? '0');
+      var ent = await sessionSupabase.from('user_ai_entitlements').select('report_type').eq('user_id',uid).eq('used',false);
+      setText('psVouchers', (ent.data||[]).length);
+      var reps = await sessionSupabase.from('session_ai_reports').select('id').eq('user_id',uid);
+      setText('psReportCount', (reps.data||[]).length);
+    } catch(e) {}
   }
 
   var safariMediaRecorder = null;
