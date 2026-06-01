@@ -107,7 +107,7 @@ body {
 #stopBtn:disabled { background: var(--gauge-bg); color: var(--muted2); box-shadow: none; cursor: not-allowed; transform: none; }
 
 /* ── Status dots (used by app.js) ── */
-#micDot.live, #socketDot.live { background: var(--good); box-shadow: 0 0 6px var(--good); }
+#micDot.connected, #socketDot.connected { background: var(--good); box-shadow: 0 0 6px var(--good); }
 #micDot.warn, #socketDot.warn { background: var(--warn); }
 #micDot.idle, #socketDot.idle { background: var(--muted2); }
 
@@ -379,9 +379,32 @@ body {
 .h-nav-arrow.right{right:12px}
 [data-theme="light"] .h-nav-arrow{background:rgba(255,255,255,.85);color:#111827;border-color:rgba(0,0,0,.08)}
 @media(max-width:768px){.h-nav-arrow{width:36px;height:36px;font-size:16px}.h-nav-arrow.left{left:4px}.h-nav-arrow.right{right:4px}}
+
+/* ─── Mobile landscape hint ─── */
+@media (max-width: 768px) and (orientation: portrait) {
+  .mobile-rotate-hint {
+    display: flex !important;
+    position: fixed; inset: 0; z-index: 9999;
+    background: rgba(0,0,0,.92); color: #fff;
+    align-items: center; justify-content: center;
+    flex-direction: column; gap: 16px; text-align: center;
+    font-family: 'Inter', system-ui, sans-serif;
+  }
+  .mobile-rotate-hint .icon { font-size: 48px; animation: rotate-phone 2s ease-in-out infinite; }
+  @keyframes rotate-phone { 0%,100% { transform: rotate(0deg); } 50% { transform: rotate(90deg); } }
+}
+@media (min-width: 769px), (orientation: landscape) {
+  .mobile-rotate-hint { display: none !important; }
+}
 </style>
 </head>
 <body>
+
+<div class="mobile-rotate-hint">
+  <div class="icon">📱</div>
+  <div style="font-size:18px;font-weight:700">Ruota il dispositivo</div>
+  <div style="font-size:13px;color:rgba(255,255,255,.6)">Sottotitoli funziona meglio in orizzontale</div>
+</div>
 
 <!-- Top bar -->
 <header class="topbar" id="topbar">
@@ -976,9 +999,35 @@ body {
       setText('cefrLevel', level);
     }
 
-    // Update sentences count
-    var sentences = (text.match(/[.!?]/g) || []).length || 0;
-    setText('liveSentences', sentences);
+    // Update sentences count (from transcript lines or punctuation)
+    var sentences = (text.match(/[.!?]/g) || []).length;
+    if (sentences === 0) {
+      // Fallback: count transcript lines as sentences
+      var transcriptEl2 = $('captionTranscript');
+      var lineEls = transcriptEl2 ? transcriptEl2.querySelectorAll('.line') : [];
+      sentences = lineEls.length || 1;
+    }
+    setText('liveSentences', sentences || 1);
+
+    // Fillers detection
+    var fillerPattern = /\b(um|uh|er|ah|like|you\s*know|i\s*mean|sort\s*of|kind\s*of|basically|actually|literally|just|really|so|well|hmm|mmm)\b/gi;
+    var fillerMatches = text.match(fillerPattern) || [];
+    setText('liveFillers', fillerMatches.length);
+
+    // Questions detection
+    var questionWords = /\b(what|when|where|which|who|whom|whose|why|how|is|are|was|were|do|does|did|can|could|will|would|shall|should|may|might|have|has|had)\b/gi;
+    var qMatches = text.match(questionWords) || [];
+    var questionMarks = (text.match(/\?/g) || []).length;
+    setText('liveQuestions', Math.max(questionMarks, Math.min(qMatches.length, sentences)));
+
+    // NGSL coverage
+    var ngslWords = ['the','be','to','of','and','a','in','that','have','i','it','for','not','on','with','he','as','you','do','at','this','but','his','by','from','they','we','her','she','or','an','will','my','one','all','would','there','their','what','so','up','out','if','about','who','get','which','go','me','when','make','can','like','time','no','just','him','know','take','people','into','year','your','good','some','could','them','see','other','than','then','now','look','only','come','its','over','think','also','back','after','use','two','how','our','work','first','well','way','even','new','want','because','any','these','give','day','most','us'];
+    var textWords = text.toLowerCase().match(/[a-z']+/g) || [];
+    var ngslSet = new Set(ngslWords);
+    var ngslCount = 0;
+    textWords.forEach(function(w){ if (ngslSet.has(w)) ngslCount++; });
+    var ngslCov = textWords.length > 0 ? Math.round((ngslCount / ngslWords.length) * 100) : 0;
+    setText('liveNgsl', ngslCov + '%');
 
     // Update quality
     var qualityEl = $('liveQuality');
