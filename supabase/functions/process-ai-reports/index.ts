@@ -49,15 +49,23 @@ serve(async (req) => {
         }
 
         // Get module details
+<<<<<<< HEAD
+        const { data: mod } = await supabase
+=======
         const moduleId = parseInt(request.module_key || '1');
         const { data: module } = await supabase
+>>>>>>> 61fadc4568e14cced91241566fdbb4d7d6f62758
           .from('ai_report_modules')
           .select('*')
           .eq('id', moduleId)
           .single();
 
         // Call OpenAI API
+<<<<<<< HEAD
+        const prompt = getModulePrompt(request.module_id, session.transcript_text);
+=======
         const prompt = getModulePrompt(moduleId, session?.transcript_text);
+>>>>>>> 61fadc4568e14cced91241566fdbb4d7d6f62758
         const aiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
           method: 'POST',
           headers: {
@@ -65,14 +73,10 @@ serve(async (req) => {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            model: 'gpt-4',
+            model: 'gpt-4o',
             messages: [
-              {
-                role: 'system',
-          content: prompt.system,              },
-              {
-                role: 'user',
-          content: prompt.user              }
+              { role: 'system', content: prompt.system },
+              { role: 'user', content: prompt.user }
             ],
             temperature: 0.7,
             max_tokens: 800
