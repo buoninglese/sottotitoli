@@ -538,6 +538,7 @@ body{background:var(--bg)}
     
     .viaggio-content{min-height:200px;overflow-x:hidden}
     .viaggio-loading{padding:40px;text-align:center;color:var(--text-muted);font-size:13px}
+    @media(max-width:500px){.viaggio-content>div>div:first-child{grid-template-columns:repeat(2,1fr)!important}.viaggio-content>div>div:nth-child(2){grid-template-columns:1fr!important}}
     
     .vt-panel{display:flex;flex-direction:column;gap:28px;min-width:0}
     
@@ -896,7 +897,7 @@ body{background:var(--bg)}
     }
 
     function estimateCEFR(wpm, lexDiv, qualityScore, durationMinutes) {
-      if (durationMinutes < 30) return { level: '—', dot: 'r', pct: 0 };
+      if (durationMinutes < 5) return { level: '?', dot: 'r', pct: 10 };
       var score = 0;
       if (wpm && wpm >= 110 && wpm <= 170) score += 1;
       else if (wpm && wpm > 170) score += 1.5;
@@ -958,45 +959,56 @@ body{background:var(--bg)}
     function renderViaggio(lang, langData) {
       var el = document.getElementById('viaggioContent');
       if (!el) return;
-      var info = LANG_INFO[lang] || { flag: '', name: lang, cefr: 'CEFR', talktime: 'Time', accuracy: 'Accuracy', errors: 'Errors' };
+      var info = LANG_INFO[lang] || { flag: '🌐', name: lang, cefr: 'CEFR', talktime: 'Time', accuracy: 'Accuracy', errors: 'Errors' };
       var m = langData.metrics;
       var cefr = estimateCEFR(m.avgWpm, m.avgLexDiv, m.avgQuality, m.totalSeconds / 60);
       var accuracy = estimateAccuracy(m.avgLexDiv, m.avgQuality);
-      var errorRate = accuracy ? (100 - accuracy).toFixed(1) + '%' : '—';
-      var strengths = buildStrengths(m);
-      var grammarTopics = ['Sentence structure', 'Word order', 'Verb forms', 'Prepositions', 'Articles', 'Connectors', 'Question formation'];
-
-      var h = '<div class="vt-panel">';
-      h += '<div class="vt-stats">';
-      h += '<div class="vt-stat"><div class="vt-stat-inner"><div class="vt-dot ' + dotClass(cefr.dot) + '"></div><div class="vt-stat-n">' + cefr.level + '</div><div class="vt-stat-l">' + info.cefr + '</div></div></div>';
-      h += '<div class="vt-stat"><div class="vt-stat-inner"><div class="vt-dot ' + (m.totalSeconds >= 3600 ? 'vt-dot-g' : 'vt-dot-y') + '"></div><div class="vt-stat-n">' + formatDuration(m.totalSeconds) + '</div><div class="vt-stat-l">' + info.talktime + '</div></div></div>';
-      h += '<div class="vt-stat"><div class="vt-stat-inner"><div class="vt-dot ' + (accuracy && accuracy >= 85 ? 'vt-dot-g' : 'vt-dot-y') + '"></div><div class="vt-stat-n">' + (accuracy ? accuracy + '%' : '—') + '</div><div class="vt-stat-l">' + info.accuracy + '</div></div></div>';
-      h += '<div class="vt-stat"><div class="vt-stat-inner"><div class="vt-dot ' + (errorRate === '—' ? 'vt-dot-y' : 'vt-dot-g') + '"></div><div class="vt-stat-n">' + errorRate + '</div><div class="vt-stat-l">' + info.errors + '</div></div></div>';
+      var colors = ['#a78bfa','#60a5fa','#34d399','#fbbf24','#f472b6','#fb923c'];
+      
+      var h = '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:16px">';
+      // CEFR card
+      h += '<div style="background:linear-gradient(135deg,rgba(167,139,250,.2),rgba(167,139,250,.05));border:1px solid rgba(167,139,250,.25);border-radius:14px;padding:18px 14px;text-align:center">';
+      h += '<div style="font-size:36px;font-weight:900;letter-spacing:-2px;color:#a78bfa;line-height:1">'+cefr.level+'</div>';
+      h += '<div style="font-size:10px;text-transform:uppercase;letter-spacing:.1em;color:var(--text-muted);margin-top:4px">'+info.cefr+'</div></div>';
+      // Talk time
+      h += '<div style="background:linear-gradient(135deg,rgba(96,165,250,.2),rgba(96,165,250,.05));border:1px solid rgba(96,165,250,.25);border-radius:14px;padding:18px 14px;text-align:center">';
+      h += '<div style="font-size:32px;font-weight:900;letter-spacing:-1px;color:#60a5fa;line-height:1">'+formatDuration(m.totalSeconds)+'</div>';
+      h += '<div style="font-size:10px;text-transform:uppercase;letter-spacing:.1em;color:var(--text-muted);margin-top:4px">'+info.talktime+'</div></div>';
+      // Accuracy
+      h += '<div style="background:linear-gradient(135deg,rgba(52,211,153,.2),rgba(52,211,153,.05));border:1px solid rgba(52,211,153,.25);border-radius:14px;padding:18px 14px;text-align:center">';
+      h += '<div style="font-size:32px;font-weight:900;letter-spacing:-1px;color:#34d399;line-height:1">'+(accuracy?accuracy+'%':'?')+'</div>';
+      h += '<div style="font-size:10px;text-transform:uppercase;letter-spacing:.1em;color:var(--text-muted);margin-top:4px">'+info.accuracy+'</div></div>';
+      // Sessions
+      h += '<div style="background:linear-gradient(135deg,rgba(251,191,36,.2),rgba(251,191,36,.05));border:1px solid rgba(251,191,36,.25);border-radius:14px;padding:18px 14px;text-align:center">';
+      h += '<div style="font-size:32px;font-weight:900;letter-spacing:-1px;color:#fbbf24;line-height:1">'+m.sessionCount+'</div>';
+      h += '<div style="font-size:10px;text-transform:uppercase;letter-spacing:.1em;color:var(--text-muted);margin-top:4px">Sessioni</div></div>';
       h += '</div>';
 
-      h += '<div class="vt-ch"><div class="vt-ch-hdr"><span class="vt-ch-num">01</span><h3>Indicatori di forza <span class="vt-ch-sub">— dalle tue sessioni</span></h3></div>';
-      if (strengths.length) {
-        h += '<div class="vt-grid-3">';
-        strengths.forEach(function(item) {
-          h += '<div class="vt-card"><div class="vt-card-hdr"><span class="vt-card-name">' + item.name + '</span><span class="vt-card-pct">' + item.pct + '%</span></div>';
-          h += '<div class="vt-bar"><div class="vt-bar-fill ' + barClass(item.color) + '" style="width:' + item.pct + '%"></div></div>';
-          h += '<div class="vt-card-desc">' + item.desc + '</div></div>';
-        });
+      // Metrics bars
+      h += '<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:16px">';
+      var bars = [
+        {label:'WPM',val:m.avgWpm?Math.round(m.avgWpm):null,max:200,unit:'',color:'#a78bfa',icon:'⚡'},
+        {label:'Fillers/min',val:m.fillersPerMin?m.fillersPerMin.toFixed(1):null,max:10,unit:'',color:'#f472b6',icon:'🫧'},
+        {label:'Lexical div.',val:m.avgLexDiv?m.avgLexDiv.toFixed(2):null,max:1,unit:'',color:'#60a5fa',icon:'📊'},
+        {label:'Quality',val:m.avgQuality?Math.round(m.avgQuality*100):null,max:100,unit:'%',color:'#34d399',icon:'🎯'}
+      ];
+      bars.forEach(function(b){
+        var pct = b.val ? Math.min(100,Math.round((b.val/b.max)*100)) : 0;
+        h += '<div style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px">';
+        h += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">';
+        h += '<span style="font-size:11px;font-weight:600;color:var(--text-secondary)">'+b.icon+' '+b.label+'</span>';
+        h += '<span style="font-size:14px;font-weight:800;color:'+b.color+'">'+(b.val||'—')+b.unit+'</span></div>';
+        h += '<div style="height:6px;background:var(--bg);border-radius:3px;overflow:hidden"><div style="height:100%;width:'+pct+'%;border-radius:3px;background:'+b.color+';transition:width .6s"></div></div>';
         h += '</div>';
-      } else {
-        h += '<p style="font-size:13px;color:var(--text-secondary)">Recording more sessions will reveal your strengths. Keep using Studio!</p>';
-      }
-      h += '</div>';
-
-      h += '<div class="vt-ch"><div class="vt-ch-hdr"><span class="vt-ch-num">02</span><h3>Strutture tracciate <span class="vt-ch-sub">— aree linguistiche coperte</span></h3></div>';
-      h += '<div class="vt-tags">';
-      grammarTopics.forEach(function(g) {
-        h += '<div class="vt-tag"><span class="vt-tag-dot"></span><span>' + g + '</span></div>';
       });
-      h += '</div></div>';
-
-      h += '<a href="analysis.html" class="vt-go">Vedi analisi completa →</a>';
       h += '</div>';
+
+      // Word count + link
+      h += '<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px">';
+      h += '<div style="font-size:11px;color:var(--text-muted)">📝 '+m.totalWords.toLocaleString()+' parole totali in '+m.sessionCount+' sessioni</div>';
+      h += '<a href="analysis.html" style="display:inline-flex;align-items:center;gap:6px;padding:10px 22px;border-radius:100px;background:var(--accent-purple);color:#fff;font-weight:600;font-size:12px;text-decoration:none">Vedi analisi completa →</a>';
+      h += '</div>';
+
       el.innerHTML = h;
     }
 
@@ -1023,7 +1035,7 @@ body{background:var(--bg)}
 
     function showEmpty() {
       var el = document.getElementById('viaggioContent');
-      if (el) el.innerHTML = '<div class="viaggio-loading" style="padding:40px;text-align:center;color:var(--text-secondary);font-size:14px;line-height:1.8"><strong>Nessun dato ancora.</strong><br>Usa Studio per almeno un\'ora in una lingua per vedere il tuo profilo linguistico qui.<br><a href="studio.html" style="color:var(--accent-purple);font-weight:600">Apri Studio →</a></div>';
+      if (el) el.innerHTML = '<div style="padding:48px 24px;text-align:center;color:var(--text-secondary);font-size:14px;line-height:1.8"><div style="font-size:48px;margin-bottom:12px">🎙️</div><strong>Nessun dato ancora.</strong><br>Usa Studio per registrare la tua prima sessione.<br><a href="studio.html" style="display:inline-block;margin-top:12px;padding:10px 24px;background:var(--accent-purple);color:#fff;border-radius:100px;text-decoration:none;font-weight:600;font-size:13px">Apri Studio →</a></div>';
       var tabsEl = document.getElementById('viaggioTabs');
       if (tabsEl) tabsEl.innerHTML = '';
     }
@@ -1061,11 +1073,10 @@ body{background:var(--bg)}
         if (typeof s.fillers_per_minute === 'number') { t.sumFillers += s.fillers_per_minute; t.fillerCount++; }
       });
 
-      // Compute averages and filter languages with < 1 hour
+      // Compute averages — include ALL languages, no minimum threshold
       var filtered = {};
       Object.keys(langTotals).forEach(function(lang) {
         var t = langTotals[lang];
-        if (t.totalSeconds < 3600) return; // Skip languages with < 1 hour
         t.metrics = {
           totalSeconds: t.totalSeconds,
           totalWords: t.totalWords,
