@@ -24,7 +24,7 @@ body.snap-body{overflow:hidden;height:100vh}
 [data-theme="light"] .topbar.scrolled{background:linear-gradient(to bottom,rgba(241,245,249,.95) 0%,rgba(241,245,249,.5) 70%,transparent 100%)}
 
 /* ═══ Hero ═══ */
-.hero-panel{min-height:100vh;display:flex;align-items:center;justify-content:center;position:relative;padding:100px 32px 80px;background:linear-gradient(170deg,#050510 0%,#08081a 25%,#0c0c28 50%,#08081a 75%,#050510 100%);overflow:hidden}
+.hero-panel{min-height:100vh;display:flex;align-items:center;justify-content:center;position:relative;padding:100px 32px 80px;scroll-snap-align:start;background:linear-gradient(170deg,#050510 0%,#08081a 25%,#0c0c28 50%,#08081a 75%,#050510 100%);overflow:hidden}
 .hero-panel::before{content:'';position:absolute;inset:0;background-image:radial-gradient(rgba(255,255,255,.03) 1px,transparent 1px);background-size:28px 28px;pointer-events:none;z-index:0;mask-image:radial-gradient(ellipse at 50% 30%,#000 40%,transparent 70%)}
 .hero-panel::after{content:'';position:absolute;inset:0;background:radial-gradient(ellipse at 50% -20%,rgba(99,102,241,.18) 0%,transparent 55%),radial-gradient(ellipse at 80% 80%,rgba(56,189,248,.08) 0%,transparent 50%),radial-gradient(ellipse at 20% 70%,rgba(168,85,247,.06) 0%,transparent 50%);pointer-events:none;z-index:0}
 [data-theme="light"] .hero-panel{background:linear-gradient(170deg,#f8fafc 0%,#f1f5f9 25%,#eef2ff 50%,#f1f5f9 75%,#f8fafc 100%)}
@@ -309,6 +309,14 @@ body.logged-in .guest-only{display:none!important}
 <script src="js/preferences.js?v=5"></script>
 
 <script>
+// ═══ Force scroll to top — prevent browser scroll restoration on snap container ═══
+if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
+window.addEventListener('beforeunload',function(){document.getElementById('mainScroll').scrollTop=0});
+document.addEventListener('DOMContentLoaded',function(){
+  var ms=document.getElementById('mainScroll');
+  if(ms){ms.scrollTop=0;setTimeout(function(){ms.scrollTop=0},50)}
+});
+
 // ═══ Typewriter — slow, flag gradient colors ═══
 (function(){
   function typewriter(el, words, flagClasses, speed){
@@ -386,6 +394,21 @@ function handleHeroLogin(e){e.preventDefault();if(typeof signInWithGoogle==='fun
   var v=localStorage.getItem('sottotitoli-visited');
   if(!v){localStorage.setItem('sottotitoli-visited','1')}
   else{var sb=document.getElementById('heroScrollBtn');if(sb)sb.style.display='none'}
+})();
+
+// ═══ Section dots — sync with scroll ═══
+(function(){
+  var ms=document.getElementById('mainScroll'), dots=document.querySelectorAll('#sectionDots a');
+  if(!ms||!dots.length) return;
+  var sections=[];
+  dots.forEach(function(d){var s=document.querySelector(d.getAttribute('href'));if(s) sections.push(s)});
+  function update(){
+    var st=ms.scrollTop, h=ms.clientHeight, active=0;
+    sections.forEach(function(s,i){if(s.offsetTop<=st+h/2) active=i});
+    dots.forEach(function(d,i){d.classList.toggle('active',i===active)});
+  }
+  ms.addEventListener('scroll',update,{passive:true});
+  update();
 })();
 </script>
 </body>
