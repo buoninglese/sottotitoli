@@ -95,7 +95,6 @@ async function saveUserPreferences(prefs) {
       daily_reminders: !!prefs.daily_reminders,
       weekly_reports: !!prefs.weekly_reports,
       dark_mode: !!prefs.dark_mode,
-      display_name: prefs.display_name || null,
       updated_at: new Date().toISOString()
     }, { onConflict: 'user_id' });
 
@@ -104,8 +103,8 @@ async function saveUserPreferences(prefs) {
     return false;
   }
 
-  // Update cache
-  prefsCache = { ...prefs, user_id: userId };
+  // Invalidate cache so next load fetches fresh data
+  prefsCache = null;
   return true;
 }
 
