@@ -95,7 +95,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             <div class="ud-label">Crediti</div>
             <div class="ud-credits">
               <span class="amount" id="udCreditBal">—</span>
-              <span class="unit">token AI</span>
+              <span class=\"unit\">Voice Credit</span>
             </div>
           </div>
           <div class="ud-section">
