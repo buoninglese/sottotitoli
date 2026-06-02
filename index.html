@@ -17,7 +17,8 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;background:
 body.snap-body{overflow:hidden;height:100vh}
 .main-scroll{overflow-y:scroll;height:100vh;background:linear-gradient(0deg,#0a0e1a 0%,#0f1729 20%,#111d33 40%,#0f1b2d 60%,#0c1625 80%,#0a101d 100%);background-size:100% 600vh;background-attachment:fixed;scroll-behavior:smooth}
 [data-theme="light"] .main-scroll{background:linear-gradient(0deg,#f1f5f9 0%,#f8fafc 20%,#e2e8f0 40%,#f1f5f9 60%,#f8fafc 80%,#eef2ff 100%);background-size:100% 600vh;background-attachment:fixed}
-.panel{background:transparent;min-height:100vh;min-height:100dvh;display:flex;align-items:center;justify-content:center;position:relative;padding:64px 20px 40px}
+.panel{background:transparent;min-height:100vh;min-height:100dvh;display:flex;align-items:center;justify-content:center;position:relative;padding:64px 20px 40px;opacity:0;transform:scale(.95);transition:opacity .7s ease,transform .9s cubic-bezier(.25,0,.15,1)}
+.panel.visible{opacity:1;transform:scale(1)}
 @media(max-width:480px){.panel{padding:56px 16px 32px}}
 .panel-alt{background:transparent}
 .panel-inner{max-width:860px;margin:0 auto;text-align:center;width:100%;position:relative;z-index:2}
@@ -25,7 +26,7 @@ body.snap-body{overflow:hidden;height:100vh}
 [data-theme="light"] .topbar.scrolled{background:linear-gradient(to bottom,rgba(241,245,249,.95) 0%,rgba(241,245,249,.5) 70%,transparent 100%)}
 
 /* ═══ Hero ═══ */
-.hero-panel{min-height:100vh;min-height:100dvh;display:flex;align-items:center;justify-content:center;position:relative;padding:64px 20px 48px;scroll-snap-align:start;scroll-snap-stop:always;background:linear-gradient(170deg,#050510 0%,#08081a 25%,#0c0c28 50%,#08081a 75%,#050510 100%);overflow:hidden}
+.hero-panel{min-height:100vh;min-height:100dvh;display:flex;align-items:center;justify-content:center;position:relative;padding:64px 20px 48px;scroll-snap-align:start;scroll-snap-stop:always;background:linear-gradient(170deg,#050510 0%,#08081a 25%,#0c0c28 50%,#08081a 75%,#050510 100%);overflow:hidden;opacity:1!important;transform:none!important}
 @media(max-width:480px){.hero-panel{padding:48px 16px 56px}}
 .hero-panel::before{content:'';position:absolute;inset:0;background-image:radial-gradient(rgba(255,255,255,.03) 1px,transparent 1px);background-size:28px 28px;pointer-events:none;z-index:0;mask-image:radial-gradient(ellipse at 50% 30%,#000 40%,transparent 70%)}
 .hero-panel::after{content:'';position:absolute;inset:0;background:radial-gradient(ellipse at 50% -20%,rgba(99,102,241,.18) 0%,transparent 55%),radial-gradient(ellipse at 80% 80%,rgba(56,189,248,.08) 0%,transparent 50%),radial-gradient(ellipse at 20% 70%,rgba(168,85,247,.06) 0%,transparent 50%);pointer-events:none;z-index:0}
@@ -138,6 +139,7 @@ body.logged-in .guest-only{display:none!important}
 </head>
 <body class="snap-body">
 <script>history.scrollRestoration='manual';</script>
+<script>document.addEventListener('DOMContentLoaded',function(){var ms=document.getElementById('mainScroll');if(ms)ms.scrollTop=0});window.addEventListener('load',function(){var ms=document.getElementById('mainScroll');if(ms){ms.scrollTop=0;setTimeout(function(){ms.scrollTop=0},100)}});</script>
 
 <header class="topbar" id="topbar">
   <a href="index.html" class="logo">Sotto<span>titoli</span></a>
@@ -386,6 +388,29 @@ function handleHeroLogin(e){e.preventDefault();if(typeof signInWithGoogle==='fun
   }
   ms.addEventListener('scroll',update,{passive:true});
   update();
+})();
+
+// ═══ Fade + Scale reveal on scroll ═══
+(function(){
+  var ms=document.getElementById('mainScroll');
+  if(!ms) return;
+  var panels=ms.querySelectorAll('.panel:not(.hero-panel)');
+  if(!panels.length) return;
+  var observer=new IntersectionObserver(function(entries){
+    entries.forEach(function(entry){
+      if(entry.isIntersecting){
+        entry.target.classList.add('visible');
+      }
+    });
+  },{root:ms,threshold:.15,rootMargin:'-40px 0px'});
+  panels.forEach(function(p){observer.observe(p)});
+  // Also trigger on load for panels already in view
+  setTimeout(function(){
+    panels.forEach(function(p){
+      var rect=p.getBoundingClientRect();
+      if(rect.top<window.innerHeight&&rect.bottom>0) p.classList.add('visible');
+    });
+  },300);
 })();
 </script>
 </body>
