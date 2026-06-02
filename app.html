@@ -860,11 +860,34 @@ body {
   };
 
   function getDictionaryUrl(word) {
-    var lang = (window.__currentSessionLang || 'en').split('-')[0];
+    var mode = window.__currentSessionMode || 'caption-en';
     var encoded = encodeURIComponent(word);
-    // WordReference for major bilingual pairs, Google Translate as universal fallback
-    var wrMap = {en:'https://www.wordreference.com/enit/'+encoded, it:'https://www.wordreference.com/iten/'+encoded, fr:'https://www.wordreference.com/fren/'+encoded, de:'https://www.wordreference.com/deen/'+encoded, es:'https://www.wordreference.com/es/en/translation.asp?spen='+encoded, pt:'https://www.wordreference.com/pten/'+encoded};
-    if (wrMap[lang]) return wrMap[lang];
+    var isTranslate = mode.indexOf('translate-') === 0;
+
+    if (isTranslate) {
+      // Bilingual: WordReference with the right language pair
+      var parts = mode.replace('translate-','').split('-');
+      var src = parts[0], tgt = parts[1] || 'it';
+      var wrPairs = {enit:'https://www.wordreference.com/enit/'+encoded, iten:'https://www.wordreference.com/iten/'+encoded, fren:'https://www.wordreference.com/fren/'+encoded, deen:'https://www.wordreference.com/deen/'+encoded, esen:'https://www.wordreference.com/es/en/translation.asp?spen='+encoded, pten:'https://www.wordreference.com/pten/'+encoded, nlen:'https://www.wordreference.com/nlen/'+encoded, plen:'https://www.wordreference.com/plen/'+encoded};
+      var key = src+tgt;
+      if (wrPairs[key]) return wrPairs[key];
+      // Fallback: Google Translate with the pair
+      return 'https://translate.google.com/?sl='+src+'&tl='+tgt+'&text='+encoded+'&op=translate';
+    }
+
+    // Monolingual caption mode: best dictionary per language
+    var lang = mode.replace('caption-','');
+    var dicts = {
+      en:'https://www.oxfordlearnersdictionaries.com/search/english/?q='+encoded,
+      it:'https://www.treccani.it/vocabolario/'+encoded,
+      fr:'https://www.larousse.fr/dictionnaires/francais/'+encoded,
+      de:'https://www.duden.de/suchen/dudenonline/'+encoded,
+      es:'https://dle.rae.es/'+encoded,
+      pt:'https://dicionario.priberam.org/'+encoded,
+      nl:'https://www.vandale.nl/gratis-woordenboek/nederlands/betekenis/'+encoded,
+      pl:'https://wsjp.pl/haslo/podglad/1/?szukaj='+encoded
+    };
+    if (dicts[lang]) return dicts[lang];
     return 'https://translate.google.com/?sl='+lang+'&tl=it&text='+encoded+'&op=translate';
   }
 
@@ -1074,8 +1097,9 @@ body {
     var mode = params.get('mode') || 'caption-en';
     var tw = $('translatedWindow');
     if (tw) tw.style.display = mode.indexOf('translate-') === 0 ? 'block' : 'none';
-    // Track current session language for dictionary lookups
+    // Track current session language and mode for dictionary lookups
     window.__currentSessionLang = mode.replace('caption-','').replace('translate-','').split('-')[0] || 'en';
+    window.__currentSessionMode = mode;
   }
   updateModeBadge();
 
