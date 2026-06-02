@@ -118,6 +118,71 @@ serve(async (req) => {
     }
 
     console.log(`Credited user ${userId}: +${creditsSeconds}s, +${tokens} tokens (product: ${product})`);
+
+    // ═══ Referral bonus ═══
+    // Check if this user was referred — if yes, grant 45 tokens to both parties
+    try {
+      const { data: referral } = await supabase.from('referrals')
+        .select('referrer_id, status')
+        .eq('referred_user_id', userId)
+        .eq('status', 'signed_up')
+        .maybeSingle();
+
+      if (referral?.referrer_id && referral.status === 'signed_up') {
+        const REFERRAL_BONUS = 45; // tokens
+
+        // Grant bonus to referrer
+        const { data: refTok } = await supabase.from('user_tokens')
+          .select('balance').eq('user_id', referral.referrer_id).maybeSingle();
+        const refBalance = (refTok?.balance || 0) + REFERRAL_BONUS;
+
+        await supabase.from('user_tokens').upsert({
+          user_id: referral.referrer_id,
+          balance: refBalance,
+          updated_at: new Date().toISOString()
+        }, { onConflict: 'user_id' });
+
+        await supabase.from('token_transactions').insert({
+          user_id: referral.referrer_id,
+          amount: REFERRAL_BONUS,
+          type: 'referral_bonus',
+          reference: `ref_${stripeSessionId}`,
+          description: 'Bonus referral — amico ha acquistato gettoni',
+          balance_after: refBalance
+        });
+
+        // Grant bonus to referred user (on top of their purchase)
+        const { data: refdTok } = await supabase.from('user_tokens')
+          .select('balance').eq('user_id', userId).maybeSingle();
+        const refdBalance = (refdTok?.balance || 0) + REFERRAL_BONUS;
+
+        await supabase.from('user_tokens').update({
+          balance: refdBalance,
+          updated_at: new Date().toISOString()
+        }).eq('user_id', userId);
+
+        await supabase.from('token_transactions').insert({
+          user_id: userId,
+          amount: REFERRAL_BONUS,
+          type: 'referral_bonus',
+          reference: `ref_referred_${stripeSessionId}`,
+          description: 'Bonus referral — hai usato un link invito',
+          balance_after: refdBalance
+        });
+
+        // Mark referral as completed
+        await supabase.from('referrals').update({
+          status: 'completed',
+          bonus_granted_at: new Date().toISOString(),
+          bonus_amount: REFERRAL_BONUS
+        }).eq('referred_user_id', userId);
+
+        console.log(`Referral bonus: +${REFERRAL_BONUS} tokens each for ${referral.referrer_id} and ${userId}`);
+      }
+    } catch (refErr) {
+      console.error('Referral bonus error (non-fatal):', refErr.message);
+    }
+
     return new Response(JSON.stringify({ success: true, creditsSeconds, tokens }), { headers: { 'Content-Type': 'application/json' } });
 
   } catch (err) {
