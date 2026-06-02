@@ -162,6 +162,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (logoutBtn) {
       logoutBtn.addEventListener('click', async function(){
         await window.sottotitoliSupabase.auth.signOut();
+        // Clear any stored state
+        try { localStorage.removeItem('sottotitoli_return_page'); } catch(e) {}
+        try { localStorage.removeItem('sottotitoli_referrer'); } catch(e) {}
         window.location.href = getPostLogoutUrl();
       });
     }
