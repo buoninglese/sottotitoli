@@ -1,9 +1,64 @@
 /* ═══════════════════════════════════════════════════════
    Sottotitoli · Shared Theme JS — Navbar, Hamburger, Theme
+   + Flexbox gap polyfill for iOS <14.5
    ═══════════════════════════════════════════════════════ */
 
 (function () {
   'use strict';
+
+  // ── Flex gap polyfill (iOS <14.5 doesn't support gap in flexbox) ──
+  (function(){
+    // Test if gap works in flexbox
+    var gapWorks = false;
+    try {
+      var testParent = document.createElement('div');
+      testParent.style.cssText = 'position:absolute;visibility:hidden;display:flex;gap:30px';
+      testParent.innerHTML = '<div style="width:20px;height:20px"></div><div style="width:20px;height:20px"></div>';
+      document.body.appendChild(testParent);
+      gapWorks = testParent.children[1].offsetLeft > 25;
+      document.body.removeChild(testParent);
+    } catch(e) {}
+    if (gapWorks) return;
+
+    // Polyfill: convert gap to margins on flex children
+    function applyGapPolyfill() {
+      document.querySelectorAll('*').forEach(function(el) {
+        var ds = el.style.display || '';
+        if (ds.indexOf('flex') === -1) {
+          try { var cs = getComputedStyle(el); } catch(e) { return; }
+          if (cs.display !== 'flex' && cs.display !== 'inline-flex') return;
+        }
+        // Read gap from inline style first, then computed
+        var gap = el.style.gap || '';
+        if (!gap || gap === 'normal') {
+          try { gap = getComputedStyle(el).gap; } catch(e) { return; }
+        }
+        if (!gap || gap === '0px' || gap === 'normal') return;
+        var gv = parseFloat(gap);
+        if (!gv || gv <= 0) return;
+        var children = el.children;
+        for (var i = 0; i < children.length; i++) {
+          children[i].style.marginRight = gv + 'px';
+          children[i].style.marginBottom = gv + 'px';
+        }
+        // If this is a row flex, also handle wrap
+        var fd = el.style.flexDirection || '';
+        if (!fd) { try { fd = getComputedStyle(el).flexDirection; } catch(e) {} }
+        if (fd === 'column' || fd === 'column-reverse') {
+          for (var j = 0; j < children.length; j++) {
+            children[j].style.marginRight = '0';
+          }
+          var last = children[children.length - 1];
+          if (last) last.style.marginBottom = '0';
+        }
+      });
+    }
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', applyGapPolyfill);
+    } else {
+      applyGapPolyfill();
+    }
+  })();
 
   // ── Hamburger ──
   var btn = document.getElementById('hamburger');
