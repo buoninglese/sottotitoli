@@ -14,8 +14,8 @@
 :root{--bg:#f7f8fa;--bg-card:#fff;--bg-btn-subtle:#f3f4f6;--bg-btn-hover:#e5e7eb;--text-primary:#111827;--text-secondary:#6b7280;--text-muted:#9ca3af;--text-nav:#4b5563;--border:#e5e7eb;--shadow-card:0 4px 14px rgba(0,0,0,.04);--accent-purple:#7c3aed;--accent-green:#059669;--accent-blue:#2563eb;--accent-amber:#d97706}
 [data-theme="dark"]{--bg:#0f1117;--bg-card:#1a1d26;--bg-btn-subtle:#252830;--bg-btn-hover:#2f333e;--text-primary:#e8eaed;--text-secondary:#9ca3af;--text-muted:#6b7280;--text-nav:#9ca3af;--border:#2f333e;--shadow-card:0 4px 14px rgba(0,0,0,.25);--accent-purple:#a78bfa;--accent-green:#34d399;--accent-blue:#60a5fa;--accent-amber:#fbbf24}
 body{font-family:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;background:var(--bg);color:var(--text-primary);line-height:1.6;-webkit-font-smoothing:antialiased;transition:background .25s,color .25s}
-body.snap-body{overflow:hidden;height:100vh}
-.main-scroll{overflow-y:scroll;height:100vh;background:linear-gradient(180deg,#0a0a28 0%,#0f0f35 15%,#151540 30%,#1a1050 50%,#151540 70%,#0f0f35 85%,#0a0a28 100%)}
+body.snap-body{overflow-x:hidden!important;overflow-y:visible!important;height:auto!important}
+.main-scroll{overflow:visible!important;height:auto!important;scroll-snap-type:none!important;scroll-behavior:auto!important;background:linear-gradient(180deg,#0a0a28 0%,#0f0f35 15%,#151540 30%,#1a1050 50%,#151540 70%,#0f0f35 85%,#0a0a28 100%);background-attachment:fixed}
 .main-scroll::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;background-image:radial-gradient(rgba(255,255,255,.02) 1px,transparent 1px);background-size:30px 30px;mask-image:radial-gradient(ellipse at 50% 30%,#000 30%,transparent 70%)}
 [data-theme="light"] .main-scroll{background:linear-gradient(180deg,#f5f0ff 0%,#faf5ff 15%,#f0eaff 30%,#ede4ff 50%,#f0eaff 70%,#faf5ff 85%,#f5f0ff 100%)}
 [data-theme="light"] .main-scroll::before{background-image:radial-gradient(rgba(139,92,246,.04) 1px,transparent 1px)}
@@ -140,8 +140,7 @@ body.logged-in .guest-only{display:none!important}
 </style>
 </head>
 <body class="snap-body">
-<script>history.scrollRestoration='manual';</script>
-<script>document.addEventListener('DOMContentLoaded',function(){var ms=document.getElementById('mainScroll');if(ms)ms.scrollTop=0});window.addEventListener('load',function(){var ms=document.getElementById('mainScroll');if(ms){ms.scrollTop=0;setTimeout(function(){ms.scrollTop=0},100)}});</script>
+<script>history.scrollRestoration='manual';window.scrollTo(0,0);</script>
 
 <header class="topbar" id="topbar">
   <a href="index.html" class="logo">Sotto<span>titoli</span></a>
@@ -379,24 +378,22 @@ function handleHeroLogin(e){e.preventDefault();if(typeof signInWithGoogle==='fun
 
 // ═══ Section dots — sync with scroll ═══
 (function(){
-  var ms=document.getElementById('mainScroll'), dots=document.querySelectorAll('#sectionDots a');
-  if(!ms||!dots.length) return;
+  var dots=document.querySelectorAll('#sectionDots a');
+  if(!dots.length) return;
   var sections=[];
   dots.forEach(function(d){var s=document.querySelector(d.getAttribute('href'));if(s) sections.push(s)});
   function update(){
-    var st=ms.scrollTop, h=ms.clientHeight, active=0;
+    var st=window.pageYOffset||document.documentElement.scrollTop, h=window.innerHeight, active=0;
     sections.forEach(function(s,i){if(s.offsetTop<=st+h/2) active=i});
     dots.forEach(function(d,i){d.classList.toggle('active',i===active)});
   }
-  ms.addEventListener('scroll',update,{passive:true});
+  window.addEventListener('scroll',update,{passive:true});
   update();
 })();
 
 // ═══ Fade + Scale reveal on scroll ═══
 (function(){
-  var ms=document.getElementById('mainScroll');
-  if(!ms) return;
-  var panels=ms.querySelectorAll('.panel:not(.hero-panel)');
+  var panels=document.querySelectorAll('.panel:not(.hero-panel)');
   if(!panels.length) return;
   var observer=new IntersectionObserver(function(entries){
     entries.forEach(function(entry){
@@ -404,9 +401,8 @@ function handleHeroLogin(e){e.preventDefault();if(typeof signInWithGoogle==='fun
         entry.target.classList.add('visible');
       }
     });
-  },{root:ms,threshold:.15,rootMargin:'-40px 0px'});
+  },{threshold:.15,rootMargin:'-40px 0px'});
   panels.forEach(function(p){observer.observe(p)});
-  // Also trigger on load for panels already in view
   setTimeout(function(){
     panels.forEach(function(p){
       var rect=p.getBoundingClientRect();
