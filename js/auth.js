@@ -32,6 +32,11 @@ async function signInWithGoogle() {
   if (currentPage !== 'app.html' && currentPage !== 'index.html') {
     localStorage.setItem('sottotitoli_return_page', currentPage);
   }
+  // Preserve referral param through OAuth redirect
+  var ref = new URLSearchParams(window.location.search).get('ref');
+  if (ref && ref.length > 8) {
+    localStorage.setItem('sottotitoli_referrer', ref);
+  }
   const { error } = await window.sottotitoliSupabase.auth.signInWithOAuth({
     provider: 'google',
     options: {
@@ -170,6 +175,31 @@ document.addEventListener('DOMContentLoaded', async () => {
   console.log('auth.js: getSession result', { data, error });
 
   const session = data?.session;
+
+  // ═══ Referral capture ═══
+  // Save ?ref= param on any page load
+  (function(){
+    var ref = new URLSearchParams(window.location.search).get('ref');
+    if (ref && ref.length > 8) {
+      localStorage.setItem('sottotitoli_referrer', ref);
+    }
+  })();
+
+  // Record referral after sign-in (one-time, idempotent)
+  if (session?.user) {
+    var savedRef = localStorage.getItem('sottotitoli_referrer');
+    if (savedRef && session.user.id !== savedRef) {
+      try {
+        var { error: refErr } = await window.sottotitoliSupabase.from('referrals').upsert({
+          referrer_id: savedRef,
+          referred_user_id: session.user.id,
+          status: 'signed_up',
+          created_at: new Date().toISOString()
+        }, { onConflict: 'referred_user_id', ignoreDuplicates: true });
+        if (!refErr) localStorage.removeItem('sottotitoli_referrer');
+      } catch(e) { console.log('Referral record skipped:', e.message); }
+    }
+  }
 
   if (error || !session) {
     console.log('auth.js: no active session, rendering signed out');
