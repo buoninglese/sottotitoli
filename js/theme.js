@@ -82,7 +82,7 @@
   var dots = document.querySelectorAll('.dots a');
   var panels = document.querySelectorAll('.panel');
 
-  if (dots.length && panels.length) {
+  if (dots.length && panels.length && typeof IntersectionObserver !== 'undefined') {
     var observer = new IntersectionObserver(function (entries) {
       entries.forEach(function (e) {
         if (e.isIntersecting) {
