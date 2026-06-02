@@ -162,7 +162,7 @@
   function clearBox(id, placeholder) {
     const el = $(id);
     if (!el) return;
-    el.textContent = placeholder || "";
+    el.innerHTML = placeholder || "";
     el.dataset.placeholderActive = "true";
   }
 
@@ -170,7 +170,7 @@
     const el = $(id);
     if (!el) return null;
     if (el.dataset.placeholderActive === "true") {
-      el.textContent = "";
+      el.innerHTML = "";
       el.dataset.placeholderActive = "false";
     }
     return el;
@@ -498,7 +498,23 @@
       return;
     }
 
-    interimBox.textContent = clean;
+    // Sticky interim: keep common prefix stable, only suffix flickers
+    var prevWords = (lastInterimSent || '').trim().split(/\s+/);
+    var currWords = clean.split(/\s+/);
+    var commonLen = 0;
+    for (var i = 0; i < Math.min(prevWords.length, currWords.length); i++) {
+      if (prevWords[i].toLowerCase() === currWords[i].toLowerCase()) commonLen++;
+      else break;
+    }
+    // Escape to prevent XSS from speech text
+    var esc = function(s){ return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); };
+    if (commonLen > 0 && commonLen < currWords.length) {
+      var stable = esc(currWords.slice(0, commonLen).join(' '));
+      var flicker = esc(currWords.slice(commonLen).join(' '));
+      interimBox.innerHTML = '<span style="color:var(--text);font-weight:600">' + stable + '</span> <span style="color:var(--accent-purple);opacity:.7">' + flicker + '</span>';
+    } else {
+      interimBox.innerHTML = '<span style="color:var(--accent-purple);opacity:.7">' + esc(clean) + '</span>';
+    }
     interimBox.dataset.placeholderActive = "false";
     lastInterimSent = clean;
 
