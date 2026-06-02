@@ -90,6 +90,16 @@ body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--t
       <div class="vcard"><div class="vi">💼</div><div class="vn">Business</div><div class="vc" id="vBusiness">0</div></div>
     </div>
 
+    <div class="sec-t">🎁 Guadagna voucher</div>
+    <div style="background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px;margin-bottom:20px;font-size:12px;color:var(--text-sec);line-height:1.6">
+      <strong style="color:var(--accent)">Invita un amico</strong> — condividi il tuo link referral. Quando il tuo amico si iscrive e acquista un pacchetto crediti, ricevi <strong style="color:var(--accent-green)">20 VC</strong> in voucher gratuiti.
+      <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
+        <input id="refLink" readonly style="flex:1;min-width:180px;font-family:monospace;font-size:11px;padding:8px 12px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--text)" value="Caricamento...">
+        <button onclick="copyRefLink()" style="font-family:inherit;font-size:11px;font-weight:600;padding:8px 14px;border-radius:8px;border:1px solid var(--accent);background:var(--accent);color:#fff;cursor:pointer;white-space:nowrap">📋 Copia link</button>
+      </div>
+      <div id="refStatus" style="font-size:10px;color:var(--text-muted);margin-top:6px">Iscrizioni referral: —</div>
+    </div>
+
     <div class="sec-t">📋 Cronologia</div>
     <div class="hlist" id="hl"><div class="empty">Nessuna transazione.</div></div>
   </div>
@@ -127,6 +137,21 @@ var hl=document.getElementById('hl');
 if(h.data?.length){hl.innerHTML=h.data.map(function(r){var d=new Date(r.created_at).toLocaleDateString('it-IT');return'<div class="hrow"><span>'+r.description+'</span><span style="color:var(--text-muted);font-size:10px">'+d+'</span><span style="font-weight:700;color:'+(r.amount>0?'var(--accent-green)':'var(--accent-amber)')+'">'+(r.amount>0?'+':'')+r.amount+'</span></div>'}).join('')}
 }
 window.addEventListener('sottotitoli-auth',function(e){if(e.detail.user)init()});
+// Referral link
+async function loadRefLink(){
+  var s=await sup.auth.getSession(); if(!s.data?.session) return;
+  var uid=s.data.session.user.id;
+  var link='https://buoninglese.github.io/sottotitoli/?ref='+uid.substring(0,8);
+  var el=document.getElementById('refLink'); if(el) el.value=link;
+  var c=await sup.from('referrals').select('id',{count:'exact'}).eq('referrer_id',uid);
+  var st=document.getElementById('refStatus'); if(st) st.textContent='Iscrizioni referral: '+(c.count||0);
+}
+function copyRefLink(){
+  var el=document.getElementById('refLink'); if(!el) return;
+  el.select(); document.execCommand('copy');
+  var btn=event.target; btn.textContent='✓ Copiato!'; setTimeout(function(){btn.textContent='📋 Copia link'},2000);
+}
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',function(){setTimeout(loadRefLink,1000)});else setTimeout(loadRefLink,500);
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init);else init();
 })();
 </script>
