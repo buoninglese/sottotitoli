@@ -1379,6 +1379,81 @@ window.downloadTranscript=function(){
 };
 document.getElementById('psCopyBtn')?.addEventListener('click',copyTranscript);
 document.getElementById('psDownloadBtn')?.addEventListener('click',downloadTranscript);
+
+// ── Hover sync: transcript ↔ translation ──
+(function(){
+  var styleEl = document.createElement('style');
+  styleEl.textContent = '.tx-line.hover-hl,.tl-line.hover-hl{background:rgba(124,58,237,.12)!important;border-radius:3px;transition:background .15s}';
+  document.head.appendChild(styleEl);
+  var lineIdx = 0;
+  function syncLines(){
+    var txLines = document.querySelectorAll('#captionTranscript .line:not([data-tx])');
+    var tlLines = document.querySelectorAll('#captionTranslated .line:not([data-tl])');
+    txLines.forEach(function(l){ l.setAttribute('data-tx', ++lineIdx); });
+    tlLines.forEach(function(l,i){ l.setAttribute('data-tl', i+1); });
+    // Hover handlers on transcript
+    document.querySelectorAll('#captionTranscript .line[data-tx]').forEach(function(l){
+      if(l.dataset.hooked) return; l.dataset.hooked='1';
+      l.addEventListener('mouseenter',function(){
+        var idx = l.getAttribute('data-tx');
+        document.querySelectorAll('.tx-line[data-tx="'+idx+'"],.tl-line[data-tl="'+idx+'"]').forEach(function(el){el.classList.add('hover-hl')});
+      });
+      l.addEventListener('mouseleave',function(){
+        document.querySelectorAll('.hover-hl').forEach(function(el){el.classList.remove('hover-hl')});
+      });
+    });
+    // Hover handlers on translation
+    document.querySelectorAll('#captionTranslated .line[data-tl]').forEach(function(l){
+      if(l.dataset.hooked) return; l.dataset.hooked='1';
+      l.addEventListener('mouseenter',function(){
+        var idx = l.getAttribute('data-tl');
+        document.querySelectorAll('.tx-line[data-tx="'+idx+'"],.tl-line[data-tl="'+idx+'"]').forEach(function(el){el.classList.add('hover-hl')});
+      });
+      l.addEventListener('mouseleave',function(){
+        document.querySelectorAll('.hover-hl').forEach(function(el){el.classList.remove('hover-hl')});
+      });
+    });
+  }
+  // Watch for new lines
+  var txObs = new MutationObserver(syncLines);
+  var txEl = document.getElementById('captionTranscript');
+  if(txEl) txObs.observe(txEl, {childList:true,subtree:true});
+  var tlEl = document.getElementById('captionTranslated');
+  if(tlEl) txObs.observe(tlEl, {childList:true,subtree:true});
+  syncLines();
+})();
+
+// ── Basic punctuation for finalized transcript lines ──
+(function(){
+  function addPunctuation(el){
+    if(el.dataset.punctuated) return;
+    el.dataset.punctuated = '1';
+    var text = el.textContent.trim();
+    if(!text) return;
+    // Already has ending punctuation
+    if(/[.!?]$/.test(text)) return;
+    var lower = text.toLowerCase();
+    // Questions
+    if(/^(what|when|where|why|how|who|whom|which|whose|is|are|was|were|do|does|did|can|could|will|would|shall|should|may|might|have|has|had|am|che|cosa|come|quando|dove|perche|quale|quali|chi|quanto|quanti|puo|posso|puoi|sei|ha|hanno|avete|est-ce|que|quand|ou|pourquoi|comment|qui|quel|quelle|was|ist|sind|hat|haben|kann|kannst|warum|wann|wo|wer|wie)/i.test(lower)) {
+      el.textContent = text + '?'; return;
+    }
+    // Exclamations (very short enthusiastic)
+    if(text.length < 30 && /^(wow|great|amazing|yes|no|bravo|bene|ottimo|fantastico|magnifique|super|genial|perfect|excellent)/i.test(lower)) {
+      el.textContent = text + '!'; return;
+    }
+    // Default: period
+    el.textContent = text + '.';
+  }
+  var punctObs = new MutationObserver(function(mutations){
+    mutations.forEach(function(m){
+      m.addedNodes.forEach(function(node){
+        if(node.nodeType===1 && node.classList.contains('line')) addPunctuation(node);
+      });
+    });
+  });
+  var txPunct = document.getElementById('captionTranscript');
+  if(txPunct) punctObs.observe(txPunct, {childList:true,subtree:true});
+})();
 </script>
 <script src="js/theme.js?v=2"></script>
 </body>
