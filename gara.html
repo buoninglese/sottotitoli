@@ -360,8 +360,11 @@ function playerFinished(isMe) {
 }
 
 function stopMic() {
-  if (recognition) { try { recognition.stop(); } catch(e) {} }
+  if (recognition) { try { recognition.stop(); } catch(e) {} recognition = null; }
+  if (sentenceRecognition) { try { sentenceRecognition.stop(); } catch(e) {} sentenceRecognition = null; }
   isListening = false;
+  sentenceActive = false;
+  sentenceLastFinalIdx = -1;
 }
 
 // ═══════════════════════════════════════
@@ -723,101 +726,113 @@ function startProntoListening() {
   }
 }
 
-// Phase 2: Listen for sentences with interim word coloring
+// Phase 2: CONTINUOUS listening — starts once, never stops between sentences.
+// Only stops when game is over (all 10 done or opponent wins).
+var sentenceRecognition = null;    // the long-lived continuous recognition
+var sentenceLastFinalIdx = -1;     // last processed final result index
+var sentenceActive = false;        // is the continuous recognition running?
+
 function startSentenceListening() {
   if (gameOver) return;
+  if (sentenceActive) return;
   if (myIndex >= mySentences.length) return;
-  if (isListening) return; // Guard: prevent overlapping recognition instances
 
-  var rec = createRecognition();
-  if (!rec) return;
+  var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SR) return;
 
-  var target = mySentences[myIndex].text;
-  var handled = false; // Prevent double-processing of final result
+  var rec = new SR();
+  rec.continuous = true;
+  rec.interimResults = true;
+  rec.lang = 'en-US';
 
   rec.onresult = function(event) {
-    var last = event.results[event.results.length - 1];
-    var spoken = last[0].transcript.trim();
+    if (gameOver) return;
 
-    if (!last.isFinal) {
-      // INTERIM — show colored words in real-time
-      $('sInterim').style.display = 'block';
-      $('sInterim').innerHTML = '🗣 ' + buildInterimHTML(spoken, target);
-      setText('sFeedback', '');
-      return;
+    var target = mySentences[myIndex].text;
+
+    // Process any new final results
+    for (var i = sentenceLastFinalIdx + 1; i < event.results.length; i++) {
+      if (!event.results[i].isFinal) continue;
+      sentenceLastFinalIdx = i;
+      var spoken = event.results[i][0].transcript.trim();
+      if (!spoken) continue;
+
+      if (isMatch(spoken, target)) {
+        // Correct!
+        $('sInterim').style.display = 'block';
+        $('sInterim').innerHTML = '<span style="color:var(--accent-green)">✅ ' + escHtml(spoken) + '</span>';
+        myCorrect++;
+        myIndex++;
+        updateProgress();
+        setText('sFeedback', '✅ Perfetto!');
+        $('sFeedback').className = 's-feedback s-feedback-ok';
+        sendWS({ type: 'caption', action: 'progress', correct: myCorrect, playerId: myPlayerId });
+
+        if (myIndex >= TOTAL_SENTENCES) {
+          playerFinished(true);
+          return;
+        }
+        showSentence();
+        // Clear interim after a beat so the next sentence's target is visible
+        setTimeout(function() {
+          if ($('sInterim')) { $('sInterim').style.display = 'none'; $('sInterim').innerHTML = ''; }
+        }, 1200);
+      } else {
+        // Wrong — flash red but keep listening (don't stop!)
+        $('sInterim').style.display = 'block';
+        $('sInterim').innerHTML = '<span style="color:var(--danger)">❌ ' + escHtml(spoken) + '</span>';
+        setText('sFeedback', '❌ Non esatto. Riprova.');
+        $('sFeedback').className = 's-feedback s-feedback-err';
+        setTimeout(function() {
+          if ($('sInterim') && $('sFeedback') && $('sFeedback').textContent.indexOf('Non esatto') !== -1) {
+            $('sInterim').style.display = 'none';
+            $('sInterim').innerHTML = '';
+            setText('sFeedback', '');
+          }
+        }, 1500);
+      }
     }
 
-    // FINAL result — only process once
-    if (handled) return;
-    handled = true;
-    isListening = false;
-
-    if (isMatch(spoken, target)) {
-      // Correct! Show all green
-      $('sInterim').style.display = 'block';
-      $('sInterim').innerHTML = '<span style="color:var(--accent-green)">✅ ' + escHtml(spoken) + '</span>';
-      myCorrect++;
-      myIndex++;
-      updateProgress();
-      setText('sFeedback', '✅ Perfetto!');
-      $('sFeedback').className = 's-feedback s-feedback-ok';
-      sendWS({ type: 'caption', action: 'progress', correct: myCorrect, playerId: myPlayerId });
-      if (myIndex >= TOTAL_SENTENCES) {
-        playerFinished(true);
-        return;
+    // Show interim for the latest non-final result
+    var latest = event.results[event.results.length - 1];
+    if (!latest.isFinal && !gameOver) {
+      var interimText = latest[0].transcript.trim();
+      if (interimText) {
+        $('sInterim').style.display = 'block';
+        $('sInterim').innerHTML = '🗣 ' + buildInterimHTML(interimText, target);
       }
-      showSentence();
-      // Short pause then listen for next sentence
-      setTimeout(function() {
-        $('sInterim').style.display = 'none';
-        $('sInterim').innerHTML = '';
-        startSentenceListening();
-      }, 600);
-    } else {
-      // Wrong — show feedback and re-listen
-      $('sInterim').style.display = 'block';
-      $('sInterim').innerHTML = '<span style="color:var(--danger)">❌ ' + escHtml(spoken) + '</span>';
-      setText('sFeedback', '❌ Non esatto. Riprova.');
-      $('sFeedback').className = 's-feedback s-feedback-err';
-      setTimeout(function() {
-        $('sInterim').style.display = 'none';
-        $('sInterim').innerHTML = '';
-        startSentenceListening();
-      }, 800);
     }
   };
 
   rec.onerror = function(e) {
-    if (handled) return;
-    handled = true;
-    isListening = false;
+    if (gameOver) return;
     if (e.error === 'no-speech' || e.error === 'aborted') {
-      setTimeout(startSentenceListening, 400);
-    } else {
-      setText('sFeedback', '⚠️ ' + e.error);
-      $('sFeedback').className = 's-feedback s-feedback-err';
-      setTimeout(startSentenceListening, 1500);
+      // These are normal with continuous mode — recognition will keep trying
+      return;
     }
+    setText('sFeedback', '⚠️ ' + e.error);
+    $('sFeedback').className = 's-feedback s-feedback-err';
+    // Will restart via onend
   };
 
   rec.onend = function() {
-    // Only set flag — restart is handled by onresult or onerror
-    // If neither fired (rare edge case), fallback restart
-    if (!handled && !gameOver && myIndex < mySentences.length) {
-      handled = true;
-      isListening = false;
-      setTimeout(startSentenceListening, 800);
-    } else {
-      isListening = false;
+    sentenceActive = false;
+    sentenceLastFinalIdx = -1;
+    sentenceRecognition = null;
+    // If game still going, restart continuous recognition
+    if (!gameOver && myIndex < mySentences.length) {
+      setTimeout(startSentenceListening, 300);
     }
   };
 
   try {
-    recognition = rec;
+    sentenceRecognition = rec;
     rec.start();
+    sentenceActive = true;
+    sentenceLastFinalIdx = -1;
     isListening = true;
   } catch(e) {
-    isListening = false;
+    sentenceActive = false;
     setTimeout(startSentenceListening, 500);
   }
 }
