@@ -922,23 +922,27 @@ body {
     var key=lang+':'+word.toLowerCase();
     if(dictCache[key]) return dictCache[key];
     try{
-      var resp=await fetch('https://api.dictionaryapi.dev/api/v2/entries/'+lang+'/'+encodeURIComponent(word));
+      var resp=await fetch('https://freedictionaryapi.com/api/v1/entries/'+lang+'/'+encodeURIComponent(word));
       if(!resp.ok) throw new Error('Not found');
       var data=await resp.json();
-      if(!data||!data.length) throw new Error('Empty');
-      var entry=data[0];
+      if(!data||!data.entries||!data.entries.length) throw new Error('Empty');
+      var entry=data.entries[0];
+      var firstSense=(entry.senses||[])[0]||{};
       var result={
-        word:entry.word||word,
-        phonetic:(entry.phonetics||[]).filter(function(p){return p.text})[0],
-        audio:(entry.phonetics||[]).filter(function(p){return p.audio})[0],
-        meanings:(entry.meanings||[]).slice(0,3).map(function(m){
+        word:data.word||word,
+        phonetic:(entry.pronunciations||[]).filter(function(p){return p.text})[0],
+        audio:(entry.pronunciations||[]).filter(function(p){return p.audio})[0],
+        meanings:(entry.senses||[]).slice(0,3).map(function(s){
           return{
-            pos:m.partOfSpeech,
-            defs:(m.definitions||[]).slice(0,2).map(function(d){return{def:d.definition,ex:d.example}})
+            pos:entry.partOfSpeech||'',
+            defs:(s.definitions||[]).slice(0,2).map(function(d){return{def:d,ex:(s.examples||[])[0]||''}})
           };
         }),
-        sourceUrl:(entry.sourceUrls||[])[0]||''
+        sourceUrl:(data.source&&data.source.url)||''
       };
+      if(!result.meanings.length&&firstSense.definitions){
+        result.meanings=[{pos:entry.partOfSpeech||'',defs:(firstSense.definitions||[]).slice(0,2).map(function(d){return{def:d,ex:(firstSense.examples||[])[0]||''}})}];
+      }
       dictCache[key]=result;
       return result;
     }catch(e){

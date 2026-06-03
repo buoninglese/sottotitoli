@@ -814,8 +814,8 @@
     stopAudioCapture();
     updateMicState("stopped", false);
     setText("statusText", "Saving session...");
-    await finalizeSessionRow();
     setSessionUI('complete');
+    await finalizeSessionRow();
     setText("statusText", "Recognition stopped by user.");
   }
 
