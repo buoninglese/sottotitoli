@@ -20,6 +20,14 @@ window.SOTTOTITOLI_CONFIG = {
     myMemoryBase: "https://api.mymemory.translated.net/get"
   },
 
+  /** Deepgram speech-to-text (optional — replaces browser Web Speech API) */
+  // Set enabled:true to use Deepgram as primary STT. Requires the WebSocket
+  // relay server to have DEEPGRAM_API_KEY set in its environment.
+  // When disabled or unconfigured, falls back to browser webkitSpeechRecognition.
+  // deepgram: {
+  //   enabled: true
+  // },
+
   /** Analysis / speaker diarization endpoint */
   analysis: {
     speakerEndpoint: "https://sottotitoli-websocket.onrender.com/analyze-speakers"

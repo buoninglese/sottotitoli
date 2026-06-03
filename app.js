@@ -120,6 +120,8 @@
   }
 
   const SpeechRecognition = w.SpeechRecognition || w.webkitSpeechRecognition;
+  // Deepgram integration — set deepgram.enabled=true in config to use it as primary STT
+  const useDeepgram = !!(configRoot.deepgram && configRoot.deepgram.enabled);
   const DIARIZE_URL =
     (configRoot.analysis && configRoot.analysis.speakerEndpoint) ||
     "https://sottotitoli-websocket.onrender.com/analyze-speakers";
@@ -718,11 +720,22 @@
   }
 
   async function startRecognition() {
+    // ── Deepgram path (all browsers) ──
+    if (useDeepgram && wsPublisher && wsPublisher.ws && typeof wsPublisher.ws.send === 'function') {
+      try {
+        await startDeepgramCapture();
+        return;
+      } catch(e) {
+        setText("statusText", "Deepgram failed, falling back to browser STT…");
+        // Fall through to Web Speech API below
+      }
+    }
+
     if (!SpeechRecognition) {
-      // ── Safari fallback: MediaRecorder + Deepgram via WebSocket ──
+      // ── Safari fallback (no Web Speech API, no Deepgram config) ──
       if (navigator.mediaDevices?.getUserMedia && wsPublisher && wsPublisher.ws && typeof wsPublisher.ws.send === 'function') {
-        setText("statusText", "Starting Safari audio capture...");
-        await startSafariDeepgramCapture();
+        setText("statusText", "Starting audio capture via relay…");
+        await startDeepgramCapture();
         return;
       }
       setText("statusText", "⚠️ Speech recognition is not supported. Use Chrome or Edge.");
@@ -796,21 +809,16 @@
     shouldKeepListening = false;
     clearRestartTimer();
     clearInterimFlushTimer();
-    // Flush any pending interim as a final line before stopping
     if (pendingInterimText) {
       commitUtteranceFinal(pendingInterimText);
       pendingInterimText = "";
     }
     if (recognition) {
-      try {
-        recognition.stop();
-      } catch (e) {}
-      // FIX #4: null the recognition instance so buildRecognition() is called
-      // fresh on the next startRecognition(), picking up any language change.
+      try { recognition.stop(); } catch (e) {}
       recognition = null;
     }
-    // Stop Safari Deepgram capture if active
-    stopSafariDeepgramCapture();
+    // Stop Deepgram capture if active
+    stopDeepgramCapture();
     stopAudioCapture();
     updateMicState("stopped", false);
     setText("statusText", "Saving session...");
@@ -898,12 +906,11 @@
     } catch(e) {}
   }
 
-  var safariMediaRecorder = null;
-  var safariAudioStream = null;
-  var safariChunkInterval = null;
-  var SEND_CHUNK_MS = 300; // send audio chunk every 300ms
+  var deepgramMediaRecorder = null;
+  var deepgramAudioStream = null;
+  var SEND_CHUNK_MS = 300;
 
-  async function startSafariDeepgramCapture() {
+  async function startDeepgramCapture() {
     // Credit check (same as Chrome path)
     if (sessionSupabase) {
       try {
@@ -940,22 +947,22 @@
 
     // Use a single stream and recorder for both Deepgram + session saving
     try {
-      safariAudioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      deepgramAudioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
     } catch(e) {
       setText("statusText", "Microphone access denied. Check browser permissions.");
       return;
     }
 
     // Also set the global audio stream so stopAudioCapture can clean it up
-    audioStream = safariAudioStream;
+    audioStream = deepgramAudioStream;
     audioChunks = [];
     lastAudioBlob = null;
     speakerAnalysisCompleted = false;
     isAnalyzingSpeakers = false;
 
-    safariMediaRecorder = new MediaRecorder(safariAudioStream, { mimeType: 'audio/webm;codecs=opus' });
-    if (safariMediaRecorder.mimeType !== 'audio/webm;codecs=opus') {
-      safariMediaRecorder = new MediaRecorder(safariAudioStream);
+    deepgramMediaRecorder = new MediaRecorder(deepgramAudioStream, { mimeType: 'audio/webm;codecs=opus' });
+    if (deepgramMediaRecorder.mimeType !== 'audio/webm;codecs=opus') {
+      deepgramMediaRecorder = new MediaRecorder(deepgramAudioStream);
     }
 
     shouldKeepListening = true;
@@ -971,7 +978,7 @@
     var lang = (modeConfig && modeConfig.sourceLang) || "en-US";
     wsPublisher.ws.send(JSON.stringify({ type: "audio-start", lang: lang }));
 
-    safariMediaRecorder.ondataavailable = function(event) {
+    deepgramMediaRecorder.ondataavailable = function(event) {
       if (!event.data || event.data.size === 0) return;
       // Save for session recording
       audioChunks.push(event.data);
@@ -986,33 +993,33 @@
       reader.readAsDataURL(event.data);
     };
 
-    safariMediaRecorder.onstop = function() {
-      var actualType = safariMediaRecorder.mimeType || "audio/webm";
+    deepgramMediaRecorder.onstop = function() {
+      var actualType = deepgramMediaRecorder.mimeType || "audio/webm";
       lastAudioBlob = new Blob(audioChunks, { type: actualType });
-      if (safariAudioStream) {
-        safariAudioStream.getTracks().forEach(function(t){ t.stop(); });
-        safariAudioStream = null;
+      if (deepgramAudioStream) {
+        deepgramAudioStream.getTracks().forEach(function(t){ t.stop(); });
+        deepgramAudioStream = null;
         audioStream = null;
       }
     };
 
-    safariMediaRecorder.start(SEND_CHUNK_MS);
+    deepgramMediaRecorder.start(SEND_CHUNK_MS);
     isRecordingAudio = true;
     await createSessionRow();
 
-    setText("statusText", "🎤 Safari — Deepgram (" + lang + ")");
+    setText("statusText", "🎤 Deepgram (" + lang + ")");
     updateMicState("live", true);
   }
 
-  function stopSafariDeepgramCapture() {
-    if (safariMediaRecorder && safariMediaRecorder.state !== 'inactive') {
-      try { safariMediaRecorder.stop(); } catch(e) {}
+  function stopDeepgramCapture() {
+    if (deepgramMediaRecorder && deepgramMediaRecorder.state !== 'inactive') {
+      try { deepgramMediaRecorder.stop(); } catch(e) {}
     }
     if (wsPublisher?.ws?.readyState === WebSocket.OPEN) {
       wsPublisher.ws.send(JSON.stringify({ type: "audio-stop" }));
     }
-    safariMediaRecorder = null;
-    safariAudioStream = null;
+    deepgramMediaRecorder = null;
+    deepgramAudioStream = null;
     isRecordingAudio = false;
   }
 
