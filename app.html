@@ -216,6 +216,37 @@ body {
 .cefr-legend-item { display: flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 500; color: var(--text-secondary); padding: 3px 0; }
 .cefr-legend-dot { width: 12px; height: 12px; border-radius: 4px; flex-shrink: 0; }
 
+/* ── Dictionary popup card ── */
+.dict-popup{position:fixed;z-index:9999;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px 18px;max-width:340px;min-width:240px;box-shadow:0 8px 40px rgba(0,0,0,.3);font-size:13px;animation:dpIn .2s ease-out;pointer-events:auto}
+.dict-popup .dp-close{position:absolute;top:8px;right:12px;background:none;border:none;font-size:16px;cursor:pointer;color:var(--text-muted);padding:2px 6px;border-radius:4px}
+.dict-popup .dp-close:hover{color:var(--text);background:var(--bg-btn-subtle)}
+.dict-popup .dp-word{font-size:18px;font-weight:800;letter-spacing:-.5px;margin-bottom:2px;color:var(--text);padding-right:24px}
+.dict-popup .dp-phonetic{font-size:12px;color:var(--text-muted);margin-bottom:6px}
+.dict-popup .dp-phonetic .dp-audio{display:inline-flex;align-items:center;gap:3px;margin-left:6px;cursor:pointer;color:var(--accent-purple);font-size:11px;font-weight:600}
+.dict-popup .dp-phonetic .dp-audio:hover{opacity:.8}
+.dict-popup .dp-pos{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--accent-purple);margin-bottom:8px}
+.dict-popup .dp-defs{display:flex;flex-direction:column;gap:8px;margin-bottom:10px}
+.dict-popup .dp-def{font-size:12px;color:var(--text-secondary);line-height:1.5;padding-left:12px;border-left:2px solid var(--line)}
+.dict-popup .dp-def .dp-ex{font-size:11px;color:var(--text-muted);font-style:italic;margin-top:2px}
+.dict-popup .dp-trans{font-size:12px;color:var(--text);padding-top:8px;border-top:1px solid var(--line);display:flex;align-items:center;gap:6px}
+.dict-popup .dp-trans strong{color:var(--accent-purple)}
+.dict-popup .dp-source{font-size:10px;color:var(--text-muted);margin-top:6px;text-align:right}
+.dict-popup .dp-source a{color:var(--text-muted)}
+.dict-popup .dp-loading{text-align:center;padding:20px;color:var(--text-muted);font-size:13px}
+.dict-popup .dp-error{text-align:center;padding:16px;color:var(--danger);font-size:12px}
+@keyframes dpIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+
+/* ── Dual vocab boxes ── */
+.vocab-dual{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+@media(max-width:500px){.vocab-dual{grid-template-columns:1fr}}
+.vocab-dual .vocab-box{background:var(--bg-btn-subtle);border:1px solid var(--line);border-radius:12px;padding:14px;text-align:left}
+.vocab-dual .vocab-box h4{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--text-muted);margin-bottom:8px}
+.vocab-dual .vocab-box .bubbles{display:flex;flex-wrap:wrap;gap:5px;max-height:200px;overflow-y:auto;min-height:40px}
+
+/* ── Cross-highlight ── */
+.cefr-bubble[data-side]{transition:all .2s}
+.cefr-bubble.cross-lit{box-shadow:0 0 14px rgba(167,139,250,.5)!important;transform:scale(1.12)!important;z-index:2;position:relative}
+
 /* ═══════════════════════════════════════ */
 /* 🧪 CEFR GAUGE LAB — 20 variants ────── */
 /* ═══════════════════════════════════════ */
@@ -589,14 +620,20 @@ body {
       <div class="section-label">Vocabulary</div>
       <h2>Vocabolario</h2>
 
-      <!-- CEFR Bubbles — center stage -->
-      <div style="background:var(--card);border:1px solid var(--line);border-radius:16px;padding:20px;margin:16px 0;text-align:left">
+      <!-- CEFR Bubbles — dual layout for translate, single for caption -->
+      <div style="background:var(--card);border:1px solid var(--line);border-radius:16px;padding:20px;margin:16px 0;text-align:left" id="vocabCard">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
           <span style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--muted2)">🫧 Vocabolario CEFR</span>
           <span style="font-size:11px;color:var(--muted2)" id="cefrBubbleCount">0 parole</span>
         </div>
-        <div style="display:flex;flex-wrap:wrap;gap:6px;max-height:280px;overflow-y:auto;padding:4px 0;min-height:60px" id="cefrBubbles">
+        <!-- Single bubble box (caption mode) -->
+        <div id="vocabSingle" style="display:flex;flex-wrap:wrap;gap:6px;max-height:280px;overflow-y:auto;padding:4px 0;min-height:60px">
           <span style="font-size:12px;color:var(--muted2)">Avvia il microfono per vedere il vocabolario…</span>
+        </div>
+        <!-- Dual bubble boxes (translate mode) — hidden by default -->
+        <div id="vocabDual" class="vocab-dual" style="display:none">
+          <div class="vocab-box"><h4 id="vocabSrcLabel">🇬🇧 Source</h4><div class="bubbles" id="cefrBubblesSrc"></div></div>
+          <div class="vocab-box"><h4 id="vocabTgtLabel">🇮🇹 Target</h4><div class="bubbles" id="cefrBubblesTgt"></div></div>
         </div>
         <div style="display:flex;flex-wrap:wrap;gap:10px;margin-top:12px;padding-top:12px;border-top:1px solid var(--line)" id="cefrLegend"></div>
       </div>
@@ -796,115 +833,235 @@ body {
   }
 })();
 
-// ── CEFR word bubbles ──
+// ── CEFR word bubbles + Free Dictionary API ──
 (function(){
-  var seenWords = new Set();
-  var bubblesEl = document.getElementById('cefrBubbles');
+  var seenSrc = new Set(), seenTgt = new Set();
+  var dictCache = window.__dictCache = window.__dictCache || {};
   var legendEl = document.getElementById('cefrLegend');
-  if (!bubblesEl) return;
+  var singleEl = document.getElementById('vocabSingle');
+  var dualEl = document.getElementById('vocabDual');
+  var srcBubblesEl = document.getElementById('cefrBubblesSrc');
+  var tgtBubblesEl = document.getElementById('cefrBubblesTgt');
+  var countEl = document.getElementById('cefrBubbleCount');
+  var popupEl = null;
 
-  // Build color legend
-  function buildLegend() {
-    if (!legendEl) return;
-    var colors = window.CEFR_COLORS || {};
-    var order = ['A1','A2','B1','B2','C1','C2'];
-    legendEl.innerHTML = order.map(function(lvl){
-      var c = colors[lvl] || {bg:'#eee',text:'#666',label:lvl};
+  // Mode info
+  function getModeInfo(){
+    var m = window.__currentSessionMode || 'caption-en';
+    var isTrans = m.indexOf('translate-')===0;
+    var parts = isTrans ? m.replace('translate-','').split('-') : [];
+    var srcLang = isTrans ? (parts[0]||'en') : m.replace('caption-','');
+    var tgtLang = isTrans ? (parts[1]||'it') : null;
+    var srcFlag = langFlag(srcLang), tgtFlag = langFlag(tgtLang);
+    return {isTrans:isTrans, srcLang:srcLang, tgtLang:tgtLang, srcFlag:srcFlag, tgtFlag:tgtFlag};
+  }
+
+  function langFlag(code){
+    var f={en:'🇬🇧',it:'🇮🇹',fr:'🇫🇷',de:'🇩🇪',es:'🇪🇸',pt:'🇵🇹',nl:'🇳🇱',pl:'🇵🇱'};
+    return f[code]||'🌐';
+  }
+
+  function langName(code){
+    var n={en:'English',it:'Italiano',fr:'Français',de:'Deutsch',es:'Español',pt:'Português',nl:'Nederlands',pl:'Polski'};
+    return n[code]||code;
+  }
+
+  // Build legend
+  function buildLegend(){
+    if(!legendEl) return;
+    var colors=window.CEFR_COLORS||{};
+    legendEl.innerHTML=['A1','A2','B1','B2','C1','C2'].map(function(l){
+      var c=colors[l]||{bg:'#eee',text:'#666',label:l};
       return '<span class="cefr-legend-item"><span class="cefr-legend-dot" style="background:'+c.text+'"></span>'+c.label+'</span>';
     }).join('');
   }
   buildLegend();
 
-  function extractWords(text) {
-    if (!text) return [];
-    var tokens = text.toLowerCase().match(/[a-zà-ÿ']+/gi);
-    if (!tokens) return [];
-    // Filter out very short tokens
-    return tokens.filter(function(w){ return w.length >= 2; });
+  function extractWords(text){
+    if(!text) return[];
+    var t=text.toLowerCase().match(/[a-zà-ÿ']+/gi);
+    return t?t.filter(function(w){return w.length>=2}):[];
   }
 
-  function getCEFRColor(word) {
-    var level = (window.getCEFRLevel && window.getCEFRLevel(word)) || 'A1';
-    var colors = window.CEFR_COLORS || {};
-    var c = colors[level] || {bg:'#e5e7eb',text:'#374151'};
-    return { level: level, bg: c.bg, text: c.text };
+  function getCEFRColor(word){
+    var l=(window.getCEFRLevel&&window.getCEFRLevel(word))||'A1';
+    var c=(window.CEFR_COLORS||{})[l]||{bg:'#e5e7eb',text:'#374151'};
+    return{level:l,bg:c.bg,text:c.text};
   }
 
-  window.updateCefrBubbles = function(text) {
-    if (!bubblesEl) return;
-    var words = extractWords(text);
-    var newWords = [];
+  function renderBubble(w,side,index){
+    var c=getCEFRColor(w);
+    var esc=w.replace(/'/g,"&#39;").replace(/"/g,'&quot;');
+    return'<span class="cefr-bubble" data-side="'+side+'" data-word="'+esc+'" data-idx="'+index+'" style="background:'+c.bg+';color:'+c.text+';border:1px solid '+c.text+'22" title="'+w+' · '+c.level+' — click for definition">'+w+'</span>';
+  }
+
+  function renderBubbles(words,side,seenSet){
+    var all=Array.from(seenSet);
+    var order={A1:0,A2:1,B1:2,B2:3,C1:4,C2:5};
+    all.sort(function(a,b){
+      var la=(window.getCEFRLevel&&window.getCEFRLevel(a))||'A1';
+      var lb=(window.getCEFRLevel&&window.getCEFRLevel(b))||'A1';
+      return(order[la]||0)-(order[lb]||0)||a.localeCompare(b);
+    });
+    return all.map(function(w,i){return renderBubble(w,side,i)}).join('');
+  }
+
+  function feedWords(text,seenSet,bubblesEl,side){
+    if(!bubblesEl) return;
+    var words=extractWords(text);
+    var added=false;
     words.forEach(function(w){
-      var clean = w.replace(/[^a-zà-ÿ']/gi, '').toLowerCase();
-      if (clean.length < 2) return;
-      if (!seenWords.has(clean)) {
-        seenWords.add(clean);
-        newWords.push(clean);
+      if(!seenSet.has(w)){seenSet.add(w);added=true}
+    });
+    if(!added&&seenSet.size===0) return;
+    bubblesEl.innerHTML=renderBubbles(null,side,seenSet);
+    bindBubbleClicks(bubblesEl);
+  }
+
+  // ═══ Free Dictionary API ═══
+  async function lookupWord(word,lang){
+    var key=lang+':'+word.toLowerCase();
+    if(dictCache[key]) return dictCache[key];
+    try{
+      var resp=await fetch('https://api.dictionaryapi.dev/api/v2/entries/'+lang+'/'+encodeURIComponent(word));
+      if(!resp.ok) throw new Error('Not found');
+      var data=await resp.json();
+      if(!data||!data.length) throw new Error('Empty');
+      var entry=data[0];
+      var result={
+        word:entry.word||word,
+        phonetic:(entry.phonetics||[]).filter(function(p){return p.text})[0],
+        audio:(entry.phonetics||[]).filter(function(p){return p.audio})[0],
+        meanings:(entry.meanings||[]).slice(0,3).map(function(m){
+          return{
+            pos:m.partOfSpeech,
+            defs:(m.definitions||[]).slice(0,2).map(function(d){return{def:d.definition,ex:d.example}})
+          };
+        }),
+        sourceUrl:(entry.sourceUrls||[])[0]||''
+      };
+      dictCache[key]=result;
+      return result;
+    }catch(e){
+      dictCache[key]=null;
+      return null;
+    }
+  }
+
+  function showDictPopup(word,lang,event){
+    dismissPopup();
+    var rect=event.target.getBoundingClientRect();
+    popupEl=document.createElement('div');
+    popupEl.className='dict-popup';
+    popupEl.style.left=Math.min(rect.left,window.innerWidth-360)+'px';
+    popupEl.style.top=Math.min(rect.bottom+6,window.innerHeight-320)+'px';
+    popupEl.innerHTML='<div class="dp-loading">🔍 Cercando <strong>'+word+'</strong>…</div>';
+    document.body.appendChild(popupEl);
+
+    lookupWord(word,lang).then(function(r){
+      if(!popupEl) return;
+      if(!r){popupEl.innerHTML='<div class="dp-error">Nessuna definizione trovata per <strong>'+word+'</strong>.<br><a href="https://translate.google.com/?sl='+lang+'&tl=it&text='+encodeURIComponent(word)+'" target="_blank" style="color:var(--accent-purple)">Cerca su Google Translate →</a></div>';return}
+      var audioBtn=r.audio?' <span class="dp-audio" onclick="var a=new Audio(\''+r.audio.audio+'\');a.play()">🔊 Ascolta</span>':'';
+      var phonetic=r.phonetic?' /'+r.phonetic.text+'/':'';
+      var defsHtml=r.meanings.map(function(m){
+        var dHtml=m.defs.map(function(d){return'<div class="dp-def">'+d.def+(d.ex?'<div class="dp-ex">“'+d.ex+'”</div>':'')+'</div>'}).join('');
+        return'<div style="margin-bottom:6px"><span class="dp-pos">'+m.pos+'</span>'+dHtml+'</div>';
+      }).join('');
+      var transHtml='';
+      var mi=getModeInfo();
+      if(mi.isTrans&&mi.tgtLang&&mi.tgtLang!==lang){
+        transHtml='<div class="dp-trans">🔄 <strong>Cerca traduzione:</strong> <a href="https://translate.google.com/?sl='+lang+'&tl='+mi.tgtLang+'&text='+encodeURIComponent(word)+'" target="_blank" style="color:var(--accent-purple)">'+word+' in '+langName(mi.tgtLang)+' →</a></div>';
       }
+      var srcHtml=r.sourceUrl?'<div class="dp-source"><a href="'+r.sourceUrl+'" target="_blank">📖 Wiktionary</a></div>':'';
+      popupEl.innerHTML='<button class="dp-close" onclick="document.querySelector(\'.dict-popup\')&&document.querySelector(\'.dict-popup\').remove()">✕</button><div class="dp-word">'+r.word+'</div><div class="dp-phonetic">'+phonetic+audioBtn+'</div>'+defsHtml+transHtml+srcHtml;
+    }).catch(function(){
+      if(popupEl) popupEl.innerHTML='<div class="dp-error">Errore nel caricamento.</div>';
     });
+  }
 
-    if (newWords.length === 0 && seenWords.size === 0) return;
+  function dismissPopup(){
+    if(popupEl){popupEl.remove();popupEl=null}
+  }
 
-    // Render all seen words sorted by CEFR level
-    var allWords = Array.from(seenWords);
-    var cefrOrder = {A1:0,A2:1,B1:2,B2:3,C1:4,C2:5};
-    allWords.sort(function(a,b){
-      var la = (window.getCEFRLevel && window.getCEFRLevel(a)) || 'A1';
-      var lb = (window.getCEFRLevel && window.getCEFRLevel(b)) || 'A1';
-      return (cefrOrder[la]||0) - (cefrOrder[lb]||0) || a.localeCompare(b);
+  document.addEventListener('click',function(e){
+    if(popupEl&&!popupEl.contains(e.target)&&!e.target.classList.contains('cefr-bubble')){dismissPopup()}
+  });
+
+  function bindBubbleClicks(container){
+    if(!container) return;
+    container.querySelectorAll('.cefr-bubble').forEach(function(b){
+      b.addEventListener('click',function(e){
+        e.stopPropagation();
+        var w=b.getAttribute('data-word');
+        var side=b.getAttribute('data-side')||'src';
+        var mi=getModeInfo();
+        var lang=side==='tgt'?mi.tgtLang:mi.srcLang;
+        if(w) showDictPopup(w,lang,e);
+      });
     });
+  }
 
-    bubblesEl.innerHTML = allWords.map(function(w){
-      var c = getCEFRColor(w);
-      var dictUrl = getDictionaryUrl(w);
-      return '<span class="cefr-bubble" style="background:'+c.bg+';color:'+c.text+';border:1px solid '+c.text+'22" title="'+w+' · '+c.level+' — click for dictionary" onclick="window.open(\''+dictUrl+'\', \'_blank\')">'+w+'</span>';
-    }).join('');
+  // ═══ Cross-highlight hover ═══
+  function bindCrossHighlight(){
+    document.querySelectorAll('.cefr-bubble[data-side]').forEach(function(b){
+      b.addEventListener('mouseenter',function(){
+        var w=b.getAttribute('data-word'),side=b.getAttribute('data-side');
+        if(!w) return;
+        var otherSide=side==='src'?'tgt':'src';
+        document.querySelectorAll('.cefr-bubble[data-side="'+side+'"][data-word="'+CSS.escape(w)+'"]').forEach(function(s){s.classList.add('cross-lit')});
+        // Also light matching word on other side
+        document.querySelectorAll('.cefr-bubble[data-side="'+otherSide+'"][data-word="'+CSS.escape(w)+'"]').forEach(function(s){s.classList.add('cross-lit')});
+      });
+      b.addEventListener('mouseleave',function(){
+        document.querySelectorAll('.cefr-bubble.cross-lit').forEach(function(s){s.classList.remove('cross-lit')});
+      });
+    });
+  }
+
+  // ═══ Main update ═══
+  window.updateCefrBubbles = function(text, translatedText){
+    var mi=getModeInfo();
+    if(mi.isTrans){
+      // Translate mode: dual boxes
+      if(singleEl) singleEl.style.display='none';
+      if(dualEl) dualEl.style.display='grid';
+      var sl=document.getElementById('vocabSrcLabel');
+      var tl=document.getElementById('vocabTgtLabel');
+      if(sl) sl.textContent=mi.srcFlag+' '+langName(mi.srcLang);
+      if(tl) tl.textContent=mi.tgtFlag+' '+langName(mi.tgtLang);
+      if(text) feedWords(text,seenSrc,srcBubblesEl,'src');
+      if(translatedText) feedWords(translatedText,seenTgt,tgtBubblesEl,'tgt');
+      if(countEl) countEl.textContent=(seenSrc.size+seenTgt.size)+' parole';
+      setTimeout(bindCrossHighlight,100);
+    }else{
+      // Caption mode: single box
+      if(dualEl) dualEl.style.display='none';
+      if(singleEl) singleEl.style.display='flex';
+      if(text) feedWords(text,seenSrc,singleEl,'src');
+      if(countEl) countEl.textContent=seenSrc.size+' parole';
+    }
   };
 
-  function getDictionaryUrl(word) {
-    var mode = window.__currentSessionMode || 'caption-en';
-    var encoded = encodeURIComponent(word);
-    var isTranslate = mode.indexOf('translate-') === 0;
-
-    if (isTranslate) {
-      // Bilingual: WordReference with the right language pair
-      var parts = mode.replace('translate-','').split('-');
-      var src = parts[0], tgt = parts[1] || 'it';
-      var wrPairs = {enit:'https://www.wordreference.com/enit/'+encoded, iten:'https://www.wordreference.com/iten/'+encoded, fren:'https://www.wordreference.com/fren/'+encoded, deen:'https://www.wordreference.com/deen/'+encoded, esen:'https://www.wordreference.com/es/en/translation.asp?spen='+encoded, pten:'https://www.wordreference.com/pten/'+encoded, nlen:'https://www.wordreference.com/nlen/'+encoded, plen:'https://www.wordreference.com/plen/'+encoded};
-      var key = src+tgt;
-      if (wrPairs[key]) return wrPairs[key];
-      // Fallback: Google Translate with the pair
-      return 'https://translate.google.com/?sl='+src+'&tl='+tgt+'&text='+encoded+'&op=translate';
-    }
-
-    // Monolingual caption mode: best dictionary per language
-    var lang = mode.replace('caption-','');
-    var dicts = {
-      en:'https://www.oxfordlearnersdictionaries.com/search/english/?q='+encoded,
-      it:'https://www.treccani.it/vocabolario/'+encoded,
-      fr:'https://www.larousse.fr/dictionnaires/francais/'+encoded,
-      de:'https://www.duden.de/suchen/dudenonline/'+encoded,
-      es:'https://dle.rae.es/'+encoded,
-      pt:'https://dicionario.priberam.org/'+encoded,
-      nl:'https://www.vandale.nl/gratis-woordenboek/nederlands/betekenis/'+encoded,
-      pl:'https://wsjp.pl/haslo/podglad/1/?szukaj='+encoded
-    };
-    if (dicts[lang]) return dicts[lang];
-    return 'https://translate.google.com/?sl='+lang+'&tl=it&text='+encoded+'&op=translate';
-  }
-
-  // Watch transcript for changes
-  var transcriptEl = document.getElementById('captionTranscript');
-  if (transcriptEl) {
-    var observer = new MutationObserver(function(){
-      // Join child divs with space so words from different lines don't concatenate
-      var lines = [];
-      transcriptEl.querySelectorAll('div').forEach(function(d){ lines.push(d.textContent || ''); });
-      var text = lines.join(' ');
-      window.updateCefrBubbles(text);
+  // Watch transcripts
+  function watchTranscript(id,isTranslated){
+    var el=document.getElementById(id);
+    if(!el) return;
+    var observer=new MutationObserver(function(){
+      var lines=[];
+      el.querySelectorAll('div').forEach(function(d){lines.push(d.textContent||'')});
+      var txt=lines.join(' ');
+      if(isTranslated){
+        var srcEl=document.getElementById('captionTranscript');
+        var srcLines=[]; if(srcEl) srcEl.querySelectorAll('div').forEach(function(d){srcLines.push(d.textContent||'')});
+        window.updateCefrBubbles(srcLines.join(' '),txt);
+      }else{
+        window.updateCefrBubbles(txt);
+      }
     });
-    observer.observe(transcriptEl, { childList: true, subtree: true, characterData: true });
+    observer.observe(el,{childList:true,subtree:true,characterData:true});
   }
+  watchTranscript('captionTranscript',false);
+  watchTranscript('captionTranslated',true);
 })();
 
 // ── Live metrics dashboard ──
@@ -1198,10 +1355,14 @@ document.addEventListener("DOMContentLoaded", function() {
         if (completePanel) completePanel.classList.remove('visible');
         var transcriptEl = document.getElementById('captionTranscript');
         var translEl = document.getElementById('captionTranslated');
-        var bubblesEl = document.getElementById('cefrBubbles');
+        var bubblesEl = document.getElementById('vocabSingle');
+        var bubblesSrc = document.getElementById('cefrBubblesSrc');
+        var bubblesTgt = document.getElementById('cefrBubblesTgt');
         if (transcriptEl) transcriptEl.innerHTML = '';
         if (translEl) translEl.innerHTML = '';
         if (bubblesEl) bubblesEl.innerHTML = '<span style="font-size:12px;color:var(--muted2)">Avvia il microfono…</span>';
+        if (bubblesSrc) bubblesSrc.innerHTML = '';
+        if (bubblesTgt) bubblesTgt.innerHTML = '';
         // Reset stats display
         ['statLines','statWords','statChars','liveWpm','liveWords','liveSentences','liveLexDiv','liveFillers','liveNgsl','liveQuality','liveVerbCount','liveNounCount','liveAdjCount','liveQuestions','cefrLevel','cefrGauge','reportQuality','reportWpm','reportFillers'].forEach(function(id){
           var el = document.getElementById(id);
