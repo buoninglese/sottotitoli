@@ -335,7 +335,7 @@ function playerFinished(isMe) {
     setText('rOppScore', oppCorrect + '/' + TOTAL_SENTENCES);
     setText('rOppTime', '—');
     $('sentenceBox').style.display = 'none';
-    sendWS({ type: 'gara', action: 'finish', score: myCorrect, time: myElapsed });
+    sendWS({ type: 'caption', action: 'finish', score: myCorrect, time: myElapsed });
   }
 }
 
@@ -355,10 +355,10 @@ function connectWS() {
       if (state === 'connected') {
         setText('lobbyStatus', '✅ Connesso alla room ' + room);
         // Announce ourselves
-        sendWS({ type: 'gara', action: 'joined', playerId: myPlayerId, name: myDisplayName });
+        sendWS({ type: 'caption', action: 'joined', playerId: myPlayerId, name: myDisplayName });
         // Re-announce ready status on reconnect so opponent knows
         if (iAmReady && !gameStarted) {
-          sendWS({ type: 'gara', action: 'ready', playerId: myPlayerId });
+          sendWS({ type: 'caption', action: 'ready', playerId: myPlayerId });
         }
       } else {
         setText('lobbyStatus', '⏳ ' + state + '…');
@@ -367,7 +367,10 @@ function connectWS() {
     onMessage: function(event) {
       try {
         var p = JSON.parse(event.data);
-        if (!p || p.type !== 'gara') return;
+        if (!p) return;
+        // Only process game messages (they have a gara action field)
+        var garaActions = ['joined','ready','progress','finish','hello','paired'];
+        if (!p.action || garaActions.indexOf(p.action) === -1) return;
         // Ignore own messages
         if (p.playerId === myPlayerId) return;
 
@@ -378,7 +381,7 @@ function connectWS() {
           }
           // If we already said PRONTO, re-broadcast so late joiners know
           if (iAmReady) {
-            sendWS({ type: 'gara', action: 'ready', playerId: myPlayerId });
+            sendWS({ type: 'caption', action: 'ready', playerId: myPlayerId });
           }
         }
         if (p.action === 'ready') {
@@ -448,7 +451,7 @@ function startMatchmaking() {
         setText('matchmakingStatus', '🔍 In attesa di un avversario… (condividi il link nel frattempo)');
         // Announce presence in lobby
         if (lobbyPublisher && lobbyPublisher.ws && lobbyPublisher.ws.readyState === WebSocket.OPEN) {
-          lobbyPublisher.publish({ type: 'gara-lobby', action: 'hello', playerId: myPlayerId, name: myDisplayName, room: room });
+          lobbyPublisher.publish({ type: 'caption', action: 'hello', playerId: myPlayerId, name: myDisplayName, room: room });
         }
         // Show share as fallback
         $('shareRow').style.display = 'block';
@@ -457,7 +460,10 @@ function startMatchmaking() {
     onMessage: function(event) {
       try {
         var p = JSON.parse(event.data);
-        if (!p || p.type !== 'gara-lobby') return;
+        if (!p) return;
+        // Only process lobby messages (hello/paired actions)
+        var lobbyActions = ['hello','paired'];
+        if (!p.action || lobbyActions.indexOf(p.action) === -1) return;
         if (p.playerId === myPlayerId) return; // ignore self
 
         if (p.action === 'hello') {
@@ -466,7 +472,7 @@ function startMatchmaking() {
           if (!targetRoom) return;
           setText('matchmakingStatus', '🎯 Avversario trovato! Entro nella room ' + targetRoom + '…');
           // Tell them we're joining
-          lobbyPublisher.publish({ type: 'gara-lobby', action: 'paired', playerId: myPlayerId, room: targetRoom, targetId: p.playerId });
+          lobbyPublisher.publish({ type: 'caption', action: 'paired', playerId: myPlayerId, room: targetRoom, targetId: p.playerId });
           // Switch to game room
           setTimeout(function() {
             cleanupLobby();
@@ -607,14 +613,14 @@ function startProntoListening() {
       $('prontoPrompt').querySelector('p').textContent = '✅ PRONTO! In attesa dell\'avversario…';
       $('prontoPrompt').querySelector('p').style.color = 'var(--accent-green)';
       // Send via both paths for reliability
-      sendWS({ type: 'gara', action: 'ready', playerId: myPlayerId });
-      if (wsPublisher) wsPublisher.publish({ type: 'gara', action: 'ready', playerId: myPlayerId });
+      sendWS({ type: 'caption', action: 'ready', playerId: myPlayerId });
+      if (wsPublisher) wsPublisher.publish({ type: 'caption', action: 'ready', playerId: myPlayerId });
       tryStartCountdown();
       // Re-broadcast ready every 2s until game starts (handles dropped messages & late joiners)
       clearInterval(readyRebroadcastTimer);
       readyRebroadcastTimer = setInterval(function() {
         if (gameStarted || gameOver) { clearInterval(readyRebroadcastTimer); return; }
-        sendWS({ type: 'gara', action: 'ready', playerId: myPlayerId });
+        sendWS({ type: 'caption', action: 'ready', playerId: myPlayerId });
       }, 2000);
       rec.stop();
     } else {
@@ -672,7 +678,7 @@ function startSentenceListening() {
       updateProgress();
       setText('sFeedback', '✅ Perfetto!');
       $('sFeedback').className = 's-feedback s-feedback-ok';
-      sendWS({ type: 'gara', action: 'progress', correct: myCorrect, playerId: myPlayerId });
+      sendWS({ type: 'caption', action: 'progress', correct: myCorrect, playerId: myPlayerId });
       if (myIndex >= TOTAL_SENTENCES) {
         playerFinished(true);
         return;
