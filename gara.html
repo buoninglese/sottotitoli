@@ -170,7 +170,7 @@ body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--t
       <div class="s-label">Ripeti la frase</div>
       <div class="s-cefr cefr-a1" id="sCefr">A1</div>
       <div class="s-text" id="sText">—</div>
-      <div class="s-spoken" id="sSpoken" style="display:none"></div>
+      <div class="s-interim" id="sInterim" style="display:none;font-size:18px;font-weight:600;line-height:1.5;margin-top:12px;padding-top:12px;border-top:1px solid var(--line);width:100%;min-height:28px"></div>
       <div class="s-feedback" id="sFeedback"></div>
     </div>
 
@@ -316,7 +316,7 @@ function showSentence() {
   var cefr = $('sCefr');
   cefr.textContent = s.level;
   cefr.className = 's-cefr cefr-' + s.level.toLowerCase();
-  $('sSpoken').style.display = 'none';
+  if ($('sInterim')) { $('sInterim').style.display = 'none'; $('sInterim').innerHTML = ''; }
   setText('sFeedback', '');
 }
 
@@ -618,9 +618,26 @@ function createRecognition() {
   if (!SR) return null;
   var rec = new SR();
   rec.continuous = false;
-  rec.interimResults = false;
+  rec.interimResults = true;  // enable interim for real-time word coloring
   rec.lang = 'en-US';
   return rec;
+}
+
+// Build colored HTML: matching words green, wrong words red
+function buildInterimHTML(spoken, target) {
+  var sWords = spoken.toLowerCase().replace(/[^a-z0-9\s']/g, '').trim().split(/\s+/);
+  var tWords = target.toLowerCase().replace(/[^a-z0-9\s']/g, '').trim().split(/\s+/);
+  var html = '';
+  for (var i = 0; i < sWords.length; i++) {
+    var match = (i < tWords.length && sWords[i] === tWords[i]);
+    var color = match ? 'var(--accent-green)' : 'var(--danger)';
+    html += '<span style="color:' + color + ';transition:color .2s">' + escHtml(sWords[i]) + '</span> ';
+  }
+  return html.trim();
+}
+
+function escHtml(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 }
 
 // Phase 1: Listen for "PRONTO"
@@ -633,8 +650,10 @@ function startProntoListening() {
   }
 
   rec.onresult = function(event) {
-    var spoken = event.results[0][0].transcript.trim().toLowerCase();
-    // Detect "pronto", " pronto", "pronto ", "ready"
+    var last = event.results[event.results.length - 1];
+    if (!last.isFinal) return; // ignore interim during pronto phase
+    var spoken = last[0].transcript.trim().toLowerCase();
+    isListening = false;
     if (/\b(pronto|ready|pronto!|ready!)\b/i.test(spoken)) {
       iAmReady = true;
       setText('pYouStatus', '✅ Hai detto PRONTO!');
@@ -642,41 +661,34 @@ function startProntoListening() {
       $('sFeedback').className = 's-feedback s-feedback-ok';
       $('prontoPrompt').querySelector('p').textContent = '✅ PRONTO! In attesa dell\'avversario…';
       $('prontoPrompt').querySelector('p').style.color = 'var(--accent-green)';
-      // Send via both paths for reliability
       sendWS({ type: 'caption', action: 'ready', playerId: myPlayerId });
       if (wsPublisher) wsPublisher.publish({ type: 'caption', action: 'ready', playerId: myPlayerId });
       tryStartCountdown();
-      // Re-broadcast ready every 2s until game starts (handles dropped messages & late joiners)
       clearInterval(readyRebroadcastTimer);
       readyRebroadcastTimer = setInterval(function() {
         if (gameStarted || gameOver) { clearInterval(readyRebroadcastTimer); return; }
         sendWS({ type: 'caption', action: 'ready', playerId: myPlayerId });
       }, 2000);
-      rec.stop();
     } else {
-      // Not "pronto", show what was heard
-      setText('sSpoken', '🗣 ' + spoken);
-      $('sSpoken').style.display = 'block';
       setText('sFeedback', '👂 Ho sentito: "' + spoken + '". Di\' "PRONTO" per iniziare.');
       $('sFeedback').className = 's-feedback s-feedback-err';
-      // Restart listening
-      rec.stop();
       setTimeout(startProntoListening, 400);
     }
   };
 
   rec.onerror = function(e) {
+    isListening = false;
     if (e.error === 'no-speech' || e.error === 'aborted') {
-      // Normal — restart silently
       setTimeout(startProntoListening, 400);
     } else {
-      setText('sFeedback', '⚠️ Microfono: ' + e.error + '. Ricarica la pagina e consenti il microfono.');
+      setText('sFeedback', '⚠️ Microfono: ' + e.error + '. Ricarica e consenti il microfono.');
       $('sFeedback').className = 's-feedback s-feedback-err';
+      setTimeout(startProntoListening, 1500);
     }
   };
 
   rec.onend = function() {
-    // Will restart via onresult or onerror
+    isListening = false;
   };
 
   try {
@@ -685,24 +697,44 @@ function startProntoListening() {
     isListening = true;
     setText('pYouStatus', '🎤 In ascolto… Di\' "PRONTO"');
   } catch(e) {
-    setText('pYouStatus', '⚠️ Errore microfono. Consenti l\'accesso al microfono.');
+    isListening = false;
+    setText('pYouStatus', '⚠️ Errore microfono. Consenti l\'accesso.');
+    setTimeout(startProntoListening, 1000);
   }
 }
 
-// Phase 2: Listen for sentence after countdown
+// Phase 2: Listen for sentences with interim word coloring
 function startSentenceListening() {
-  if (isListening || gameOver) return;
+  if (gameOver) return;
   if (myIndex >= mySentences.length) return;
+  // Don't check isListening here — we properly manage it via onend
 
   var rec = createRecognition();
   if (!rec) return;
 
+  var target = mySentences[myIndex].text;
+
   rec.onresult = function(event) {
-    var spoken = event.results[0][0].transcript.trim();
-    $('sSpoken').style.display = 'block';
-    setText('sSpoken', '🗣 ' + spoken);
-    var target = mySentences[myIndex].text;
+    var last = event.results[event.results.length - 1];
+    var spoken = last[0].transcript.trim();
+
+    if (!last.isFinal) {
+      // INTERIM — show colored words in real-time
+      $('sInterim').style.display = 'block';
+      $('sInterim').innerHTML = '🗣 ' + buildInterimHTML(spoken, target);
+      setText('sFeedback', '');
+      return;
+    }
+
+    // FINAL result
+    isListening = false;
+    $('sInterim').style.display = 'none';
+    $('sInterim').innerHTML = '';
+
     if (isMatch(spoken, target)) {
+      // Correct! Show all green
+      $('sInterim').style.display = 'block';
+      $('sInterim').innerHTML = '<span style="color:var(--accent-green)">✅ ' + escHtml(spoken) + '</span>';
       myCorrect++;
       myIndex++;
       updateProgress();
@@ -714,26 +746,47 @@ function startSentenceListening() {
         return;
       }
       showSentence();
+      // Short pause then listen for next
+      setTimeout(function() {
+        $('sInterim').style.display = 'none';
+        $('sInterim').innerHTML = '';
+        startSentenceListening();
+      }, 600);
     } else {
+      // Wrong — show feedback and re-listen
+      $('sInterim').style.display = 'block';
+      $('sInterim').innerHTML = '<span style="color:var(--danger)">❌ ' + escHtml(spoken) + '</span>';
       setText('sFeedback', '❌ Non esatto. Riprova.');
       $('sFeedback').className = 's-feedback s-feedback-err';
+      setTimeout(function() {
+        $('sInterim').style.display = 'none';
+        $('sInterim').innerHTML = '';
+        startSentenceListening();
+      }, 800);
     }
-    // Continue listening
-    rec.stop();
-    setTimeout(startSentenceListening, 300);
   };
 
   rec.onerror = function(e) {
+    isListening = false;
     if (e.error === 'no-speech' || e.error === 'aborted') {
       setTimeout(startSentenceListening, 400);
     } else {
       setText('sFeedback', '⚠️ ' + e.error);
       $('sFeedback').className = 's-feedback s-feedback-err';
-      setTimeout(startSentenceListening, 800);
+      setTimeout(startSentenceListening, 1500);
     }
   };
 
-  rec.onend = function() {};
+  rec.onend = function() {
+    isListening = false;
+    // If onend fires without onresult processing (e.g., timeout), restart
+    if (!gameOver && myIndex < mySentences.length) {
+      // Small delay to avoid race with onresult
+      setTimeout(function() {
+        if (!isListening && !gameOver) startSentenceListening();
+      }, 500);
+    }
+  };
 
   try {
     recognition = rec;
@@ -815,7 +868,7 @@ function resetGame() {
   setText('pOppStatus', 'In attesa…');
   setText('pOppTime', '—');
   setText('sFeedback', '');
-  $('sSpoken').style.display = 'none';
+  if ($('sInterim')) { $('sInterim').style.display = 'none'; $('sInterim').innerHTML = ''; }
   updateProgress();
   showSentence();
   // Restart PRONTO listening
