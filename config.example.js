@@ -24,9 +24,9 @@ window.SOTTOTITOLI_CONFIG = {
   // Set enabled:true to use Deepgram as primary STT. Requires the WebSocket
   // relay server to have DEEPGRAM_API_KEY set in its environment.
   // When disabled or unconfigured, falls back to browser webkitSpeechRecognition.
-  // deepgram: {
-  //   enabled: true
-  // },
+  deepgram: {
+    enabled: true
+  },
 
   /** Analysis / speaker diarization endpoint */
   analysis: {
