@@ -643,17 +643,21 @@ function escHtml(s) {
 // Phase 1: Listen for "PRONTO"
 function startProntoListening() {
   if (iAmReady || gameOver) return;
+  if (isListening) return;
   var rec = createRecognition();
   if (!rec) {
     setText('pYouStatus', '⚠️ Speech API non supportata. Usa Chrome.');
     return;
   }
+  var handled = false;
 
   rec.onresult = function(event) {
     var last = event.results[event.results.length - 1];
     if (!last.isFinal) return; // ignore interim during pronto phase
-    var spoken = last[0].transcript.trim().toLowerCase();
+    if (handled) return;
+    handled = true;
     isListening = false;
+    var spoken = last[0].transcript.trim().toLowerCase();
     if (/\b(pronto|ready|pronto!|ready!)\b/i.test(spoken)) {
       iAmReady = true;
       setText('pYouStatus', '✅ Hai detto PRONTO!');
@@ -677,6 +681,8 @@ function startProntoListening() {
   };
 
   rec.onerror = function(e) {
+    if (handled) return;
+    handled = true;
     isListening = false;
     if (e.error === 'no-speech' || e.error === 'aborted') {
       setTimeout(startProntoListening, 400);
@@ -688,7 +694,13 @@ function startProntoListening() {
   };
 
   rec.onend = function() {
-    isListening = false;
+    if (!handled && !iAmReady && !gameOver) {
+      handled = true;
+      isListening = false;
+      setTimeout(startProntoListening, 800);
+    } else {
+      isListening = false;
+    }
   };
 
   try {
@@ -707,12 +719,13 @@ function startProntoListening() {
 function startSentenceListening() {
   if (gameOver) return;
   if (myIndex >= mySentences.length) return;
-  // Don't check isListening here — we properly manage it via onend
+  if (isListening) return; // Guard: prevent overlapping recognition instances
 
   var rec = createRecognition();
   if (!rec) return;
 
   var target = mySentences[myIndex].text;
+  var handled = false; // Prevent double-processing of final result
 
   rec.onresult = function(event) {
     var last = event.results[event.results.length - 1];
@@ -726,10 +739,10 @@ function startSentenceListening() {
       return;
     }
 
-    // FINAL result
+    // FINAL result — only process once
+    if (handled) return;
+    handled = true;
     isListening = false;
-    $('sInterim').style.display = 'none';
-    $('sInterim').innerHTML = '';
 
     if (isMatch(spoken, target)) {
       // Correct! Show all green
@@ -746,7 +759,7 @@ function startSentenceListening() {
         return;
       }
       showSentence();
-      // Short pause then listen for next
+      // Short pause then listen for next sentence
       setTimeout(function() {
         $('sInterim').style.display = 'none';
         $('sInterim').innerHTML = '';
@@ -767,6 +780,8 @@ function startSentenceListening() {
   };
 
   rec.onerror = function(e) {
+    if (handled) return;
+    handled = true;
     isListening = false;
     if (e.error === 'no-speech' || e.error === 'aborted') {
       setTimeout(startSentenceListening, 400);
@@ -778,13 +793,14 @@ function startSentenceListening() {
   };
 
   rec.onend = function() {
-    isListening = false;
-    // If onend fires without onresult processing (e.g., timeout), restart
-    if (!gameOver && myIndex < mySentences.length) {
-      // Small delay to avoid race with onresult
-      setTimeout(function() {
-        if (!isListening && !gameOver) startSentenceListening();
-      }, 500);
+    // Only set flag — restart is handled by onresult or onerror
+    // If neither fired (rare edge case), fallback restart
+    if (!handled && !gameOver && myIndex < mySentences.length) {
+      handled = true;
+      isListening = false;
+      setTimeout(startSentenceListening, 800);
+    } else {
+      isListening = false;
     }
   };
 
