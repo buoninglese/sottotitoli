@@ -278,13 +278,21 @@ function isMatch(spoken, target) {
   var s = spoken.toLowerCase().replace(/[^a-z0-9\s']/g, '').trim();
   var t = target.toLowerCase().replace(/[^a-z0-9\s']/g, '').trim();
   if (s === t) return true;
+
   var sWords = s.split(/\s+/), tWords = t.split(/\s+/);
-  if (Math.abs(sWords.length - tWords.length) <= 1) {
-    var dist = levenshtein(s, t);
-    var maxLen = Math.max(s.length, t.length);
-    if (dist <= Math.max(2, Math.floor(maxLen * 0.15))) return true;
-  }
-  return false;
+  var wordDiff = Math.abs(sWords.length - tWords.length);
+
+  // Must be within 1 word of target
+  if (wordDiff > 1) return false;
+
+  var dist = levenshtein(s, t);
+  var maxLen = Math.max(s.length, t.length);
+
+  // Stricter: at most 10% character difference, capped at 2 edits
+  var allowed = Math.min(2, Math.floor(maxLen * 0.10));
+  if (allowed < 1) allowed = 1;
+
+  return dist <= allowed;
 }
 
 // ═══════════════════════════════════════
