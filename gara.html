@@ -275,9 +275,25 @@ function levenshtein(a, b) {
   return dp[m][n];
 }
 
+// Normalize number words ↔ digits so "ten years" matches "10 years"
+var NUMBER_WORDS = {
+  zero:'0',one:'1',two:'2',three:'3',four:'4',five:'5',
+  six:'6',seven:'7',eight:'8',nine:'9',ten:'10',
+  eleven:'11',twelve:'12',thirteen:'13',fourteen:'14',fifteen:'15',
+  sixteen:'16',seventeen:'17',eighteen:'18',nineteen:'19',
+  twenty:'20',thirty:'30',forty:'40',fifty:'50',
+  sixty:'60',seventy:'70',eighty:'80',ninety:'90'
+};
+
+function normalizeNumbers(text) {
+  return text.replace(/\b(zero|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety)\b/gi, function(m) {
+    return NUMBER_WORDS[m.toLowerCase()] || m;
+  });
+}
+
 function isMatch(spoken, target) {
-  var s = spoken.toLowerCase().replace(/[^a-z0-9\s']/g, '').trim();
-  var t = target.toLowerCase().replace(/[^a-z0-9\s']/g, '').trim();
+  var s = normalizeNumbers(spoken.toLowerCase().replace(/[^a-z0-9\s']/g, '').trim());
+  var t = normalizeNumbers(target.toLowerCase().replace(/[^a-z0-9\s']/g, '').trim());
   if (s === t) return true;
 
   var sWords = s.split(/\s+/), tWords = t.split(/\s+/);
@@ -643,11 +659,16 @@ function createRecognition() {
 
 // Build colored HTML: matching words green, wrong words red
 function buildInterimHTML(spoken, target) {
-  var sWords = spoken.toLowerCase().replace(/[^a-z0-9\s']/g, '').trim().split(/\s+/);
-  var tWords = target.toLowerCase().replace(/[^a-z0-9\s']/g, '').trim().split(/\s+/);
+  var sClean = spoken.toLowerCase().replace(/[^a-z0-9\s']/g, '').trim();
+  var tClean = target.toLowerCase().replace(/[^a-z0-9\s']/g, '').trim();
+  var sWords = sClean.split(/\s+/);
+  var tWords = tClean.split(/\s+/);
+  // Normalize for comparison (number words → digits) but display original
+  var sNorm = normalizeNumbers(sClean).split(/\s+/);
+  var tNorm = normalizeNumbers(tClean).split(/\s+/);
   var html = '';
   for (var i = 0; i < sWords.length; i++) {
-    var match = (i < tWords.length && sWords[i] === tWords[i]);
+    var match = (i < tNorm.length && sNorm[i] === tNorm[i]);
     var color = match ? 'var(--accent-green)' : 'var(--danger)';
     html += '<span style="color:' + color + ';transition:color .2s">' + escHtml(sWords[i]) + '</span> ';
   }
