@@ -926,22 +926,23 @@ body {
       var data=await resp.json();
       if(!data||!data.entries||!data.entries.length) throw new Error('Empty');
       var entry=data.entries[0];
-      var firstSense=(entry.senses||[])[0]||{};
+      // Collect definitions from senses + subsenses
+      var allDefs=[];
+      (entry.senses||[]).forEach(function(s){
+        if(s.definition) allDefs.push({def:s.definition, ex:(s.examples||[])[0]||'', synonyms:s.synonyms||[]});
+        (s.subsenses||[]).forEach(function(ss){
+          if(ss.definition) allDefs.push({def:ss.definition, ex:(ss.examples||[])[0]||'', synonyms:ss.synonyms||[]});
+        });
+      });
       var result={
         word:data.word||word,
-        phonetic:(entry.pronunciations||[]).filter(function(p){return p.text})[0],
-        audio:(entry.pronunciations||[]).filter(function(p){return p.audio})[0],
-        meanings:(entry.senses||[]).slice(0,3).map(function(s){
-          return{
-            pos:entry.partOfSpeech||'',
-            defs:(s.definitions||[]).slice(0,2).map(function(d){return{def:d,ex:(s.examples||[])[0]||''}})
-          };
-        }),
+        phonetic:(entry.pronunciations||[]).filter(function(p){return p.text&&p.type==='ipa'})[0]||(entry.pronunciations||[])[0],
+        audio:null,
+        pos:entry.partOfSpeech||'',
+        defs:allDefs.slice(0,4),
+        synonyms:(entry.synonyms||[]).slice(0,5),
         sourceUrl:(data.source&&data.source.url)||''
       };
-      if(!result.meanings.length&&firstSense.definitions){
-        result.meanings=[{pos:entry.partOfSpeech||'',defs:(firstSense.definitions||[]).slice(0,2).map(function(d){return{def:d,ex:(firstSense.examples||[])[0]||''}})}];
-      }
       dictCache[key]=result;
       return result;
     }catch(e){
@@ -962,20 +963,21 @@ body {
 
     lookupWord(word,lang).then(function(r){
       if(!popupEl) return;
-      if(!r){popupEl.innerHTML='<div class="dp-error">Nessuna definizione trovata per <strong>'+word+'</strong>.<br><a href="https://translate.google.com/?sl='+lang+'&tl=it&text='+encodeURIComponent(word)+'" target="_blank" style="color:var(--accent-purple)">Cerca su Google Translate →</a></div>';return}
-      var audioBtn=r.audio?' <span class="dp-audio" onclick="var a=new Audio(\''+r.audio.audio+'\');a.play()">🔊 Ascolta</span>':'';
-      var phonetic=r.phonetic?' /'+r.phonetic.text+'/':'';
-      var defsHtml=r.meanings.map(function(m){
-        var dHtml=m.defs.map(function(d){return'<div class="dp-def">'+d.def+(d.ex?'<div class="dp-ex">“'+d.ex+'”</div>':'')+'</div>'}).join('');
-        return'<div style="margin-bottom:6px"><span class="dp-pos">'+m.pos+'</span>'+dHtml+'</div>';
+      if(!r||!r.defs.length){popupEl.innerHTML='<div class="dp-error">Nessuna definizione trovata per <strong>'+word+'</strong>.<br><a href="https://translate.google.com/?sl='+lang+'&tl=it&text='+encodeURIComponent(word)+'" target="_blank" style="color:var(--accent-purple)">Cerca su Google Translate →</a></div>';return}
+      var phonetic=r.phonetic&&r.phonetic.text?' /'+r.phonetic.text+'/':'';
+      var defsHtml=r.defs.map(function(d){
+        var exHtml=d.ex?'<div class="dp-ex">“'+d.ex+'”</div>':'';
+        var synHtml=d.synonyms&&d.synonyms.length?'<div style="font-size:10px;color:var(--text-muted);margin-top:2px">Sinonimi: '+d.synonyms.slice(0,5).join(', ')+'</div>':'';
+        return'<div class="dp-def">'+d.def+exHtml+synHtml+'</div>';
       }).join('');
+      var synAll=r.synonyms&&r.synonyms.length?'<div style="font-size:10px;color:var(--text-muted);margin-top:6px;padding-top:6px;border-top:1px solid var(--line)">🔄 Sinonimi: '+r.synonyms.join(', ')+'</div>':'';
       var transHtml='';
       var mi=getModeInfo();
       if(mi.isTrans&&mi.tgtLang&&mi.tgtLang!==lang){
         transHtml='<div class="dp-trans">🔄 <strong>Cerca traduzione:</strong> <a href="https://translate.google.com/?sl='+lang+'&tl='+mi.tgtLang+'&text='+encodeURIComponent(word)+'" target="_blank" style="color:var(--accent-purple)">'+word+' in '+langName(mi.tgtLang)+' →</a></div>';
       }
       var srcHtml=r.sourceUrl?'<div class="dp-source"><a href="'+r.sourceUrl+'" target="_blank">📖 Wiktionary</a></div>':'';
-      popupEl.innerHTML='<button class="dp-close" onclick="document.querySelector(\'.dict-popup\')&&document.querySelector(\'.dict-popup\').remove()">✕</button><div class="dp-word">'+r.word+'</div><div class="dp-phonetic">'+phonetic+audioBtn+'</div>'+defsHtml+transHtml+srcHtml;
+      popupEl.innerHTML='<button class="dp-close" onclick="document.querySelector(\'.dict-popup\')&&document.querySelector(\'.dict-popup\').remove()">✕</button><div class="dp-word">'+r.word+'</div>'+(r.pos?'<div class="dp-pos">'+r.pos+'</div>':'')+'<div class="dp-phonetic">'+phonetic+'</div>'+defsHtml+synAll+transHtml+srcHtml;
     }).catch(function(){
       if(popupEl) popupEl.innerHTML='<div class="dp-error">Errore nel caricamento.</div>';
     });
