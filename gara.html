@@ -244,9 +244,11 @@ var gameStarted = false;
 var mySentences = [];
 var myIndex = 0;
 var myCorrect = 0;
+var myAttempts = 0;     // total utterances (including wrong ones)
 var myStartTime = null;
 var myElapsed = 0;
 var oppCorrect = 0;
+var oppAttempts = 0;
 var gameOver = false;
 var countdownActive = false;
 var iAmReady = false;
@@ -367,12 +369,14 @@ function playerFinished(isMe) {
     $('playerYou').classList.add('winner');
     $('results').style.display = 'block';
     setText('winnerName', myDisplayName);
-    setText('rYourScore', myCorrect + '/' + TOTAL_SENTENCES);
+    setText('rYourScore', myCorrect + '/' + TOTAL_SENTENCES + ' (' + myAttempts + ' tentativi)');
     setText('rYourTime', Math.round(myElapsed) + 's');
-    setText('rOppScore', oppCorrect + '/' + TOTAL_SENTENCES);
+    var oppDisplay = oppCorrect + '/' + TOTAL_SENTENCES;
+    if (oppAttempts > 0) oppDisplay += ' (' + oppAttempts + ' tentativi)';
+    setText('rOppScore', oppDisplay);
     setText('rOppTime', '—');
     $('sentenceBox').style.display = 'none';
-    sendWS({ type: 'caption', action: 'finish', score: myCorrect, time: myElapsed });
+    sendWS({ type: 'caption', action: 'finish', score: myCorrect, attempts: myAttempts, time: myElapsed });
   }
 }
 
@@ -447,17 +451,22 @@ function connectWS() {
           setText('pOppStatus', '🔊 Sta parlando… (' + p.correct + '/' + TOTAL_SENTENCES + ')');
         }
         if (p.action === 'finish') {
-          oppCorrect = p.score || TOTAL_SENTENCES;
+          oppCorrect = (p.score != null) ? p.score : oppCorrect;
+          oppAttempts = (p.attempts != null) ? p.attempts : 0;
           updateProgress();
           setText('pOppStatus', '✅ Completato!');
-          setText('rOppScore', oppCorrect + '/' + TOTAL_SENTENCES);
+          var oppDisplay = oppCorrect + '/' + TOTAL_SENTENCES;
+          if (oppAttempts > 0) oppDisplay += ' (' + oppAttempts + ' tentativi)';
+          setText('rOppScore', oppDisplay);
           setText('rOppTime', (p.time || 0) + 's');
           if (!gameOver) {
             gameOver = true;
             stopMic();
             $('results').style.display = 'block';
             setText('winnerName', 'Avversario');
-            setText('rYourScore', myCorrect + '/' + TOTAL_SENTENCES);
+            var myDisplay = myCorrect + '/' + TOTAL_SENTENCES;
+            if (myAttempts > 0) myDisplay += ' (' + myAttempts + ' tentativi)';
+            setText('rYourScore', myDisplay);
             setText('rYourTime', '—');
             $('sentenceBox').style.display = 'none';
           }
@@ -787,6 +796,7 @@ function startSentenceListening() {
 
       if (isMatch(spoken, target)) {
         // Correct!
+        myAttempts++;
         $('sInterim').style.display = 'block';
         $('sInterim').innerHTML = '<span style="color:var(--accent-green)">✅ ' + escHtml(spoken) + '</span>';
         myCorrect++;
@@ -807,6 +817,7 @@ function startSentenceListening() {
         }, 1200);
       } else {
         // Wrong — flash red but keep listening (don't stop!)
+        myAttempts++;
         $('sInterim').style.display = 'block';
         $('sInterim').innerHTML = '<span style="color:var(--danger)">❌ ' + escHtml(spoken) + '</span>';
         setText('sFeedback', '❌ Non esatto. Riprova.');
@@ -922,7 +933,9 @@ function resetGame() {
   clearInterval(readyRebroadcastTimer);
   clearInterval(dbgIntervalId);
   myCorrect = 0; myIndex = 0; myElapsed = 0; myStartTime = null;
+  myAttempts = 0;
   oppCorrect = 0;
+  oppAttempts = 0;
   stopMic();
   isListening = false;
   mySentences = generateSentences(TOTAL_SENTENCES);
