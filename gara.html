@@ -257,6 +257,7 @@ var myDisplayName = '👤 Tu';
 var readyRebroadcastTimer = null;
 var dbgSentCount = 0;
 var dbgRecvCount = 0;
+var dbgIntervalId = null;
 
 // ═══════════════════════════════════════
 // FUZZY MATCHING
@@ -371,6 +372,11 @@ function stopMic() {
 // WEBSOCKET (game room)
 // ═══════════════════════════════════════
 function connectWS() {
+  if (typeof window.createWSPublisher !== 'function') {
+    setText('lobbyStatus', '⚠️ WebSocket module not loaded. Refresh the page.');
+    if ($('dbgLast')) $('dbgLast').textContent = '📥 ERROR: createWSPublisher missing';
+    return;
+  }
   var wsUrl = (window.SOTTOTITOLI_CONFIG && window.SOTTOTITOLI_CONFIG.websocketUrl) || 'wss://sottotitoli-websocket.onrender.com';
   wsPublisher = window.createWSPublisher({
     url: wsUrl, room: room,
@@ -613,7 +619,8 @@ function enterGame() {
   // Auto-start mic for PRONTO detection
   setTimeout(startProntoListening, 600);
   // Periodically update WS state in debug
-  setInterval(function() {
+  clearInterval(dbgIntervalId);
+  dbgIntervalId = setInterval(function() {
     if ($('dbgWsState') && wsPublisher) {
       var s = wsPublisher.getSnapshot();
       $('dbgWsState').textContent = s.state + ' (' + (s.queueLength || 0) + 'q)';
@@ -748,14 +755,14 @@ function startSentenceListening() {
   rec.onresult = function(event) {
     if (gameOver) return;
 
-    var target = mySentences[myIndex].text;
-
     // Process any new final results
     for (var i = sentenceLastFinalIdx + 1; i < event.results.length; i++) {
       if (!event.results[i].isFinal) continue;
       sentenceLastFinalIdx = i;
       var spoken = event.results[i][0].transcript.trim();
       if (!spoken) continue;
+
+      var target = mySentences[myIndex].text;  // current target for THIS final
 
       if (isMatch(spoken, target)) {
         // Correct!
@@ -793,13 +800,14 @@ function startSentenceListening() {
       }
     }
 
-    // Show interim for the latest non-final result
+    // Show interim for the latest non-final result (use CURRENT target)
     var latest = event.results[event.results.length - 1];
-    if (!latest.isFinal && !gameOver) {
+    if (!latest.isFinal && !gameOver && myIndex < mySentences.length) {
       var interimText = latest[0].transcript.trim();
       if (interimText) {
+        var curTarget = mySentences[myIndex].text;
         $('sInterim').style.display = 'block';
-        $('sInterim').innerHTML = '🗣 ' + buildInterimHTML(interimText, target);
+        $('sInterim').innerHTML = '🗣 ' + buildInterimHTML(interimText, curTarget);
       }
     }
   };
@@ -891,6 +899,7 @@ function resetGame() {
   iAmReady = false;
   oppIsReady = false;
   clearInterval(readyRebroadcastTimer);
+  clearInterval(dbgIntervalId);
   myCorrect = 0; myIndex = 0; myElapsed = 0; myStartTime = null;
   oppCorrect = 0;
   stopMic();
