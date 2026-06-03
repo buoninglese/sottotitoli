@@ -854,7 +854,12 @@
         var plain = transcriptLines.map(function(x){ return x.text; }).join(" ").trim();
         var wc = w.SottotitoliSessionUtils.countWords(plain);
         var durationMin = currentSessionStart ? Math.round((Date.now() - currentSessionStart.getTime()) / 60000) : 0;
-        setText('sumDuration', durationMin + ' min');
+        var totalSec = currentSessionStart ? Math.round((Date.now() - currentSessionStart.getTime()) / 1000) : 0;
+        var h = Math.floor(totalSec / 3600);
+        var m = Math.floor((totalSec % 3600) / 60);
+        var s = totalSec % 60;
+        var durStr = h > 0 ? h+'h '+m+'m '+s+'s' : m > 0 ? m+'m '+s+'s' : s+'s';
+        setText('sumDuration', durStr);
         setText('sumWords', wc);
         var cefrEl = $('cefrLevel');
         setText('sumCefr', cefrEl ? cefrEl.textContent : '—');
@@ -868,7 +873,7 @@
         fetchPostSessionData();
         var cefr = $("cefrLevel") ? $("cefrLevel").textContent : '—';
         var quality = $("liveQuality") ? $("liveQuality").textContent : '—';
-        setText("sumDuration", (durationMin > 0 ? durationMin + 'm' : '—'));
+        setText("sumDuration", durStr);
         setText("sumWords", String(wc));
         setText("sumCefr", cefr);
         setText("sumQuality", quality);
