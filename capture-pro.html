@@ -318,7 +318,11 @@
         var t = sanitize(event.results[i][0].transcript);
         if (event.results[i].isFinal) {
           if (!agg.open) { agg.open = true; agg.startMs = (agg.lastMs!=null ? agg.lastMs : lastStopMs); }
-          agg.text += (agg.text? ' ' : '') + t; agg.lastMs = rel;
+          // Skip if this final's text is already contained within agg (Google may re-send cumulative finals)
+          if (agg.text && t && agg.text.indexOf(t) !== -1) { agg.lastMs = rel; continue; }
+          // If new text contains old agg, replace rather than append
+          if (agg.text && t && t.indexOf(agg.text) !== -1) { agg.text = t; agg.lastMs = rel; }
+          else { agg.text += (agg.text? ' ' : '') + t; agg.lastMs = rel; }
           if (silenceTimer) clearTimeout(silenceTimer);
           silenceTimer = setTimeout(flushSegment, parseInt(elPauseMs.value||'600'));
         } else {
