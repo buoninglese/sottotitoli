@@ -1104,38 +1104,35 @@ body {
     var transcriptEl = $('captionTranscript');
     var text = transcriptEl ? (transcriptEl.textContent || '').trim() : '';
 
-    // Count verbs/nouns/adjectives using lemma-pos-map + suffix fallback
+    // Count verbs/nouns/adjectives using comprehensive word lists + suffix fallback
     var verbCount = 0, nounCount = 0, adjCount = 0, advCount = 0, pronCount = 0, prepCount = 0;
-    var chipHtml = '';
     var usedWords = {};
 
-    // Language-specific suffix rules
-    var isItalian = mode.indexOf('it') !== -1;
-    var isEnglish = mode.indexOf('en') !== -1;
+    // ── Comprehensive English POS word sets ──
+    var VERB_SET = new Set(['be','am','is','are','was','were','been','being','have','has','had','having','do','does','did','doing','done','say','said','says','saying','go','goes','went','gone','going','get','gets','got','gotten','getting','make','makes','made','making','know','knew','known','knows','knowing','think','thinks','thought','thinking','see','saw','seen','sees','seeing','come','came','comes','coming','take','took','taken','takes','taking','give','gave','given','gives','giving','put','puts','putting','let','lets','letting','run','ran','runs','running','sit','sat','sits','sitting','tell','told','tells','telling','hold','held','holds','holding','keep','kept','keeps','keeping','find','found','finds','finding','leave','left','leaves','leaving','bring','brought','brings','bringing','begin','began','begun','begins','beginning','become','became','becomes','becoming','call','called','calls','calling','try','tried','tries','trying','ask','asked','asks','asking','need','needed','needs','needing','feel','felt','feels','feeling','work','worked','works','working','seem','seemed','seems','seeming','help','helped','helps','helping','talk','talked','talks','talking','turn','turned','turns','turning','start','started','starts','starting','show','showed','shown','shows','showing','play','played','plays','playing','move','moved','moves','moving','live','lived','lives','living','believe','believed','believes','believing','happen','happened','happens','happening','allow','allowed','allows','allowing','stand','stood','stands','standing','mean','meant','means','meaning','set','sets','setting','meet','met','meets','meeting','pay','paid','pays','paying','win','won','wins','winning','lose','lost','loses','losing','build','built','builds','building','send','sent','sends','sending','spend','spent','spends','spending','grow','grew','grown','grows','growing','speak','spoke','spoken','speaks','speaking','hear','heard','hears','hearing','read','reads','reading','write','wrote','written','writes','writing','learn','learned','learnt','learns','learning','change','changed','changes','changing','lead','led','leads','leading','understand','understood','understands','understanding','watch','watched','watches','watching','follow','followed','follows','following','stop','stopped','stops','stopping','create','created','creates','creating','open','opened','opens','opening','walk','walked','walks','walking','offer','offered','offers','offering','remember','remembered','remembers','remembering','consider','considered','considers','considering','appear','appeared','appears','appearing','buy','bought','buys','buying','wait','waited','waits','waiting','serve','served','serves','serving','die','died','dies','dying','eat','ate','eaten','eats','eating','drink','drank','drunk','drinks','drinking','sleep','slept','sleeps','sleeping','wear','wore','worn','wears','wearing','cut','cuts','cutting','fall','fell','fallen','falls','falling','rise','rose','risen','rises','rising','fight','fought','fights','fighting','sing','sang','sung','sings','singing','draw','drew','drawn','draws','drawing','drive','drove','driven','drives','driving','fly','flew','flown','flies','flying','throw','threw','thrown','throws','throwing','catch','caught','catches','catching','choose','chose','chosen','chooses','choosing','forget','forgot','forgotten','forgets','forgetting','break','broke','broken','breaks','breaking','carry','carried','carries','carrying','agree','agreed','agrees','agreeing','argue','argued','argues','arguing','recognize','recognized','recognizes','recognizing','recreate','recreated','recreates','recreating','unfold','unfolded','unfolds','unfolding','corrode','corroded','corrodes','corroding','commit','committed','commits','committing','emerge','emerged','emerges','emerging']);
+    var NOUN_SET = new Set(['time','year','people','way','day','man','woman','child','world','life','hand','part','place','case','week','company','system','program','question','government','number','night','point','home','water','room','mother','area','money','story','fact','month','lot','right','study','book','eye','job','word','business','issue','side','kind','head','house','service','friend','father','power','hour','game','line','end','member','law','car','city','community','name','president','team','minute','idea','body','information','back','parent','face','others','level','office','door','health','person','art','war','history','party','result','morning','reason','research','girl','guy','moment','air','teacher','force','education','work','food','boy','age','policy','process','music','market','sense','nation','plan','college','interest','death','experience','effect','use','class','society','industry','cause','land','care','project','century','security','bank','science','opportunity','source','value','condition','action','nature','range','defense','budget','practice','movement','record','rule','goal','film','success','article','population','economy','culture','strategy','newspaper','language','truth','church','song','candidate','worker','environment','material','thought','media','response','technology','relationship','quality','conference','stuff','argument','debate','story','nation','hierarchy','domination','subjugation','solidarity','cooperation','dimension','mixture','liberalism','nationalism','ideology','theory','condition','right']);
+    var ADJ_SET = new Set(['good','new','first','last','long','great','little','own','other','old','right','big','high','different','small','large','next','early','young','important','few','public','bad','same','able','possible','open','free','political','economic','social','national','local','international','recent','strong','sure','true','real','full','special','easy','hard','clear','nice','quick','ready','sorry','afraid','aware','available','likely','particular','various','serious','religious','ethnic','human','intense','curious','appealing','shared','nationalist','based','different','large','great','nice','wrong','short','simple','certain','single','personal','professional','academic','pretty','funny','happy','sad','dark','light','heavy','cold','hot','warm','cool','dry','wet','rich','poor','tall','short','thick','thin','wide','narrow','deep','shallow','fast','slow','soft','loud','quiet','cheap','expensive','clean','dirty','empty','fair','safe','dangerous','wise','stupid','brave','proud','angry','kind','mean','honest','brave','generous','greedy','polite','rude','patient','eager','anxious','nervous','calm','gentle','cruel','humble','arrogant']);
+    var ADV_SET = new Set(['not','also','very','often','however','too','usually','really','already','always','never','sometimes','together','likely','generally','certainly','absolutely','exactly','perhaps','maybe','quite','almost','enough','far','less','maybe','perhaps','probably','rather','recently','still','then','there','today','tomorrow','tonight','yesterday','yet','just','now','soon','later','again','once','ever','never','always','here','there','everywhere','somewhere','anywhere','nowhere','up','down','in','out','on','off','over','under','back','forward','away','home','abroad','well','badly','slowly','quickly','easily','carefully','definitely']);
+    var PRON_SET = new Set(['i','you','he','she','it','we','they','me','him','her','us','them','my','your','his','its','our','their','mine','yours','hers','ours','theirs','myself','yourself','himself','herself','itself','ourselves','yourselves','themselves','this','that','these','those','who','whom','whose','which','what','whoever','whatever','anyone','someone','everyone','nobody','anybody','somebody','everybody','nothing','anything','something','everything','none','all','both','few','many','several','some','any','each','every','either','neither','one','ones','other','others','another']);
+    var PREP_SET = new Set(['in','on','at','to','for','with','from','by','about','into','through','during','before','after','over','under','between','among','within','without','above','below','behind','beyond','across','along','around','against','toward','towards','upon','inside','outside','near','off','up','down','of','like','as','since','until','till','despite','except','besides','beside','per','throughout']);
+
+    // Suffix rules for fallback
     var suffixes = {
-      verb: isItalian ? ['are','ere','ire','ndo','ato','uto','ito','ava','evo','iva','ò','ai','à','ei','etti'] :
-            ['ing','ed','ize','ise','ate','ify','en'],
-      noun: isItalian ? ['ione','ore','trice','tà','tù','ezza','ura','mento','zione','sione','ista','logo','eria'] :
-            ['tion','sion','ment','ness','ity','ance','ence','er','or','ist','ism','dom','hood','ship'],
-      adj: isItalian ? ['oso','ale','ile','ico','istico','evole','bile','abile','ibile'] :
-            ['ous','ful','less','able','ible','ive','al','ial','ic','ical','ish','like','esque'],
-      adv: ['mente','ly','wise','wards'],
-      pron: isItalian ? ['io','tu','lui','lei','noi','voi','loro','mi','ti','si','ci','vi','lo','la','li','le','ne'] :
-             ['i','you','he','she','it','we','they','me','him','her','us','them','my','your','his','its','our','their'],
-      prep: isItalian ? ['di','a','da','in','con','su','per','tra','fra','sotto','sopra','dopo','prima','durante','senza'] :
-             ['in','on','at','to','for','with','from','by','about','into','through','during','before','after','over','under','between']
+      verb: ['ing','ed','ize','ise','ate','ify','en'],
+      noun: ['tion','sion','ment','ness','ity','ance','ence','er','or','ist','ism','dom','hood','ship'],
+      adj: ['ous','ful','less','able','ible','ive','al','ial','ic','ical','ish','like','esque'],
+      adv: ['ly','wise','wards']
     };
 
     function detectPOS(word) {
       var w = word.toLowerCase();
-      // Check lemma map first (English)
-      if (window.LEMMA_POS_MAP && window.LEMMA_POS_MAP[w]) {
-        var p = window.LEMMA_POS_MAP[w];
-        if (p === 'verb' || p === 'v') return 'verb';
-        if (p === 'noun' || p === 'n') return 'noun';
-        if (p === 'adj') return 'adj';
-        if (p === 'adv') return 'adv';
-      }
+      // Check comprehensive word sets first
+      if (VERB_SET.has(w)) return 'verb';
+      if (NOUN_SET.has(w)) return 'noun';
+      if (ADJ_SET.has(w)) return 'adj';
+      if (ADV_SET.has(w)) return 'adv';
+      if (PRON_SET.has(w)) return 'pron';
+      if (PREP_SET.has(w)) return 'prep';
       // Suffix fallback
       for (var i = 0; i < suffixes.verb.length; i++) { if (w.endsWith(suffixes.verb[i]) && w.length > 3) return 'verb'; }
       for (var i = 0; i < suffixes.noun.length; i++) { if (w.endsWith(suffixes.noun[i]) && w.length > 3) return 'noun'; }
@@ -1148,8 +1145,8 @@ body {
       var tokens = text.split(/\s+/);
       tokens.forEach(function(t) {
         var clean = t.toLowerCase().replace(/[^a-zà-ù']/g, '');
-        if (!clean || clean.length < 2 || usedWords[clean]) return;
-        usedWords[clean] = true;
+        if (!clean || clean.length < 2) return;
+        // Count ALL occurrences for verb/noun/adj/adv
         var pos = detectPOS(clean);
         if (!pos) return;
         if (pos === 'verb') { verbCount++; }
@@ -1163,16 +1160,14 @@ body {
     setText('liveNounCount', nounCount);
     setText('liveAdjCount', adjCount);
     setText('liveAdvCount', advCount);
-    // Estimate pronouns and prepositions from common sets
-    var preps = suffixes.prep;
-    var prons = suffixes.pron;
+    // Estimate pronouns and prepositions
     var prepCount2 = 0, pronCount2 = 0;
     if (text) {
       var tokens2 = text.toLowerCase().split(/\s+/);
       tokens2.forEach(function(t){
         var clean = t.replace(/[^a-zà-ù']/g, '');
-        if (preps.indexOf(clean) !== -1) prepCount2++;
-        if (prons.indexOf(clean) !== -1) pronCount2++;
+        if (PREP_SET.has(clean)) prepCount2++;
+        if (PRON_SET.has(clean)) pronCount2++;
       });
     }
     setText('livePrepCount', prepCount2);
