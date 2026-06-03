@@ -6,6 +6,9 @@ window.SOTTOTITOLI_CONFIG = {
     provider: "mymemory",
     myMemoryBase: "https://api.mymemory.translated.net/get"
   },
+  deepgram: {
+    enabled: true
+  },
   analysis: {
     speakerEndpoint: "https://sottotitoli-websocket.onrender.com/analyze-speakers"
   },
