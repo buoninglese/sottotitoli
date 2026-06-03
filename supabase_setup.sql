@@ -27,7 +27,7 @@ CREATE TABLE IF NOT EXISTS ai_report_requests (
   id BIGSERIAL PRIMARY KEY, user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
   module_id INTEGER REFERENCES ai_report_modules(id), family_key TEXT,
   session_ids UUID[] DEFAULT '{}', scope_type TEXT DEFAULT 'single_session',
-  status TEXT DEFAULT 'pending' CHECK (status IN ('pending','processing','completed','failed')),
+  status TEXT DEFAULT 'queued' CHECK (status IN ('queued','processing','completed','failed')),
   created_at TIMESTAMPTZ DEFAULT now(), processed_at TIMESTAMPTZ
 );
 

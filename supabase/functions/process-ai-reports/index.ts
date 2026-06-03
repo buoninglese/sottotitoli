@@ -17,7 +17,7 @@ serve(async (req) => {
     const { data: requests, error: fetchError } = await supabase
       .from('ai_report_requests')
       .select('*')
-      .eq('status', 'pending')
+      .eq('status', 'queued')
       .limit(10);
 
     if (fetchError) throw fetchError;
