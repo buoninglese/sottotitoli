@@ -244,6 +244,7 @@ var oppIsReady = false;
 var matchmakingActive = false;
 var myPlayerId = Math.random().toString(36).substring(2, 10);
 var myDisplayName = '👤 Tu';
+var readyRebroadcastTimer = null;
 
 // ═══════════════════════════════════════
 // FUZZY MATCHING
@@ -355,6 +356,10 @@ function connectWS() {
         setText('lobbyStatus', '✅ Connesso alla room ' + room);
         // Announce ourselves
         sendWS({ type: 'gara', action: 'joined', playerId: myPlayerId, name: myDisplayName });
+        // Re-announce ready status on reconnect so opponent knows
+        if (iAmReady && !gameStarted) {
+          sendWS({ type: 'gara', action: 'ready', playerId: myPlayerId });
+        }
       } else {
         setText('lobbyStatus', '⏳ ' + state + '…');
       }
@@ -371,11 +376,15 @@ function connectWS() {
             setText('pOppStatus', '👤 ' + p.name);
             $('playerOpp').querySelector('.p-name').textContent = '👤 ' + p.name;
           }
+          // If we already said PRONTO, re-broadcast so late joiners know
+          if (iAmReady) {
+            sendWS({ type: 'gara', action: 'ready', playerId: myPlayerId });
+          }
         }
         if (p.action === 'ready') {
           oppIsReady = true;
           setText('pOppStatus', '✅ Ha detto PRONTO');
-          if (iAmReady && oppIsReady && !gameStarted) { startCountdown(); }
+          tryStartCountdown();
         }
         if (p.action === 'progress') {
           oppCorrect = p.correct;
@@ -405,8 +414,16 @@ function connectWS() {
 }
 
 function sendWS(data) {
-  if (wsPublisher && wsPublisher.ws && wsPublisher.ws.readyState === WebSocket.OPEN) {
+  // Always delegate to publish() — it handles queuing & reconnection internally
+  if (wsPublisher) {
     wsPublisher.publish(data);
+  }
+}
+
+// Central check: can we start the countdown?
+function tryStartCountdown() {
+  if (iAmReady && oppIsReady && !gameStarted && !countdownActive) {
+    startCountdown();
   }
 }
 
@@ -589,8 +606,16 @@ function startProntoListening() {
       $('sFeedback').className = 's-feedback s-feedback-ok';
       $('prontoPrompt').querySelector('p').textContent = '✅ PRONTO! In attesa dell\'avversario…';
       $('prontoPrompt').querySelector('p').style.color = 'var(--accent-green)';
+      // Send via both paths for reliability
       sendWS({ type: 'gara', action: 'ready', playerId: myPlayerId });
-      if (oppIsReady && !gameStarted) { startCountdown(); }
+      if (wsPublisher) wsPublisher.publish({ type: 'gara', action: 'ready', playerId: myPlayerId });
+      tryStartCountdown();
+      // Re-broadcast ready every 2s until game starts (handles dropped messages & late joiners)
+      clearInterval(readyRebroadcastTimer);
+      readyRebroadcastTimer = setInterval(function() {
+        if (gameStarted || gameOver) { clearInterval(readyRebroadcastTimer); return; }
+        sendWS({ type: 'gara', action: 'ready', playerId: myPlayerId });
+      }, 2000);
       rec.stop();
     } else {
       // Not "pronto", show what was heard
@@ -689,6 +714,7 @@ function startSentenceListening() {
 // ═══════════════════════════════════════
 function startCountdown() {
   if (countdownActive || gameStarted) return;
+  clearInterval(readyRebroadcastTimer);
   countdownActive = true;
   gameStarted = true;
   myStartTime = Date.now();
@@ -736,6 +762,7 @@ function resetGame() {
   countdownActive = false;
   iAmReady = false;
   oppIsReady = false;
+  clearInterval(readyRebroadcastTimer);
   myCorrect = 0; myIndex = 0; myElapsed = 0; myStartTime = null;
   oppCorrect = 0;
   stopMic();
