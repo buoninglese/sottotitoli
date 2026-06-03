@@ -81,6 +81,12 @@ body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--t
 
 /* ── Controls ── */
 .ctrl-row{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-bottom:16px}
+#prontoPrompt p:first-child{animation:pulse 1.5s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
+
+/* ── Matchmaking status ── */
+#matchmakingStatus{animation:fadeIn .3s ease}
+@keyframes fadeIn{0%{opacity:0;transform:translateY(-4px)}100%{opacity:1;transform:translateY(0)}}
 
 /* ── Countdown ── */
 .countdown-overlay{position:fixed;inset:0;z-index:100;background:rgba(0,0,0,.8);display:flex;align-items:center;justify-content:center;backdrop-filter:blur(4px)}
@@ -110,22 +116,33 @@ body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--t
 
 <section class="gara-hero">
   <h1>⚡ Gara</h1>
-  <p>Sfida un amico. Ripeti le frasi senza errori. Il primo che finisce vince.</p>
+  <p>Sfida un amico o cerca un avversario casuale. Ripeti le frasi senza errori. Il primo che finisce vince.</p>
 </section>
 
 <div class="wrap">
   <!-- Lobby -->
   <div class="lobby" id="lobby">
     <h2>🏁 Unisciti a una gara</h2>
-    <p style="color:var(--text-sec);font-size:14px;margin-bottom:4px">Inserisci un Room ID e condividilo con il tuo avversario.</p>
+    <p style="color:var(--text-sec);font-size:14px;margin-bottom:4px">Sfida un amico o cerca un avversario casuale.</p>
     <div class="room-row">
       <input id="roomInput" placeholder="Room ID (es. gara-123)" value="">
       <button class="btn btn-s" onclick="newRoom()">🎲 Nuova</button>
     </div>
     <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-top:12px">
       <button class="btn btn-p" id="joinBtn" onclick="joinRoom()">🔗 Entra nella room</button>
+      <button class="btn btn-s" id="matchBtn" onclick="startMatchmaking()">🌐 Gara casuale</button>
+    </div>
+    <!-- Share row -->
+    <div id="shareRow" style="display:none;margin-top:16px;padding-top:16px;border-top:1px solid var(--line)">
+      <p style="font-size:12px;color:var(--text-muted);margin-bottom:8px">Condividi il link con il tuo avversario:</p>
+      <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap">
+        <button class="btn btn-s" onclick="shareWhatsApp()" style="font-size:13px;padding:8px 16px"><i class="fab fa-whatsapp"></i> WhatsApp</button>
+        <button class="btn btn-s" onclick="shareEmail()" style="font-size:13px;padding:8px 16px"><i class="fas fa-envelope"></i> Email</button>
+        <button class="btn btn-s" onclick="copyLink()" style="font-size:13px;padding:8px 16px"><i class="fas fa-copy"></i> Copia link</button>
+      </div>
     </div>
     <div id="lobbyStatus" style="margin-top:12px;font-size:12px;color:var(--text-muted)"></div>
+    <div id="matchmakingStatus" style="display:none;margin-top:12px;font-size:14px;color:var(--accent-purple);font-weight:600"></div>
   </div>
 
   <!-- Game (hidden until joined) -->
@@ -159,8 +176,11 @@ body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--t
 
     <!-- Controls -->
     <div class="ctrl-row">
-      <button class="btn btn-p" id="readyBtn" onclick="playerReady()">✅ Pronto</button>
-      <button class="btn btn-s" id="listenBtn" onclick="startListening()" disabled>🎤 Parla</button>
+      <div id="prontoPrompt" style="text-align:center;width:100%">
+        <p style="font-size:18px;font-weight:700;color:var(--accent-purple);margin-bottom:8px">🎤 Say <em>"PRONTO"</em> into the microphone</p>
+        <p style="font-size:12px;color:var(--text-muted)">La gara partirà quando entrambi i giocatori avranno detto PRONTO</p>
+      </div>
+      <button class="btn btn-s" id="listenBtn" onclick="startListening()" disabled style="display:none">🎤 Parla</button>
     </div>
 
     <!-- Results -->
@@ -178,7 +198,9 @@ body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--t
 </div>
 
 <script src="js/theme.js?v=2"></script>
-<script src="js/ws-publisher.js?v=4"></script>
+<script src="ws-publisher.js?v=4"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="js/auth.js?v=2"></script>
 <script>
 // ═══════════════════════════════════════
 // SENTENCE BANK (English, by CEFR level)
@@ -198,16 +220,16 @@ var SENTENCES = {
   ]
 };
 
-var TOTAL_SENTENCES = 10; // Sentences per game
+var TOTAL_SENTENCES = 10;
 
 // ═══════════════════════════════════════
 // GAME STATE
 // ═══════════════════════════════════════
 var room = '';
 var wsPublisher = null;
+var lobbyPublisher = null; // separate WS for matchmaking lobby
 var recognition = null;
 var isListening = false;
-var gameActive = false;
 var gameStarted = false;
 var mySentences = [];
 var myIndex = 0;
@@ -215,9 +237,13 @@ var myCorrect = 0;
 var myStartTime = null;
 var myElapsed = 0;
 var oppCorrect = 0;
-var oppTotal = TOTAL_SENTENCES;
 var gameOver = false;
 var countdownActive = false;
+var iAmReady = false;
+var oppIsReady = false;
+var matchmakingActive = false;
+var myPlayerId = Math.random().toString(36).substring(2, 10);
+var myDisplayName = '👤 Tu';
 
 // ═══════════════════════════════════════
 // FUZZY MATCHING
@@ -239,7 +265,6 @@ function isMatch(spoken, target) {
   var s = spoken.toLowerCase().replace(/[^a-z0-9\s']/g, '').trim();
   var t = target.toLowerCase().replace(/[^a-z0-9\s']/g, '').trim();
   if (s === t) return true;
-  // Allow minor variations: 1 word difference or ≤2 char edits
   var sWords = s.split(/\s+/), tWords = t.split(/\s+/);
   if (Math.abs(sWords.length - tWords.length) <= 1) {
     var dist = levenshtein(s, t);
@@ -298,43 +323,59 @@ function playerFinished(isMe) {
   gameOver = true;
   if (isMe) myElapsed = Math.round((Date.now() - myStartTime) / 1000);
   updateProgress();
-  // Stop listening
-  if (recognition) { try { recognition.stop(); } catch(e) {} }
-  isListening = false;
-  $('listenBtn').disabled = true;
+  stopMic();
   setText('pYouStatus', isMe ? '✅ Completato!' : 'In attesa…');
   if (isMe) {
     $('playerYou').classList.add('winner');
-    $('playerOpp').classList.add('winner');
     $('results').style.display = 'block';
-    setText('winnerName', 'Tu');
+    setText('winnerName', myDisplayName);
     setText('rYourScore', myCorrect + '/' + TOTAL_SENTENCES);
     setText('rYourTime', Math.round(myElapsed) + 's');
     setText('rOppScore', oppCorrect + '/' + TOTAL_SENTENCES);
     setText('rOppTime', '—');
     $('sentenceBox').style.display = 'none';
-    // Tell opponent we finished
-    sendWS({ type: 'gara-finish', score: myCorrect, time: myElapsed });
+    sendWS({ type: 'gara', action: 'finish', score: myCorrect, time: myElapsed });
   }
 }
 
+function stopMic() {
+  if (recognition) { try { recognition.stop(); } catch(e) {} }
+  isListening = false;
+}
+
 // ═══════════════════════════════════════
-// WEBSOCKET
+// WEBSOCKET (game room)
 // ═══════════════════════════════════════
 function connectWS() {
   var wsUrl = (window.SOTTOTITOLI_CONFIG && window.SOTTOTITOLI_CONFIG.websocketUrl) || 'wss://sottotitoli-websocket.onrender.com';
   wsPublisher = window.createWSPublisher({
     url: wsUrl, room: room,
     onStateChange: function(state) {
-      setText('lobbyStatus', state === 'connected' ? '✅ Connesso alla room ' + room : '⏳ ' + state + '…');
+      if (state === 'connected') {
+        setText('lobbyStatus', '✅ Connesso alla room ' + room);
+        // Announce ourselves
+        sendWS({ type: 'gara', action: 'joined', playerId: myPlayerId, name: myDisplayName });
+      } else {
+        setText('lobbyStatus', '⏳ ' + state + '…');
+      }
     },
     onMessage: function(event) {
       try {
         var p = JSON.parse(event.data);
         if (!p || p.type !== 'gara') return;
+        // Ignore own messages
+        if (p.playerId === myPlayerId) return;
+
+        if (p.action === 'joined') {
+          if (p.name) {
+            setText('pOppStatus', '👤 ' + p.name);
+            $('playerOpp').querySelector('.p-name').textContent = '👤 ' + p.name;
+          }
+        }
         if (p.action === 'ready') {
-          setText('pOppStatus', '✅ Pronto');
-          if ($('readyBtn').disabled && !gameStarted) { startCountdown(); }
+          oppIsReady = true;
+          setText('pOppStatus', '✅ Ha detto PRONTO');
+          if (iAmReady && oppIsReady && !gameStarted) { startCountdown(); }
         }
         if (p.action === 'progress') {
           oppCorrect = p.correct;
@@ -349,6 +390,7 @@ function connectWS() {
           setText('rOppTime', (p.time || 0) + 's');
           if (!gameOver) {
             gameOver = true;
+            stopMic();
             $('results').style.display = 'block';
             setText('winnerName', 'Avversario');
             setText('rYourScore', myCorrect + '/' + TOTAL_SENTENCES);
@@ -369,37 +411,232 @@ function sendWS(data) {
 }
 
 // ═══════════════════════════════════════
+// MATCHMAKING (lobby room)
+// ═══════════════════════════════════════
+function startMatchmaking() {
+  if (matchmakingActive) return;
+  matchmakingActive = true;
+  $('matchBtn').disabled = true;
+  $('matchmakingStatus').style.display = 'block';
+  setText('matchmakingStatus', '🔍 Cerco un avversario…');
+  setText('lobbyStatus', '');
+
+  var wsUrl = (window.SOTTOTITOLI_CONFIG && window.SOTTOTITOLI_CONFIG.websocketUrl) || 'wss://sottotitoli-websocket.onrender.com';
+  var lobbyRoom = 'gara-lobby';
+
+  lobbyPublisher = window.createWSPublisher({
+    url: wsUrl, room: lobbyRoom,
+    onStateChange: function(state) {
+      if (state === 'connected') {
+        setText('matchmakingStatus', '🔍 In attesa di un avversario… (condividi il link nel frattempo)');
+        // Announce presence in lobby
+        if (lobbyPublisher && lobbyPublisher.ws && lobbyPublisher.ws.readyState === WebSocket.OPEN) {
+          lobbyPublisher.publish({ type: 'gara-lobby', action: 'hello', playerId: myPlayerId, name: myDisplayName, room: room });
+        }
+        // Show share as fallback
+        $('shareRow').style.display = 'block';
+      }
+    },
+    onMessage: function(event) {
+      try {
+        var p = JSON.parse(event.data);
+        if (!p || p.type !== 'gara-lobby') return;
+        if (p.playerId === myPlayerId) return; // ignore self
+
+        if (p.action === 'hello') {
+          // Another player found! Use their room if they have one, otherwise use ours
+          var targetRoom = p.room || room;
+          if (!targetRoom) return;
+          setText('matchmakingStatus', '🎯 Avversario trovato! Entro nella room ' + targetRoom + '…');
+          // Tell them we're joining
+          lobbyPublisher.publish({ type: 'gara-lobby', action: 'paired', playerId: myPlayerId, room: targetRoom, targetId: p.playerId });
+          // Switch to game room
+          setTimeout(function() {
+            cleanupLobby();
+            room = targetRoom;
+            $('roomInput').value = room;
+            enterGame();
+          }, 800);
+        }
+
+        if (p.action === 'paired' && p.targetId === myPlayerId) {
+          // Someone paired with us — join their room
+          setText('matchmakingStatus', '🎯 Abbinamento riuscito! Entro nella room…');
+          setTimeout(function() {
+            cleanupLobby();
+            room = p.room;
+            $('roomInput').value = room;
+            enterGame();
+          }, 500);
+        }
+      } catch(e) {}
+    }
+  });
+  lobbyPublisher.connect();
+
+  // Timeout fallback
+  setTimeout(function() {
+    if (matchmakingActive && lobbyPublisher) {
+      setText('matchmakingStatus', '⏰ Nessun avversario trovato. Condividi il link qui sotto!');
+    }
+  }, 30000);
+}
+
+function cleanupLobby() {
+  matchmakingActive = false;
+  if (lobbyPublisher) {
+    try { lobbyPublisher.disconnect(); } catch(e) {}
+    lobbyPublisher = null;
+  }
+  $('matchmakingStatus').style.display = 'none';
+  $('matchBtn').disabled = false;
+}
+
+// ═══════════════════════════════════════
+// SHARE
+// ═══════════════════════════════════════
+function getShareUrl() {
+  return 'https://buoninglese.github.io/sottotitoli/gara.html?room=' + encodeURIComponent(room);
+}
+
+function shareWhatsApp() {
+  var url = getShareUrl();
+  var text = encodeURIComponent('⚡ Sfidami a Gara su Sottotitoli! Unisciti con questo link: ' + url);
+  window.open('https://wa.me/?text=' + text, '_blank');
+}
+
+function shareEmail() {
+  var url = getShareUrl();
+  var subject = encodeURIComponent('⚡ Gara di pronuncia su Sottotitoli');
+  var body = encodeURIComponent('Ti sfido a una gara di pronuncia inglese su Sottotitoli!\n\nUnisciti alla room: ' + room + '\nOppure apri direttamente: ' + url);
+  window.open('mailto:?subject=' + subject + '&body=' + body, '_blank');
+}
+
+function copyLink() {
+  var url = getShareUrl();
+  if (navigator.clipboard) {
+    navigator.clipboard.writeText(url).then(function() {
+      setText('lobbyStatus', '📋 Link copiato! Room: ' + room);
+    });
+  } else {
+    // Fallback
+    var inp = document.createElement('input');
+    inp.value = url;
+    document.body.appendChild(inp);
+    inp.select();
+    document.execCommand('copy');
+    document.body.removeChild(inp);
+    setText('lobbyStatus', '📋 Link copiato! Room: ' + room);
+  }
+}
+
+// ═══════════════════════════════════════
 // ROOM MANAGEMENT
 // ═══════════════════════════════════════
 function newRoom() {
-  var r = 'gara-' + Math.random().toString(36).substring(2, 8);
-  $('roomInput').value = r;
+  room = 'gara-' + Math.random().toString(36).substring(2, 8);
+  $('roomInput').value = room;
   setText('lobbyStatus', 'Room ID generato. Condividilo!');
+  $('shareRow').style.display = 'block';
 }
 
 function joinRoom() {
   room = $('roomInput').value.trim();
   if (!room) { setText('lobbyStatus', 'Inserisci un Room ID.'); return; }
+  cleanupLobby();
+  enterGame();
+}
+
+function enterGame() {
   $('lobby').style.display = 'none';
   $('game').style.display = 'block';
   mySentences = generateSentences(TOTAL_SENTENCES);
   showSentence();
   connectWS();
+  // Auto-start mic for PRONTO detection
+  setTimeout(startProntoListening, 600);
 }
 
 // ═══════════════════════════════════════
 // SPEECH RECOGNITION
 // ═══════════════════════════════════════
-function startListening() {
-  if (isListening || gameOver) return;
+function createRecognition() {
   var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-  if (!SR) { alert('Speech recognition not supported. Use Chrome, Edge, or Opera.'); return; }
-  recognition = new SR();
-  recognition.continuous = false;
-  recognition.interimResults = false;
-  recognition.lang = 'en-US';
+  if (!SR) return null;
+  var rec = new SR();
+  rec.continuous = false;
+  rec.interimResults = false;
+  rec.lang = 'en-US';
+  return rec;
+}
 
-  recognition.onresult = function(event) {
+// Phase 1: Listen for "PRONTO"
+function startProntoListening() {
+  if (iAmReady || gameOver) return;
+  var rec = createRecognition();
+  if (!rec) {
+    setText('pYouStatus', '⚠️ Speech API non supportata. Usa Chrome.');
+    return;
+  }
+
+  rec.onresult = function(event) {
+    var spoken = event.results[0][0].transcript.trim().toLowerCase();
+    // Detect "pronto", " pronto", "pronto ", "ready"
+    if (/\b(pronto|ready|pronto!|ready!)\b/i.test(spoken)) {
+      iAmReady = true;
+      setText('pYouStatus', '✅ Hai detto PRONTO!');
+      setText('sFeedback', '✅ PRONTO registrato! In attesa dell\'avversario…');
+      $('sFeedback').className = 's-feedback s-feedback-ok';
+      $('prontoPrompt').querySelector('p').textContent = '✅ PRONTO! In attesa dell\'avversario…';
+      $('prontoPrompt').querySelector('p').style.color = 'var(--accent-green)';
+      sendWS({ type: 'gara', action: 'ready', playerId: myPlayerId });
+      if (oppIsReady && !gameStarted) { startCountdown(); }
+      rec.stop();
+    } else {
+      // Not "pronto", show what was heard
+      setText('sSpoken', '🗣 ' + spoken);
+      $('sSpoken').style.display = 'block';
+      setText('sFeedback', '👂 Ho sentito: "' + spoken + '". Di\' "PRONTO" per iniziare.');
+      $('sFeedback').className = 's-feedback s-feedback-err';
+      // Restart listening
+      rec.stop();
+      setTimeout(startProntoListening, 400);
+    }
+  };
+
+  rec.onerror = function(e) {
+    if (e.error === 'no-speech' || e.error === 'aborted') {
+      // Normal — restart silently
+      setTimeout(startProntoListening, 400);
+    } else {
+      setText('sFeedback', '⚠️ Microfono: ' + e.error + '. Ricarica la pagina e consenti il microfono.');
+      $('sFeedback').className = 's-feedback s-feedback-err';
+    }
+  };
+
+  rec.onend = function() {
+    // Will restart via onresult or onerror
+  };
+
+  try {
+    recognition = rec;
+    rec.start();
+    isListening = true;
+    setText('pYouStatus', '🎤 In ascolto… Di\' "PRONTO"');
+  } catch(e) {
+    setText('pYouStatus', '⚠️ Errore microfono. Consenti l\'accesso al microfono.');
+  }
+}
+
+// Phase 2: Listen for sentence after countdown
+function startSentenceListening() {
+  if (isListening || gameOver) return;
+  if (myIndex >= mySentences.length) return;
+
+  var rec = createRecognition();
+  if (!rec) return;
+
+  rec.onresult = function(event) {
     var spoken = event.results[0][0].transcript.trim();
     $('sSpoken').style.display = 'block';
     setText('sSpoken', '🗣 ' + spoken);
@@ -410,53 +647,55 @@ function startListening() {
       updateProgress();
       setText('sFeedback', '✅ Perfetto!');
       $('sFeedback').className = 's-feedback s-feedback-ok';
-      sendWS({ type: 'gara', action: 'progress', correct: myCorrect });
+      sendWS({ type: 'gara', action: 'progress', correct: myCorrect, playerId: myPlayerId });
       if (myIndex >= TOTAL_SENTENCES) {
         playerFinished(true);
-      } else {
-        showSentence();
+        return;
       }
+      showSentence();
     } else {
       setText('sFeedback', '❌ Non esatto. Riprova.');
       $('sFeedback').className = 's-feedback s-feedback-err';
-      // Re-show the same sentence
+    }
+    // Continue listening
+    rec.stop();
+    setTimeout(startSentenceListening, 300);
+  };
+
+  rec.onerror = function(e) {
+    if (e.error === 'no-speech' || e.error === 'aborted') {
+      setTimeout(startSentenceListening, 400);
+    } else {
+      setText('sFeedback', '⚠️ ' + e.error);
+      $('sFeedback').className = 's-feedback s-feedback-err';
+      setTimeout(startSentenceListening, 800);
     }
   };
 
-  recognition.onerror = function(e) {
-    setText('sFeedback', '⚠️ ' + e.error);
-  };
-
-  recognition.onend = function() {
-    isListening = false;
-    if (!gameOver) $('listenBtn').disabled = false;
-  };
+  rec.onend = function() {};
 
   try {
-    recognition.start();
+    recognition = rec;
+    rec.start();
     isListening = true;
-    $('listenBtn').disabled = true;
   } catch(e) {
-    setText('sFeedback', 'Errore microfono.');
     isListening = false;
+    setTimeout(startSentenceListening, 500);
   }
 }
 
 // ═══════════════════════════════════════
 // GAME FLOW
 // ═══════════════════════════════════════
-function playerReady() {
-  $('readyBtn').disabled = true;
-  $('listenBtn').disabled = false;
-  setText('pYouStatus', '✅ Pronto');
-  sendWS({ type: 'gara', action: 'ready' });
-}
-
 function startCountdown() {
   if (countdownActive || gameStarted) return;
   countdownActive = true;
   gameStarted = true;
   myStartTime = Date.now();
+  stopMic();
+  isListening = false;
+  $('prontoPrompt').style.display = 'none';
+
   var nums = ['3','2','1','VIA!'];
   var i = 0;
   var overlay = document.createElement('div');
@@ -466,7 +705,16 @@ function startCountdown() {
   overlay.appendChild(numEl);
   document.body.appendChild(overlay);
   function tick() {
-    if (i >= nums.length) { overlay.remove(); countdownActive = false; setText('pYouStatus', '🔊 Parla!'); setText('pOppStatus', '🔊 Parla!'); $('listenBtn').disabled = false; return; }
+    if (i >= nums.length) {
+      overlay.remove();
+      countdownActive = false;
+      setText('pYouStatus', '🔊 Parla!');
+      setText('pOppStatus', '🔊 Parla!');
+      // Auto-start mic for sentences
+      isListening = false;
+      setTimeout(startSentenceListening, 300);
+      return;
+    }
     numEl.textContent = nums[i];
     numEl.style.animation = 'none';
     void numEl.offsetWidth;
@@ -477,31 +725,80 @@ function startCountdown() {
   tick();
 }
 
+// Legacy button (hidden, kept for compatibility)
+function startListening() {
+  if (gameStarted) { startSentenceListening(); }
+}
+
 function resetGame() {
   gameOver = false;
   gameStarted = false;
   countdownActive = false;
+  iAmReady = false;
+  oppIsReady = false;
   myCorrect = 0; myIndex = 0; myElapsed = 0; myStartTime = null;
   oppCorrect = 0;
+  stopMic();
   isListening = false;
-  if (recognition) { try { recognition.stop(); } catch(e) {} }
   mySentences = generateSentences(TOTAL_SENTENCES);
   $('results').style.display = 'none';
   $('sentenceBox').style.display = '';
-  $('readyBtn').disabled = false;
-  $('listenBtn').disabled = true;
+  $('prontoPrompt').style.display = '';
+  $('prontoPrompt').querySelector('p').textContent = '🎤 Say "PRONTO" into the microphone';
+  $('prontoPrompt').querySelector('p').style.color = 'var(--accent-purple)';
   $('playerYou').classList.remove('winner');
   $('playerOpp').classList.remove('winner');
-  setText('pYouStatus', 'In attesa…');
+  setText('pYouStatus', '🎤 In ascolto…');
   setText('pOppStatus', 'In attesa…');
   setText('pOppTime', '—');
   setText('sFeedback', '');
+  $('sSpoken').style.display = 'none';
   updateProgress();
   showSentence();
+  // Restart PRONTO listening
+  setTimeout(startProntoListening, 500);
 }
 
-// Init
-newRoom();
+// ═══════════════════════════════════════
+// AUTH (load user name if logged in)
+// ═══════════════════════════════════════
+(function initAuth() {
+  if (window.sottotitoliSupabase) {
+    window.sottotitoliSupabase.auth.getSession().then(function(res) {
+      if (res && res.data && res.data.session && res.data.session.user) {
+        var u = res.data.session.user;
+        var name = u.user_metadata && u.user_metadata.full_name ? u.user_metadata.full_name.split(' ')[0] : (u.email ? u.email.split('@')[0] : '');
+        if (name) {
+          myDisplayName = name;
+          $('playerYou').querySelector('.p-name').textContent = '👤 ' + name;
+          setText('pYouStatus', 'Ciao ' + name + '!');
+        }
+      }
+    });
+  }
+})();
+
+// ═══════════════════════════════════════
+// URL PARAM: auto-join room from link
+// ═══════════════════════════════════════
+(function checkUrlRoom() {
+  var params = new URLSearchParams(window.location.search);
+  var urlRoom = params.get('room');
+  if (urlRoom) {
+    room = urlRoom;
+    $('roomInput').value = room;
+    setText('lobbyStatus', 'Room ID ricevuto dal link: ' + room + '. Clicca Entra per iniziare.');
+    $('shareRow').style.display = 'block';
+    // Auto-join after short delay
+    setTimeout(function() {
+      if (room && $('lobby').style.display !== 'none') {
+        // Don't auto-join; let user click
+      }
+    }, 1000);
+  } else {
+    newRoom();
+  }
+})();
 </script>
 </body>
 </html>
