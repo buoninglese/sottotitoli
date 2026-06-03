@@ -719,23 +719,41 @@
     }
   }
 
+  var deepgramFallbackTimer = null;
+
   async function startRecognition() {
     // ── Deepgram path (all browsers) ──
     if (useDeepgram && wsPublisher && wsPublisher.ws && typeof wsPublisher.ws.send === 'function') {
+      var deepgramStarted = false;
       try {
         await startDeepgramCapture();
-        return;
+        deepgramStarted = true;
       } catch(e) {
         setText("statusText", "Deepgram failed, falling back to browser STT…");
-        // Fall through to Web Speech API below
+      }
+      if (deepgramStarted) {
+        // Set a safety timeout — if no transcription arrives in 5s, fall back
+        deepgramFallbackTimer = setTimeout(function(){
+          if (!lastFinalSent && !pendingInterimText) {
+            setText("statusText", "Deepgram not responding, switching to browser STT…");
+            stopDeepgramCapture();
+            shouldKeepListening = false;
+            startRecognitionWebSpeech();
+          }
+        }, 5000);
+        return;
       }
     }
 
+    await startRecognitionWebSpeech();
+  }
+
+  async function startRecognitionWebSpeech() {
     if (!SpeechRecognition) {
-      // ── Safari fallback (no Web Speech API, no Deepgram config) ──
+      // No browser STT — if WebSocket is available, try Deepgram relay as last resort
       if (navigator.mediaDevices?.getUserMedia && wsPublisher && wsPublisher.ws && typeof wsPublisher.ws.send === 'function') {
         setText("statusText", "Starting audio capture via relay…");
-        await startDeepgramCapture();
+        startDeepgramCapture();
         return;
       }
       setText("statusText", "⚠️ Speech recognition is not supported. Use Chrome or Edge.");
@@ -1012,6 +1030,7 @@
   }
 
   function stopDeepgramCapture() {
+    if (deepgramFallbackTimer) { clearTimeout(deepgramFallbackTimer); deepgramFallbackTimer = null; }
     if (deepgramMediaRecorder && deepgramMediaRecorder.state !== 'inactive') {
       try { deepgramMediaRecorder.stop(); } catch(e) {}
     }
@@ -1055,8 +1074,9 @@
       onMessage(event) {
         try {
           var p = JSON.parse(event.data);
-          // Only handle Deepgram caption messages (msg===true, from safari fallback)
           if (!p || p.msg !== true) return;
+          // Clear Deepgram fallback timer — transcription is flowing
+          if (deepgramFallbackTimer) { clearTimeout(deepgramFallbackTimer); deepgramFallbackTimer = null; }
           if (p.interm) {
             // Interim — just display
             var el = $("captionInterim");
