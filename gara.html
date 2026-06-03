@@ -183,6 +183,16 @@ body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--t
       <button class="btn btn-s" id="listenBtn" onclick="startListening()" disabled style="display:none">🎤 Parla</button>
     </div>
 
+    <!-- Debug panel -->
+    <div id="debugPanel" style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 16px;margin-bottom:16px;font-size:11px;font-family:monospace;color:var(--text-muted);display:none">
+      <div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px">
+        <span>📤 Sent: <b id="dbgSent" style="color:var(--accent-blue)">0</b></span>
+        <span>📥 Recv: <b id="dbgRecv" style="color:var(--accent-green)">0</b></span>
+        <span>🔗 WS: <b id="dbgWsState" style="color:var(--amber)">—</b></span>
+      </div>
+      <div id="dbgLast" style="margin-top:4px;opacity:.7">—</div>
+    </div>
+
     <!-- Results -->
     <div class="results" id="results">
       <h2>🏆 <span class="winner-name" id="winnerName">—</span> ha vinto!</h2>
@@ -245,6 +255,8 @@ var matchmakingActive = false;
 var myPlayerId = Math.random().toString(36).substring(2, 10);
 var myDisplayName = '👤 Tu';
 var readyRebroadcastTimer = null;
+var dbgSentCount = 0;
+var dbgRecvCount = 0;
 
 // ═══════════════════════════════════════
 // FUZZY MATCHING
@@ -366,8 +378,15 @@ function connectWS() {
     },
     onMessage: function(event) {
       try {
-        var p = JSON.parse(event.data);
+        var raw = event.data;
+        var p = JSON.parse(raw);
         if (!p) return;
+        // Show ALL received messages in debug (except heartbeats)
+        if (p.type !== 'heartbeat' && $('dbgLast')) {
+          dbgRecvCount++;
+          $('dbgRecv').textContent = dbgRecvCount;
+          $('dbgLast').textContent = '📥 ' + (p.action || p.event || p.type || '?') + (p.playerId === myPlayerId ? ' (self)' : '');
+        }
         // Only process game messages (they have a gara action field)
         var garaActions = ['joined','ready','progress','finish','hello','paired'];
         if (!p.action || garaActions.indexOf(p.action) === -1) return;
@@ -419,7 +438,10 @@ function connectWS() {
 function sendWS(data) {
   // Always delegate to publish() — it handles queuing & reconnection internally
   if (wsPublisher) {
-    wsPublisher.publish(data);
+    var sent = wsPublisher.publish(data);
+    dbgSentCount++;
+    if ($('dbgSent')) $('dbgSent').textContent = dbgSentCount;
+    if ($('dbgLast')) $('dbgLast').textContent = '📤 ' + (data.action || '?') + (sent ? ' ✓' : ' ⚠queued');
   }
 }
 
@@ -573,11 +595,19 @@ function joinRoom() {
 function enterGame() {
   $('lobby').style.display = 'none';
   $('game').style.display = 'block';
+  $('debugPanel').style.display = 'block';
   mySentences = generateSentences(TOTAL_SENTENCES);
   showSentence();
   connectWS();
   // Auto-start mic for PRONTO detection
   setTimeout(startProntoListening, 600);
+  // Periodically update WS state in debug
+  setInterval(function() {
+    if ($('dbgWsState') && wsPublisher) {
+      var s = wsPublisher.getSnapshot();
+      $('dbgWsState').textContent = s.state + ' (' + (s.queueLength || 0) + 'q)';
+    }
+  }, 1000);
 }
 
 // ═══════════════════════════════════════
