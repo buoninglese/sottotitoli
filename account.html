@@ -738,6 +738,22 @@ body{background:var(--bg)}
         <button class="btn" id="downloadSessionsCsvBtn" style="margin-top:10px;width:100%">📥 Download CSV</button>
       </div>
       
+      <!-- NGSL Mastery -->
+      <div class="acard s-purple" id="ngslCard">
+        <h3>📚 NGSL Mastery</h3>
+        <p style="font-size:12px;color:var(--text-secondary);margin-bottom:12px;line-height:1.5">La New General Service List è una lista delle ~2800 parole più usate in inglese. Ogni parola che incontri nelle tue sessioni viene tracciata qui — è una misura cumulativa del tuo vocabolario incontrato.</p>
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:8px">
+          <span style="font-size:28px;font-weight:900;letter-spacing:-1px;color:var(--accent-purple)" id="ngslMastered">—</span>
+          <span style="font-size:13px;color:var(--text-muted)">parole NGSL incontrate</span>
+        </div>
+        <div style="height:8px;background:var(--bg-btn-subtle);border-radius:4px;overflow:hidden;margin-bottom:6px">
+          <div id="ngslBar" style="height:100%;background:var(--accent-purple);border-radius:4px;width:0%;transition:width .8s"></div>
+        </div>
+        <div style="font-size:10px;color:var(--text-muted);display:flex;justify-content:space-between">
+          <span id="ngslDetail">Caricamento…</span>
+        </div>
+      </div>
+      
       <!-- Performance Dashboard (from old account, restyled) -->
       <div class="acard">
         <h3>📊 Performance dashboard <span style="font-size:11px;font-weight:400;color:var(--text-muted);margin-left:8px">← scorri →</span></h3>
@@ -1153,6 +1169,51 @@ body{background:var(--bg)}
     load();
   })();
 
+  // ── NGSL Mastery ──
+  (async function(){
+    var masteredEl = document.getElementById('ngslMastered');
+    var barEl = document.getElementById('ngslBar');
+    var detailEl = document.getElementById('ngslDetail');
+    if (!masteredEl || !barEl) return;
+
+    var supabase = window.sottotitoliSupabase;
+    if (!supabase) { setTimeout(arguments.callee, 800); return; }
+    var session = await supabase.auth.getSession();
+    if (!session.data?.session) { masteredEl.textContent = '🔐'; detailEl.textContent = 'Accedi per vedere'; return; }
+    var userId = session.data.session.user.id;
+
+    // Get total NGSL words from the lemma map
+    var totalNgsl = window.LEMMA_POS_MAP ? Object.keys(window.LEMMA_POS_MAP).length : 2800;
+
+    // Fetch all session transcripts
+    var { data: sessions } = await supabase.from('sessions')
+      .select('transcript_text').eq('user_id', userId).not('transcript_text', 'is', null);
+    
+    if (!sessions || !sessions.length) {
+      masteredEl.textContent = '0';
+      detailEl.textContent = '0 di ~'+totalNgsl+' parole NGSL — inizia a parlare in Studio!';
+      return;
+    }
+
+    // Extract unique words from all transcripts
+    var allText = sessions.map(function(s){ return s.transcript_text || ''; }).join(' ');
+    var words = allText.toLowerCase().match(/[a-z']+/g) || [];
+    var uniqueWords = new Set(words);
+
+    // Count how many are in the NGSL lemma map
+    var ngslHits = 0;
+    if (window.LEMMA_POS_MAP) {
+      uniqueWords.forEach(function(w){
+        if (window.LEMMA_POS_MAP[w]) ngslHits++;
+      });
+    }
+
+    var pct = Math.round((ngslHits / totalNgsl) * 100);
+    masteredEl.textContent = ngslHits;
+    barEl.style.width = Math.min(pct, 100) + '%';
+    detailEl.textContent = ngslHits + ' di ~' + totalNgsl + ' parole NGSL incontrate (' + pct + '%)';
+  })();
+
 </script>
 
   </div>
@@ -1174,6 +1235,7 @@ body{background:var(--bg)}
 <script src="js/stripe.js?v=1"></script>
 <script src="js/auth.js?v=6"></script>
 <script src="js/preferences.js?v=5"></script>
+<script src="js/lemma-pos-map.js?v=2"></script>
 <script src="js/account.js?v=6"></script>
 <script src="js/theme.js?v=2"></script>
 <script>
