@@ -772,7 +772,7 @@ body {
       overlayCinema.__rawHTML = html;
       overlayCinema.__rawText = current;
       var lang = window.__currentSessionLang || 'en-US';
-      overlayCinema.innerHTML = (typeof posColoringOn !== 'undefined' && posColoringOn && w.SottotitoliPosColoring) ? applyPosColoring(current, lang) : html;
+      overlayCinema.innerHTML = (window.__posColoringOn && w.SottotitoliPosColoring) ? applyPosColoring(current, lang) : html;
     }
 
     // Overlay Roll: only final complete sentences, newest at top, older fade down
@@ -792,7 +792,16 @@ body {
         overlayRoll.__rawHTML = html;
         overlayRoll.__rawText = overlayHistory[overlayHistory.length-1] || '';
         var lang = window.__currentSessionLang || 'en-US';
-        overlayRoll.innerHTML = (typeof posColoringOn !== 'undefined' && posColoringOn && w.SottotitoliPosColoring) ? applyPosColoring(overlayRoll.__rawText, lang) : html;
+        overlayRoll.innerHTML = (window.__posColoringOn && w.SottotitoliPosColoring) ? applyPosColoring(overlayRoll.__rawText, lang) : html;
+      }
+    }
+
+    // Room + timer for roll
+    var rollRoom = document.getElementById('overlayRollRoom');
+    var rollTimer = document.getElementById('overlayRollTimer');
+    if (rollRoom && roomEl) rollRoom.textContent = 'Room: ' + (roomEl.textContent || '—');
+    if (rollTimer && timerEl) rollTimer.textContent = timerEl ? timerEl.textContent : '00:00';
+  }, 400);
 })();
 
 // ── Style scheme cycle (9 schemes) ──
@@ -841,27 +850,25 @@ body {
   }
 
   // ── POS coloring toggle on overlay slides ──
-  var posColoringOn = false;
+  window.__posColoringOn = false;
   var ovPos1 = document.getElementById('ovPosBtn1');
   var ovPos2 = document.getElementById('ovPosBtn2');
 
   function updatePosToggleUI() {
-    if (ovPos1) { ovPos1.classList.toggle('on', posColoringOn); ovPos1.textContent = posColoringOn ? '🔤' : '🔤'; }
-    if (ovPos2) { ovPos2.classList.toggle('on', posColoringOn); ovPos2.textContent = posColoringOn ? '🔤' : '🔤'; }
+    if (ovPos1) { ovPos1.classList.toggle('on', window.__posColoringOn); }
+    if (ovPos2) { ovPos2.classList.toggle('on', window.__posColoringOn); }
   }
 
   function togglePosColoring() {
-    posColoringOn = !posColoringOn;
+    window.__posColoringOn = !window.__posColoringOn;
     updatePosToggleUI();
-    // Re-render current overlay text with/without colors
-    renderOverlaySlides();
   }
 
   if (ovPos1) ovPos1.addEventListener('click', togglePosColoring);
   if (ovPos2) ovPos2.addEventListener('click', togglePosColoring);
 
   function applyPosColoring(text, langCode) {
-    if (!posColoringOn || !w.SottotitoliPosColoring) return text;
+    if (!window.__posColoringOn || !w.SottotitoliPosColoring) return text;
     var lk = w.SottotitoliPosColoring.getLangKey(langCode || 'en-US');
     var tokens = (text || '').match(/[A-Za-zÀ-ÿ\u0100-\u024f']+|\S/g) || [];
     var h = '';
@@ -876,19 +883,6 @@ body {
       }
     }
     return h;
-  }
-
-  // Hook into the overlay slide rendering to apply POS colors
-  var _origRenderSlides = null;
-  function renderOverlaySlides() {
-    var cinema = document.getElementById('overlayCinemaText');
-    var roll = document.getElementById('overlayRollText');
-    if (cinema && cinema.__rawHTML) {
-      cinema.innerHTML = posColoringOn ? applyPosColoring(cinema.__rawText || cinema.textContent, window.__currentSessionLang || 'en-US') : cinema.__rawHTML;
-    }
-    if (roll && roll.__rawHTML) {
-      roll.innerHTML = posColoringOn ? applyPosColoring(roll.__rawText || roll.textContent, window.__currentSessionLang || 'en-US') : roll.__rawHTML;
-    }
   }
 })();
 
