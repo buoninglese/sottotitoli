@@ -722,8 +722,10 @@
   var deepgramFallbackTimer = null;
 
   async function startRecognition() {
-    // ── Deepgram path (all browsers) ──
-    if (useDeepgram && wsPublisher && wsPublisher.ws && typeof wsPublisher.ws.send === 'function') {
+    // ── Deepgram path (only for English — Web Speech API handles other languages better) ──
+    var dgLang = (modeConfig && (modeConfig.sourceCode || modeConfig.sourceLang)) || 'en';
+    var canUseDeepgram = useDeepgram && (dgLang === 'en' || dgLang === 'en-US' || dgLang === 'en-GB');
+    if (canUseDeepgram && wsPublisher && wsPublisher.ws && typeof wsPublisher.ws.send === 'function') {
       var deepgramStarted = false;
       try {
         await startDeepgramCapture();

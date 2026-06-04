@@ -25,7 +25,9 @@ window.SOTTOTITOLI_CONFIG = {
   // relay server to have DEEPGRAM_API_KEY set in its environment.
   // When disabled or unconfigured, falls back to browser webkitSpeechRecognition.
   deepgram: {
-    enabled: true
+    // Deepgram STT — only activates for English (en-US). Browser Web Speech API
+    // handles Italian, French, Spanish, German, Dutch, Polish, Portuguese better.
+    enabled: false
   },
 
   /** Analysis / speaker diarization endpoint */

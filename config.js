@@ -7,7 +7,7 @@ window.SOTTOTITOLI_CONFIG = {
     myMemoryBase: "https://api.mymemory.translated.net/get"
   },
   deepgram: {
-    enabled: true
+    enabled: false  // Deepgram STT: only reliable for English; browser Web Speech API handles other languages better
   },
   analysis: {
     speakerEndpoint: "https://sottotitoli-websocket.onrender.com/analyze-speakers"
