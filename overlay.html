@@ -63,8 +63,12 @@ body {
 .mode-badge{position:fixed;top:28px;left:32px;z-index:10;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.2em;pointer-events:auto;}
 .style-toggle{position:fixed;top:28px;right:32px;z-index:10;padding:6px 16px;border-radius:100px;font-family:inherit;font-size:12px;font-weight:600;cursor:pointer;pointer-events:auto;transition:all .25s;border:1px solid;}
 .style-toggle:hover{transform:scale(1.05);}
+.pos-toggle{position:fixed;top:68px;right:32px;z-index:10;padding:6px 16px;border-radius:100px;font-family:inherit;font-size:12px;font-weight:600;cursor:pointer;pointer-events:auto;transition:all .25s;border:1px solid;background:rgba(255,255,255,.04);color:rgba(255,255,255,.3);border-color:rgba(255,255,255,.06);}
+.pos-toggle.on{background:rgba(167,139,250,.12);color:rgba(167,139,250,.8);border-color:rgba(167,139,250,.25);box-shadow:0 0 12px rgba(167,139,250,.1);}
+.pos-toggle:hover{transform:scale(1.05);border-color:rgba(167,139,250,.3);color:rgba(255,255,255,.6);}
+.pos-toggle.on:hover{color:rgba(167,139,250,1);}
 
-@media(max-width:640px){.caption-stage{padding:40px 20px}.status-pill{bottom:16px;right:16px;font-size:10px}.mode-badge{top:16px;left:16px}.style-toggle{top:16px;right:16px;font-size:11px;padding:5px 12px}}
+@media(max-width:640px){.caption-stage{padding:40px 20px}.status-pill{bottom:16px;right:16px;font-size:10px}.mode-badge{top:16px;left:16px}.style-toggle{top:16px;right:16px;font-size:11px;padding:5px 12px}.pos-toggle{top:52px;right:16px;font-size:11px;padding:5px 12px}}
 
 /* ═══════════════════════════════════════ */
 /* STYLE 1 — AURORA (purple/blue)         */
@@ -79,6 +83,7 @@ body {
 [data-style="1"] .status-pill.connected{color:rgba(255,255,255,.6);}
 [data-style="1"] .mode-badge{color:rgba(255,255,255,.2);}
 [data-style="1"] .style-toggle{background:rgba(124,58,237,.1);color:rgba(255,255,255,.5);border-color:rgba(124,58,237,.25);}
+[data-style="1"] .pos-toggle.on{background:rgba(124,58,237,.15);color:rgba(167,139,250,.9);border-color:rgba(124,58,237,.3);}
 
 /* ═══════════════════════════════════════ */
 /* STYLE 2 — NEON (hot pink / cyan)       */
@@ -178,6 +183,7 @@ body {
 
 <div class="mode-badge" id="modeBadge"></div>
 <button class="style-toggle" id="styleToggle" title="Cycle style (1-5)">🎬 1 · Aurora</button>
+<button class="pos-toggle" id="posToggle" title="Toggle POS coloring (verbs=pink, pronouns=blue, adj=gold, adv=green)">🔤 OFF</button>
 <div class="status-pill" id="statusPill">
   <span class="dot"></span>
   <span id="statusLabel">Disconnected</span>
@@ -196,6 +202,36 @@ body {
   var room = params.get("room");
   var modeFromQuery = params.get("mode") || "caption-en";
   var posEnabled = params.get("pos") === "1" || params.get("poscoloring") === "1";  // ?pos=1 toggles POS coloring
+
+  var posToggle = document.getElementById("posToggle");
+  if (posToggle) {
+    updatePosToggleUI();
+    posToggle.addEventListener("click", function(){
+      posEnabled = !posEnabled;
+      updatePosToggleUI();
+      // Re-render current caption with/without colors
+      var currentText = captionBox.textContent || captionBox.innerText || "";
+      if (currentText && currentText !== "Waiting for captions…") {
+        var tokens = tokenizeCaption(currentText);
+        var langCode = (window.__lastPayload && (window.__lastPayload.ln || window.__lastPayload.sourceLang)) || modeFromQuery;
+        if (posEnabled && w.SottotitoliPosColoring) {
+          w.SottotitoliPosColoring.renderColoredCaption(captionBox, tokens, langCode);
+        } else {
+          captionBox.textContent = currentText;
+        }
+      }
+    });
+  }
+  function updatePosToggleUI() {
+    if (!posToggle) return;
+    if (posEnabled) {
+      posToggle.textContent = "🔤 ON";
+      posToggle.classList.add("on");
+    } else {
+      posToggle.textContent = "🔤 OFF";
+      posToggle.classList.remove("on");
+    }
+  }
 
   var captionBox = document.getElementById("captionBox");
   var translationBox = document.getElementById("translationBox");
@@ -257,6 +293,8 @@ body {
 
   function handleCaptionPayload(payload) {
     if (!payload) return;
+
+    w.__lastPayload = payload;  // store for POS toggle re-render
 
     var text = payload.final || payload.interim || "";
     var modeKey = payload.mode || modeFromQuery;
