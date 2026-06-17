@@ -16,7 +16,9 @@ window.SOTTOTITOLI_CONFIG = {
 
   /** Translation provider settings */
   translation: {
-    provider: "mymemory", // "mymemory" | "google" | "none"
+    /** Translation provider: "auto" = Google first with MyMemory fallback.
+        Also accepts "google" or "mymemory" for single-provider mode. */
+    provider: "auto", // "mymemory" | "google" | "none"
     myMemoryBase: "https://api.mymemory.translated.net/get"
   },
 

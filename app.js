@@ -412,20 +412,32 @@
     return reportText.slice(0, markerIndex).trim();
   }
 
+  // ── Translation cache (text+langpair → translatedText) ──
+  var translationCache = {};
+
   async function maybeTranslate(text) {
     if (!modeConfig || !modeConfig.translate) return null;
     if (!w.SottotitoliTranslationProviders) return null;
+
+    var cacheKey = modeConfig.sourceCode + '|' + (modeConfig.targetLang || 'it') + '|' + text.toLowerCase().trim();
+
+    // Check cache first
+    if (translationCache[cacheKey]) return translationCache[cacheKey];
+
     try {
-      const providerConfig = w.SottotitoliTranslationProviders.resolveConfig();
-      const result = await w.SottotitoliTranslationProviders.translateText(
-        providerConfig,
+      var providerConfig = w.SottotitoliTranslationProviders.resolveConfig();
+      // Use fallback mode: Google first, MyMemory backup
+      var result = await w.SottotitoliTranslationProviders.translateWithFallback(
         text,
         modeConfig.sourceCode,
-        modeConfig.targetLang
+        modeConfig.targetLang || 'it',
+        providerConfig
       );
-      return result && result.translatedText ? result.translatedText : null;
+      var translated = result && result.translatedText ? result.translatedText : null;
+      if (translated) translationCache[cacheKey] = translated;
+      return translated;
     } catch (err) {
-      setText("statusText", "Translation error: " + err.message);
+      setText("statusText", "Translation error: " + (err.message || 'unknown'));
       return null;
     }
   }
@@ -484,7 +496,8 @@
       appendLine("captionTranscript", clean);
     }
 
-    const payload = {
+    // ── Send caption IMMEDIATELY (don't wait for translation) ──
+    var payload = {
       type: "caption",
       room,
       mode: modeKey,
@@ -494,21 +507,35 @@
       kind: modeConfig && modeConfig.translate ? "translation" : "caption"
     };
 
-    if (modeConfig && modeConfig.translate) {
-      const translated = await maybeTranslate(clean);
-      if (translated) {
-        entry.translated = translated;
-        appendLine("captionTranslated", translated);
-        payload.translated = translated;
-        payload.targetLang = modeConfig.targetLang;
-      }
-    }
-
+    sendPayload(payload, "Final caption sent to overlay.");
     updateStats();
     lastInterimSent = "";
     clearBox("captionInterim", "");
 
-    sendPayload(payload, "Final caption sent to overlay.");
+    // ── Translate async (doesn't block caption broadcast) ──
+    if (modeConfig && modeConfig.translate) {
+      maybeTranslate(clean).then(function(translated) {
+        if (translated) {
+          entry.translated = translated;
+          appendLine("captionTranslated", translated);
+          // Send translation as a follow-up message
+          var transPayload = {
+            type: "caption",
+            room,
+            mode: modeKey,
+            final: clean,
+            translated: translated,
+            targetLang: modeConfig.targetLang,
+            timestamp: w.SottotitoliSessionUtils.formatTimestamp(new Date()),
+            sourceLang: modeConfig.sourceLang,
+            kind: "translation"
+          };
+          sendPayload(transPayload);
+        }
+      }).catch(function(err) {
+        setText("statusText", "Translation failed: " + (err.message || 'unknown'));
+      });
+    }
   }
 
   function handleInterimTranscript(text) {
@@ -837,6 +864,7 @@
     hasStartedOnce = false;
     lastFinalSent = "";
     transcriptLines = [];
+    translationCache = {};
 
     setSessionUI('starting');
 
@@ -1020,6 +1048,7 @@
     hasStartedOnce = false;
     lastFinalSent = "";
     transcriptLines = [];
+    translationCache = {};
 
     setSessionUI('starting');
 
@@ -1229,6 +1258,7 @@
     if (!confirm('Creare una nuova room? Il transcript corrente e il link overlay cambieranno.')) return;
     room = w.SottotitoliSessionUtils.randomRoom();
     transcriptLines = [];
+    translationCache = {};
     latestReportText = "";
     lastInterimSent = "";
     lastFinalSent = "";

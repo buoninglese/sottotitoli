@@ -3,7 +3,7 @@ window.SOTTOTITOLI_CONFIG = {
   siteName: "Sottotitoli",
   AUTH_REDIRECT_URL: "https://buoninglese.github.io/sottotitoli/app.html",
   translation: {
-    provider: "mymemory",
+    provider: "auto",  // "auto" = Google first, MyMemory fallback. Also: "google", "mymemory"
     myMemoryBase: "https://api.mymemory.translated.net/get"
   },
   deepgram: {
