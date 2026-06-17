@@ -189,6 +189,20 @@
     box.prepend(div);
   }
 
+  function replaceLastLine(targetId, text) {
+    const box = ensureBoxReady(targetId);
+    if (!box || !text) return;
+    var lines = box.querySelectorAll('.line');
+    if (lines.length > 0) {
+      var last = lines[0]; // most recent is first (prepend order)
+      var ts = last.querySelector('span');
+      var tsText = ts ? ts.textContent : '';
+      last.innerHTML = '<span style="font-size:10px;color:var(--muted2);margin-right:6px;font-variant-numeric:tabular-nums">' + tsText + '</span>' + text;
+    } else {
+      appendLine(targetId, text);
+    }
+  }
+
   function syncUrl() {
     const url = new URL(window.location.href);
     url.searchParams.set("mode", modeKey);
@@ -444,8 +458,11 @@
     const clean = text.trim();
     if (!clean) return;
     if (clean === lastFinalSent) return;
-    lastFinalSent = clean;
 
+    // Detect cumulative/superset text from Google STT (e.g. "I am" → "I am happy" → "I am happy today")
+    var isCumulative = lastFinalSent && clean.indexOf(lastFinalSent) === 0 && clean.length > lastFinalSent.length;
+
+    lastFinalSent = clean;
     clearInterimFlushTimer();
     pendingInterimText = "";
 
@@ -457,9 +474,15 @@
       translated: null,
       learning: annotateLineWithNgsl(clean)
     };
-    transcriptLines.push(entry);
 
-    appendLine("captionTranscript", clean);
+    if (isCumulative && transcriptLines.length > 0) {
+      // Replace the last line instead of adding a duplicate cumulative one
+      transcriptLines[transcriptLines.length - 1] = entry;
+      replaceLastLine("captionTranscript", clean);
+    } else {
+      transcriptLines.push(entry);
+      appendLine("captionTranscript", clean);
+    }
 
     const payload = {
       type: "caption",
@@ -1088,12 +1111,20 @@
           if (p.final) {
             var clean = p.final.trim();
             if (!clean || clean === lastFinalSent) return;
+            // Detect cumulative text from remote sender
+            var isCumulative = lastFinalSent && clean.indexOf(lastFinalSent) === 0 && clean.length > lastFinalSent.length;
             lastFinalSent = clean;
             pendingInterimText = "";
             clearBox("captionInterim", "");
             var timestamp = w.SottotitoliSessionUtils.formatTimestamp(new Date());
-            transcriptLines.push({ timestamp: timestamp, text: clean, translated: null, learning: annotateLineWithNgsl(clean) });
-            appendLine("captionTranscript", clean);
+            var entry = { timestamp: timestamp, text: clean, translated: null, learning: annotateLineWithNgsl(clean) };
+            if (isCumulative && transcriptLines.length > 0) {
+              transcriptLines[transcriptLines.length - 1] = entry;
+              replaceLastLine("captionTranscript", clean);
+            } else {
+              transcriptLines.push(entry);
+              appendLine("captionTranscript", clean);
+            }
             updateStats();
             lastInterimSent = "";
           }
