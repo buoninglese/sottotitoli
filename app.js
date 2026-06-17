@@ -472,7 +472,9 @@
     if (clean === lastFinalSent) return;
 
     // Detect cumulative/superset text from Google STT (e.g. "I am" → "I am happy" → "I am happy today")
-    var isCumulative = lastFinalSent && clean.indexOf(lastFinalSent) === 0 && clean.length > lastFinalSent.length;
+    // Case-insensitive: STT may change capitalisation between results (e.g. "ça va" → "Ça va bien")
+    var isCumulative = lastFinalSent && clean.length > lastFinalSent.length &&
+      clean.toLowerCase().indexOf(lastFinalSent.toLowerCase()) === 0;
 
     lastFinalSent = clean;
     clearInterimFlushTimer();
@@ -514,10 +516,15 @@
 
     // ── Translate async (doesn't block caption broadcast) ──
     if (modeConfig && modeConfig.translate) {
+      var wasCumulative = isCumulative;
       maybeTranslate(clean).then(function(translated) {
         if (translated) {
           entry.translated = translated;
-          appendLine("captionTranslated", translated);
+          if (wasCumulative) {
+            replaceLastLine("captionTranslated", translated);
+          } else {
+            appendLine("captionTranslated", translated);
+          }
           // Send translation as a follow-up message
           var transPayload = {
             type: "caption",
@@ -1145,9 +1152,10 @@
           }
           if (p.final) {
             var clean = p.final.trim();
-            if (!clean || clean === lastFinalSent) return;
-            // Detect cumulative text from remote sender
-            var isCumulative = lastFinalSent && clean.indexOf(lastFinalSent) === 0 && clean.length > lastFinalSent.length;
+            if (!clean || clean.toLowerCase() === lastFinalSent.toLowerCase()) return;
+            // Detect cumulative text from remote sender (case-insensitive)
+            var isCumulative = lastFinalSent && clean.length > lastFinalSent.length &&
+              clean.toLowerCase().indexOf(lastFinalSent.toLowerCase()) === 0;
             lastFinalSent = clean;
             pendingInterimText = "";
             clearBox("captionInterim", "");
