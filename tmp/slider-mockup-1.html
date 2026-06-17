@@ -99,6 +99,7 @@ h2 .hl{background:linear-gradient(135deg,var(--accent-purple),var(--accent-blue)
     if(transitioning||idx===current||idx<0||idx>=total)return;
     var dur=Math.max(200,Math.min(1100,duration||600));
     transitioning=true;
+    wheelAccum=0; clearTimeout(wheelTimer); // flush any pending scroll buildup
 
     var oldSlide=slides[current],newSlide=slides[idx];
 
@@ -129,7 +130,8 @@ h2 .hl{background:linear-gradient(135deg,var(--accent-purple),var(--accent-blue)
     setTimeout(function(){
       newSlide.style.transition='clip-path 0s';
       slides.forEach(function(s,i){if(i!==current){s.style.clipPath='polygon(0 0,100% 0,100% 100%,0 100%)';s.style.zIndex='0';}});
-      transitioning=false;
+      // Brief cooldown before accepting next scroll — prevents double-fires
+      setTimeout(function(){transitioning=false;},180);
     },dur+50);
   }
 
@@ -145,7 +147,7 @@ h2 .hl{background:linear-gradient(135deg,var(--accent-purple),var(--accent-blue)
 
   // ── SPEED-RESPONSIVE WHEEL (no auto-advance) ──
   document.addEventListener('wheel',function(e){
-    if(transitioning)return;
+    if(transitioning){wheelAccum=0;return;}
     var delta=Math.abs(e.deltaX)>Math.abs(e.deltaY)?e.deltaX:e.deltaY;
     wheelAccum+=delta;
     var absAccum=Math.abs(wheelAccum);
