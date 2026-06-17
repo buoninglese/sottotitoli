@@ -94,18 +94,10 @@ h2 .hl{background:linear-gradient(135deg,var(--accent-purple),var(--accent-blue)
   for(var i=0;i<total;i++){var d=document.createElement('div');d.className='dot'+(i===0?' active':'');d.setAttribute('data-index',i);d.addEventListener('click',function(){goTo(parseInt(this.getAttribute('data-index')));});dotsEl.appendChild(d);}
 
   // forceDir: 1=forward (wipe down), -1=backward (wipe up), 0=auto-detect
-  function goTo(idx, duration, forceDir){
+  function goTo(idx, duration){
     if(transitioning||idx===current||idx<0||idx>=total)return;
     var dur=Math.max(200,Math.min(1100,duration||600));
     transitioning=true;
-
-    // Direction: use forced direction if provided, otherwise detect from indices
-    // For wrap-around, forceDir ensures correct feel:
-    //   last→first (goNext wrap) = forceDir 1 (forward wipe)
-    //   first→last (goPrev wrap) = forceDir -1 (backward wipe)
-    var dir;
-    if(typeof forceDir==='number'&&forceDir!==0)dir=forceDir;
-    else dir=idx>current?1:-1;
 
     var oldSlide=slides[current],newSlide=slides[idx];
 
@@ -113,15 +105,8 @@ h2 .hl{background:linear-gradient(135deg,var(--accent-purple),var(--accent-blue)
     newSlide.style.transition='none';
     newSlide.style.zIndex=String(10+idx);
 
-    if(dir===1){
-      // Forward wipe: new slide sweeps DOWN from top
-      // Diagonal edge from top-left (0,0) to top-right (100%,-30%)
-      newSlide.style.clipPath='polygon(0 -10%, 100% -40%, 100% -10%, 0 -10%)';
-    } else {
-      // Backward wipe: new slide sweeps UP from bottom
-      // Diagonal edge from bottom-right (100%,140%) to bottom-left (0,100%)
-      newSlide.style.clipPath='polygon(0 140%, 100% 110%, 100% 140%, 0 140%)';
-    }
+    // Always sweep UP from the bottom — the same clean diagonal rise for every transition
+    newSlide.style.clipPath='polygon(0 140%, 100% 110%, 100% 140%, 0 140%)';
 
     oldSlide.classList.remove('active');newSlide.classList.add('active');
     dotsEl.children[current].classList.remove('active');
@@ -140,8 +125,8 @@ h2 .hl{background:linear-gradient(135deg,var(--accent-purple),var(--accent-blue)
     },dur+50);
   }
 
-  function goNext(dur){var nxt=current<total-1?current+1:0;goTo(nxt,dur,1);}
-  function goPrev(dur){var prv=current>0?current-1:total-1;goTo(prv,dur,-1);}
+  function goNext(dur){var nxt=current<total-1?current+1:0;goTo(nxt,dur);}
+  function goPrev(dur){var prv=current>0?current-1:total-1;goTo(prv,dur);}
 
   prevBtn.addEventListener('click',function(){goPrev(500);});
   nextBtn.addEventListener('click',function(){goNext(500);});
