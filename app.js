@@ -774,6 +774,12 @@
   }
 
   async function startRecognitionWebSpeech() {
+    // ── Stop any existing recognition FIRST to prevent duplicate transcriptions ──
+    if (recognition) {
+      try { recognition.stop(); } catch(e) {}
+      recognition = null;
+      await new Promise(function(r){ setTimeout(r, 150); }); // let old instance fully terminate
+    }
     if (!SpeechRecognition) {
       // No browser STT — if WebSocket is available, try Deepgram relay as last resort
       if (navigator.mediaDevices?.getUserMedia && wsPublisher && wsPublisher.ws && typeof wsPublisher.ws.send === 'function') {
@@ -834,7 +840,7 @@
 
     setSessionUI('starting');
 
-    if (!recognition) recognition = buildRecognition();
+    recognition = buildRecognition();
 
     try {
       recognition.start();
