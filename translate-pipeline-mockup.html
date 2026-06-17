@@ -61,7 +61,7 @@ h1 span{color:var(--accent)}
 <body>
 
 <h1>Translation Pipeline <span>Mockup</span></h1>
-<p class="sub">Decoupled broadcast · LibreTranslate · Cache · Timeout · Async</p>
+<p class="sub">Decoupled broadcast · MyMemory + Google fallback · Cache · Timeout · Async</p>
 
 <!-- Stats -->
 <div class="stats">
@@ -249,35 +249,46 @@ function renderError(original, msg) {
   stage.insertBefore(div, stage.firstChild);
 }
 
-// ═══════════════ LIBRETRANSLATE API ═══════════════
+// ═══════════════ MYMEMORY + GOOGLE TRANSLATE API ═══════════════
+async function translateWithMyMemory(text, srcLang, tgtLang) {
+  var url = 'https://api.mymemory.translated.net/get?q='+encodeURIComponent(text)+'&langpair='+srcLang+'|'+tgtLang;
+  var resp = await fetch(url);
+  if (!resp.ok) throw new Error('MyMemory HTTP '+resp.status);
+  var data = await resp.json();
+  if (data && data.responseData && data.responseData.translatedText) return data.responseData.translatedText;
+  throw new Error('No translation in MyMemory response');
+}
+
+async function translateWithGoogle(text, srcLang, tgtLang) {
+  var url = 'https://translate.googleapis.com/translate_a/single?client=gtx&sl='+srcLang+'&tl='+tgtLang+'&dt=t&q='+encodeURIComponent(text);
+  var resp = await fetch(url);
+  if (!resp.ok) throw new Error('Google HTTP '+resp.status);
+  var raw = await resp.text();
+  // Response format: [[["translated text","original",...]],...]
+  var match = raw.match(/\"([^\"]+)\"/);
+  if (match) return match[1];
+  throw new Error('Could not parse Google response');
+}
+
 async function fetchTranslationWithTimeout(text, srcLang, tgtLang) {
   var controller = new AbortController();
-  var timeout = setTimeout(function(){ controller.abort(); }, 5000); // 5s timeout
+  var timeout = setTimeout(function(){ controller.abort(); }, 5000);
 
+  // Try MyMemory first (reliable, no key needed), fall back to Google
   try {
-    var url = 'https://libretranslate.com/translate';
-    var resp = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        q: text,
-        source: srcLang,
-        target: tgtLang,
-        format: 'text'
-      }),
-      signal: controller.signal
-    });
+    var result = await translateWithMyMemory(text, srcLang, tgtLang);
     clearTimeout(timeout);
-
-    if (!resp.ok) throw new Error('HTTP ' + resp.status);
-
-    var data = await resp.json();
-    if (data && data.translatedText) return data.translatedText;
-    throw new Error('No translation in response');
-  } catch(err) {
-    clearTimeout(timeout);
-    if (err.name === 'AbortError') throw new Error('Timeout (5s) — LibreTranslate may be down');
-    throw err;
+    return result;
+  } catch(e1) {
+    log('⚠️ MyMemory failed: '+e1.message+', trying Google…', 'info');
+    try {
+      var result2 = await translateWithGoogle(text, srcLang, tgtLang);
+      clearTimeout(timeout);
+      return result2;
+    } catch(e2) {
+      clearTimeout(timeout);
+      throw new Error('Both providers failed. MyMemory: '+e1.message+' | Google: '+e2.message);
+    }
   }
 }
 
