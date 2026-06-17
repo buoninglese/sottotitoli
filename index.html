@@ -203,21 +203,156 @@ body.logged-in .guest-only{display:none!important}
 
 <div class="main-scroll" id="mainScroll">
 
-<!-- ═══ 1. HERO ═══ -->
-<section class="hero-panel" id="hero">
-  <div class="panel-inner">
-    <h1>I tuoi sottotitoli<br>in <em>tempo reale</em></h1>
-    <p class="hero-p">Microfono, voce, sottotitoli. In 8 lingue.</p>
-    <p class="hero-p" style="max-width:500px;margin:0 auto 14px;font-size:clamp(12px,1.5vw,14px)">Accedi con Google in un clic. Se ti iscrivi oggi, ricevi <strong style="color:#a78bfa">15 minuti gratis</strong> — e se presenti un amico che acquista gettoni, vi regaliamo <strong style="color:#f59e0b">45 minuti extra</strong>.</p>
-    <div class="hero-btns">
-      <a href="#" class="hero-login-btn" id="heroLoginBtn" onclick="handleHeroLogin(event)">Crea account o accedi subito</a>
+<!-- ═══ PARALLAX SLIDER ═══ -->
+<style>
+/* ── Slider container ── */
+.hero-slider{position:relative;width:100%;height:100vh;height:100dvh;overflow:hidden;scroll-snap-align:start}
+.hero-slide{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;opacity:0;transform:scale(1.04);transition:opacity .7s cubic-bezier(.4,0,.2,1),transform .7s cubic-bezier(.4,0,.2,1);pointer-events:none}
+.hero-slide.active{opacity:1;transform:scale(1);pointer-events:auto;z-index:1}
+/* ── Parallax layers ── */
+.hero-slide .hs-bg{position:absolute;inset:0;transition:transform 1s cubic-bezier(.25,.1,.25,1)}
+.hero-slide .hs-orb{position:absolute;border-radius:50%;filter:blur(70px);opacity:.35;transition:transform 1.2s cubic-bezier(.25,.1,.25,1)}
+.hero-slide .hs-content{position:relative;z-index:2;text-align:center;max-width:680px;padding:0 24px;transition:transform .7s cubic-bezier(.25,.1,.25,1),opacity .5s}
+.hero-slide.active .hs-content{transform:translateY(0);opacity:1}
+.hero-slide:not(.active) .hs-content{transform:translateY(30px);opacity:0}
+/* ── Slide backgrounds ── */
+.hs-1 .hs-bg{background:radial-gradient(ellipse at 30% 50%,#1a1040 0%,transparent 60%),radial-gradient(ellipse at 70% 30%,#0a1a30 0%,transparent 50%),#0a0a1a}
+.hs-1 .hs-orb:nth-child(2){width:450px;height:450px;top:-12%;left:-8%;background:rgba(124,58,237,.25)}
+.hs-1 .hs-orb:nth-child(3){width:300px;height:300px;bottom:8%;right:-6%;background:rgba(59,130,246,.15)}
+.hs-2 .hs-bg{background:radial-gradient(ellipse at 70% 60%,#102040 0%,transparent 55%),radial-gradient(ellipse at 25% 20%,#1a0530 0%,transparent 45%),#0a0a1a}
+.hs-2 .hs-orb:nth-child(2){width:400px;height:400px;top:18%;right:-10%;background:rgba(6,182,212,.2)}
+.hs-2 .hs-orb:nth-child(3){width:280px;height:280px;bottom:-8%;left:4%;background:rgba(168,85,247,.15)}
+.hs-3 .hs-bg{background:radial-gradient(ellipse at 40% 40%,#0a3020 0%,transparent 50%),radial-gradient(ellipse at 60% 70%,#1a1030 0%,transparent 45%),#0a0a1a}
+.hs-3 .hs-orb:nth-child(2){width:360px;height:360px;top:-8%;left:12%;background:rgba(52,211,153,.18)}
+.hs-3 .hs-orb:nth-child(3){width:320px;height:320px;bottom:4%;right:8%;background:rgba(251,191,36,.12)}
+.hs-4 .hs-bg{background:radial-gradient(ellipse at 50% 35%,#1a0a30 0%,transparent 55%),radial-gradient(ellipse at 30% 65%,#0a1a30 0%,transparent 45%),#0a0a1a}
+.hs-4 .hs-orb:nth-child(2){width:440px;height:440px;bottom:-12%;left:-4%;background:rgba(236,72,153,.15)}
+.hs-4 .hs-orb:nth-child(3){width:260px;height:260px;top:4%;right:6%;background:rgba(99,102,241,.15)}
+[data-theme="light"] .hs-1 .hs-bg{background:radial-gradient(ellipse at 30% 50%,#ede4ff 0%,transparent 60%),radial-gradient(ellipse at 70% 30%,#e0f0ff 0%,transparent 50%),#f8f6ff}
+[data-theme="light"] .hs-2 .hs-bg{background:radial-gradient(ellipse at 70% 60%,#e0f0ff 0%,transparent 55%),radial-gradient(ellipse at 25% 20%,#f0eaff 0%,transparent 45%),#f8f6ff}
+[data-theme="light"] .hs-3 .hs-bg{background:radial-gradient(ellipse at 40% 40%,#e0f8ec 0%,transparent 50%),radial-gradient(ellipse at 60% 70%,#f0eaff 0%,transparent 45%),#f8f6ff}
+[data-theme="light"] .hs-4 .hs-bg{background:radial-gradient(ellipse at 50% 35%,#fce7f3 0%,transparent 55%),radial-gradient(ellipse at 30% 65%,#ede4ff 0%,transparent 45%),#f8f6ff}
+/* ── Typography ── */
+.hero-slide .hs-tag{display:inline-block;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.2em;color:var(--accent-purple);margin-bottom:16px;padding:4px 12px;border:1px solid rgba(167,139,250,.2);border-radius:100px}
+.hero-slide h2{font-size:clamp(34px,8vw,64px);font-weight:900;line-height:1.05;letter-spacing:-1.5px;color:#f1f5f9;margin-bottom:12px}
+[data-theme="light"] .hero-slide h2{color:#0f172a}
+.hero-slide h2 .hl{background:linear-gradient(135deg,var(--accent-purple),var(--accent-blue));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.hero-slide .hs-p{font-size:clamp(13px,1.8vw,16px);color:rgba(241,245,249,.55);max-width:440px;margin:0 auto 20px;line-height:1.6}
+[data-theme="light"] .hero-slide .hs-p{color:rgba(15,23,42,.55)}
+.hero-slide .hs-btns{display:flex;gap:10px;justify-content:center;flex-wrap:wrap}
+/* ── Bottom bar ── */
+.hs-bar{position:absolute;bottom:0;left:0;right:0;z-index:10;display:flex;align-items:center;justify-content:space-between;padding:20px 28px;padding-bottom:max(20px,env(safe-area-inset-bottom))}
+.hs-bar .hs-counter{font-size:11px;font-weight:600;color:var(--text-sec);letter-spacing:.08em;font-variant-numeric:tabular-nums}
+.hs-bar .hs-counter b{color:var(--text);font-size:16px;font-weight:800}
+.hs-bar .hs-dots{display:flex;gap:6px}
+.hs-bar .hs-dot{width:7px;height:7px;border-radius:50%;background:rgba(255,255,255,.12);cursor:pointer;transition:all .3s}
+.hs-bar .hs-dot.active{background:var(--accent-purple);box-shadow:0 0 8px rgba(167,139,250,.4);width:20px;border-radius:4px}
+.hs-bar .hs-arr{display:flex;gap:6px}
+.hs-bar .hs-arr button{width:36px;height:36px;border-radius:50%;border:1px solid rgba(255,255,255,.08);background:rgba(255,255,255,.02);color:var(--text-sec);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:14px;transition:all .2s;font-family:inherit}
+.hs-bar .hs-arr button:hover{border-color:rgba(255,255,255,.25);color:var(--text);background:rgba(255,255,255,.04)}
+/* ── Scroll hint ── */
+.hs-scroll-hint{position:absolute;bottom:90px;left:28px;z-index:10;display:flex;align-items:center;gap:6px;font-size:8px;font-weight:700;text-transform:uppercase;letter-spacing:.15em;color:var(--muted);transform:rotate(-90deg);transform-origin:left center;pointer-events:none}
+.hs-scroll-hint::after{content:'';width:30px;height:1px;background:rgba(255,255,255,.08)}
+@media(max-width:768px){.hs-bar{padding:14px 18px}.hs-scroll-hint{display:none}.hs-bar .hs-counter{font-size:10px}}
+</style>
+
+<div class="hero-slider" id="hero">
+  <!-- SLIDE 1: Captions -->
+  <div class="hero-slide hs-1 active" data-index="0">
+    <div class="hs-bg"></div><div class="hs-orb"></div><div class="hs-orb"></div>
+    <div class="hs-content">
+      <div class="hs-tag">Live Captions</div>
+      <h2>I tuoi sottotitoli<br>in <span class="hl">tempo reale</span></h2>
+      <p class="hs-p">Microfono, voce, sottotitoli. In 8 lingue. Accedi con Google — ricevi <strong style="color:var(--accent-purple)">15 minuti gratis</strong>.</p>
+      <div class="hs-btns">
+        <a href="#" class="hero-login-btn" id="heroLoginBtn" onclick="handleHeroLogin(event)">Crea account o accedi subito</a>
+        <a href="#sia" class="hero-scroll-btn">Scopri di più ↓</a>
+      </div>
     </div>
-    <p class="fine-print" style="margin-top:12px;font-size:11px;color:rgba(241,245,249,.35);position:relative;z-index:1">Creando un account accetti i <a href="https://github.com/buoninglese/sottotitoli/blob/main/PRIVACY.md" style="color:rgba(241,245,249,.35)">Termini</a> e la <a href="https://github.com/buoninglese/sottotitoli/blob/main/PRIVACY.md" style="color:rgba(241,245,249,.35)">Privacy</a>.</p>
   </div>
-  <a href="#sia" class="scroll-hint guest-only" id="heroScrollHint" aria-label="Scorri">
-    <span></span><span></span><span></span>
-  </a>
-</section>
+
+  <!-- SLIDE 2: Translation -->
+  <div class="hero-slide hs-2" data-index="1">
+    <div class="hs-bg"></div><div class="hs-orb"></div><div class="hs-orb"></div>
+    <div class="hs-content">
+      <div class="hs-tag">Live Translation</div>
+      <h2>Parla nella tua lingua,<br><span class="hl">leggi nella tua</span></h2>
+      <p class="hs-p">Traduzione simultanea in 8 lingue. Chi parla in una lingua, tu leggi nell'altra. Perfetto per call internazionali e lezioni.</p>
+      <div class="hs-btns">
+        <a href="studio.html" class="hero-login-btn" style="background:var(--accent-blue);box-shadow:0 4px 24px rgba(96,165,250,.3)">Prova Studio →</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- SLIDE 3: Learn -->
+  <div class="hero-slide hs-3" data-index="2">
+    <div class="hs-bg"></div><div class="hs-orb"></div><div class="hs-orb"></div>
+    <div class="hs-content">
+      <div class="hs-tag">Language Learning</div>
+      <h2>Impara parlando,<br><span class="hl">senza studiare</span></h2>
+      <p class="hs-p">Vocabolario CEFR, sfide di pronuncia e una battle royale per sfidare amici in tempo reale. Gara è il modo più divertente per migliorare.</p>
+      <div class="hs-btns">
+        <a href="gara.html" class="hero-login-btn" style="background:var(--accent-green);box-shadow:0 4px 24px rgba(52,211,153,.3);color:#000">⚡ Gioca a Gara</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- SLIDE 4: Studio -->
+  <div class="hero-slide hs-4" data-index="3">
+    <div class="hs-bg"></div><div class="hs-orb"></div><div class="hs-orb"></div>
+    <div class="hs-content">
+      <div class="hs-tag">Studio Dashboard</div>
+      <h2>Il tuo cockpit<br><span class="hl">per la voce</span></h2>
+      <p class="hs-p">Session analytics, report AI, speaker diarization. Misura, analizza e migliora ogni sessione di speaking.</p>
+      <div class="hs-btns">
+        <a href="app.html" class="hero-login-btn" style="background:var(--accent-purple);box-shadow:0 4px 24px rgba(167,139,250,.3)">Apri Dashboard →</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- Bottom bar -->
+  <div class="hs-bar">
+    <div class="hs-counter"><b id="hsCurrent">01</b> / 04</div>
+    <div class="hs-dots" id="hsDots"></div>
+    <div class="hs-arr">
+      <button id="hsPrev">←</button>
+      <button id="hsNext">→</button>
+    </div>
+  </div>
+  <div class="hs-scroll-hint">Scroll</div>
+</div>
+
+<script>
+(function(){
+  var slides=document.querySelectorAll('.hero-slide');
+  var dotsEl=document.getElementById('hsDots');
+  var curEl=document.getElementById('hsCurrent');
+  var prevBtn=document.getElementById('hsPrev');
+  var nextBtn=document.getElementById('hsNext');
+  var current=0,total=slides.length,transitioning=false,autoTimer,wheelTimer;
+  // Create dots
+  for(var i=0;i<total;i++){var d=document.createElement('div');d.className='hs-dot'+(i===0?' active':'');d.setAttribute('data-index',i);d.addEventListener('click',function(){goTo(parseInt(this.getAttribute('data-index')));resetAuto();});dotsEl.appendChild(d);}
+  function goTo(idx){
+    if(transitioning||idx===current||idx<0||idx>=total)return;transitioning=true;
+    slides[current].classList.remove('active');dotsEl.children[current].classList.remove('active');
+    current=idx;
+    slides[current].classList.add('active');dotsEl.children[current].classList.add('active');
+    curEl.textContent=String(current+1).padStart(2,'0');
+    setTimeout(function(){transitioning=false;},700);
+  }
+  function goNext(){goTo(current+1);}function goPrev(){goTo(current-1);}
+  function resetAuto(){clearInterval(autoTimer);autoTimer=setInterval(goNext,6000);}
+  prevBtn.addEventListener('click',function(){goPrev();resetAuto();});
+  nextBtn.addEventListener('click',function(){goNext();resetAuto();});
+  document.addEventListener('keydown',function(e){if(e.key==='ArrowRight'){goNext();resetAuto();}if(e.key==='ArrowLeft'){goPrev();resetAuto();}});
+  // Touch swipe — gentle, no snap-back
+  var tx=0;document.addEventListener('touchstart',function(e){tx=e.touches[0].clientX;});
+  document.addEventListener('touchend',function(e){var d=tx-e.changedTouches[0].clientX;if(Math.abs(d)>40){if(d>0)goNext();else goPrev();resetAuto();}});
+  // Mouse wheel — debounced, gentle
+  document.addEventListener('wheel',function(e){if(wheelTimer)return;wheelTimer=setTimeout(function(){wheelTimer=null;},800);if(e.deltaY>15)goNext();else if(e.deltaY<-15)goPrev();resetAuto();},{passive:true});
+  resetAuto();
+})();
+</script>
 
 <!-- ═══ 2. SIA IN + STEPS ═══ -->
 <section class="panel panel-alt" id="sia">
