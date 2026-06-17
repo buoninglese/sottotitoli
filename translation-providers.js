@@ -35,9 +35,7 @@
 
     const response = await fetch(`${base}?${params.toString()}`, {
       method: 'GET',
-      headers: {
-        'Accept': 'application/json'
-      }
+      headers: { 'Accept': 'application/json' }
     });
 
     if (!response.ok) {
@@ -58,23 +56,82 @@
     };
   }
 
+  async function translateWithGoogle(text, sourceLang, targetLang) {
+    const source = normalizeLangCode(sourceLang);
+    const target = normalizeLangCode(targetLang);
+
+    if (!text || !source || !target) {
+      throw new Error('Missing translation text or language codes.');
+    }
+
+    const url = 'https://translate.googleapis.com/translate_a/single?client=gtx&sl=' +
+      encodeURIComponent(source) + '&tl=' + encodeURIComponent(target) +
+      '&dt=t&q=' + encodeURIComponent(text);
+
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: { 'Accept': 'application/json' }
+    });
+
+    if (!response.ok) {
+      throw new Error(`Google Translate request failed with HTTP ${response.status}`);
+    }
+
+    const raw = await response.text();
+    // Response format: [[["translated text","original",...]],...]
+    const match = raw.match(/"([^"]+)"/);
+    if (!match) {
+      throw new Error('Could not parse Google Translate response.');
+    }
+
+    return {
+      provider: 'google',
+      translatedText: match[1],
+      raw: raw
+    };
+  }
+
+  async function translateWithFallback(text, sourceLang, targetLang, config) {
+    // Try Google first (better quality for European languages), fall back to MyMemory
+    try {
+      return await translateWithGoogle(text, sourceLang, targetLang);
+    } catch (googleErr) {
+      console.warn('Google Translate failed, trying MyMemory:', googleErr.message);
+      try {
+        return await translateWithMyMemory(text, sourceLang, targetLang, {
+          baseUrl: config && config.myMemoryBase
+        });
+      } catch (myMemoryErr) {
+        throw new Error('All translation providers failed. Google: ' + googleErr.message + ' | MyMemory: ' + myMemoryErr.message);
+      }
+    }
+  }
+
   function resolveConfig() {
     const root = global.SOTTOTITOLI_CONFIG || {};
     const translation = root.translation || {};
 
     return {
-      provider: translation.provider || 'mymemory',
+      provider: translation.provider || 'google',  // default to Google
       myMemoryBase: translation.myMemoryBase || 'https://api.mymemory.translated.net/get'
     };
   }
 
   async function translateText(config, text, sourceLang, targetLang) {
-    const provider = (config && config.provider) || 'mymemory';
+    const provider = (config && config.provider) || 'google';
+
+    if (provider === 'google') {
+      return translateWithGoogle(text, sourceLang, targetLang);
+    }
 
     if (provider === 'mymemory') {
       return translateWithMyMemory(text, sourceLang, targetLang, {
-        baseUrl: config.myMemoryBase
+        baseUrl: config && config.myMemoryBase
       });
+    }
+
+    if (provider === 'fallback' || provider === 'auto') {
+      return translateWithFallback(text, sourceLang, targetLang, config);
     }
 
     throw new Error(`Unsupported provider: ${provider}`);
@@ -83,6 +140,9 @@
   global.SottotitoliTranslationProviders = {
     resolveConfig,
     normalizeLangCode,
-    translateText
+    translateText,
+    translateWithFallback,
+    translateWithGoogle,
+    translateWithMyMemory
   };
 })(window);
