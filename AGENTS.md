@@ -35,11 +35,10 @@ Sottotitoli is a **real-time AI captioning + translation web app**, user-facing 
 | `index.html` | Landing page | Parallax slider (4 slides), diagonal wipe transitions, pricing, testimonials. The slider is custom JS/CSS — fragile, don't rewrite it. |
 | `studio.html` | Workspace selector | Horizontal scroll panels for caption/translate modes. Login redirect target. |
 | `app.html` | Main cockpit/dashboard | **The biggest page (114KB).** Live transcription room, vocabulary bubbles, metrics, AI reports. The "control room." |
-| `account.html` | User profile + "Il tuo viaggio" | Per-language progress dashboard. Settings persistence issues (see Known Issues). |
-| `analysis.html` | Session analysis | Session history cards, AI reports, expandable cards. |
+| `account.html` | User profile + "Il tuo viaggio" + goals/preferences | Settings persistence issues (see Known Issues). |
+| `analysis.html` | Session analysis | Session history cards, AI reports, expandable cards, performance dashboard, NGSL mastery, favorite sessions, viaggio. |
 | `wallet.html` | Credits & transactions | Voice Credits (VC) balance, token ledger, vouchers. |
 | `gara.html` | Multiplayer language game | Supabase Realtime. Connection/sync bugs (see Known Issues). |
-| `goals.html` | Learning goal settings | Settings not always persisting. |
 | `overlay.html` / `overlay-roll.html` / `overlay-cinema.html` | Caption display overlays | Different visual styles for captions. Used as pop-out windows. |
 
 ### JavaScript Files
@@ -240,7 +239,7 @@ window.SOTTOTITOLI_CONFIG = {
 | Issue | Location | Status |
 |-------|----------|--------|
 | Session duration shows 0s after recording | `app.html` | Unresolved |
-| Account settings not persisting | `goals.html` | Unresolved |
+| Account settings not persisting | `account.html` | Unresolved |
 | Hamburger menu links broken (Wallet, Impostazioni, Esci) | Some pages | Unresolved |
 | "Pronto a cominciare" box has closeable X that shouldn't be there | `studio.html` | Unresolved |
 | Gara multiplayer: mic stops after 2 sentences, connection/sync bugs | `gara.html` | Unresolved |
