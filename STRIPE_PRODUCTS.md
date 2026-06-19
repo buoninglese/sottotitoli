@@ -68,7 +68,7 @@ DEPLOY COMMANDS:
 
 
 HOW IT WORKS:
-  1. User clicks "Acquista" on studio.html
+  1. User clicks "Acquista" on start.html
   2. stripe.js → calls create-checkout-session edge function
   3. Edge function → creates Stripe Checkout Session → returns URL
   4. User pays on Stripe's hosted page

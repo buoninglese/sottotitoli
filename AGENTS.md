@@ -34,7 +34,7 @@ Sottotitoli is a **real-time AI captioning + translation web app**, user-facing 
 |------|---------|-----------|
 | `index.html` | Landing page | Parallax slider (4 slides), diagonal wipe transitions, pricing, testimonials. The slider is custom JS/CSS — fragile, don't rewrite it. |
 | `studio.html` | Workspace selector | Horizontal scroll panels for caption/translate modes. Login redirect target. |
-| `app.html` | Main cockpit/dashboard | **The biggest page (114KB).** Live transcription room, vocabulary bubbles, metrics, AI reports. The "control room." |
+| `studio.html` | Main cockpit/dashboard | **The biggest page (114KB).** Live transcription room, vocabulary bubbles, metrics, AI reports. The "control room." |
 | `account.html` | User profile + "Il tuo viaggio" + goals/preferences | Settings persistence issues (see Known Issues). |
 | `analysis.html` | Session analysis | Session history cards, AI reports, expandable cards, performance dashboard, NGSL mastery, favorite sessions, viaggio. |
 | `wallet.html` | Credits & transactions | Voice Credits (VC) balance, token ledger, vouchers. |
@@ -125,7 +125,7 @@ Theme is toggled via `js/theme.js` which:
 }
 ```
 
-**If you add a new page, follow this pattern.** Copy the `:root`/`[data-theme="dark"]` block from `studio.html` or `app.html` as a starting point.
+**If you add a new page, follow this pattern.** Copy the `:root`/`[data-theme="dark"]` block from `studio.html` or `studio.html` as a starting point.
 
 ### Font
 
@@ -238,15 +238,15 @@ window.SOTTOTITOLI_CONFIG = {
 
 | Issue | Location | Status |
 |-------|----------|--------|
-| Session duration shows 0s after recording | `app.html` | Unresolved |
+| Session duration shows 0s after recording | `studio.html` | Unresolved |
 | Account settings not persisting | `account.html` | Unresolved |
 | Hamburger menu links broken (Wallet, Impostazioni, Esci) | Some pages | Unresolved |
 | "Pronto a cominciare" box has closeable X that shouldn't be there | `studio.html` | Unresolved |
 | Gara multiplayer: mic stops after 2 sentences, connection/sync bugs | `gara.html` | Unresolved |
 | AI report generation: constraint violations in `ai_report_requests` | Supabase | Unresolved |
 | Translation duplicate outputs bug | `translation-providers.js` | Intermittent |
-| NGSL coverage metric calculation questionable | `app.html` | Needs verification |
-| Day/night mode doesn't work on `app.html` | `app.html` | Possibly fixed, verify |
+| NGSL coverage metric calculation questionable | `studio.html` | Needs verification |
+| Day/night mode doesn't work on `studio.html` | `studio.html` | Possibly fixed, verify |
 | Index slider: occasional visual glitch blocks on backgrounds | `index.html` | Mostly fixed |
 
 ## 9. User Design Preferences

@@ -1,453 +1,1901 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="it">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title>Sottotitoli · Studio</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,400;14..32,500;14..32,600;14..32,700;14..32,800;14..32,900&display=swap" rel="stylesheet">
+  <meta charset="utf-8" />
+  <title>Sottotitoli · Cockpit</title>
+  <meta name="description" content="Sottotitoli Studio: avvia il microfono e ottieni sottotitoli in tempo reale con metriche live. 8 lingue, gratis.">
+  <meta name="robots" content="noindex, follow">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,400;14..32,500;14..32,600;14..32,700;14..32,800;14..32,900&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" crossorigin="anonymous" referrerpolicy="no-referrer">
-  <link rel="stylesheet" href="css/theme.css?v=2">
-  <style>
-    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+  <link rel="icon" type="image/png" href="img/favicon.png" />
+  <link rel="stylesheet" href="css/normalize.css" />
+  <link rel="stylesheet" href="css/theme.css?v=2" />
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root {
+  --bg: #f0f2f5; --bg2: #e4e7ec; --card: #ffffff; --card2: #f8f9fb;
+  --line: #e2e5ea; --text: #111827; --muted: #6b7280; --muted2: #9ca3af;
+  --accent: #2563eb; --accent2: #3b82f6; --good: #16a34a; --warn: #d97706;
+  --danger: #dc2626; --glow: rgba(37,99,235,.08);
+  --gauge-bg: #e5e7eb; --panel-bg: #f9fafb;
+}
+[data-theme="dark"] {
+  --bg: #060b14; --bg2: #0c1424; --card: rgba(12, 22, 42, 0.95); --card2: rgba(16, 28, 52, 0.8);
+  --line: rgba(96,165,250,.14); --text: #e2e8f0; --muted: #94a3b8; --muted2: #64748b;
+  --accent: #3b82f6; --accent2: #60a5fa; --good: #22c55e; --warn: #f59e0b;
+  --danger: #ef4444; --glow: rgba(59,130,246,.12);
+  --gauge-bg: rgba(148,163,184,.12); --panel-bg: rgba(15,23,42,.6);
+}
+body {
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  background: var(--bg);
+  color: var(--text); height: 100vh; overflow: hidden;
+  -webkit-font-smoothing: antialiased;
+  transition: background .35s, color .35s;
+}
 
-    :root {
-      --bg:#f7f8fa;--bg-card:#fff;--bg-btn-subtle:#f3f4f6;--bg-btn-hover:#e5e7eb;
-      --text-primary:#111827;--text-secondary:#6b7280;--text-muted:#9ca3af;--text-nav:#4b5563;
-      --border:#e5e7eb;--border-btn:#e5e7eb;--bg-lang-btn:#f9fafb;
-      --shadow-card:0 4px 14px rgba(0,0,0,0.04);
-      --accent-purple:#7c3aed;--accent-green:#059669;--accent-blue:#2563eb;--accent-amber:#d97706;
-    }
-    [data-theme="dark"] {
-      --bg:#0f1117;--bg-card:#1a1d26;--bg-btn-subtle:#252830;--bg-btn-hover:#2f333e;
-      --text-primary:#e8eaed;--text-secondary:#9ca3af;--text-muted:#6b7280;--text-nav:#9ca3af;
-      --border:#2f333e;--border-btn:#2f333e;--bg-lang-btn:#1a1d26;
-      --shadow-card:0 4px 14px rgba(0,0,0,0.25);
-      --accent-purple:#a78bfa;--accent-green:#34d399;--accent-blue:#60a5fa;--accent-amber:#fbbf24;
-    }
+/* ── Status strip ── */
+.status-strip { display: flex; gap: 10px; margin-bottom: 16px; flex-wrap: wrap; justify-content: center; }
+.s-pill { display: flex; align-items: center; gap: 6px; padding: 6px 14px; border-radius: 100px; font-size: 11px; font-weight: 500; background: var(--card); border: 1px solid var(--line); white-space: nowrap; }
+.s-pill .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--muted2); flex-shrink: 0; }
+.s-pill .dot.live { background: var(--good); box-shadow: 0 0 6px var(--good); }
+.s-pill .dot.warn { background: var(--warn); }
+.s-pill .dot.idle { background: var(--muted2); }
+.overlay-url { font-family: 'SF Mono', ui-monospace, monospace; font-size: 10px; color: var(--muted); max-width: 280px; overflow: hidden; text-overflow: ellipsis; }
 
-    body {
-      font-family:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;
-      background:var(--bg);color:var(--text-primary);
-      line-height:1.6;-webkit-font-smoothing:antialiased;
-      transition:background .25s,color .25s;
-    }
-    body.snap-body{overflow:hidden;height:100vh}
+/* ── Left panel: Live metrics ── */
+.metrics-panel { display: flex; flex-direction: column; gap: 10px; }
+.m-card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 14px; }
+.m-card .m-title { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .14em; color: var(--muted2); margin-bottom: 8px; }
+.cefr-help { display:inline-flex; align-items:center; justify-content:center; width:16px; height:16px; border-radius:50%; background:var(--gauge-bg); color:var(--muted2); font-size:10px; cursor:help; margin-left:4px; font-weight:700 }
+.metric-row { display: flex; justify-content: space-between; align-items: baseline; padding: 5px 0; border-bottom: 1px solid var(--line); }
+.metric-row:last-child { border-bottom: none; }
+.metric-row .m-label { font-size: 12px; color: var(--muted); }
+.metric-row .m-value { font-size: 18px; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--text); }
+.metric-row .m-value.small { font-size: 14px; }
+.gauge-wrap { position: relative; width: 100px; height: 50px; margin: 0 auto 8px; overflow: hidden; }
+.gauge-bg { position: absolute; bottom: 0; left: 0; right: 0; height: 100px; border-radius: 100px 100px 0 0; background: var(--gauge-bg); }
+.gauge-fill { position: absolute; bottom: 0; left: 0; right: 0; border-radius: 100px 100px 0 0; transition: height .6s ease; }
+.gauge-center { text-align: center; margin-top: -4px; }
+.gauge-value { font-size: 28px; font-weight: 800; letter-spacing: -1px; line-height: 1; }
+.gauge-label { font-size: 9px; text-transform: uppercase; letter-spacing: .1em; color: var(--muted2); }
 
-    #authSection .btn{background:none;border:1.5px solid var(--border);border-radius:100px;padding:6px 14px;font-size:12px;font-weight:500;color:var(--text-nav);cursor:pointer;font-family:inherit;display:flex;align-items:center;gap:6px;transition:all .15s}
-    #authSection .btn:hover{background:var(--bg-btn-subtle);color:var(--text-primary);border-color:var(--accent-purple)}
+/* ── Center panel: Live caption window ── */
+.center-panel { display: flex; flex-direction: column; gap: 10px; }
+.caption-window { background: var(--panel-bg); border: 2px solid var(--line); border-radius: 18px; padding: 20px 24px; min-height: 160px; display: flex; flex-direction: column; }
+.caption-interim { font-size: 28px; font-weight: 500; line-height: 1.4; color: var(--accent2); min-height: 40px; word-break: break-word; transition: opacity .2s; }
+.caption-interim:empty::after { content: 'Parla per vedere i sottotitoli…'; color: var(--muted2); font-size: 16px; font-style: italic; }
+.caption-transcript { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--line); font-size: 15px; line-height: 1.7; color: var(--text); max-height: 200px; overflow-y: auto; }
+.caption-transcript .line { padding: 4px 0; border-bottom: 1px solid rgba(128,128,128,.06); }
+.translated-window { background: var(--panel-bg); border: 1px solid var(--line); border-radius: 14px; padding: 14px 18px; min-height: 60px; font-size: 15px; color: var(--muted); display: none; }
+.translated-window .t-label { font-size: 9px; text-transform: uppercase; letter-spacing: .12em; color: var(--accent2); margin-bottom: 6px; font-weight: 700; }
+.translated-window .line { padding: 3px 0; border-bottom: 1px solid rgba(128,128,128,.04); }
 
-    .main-scroll{background:transparent}
-    .panel{background:transparent}.panel-alt{background:transparent}
-    .topbar.scrolled{background:linear-gradient(to bottom,rgba(10,14,26,.95) 0%,rgba(10,14,26,.5) 70%,transparent 100%);border-bottom:none;backdrop-filter:blur(10px)}
-    [data-theme="light"] .topbar.scrolled{background:linear-gradient(to bottom,rgba(245,243,240,.95) 0%,rgba(245,243,240,.5) 70%,transparent 100%)}
+/* ── Right panel: Vocab & actions ── */
+.side-panel { display: flex; flex-direction: column; gap: 10px; }
+.verb-list { max-height: 160px; overflow-y: auto; }
+.verb-chip { display: inline-block; padding: 3px 10px; border-radius: 100px; font-size: 11px; font-weight: 500; margin: 2px 3px 2px 0; background: var(--accent); color: #fff; opacity: .85; }
+.verb-chip.noun { background: var(--good); }
+.verb-chip.adj { background: var(--warn); }
+.verb-chip.adv { background: #7c3aed; }
+.verb-chip.other { background: var(--muted2); }
+.meter-bar { height: 4px; border-radius: 2px; background: var(--gauge-bg); margin-top: 2px; overflow: hidden; }
+.meter-fill { height: 100%; border-radius: 2px; transition: width .4s; }
 
-    /* ═══ Hero slider (1 slide — identical to index) ═══ */
-    .hero-slider{position:fixed;inset:0;overflow:hidden}
-    .hero-slide{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none;opacity:1!important;z-index:1;transform:none!important;transition:clip-path 0s}
-    .hero-slide.active{z-index:1;pointer-events:auto}
-    .hero-slide .hs-content{opacity:1;transform:translateY(0) scale(1);position:relative;z-index:2;text-align:center;max-width:680px;padding:0 24px;display:flex;flex-direction:column;align-items:center;gap:0}
-    .hero-slide .hs-content>*{flex-shrink:0}
-    .hero-slide .hs-bg{position:absolute;inset:0}
-    .hero-slide .hs-orb{position:absolute;border-radius:50%;filter:blur(100px);opacity:.4;pointer-events:none;transform-origin:center center}
+/* ── Buttons row ── */
+.action-row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
 
-    .hs-1 .hs-bg{background:radial-gradient(circle at 30% 50%,rgba(237,228,255,.15),transparent 50%),radial-gradient(circle at 70% 20%,rgba(224,240,255,.1),transparent 40%),radial-gradient(circle at 50% 80%,rgba(240,234,255,.1),transparent 50%),#0a0a30}
-    .hs-1 .hs-orb:nth-child(2){width:500px;height:500px;top:-12%;left:-10%;background:rgba(139,92,246,.3)}
-    .hs-1 .hs-orb:nth-child(3){width:380px;height:380px;bottom:-6%;right:-6%;background:rgba(59,130,246,.22)}
+/* ── Prominent session buttons ── */
+.start-btn, .stop-btn {
+  font-family: inherit; font-size: 15px; font-weight: 700; padding: 14px 32px;
+  border-radius: 14px; border: none; cursor: pointer; transition: all .2s;
+  display: inline-flex; align-items: center; gap: 8px; letter-spacing: -.2px;
+}
+.start-btn { background: var(--good); color: #fff; box-shadow: 0 4px 14px rgba(22,163,74,.35); }
+.start-btn:hover { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(22,163,74,.45); }
+.start-btn:disabled { background: var(--gauge-bg); color: var(--muted2); box-shadow: none; cursor: not-allowed; transform: none; }
+.stop-btn { background: var(--danger); color: #fff; box-shadow: 0 4px 14px rgba(220,38,38,.35); }
+.stop-btn:hover { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(220,38,38,.45); }
+.stop-btn:disabled { background: var(--gauge-bg); color: var(--muted2); box-shadow: none; cursor: not-allowed; transform: none; }
+/* ── Session button states (used by app.js) ── */
+#startBtn.recording {
+  background-image: linear-gradient(to right, #7c3aed 0%, #a78bfa 51%, #7c3aed 100%) !important;
+  box-shadow: 0 0 0 0 rgba(124,58,237,.4) !important;
+  animation: pulse-rec 1.8s ease-in-out infinite;
+}
+@keyframes pulse-rec { 0%,100% { box-shadow: 0 0 0 0 rgba(124,58,237,.4); } 50% { box-shadow: 0 0 0 14px rgba(124,58,237,0); } }
+#startBtn:disabled { background-image: linear-gradient(to right, #6b7280 0%, #9ca3af 51%, #6b7280 100%) !important; box-shadow: none !important; cursor: not-allowed; transform: none; animation: none; }
+#stopBtn:disabled { background-image: linear-gradient(to right, #6b7280 0%, #9ca3af 51%, #6b7280 100%) !important; box-shadow: none !important; cursor: not-allowed; transform: none; animation: none; }
 
-    [data-theme="light"] .hs-1 .hs-bg{background:radial-gradient(circle at 30% 50%,#ede4ff,transparent 50%),radial-gradient(circle at 70% 20%,#e0f0ff,transparent 40%),radial-gradient(circle at 50% 80%,#f0eaff,transparent 50%),#f8f6ff}
-    [data-theme="light"] .hs-1 .hs-bg::after{background-image:radial-gradient(rgba(139,92,246,.06) 1px,transparent 1px)}
-    [data-theme="light"] .hs-1 .hs-orb:nth-child(2){background:rgba(139,92,246,.15)}
-    [data-theme="light"] .hs-1 .hs-orb:nth-child(3){background:rgba(59,130,246,.1)}
+/* ── Status dots (used by app.js) ── */
+#micDot.connected, #socketDot.connected { background: var(--good); box-shadow: 0 0 6px var(--good); }
+#micDot.warn, #socketDot.warn { background: var(--warn); }
+#micDot.idle, #socketDot.idle { background: var(--muted2); }
 
-    .hero-slide .hs-tag{display:inline-block;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.2em;color:var(--accent-purple);margin-bottom:16px;padding:4px 12px;border:1px solid rgba(167,139,250,.25);border-radius:100px;backdrop-filter:blur(4px)}
-    .hero-slide h2{font-size:clamp(34px,8vw,64px);font-weight:900;line-height:1.05;letter-spacing:-1.5px;color:#f1f5f9;margin-bottom:12px;text-shadow:0 2px 12px rgba(0,0,0,.25),0 0 40px rgba(167,139,250,.08)}
-    [data-theme="light"] .hero-slide h2{color:#0f172a;text-shadow:0 2px 12px rgba(0,0,0,.06),0 0 40px rgba(139,92,246,.04)}
-    .hero-slide h2 em{color:#a78bfa!important;font-style:normal}
-    .hero-slide .hs-p{font-size:clamp(13px,1.8vw,16px);color:rgba(241,245,249,.55);max-width:440px;margin:0 auto 20px;line-height:1.6}
-    [data-theme="light"] .hero-slide .hs-p{color:rgba(15,23,42,.55)}
-    .hs-btns{display:flex;gap:14px;justify-content:center;flex-wrap:wrap;margin-top:24px;position:relative;z-index:5}
-    @media(max-width:420px){.hs-btns{gap:10px}}
-    .hs-btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:16px 38px;border-radius:60px;font-weight:700;font-size:15px;text-decoration:none;cursor:pointer;border:none;font-family:inherit;transition:all .35s cubic-bezier(.4,0,.2,1);position:relative;overflow:hidden}
-    .hs-btn-primary{background:linear-gradient(135deg,#7c3aed,#6366f1);color:#fff;box-shadow:0 4px 24px rgba(124,58,237,.3)}
-    .hs-btn-primary::after{content:'';position:absolute;top:0;left:-100%;width:100%;height:100%;background:linear-gradient(90deg,transparent,rgba(255,255,255,.12),transparent);transition:left .6s}
-    .hs-btn-primary:hover{transform:translateY(-2px);box-shadow:0 8px 36px rgba(124,58,237,.45)}
-    .hs-btn-primary:hover::after{left:100%}
-    @media(max-width:420px){.hs-btn{padding:14px 24px;font-size:14px;width:100%}}
-    .cta-btn{display:inline-flex;align-items:center;gap:8px;padding:16px 40px;border-radius:100px;font-weight:700;font-size:16px;text-decoration:none;cursor:pointer;border:none;font-family:inherit;transition:all .3s cubic-bezier(.4,0,.2,1);background:var(--accent-purple);color:#fff;box-shadow:0 4px 24px rgba(124,58,237,.35)}
-    .cta-btn:hover{transform:translateY(-3px);box-shadow:0 12px 40px rgba(124,58,237,.55)}
+/* ── Transcript lines ── */
+#captionTranscript .line { padding: 5px 0; border-bottom: 1px solid rgba(128,128,128,.06); font-size: 15px; line-height: 1.7; }
 
-    /* ═══ Immersive Studio (post-login) ═══ */
-    #studioContent {
-      position:fixed;inset:0;z-index:100;
-      display:none;overflow-y:auto;overflow-x:hidden;
-      background:#080614;
-    }
-    #studioContent::before {
-      content:'';position:fixed;inset:0;z-index:0;pointer-events:none;
-      background-image:radial-gradient(rgba(255,255,255,.02) 1px,transparent 1px);
-      background-size:28px 28px;
-      mask-image:radial-gradient(ellipse at 50% 50%,#000 30%,transparent 70%);
-    }
-    #studioContent::after {
-      content:'';position:fixed;inset:0;z-index:0;pointer-events:none;
-      background:radial-gradient(ellipse at 50% 40%,rgba(139,92,246,.1) 0%,transparent 60%);
-    }
-    [data-theme="light"] #studioContent{background:#faf8ff}
-    [data-theme="light"] #studioContent::before{background-image:radial-gradient(rgba(139,92,246,.04) 1px,transparent 1px)}
-    [data-theme="light"] #studioContent::after{background:radial-gradient(ellipse at 50% 40%,rgba(139,92,246,.06) 0%,transparent 60%)}
+/* ── Session complete visibility ── */
+#sessionComplete.visible { display: block; }
+#creditWarn.visible { display: flex; align-items: center; gap: 8px; justify-content: center; }
+#onboardHint.hidden { display: none; }
 
-    .studio-workspace {
-      min-height:100vh;min-height:100dvh;
-      display:flex;align-items:center;justify-content:center;
-      padding:40px 32px;position:relative;z-index:1;
-    }
-    @media(max-width:860px){.studio-workspace{padding:24px 16px;align-items:flex-start}}
-    @media(max-width:480px){.studio-workspace{padding:16px 12px}}
+/* ── Session complete panel ── */
+.session-complete { display: none; background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 24px; margin-top: 16px; animation: fadeIn .35s; }
+.session-complete.visible { display: block; }
+@keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+.session-complete h3 { font-size: 20px; font-weight: 700; margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
+.session-complete .summary-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 10px; margin-bottom: 20px; }
+@media(max-width:600px){ .session-complete .summary-grid { grid-template-columns: repeat(2,1fr); } }
+.session-complete .sum-item { background: var(--bg2); border-radius: 10px; padding: 12px; text-align: center; }
+.session-complete .sum-item .sv { font-size: 24px; font-weight: 800; letter-spacing: -.5px; }
+.session-complete .sum-item .sl { font-size: 11px; color: var(--muted2); text-transform: uppercase; letter-spacing: .08em; margin-top: 2px; }
+.report-buy-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 10px; margin-bottom: 16px; }
+@media(max-width:700px){ .report-buy-grid { grid-template-columns: repeat(2,1fr); } }
+.report-buy-btn { font-family: inherit; font-size: 13px; font-weight: 600; padding: 14px 12px; border-radius: 12px; border: 1px solid var(--line); background: var(--card); color: var(--text); cursor: pointer; transition: all .15s; text-align: center; display: flex; flex-direction: column; align-items: center; gap: 6px; }
+.report-buy-btn:hover { border-color: var(--accent); background: var(--glow); }
+.report-buy-btn .rb-icon { font-size: 24px; }
+.report-buy-btn .rb-name { font-size: 12px; font-weight: 700; }
+.report-buy-btn .rb-cost { font-size: 11px; color: var(--muted2); }
+.report-buy-btn:disabled { opacity: .4; cursor: not-allowed; }
+.new-session-row { display: flex; gap: 10px; align-items: center; justify-content: center; padding-top: 16px; border-top: 1px solid var(--line); }
+.new-session-btn { font-family: inherit; font-size: 14px; font-weight: 600; padding: 12px 28px; border-radius: 100px; border: 1px solid var(--line); background: var(--card); color: var(--text); cursor: pointer; transition: all .15s; }
+.new-session-btn:hover { border-color: var(--accent); color: var(--accent); }
+.credit-warn { background: rgba(217,119,6,.1); border: 1px solid rgba(217,119,6,.3); border-radius: 10px; padding: 10px 16px; margin-bottom: 12px; font-size: 13px; color: var(--amber); display: none; }
+.credit-warn.visible { display: flex; align-items: center; gap: 8px; }
+.credit-warn a { color: var(--amber); font-weight: 600; }
 
-    .sw-split{display:grid;grid-template-columns:1fr 1fr;width:100%;max-width:1100px;gap:0;border-radius:28px;overflow:hidden;background:rgba(255,255,255,.015);border:1px solid rgba(255,255,255,.04);backdrop-filter:blur(20px);box-shadow:0 40px 120px rgba(0,0,0,.4)}
-    @media(max-width:860px){.sw-split{grid-template-columns:1fr;max-width:520px;border-radius:22px}}
-    @media(max-width:480px){.sw-split{border-radius:18px}}
-    [data-theme="light"] .sw-split{background:rgba(255,255,255,.45);border-color:rgba(0,0,0,.04);box-shadow:0 40px 120px rgba(0,0,0,.05)}
+/* ── Onboarding hint ── */
+.onboard-hint {
+  background: linear-gradient(135deg, rgba(124,58,237,.06), rgba(37,99,235,.06));
+  border: 1px solid rgba(124,58,237,.15); border-radius: 14px;
+  padding: 20px 24px; margin-bottom: 14px; text-align: center;
+  font-size: 14px; color: var(--text); transition: opacity .3s;
+}
+.onboard-hint.hidden { display: none; }
 
-    .sw-half{padding:52px 44px 44px;display:flex;flex-direction:column;align-items:center;text-align:center;position:relative;transition:all .5s cubic-bezier(.4,0,.2,1)}
-    @media(max-width:860px){.sw-half{padding:36px 28px 32px}}
-    @media(max-width:480px){.sw-half{padding:28px 20px 24px}}
-    .sw-half.caption{background:rgba(5,150,105,.025);border-right:1px solid rgba(255,255,255,.04)}
-    .sw-half.translate{background:rgba(37,99,235,.025)}
-    @media(max-width:860px){.sw-half.caption{border-right:none;border-bottom:1px solid rgba(255,255,255,.04)}}
-    [data-theme="light"] .sw-half.caption{background:rgba(5,150,105,.012);border-color:rgba(0,0,0,.04)}
-    [data-theme="light"] .sw-half.translate{background:rgba(37,99,235,.012)}
+/* ═══════════════════════════════════════════════════════════════
+   MOBILE LAYOUT — Responsive redesign
+   Organized by section for easy maintenance.
+   Breakpoints: ≤768px (tablet/phone), ≤480px (small phone)
+   ═══════════════════════════════════════════════════════════════ */
 
-    /* Hover: highlight the hovered half, dim the other */
-    .sw-split:hover .sw-half{opacity:.65;transition:all .5s cubic-bezier(.4,0,.2,1)}
-    .sw-split .sw-half:hover{opacity:1;transform:scale(1.015)}
-    .sw-half.caption:hover{background:rgba(5,150,105,.1);box-shadow:inset 0 0 100px rgba(5,150,105,.08),0 0 60px rgba(5,150,105,.1)}
-    .sw-half.translate:hover{background:rgba(37,99,235,.1);box-shadow:inset 0 0 100px rgba(37,99,235,.08),0 0 60px rgba(37,99,235,.1)}
-    [data-theme="light"] .sw-half.caption:hover{background:rgba(5,150,105,.06);box-shadow:inset 0 0 100px rgba(5,150,105,.04),0 0 60px rgba(5,150,105,.05)}
-    [data-theme="light"] .sw-half.translate:hover{background:rgba(37,99,235,.06);box-shadow:inset 0 0 100px rgba(37,99,235,.04),0 0 60px rgba(37,99,235,.05)}
-    @media(max-width:860px){.sw-split .sw-half:hover{transform:none}}
+@media (max-width: 768px) {
 
-    .sw-half-icon{font-size:24px;margin-bottom:20px;width:44px;height:44px;border-radius:12px;display:flex;align-items:center;justify-content:center;transition:all .4s}
-    .sw-half:hover .sw-half-icon{transform:scale(1.1)}
-    .sw-half.caption .sw-half-icon{background:rgba(5,150,105,.12);color:var(--accent-green)}
-    .sw-half.translate .sw-half-icon{background:rgba(37,99,235,.12);color:var(--accent-blue)}
-    .sw-half:hover .sw-half-icon.caption,.sw-half.caption:hover .sw-half-icon{box-shadow:0 0 30px rgba(5,150,105,.25)}
-    .sw-half:hover .sw-half-icon.translate,.sw-half.translate:hover .sw-half-icon{box-shadow:0 0 30px rgba(37,99,235,.25)}
-    .sw-half-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.14em;margin-bottom:10px}
-    .sw-half.caption .sw-half-label{color:var(--accent-green)}
-    .sw-half.translate .sw-half-label{color:var(--accent-blue)}
-    .sw-half h3{font-size:clamp(22px,3vw,28px);font-weight:800;line-height:1.12;letter-spacing:-1px;margin-bottom:6px;color:#f1f5f9}
-    [data-theme="light"] .sw-half h3{color:#0f172a}
-    .sw-half h3 .hl{background:linear-gradient(135deg,var(--accent-purple),var(--accent-blue));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
-    .sw-half-desc{font-size:12px;color:rgba(241,245,249,.4);line-height:1.5;margin-bottom:24px}
-    [data-theme="light"] .sw-half-desc{color:rgba(15,23,42,.45)}
+  /* ── Panels: stack vertically instead of horizontal scroll ── */
+  .h-scroll {
+    scroll-snap-type: none;
+    overflow-x: hidden;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+  }
+  .h-panel {
+    min-width: 100%;
+    width: 100%;
+    height: auto;
+    min-height: auto;
+    scroll-snap-align: none;
+    flex-shrink: 0;
+  }
+  /* Hide overlay slides on mobile — no use case */
+  #overlayRollPanel, #overlayPanel {
+    display: none !important;
+  }
+  /* Hide nav arrows */
+  .h-nav-arrow { display: none !important; }
+  .h-dots { display: none !important; }
 
-    .sw-chips{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:16px;justify-content:center}
-    .sw-chip{display:inline-flex;align-items:center;gap:5px;padding:7px 13px;background:rgba(255,255,255,.025);border:1px solid rgba(255,255,255,.04);border-radius:8px;font-size:12px;font-weight:500;color:#cbd5e1;text-decoration:none;cursor:pointer;font-family:inherit;transition:all .25s;animation:chipIn .4s ease-out backwards}
-    .sw-chip:nth-child(1){animation-delay:.05s}.sw-chip:nth-child(2){animation-delay:.1s}.sw-chip:nth-child(3){animation-delay:.15s}.sw-chip:nth-child(4){animation-delay:.2s}.sw-chip:nth-child(5){animation-delay:.25s}.sw-chip:nth-child(6){animation-delay:.3s}.sw-chip:nth-child(7){animation-delay:.35s}.sw-chip:nth-child(8){animation-delay:.4s}
-    @keyframes chipIn{from{opacity:0;transform:translateY(8px) scale(.9)}to{opacity:1;transform:translateY(0) scale(1)}}
-    .sw-chip:hover{background:rgba(255,255,255,.06);border-color:rgba(5,150,105,.25);color:#fff;transform:translateY(-2px)}
-    .sw-chip.active{background:rgba(5,150,105,.15);border-color:var(--accent-green);color:var(--accent-green);font-weight:600;box-shadow:0 0 0 2px rgba(5,150,105,.15)}
-    [data-theme="light"] .sw-chip{background:rgba(0,0,0,.015);border-color:rgba(0,0,0,.04);color:#475569}
-    [data-theme="light"] .sw-chip:hover{background:rgba(5,150,105,.04);border-color:rgba(5,150,105,.2);color:#0f172a}
+  /* ── Panel padding: compact for mobile ── */
+  .h-panel-inner {
+    padding: 20px 16px 100px; /* bottom space for controls */
+    max-width: 100%;
+    max-height: none;
+    overflow-y: visible;
+  }
+  #transcriptPanel .h-panel-inner {
+    padding-top: 20px;
+  }
 
-    /* Language pair selector */
-    .sw-pair{display:flex;align-items:center;gap:14px;margin-bottom:20px;justify-content:center}
-    .sw-pair-side{display:flex;flex-direction:column;align-items:center;gap:4px;min-width:100px}
-    .sw-pair-flag{font-size:40px;line-height:1;transition:all .3s}
-    .sw-pair-flag-box{display:flex;flex-direction:column;align-items:center;gap:8px;padding:20px 28px;background:rgba(5,150,105,.06);border:1px solid rgba(5,150,105,.15);border-radius:18px;backdrop-filter:blur(10px);min-width:110px;box-shadow:0 0 30px rgba(5,150,105,.06)}
-    .sw-pair-flag-box .sw-pair-flag{font-size:48px}
-    .sw-pair-flag-box .sw-pair-name{font-size:14px;color:var(--accent-green)}
-    .sw-half.translate .sw-pair-flag-box{background:rgba(37,99,235,.06);border-color:rgba(37,99,235,.15);box-shadow:0 0 30px rgba(37,99,235,.06)}
-    .sw-half.translate .sw-pair-flag-box .sw-pair-name{color:var(--accent-blue)}
-    /* Clickable flag boxes */
-    .sw-pair-clickable{cursor:pointer;transition:all .25s;position:relative}
-    .sw-pair-clickable:hover{transform:translateY(-2px);box-shadow:0 8px 30px rgba(37,99,235,.15)!important;border-color:rgba(37,99,235,.3)!important}
-    .sw-pair-clickable:active{transform:scale(.97)}
-    .sw-pair-hint{font-size:9px;color:rgba(241,245,249,.2);margin-top:4px;font-style:italic}
-    /* Spinner overlay */
-    .tr-spinner-overlay{display:none;position:absolute;inset:0;z-index:50;background:rgba(0,0,0,.92);backdrop-filter:blur(16px);flex-direction:column;align-items:center;justify-content:center;padding:24px;border-radius:inherit}
-    .tr-spinner-overlay.show{display:flex}
-    .tr-spinner-title{font-size:15px;font-weight:700;color:#f1f5f9;margin-bottom:16px}
-    .tr-spinner-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;width:100%;max-width:280px;margin-bottom:16px}
-    .tr-spinner-chip{padding:13px 10px;border-radius:12px;font-size:14px;font-weight:600;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);color:#cbd5e1;cursor:pointer;transition:all .2s;font-family:inherit;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-    .tr-spinner-chip:hover{background:rgba(37,99,235,.12);border-color:rgba(37,99,235,.3);color:#fff;transform:translateY(-1px)}
-    .tr-spinner-chip.selected{background:rgba(37,99,235,.22);border-color:var(--accent-blue);color:var(--accent-blue);box-shadow:0 0 0 3px rgba(37,99,235,.2)}
-    .tr-spinner-confirm{padding:13px 44px;border-radius:100px;font-size:14px;font-weight:700;background:linear-gradient(135deg,var(--accent-blue),#60a5fa);color:#fff;cursor:pointer;font-family:inherit;border:none;box-shadow:0 4px 22px rgba(37,99,235,.4);transition:all .3s}
-    .tr-spinner-confirm:hover{transform:translateY(-2px);box-shadow:0 8px 32px rgba(37,99,235,.55)}
-    [data-theme="light"] .sw-pair-flag-box{background:rgba(5,150,105,.04);border-color:rgba(5,150,105,.1);box-shadow:0 0 30px rgba(5,150,105,.03)}
-    [data-theme="light"] .sw-half.translate .sw-pair-flag-box{background:rgba(37,99,235,.04);border-color:rgba(37,99,235,.1);box-shadow:0 0 30px rgba(37,99,235,.03)}
-    .sw-pair-name{font-size:13px;font-weight:700;color:#f1f5f9;transition:all .3s}
-    [data-theme="light"] .sw-pair-name{color:#0f172a}
-    .sw-pair-label{font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:rgba(241,245,249,.25);margin-bottom:2px}
-    [data-theme="light"] .sw-pair-label{color:rgba(15,23,42,.3)}
-    .sw-pair-arrow{color:rgba(37,99,235,.5);display:flex;align-items:center;animation:pairPulse 2s ease-in-out infinite}
-    @keyframes pairPulse{0%,100%{opacity:.4;transform:translateX(0)}50%{opacity:1;transform:translateX(4px)}}
-    @media(max-width:480px){.sw-pair{gap:8px}.sw-pair-flag{font-size:32px}.sw-pair-name{font-size:11px}.sw-pair-side{min-width:80px}}
+  /* ── Header: compact ── */
+  header.topbar {
+    padding: 8px 12px;
+    position: sticky;
+    top: 0;
+    background: var(--bg);
+    z-index: 50;
+  }
+  .mode-badge { font-size: 9px; padding: 3px 8px; }
+  .mode-quick-switch { font-size: 10px; max-width: 100px; padding: 4px 6px; }
+  .layout-btn { font-size: 10px; padding: 4px 7px; }
 
-    .lang-picker-row{display:flex;flex-wrap:wrap;gap:6px;justify-content:center}
-    .lang-flag-btn{padding:10px 12px;border:1px solid rgba(255,255,255,.06);border-radius:10px;background:rgba(255,255,255,.02);cursor:pointer;font-size:22px;transition:all .2s;line-height:1}
-    .lang-flag-btn:hover{border-color:rgba(37,99,235,.35);background:rgba(37,99,235,.1);transform:translateY(-2px)}
-    .lang-flag-btn.active{border-color:var(--accent-blue)!important;background:rgba(37,99,235,.18);box-shadow:0 0 0 2px rgba(37,99,235,.2)}
-    [data-theme="light"] .lang-flag-btn{border-color:rgba(0,0,0,.05);background:rgba(0,0,0,.01)}
-    [data-theme="light"] .lang-flag-btn:hover{border-color:rgba(37,99,235,.3);background:rgba(37,99,235,.08)}
-    [data-theme="light"] .lang-flag-btn.active{background:rgba(37,99,235,.12);box-shadow:0 0 0 2px rgba(37,99,235,.15)}
+  /* ── Status strip: inline flex, smaller ── */
+  .status-strip {
+    gap: 4px;
+    flex-wrap: wrap;
+    justify-content: center;
+    margin-bottom: 12px;
+  }
+  .s-pill {
+    font-size: 9px;
+    padding: 4px 8px;
+    gap: 3px;
+  }
+  .s-pill.overlay-url { display: none; }
 
-    .sw-cta {
-      display:inline-flex;align-items:center;gap:8px;
-      padding:14px 32px;border-radius:100px;
-      font-size:14px;font-weight:700;text-decoration:none;
-      transition:all .35s cubic-bezier(.4,0,.2,1);
-      position:relative;overflow:hidden;
-      margin-top:auto;
-    }
-    .sw-cta::after {
-      content:'';position:absolute;inset:0;border-radius:100px;
-      background:linear-gradient(90deg,transparent,rgba(255,255,255,.15),transparent);
-      transform:translateX(-100%);transition:transform .5s;
-    }
-    .sw-cta:hover::after{transform:translateX(100%)}
-    .sw-cta:hover{transform:translateY(-2px)}
-    .sw-cta span{position:relative;z-index:1}
-    .sw-cta svg{position:relative;z-index:1;transition:transform .35s}
-    .sw-cta:hover svg{transform:translateX(3px)}
+  /* ── Caption window: full width, larger font for readability ── */
+  .caption-window {
+    padding: 14px;
+    min-height: 120px;
+    border-radius: 14px;
+  }
+  .caption-interim {
+    font-size: 18px;
+    min-height: 1.4em;
+  }
+  .caption-transcript {
+    font-size: 12px;
+    max-height: 180px;
+  }
 
-    .cap-cta{background:linear-gradient(135deg,var(--accent-green),#34d399);color:#000;box-shadow:0 4px 20px rgba(5,150,105,.25)}
-    .cap-cta:hover{box-shadow:0 8px 32px rgba(5,150,105,.4)}
-    .tr-cta{background:linear-gradient(135deg,var(--accent-blue),#60a5fa);color:#fff;box-shadow:0 4px 20px rgba(37,99,235,.25)}
-    .tr-cta:hover{box-shadow:0 8px 32px rgba(37,99,235,.4)}
-  </style>
+  /* ── Action buttons: larger, centered ── */
+  .action-row {
+    gap: 8px;
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+  .start-btn, .stop-btn {
+    font-size: 14px;
+    padding: 12px 24px;
+    min-width: 160px;
+    min-height: 48px; /* touch target */
+  }
+  .action-row .t-btn {
+    font-size: 11px;
+    padding: 8px 12px;
+    min-height: 40px;
+  }
+  .action-row span { display: none; }
+
+  /* ── Session complete: compact ── */
+  .session-complete {
+    padding: 14px;
+    border-radius: 14px;
+  }
+  .session-complete .summary-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 6px;
+  }
+  .session-complete .sum-item .sv { font-size: 18px; }
+  .new-session-btn { font-size: 13px; padding: 10px 20px; }
+
+  /* ── Report buttons ── */
+  .report-buy-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 6px;
+  }
+  .report-buy-btn { padding: 10px 8px; font-size: 11px; }
+  .report-buy-btn .rb-icon { font-size: 18px; }
+  .report-buy-btn .rb-name { font-size: 10px; }
+
+  /* ── Metrics cards: 2-column grid ── */
+  .m-card { padding: 10px; }
+  .metric-row .m-value { font-size: 14px; }
+  .metric-row .m-value.small { font-size: 12px; }
+  .gauge-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+  }
+
+  /* ── Vocabulary: full width, scrollable ── */
+  .cefr-bubbles {
+    max-height: 160px;
+    gap: 4px;
+  }
+  .cefr-bubble {
+    font-size: 11px;
+    padding: 4px 10px;
+  }
+  .vocab-dual {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  /* ── Bottom bar: fixed controls at bottom ── */
+  #appControls {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 100;
+    background: var(--bg);
+    border-top: 1px solid var(--line);
+    padding: 8px 12px;
+    padding-bottom: max(8px, env(safe-area-inset-bottom));
+    display: flex;
+    gap: 8px;
+    justify-content: center;
+    align-items: center;
+  }
+  /* Start button in bottom bar: full width */
+  #appControls .start-btn,
+  #appControls .stop-btn {
+    flex: 1;
+    max-width: 280px;
+  }
+
+  /* ── Nav overlay: full screen on mobile ── */
+  .overlay nav {
+    flex-direction: column;
+    gap: 12px;
+    font-size: 18px;
+  }
+}
+
+/* ═══════════════ SMALL PHONES (≤480px) ═══════════════ */
+@media (max-width: 480px) {
+
+  .h-panel-inner {
+    padding: 16px 12px 90px;
+  }
+
+  /* Header: even tighter */
+  header.topbar { padding: 6px 10px; }
+  .mode-quick-switch { max-width: 80px; font-size: 9px; }
+
+  /* Status strip: icon-only where possible */
+  .s-pill { font-size: 8px; padding: 3px 6px; }
+  .s-pill .s-pill-label { display: none; }
+
+  /* Captions: smaller but readable */
+  .caption-interim { font-size: 16px; }
+  .caption-transcript { font-size: 11px; max-height: 140px; }
+  .caption-window { padding: 10px; min-height: 100px; }
+
+  /* Buttons */
+  .start-btn, .stop-btn {
+    font-size: 12px;
+    padding: 10px 20px;
+    min-height: 44px;
+  }
+  .action-row .t-btn { font-size: 10px; padding: 6px 8px; }
+
+  /* Metrics: 1 column on very small screens */
+  .gauge-grid { grid-template-columns: 1fr; }
+
+  /* Vocab bubbles: smaller */
+  .cefr-bubble { font-size: 10px; padding: 3px 8px; }
+  .cefr-bubbles { max-height: 120px; }
+
+  /* Session complete: two columns */
+  .session-complete .summary-grid { grid-template-columns: 1fr 1fr; }
+  .report-buy-grid { grid-template-columns: 1fr 1fr; }
+
+  /* Bottom bar */
+  #appControls { padding: 6px 8px; gap: 4px; }
+  #appControls .start-btn,
+  #appControls .stop-btn { max-width: 240px; }
+}
+
+/* ── Layout toggle button ── */
+.layout-btn { font-family: inherit; padding: 7px 10px; border-radius: 8px; font-size: 13px; cursor: pointer; border: 1px solid var(--line); background: var(--card); color: var(--text); transition: all .15s; white-space: nowrap; }
+.layout-btn:hover { border-color: var(--accent); }
+
+/* ── CEFR word bubbles ── */
+.cefr-bubbles { display: flex; flex-wrap: wrap; gap: 6px; max-height: 240px; overflow-y: auto; padding: 4px 0; }
+.cefr-bubble { padding: 5px 12px; border-radius: 100px; font-size: 12px; font-weight: 600; white-space: nowrap; transition: transform .12s, box-shadow .12s; cursor: pointer; letter-spacing: 0.01em; }
+.cefr-bubble:hover { transform: scale(1.08); box-shadow: 0 2px 8px rgba(0,0,0,.1); }
+.cefr-legend { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--line); }
+.cefr-legend-item { display: flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 500; color: var(--text-secondary); padding: 3px 0; }
+.cefr-legend-dot { width: 12px; height: 12px; border-radius: 4px; flex-shrink: 0; }
+
+/* ── Dictionary popup card ── */
+.dict-popup{position:fixed;z-index:9999;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px 18px;max-width:340px;min-width:240px;box-shadow:0 8px 40px rgba(0,0,0,.3);font-size:13px;animation:dpIn .2s ease-out;pointer-events:auto}
+.dict-popup .dp-close{position:absolute;top:8px;right:12px;background:none;border:none;font-size:16px;cursor:pointer;color:var(--text-muted);padding:2px 6px;border-radius:4px}
+.dict-popup .dp-close:hover{color:var(--text);background:var(--bg-btn-subtle)}
+.dict-popup .dp-word{font-size:18px;font-weight:800;letter-spacing:-.5px;margin-bottom:2px;color:var(--text);padding-right:24px}
+.dict-popup .dp-phonetic{font-size:12px;color:var(--text-muted);margin-bottom:6px}
+.dict-popup .dp-phonetic .dp-audio{display:inline-flex;align-items:center;gap:3px;margin-left:6px;cursor:pointer;color:var(--accent-purple);font-size:11px;font-weight:600}
+.dict-popup .dp-phonetic .dp-audio:hover{opacity:.8}
+.dict-popup .dp-pos{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--accent-purple);margin-bottom:8px}
+.dict-popup .dp-defs{display:flex;flex-direction:column;gap:8px;margin-bottom:10px}
+.dict-popup .dp-def{font-size:12px;color:var(--text-secondary);line-height:1.5;padding-left:12px;border-left:2px solid var(--line)}
+.dict-popup .dp-def .dp-ex{font-size:11px;color:var(--text-muted);font-style:italic;margin-top:2px}
+.dict-popup .dp-trans{font-size:12px;color:var(--text);padding-top:8px;border-top:1px solid var(--line);display:flex;align-items:center;gap:6px}
+.dict-popup .dp-trans strong{color:var(--accent-purple)}
+.dict-popup .dp-source{font-size:10px;color:var(--text-muted);margin-top:6px;text-align:right}
+.dict-popup .dp-source a{color:var(--text-muted)}
+.dict-popup .dp-loading{text-align:center;padding:20px;color:var(--text-muted);font-size:13px}
+.dict-popup .dp-error{text-align:center;padding:16px;color:var(--danger);font-size:12px}
+@keyframes dpIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+
+/* ── Dual vocab boxes ── */
+.vocab-dual{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+@media(max-width:500px){.vocab-dual{grid-template-columns:1fr}}
+.vocab-dual .vocab-box{background:var(--bg-btn-subtle);border:1px solid var(--line);border-radius:12px;padding:14px;text-align:left}
+.vocab-dual .vocab-box h4{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--text-muted);margin-bottom:8px}
+.vocab-dual .vocab-box .bubbles{display:flex;flex-wrap:wrap;gap:5px;max-height:200px;overflow-y:auto;min-height:40px}
+
+/* ── Cross-highlight ── */
+.cefr-bubble[data-side]{transition:all .2s}
+.cefr-bubble.cross-lit{box-shadow:0 0 14px rgba(167,139,250,.5)!important;transform:scale(1.12)!important;z-index:2;position:relative}
+
+/* ═══════════════════════════════════════ */
+/* 🧪 CEFR GAUGE LAB — 20 variants ────── */
+/* ═══════════════════════════════════════ */
+.gauge-lab-section{margin-top:20px}
+.gauge-lab-title{font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:.12em;color:var(--muted2);margin-bottom:12px}
+.gauge-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:10px}
+@media(max-width:1400px){.gauge-grid{grid-template-columns:repeat(4,1fr)}}
+@media(max-width:1000px){.gauge-grid{grid-template-columns:repeat(3,1fr)}}
+@media(max-width:700px){.gauge-grid{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:450px){.gauge-grid{grid-template-columns:1fr}}
+.gauge-card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px 12px;display:flex;flex-direction:column;align-items:center;gap:8px;transition:border-color .3s}
+.gauge-card:hover{border-color:var(--accent)}
+.gauge-card .gc-label{font-size:9px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted2);font-weight:600}
+.gauge-card .gc-value{font-size:22px;font-weight:800;letter-spacing:-1px;line-height:1;color:var(--text)}
+.gauge-stage{position:relative;width:100%;display:flex;align-items:center;justify-content:center}
+.g-speedo{width:90px;height:90px;position:relative}
+.g-speedo svg{transform:rotate(-90deg)}
+.g-speedo .bg{fill:none;stroke:var(--gauge-bg);stroke-width:7}
+.g-speedo .fill{fill:none;stroke:var(--accent);stroke-width:7;stroke-linecap:round;transition:stroke-dashoffset .6s}
+.g-speedo .center-val{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:800;color:var(--text)}
+.g-thermo{width:22px;height:90px;background:var(--gauge-bg);border-radius:11px;overflow:hidden;position:relative}
+.g-thermo .fill{position:absolute;bottom:0;left:0;right:0;border-radius:11px;transition:height .6s;background:linear-gradient(180deg,#22c55e,#3b82f6)}
+.g-hbar{width:100%;height:7px;background:var(--gauge-bg);border-radius:4px;overflow:hidden}
+.g-hbar .fill{height:100%;border-radius:4px;transition:width .6s;background:linear-gradient(90deg,#3b82f6,#a855f7)}
+.g-ring{width:80px;height:80px;position:relative}
+.g-ring svg{transform:rotate(-90deg)}
+.g-ring .bg{fill:none;stroke:var(--gauge-bg);stroke-width:5}
+.g-ring .fill{fill:none;stroke:#f59e0b;stroke-width:5;stroke-linecap:round;transition:stroke-dashoffset .6s}
+.g-wave{width:70px;height:70px;border-radius:50%;background:var(--gauge-bg);overflow:hidden;position:relative}
+.g-wave .water{position:absolute;bottom:0;left:0;right:0;transition:height .6s;background:rgba(59,130,246,.3)}
+.g-wave .water::after{content:'';position:absolute;top:-8px;left:-25%;width:150%;height:16px;background:rgba(59,130,246,.2);border-radius:40%;animation:gwWave 2s ease-in-out infinite}
+@keyframes gwWave{0%,100%{transform:translateX(-5%)}50%{transform:translateX(5%)}}
+.g-dots{display:flex;flex-wrap:wrap;gap:3px;width:66px}
+.g-dot{width:9px;height:9px;border-radius:2px;background:var(--gauge-bg);transition:background .3s}
+.g-dot.on{background:var(--accent)}
+.g-arc{width:100px;height:50px;overflow:hidden;position:relative}
+.g-arc .bg{width:100px;height:100px;border-radius:50%;border:7px solid var(--gauge-bg);border-bottom-color:transparent;border-left-color:transparent;transform:rotate(-45deg)}
+.g-arc .fill-wrap{position:absolute;top:0;left:0;width:100px;height:100px;transform:rotate(-45deg)}
+.g-arc .fill-wrap .arc-fill{width:100px;height:100px;border-radius:50%;border:7px solid transparent;border-bottom-color:var(--accent);border-left-color:var(--accent);transition:transform .6s}
+.g-leds{display:flex;gap:2px;width:100%}
+.g-led{flex:1;height:10px;border-radius:2px;background:var(--gauge-bg);transition:background .3s}
+.g-pulse{width:60px;height:60px;border-radius:50%;display:flex;align-items:center;justify-content:center;transition:box-shadow .6s,background .6s}
+.g-pulse .inner{font-size:18px;font-weight:800;color:#fff}
+.g-battery{width:50px;height:90px;border:2px solid var(--line);border-radius:7px;position:relative;overflow:hidden}
+.g-battery::after{content:'';position:absolute;top:-5px;left:50%;transform:translateX(-50%);width:16px;height:5px;background:var(--line);border-radius:3px 3px 0 0}
+.g-battery .fill{position:absolute;bottom:0;left:0;right:0;border-radius:4px;transition:height .6s}
+.g-radial{display:flex;gap:3px;align-items:flex-end;height:60px}
+.g-radial .bar{width:7px;border-radius:3px;transition:height .4s;background:var(--accent)}
+.g-radial .bar:nth-child(odd){transition-delay:.05s}
+.g-compass{width:70px;height:70px;position:relative}
+.g-compass .needle{position:absolute;bottom:50%;left:50%;width:2px;height:30px;background:#ef4444;transform-origin:bottom center;transition:transform .6s;border-radius:2px}
+.g-compass .needle::after{content:'';position:absolute;top:-3px;left:-3px;width:8px;height:8px;border-radius:50%;background:#ef4444}
+.g-compass .dial{width:70px;height:70px;border-radius:50%;border:2px solid var(--line)}
+.g-steps{display:flex;flex-direction:column-reverse;gap:2px;width:44px}
+.g-step{height:5px;border-radius:3px;background:var(--gauge-bg);transition:background .3s}
+.g-step.on{background:var(--accent)}
+.g-pyramid{display:flex;flex-direction:column;align-items:center;gap:2px}
+.g-pyramid .row{display:flex;gap:2px}
+.g-pyramid .cell{width:10px;height:10px;border-radius:2px;background:var(--gauge-bg);transition:background .3s}
+.g-pyramid .cell.on{background:var(--accent)}
+.g-pend{width:70px;height:50px;position:relative;overflow:hidden}
+.g-pend .ball{position:absolute;bottom:0;width:10px;height:10px;border-radius:50%;background:var(--accent);transition:left .6s,bottom .6s}
+.g-spiral{width:60px;height:60px;position:relative}
+.g-spiral .dot{position:absolute;width:5px;height:5px;border-radius:50%;background:var(--gauge-bg);transition:background .2s}
+.g-word{font-size:30px;font-weight:900;letter-spacing:-1px;transition:all .6s;color:var(--muted2)}
+.g-litmus{width:26px;height:90px;border-radius:4px;display:flex;flex-direction:column;overflow:hidden}
+.g-litmus .band{flex:1;transition:opacity .4s;opacity:.15}
+.g-fuel{width:70px;height:35px;border-radius:35px 35px 0 0;background:var(--gauge-bg);position:relative;overflow:hidden;border:2px solid var(--line);border-bottom:none}
+.g-fuel .fill{position:absolute;bottom:0;left:0;right:0;border-radius:35px 35px 0 0;transition:height .6s;background:linear-gradient(180deg,#22c55e,#eab308,#ef4444)}
+.g-blob{width:60px;height:60px;border-radius:60% 40% 50% 45%;transition:border-radius .6s,background .6s,box-shadow .6s;background:var(--gauge-bg)}
+
+/* ─── Horizontal scroll-snap ─── */
+.h-scroll{scroll-snap-type:x proximity;overflow-x:auto;overflow-y:hidden;display:flex;height:100vh;height:100dvh;scroll-behavior:smooth;touch-action:pan-x}
+.h-panel{min-width:100vw;height:100vh;height:100dvh;scroll-snap-align:start;display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden;background:var(--bg)}
+.h-panel-alt{background:var(--bg2)}
+.h-panel-inner{max-width:720px;width:100%;padding:100px 24px 60px;text-align:center;position:relative;z-index:1;overflow-y:auto;max-height:100vh;max-height:100dvh}
+@media(max-width:768px){.h-panel-inner{padding:90px 20px 50px;max-width:100%;max-height:100dvh}}
+@media(max-width:400px){.h-panel-inner{padding:80px 16px 40px}}
+
+.h-dots{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);z-index:900;display:flex;gap:10px}
+.h-dots a{width:10px;height:10px;border-radius:50%;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.06);display:block;transition:all .3s}
+[data-theme="light"] .h-dots a{background:rgba(0,0,0,.08);border:1px solid rgba(0,0,0,.06)}
+.h-dots a:hover,.h-dots a.active{background:var(--accent-purple);border-color:var(--accent-purple);transform:scale(1.4)}
+@media(max-width:768px){.h-dots{display:none}}
+
+/* ─── Panel gradients ─── */
+.h-panel{background:linear-gradient(135deg,#0f1117 0%,#1a1040 50%,#0f1117 100%)}
+.h-panel-alt{background:linear-gradient(135deg,#0f1117 0%,#0d2438 50%,#0f1117 100%)}
+[data-theme="light"] .h-panel{background:linear-gradient(135deg,#f0f2f5 0%,#ede9fe 50%,#f0f2f5 100%)}
+[data-theme="light"] .h-panel-alt{background:linear-gradient(135deg,#f0f2f5 0%,#e0f2fe 50%,#f0f2f5 100%)}
+
+/* ─── Vertical flip transition ─── */
+.h-panel .h-panel-inner{animation:flipReveal .55s cubic-bezier(.4,0,.2,1) backwards}
+@keyframes flipReveal{0%{transform:translateY(40px) scale(.97);opacity:0}100%{transform:translateY(0) scale(1);opacity:1}}
+.h-panel.flip-in .h-panel-inner{animation:flipReveal .55s cubic-bezier(.4,0,.2,1) backwards}
+
+/* ─── Arrow nav ─── */
+.h-nav-arrow{position:fixed;top:50%;transform:translateY(-50%);z-index:800;width:44px;height:44px;border-radius:50%;border:1px solid rgba(255,255,255,.1);background:rgba(15,17,23,.8);color:#fff;font-size:20px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .2s;backdrop-filter:blur(8px)}
+.h-nav-arrow:hover{background:var(--accent-purple);border-color:var(--accent-purple)}
+.h-nav-arrow.left{left:12px}
+.h-nav-arrow.right{right:12px}
+[data-theme="light"] .h-nav-arrow{background:rgba(255,255,255,.85);color:#111827;border-color:rgba(0,0,0,.08)}
+@media(max-width:768px){.h-nav-arrow{width:36px;height:36px;font-size:16px}.h-nav-arrow.left{left:4px}.h-nav-arrow.right{right:4px}}
+
+/* ── Direction hint (removed) ── */
+[data-scheme="navy"] { --bg: #0a0e1a; --bg2: #0f1729; --card: #111d33; --card2: #151f3a; --panel-bg: rgba(15,23,42,.6); }
+[data-scheme="cielo"] { --bg: #0c1929; --bg2: #102a40; --card: #0d2137; --card2: #122b42; --panel-bg: rgba(13,33,55,.6); }
+[data-scheme="menta"] { --bg: #041a14; --bg2: #06261e; --card: #052118; --card2: #082c22; --panel-bg: rgba(5,33,24,.6); }
+[data-scheme="rosa"] { --bg: #1f0a14; --bg2: #2d1020; --card: #240d1a; --card2: #301222; --panel-bg: rgba(36,13,26,.6); }
+[data-scheme="burro"] { --bg: #151310; --bg2: #1f1c18; --card: #1a1713; --card2: #24211c; --panel-bg: rgba(26,23,19,.6); }
+[data-scheme="velluto"] { --bg: #1a0610; --bg2: #280a1a; --card: #200812; --card2: #2c0e1e; --panel-bg: rgba(32,8,18,.6); }
+[data-scheme="giada"] { --bg: #021a14; --bg2: #04281e; --card: #031f17; --card2: #052c20; --panel-bg: rgba(3,31,23,.6); }
+[data-scheme="aurora"] { --bg: #0a0a1a; --bg2: #10102a; --card: #111128; --card2: #161638; --panel-bg: rgba(17,17,40,.6); }
+[data-scheme="oceano"] { --bg: #030d1a; --bg2: #061628; --card: #051222; --card2: #081a30; --panel-bg: rgba(5,18,34,.6); }
+
+/* Light-mode scheme variants */
+[data-theme="light"][data-scheme="navy"] { --bg: #f8fafc; --bg2: #f1f5f9; --card: #fff; --card2: #f8fafc; --panel-bg: #f9fafb; }
+[data-theme="light"][data-scheme="cielo"] { --bg: #f0f8ff; --bg2: #e0f0ff; --card: #fff; --card2: #f0f8ff; --panel-bg: #f9fafb; }
+[data-theme="light"][data-scheme="menta"] { --bg: #f0fdf6; --bg2: #e0f8ec; --card: #fff; --card2: #f0fdf6; --panel-bg: #f9fafb; }
+[data-theme="light"][data-scheme="rosa"] { --bg: #fdf2f8; --bg2: #fce7f3; --card: #fff; --card2: #fdf2f8; --panel-bg: #f9fafb; }
+[data-theme="light"][data-scheme="burro"] { --bg: #fefce8; --bg2: #fef9c3; --card: #fff; --card2: #fefce8; --panel-bg: #f9fafb; }
+[data-theme="light"][data-scheme="velluto"] { --bg: #fef2f2; --bg2: #fee2e2; --card: #fff; --card2: #fef2f2; --panel-bg: #f9fafb; }
+[data-theme="light"][data-scheme="giada"] { --bg: #ecfdf5; --bg2: #d1fae5; --card: #fff; --card2: #ecfdf5; --panel-bg: #f9fafb; }
+[data-theme="light"][data-scheme="aurora"] { --bg: #f0faff; --bg2: #e0f2fe; --card: #fff; --card2: #f0faff; --panel-bg: #f9fafb; }
+[data-theme="light"][data-scheme="oceano"] { --bg: #f0f9ff; --bg2: #e0f2fe; --card: #fff; --card2: #f0f9ff; --panel-bg: #f9fafb; }
+
+.ov-scheme-btn { position: absolute; bottom: 24px; left: 24px; z-index: 1000;
+  width: 40px; height: 40px; border-radius: 50%; cursor: pointer;
+  display: flex; align-items: center; justify-content: center; font-size: 18px;
+  background: rgba(255,255,255,.1); border: 1px solid rgba(255,255,255,.15);
+  color: #fff; transition: all .2s; outline: none;
+  -webkit-tap-highlight-color: transparent; }
+.ov-scheme-btn:hover { background: rgba(255,255,255,.2); border-color: rgba(255,255,255,.35); transform: scale(1.1); }
+.ov-pos-btn { position: absolute; bottom: 24px; left: 64px; z-index: 1000; width: 32px; height: 32px; border-radius: 50%; border: 1px solid rgba(255,255,255,.15); background: rgba(255,255,255,.06); color: rgba(255,255,255,.4); font-size: 14px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all .2s; padding: 0; line-height: 1; }
+.ov-pos-btn:hover { background: rgba(255,255,255,.15); border-color: rgba(255,255,255,.3); color: rgba(255,255,255,.8); transform: scale(1.1); }
+.ov-pos-btn.on { background: rgba(167,139,250,.2); border-color: rgba(167,139,250,.4); color: rgba(167,139,250,.9); box-shadow: 0 0 10px rgba(167,139,250,.2); }
+
+/* ── POS coloring classes ── */
+.pos-verb{color:#f9a8d4!important;text-shadow:0 0 8px rgba(249,168,212,.3)}
+.pos-pronoun{color:#93c5fd!important;text-shadow:0 0 8px rgba(147,197,253,.3)}
+.pos-adj{color:#fcd34d!important;text-shadow:0 0 8px rgba(252,211,77,.3)}
+.pos-adv{color:#6ee7b7!important;text-shadow:0 0 8px rgba(110,231,183,.3)}
+
+/* ═══ MOBILE FIXES — applied last to win specificity ═══ */
+@media(max-width:768px){
+  body{overflow:auto!important;height:auto!important}
+  .h-panel{min-width:100%!important;overflow:visible!important}
+  .h-panel-inner{max-width:100%!important}
+  .h-panel,.h-panel-alt{background:var(--bg)!important}
+  [data-theme="dark"] .h-panel,[data-theme="dark"] .h-panel-alt{background:var(--bg)!important}
+  .ov-scheme-btn{min-width:44px;min-height:44px}
+  .ov-pos-btn{min-width:44px;min-height:44px}
+}
+</style>
 </head>
-<body class="snap-body">
+<body>
 
+<script>
+// Old device warning
+(function(){
+  var missing=[];
+  if(typeof IntersectionObserver==='undefined') missing.push('panel transitions');
+  if(!('SpeechRecognition' in window)&&!('webkitSpeechRecognition' in window)) missing.push('voice captioning');
+  if(missing.length){
+    var banner=document.createElement('div');
+    banner.style.cssText='background:#f59e0b;color:#000;text-align:center;padding:10px 16px;font-size:13px;font-weight:600;line-height:1.5;position:relative;z-index:9999;font-family:Inter,system-ui,sans-serif';
+    banner.innerHTML='⚠️ Your device is missing: <strong>'+missing.join(', ')+'</strong>. The studio may not work fully. <button onclick="this.parentElement.remove()" style="margin-left:8px;background:#000;color:#fff;border:none;padding:4px 12px;border-radius:100px;font-size:11px;cursor:pointer;font-family:inherit">Dismiss</button>';
+    document.body.insertBefore(banner,document.body.firstChild);
+  }
+})();
+</script>
+
+
+<!-- Top bar -->
 <header class="topbar" id="topbar">
   <a href="index.html" class="logo">Sotto<span>titoli</span><span class="dot"></span></a>
-  <div style="display:flex;align-items:center;gap:8px" id="authSection"></div>
+  <ul class="nav-links">
+    <li><a href="index.html">Home</a></li>
+    <li><a href="start.html">Start</a></li>
+    <li><a href="analysis.html">Analysis</a></li>
+    <li><a href="studio.html" class="active">Studio</a></li>
+  </ul>
+  <div style="display:flex;align-items:center;gap:6px" id="appControls">
+    <span class="mode-badge" id="modeBadge" style="font-size:10px;font-weight:700;padding:4px 10px;border-radius:100px;background:var(--accent);color:#fff;white-space:nowrap">Scegli:</span>
+    <select class="mode-quick-switch" id="modeQuickSwitch" title="Cambia lingua/modalità" onchange="var p=new URLSearchParams(window.location.search);p.set('mode',this.value);window.location.search=p.toString()" style="font-family:inherit;font-size:11px;padding:5px 8px;border-radius:8px;border:1px solid var(--line);background:var(--card);color:var(--text);max-width:90px">
+      <optgroup label="Solo caption">
+        <option value="caption-en">🇬🇧 EN</option><option value="caption-it">🇮🇹 IT</option><option value="caption-fr">🇫🇷 FR</option>
+        <option value="caption-es">🇪🇸 ES</option><option value="caption-de">🇩🇪 DE</option><option value="caption-nl">🇳🇱 NL</option>
+        <option value="caption-pt">🇵🇹 PT</option><option value="caption-pl">🇵🇱 PL</option>
+      </optgroup>
+      <optgroup label="Con traduzione">
+        <option value="translate-it-en">🇮🇹→🇬🇧 IT→EN</option>
+        <option value="translate-it-fr">🇮🇹→🇫🇷 IT→FR</option>
+        <option value="translate-it-es">🇮🇹→🇪🇸 IT→ES</option>
+        <option value="translate-it-pt">🇮🇹→🇵🇹 IT→PT</option>
+        <option value="translate-it-nl">🇮🇹→🇳🇱 IT→NL</option>
+        <option value="translate-it-de">🇮🇹→🇩🇪 IT→DE</option>
+        <option value="translate-it-pl">🇮🇹→🇵🇱 IT→PL</option>
+        <option value="translate-en-it">🇬🇧→🇮🇹 EN→IT</option>
+        <option value="translate-fr-it">🇫🇷→🇮🇹 FR→IT</option>
+        <option value="translate-es-it">🇪🇸→🇮🇹 ES→IT</option>
+        <option value="translate-pt-it">🇵🇹→🇮🇹 PT→IT</option>
+        <option value="translate-nl-it">🇳🇱→🇮🇹 NL→IT</option>
+        <option value="translate-de-it">🇩🇪→🇮🇹 DE→IT</option>
+        <option value="translate-pl-it">🇵🇱→🇮🇹 PL→IT</option>
+      </optgroup>
+    </select>
+    <button class="theme-btn" id="themeToggle" title="Toggle theme">🌙</button>
+    <div id="authSection" style="display:flex;align-items:center;gap:4px"></div>
+  </div>
+  <button class="hamburger" id="hamburger"><span></span><span></span><span></span></button>
 </header>
 
-<div class="main-scroll" id="mainScroll">
-<div class="hero-slider" id="hero">
-  <div class="hero-slide hs-1 active" data-index="0">
-    <div class="hs-bg"></div><div class="hs-orb"></div><div class="hs-orb"></div>
-    <div class="hs-content" id="studioHero">
-      <div class="hs-tag" id="heroTag">Studio</div>
-      <h2 id="heroTitle">Accedi per<br><em>entrare in Studio</em></h2>
-      <p class="hs-p" id="heroSub">Accedere è facile. Entra con il tuo account Google per cominciare.</p>
-      <div class="hs-btns" id="heroLoggedOut">
-        <a href="#" onclick="signInWithGoogle()" class="hs-btn hs-btn-primary">Inizia gratis con Google</a>
-      </div>
-      <div id="heroLoggedIn" style="display:none"></div>
-    </div>
-  </div>
-</div>
+<!-- Overlay -->
+<div class="overlay" id="overlay">
+  <nav>
+    <a href="index.html">Home</a><a href="start.html">Start</a>
+    <a href="analysis.html">Analysis</a>
+    <a href="studio.html" class="cta-btn">Studio →</a>
+  </nav>
+
 </div>
 
-<div id="studioContent" style="display:none">
-<div class="studio-workspace">
-  <div class="sw-split">
-    <div class="sw-half caption">
-      <div class="sw-half-icon"><i class="fa-solid fa-closed-captioning"></i></div>
-      <div class="sw-half-label">Caption</div>
-      <h3>Sottotitoli in<br><span class="hl">una sola lingua</span></h3>
-      <p class="sw-half-desc">Scegli la lingua e avvia i sottotitoli in tempo reale.</p>
-      <div class="sw-pair">
-        <div class="sw-pair-side" style="min-width:auto">
-          <div class="sw-pair-flag-box">
-            <div class="sw-pair-flag" id="capFlag">🇬🇧</div>
-            <div class="sw-pair-name" id="capName">Inglese</div>
-          </div>
-        </div>
+<!-- Horizontal scroll -->
+<button class="h-nav-arrow left" id="hNavLeft" title="Precedente">◂</button>
+<button class="h-nav-arrow right" id="hNavRight" title="Successivo">▸</button>
+<div class="h-scroll" id="modeScroll">
+
+  <!-- Overlay Roll — rolling captions view -->
+  <section class="h-panel" id="overlayRollPanel" style="background:#000">
+    <div class="h-panel-inner" style="max-width:100%;padding:60px 20px;text-align:center;display:flex;flex-direction:column;justify-content:flex-end">
+      <div style="font-size:clamp(24px,5vw,48px);font-weight:700;color:#fff;line-height:1.3;word-break:break-word;min-height:80px" id="overlayRollText">In attesa del microfono…</div>
+      <div style="margin-top:20px;font-size:11px;color:rgba(255,255,255,.3);display:flex;gap:16px;justify-content:center">
+        <span id="overlayRollRoom">Room: —</span>
+        <span id="overlayRollTimer">00:00</span>
       </div>
-      <div class="sw-chips" id="capChips">
-        <button class="sw-chip active" data-cap="en">🇬🇧 Inglese</button>
-        <button class="sw-chip" data-cap="it">🇮🇹 Italiano</button>
-        <button class="sw-chip" data-cap="fr">🇫🇷 Francese</button>
-        <button class="sw-chip" data-cap="de">🇩🇪 Tedesco</button>
-        <button class="sw-chip" data-cap="es">🇪🇸 Spagnolo</button>
-        <button class="sw-chip" data-cap="nl">🇳🇱 Olandese</button>
-        <button class="sw-chip" data-cap="pt">🇵🇹 Portoghese</button>
-        <button class="sw-chip" data-cap="pl">🇵🇱 Polacco</button>
-      </div>
-      <a href="app.html?mode=caption-en" id="capGoBtn" class="sw-cta cap-cta">
-        <span>Avvia Caption</span>
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 5l7 7-7 7"/></svg>
-      </a>
     </div>
-    <div class="sw-half translate">
-      <div class="sw-half-icon"><i class="fa-solid fa-language"></i></div>
-      <div class="sw-half-label">Translate</div>
-      <h3>Traduzione<br><span class="hl">in tempo reale</span></h3>
-      <p class="sw-half-desc">Scegli la lingua che parli e quella per i sottotitoli.</p>
-      <div class="sw-pair">
-        <div class="sw-pair-side">
-          <div class="sw-pair-flag-box sw-pair-clickable" id="srcBox">
-            <div class="sw-pair-label">Io parlo in…</div>
-            <div class="sw-pair-flag" id="sourceFlag">🇬🇧</div>
-            <div class="sw-pair-name" id="sourceName">Inglese</div>
-            <div class="sw-pair-hint">clicca per cambiare</div>
-          </div>
-        </div>
-        <div class="sw-pair-arrow">
-          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 5l7 7-7 7"/></svg>
-        </div>
-        <div class="sw-pair-side">
-          <div class="sw-pair-flag-box sw-pair-clickable" id="tgtBox">
-            <div class="sw-pair-label">Sottotitoli in…</div>
-            <div class="sw-pair-flag" id="targetFlag">🇮🇹</div>
-            <div class="sw-pair-name" id="targetName">Italiano</div>
-            <div class="sw-pair-hint">clicca per cambiare</div>
-          </div>
-        </div>
-      </div>
-      <!-- Spinner overlay for language selection -->
-      <div class="tr-spinner-overlay" id="trSpinner">
-        <div class="tr-spinner-title" id="trSpinnerTitle">Io parlo in…</div>
-        <div class="tr-spinner-grid" id="trSpinnerGrid"></div>
-        <button class="tr-spinner-confirm" id="trSpinnerClose">Conferma selezione ✓</button>
-      </div>
-      <a href="#" id="translateGoBtn" class="sw-cta tr-cta">
-        <span>Avvia Traduzione</span>
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 5l7 7-7 7"/></svg>
-      </a>
+    <button class="ov-scheme-btn" id="ovSchemeBtn1" title="Cambia stile">🎨</button>
+    <button class="ov-pos-btn" id="ovPosBtn1" title="POS coloring" style="bottom:64px">🔤</button>
+  </section>
+
+  <!-- Overlay — cinema-style caption view -->
+  <section class="h-panel h-panel-alt" id="overlayPanel" style="background:#000">
+    <div class="h-panel-inner" style="max-width:100%;padding:60px 20px;text-align:center;display:flex;align-items:center;justify-content:center">
+      <div style="font-size:clamp(28px,6vw,56px);font-weight:800;color:#fff;line-height:1.2;letter-spacing:-1px;word-break:break-word;min-height:120px" id="overlayCinemaText">In attesa del microfono…</div>
     </div>
-  </div>
-</div>
-</div>
+    <button class="ov-scheme-btn" id="ovSchemeBtn2" title="Cambia stile">🎨</button>
+    <button class="ov-pos-btn" id="ovPosBtn2" title="POS coloring" style="bottom:64px">🔤</button>
+  </section>
+
+  <!-- Panel 3: Live Transcript — main dashboard -->
+  <section class="h-panel" id="transcriptPanel">
+    <div class="h-panel-inner" style="max-width:900px;text-align:center;padding-top:90px;padding-bottom:40px">
+
+      <!-- Status bar -->
+      <div style="display:flex;gap:10px;margin-bottom:20px;flex-wrap:wrap;justify-content:center">
+        <div style="display:flex;align-items:center;gap:6px;padding:6px 14px;border-radius:100px;background:var(--card);border:1px solid var(--line);font-size:12px;font-weight:600">
+          <span style="width:8px;height:8px;border-radius:50%;background:var(--muted2);flex-shrink:0" id="micDot"></span>
+          <span id="micStatus" style="color:var(--text);font-size:11px">Mic</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:6px;padding:6px 14px;border-radius:100px;background:var(--card);border:1px solid var(--line);font-size:12px;font-weight:600">
+          <span style="width:8px;height:8px;border-radius:50%;background:var(--muted2);flex-shrink:0" id="socketDot"></span>
+          <span id="socketStatus" style="color:var(--text);font-size:11px">Live</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:4px;padding:6px 14px;border-radius:100px;background:var(--card);border:1px solid var(--line);font-size:12px;font-weight:600;font-variant-numeric:tabular-nums">
+          <span style="color:var(--muted2)">⏱</span>
+          <span id="sessionTimer" style="color:var(--text)">00:00</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:6px;padding:6px 12px;border-radius:100px;background:var(--card);border:1px solid var(--line);font-size:11px;font-weight:600;min-width:130px">
+          <span style="color:var(--accent-green)">▮</span><span id="creditCapMin" style="color:var(--text)">—</span>
+          <span style="color:var(--accent-purple);margin-left:2px">▮</span><span id="creditTraMin" style="color:var(--text-secondary)">—</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:4px;padding:6px 14px;border-radius:100px;background:var(--card);border:1px solid var(--line);font-size:12px;font-weight:600">
+          <span id="tokenBalanceApp" style="color:var(--text)">—</span>
+        </div>
+        <button title="Overlay" style="font-family:inherit;font-size:11px;font-weight:600;padding:6px 10px;border-radius:100px;border:1px solid var(--line);background:var(--card);color:var(--text);cursor:pointer" id="openOverlayBtn">🖥</button>
+        <button title="Copy link" style="font-family:inherit;font-size:11px;font-weight:600;padding:6px 10px;border-radius:100px;border:1px solid var(--line);background:var(--card);color:var(--text);cursor:pointer" id="copyOverlayBtn">📋</button>
+        <button title="New room" style="font-family:inherit;font-size:11px;font-weight:600;padding:6px 10px;border-radius:100px;border:1px solid var(--line);background:var(--card);color:var(--text);cursor:pointer" id="newRoomBtn">🔄</button>
+      </div>
+
+      <!-- Main caption area -->
+      <div style="background:var(--card);border:1px solid var(--line);border-radius:20px;padding:32px 32px 24px;margin-bottom:16px;text-align:left;min-height:180px">
+        <div style="font-size:clamp(22px,4vw,36px);font-weight:600;line-height:1.35;color:var(--accent-purple);min-height:40px;word-break:break-word" id="captionInterim">
+          <span style="color:var(--muted2);font-weight:400;font-style:italic">Parla per vedere i sottotitoli…</span>
+        </div>
+        <div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--line);font-size:15px;line-height:1.7;color:var(--text);max-height:180px;overflow-y:auto" id="captionTranscript"></div>
+      </div>
+
+      <!-- Translation output -->
+      <div style="display:none;background:var(--bg2);border:1px solid var(--line);border-radius:14px;padding:14px 18px;margin-bottom:14px;font-size:14px;color:var(--text-secondary);text-align:left" id="translatedWindow">
+        <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--accent-blue);margin-bottom:6px">🌐 Traduzione live</div>
+        <div id="captionTranslated"></div>
+      </div>
+
+      <!-- Credit warning -->
+      <div style="display:none;align-items:center;gap:8px;background:rgba(217,119,6,.1);border:1px solid rgba(217,119,6,.3);border-radius:10px;padding:10px 16px;margin-bottom:12px;font-size:13px;color:var(--amber);justify-content:center" id="creditWarn">
+        ⚠️ Meno di 5 minuti rimanenti. <a href="account.html" style="color:var(--amber);font-weight:600">Acquista minuti →</a>
+      </div>
+
+      <!-- Onboarding hint -->
+      <div style="background:linear-gradient(135deg,rgba(124,58,237,.06),rgba(37,99,235,.06));border:1px solid rgba(124,58,237,.15);border-radius:16px;padding:20px 24px;margin-bottom:16px;text-align:center;position:relative" id="onboardHint">
+        <button onclick="this.parentElement.style.display='none'" style="position:absolute;top:8px;right:10px;background:none;border:none;color:var(--muted2);cursor:pointer;font-size:16px;line-height:1">✕</button>
+        <div style="font-size:32px;margin-bottom:6px">🎤</div>
+        <div style="font-size:16px;font-weight:700;color:var(--text);margin-bottom:4px">Pronto a iniziare?</div>
+        <div style="font-size:13px;color:var(--muted);line-height:1.5">Scegli la lingua nel menu in alto, poi clicca <strong>Start Session</strong> e parla.<br>I sottotitoli appariranno qui in tempo reale.</div>
+      </div>
+
+      <!-- Primary action: Start/Stop -->
+      <div style="display:flex;gap:10px;justify-content:center;margin-bottom:12px">
+        <button class="btn-grad btn-grad-green" style="font-size:17px;padding:16px 40px;border-radius:16px" id="startBtn">🎤 Start Session</button>
+        <button class="btn-grad btn-grad-red" style="font-size:17px;padding:16px 40px;border-radius:16px;display:none" id="stopBtn" disabled>⏹ Stop</button>
+      </div>
+
+      <!-- Session complete (hidden until stop) -->
+      <div style="display:none;background:var(--card);border:1px solid var(--line);border-radius:16px;padding:24px;margin-top:16px;text-align:left" id="sessionComplete">
+        <h3>✅ Sessione completata</h3>
+        <div class="summary-grid">
+          <div class="sum-item"><div class="sv" id="sumDuration">—</div><div class="sl">Durata</div></div>
+          <div class="sum-item"><div class="sv" id="sumWords">—</div><div class="sl">Parole</div></div>
+          <div class="sum-item"><div class="sv" id="sumCefr">—</div><div class="sl">Livello CEFR</div></div>
+          <div class="sum-item"><div class="sv" id="sumQuality">—</div><div class="sl">Qualità</div></div>
+        </div>
+        <div style="text-align:center;margin-bottom:10px"><a href="analysis.html" style="font-size:13px;color:var(--accent);font-weight:600;text-decoration:none">📊 Salva la sessione e vai all'Analysis →</a></div>
+        <div class="new-session-row"><button class="new-session-btn" id="newSessionBtn">🔄 Nuova sessione</button></div>
+      </div>
+
+      <div style="display:none;padding-top:20px" id="postSessionAnalysis">
+        <div style="background:var(--card);border:1px solid var(--line);border-radius:16px;padding:20px;text-align:left;margin-bottom:16px">
+          <h3 style="font-size:16px;font-weight:700;margin-bottom:10px">📊 Analisi della sessione</h3>
+          <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px;font-size:12px;color:var(--muted);margin-bottom:12px">
+            <div><strong style="color:var(--text)">Lingua:</strong> <span id="psLang">—</span></div>
+            <div><strong style="color:var(--text)">Data:</strong> <span id="psDate">—</span></div>
+            <div><strong style="color:var(--text)">Durata:</strong> <span id="psDuration">—</span></div>
+            <div><strong style="color:var(--text)">Parole:</strong> <span id="psWords">—</span></div>
+          </div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">
+            <input id="psSaveName" placeholder="Nome sessione..." style="flex:1;min-width:120px;font-family:inherit;font-size:12px;padding:8px 12px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--text)">
+            <button onclick="saveSessionName()" style="font-family:inherit;font-size:11px;font-weight:600;padding:8px 14px;border-radius:8px;border:1px solid var(--line);background:var(--card);color:var(--text);cursor:pointer;white-space:nowrap">💾 Salva</button>
+          </div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px">
+            <button id="psCopyBtn" style="font-family:inherit;font-size:11px;font-weight:600;padding:7px 12px;border-radius:8px;border:1px solid var(--line);background:var(--card);color:var(--text);cursor:pointer">📋 Copia trascrizione</button>
+            <button id="psDownloadBtn" style="font-family:inherit;font-size:11px;font-weight:600;padding:7px 12px;border-radius:8px;border:1px solid var(--line);background:var(--card);color:var(--text);cursor:pointer">📥 Scarica TXT</button>
+          </div>
+          <div style="text-align:center"><a href="analysis.html" style="display:inline-flex;align-items:center;gap:6px;padding:10px 20px;border-radius:100px;background:var(--accent-purple);color:#fff;font-weight:600;font-size:13px;text-decoration:none">📊 Vai all'Analysis completa →</a></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Panel 2: Live Metrics -->
+  <section class="h-panel h-panel-alt" id="metricsPanel">
+    <div class="h-panel-inner" style="max-width:800px">
+      <div class="section-label">Live Metrics</div>
+      <h2>Statistiche<br>in tempo reale</h2>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px;margin-top:16px">
+        <div class="m-card">
+          <div class="m-title">📊 CEFR Level <span class="cefr-help" title="CEFR = Quadro comune europeo per le lingue.">?</span></div>
+          <div class="gauge-wrap"><div class="gauge-bg"></div><div class="gauge-fill" id="cefrGauge" style="height:10%;background:linear-gradient(180deg,var(--good),var(--accent))"></div></div>
+          <div class="gauge-center"><div class="gauge-value" id="cefrLevel">—</div><div class="gauge-label">Estimated level</div></div>
+        </div>
+        <div class="m-card">
+          <div class="m-title">⚡ Live metrics</div>
+          <div class="metric-row"><span class="m-label">WPM</span><span class="m-value" id="liveWpm">—</span></div>
+          <div class="metric-row"><span class="m-label">Words</span><span class="m-value" id="liveWords">0</span></div>
+          <div class="metric-row"><span class="m-label">Sentences</span><span class="m-value small" id="liveSentences">0</span></div>
+          <div class="metric-row"><span class="m-label">Fillers</span><span class="m-value small" id="liveFillers">0</span></div>
+          <div class="metric-row"><span class="m-label">Questions</span><span class="m-value small" id="liveQuestions">0</span></div>
+        </div>
+        <div class="m-card">
+          <div class="m-title">🎯 Speech quality</div>
+          <div class="metric-row"><span class="m-label">Quality score</span><span class="m-value" id="liveQuality">—</span></div>
+          <div class="meter-bar"><div class="meter-fill" id="qualityMeter" style="width:0%;background:var(--good)"></div></div>
+          <div style="font-size:10px;color:var(--muted2);margin-top:2px;line-height:1.4" id="qualityInfo"></div>
+          <div class="metric-row" style="margin-top:8px"><span class="m-label">Lexical div.</span><span class="m-value small" id="liveLexDiv">—</span></div>
+          <div style="font-size:10px;color:var(--muted2);margin-top:2px;line-height:1.4" id="lexDivInfo"></div>
+        </div>
+        <div class="m-card">
+          <div class="m-title">📈 Sessione</div>
+          <div class="metric-row"><span class="m-label">Lines</span><span class="m-value" id="statLines">0</span></div>
+          <div class="metric-row"><span class="m-label">Words</span><span class="m-value" id="statWords">0</span></div>
+          <div class="metric-row"><span class="m-label">Chars</span><span class="m-value" id="statChars">0</span></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Panel 5: Vocabulary & Tools -->
+  <section class="h-panel" id="vocabPanel">
+    <div class="h-panel-inner" style="max-width:800px">
+      <div class="section-label">Vocabulary</div>
+      <h2>Vocabolario</h2>
+
+      <!-- CEFR Bubbles — dual layout for translate, single for caption -->
+      <div style="background:var(--card);border:1px solid var(--line);border-radius:16px;padding:20px;margin:16px 0;text-align:left" id="vocabCard">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+          <span style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--muted2)">🫧 Vocabolario CEFR</span>
+          <span style="font-size:11px;color:var(--muted2)" id="cefrBubbleCount">0 parole</span>
+        </div>
+        <!-- Single bubble box (caption mode) -->
+        <div id="vocabSingle" style="display:flex;flex-wrap:wrap;gap:6px;max-height:280px;overflow-y:auto;padding:4px 0;min-height:60px">
+          <span style="font-size:12px;color:var(--muted2)">Avvia il microfono per vedere il vocabolario…</span>
+        </div>
+        <!-- Dual bubble boxes (translate mode) — hidden by default -->
+        <div id="vocabDual" class="vocab-dual" style="display:none">
+          <div class="vocab-box"><h4 id="vocabSrcLabel">🇬🇧 Source</h4><div class="bubbles" id="cefrBubblesSrc"></div></div>
+          <div class="vocab-box"><h4 id="vocabTgtLabel">🇮🇹 Target</h4><div class="bubbles" id="cefrBubblesTgt"></div></div>
+        </div>
+        <div style="display:flex;flex-wrap:wrap;gap:10px;margin-top:12px;padding-top:12px;border-top:1px solid var(--line)" id="cefrLegend"></div>
+      </div>
+
+      <!-- POS only -->
+      <div style="background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px;text-align:left;max-width:400px;margin:0 auto">
+        <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--muted2);margin-bottom:10px">📝 Parti del discorso</div>
+        <div style="display:flex;flex-direction:column;gap:6px">
+          <div style="display:flex;justify-content:space-between;font-size:13px"><span style="color:var(--muted)">Verbi</span><span style="font-weight:700;font-variant-numeric:tabular-nums" id="liveVerbCount">0</span></div>
+          <div style="display:flex;justify-content:space-between;font-size:13px"><span style="color:var(--muted)">Nomi</span><span style="font-weight:700;font-variant-numeric:tabular-nums" id="liveNounCount">0</span></div>
+          <div style="display:flex;justify-content:space-between;font-size:13px"><span style="color:var(--muted)">Aggettivi</span><span style="font-weight:700;font-variant-numeric:tabular-nums" id="liveAdjCount">0</span></div>
+          <div style="display:flex;justify-content:space-between;font-size:13px"><span style="color:var(--muted)">Avverbi</span><span style="font-weight:700;font-variant-numeric:tabular-nums" id="liveAdvCount">0</span></div>
+          <div style="display:flex;justify-content:space-between;font-size:13px"><span style="color:var(--muted)">Pronomi</span><span style="font-weight:700;font-variant-numeric:tabular-nums" id="livePronCount">0</span></div>
+          <div style="display:flex;justify-content:space-between;font-size:13px"><span style="color:var(--muted)">Preposizioni</span><span style="font-weight:700;font-variant-numeric:tabular-nums" id="livePrepCount">0</span></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+</div><!-- /h-scroll -->
 
 <button class="theme-btn" id="themeToggle" title="Toggle theme">🌙</button>
 
+<a id="overlayLink" style="display:none" target="_blank" rel="noopener noreferrer"></a>
+
 <script src="config.js?v=12"></script>
 <script src="security-utils.js?v=1"></script>
+<script src="ws-publisher.js?v=12"></script>
+<script src="translation-providers.js?v=12"></script>
+<script src="session-utils.js?v=12"></script>
+<script src="lesson-report.js?v=12"></script>
+<script src="js/lemma-pos-map.js?v=1"></script>
+<script src="js/pos-coloring.js?v=1"></script>
+<script src="js/cefr-levels.js?v=1"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="js/auth.js?v=6"></script>
-<script src="js/preferences.js?v=5"></script>
-<script src="js/stripe.js?v=2"></script>
-<script src="js/theme.js?v=2"></script>
-<script>
-(function(){
-  var loggedOut=document.getElementById('heroLoggedOut');
-  var heroTitle=document.getElementById('heroTitle');
-  var heroSub=document.getElementById('heroSub');
-  var heroTag=document.getElementById('heroTag');
-  var hero=document.getElementById('studioHero');
-  var heroPanel=document.getElementById('hero');
-  if(!loggedOut)return;
+<script src="app.js?v=12"></script>
 
-  function applyState(isLoggedIn){
-    var sc=document.getElementById('studioContent');
-    var ms=document.getElementById('mainScroll');
-    if(isLoggedIn){
-      if(loggedOut)loggedOut.style.display='none';
-      if(heroTitle)heroTitle.style.display='none';
-      if(heroSub)heroSub.style.display='none';
-      if(heroTag)heroTag.style.display='none';
-      if(ms)ms.style.display='none';
-      if(sc)sc.style.display='block';
-      document.body.classList.remove('snap-body');
-    }else{
-      if(loggedOut)loggedOut.style.display='block';
-      if(heroTitle)heroTitle.style.display='block';
-      if(heroSub)heroSub.style.display='block';
-      if(heroTag)heroTag.style.display='block';
-      if(ms)ms.style.display='';
-      if(sc)sc.style.display='none';
-      document.body.classList.add('snap-body');
+<script>
+// ── Horizontal dot tracking + flip + overlay sync ──
+(function(){
+  var dots = document.querySelectorAll('.h-dots a');
+  var panels = document.querySelectorAll('.h-panel');
+  var scrollEl = document.getElementById('modeScroll');
+  var leftBtn = document.getElementById('hNavLeft');
+  var rightBtn = document.getElementById('hNavRight');
+  if (!scrollEl || !panels.length) return;
+  var totalPanels = panels.length, currentIndex = 2, scrolling = false; // Start at transcript panel
+
+  function scrollTo(idx, smooth) {
+    if (idx < 0) idx = 0;
+    if (idx >= totalPanels) idx = totalPanels - 1;
+    currentIndex = idx;
+    panels[idx].scrollIntoView({ behavior: smooth ? 'smooth' : 'auto', block: 'nearest', inline: 'start' });
+    panels.forEach(function(p){ p.classList.remove('flip-in'); });
+    panels[idx].classList.add('flip-in');
+    dots.forEach(function(d, i){ d.classList.toggle('active', i === idx); });
+    if (leftBtn) leftBtn.style.display = idx === 0 ? 'none' : '';
+    if (rightBtn) rightBtn.style.display = idx === totalPanels - 1 ? 'none' : '';
+  }
+
+  dots.forEach(function(d, i){ d.addEventListener('click', function(e){ e.preventDefault(); scrollTo(i, true); }); });
+  if (leftBtn) leftBtn.addEventListener('click', function(){ scrollTo(currentIndex - 1, true); });
+  if (rightBtn) rightBtn.addEventListener('click', function(){ scrollTo(currentIndex + 1, true); });
+
+  if (typeof IntersectionObserver !== 'undefined') {
+  var observer = new IntersectionObserver(function(entries){
+    entries.forEach(function(e){
+      if (e.isIntersecting && !scrolling) {
+        panels.forEach(function(p, i){
+          if (p === e.target) {
+            currentIndex = i;
+            dots.forEach(function(d, j){ d.classList.toggle('active', j === i); });
+            panels.forEach(function(pp){ pp.classList.remove('flip-in'); });
+            p.classList.add('flip-in');
+            if (leftBtn) leftBtn.style.display = i === 0 ? 'none' : '';
+            if (rightBtn) rightBtn.style.display = i === totalPanels - 1 ? 'none' : '';
+          }
+        });
+      }
+    });
+  }, { threshold: 0.5 });
+  panels.forEach(function(p){ observer.observe(p); });
+  } // end IntersectionObserver feature check
+
+  document.addEventListener('keydown', function(e){
+    if (e.key === 'ArrowRight') { e.preventDefault(); scrollTo(currentIndex + 1, true); }
+    if (e.key === 'ArrowLeft') { e.preventDefault(); scrollTo(currentIndex - 1, true); }
+  });
+
+  // Default: scroll to transcript panel (index 2), hide left arrow
+  panels[2].classList.add('flip-in');
+  panels[2].scrollIntoView({ block: 'nearest', inline: 'start' });
+  if (leftBtn) leftBtn.style.display = 'none';
+
+  // ── Sync overlay panels with live caption text ──
+  var overlayHistory = [];
+  setInterval(function(){
+    var interim = document.getElementById('captionInterim');
+    var transcript = document.getElementById('captionTranscript');
+    var roomEl = document.getElementById('roomValue');
+    var timerEl = document.getElementById('sessionTimer');
+
+    // Get latest FINAL text only (skip interim for overlay panels)
+    var text = '';
+    if (transcript) {
+      var lines = transcript.querySelectorAll('.line');
+      if (lines.length) text = lines[lines.length-1].textContent.replace(/^\d{2}:\d{2}:\d{2}\s*/,'').trim();
+    }
+
+    // Only push complete sentences (ending with .!?) to history
+    var isComplete = function(s){ return /[.!?]$/.test(s.trim()); };
+    if (text && isComplete(text) && (overlayHistory.length === 0 || overlayHistory[overlayHistory.length-1] !== text)) {
+      overlayHistory.push(text);
+      if (overlayHistory.length > 5) overlayHistory.shift();
+    }
+
+  // Overlay Cinema: current final sentence + 2 previous complete sentences
+    var overlayCinema = document.getElementById('overlayCinemaText');
+    if (overlayCinema) {
+      var current = overlayHistory.length ? overlayHistory[overlayHistory.length-1] : '';
+      var prev1 = overlayHistory.length > 1 ? overlayHistory[overlayHistory.length - 2] : '';
+      var prev2 = overlayHistory.length > 2 ? overlayHistory[overlayHistory.length - 3] : '';
+      var html = '<div style="font-size:100%;font-weight:800;line-height:1.3;margin-bottom:4px">' + (current || 'In attesa del microfono…') + '</div>';
+      if (prev2 && isComplete(prev2)) html += '<div style="font-size:55%;opacity:.35;line-height:1.4;margin-bottom:2px">' + prev2 + '</div>';
+      if (prev1 && isComplete(prev1)) html += '<div style="font-size:55%;opacity:.35;line-height:1.4">' + prev1 + '</div>';
+      overlayCinema.__rawHTML = html;
+      overlayCinema.__rawText = current;
+      var lang = window.__currentSessionLang || 'en-US';
+      overlayCinema.innerHTML = (window.__posColoringOn && w.SottotitoliPosColoring) ? applyPosColoring(current, lang) : html;
+    }
+
+    // Overlay Roll: only final complete sentences, newest at top, older fade down
+    var overlayRoll = document.getElementById('overlayRollText');
+    if (overlayRoll) {
+      if (overlayHistory.length === 0) {
+        overlayRoll.innerHTML = '<div style="opacity:.4">In attesa del microfono…</div>';
+        overlayRoll.__rawHTML = overlayRoll.innerHTML;
+        overlayRoll.__rawText = '';
+      } else {
+        var html = '';
+        for (var i = overlayHistory.length - 1; i >= 0; i--) {
+          var opacity = 0.2 + (i / overlayHistory.length) * 0.8;
+          var size = 0.6 + (i / overlayHistory.length) * 0.4;
+          html += '<div style="opacity:' + opacity.toFixed(2) + ';font-size:' + (size*100).toFixed(0) + '%;margin-bottom:6px;transition:opacity .8s">' + overlayHistory[i] + '</div>';
+        }
+        overlayRoll.__rawHTML = html;
+        overlayRoll.__rawText = overlayHistory[overlayHistory.length-1] || '';
+        var lang = window.__currentSessionLang || 'en-US';
+        overlayRoll.innerHTML = (window.__posColoringOn && w.SottotitoliPosColoring) ? applyPosColoring(overlayRoll.__rawText, lang) : html;
+      }
+    }
+
+    // Room + timer for roll
+    var rollRoom = document.getElementById('overlayRollRoom');
+    var rollTimer = document.getElementById('overlayRollTimer');
+    if (rollRoom && roomEl) rollRoom.textContent = 'Room: ' + (roomEl.textContent || '—');
+    if (rollTimer && timerEl) rollTimer.textContent = timerEl ? timerEl.textContent : '00:00';
+  }, 400);
+})();
+
+// ── Style scheme cycle (9 schemes) ──
+(function(){
+  // Clean up old layout attribute
+  document.documentElement.removeAttribute('data-layout');
+
+  var schemes = ['default','navy','cielo','menta','rosa','burro','velluto','giada','aurora','oceano'];
+  var icons = { default:'🎨', navy:'🌑', cielo:'☁️', menta:'🌿', rosa:'🌸', burro:'🧈', velluto:'🍷', giada:'💎', aurora:'🌌', oceano:'🌊' };
+  var btn = document.getElementById('layoutToggle');
+  var html = document.documentElement;
+  var stored = localStorage.getItem('sottotitoli-scheme') || 'default';
+
+  function setScheme(name) {
+    if (name === 'default') { html.removeAttribute('data-scheme'); }
+    else { html.setAttribute('data-scheme', name); }
+    var icon = icons[name] || '🎨';
+    if (btn) { btn.textContent = icon; btn.title = name; }
+    if (ov1) { ov1.textContent = icon; ov1.title = name; }
+    if (ov2) { ov2.textContent = icon; ov2.title = name; }
+    localStorage.setItem('sottotitoli-scheme', name);
+  }
+
+  setScheme(stored);
+
+  if (btn) {
+    btn.addEventListener('click', function(){
+      var cur = localStorage.getItem('sottotitoli-scheme') || 'default';
+      var idx = schemes.indexOf(cur);
+      var next = schemes[(idx + 1) % schemes.length];
+      setScheme(next);
+    });
+  }
+
+  // Overlay slide scheme buttons (bottom-left, won't overlap theme-toggle)
+  var ov1 = document.getElementById('ovSchemeBtn1');
+  var ov2 = document.getElementById('ovSchemeBtn2');
+  if (ov1) { ov1.addEventListener('click', cycleScheme); }
+  if (ov2) { ov2.addEventListener('click', cycleScheme); }
+
+  function cycleScheme() {
+    var cur = localStorage.getItem('sottotitoli-scheme') || 'default';
+    var idx = schemes.indexOf(cur);
+    var next = schemes[(idx + 1) % schemes.length];
+    setScheme(next);
+  }
+
+  // ── POS coloring toggle on overlay slides ──
+  window.__posColoringOn = false;
+  var ovPos1 = document.getElementById('ovPosBtn1');
+  var ovPos2 = document.getElementById('ovPosBtn2');
+
+  function updatePosToggleUI() {
+    if (ovPos1) { ovPos1.classList.toggle('on', window.__posColoringOn); }
+    if (ovPos2) { ovPos2.classList.toggle('on', window.__posColoringOn); }
+  }
+
+  function togglePosColoring() {
+    window.__posColoringOn = !window.__posColoringOn;
+    updatePosToggleUI();
+  }
+
+  if (ovPos1) ovPos1.addEventListener('click', togglePosColoring);
+  if (ovPos2) ovPos2.addEventListener('click', togglePosColoring);
+
+  function applyPosColoring(text, langCode) {
+    if (!window.__posColoringOn || !w.SottotitoliPosColoring) return text;
+    var lk = w.SottotitoliPosColoring.getLangKey(langCode || 'en-US');
+    var tokens = (text || '').match(/[A-Za-zÀ-ÿ\u0100-\u024f']+|\S/g) || [];
+    var h = '';
+    for (var i=0; i<tokens.length; i++) {
+      var t = tokens[i];
+      var pos = w.SottotitoliPosColoring.detectPOS(t, lk);
+      if (pos) { h += '<span class="pos-'+pos+'">'+t+'</span>'; }
+      else { h += t; }
+      if (i < tokens.length-1) {
+        var nw = tokens[i+1];
+        if (/^[A-Za-zÀ-ÿ\u0100-\u024f']/.test(nw)) h += ' ';
+      }
+    }
+    return h;
+  }
+})();
+
+// ── CEFR word bubbles + Free Dictionary API ──
+(function(){
+  var seenSrc = new Set(), seenTgt = new Set();
+  var dictCache = window.__dictCache = window.__dictCache || {};
+  var legendEl = document.getElementById('cefrLegend');
+  var singleEl = document.getElementById('vocabSingle');
+  var dualEl = document.getElementById('vocabDual');
+  var srcBubblesEl = document.getElementById('cefrBubblesSrc');
+  var tgtBubblesEl = document.getElementById('cefrBubblesTgt');
+  var countEl = document.getElementById('cefrBubbleCount');
+  var popupEl = null;
+
+  // Mode info
+  function getModeInfo(){
+    var m = window.__currentSessionMode || 'caption-en';
+    var isTrans = m.indexOf('translate-')===0;
+    var parts = isTrans ? m.replace('translate-','').split('-') : [];
+    var srcLang = isTrans ? (parts[0]||'en') : m.replace('caption-','');
+    var tgtLang = isTrans ? (parts[1]||'it') : null;
+    var srcFlag = langFlag(srcLang), tgtFlag = langFlag(tgtLang);
+    return {isTrans:isTrans, srcLang:srcLang, tgtLang:tgtLang, srcFlag:srcFlag, tgtFlag:tgtFlag};
+  }
+
+  function langFlag(code){
+    var f={en:'🇬🇧',it:'🇮🇹',fr:'🇫🇷',de:'🇩🇪',es:'🇪🇸',pt:'🇵🇹',nl:'🇳🇱',pl:'🇵🇱'};
+    return f[code]||'🌐';
+  }
+
+  function langName(code){
+    var n={en:'English',it:'Italiano',fr:'Français',de:'Deutsch',es:'Español',pt:'Português',nl:'Nederlands',pl:'Polski'};
+    return n[code]||code;
+  }
+
+  // Build legend
+  function buildLegend(){
+    if(!legendEl) return;
+    var colors=window.CEFR_COLORS||{};
+    legendEl.innerHTML=['A1','A2','B1','B2','C1','C2'].map(function(l){
+      var c=colors[l]||{bg:'#eee',text:'#666',label:l};
+      return '<span class="cefr-legend-item"><span class="cefr-legend-dot" style="background:'+c.text+'"></span>'+c.label+'</span>';
+    }).join('');
+  }
+  buildLegend();
+
+  function extractWords(text){
+    if(!text) return[];
+    var t=text.toLowerCase().match(/[a-zà-ÿ\u0100-\u024f']+/gi);
+    return t?t.filter(function(w){return w.length>=2}):[];
+  }
+
+  function getCEFRColor(word){
+    var l=(window.getCEFRLevel&&window.getCEFRLevel(word))||'A1';
+    var c=(window.CEFR_COLORS||{})[l]||{bg:'#e5e7eb',text:'#374151'};
+    return{level:l,bg:c.bg,text:c.text};
+  }
+
+  function renderBubble(w,side,index){
+    var c=getCEFRColor(w);
+    var esc=w.replace(/'/g,"&#39;").replace(/"/g,'&quot;');
+    return'<span class="cefr-bubble" data-side="'+side+'" data-word="'+esc+'" data-idx="'+index+'" style="background:'+c.bg+';color:'+c.text+';border:1px solid '+c.text+'22" title="'+w+' · '+c.level+' — click for definition">'+w+'</span>';
+  }
+
+  function renderBubbles(words,side,seenSet){
+    var all=Array.from(seenSet);
+    var order={A1:0,A2:1,B1:2,B2:3,C1:4,C2:5};
+    all.sort(function(a,b){
+      var la=(window.getCEFRLevel&&window.getCEFRLevel(a))||'A1';
+      var lb=(window.getCEFRLevel&&window.getCEFRLevel(b))||'A1';
+      return(order[la]||0)-(order[lb]||0)||a.localeCompare(b);
+    });
+    return all.map(function(w,i){return renderBubble(w,side,i)}).join('');
+  }
+
+  function feedWords(text,seenSet,bubblesEl,side){
+    if(!bubblesEl) return;
+    var words=extractWords(text);
+    var added=false;
+    words.forEach(function(w){
+      if(!seenSet.has(w)){seenSet.add(w);added=true}
+    });
+    if(!added&&seenSet.size===0) return;
+    bubblesEl.innerHTML=renderBubbles(null,side,seenSet);
+    bindBubbleClicks(bubblesEl);
+  }
+
+  // ═══ Free Dictionary API ═══
+  async function lookupWord(word,lang){
+    var key=lang+':'+word.toLowerCase();
+    if(dictCache[key]) return dictCache[key];
+    try{
+      var resp=await fetch('https://freedictionaryapi.com/api/v1/entries/'+lang+'/'+encodeURIComponent(word));
+      if(!resp.ok) throw new Error('Not found');
+      var data=await resp.json();
+      if(!data||!data.entries||!data.entries.length) throw new Error('Empty');
+      var entry=data.entries[0];
+      // Collect definitions from senses + subsenses
+      var allDefs=[];
+      (entry.senses||[]).forEach(function(s){
+        if(s.definition) allDefs.push({def:s.definition, ex:(s.examples||[])[0]||'', synonyms:s.synonyms||[]});
+        (s.subsenses||[]).forEach(function(ss){
+          if(ss.definition) allDefs.push({def:ss.definition, ex:(ss.examples||[])[0]||'', synonyms:ss.synonyms||[]});
+        });
+      });
+      var result={
+        word:data.word||word,
+        phonetic:(entry.pronunciations||[]).filter(function(p){return p.text&&p.type==='ipa'})[0]||(entry.pronunciations||[])[0],
+        audio:null,
+        pos:entry.partOfSpeech||'',
+        defs:allDefs.slice(0,4),
+        synonyms:(entry.synonyms||[]).slice(0,5),
+        sourceUrl:(data.source&&data.source.url)||''
+      };
+      dictCache[key]=result;
+      return result;
+    }catch(e){
+      dictCache[key]=null;
+      return null;
     }
   }
 
-  function tryDetect(){
-    var supabase=window.sottotitoliSupabase;
-    if(!supabase){setTimeout(tryDetect,200);return}
-    supabase.auth.getSession().then(function(r){
-      applyState(!!r.data?.session);
-      supabase.auth.onAuthStateChange(function(event,session){applyState(!!session)});
-    }).catch(function(){applyState(false)});
+  function showDictPopup(word,lang,event){
+    dismissPopup();
+    var rect=event.target.getBoundingClientRect();
+    popupEl=document.createElement('div');
+    popupEl.className='dict-popup';
+    popupEl.style.left=Math.min(rect.left,window.innerWidth-360)+'px';
+    popupEl.style.top=Math.min(rect.bottom+6,window.innerHeight-320)+'px';
+    popupEl.innerHTML='<div class="dp-loading">🔍 Cercando <strong>'+word+'</strong>…</div>';
+    document.body.appendChild(popupEl);
+
+    lookupWord(word,lang).then(function(r){
+      if(!popupEl) return;
+      if(!r||!r.defs.length){popupEl.innerHTML='<div class="dp-error">Nessuna definizione trovata per <strong>'+word+'</strong>.<br><a href="https://translate.google.com/?sl='+lang+'&tl=it&text='+encodeURIComponent(word)+'" target="_blank" style="color:var(--accent-purple)">Cerca su Google Translate →</a></div>';return}
+      var phonetic=r.phonetic&&r.phonetic.text?' /'+r.phonetic.text+'/':'';
+      var defsHtml=r.defs.map(function(d){
+        var exHtml=d.ex?'<div class="dp-ex">“'+d.ex+'”</div>':'';
+        var synHtml=d.synonyms&&d.synonyms.length?'<div style="font-size:10px;color:var(--text-muted);margin-top:2px">Sinonimi: '+d.synonyms.slice(0,5).join(', ')+'</div>':'';
+        return'<div class="dp-def">'+d.def+exHtml+synHtml+'</div>';
+      }).join('');
+      var synAll=r.synonyms&&r.synonyms.length?'<div style="font-size:10px;color:var(--text-muted);margin-top:6px;padding-top:6px;border-top:1px solid var(--line)">🔄 Sinonimi: '+r.synonyms.join(', ')+'</div>':'';
+      var transHtml='';
+      var mi=getModeInfo();
+      // For non-English words, show translation link to Italian (UI language)
+      if(lang!=='en'){
+        transHtml='<div class="dp-trans">🔄 <a href="https://translate.google.com/?sl='+lang+'&tl=it&text='+encodeURIComponent(word)+'" target="_blank" style="color:var(--accent-purple)">'+word+' in Italiano →</a></div>';
+      }
+      if(mi.isTrans&&mi.tgtLang&&mi.tgtLang!==lang&&mi.tgtLang!=='it'){
+        transHtml='<div class="dp-trans">🔄 <a href="https://translate.google.com/?sl='+lang+'&tl='+mi.tgtLang+'&text='+encodeURIComponent(word)+'" target="_blank" style="color:var(--accent-purple)">'+word+' in '+langName(mi.tgtLang)+' →</a></div>';
+      }
+      var srcHtml=r.sourceUrl?'<div class="dp-source"><a href="'+r.sourceUrl+'" target="_blank">📖 Wiktionary'+(lang!=='en'?' (definizione in inglese)':'')+'</a></div>':'';
+      popupEl.innerHTML='<button class="dp-close" onclick="document.querySelector(\'.dict-popup\')&&document.querySelector(\'.dict-popup\').remove()">✕</button><div class="dp-word">'+r.word+'</div>'+(r.pos?'<div class="dp-pos">'+r.pos+'</div>':'')+'<div class="dp-phonetic">'+phonetic+'</div>'+defsHtml+synAll+transHtml+srcHtml;
+    }).catch(function(){
+      if(popupEl) popupEl.innerHTML='<div class="dp-error">Errore nel caricamento.</div>';
+    });
   }
-  tryDetect();
+
+  function dismissPopup(){
+    if(popupEl){popupEl.remove();popupEl=null}
+  }
+
+  document.addEventListener('click',function(e){
+    if(popupEl&&!popupEl.contains(e.target)&&!e.target.classList.contains('cefr-bubble')){dismissPopup()}
+  });
+
+  function bindBubbleClicks(container){
+    if(!container) return;
+    container.querySelectorAll('.cefr-bubble').forEach(function(b){
+      b.addEventListener('click',function(e){
+        e.stopPropagation();
+        var w=b.getAttribute('data-word');
+        var side=b.getAttribute('data-side')||'src';
+        var mi=getModeInfo();
+        var lang=side==='tgt'?mi.tgtLang:mi.srcLang;
+        if(w) showDictPopup(w,lang,e);
+      });
+    });
+  }
+
+  // ═══ Cross-highlight hover ═══
+  function bindCrossHighlight(){
+    document.querySelectorAll('.cefr-bubble[data-side]').forEach(function(b){
+      b.addEventListener('mouseenter',function(){
+        var w=b.getAttribute('data-word'),side=b.getAttribute('data-side');
+        if(!w) return;
+        // Light all bubbles with matching word (both sides)
+        document.querySelectorAll('.cefr-bubble[data-side]').forEach(function(s){
+          if(s.getAttribute('data-word').toLowerCase()===w.toLowerCase()) s.classList.add('cross-lit');
+        });
+      });
+      b.addEventListener('mouseleave',function(){
+        document.querySelectorAll('.cefr-bubble.cross-lit').forEach(function(s){s.classList.remove('cross-lit')});
+      });
+    });
+  }
+
+  // ═══ Main update ═══
+  window.updateCefrBubbles = function(text, translatedText){
+    var mi=getModeInfo();
+    if(mi.isTrans){
+      // Translate mode: dual boxes
+      if(singleEl) singleEl.style.display='none';
+      if(dualEl) dualEl.style.display='grid';
+      var sl=document.getElementById('vocabSrcLabel');
+      var tl=document.getElementById('vocabTgtLabel');
+      if(sl) sl.textContent=mi.srcFlag+' '+langName(mi.srcLang);
+      if(tl) tl.textContent=mi.tgtFlag+' '+langName(mi.tgtLang);
+      if(text) feedWords(text,seenSrc,srcBubblesEl,'src');
+      if(translatedText) feedWords(translatedText,seenTgt,tgtBubblesEl,'tgt');
+      if(countEl) countEl.textContent=(seenSrc.size+seenTgt.size)+' parole';
+      setTimeout(bindCrossHighlight,100);
+    }else{
+      // Caption mode: single box
+      if(dualEl) dualEl.style.display='none';
+      if(singleEl) singleEl.style.display='flex';
+      if(text) feedWords(text,seenSrc,singleEl,'src');
+      if(countEl) countEl.textContent=seenSrc.size+' parole';
+    }
+  };
+
+  // Watch transcripts
+  function watchTranscript(id,isTranslated){
+    var el=document.getElementById(id);
+    if(!el) return;
+    var observer=new MutationObserver(function(){
+      var lines=[];
+      el.querySelectorAll('div').forEach(function(d){lines.push(d.textContent||'')});
+      var txt=lines.join(' ');
+      if(isTranslated){
+        var srcEl=document.getElementById('captionTranscript');
+        var srcLines=[]; if(srcEl) srcEl.querySelectorAll('div').forEach(function(d){srcLines.push(d.textContent||'')});
+        window.updateCefrBubbles(srcLines.join(' '),txt);
+      }else{
+        window.updateCefrBubbles(txt);
+      }
+    });
+    observer.observe(el,{childList:true,subtree:true,characterData:true});
+  }
+  watchTranscript('captionTranscript',false);
+  watchTranscript('captionTranslated',true);
 })();
 
-// ── Caption language selector ──
+// ── Live metrics dashboard ──
 (function(){
-  var chips=document.querySelectorAll('#capChips .sw-chip');
-  var flagEl=document.getElementById('capFlag');
-  var nameEl=document.getElementById('capName');
-  var goBtn=document.getElementById('capGoBtn');
-  if(!chips.length)return;
+  'use strict';
+  function $(id) { return document.getElementById(id); }
+  function setText(id, v) { var e = $(id); if (e) e.textContent = v; }
 
-  var capNames={en:'Inglese',it:'Italiano',fr:'Francese',de:'Tedesco',es:'Spagnolo',nl:'Olandese',pt:'Portoghese',pl:'Polacco'};
-  var capFlags={en:'🇬🇧',it:'🇮🇹',fr:'🇫🇷',de:'🇩🇪',es:'🇪🇸',nl:'🇳🇱',pt:'🇵🇹',pl:'🇵🇱'};
+  var sessionStart = null;
+  var timerInterval = null;
+  var metricsInterval = null;
+  var lastVerbChips = '';
 
-  chips.forEach(function(chip){
-    chip.addEventListener('click',function(){
-      var code=this.getAttribute('data-cap');
-      chips.forEach(function(c){c.classList.remove('active')});
-      this.classList.add('active');
-      if(flagEl)flagEl.textContent=capFlags[code];
-      if(nameEl)nameEl.textContent=capNames[code];
-      if(goBtn)goBtn.href='app.html?mode=caption-'+code;
+  function startTimer() {
+    if (timerInterval) return;
+    sessionStart = Date.now();
+    timerInterval = setInterval(function() {
+      var elapsed = Math.floor((Date.now() - sessionStart) / 1000);
+      var m = Math.floor(elapsed / 60);
+      var s = elapsed % 60;
+      setText('sessionTimer', String(m).padStart(2,'0') + ':' + String(s).padStart(2,'0'));
+      setText('minuteCounter', m + 'm usati');
+    }, 1000);
+  }
+
+  function stopTimer() {
+    if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
+    if (metricsInterval) { clearInterval(metricsInterval); metricsInterval = null; }
+    sessionStart = null;
+  }
+
+  function updateLiveMetrics() {
+    var modeEl = $('modeBadge');
+    var mode = modeEl ? modeEl.textContent : 'caption-en';
+    // Read the current transcript text
+    var transcriptEl = $('captionTranscript');
+    var text = transcriptEl ? (transcriptEl.textContent || '').trim() : '';
+
+    // Count verbs/nouns/adjectives using comprehensive word lists + suffix fallback
+    var verbCount = 0, nounCount = 0, adjCount = 0, advCount = 0, pronCount = 0, prepCount = 0;
+    var usedWords = {};
+
+    // ── Comprehensive English POS word sets ──
+    var VERB_SET = new Set(['be','am','is','are','was','were','been','being','have','has','had','having','do','does','did','doing','done','say','said','says','saying','go','goes','went','gone','going','get','gets','got','gotten','getting','make','makes','made','making','know','knew','known','knows','knowing','think','thinks','thought','thinking','see','saw','seen','sees','seeing','come','came','comes','coming','take','took','taken','takes','taking','give','gave','given','gives','giving','put','puts','putting','let','lets','letting','run','ran','runs','running','sit','sat','sits','sitting','tell','told','tells','telling','hold','held','holds','holding','keep','kept','keeps','keeping','find','found','finds','finding','leave','left','leaves','leaving','bring','brought','brings','bringing','begin','began','begun','begins','beginning','become','became','becomes','becoming','call','called','calls','calling','try','tried','tries','trying','ask','asked','asks','asking','need','needed','needs','needing','feel','felt','feels','feeling','work','worked','works','working','seem','seemed','seems','seeming','help','helped','helps','helping','talk','talked','talks','talking','turn','turned','turns','turning','start','started','starts','starting','show','showed','shown','shows','showing','play','played','plays','playing','move','moved','moves','moving','live','lived','lives','living','believe','believed','believes','believing','happen','happened','happens','happening','allow','allowed','allows','allowing','stand','stood','stands','standing','mean','meant','means','meaning','set','sets','setting','meet','met','meets','meeting','pay','paid','pays','paying','win','won','wins','winning','lose','lost','loses','losing','build','built','builds','building','send','sent','sends','sending','spend','spent','spends','spending','grow','grew','grown','grows','growing','speak','spoke','spoken','speaks','speaking','hear','heard','hears','hearing','read','reads','reading','write','wrote','written','writes','writing','learn','learned','learnt','learns','learning','change','changed','changes','changing','lead','led','leads','leading','understand','understood','understands','understanding','watch','watched','watches','watching','follow','followed','follows','following','stop','stopped','stops','stopping','create','created','creates','creating','open','opened','opens','opening','walk','walked','walks','walking','offer','offered','offers','offering','remember','remembered','remembers','remembering','consider','considered','considers','considering','appear','appeared','appears','appearing','buy','bought','buys','buying','wait','waited','waits','waiting','serve','served','serves','serving','die','died','dies','dying','eat','ate','eaten','eats','eating','drink','drank','drunk','drinks','drinking','sleep','slept','sleeps','sleeping','wear','wore','worn','wears','wearing','cut','cuts','cutting','fall','fell','fallen','falls','falling','rise','rose','risen','rises','rising','fight','fought','fights','fighting','sing','sang','sung','sings','singing','draw','drew','drawn','draws','drawing','drive','drove','driven','drives','driving','fly','flew','flown','flies','flying','throw','threw','thrown','throws','throwing','catch','caught','catches','catching','choose','chose','chosen','chooses','choosing','forget','forgot','forgotten','forgets','forgetting','break','broke','broken','breaks','breaking','carry','carried','carries','carrying','agree','agreed','agrees','agreeing','argue','argued','argues','arguing','recognize','recognized','recognizes','recognizing','recreate','recreated','recreates','recreating','unfold','unfolded','unfolds','unfolding','corrode','corroded','corrodes','corroding','commit','committed','commits','committing','emerge','emerged','emerges','emerging']);
+    var NOUN_SET = new Set(['time','year','people','way','day','man','woman','child','world','life','hand','part','place','case','week','company','system','program','question','government','number','night','point','home','water','room','mother','area','money','story','fact','month','lot','right','study','book','eye','job','word','business','issue','side','kind','head','house','service','friend','father','power','hour','game','line','end','member','law','car','city','community','name','president','team','minute','idea','body','information','back','parent','face','others','level','office','door','health','person','art','war','history','party','result','morning','reason','research','girl','guy','moment','air','teacher','force','education','work','food','boy','age','policy','process','music','market','sense','nation','plan','college','interest','death','experience','effect','use','class','society','industry','cause','land','care','project','century','security','bank','science','opportunity','source','value','condition','action','nature','range','defense','budget','practice','movement','record','rule','goal','film','success','article','population','economy','culture','strategy','newspaper','language','truth','church','song','candidate','worker','environment','material','thought','media','response','technology','relationship','quality','conference','stuff','argument','debate','story','nation','hierarchy','domination','subjugation','solidarity','cooperation','dimension','mixture','liberalism','nationalism','ideology','theory','condition','right']);
+    var ADJ_SET = new Set(['good','new','first','last','long','great','little','own','other','old','right','big','high','different','small','large','next','early','young','important','few','public','bad','same','able','possible','open','free','political','economic','social','national','local','international','recent','strong','sure','true','real','full','special','easy','hard','clear','nice','quick','ready','sorry','afraid','aware','available','likely','particular','various','serious','religious','ethnic','human','intense','curious','appealing','shared','nationalist','based','different','large','great','nice','wrong','short','simple','certain','single','personal','professional','academic','pretty','funny','happy','sad','dark','light','heavy','cold','hot','warm','cool','dry','wet','rich','poor','tall','short','thick','thin','wide','narrow','deep','shallow','fast','slow','soft','loud','quiet','cheap','expensive','clean','dirty','empty','fair','safe','dangerous','wise','stupid','brave','proud','angry','kind','mean','honest','brave','generous','greedy','polite','rude','patient','eager','anxious','nervous','calm','gentle','cruel','humble','arrogant']);
+    var ADV_SET = new Set(['not','also','very','often','however','too','usually','really','already','always','never','sometimes','together','likely','generally','certainly','absolutely','exactly','perhaps','maybe','quite','almost','enough','far','less','maybe','perhaps','probably','rather','recently','still','then','there','today','tomorrow','tonight','yesterday','yet','just','now','soon','later','again','once','ever','never','always','here','there','everywhere','somewhere','anywhere','nowhere','up','down','in','out','on','off','over','under','back','forward','away','home','abroad','well','badly','slowly','quickly','easily','carefully','definitely']);
+    var PRON_SET = new Set(['i','you','he','she','it','we','they','me','him','her','us','them','my','your','his','its','our','their','mine','yours','hers','ours','theirs','myself','yourself','himself','herself','itself','ourselves','yourselves','themselves','this','that','these','those','who','whom','whose','which','what','whoever','whatever','anyone','someone','everyone','nobody','anybody','somebody','everybody','nothing','anything','something','everything','none','all','both','few','many','several','some','any','each','every','either','neither','one','ones','other','others','another']);
+    var PREP_SET = new Set(['in','on','at','to','for','with','from','by','about','into','through','during','before','after','over','under','between','among','within','without','above','below','behind','beyond','across','along','around','against','toward','towards','upon','inside','outside','near','off','up','down','of','like','as','since','until','till','despite','except','besides','beside','per','throughout']);
+
+    // Suffix rules for fallback
+    var suffixes = {
+      verb: ['ing','ed','ize','ise','ate','ify','en'],
+      noun: ['tion','sion','ment','ness','ity','ance','ence','er','or','ist','ism','dom','hood','ship'],
+      adj: ['ous','ful','less','able','ible','ive','al','ial','ic','ical','ish','like','esque'],
+      adv: ['ly','wise','wards']
+    };
+
+    function detectPOS(word) {
+      var w = word.toLowerCase();
+      // Check comprehensive word sets first
+      if (VERB_SET.has(w)) return 'verb';
+      if (NOUN_SET.has(w)) return 'noun';
+      if (ADJ_SET.has(w)) return 'adj';
+      if (ADV_SET.has(w)) return 'adv';
+      if (PRON_SET.has(w)) return 'pron';
+      if (PREP_SET.has(w)) return 'prep';
+      // Suffix fallback
+      for (var i = 0; i < suffixes.verb.length; i++) { if (w.endsWith(suffixes.verb[i]) && w.length > 3) return 'verb'; }
+      for (var i = 0; i < suffixes.noun.length; i++) { if (w.endsWith(suffixes.noun[i]) && w.length > 3) return 'noun'; }
+      for (var i = 0; i < suffixes.adj.length; i++) { if (w.endsWith(suffixes.adj[i]) && w.length > 3) return 'adj'; }
+      for (var i = 0; i < suffixes.adv.length; i++) { if (w.endsWith(suffixes.adv[i]) && w.length > 3) return 'adv'; }
+      return null;
+    }
+
+    if (text) {
+      var tokens = text.split(/\s+/);
+      tokens.forEach(function(t) {
+        var clean = t.toLowerCase().replace(/[^a-zà-ù']/g, '');
+        if (!clean || clean.length < 2) return;
+        // Count ALL occurrences for verb/noun/adj/adv
+        var pos = detectPOS(clean);
+        if (!pos) return;
+        if (pos === 'verb') { verbCount++; }
+        else if (pos === 'noun') { nounCount++; }
+        else if (pos === 'adj') { adjCount++; }
+        else if (pos === 'adv') { advCount++; }
+      });
+    }
+
+    setText('liveVerbCount', verbCount);
+    setText('liveNounCount', nounCount);
+    setText('liveAdjCount', adjCount);
+    setText('liveAdvCount', advCount);
+    // Estimate pronouns and prepositions
+    var prepCount2 = 0, pronCount2 = 0;
+    if (text) {
+      var tokens2 = text.toLowerCase().split(/\s+/);
+      tokens2.forEach(function(t){
+        var clean = t.replace(/[^a-zà-ù']/g, '');
+        if (PREP_SET.has(clean)) prepCount2++;
+        if (PRON_SET.has(clean)) pronCount2++;
+      });
+    }
+    setText('livePrepCount', prepCount2);
+    setText('livePronCount', pronCount2);
+
+    // Read stats from DOM (populated by app.js)
+    var words = parseInt(($('statWords')||{}).textContent) || 0;
+    var lines = parseInt(($('statLines')||{}).textContent) || 0;
+    setText('liveWords', words);
+
+    // Compute live metrics
+    if (words > 0 && sessionStart) {
+      var elapsedMin = (Date.now() - sessionStart) / 60000;
+      var wpm = elapsedMin > 0 ? Math.round(words / elapsedMin) : 0;
+      setText('liveWpm', wpm);
+
+      // Lexical diversity estimate
+      var uniqueText = text.toLowerCase().match(/[a-z']+/g);
+      var uniqueCount = uniqueText ? new Set(uniqueText).size : 0;
+      var lexDiv = words > 0 ? (uniqueCount / words).toFixed(2) : '—';
+      setText('liveLexDiv', lexDiv);
+
+      // CEFR gauge
+      var cefrScore = 0;
+      if (wpm >= 80 && wpm <= 170) cefrScore = Math.min(100, (wpm - 70) * 1.2);
+      else if (wpm > 170) cefrScore = 100;
+      else cefrScore = Math.max(5, wpm * 1.1);
+      if (Number(lexDiv) > 0.35) cefrScore = Math.min(100, cefrScore + 15);
+      cefrScore = Math.round(cefrScore);
+      var gauge = $('cefrGauge');
+      if (gauge) gauge.style.height = cefrScore + '%';
+      var level = cefrScore >= 80 ? 'C1' : cefrScore >= 60 ? 'B2' : cefrScore >= 35 ? 'B1' : cefrScore >= 15 ? 'A2' : 'A1';
+      setText('cefrLevel', level);
+    }
+
+    // Update sentences count (from transcript lines or punctuation)
+    var sentences = (text.match(/[.!?]/g) || []).length;
+    if (sentences === 0) {
+      // Fallback: count transcript lines as sentences
+      var transcriptEl2 = $('captionTranscript');
+      var lineEls = transcriptEl2 ? transcriptEl2.querySelectorAll('.line') : [];
+      sentences = lineEls.length || 1;
+    }
+    setText('liveSentences', sentences || 1);
+
+    // Fillers detection
+    var fillerPattern = /\b(um|uh|er|ah|like|you\s*know|i\s*mean|sort\s*of|kind\s*of|basically|actually|literally|just|really|so|well|hmm|mmm)\b/gi;
+    var fillerMatches = text.match(fillerPattern) || [];
+    setText('liveFillers', fillerMatches.length);
+
+    // Questions detection
+    var questionWords = /\b(what|when|where|which|who|whom|whose|why|how|is|are|was|were|do|does|did|can|could|will|would|shall|should|may|might|have|has|had)\b/gi;
+    var qMatches = text.match(questionWords) || [];
+    var questionMarks = (text.match(/\?/g) || []).length;
+    setText('liveQuestions', Math.max(questionMarks, Math.min(qMatches.length, sentences)));
+
+    // Update quality
+    var qualityEl = $('liveQuality');
+    if (qualityEl && qualityEl.textContent !== '—') {
+      var qVal = parseFloat(qualityEl.textContent) || 0;
+      var qMeter = $('qualityMeter');
+      if (qMeter) qMeter.style.width = Math.round(qVal * 100) + '%';
+    }
+    // Quality score & Lexical div. info lines
+    var qInfo = $('qualityInfo');
+    if (qInfo && qualityEl && qualityEl.textContent !== '—') {
+      var qv = parseFloat(qualityEl.textContent) || 0;
+      var qLabels = ['No data yet','Hesitant, many pauses','Developing flow','Conversational pace','Confident speaker','Near-native fluency'];
+      var qi = Math.min(5, Math.floor(qv * 5));
+      qInfo.textContent = (qv*100).toFixed(0)+'/100 — '+qLabels[qi];
+    }
+    var ldInfo = $('lexDivInfo');
+    var ldEl = $('liveLexDiv');
+    if (ldInfo && ldEl && ldEl.textContent !== '—') {
+      var lv = parseFloat(ldEl.textContent) || 0;
+      var lLabels = ['No data yet','Repetitive vocabulary','Basic range','Everyday variety','Rich vocabulary','Academic-level range'];
+      var li = Math.min(5, Math.floor(lv * 5));
+      ldInfo.textContent = lv.toFixed(2)+'/1 — '+lLabels[li];
+    }
+  }
+
+  // Hook into app.js start/stop
+  var origStart = document.getElementById('startBtn');
+  if (origStart) {
+    origStart.addEventListener('click', function() { setTimeout(startTimer, 100); });
+  }
+  var origStop = document.getElementById('stopBtn');
+  if (origStop) {
+    origStop.addEventListener('click', function() { stopTimer(); });
+  }
+
+  // Mode badge — just show label, dropdown handles selection
+  function updateModeBadge() {
+    var params = new URLSearchParams(window.location.search);
+    var mode = params.get('mode') || 'caption-en';
+    var tw = $('translatedWindow');
+    if (tw) tw.style.display = mode.indexOf('translate-') === 0 ? 'block' : 'none';
+    // Track current session language and mode for dictionary lookups
+    window.__currentSessionLang = mode.replace('caption-','').replace('translate-','').split('-')[0] || 'en';
+    window.__currentSessionMode = mode;
+    // Update badge text
+    var badge = $('modeBadge');
+    if (badge) {
+      var labels = {
+        'caption-en':'🇬🇧 English','caption-it':'🇮🇹 Italiano','caption-fr':'🇫🇷 Français',
+        'caption-de':'🇩🇪 Deutsch','caption-es':'🇪🇸 Español','caption-pt':'🇵🇹 Português',
+        'caption-nl':'🇳🇱 Nederlands','caption-pl':'🇵🇱 Polski',
+        'translate-en-it':'🇬🇧→🇮🇹 EN→IT','translate-it-en':'🇮🇹→🇬🇧 IT→EN',
+        'translate-en-fr':'🇬🇧→🇫🇷 EN→FR','translate-en-de':'🇬🇧→🇩🇪 EN→DE',
+        'translate-en-es':'🇬🇧→🇪🇸 EN→ES','translate-en-pt':'🇬🇧→🇵🇹 EN→PT',
+        'translate-en-nl':'🇬🇧→🇳🇱 EN→NL','translate-en-pl':'🇬🇧→🇵🇱 EN→PL'
+      };
+      badge.textContent = labels[mode] || mode;
+    }
+  }
+  updateModeBadge();
+
+  // Poll live metrics every 1500ms
+  var metricsInterval = setInterval(updateLiveMetrics, 1500);
+  document.addEventListener('DOMContentLoaded', updateLiveMetrics);
+})();
+</script>
+
+<script>
+// ── Short overlay URL ──
+document.addEventListener("DOMContentLoaded", function() {
+  var overlayLink = document.getElementById("overlayLink");
+  var short = document.getElementById("overlayLinkShort");
+  if (!overlayLink || !short) return;
+  var observer = new MutationObserver(function() {
+    if (!overlayLink.href) return;
+    try {
+      var u = new URL(overlayLink.href);
+      var path = u.pathname.split("/").slice(-1)[0] || "";
+      var room = u.searchParams.get("room");
+      short.textContent = room ? (path + "?room=" + room) : u.href;
+    } catch(e) { short.textContent = overlayLink.href; }
+  });
+  observer.observe(overlayLink, { attributes: true, attributeFilter: ["href"] });
+});
+</script>
+
+<script>
+// ── Auth gate: block recording if not logged in ──
+(function(){
+  var startBtn = document.getElementById('startBtn');
+  if(!startBtn) return;
+  startBtn.addEventListener('click', function(e){
+    var sup = window.sottotitoliSupabase;
+    if(!sup){ e.preventDefault(); e.stopPropagation(); alert('Connessione al server non disponibile.'); return; }
+    sup.auth.getSession().then(function(r){
+      if(!r.data?.session){
+        e.preventDefault(); e.stopPropagation();
+        localStorage.setItem('sottotitoli_return_page','studio.html');
+        window.location.href = 'https://buoninglese.github.io/sottotitoli/start.html';
+      }
+    });
+  }, true); // capture phase — fires before app.js handler
+})();
+</script>
+<script>
+// ── Load credits & tokens on login ──
+(function(){
+  async function loadBalances(){
+    var sup=window.sottotitoliSupabase; if(!sup) return;
+    var s=await sup.auth.getSession(); if(!s.data?.session) return;
+    var uid=s.data.session.user.id;
+    var c=await sup.from('user_credits').select('balance_seconds').eq('user_id',uid).maybeSingle();
+    var bal=c.data?.balance_seconds??0;
+    var cdCap=document.getElementById('creditCapMin');
+    var cdTra=document.getElementById('creditTraMin');
+    var mins=Math.round(bal/60);
+    if(cdCap) cdCap.textContent=mins+'m capt';
+    if(cdTra) cdTra.textContent=Math.round(mins/2)+'m trad';
+    var t=await sup.from('user_tokens').select('balance').eq('user_id',uid).maybeSingle();
+    var td=document.getElementById('tokenBalanceApp');
+    if(td) td.textContent=(t.data?.balance??0)+' VC';
+  }
+  window.addEventListener('sottotitoli-auth',function(e){if(e.detail.user)loadBalances()});
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',function(){setTimeout(loadBalances,800)});else setTimeout(loadBalances,500);
+})();
+</script>
+
+<script>
+// ── Session completion + report purchases ──
+(function(){
+  'use strict';
+
+  // New session confirmation
+  var newBtn = document.getElementById('newSessionBtn');
+  if (newBtn) {
+    newBtn.addEventListener('click', function(){
+      if (confirm('Iniziare una nuova sessione? Il transcript corrente sarà cancellato.')) {
+        var completePanel = document.getElementById('sessionComplete');
+        if (completePanel) completePanel.classList.remove('visible');
+        var transcriptEl = document.getElementById('captionTranscript');
+        var translEl = document.getElementById('captionTranslated');
+        var bubblesEl = document.getElementById('vocabSingle');
+        var bubblesSrc = document.getElementById('cefrBubblesSrc');
+        var bubblesTgt = document.getElementById('cefrBubblesTgt');
+        if (transcriptEl) transcriptEl.innerHTML = '';
+        if (translEl) translEl.innerHTML = '';
+        if (bubblesEl) bubblesEl.innerHTML = '<span style="font-size:12px;color:var(--muted2)">Avvia il microfono…</span>';
+        if (bubblesSrc) bubblesSrc.innerHTML = '';
+        if (bubblesTgt) bubblesTgt.innerHTML = '';
+        // Reset stats display
+        ['statLines','statWords','statChars','liveWpm','liveWords','liveSentences','liveLexDiv','liveFillers','liveQuality','liveVerbCount','liveNounCount','liveAdjCount','liveQuestions','cefrLevel','cefrGauge','reportQuality','reportWpm','reportFillers'].forEach(function(id){
+          var el = document.getElementById(id);
+          if (el) { el.textContent = id === 'cefrGauge' ? '' : (el.tagName === 'DIV' ? '' : '—'); }
+        });
+      }
+    });
+  }
+
+  // Direct report purchase buttons
+  var reportModuleMap = { cambridge: 1, academic: 5, linguistic: 9, business: 11 };
+  var reportFamilyMap = { cambridge: 'cambridge', academic: 'academic', linguistic: 'linguistic', business: 'business' };
+
+  // Show post-session analysis when session completes
+  var sessionCompleteObserver = new MutationObserver(function(mutations){
+    mutations.forEach(function(m){
+      if(m.target.id==='sessionComplete'&&m.target.classList.contains('visible')){
+        var psa = document.getElementById('postSessionAnalysis');
+        if(psa) psa.style.display='block';
+        // Populate post-session fields
+        var sumDur = document.getElementById('sumDuration');
+        var sumWords = document.getElementById('sumWords');
+        if(sumDur) document.getElementById('psDuration').textContent = sumDur.textContent;
+        if(sumWords) document.getElementById('psWords').textContent = sumWords.textContent;
+        var modeEl = document.getElementById('modeBadge');
+        document.getElementById('psLang').textContent = modeEl ? modeEl.textContent : '—';
+        document.getElementById('psDate').textContent = new Date().toLocaleDateString('it-IT');
+        psa.scrollIntoView({behavior:'smooth',block:'nearest'});
+      }
+    });
+  });
+  var scEl = document.getElementById('sessionComplete');
+  if(scEl) sessionCompleteObserver.observe(scEl, {attributes:true, attributeFilter:['class']});
+
+  document.querySelectorAll('.report-buy-btn').forEach(function(btn){
+    btn.addEventListener('click', async function(){
+      var reportType = btn.dataset.report;
+      var tokensNeeded = parseInt(btn.dataset.tokens);
+      var msgEl = document.getElementById('reportBuyMsg');
+      var progressEl = document.getElementById('reportProgress');
+      var progressBar = document.getElementById('reportProgressBar');
+      var progressLabel = document.getElementById('reportProgressLabel');
+      var resultEl = document.getElementById('reportResult');
+      
+      if (!window.sottotitoliSupabase) {
+        if (msgEl) { msgEl.textContent = 'Accedi per acquistare report.'; msgEl.style.color = 'var(--warn)'; }
+        return;
+      }
+
+      var sessionResp = await window.sottotitoliSupabase.auth.getSession();
+      if (!sessionResp.data?.session) {
+        if (msgEl) { msgEl.textContent = 'Accedi per acquistare report.'; msgEl.style.color = 'var(--warn)'; }
+        return;
+      }
+
+      var userId = sessionResp.data.session.user.id;
+      var sessionId = window.currentSessionId;
+      if (!sessionId) {
+        if (msgEl) { msgEl.textContent = 'Nessuna sessione attiva. Avvia e ferma una sessione prima.'; msgEl.style.color = 'var(--warn)'; }
+        return;
+      }
+
+      // Check token balance
+      var tokResp = await window.sottotitoliSupabase.from('user_tokens').select('balance').eq('user_id', userId).maybeSingle();
+      var balance = tokResp.data?.balance ?? 0;
+      if (balance < tokensNeeded) {
+        if (msgEl) { msgEl.textContent = 'Token insufficienti. Ne hai ' + balance + ', servono ' + tokensNeeded + '.'; msgEl.style.color = 'var(--danger)'; }
+        return;
+      }
+
+      btn.disabled = true;
+      btn.style.opacity = '0.5';
+      btn.textContent = '⏳…';
+
+      // Deduct tokens
+      var newBalance = balance - tokensNeeded;
+      var updateResp = await window.sottotitoliSupabase.from('user_tokens').update({ balance: newBalance, updated_at: new Date().toISOString() }).eq('user_id', userId);
+      if (updateResp.error) {
+        if (msgEl) { msgEl.textContent = 'Errore: ' + updateResp.error.message; msgEl.style.color = 'var(--danger)'; }
+        btn.disabled = false; btn.style.opacity = '1'; return;
+      }
+
+      // Log transaction
+      await window.sottotitoliSupabase.from('token_transactions').insert({
+        user_id: userId, amount: -tokensNeeded, type: 'report_purchase',
+        reference: reportType, balance_after: newBalance
+      });
+
+      // Update token display
+      var tokDisp = document.getElementById('tokenBalanceApp');
+      if (tokDisp) tokDisp.textContent = newBalance + ' VC';
+
+      // Create AI report request
+      var moduleId = reportModuleMap[reportType] || 1;
+      var familyKey = reportFamilyMap[reportType] || reportType;
+      var reqResp = await window.sottotitoliSupabase.from('ai_report_requests').insert({
+        user_id: userId, family_key: familyKey, module_key: String(moduleId),
+        scope_type: 'single_session', session_ids: [sessionId],
+        status: 'queued', tokens_spent: tokensNeeded, billing_rule_applied: 'per_report'
+      }).select('id').single();
+
+      if (reqResp.error) {
+        if (msgEl) { msgEl.textContent = 'Errore richiesta: ' + reqResp.error.message; msgEl.style.color = 'var(--danger)'; }
+        btn.disabled = false; btn.style.opacity = '1'; return;
+      }
+
+      var requestId = reqResp.data.id;
+
+      // Trigger the edge function to process the report
+      try {
+        await fetch('https://qzqmuegbpmvqrjrlfbgk.supabase.co/functions/v1/process-ai-reports', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + sessionResp.data.session.access_token }
+        });
+      } catch(e) { /* Edge function call may fail silently; poll will still work */ }
+
+      // Show progress bar
+      if (progressEl) progressEl.style.display = 'block';
+      if (progressBar) progressBar.style.width = '10%';
+      if (progressLabel) progressLabel.textContent = 'Richiesta inviata…';
+      if (msgEl) { msgEl.textContent = ''; }
+
+      // Poll for results
+      var attempts = 0, maxAttempts = 20;
+      var pollInterval = setInterval(async function(){
+        attempts++;
+        var pct = Math.min(90, 10 + attempts * 4);
+        if (progressBar) progressBar.style.width = pct + '%';
+        if (progressLabel) progressLabel.textContent = 'Elaborazione… (' + attempts + 's)';
+
+        // Check for failure
+        var checkResp = await window.sottotitoliSupabase.from('ai_report_requests').select('status,error_message').eq('id', requestId).single();
+        if (checkResp.data?.status === 'failed') {
+          clearInterval(pollInterval);
+          if (progressEl) progressEl.style.display = 'none';
+          if (msgEl) { msgEl.textContent = '❌ Fallito: ' + (checkResp.data.error_message || 'errore'); msgEl.style.color = 'var(--danger)'; }
+          btn.disabled = false; btn.style.opacity = '1'; btn.textContent = 'Riprova'; return;
+        }
+
+        // Check for completed report
+        var reportResp = await window.sottotitoliSupabase.from('session_ai_reports').select('summary_text,overall_score').eq('session_id', sessionId).eq('user_id', userId).not('summary_text', 'is', null).order('created_at', {ascending:false}).limit(1).maybeSingle();
+
+        if (reportResp.data?.summary_text) {
+          clearInterval(pollInterval);
+          if (progressBar) progressBar.style.width = '100%';
+          if (progressLabel) progressLabel.textContent = '✅ Completato!';
+          setTimeout(function(){ if (progressEl) progressEl.style.display = 'none'; }, 2000);
+
+          var summary = reportResp.data.summary_text;
+          var score = reportResp.data.overall_score;
+          if (resultEl) {
+            resultEl.style.display = 'block';
+            resultEl.innerHTML = '<div style="background:rgba(22,163,74,.08);border:1px solid rgba(22,163,74,.2);border-radius:10px;padding:16px">' +
+              '<strong>✅ Report pronto!</strong>' + (score ? ' <span style="color:var(--muted)">Punteggio: ' + Number(score).toFixed(1) + '/10</span>' : '') +
+              '<p style="margin:8px 0 0;font-size:12px;color:var(--muted);max-height:120px;overflow-y:auto;white-space:pre-wrap">' + summary.substring(0, 400) + (summary.length>400?'…':'') + '</p>' +
+              '<a href="analysis.html" style="display:inline-block;margin-top:8px;font-size:12px;color:var(--accent);font-weight:600">📊 Vedi report completo →</a></div>';
+          }
+          btn.textContent = '✅ Fatto'; btn.style.opacity = '1';
+          setTimeout(function(){ btn.disabled = false; }, 3000);
+          return;
+        }
+
+        if (attempts >= maxAttempts) {
+          clearInterval(pollInterval);
+          if (progressEl) progressEl.style.display = 'none';
+          if (msgEl) { msgEl.textContent = '⏰ In elaborazione — lo troverai su Analysis tra poco.'; msgEl.style.color = 'var(--amber)'; }
+          btn.textContent = 'In coda'; btn.style.opacity = '1'; btn.disabled = false;
+        }
+      }, 3000);
     });
   });
 })();
 
+// ── Post-session tools ──
+window.saveSessionName=function(){
+  var name=document.getElementById('psSaveName')?.value?.trim();
+  if(!name) return;
+  localStorage.setItem('sottotitoli-last-session-name',name);
+  var btn=event.target; btn.textContent='✓ Salvato'; setTimeout(function(){btn.textContent='💾 Salva'},2000);
+};
+window.copyTranscript=function(){
+  var text=document.getElementById('captionTranscript')?.innerText||'';
+  navigator.clipboard.writeText(text).then(function(){
+    var btn=document.getElementById('psCopyBtn'); if(btn){btn.textContent='✓ Copiato';setTimeout(function(){btn.textContent='📋 Copia trascrizione'},2000)}
+  });
+};
+window.downloadTranscript=function(){
+  var text=document.getElementById('captionTranscript')?.innerText||'';
+  var blob=new Blob([text],{type:'text/plain'});
+  var a=document.createElement('a'); a.href=URL.createObjectURL(blob);
+  var name=localStorage.getItem('sottotitoli-last-session-name')||'trascrizione';
+  a.download=name+'.txt'; a.click();
+};
+document.getElementById('psCopyBtn')?.addEventListener('click',copyTranscript);
+document.getElementById('psDownloadBtn')?.addEventListener('click',downloadTranscript);
+
+// ── Hover sync: transcript ↔ translation ──
 (function(){
-  var flags=[
-    {code:'en',flag:'🇬🇧',name:'Inglese'},{code:'it',flag:'🇮🇹',name:'Italiano'},
-    {code:'fr',flag:'🇫🇷',name:'Francese'},{code:'de',flag:'🇩🇪',name:'Tedesco'},
-    {code:'es',flag:'🇪🇸',name:'Spagnolo'},{code:'nl',flag:'🇳🇱',name:'Olandese'},
-    {code:'pt',flag:'🇵🇹',name:'Portoghese'},{code:'pl',flag:'🇵🇱',name:'Polacco'}
-  ];
-  var selSrc='en',selTgt='it';
-  var srcBox=document.getElementById('srcBox');
-  var tgtBox=document.getElementById('tgtBox');
-  var goBtn=document.getElementById('translateGoBtn');
-  var srcFlagEl=document.getElementById('sourceFlag');
-  var tgtFlagEl=document.getElementById('targetFlag');
-  var srcNameEl=document.getElementById('sourceName');
-  var tgtNameEl=document.getElementById('targetName');
-  var spinner=document.getElementById('trSpinner');
-  var spinnerTitle=document.getElementById('trSpinnerTitle');
-  var spinnerGrid=document.getElementById('trSpinnerGrid');
-  var spinnerClose=document.getElementById('trSpinnerClose');
-  var activeSide=null; // 'source' or 'target'
+  var styleEl = document.createElement('style');
+  styleEl.textContent = '.tx-line.hover-hl,.tl-line.hover-hl{background:rgba(124,58,237,.12)!important;border-radius:3px;transition:background .15s}';
+  document.head.appendChild(styleEl);
 
-  function updPairDisplay(){
-    var s=flags.find(function(ff){return ff.code===selSrc});
-    var t=flags.find(function(ff){return ff.code===selTgt});
-    if(srcFlagEl)srcFlagEl.textContent=s.flag;
-    if(srcNameEl)srcNameEl.textContent=s.name;
-    if(tgtFlagEl)tgtFlagEl.textContent=t.flag;
-    if(tgtNameEl)tgtNameEl.textContent=t.name;
-    if(goBtn)goBtn.href='app.html?mode=translate-'+selSrc+'-'+selTgt;
+  function getTimestamp(el){
+    var span = el.querySelector('span');
+    return span ? span.textContent.trim() : '';
   }
 
-  function openSpinner(side){
-    activeSide=side;
-    spinnerTitle.textContent=side==='source'?'Io parlo in…':'Sottotitoli in…';
-    spinnerGrid.innerHTML='';
-    var cur=side==='source'?selSrc:selTgt;
-    flags.forEach(function(f){
-      var c=document.createElement('button');
-      c.className='tr-spinner-chip'+(f.code===cur?' selected':'');
-      c.textContent=f.flag+' '+f.name;
-      c.addEventListener('click',function(){
-        if(side==='source')selSrc=f.code;else selTgt=f.code;
-        updPairDisplay();
-        spinnerGrid.querySelectorAll('.tr-spinner-chip').forEach(function(x){x.classList.remove('selected')});
-        c.classList.add('selected');
+  function syncLines(){
+    var allLines = document.querySelectorAll('#captionTranscript .line, #captionTranslated .line');
+    allLines.forEach(function(l){
+      if(l.dataset.tsSynced) return; l.dataset.tsSynced='1';
+      var ts = getTimestamp(l);
+      if(ts) l.setAttribute('data-ts', ts);
+      l.addEventListener('mouseenter',function(){
+        var tsKey = l.getAttribute('data-ts');
+        if(!tsKey) return;
+        // Exact match first
+        var matched = document.querySelectorAll('.line[data-ts="'+tsKey+'"]');
+        if(matched.length <= 1){
+          // Fuzzy: match lines within ±2 seconds
+          var parts = tsKey.split(':');
+          var hoverSec = (+parts[0]*3600)+(+parts[1]*60)+(+parts[2]||0);
+          document.querySelectorAll('.line[data-ts]').forEach(function(el){
+            var ep = el.getAttribute('data-ts').split(':');
+            var elSec = (+ep[0]*3600)+(+ep[1]*60)+(+ep[2]||0);
+            if(Math.abs(elSec - hoverSec) <= 2) el.classList.add('hover-hl');
+          });
+          return;
+        }
+        matched.forEach(function(el){el.classList.add('hover-hl')});
       });
-      spinnerGrid.appendChild(c);
+      l.addEventListener('mouseleave',function(){
+        document.querySelectorAll('.hover-hl').forEach(function(el){el.classList.remove('hover-hl')});
+      });
     });
-    spinner.classList.add('show');
   }
 
-  spinnerClose.addEventListener('click',function(){spinner.classList.remove('show')});
-  if(srcBox)srcBox.addEventListener('click',function(){openSpinner('source')});
-  if(tgtBox)tgtBox.addEventListener('click',function(){openSpinner('target')});
+  // Watch for new lines
+  var txObs = new MutationObserver(syncLines);
+  var txEl = document.getElementById('captionTranscript');
+  if(txEl) txObs.observe(txEl, {childList:true,subtree:true});
+  var tlEl = document.getElementById('captionTranslated');
+  if(tlEl) txObs.observe(tlEl, {childList:true,subtree:true});
+  syncLines();
+})();
 
-  updPairDisplay();
+// ── Basic punctuation for finalized transcript lines ──
+(function(){
+  function addPunctuation(el){
+    if(el.dataset.punctuated) return;
+    el.dataset.punctuated = '1';
+    var text = el.textContent.trim();
+    if(!text) return;
+    // Already has ending punctuation
+    if(/[.!?]$/.test(text)) return;
+    var lower = text.toLowerCase();
+    // Questions
+    if(/^(what|when|where|why|how|who|whom|which|whose|is|are|was|were|do|does|did|can|could|will|would|shall|should|may|might|have|has|had|am|che|cosa|come|quando|dove|perche|quale|quali|chi|quanto|quanti|puo|posso|puoi|sei|ha|hanno|avete|est-ce|que|quand|ou|pourquoi|comment|qui|quel|quelle|was|ist|sind|hat|haben|kann|kannst|warum|wann|wo|wer|wie)/i.test(lower)) {
+      el.textContent = text + '?'; return;
+    }
+    // Exclamations (very short enthusiastic)
+    if(text.length < 30 && /^(wow|great|amazing|yes|no|bravo|bene|ottimo|fantastico|magnifique|super|genial|perfect|excellent)/i.test(lower)) {
+      el.textContent = text + '!'; return;
+    }
+    // Default: period
+    el.textContent = text + '.';
+  }
+  var punctObs = new MutationObserver(function(mutations){
+    mutations.forEach(function(m){
+      m.addedNodes.forEach(function(node){
+        if(node.nodeType===1 && node.classList.contains('line')) addPunctuation(node);
+      });
+    });
+  });
+  var txPunct = document.getElementById('captionTranscript');
+  if(txPunct) punctObs.observe(txPunct, {childList:true,subtree:true});
 })();
 </script>
+<script src="js/theme.js?v=2"></script>
 </body>
 </html>

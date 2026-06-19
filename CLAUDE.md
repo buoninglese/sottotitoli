@@ -53,7 +53,7 @@ Message format:
 - `account.html` - User account/profile page
 - `goals.html` - Learning goals tracking
 - `training.html` - Training/practice mode
-- `app.html` - Application shell
+- `studio.html` - Application shell
 - `tools.html` - Utilities and tools
 - `capture-pro.html` - Enhanced capture mode
 - `manual.html` - Manual text entry

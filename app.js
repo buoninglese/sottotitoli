@@ -1973,7 +1973,7 @@
       }
     }
 
-    // Handle translate mode — toggle the translated output card on app.html
+    // Handle translate mode — toggle the translated output card on start.html
     if (modeKey.indexOf("translate-") === 0 && typeof window.studioSwitchTab === "function") {
       window.studioSwitchTab("translate");
     }

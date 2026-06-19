@@ -16,11 +16,11 @@ Computed in `app.js` → `finalizeSessionRow()` on session stop. Saved to Supaba
 ### 1.2 `words_count` — Word Count
 - **Calculation**: `SottotitoliSessionUtils.countWords(plain)` — splits on whitespace, filters empty
 - **Source**: `session-utils.js` → `countWords()`
-- **User sees it**: app.html Stats card ("Words"), Account → Dashboard, Goals page weekly progress
+- **User sees it**: studio.html Stats card ("Words"), Account → Dashboard, Goals page weekly progress
 
 ### 1.3 `chars_count` — Character Count
 - **Calculation**: `plain.length`
-- **User sees it**: app.html Stats card ("Chars"), CSV export
+- **User sees it**: studio.html Stats card ("Chars"), CSV export
 
 ### 1.4 `wpm` — Words Per Minute
 - **Calculation**: `(wordsCount * 60) / durationSeconds`, null if duration ≤ 0
@@ -42,11 +42,11 @@ Computed in `app.js` → `finalizeSessionRow()` on session stop. Saved to Supaba
 
 ### 1.8 `uniquewords_count` — Unique Words
 - **Calculation**: `computeUniqueWordsCount(plain)` — splits on `[a-z']+`, uses `new Set()`
-- **User sees it**: Account → Dashboard ("Unique words"), app.html Report tab ("reportUnique")
+- **User sees it**: Account → Dashboard ("Unique words"), studio.html Report tab ("reportUnique")
 
 ### 1.9 `lexical_diversity` — Lexical Diversity
 - **Calculation**: `uniqueWordsCount / wordsCount`, null if 0 words. Range: 0–1
-- **User sees it**: Account → Dashboard ("Lexical diversity"), app.html Report tab ("reportLexDiv"), Viaggio CEFR estimate
+- **User sees it**: Account → Dashboard ("Lexical diversity"), studio.html Report tab ("reportLexDiv"), Viaggio CEFR estimate
 
 ### 1.10 `quality_score` — Composite Quality Score
 - **Calculation**: `computeQualityScore({ wpm, fillersPerMinute, lexicalDiversity })`:
@@ -54,7 +54,7 @@ Computed in `app.js` → `finalizeSessionRow()` on session stop. Saved to Supaba
   - Fillers/min < 4 → +0.3
   - Lexical diversity > 0.35 → +0.3
   - Range: 0–1
-- **User sees it**: Account → Dashboard ("Quality score"), app.html Report tab, Viaggio CEFR estimate
+- **User sees it**: Account → Dashboard ("Quality score"), studio.html Report tab, Viaggio CEFR estimate
 
 ### 1.11 `ngsl_coverage` — NGSL Vocabulary Coverage
 - **Calculation**: `computeNgslCoverage(transcriptLines)` — for each token with a lemma key, checks `LEMMA_POS_MAP[lemmaKey]`. Ratio of NGSL hits to total lemmatized tokens.
@@ -255,9 +255,9 @@ Computed in `goals.html`. Stored in `localStorage` + synced to Supabase `user_pr
 
 ---
 
-## 5. Live Session Sidebar (app.html)
+## 5. Live Session Sidebar (studio.html)
 
-Computed in `app.html` → polling script (runs every 2s).
+Computed in `studio.html` → polling script (runs every 2s).
 
 ### 5.1 Obiettivi Panel
 - **When listening**: Shows "● In session" badge + words this session + link to goals
@@ -340,13 +340,13 @@ Computed in `app.js` → `maybeTranslate()`.
 - **Auto-checks** on every page load when `?room=` is in URL
 - **Patterns flagged**: Common words (test, demo, guest...), short IDs (< 4 chars), numeric-only, repetitive
 - **Warning banner**: Fixed at top, dismissible, with "New room" fix button that removes the `?room=` param
-- **Loaded by**: `app.html`, `studio.html`, and legacy pages
+- **Loaded by**: `studio.html`, `studio.html`, and legacy pages
 
 ---
 
 ## 10. Quick Reference: Where Users See Each Metric
 
-| Metric | app.html | Account Dashboard | Viaggio | Goals | Analysis | CSV |
+| Metric | studio.html | Account Dashboard | Viaggio | Goals | Analysis | CSV |
 |--------|----------|-------------------|---------|-------|----------|-----|
 | Duration | — | ✓ (Time spoken) | ✓ (Talk time) | ✓ (progress) | ✓ | ✓ |
 | Words | ✓ (Stats) | — | — | ✓ (progress) | — | ✓ |
