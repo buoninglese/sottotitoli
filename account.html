@@ -404,6 +404,31 @@ body{background:var(--bg)}
 .settings-card .toggle-row .info{font-size:12px;font-weight:500}
 .settings-card .toggle-row .info .desc{font-size:10px;color:var(--text-muted);font-weight:400}
 
+/* ─── CEFR buttons ─── */
+.cefr-row{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}
+.cefr-btn{font-family:inherit;font-size:13px;font-weight:700;padding:8px 16px;border-radius:8px;border:1px solid var(--border);background:var(--bg-card);color:var(--text);cursor:pointer;transition:all .15s}
+.cefr-btn:hover{border-color:var(--accent-purple)}
+.cefr-btn.active{background:var(--accent-purple);color:#fff;border-color:var(--accent-purple)}
+.cefr-desc{font-size:13px;color:var(--muted)}
+
+/* ─── Progress bars ─── */
+.goals-progress-wrap{margin-top:8px}
+.goals-progress-bar{height:8px;border-radius:4px;background:var(--border);overflow:hidden;margin-bottom:4px}
+.goals-progress-fill{height:100%;border-radius:4px;background:var(--accent-purple);transition:width .5s;width:0%}
+.goals-progress-label{font-size:12px;color:var(--muted)}
+
+/* ─── Streak ─── */
+.streak-badge{display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border-radius:100px;font-size:13px;font-weight:700}
+.streak-badge.cold{background:rgba(100,116,139,.1);color:var(--muted)}
+.streak-badge.warm{background:rgba(217,119,6,.1);color:var(--amber)}
+.streak-badge.hot{background:rgba(220,38,38,.1);color:#dc2626}
+
+.saved-msg{font-size:12px;color:var(--accent-green);margin-left:12px;display:none}
+.saved-msg.visible{display:inline}
+.save-btn{font-family:inherit;font-size:14px;font-weight:600;padding:12px 28px;border-radius:10px;border:none;background:var(--accent-purple);color:#fff;cursor:pointer;transition:opacity .15s}
+.save-btn:hover{opacity:.9}
+.save-btn:disabled{opacity:.5;cursor:not-allowed}
+
 /* Toggle switch */
 .toggle{width:36px;height:20px;border-radius:100px;background:var(--border);position:relative;cursor:pointer;transition:background .2s;flex-shrink:0}
 .toggle.on{background:var(--accent-purple)}
@@ -700,17 +725,186 @@ body{background:var(--bg)}
       <div class="settings-card" id="settingsCard">
         <h3><span class="icon">⚙️</span> Impostazioni e obiettivi</h3>
         <p style="font-size:13px;color:var(--text-secondary);margin-bottom:12px">Lingua, livello, obiettivi di apprendimento e preferenze.</p>
-        <a href="goals.html" class="save-btn" style="display:inline-flex;align-items:center;gap:6px;text-decoration:none">🎯 Vai a Impostazioni e Obiettivi →</a>
       </div>
       
     </div>
     
+    <!-- MAIN: Goals & Preferences -->
+    <div class="retreat-main">
+      
+      <div class="settings-card">
+        <h3>📊 Obiettivi settimanali</h3>
+        <div class="field">
+          <label>Minuti parlati / settimana</label>
+          <input id="targetMinutes" type="number" min="1" max="600" value="120" style="width:120px">
+        </div>
+        <div class="goals-progress-wrap">
+          <div class="goals-progress-bar"><div id="minutesProgressBar" class="goals-progress-fill"></div></div>
+          <div id="minutesProgressLabel" class="goals-progress-label">Caricamento…</div>
+        </div>
+        <div class="field" style="margin-top:12px">
+          <label>Sessioni / settimana</label>
+          <input id="targetSessions" type="number" min="1" max="100" value="5" style="width:120px">
+        </div>
+        <div class="goals-progress-wrap">
+          <div class="goals-progress-bar"><div id="sessionsProgressBar" class="goals-progress-fill"></div></div>
+          <div id="sessionsProgressLabel" class="goals-progress-label">Caricamento…</div>
+        </div>
+      </div>
+
+      <div class="settings-card">
+        <h3>📈 Livello CEFR target</h3>
+        <div class="cefr-row" id="cefrRow">
+          <button class="cefr-btn" data-level="A1">A1</button>
+          <button class="cefr-btn" data-level="A2">A2</button>
+          <button class="cefr-btn active" data-level="B1">B1</button>
+          <button class="cefr-btn" data-level="B2">B2</button>
+          <button class="cefr-btn" data-level="C1">C1</button>
+          <button class="cefr-btn" data-level="C2">C2</button>
+        </div>
+        <div id="cefrDesc" class="cefr-desc">Can understand the main points of clear standard input on familiar matters.</div>
+        <select id="prefGoal" style="margin-top:12px;width:100%;padding:8px;border:1px solid var(--border);border-radius:8px;font-family:inherit;font-size:13px;background:var(--card);color:var(--text)">
+          <option value="b2_6m" selected>B2 entro 6 mesi</option>
+          <option value="fluency">Fluenza conversazionale</option>
+          <option value="exam">Preparazione esame</option>
+          <option value="maintenance">Mantenimento</option>
+        </select>
+      </div>
+
+      <div class="settings-card">
+        <h3>🔥 Streak</h3>
+        <div><span id="streakBadge" class="streak-badge cold">0-day streak</span></div>
+        <p style="font-size:12px;color:var(--muted);margin-top:8px">Una sessione al giorno mantiene la streak attiva.</p>
+      </div>
+
+      <div class="settings-card">
+        <h3>🌐 Lingue</h3>
+        <div class="field"><label>Nome visualizzato</label><input id="prefDisplayName" placeholder="Il tuo nome" style="width:100%"><div class="desc">Mostrato sul tuo profilo pubblico</div></div>
+        <div class="field"><label>Lingua madre</label><select id="prefNativeLang"><option value="it">Italiano</option><option value="en" selected>English</option><option value="es">Español</option><option value="fr">Français</option><option value="de">Deutsch</option><option value="pt">Português</option><option value="nl">Nederlands</option><option value="pl">Polski</option></select></div>
+        <div class="field"><label>Prima lingua obiettivo</label><select id="prefTargetLang1"><option value="">— Seleziona —</option><option value="it">Italiano</option><option value="en">English</option><option value="es">Español</option><option value="fr">Français</option><option value="de">Deutsch</option><option value="pt">Português</option><option value="nl">Nederlands</option><option value="pl">Polski</option></select></div>
+        <div class="field"><label>Seconda lingua obiettivo</label><select id="prefTargetLang2"><option value="">— Seleziona —</option><option value="it">Italiano</option><option value="en">English</option><option value="es">Español</option><option value="fr">Français</option><option value="de">Deutsch</option><option value="pt">Português</option><option value="nl">Nederlands</option><option value="pl">Polski</option></select></div>
+        <div class="field"><label>Livello attuale</label><select id="prefLevel"><option value="A1">A1 — Principiante</option><option value="A2">A2 — Elementare</option><option value="B1" selected>B1 — Intermedio</option><option value="B2">B2 — Intermedio superiore</option><option value="C1">C1 — Avanzato</option><option value="C2">C2 — Padronanza</option></select></div>
+        <div class="field"><label>Sessioni a settimana</label><input type="number" id="prefSessionsPerWeek" value="4" min="1" max="14" style="width:100px"></div>
+      </div>
+
+      <div class="settings-card">
+        <h3>🔔 Preferenze</h3>
+        <div class="toggle-row"><div class="info">Promemoria giornalieri<div class="desc">Notifiche push</div></div><div id="prefDailyReminders" class="toggle on"></div></div>
+        <div class="toggle-row"><div class="info">Report settimanali<div class="desc">Ricevi via email</div></div><div id="prefWeeklyReports" class="toggle"></div></div>
+        <div class="toggle-row"><div class="info">Modalità scura<div class="desc">Tema preferito</div></div><div id="prefDarkMode" class="toggle on"></div></div>
+      </div>
+
+      <button class="save-btn" id="saveAllBtn" style="margin-top:12px">💾 Salva tutto</button>
+      <span class="saved-msg" id="savedMsg">✓ Salvato</span>
+
+    </div>
   </div>
 </div>
 </div>
 <script>
 
-</script>
+  // ═══ Goals & Preferences ═══
+  (function(){
+    var supabase = window.sottotitoliSupabase;
+
+    var cefrBtns = document.querySelectorAll('.cefr-btn');
+    var cefrDescEl = document.getElementById('cefrDesc');
+    var cefrDescs = {A1:'Can understand and use familiar everyday expressions.',A2:'Can communicate in simple and routine tasks.',B1:'Can deal with most situations likely to arise while travelling.',B2:'Can interact with a degree of fluency and spontaneity.',C1:'Can express ideas fluently and spontaneously without much searching.',C2:'Can understand with ease virtually everything heard or read.'};
+    cefrBtns.forEach(function(b){
+      b.addEventListener('click',function(){
+        cefrBtns.forEach(function(x){x.classList.remove('active');});
+        b.classList.add('active');
+        if(cefrDescEl) cefrDescEl.textContent = cefrDescs[b.dataset.level]||'';
+      });
+    });
+
+    ['prefDailyReminders','prefWeeklyReports','prefDarkMode'].forEach(function(id){
+      var el = document.getElementById(id);
+      if(el) el.addEventListener('click',function(){el.classList.toggle('on');});
+    });
+
+    async function loadPrefs(){
+      if(!supabase) return;
+      var r=await supabase.auth.getSession();
+      if(!r.data?.session) return;
+      if(!window.loadUserPreferences) return;
+      var prefs=await window.loadUserPreferences();
+      if(!prefs) return;
+      var setVal=function(id,v){var el=document.getElementById(id);if(el&&v!=null)el.value=v;};
+      var setToggle=function(id,v){var el=document.getElementById(id);if(el)el.classList.toggle('on',!!v);};
+      setVal('prefNativeLang',prefs.native_lang);
+      setVal('prefTargetLang1',prefs.target_lang_1);
+      setVal('prefTargetLang2',prefs.target_lang_2);
+      setVal('prefLevel',prefs.level);
+      setVal('prefGoal',prefs.goal);
+      setVal('prefSessionsPerWeek',prefs.sessions_per_week);
+      setToggle('prefDailyReminders',prefs.daily_reminders);
+      setToggle('prefWeeklyReports',prefs.weekly_reports);
+      setToggle('prefDarkMode',prefs.dark_mode);
+      if(prefs.display_name){ var dn=document.getElementById('prefDisplayName'); if(dn)dn.value=prefs.display_name; }
+      if(prefs.level){
+        cefrBtns.forEach(function(b){b.classList.toggle('active',b.dataset.level===prefs.level);});
+        if(cefrDescEl) cefrDescEl.textContent=cefrDescs[prefs.level]||'';
+      }
+    }
+
+    var saveBtn=document.getElementById('saveAllBtn');
+    var savedMsg=document.getElementById('savedMsg');
+    if(saveBtn){
+      saveBtn.addEventListener('click',async function(){
+        saveBtn.disabled=true;saveBtn.textContent='Salvataggio…';
+        var prefs={
+          native_lang: (document.getElementById('prefNativeLang')||{}).value||'en',
+          target_lang_1: (document.getElementById('prefTargetLang1')||{}).value||null,
+          target_lang_2: (document.getElementById('prefTargetLang2')||{}).value||null,
+          level: (document.getElementById('prefLevel')||{}).value||'B1',
+          goal: (document.getElementById('prefGoal')||{}).value||'b2_6m',
+          sessions_per_week: parseInt((document.getElementById('prefSessionsPerWeek')||{}).value)||4,
+          daily_reminders: document.getElementById('prefDailyReminders').classList.contains('on'),
+          weekly_reports: document.getElementById('prefWeeklyReports').classList.contains('on'),
+          dark_mode: document.getElementById('prefDarkMode').classList.contains('on'),
+          display_name: (document.getElementById('prefDisplayName')||{}).value||null
+        };
+        localStorage.setItem('sottotitoli_goals',JSON.stringify({minutes:parseInt((document.getElementById('targetMinutes')||{}).value)||120,sessions:parseInt((document.getElementById('targetSessions')||{}).value)||5}));
+        if(supabase&&window.saveUserPreferences){
+          var ok=await window.saveUserPreferences(prefs);
+          if(savedMsg){savedMsg.textContent=ok?'✓ Salvato':'Errore';savedMsg.classList.add('visible');}
+        }else{
+          localStorage.setItem('sottotitoli_prefs',JSON.stringify(prefs));
+          if(savedMsg){savedMsg.textContent='✓ Salvato localmente';savedMsg.classList.add('visible');}
+        }
+        saveBtn.textContent='💾 Salva tutto';saveBtn.disabled=false;
+        setTimeout(function(){if(savedMsg)savedMsg.classList.remove('visible');},2500);
+      });
+    }
+
+    async function loadProgress(){
+      if(!supabase) return;
+      var r=await supabase.auth.getSession();
+      if(!r.data?.session) return;
+      var userId=r.data.session.user.id;
+      var weekAgo=new Date(Date.now()-7*86400000).toISOString();
+      var sessions=await supabase.from('sessions').select('duration_seconds,created_at').eq('user_id',userId).gte('created_at',weekAgo);
+      var totalSec=0;(sessions.data||[]).forEach(function(s){totalSec+=(s.duration_seconds||0);});
+      var totalMin=Math.round(totalSec/60);
+      var sessCount=(sessions.data||[]).length;
+      var targetMin=parseInt((document.getElementById('targetMinutes')||{}).value)||120;
+      var targetSess=parseInt((document.getElementById('targetSessions')||{}).value)||5;
+      var mpb=document.getElementById('minutesProgressBar');if(mpb)mpb.style.width=Math.min(100,(totalMin/targetMin)*100)+'%';
+      var mpl=document.getElementById('minutesProgressLabel');if(mpl)mpl.textContent=totalMin+' / '+targetMin+' minuti';
+      var spb=document.getElementById('sessionsProgressBar');if(spb)spb.style.width=Math.min(100,(sessCount/targetSess)*100)+'%';
+      var spl=document.getElementById('sessionsProgressLabel');if(spl)spl.textContent=sessCount+' / '+targetSess+' sessioni';
+      var days=[];(sessions.data||[]).forEach(function(s){if(s.created_at)days.push(s.created_at.split('T')[0]);});
+      var uniqueDays=[...new Set(days)].sort().reverse();
+      var streak=0;var today=new Date().toISOString().split('T')[0];
+      for(var i=0;i<uniqueDays.length;i++){var expected=new Date(Date.now()-streak*86400000).toISOString().split('T')[0];if(uniqueDays[i]===expected)streak++;else break;}
+      var badge=document.getElementById('streakBadge');
+      if(badge){badge.textContent=streak+'-day streak';badge.className='streak-badge '+(streak>=7?'hot':streak>=3?'warm':'cold');}
+    }
+
+    if(document.readyState==='loading'){document.addEventListener('DOMContentLoaded',function(){loadPrefs();loadProgress();});}
+    else{loadPrefs();loadProgress();}
+  })();
 
   </div>
 </section>
