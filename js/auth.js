@@ -7,10 +7,10 @@ const SUPABASE_ANON_KEY = 'sb_publishable_l-PG1wsO1FMWADK9GVBqoQ_0EtPA2K7';
 // Redirect target — change this if deploying to a different domain
 // IMPORTANT: This must be whitelisted in Supabase Auth settings
 function getAuthRedirectUrl() {
-  return window.SOTTOTITOLI_CONFIG?.AUTH_REDIRECT_URL || 'https://buoninglese.github.io/sottotitoli/studio.html';
+  return window.SOTTOTITOLI_CONFIG?.AUTH_REDIRECT_URL || 'https://buoninglese.github.io/sottotitoli/start.html';
 }
 function getPostLogoutUrl() {
-  return window.SOTTOTITOLI_CONFIG?.AUTH_REDIRECT_URL || 'https://buoninglese.github.io/sottotitoli/studio.html';
+  return window.SOTTOTITOLI_CONFIG?.AUTH_REDIRECT_URL || 'https://buoninglese.github.io/sottotitoli/start.html';
 }
 
 window.sottotitoliSupabase = window.supabase.createClient(
@@ -19,7 +19,7 @@ window.sottotitoliSupabase = window.supabase.createClient(
   {
     auth: {
       persistSession: true,
-      detectSessionInUrl: true,   // lets Supabase read #access_token on studio.html
+      detectSessionInUrl: true,   // lets Supabase read #access_token on start.html
       autoRefreshToken: true,
     },
   }
@@ -29,7 +29,7 @@ window.sottotitoliSupabase = window.supabase.createClient(
 async function signInWithGoogle() {
   // Remember where the user was so we can bring them back after login
   var currentPage = window.location.pathname.split('/').pop() || 'index.html';
-  if (currentPage !== 'app.html' && currentPage !== 'index.html') {
+  if (currentPage !== 'studio.html' && currentPage !== 'index.html') {
     localStorage.setItem('sottotitoli_return_page', currentPage);
   }
   // Preserve referral param through OAuth redirect

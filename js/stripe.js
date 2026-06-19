@@ -46,7 +46,7 @@
             product: productKey,
             userId: userId,
             email: email,
-            successUrl: window.location.origin + '/app.html?payment=success',
+            successUrl: window.location.origin + '/studio.html?payment=success',
             cancelUrl: window.location.origin + '/studio.html?payment=cancelled'
           })
         });
