@@ -2,7 +2,7 @@
 <html lang="it">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>Sottotitoli · Studio</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -162,6 +162,21 @@
     .sw-pair-flag-box .sw-pair-name{font-size:14px;color:var(--accent-green)}
     .sw-half.translate .sw-pair-flag-box{background:rgba(37,99,235,.06);border-color:rgba(37,99,235,.15);box-shadow:0 0 30px rgba(37,99,235,.06)}
     .sw-half.translate .sw-pair-flag-box .sw-pair-name{color:var(--accent-blue)}
+    /* Clickable flag boxes */
+    .sw-pair-clickable{cursor:pointer;transition:all .25s;position:relative}
+    .sw-pair-clickable:hover{transform:translateY(-2px);box-shadow:0 8px 30px rgba(37,99,235,.15)!important;border-color:rgba(37,99,235,.3)!important}
+    .sw-pair-clickable:active{transform:scale(.97)}
+    .sw-pair-hint{font-size:9px;color:rgba(241,245,249,.2);margin-top:4px;font-style:italic}
+    /* Spinner overlay */
+    .tr-spinner-overlay{display:none;position:absolute;inset:0;z-index:50;background:rgba(0,0,0,.92);backdrop-filter:blur(16px);flex-direction:column;align-items:center;justify-content:center;padding:24px;border-radius:inherit}
+    .tr-spinner-overlay.show{display:flex}
+    .tr-spinner-title{font-size:15px;font-weight:700;color:#f1f5f9;margin-bottom:16px}
+    .tr-spinner-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;width:100%;max-width:260px;margin-bottom:16px}
+    .tr-spinner-chip{padding:13px;border-radius:12px;font-size:14px;font-weight:600;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);color:#cbd5e1;cursor:pointer;transition:all .2s;font-family:inherit;text-align:center}
+    .tr-spinner-chip:hover{background:rgba(37,99,235,.12);border-color:rgba(37,99,235,.3);color:#fff;transform:translateY(-1px)}
+    .tr-spinner-chip.selected{background:rgba(37,99,235,.22);border-color:var(--accent-blue);color:var(--accent-blue);box-shadow:0 0 0 3px rgba(37,99,235,.2)}
+    .tr-spinner-confirm{padding:13px 44px;border-radius:100px;font-size:14px;font-weight:700;background:linear-gradient(135deg,var(--accent-blue),#60a5fa);color:#fff;cursor:pointer;font-family:inherit;border:none;box-shadow:0 4px 22px rgba(37,99,235,.4);transition:all .3s}
+    .tr-spinner-confirm:hover{transform:translateY(-2px);box-shadow:0 8px 32px rgba(37,99,235,.55)}
     [data-theme="light"] .sw-pair-flag-box{background:rgba(5,150,105,.04);border-color:rgba(5,150,105,.1);box-shadow:0 0 30px rgba(5,150,105,.03)}
     [data-theme="light"] .sw-half.translate .sw-pair-flag-box{background:rgba(37,99,235,.04);border-color:rgba(37,99,235,.1);box-shadow:0 0 30px rgba(37,99,235,.03)}
     .sw-pair-name{font-size:13px;font-weight:700;color:#f1f5f9;transition:all .3s}
@@ -267,24 +282,30 @@
       <p class="sw-half-desc">Scegli la lingua che parli e quella per i sottotitoli.</p>
       <div class="sw-pair">
         <div class="sw-pair-side">
-          <div class="sw-pair-flag-box">
+          <div class="sw-pair-flag-box sw-pair-clickable" id="srcBox">
             <div class="sw-pair-label">Io parlo in…</div>
             <div class="sw-pair-flag" id="sourceFlag">🇬🇧</div>
             <div class="sw-pair-name" id="sourceName">Inglese</div>
+            <div class="sw-pair-hint">clicca per cambiare</div>
           </div>
-          <div class="lang-picker-row" id="sourceFlags"></div>
         </div>
         <div class="sw-pair-arrow">
           <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 5l7 7-7 7"/></svg>
         </div>
         <div class="sw-pair-side">
-          <div class="sw-pair-flag-box">
+          <div class="sw-pair-flag-box sw-pair-clickable" id="tgtBox">
             <div class="sw-pair-label">Sottotitoli in…</div>
             <div class="sw-pair-flag" id="targetFlag">🇮🇹</div>
             <div class="sw-pair-name" id="targetName">Italiano</div>
+            <div class="sw-pair-hint">clicca per cambiare</div>
           </div>
-          <div class="lang-picker-row" id="targetFlags"></div>
         </div>
+      </div>
+      <!-- Spinner overlay for language selection -->
+      <div class="tr-spinner-overlay" id="trSpinner">
+        <div class="tr-spinner-title" id="trSpinnerTitle">Io parlo in…</div>
+        <div class="tr-spinner-grid" id="trSpinnerGrid"></div>
+        <button class="tr-spinner-confirm" id="trSpinnerClose">Conferma selezione ✓</button>
       </div>
       <a href="#" id="translateGoBtn" class="sw-cta tr-cta">
         <span>Avvia Traduzione</span>
@@ -377,38 +398,55 @@
     {code:'es',flag:'🇪🇸',name:'Spagnolo'},{code:'nl',flag:'🇳🇱',name:'Olandese'},
     {code:'pt',flag:'🇵🇹',name:'Portoghese'},{code:'pl',flag:'🇵🇱',name:'Polacco'}
   ];
-  var sourceRow=document.getElementById('sourceFlags');
-  var targetRow=document.getElementById('targetFlags');
+  var selSrc='en',selTgt='it';
+  var srcBox=document.getElementById('srcBox');
+  var tgtBox=document.getElementById('tgtBox');
   var goBtn=document.getElementById('translateGoBtn');
   var srcFlagEl=document.getElementById('sourceFlag');
   var tgtFlagEl=document.getElementById('targetFlag');
   var srcNameEl=document.getElementById('sourceName');
   var tgtNameEl=document.getElementById('targetName');
-  if(!sourceRow||!targetRow)return;
-  var selSrc='en',selTgt='it';
+  var spinner=document.getElementById('trSpinner');
+  var spinnerTitle=document.getElementById('trSpinnerTitle');
+  var spinnerGrid=document.getElementById('trSpinnerGrid');
+  var spinnerClose=document.getElementById('trSpinnerClose');
+  var activeSide=null; // 'source' or 'target'
 
-  function build(row,sel,isSrc){
-    row.innerHTML='';
-    flags.forEach(function(f){
-      var b=document.createElement('button');
-      b.textContent=f.flag;b.title=f.name;
-      b.className='lang-flag-btn';
-      if(f.code===sel)b.classList.add('active');
-      b.addEventListener('click',function(){
-        if(isSrc)selSrc=f.code;else selTgt=f.code;
-        // Update the big flag display
-        if(srcFlagEl)srcFlagEl.textContent=flags.find(function(ff){return ff.code===selSrc}).flag;
-        if(srcNameEl)srcNameEl.textContent=flags.find(function(ff){return ff.code===selSrc}).name;
-        if(tgtFlagEl)tgtFlagEl.textContent=flags.find(function(ff){return ff.code===selTgt}).flag;
-        if(tgtNameEl)tgtNameEl.textContent=flags.find(function(ff){return ff.code===selTgt}).name;
-        build(sourceRow,selSrc,true);build(targetRow,selTgt,false);
-        if(goBtn)goBtn.href='app.html?mode=translate-'+selSrc+'-'+selTgt;
-      });
-      row.appendChild(b);
-    });
+  function updPairDisplay(){
+    var s=flags.find(function(ff){return ff.code===selSrc});
+    var t=flags.find(function(ff){return ff.code===selTgt});
+    if(srcFlagEl)srcFlagEl.textContent=s.flag;
+    if(srcNameEl)srcNameEl.textContent=s.name;
+    if(tgtFlagEl)tgtFlagEl.textContent=t.flag;
+    if(tgtNameEl)tgtNameEl.textContent=t.name;
+    if(goBtn)goBtn.href='app.html?mode=translate-'+selSrc+'-'+selTgt;
   }
-  build(sourceRow,selSrc,true);build(targetRow,selTgt,false);
-  if(goBtn)goBtn.href='app.html?mode=translate-'+selSrc+'-'+selTgt;
+
+  function openSpinner(side){
+    activeSide=side;
+    spinnerTitle.textContent=side==='source'?'Io parlo in…':'Sottotitoli in…';
+    spinnerGrid.innerHTML='';
+    var cur=side==='source'?selSrc:selTgt;
+    flags.forEach(function(f){
+      var c=document.createElement('button');
+      c.className='tr-spinner-chip'+(f.code===cur?' selected':'');
+      c.textContent=f.flag+' '+f.name;
+      c.addEventListener('click',function(){
+        if(side==='source')selSrc=f.code;else selTgt=f.code;
+        updPairDisplay();
+        spinnerGrid.querySelectorAll('.tr-spinner-chip').forEach(function(x){x.classList.remove('selected')});
+        c.classList.add('selected');
+      });
+      spinnerGrid.appendChild(c);
+    });
+    spinner.classList.add('show');
+  }
+
+  spinnerClose.addEventListener('click',function(){spinner.classList.remove('show')});
+  if(srcBox)srcBox.addEventListener('click',function(){openSpinner('source')});
+  if(tgtBox)tgtBox.addEventListener('click',function(){openSpinner('target')});
+
+  updPairDisplay();
 })();
 </script>
 </body>
