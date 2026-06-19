@@ -474,7 +474,8 @@ body.logged-in .guest-only{display:none!important}
 (function(){
   var slides=document.querySelectorAll('.hero-slide'),dotsEl=document.getElementById('hsDots'),
       prevBtn=document.getElementById('hsPrev'),nextBtn=document.getElementById('hsNext'),
-      current=0,total=slides.length,transitioning=false,wheelAccum=0,wheelTimer,zStack=10;
+      current=0,total=slides.length,transitioning=false,wheelAccum=0,wheelTimer,zStack=10,
+      isMobile=window.innerWidth<=768;
   // Build dots
   dotsEl.innerHTML='';
   for(var i=0;i<total;i++){var d=document.createElement('div');d.className='hs-dot'+(i===0?' active':'');d.setAttribute('data-index',i);d.addEventListener('click',function(){goTo(parseInt(this.getAttribute('data-index')));});dotsEl.appendChild(d);}
@@ -482,7 +483,7 @@ body.logged-in .guest-only{display:none!important}
   //     -1 = prev slide (scroll up   → sweep DOWN from top)
   function goTo(idx, duration, dir){
     if(transitioning||idx===current||idx<0||idx>=total)return;
-    var dur=Math.max(200,Math.min(1100,duration||600));
+    var dur=isMobile?Math.max(150,Math.min(400,duration||300)):Math.max(200,Math.min(1100,duration||600));
     transitioning=true;
     wheelAccum=0;clearTimeout(wheelTimer);
 
@@ -490,35 +491,35 @@ body.logged-in .guest-only{display:none!important}
     newSlide.style.transition='none';
     newSlide.style.zIndex=String(++zStack);
 
-    if(dir===-1){
-      newSlide.style.clipPath='polygon(0 -22%, 100% 0, 100% 1%, 0 -21%)';
+    if(isMobile){
+      // ── Mobile: simple translateY slide (no clip-path, no parallax) ──
+      newSlide.style.transform=dir===1?'translateY(40px)':'translateY(-40px)';
+      newSlide.offsetHeight;
     } else {
-      newSlide.style.clipPath='polygon(0 100%, 100% 122%, 100% 123%, 0 101%)';
-    }
-    // Force the clipPath to render before we remove active from old slide.
-    // Without this, the new slide's unclipped background can briefly cover
-    // the old content on the first transition after page load.
-    newSlide.offsetHeight;
+      // ── Desktop: diagonal clip-path wipe ──
+      if(dir===-1){
+        newSlide.style.clipPath='polygon(0 -22%, 100% 0, 100% 1%, 0 -21%)';
+      } else {
+        newSlide.style.clipPath='polygon(0 100%, 100% 122%, 100% 123%, 0 101%)';
+      }
+      newSlide.offsetHeight;
 
-    // Pin old slide's z-index. When active is removed, CSS drops z-index from
-    // 1 to 0, and among z-index:0 slides the last in DOM order (slide 4, red)
-    // pops to the top. Keeping z-index at 1 prevents the flash.
+      var bg=newSlide.querySelector('.hs-bg');
+      var orbs=newSlide.querySelectorAll('.hs-orb');
+      bg.style.transition='none';bg.style.transform='translateY(-18px)';
+      if(orbs[0]){orbs[0].style.transition='none';orbs[0].style.transform='translate(-30px,-20px) scale(1.12)';}
+      if(orbs[1]){orbs[1].style.transition='none';orbs[1].style.transform='translate(25px,30px) scale(1.06)';}
+    }
+
+    // Pin old slide z-index to prevent flash
     oldSlide.style.zIndex = '1';
 
-    var bg=newSlide.querySelector('.hs-bg');
-    var orbs=newSlide.querySelectorAll('.hs-orb');
-    bg.style.transition='none';bg.style.transform='translateY(-18px)';
-    if(orbs[0]){orbs[0].style.transition='none';orbs[0].style.transform='translate(-30px,-20px) scale(1.12)';}
-    if(orbs[1]){orbs[1].style.transition='none';orbs[1].style.transform='translate(25px,30px) scale(1.06)';}
-
-    // Manual fade-out: the CSS opacity transition on .hs-content does not fire
-    // on the first scroll after page load (browser does not register the initial
-    // computed value as a transition source). Animate opacity with rAF instead.
+    // Fade out old content
     var oc = oldSlide.querySelector('.hs-content');
     if (oc) {
       var _t0 = performance.now();
       function _fade(ts) {
-        var p = Math.min((ts - _t0) / 500, 1);
+        var p = Math.min((ts - _t0) / (isMobile?250:500), 1);
         oc.style.opacity = String(1 - p);
         oc.style.transform = 'translateY(' + (p * 16) + 'px) scale(' + (1 - p * .03) + ')';
         if (p < 1) { requestAnimationFrame(_fade); }
@@ -533,17 +534,28 @@ body.logged-in .guest-only{display:none!important}
     dotsEl.children[current].classList.add('active');
 
     requestAnimationFrame(function(){
-      newSlide.style.transition='clip-path '+dur+'ms cubic-bezier(.55,0,.12,1)';
-      newSlide.style.clipPath='polygon(0 0, 100% 0, 100% 100%, 0 100%)';
-      bg.style.transition='transform '+(dur*.9)+'ms cubic-bezier(.2,.1,.2,1)';
-      bg.style.transform='translateY(0)';
-      if(orbs[0]){orbs[0].style.transition='transform '+(dur*.85)+'ms cubic-bezier(.2,.1,.2,1)';orbs[0].style.transform='translate(0,0) scale(1)';}
-      if(orbs[1]){orbs[1].style.transition='transform '+(dur*.7)+'ms cubic-bezier(.2,.1,.2,1)';orbs[1].style.transform='translate(0,0) scale(1)';}
+      if(isMobile){
+        newSlide.style.transition='transform '+dur+'ms cubic-bezier(.25,.1,.25,1)';
+        newSlide.style.transform='translateY(0)';
+      } else {
+        newSlide.style.transition='clip-path '+dur+'ms cubic-bezier(.55,0,.12,1)';
+        newSlide.style.clipPath='polygon(0 0, 100% 0, 100% 100%, 0 100%)';
+        var bg=newSlide.querySelector('.hs-bg');
+        var orbs=newSlide.querySelectorAll('.hs-orb');
+        if(bg){bg.style.transition='transform '+(dur*.9)+'ms cubic-bezier(.2,.1,.2,1)';bg.style.transform='translateY(0)';}
+        if(orbs[0]){orbs[0].style.transition='transform '+(dur*.85)+'ms cubic-bezier(.2,.1,.2,1)';orbs[0].style.transform='translate(0,0) scale(1)';}
+        if(orbs[1]){orbs[1].style.transition='transform '+(dur*.7)+'ms cubic-bezier(.2,.1,.2,1)';orbs[1].style.transform='translate(0,0) scale(1)';}
+      }
     });
 
     setTimeout(function(){
-      newSlide.style.transition='clip-path 0s';
-      slides.forEach(function(s,i){if(i!==current){s.style.clipPath='polygon(0 0,100% 0,100% 100%,0 100%)';s.style.zIndex='0';}});
+      newSlide.style.transition=isMobile?'transform 0s':'clip-path 0s';
+      if(!isMobile){
+        slides.forEach(function(s,i){if(i!==current){s.style.clipPath='polygon(0 0,100% 0,100% 100%,0 100%)';s.style.zIndex='0';}});
+      } else {
+        newSlide.style.transform='';
+        slides.forEach(function(s,i){if(i!==current){s.style.zIndex='0';s.style.transform='';}});
+      }
       setTimeout(function(){transitioning=false;},180);
     },dur+50);
   }
