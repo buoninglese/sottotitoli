@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dev · Prompt Workspace</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,400;14..32,500;14..32,600;14..32,700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{--bg:#0a0c14;--card:#0f111e;--line:#1a1e2e;--text:#e8eaed;--t2:#8b93a5;--t3:#4e5566;--accent:#a78bfa;--green:#34d399;--red:#f87171}
+body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--text);line-height:1.5;min-height:100vh}
+.app{display:flex;height:100vh}
+.sidebar{width:260px;background:var(--card);border-right:1px solid var(--line);overflow-y:auto;padding:16px 0;flex-shrink:0}
+.sidebar h2{padding:0 16px 10px;font-size:14px;font-weight:700}
+.sidebar .mod-item{padding:8px 16px;font-size:12px;cursor:pointer;color:var(--t2);border-left:2px solid transparent;transition:all .12s}
+.sidebar .mod-item:hover{color:var(--text);background:rgba(167,139,250,.03)}
+.sidebar .mod-item.active{color:var(--accent);border-left-color:var(--accent);font-weight:600}
+.main{flex:1;overflow-y:auto;padding:24px 32px 60px}
+.main h3{font-size:18px;font-weight:700;margin-bottom:4px}
+.main .mod-id{font-size:11px;color:var(--t3);margin-bottom:16px;font-family:'JetBrains Mono',monospace}
+.field{margin-bottom:14px}
+.field label{display:block;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--t3);margin-bottom:4px}
+.field textarea{width:100%;min-height:120px;padding:12px;border:1.5px solid var(--line);border-radius:10px;font-size:13px;font-family:'JetBrains Mono',monospace;background:var(--bg);color:var(--text);resize:vertical;line-height:1.6}
+.field textarea:focus{outline:none;border-color:var(--accent)}
+.field input{width:100%;padding:10px 12px;border:1.5px solid var(--line);border-radius:10px;font-size:13px;font-family:inherit;background:var(--bg);color:var(--text)}
+.field input:focus{outline:none;border-color:var(--accent)}
+.field select{width:100%;padding:10px 12px;border:1.5px solid var(--line);border-radius:10px;font-size:13px;font-family:inherit;background:var(--bg);color:var(--text)}
+.btn{font-family:inherit;font-weight:600;cursor:pointer;border:none;transition:all .2s;border-radius:100px;padding:10px 22px;font-size:13px;display:inline-flex;align-items:center;gap:6px}
+.btn-primary{background:var(--accent);color:#fff}
+.btn-primary:hover{opacity:.9}
+.btn-ghost{background:transparent;border:1.5px solid var(--line);color:var(--t2)}
+.btn-ghost:hover{border-color:var(--accent);color:var(--accent)}
+.btn-sm{padding:6px 14px;font-size:11px}
+.preview-box{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:14px;font-size:12px;color:var(--t2);white-space:pre-wrap;max-height:300px;overflow-y:auto;font-family:'JetBrains Mono',monospace;line-height:1.6;margin-top:10px}
+.row{display:flex;gap:10px;flex-wrap:wrap}
+.toast{position:fixed;bottom:20px;right:20px;padding:12px 20px;border-radius:100px;font-size:13px;font-weight:600;z-index:100;animation:fadeIn .3s}
+.toast.ok{background:var(--green);color:#000}
+.toast.err{background:var(--red);color:#fff}
+@keyframes fadeIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar">
+    <h2>🧠 Prompt Workspace</h2>
+    <div id="modList"></div>
+    <div style="padding:12px 16px;margin-top:8px;border-top:1px solid var(--line)">
+      <button class="btn btn-ghost btn-sm" onclick="exportAll()" style="width:100%;justify-content:center">📥 Esporta tutto</button>
+      <button class="btn btn-ghost btn-sm" onclick="importAll()" style="width:100%;justify-content:center;margin-top:4px">📤 Importa</button>
+      <input type="file" id="importFile" accept=".json" style="display:none" onchange="handleImport(event)">
+    </div>
+  </aside>
+  <main class="main" id="mainContent">
+    <div style="text-align:center;padding:80px 20px;color:var(--t3)">
+      <div style="font-size:48px;margin-bottom:12px">🧠</div>
+      <div style="font-size:14px;font-weight:600">Seleziona un modulo dalla sidebar</div>
+      <div style="font-size:12px;margin-top:4px">Modifica i prompt, la struttura output, e i parametri del modello</div>
+    </div>
+  </main>
+</div>
+
+<script>
+var MODULES=[
+  {id:'grammar',name:'Grammar & Accuracy',family:'Cambridge',model:'gpt-4o',temp:0.7,prompt:'You are an expert English language assessor. Analyze the following transcript for grammatical accuracy.\n\nTranscript:\n{{TRANSCRIPT}}\n\nProvide:\n1. Overall grammar score (0-100)\n2. Top 3 strengths (array)\n3. Top 3 issues with specific examples from the transcript (array)\n4. 3 actionable recommendations (array)\n5. A CEFR-aligned summary (1-2 sentences)\n\nOutput as JSON.',outputSchema:'{"overall_score":number,"strengths":["..."],"issues":["..."],"recommendations":["..."],"summary":"..."}'},
+  {id:'vocabulary',name:'Vocabulary Range',family:'Linguistic',model:'gpt-4o',temp:0.6,prompt:'You are an expert in lexical analysis. Analyze the vocabulary used in this transcript.\n\nTranscript:\n{{TRANSCRIPT}}\n\nProvide:\n1. Vocabulary range score (0-100)\n2. CEFR level distribution of words used\n3. List of sophisticated/advanced words found\n4. List of words the learner could add to improve\n5. NGSL coverage estimate\n\nOutput as JSON.',outputSchema:'{"overall_score":number,"cefr_distribution":{},"advanced_words":[],"suggested_words":[],"ngsl_coverage":number}'},
+  {id:'fluency',name:'Fluency & Coherence',family:'Cambridge',model:'gpt-4o',temp:0.6,prompt:'You are an expert in speech fluency analysis. Analyze the fluency of this transcript.\n\nTranscript:\n{{TRANSCRIPT}}\n\nConsider: pacing, filler words, sentence flow, coherence between ideas, topic development.\n\nProvide:\n1. Fluency score (0-100)\n2. Speaking pace analysis\n3. Filler word analysis with counts\n4. Coherence evaluation\n5. 3 specific suggestions\n\nOutput as JSON.',outputSchema:'{"overall_score":number,"pace_analysis":"...","filler_analysis":{},"coherence":"...","suggestions":[]}'},
+  {id:'cefr',name:'CEFR Assessment',family:'Linguistic',model:'gpt-4o',temp:0.5,prompt:'You are a CEFR assessment specialist. Estimate the speaker\'s CEFR level from this transcript.\n\nTranscript:\n{{TRANSCRIPT}}\n\nConsider: grammatical range, vocabulary range, fluency markers, sentence complexity, discourse management.\n\nProvide:\n1. Estimated CEFR level (A1/A2/B1/B2/C1/C2)\n2. Confidence score (0-100)\n3. Evidence for the level (3 points)\n4. What would be needed for the next level (3 points)\n\nOutput as JSON.',outputSchema:'{"cefr_level":"B1","confidence":number,"evidence":[],"next_level_needs":[]}'},
+  {id:'progress',name:'Progress Report',family:'Linguistic',model:'gpt-4o',temp:0.5,prompt:'You are a learning progress analyst. Compare this transcript to the learner\'s previous sessions.\n\nCurrent transcript:\n{{TRANSCRIPT}}\n\nPrevious session summaries:\n{{PREVIOUS_SESSIONS}}\n\nProvide:\n1. Progress assessment (improving/stable/declining)\n2. Key areas of improvement (3)\n3. Areas that need attention (3)\n4. Projected timeline to next CEFR level\n5. Plateau risk assessment\n\nOutput as JSON.',outputSchema:'{"trend":"improving","improvements":[],"attention_areas":[],"cefr_projection":"...","plateau_risk":"low"}'},
+  {id:'style',name:'Speaking Style',family:'Linguistic',model:'gpt-4o',temp:0.7,prompt:'You are a linguistic style analyst. Characterize the speaker\'s style from this transcript.\n\nTranscript:\n{{TRANSCRIPT}}\n\nAnalyze: formality level, sentence complexity, passive voice usage, connector variety, repetition patterns, register.\n\nProvide:\n1. Style profile (descriptive label + 3 characteristics)\n2. Formality score (0-100)\n3. Sentence variety score (0-100)\n4. Connector diversity analysis\n5. Recommendations for style development\n\nOutput as JSON.',outputSchema:'{"style_label":"...","characteristics":[],"formality_score":number,"sentence_variety":number,"connector_analysis":"...","recommendations":[]}'},
+  {id:'transfer',name:'Italian-English Transfer',family:'Linguistic',model:'gpt-4o',temp:0.6,prompt:'You are an expert in L1-L2 transfer analysis for Italian speakers learning English. Identify Italian language interference patterns.\n\nTranscript:\n{{TRANSCRIPT}}\n\nLook for: false friends, calques (direct translations), syntactic transfer, article misuse, preposition transfer, typical Italian-speaker errors.\n\nProvide:\n1. Transfer interference score (lower = more interference, 0-100)\n2. Specific examples found (with corrections)\n3. Most frequent transfer type\n4. 3 targeted exercises to reduce interference\n\nOutput as JSON.',outputSchema:'{"interference_score":number,"examples":[{"error":"...","correction":"...","type":"..."}],"top_transfer_type":"...","exercises":[]}'},
+  {id:'business',name:'Business English',family:'Business',model:'gpt-4o',temp:0.6,prompt:'You are a Business English assessor. Evaluate the professional communication quality of this transcript.\n\nTranscript:\n{{TRANSCRIPT}}\n\nAssess: business vocabulary, formal register, meeting language, email-appropriate phrases, presentation readiness.\n\nProvide:\n1. Business English score (0-100)\n2. Business vocabulary used (list)\n3. Missing key business terms (list)\n4. Situational readiness (meetings/presentations/emails)\n5. 3 professional development tips\n\nOutput as JSON.',outputSchema:'{"overall_score":number,"business_vocab":[],"missing_terms":[],"readiness":{},"tips":[]}'},
+  {id:'exam',name:'Exam Readiness',family:'Academic',model:'gpt-4o',temp:0.5,prompt:'You are an IELTS/TOEFL exam preparation specialist. Assess exam readiness from this transcript.\n\nTranscript:\n{{TRANSCRIPT}}\n\nConsider: task achievement, coherence, lexical resource, grammatical range, pronunciation potential.\n\nProvide:\n1. Estimated IELTS band (0-9) or TOEFL equivalent\n2. Score per criterion\n3. Weakest criterion with examples\n4. Study plan for 1-month improvement\n\nOutput as JSON.',outputSchema:'{"ielts_band":number,"criteria_scores":{},"weakest_criterion":"...","one_month_plan":[]}'},
+  {id:'comprehensive',name:'Comprehensive',family:'Linguistic',model:'gpt-4o',temp:0.6,prompt:'You are a comprehensive English language assessor. Provide a complete analysis of this transcript.\n\nTranscript:\n{{TRANSCRIPT}}\n\nCover ALL of the following:\n1. Overall assessment score (0-100)\n2. Grammar analysis (strengths + issues)\n3. Vocabulary analysis (range + CEFR distribution)\n4. Fluency analysis (pace + coherence)\n5. Style analysis (formality + complexity)\n6. CEFR estimate\n7. Top 5 recommendations\n8. Predicted progress trajectory\n\nBe thorough. Output as JSON.',outputSchema:'{"overall_score":number,"grammar":{},"vocabulary":{},"fluency":{},"style":{},"cefr":"...","recommendations":[],"trajectory":"..."}'}
+];
+
+var activeModule=null;
+var promptsData=JSON.parse(localStorage.getItem('dev_prompts')||'{}');
+
+function init(){
+  var list=document.getElementById('modList'),h='';
+  MODULES.forEach(function(m){
+    var custom=promptsData[m.id];
+    h+='<div class="mod-item" data-id="'+m.id+'" onclick="selectModule(\''+m.id+'\')">'+
+      '<span style="font-size:11px;color:var(--t3)">'+m.family+'</span><br>'+m.name+
+      (custom?' <span style="font-size:9px;color:var(--green)">modificato</span>':'')+'</div>';
+  });
+  list.innerHTML=h;
+  var hash=window.location.hash.replace('#','');
+  if(hash)selectModule(hash);
+}
+
+function selectModule(id){
+  activeModule=MODULES.find(function(m){return m.id===id});if(!activeModule)return;
+  document.querySelectorAll('.mod-item').forEach(function(x){x.classList.toggle('active',x.dataset.id===id)});
+  window.location.hash=id;
+  var custom=promptsData[id]||{};
+  var m=activeModule;
+  document.getElementById('mainContent').innerHTML=
+    '<h3>'+m.name+'</h3><div class="mod-id">'+m.id+' · '+m.family+' · Model: '+(custom.model||m.model)+'</div>'+
+    '<div class="field"><label>System Prompt</label><textarea id="promptText">'+(custom.prompt||m.prompt).replace(/</g,'&lt;')+'</textarea></div>'+
+    '<div class="field"><label>Output Schema (JSON)</label><textarea id="schemaText" style="min-height:80px">'+(custom.outputSchema||m.outputSchema)+'</textarea></div>'+
+    '<div class="row"><div class="field" style="flex:1;min-width:120px"><label>Model</label><select id="modelSelect"><option value="gpt-4o"'+(m.model==='gpt-4o'?' selected':'')+'>GPT-4o</option><option value="gpt-4o-mini"'+(m.model==='gpt-4o-mini'?' selected':'')+'>GPT-4o-mini</option></select></div><div class="field" style="flex:1;min-width:120px"><label>Temperature</label><input id="tempInput" type="number" min="0" max="2" step="0.1" value="'+(custom.temp||m.temp)+'"></div></div>'+
+    '<div style="display:flex;gap:8px;margin-top:8px"><button class="btn btn-primary" onclick="saveModule()">💾 Salva</button><button class="btn btn-ghost" onclick="resetModule()">🔄 Reset</button><button class="btn btn-ghost" onclick="testPrompt()">▶️ Test</button></div>'+
+    '<div class="preview-box" id="testOutput" style="display:none"></div>';
+}
+
+function saveModule(){
+  if(!activeModule)return;
+  var prompt=document.getElementById('promptText').value;
+  var schema=document.getElementById('schemaText').value;
+  var model=document.getElementById('modelSelect').value;
+  var temp=parseFloat(document.getElementById('tempInput').value);
+  promptsData[activeModule.id]={prompt:prompt,outputSchema:schema,model:model,temp:temp};
+  localStorage.setItem('dev_prompts',JSON.stringify(promptsData));
+  toast('✅ Salvato: '+activeModule.name);
+  init(); // refresh sidebar
+}
+
+function resetModule(){
+  if(!activeModule||!confirm('Resettare il prompt di '+activeModule.name+'?'))return;
+  delete promptsData[activeModule.id];localStorage.setItem('dev_prompts',JSON.stringify(promptsData));
+  selectModule(activeModule.id);toast('🔄 Resettato');init();
+}
+
+function exportAll(){
+  var data={prompts:promptsData,modules:MODULES,exported:new Date().toISOString()};
+  var blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
+  var a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='sottotitoli-prompts-'+new Date().toISOString().slice(0,10)+'.json';a.click();
+  toast('📥 Esportato');
+}
+
+function importAll(){document.getElementById('importFile').click()}
+function handleImport(e){
+  var file=e.target.files[0];if(!file)return;
+  var reader=new FileReader();reader.onload=function(ev){
+    try{var data=JSON.parse(ev.target.result);if(data.prompts){promptsData=data.prompts;localStorage.setItem('dev_prompts',JSON.stringify(promptsData));toast('📤 Importato '+Object.keys(data.prompts).length+' prompts');init();if(activeModule)selectModule(activeModule.id)}}catch(ex){toast('❌ File non valido','err')}
+  };reader.readAsText(file);
+}
+
+function testPrompt(){
+  var output=document.getElementById('testOutput');output.style.display='block';
+  output.innerHTML='<span style="color:var(--amber)">⏳ Per testare veramente il prompt, esegui la Edge Function con:\n\nsupabase functions deploy process-ai-reports\n\nPoi invia una richiesta con il module_id: '+activeModule.id+'</span>';
+}
+
+function toast(msg,type){
+  var t=document.createElement('div');t.className='toast '+(type||'ok');t.textContent=msg;document.body.appendChild(t);
+  setTimeout(function(){t.remove()},2500);
+}
+
+init();
+</script>
+</body>
+</html>
