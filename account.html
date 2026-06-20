@@ -375,7 +375,8 @@ body.snap-body{overflow:hidden}
 
     <!-- ═══ TRASCRIZIONI ═══ -->
     <div class="cs" id="cs-transcripts">
-      <div class="card"><div class="card-h3">📄 Sessioni recenti <span style="font-weight:400;font-size:11px;color:var(--t3)">· <span id="transcriptCount">0</span> totali</span></div><div id="transcriptList" style="display:flex;flex-direction:column;gap:6px"></div></div>
+      <div class="card"><div class="card-h3">⭐ Preferiti <span style="font-weight:400;font-size:11px;color:var(--t3)" id="favCount">0</span></div><div id="favList" style="display:flex;flex-direction:column;gap:4px"><div style="text-align:center;color:var(--t3);font-size:11px;padding:12px">Nessun preferito. Clicca la ⭐ in una sessione per salvarlo qui.</div></div></div>
+      <div class="card"><div class="card-h3">📄 Sessioni recenti <span style="font-weight:400;font-size:11px;color:var(--t3)">· <span id="transcriptCount">0</span> totali</span></div><div id="transcriptList" style="display:flex;flex-direction:column;gap:4px"></div></div>
     </div>
 
     <!-- ═══ REPORT ═══ -->
@@ -494,17 +495,44 @@ async function loadAllData(supabase,userId){
   var repResp=await supabase.from('session_ai_reports').select('id',{count:'exact',head:true}).eq('user_id',userId).eq('status','completed');
   var rb=document.getElementById('reportBadge');if(rb)rb.textContent=repResp.count||0;
 
+  // ── Profile: member since + plan ──
   var profResp=await supabase.from('profiles').select('created_at').eq('id',userId).maybeSingle();
-  if(profResp.data?.created_at){
-    var created=new Date(profResp.data.created_at);
-    var daysAgo=Math.floor((Date.now()-created.getTime())/86400000);
-    var ms=document.getElementById('memberSince');if(ms)ms.textContent=created.toLocaleDateString('it-IT',{month:'long',year:'numeric'});
-    var pd=document.getElementById('profDays');if(pd)pd.textContent=daysAgo;
-    var pc=document.getElementById('profCompletion');if(pc)pc.textContent=Math.min(100,Math.round(daysAgo/30*100))+'%';
-    var px=document.getElementById('profXp');if(px)px.textContent=(daysAgo*50).toLocaleString();
-  }
+  var created=profResp.data?.created_at?new Date(profResp.data.created_at):new Date(r.data.session.user.created_at||Date.now());
+  var daysAgo=Math.floor((Date.now()-created.getTime())/86400000);
+  var ms=document.getElementById('memberSince');if(ms)ms.textContent=created.toLocaleDateString('it-IT',{month:'long',year:'numeric'});
+  var pd=document.getElementById('profDays');if(pd)pd.textContent=daysAgo;
+  var pc=document.getElementById('profCompletion');if(pc)pc.textContent=Math.min(100,Math.round(daysAgo/30*100))+'%';
 
-  // Panoramica KPIs
+  // ── Plan from user_credits ──
+  var planName='Gratuito',planDetail='15 min inclusi';
+  try{
+    var credResp=await supabase.from('user_credits').select('balance_seconds,lifetime_seconds').eq('user_id',userId).maybeSingle();
+    if(credResp.data){
+      var lifeMin=Math.round((credResp.data.lifetime_seconds||0)/60);
+      if(lifeMin>=3000){planName='Plus';planDetail=lifeMin+' min lifetime';}
+      else if(lifeMin>=900){planName='Base';planDetail=lifeMin+' min lifetime';}
+      else{planDetail=Math.round((credResp.data.balance_seconds||900)/60)+' min rimanenti';}
+    }
+  }catch(e){}
+  var ap=document.getElementById('accountPlan');if(ap)ap.textContent=planName;
+  var pn=document.getElementById('planName');if(pn)pn.textContent=planName;
+  var pnd=document.getElementById('planDetail');if(pnd)pnd.textContent=planDetail;
+
+  // ── XP Calculation ──
+  var allSec=0,allWords=0;allSessions.forEach(function(s){allSec+=(s.duration_seconds||0);allWords+=(s.unique_words_count||0)});
+  var allMin=Math.round(allSec/60);
+  var xp=allSessions.length*10 + allMin*2 + Math.round(allWords*0.1);
+  var level=Math.floor(xp/1000)+1;
+  var xpNext=(level)*1000;
+  var xpPct=Math.round((xp-(level-1)*1000)/1000*100);
+  var hx=document.getElementById('heroXp');if(hx)hx.textContent=xp.toLocaleString()+' XP';
+  var xc=document.getElementById('xpCurrent');if(xc)xc.textContent=xp.toLocaleString()+' XP';
+  var xn=document.getElementById('xpNext');if(xn)xn.textContent=xpNext.toLocaleString()+' XP — Livello '+(level+1);
+  var xf=document.getElementById('xpFill');if(xf)xf.style.width=xpPct+'%';
+  var hl=document.getElementById('heroLvl');if(hl)hl.textContent='LVL '+level;
+  var plx=document.getElementById('profXp');if(plx)plx.textContent=xp.toLocaleString();
+
+  // ── Panoramica KPIs ──
   var weekAgo=new Date(Date.now()-7*86400000);
   var weekSessions=allSessions.filter(function(s){return new Date(s.started_at)>=weekAgo});
   var totalSec=0,totalWords=0,sumWpm=0,countWpm=0;
@@ -515,9 +543,8 @@ async function loadAllData(supabase,userId){
   if(document.getElementById('ovWords'))document.getElementById('ovWords').textContent=totalWords;
   if(document.getElementById('ovReports'))document.getElementById('ovReports').textContent=repResp.count||'—';
 
-  // Investment
-  var allSec=0,allWords=0;allSessions.forEach(function(s){allSec+=(s.duration_seconds||0);allWords+=(s.unique_words_count||0)});
-  var allMin=Math.round(allSec/60),allHrs=allMin>=60?(allMin/60).toFixed(1)+'h':allMin+'m';
+  // ── Investment (uses allSec/allWords from XP block above) ──
+  var allHrs=allMin>=60?(allMin/60).toFixed(1)+'h':allMin+'m';
   if(document.getElementById('invTalk'))document.getElementById('invTalk').textContent=allHrs;
   if(document.getElementById('invSessions'))document.getElementById('invSessions').textContent=allSessions.length;
   if(document.getElementById('invWords'))document.getElementById('invWords').textContent=allWords;
@@ -628,24 +655,63 @@ function renderStreakTab(){
   if(document.getElementById('habitDayAvg'))document.getElementById('habitDayAvg').textContent=total>0?'Media '+(dayCounts[bestDay]/Math.max(1,Math.ceil(total/7))).toFixed(1)+' sessioni':'';
 }
 
-// ═══ ACHIEVEMENTS ═══
+// ═══ ACHIEVEMENTS (50) ═══
 var ACHIEVEMENTS=[
+  // Beginner (1-10)
   {id:'first',icon:'🎤',name:'Prima sessione',desc:'Registra la tua prima sessione',cond:function(d){return d.total>=1}},
-  {id:'streak7',icon:'🔥',name:'Streak 7 giorni',desc:'Mantieni una streak di 7 giorni',cond:function(d){return d.streak>=7}},
-  {id:'words100',icon:'📚',name:'100 parole NGSL',desc:'Riconosci 100 parole NGSL',cond:function(d){return d.ngsl>=100}},
-  {id:'hours10',icon:'⏱️',name:'10 ore parlate',desc:'Accumula 10 ore di parlato',cond:function(d){return d.min>=600}},
-  {id:'streak30',icon:'💪',name:'Mese di fuoco',desc:'Streak di 30 giorni',cond:function(d){return d.streak>=30}},
-  {id:'words1000',icon:'🧠',name:'1000 parole NGSL',desc:'Riconosci 1000 parole NGSL',cond:function(d){return d.ngsl>=1000}},
-  {id:'hours50',icon:'💎',name:'50 ore parlate',desc:'Accumula 50 ore di parlato',cond:function(d){return d.min>=3000}},
-  {id:'sessions100',icon:'🎯',name:'100 sessioni',desc:'Completa 100 sessioni',cond:function(d){return d.total>=100}},
-  {id:'wpm120',icon:'⚡',name:'WPM 120+',desc:'Mantieni 120+ WPM',cond:function(d){return d.maxWpm>=120}},
-  {id:'lexDiv50',icon:'🌈',name:'Lexical Diversity 0.50+',desc:'Diversità lessicale > 0.50',cond:function(d){return d.maxLex>=0.50}},
-  {id:'report5',icon:'📊',name:'5 report AI',desc:'Genera 5 report AI',cond:function(d){return d.reports>=5}},
-  {id:'perfectWeek',icon:'⭐',name:'Settimana perfetta',desc:'5+ sessioni in una settimana',cond:function(d){return d.maxWeek>=5}},
+  {id:'streak3',icon:'🌱',name:'TRE giorni',desc:'Streak di 3 giorni',cond:function(d){return d.streak>=3}},
+  {id:'streak7',icon:'🔥',name:'Sette giorni di fuoco',desc:'Streak di 7 giorni',cond:function(d){return d.streak>=7}},
+  {id:'min30',icon:'⏱️',name:'Mezz\'ora',desc:'30 minuti totali di parlato',cond:function(d){return d.min>=30}},
+  {id:'words50',icon:'📚',name:'50 parole NGSL',desc:'Riconosci 50 parole NGSL',cond:function(d){return d.ngsl>=50}},
+  {id:'sess5',icon:'🎯',name:'5 sessioni',desc:'Completa 5 sessioni',cond:function(d){return d.total>=5}},
+  {id:'wpm80',icon:'⚡',name:'WPM 80+',desc:'Supera 80 parole al minuto',cond:function(d){return d.maxWpm>=80}},
   {id:'nightOwl',icon:'🦉',name:'Gufo notturno',desc:'Sessione dopo le 22:00',cond:function(d){return d.night>=1}},
   {id:'earlyBird',icon:'🌅',name:'Allodola',desc:'Sessione prima delle 7:00',cond:function(d){return d.early>=1}},
-  {id:'linguist',icon:'🗣️',name:'Poliglotta',desc:'Usa 2+ lingue diverse',cond:function(d){return d.langs>=2}},
-  {id:'marathon',icon:'🏃',name:'Maratona',desc:'Sessione di oltre 60 minuti',cond:function(d){return d.maxSess>=60}}
+  {id:'twoLangs',icon:'🗣️',name:'Bilingue',desc:'Usa 2+ lingue diverse',cond:function(d){return d.langs>=2}},
+  // Intermediate (11-20)
+  {id:'streak14',icon:'💪',name:'Due settimane',desc:'Streak di 14 giorni',cond:function(d){return d.streak>=14}},
+  {id:'words100',icon:'📖',name:'100 parole NGSL',desc:'Riconosci 100 parole NGSL',cond:function(d){return d.ngsl>=100}},
+  {id:'hours1',icon:'🕐',name:'1 ora parlata',desc:'60 minuti totali di parlato',cond:function(d){return d.min>=60}},
+  {id:'sess20',icon:'🎯',name:'20 sessioni',desc:'Completa 20 sessioni',cond:function(d){return d.total>=20}},
+  {id:'wpm100',icon:'💨',name:'WPM 100+',desc:'Supera 100 parole al minuto',cond:function(d){return d.maxWpm>=100}},
+  {id:'lexDiv30',icon:'🌈',name:'Varietà 0.30',desc:'Diversità lessicale > 0.30',cond:function(d){return d.maxLex>=0.30}},
+  {id:'report1',icon:'📊',name:'Primo report',desc:'Genera il tuo primo report AI',cond:function(d){return d.reports>=1}},
+  {id:'perfectWeek',icon:'⭐',name:'Settimana perfetta',desc:'5+ sessioni in una settimana',cond:function(d){return d.maxWeek>=5}},
+  {id:'marathon30',icon:'🏃',name:'Maratona 30min',desc:'Sessione di oltre 30 minuti',cond:function(d){return d.maxSess>=30}},
+  {id:'threeLangs',icon:'🌍',name:'Trilingue',desc:'Usa 3+ lingue diverse',cond:function(d){return d.langs>=3}},
+  // Advanced (21-30)
+  {id:'streak21',icon:'🔥',name:'Tre settimane',desc:'Streak di 21 giorni',cond:function(d){return d.streak>=21}},
+  {id:'streak30',icon:'💎',name:'Mese di fuoco',desc:'Streak di 30 giorni',cond:function(d){return d.streak>=30}},
+  {id:'words500',icon:'🧠',name:'500 parole NGSL',desc:'Riconosci 500 parole NGSL',cond:function(d){return d.ngsl>=500}},
+  {id:'hours5',icon:'⏰',name:'5 ore parlate',desc:'300 minuti totali di parlato',cond:function(d){return d.min>=300}},
+  {id:'sess50',icon:'🏅',name:'50 sessioni',desc:'Completa 50 sessioni',cond:function(d){return d.total>=50}},
+  {id:'wpm120',icon:'🚀',name:'WPM 120+',desc:'Supera 120 parole al minuto',cond:function(d){return d.maxWpm>=120}},
+  {id:'lexDiv40',icon:'🎨',name:'Varietà 0.40',desc:'Diversità lessicale > 0.40',cond:function(d){return d.maxLex>=0.40}},
+  {id:'report5',icon:'📈',name:'5 report AI',desc:'Genera 5 report AI',cond:function(d){return d.reports>=5}},
+  {id:'quality70',icon:'✨',name:'Qualità 70+',desc:'Quality score medio > 70',cond:function(d){return d.avgQuality>=70}},
+  {id:'fillersLow',icon:'🤫',name:'Poche esitazioni',desc:'Fillers/min < 3',cond:function(d){return d.avgFillers<3}},
+  // Expert (31-40)
+  {id:'streak60',icon:'👑',name:'Due mesi',desc:'Streak di 60 giorni',cond:function(d){return d.streak>=60}},
+  {id:'words1000',icon:'📚',name:'1000 parole NGSL',desc:'Riconosci 1000 parole NGSL',cond:function(d){return d.ngsl>=1000}},
+  {id:'hours10',icon:'🎖️',name:'10 ore parlate',desc:'600 minuti totali di parlato',cond:function(d){return d.min>=600}},
+  {id:'sess100',icon:'💯',name:'100 sessioni',desc:'Completa 100 sessioni',cond:function(d){return d.total>=100}},
+  {id:'wpm150',icon:'✈️',name:'WPM 150+',desc:'Supera 150 parole al minuto',cond:function(d){return d.maxWpm>=150}},
+  {id:'lexDiv50',icon:'🌟',name:'Varietà 0.50',desc:'Diversità lessicale > 0.50',cond:function(d){return d.maxLex>=0.50}},
+  {id:'report10',icon:'📊',name:'10 report AI',desc:'Genera 10 report AI',cond:function(d){return d.reports>=10}},
+  {id:'ngsl50',icon:'📗',name:'Copertura NGSL 50%',desc:'50%+ copertura NGSL',cond:function(d){return d.ngslPct>=50}},
+  {id:'fourLangs',icon:'🌐',name:'Poliglotta',desc:'Usa 4+ lingue diverse',cond:function(d){return d.langs>=4}},
+  {id:'marathon60',icon:'🏃‍♂️',name:'Maratona 60min',desc:'Sessione di oltre 60 minuti',cond:function(d){return d.maxSess>=60}},
+  // Master (41-50)
+  {id:'streak90',icon:'🏆',name:'Trimestre perfetto',desc:'Streak di 90 giorni',cond:function(d){return d.streak>=90}},
+  {id:'words2000',icon:'📚',name:'2000 parole NGSL',desc:'Riconosci 2000 parole NGSL',cond:function(d){return d.ngsl>=2000}},
+  {id:'hours25',icon:'🎖️',name:'25 ore parlate',desc:'1500 minuti totali di parlato',cond:function(d){return d.min>=1500}},
+  {id:'sess200',icon:'🔥',name:'200 sessioni',desc:'Completa 200 sessioni',cond:function(d){return d.total>=200}},
+  {id:'wpm170',icon:'🛫',name:'WPM 170+',desc:'Supera 170 parole al minuto',cond:function(d){return d.maxWpm>=170}},
+  {id:'lexDiv60',icon:'💫',name:'Varietà 0.60',desc:'Diversità lessicale > 0.60',cond:function(d){return d.maxLex>=0.60}},
+  {id:'report25',icon:'📊',name:'25 report AI',desc:'Genera 25 report AI',cond:function(d){return d.reports>=25}},
+  {id:'ngsl80',icon:'📘',name:'Copertura NGSL 80%',desc:'80%+ copertura NGSL',cond:function(d){return d.ngslPct>=80}},
+  {id:'hours50',icon:'👑',name:'50 ore parlate',desc:'3000 minuti totali di parlato',cond:function(d){return d.min>=3000}},
+  {id:'allAchievements',icon:'🌟',name:'Collezionista',desc:'Sblocca 40+ achievements',cond:function(d){return d.earned>=40}}
 ];
 
 function renderAchievements(){
@@ -654,23 +720,31 @@ function renderAchievements(){
   var uniqueDays2=[...new Set(days2)].sort().reverse();
   var streak=0;
   for(var i=0;i<365;i++){var d=new Date(Date.now()-streak*86400000).toISOString().split('T')[0];if(uniqueDays2.includes(d))streak++;else break}
-  var totalSec=0,totalWords2=0,maxWpm=0,maxLex=0;allSessions.forEach(function(s){totalSec+=(s.duration_seconds||0);totalWords2+=(s.words_count||0);if((s.wpm||0)>maxWpm)maxWpm=s.wpm;if((s.lexical_diversity||0)>maxLex)maxLex=s.lexical_diversity});
+  var totalSec=0,totalWords2=0,maxWpm=0,maxLex=0,sumQuality=0,countQuality=0,sumFillers=0,countFillers=0,sumNgsl=0,countNgsl=0;
+  allSessions.forEach(function(s){totalSec+=(s.duration_seconds||0);totalWords2+=(s.words_count||0);if((s.wpm||0)>maxWpm)maxWpm=s.wpm;if((s.lexical_diversity||0)>maxLex)maxLex=s.lexical_diversity;if(typeof s.quality_score==='number'){sumQuality+=s.quality_score;countQuality++}if(typeof s.fillers_per_minute==='number'){sumFillers+=s.fillers_per_minute;countFillers++}if(typeof s.ngsl_coverage==='number'){sumNgsl+=s.ngsl_coverage;countNgsl++}});
   var totalMin=Math.round(totalSec/60);
   var maxSess=Math.round(Math.max.apply(null,allSessions.map(function(s){return(s.duration_seconds||0)/60}).concat([0])));
   var weekMap={};allSessions.forEach(function(s){if(s.started_at){var wk=new Date(s.started_at).toISOString().slice(0,7);weekMap[wk]=(weekMap[wk]||0)+1}});
   var maxWeek=Math.max.apply(null,Object.values(weekMap).concat([0]));
   var modes=[];allSessions.forEach(function(s){if(s.mode&&modes.indexOf(s.mode)===-1)modes.push(s.mode)});
   var night=0,early=0;allSessions.forEach(function(s){if(s.started_at){var h=new Date(s.started_at).getHours();if(h>=22)night++;if(h<7)early++}});
-  var data={total:allSessions.length,streak:streak,ngsl:Math.round(totalWords2*0.7),min:totalMin,maxWpm:maxWpm,maxLex:maxLex,reports:parseInt((document.getElementById('reportBadge')||{}).textContent)||0,maxWeek:maxWeek,night:night,early:early,langs:modes.length,maxSess:maxSess};
+  var avgQuality=countQuality>0?sumQuality/countQuality*100:0;
+  var avgFillers=countFillers>0?sumFillers/countFillers:99;
+  var ngslPct=countNgsl>0?Math.round(sumNgsl/countNgsl*100):0;
+  var earnedCount=0;
+  // Pre-count earned for "Collezionista"
+  var data={total:allSessions.length,streak:streak,ngsl:Math.round(totalWords2*0.7),min:totalMin,maxWpm:maxWpm,maxLex:maxLex,reports:parseInt((document.getElementById('reportBadge')||{}).textContent)||0,maxWeek:maxWeek,night:night,early:early,langs:modes.length,maxSess:maxSess,avgQuality:avgQuality,avgFillers:avgFillers,ngslPct:ngslPct,earned:0};
+  ACHIEVEMENTS.forEach(function(a){if(a.cond(data))earnedCount++;});
+  data.earned=earnedCount;
 
-  var earned=0,gridEl=document.getElementById('achGrid');
+  var gridEl=document.getElementById('achGrid');
   if(!gridEl)return;
   var h='';
-  ACHIEVEMENTS.forEach(function(a){var ok=a.cond(data);if(ok)earned++;h+='<div class="ach '+(ok?'earned':'locked')+'"><span class="ai">'+a.icon+'</span><div class="an">'+a.name+'</div><div class="ad">'+a.desc+'</div></div>'});
+  ACHIEVEMENTS.forEach(function(a){var ok=a.cond(data);h+='<div class="ach '+(ok?'earned':'locked')+'"><span class="ai">'+a.icon+'</span><div class="an">'+a.name+'</div><div class="ad">'+(ok?'Sbloccato!':'<div class="ap"><div class="apf" style="width:'+(a.id==='streak3'?Math.min(100,data.streak/3*100):a.id==='streak7'?Math.min(100,data.streak/7*100):50)+'%"></div></div>')+'</div></div>'});
   gridEl.innerHTML=h;
-  if(document.getElementById('achEarned'))document.getElementById('achEarned').textContent=earned;
+  if(document.getElementById('achEarned'))document.getElementById('achEarned').textContent=earnedCount;
   if(document.getElementById('achTotal'))document.getElementById('achTotal').textContent=ACHIEVEMENTS.length;
-  if(document.getElementById('achBadge'))document.getElementById('achBadge').textContent=earned;
+  if(document.getElementById('achBadge'))document.getElementById('achBadge').textContent=earnedCount;
 }
 
 // ═══ VOCAB TAB ═══
@@ -733,13 +807,60 @@ function loadSpeakingTab(){
 }
 
 // ═══ TRANSCRIPTS TAB ═══
+var favorites=JSON.parse(localStorage.getItem('sottotitoli_favorites')||'[]');
+function saveFavs(){localStorage.setItem('sottotitoli_favorites',JSON.stringify(favorites));renderFavorites();}
+function renderFavorites(){
+  var el=document.getElementById('favList');if(!el)return;
+  var favSessions=allSessions.filter(function(s){return favorites.indexOf(s.id)!==-1});
+  var fc=document.getElementById('favCount');if(fc)fc.textContent=favSessions.length;
+  if(favSessions.length===0){el.innerHTML='<div style="text-align:center;color:var(--t3);font-size:11px;padding:12px">Nessun preferito. Clicca la ⭐ in una sessione per salvarlo qui.</div>';return}
+  var h='';favSessions.forEach(function(s){h+=renderSessionRow(s,true)});el.innerHTML=h;
+}
+function renderSessionRow(s,isFav){
+  var when=s.started_at?new Date(s.started_at).toLocaleDateString('it-IT',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}):'';
+  var dur=s.duration_seconds?Math.round(s.duration_seconds/60)+'m':'—';
+  var wc=s.words_count||0,star=isFav?'★':'☆';
+  return '<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;background:var(--bg2);border-radius:10px;font-size:12px;gap:6px;flex-wrap:wrap" data-sid="'+s.id+'">'+
+    '<span style="cursor:pointer;font-size:14px" class="favStar" data-sid="'+s.id+'" title="Preferito">'+star+'</span>'+
+    '<span style="font-weight:600;color:var(--text);min-width:60px">'+(s.mode||'session')+'</span>'+
+    '<span style="color:var(--t3);font-size:10px">'+when+' · '+dur+' · '+wc+' parole</span>'+
+    '<span style="display:flex;gap:4px;font-size:10px">'+
+    '<a href="transcript.html?session='+s.id+'" style="color:var(--blue);font-weight:500;text-decoration:none">Trascr.</a>'+
+    '<a href="analysis.html?session='+s.id+'" style="color:var(--accent);font-weight:500;text-decoration:none">Analysis</a>'+
+    '<span style="cursor:pointer;color:var(--t3);margin-left:4px" class="renameSession" data-sid="'+s.id+'" title="Rinomina">✏️</span>'+
+    '<span style="cursor:pointer;color:var(--red);margin-left:2px" class="deleteSession" data-sid="'+s.id+'" title="Elimina">🗑️</span>'+
+    '</span></div>';
+}
 function loadTranscriptsTab(){
   var el=document.getElementById('transcriptList');if(!el||el.children.length>0)return;
-  var recent=allSessions.slice(0,20);
+  var recent=allSessions.slice(0,30);
   if(recent.length===0){el.innerHTML='<div style="text-align:center;color:var(--t3);padding:20px;font-size:12px">🎤 Nessuna sessione ancora. <a href="start.html" style="color:var(--accent)">Inizia →</a></div>';return}
   var tc2=document.getElementById('transcriptCount');if(tc2)tc2.textContent=allSessions.length;
-  var h='';recent.forEach(function(s){var when=s.started_at?new Date(s.started_at).toLocaleDateString('it-IT',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}):'';var dur=s.duration_seconds?Math.round(s.duration_seconds/60)+'m':'—';var wc=s.words_count||0;h+='<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:var(--bg2);border-radius:10px;font-size:12px;gap:8px;flex-wrap:wrap"><span style="font-weight:600;color:var(--text)">'+(s.mode||'session')+'</span><span style="color:var(--t3);font-size:10px">'+when+' · '+dur+' · '+wc+' parole</span><span style="display:flex;gap:6px;font-size:10px"><a href="transcript.html?session='+s.id+'" style="color:var(--blue);font-weight:500">Trascrizione</a><a href="analysis.html?session='+s.id+'" style="color:var(--accent);font-weight:500">Analysis</a></span></div>'});
+  var h='';recent.forEach(function(s){h+=renderSessionRow(s,favorites.indexOf(s.id)!==-1)});
   el.innerHTML=h;
+  renderFavorites();
+  // Delegate clicks for star/delete/rename
+  el.addEventListener('click',function(e){
+    var target=e.target;var sid=target.dataset.sid;
+    if(!sid)return;
+    if(target.classList.contains('favStar')){
+      var idx=favorites.indexOf(sid);
+      if(idx===-1){favorites.push(sid)}else{favorites.splice(idx,1)}
+      saveFavs();loadTranscriptsTab(); // refresh
+    }
+    if(target.classList.contains('renameSession')){
+      var newName=prompt('Nuovo nome per questa sessione:',allSessions.find(function(s){return s.id===sid})?.mode||'');
+      if(newName){var s=allSessions.find(function(s){return s.id===sid});if(s)s.mode=newName;loadTranscriptsTab()}
+    }
+    if(target.classList.contains('deleteSession')){
+      if(confirm('Eliminare questa sessione? Potrai ancora accedere alla trascrizione.')){
+        allSessions=allSessions.filter(function(s){return s.id!==sid});
+        // Also remove from favorites
+        var fidx=favorites.indexOf(sid);if(fidx!==-1){favorites.splice(fidx,1);saveFavs()}
+        loadTranscriptsTab();
+      }
+    }
+  });
 }
 
 // ═══ REPORTS TAB ═══
