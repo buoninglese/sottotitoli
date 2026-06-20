@@ -1078,23 +1078,25 @@ async function loadGrammarTab(){
     th+='</div>';hmEl.innerHTML=th;
   }
 
-  // ── Grammar Topics by CEFR level ──
+  // ── Grammar Topics by CEFR level (dynamic from error data) ──
   var topicsEl=document.getElementById('gramTopics');
   if(topicsEl){
-    var cefrTopics=[
-      {level:'A1',color:'#34d399',items:[{name:'Present Simple',ok:true},{name:'Articles (a/an/the)',ok:true},{name:'Plural nouns',ok:true},{name:'To be / To have',ok:true},{name:'Basic prepositions',ok:false}]},
-      {level:'A2',color:'#60a5fa',items:[{name:'Past Simple',ok:true},{name:'Future (will/going to)',ok:true},{name:'Comparatives',ok:false},{name:'Modals (can/must)',ok:true},{name:'Adverbs of frequency',ok:false}]},
-      {level:'B1',color:'#fbbf24',items:[{name:'Present Perfect',ok:false},{name:'Conditionals 1st/2nd',ok:false},{name:'Passive Voice',ok:false},{name:'Relative clauses',ok:false},{name:'Used to',ok:true}]},
-      {level:'B2',color:'#f472b6',items:[{name:'Past Perfect',ok:false},{name:'Conditionals 3rd/mixed',ok:false},{name:'Reported Speech',ok:false},{name:'Gerund vs Infinitive',ok:false},{name:'Phrasal Verbs',ok:false}]}
-    ];
+    // Infer topic mastery: if the related error category has <10% frequency, consider it "ok"
+    var errMap={};if(grammarData&&grammarData.categories){grammarData.categories.forEach(function(c){errMap[c.name]=c.pct})}
+    function isOk(topicName){
+      // Map topic names to error categories
+      var map={ 'Present Simple':'Coniugazioni','Articles (a/an/the)':'Articoli','Plural nouns':'Ortografia','To be / To have':'Coniugazioni','Basic prepositions':'Preposizioni','Past Simple':'Coniugazioni','Future (will/going to)':'Coniugazioni','Comparatives':'Accordo','Modals (can/must)':'Coniugazioni','Adverbs of frequency':'Ordine parole','Present Perfect':'Coniugazioni','Conditionals 1st/2nd':'Coniugazioni','Passive Voice':'Ordine parole','Relative clauses':'Ordine parole','Used to':'Coniugazioni','Past Perfect':'Coniugazioni','Conditionals 3rd/mixed':'Coniugazioni','Reported Speech':'Ordine parole','Gerund vs Infinitive':'Coniugazioni','Phrasal Verbs':'Preposizioni'};
+      var cat=map[topicName];if(!cat)return false;
+      var pct=errMap[cat];return pct!=null?pct<10:false;
+    }
+    var cefrTopics=[{level:'A1',color:'#34d399',items:[{name:'Present Simple'},{name:'Articles (a/an/the)'},{name:'Plural nouns'},{name:'To be / To have'},{name:'Basic prepositions'}]},{level:'A2',color:'#60a5fa',items:[{name:'Past Simple'},{name:'Future (will/going to)'},{name:'Comparatives'},{name:'Modals (can/must)'},{name:'Adverbs of frequency'}]},{level:'B1',color:'#fbbf24',items:[{name:'Present Perfect'},{name:'Conditionals 1st/2nd'},{name:'Passive Voice'},{name:'Relative clauses'},{name:'Used to'}]},{level:'B2',color:'#f472b6',items:[{name:'Past Perfect'},{name:'Conditionals 3rd/mixed'},{name:'Reported Speech'},{name:'Gerund vs Infinitive'},{name:'Phrasal Verbs'}]}];
+    var hasErrData=Object.keys(errMap).length>0;
     var th2='<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:8px">';
     cefrTopics.forEach(function(grp){
-      var mastered=grp.items.filter(function(i){return i.ok}).length;
+      var mastered=grp.items.filter(function(i){return hasErrData?isOk(i.name):i.name==='Present Simple'||i.name==='Articles (a/an/the)'||i.name==='Plural nouns'||i.name==='To be / To have'||i.name==='Past Simple'||i.name==='Modals (can/must)'||i.name==='Used to'}).length;
       th2+='<div style="background:var(--bg2);border-radius:10px;padding:10px 12px;border-left:3px solid '+grp.color+'">';
       th2+='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><span style="font-size:12px;font-weight:700">'+grp.level+'</span><span style="font-size:10px;color:var(--t3)">'+mastered+'/'+grp.items.length+'</span></div>';
-      grp.items.forEach(function(item){
-        th2+='<div style="display:flex;align-items:center;gap:4px;font-size:10px;padding:2px 0;color:'+(item.ok?'var(--text)':'var(--t3)')+'"><span style="color:'+(item.ok?grp.color:'var(--t3)')+'">'+(item.ok?'✓':'○')+'</span> '+item.name+'</div>';
-      });
+      grp.items.forEach(function(item){var ok=hasErrData?isOk(item.name):item.name==='Present Simple'||item.name==='Articles (a/an/the)'||item.name==='Plural nouns'||item.name==='To be / To have'||item.name==='Past Simple'||item.name==='Modals (can/must)'||item.name==='Used to';th2+='<div style="display:flex;align-items:center;gap:4px;font-size:10px;padding:2px 0;color:'+(ok?'var(--text)':'var(--t3)')+'"><span style="color:'+(ok?grp.color:'var(--t3)')+'">'+(ok?'✓':'○')+'</span> '+item.name+'</div>'});
       th2+='</div>';
     });
     th2+='</div>';topicsEl.innerHTML=th2;
@@ -1181,15 +1183,20 @@ function loadTrendTab(){
   if(document.getElementById('trWords'))document.getElementById('trWords').textContent=totalWords;
   if(document.getElementById('trReports'))document.getElementById('trReports').textContent=reportCount;
 
-  // Heatmap (12 weeks)
+  // Heatmap (12 weeks, Mon-Sun)
   var hmEl=document.getElementById('trendHeatmap');
-  if(hmEl){
-    var days=[];for(var i=83;i>=0;i--){var d=new Date(Date.now()-i*86400000);var key=d.toISOString().split('T')[0];var min=0;allSessions.forEach(function(s){if(s.started_at&&s.started_at.split('T')[0]===key)min+=(s.duration_seconds||0)/60});days.push({date:key,min:min,day:d.getDay()});}
-    var maxMin=Math.max.apply(null,days.map(function(d){return d.min}).concat([1]));
-    var cols=[[],[],[],[],[],[],[]];days.forEach(function(d){cols[d.day].push(d)});
+  if(hmEl&&hmEl.children.length===0){
+    // Build 12 weeks of 7 days each: Mon(0) to Sun(6)
+    var today=new Date();var start=new Date(today);start.setDate(today.getDate()-83); // 12*7-1=83 days back
+    var weeks=[];for(var w=0;w<12;w++){weeks.push([]);for(var d=0;d<7;d++){var date=new Date(start);date.setDate(start.getDate()+w*7+d);var key=date.toISOString().split('T')[0];var min=0;allSessions.forEach(function(s){if(s.started_at&&s.started_at.split('T')[0]===key)min+=(s.duration_seconds||0)/60});weeks[w].push({date:key,min:min})}}
+    var allMins=[];weeks.forEach(function(w){w.forEach(function(d){allMins.push(d.min)})});var maxMin=Math.max.apply(null,allMins.concat([1]));
     var hmh='<div style="display:flex;gap:2px">';
+    // Day labels (Mon-Sun)
+    hmh+='<div style="display:flex;flex-direction:column;gap:2px;margin-right:4px">';
+    ['L','M','M','G','V','S','D'].forEach(function(l,i){hmh+='<div style="width:14px;height:14px;font-size:8px;color:var(--t3);display:flex;align-items:center;justify-content:center">'+l+'</div>'});
+    hmh+='</div>';
     for(var w=0;w<12;w++){hmh+='<div style="display:flex;flex-direction:column;gap:2px">';
-      for(var dow=0;dow<7;dow++){var dayData=cols[dow][w]||{min:0};var lvl=dayData.min>0?(dayData.min/maxMin>0.66?'l4':dayData.min/maxMin>0.33?'l3':'l2'):'';hmh+='<div class="hm-day '+lvl+'" title="'+dayData.date+': '+Math.round(dayData.min)+' min"></div>';}
+      for(var d=0;d<7;d++){var dayData=weeks[w][d];var lvl=dayData.min>0?(dayData.min/maxMin>0.66?'l4':dayData.min/maxMin>0.33?'l3':'l2'):'';hmh+='<div class="hm-day '+lvl+'" title="'+dayData.date+': '+Math.round(dayData.min)+' min"></div>';}
     hmh+='</div>';}
     hmh+='</div>';hmEl.innerHTML=hmh;
   }
