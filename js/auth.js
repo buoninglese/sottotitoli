@@ -25,6 +25,26 @@ window.sottotitoliSupabase = window.supabase.createClient(
   }
 );
 
+// 1.5) Auth guard — redirect to index if not signed in (skip for index.html)
+(function(){
+  var path = window.location.pathname.replace(/\/$/,'').split('/').pop() || 'index.html';
+  if(path==='index.html'||path===''||path==='404.html'||path.indexOf('overlay')===0)return;
+  // Wait for session, redirect if missing
+  function check(){
+    var sb = window.sottotitoliSupabase;
+    if(!sb){setTimeout(check,200);return;}
+    sb.auth.onAuthStateChange(function(event,session){
+      if(event==='INITIAL_SESSION'&&!session){
+        window.location.replace('index.html');
+      }
+    });
+    sb.auth.getSession().then(function(r){
+      if(!r.data?.session){window.location.replace('index.html');}
+    });
+  }
+  check();
+})();
+
 // 2) Sign-in function used by the button
 async function signInWithGoogle() {
   // Remember where the user was so we can bring them back after login
