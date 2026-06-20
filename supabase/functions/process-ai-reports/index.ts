@@ -154,10 +154,17 @@ Deno.serve(async (req) => {
           is_active: true
         });
 
-        // Mark request as completed
+        // Mark request as completed — write back report content & token usage
         await supabase
           .from('ai_report_requests')
-          .update({ status: 'completed' })
+          .update({
+            status: 'completed',
+            report_markdown: summaryText,
+            tokens_spent: tokensUsed,
+            input_snapshot: session.transcript_text.slice(0, 2000),
+            prompt_key: String(moduleId),
+            completed_at: new Date().toISOString()
+          })
           .eq('id', request.id);
 
         results.push({ id: request.id, status: 'success' });
