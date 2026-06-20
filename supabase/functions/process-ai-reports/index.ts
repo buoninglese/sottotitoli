@@ -48,13 +48,15 @@ serve(async (req) => {
           throw new Error('No transcript found');
         }
 
-        // Get module details — use module_id from request, fallback to 1
-        const moduleId = request.module_id || 1;
-        const { data: mod } = await supabase
+        // Get module by family_key (or default to module 1)
+        const moduleKey = request.family_key || 'cambridge';
+        const { data: modules } = await supabase
           .from('ai_report_modules')
           .select('*')
-          .eq('id', moduleId)
-          .single();
+          .eq('family', moduleKey)
+          .limit(1);
+        const mod = modules && modules.length > 0 ? modules[0] : null;
+        const moduleId = mod ? mod.id : 1;
 
         // Call OpenAI API
         const prompt = getModulePrompt(moduleId, session.transcript_text);
