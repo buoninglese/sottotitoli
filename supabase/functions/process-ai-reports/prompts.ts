@@ -248,11 +248,3 @@ export function getModulePrompt(moduleId: number, reportLanguage?: string): { sy
     user: (transcript: string) => prompt.user(transcript, rl)
   };
 }
-
-export function getModulePrompt(moduleId: number): { system: string; user: (transcript: string) => string } {
-  const prompt = MODULE_PROMPTS[moduleId];
-  if (!prompt) {
-    throw new Error(`No prompt defined for module ID ${moduleId}`);
-  }
-  return prompt;
-}

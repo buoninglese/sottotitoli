@@ -127,6 +127,10 @@ body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--t
   <div class="modal" style="max-width:680px">
     <button class="close-btn" onclick="document.getElementById('reportDetailModal').classList.remove('active')">✕</button>
     <div id="reportDetailContent" style="font-size:13px;line-height:1.7;white-space:pre-wrap;max-height:65vh;overflow-y:auto"></div>
+    <div style="margin-top:16px;display:flex;gap:8px;justify-content:flex-end">
+      <button class="btn" style="font-size:12px;padding:8px 16px;background:var(--bg2);border:1px solid var(--line);border-radius:100px;cursor:pointer;color:var(--text)" onclick="downloadReportPDF()">🖨️ Scarica PDF</button>
+      <button class="btn" style="font-size:12px;padding:8px 16px;background:var(--accent);border:none;border-radius:100px;cursor:pointer;color:#fff" onclick="document.getElementById('reportDetailModal').classList.remove('active')">Chiudi</button>
+    </div>
   </div>
 </div>
 
@@ -258,20 +262,65 @@ document.getElementById('purchaseModal').addEventListener('click',function(e){if
 document.getElementById('reportDetailModal').addEventListener('click',function(e){if(e.target===this)this.classList.remove('active')});
 
 // ═══ Report Detail View (from ?report=ID) ═══
+var _currentReportData=null; // stored for PDF download
 (function loadReportDetail(){
   var reportId=new URLSearchParams(location.search).get('report');if(!reportId)return;
   var supabase=window.sottotitoliSupabase;if(!supabase){setTimeout(loadReportDetail,500);return}
   supabase.auth.getSession().then(function(r){if(!r.data?.session)return;
     supabase.from('session_ai_reports').select('id,module_id,overall_score,summary_text,created_at').eq('id',reportId).eq('user_id',r.data.session.user.id).single().then(function(resp){
       if(!resp.data||!resp.data.summary_text)return;
+      _currentReportData=resp.data;
       var mod=REPORT_MODULES[resp.data.module_id]||{icon:'📊',name:'Report'};
       var score=resp.data.overall_score?Math.round(resp.data.overall_score)+'%':'—';
       var when=resp.data.created_at?new Date(resp.data.created_at).toLocaleDateString('it-IT',{day:'numeric',month:'long',hour:'2-digit',minute:'2-digit'}):'';
       document.getElementById('reportDetailContent').innerHTML='<h3 style="margin-bottom:4px">'+mod.icon+' '+mod.name+'</h3><div style="font-size:11px;color:var(--t3);margin-bottom:16px">'+when+' · Punteggio: <strong style="color:var(--green)">'+score+'</strong></div><hr style="border-color:var(--line);margin-bottom:14px">'+resp.data.summary_text.replace(/\n/g,'<br>');
       document.getElementById('reportDetailModal').classList.add('active');
+      // Auto-trigger PDF if ?print=1
+      if(new URLSearchParams(location.search).get('print')==='1'){setTimeout(function(){downloadReportPDF()},600);}
     });
   });
 })();
+
+// ═══ PDF Download ═══
+function downloadReportPDF(){
+  var d=_currentReportData;if(!d||!d.summary_text)return;
+  var mod=REPORT_MODULES[d.module_id]||{icon:'📊',name:'Report'};
+  var score=d.overall_score?Math.round(d.overall_score)+'%':'—';
+  var when=d.created_at?new Date(d.created_at).toLocaleDateString('it-IT',{day:'numeric',month:'long',year:'numeric',hour:'2-digit',minute:'2-digit'}):'';
+  // Convert markdown-ish text to styled HTML
+  var bodyHtml=d.summary_text
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/^### (.+)$/gm,'<h3 style="font-size:15px;font-weight:700;margin:18px 0 6px;color:#111">$1</h3>')
+    .replace(/^## (.+)$/gm,'<h2 style="font-size:17px;font-weight:800;margin:20px 0 8px;color:#111">$1</h2>')
+    .replace(/^# (.+)$/gm,'<h1 style="font-size:19px;font-weight:900;margin:22px 0 8px;color:#111">$1</h1>')
+    .replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>')
+    .replace(/^(\d+)\.\s\*\*(.+?)\*\*:?\s?(.*)$/gm,'<div style="margin:8px 0 4px"><strong style="color:#7c3aed">$1. $2:</strong> $3</div>')
+    .replace(/^(\d+)\.\s(.+)$/gm,'<div style="margin:4px 0 4px 16px">$1. $2</div>')
+    .replace(/\n\n/g,'<br><br>')
+    .replace(/\n/g,'<br>');
+
+  var iframe=document.createElement('iframe');iframe.style.display='none';document.body.appendChild(iframe);
+  var doc=iframe.contentDocument||iframe.contentWindow.document;
+  doc.write('<!DOCTYPE html><html><head><meta charset="utf-8"><title>Sottotitoli Report</title>');
+  doc.write('<style>');
+  doc.write('*{box-sizing:border-box;margin:0;padding:0}');
+  doc.write('body{font-family:Inter,system-ui,sans-serif;font-size:12px;color:#1a1a2e;line-height:1.7;padding:40px 48px;max-width:700px;margin:0 auto}');
+  doc.write('.logo{font-size:22px;font-weight:900;letter-spacing:-0.5px;color:#7c3aed;margin-bottom:4px}');
+  doc.write('.logo span{color:#1a1a2e}');
+  doc.write('.logo .dot{display:inline-block;width:6px;height:6px;background:#7c3aed;border-radius:50%;margin-left:2px;vertical-align:middle;margin-bottom:2px}');
+  doc.write('.meta{color:#888;font-size:10px;margin-bottom:20px;padding-bottom:14px;border-bottom:1px solid #e5e5e5}');
+  doc.write('.meta strong{color:#1a1a2e}');
+  doc.write('h2{font-size:16px;font-weight:800;margin:20px 0 6px;color:#7c3aed}');
+  doc.write('@media print{body{padding:20px 32px}}');
+  doc.write('</style></head><body>');
+  doc.write('<div class="logo">Sotto<span>titoli</span><span class="dot"></span></div>');
+  doc.write('<div class="meta">'+when+' · '+mod.icon+' '+mod.name+' · Punteggio: <strong>'+score+'</strong></div>');
+  doc.write('<h2>'+mod.icon+' '+mod.name+'</h2>');
+  doc.write(bodyHtml);
+  doc.write('</body></html>');
+  doc.close();
+  setTimeout(function(){iframe.contentWindow.print();setTimeout(function(){document.body.removeChild(iframe)},1000)},400);
+}
 
 </script>
 </body>
