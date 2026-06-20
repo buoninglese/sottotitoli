@@ -1348,9 +1348,10 @@ function loadTranscriptsTab(){
       if(newName){var s=allSessions.find(function(s){return s.id===sid});if(s)s.mode=newName;loadTranscriptsTab()}
     }
     if(target.classList.contains('deleteSession')){
-      if(confirm('Eliminare questa sessione? Potrai ancora accedere alla trascrizione.')){
+      if(confirm('Eliminare questa sessione? La trascrizione sarà rimossa definitivamente.')){
+        var supabase=window.sottotitoliSupabase;
+        if(supabase){supabase.from('sessions').delete().eq('id',sid).then(function(){})}
         allSessions=allSessions.filter(function(s){return s.id!==sid});
-        // Also remove from favorites
         var fidx=favorites.indexOf(sid);if(fidx!==-1){favorites.splice(fidx,1);saveFavs()}
         loadTranscriptsTab();
       }
@@ -1366,8 +1367,19 @@ async function loadReportsTab(){
   var r=await supabase.auth.getSession();if(!r.data?.session)return;
   var resp=await supabase.from('session_ai_reports').select('id,module_id,overall_score,summary_text,created_at').eq('user_id',r.data.session.user.id).eq('status','completed').order('created_at',{ascending:false}).limit(20);
   if(!resp.data||resp.data.length===0){var emp=document.getElementById('reportEmpty');if(emp)emp.style.display='block';return}
-  var h='';resp.data.forEach(function(rep){var mod=REPORT_MODULES[rep.module_id]||{icon:'📊',name:'Report'};var score=rep.overall_score?Math.round(rep.overall_score)+'%':'—';var when=rep.created_at?new Date(rep.created_at).toLocaleDateString('it-IT',{day:'numeric',month:'short'}):'';h+='<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:var(--bg2);border-radius:10px;font-size:12px;gap:8px;flex-wrap:wrap"><span style="font-size:18px">'+mod.icon+'</span><span style="font-weight:600;color:var(--text);flex:1">'+mod.name+'</span><span style="color:var(--t3);font-size:10px">'+when+' · '+score+'</span><a href="analysis.html?report='+rep.id+'&print=1" title="Scarica PDF" style="font-size:13px;color:var(--t3);text-decoration:none" onclick="event.preventDefault();var w=window.open(\'analysis.html?report='+rep.id+'&print=1\',\'_blank\');setTimeout(function(){if(w)w.close()},120000)">🖨️</a><a href="analysis.html?report='+rep.id+'" style="font-size:10px;color:var(--accent);font-weight:500">Vedi →</a></div>'});
+  var h='';resp.data.forEach(function(rep){var mod=REPORT_MODULES[rep.module_id]||{icon:'📊',name:'Report'};var score=rep.overall_score?Math.round(rep.overall_score)+'%':'—';var when=rep.created_at?new Date(rep.created_at).toLocaleDateString('it-IT',{day:'numeric',month:'short'}):'';h+='<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:var(--bg2);border-radius:10px;font-size:12px;gap:8px;flex-wrap:wrap"><span style="font-size:18px">'+mod.icon+'</span><span style="font-weight:600;color:var(--text);flex:1">'+mod.name+'</span><span style="color:var(--t3);font-size:10px">'+when+' · '+score+'</span><a href="analysis.html?report='+rep.id+'&print=1" title="Scarica PDF" style="font-size:13px;color:var(--t3);text-decoration:none" onclick="event.preventDefault();var w=window.open(\'analysis.html?report='+rep.id+'&print=1\',\'_blank\');setTimeout(function(){if(w)w.close()},120000)">🖨️</a><a href="analysis.html?report='+rep.id+'" style="font-size:10px;color:var(--accent);font-weight:500">Vedi →</a><span style="cursor:pointer;color:var(--red);font-size:12px;margin-left:2px" title="Elimina report" onclick="event.stopPropagation();deleteReport(\''+rep.id+'\')">🗑️</span></div>'});
   el.innerHTML=h;
+}
+
+async function deleteReport(reportId){
+  if(!confirm('Eliminare questo report? L\'analisi sarà rimossa definitivamente.'))return;
+  var supabase=window.sottotitoliSupabase;if(!supabase)return;
+  var {error}=await supabase.from('session_ai_reports').delete().eq('id',reportId);
+  if(!error){
+    var el=document.getElementById('reportList');if(el)el.innerHTML='';
+    var rb=document.getElementById('reportBadge');if(rb){var cnt=parseInt(rb.textContent)||0;rb.textContent=Math.max(0,cnt-1)}
+    loadReportsTab();
+  }
 }
 
 // ═══ RIGHT PANEL ═══
