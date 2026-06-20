@@ -28,23 +28,16 @@ document.addEventListener('DOMContentLoaded', () => {
   const perfquality_scoreEl = document.getElementById('perfquality_score');
   const perfquality_scoreBarEl = document.getElementById('perfquality_scoreBar');
 
-  const perfQuestionsUsedEl = document.getElementById('perfQuestionsUsed');
-  const perfQuestionsUsedBarEl = document.getElementById('perfQuestionsUsedBar');
-
-  const perfnegation_countEl = document.getElementById('perfnegation_count');
-  const perfnegation_countBarEl = document.getElementById('perfnegation_countBar');
-
   const perfrepetition_rateEl = document.getElementById('perfrepetition_rate');
   const perfrepetition_rateBarEl = document.getElementById('perfrepetition_rateBar');
 
   const perfConversationTurnsEl = document.getElementById('perfConversationTurns');
   const perfConversationTurnsBarEl = document.getElementById('perfConversationTurnsBar');
 
-  const perfInterruptionsEl = document.getElementById('perfInterruptions');
-  const perfInterruptionsBarEl = document.getElementById('perfInterruptionsBar');
+  const perfNgslCoverageEl = document.getElementById('perfNgslCoverage');
+  const perfNgslCoverageBarEl = document.getElementById('perfNgslCoverageBar');
 
-  const perfSpeakingShareEl = document.getElementById('perfSpeakingShare');
-  const perfSpeakingShareBarEl = document.getElementById('perfSpeakingShareBar');
+  const perfQualityTrendEl = document.getElementById('perfQualityTrend');
 
   const perfFunFactEl = document.getElementById('perfFunFact');
   const perfStreakBadgeEl = document.getElementById('perfStreakBadge');
@@ -120,12 +113,9 @@ const { data: sessions, error: sessionsError } = await accountSupabase
     unique_words_count,
     lexical_diversity,
     quality_score,
-    question_count,
-    negation_count,
+    ngsl_coverage,
     repetition_rate,
     turn_count,
-    interruption_count,
-    speaking_share_ratio,
     ai_status
   `)
   .eq('user_id', user_id)
@@ -181,12 +171,9 @@ const { data: sessions, error: sessionsError } = await accountSupabase
       if (perfUniqueWordsEl) perfUniqueWordsEl.textContent = '0';
       if (perflexical_diversityEl) perflexical_diversityEl.textContent = '–';
       if (perfquality_scoreEl) perfquality_scoreEl.textContent = '–';
-      if (perfQuestionsUsedEl) perfQuestionsUsedEl.textContent = '–';
-      if (perfnegation_countEl) perfnegation_countEl.textContent = '–';
       if (perfrepetition_rateEl) perfrepetition_rateEl.textContent = '–';
       if (perfConversationTurnsEl) perfConversationTurnsEl.textContent = '–';
-      if (perfInterruptionsEl) perfInterruptionsEl.textContent = '–';
-      if (perfSpeakingShareEl) perfSpeakingShareEl.textContent = '–';
+      if (perfNgslCoverageEl) perfNgslCoverageEl.textContent = '–';
 
       setBarState(perfMinutesSpokenBarEl, 0, null);
       setBarState(perfAverageWpmBarEl, 0, null);
@@ -194,12 +181,13 @@ const { data: sessions, error: sessionsError } = await accountSupabase
       setBarState(perfUniqueWordsBarEl, 0, null);
       setBarState(perflexical_diversityBarEl, 0, null);
       setBarState(perfquality_scoreBarEl, 0, null);
-      setBarState(perfQuestionsUsedBarEl, 0, null);
-      setBarState(perfnegation_countBarEl, 0, null);
       setBarState(perfrepetition_rateBarEl, 0, null);
       setBarState(perfConversationTurnsBarEl, 0, null);
-      setBarState(perfInterruptionsBarEl, 0, null);
-      setBarState(perfSpeakingShareBarEl, 0, null);
+      setBarState(perfNgslCoverageBarEl, 0, null);
+
+      if (perfQualityTrendEl) {
+        perfQualityTrendEl.innerHTML = '<span style="font-size:20px;margin-right:6px">📊</span><strong>Dati insufficienti</strong><br><span style="font-size:12px;color:var(--text-muted)">Servono almeno 3 sessioni per calcolare il trend.</span>';
+      }
 
       if (perfFunFactEl) {
         perfFunFactEl.textContent = 'Inizia a usare Studio per vedere le prime letture del tuo inglese.';
@@ -233,20 +221,16 @@ const { data: sessions, error: sessionsError } = await accountSupabase
     let countlexical_diversity = 0;
     let sumquality_score = 0;
     let countquality_score = 0;
-    let sumQuestions = 0;
-    let countQuestions = 0;
-    let sumNegations = 0;
-    let countNegations = 0;
     let sumrepetition_rate = 0;
     let countrepetition_rate = 0;
     let sumTurns = 0;
     let countTurns = 0;
-    let sumInterruptions = 0;
-    let countInterruptions = 0;
-    let sumSpeakingShare = 0;
-    let countSpeakingShare = 0;
+    let sumNgslCoverage = 0;
+    let countNgslCoverage = 0;
     let sumWpmPrevWeek = 0;
     let countWpmPrevWeek = 0;
+    // For session-over-session trend: collect quality scores chronologically
+    let qualitySeries = [];
 
     const dailyMinutes = new Array(14).fill(0);
     const spokenDates = new Set();
@@ -283,14 +267,6 @@ const { data: sessions, error: sessionsError } = await accountSupabase
             sumquality_score += s.quality_score;
             countquality_score += 1;
           }
-          if (typeof s.question_count === 'number') {
-            sumQuestions += s.question_count;
-            countQuestions += 1;
-          }
-          if (typeof s.negation_count === 'number') {
-            sumNegations += s.negation_count;
-            countNegations += 1;
-          }
           if (typeof s.repetition_rate === 'number') {
             sumrepetition_rate += s.repetition_rate;
             countrepetition_rate += 1;
@@ -299,13 +275,9 @@ const { data: sessions, error: sessionsError } = await accountSupabase
             sumTurns += s.turn_count;
             countTurns += 1;
           }
-          if (typeof s.interruption_count === 'number') {
-            sumInterruptions += s.interruption_count;
-            countInterruptions += 1;
-          }
-          if (typeof s.speaking_share_ratio === 'number') {
-            sumSpeakingShare += s.speaking_share_ratio;
-            countSpeakingShare += 1;
+          if (typeof s.ngsl_coverage === 'number') {
+            sumNgslCoverage += s.ngsl_coverage;
+            countNgslCoverage += 1;
           }
         }
       }
@@ -331,7 +303,15 @@ const { data: sessions, error: sessionsError } = await accountSupabase
           dailyMinutes[dayIndex] += s.duration_seconds / 60;
         }
       }
+
+      // Collect quality scores for trend computation (all sessions, chronological)
+      if (typeof s.quality_score === 'number' && s.started_at) {
+        qualitySeries.push({ date: new Date(s.started_at), value: s.quality_score });
+      }
     });
+
+    // Sort quality series chronologically for trend computation
+    qualitySeries.sort((a, b) => a.date - b.date);
 
     const minutesWeek = Math.round(totalSecondsWeek / 60);
     const avgWpm = countWpm > 0 ? sumWpm / countWpm : null;
@@ -340,14 +320,12 @@ const { data: sessions, error: sessionsError } = await accountSupabase
     const avglexical_diversity =
       countlexical_diversity > 0 ? sumlexical_diversity / countlexical_diversity : null;
     const avgquality_score = countquality_score > 0 ? sumquality_score / countquality_score : null;
-    const avgQuestions = countQuestions > 0 ? sumQuestions / countQuestions : null;
-    const avgNegations = countNegations > 0 ? sumNegations / countNegations : null;
     const avgrepetition_rate =
       countrepetition_rate > 0 ? sumrepetition_rate / countrepetition_rate : null;
     const avgTurns = countTurns > 0 ? sumTurns / countTurns : null;
-    const avgInterruptions = countInterruptions > 0 ? sumInterruptions / countInterruptions : null;
-    const avgSpeakingShare =
-      countSpeakingShare > 0 ? sumSpeakingShare / countSpeakingShare : null;
+    const avgNgslCoverage = countNgslCoverage > 0 ? sumNgslCoverage / countNgslCoverage : null;
+    // Session-over-session quality trend (simple linear regression on last 10)
+    const qualitySlope = computeQualityTrend(qualitySeries, 10);
 
     const targetMinutesWeek = 120;
     const maxMinutesWeek = 240;
@@ -465,34 +443,35 @@ const { data: sessions, error: sessionsError } = await accountSupabase
       }
     }
 
-    if (perfQuestionsUsedEl) {
-      perfQuestionsUsedEl.textContent =
-        avgQuestions != null ? avgQuestions.toFixed(1) : '–';
+    // ── NGSL Coverage (7-day average) ──
+    if (perfNgslCoverageEl) {
+      perfNgslCoverageEl.textContent =
+        avgNgslCoverage != null ? (avgNgslCoverage * 100).toFixed(0) + '%' : '–';
     }
-    if (perfQuestionsUsedBarEl) {
-      if (avgQuestions == null) {
-        setBarState(perfQuestionsUsedBarEl, 0, null);
+    if (perfNgslCoverageBarEl) {
+      if (avgNgslCoverage == null) {
+        setBarState(perfNgslCoverageBarEl, 0, null);
       } else {
-        let state = 'warn';
-        if (avgQuestions >= 2) state = 'good';
-        else if (avgQuestions === 0) state = 'bad';
-        setBarState(perfQuestionsUsedBarEl, Math.min(avgQuestions / 6, 1), state);
+        let state = 'good';
+        if (avgNgslCoverage < 0.4) state = 'bad';
+        else if (avgNgslCoverage < 0.6) state = 'warn';
+        setBarState(perfNgslCoverageBarEl, Math.min(avgNgslCoverage, 1), state);
       }
     }
 
-    if (perfnegation_countEl) {
-      perfnegation_countEl.textContent =
-        avgNegations != null ? avgNegations.toFixed(1) : '–';
-    }
-    if (perfnegation_countBarEl) {
-      if (avgNegations == null) {
-        setBarState(perfnegation_countBarEl, 0, null);
+    // ── Quality Trend (session-over-session slope) ──
+    if (perfQualityTrendEl) {
+      if (qualitySlope != null) {
+        var trendIcon = qualitySlope > 0.5 ? '📈' : qualitySlope < -0.5 ? '📉' : '📊';
+        var trendLabel = qualitySlope > 0.5 ? 'In miglioramento' : qualitySlope < -0.5 ? 'In calo' : 'Stabile';
+        var trendDetail = qualitySlope > 0.3
+          ? ('+' + qualitySlope.toFixed(1) + ' pts/settimana — continua così!')
+          : qualitySlope < -0.3
+          ? (qualitySlope.toFixed(1) + ' pts/settimana — prova a variare gli esercizi')
+          : 'Andamento stabile. Per sbloccare il prossimo livello, aumenta la frequenza.';
+        perfQualityTrendEl.innerHTML = '<span style="font-size:20px;margin-right:6px">' + trendIcon + '</span><strong>' + trendLabel + '</strong><br><span style="font-size:12px;color:var(--text-muted)">' + trendDetail + '</span>';
       } else {
-        setBarState(
-          perfnegation_countBarEl,
-          Math.min(avgNegations / 8, 1),
-          'warn'
-        );
+        perfQualityTrendEl.innerHTML = '<span style="font-size:20px;margin-right:6px">📊</span><strong>Dati insufficienti</strong><br><span style="font-size:12px;color:var(--text-muted)">Servono almeno 3 sessioni per calcolare il trend.</span>';
       }
     }
 
@@ -534,41 +513,7 @@ const { data: sessions, error: sessionsError } = await accountSupabase
       }
     }
 
-    if (perfInterruptionsEl) {
-      perfInterruptionsEl.textContent =
-        avgInterruptions != null ? avgInterruptions.toFixed(1) : '–';
-    }
-    if (perfInterruptionsBarEl) {
-      if (avgInterruptions == null) {
-        setBarState(perfInterruptionsBarEl, 0, null);
-      } else {
-        let state = 'good';
-        if (avgInterruptions >= 3) state = 'bad';
-        else if (avgInterruptions >= 1) state = 'warn';
-        setBarState(
-          perfInterruptionsBarEl,
-          Math.min(avgInterruptions / 5, 1),
-          state
-        );
-      }
-    }
-
-    if (perfSpeakingShareEl) {
-      perfSpeakingShareEl.textContent =
-        avgSpeakingShare != null ? Math.round(avgSpeakingShare * 100) + '%' : '–';
-    }
-    if (perfSpeakingShareBarEl) {
-      if (avgSpeakingShare == null) {
-        setBarState(perfSpeakingShareBarEl, 0, null);
-      } else {
-        const distanceFromBalanced = Math.abs(avgSpeakingShare - 0.5);
-        const balanceScore = 1 - Math.min(distanceFromBalanced / 0.5, 1);
-        let state = 'good';
-        if (distanceFromBalanced > 0.3) state = 'bad';
-        else if (distanceFromBalanced > 0.18) state = 'warn';
-        setBarState(perfSpeakingShareBarEl, balanceScore, state);
-      }
-    }
+    // ── Quality Trend display moved above ──
 
     if (perfMinutesSparklineEl) {
       perfMinutesSparklineEl.innerHTML = '';
@@ -640,27 +585,123 @@ const { data: sessions, error: sessionsError } = await accountSupabase
 
     if (perfFunFactEl) {
       let fact = '';
-      if (avgTurns != null && avgTurns >= 6 && avgSpeakingShare != null) {
-        fact = `Your recent sessions look more dialogic: about ${avgTurns.toFixed(
-          1
-        )} turns per session with a speaking share near ${Math.round(
-          avgSpeakingShare * 100
-        )}%.`;
-      } else if (avgquality_score != null && avgquality_score >= 70) {
-        fact = `Your recent session quality is strong at ${Math.round(
+      if (avgquality_score != null && avgquality_score >= 70) {
+        fact = `La qualità delle tue sessioni recenti è forte: ${Math.round(
           avgquality_score
-        )}/100, with a healthy balance of fluency and lexical variety.`;
+        )}/100, con un buon equilibrio tra fluidità e varietà lessicale.`;
+      } else if (avgNgslCoverage != null && avgNgslCoverage >= 0.6) {
+        fact = `Ottimo! Il ${(avgNgslCoverage * 100).toFixed(
+          0
+        )}% del tuo vocabolario attivo rientra nelle parole NGSL di base.`;
       } else if (minutesWeek >= 60 && avgWpm != null) {
-        fact = `In the last 7 days you spoke for ${minutesWeek} minutes at an average speed of ${Math.round(
+        fact = `Negli ultimi 7 giorni hai parlato per ${minutesWeek} minuti a una velocità media di ${Math.round(
           avgWpm
-        )} words per minute.`;
+        )} parole al minuto.`;
       } else if (uniqueWordsLast30 > 0) {
-        fact = `You have produced roughly ${uniqueWordsLast30} unique spoken-word instances over the last 30 days.`;
+        fact = `Hai prodotto circa ${uniqueWordsLast30} parole uniche negli ultimi 30 giorni.`;
       } else {
-        fact = 'Keep using Studio: each session adds more telemetry to your language dashboard.';
+        fact = 'Continua a usare Studio: ogni sessione aggiunge dati al tuo profilo linguistico.';
       }
       perfFunFactEl.textContent = fact;
     }
+  }
+
+  /**
+   * Simple linear regression on the last `windowSize` quality scores.
+   * Returns slope in points-per-session (multiplied by 10 for "per 10 sessions" readability).
+   * Returns null if fewer than 3 data points.
+   */
+  function computeQualityTrend(series, windowSize) {
+    if (!series || series.length < 3) return null;
+    var window = series.slice(-windowSize);
+    if (window.length < 3) return null;
+    var n = window.length;
+    var sumX = 0, sumY = 0, sumXY = 0, sumX2 = 0;
+    for (var i = 0; i < n; i++) {
+      sumX += i;
+      sumY += window[i].value;
+      sumXY += i * window[i].value;
+      sumX2 += i * i;
+    }
+    var denominator = n * sumX2 - sumX * sumX;
+    if (denominator === 0) return null;
+    var slope = (n * sumXY - sumX * sumY) / denominator;
+    // Scale to "per 10 sessions" for readability
+    return slope * 10;
+  }
+
+  /**
+   * Aggregate grammar errors from AI reports.
+   * Queries session_ai_reports for grammar-related modules,
+   * parses the `issues` array to categorize error types,
+   * and returns {total, categories: [{name, count, pct}]}.
+   * Categories are detected via Italian keyword matching on issue text.
+   */
+  async function loadGrammarErrors() {
+    if (!accountSupabase) return null;
+    var sessionResp = await accountSupabase.auth.getSession();
+    if (!sessionResp.data?.session) return null;
+    var userId = sessionResp.data.session.user.id;
+
+    // Get module IDs for grammar-related modules
+    var modResp = await accountSupabase
+      .from('ai_report_modules')
+      .select('id, name')
+      .or('name.ilike.%grammar%,name.ilike.%accuracy%,name.ilike.%syntax%');
+
+    if (modResp.error || !modResp.data?.length) return null;
+    var grammarModuleIds = modResp.data.map(function(m) { return m.id; });
+
+    // Get completed reports for these modules
+    var repResp = await accountSupabase
+      .from('session_ai_reports')
+      .select('issues, overall_score, created_at')
+      .eq('user_id', userId)
+      .in('module_id', grammarModuleIds)
+      .eq('status', 'completed')
+      .order('created_at', { ascending: false })
+      .limit(50);
+
+    if (repResp.error || !repResp.data?.length) return null;
+
+    // Categorize issues by keyword matching
+    var categories = {
+      'Preposizioni': { keywords: ['preposiz', 'preposition', 'in/on/at', 'di/a/da/in/con/su'], count: 0 },
+      'Articoli': { keywords: ['articol', 'article', 'il/lo/la/i/gli/le', 'un/uno/una'], count: 0 },
+      'Coniugazioni': { keywords: ['coniugaz', 'conjugat', 'verbo', 'verb tense', 'tempo verbal', 'passato', 'presente', 'futuro'], count: 0 },
+      'Accordo': { keywords: ['accordo', 'agreement', 'concordanza', 'subject.verb', 'genere', 'numero', 'singolare', 'plurale'], count: 0 },
+      'Ordine parole': { keywords: ['ordine delle parole', 'word order', 'sintassi', 'syntax', 'struttura'], count: 0 },
+      'Pronomi': { keywords: ['pronom', 'pronoun', 'mi/ti/lo/la/ci/vi', 'gli/le'], count: 0 },
+      'Connettivi': { keywords: ['connettiv', 'connect', 'congiunz', 'conjunction', 'linking word'], count: 0 },
+      'Ortografia': { keywords: ['ortografia', 'spelling', 'typo', 'accent', 'apostrof'], count: 0 }
+    };
+
+    var totalIssues = 0;
+    repResp.data.forEach(function(report) {
+      if (!Array.isArray(report.issues)) return;
+      report.issues.forEach(function(issue) {
+        var lower = (issue || '').toLowerCase();
+        totalIssues++;
+        Object.keys(categories).forEach(function(cat) {
+          var kw = categories[cat].keywords;
+          for (var i = 0; i < kw.length; i++) {
+            if (lower.indexOf(kw[i]) !== -1) {
+              categories[cat].count++;
+              break;
+            }
+          }
+        });
+      });
+    });
+
+    if (totalIssues === 0) return null;
+
+    // Build sorted result array
+    var result = Object.keys(categories).map(function(name) {
+      return { name: name, count: categories[name].count, pct: Math.round(categories[name].count / totalIssues * 100) };
+    }).filter(function(c) { return c.count > 0; }).sort(function(a, b) { return b.count - a.count; });
+
+    return { total: totalIssues, categories: result, avgScore: repResp.data.reduce(function(s, r) { return s + (r.overall_score || 0); }, 0) / Math.max(1, repResp.data.length) };
   }
 
   function downloadSessionsCsv() {
@@ -683,12 +724,9 @@ const { data: sessions, error: sessionsError } = await accountSupabase
       'unique_words_count',
       'lexical_diversity',
       'quality_score',
-      'question_count',
-      'negation_count',
+      'ngsl_coverage',
       'repetition_rate',
       'turn_count',
-      'interruption_count',
-      'speaking_share_ratio',
       'ai_status'
     ];
 
@@ -706,12 +744,9 @@ const { data: sessions, error: sessionsError } = await accountSupabase
       s.unique_words_count != null ? s.unique_words_count : '',
       s.lexical_diversity != null ? Number(s.lexical_diversity).toFixed(3) : '',
       s.quality_score != null ? Number(s.quality_score).toFixed(1) : '',
-      s.question_count != null ? s.question_count : '',
-      s.negation_count != null ? s.negation_count : '',
+      s.ngsl_coverage != null ? Number(s.ngsl_coverage).toFixed(3) : '',
       s.repetition_rate != null ? Number(s.repetition_rate).toFixed(4) : '',
       s.turn_count != null ? s.turn_count : '',
-      s.interruption_count != null ? s.interruption_count : '',
-      s.speaking_share_ratio != null ? Number(s.speaking_share_ratio).toFixed(4) : '',
       s.ai_status || ''
     ]);
 
