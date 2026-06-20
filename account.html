@@ -106,11 +106,11 @@ body.snap-body{overflow:hidden}
 .kpi:hover .glow{opacity:1}
 
 /* === RINGS === */
-.rings{display:flex;gap:18px;justify-content:center;flex-wrap:wrap;margin:6px 0}
-.ring{text-align:center;width:85px}
-.ring svg{width:78px;height:78px;transform:rotate(-90deg)}
-.ring .rv{font-family:'JetBrains Mono',monospace;font-size:17px;font-weight:800;margin-top:-48px}
-.ring .rl{font-size:8px;text-transform:uppercase;letter-spacing:.06em;color:var(--t3)}
+.rings{display:flex;gap:14px;justify-content:center;flex-wrap:wrap;margin:4px 0}
+.ring{text-align:center;width:80px;position:relative}
+.ring svg{width:72px;height:72px;transform:rotate(-90deg)}
+.ring .rv{font-family:'JetBrains Mono',monospace;font-size:16px;font-weight:800;position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);margin-top:2px}
+.ring .rl{font-size:8px;text-transform:uppercase;letter-spacing:.06em;color:var(--t3);margin-top:2px}
 
 /* === STREAK === */
 .streak-show{display:flex;align-items:center;gap:12px}
@@ -346,6 +346,7 @@ body.snap-body{overflow:hidden}
         <div class="field"><label>Livello CEFR target</label><div class="cefr-chips" id="cefrRow"><button class="cefr-chip" data-level="A1">A1</button><button class="cefr-chip" data-level="A2">A2</button><button class="cefr-chip active" data-level="B1">B1</button><button class="cefr-chip" data-level="B2">B2</button><button class="cefr-chip" data-level="C1">C1</button><button class="cefr-chip" data-level="C2">C2</button></div></div>
       </div>
       <div class="pred-card"><div class="pred-icon">🧠</div><div class="pred-text"><strong>Proiezione: <span id="gPredLevel">B2</span> entro <span id="gPredEta">~45 giorni</span></strong></div></div>
+      <button class="btn btn-primary btn-sm" id="saveGoalsBtn" style="margin-top:8px;width:100%;justify-content:center">💾 Salva obiettivi</button>
     </div>
 
     <!-- ═══ STREAK ═══ -->
@@ -528,7 +529,7 @@ async function loadAllData(supabase,userId){
 
   // ── Profile: member since + plan ──
   var profResp=await supabase.from('profiles').select('created_at').eq('id',userId).maybeSingle();
-  var created=profResp.data?.created_at?new Date(profResp.data.created_at):new Date(r.data.session.user.created_at||Date.now());
+  var created=profResp.data?.created_at?new Date(profResp.data.created_at):new Date();
   var daysAgo=Math.floor((Date.now()-created.getTime())/86400000);
   var ms=document.getElementById('memberSince');if(ms)ms.textContent=created.toLocaleDateString('it-IT',{month:'long',year:'numeric'});
   var pd=document.getElementById('profDays');if(pd)pd.textContent=daysAgo;
@@ -626,9 +627,7 @@ function loadProgress(){
   var uniq=0;weekSessions.forEach(function(s){uniq+=(s.unique_words_count||0)});
   sRing('ringVocab',uniq,200);
   if(document.getElementById('ringMinVal'))document.getElementById('ringMinVal').textContent=totalMin;
-  if(document.getElementById('ringMinMax'))document.getElementById('ringMinMax').textContent=targetMin;
   if(document.getElementById('ringSessVal'))document.getElementById('ringSessVal').textContent=sessCount;
-  if(document.getElementById('ringSessMax'))document.getElementById('ringSessMax').textContent=targetSess;
   if(document.getElementById('ringVocabVal'))document.getElementById('ringVocabVal').textContent=uniq;
   syncGoalsToTab();
   renderStreakTab();
@@ -639,16 +638,12 @@ function syncGoalsToTab(){
   var weekSessions=allSessions.filter(function(s){return new Date(s.started_at)>=weekAgo});
   var totalSec=0;weekSessions.forEach(function(s){totalSec+=(s.duration_seconds||0)});
   var totalMin=Math.round(totalSec/60),sessCount=weekSessions.length;
-  var targetMin=parseInt((document.getElementById('targetMinutes')||{}).value)||120;
-  var targetSess=parseInt((document.getElementById('targetSessions')||{}).value)||5;
   function gs(id,val,max){var el=document.getElementById(id);if(el)el.style.strokeDashoffset=263.89*(1-Math.min(1,val/max))}
-  gs('gRingMin',totalMin,targetMin);gs('gRingSess',sessCount,targetSess);
+  gs('gRingMin',totalMin,120);gs('gRingSess',sessCount,5);
   var uniq=0;weekSessions.forEach(function(s){uniq+=(s.unique_words_count||0)});
   gs('gRingVocab',uniq,200);
   if(document.getElementById('gRingMinVal'))document.getElementById('gRingMinVal').textContent=totalMin;
-  if(document.getElementById('gRingMinMax'))document.getElementById('gRingMinMax').textContent=targetMin;
   if(document.getElementById('gRingSessVal'))document.getElementById('gRingSessVal').textContent=sessCount;
-  if(document.getElementById('gRingSessMax'))document.getElementById('gRingSessMax').textContent=targetSess;
   if(document.getElementById('gRingVocabVal'))document.getElementById('gRingVocabVal').textContent=uniq;
 }
 
@@ -976,6 +971,15 @@ document.querySelectorAll('.cefr-chips').forEach(function(row){row.querySelector
 
 // ═══ TOGGLES ═══
 ['prefWeeklyReports','prefAITips','prefDarkMode'].forEach(function(id){var el=document.getElementById(id);if(el)el.addEventListener('click',function(){el.classList.toggle('on')})});
+
+// ═══ SAVE GOALS ═══
+var saveGoalsBtn=document.getElementById('saveGoalsBtn');
+if(saveGoalsBtn){saveGoalsBtn.addEventListener('click',function(){
+  var goals={minutes:parseInt((document.getElementById('targetMinutes')||{}).value)||120,sessions:parseInt((document.getElementById('targetSessions')||{}).value)||5};
+  localStorage.setItem('sottotitoli_goals',JSON.stringify(goals));
+  loadProgress();
+  alert('✓ Obiettivi salvati');
+})}
 
 // ═══ SAVE PREFERENCES ═══
 var saveBtn=document.getElementById('saveAllBtn'),savedMsg=document.getElementById('savedMsg');
