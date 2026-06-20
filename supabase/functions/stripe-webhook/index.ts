@@ -2,7 +2,7 @@
 // Deploy: supabase functions deploy stripe-webhook --no-verify-jwt
 // Requires secrets: STRIPE_WEBHOOK_SECRET, SB_URL, SB_SERVICE_ROLE_KEY, STRIPE_SECRET_KEY
 
-import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
+import { serve } from 'https://deno.land/std@0.208.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import Stripe from 'https://esm.sh/stripe@14';
 

@@ -2,7 +2,7 @@
 // Deploy: supabase functions deploy create-checkout-session
 // Requires secrets: STRIPE_SECRET_KEY
 
-import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
+import { serve } from 'https://deno.land/std@0.208.0/http/server.ts';
 
 const STRIPE_SECRET_KEY = Deno.env.get('STRIPE_SECRET_KEY')!;
 
