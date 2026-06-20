@@ -122,6 +122,14 @@ body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--t
   </div>
 </div>
 
+<!-- Report Detail Modal -->
+<div class="modal-overlay" id="reportDetailModal">
+  <div class="modal" style="max-width:680px">
+    <button class="close-btn" onclick="document.getElementById('reportDetailModal').classList.remove('active')">✕</button>
+    <div id="reportDetailContent" style="font-size:13px;line-height:1.7;white-space:pre-wrap;max-height:65vh;overflow-y:auto"></div>
+  </div>
+</div>
+
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="config.js?v=12"></script>
 <script src="js/auth.js?v=6"></script>
@@ -142,6 +150,9 @@ var REPORT_TYPES=[
 ];
 
 var allSessions=[],selectedSession=null,selectedReport=null,myReports=[];
+
+// Module ID → display name mapping (kept in sync with account.html)
+var REPORT_MODULES={1:{icon:'📝',name:'Grammar & Accuracy'},2:{icon:'📚',name:'Vocabulary Range'},3:{icon:'💨',name:'Fluency & Coherence'},4:{icon:'🎯',name:'CEFR Assessment'},5:{icon:'📈',name:'Progress Report'},6:{icon:'💼',name:'Business English'},7:{icon:'🗂️',name:'Business Vocabulary'},8:{icon:'🎨',name:'Speaking Style'},9:{icon:'🔄',name:'English Transfer'},10:{icon:'📖',name:'Academic Vocabulary'},11:{icon:'🔬',name:'Discourse Analysis'},12:{icon:'🧮',name:'Syntax & Complexity'},13:{icon:'📊',name:'Lexical Analysis'},14:{icon:'🌟',name:'Comprehensive'}};
 
 (async function init(){
   var supabase=window.sottotitoliSupabase;
@@ -234,12 +245,30 @@ function renderMyReports(){
     var sc=r.status==='completed'?'ri-done':r.status==='processing'?'ri-processing':'ri-failed';
     var st=r.status==='completed'?'✅ Completato':r.status==='processing'?'⏳ In elaborazione':'❌ Fallito';
     var when=r.created_at?new Date(r.created_at).toLocaleDateString('it-IT',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}):'';
-    var mod=REPORT_TYPES.find(function(rt){return parseInt(rt.moduleKey)===r.module_id});
-    h+='<div class="report-item"><span style="font-size:22px">'+(mod?mod.icon:'📊')+'</span><div style="flex:1"><strong>'+(mod?mod.name:'Report')+'</strong><br><span style="font-size:10px;color:var(--t3)">'+when+'</span></div><span class="ri-status '+sc+'">'+st+'</span>'+(r.overall_score!=null?'<span class="ri-score" style="color:var(--green)">'+Math.round(r.overall_score)+'%</span>':'')+'</div>';
+    var mod=REPORT_MODULES[r.module_id]||{icon:'📊',name:'Report'};
+    h+='<div class="report-item"><span style="font-size:22px">'+mod.icon+'</span><div style="flex:1"><strong>'+mod.name+'</strong><br><span style="font-size:10px;color:var(--t3)">'+when+'</span></div><span class="ri-status '+sc+'">'+st+'</span>'+(r.overall_score!=null?'<span class="ri-score" style="color:var(--green)">'+Math.round(r.overall_score)+'%</span>':'')+'</div>';
   });el.innerHTML=h;
 }
 
 document.getElementById('purchaseModal').addEventListener('click',function(e){if(e.target===this)closeModal()});
+document.getElementById('reportDetailModal').addEventListener('click',function(e){if(e.target===this)this.classList.remove('active')});
+
+// ═══ Report Detail View (from ?report=ID) ═══
+(function loadReportDetail(){
+  var reportId=new URLSearchParams(location.search).get('report');if(!reportId)return;
+  var supabase=window.sottotitoliSupabase;if(!supabase){setTimeout(loadReportDetail,500);return}
+  supabase.auth.getSession().then(function(r){if(!r.data?.session)return;
+    supabase.from('session_ai_reports').select('id,module_id,overall_score,summary_text,created_at').eq('id',reportId).eq('user_id',r.data.session.user.id).single().then(function(resp){
+      if(!resp.data||!resp.data.summary_text)return;
+      var mod=REPORT_MODULES[resp.data.module_id]||{icon:'📊',name:'Report'};
+      var score=resp.data.overall_score?Math.round(resp.data.overall_score)+'%':'—';
+      var when=resp.data.created_at?new Date(resp.data.created_at).toLocaleDateString('it-IT',{day:'numeric',month:'long',hour:'2-digit',minute:'2-digit'}):'';
+      document.getElementById('reportDetailContent').innerHTML='<h3 style="margin-bottom:4px">'+mod.icon+' '+mod.name+'</h3><div style="font-size:11px;color:var(--t3);margin-bottom:16px">'+when+' · Punteggio: <strong style="color:var(--green)">'+score+'</strong></div><hr style="border-color:var(--line);margin-bottom:14px">'+resp.data.summary_text.replace(/\n/g,'<br>');
+      document.getElementById('reportDetailModal').classList.add('active');
+    });
+  });
+})();
+
 </script>
 </body>
 </html>
