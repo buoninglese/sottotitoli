@@ -129,16 +129,16 @@ body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--t
 
 <script>
 var REPORT_TYPES=[
-  {id:'grammar',icon:'📝',name:'Grammar & Accuracy',desc:'Analisi grammaticale completa: tempi verbali, preposizioni, articoli, concordanze.',price:2,color:'var(--accent)',badge:'popular',badgeText:'Più richiesto',moduleId:1,family:'cambridge'},
-  {id:'vocabulary',icon:'📚',name:'Vocabulary Range',desc:'Diversità e sofisticazione del vocabolario. Mappatura CEFR, copertura NGSL.',price:2,color:'var(--green)',badge:'new',badgeText:'Nuovo',moduleId:2,family:'linguistic'},
-  {id:'fluency',icon:'💨',name:'Fluency & Coherence',desc:'Ritmo di parlato, pause, filler words. Analisi della fluidità.',price:2,color:'var(--blue)',badge:'',badgeText:'',moduleId:3,family:'cambridge'},
-  {id:'cefr',icon:'🎯',name:'CEFR Level Assessment',desc:'Stima del livello CEFR (A1-C2) basata su metriche reali.',price:2,color:'var(--amber)',badge:'',badgeText:'',moduleId:4,family:'linguistic'},
-  {id:'progress',icon:'📈',name:'Progress Report',desc:'Trend, confronto sessioni, plateau detection, proiezioni future.',price:3,color:'var(--pink)',badge:'premium',badgeText:'Premium',moduleId:5,family:'linguistic'},
-  {id:'style',icon:'🎨',name:'Speaking Style',desc:'Formalità, complessità frasi, voce passiva, varietà connettivi.',price:2,color:'#06b6d4',badge:'',badgeText:'',moduleId:8,family:'linguistic'},
-  {id:'transfer',icon:'🔄',name:'Italian-English Transfer',desc:'Interferenze dall\'italiano: false friends, calchi, strutture tipiche.',price:3,color:'var(--red)',badge:'premium',badgeText:'Premium',moduleId:9,family:'linguistic'},
-  {id:'business',icon:'💼',name:'Business English',desc:'Vocabolario business, frasi da riunione, email formali.',price:3,color:'var(--blue)',badge:'premium',badgeText:'Premium',moduleId:5,family:'business'},
-  {id:'exam',icon:'🏅',name:'Exam Readiness',desc:'Stima punteggio IELTS/TOEFL, aree da migliorare per l\'esame.',price:4,color:'var(--amber)',badge:'premium',badgeText:'Premium',moduleId:11,family:'academic'},
-  {id:'comprehensive',icon:'🌟',name:'Comprehensive Analysis',desc:'Report completo: grammatica, vocabolario, fluidità, CEFR, stile.',price:5,color:'var(--accent)',badge:'new',badgeText:'Consigliato',moduleId:14,family:'linguistic'}
+  {id:'grammar',icon:'📝',name:'Grammar & Accuracy',desc:'Analisi grammaticale completa: tempi verbali, preposizioni, articoli, concordanze.',price:2,color:'var(--accent)',badge:'popular',badgeText:'Più richiesto',moduleKey:'1',family:'cambridge'},
+  {id:'vocabulary',icon:'📚',name:'Vocabulary Range',desc:'Diversità e sofisticazione del vocabolario. Mappatura CEFR, copertura NGSL.',price:2,color:'var(--green)',badge:'new',badgeText:'Nuovo',moduleKey:'2',family:'linguistic'},
+  {id:'fluency',icon:'💨',name:'Fluency & Coherence',desc:'Ritmo di parlato, pause, filler words. Analisi della fluidità.',price:2,color:'var(--blue)',badge:'',badgeText:'',moduleKey:'3',family:'cambridge'},
+  {id:'cefr',icon:'🎯',name:'CEFR Level Assessment',desc:'Stima del livello CEFR (A1-C2) basata su metriche reali.',price:2,color:'var(--amber)',badge:'',badgeText:'',moduleKey:'4',family:'linguistic'},
+  {id:'progress',icon:'📈',name:'Progress Report',desc:'Trend, confronto sessioni, plateau detection, proiezioni future.',price:3,color:'var(--pink)',badge:'premium',badgeText:'Premium',moduleKey:'5',family:'linguistic'},
+  {id:'style',icon:'🎨',name:'Speaking Style',desc:'Formalità, complessità frasi, voce passiva, varietà connettivi.',price:2,color:'#06b6d4',badge:'',badgeText:'',moduleKey:'8',family:'linguistic'},
+  {id:'transfer',icon:'🔄',name:'Italian-English Transfer',desc:'Interferenze dall\'italiano: false friends, calchi, strutture tipiche.',price:3,color:'var(--red)',badge:'premium',badgeText:'Premium',moduleKey:'9',family:'linguistic'},
+  {id:'business',icon:'💼',name:'Business English',desc:'Vocabolario business, frasi da riunione, email formali.',price:3,color:'var(--blue)',badge:'premium',badgeText:'Premium',moduleKey:'5',family:'business'},
+  {id:'exam',icon:'🏅',name:'Exam Readiness',desc:'Stima punteggio IELTS/TOEFL, aree da migliorare per l\'esame.',price:4,color:'var(--amber)',badge:'premium',badgeText:'Premium',moduleKey:'11',family:'academic'},
+  {id:'comprehensive',icon:'🌟',name:'Comprehensive Analysis',desc:'Report completo: grammatica, vocabolario, fluidità, CEFR, stile.',price:5,color:'var(--accent)',badge:'new',badgeText:'Consigliato',moduleKey:'14',family:'linguistic'}
 ];
 
 var allSessions=[],selectedSession=null,selectedReport=null,myReports=[];
@@ -215,7 +215,7 @@ document.getElementById('modBuyBtn').addEventListener('click',async function(){
   if(curBal<selectedReport.price){statusEl.innerHTML='<span class="ri-failed">❌ Token insufficienti (hai '+curBal+', servono '+selectedReport.price+'). <a href="wallet.html">Acquista →</a></span>';btn.disabled=false;btn.textContent='Acquista report';return}
   await supabase.from('user_tokens').update({balance:curBal-selectedReport.price,updated_at:new Date().toISOString()}).eq('user_id',userId);
   document.getElementById('tokenBalance').textContent=curBal-selectedReport.price;
-  var reqResp=await supabase.from('ai_report_requests').insert({user_id:userId,session_ids:[selectedSession.id],module_id:selectedReport.moduleId,family_key:selectedReport.family,scope_type:'single_session',status:'queued'}).select('id').single();
+  var reqResp=await supabase.from('ai_report_requests').insert({user_id:userId,session_ids:[selectedSession.id],module_key:selectedReport.moduleKey,family_key:selectedReport.family,scope_type:'single_session',status:'queued'}).select('id').single();
   if(reqResp.error){statusEl.innerHTML='<span class="ri-failed">❌ Errore DB: '+reqResp.error.message+'</span>';btn.disabled=false;btn.textContent='Acquista report';return}
   var poller=setInterval(async function(){
     var check=await supabase.from('session_ai_reports').select('id,overall_score').eq('user_id',userId).order('created_at',{ascending:false}).limit(1);
@@ -232,7 +232,7 @@ function renderMyReports(){
     var sc=r.status==='completed'?'ri-done':r.status==='processing'?'ri-processing':'ri-failed';
     var st=r.status==='completed'?'✅ Completato':r.status==='processing'?'⏳ In elaborazione':'❌ Fallito';
     var when=r.created_at?new Date(r.created_at).toLocaleDateString('it-IT',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}):'';
-    var mod=REPORT_TYPES.find(function(rt){return rt.moduleId==r.module_id});
+    var mod=REPORT_TYPES.find(function(rt){return parseInt(rt.moduleKey)===r.module_id});
     h+='<div class="report-item"><span style="font-size:22px">'+(mod?mod.icon:'📊')+'</span><div style="flex:1"><strong>'+(mod?mod.name:'Report')+'</strong><br><span style="font-size:10px;color:var(--t3)">'+when+'</span></div><span class="ri-status '+sc+'">'+st+'</span>'+(r.overall_score!=null?'<span class="ri-score" style="color:var(--green)">'+Math.round(r.overall_score)+'%</span>':'')+'</div>';
   });el.innerHTML=h;
 }

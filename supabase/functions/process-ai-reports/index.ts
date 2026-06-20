@@ -48,8 +48,8 @@ serve(async (req) => {
           throw new Error('No transcript found');
         }
 
-        // Use request.module_id (integer FK), fallback to 1
-        const moduleId = request.module_id || 1;
+        // Read module_key (text) from request, parse to int for module lookup
+        const moduleId = parseInt(request.module_key) || 1;
 
         // Call OpenAI API
         const prompt = getModulePrompt(moduleId, session.transcript_text);
