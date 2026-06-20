@@ -218,8 +218,8 @@ document.getElementById('modBuyBtn').addEventListener('click',async function(){
   var reqResp=await supabase.from('ai_report_requests').insert({user_id:userId,session_ids:[selectedSession.id],module_key:selectedReport.moduleKey,family_key:selectedReport.family,scope_type:'single_session',status:'queued'}).select('id').single();
   if(reqResp.error){statusEl.innerHTML='<span class="ri-failed">❌ Errore DB: '+reqResp.error.message+'</span>';btn.disabled=false;btn.textContent='Acquista report';return}
   var poller=setInterval(async function(){
-    var check=await supabase.from('session_ai_reports').select('id,overall_score').eq('user_id',userId).order('created_at',{ascending:false}).limit(1);
-    if(check.data&&check.data.length>0&&check.data[0].overall_score!=null){clearInterval(poller);statusEl.innerHTML='<span class="ri-done">✅ Report pronto! <a href="account.html">Vedi su Account →</a></span>';btn.disabled=false;btn.textContent='Acquista report';
+    var check=await supabase.from('session_ai_reports').select('id,overall_score,status').eq('user_id',userId).order('created_at',{ascending:false}).limit(1);
+    if(check.data&&check.data.length>0&&(check.data[0].status==='completed'||check.data[0].overall_score!=null)){clearInterval(poller);statusEl.innerHTML='<span class="ri-done">✅ Report pronto! <a href="account.html">Vedi su Account →</a></span>';btn.disabled=false;btn.textContent='Acquista report';
       var newReps=await supabase.from('session_ai_reports').select('id,module_id,overall_score,summary_text,status,created_at').eq('user_id',userId).order('created_at',{ascending:false}).limit(30);myReports=newReps.data||[];renderMyReports();}
   },2000);
   setTimeout(function(){clearInterval(poller);statusEl.innerHTML='<span class="ri-failed">⏰ In elaborazione. Controlla su Account.</span>';btn.disabled=false;btn.textContent='Acquista report'},60000);
