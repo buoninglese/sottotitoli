@@ -84,11 +84,14 @@ Deno.serve(async (req) => {
         });
 
         const aiData = await aiResponse.json();
+        if (!aiData.choices?.[0]?.message?.content) {
+          throw new Error('OpenAI returned no content: ' + JSON.stringify(aiData).slice(0, 200));
+        }
         const summaryText = aiData.choices[0].message.content;
-        const tokensUsed = aiData.usage.total_tokens;
+        const tokensUsed = aiData.usage?.total_tokens || 0;
 
-        // Insert completed report
-        const { data: report } = await supabase
+        // Insert completed report into session_ai_reports
+        const { data: report, error: insertError } = await supabase
           .from('session_ai_reports')
           .insert({
             session_id: request.session_ids[0],
@@ -101,6 +104,10 @@ Deno.serve(async (req) => {
           })
           .select('id')
           .single();
+
+        if (insertError) {
+          throw new Error('Failed to insert session_ai_reports: ' + insertError.message);
+        }
 
         // ── Extract scores from AI response ──
         let overallScore = null;
