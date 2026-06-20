@@ -91,6 +91,7 @@ Deno.serve(async (req) => {
         const tokensUsed = aiData.usage?.total_tokens || 0;
 
         // Insert completed report into session_ai_reports
+        const now = new Date().toISOString();
         const { data: report, error: insertError } = await supabase
           .from('session_ai_reports')
           .insert({
@@ -99,8 +100,12 @@ Deno.serve(async (req) => {
             module_id: moduleId,
             provider: 'openai',
             model: 'gpt-4o',
+            prompt_version: 'v1',
             status: 'completed',
-            summary_text: summaryText
+            summary: summaryText,
+            summary_text: summaryText,
+            raw_json: aiData,
+            updated_at: now
           })
           .select('id')
           .single();
