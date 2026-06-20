@@ -48,8 +48,8 @@ serve(async (req) => {
           throw new Error('No transcript found');
         }
 
-        // Use request.module_key if numeric, otherwise default to module 1
-        const moduleId = parseInt(request.module_key) || 1;
+        // Use request.module_id (integer FK), fallback to 1
+        const moduleId = request.module_id || 1;
 
         // Call OpenAI API
         const prompt = getModulePrompt(moduleId, session.transcript_text);
@@ -82,10 +82,9 @@ serve(async (req) => {
             user_id: request.user_id,
             module_id: moduleId,
             provider: 'openai',
-            model: 'gpt-4',
-            status: 'done',
-            summary_text: summaryText,
-            raw_json: aiData
+            model: 'gpt-4o',
+            status: 'completed',
+            summary_text: summaryText
           });
 
         // ── Write scores back to sessions table ──
@@ -132,10 +131,10 @@ serve(async (req) => {
 
         results.push({ id: request.id, status: 'success' });
       } catch (error: any) {
-        // Mark as error
+        // Mark as failed
         await supabase
           .from('ai_report_requests')
-          .update({ status: 'error', error_message: error.message })
+          .update({ status: 'failed' })
           .eq('id', request.id);
 
         results.push({ id: request.id, status: 'error', message: error.message });
