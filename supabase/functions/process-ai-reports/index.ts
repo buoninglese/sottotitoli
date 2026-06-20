@@ -61,8 +61,26 @@ Deno.serve(async (req) => {
         // Read module_key (text) from request, parse to int for module lookup
         const moduleId = parseInt(request.module_key) || 1;
 
+        // Read user's native language from profile for report language
+        let reportLanguage = 'italiano';
+        try {
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('native_lang')
+            .eq('id', request.user_id)
+            .maybeSingle();
+          if (profile?.native_lang) {
+            const langMap: Record<string, string> = {
+              it: 'italiano', en: 'inglese', nl: 'olandese', fr: 'francese',
+              de: 'tedesco', es: 'spagnolo', pt: 'portoghese', pl: 'polacco',
+              ru: 'russo', zh: 'cinese', ja: 'giapponese', ko: 'coreano'
+            };
+            reportLanguage = langMap[profile.native_lang] || profile.native_lang;
+          }
+        } catch (_) { /* keep default italiano */ }
+
         // Build prompt — getModulePrompt returns {system, user: fn(transcript)}
-        const prompt = getModulePrompt(moduleId);
+        const prompt = getModulePrompt(moduleId, reportLanguage);
         const userPrompt = prompt.user(session.transcript_text);
 
         // Call OpenAI API
