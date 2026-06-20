@@ -1562,14 +1562,38 @@
     return (text.match(/[.!?]/g) || []).length || 1;
   }
 
+  /**
+   * Per-language filler word detection.
+   * Detects source language from modeKey and uses appropriate filler list.
+   * Falls back to English list for unknown languages.
+   */
+  var FILLERS_BY_LANG = {
+    en: ['uh', 'um', 'eh', 'you know', 'like', 'i mean', 'sort of', 'kind of', 'actually', 'basically', 'literally', 'right', 'okay', 'so'],
+    it: ['allora', 'cioè', 'tipo', 'quindi', 'ehm', 'beh', 'insomma', 'praticamente', 'diciamo', 'ecco', 'mah', 'boh', 'comunque', 'alla fine', 'nel senso'],
+    nl: ['dus', 'nou', 'uh', 'euhm', 'zeg maar', 'eigenlijk', 'gewoon', 'weet je', 'ofzo', 'nou ja', 'kijk', 'luister', 'inderdaad', 'misschien'],
+    fr: ['euh', 'donc', 'alors', 'quoi', 'hein', 'voilà', 'genre', 'tu vois', 'en fait', 'quand même', 'du coup', 'bref'],
+    de: ['äh', 'ähm', 'also', 'quasi', 'halt', 'sozusagen', 'eigentlich', 'irgendwie', 'so', 'ja', 'ne', 'oder so'],
+    es: ['eh', 'este', 'o sea', 'bueno', 'pues', 'entonces', 'vale', '¿no?', 'digamos', 'como que', 'realmente'],
+    pl: ['yyy', 'eee', 'no', 'wiesz', 'znaczy', 'powiedzmy', 'właściwie', 'jakby', 'tak', 'prostu'],
+    pt: ['tipo', 'é', 'tá', 'né', 'então', 'assim', 'bem', 'tipo assim', 'quer dizer', 'sabe']
+  };
+
   function computeFillersCount(text) {
     if (!text) return 0;
-    const fillers = ["uh", "um", "eh", "you know"];
-    const lower = text.toLowerCase();
-    let count = 0;
-    fillers.forEach((f) => {
-      const re = new RegExp("\\b" + f.replace(" ", "\\s+") + "\\b", "g");
-      const matches = lower.match(re);
+    // Detect source language from modeKey
+    var sourceLang = 'en';
+    if (typeof modeKey === 'string') {
+      if (modeKey.startsWith('caption-')) sourceLang = modeKey.replace('caption-', '').split('-')[0];
+      else if (modeKey.startsWith('translate-')) sourceLang = modeKey.replace('translate-', '').split('-')[0];
+      else if (modeKey.startsWith('lesson')) sourceLang = 'en';
+    }
+    var fillers = FILLERS_BY_LANG[sourceLang] || FILLERS_BY_LANG['en'];
+    var lower = text.toLowerCase();
+    var count = 0;
+    fillers.forEach(function(f) {
+      // Build regex that handles multi-word fillers and word boundaries
+      var re = new RegExp('\\b' + f.replace(/\s+/g, '\\s+') + '\\b', 'gi');
+      var matches = lower.match(re);
       if (matches) count += matches.length;
     });
     return count;
@@ -1732,8 +1756,6 @@
       const plainWithTimestamps = transcriptLines
         .map(function (entry) { return entry.timestamp ? "[" + entry.timestamp + "] " + entry.text : entry.text; })
         .join("\n");
-      const questionCount = computeQuestionCount(plain);
-      const negationCount = computeNegationCount(plain);
       const repetitionRate = computeRepetitionRate(plain);
       const turnCount = computeTurnCount(plain);
 
@@ -1760,7 +1782,6 @@
       if (fillersPerMinute != null) { setText("reportFillers", fillersPerMinute.toFixed(1)); setText("liveFillers", fillersPerMinute.toFixed(1)); }
       if (qualityScore != null) { setText("reportQuality", qualityScore.toFixed(2)); setText("liveQuality", qualityScore.toFixed(2)); }
       if (ngslCoverage != null) setText("liveNgsl", (ngslCoverage * 100).toFixed(0) + '%');
-      setText("liveQuestions", String(questionCount));
 
       const updatePayload = {
         ended_at: ended.toISOString(),
@@ -1777,12 +1798,8 @@
         quality_score: qualityScore,
         ngsl_coverage: ngslCoverage,
         transcript_text: plainWithTimestamps,
-        question_count: questionCount,
-        negation_count: negationCount,
         repetition_rate: repetitionRate,
         turn_count: turnCount,
-        interruption_count: null,
-        speaking_share_ratio: null,
         noun_count: posNouns || null,
         verb_count: posVerbs || null,
         adjective_count: posAdjs || null,
