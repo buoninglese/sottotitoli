@@ -49,8 +49,11 @@ Deno.serve(async (req) => {
         // Read module_key (text) from request, parse to int for module lookup
         const moduleId = parseInt(request.module_key) || 1;
 
+        // Build prompt — getModulePrompt returns {system, user: fn(transcript)}
+        const prompt = getModulePrompt(moduleId);
+        const userPrompt = prompt.user(session.transcript_text);
+
         // Call OpenAI API
-        const prompt = getModulePrompt(moduleId, session.transcript_text);
         const aiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
           method: 'POST',
           headers: {
@@ -61,7 +64,7 @@ Deno.serve(async (req) => {
             model: 'gpt-4o',
             messages: [
               { role: 'system', content: prompt.system },
-              { role: 'user', content: prompt.user }
+              { role: 'user', content: userPrompt }
             ],
             temperature: 0.7,
             max_tokens: 800
