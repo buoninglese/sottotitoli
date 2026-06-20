@@ -75,7 +75,7 @@ serve(async (req) => {
         const tokensUsed = aiData.usage.total_tokens;
 
         // Insert completed report
-        await supabase
+        const { data: report } = await supabase
           .from('session_ai_reports')
           .insert({
             session_id: request.session_ids[0],
@@ -85,27 +85,45 @@ serve(async (req) => {
             model: 'gpt-4o',
             status: 'completed',
             summary_text: summaryText
-          });
+          })
+          .select('id')
+          .single();
 
-        // ── Write scores back to sessions table ──
-        const scoreUpdates: Record<string, any> = { last_ai_metrics_at: new Date().toISOString() };
-
-        // Extract scores from AI response text (look for patterns like "Score: 7/10" or "Overall: 8.5")
+        // ── Extract scores from AI response ──
+        let overallScore = null;
         const scorePatterns = [
           { regex: /fluency[:\s]*(\d+(?:\.\d+)?)/i, col: 'fluency_score' },
           { regex: /vocabulary[:\s]*(\d+(?:\.\d+)?)/i, col: 'vocabulary_score' },
           { regex: /grammar[:\s]*(\d+(?:\.\d+)?)/i, col: 'grammar_score' },
-          { regex: /interaction[:\s]*(\d+(?:\.\d+)?)/i, col: 'interaction_score' },
-          { regex: /business[:\s]*clarity[:\s]*(\d+(?:\.\d+)?)/i, col: 'business_clarity_score' },
-          { regex: /academic[:\s]*participation[:\s]*(\d+(?:\.\d+)?)/i, col: 'academic_participation_score' },
           { regex: /overall[:\s]*score[:\s]*(\d+(?:\.\d+)?)/i, col: 'quality_score' },
+          { regex: /score[:\s]*(\d+(?:\.\d+)?)\s*\/\s*100/i, col: 'quality_score' },
         ];
 
+        const scoreUpdates: Record<string, any> = { last_ai_metrics_at: new Date().toISOString() };
         scorePatterns.forEach(({ regex, col }) => {
           const match = summaryText.match(regex);
-          if (match) scoreUpdates[col] = parseFloat(match[1]);
+          if (match) {
+            const val = parseFloat(match[1]);
+            scoreUpdates[col] = val;
+            if (col === 'quality_score' && overallScore === null) overallScore = val;
+          }
         });
 
+        // Try to find any number that looks like a score
+        if (overallScore === null) {
+          const anyScore = summaryText.match(/(\d{1,3})\s*\/\s*100/);
+          if (anyScore) overallScore = parseFloat(anyScore[1]);
+        }
+
+        // Write overall_score back to the report
+        if (overallScore !== null && report) {
+          await supabase
+            .from('session_ai_reports')
+            .update({ overall_score: overallScore })
+            .eq('id', report.id);
+        }
+
+        // Write scores back to sessions table
         if (Object.keys(scoreUpdates).length > 1) {
           await supabase
             .from('sessions')
