@@ -9,7 +9,19 @@ const SUPABASE_SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
 
+const corsHeaders = {
+  'Content-Type': 'application/json',
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+  'Access-Control-Allow-Headers': 'Authorization, Content-Type',
+};
+
 Deno.serve(async (req) => {
+  // Handle CORS preflight
+  if (req.method === 'OPTIONS') {
+    return new Response(null, { headers: corsHeaders });
+  }
+
   try {
     // Get pending AI report requests
     const { data: requests, error: fetchError } = await supabase
@@ -21,7 +33,7 @@ Deno.serve(async (req) => {
     if (fetchError) throw fetchError;
     if (!requests || requests.length === 0) {
       return new Response(JSON.stringify({ message: 'No pending requests' }), {
-        headers: { 'Content-Type': 'application/json' },
+        headers: corsHeaders,
       });
     }
 
@@ -161,13 +173,13 @@ Deno.serve(async (req) => {
     }
 
     return new Response(JSON.stringify({ processed: results.length, results }), {
-      headers: { 'Content-Type': 'application/json' },
+      headers: corsHeaders,
     });
 
   } catch (error: any) {
     return new Response(JSON.stringify({ error: error.message }), {
       status: 500,
-      headers: { 'Content-Type': 'application/json' },
+      headers: corsHeaders,
     });
   }
 });
