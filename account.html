@@ -463,15 +463,32 @@ document.querySelectorAll('.ni[data-tab]').forEach(function(t){
 
 // ═══ ALL DATA ═══
 var allSessions=[];
-(async function loadAllData(){
+function initDataLoading(){
   var supabase=window.sottotitoliSupabase;
-  if(!supabase)return setTimeout(loadAllData,500);
-  var r=await supabase.auth.getSession();
-  if(!r.data?.session)return;
-  var userId=r.data.session.user.id;
+  if(!supabase){setTimeout(initDataLoading,300);return;}
 
-  var sessResp=await supabase.from('sessions').select('id,room,mode,started_at,ended_at,duration_seconds,words_count,wpm,fillers_per_minute,unique_words_count,lexical_diversity,quality_score,ngsl_coverage,repetition_rate,turn_count').eq('user_id',userId).order('started_at',{ascending:false}).limit(200);
-  allSessions=(sessResp.data||[]).filter(function(s){return s.started_at});
+  // Wait for Supabase auth to fully initialize (session restored from localStorage)
+  supabase.auth.onAuthStateChange(function(event, session){
+    if(event==='INITIAL_SESSION'||event==='SIGNED_IN'){
+      if(session){loadAllData(supabase,session.user.id);}
+    }
+  });
+
+  // Also try immediately in case auth is already initialized
+  supabase.auth.getSession().then(function(r){
+    if(r.data?.session){loadAllData(supabase,r.data.session.user.id);}
+  });
+}
+
+var _dataLoaded=false;
+async function loadAllData(supabase,userId){
+  if(_dataLoaded)return;_dataLoaded=true;
+
+  try {
+    var sessResp=await supabase.from('sessions').select('id,room,mode,started_at,ended_at,duration_seconds,words_count,wpm,fillers_per_minute,unique_words_count,lexical_diversity,quality_score,ngsl_coverage,repetition_rate,turn_count').eq('user_id',userId).order('started_at',{ascending:false}).limit(200);
+    allSessions=(sessResp.data||[]).filter(function(s){return s.started_at});
+  }catch(e){console.error('Session load error:',e);allSessions=[];}
+
   var tc=document.getElementById('transcriptBadge');if(tc)tc.textContent=allSessions.length;
 
   var repResp=await supabase.from('session_ai_reports').select('id',{count:'exact',head:true}).eq('user_id',userId).eq('status','completed');
@@ -533,7 +550,10 @@ var allSessions=[];
   loadProgress();
   renderAchievements();
   loadRightPanel(userId);
-})();
+}
+
+// Kick off data loading — waits for Supabase auth to be ready
+initDataLoading();
 
 function loadProgress(){
   var weekAgo=new Date(Date.now()-7*86400000);
