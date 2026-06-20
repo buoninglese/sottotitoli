@@ -227,11 +227,11 @@ document.getElementById('modBuyBtn').addEventListener('click',async function(){
   var statusEl=document.getElementById('modStatus');statusEl.style.display='block';statusEl.innerHTML='<span class="ri-processing">⏳ Elaborazione…</span>';
   var supabase=window.sottotitoliSupabase;var r=await supabase.auth.getSession();if(!r.data?.session)return;var userId=r.data.session.user.id;
   var tokResp=await supabase.from('user_tokens').select('balance').eq('user_id',userId).maybeSingle();var curBal=tokResp.data?.balance??0;
-  if(curBal<selectedReport.price){statusEl.innerHTML='<span class="ri-failed">❌ Token insufficienti. <a href="wallet.html">Acquista →</a></span>';btn.disabled=false;btn.textContent='Acquista report';return}
+  if(curBal<selectedReport.price){statusEl.innerHTML='<span class="ri-failed">❌ Token insufficienti (hai '+curBal+', servono '+selectedReport.price+'). <a href="wallet.html">Acquista →</a></span>';btn.disabled=false;btn.textContent='Acquista report';return}
   await supabase.from('user_tokens').update({balance:curBal-selectedReport.price,updated_at:new Date().toISOString()}).eq('user_id',userId);
   document.getElementById('tokenBalance').textContent=curBal-selectedReport.price;
   var reqResp=await supabase.from('ai_report_requests').insert({user_id:userId,session_ids:[selectedSession.id],module_id:selectedReport.moduleId,family_key:selectedReport.family,status:'queued'}).select('id').single();
-  if(reqResp.error){statusEl.innerHTML='<span class="ri-failed">❌ Errore</span>';btn.disabled=false;btn.textContent='Acquista report';return}
+  if(reqResp.error){statusEl.innerHTML='<span class="ri-failed">❌ Errore DB: '+reqResp.error.message+'</span>';btn.disabled=false;btn.textContent='Acquista report';return}
   var poller=setInterval(async function(){
     var check=await supabase.from('session_ai_reports').select('id,overall_score').eq('user_id',userId).order('created_at',{ascending:false}).limit(1);
     if(check.data&&check.data.length>0&&check.data[0].overall_score!=null){clearInterval(poller);statusEl.innerHTML='<span class="ri-done">✅ Report pronto! <a href="account.html">Vedi su Account →</a></span>';btn.disabled=false;btn.textContent='Acquista report';
