@@ -1,235 +1,236 @@
-// AI Analysis Module Prompts
-// Maps module IDs (1-14) to specialized assessment prompts
+// AI Analysis Module Prompts — multilingual, language-agnostic
+// All prompts auto-detect the transcript language and analyze accordingly.
+// Output always in Italian (the app's UI language).
+// Never apologize for the language — just analyze what's there.
+
+const SHARED_RULES = `
+Regole generali:
+- Rileva automaticamente la lingua del transcript e analizzala in quella lingua.
+- NON scusarti per la lingua usata. Non dire "il transcript è in italiano quindi non posso…". Analizza semplicemente ciò che c'è.
+- Fornisci l'analisi in italiano, con esempi tratti dal transcript nella lingua originale.
+- Sii specifico, concreto e utile. Evita frasi generiche.
+- Usa la scala CEFR (A1-C2) dove richiesto — è valida per tutte le lingue europee.
+- Formatta il responso in modo chiaro, con sezioni numerate.
+`;
 
 export const MODULE_PROMPTS: Record<number, { system: string; user: (transcript: string) => string }> = {
-  // ========================================================
-  // CAMBRIDGE MODULES (1-4)
-  // ========================================================
+
+  // ═══ CAMBRIDGE-STYLE (1-4): Grammar, Vocabulary, Fluency, Pronunciation ═══
 
   1: {
-    system: `You are an expert Cambridge English examiner specializing in Grammatical Range & Accuracy assessment for speaking tests (B1-C2 levels).`,
-    user: (transcript: string) => `Analyze this speaking transcript for Grammar & Accuracy:
+    system: `Sei un esperto valutatore linguistico specializzato in grammatica e accuratezza (Grammatical Range & Accuracy). Lavori con qualsiasi lingua.${SHARED_RULES}`,
+    user: (transcript: string) => `Analizza questo transcript per Gamma e Accuratezza Grammaticale:
 
 ${transcript}
 
-Provide:
-1. Grammatical Range (variety of structures used)
-2. Accuracy Assessment (error frequency and type)
-3. Specific Grammar Errors with corrections
-4. Strengths identified
-5. Targeted Practice Recommendations
-6. CEFR Level Estimate (B1-C2)
-
-Be specific with examples from the transcript. Format: Professional, concise, actionable.`
+Fornisci:
+1. Gamma Grammaticale (varietà di strutture usate: tempi verbali, modi, subordinate, costruzioni complesse)
+2. Accuratezza (frequenza e tipo di errori grammaticali)
+3. Errori Specifici — elenca errori concreti con la correzione
+4. Punti di Forza identificati
+5. Raccomandazioni mirate per migliorare
+6. Stima del Livello CEFR (A1-C2)`
   },
 
   2: {
-    system: `You are an expert Cambridge English examiner specializing in Lexical Resource assessment.`,
-    user: (transcript: string) => `Analyze this speaking transcript for Vocabulary Range:
+    system: `Sei un esperto valutatore linguistico specializzato in risorse lessicali (Lexical Resource). Lavori con qualsiasi lingua.${SHARED_RULES}`,
+    user: (transcript: string) => `Analizza questo transcript per Ricchezza Lessicale:
 
 ${transcript}
 
-Provide:
-1. Lexical Range Score (variety and sophistication)
-2. Topic-Specific Vocabulary usage
-3. Collocations and Phrases identified
-4. Overused words/phrases
-5. Vocabulary gaps
-6. Recommendations for expansion
-7. CEFR Level Estimate`
+Fornisci:
+1. Punteggio di Gamma Lessicale (varietà e sofisticazione del vocabolario)
+2. Vocabolario Tematico — parole ed espressioni legate agli argomenti trattati
+3. Collocazioni e Frasi Fatte identificate
+4. Parole/Espressioni Abusate o ripetute eccessivamente
+5. Lacune Lessicali — cosa manca per esprimersi con più precisione
+6. Raccomandazioni per espandere il vocabolario
+7. Stima del Livello CEFR (A1-C2)`
   },
 
   3: {
-    system: `You are an expert Cambridge English examiner specializing in Fluency & Coherence assessment for speaking tests (B1-C2 levels).`,
-    user: (transcript: string) => `Analyze this speaking transcript for Fluency & Coherence:
+    system: `Sei un esperto valutatore linguistico specializzato in fluidità e coerenza (Fluency & Coherence). Lavori con qualsiasi lingua.${SHARED_RULES}`,
+    user: (transcript: string) => `Analizza questo transcript per Fluidità e Coerenza:
 
 ${transcript}
 
-Provide:
-1. Overall Fluency Score (rate of speech, hesitations, pauses)
-2. Coherence Assessment (logical organization, discourse markers)
-3. Specific Examples from transcript
-4. Improvement Recommendations
-5. CEFR Level Estimate (B1-C2)
-
-Format: Professional, concise, actionable.`
+Fornisci:
+1. Punteggio di Fluidità (ritmo, esitazioni, pause apparenti)
+2. Coerenza (organizzazione logica, connettivi discorsivi)
+3. Esempi specifici dal transcript
+4. Raccomandazioni per migliorare
+5. Stima del Livello CEFR (A1-C2)`
   },
 
   4: {
-    system: `You are an expert Cambridge English examiner specializing in Pronunciation assessment.`,
-    user: (transcript: string) => `Analyze this speaking transcript for Pronunciation features:
+    system: `Sei un esperto valutatore linguistico specializzato in pronuncia e tratti fonetici. Lavori con qualsiasi lingua.${SHARED_RULES}`,
+    user: (transcript: string) => `Analizza questo transcript per tratti di Pronuncia:
 
 ${transcript}
 
-Provide:
-1. Intelligibility Score
-2. Intonation & Stress patterns
-3. Problem sounds or patterns identified
-4. Word/sentence stress issues
-5. Recommendations for improvement
-6. CEFR Level Estimate
+Fornisci:
+1. Intelligibilità stimata (basata su pattern testuali)
+2. Pattern di Intonazione e Accento
+3. Suoni o pattern potenzialmente problematici
+4. Problemi di accento di parola/frase
+5. Raccomandazioni per migliorare la pronuncia
+6. Stima del Livello CEFR (A1-C2)
 
-Note: Base analysis on text patterns that suggest pronunciation issues.`
+Nota: L'analisi si basa su pattern testuali, non audio.`
   },
 
-  // ========================================================
-  // BUSINESS MODULES (5-7)
-  // ========================================================
+  // ═══ BUSINESS (5-7): Professional, Meetings, Business Vocab ═══
 
   5: {
-    system: `You are an expert business English assessor specializing in formal register and professional communication.`,
-    user: (transcript: string) => `Analyze this speaking transcript for Business Professional Communication:
+    system: `Sei un esperto di comunicazione professionale e linguaggio aziendale. Lavori con qualsiasi lingua.${SHARED_RULES}`,
+    user: (transcript: string) => `Analizza questo transcript per Comunicazione Professionale:
 
 ${transcript}
 
-Provide:
-1. Register Appropriateness (formal vs informal language)
-2. Professional Tone Assessment
-3. Business Vocabulary usage
-4. Clarity and conciseness
-5. Confidence and assertiveness
-6. Recommendations for professional contexts`
+Fornisci:
+1. Appropriatezza del Registro (formale vs informale)
+2. Tono Professionale
+3. Uso del Vocabolario Business/settoriale
+4. Chiarezza e Concisione
+5. Sicurezza e Assertività comunicativa
+6. Raccomandazioni per contesti professionali`
   },
 
   6: {
-    system: `You are an expert business communication coach specializing in presentation skills assessment.`,
-    user: (transcript: string) => `Analyze this speaking transcript for Meetings & Presentations:
+    system: `Sei un coach di comunicazione aziendale specializzato in riunioni e presentazioni. Lavori con qualsiasi lingua.${SHARED_RULES}`,
+    user: (transcript: string) => `Analizza questo transcript per Riunioni e Presentazioni:
 
 ${transcript}
 
-Provide:
-1. Opening and closing techniques
-2. Turn-taking and interruption management
-3. Persuasion and argumentation skills
-4. Signposting language effectiveness
-5. Question handling ability
-6. Actionable business communication tips`
+Fornisci:
+1. Tecniche di apertura e chiusura
+2. Gestione dei turni di parola e interruzioni
+3. Capacità di persuasione e argomentazione
+4. Efficacia del linguaggio di segnalazione (signposting)
+5. Gestione delle domande
+6. Consigli pratici per la comunicazione professionale`
   },
 
   7: {
-    system: `You are an expert business English assessor specializing in industry-specific terminology and business idioms.`,
-    user: (transcript: string) => `Analyze this speaking transcript for Business Vocabulary:
+    system: `Sei un esperto di vocabolario aziendale e terminologia di settore. Lavori con qualsiasi lingua.${SHARED_RULES}`,
+    user: (transcript: string) => `Analizza questo transcript per Vocabolario Business:
 
 ${transcript}
 
-Provide:
-1. Industry and field-specific terminology usage
-2. Business idioms and phrasal verbs
-3. Financial/commercial language
-4. Formal vs informal business register
-5. Suggestions for expanding professional lexicon
-6. Comparison to business communication standards`
+Fornisci:
+1. Uso di terminologia specifica del settore
+2. Modi di dire ed espressioni idiomatiche professionali
+3. Linguaggio commerciale/finanziario
+4. Registro formale vs informale in contesto aziendale
+5. Suggerimenti per espandere il lessico professionale
+6. Confronto con standard di comunicazione aziendale`
   },
 
-  // ========================================================
-  // ACADEMIC MODULES (8-10)
-  // ========================================================
+  // ═══ ACADEMIC (8-10): Discourse, Research, Academic Vocab ═══
 
   8: {
-    system: `You are an expert academic English assessor specializing in academic discourse analysis.`,
-    user: (transcript: string) => `Analyze this speaking transcript for Academic Discourse:
+    system: `Sei un esperto di discorso accademico e analisi del linguaggio formale. Lavori con qualsiasi lingua.${SHARED_RULES}`,
+    user: (transcript: string) => `Analizza questo transcript per Discorso Accademico:
 
 ${transcript}
 
-Provide:
-1. Use of hedging and academic qualifiers
-2. Citation and referencing in speech
-3. Critical thinking and argumentation
-4. Abstract and complex idea expression
-5. Objective vs subjective language balance`
+Fornisci:
+1. Uso di hedging e qualificatori accademici (forse, probabilmente, sembrerebbe...)
+2. Citazioni e riferimenti nel parlato
+3. Pensiero critico e argomentazione
+4. Espressione di idee astratte e complesse
+5. Bilanciamento tra linguaggio oggettivo e soggettivo`
   },
 
   9: {
-    system: `You are an expert academic skills assessor specializing in critical thinking evaluation.`,
-    user: (transcript: string) => `Analyze this speaking transcript for Research Communication:
+    system: `Sei un esperto di comunicazione accademica e ricerca. Lavori con qualsiasi lingua.${SHARED_RULES}`,
+    user: (transcript: string) => `Analizza questo transcript per Comunicazione di Ricerca:
 
 ${transcript}
 
-Provide:
-1. Methodology description clarity
-2. Results and data presentation
-3. Limitations and implications discussion
-4. Technical terminology accuracy
-5. Ability to respond to academic questioning
-6. Recommendations for academic development`
+Fornisci:
+1. Chiarezza nella descrizione metodologica
+2. Presentazione di risultati e dati
+3. Discussione di limitazioni e implicazioni
+4. Accuratezza della terminologia tecnica
+5. Capacità di rispondere a domande accademiche
+6. Raccomandazioni per lo sviluppo accademico`
   },
 
   10: {
-    system: `You are an expert academic English assessor specializing in academic vocabulary and terminology.`,
-    user: (transcript: string) => `Analyze this speaking transcript for Academic Vocabulary:
+    system: `Sei un esperto di vocabolario accademico e terminologia specialistica. Lavori con qualsiasi lingua.${SHARED_RULES}`,
+    user: (transcript: string) => `Analizza questo transcript per Vocabolario Accademico:
 
 ${transcript}
 
-Provide:
-1. Academic word list coverage
-2. Subject-specific terminology
-3. Abstract noun usage
-4. Nominalization patterns
-5. Formal register maintenance
-6. Comparison against academic corpus standards`
+Fornisci:
+1. Copertura del vocabolario accademico (equivalenti AWL nella lingua del transcript)
+2. Terminologia specifica della materia
+3. Uso di nomi astratti
+4. Pattern di nominalizzazione
+5. Mantenimento del registro formale
+6. Confronto con standard accademici`
   },
 
-  // ========================================================
-  // LINGUISTIC ANALYSIS MODULES (11-14)
-  // ========================================================
+  // ═══ LINGUISTIC (11-14): Discourse, Syntax, Lexical Stats, Fillers ═══
 
   11: {
-    system: `You are an expert linguist specializing in discourse analysis and cohesion.`,
-    user: (transcript: string) => `Analyze this speaking transcript for Discourse Analysis:
+    system: `Sei un linguista esperto in analisi del discorso e coesione testuale. Lavori con qualsiasi lingua.${SHARED_RULES}`,
+    user: (transcript: string) => `Analizza questo transcript per Analisi del Discorso:
 
 ${transcript}
 
-Provide:
-1. Discourse markers and connectives usage
-2. Cohesion and coherence devices
-3. Topic management and development
-4. Reference and ellipsis patterns
-5. Pragmatic features (politeness, indirectness, implicature)`
+Fornisci:
+1. Uso di marcatori discorsivi e connettivi (quindi, però, infatti, comunque...)
+2. Dispositivi di coesione e coerenza
+3. Gestione e sviluppo dei temi/topic
+4. Pattern di riferimento ed ellissi
+5. Tratti pragmatici (cortesia, indirectness, implicature)`
   },
 
   12: {
-    system: `You are an expert computational linguist specializing in language complexity measurement.`,
-    user: (transcript: string) => `Analyze this speaking transcript for Syntax & Complexity:
+    system: `Sei un linguista computazionale esperto in misurazione della complessità linguistica. Lavori con qualsiasi lingua.${SHARED_RULES}`,
+    user: (transcript: string) => `Analizza questo transcript per Sintassi e Complessità:
 
 ${transcript}
 
-Provide:
-1. Sentence length variation
-2. Clause types and subordination
-3. Syntactic complexity index
-4. Passive vs active voice distribution
-5. Coordination and subordination balance
-6. Quantitative metrics`
+Fornisci:
+1. Variazione della lunghezza delle frasi
+2. Tipi di clausole e subordinazione
+3. Indice di complessità sintattica
+4. Distribuzione voce attiva vs passiva
+5. Bilanciamento tra coordinazione e subordinazione
+6. Metriche quantitative (conteggi, medie, rapporti)`
   },
 
   13: {
-    system: `You are an expert error analysis specialist in second language acquisition.`,
-    user: (transcript: string) => `Perform comprehensive Lexical Analysis on this transcript:
+    system: `Sei un esperto di statistica lessicale e analisi quantitative del linguaggio. Lavori con qualsiasi lingua.${SHARED_RULES}`,
+    user: (transcript: string) => `Esegui un'Analisi Lessicale Quantitativa su questo transcript:
 
 ${transcript}
 
-Provide:
-1. Type-token ratio interpretation
-2. Lexical density metrics
-3. Word frequency distribution
-4. Semantic fields and domains
-5. Lexical sophistication indices
-6. Recommendations for vocabulary development`
+Fornisci:
+1. Rapporto type-token (TTR) e sua interpretazione
+2. Densità lessicale
+3. Distribuzione della frequenza delle parole
+4. Campi semantici e domini
+5. Indici di sofisticazione lessicale
+6. Raccomandazioni per lo sviluppo del vocabolario`
   },
 
   14: {
-    system: `You are an expert conversation analyst specializing in interactive competence.`,
-    user: (transcript: string) => `Analyze this speaking transcript for Filler Analysis:
+    system: `Sei un analista della conversazione esperto in disfluenze e pianificazione del parlato. Lavori con qualsiasi lingua — ogni lingua ha i propri riempitivi caratteristici.${SHARED_RULES}`,
+    user: (transcript: string) => `Analizza questo transcript per Fillers e Disfluenze:
 
 ${transcript}
 
-Provide:
-1. Filler word distribution (um, uh, er, etc.)
-2. False starts and self-repairs
-3. Pause patterns (estimated from transcript)
-4. Repetition types identified
-5. Strategic vs problematic disfluencies
-6. Already have fillers_per_minute metric — contextualize it`
+Fornisci:
+1. Distribuzione dei riempitivi (per l'italiano: quindi, allora, cioè, tipo, ecc; per inglese: um, uh, like, you know; per altre lingue: i riempitivi caratteristici)
+2. False partenze e auto-correzioni
+3. Pattern di pausa (stimati dal transcript)
+4. Tipi di ripetizione identificati
+5. Disfluenze strategiche vs problematiche — quali aiutano la pianificazione e quali disturbano
+6. Il metric fillers_per_minute è già calcolato — contestualizzalo e interpretalo`
   }
 };
 
