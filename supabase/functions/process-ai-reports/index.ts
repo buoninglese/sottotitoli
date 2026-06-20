@@ -1,5 +1,5 @@
 // Supabase Edge Function: Process AI Report Requests
-import { serve } from 'https://deno.land/std@0.177.0/http/server.ts';
+// Uses Deno.serve() built-in — no deno.land import needed
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { getModulePrompt } from './prompts.ts';
 
@@ -9,7 +9,7 @@ const SUPABASE_SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
 
-serve(async (req) => {
+Deno.serve(async (req) => {
   try {
     // Get pending AI report requests
     const { data: requests, error: fetchError } = await supabase
