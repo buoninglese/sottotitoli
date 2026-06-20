@@ -2,7 +2,13 @@
 
 const accountSupabase = window.sottotitoliSupabase;
 
+// Detect V6 sidebar page — don't run old dashboard init on the new layout
+const isV6Page = !!document.querySelector('.sidebar');
+
 document.addEventListener('DOMContentLoaded', () => {
+  // V6 page handles its own data loading via inline script — skip old init
+  if (isV6Page) return;
+
   const emailEl = document.getElementById('accountEmail');
   const createdEl = document.getElementById('accountCreated');
   const sessionsEl = document.getElementById('sessionsList');
