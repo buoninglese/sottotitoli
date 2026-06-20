@@ -88,6 +88,13 @@ body.snap-body{overflow:hidden}
 .lang-tab:hover{border-color:var(--accent);color:var(--accent)}
 .lang-tab.active{background:var(--accent);color:#fff;border-color:var(--accent)}
 
+/* === HEATMAP === */
+.hm-day{width:14px;height:14px;border-radius:3px;background:var(--line);transition:all .2s;cursor:default}
+.hm-day:hover{transform:scale(1.5);z-index:2;box-shadow:0 2px 8px rgba(0,0,0,.3)}
+.hm-day.l2{background:rgba(52,211,153,.25)}
+.hm-day.l3{background:rgba(52,211,153,.55)}
+.hm-day.l4{background:var(--green);box-shadow:0 0 6px rgba(52,211,153,.3)}
+
 /* === STAT STRIP (replaces big KPI boxes) === */
 .stat-strip{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px}
 .stat-pill{flex:1;min-width:90px;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:10px 12px;text-align:center;transition:all .2s}
@@ -250,10 +257,12 @@ body.snap-body{overflow:hidden}
   <div class="ni" data-tab="streak"><span class="ni-icon">🔥</span><span class="nl">Streak</span></div>
   <div class="ni" data-tab="achievements"><span class="ni-icon">🏆</span><span class="nl">Achievements</span><span class="nb c" id="achBadge">0</span></div>
   <div class="sidebar-div"></div>
-  <div class="sidebar-st">Lingua</div>
+  <div class="sidebar-st">Analisi</div>
+  <div class="ni" data-tab="trend"><span class="ni-icon">📈</span><span class="nl">Trend</span></div>
   <div class="ni" data-tab="vocabulary"><span class="ni-icon">📚</span><span class="nl">Vocabolario</span></div>
   <div class="ni" data-tab="grammar"><span class="ni-icon">📝</span><span class="nl">Grammatica</span></div>
-  <div class="ni" data-tab="speaking"><span class="ni-icon">🗣️</span><span class="nl">Speaking Analytics</span></div>
+  <div class="ni" data-tab="speaking"><span class="ni-icon">🗣️</span><span class="nl">Speaking</span></div>
+  <div class="ni" data-tab="viaggio"><span class="ni-icon">🗺️</span><span class="nl">Viaggio</span></div>
   <div class="sidebar-div"></div>
   <div class="sidebar-st">Dati</div>
   <div class="ni" data-tab="transcripts"><span class="ni-icon">📄</span><span class="nl">Trascrizioni</span><span class="nb c" id="transcriptBadge">0</span></div>
@@ -362,6 +371,44 @@ body.snap-body{overflow:hidden}
     <!-- ═══ ACHIEVEMENTS ═══ -->
     <div class="cs" id="cs-achievements">
       <div class="card card-sm"><div class="card-h3">🏆 Achievements <span style="font-weight:400;font-size:11px;color:var(--t3)">· <span id="achEarned">0</span>/<span id="achTotal">50</span> sbloccati</span></div><div class="gaf" id="achGrid"></div></div>
+    </div>
+
+    <!-- ═══ TREND ═══ -->
+    <div class="cs" id="cs-trend">
+      <!-- KPI Row -->
+      <div class="stat-strip">
+        <div class="stat-pill"><span class="sp-val" style="color:var(--accent)" id="trSessions">—</span><span class="sp-lbl">Sessioni totali</span></div>
+        <div class="stat-pill"><span class="sp-val" style="color:var(--green)" id="trTime">—</span><span class="sp-lbl">Tempo parlato</span></div>
+        <div class="stat-pill"><span class="sp-val" style="color:var(--blue)" id="trWords">—</span><span class="sp-lbl">Parole uniche</span></div>
+        <div class="stat-pill"><span class="sp-val" style="color:var(--amber)" id="trReports">—</span><span class="sp-lbl">Report AI</span></div>
+      </div>
+
+      <!-- Heatmap + Chart -->
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px">
+        <div class="card card-sm" style="flex:1;min-width:280px">
+          <div class="card-h3">🗓️ Attività — ultime 12 settimane</div>
+          <div id="trendHeatmap" style="overflow-x:auto"></div>
+          <div style="display:flex;justify-content:space-between;font-size:9px;color:var(--t3);margin-top:6px"><span>12 sett. fa</span><span>Oggi</span></div>
+        </div>
+        <div class="card card-sm" style="flex:1;min-width:240px">
+          <div class="card-h3">📈 Trend qualità</div>
+          <div class="bar-row" id="trendQualityBars" style="height:80px"></div>
+          <div style="display:flex;justify-content:space-between;font-size:9px;color:var(--t3);margin-top:4px"><span>30 gg fa</span><span>Oggi</span></div>
+        </div>
+      </div>
+
+      <!-- Personal Records -->
+      <div class="card card-sm" style="margin-bottom:8px">
+        <div class="card-h3">🏆 Record personali</div>
+        <div class="gaf" id="trendRecords"></div>
+      </div>
+
+      <!-- Session list (compact) -->
+      <div class="card card-sm">
+        <div class="card-h3">📋 Sessioni recenti</div>
+        <div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:8px" id="trendFilters"></div>
+        <div id="trendSessionList" style="display:flex;flex-direction:column;gap:3px;max-height:300px;overflow-y:auto"></div>
+      </div>
     </div>
 
     <!-- ═══ VOCABOLARIO ═══ -->
@@ -488,6 +535,16 @@ body.snap-body{overflow:hidden}
       <div class="card card-sm"><div class="card-h3">🗣️ Speaking Fingerprint</div><div id="spkFingerprint" style="font-size:12px;color:var(--t2);line-height:1.6">Registra più sessioni per generare il tuo profilo.</div></div>
     </div>
 
+    <!-- ═══ VIAGGIO ═══ -->
+    <div class="cs" id="cs-viaggio">
+      <div class="lang-tabs" id="viaggioLangTabs"></div>
+      <div class="stat-strip" id="viaggioStats"></div>
+      <div class="g2" style="margin-bottom:8px">
+        <div class="card card-sm"><div class="card-h3">📊 Metriche</div><div id="viaggioMetrics"></div></div>
+        <div class="card card-sm"><div class="card-h3">💪 Punti di forza</div><div id="viaggioStrengths"></div></div>
+      </div>
+    </div>
+
     <!-- ═══ TRASCRIZIONI ═══ -->
     <div class="cs" id="cs-transcripts">
       <div class="card card-sm"><div class="card-h3">⭐ Preferiti <span style="font-weight:400;font-size:11px;color:var(--t3)" id="favCount">0</span></div><div id="favList" style="display:flex;flex-direction:column;gap:4px"><div style="text-align:center;color:var(--t3);font-size:11px;padding:8px">Nessun preferito. Clicca la ⭐ per salvare.</div></div></div>
@@ -564,6 +621,7 @@ document.querySelectorAll('.ni[data-tab]').forEach(function(t){
     document.querySelectorAll('.cs').forEach(function(p){p.classList.remove('active')});
     var panel=document.getElementById('cs-'+tab);
     if(panel)panel.classList.add('active');
+    if(tab==='trend')loadTrendTab();
     if(tab==='vocabulary')loadVocabTab();
     if(tab==='grammar')loadGrammarTab();
     if(tab==='achievements')renderAchievements();
@@ -571,6 +629,7 @@ document.querySelectorAll('.ni[data-tab]').forEach(function(t){
     if(tab==='transcripts')loadTranscriptsTab();
     if(tab==='reports')loadReportsTab();
     if(tab==='speaking')loadSpeakingTab();
+    if(tab==='viaggio')loadViaggioTab();
     if(tab==='goals')syncGoalsToTab();
   });
 });
@@ -1109,6 +1168,104 @@ function loadSpeakingTab(){
   if(barsEl){var vals=recent.map(function(s){return s.wpm||0});var maxV=Math.max.apply(null,vals.concat([1]));var h='';vals.forEach(function(v){h+='<div class="bar-col" style="height:'+Math.max(4,v/maxV*100)+'%" title="'+Math.round(v)+' WPM"></div>'});barsEl.innerHTML=h}
   var fp=document.getElementById('spkFingerprint');
   if(fp&&cW>0&&cL>0){var aw=sumWpm/cW,al=sumLex/cL;fp.innerHTML='Parlatore <strong style="color:var(--accent)">'+(aw>130?'veloce':aw>90?'moderato':'lento')+'</strong> con vocabolario <strong style="color:var(--green)">'+(al>0.45?'ricco':al>0.30?'buono':'in crescita')+'</strong>. Il tuo ritmo naturale è di circa <strong>'+Math.round(aw)+' WPM</strong> con diversità lessicale <strong>'+al.toFixed(2)+'</strong>.'}
+}
+
+// ═══ TREND TAB ═══
+function loadTrendTab(){
+  if(allSessions.length===0)return;
+  var totalSec=0,totalWords=0;allSessions.forEach(function(s){totalSec+=(s.duration_seconds||0);totalWords+=(s.unique_words_count||0)});
+  var totalMin=Math.round(totalSec/60),totalHrs=totalMin>=60?(totalMin/60).toFixed(1)+'h':totalMin+'m';
+  var rb=document.getElementById('reportBadge');var reportCount=parseInt(rb?.textContent)||0;
+  if(document.getElementById('trSessions'))document.getElementById('trSessions').textContent=allSessions.length;
+  if(document.getElementById('trTime'))document.getElementById('trTime').textContent=totalHrs;
+  if(document.getElementById('trWords'))document.getElementById('trWords').textContent=totalWords;
+  if(document.getElementById('trReports'))document.getElementById('trReports').textContent=reportCount;
+
+  // Heatmap (12 weeks)
+  var hmEl=document.getElementById('trendHeatmap');
+  if(hmEl){
+    var days=[];for(var i=83;i>=0;i--){var d=new Date(Date.now()-i*86400000);var key=d.toISOString().split('T')[0];var min=0;allSessions.forEach(function(s){if(s.started_at&&s.started_at.split('T')[0]===key)min+=(s.duration_seconds||0)/60});days.push({date:key,min:min,day:d.getDay()});}
+    var maxMin=Math.max.apply(null,days.map(function(d){return d.min}).concat([1]));
+    var cols=[[],[],[],[],[],[],[]];days.forEach(function(d){cols[d.day].push(d)});
+    var hmh='<div style="display:flex;gap:2px">';
+    for(var w=0;w<12;w++){hmh+='<div style="display:flex;flex-direction:column;gap:2px">';
+      for(var dow=0;dow<7;dow++){var dayData=cols[dow][w]||{min:0};var lvl=dayData.min>0?(dayData.min/maxMin>0.66?'l4':dayData.min/maxMin>0.33?'l3':'l2'):'';hmh+='<div class="hm-day '+lvl+'" title="'+dayData.date+': '+Math.round(dayData.min)+' min"></div>';}
+    hmh+='</div>';}
+    hmh+='</div>';hmEl.innerHTML=hmh;
+  }
+
+  // Quality trend bars
+  var qtEl=document.getElementById('trendQualityBars');
+  if(qtEl){var recent30=allSessions.slice(0,30).reverse();var vals=recent30.map(function(s){return s.quality_score||0});var maxV=Math.max.apply(null,vals.concat([1]));var bh='';vals.forEach(function(v){var pct=Math.max(3,(v/maxV*100));var color=v>70?'var(--green)':v>40?'var(--amber)':'var(--red)';bh+='<div class="bar-col" style="height:'+pct+'%;background:'+color+'" title="'+Math.round(v)+'"></div>'});qtEl.innerHTML=bh;}
+
+  // Personal Records
+  var prEl=document.getElementById('trendRecords');
+  if(prEl){
+    var bestWpm=0,bestDur=0,bestWords=0,bestLex=0;allSessions.forEach(function(s){if((s.wpm||0)>bestWpm)bestWpm=s.wpm;if((s.duration_seconds||0)>bestDur)bestDur=s.duration_seconds;if((s.unique_words_count||0)>bestWords)bestWords=s.unique_words_count;if((s.lexical_diversity||0)>bestLex)bestLex=s.lexical_diversity});
+    var records=[{icon:'⚡',label:'Miglior WPM',val:Math.round(bestWpm),unit:'WPM'},{icon:'⏱️',label:'Sessione più lunga',val:Math.round(bestDur/60),unit:'min'},{icon:'📚',label:'Più parole uniche',val:bestWords,unit:'parole'},{icon:'🌈',label:'Miglior Lexical Div.',val:bestLex.toFixed(2),unit:''},{icon:'🔥',label:'Streak record',val:document.getElementById('streakRecord')?.textContent||'—',unit:'gg'},{icon:'🎯',label:'Sessioni totali',val:allSessions.length,unit:''}];
+    var prh='';records.forEach(function(r){prh+='<div class="ach earned" style="text-align:center"><span class="ai">'+r.icon+'</span><div style="font-size:10px;font-weight:700">'+r.label+'</div><div style="font-family:JetBrains Mono,monospace;font-size:16px;font-weight:800;margin-top:2px">'+r.val+'</div><div style="font-size:8px;color:var(--t3)">'+r.unit+'</div></div>'});
+    prEl.innerHTML=prh;
+  }
+
+  // Recent sessions (compact, filterable)
+  var tsEl=document.getElementById('trendSessionList');
+  if(tsEl&&tsEl.children.length===0){
+    var filterEl=document.getElementById('trendFilters');if(filterEl&&filterEl.children.length===0){filterEl.innerHTML='<span class="lang-tab active" data-filter="all">Tutte</span>';var modes=[];allSessions.forEach(function(s){var m=s.mode||'session';if(modes.indexOf(m)===-1){modes.push(m);filterEl.innerHTML+='<span class="lang-tab" data-filter="'+m+'">'+m+'</span>'}});filterEl.addEventListener('click',function(e){if(e.target.classList.contains('lang-tab')){filterEl.querySelectorAll('.lang-tab').forEach(function(x){x.classList.remove('active')});e.target.classList.add('active');var f=e.target.dataset.filter;var rows=tsEl.querySelectorAll('.ts-row');rows.forEach(function(r){r.style.display=(f==='all'||r.dataset.mode===f)?'':'none'})}})}
+    var tsh='';allSessions.slice(0,20).forEach(function(s){var when=s.started_at?new Date(s.started_at).toLocaleDateString('it-IT',{day:'numeric',month:'short'}):'';var dur=s.duration_seconds?Math.round(s.duration_seconds/60)+'m':'—';tsh+='<div class="ts-row" data-mode="'+(s.mode||'session')+'" style="display:flex;justify-content:space-between;align-items:center;padding:6px 10px;background:var(--bg2);border-radius:8px;font-size:11px;gap:6px"><span style="font-weight:600;color:var(--text);min-width:70px">'+(s.mode||'session')+'</span><span style="color:var(--t3)">'+when+' · '+dur+'</span><span style="display:flex;gap:4px;font-size:10px"><a href="transcript.html?session='+s.id+'" style="color:var(--blue)">Trascr.</a><a href="analysis.html?session='+s.id+'" style="color:var(--accent)">Analysis</a></span></div>'});
+    tsEl.innerHTML=tsh;
+  }
+}
+
+// ═══ VIAGGIO TAB ═══
+var viaggioActiveLang=null;
+function loadViaggioTab(){
+  var ltEl=document.getElementById('viaggioLangTabs');
+  if(ltEl&&ltEl.children.length===0){
+    var langMap={};
+    allSessions.forEach(function(s){var m=s.mode||'';var src=null;if(m.startsWith('caption-'))src=m.replace('caption-','');else if(m.startsWith('translate-')){var p=m.replace('translate-','').split('-');if(p.length>=2)src=p[0];}if(src){if(!langMap[src])langMap[src]={sec:0,words:0,wpm:0,wpmC:0,lex:0,lexC:0,qual:0,qualC:0,fill:0,fillC:0,sess:0};var l=langMap[src];l.sess++;l.sec+=(s.duration_seconds||0);l.words+=(s.unique_words_count||0);if(typeof s.wpm==='number'){l.wpm+=s.wpm;l.wpmC++}if(typeof s.lexical_diversity==='number'){l.lex+=s.lexical_diversity;l.lexC++}if(typeof s.quality_score==='number'){l.qual+=s.quality_score;l.qualC++}if(typeof s.fillers_per_minute==='number'){l.fill+=s.fillers_per_minute;l.fillC++}}});
+    var langs=Object.keys(langMap);if(langs.length===0){langs=['en'];langMap['en']={sec:0,words:0,wpm:0,wpmC:0,lex:0,lexC:0,qual:0,qualC:0,fill:0,fillC:0,sess:0}}
+    if(!viaggioActiveLang)viaggioActiveLang=langs[0];
+    var lth='';langs.forEach(function(l){lth+='<span class="lang-tab'+(l===viaggioActiveLang?' active':'')+'" data-lang="'+l+'">'+l.toUpperCase()+'</span>'});
+    ltEl.innerHTML=lth;
+    ltEl.addEventListener('click',function(e){if(e.target.classList.contains('lang-tab')){ltEl.querySelectorAll('.lang-tab').forEach(function(x){x.classList.remove('active')});e.target.classList.add('active');viaggioActiveLang=e.target.dataset.lang;renderViaggioData(langMap[viaggioActiveLang])}});
+    // Store for later
+    ltEl._langMap=langMap;
+    renderViaggioData(langMap[viaggioActiveLang]);
+  }else if(ltEl._langMap){renderViaggioData(ltEl._langMap[viaggioActiveLang])}
+}
+
+function renderViaggioData(ld){
+  if(!ld)return;
+  var totalMin=Math.round(ld.sec/60),totalHrs=totalMin>=60?(totalMin/60).toFixed(1)+'h':totalMin+'m';
+  var avgWpm=ld.wpmC>0?Math.round(ld.wpm/ld.wpmC):null;
+  var avgLex=ld.lexC>0?(ld.lex/ld.lexC).toFixed(2):null;
+  var avgQual=ld.qualC>0?Math.round(ld.qual/ld.qualC):null;
+  var avgFill=ld.fillC>0?(ld.fill/ld.fillC).toFixed(1):null;
+
+  // Stat strip
+  var ssEl=document.getElementById('viaggioStats');
+  if(ssEl)ssEl.innerHTML='<div class="stat-pill"><span class="sp-val" style="color:var(--accent)">'+ld.sess+'</span><span class="sp-lbl">Sessioni</span></div><div class="stat-pill"><span class="sp-val" style="color:var(--green)">'+totalHrs+'</span><span class="sp-lbl">Parlato</span></div><div class="stat-pill"><span class="sp-val" style="color:var(--blue)">'+ld.words+'</span><span class="sp-lbl">Parole</span></div><div class="stat-pill"><span class="sp-val" style="color:var(--amber)">'+(avgQual||'—')+'</span><span class="sp-lbl">Qualità</span></div>';
+
+  // Metrics
+  var metEl=document.getElementById('viaggioMetrics');
+  if(metEl){
+    function mRow(icon,label,val,max,color){var pct=val!=null?Math.min(100,(val/max*100)):0;return '<div style="display:flex;align-items:center;gap:8px;margin-bottom:5px"><span style="font-size:13px;width:20px">'+icon+'</span><span style="font-size:11px;font-weight:600;width:80px;color:var(--t3)">'+label+'</span><div style="flex:1;height:6px;background:var(--line);border-radius:3px;overflow:hidden"><div style="height:100%;width:'+pct+'%;border-radius:3px;background:'+color+'"></div></div><span style="font-size:10px;font-weight:600;font-family:JetBrains Mono,monospace">'+(val!=null?val:'—')+'</span></div>'}
+    metEl.innerHTML=mRow('⚡','WPM',avgWpm,180,'var(--accent)')+mRow('🌈','Lexical Div.',avgLex,0.7,'var(--green)')+mRow('✨','Qualità',avgQual,100,'var(--blue)')+mRow('🤫','Fillers/min',avgFill,10,'var(--amber)');
+  }
+
+  // Strengths
+  var strEl=document.getElementById('viaggioStrengths');
+  if(strEl){
+    var strengths=[];
+    if(avgWpm&&avgWpm>=100)strengths.push({icon:'💨',text:'Buon ritmo di parlato ('+avgWpm+' WPM)'});
+    if(avgLex&&avgLex>=0.35)strengths.push({icon:'📚',text:'Buona varietà lessicale ('+avgLex+')'});
+    if(avgQual&&avgQual>=70)strengths.push({icon:'⭐',text:'Alta qualità complessiva ('+avgQual+'%)'});
+    if(avgFill&&avgFill<4)strengths.push({icon:'🎯',text:'Poche esitazioni ('+avgFill+' fillers/min)'});
+    if(ld.sess>=20)strengths.push({icon:'🔄',text:'Pratica costante ('+ld.sess+' sessioni)'});
+    if(strengths.length===0)strengths.push({icon:'🌱',text:'Continua a praticare per vedere i tuoi punti di forza'});
+    var sh='';strengths.forEach(function(s){sh+='<div style="display:flex;align-items:center;gap:8px;padding:6px 0;font-size:12px"><span>'+s.icon+'</span><span style="color:var(--t2)">'+s.text+'</span></div>'});
+    strEl.innerHTML=sh;
+  }
 }
 
 // ═══ TRANSCRIPTS TAB ═══
