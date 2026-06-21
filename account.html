@@ -602,7 +602,7 @@ body.snap-body{overflow:hidden}
 
     <!-- ═══ REPORT ═══ -->
     <div class="cs" id="cs-reports">
-      <div class="card card-sm"><div class="card-h3">📊 Report AI generati</div><div id="reportList" style="display:flex;flex-direction:column;gap:6px"></div><div style="text-align:center;color:var(--t3);font-size:12px;padding:12px;display:none" id="reportEmpty">Nessun report ancora. <a href="analysis.html" style="color:var(--accent)">Genera il primo →</a></div></div>
+      <div class="card card-sm"><div class="card-h3">📊 Report AI generati</div><div class="g2" id="reportList"></div><div style="text-align:center;color:var(--t3);font-size:12px;padding:12px;display:none" id="reportEmpty">Nessun report ancora. <a href="analysis.html" style="color:var(--accent)">Genera il primo →</a></div></div>
     </div>
 
     <!-- ═══ PREFERENZE ═══ -->
@@ -1514,14 +1514,28 @@ function loadTranscriptsTab(){
 }
 
 // ═══ REPORTS TAB ═══
-var REPORT_MODULES={1:{icon:'📝',name:'Grammar & Accuracy'},2:{icon:'📚',name:'Vocabulary Range'},3:{icon:'💨',name:'Fluency & Coherence'},4:{icon:'🎯',name:'CEFR Assessment'},5:{icon:'📈',name:'Progress Report'},6:{icon:'💼',name:'Business English'},7:{icon:'🗂️',name:'Business Vocabulary'},8:{icon:'🎨',name:'Speaking Style'},9:{icon:'🔄',name:'English Transfer'},10:{icon:'📖',name:'Academic Vocabulary'},11:{icon:'🔬',name:'Discourse Analysis'},12:{icon:'🧮',name:'Syntax & Complexity'},13:{icon:'📊',name:'Lexical Analysis'},14:{icon:'🌟',name:'Comprehensive'}};
+var REPORT_MODULES={1:{icon:'📝',name:'Grammar & Accuracy',color:'#7c3aed'},2:{icon:'📚',name:'Vocabulary Range',color:'#059669'},3:{icon:'💨',name:'Fluency & Coherence',color:'#2563eb'},4:{icon:'🎯',name:'CEFR Assessment',color:'#d97706'},5:{icon:'📈',name:'Progress Report',color:'#ec4899'},6:{icon:'💼',name:'Business English',color:'#2563eb'},7:{icon:'🗂️',name:'Business Vocabulary',color:'#2563eb'},8:{icon:'🎨',name:'Speaking Style',color:'#06b6d4'},9:{icon:'🔄',name:'Language Transfer',color:'#dc2626'},10:{icon:'📖',name:'Academic Vocabulary',color:'#7c3aed'},11:{icon:'🔬',name:'Discourse Analysis',color:'#7c3aed'},12:{icon:'🧮',name:'Syntax & Complexity',color:'#7c3aed'},13:{icon:'📊',name:'Lexical Analysis',color:'#059669'},14:{icon:'🌟',name:'Comprehensive',color:'#7c3aed'}};
 async function loadReportsTab(){
   var el=document.getElementById('reportList');if(!el||el.children.length>0)return;
   var supabase=window.sottotitoliSupabase;if(!supabase)return;
   var r=await supabase.auth.getSession();if(!r.data?.session)return;
   var resp=await supabase.from('session_ai_reports').select('id,module_id,overall_score,summary_text,created_at').eq('user_id',r.data.session.user.id).eq('status','completed').order('created_at',{ascending:false}).limit(20);
   if(!resp.data||resp.data.length===0){var emp=document.getElementById('reportEmpty');if(emp)emp.style.display='block';return}
-  var h='';resp.data.forEach(function(rep){var mod=REPORT_MODULES[rep.module_id]||{icon:'📊',name:'Report'};var score=rep.overall_score?Math.round(rep.overall_score)+'%':'—';var when=rep.created_at?new Date(rep.created_at).toLocaleDateString('it-IT',{day:'numeric',month:'short'}):'';h+='<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:var(--bg2);border-radius:10px;font-size:12px;gap:8px;flex-wrap:wrap"><span style="font-size:18px">'+mod.icon+'</span><span style="font-weight:600;color:var(--text);flex:1">'+mod.name+'</span><span style="color:var(--t3);font-size:10px">'+when+' · '+score+'</span><a href="analysis.html?report='+rep.id+'&print=1" title="Scarica PDF" style="font-size:13px;color:var(--t3);text-decoration:none" onclick="event.preventDefault();var w=window.open(\'analysis.html?report='+rep.id+'&print=1\',\'_blank\');setTimeout(function(){if(w)w.close()},120000)">🖨️</a><a href="analysis.html?report='+rep.id+'" style="font-size:10px;color:var(--accent);font-weight:500">Vedi →</a><span style="cursor:pointer;color:var(--red);font-size:12px;margin-left:2px" title="Elimina report" onclick="event.stopPropagation();deleteReport(\''+rep.id+'\')">🗑️</span></div>'});
+  var h='';resp.data.forEach(function(rep){
+    var mod=REPORT_MODULES[rep.module_id]||{icon:'📊',name:'Report',color:'var(--accent)'};
+    var score=rep.overall_score?Math.round(rep.overall_score)+'%':'—';
+    var when=rep.created_at?new Date(rep.created_at).toLocaleDateString('it-IT',{day:'numeric',month:'short',year:'numeric'}):'';
+    var preview=(rep.summary_text||'').replace(/[#*]/g,'').substring(0,100)+'…';
+    h+='<div style="background:var(--bg2);border:1px solid var(--line);border-radius:12px;padding:14px;display:flex;flex-direction:column;gap:8px;transition:all .2s" onmouseenter="this.style.borderColor=\''+mod.color+'\'" onmouseleave="this.style.borderColor=\'var(--line)\'">';
+    h+='<div style="display:flex;align-items:center;gap:8px"><span style="font-size:24px">'+mod.icon+'</span><div style="flex:1"><div style="font-weight:700;font-size:13px">'+mod.name+'</div><div style="font-size:10px;color:var(--t3)">'+when+'</div></div><span style="font-weight:800;font-size:14px;color:'+(score!=='—'&&parseInt(score)>=70?'var(--green)':score!=='—'?'var(--amber)':'var(--t3)')+'">'+score+'</span></div>';
+    h+='<div style="font-size:10px;color:var(--t2);line-height:1.5">'+preview+'</div>';
+    h+='<div style="display:flex;gap:4px;justify-content:flex-end;border-top:1px solid var(--line);padding-top:8px;margin-top:4px">';
+    h+='<a href="analysis.html?report='+rep.id+'" style="font-size:10px;color:var(--accent);font-weight:500;text-decoration:none;padding:4px 8px">👁️ Vedi</a>';
+    h+='<a href="analysis.html?report='+rep.id+'&print=1" title="Scarica PDF" style="font-size:10px;color:var(--t2);text-decoration:none;padding:4px 8px" onclick="event.preventDefault();var w=window.open(\'analysis.html?report='+rep.id+'&print=1\',\'_blank\');setTimeout(function(){if(w)w.close()},120000)">📥 PDF</a>';
+    h+='<span style="cursor:pointer;font-size:10px;color:var(--t2);padding:4px 8px" title="Rinomina" onclick="event.stopPropagation();var nn=prompt(\'Nuovo nome:\',\''+mod.name+'\');if(nn){alert(\'Funzione in sviluppo\')}">✏️</span>';
+    h+='<span style="cursor:pointer;color:var(--red);font-size:10px;padding:4px 8px" title="Elimina" onclick="event.stopPropagation();deleteReport(\''+rep.id+'\')">🗑️</span>';
+    h+='</div></div>';
+  });
   el.innerHTML=h;
 }
 
