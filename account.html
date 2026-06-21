@@ -371,10 +371,12 @@ body.snap-body{overflow:hidden}
     <!-- ═══ ABBONAMENTO ═══ -->
     <div class="cs" id="cs-plan">
       <div class="card card-sm"><div class="card-h3">💎 Il tuo piano</div>
-        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:10px"><div><div style="font-size:16px;font-weight:800" id="planName">Gratuito</div><div style="font-size:11px;color:var(--t2)" id="planDetail">Uso illimitato durante la beta</div></div><a href="wallet.html" class="btn btn-ghost btn-sm">Cambia piano</a></div>
-        <div style="background:var(--bg2);border-radius:10px;padding:12px"><div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:4px"><span style="color:var(--t2)">Usati questo mese</span><span style="font-weight:700" id="planUsage">—</span></div><div style="height:6px;background:var(--line);border-radius:3px;overflow:hidden"><div style="height:100%;width:35%;border-radius:3px;background:linear-gradient(90deg,var(--accent),#6366f1);transition:width .6s" id="planUsageBar"></div></div><div style="display:flex;justify-content:space-between;margin-top:4px;font-size:10px"><span style="color:var(--t3)" id="planRemaining">~23 ore rimanenti</span><a href="wallet.html" style="color:var(--accent);font-weight:600;text-decoration:none">Acquista →</a></div></div>
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:10px"><div><div style="font-size:16px;font-weight:800" id="planName">Gratuito</div><div style="font-size:11px;color:var(--t2)" id="planDetail">15 min inclusi a settimana</div></div><a href="wallet.html" class="btn btn-ghost btn-sm">Cambia piano</a></div>
+        <div style="background:var(--bg2);border-radius:10px;padding:12px;margin-bottom:8px"><div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:4px"><span style="color:var(--t2)">Minuti usati questa settimana</span><span style="font-weight:700" id="planUsage">—</span></div><div style="height:6px;background:var(--line);border-radius:3px;overflow:hidden"><div style="height:100%;width:0%;border-radius:3px;background:linear-gradient(90deg,var(--accent),#6366f1);transition:width .6s" id="planUsageBar"></div></div><div style="display:flex;justify-content:space-between;margin-top:4px;font-size:10px"><span style="color:var(--t3)" id="planRemaining">—</span><a href="wallet.html" style="color:var(--accent);font-weight:600;text-decoration:none">Acquista →</a></div></div>
+        <div style="background:rgba(167,139,250,.05);border:1px solid rgba(167,139,250,.15);border-radius:10px;padding:10px 12px;margin-bottom:8px"><div style="font-size:11px;font-weight:600;color:var(--accent);margin-bottom:2px">👥 Programma referral</div><div style="font-size:10px;color:var(--t2)">Invita un amico: <strong>+45 min</strong> per entrambi. <span id="refCount" style="font-weight:600">0 referral</span></div><div style="margin-top:4px;font-size:9px;color:var(--t3);word-break:break-all" id="refLink">—</div></div>
+        <div class="g2"><div class="stat-pill" style="text-align:left;padding:8px 10px"><span class="sp-val" style="color:var(--green);font-size:14px" id="planTokens">—</span><span class="sp-lbl">VC disponibili</span></div><div class="stat-pill" style="text-align:left;padding:8px 10px"><span class="sp-val" style="color:var(--amber);font-size:14px" id="planRepTokens">—</span><span class="sp-lbl">Token report</span></div></div>
       </div>
-      <div class="card card-sm"><div class="card-h3">📜 Storico pagamenti</div><div style="text-align:center;color:var(--t3);font-size:12px;padding:12px">Nessun pagamento ancora. <a href="wallet.html" style="color:var(--accent)">Acquista crediti →</a></div></div>
+      <div class="card card-sm"><div class="card-h3">📜 Storico pagamenti</div><div style="text-align:center;color:var(--t3);font-size:12px;padding:12px" id="paymentHistory">Nessun pagamento ancora. <a href="wallet.html" style="color:var(--accent)">Acquista crediti →</a></div></div>
     </div>
 
     <!-- ═══ OBIETTIVI ═══ -->
@@ -740,16 +742,39 @@ async function loadAllData(supabase,userId){
   var pc=document.getElementById('profCompletion');if(pc)pc.textContent=Math.min(100,Math.round(daysAgo/30*100))+'%';
 
   // ── Plan from user_credits ──
-  var planName='Gratuito',planDetail='15 min inclusi';
+  var planName='Gratuito',planDetail='15 min inclusi a settimana',planWeeklyMin=15;
   try{
     var credResp=await supabase.from('user_credits').select('balance_seconds,lifetime_seconds').eq('user_id',userId).maybeSingle();
     if(credResp.data){
       var lifeMin=Math.round((credResp.data.lifetime_seconds||0)/60);
-      if(lifeMin>=3000){planName='Plus';planDetail=lifeMin+' min lifetime';}
-      else if(lifeMin>=900){planName='Base';planDetail=lifeMin+' min lifetime';}
-      else{planDetail=Math.round((credResp.data.balance_seconds||900)/60)+' min rimanenti';}
+      if(lifeMin>=3000){planName='Plus';planDetail=lifeMin+' min lifetime';planWeeklyMin=600}
+      else if(lifeMin>=900){planName='Base';planDetail=lifeMin+' min lifetime';planWeeklyMin=120}
+      else{planWeeklyMin=15;planDetail='15 min inclusi a settimana'}
     }
+    // Weekly usage
+    var weekAgo2=new Date(Date.now()-7*86400000);var weekSec=0;
+    allSessions.forEach(function(s){var sd=new Date(s.started_at);if(sd>=weekAgo2)weekSec+=(s.duration_seconds||0)});
+    var weekMinUsed=Math.round(weekSec/60);
+    if(document.getElementById('planUsage'))document.getElementById('planUsage').textContent=weekMinUsed+'m / '+planWeeklyMin+'m';
+    if(document.getElementById('planUsageBar'))document.getElementById('planUsageBar').style.width=Math.min(100,weekMinUsed/planWeeklyMin*100)+'%';
+    if(document.getElementById('planRemaining'))document.getElementById('planRemaining').textContent=Math.max(0,planWeeklyMin-weekMinUsed)+'m rimanenti';
   }catch(e){}
+  // Tokens
+  try{
+    var tokResp=await supabase.from('user_tokens').select('balance').eq('user_id',userId).maybeSingle();
+    if(document.getElementById('planTokens'))document.getElementById('planTokens').textContent=(tokResp.data?.balance??0)+' VC';
+  }catch(e){}
+  try{
+    var tokRep=await supabase.from('user_tokens').select('balance').eq('user_id',userId).maybeSingle();
+    if(document.getElementById('planRepTokens'))document.getElementById('planRepTokens').textContent=(tokRep.data?.balance??0);
+  }catch(e){}
+  // Referral
+  if(document.getElementById('refLink'))document.getElementById('refLink').textContent='buoninglese.github.io/sottotitoli/?ref='+(userId||'').substring(0,8);
+  try{
+    var refResp=await supabase.from('referrals').select('id',{count:'exact',head:true}).eq('referrer_id',userId);
+    if(document.getElementById('refCount'))document.getElementById('refCount').textContent=(refResp.count||0)+' referral'+(refResp.count!==1?'':'s');
+  }catch(e){}
+
   var ap=document.getElementById('accountPlan');if(ap)ap.textContent=planName;
   var pn=document.getElementById('planName');if(pn)pn.textContent=planName;
   var pnd=document.getElementById('planDetail');if(pnd)pnd.textContent=planDetail;
