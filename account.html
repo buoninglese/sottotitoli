@@ -163,6 +163,8 @@ body.snap-body{overflow:hidden}
 .sess-item-v3:last-child{border-bottom:none}
 .si-check{width:16px;height:16px;border-radius:4px;border:2px solid var(--line);flex-shrink:0;transition:all .2s;cursor:pointer}
 .si-check:hover{border-color:var(--accent)}
+.si-check.checked{background:var(--accent);border-color:var(--accent);position:relative}
+.si-check.checked::after{content:'✓';position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:10px;color:#fff;font-weight:700}
 .si-date{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--t3);width:52px;flex-shrink:0}
 .si-info-v3{flex:1;min-width:0}
 .si-name-v3{font-size:12px;font-weight:600}
@@ -650,6 +652,11 @@ body.snap-body{overflow:hidden}
       <div class="card card-sm">
         <div class="card-header-v3"><h3>📄 Sessioni recenti <span style="font-weight:400;font-size:11px;color:var(--t3)">· <span id="transcriptCount">0</span> totali</span></h3></div>
         <div class="filter-chips" style="margin-bottom:8px" id="sessFilters"></div>
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+          <span class="si-check" id="sessSelectAll" title="Seleziona tutte" style="cursor:pointer;width:16px;height:16px;border-radius:4px;border:2px solid var(--line)" onclick="toggleSelectAll()"></span>
+          <span style="font-size:10px;color:var(--t3);cursor:pointer" onclick="toggleSelectAll()">Seleziona tutte</span>
+          <button class="btn btn-ghost btn-sm" style="margin-left:auto;font-size:10px;padding:4px 10px;color:var(--red);display:none" id="bulkDeleteBtn" onclick="bulkDeleteSessions()">🗑️ Elimina selezionate</button>
+        </div>
         <div id="transcriptList" style="display:flex;flex-direction:column"></div>
       </div>
       <div class="card card-sm" style="margin-top:8px"><div class="card-h3">⭐ Preferiti <span style="font-weight:400;font-size:11px;color:var(--t3)" id="favCount">0</span></div><div id="favList" style="display:flex;flex-direction:column;gap:4px"><div style="text-align:center;color:var(--t3);font-size:11px;padding:8px">Nessun preferito. Clicca la ⭐ per salvare.</div></div></div>
@@ -1665,6 +1672,7 @@ function renderSessionRow(s,isFav){
   var modeLabel=(s.mode||'session');var flag='';if(modeLabel.toLowerCase().indexOf('caption')!==-1||modeLabel.toLowerCase().indexOf('speech')!==-1)flag='🎤';else if(modeLabel.toLowerCase().indexOf('translat')!==-1)flag='🔄';
   var star=isFav?'★':'☆',starCls=isFav?'fav':'';
   return '<div class="sess-item-v3" data-sid="'+s.id+'">'+
+    '<span class="si-check sess-check" data-sid="'+s.id+'"></span>'+
     '<span class="si-star-v3 '+starCls+'" data-sid="'+s.id+'">'+star+'</span>'+
     '<span class="si-date">'+when+'</span>'+
     '<div class="si-info-v3"><div class="si-name-v3">'+flag+' '+(s.mode||'session')+'</div><div class="si-meta-v3">'+dur+' · '+(s.words_count||0)+' parole</div></div>'+
@@ -1693,7 +1701,7 @@ function loadTranscriptsTab(){
   var h='';recent.forEach(function(s){h+=renderSessionRow(s,favorites.indexOf(s.id)!==-1)});
   el.innerHTML=h;
   renderFavorites();
-  // Delegate clicks for star/delete
+  // Delegate clicks for star/delete/check
   el.addEventListener('click',function(e){
     var target=e.target;var sid=target.dataset.sid;
     if(!sid)return;
@@ -1701,6 +1709,9 @@ function loadTranscriptsTab(){
       var idx=favorites.indexOf(sid);
       if(idx===-1){favorites.push(sid)}else{favorites.splice(idx,1)}
       saveFavs();loadTranscriptsTab();
+    }
+    if(target.classList.contains('sess-check')){
+      target.classList.toggle('checked');updateBulkDeleteBtn();
     }
     if(target.classList.contains('deleteSession')){
       if(confirm('Eliminare questa sessione? La trascrizione sarà rimossa definitivamente.')){
@@ -1712,6 +1723,31 @@ function loadTranscriptsTab(){
       }
     }
   });
+}
+
+function toggleSelectAll(){
+  var allChecked=document.querySelectorAll('#transcriptList .sess-check.checked').length;
+  var total=document.querySelectorAll('#transcriptList .sess-check').length;
+  var selectAll=total>0&&allChecked<total;
+  document.querySelectorAll('#transcriptList .sess-check').forEach(function(c){if(selectAll)c.classList.add('checked');else c.classList.remove('checked')});
+  updateBulkDeleteBtn();
+}
+function updateBulkDeleteBtn(){
+  var count=document.querySelectorAll('#transcriptList .sess-check.checked').length;
+  var btn=document.getElementById('bulkDeleteBtn');if(btn)btn.style.display=count>0?'':'none';
+}
+function bulkDeleteSessions(){
+  var checked=document.querySelectorAll('#transcriptList .sess-check.checked');
+  if(checked.length===0)return;
+  if(!confirm('Eliminare '+checked.length+' sessioni selezionate? Questa azione è irreversibile.'))return;
+  var supabase=window.sottotitoliSupabase;
+  checked.forEach(function(c){
+    var sid=c.dataset.sid;
+    if(supabase){supabase.from('sessions').delete().eq('id',sid).then(function(){})}
+    allSessions=allSessions.filter(function(s){return s.id!==sid});
+    var fidx=favorites.indexOf(sid);if(fidx!==-1)favorites.splice(fidx,1);
+  });
+  saveFavs();loadTranscriptsTab();
 }
 
 // ═══ REPORTS TAB ═══
@@ -1789,7 +1825,7 @@ if(saveGoalsBtn){saveGoalsBtn.addEventListener('click',function(){
   localStorage.setItem('sottotitoli_goals',JSON.stringify(goals));
   loadProgress();
   alert('✓ Obiettivi salvati');
-})}
+})
 
 // ═══ SAVE PREFERENCES ═══
 var saveBtn=document.getElementById('saveAllBtn'),savedMsg=document.getElementById('savedMsg');
