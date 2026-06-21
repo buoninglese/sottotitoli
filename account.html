@@ -504,6 +504,8 @@ body.snap-body{overflow:hidden}
 
     <!-- ═══ GRAMMATICA ═══ -->
     <div class="cs" id="cs-grammar">
+      <div style="font-size:10px;color:var(--t3);margin-bottom:6px">Basato sui report AI. Genera 3+ report grammaticali per sbloccare l'analisi completa.</div>
+      <div class="lang-tabs" id="gramLangTabs"></div>
 
       <!-- Row 1: Accuracy gauge + Error heatmap -->
       <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:8px">
@@ -1192,9 +1194,29 @@ function refreshVocabData(){
   }
 }
 
-// ═══ GRAMMAR TAB (fully redesigned) ═══
+// ═══ GRAMMAR TAB (with per-language tabs) ═══
+var gramActiveLang='all';
 async function loadGrammarTab(){
-  var gsEl=document.getElementById('gramScore');if(gsEl&&gsEl.textContent!=='—')return;
+  // Language tabs
+  var langTabsEl=document.getElementById('gramLangTabs');
+  if(langTabsEl&&langTabsEl.children.length===0){
+    var capSessions=allSessions.filter(function(s){var m=(s.mode||'').toLowerCase();return m.indexOf('caption')!==-1||m.indexOf('speech')!==-1||m.indexOf('lesson')!==-1});
+    var langSet={};
+    capSessions.forEach(function(s){var m=s.mode||'';if(m.startsWith('caption-')){var l=m.replace('caption-','');langSet[l]=1}});
+    var langs=Object.keys(langSet);if(langs.length===0)langs=['en'];
+    var h='';
+    langs.forEach(function(l){h+='<span class="lang-tab'+(gramActiveLang===l?' active':'')+'" data-lang="'+l+'">'+getLangName(l)+'</span>'});
+    langTabsEl.innerHTML=h;
+    langTabsEl.addEventListener('click',function(e){if(e.target.classList.contains('lang-tab')){langTabsEl.querySelectorAll('.lang-tab').forEach(function(x){x.classList.remove('active')});e.target.classList.add('active');gramActiveLang=e.target.dataset.lang;refreshGrammarDisplay()}});
+    if(langs.length>0)gramActiveLang=langs[0];
+  }
+  refreshGrammarDisplay();
+}
+
+async function refreshGrammarDisplay(){
+  var langLabel=document.getElementById('gramHeatLabel');if(langLabel)langLabel.textContent=gramActiveLang!=='all'?'· '+getLangName(gramActiveLang):'';
+
+  var gsEl=document.getElementById('gramScore');if(gsEl)gsEl.textContent='—';
   var grammarData=null;
   if(window.loadGrammarErrors){try{grammarData=await window.loadGrammarErrors();}catch(e){}}
   var avgScore=grammarData?Math.round(grammarData.avgScore||0):0;
