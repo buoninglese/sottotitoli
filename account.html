@@ -89,11 +89,21 @@ body.snap-body{overflow:hidden}
 .lang-tab.active{background:var(--accent);color:#fff;border-color:var(--accent)}
 
 /* === HEATMAP === */
-.hm-day{width:14px;height:14px;border-radius:3px;background:var(--line);transition:all .2s;cursor:default}
+.hm-day{width:14px;height:14px;border-radius:3px;background:var(--line);transition:all .2s;cursor:default;position:relative}
 .hm-day:hover{transform:scale(1.5);z-index:2;box-shadow:0 2px 8px rgba(0,0,0,.3)}
-.hm-day.l2{background:rgba(52,211,153,.25)}
-.hm-day.l3{background:rgba(52,211,153,.55)}
+.hm-day::after{content:attr(data-tip);position:absolute;bottom:110%;left:50%;transform:translateX(-50%);background:var(--card);border:1px solid var(--line);border-radius:6px;padding:2px 6px;font-size:9px;color:var(--text);white-space:nowrap;pointer-events:none;opacity:0;transition:opacity .2s}
+.hm-day:hover::after{opacity:1}
+.hm-day.l1{background:rgba(52,211,153,.18)}
+.hm-day.l2{background:rgba(52,211,153,.38)}
+.hm-day.l3{background:rgba(52,211,153,.65)}
 .hm-day.l4{background:var(--green);box-shadow:0 0 6px rgba(52,211,153,.3)}
+.hm-grid{display:flex;flex-direction:column;gap:2px}
+.hm-row{display:flex;gap:2px}
+.hm-legend-l1,.hm-legend-l2,.hm-legend-l3,.hm-legend-l4{width:12px;height:12px;border-radius:3px}
+.hm-legend-l1{background:rgba(52,211,153,.18)}
+.hm-legend-l2{background:rgba(52,211,153,.38)}
+.hm-legend-l3{background:rgba(52,211,153,.65)}
+.hm-legend-l4{background:var(--green)}
 
 /* === STAT STRIP (replaces big KPI boxes) === */
 .stat-strip{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px}
@@ -319,28 +329,41 @@ body.snap-body{overflow:hidden}
           </div>
         </div>
         <div class="card card-sm" style="flex:1;min-width:200px;display:flex;flex-direction:column;gap:6px">
-          <div class="pred-card" style="margin:0"><div class="pred-icon">🎯</div><div class="pred-text"><strong>Raggiungerai <span id="predLevel">B2</span></strong><div class="eta" id="predEta">📅 Registra più sessioni per la stima.</div></div></div>
-          <div style="display:flex;gap:6px">
-            <div class="invest-card purple" style="flex:1"><div class="iv" id="invTalk">—</div><div class="il">Parlato</div></div>
-            <div class="invest-card green" style="flex:1"><div class="iv" id="invSessions">—</div><div class="il">Sessioni</div></div>
-            <div class="invest-card amber" style="flex:1"><div class="iv" id="invWords">—</div><div class="il">Parole</div></div>
+          <div class="card-h3" style="margin-bottom:0">📈 Progresso obiettivi</div>
+          <div style="display:flex;flex-direction:column;gap:8px">
+            <div><div style="display:flex;justify-content:space-between;font-size:10px;margin-bottom:2px"><span style="color:var(--t2)">Minuti settimana</span><span style="font-weight:600" id="goalMinLabel">0/120m</span></div><div style="height:5px;background:var(--line);border-radius:3px;overflow:hidden"><div style="height:100%;border-radius:3px;background:linear-gradient(90deg,var(--green),#34d399);transition:width .6s;width:0%" id="goalMinBar"></div></div></div>
+            <div><div style="display:flex;justify-content:space-between;font-size:10px;margin-bottom:2px"><span style="color:var(--t2)">Sessioni settimana</span><span style="font-weight:600" id="goalSessLabel">0/5</span></div><div style="height:5px;background:var(--line);border-radius:3px;overflow:hidden"><div style="height:100%;border-radius:3px;background:linear-gradient(90deg,var(--accent),#a78bfa);transition:width .6s;width:0%" id="goalSessBar"></div></div></div>
+            <div><div style="display:flex;justify-content:space-between;font-size:10px;margin-bottom:2px"><span style="color:var(--t2)">Parole nuove settimana</span><span style="font-weight:600" id="goalWordLabel">0/200</span></div><div style="height:5px;background:var(--line);border-radius:3px;overflow:hidden"><div style="height:100%;border-radius:3px;background:linear-gradient(90deg,var(--blue),#60a5fa);transition:width .6s;width:0%" id="goalWordBar"></div></div></div>
           </div>
         </div>
       </div>
 
-      <!-- Activity -->
-      <div class="card card-sm"><div class="card-h3">📊 Attività ultimi 30 giorni</div><div class="activity-bar" id="activityBars"></div><div style="display:flex;justify-content:space-between;font-size:9px;color:var(--t3);margin-top:4px"><span>30 gg fa</span><span>Oggi</span></div></div>
+      <!-- Activity Heatmap: current month + previous month side by side -->
+      <div class="card card-sm"><div class="card-h3">📊 Attività — ultimi 2 mesi</div>
+        <div style="display:flex;gap:16px;flex-wrap:wrap">
+          <div style="flex:1;min-width:220px"><div style="font-size:10px;font-weight:600;color:var(--t2);margin-bottom:4px" id="hmPrevLabel">—</div><div class="hm-grid" id="hmPrev"></div></div>
+          <div style="flex:1;min-width:220px"><div style="font-size:10px;font-weight:600;color:var(--t2);margin-bottom:4px" id="hmCurrLabel">—</div><div class="hm-grid" id="hmCurr"></div></div>
+        </div>
+        <div style="display:flex;align-items:center;gap:6px;margin-top:8px;font-size:9px;color:var(--t3)">
+          <span>0-15m</span><span class="hm-legend-l1"></span>
+          <span class="hm-legend-l2"></span>
+          <span class="hm-legend-l3"></span>
+          <span class="hm-legend-l4"></span><span>60m+</span>
+        </div>
+      </div>
     </div>
 
     <!-- ═══ PROFILO ═══ -->
     <div class="cs" id="cs-profile">
       <div class="card card-sm"><div class="card-h3">👤 Informazioni personali</div>
-        <div class="g2"><div class="field"><label>Nome</label><input id="profName" placeholder="Il tuo nome"></div><div class="field"><label>Email</label><input id="profEmail" readonly></div></div>
-        <div style="display:flex;gap:6px;flex-wrap:wrap"><div class="field" style="flex:1;min-width:120px"><label>Lingua madre</label><select id="profNative"><option value="nl">Nederlands</option><option value="it">Italiano</option><option value="en">English</option><option value="es">Español</option><option value="fr">Français</option><option value="de">Deutsch</option></select></div><div class="field" style="flex:1;min-width:120px"><label>Lingua obiettivo</label><select id="profTarget"><option value="it">Italiano</option><option value="en">English</option><option value="es">Español</option><option value="fr">Français</option></select></div><div class="field" style="flex:1;min-width:120px"><label>Posizione</label><input id="profLocation" placeholder="Città, Paese"></div></div>
-        <div class="field"><label>Bio</label><input id="profBio" placeholder="Raccontaci qualcosa su di te…"></div>
+        <div class="g2"><div class="field"><label>Nome</label><input id="profName" placeholder="Il tuo nome"></div><div class="field"><label>Email</label><input id="profEmail" readonly style="color:var(--t2)"></div></div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px">
+          <div class="field" style="flex:1;min-width:140px"><label>Lingua madre</label><select id="profNative"><option value="nl">Nederlands</option><option value="it">Italiano</option><option value="en">English</option><option value="es">Español</option><option value="fr">Français</option><option value="de">Deutsch</option><option value="pt">Português</option><option value="pl">Polski</option></select><div style="font-size:9px;color:var(--t3);margin-top:2px">I report AI saranno scritti in questa lingua.</div></div>
+          <div class="field" style="flex:1;min-width:140px"><label>Città, Paese</label><input id="profLocation" placeholder="Es. Amsterdam, Paesi Bassi" list="cityList"><datalist id="cityList"><option value="Amsterdam, Paesi Bassi"><option value="Roma, Italia"><option value="Milano, Italia"><option value="Londra, Regno Unito"><option value="New York, USA"><option value="Madrid, Spagna"><option value="Barcellona, Spagna"><option value="Parigi, Francia"><option value="Berlino, Germania"></datalist></div>
+        </div>
         <button class="btn btn-primary btn-sm" style="margin-top:8px" id="profSaveBtn">💾 Salva profilo</button>
+        <span id="profSavedMsg" style="font-size:11px;color:var(--green);margin-left:8px;display:none">✓ Salvato</span>
       </div>
-      <div class="stat-strip"><div class="stat-pill"><span class="sp-val" style="color:var(--accent)" id="profDays">—</span><span class="sp-lbl">Giorni</span></div><div class="stat-pill"><span class="sp-val" style="color:var(--green)" id="profCompletion">—</span><span class="sp-lbl">Completamento</span></div><div class="stat-pill"><span class="sp-val" style="color:var(--amber)" id="profXp">—</span><span class="sp-lbl">XP totali</span></div></div>
     </div>
 
     <!-- ═══ ABBONAMENTO ═══ -->
@@ -756,19 +779,12 @@ async function loadAllData(supabase,userId){
 
   // ── Investment (uses allSec/allWords from XP block above) ──
   var allHrs=allMin>=60?(allMin/60).toFixed(1)+'h':allMin+'m';
-  if(document.getElementById('invTalk'))document.getElementById('invTalk').textContent=allHrs;
-  if(document.getElementById('invSessions'))document.getElementById('invSessions').textContent=allSessions.length;
-  if(document.getElementById('invWords'))document.getElementById('invWords').textContent=allWords;
 
-  // 30-day activity
-  var barsEl=document.getElementById('activityBars');
-  if(barsEl){
-    var dailyMin=new Array(30).fill(0),thirtyAgo=new Date(Date.now()-30*86400000);
-    allSessions.forEach(function(s){var d=new Date(s.started_at);if(d>=thirtyAgo&&s.duration_seconds){var idx=Math.floor((d-thirtyAgo)/86400000);if(idx>=0&&idx<30)dailyMin[idx]+=s.duration_seconds/60}});
-    var maxMin=Math.max(1,Math.max.apply(null,dailyMin)),h='';
-    for(var i=0;i<30;i++){var pct=Math.max(2,dailyMin[i]/maxMin*100);h+='<div class="ab" style="height:'+pct+'%" title="'+dailyMin[i].toFixed(0)+' min"></div>'}
-    barsEl.innerHTML=h;
-  }
+  // 30-day → dual-month heatmap
+  renderActivityHeatmap(allSessions);
+
+  // Goal progress bars
+  updateGoalBars();
 
   // Load prefs
   if(window.loadUserPreferences){
@@ -810,7 +826,50 @@ function loadProgress(){
   if(document.getElementById('ringSessVal'))document.getElementById('ringSessVal').textContent=sessCount;
   if(document.getElementById('ringVocabVal'))document.getElementById('ringVocabVal').textContent=uniq;
   syncGoalsToTab();
+  updateGoalBars(totalMin,sessCount,uniq,targetMin,targetSess);
   renderStreakTab();
+}
+
+function updateGoalBars(totalMin,sessCount,uniq,targetMin,targetSess){
+  var tw=document.getElementById('targetWords');var targetWords=parseInt(tw?.value)||200;
+  if(document.getElementById('goalMinLabel'))document.getElementById('goalMinLabel').textContent=totalMin+'/'+targetMin+'m';
+  if(document.getElementById('goalMinBar'))document.getElementById('goalMinBar').style.width=Math.min(100,totalMin/targetMin*100)+'%';
+  if(document.getElementById('goalSessLabel'))document.getElementById('goalSessLabel').textContent=sessCount+'/'+targetSess;
+  if(document.getElementById('goalSessBar'))document.getElementById('goalSessBar').style.width=Math.min(100,sessCount/targetSess*100)+'%';
+  if(document.getElementById('goalWordLabel'))document.getElementById('goalWordLabel').textContent=uniq+'/'+targetWords;
+  if(document.getElementById('goalWordBar'))document.getElementById('goalWordBar').style.width=Math.min(100,uniq/targetWords*100)+'%';
+}
+
+function renderActivityHeatmap(sessions){
+  var months=['Gen','Feb','Mar','Apr','Mag','Giu','Lug','Ago','Set','Ott','Nov','Dic'];
+  var dayNames=['L','M','M','G','V','S','D'];
+  function buildMonthData(year,month){
+    var daysInMonth=new Date(year,month+1,0).getDate();
+    var data=new Array(daysInMonth).fill(0);
+    var firstDow=(new Date(year,month,1).getDay()+6)%7;
+    sessions.forEach(function(s){
+      var d=new Date(s.started_at);if(d.getFullYear()===year&&d.getMonth()===month){var idx=d.getDate()-1;data[idx]+=(s.duration_seconds||0)/60}
+    });
+    return {data:data,firstDow:firstDow,daysInMonth:daysInMonth};
+  }
+  function renderMonth(elId,labelId,year,month){
+    var md=buildMonthData(year,month);
+    var h='<div style="display:flex;gap:2px;margin-bottom:2px;font-size:9px;color:var(--t3)">';dayNames.forEach(function(dn){h+='<span style="width:14px;text-align:center">'+dn+'</span>'});h+='</div>';
+    var rows=Math.ceil((md.firstDow+md.daysInMonth)/7);
+    for(var r=0;r<rows;r++){h+='<div class="hm-row">';
+      for(var c=0;c<7;c++){var idx=r*7+c-md.firstDow;
+        if(idx>=0&&idx<md.daysInMonth){var min=md.data[idx];var lvl=min<=0?'':min<15?'l1':min<30?'l2':min<60?'l3':'l4';h+='<div class="hm-day '+lvl+'" data-tip="'+min.toFixed(0)+' min"></div>'}
+        else{h+='<div style="width:14px;height:14px"></div>'}
+      }
+      h+='</div>';
+    }
+    document.getElementById(elId).innerHTML=h;
+    document.getElementById(labelId).textContent=months[month]+' '+year;
+  }
+  var now=new Date();
+  renderMonth('hmCurr','hmCurrLabel',now.getFullYear(),now.getMonth());
+  var prevMonth=new Date(now.getFullYear(),now.getMonth()-1,1);
+  renderMonth('hmPrev','hmPrevLabel',prevMonth.getFullYear(),prevMonth.getMonth());
 }
 
 function syncGoalsToTab(){
