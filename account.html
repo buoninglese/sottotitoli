@@ -496,9 +496,13 @@ body.snap-body{overflow:hidden}
           <div style="display:flex;justify-content:space-between;font-size:9px;color:var(--t3);margin-top:6px"><span>12 sett. fa</span><span>Oggi</span></div>
         </div>
         <div class="card card-sm" style="flex:1;min-width:240px">
-          <div class="card-h3">📈 Trend qualità</div>
-          <div class="bar-row" id="trendQualityBars" style="height:80px"></div>
-          <div style="display:flex;justify-content:space-between;font-size:9px;color:var(--t3);margin-top:4px"><span>30 gg fa</span><span>Oggi</span></div>
+          <div class="card-h3">📈 Trend 30 giorni</div>
+          <div class="filter-chips" style="margin-bottom:8px" id="trendChips">
+            <button class="filter-chip active" data-metric="wpm">WPM</button>
+            <button class="filter-chip" data-metric="lexical">Lexical</button>
+            <button class="filter-chip" data-metric="quality">Qualità</button>
+          </div>
+          <div class="chart-wrap-v3"><div class="chart-v3" id="trendChartV3"></div><div style="display:flex;justify-content:space-between;font-size:9px;color:var(--t3);margin-top:4px"><span>30 gg fa</span><span>Oggi</span></div></div>
         </div>
       </div>
 
@@ -1520,11 +1524,34 @@ function loadTrendTab(){
     hmh+='</div>';hmEl.innerHTML=hmh;
   }
 
-  // Quality trend bars
-  var qtEl=document.getElementById('trendQualityBars');
-  if(qtEl){var recent30=allSessions.slice(0,30).reverse();var vals=recent30.map(function(s){return s.quality_score||0});var maxV=Math.max.apply(null,vals.concat([1]));var bh='';vals.forEach(function(v){var pct=Math.max(3,(v/maxV*100));var color=v>70?'var(--green)':v>40?'var(--amber)':'var(--red)';bh+='<div class="bar-col" style="height:'+pct+'%;background:'+color+'" title="'+Math.round(v)+'"></div>'});qtEl.innerHTML=bh;}
+  // v3 Trend chart with filter chips
+  var chartEl=document.getElementById('trendChartV3');
+  var chipsEl=document.getElementById('trendChips');
+  var activeMetric='wpm';
+  function renderTrendChart(metric){
+    var recent30=allSessions.slice(0,30).reverse();
+    var vals=recent30.map(function(s){
+      if(metric==='wpm')return s.wpm||0;
+      if(metric==='lexical')return (s.lexical_diversity||0)*200;
+      return s.quality_score||0;
+    });
+    var bestEver=0;allSessions.forEach(function(s){
+      var v=metric==='wpm'?(s.wpm||0):metric==='lexical'?((s.lexical_diversity||0)*200):(s.quality_score||0);
+      if(v>bestEver)bestEver=v;
+    });
+    var maxV=Math.max.apply(null,vals.concat([1]));
+    var h='';vals.forEach(function(v,i){
+      var pct=Math.max(4,v/maxV*100);
+      var isRecord=v>=bestEver&&bestEver>0;
+      var grad=isRecord?'linear-gradient(0deg,rgba(52,211,153,.6),var(--green))':'linear-gradient(0deg,rgba(167,139,250,.35),rgba(167,139,250,.7))';
+      h+='<div class="chart-bar-v3" style="height:'+pct+'%;background:'+grad+'" title="'+Math.round(v)+(metric==='lexical'?' LexDiv':'')+'"><span class="tooltip">'+Math.round(v)+(isRecord?' \uD83C\uDFC6':'')+'</span></div>';
+    });
+    if(chartEl)chartEl.innerHTML=h;
+  }
+  renderTrendChart('wpm');
+  if(chipsEl){chipsEl.addEventListener('click',function(e){if(e.target.classList.contains('filter-chip')){chipsEl.querySelectorAll('.filter-chip').forEach(function(x){x.classList.remove('active')});e.target.classList.add('active');activeMetric=e.target.dataset.metric;renderTrendChart(activeMetric)}})}
 
-  // Personal Records
+  // Personal Records (in Trend tab)
   var prEl=document.getElementById('trendRecords');
   if(prEl){
     var bestWpm=0,bestDur=0,bestWords=0,bestLex=0;allSessions.forEach(function(s){if((s.wpm||0)>bestWpm)bestWpm=s.wpm;if((s.duration_seconds||0)>bestDur)bestDur=s.duration_seconds;if((s.unique_words_count||0)>bestWords)bestWords=s.unique_words_count;if((s.lexical_diversity||0)>bestLex)bestLex=s.lexical_diversity});
