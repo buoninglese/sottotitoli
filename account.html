@@ -418,6 +418,20 @@ body.snap-body{overflow:hidden}
     <!-- ═══ PROFILO ═══ -->
     <div class="cs" id="cs-profile">
       <div class="card card-sm" style="max-width:560px"><div class="card-h3">👤 Informazioni personali</div>
+        <!-- Avatar upload -->
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px">
+          <div class="av-wrap" style="cursor:pointer" id="profAvatarWrap" title="Clicca per caricare una foto">
+            <div class="av" id="profAvatarInitials">SB</div>
+            <img id="profAvatarImg" style="display:none;width:100%;height:100%;border-radius:50%;object-fit:cover;position:absolute;top:0;left:0">
+            <div class="av-edit-badge" style="position:absolute;bottom:-2px;right:-2px;width:22px;height:22px;border-radius:50%;background:var(--accent);color:#fff;font-size:10px;display:flex;align-items:center;justify-content:center;border:2px solid var(--card);cursor:pointer">📷</div>
+          </div>
+          <div>
+            <div style="font-weight:600;font-size:12px">Foto profilo</div>
+            <div style="font-size:10px;color:var(--t3)">Clicca sull'immagine per caricare · JPEG, PNG</div>
+            <input type="file" id="profAvatarInput" accept="image/jpeg,image/png,image/webp" style="display:none">
+            <button class="btn btn-ghost btn-sm" style="font-size:9px;padding:3px 8px;margin-top:4px;color:var(--red);display:none" id="profAvatarRemove" onclick="removeAvatar()">🗑️ Rimuovi foto</button>
+          </div>
+        </div>
         <div class="g2"><div class="field"><label>Nome</label><input id="profName" placeholder="Il tuo nome"></div><div class="field"><label>Email</label><input id="profEmail" readonly style="color:var(--t2)"></div></div>
         <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px">
           <div class="field" style="flex:1;min-width:140px"><label>Lingua madre</label><select id="profNative"><option value="nl">Nederlands</option><option value="it">Italiano</option><option value="en">English</option><option value="es">Español</option><option value="fr">Français</option><option value="de">Deutsch</option><option value="pt">Português</option><option value="pl">Polski</option></select><div style="font-size:9px;color:var(--t3);margin-top:2px">I report AI saranno scritti in questa lingua.</div></div>
@@ -750,11 +764,12 @@ document.querySelectorAll('.ni[data-tab]').forEach(function(t){
     var av=document.getElementById('avatarInitials');if(av)av.textContent=init.substring(0,2).toUpperCase();
 
     // Load saved profile from Supabase
-    supabase.from('profiles').select('full_name,native_lang,location').eq('id',user.id).maybeSingle().then(function(r2){
+    supabase.from('profiles').select('full_name,native_lang,location,avatar_url').eq('id',user.id).maybeSingle().then(function(r2){
       if(r2.data){
         var profName=document.getElementById('profName');if(profName&&r2.data.full_name)profName.value=r2.data.full_name;
         var profNative=document.getElementById('profNative');if(profNative&&r2.data.native_lang)profNative.value=r2.data.native_lang;
         var profLocation=document.getElementById('profLocation');if(profLocation&&r2.data.location)profLocation.value=r2.data.location;
+        if(r2.data.avatar_url){showAvatar(r2.data.avatar_url)}
       }
     });
   });
@@ -781,7 +796,79 @@ document.querySelectorAll('.ni[data-tab]').forEach(function(t){
     var {error}=await supabase.from('profiles').upsert(payload);
     if(msg){msg.textContent=error?'Errore':'✓ Salvato';msg.style.display='inline';msg.style.color=error?'var(--red)':'var(--green)'}
     btn.textContent='💾 Salva profilo';btn.disabled=false;
-    if(!error)setTimeout(function(){if(msg)msg.style.display='none'},2500);
+    if(!error){
+      setTimeout(function(){if(msg)msg.style.display='none'},2500);
+      // Update page hero header
+      var newName=payload.full_name||'';
+      var firstName=newName.split(' ')[0]||(document.getElementById('profEmail')||{}).value||'Utente';
+      firstName=firstName.charAt(0).toUpperCase()+firstName.slice(1);
+      var dn=document.getElementById('accountDisplayName');if(dn)dn.textContent=newName||firstName;
+      var initials=firstName.substring(0,2).toUpperCase();
+      var av=document.getElementById('avatarInitials');if(av)av.textContent=initials;
+      var pav=document.getElementById('profAvatarInitials');if(pav)pav.textContent=initials;
+      // Update top-right menu (auth section rendered by js/auth.js)
+      var grEl=document.querySelector('.user-greeting');if(grEl)grEl.textContent='Ciao '+firstName;
+      var uaEl=document.getElementById('userAvatar');if(uaEl)uaEl.textContent=initials.charAt(0);
+      var udName=document.querySelector('.ud-name');if(udName)udName.textContent=firstName;
+      var udAv=document.querySelector('.ud-avatar');if(udAv)udAv.textContent=initials.charAt(0);
+    }
+  });
+})();
+
+// ═══ AVATAR UPLOAD ═══
+function showAvatar(url){
+  // Hero avatar
+  var avInit=document.getElementById('avatarInitials');if(avInit)avInit.style.display='none';
+  // Profilo avatar
+  var profInit=document.getElementById('profAvatarInitials');if(profInit)profInit.style.display='none';
+  var avImg=document.getElementById('profAvatarImg');if(avImg){avImg.src=url;avImg.style.display='block'}
+  var rmBtn=document.getElementById('profAvatarRemove');if(rmBtn)rmBtn.style.display='';
+  // Top-right menu avatar
+  var ua=document.getElementById('userAvatar');if(ua){ua.style.backgroundImage='url('+url+')';ua.style.backgroundSize='cover';ua.style.color='transparent'}
+  var udAv=document.querySelector('.ud-avatar');if(udAv){udAv.style.backgroundImage='url('+url+')';udAv.style.backgroundSize='cover';udAv.style.color='transparent'}
+}
+function hideAvatar(){
+  var avInit=document.getElementById('avatarInitials');if(avInit)avInit.style.display='';
+  var profInit=document.getElementById('profAvatarInitials');if(profInit)profInit.style.display='';
+  var avImg=document.getElementById('profAvatarImg');if(avImg){avImg.style.display='none';avImg.src=''}
+  var rmBtn=document.getElementById('profAvatarRemove');if(rmBtn)rmBtn.style.display='none';
+  var ua=document.getElementById('userAvatar');if(ua){ua.style.backgroundImage='';ua.style.color='#fff'}
+  var udAv=document.querySelector('.ud-avatar');if(udAv){udAv.style.backgroundImage='';udAv.style.color='#fff'}
+}
+async function removeAvatar(){
+  if(!confirm('Rimuovere la foto profilo?'))return;
+  var supabase=window.sottotitoliSupabase;if(!supabase)return;
+  var r=await supabase.auth.getSession();if(!r.data?.session)return;
+  var userId=r.data.session.user.id;
+  // Try to delete from storage (ignore errors if bucket doesn't exist yet)
+  var oldUrl=(document.getElementById('profAvatarImg')||{}).src;
+  if(oldUrl){try{var path=oldUrl.split('/').pop();if(path)await supabase.storage.from('avatars').remove([userId+'/'+path])}catch(e){}}
+  await supabase.from('profiles').update({avatar_url:null,updated_at:new Date().toISOString()}).eq('id',userId);
+  hideAvatar();
+}
+(function(){
+  var input=document.getElementById('profAvatarInput'),wrap=document.getElementById('profAvatarWrap');
+  if(!input||!wrap)return;
+  wrap.addEventListener('click',function(){input.click()});
+  input.addEventListener('change',async function(){
+    var file=input.files[0];if(!file)return;
+    if(file.size>2*1024*1024){alert('Immagine troppo grande. Max 2MB.');return}
+    var supabase=window.sottotitoliSupabase;if(!supabase)return;
+    var r=await supabase.auth.getSession();if(!r.data?.session)return;
+    var userId=r.data.session.user.id;
+    var ext=file.name.split('.').pop();var fileName=Date.now()+'.'+ext;
+    var {data,error}=await supabase.storage.from('avatars').upload(userId+'/'+fileName,file,{upsert:true,contentType:file.type});
+    if(error){alert('Errore upload: '+error.message);return}
+    // Get public URL
+    var {data:urlData}=supabase.storage.from('avatars').getPublicUrl(userId+'/'+fileName);
+    if(urlData?.publicUrl){
+      // Delete old avatar from storage
+      var oldImg=document.getElementById('profAvatarImg');
+      if(oldImg&&oldImg.src){try{var oldPath=oldImg.src.split('/').pop();if(oldPath)await supabase.storage.from('avatars').remove([userId+'/'+oldPath])}catch(e){}}
+      // Save to profiles
+      await supabase.from('profiles').update({avatar_url:urlData.publicUrl,updated_at:new Date().toISOString()}).eq('id',userId);
+      showAvatar(urlData.publicUrl);
+    }
   });
 })();
 
