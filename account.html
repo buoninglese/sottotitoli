@@ -748,6 +748,40 @@ document.querySelectorAll('.ni[data-tab]').forEach(function(t){
     var dn=document.getElementById('accountDisplayName');if(dn)dn.textContent=user.user_metadata?.full_name||user.email||'Il tuo account';
     var init=user.user_metadata?.full_name||user.email||'SB';
     var av=document.getElementById('avatarInitials');if(av)av.textContent=init.substring(0,2).toUpperCase();
+
+    // Load saved profile from Supabase
+    supabase.from('profiles').select('full_name,native_lang,location').eq('id',user.id).maybeSingle().then(function(r2){
+      if(r2.data){
+        var profName=document.getElementById('profName');if(profName&&r2.data.full_name)profName.value=r2.data.full_name;
+        var profNative=document.getElementById('profNative');if(profNative&&r2.data.native_lang)profNative.value=r2.data.native_lang;
+        var profLocation=document.getElementById('profLocation');if(profLocation&&r2.data.location)profLocation.value=r2.data.location;
+      }
+    });
+  });
+})();
+
+// ═══ PROFILE SAVE ═══
+(function(){
+  var btn=document.getElementById('profSaveBtn'),msg=document.getElementById('profSavedMsg');
+  if(!btn)return;
+  btn.addEventListener('click',async function(){
+    btn.disabled=true;btn.textContent='Salvataggio…';
+    var supabase=window.sottotitoliSupabase;
+    if(!supabase){btn.disabled=false;btn.textContent='💾 Salva profilo';return;}
+    var r=await supabase.auth.getSession();
+    if(!r.data?.session){btn.disabled=false;btn.textContent='💾 Salva profilo';return;}
+    var userId=r.data.session.user.id;
+    var payload={
+      id:userId,
+      full_name:(document.getElementById('profName')||{}).value||'',
+      native_lang:(document.getElementById('profNative')||{}).value||'en',
+      location:(document.getElementById('profLocation')||{}).value||'',
+      updated_at:new Date().toISOString()
+    };
+    var {error}=await supabase.from('profiles').upsert(payload);
+    if(msg){msg.textContent=error?'Errore':'✓ Salvato';msg.style.display='inline';msg.style.color=error?'var(--red)':'var(--green)'}
+    btn.textContent='💾 Salva profilo';btn.disabled=false;
+    if(!error)setTimeout(function(){if(msg)msg.style.display='none'},2500);
   });
 })();
 
