@@ -146,6 +146,14 @@ document.addEventListener('DOMContentLoaded', async () => {
             balEl.textContent = bal;
             balEl.title = bal + ' token disponibili';
           }
+          // Load avatar if set
+          var _p = await window.sottotitoliSupabase.from('profiles').select('avatar_url,full_name').eq('id', userId).maybeSingle();
+          if (_p.data?.avatar_url) {
+            var ua = document.getElementById('userAvatar');
+            if (ua) { ua.style.backgroundImage = 'url(' + _p.data.avatar_url + ')'; ua.style.backgroundSize = 'cover'; ua.style.color = 'transparent'; }
+            var udAv = document.querySelector('.ud-avatar');
+            if (udAv) { udAv.style.backgroundImage = 'url(' + _p.data.avatar_url + ')'; udAv.style.backgroundSize = 'cover'; udAv.style.color = 'transparent'; }
+          }
         }
       } catch(e) {}
     })();
