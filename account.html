@@ -700,7 +700,7 @@ body.snap-body{overflow:hidden}
   <div class="rp-card"><h4>🧠 AI Tips</h4><div class="rp-tip" id="rpTips">Caricamento suggerimenti…</div></div>
   <div class="rp-card wotd"><h4>📖 Parola del giorno</h4><div class="w" id="wotdWord">—</div><div class="wpos" id="wotdPos"></div><div class="wdef" id="wotdDef"></div></div>
   <div class="rp-card"><h4>⚡ Quick Stats</h4><div style="font-size:11px;color:var(--t2);line-height:1.6" id="rpStats">Caricamento…</div></div>
-  <div class="rp-card"><h4>🔗 Condividi</h4><div style="font-size:11px;color:var(--t2);line-height:1.6">Invita un amico e ricevi <strong style="color:var(--accent)">45 min</strong> gratis.<br><code style="font-size:10px;background:var(--bg2);padding:2px 6px;border-radius:4px;word-break:break-all" id="refLink">Caricamento…</code></div></div>
+  <div class="rp-card"><h4>🔗 Condividi</h4><div style="font-size:11px;color:var(--t2);line-height:1.6">Invita un amico e ricevi <strong style="color:var(--accent)">45 min</strong> gratis.<br><code style="font-size:10px;background:var(--bg2);padding:2px 6px;border-radius:4px;word-break:break-all" id="refLinkPanel">Caricamento…</code></div></div>
 </aside>
 
 </div>
@@ -789,8 +789,6 @@ async function loadAllData(supabase,userId){
   var created=profResp.data?.created_at?new Date(profResp.data.created_at):new Date();
   var daysAgo=Math.floor((Date.now()-created.getTime())/86400000);
   var ms=document.getElementById('memberSince');if(ms)ms.textContent=created.toLocaleDateString('it-IT',{month:'long',year:'numeric'});
-  var pd=document.getElementById('profDays');if(pd)pd.textContent=daysAgo;
-  var pc=document.getElementById('profCompletion');if(pc)pc.textContent=Math.min(100,Math.round(daysAgo/30*100))+'%';
 
   // ── Plan from user_credits ──
   var planName='Gratuito',planDetail='15 min inclusi a settimana',planWeeklyMin=15;
@@ -981,7 +979,7 @@ function renderPRs(){
   var today=new Date().toISOString().split('T')[0];
   function prCard(icon,val,lbl,date,isNew){var dt=date?new Date(date).toLocaleDateString('it-IT',{day:'numeric',month:'short',year:'numeric'}):'';return'<div class="pr-card'+(isNew?' new-highlight':'')+'"><div class="pr-icon">'+icon+'</div><div class="pr-info"><div class="pr-val">'+val+'</div><div class="pr-lbl">'+lbl+'</div><div class="pr-date">'+dt+(isNew?' · Oggi!':'')+'</div></div>'+(isNew?'<div class="pr-badge new">NEW</div>':'')+'</div>'}
   var h='';
-  if(bestWpm>0)h+=prCard('⚡',bestWpm,'WPM più veloce',bestWpmDate,bestWpmDate&&bestWpmDate.split('T')[0]===today);
+  if(bestWpm>0)h+=prCard('⚡',Math.round(bestWpm),'WPM più veloce',bestWpmDate,bestWpmDate&&bestWpmDate.split('T')[0]===today);
   if(bestWords>0)h+=prCard('📝',bestWords,'Parole in una sessione',bestWordsDate,bestWordsDate&&bestWordsDate.split('T')[0]===today);
   if(bestDur>0){var dm=Math.round(bestDur/60);var ds=dm>=60?Math.floor(dm/60)+'h '+dm%60+'m':dm+'m';h+=prCard('⏱️',ds,'Sessione più lunga',bestDurDate,bestDurDate&&bestDurDate.split('T')[0]===today)}
   if(bestLex>0)h+=prCard('📊',bestLex.toFixed(2),'Lexical diversity',bestLexDate,bestLexDate&&bestLexDate.split('T')[0]===today);
@@ -1452,8 +1450,7 @@ async function refreshGrammarDisplay(){
   }
 
   // ── Focus suggestion ──
-  var gfEl=document.getElementById('gramFocus');
-  if(gfEl&&grammarData&&grammarData.categories&&grammarData.categories.length>0){
+  // gramFocus element removed — focus suggestion integrated into other sections
     var top=grammarData.categories[0];
     gfEl.innerHTML='<strong style="color:var(--accent)">'+top.name+'</strong> è la tua area più debole ('+top.pct+'% degli errori).<br><br>📝 <strong>Suggerimento:</strong> Esercitati con frasi che richiedono '+top.name.toLowerCase()+'. Prova a descrivere la tua giornata prestando attenzione a questo aspetto.';
   }
@@ -1648,7 +1645,7 @@ function renderSessionRow(s,isFav){
     '<span class="si-star-v3 '+starCls+'" data-sid="'+s.id+'">'+star+'</span>'+
     '<span class="si-date">'+when+'</span>'+
     '<div class="si-info-v3"><div class="si-name-v3">'+flag+' '+(s.mode||'session')+'</div><div class="si-meta-v3">'+dur+' · '+(s.words_count||0)+' parole</div></div>'+
-    '<div class="si-stats-v3"><div class="si-stat-v3"><div class="v">'+(s.wpm||'—')+'</div><div class="l">WPM</div></div><div class="si-stat-v3"><div class="v">'+(s.lexical_diversity?parseFloat(s.lexical_diversity).toFixed(2):'—')+'</div><div class="l">LexDiv</div></div></div>'+
+    '<div class="si-stats-v3"><div class="si-stat-v3"><div class="v">'+(s.wpm?Math.round(s.wpm):'—')+'</div><div class="l">WPM</div></div><div class="si-stat-v3"><div class="v">'+(s.lexical_diversity?parseFloat(s.lexical_diversity).toFixed(2):'—')+'</div><div class="l">LexDiv</div></div></div>'+
     '<span style="cursor:pointer;color:var(--red);font-size:11px;flex-shrink:0" class="deleteSession" data-sid="'+s.id+'" title="Elimina">🗑️</span>'+
     '</div>';
 }
@@ -1742,7 +1739,9 @@ function loadRightPanel(userId){
   if(document.getElementById('wotdDef'))document.getElementById('wotdDef').textContent=wotd.def;
   var totalMin2=allSessions.reduce(function(s,x){return s+(x.duration_seconds||0)},0)/60;
   var statsEl=document.getElementById('rpStats');if(statsEl)statsEl.innerHTML='<div>🗣️ <strong>'+(totalMin2<60?Math.round(totalMin2)+' min':(totalMin2/60).toFixed(1)+' ore')+'</strong> parlato</div><div>📄 <strong>'+allSessions.length+'</strong> sessioni</div><div>🔥 Streak: <strong>'+((document.getElementById('streakDays')||{}).textContent||'0')+'</strong> giorni</div>';
-  if(document.getElementById('refLink'))document.getElementById('refLink').textContent='buoninglese.github.io/sottotitoli/?ref='+(userId||'').substring(0,8);
+  var refUrl='buoninglese.github.io/sottotitoli/?ref='+(userId||'').substring(0,8);
+  if(document.getElementById('refLink'))document.getElementById('refLink').textContent=refUrl;
+  if(document.getElementById('refLinkPanel'))document.getElementById('refLinkPanel').textContent=refUrl;
 }
 
 // ═══ CEFR CHIPS ═══
