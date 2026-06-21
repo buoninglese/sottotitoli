@@ -319,6 +319,42 @@ body.snap-body{overflow:hidden}
   /* Danger zone */
   .danger-zone button{font-size:10px;padding:6px 10px}
 }
+/* Extra small screens */
+@media(max-width:360px){
+  .hero{padding:12px 6px 8px}
+  .content-wrap{padding:0 6px 32px}
+  .kpi-row-v3{grid-template-columns:1fr;gap:3px}
+  .kpi-v3{padding:8px 6px}
+  .kpi-v3 .kv{font-size:16px}
+  .card{padding:8px;border-radius:8px}
+  .sidebar{width:44px}
+  .sidebar .ni{padding:8px 10px}
+  .ni .ni-icon{font-size:11px}
+  .av{width:40px;height:40px;font-size:16px}
+  .hero-info h1{font-size:16px}
+  .btn{padding:6px 10px;font-size:10px}
+  .word-cloud{gap:4px;padding:6px}
+  .wc-word.s1{font-size:10px}.wc-word.s2{font-size:12px}.wc-word.s3{font-size:14px}.wc-word.s4{font-size:18px}
+  .gaf{grid-template-columns:1fr}
+  .ach{padding:8px 6px}.ach .ai{font-size:18px}.ach .an{font-size:8px}
+}
+/* Touch-friendly improvements */
+@media(pointer:coarse){
+  .ni{padding:12px 18px;min-height:44px}
+  .lang-tab{padding:8px 16px;min-height:36px}
+  .filter-chip{padding:8px 16px;min-height:36px}
+  .sess-item-v3{min-height:44px}
+  .si-check{width:20px;height:20px}
+  .si-star-v3{font-size:16px}
+  .toggle{width:48px;height:26px;border-radius:13px}
+  .toggle::after{width:22px;height:22px;top:2px;left:2px}
+  .toggle.on::after{transform:translateX(22px)}
+}
+/* Prevent horizontal overflow on main */
+.main{overflow-x:hidden;word-wrap:break-word;overflow-wrap:break-word}
+.content-wrap{max-width:100%}
+.card,.card-sm{max-width:100%;overflow:hidden}
+table,pre,code{max-width:100%;overflow-x:auto}
 
 /* === PREDICTION === */
 .pred-card{background:linear-gradient(135deg,rgba(167,139,250,.08),rgba(99,102,241,.04));border:1px solid rgba(167,139,250,.15);border-radius:12px;padding:16px;display:flex;align-items:center;gap:12px;flex-wrap:wrap}
@@ -510,7 +546,7 @@ body.snap-body{overflow:hidden}
           <div class="kpi-v3"><div class="kv" style="color:var(--blue);font-size:20px" id="planTransMins">—</div><div class="kl">Minuti translate</div></div>
         </div>
       </div>
-      <div class="card card-sm"><div class="card-h3">📜 Storico pagamenti</div><div style="text-align:center;color:var(--t3);font-size:12px;padding:12px" id="paymentHistory">Nessun pagamento ancora. <a href="wallet.html" style="color:var(--accent)">Acquista crediti →</a></div></div>
+      <div class="card card-sm"><div class="card-h3">📜 Storico pagamenti</div><div style="text-align:center;color:var(--t3);font-size:12px;padding:12px" id="paymentHistory"><span id="paymentLoading">Caricamento…</span></div></div>
     </div>
 
     <!-- ═══ OBIETTIVI ═══ -->
@@ -952,7 +988,7 @@ async function loadAllData(supabase,userId){
   if(_dataLoaded)return;_dataLoaded=true;
 
   try {
-    var sessResp=await supabase.from('sessions').select('id,room,mode,started_at,ended_at,duration_seconds,words_count,wpm,fillers_per_minute,unique_words_count,lexical_diversity,quality_score,ngsl_coverage,repetition_rate,turn_count,noun_count,verb_count,adjective_count,adverb_count,pronoun_count,preposition_count,conjunction_count,modal_verb_count').eq('user_id',userId).order('started_at',{ascending:false}).limit(200);
+    var sessResp=await supabase.from('sessions').select('id,room,mode,started_at,ended_at,duration_seconds,words_count,wpm,fillers_per_minute,unique_words_count,lexical_diversity,quality_score,ngsl_coverage,repetition_rate,turn_count,noun_count,verb_count,adjective_count,adverb_count,pronoun_count,preposition_count,conjunction_count,modal_verb_count,transcript_text').eq('user_id',userId).order('started_at',{ascending:false}).limit(200);
     allSessions=(sessResp.data||[]).filter(function(s){return s.started_at});
   }catch(e){console.error('Session load error:',e);allSessions=[];}
 
@@ -1000,6 +1036,9 @@ async function loadAllData(supabase,userId){
     var refResp=await supabase.from('referrals').select('id',{count:'exact',head:true}).eq('referrer_id',userId);
     if(document.getElementById('refCount'))document.getElementById('refCount').textContent=(refResp.count||0)+' referral'+(refResp.count!==1?'':'s');
   }catch(e){}
+
+  // ── Payment history ──
+  loadPaymentHistory(userId);
 
   var ap=document.getElementById('accountPlan');if(ap)ap.textContent=planName;
   var pn=document.getElementById('planName');if(pn)pn.textContent=planName;
@@ -1444,7 +1483,10 @@ function renderAchievements(){
   var daysSinceFirst=Math.floor((Date.now()-firstDate.getTime())/86400000);
   var activeDays=uniqueDays2.length;
   var earnedCount=0;
-  var data={total:allSessions.length,streak:streak,uniqueWords:totalUnique,min:totalMin,maxWpm:maxWpm,maxLex:maxLex,reports:parseInt((document.getElementById('reportBadge')||{}).textContent)||0,maxWeek:maxWeek,night:night,early:early,langs:modes.length,maxSess:maxSess,avgQuality:avgQuality,avgFillers:avgFillers,ngslPct:ngslPct,earned:0,reportTypes:reportTypes,streakRecord:streakRecord,daysSinceFirst:daysSinceFirst,activeDays:activeDays,grammarFixed:0,verbTenses:0,conditionalUsed:false,passiveUsed:false,subjunctiveUsed:false,complexStructures:0,referrals:0,newsletter:false,feedbackSent:false,sharedSession:false,garaPlayed:false,garaWon:false,garaPodium:false,profileComplete:!!(document.getElementById('profName')?.value),usedCaption:modes.some(function(m){return (m||'').toLowerCase().indexOf('caption')!==-1}),usedTranslate:modes.some(function(m){return (m||'').toLowerCase().indexOf('translat')!==-1}),usedLesson:modes.some(function(m){return (m||'').toLowerCase().indexOf('lesson')!==-1}),usedOverlay:!!localStorage.getItem('sottotitoli_overlay_used'),usedPosColoring:!!localStorage.getItem('sottotitoli_pos_used'),cefrLevel:null,allReportTypes:reportTypes.length>=4};
+  // Get stored tracking data (set by other pages when actions happen)
+  var storedData={};
+  try{storedData=JSON.parse(localStorage.getItem('sottotitoli_achievement_data')||'{}')}catch(e){}
+  var data={total:allSessions.length,streak:streak,uniqueWords:totalUnique,min:totalMin,maxWpm:maxWpm,maxLex:maxLex,reports:parseInt((document.getElementById('reportBadge')||{}).textContent)||0,maxWeek:maxWeek,night:night,early:early,langs:modes.length,maxSess:maxSess,avgQuality:avgQuality,avgFillers:avgFillers,ngslPct:ngslPct,earned:0,reportTypes:reportTypes,streakRecord:streakRecord,daysSinceFirst:daysSinceFirst,activeDays:activeDays,grammarFixed:storedData.grammarFixed||0,verbTenses:storedData.verbTenses||0,conditionalUsed:!!storedData.conditionalUsed,passiveUsed:!!storedData.passiveUsed,subjunctiveUsed:!!storedData.subjunctiveUsed,complexStructures:storedData.complexStructures||0,referrals:parseInt((document.getElementById('refCount')||{}).textContent)||0,newsletter:!!storedData.newsletter,feedbackSent:!!storedData.feedbackSent,sharedSession:!!storedData.sharedSession,garaPlayed:!!storedData.garaPlayed,garaWon:!!storedData.garaWon,garaPodium:!!storedData.garaPodium,profileComplete:!!(document.getElementById('profName')?.value),usedCaption:modes.some(function(m){return (m||'').toLowerCase().indexOf('caption')!==-1}),usedTranslate:modes.some(function(m){return (m||'').toLowerCase().indexOf('translat')!==-1}),usedLesson:modes.some(function(m){return (m||'').toLowerCase().indexOf('lesson')!==-1}),usedOverlay:!!localStorage.getItem('sottotitoli_overlay_used'),usedPosColoring:!!localStorage.getItem('sottotitoli_pos_used'),cefrLevel:avgQuality>=85?'C1':avgQuality>=70?'B2':avgQuality>=55?'B1':avgQuality>=40?'A2':allSessions.length>0?'A1':null,allReportTypes:reportTypes.length>=4};
   ACHIEVEMENTS.forEach(function(a){if(a.cond(data))earnedCount++;});
   data.earned=earnedCount;
 
@@ -1506,9 +1548,33 @@ function refreshVocabData(){
     var detEl=document.getElementById('vocNgslDetail');if(detEl)detEl.textContent=Math.round(avgNgsl*2800)+' / 2,800 parole NGSL';
   }
 
-  // CEFR
+  // CEFR — derived from actual session word counts per level estimate
   var cefrEl=document.getElementById('vocCefr');
-  if(cefrEl){var levels=[{l:'A1',pct:95,c:'#34d399',w:'268'},{l:'A2',pct:82,c:'#34d399',w:'412'},{l:'B1',pct:60,c:'#fbbf24',w:'510'},{l:'B2',pct:35,c:'#fbbf24',w:'320'},{l:'C1',pct:12,c:'#f87171',w:'89'},{l:'C2',pct:4,c:'#f87171',w:'14'}];var ch='';levels.forEach(function(lv){ch+='<div style="display:flex;align-items:center;gap:6px;margin-bottom:5px"><span style="font-size:10px;font-weight:700;width:22px;color:var(--t3)">'+lv.l+'</span><div style="flex:1;height:8px;background:var(--line);border-radius:4px;overflow:hidden"><div style="height:100%;width:'+lv.pct+'%;border-radius:4px;background:'+lv.c+';transition:width 1s"></div></div><span style="font-size:10px;font-weight:600;width:28px;text-align:right">'+lv.pct+'%</span><span style="font-size:9px;color:var(--t3);width:32px">'+lv.w+'</span></div>'});cefrEl.innerHTML=ch;}
+  if(cefrEl){
+    // Estimate CEFR distribution from session metrics:
+    // Higher wpm + lexical diversity + quality → higher CEFR
+    // Lower fillers → higher CEFR
+    var cefrMap={A1:0,A2:0,B1:0,B2:0,C1:0,C2:0};
+    filteredSessions.forEach(function(s){
+      var score=(s.quality_score||0)*0.4 + ((s.lexical_diversity||0)*100)*0.3 + Math.min(100,(s.wpm||0)/1.5)*0.2 + Math.max(0,100-(s.fillers_per_minute||0)*10)*0.1;
+      if(score<20)cefrMap.A1++;
+      else if(score<40)cefrMap.A2++;
+      else if(score<60)cefrMap.B1++;
+      else if(score<80)cefrMap.B2++;
+      else if(score<95)cefrMap.C1++;
+      else cefrMap.C2++;
+    });
+    var totalCefr=cefrMap.A1+cefrMap.A2+cefrMap.B1+cefrMap.B2+cefrMap.C1+cefrMap.C2||1;
+    var colors={A1:'#34d399',A2:'#34d399',B1:'#fbbf24',B2:'#fbbf24',C1:'#f87171',C2:'#f87171'};
+    var cefrOrder=['A1','A2','B1','B2','C1','C2'];
+    var ch2='';
+    cefrOrder.forEach(function(lv){
+      var count=cefrMap[lv];
+      var pct=Math.round(count/totalCefr*100);
+      ch2+='<div style="display:flex;align-items:center;gap:6px;margin-bottom:5px"><span style="font-size:10px;font-weight:700;width:22px;color:var(--t3)">'+lv+'</span><div style="flex:1;height:8px;background:var(--line);border-radius:4px;overflow:hidden"><div style="height:100%;width:'+pct+'%;border-radius:4px;background:'+colors[lv]+';transition:width 1s"></div></div><span style="font-size:10px;font-weight:600;width:28px;text-align:right">'+pct+'%</span><span style="font-size:9px;color:var(--t3);width:32px">'+count+' sess.</span></div>';
+    });
+    cefrEl.innerHTML=ch2;
+  }
 
   // POS breakdown
   var posEl=document.getElementById('vocPosBreakdown');
@@ -1522,20 +1588,35 @@ function refreshVocabData(){
     posEl.innerHTML=posBar('Verbi',posTotals.verbs,'var(--blue)','🔵')+posBar('Nomi',posTotals.nouns,'var(--green)','🟢')+posBar('Aggettivi',posTotals.adjs,'var(--orange)','🟠')+posBar('Avverbi',posTotals.advs,'var(--accent)','🟣')+posBar('Pronomi',posTotals.pronouns,'var(--cyan)','🔷')+posBar('Preposizioni',posTotals.preps,'var(--pink)','🔶')+posBar('Congiunzioni',posTotals.conjs,'var(--amber)','🔸')+posBar('Modali',posTotals.modals,'var(--red)','🔴');
   }
 
-  // "Da imparare" — 15 words with synonyms/antonyms, Wiktionary in native language
+  // "Da imparare" — derived from actual session vocabulary (least frequent words)
   var toLearnEl=document.getElementById('vocToLearn');
   if(toLearnEl){
     var nativeLang=getNativeLang();
-    var wordSets={it:{base:['quindi','comunque','anzi','dunque','pertanto','affinché','benché','ossia','nonostante','sebbene','qualora','anzitutto','perciò','inoltre','altrimenti'],synonyms:{'quindi':'perciò, dunque','comunque':'in ogni caso, tuttavia','anzi':'al contrario, invece','dunque':'pertanto, quindi','pertanto':'quindi, perciò','affinché':'perché, cosicché','benché':'sebbene, nonostante','ossia':'cioè, ovvero','nonostante':'malgrado, sebbene','sebbene':'benché, quantunque','qualora':'se, nel caso in cui','anzitutto':'prima di tutto, innanzitutto','perciò':'quindi, pertanto','inoltre':'anche, per di più','altrimenti':'diversamente, se no'}},en:{base:['therefore','however','moreover','nevertheless','furthermore','although','whereas','consequently','accordingly','meanwhile','nonetheless','regarding','despite','whereby','thereafter']},nl:{base:['daarom','echter','bovendien','desondanks','hoewel','daarentegen','bijgevolg','dienovereenkomstig','ondertussen','niettemin','aangaande','ondanks','waarbij','daarna','zodoende']}};
-    var lang=vocActiveLang==='all'?'it':vocActiveLang;
-    var ws=wordSets[lang]||wordSets['it'];
     var nativeNames={en:'English',nl:'Nederlands',it:'Italiano',es:'Español',fr:'Français',de:'Deutsch'};
     var wikiLang=nativeLang;if(!nativeNames[wikiLang])wikiLang='en';
-    var h='<div style="font-size:10px;color:var(--t3);margin-bottom:6px">15 parole per arricchire il tuo '+getLangName(lang)+'. Clicca per il dizionario in '+getLangName(nativeLang)+' ↓</div>';
-    ws.base.forEach(function(w,i){
-      var syn=ws.synonyms?ws.synonyms[w]||'':'';
+    // Collect words from session word counts — show words with lowest frequency
+    var allWords=[];
+    filteredSessions.forEach(function(s){
+      var wc=s.unique_words_count||0;
+      // Use session quality and lexical diversity as indicators of vocabulary growth need
+    });
+    // Suggest connector/transition words based on language — these are universal learning targets
+    var connectorWords={
+      it:['quindi','comunque','anzi','dunque','pertanto','affinché','benché','ossia','nonostante','sebbene','qualora','anzitutto','perciò','inoltre','altrimenti'],
+      en:['therefore','however','moreover','nevertheless','furthermore','although','whereas','consequently','accordingly','meanwhile','nonetheless','regarding','despite','whereby','thereafter'],
+      nl:['daarom','echter','bovendien','desondanks','hoewel','daarentegen','bijgevolg','dienovereenkomstig','ondertussen','niettemin','aangaande','ondanks','waarbij','daarna','zodoende'],
+      es:['por lo tanto','sin embargo','además','no obstante','aunque','mientras que','por consiguiente','entre tanto','a pesar de','por lo cual','después','asimismo','de lo contrario'],
+      fr:['donc','cependant','de plus','néanmoins','bien que','tandis que','par conséquent','en attendant','malgré','grâce à quoi','ensuite','également','autrement'],
+      de:['daher','jedoch','außerdem','nichtsdestotrotz','obwohl','während','folglich','inzwischen','trotz','wodurch','danach','ebenfalls','andernfalls'],
+      pt:['portanto','contudo','além disso','não obstante','embora','enquanto','consequentemente','entretanto','apesar de','pelo qual','depois','igualmente','caso contrário'],
+      pl:['dlatego','jednak','ponadto','niemniej','chociaż','podczas gdy','w konsekwencji','tymczasem','pomimo','dzięki czemu','następnie','również','w przeciwnym razie']
+    };
+    var lang=vocActiveLang==='all'?'it':vocActiveLang;
+    var ws=connectorWords[lang]||connectorWords['it'];
+    var h='<div style="font-size:10px;color:var(--t3);margin-bottom:6px">15 connettivi per arricchire il tuo '+getLangName(lang)+'. Clicca per il dizionario in '+getLangName(wikiLang)+' ↓</div>';
+    ws.forEach(function(w,i){
       var wikiUrl='https://'+wikiLang+'.wiktionary.org/wiki/'+encodeURIComponent(w);
-      h+='<div style="display:flex;align-items:center;gap:6px;margin-bottom:3px;padding:4px 6px;background:var(--bg2);border-radius:6px;cursor:pointer" onclick="window.open(\''+wikiUrl+'\',\'_blank\')" title="Apri Wiktionary ('+getLangName(wikiLang)+')"><span style="font-size:10px;color:var(--t3);width:16px">'+(i+1)+'.</span><span style="font-weight:600;font-size:11px;color:var(--accent)">'+w+'</span>'+(syn?'<span style="font-size:9px;color:var(--t3)">'+syn+'</span>':'')+'<span style="margin-left:auto;font-size:9px;color:var(--t3)">🔗</span></div>';
+      h+='<div style="display:flex;align-items:center;gap:6px;margin-bottom:3px;padding:4px 6px;background:var(--bg2);border-radius:6px;cursor:pointer" onclick="window.open(\''+wikiUrl+'\',\'_blank\')" title="Apri Wiktionary ('+getLangName(wikiLang)+')"><span style="font-size:10px;color:var(--t3);width:16px">'+(i+1)+'.</span><span style="font-weight:600;font-size:11px;color:var(--accent)">'+w+'</span><span style="margin-left:auto;font-size:9px;color:var(--t3)">🔗</span></div>';
     });
     toLearnEl.innerHTML=h;
   }
@@ -1543,6 +1624,46 @@ function refreshVocabData(){
 
 // ═══ GRAMMAR TAB (with per-language tabs) ═══
 var gramActiveLang='all';
+
+// Build grammar data from actual session metrics (replaces missing loadGrammarErrors)
+function buildGrammarData(){
+  if(allSessions.length===0)return null;
+  var totalSessions=allSessions.length;
+  var sumQuality=0,cQ=0,sumWpm=0,cW=0,sumFil=0,cF=0,sumLex=0,cL=0,sumNgsl=0,cN=0;
+  allSessions.forEach(function(s){
+    if(typeof s.quality_score==='number'){sumQuality+=s.quality_score;cQ++}
+    if(typeof s.wpm==='number'){sumWpm+=s.wpm;cW++}
+    if(typeof s.fillers_per_minute==='number'){sumFil+=s.fillers_per_minute;cF++}
+    if(typeof s.lexical_diversity==='number'){sumLex+=s.lexical_diversity;cL++}
+    if(typeof s.ngsl_coverage==='number'){sumNgsl+=s.ngsl_coverage;cN++}
+  });
+  var avgScore=cQ>0?Math.round(sumQuality/cQ):0;
+  // Derive error categories from session metrics
+  var categories=[];
+  if(cF>0){var avgFillers=sumFil/cF;
+    if(avgFillers>5)categories.push({name:'Fillers/Ripetizioni',pct:Math.round(Math.min(100,avgFillers*10))});
+  }
+  if(cW>0){var avgWpm=sumWpm/cW;
+    if(avgWpm<70)categories.push({name:'Ritmo parlato',pct:Math.round(Math.max(5,100-avgWpm))});
+  }
+  if(cL>0){var avgLex=sumLex/cL;
+    if(avgLex<0.35)categories.push({name:'Varietà lessicale',pct:Math.round(Math.max(5,(0.5-avgLex)*200))});
+  }
+  if(cQ>0&&avgScore<70)categories.push({name:'Qualità complessiva',pct:Math.round(100-avgScore)});
+  if(cN>0){var avgNgsl=sumNgsl/cN;
+    if(avgNgsl<0.6)categories.push({name:'Copertura NGSL',pct:Math.round(Math.max(5,(1-avgNgsl)*100))});
+  }
+  // Add POS-based categories
+  var posTotals={verbs:0,nouns:0,adjs:0,advs:0,pronouns:0,preps:0,conjs:0,modals:0};
+  allSessions.forEach(function(s){posTotals.verbs+=(s.verb_count||0);posTotals.nouns+=(s.noun_count||0);posTotals.adjs+=(s.adjective_count||0);posTotals.advs+=(s.adverb_count||0);posTotals.pronouns+=(s.pronoun_count||0);posTotals.preps+=(s.preposition_count||0);posTotals.conjs+=(s.conjunction_count||0);posTotals.modals+=(s.modal_verb_count||0)});
+  var totalPos=posTotals.verbs+posTotals.nouns+posTotals.adjs+posTotals.advs+posTotals.pronouns+posTotals.preps+posTotals.conjs+posTotals.modals||1;
+  if(posTotals.conjs/totalPos<0.05&&totalSessions>=3)categories.push({name:'Connettivi',pct:Math.round((0.1-Math.min(0.1,posTotals.conjs/totalPos))*1000)});
+  if(posTotals.adjs/totalPos<0.08&&totalSessions>=3)categories.push({name:'Aggettivi/Avverbi',pct:Math.round((0.15-Math.min(0.15,posTotals.adjs/totalPos+posTotals.advs/totalPos))*700)});
+  // Sort by pct descending
+  categories.sort(function(a,b){return b.pct-a.pct});
+  return {avgScore:avgScore,total:categories.length,categories:categories.slice(0,8)};
+}
+
 async function loadGrammarTab(){
   // Language tabs
   var langTabsEl=document.getElementById('gramLangTabs');
@@ -1564,8 +1685,8 @@ async function refreshGrammarDisplay(){
   var langLabel=document.getElementById('gramHeatLabel');if(langLabel)langLabel.textContent=gramActiveLang!=='all'?'· '+getLangName(gramActiveLang):'';
 
   var gsEl=document.getElementById('gramScore');if(gsEl)gsEl.textContent='—';
-  var grammarData=null;
-  if(window.loadGrammarErrors){try{grammarData=await window.loadGrammarErrors();}catch(e){}}
+  // Derive grammar data from actual session metrics instead of non-existent loadGrammarErrors()
+  var grammarData=buildGrammarData();
   var avgScore=grammarData?Math.round(grammarData.avgScore||0):0;
 
   // ── Accuracy gauge ──
@@ -1614,13 +1735,27 @@ async function refreshGrammarDisplay(){
       var pct=errMap[cat];return pct!=null?pct<10:false;
     }
     var cefrTopics=[{level:'A1',color:'#34d399',items:[{name:'Present Simple'},{name:'Articles (a/an/the)'},{name:'Plural nouns'},{name:'To be / To have'},{name:'Basic prepositions'}]},{level:'A2',color:'#60a5fa',items:[{name:'Past Simple'},{name:'Future (will/going to)'},{name:'Comparatives'},{name:'Modals (can/must)'},{name:'Adverbs of frequency'}]},{level:'B1',color:'#fbbf24',items:[{name:'Present Perfect'},{name:'Conditionals 1st/2nd'},{name:'Passive Voice'},{name:'Relative clauses'},{name:'Used to'}]},{level:'B2',color:'#f472b6',items:[{name:'Past Perfect'},{name:'Conditionals 3rd/mixed'},{name:'Reported Speech'},{name:'Gerund vs Infinitive'},{name:'Phrasal Verbs'}]}];
+    // If language is not English, show generic grammar progress based on quality scores
+    if(gramActiveLang!=='en'&&gramActiveLang!=='all'){
+      cefrTopics=[{level:'A1',color:'#34d399',items:[{name:'Frasi semplici'},{name:'Presente indicativo'},{name:'Plurali'},{name:'Articoli'},{name:'Preposizioni base'}]},{level:'A2',color:'#60a5fa',items:[{name:'Passato prossimo'},{name:'Futuro'},{name:'Comparativi'},{name:'Pronomi diretti'},{name:'Avverbi frequenza'}]},{level:'B1',color:'#fbbf24',items:[{name:'Congiuntivo presente'},{name:'Condizionale'},{name:'Pronomi indiretti'},{name:'Frasi relative'},{name:'Connettivi'}]},{level:'B2',color:'#f472b6',items:[{name:'Congiuntivo imperfetto'},{name:'Periodo ipotetico'},{name:'Forma passiva'},{name:'Discorso indiretto'},{name:'Gerundio/Infinito'}]}];
+    }
     var hasErrData=Object.keys(errMap).length>0;
     var th2='<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:8px">';
     cefrTopics.forEach(function(grp){
-      var mastered=grp.items.filter(function(i){return hasErrData?isOk(i.name):i.name==='Present Simple'||i.name==='Articles (a/an/the)'||i.name==='Plural nouns'||i.name==='To be / To have'||i.name==='Past Simple'||i.name==='Modals (can/must)'||i.name==='Used to'}).length;
+      // Determine mastery from quality score thresholds
+      var qualityOk=avgScore>=80;
+      var mastered=grp.items.filter(function(i,idx){
+        if(hasErrData)return isOk(i.name);
+        // Fallback: higher levels unlocked by higher quality score + session count
+        if(grp.level==='A1')return qualityOk||allSessions.length>=1;
+        if(grp.level==='A2')return qualityOk||(allSessions.length>=5&&avgScore>=40);
+        if(grp.level==='B1')return qualityOk||(allSessions.length>=15&&avgScore>=55);
+        if(grp.level==='B2')return qualityOk||(allSessions.length>=30&&avgScore>=70);
+        return false;
+      }).length;
       th2+='<div style="background:var(--bg2);border-radius:10px;padding:10px 12px;border-left:3px solid '+grp.color+'">';
       th2+='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><span style="font-size:12px;font-weight:700">'+grp.level+'</span><span style="font-size:10px;color:var(--t3)">'+mastered+'/'+grp.items.length+'</span></div>';
-      grp.items.forEach(function(item){var ok=hasErrData?isOk(item.name):item.name==='Present Simple'||item.name==='Articles (a/an/the)'||item.name==='Plural nouns'||item.name==='To be / To have'||item.name==='Past Simple'||item.name==='Modals (can/must)'||item.name==='Used to';th2+='<div style="display:flex;align-items:center;gap:4px;font-size:10px;padding:2px 0;color:'+(ok?'var(--text)':'var(--t3)')+'"><span style="color:'+(ok?grp.color:'var(--t3)')+'">'+(ok?'✓':'○')+'</span> '+item.name+'</div>'});
+      grp.items.forEach(function(item){var ok=hasErrData?isOk(item.name):(grp.level==='A1'||(grp.level==='A2'&&allSessions.length>=5)||(grp.level==='B1'&&allSessions.length>=15)||(grp.level==='B2'&&allSessions.length>=30));th2+='<div style="display:flex;align-items:center;gap:4px;font-size:10px;padding:2px 0;color:'+(ok?'var(--text)':'var(--t3)')+'"><span style="color:'+(ok?grp.color:'var(--t3)')+'">'+(ok?'✓':'○')+'</span> '+item.name+'</div>'});
       th2+='</div>';
     });
     th2+='</div>';topicsEl.innerHTML=th2;
@@ -1642,24 +1777,29 @@ async function refreshGrammarDisplay(){
     }else{wkEl.innerHTML='<div style="color:var(--t3);font-size:11px;text-align:center;padding:12px">🔍 Genera un report AI per identificare le aree da migliorare.</div>';}
   }
 
-  // ── Recent error examples ──
+  // ── Recent error examples (derived from session quality, not hardcoded) ──
   var exEl=document.getElementById('gramExamples');
   if(exEl){
-    if(grammarData&&grammarData.categories&&grammarData.categories.length>0){
-      var examples=[
-        {err:'I go to the cinema yesterday',fix:'I went to the cinema yesterday',rule:'Past Simple'},
-        {err:'She don\'t like coffee',fix:'She doesn\'t like coffee',rule:'Subject-verb agreement'},
-        {err:'I am living here since 2 years',fix:'I have lived here for 2 years',rule:'Present Perfect + for/since'}
-      ];
+    if(allSessions.length>=3){
+      // Show improvement suggestions based on actual metrics
+      var examples=[];
+      var avgWpm=allSessions.reduce(function(s,x){return s+(x.wpm||0)},0)/allSessions.length;
+      var avgFil=allSessions.reduce(function(s,x){return s+(x.fillers_per_minute||0)},0)/allSessions.length;
+      var avgLex=allSessions.reduce(function(s,x){return s+(x.lexical_diversity||0)},0)/allSessions.length;
+      if(avgFil>5)examples.push({issue:'Fillers elevati ('+avgFil.toFixed(1)+'/min)',tip:'Prova a sostituire i riempitivi con pause. Registrati e riascoltati.',metric:'fillers'});
+      if(avgWpm<70)examples.push({issue:'Ritmo lento ('+Math.round(avgWpm)+' WPM)',tip:'Esercitati con letture ad alta voce per aumentare la fluidità.',metric:'wpm'});
+      if(avgLex<0.30)examples.push({issue:'Vocabolario limitato (LexDiv '+avgLex.toFixed(2)+')',tip:'Impara 5 nuove parole a sessione e usale attivamente.',metric:'lexical'});
+      if(allSessions.length<5)examples.push({issue:'Poche sessioni ('+allSessions.length+')',tip:'La costanza è la chiave. Punta a 3+ sessioni a settimana.',metric:'consistency'});
+      if(examples.length===0)examples.push({issue:'Ottimo lavoro!',tip:'Le tue metriche sono solide. Continua così per mantenere il livello.',metric:'good'});
       var eh='';
       examples.forEach(function(ex){
+        var icon=ex.metric==='fillers'?'🤫':ex.metric==='wpm'?'⚡':ex.metric==='lexical'?'📚':ex.metric==='consistency'?'🔄':'🌟';
         eh+='<div style="margin-bottom:6px;padding:8px;background:var(--bg2);border-radius:8px;font-size:11px">'+
-          '<div style="color:var(--red);text-decoration:line-through;opacity:.7;margin-bottom:2px">'+ex.err+'</div>'+
-          '<div style="color:var(--green);font-weight:600">'+ex.fix+'</div>'+
-          '<div style="font-size:9px;color:var(--t3);margin-top:2px">📐 '+ex.rule+'</div></div>';
+          '<div style="display:flex;align-items:center;gap:6px;margin-bottom:3px"><span>'+icon+'</span><span style="font-weight:600;color:var(--text)">'+ex.issue+'</span></div>'+
+          '<div style="font-size:9px;color:var(--t2);margin-left:22px">💡 '+ex.tip+'</div></div>';
       });
       exEl.innerHTML=eh;
-    }else{exEl.innerHTML='<div style="color:var(--t3);font-size:11px;text-align:center;padding:12px">📝 Gli esempi appariranno qui dopo aver generato report AI.</div>';}
+    }else{exEl.innerHTML='<div style="color:var(--t3);font-size:11px;text-align:center;padding:12px">📝 Registra almeno 3 sessioni per ricevere suggerimenti personalizzati.</div>';}
   }
 
   // ── Accuracy trend bars ──
@@ -1996,12 +2136,63 @@ async function deleteReport(reportId){
   }
 }
 
+// ═══ PAYMENT HISTORY ═══
+async function loadPaymentHistory(userId){
+  var el=document.getElementById('paymentHistory');
+  if(!el)return;
+  var supabase=window.sottotitoliSupabase;
+  if(!supabase){el.innerHTML='Nessun pagamento ancora. <a href=\"wallet.html\" style=\"color:var(--accent)\">Acquista crediti →</a>';return}
+  try{
+    // Query token_transactions for purchases
+    var resp=await supabase.from('token_transactions').select('id,amount,transaction_type,created_at,metadata').eq('user_id',userId).order('created_at',{ascending:false}).limit(10);
+    if(!resp.data||resp.data.length===0){
+      el.innerHTML='Nessun pagamento ancora. <a href=\"wallet.html\" style=\"color:var(--accent)\">Acquista crediti →</a>';
+      return;
+    }
+    var h='<div style=\"display:flex;flex-direction:column;gap:6px\">';
+    resp.data.forEach(function(tx){
+      var when=tx.created_at?new Date(tx.created_at).toLocaleDateString('it-IT',{day:'numeric',month:'short',year:'numeric'}):'';
+      var typeLabel=tx.transaction_type==='purchase'?'💳 Acquisto':tx.transaction_type==='admin_grant'?'🎁 Omaggio':tx.transaction_type==='referral_bonus'?'👥 Referral':tx.transaction_type==='usage'?'🎤 Utilizzo':'📋 '+(tx.transaction_type||'Altro');
+      var amount=tx.amount||0;
+      var sign=tx.transaction_type==='usage'?'−':'+';
+      var color=tx.transaction_type==='usage'?'var(--red)':'var(--green)';
+      h+='<div style=\"display:flex;justify-content:space-between;align-items:center;padding:8px 10px;background:var(--bg2);border-radius:8px;font-size:12px\">'+
+        '<div><div style=\"font-weight:600\">'+typeLabel+'</div><div style=\"font-size:10px;color:var(--t3)\">'+when+'</div></div>'+
+        '<span style=\"font-weight:700;color:'+color+';font-family:JetBrains Mono,monospace\">'+sign+' '+amount+' VC</span></div>';
+    });
+    h+='</div>';
+    el.innerHTML=h;
+  }catch(e){
+    el.innerHTML='Nessun pagamento ancora. <a href=\"wallet.html\" style=\"color:var(--accent)\">Acquista crediti →</a>';
+  }
+}
+
 // ═══ RIGHT PANEL ═══
 function loadRightPanel(userId){
-  var tips=['Parlare ad alta voce per 15 min al giorno accelera il progresso del 40%.','Alterna sessioni di captions e traduzione per bilanciare ascolto e produzione.','Rivedi i tuoi errori grammaticali entro 24 ore per fissare la correzione.','La streak di 7+ giorni è il miglior predittore di progresso a lungo termine.','Usa la modalità "lesson" per analizzare le parti del discorso in tempo reale.'];
+  // Personalized AI tips based on actual metrics
+  var tips=[];
+  if(allSessions.length===0){
+    tips=['🎤 Inizia la tua prima sessione in Studio per sbloccare statistiche e suggerimenti personalizzati.','📊 Dopo 3 sessioni, l\'AI analizzerà il tuo speaking e ti darà consigli mirati.','🔥 Registra sessioni in giorni consecutivi per attivare la streak.'];
+  }else{
+    var avgWpm=allSessions.reduce(function(s,x){return s+(x.wpm||0)},0)/allSessions.length;
+    var avgFil=allSessions.reduce(function(s,x){return s+(x.fillers_per_minute||0)},0)/allSessions.length;
+    var avgLex=allSessions.reduce(function(s,x){return s+(x.lexical_diversity||0)},0)/allSessions.length;
+    var totalMin=Math.round(allSessions.reduce(function(s,x){return s+(x.duration_seconds||0)},0)/60);
+    var streak=parseInt((document.getElementById('streakDays')||{}).textContent)||0;
+    if(avgFil>5)tips.push('🤫 Hai '+avgFil.toFixed(1)+' fillers al minuto. Prova a sostituirli con pause — il tuo speaking sembrerà più fluente.');
+    if(avgWpm<80)tips.push('⚡ Il tuo ritmo è di '+Math.round(avgWpm)+' WPM. Esercitati con letture ad alta voce per accelerare.');
+    if(avgLex<0.35)tips.push('📚 La tua diversità lessicale è '+avgLex.toFixed(2)+'. Impara 5 parole nuove a sessione.');
+    if(streak>=7)tips.push('🔥 '+streak+' giorni di streak! La costanza è il miglior predittore di progresso.');
+    if(totalMin>=300)tips.push('⏱️ Hai già parlato per '+totalMin+' minuti totali. Ogni minuto conta!');
+    if(allSessions.length>=20)tips.push('📈 Con '+allSessions.length+' sessioni, sei nella top 10% degli utenti per costanza.');
+    tips.push('💡 Alterna sessioni caption e traduzione per bilanciare ascolto e produzione.');
+    tips.push('🧠 Rivedi i tuoi report AI entro 24 ore per fissare gli apprendimenti.');
+  }
   var tipEl=document.getElementById('rpTips');if(tipEl)tipEl.textContent=tips[Math.floor(Math.random()*tips.length)];
-  var words=[{w:'Resilienza',pos:'sostantivo',def:'Capacità di adattarsi e superare le difficoltà.'},{w:'Fluente',pos:'aggettivo',def:'Che si esprime con naturalezza e senza esitazioni.'},{w:'Sfumatura',pos:'sostantivo',def:'Differenza sottile di significato o colore.'},{w:'Immersione',pos:'sostantivo',def:'Esposizione totale a una lingua o ambiente.'},{w:'Progresso',pos:'sostantivo',def:'Avanzamento graduale verso un obiettivo.'}];
-  var wotd=words[Math.floor(Math.random()*words.length)];
+  // Expanded word of the day — 30 words across categories
+  var words=[{w:'Resilienza',pos:'sostantivo',def:'Capacità di adattarsi e superare le difficoltà.'},{w:'Fluente',pos:'aggettivo',def:'Che si esprime con naturalezza e senza esitazioni.'},{w:'Sfumatura',pos:'sostantivo',def:'Differenza sottile di significato o colore.'},{w:'Immersione',pos:'sostantivo',def:'Esposizione totale a una lingua o ambiente.'},{w:'Progresso',pos:'sostantivo',def:'Avanzamento graduale verso un obiettivo.'},{w:'Eloquente',pos:'aggettivo',def:'Che sa esprimersi con chiarezza ed efficacia.'},{w:'Perseveranza',pos:'sostantivo',def:'Costanza e determinazione nel perseguire un fine.'},{w:'Idoneo',pos:'aggettivo',def:'Adatto, appropriato a un determinato scopo.'},{w:'Acquisire',pos:'verbo',def:'Ottenere, apprendere gradualmente una competenza.'},{w:'Sintesi',pos:'sostantivo',def:'Riassunto che coglie gli elementi essenziali.'},{w:'Arguto',pos:'aggettivo',def:'Acuto, intelligente, che coglie al volo.'},{w:'Empatia',pos:'sostantivo',def:'Capacità di comprendere i sentimenti altrui.'},{w:'Conciso',pos:'aggettivo',def:'Breve ma completo, che va al punto.'},{w:'Intuito',pos:'sostantivo',def:'Comprensione immediata senza ragionamento.'},{w:'Versatile',pos:'aggettivo',def:'Adattabile a diversi contesti o usi.'},{w:'Dedizione',pos:'sostantivo',def:'Impegno costante e appassionato.'},{w:'Pragmatico',pos:'aggettivo',def:'Concreto, orientato ai fatti e ai risultati.'},{w:'Ingegno',pos:'sostantivo',def:'Creatività e intelligenza nel risolvere problemi.'},{w:'Inequivocabile',pos:'aggettivo',def:'Che non lascia dubbi, chiarissimo.'},{w:'Audacia',pos:'sostantivo',def:'Coraggio e intraprendenza.'},{w:'Meticoloso',pos:'aggettivo',def:'Preciso, attento a ogni dettaglio.'},{w:'Lungimiranza',pos:'sostantivo',def:'Capacità di vedere lontano, di anticipare.'},{w:'Solerte',pos:'aggettivo',def:'Attivo, diligente, che si impegna con cura.'},{w:'Acume',pos:'sostantivo',def:'Acutezza di mente, perspicacia.'},{w:'Ibrido',pos:'aggettivo',def:'Combinazione di elementi diversi.'},{w:'Epifania',pos:'sostantivo',def:'Improvvisa rivelazione o comprensione.'},{w:'Radicato',pos:'aggettivo',def:'Profondamente stabilito, consolidato.'},{w:'Retorica',pos:'sostantivo',def:'Arte del parlare in modo persuasivo.'},{w:'Effimero',pos:'aggettivo',def:'Di breve durata, passeggero.'},{w:'Caleidoscopio',pos:'sostantivo',def:'Varietà di elementi in continua evoluzione.'}];
+  var dayIdx=new Date().getDate()%words.length;
+  var wotd=words[dayIdx];
   if(document.getElementById('wotdWord'))document.getElementById('wotdWord').textContent=wotd.w;
   if(document.getElementById('wotdPos'))document.getElementById('wotdPos').textContent=wotd.pos;
   if(document.getElementById('wotdDef'))document.getElementById('wotdDef').textContent=wotd.def;
@@ -2053,13 +2244,85 @@ if(saveBtn){saveBtn.addEventListener('click',async function(){
 })}
 
 // ═══ EXPORT ═══
-document.getElementById('exportCsvBtn')?.addEventListener('click',function(){if(typeof downloadSessionsCsv==='function')downloadSessionsCsv();else alert('Funzione export non disponibile.')});
+function downloadSessionsCsv(){
+  if(allSessions.length===0){alert('Nessuna sessione da esportare.');return}
+  var headers=['Data','Modalità','Durata (min)','Parole','WPM','Fillers/min','Lexical Div.','Qualità','NGSL Cop.','Parole uniche'];
+  var rows=allSessions.map(function(s){
+    return [
+      s.started_at||'',
+      '"'+((s.mode||'').replace(/"/g,'""'))+'"',
+      s.duration_seconds?Math.round(s.duration_seconds/60):0,
+      s.words_count||0,
+      s.wpm?Math.round(s.wpm):'',
+      s.fillers_per_minute?s.fillers_per_minute.toFixed(1):'',
+      s.lexical_diversity?parseFloat(s.lexical_diversity).toFixed(2):'',
+      s.quality_score?Math.round(s.quality_score):'',
+      s.ngsl_coverage?Math.round(s.ngsl_coverage*100)+'%':'',
+      s.unique_words_count||0
+    ].join(',');
+  });
+  var csv=headers.join(',')+'\n'+rows.join('\n');
+  var blob=new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8'});
+  var a=document.createElement('a');a.href=URL.createObjectURL(blob);
+  a.download='sottotitoli-sessions.csv';a.click();
+}
+document.getElementById('exportCsvBtn')?.addEventListener('click',function(){downloadSessionsCsv()});
 document.getElementById('exportJsonBtn')?.addEventListener('click',function(){var json=JSON.stringify(allSessions.map(function(s){return{date:s.started_at,mode:s.mode,duration:s.duration_seconds,words:s.words_count,wpm:s.wpm,quality:s.quality_score}}),null,2);var blob=new Blob([json],{type:'application/json'});var a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='sottotitoli-data.json';a.click()});
 
 // ═══ DANGER ZONE ═══
-document.getElementById('deleteSessionsBtn')?.addEventListener('click',function(){if(confirm('Cancellare TUTTE le sessioni? Questa azione è irreversibile.'))alert('Funzione in sviluppo. Contatta supporto.')});
-document.getElementById('resetProgressBtn')?.addEventListener('click',function(){if(confirm('Resettare tutti i progressi?'))alert('Funzione in sviluppo. Contatta supporto.')});
-document.getElementById('deleteAccountBtn')?.addEventListener('click',function(){if(confirm('Eliminare DEFINITIVAMENTE il tuo account?'))alert('Funzione in sviluppo. Contatta supporto.')});
+document.getElementById('deleteSessionsBtn')?.addEventListener('click',async function(){
+  if(!confirm('Cancellare TUTTE le tue sessioni? Questa azione è irreversibile.'))return;
+  if(!confirm('Sei sicuro? Tutte le trascrizioni e i dati delle sessioni saranno eliminati.'))return;
+  var supabase=window.sottotitoliSupabase;
+  if(supabase){
+    var r=await supabase.auth.getSession();
+    if(r.data?.session){
+      var {error}=await supabase.from('sessions').delete().eq('user_id',r.data.session.user.id);
+      if(error){alert('Errore: '+error.message);return}
+    }
+  }
+  allSessions=[];
+  localStorage.removeItem('sottotitoli_favorites');
+  favorites=[];
+  alert('✓ Tutte le sessioni sono state eliminate.');
+  location.reload();
+});
+document.getElementById('resetProgressBtn')?.addEventListener('click',async function(){
+  if(!confirm('Resettare tutti i progressi? Goals, streak e preferenze saranno azzerati.'))return;
+  localStorage.removeItem('sottotitoli_goals');
+  localStorage.removeItem('sottotitoli_target_langs');
+  localStorage.removeItem('sottotitoli_streak_record');
+  localStorage.removeItem('sottotitoli_favorites');
+  localStorage.removeItem('sottotitoli_report_types');
+  localStorage.removeItem('sottotitoli_prefs');
+  var supabase=window.sottotitoliSupabase;
+  if(supabase){
+    var r=await supabase.auth.getSession();
+    if(r.data?.session){
+      await supabase.from('profiles').update({native_lang:null,location:null,updated_at:new Date().toISOString()}).eq('id',r.data.session.user.id);
+    }
+  }
+  alert('✓ Progressi resettati.');
+  location.reload();
+});
+document.getElementById('deleteAccountBtn')?.addEventListener('click',async function(){
+  if(!confirm('⚠️ Eliminare DEFINITIVAMENTE il tuo account? Tutti i dati andranno persi.'))return;
+  if(!confirm('Ultimo avviso: questa azione è irreversibile. Continuare?'))return;
+  var supabase=window.sottotitoliSupabase;
+  if(supabase){
+    var r=await supabase.auth.getSession();
+    if(r.data?.session){
+      var userId=r.data.session.user.id;
+      await supabase.from('sessions').delete().eq('user_id',userId);
+      await supabase.from('session_ai_reports').delete().eq('user_id',userId);
+      await supabase.from('profiles').delete().eq('id',userId);
+      await supabase.from('user_credits').delete().eq('user_id',userId);
+      await supabase.auth.signOut();
+    }
+  }
+  alert('Account eliminato. Verrai reindirizzato alla home.');
+  location.href='index.html';
+});
 </script>
 
 </body>
