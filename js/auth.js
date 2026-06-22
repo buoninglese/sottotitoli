@@ -29,6 +29,8 @@ window.sottotitoliSupabase = window.supabase.createClient(
 (function(){
   var path = window.location.pathname.replace(/\/$/,'').split('/').pop() || 'index.html';
   if(path==='index.html'||path===''||path==='404.html'||path.indexOf('overlay')===0)return;
+  // Dev bypass — allows previewing without auth
+  if(/[?&]dev=1(&|$)/.test(window.location.search))return;
   // Wait for session, redirect if missing
   function check(){
     var sb = window.sottotitoliSupabase;
