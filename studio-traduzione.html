@@ -390,43 +390,62 @@ var isLive = true;
 var sessionActive = false;
 var lineCounter = 0;
 
-// ═══ Render caption lines ═══
+// ═══ Persistent line data (survives across speaker changes) ═══
+var _lineData = [];
+
+// ═══ Sample data (used only for initial population) ═══
+var SAMPLES = [
+  { en: 'we are discussing the future of real‑time translation', it: 'stiamo discutendo il futuro della traduzione in tempo reale' },
+  { en: 'and how these systems can bridge language barriers', it: 'e come questi sistemi possono superare le barriere linguistiche' },
+  { en: 'deployment at scale remains our biggest challenge', it: 'la distribuzione su larga scala rimane la nostra sfida più grande' },
+  { en: 'we are seeing unprecedented accuracy in real‑time systems', it: 'stiamo vedendo una precisione senza precedenti' },
+  { en: 'the advances in neural machine translation are remarkable', it: 'i progressi nella traduzione automatica neurale sono notevoli' },
+  { en: 'let us begin this roundtable on language technology', it: 'iniziamo questa tavola rotonda sulla tecnologia linguistica' },
+];
+
+// ═══ Render caption lines (preserves existing text!) ═══
 function renderLines() {
   var container = document.getElementById('captionLines');
   if (!container) return;
   if (speakers.length === 0) {
     container.innerHTML = '<div class="studio-empty">Nessuno speaker configurato. Clicca ⚙ Setup.</div>';
+    _lineData = [];
     return;
   }
-  // Use sample data
-  var samples = [
-    { en: 'we are discussing the future of real‑time translation', it: 'stiamo discutendo il futuro della traduzione in tempo reale' },
-    { en: 'and how these systems can bridge language barriers', it: 'e come questi sistemi possono superare le barriere linguistiche' },
-    { en: 'deployment at scale remains our biggest challenge', it: 'la distribuzione su larga scala rimane la nostra sfida più grande' },
-    { en: 'we are seeing unprecedented accuracy in real‑time systems', it: 'stiamo vedendo una precisione senza precedenti' },
-    { en: 'the advances in neural machine translation are remarkable', it: 'i progressi nella traduzione automatica neurale sono notevoli' },
-    { en: 'let us begin this roundtable on language technology', it: 'iniziamo questa tavola rotonda sulla tecnologia linguistica' },
-  ];
-  
+
+  // If no stored data, initialise from samples
+  if (_lineData.length === 0) {
+    var initCount = Math.min(speakers.length * 2, SAMPLES.length);
+    for (var i = 0; i < initCount; i++) {
+      _lineData.push({ en: SAMPLES[i].en, it: SAMPLES[i].it });
+    }
+  }
+
+  // Ensure we have at least speakers.length lines
+  var minLines = Math.min(speakers.length * 2, 8);
+  while (_lineData.length < minLines) {
+    var si2 = _lineData.length % SAMPLES.length;
+    _lineData.push({ en: SAMPLES[si2].en, it: SAMPLES[si2].it });
+  }
+
   var html = '';
-  var count = Math.min(speakers.length * 2, samples.length);
   var baseTime = new Date();
   baseTime.setHours(3, 42, 0);
-  
-  for (var i = 0; i < count; i++) {
+
+  for (var i = 0; i < _lineData.length; i++) {
     var si = i % speakers.length;
     var spk = speakers[si];
     var spkClass = SPK_CLASSES[SPK_TAGS.indexOf(spk.tag)] || spk.tag.toLowerCase();
     var ts = new Date(baseTime.getTime() + i * 3000);
     var tsStr = ts.toTimeString().substring(0,8);
-    var sample = samples[i];
-    
+    var line = _lineData[i];
+
     html += '<div class="studio-line spk-'+spkClass+'">';
     html += '<span class="studio-spk" style="background:'+hexToRgba(spk.color,.12)+';color:'+lighten(spk.color,1.3)+'">'+spk.tag+'</span>';
     html += '<span class="studio-ts">'+tsStr+'</span>';
     html += '<div class="studio-content">';
-    html += '<div class="studio-orig">'+sample.en+'</div>';
-    html += '<div class="studio-trans">'+sample.it+'</div>';
+    html += '<div class="studio-orig">'+line.en+'</div>';
+    html += '<div class="studio-trans">'+line.it+'</div>';
     html += '</div></div>';
   }
   container.innerHTML = html;
@@ -668,8 +687,13 @@ function switchMode(modeId) {
   root.style.setProperty('--accent2', cfg.accent2);
   document.body.style.background = cfg.bg;
   
-  // Update speakers
+  // Update speakers (preserve line data if content exists)
+  var hadContent = _lineData.length > 0;
   speakers = JSON.parse(JSON.stringify(cfg.speakers));
+  if (hadContent) {
+    // Re-assign speakers to existing lines and regenerate
+    // _lineData is preserved, renderLines will use it
+  }
   
   // Update UI
   document.getElementById('modeName').textContent = cfg.name;
