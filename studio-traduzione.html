@@ -1083,26 +1083,41 @@ function shareRoom(channel) {
 
 // ═══ Language toggle — switches translation language ═══
 document.querySelectorAll('.lang-btn').forEach(function(btn) {
-  btn.addEventListener('click', function() {
-    document.querySelectorAll('.lang-btn').forEach(function(b) { b.classList.remove('active'); });
-    this.classList.add('active');
+  btn.addEventListener('click', function(e) {
+    e.preventDefault();
     var lang = this.getAttribute('data-lang');
-    currentTargetLang = lang.toLowerCase();
+    if (!lang) return;
+    var langLower = lang.toLowerCase();
+    // Already selected — no-op
+    if (currentTargetLang === langLower && this.classList.contains('active')) return;
+    
+    // Force-remove active from EVERY lang button (belt and suspenders)
+    var allBtns = document.querySelectorAll('.lang-btn');
+    for (var b = 0; b < allBtns.length; b++) {
+      allBtns[b].classList.remove('active');
+    }
+    // Set active on clicked button
+    this.classList.add('active');
+    
+    currentTargetLang = langLower;
     // Update all _lineData translations to new target language
     for (var i = 0; i < _lineData.length; i++) {
       var sidx = i % SAMPLES.length;
       _lineData[i].tr = SAMPLES[sidx][currentTargetLang] || SAMPLES[sidx].it;
     }
     // Update room info
-    document.getElementById('roomTarget').textContent = lang;
+    var rt = document.getElementById('roomTarget');
+    if (rt) rt.textContent = lang;
     // Flash all translations to indicate refresh with morph animation
-    document.querySelectorAll('.studio-trans').forEach(function(t) {
-      t.classList.add('sim-trans-morph');
-      setTimeout(function() { t.classList.remove('sim-trans-morph'); }, 500);
-    });
+    var transEls = document.querySelectorAll('.studio-trans');
+    for (var t = 0; t < transEls.length; t++) {
+      transEls[t].classList.add('sim-trans-morph');
+      (function(el) {
+        setTimeout(function() { el.classList.remove('sim-trans-morph'); }, 500);
+      })(transEls[t]);
+    }
     // Re-render
     renderLinesKeepScroll();
-    showToast('🌐 Target: ' + lang);
   });
 });
 
