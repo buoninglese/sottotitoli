@@ -1078,36 +1078,87 @@ function updateRoomInfo() {
   }
 }
 
-// ═══ Share room ═══
-function shareRoom(channel) {
-  var url = window.location.href;
-  var text = 'Join my Sottotitoli translation room';
-  var shareUrl;
-  switch(channel) {
-    case 'whatsapp':
-      shareUrl = 'https://wa.me/?text=' + encodeURIComponent(text + ' ' + url);
-      break;
-    case 'email':
-      shareUrl = 'mailto:?subject=' + encodeURIComponent(text) + '&body=' + encodeURIComponent(url);
-      break;
-    case 'telegram':
-      shareUrl = 'https://t.me/share/url?url=' + encodeURIComponent(url) + '&text=' + encodeURIComponent(text);
-      break;
-    case 'copy':
-      navigator.clipboard.writeText(url).then(function() {
-        var btn = document.getElementById('copyLinkBtn');
-        btn.classList.add('copied');
-        var svg = btn.querySelector('.share-svg');
-        if (svg) svg.style.color = '#6ee7b7';
-        setTimeout(function() { btn.classList.remove('copied'); if (svg) svg.style.color = ''; }, 2000);
-        showToast('📋 Link copied!');
-      }).catch(function() {
-        showToast('⚠ Copy failed');
-      });
-      return;
-  }
-  if (shareUrl) window.open(shareUrl, '_blank');
+// ═══ Share room — auth-gated with unique room per user ═══
+function _getUserRoomId() {
+  // Get or create a unique room ID for this user
+  var stored = localStorage.getItem('sottotitoli-user-room');
+  if (stored) return stored;
+  var rid = 'room-' + Date.now().toString(36) + '-' + Math.random().toString(36).substr(2,6);
+  localStorage.setItem('sottotitoli-user-room', rid);
+  return rid;
 }
+
+function _getShareUrl() {
+  var roomId = _getUserRoomId();
+  var base = window.location.origin + window.location.pathname;
+  return base + '?room=' + roomId;
+}
+
+function shareRoom(channel) {
+  // Verify user is logged in
+  var sb = window.sottotitoliSupabase;
+  if (!sb) { showToast('⚠ Auth not ready — try again'); return; }
+  sb.auth.getSession().then(function(r) {
+    if (!r.data?.session) {
+      showToast('🔒 Sign in to share your room');
+      return;
+    }
+    var url = _getShareUrl();
+    var text = 'Join my Sottotitoli translation room';
+    var shareUrl;
+    switch(channel) {
+      case 'whatsapp':
+        shareUrl = 'https://wa.me/?text=' + encodeURIComponent(text + ' ' + url);
+        break;
+      case 'email':
+        shareUrl = 'mailto:?subject=' + encodeURIComponent(text) + '&body=' + encodeURIComponent(url);
+        break;
+      case 'telegram':
+        shareUrl = 'https://t.me/share/url?url=' + encodeURIComponent(url) + '&text=' + encodeURIComponent(text);
+        break;
+      case 'copy':
+        navigator.clipboard.writeText(url).then(function() {
+          var btn = document.getElementById('copyLinkBtn');
+          btn.classList.add('copied');
+          var svg = btn.querySelector('.share-svg');
+          if (svg) svg.style.color = '#6ee7b7';
+          setTimeout(function() { btn.classList.remove('copied'); if (svg) svg.style.color = ''; }, 2000);
+          showToast('📋 Room link copied!');
+        }).catch(function() { showToast('⚠ Copy failed'); });
+        return;
+    }
+    if (shareUrl) window.open(shareUrl, '_blank');
+  });
+}
+
+// ═══ Auth gate for shared rooms ═══
+(function() {
+  var params = new URLSearchParams(window.location.search);
+  var roomParam = params.get('room');
+  if (!roomParam) return; // not a shared room link
+  
+  // Check auth
+  function checkRoomAuth() {
+    var sb = window.sottotitoliSupabase;
+    if (!sb) { setTimeout(checkRoomAuth, 300); return; }
+    sb.auth.getSession().then(function(r) {
+      if (!r.data?.session) {
+        // Redirect to login, preserving the room link
+        localStorage.setItem('sottotitoli_return_page', window.location.pathname + window.location.search);
+        window.location.href = 'https://buoninglese.github.io/sottotitoli/start.html';
+        return;
+      }
+      // User is logged in — show room info
+      var status = document.getElementById('roomStatus');
+      if (status) {
+        status.textContent = '● Shared Room';
+        status.className = 'stat-val status-connected';
+      }
+      showToast('🔗 Joined room: ' + roomParam);
+    });
+  }
+  checkRoomAuth();
+})();
 
 // ═══ Language toggle — switches translation language ═══
 document.querySelectorAll('.lang-btn').forEach(function(btn) {
