@@ -539,18 +539,14 @@ body {
   <a href="studio-caption-mockups-10.html" class="logo">SOTTO<span>TITOLI</span></a>
   <span class="badge" id="modeBadge">Universal</span>
   <div class="lang-dropdown" style="position:relative">
-    <button class="lang-dropdown-btn" id="trPairBtn" onclick="toggleTrPairDropdown()">EN → IT ▾</button>
+    <button class="lang-dropdown-btn" id="trPairBtn" onclick="toggleTrPairDropdown()">Target: IT ▾</button>
     <div class="lang-dropdown-menu" id="trPairDropdown">
-      <button data-pair="en-it" class="active" onclick="setTrPair('en','it','EN → IT')">🇬🇧 EN → 🇮🇹 IT</button>
-      <button data-pair="en-fr" onclick="setTrPair('en','fr','EN → FR')">🇬🇧 EN → 🇫🇷 FR</button>
-      <button data-pair="en-de" onclick="setTrPair('en','de','EN → DE')">🇬🇧 EN → 🇩🇪 DE</button>
-      <button data-pair="en-es" onclick="setTrPair('en','es','EN → ES')">🇬🇧 EN → 🇪🇸 ES</button>
-      <button data-pair="en-pt" onclick="setTrPair('en','pt','EN → PT')">🇬🇧 EN → 🇵🇹 PT</button>
-      <button data-pair="en-nl" onclick="setTrPair('en','nl','EN → NL')">🇬🇧 EN → 🇳🇱 NL</button>
-      <button data-pair="it-en" onclick="setTrPair('it','en','IT → EN')">🇮🇹 IT → 🇬🇧 EN</button>
-      <button data-pair="fr-en" onclick="setTrPair('fr','en','FR → EN')">🇫🇷 FR → 🇬🇧 EN</button>
-      <button data-pair="de-en" onclick="setTrPair('de','en','DE → EN')">🇩🇪 DE → 🇬🇧 EN</button>
-      <button data-pair="es-en" onclick="setTrPair('es','en','ES → EN')">🇪🇸 ES → 🇬🇧 EN</button>
+      <button data-tgt="it" class="active" onclick="setTrTarget('it','Italiano')">🇮🇹 Italiano</button>
+      <button data-tgt="fr" onclick="setTrTarget('fr','Français')">🇫🇷 Français</button>
+      <button data-tgt="de" onclick="setTrTarget('de','Deutsch')">🇩🇪 Deutsch</button>
+      <button data-tgt="es" onclick="setTrTarget('es','Español')">🇪🇸 Español</button>
+      <button data-tgt="pt" onclick="setTrTarget('pt','Português')">🇵🇹 Português</button>
+      <button data-tgt="nl" onclick="setTrTarget('nl','Nederlands')">🇳🇱 Nederlands</button>
     </div>
   </div>
   <span class="spacer"></span>
@@ -665,10 +661,10 @@ body {
 <script>
 // ═══ Speaker data ═══
 var SPK_COLORS = ['#6b9dff','#f87171','#34d399','#fbbf24','#f472b6','#a78bfa','#60a5fa','#fb923c'];
-var SPK_TAGS = ['EN','IT','FR','DE','ES','ZH','AR','NL'];
-var SPK_CLASSES = ['en','it','fr','de','es','zh','ar','nl'];
-var LANGS = ['Auto-detect','English','Italiano','Français','Deutsch','Español','Português','Nederlands','中文','日本語','العربية','Русский','한국어'];
-var LANG_CODES = ['auto','en','it','fr','de','es','pt','nl','zh','ja','ar','ru','ko'];
+var SPK_TAGS = ['EN','IT','FR','DE','ES','PT','NL'];
+var SPK_CLASSES = ['en','it','fr','de','es','pt','nl'];
+var LANGS = ['Auto-detect','English','Italiano','Français','Deutsch','Español','Português','Nederlands'];
+var LANG_CODES = ['auto','en','it','fr','de','es','pt','nl'];
 
 var speakers = [
   { tag: 'SPK1', native: 'auto', color: '#6b9dff' }
@@ -777,7 +773,7 @@ function renderLines() {
   var targetLines2 = speakers.length;
   while (_lineData.length < targetLines2) {
     var si2 = _lineData.length % SAMPLES.length;
-    var srcText2 = SAMPLES[si2][currentTrSource] || SAMPLES[si2].en;
+    var srcText2 = SAMPLES[si2].en;
     var trText2 = SAMPLES[si2][currentTargetLang] || SAMPLES[si2].it;
     _lineData.push({ en: srcText2, tr: trText2 });
   }
@@ -1117,13 +1113,13 @@ function _createTranslateRoom() {
   sb.auth.getSession().then(function(r) {
     if (!r.data?.session) return;
     var userId = r.data.session.user.id;
-    var roomId = 'tr-' + currentTrSource + '-' + currentTrTarget + '-' + Date.now().toString(36);
+    var roomId = 'tr-en-' + currentTrTarget + '-' + Date.now().toString(36);
     sb.from('sessions').insert({
       user_id: userId,
       room: roomId,
-      mode: 'translate-' + currentTrSource + '-' + currentTrTarget,
+      mode: 'translate-en-' + currentTrTarget,
       started_at: new Date().toISOString(),
-      language_pair: currentTrSource + '-' + currentTrTarget,
+      language_pair: 'en-' + currentTrTarget,
       session_type: 'translation'
     }).select('id').single().then(function(res) {
       if (res.data) localStorage.setItem('sottotitoli-translate-session', res.data.id);
@@ -1147,7 +1143,7 @@ function _getShareUrl() {
   var base = window.location.origin + window.location.pathname;
   var params = '?room=' + roomId;
   params += '&mode=' + currentMode;
-  params += '&src=' + currentTrSource;
+  
   params += '&tgt=' + currentTrTarget;
   params += '&spk=' + speakers.length;
   return base + params;
@@ -1200,7 +1196,7 @@ function shareRoom(channel) {
   var roomState = {
     room: roomParam,
     mode: params.get('mode') || 'wx',
-    src: params.get('src') || 'en',
+    
     tgt: params.get('tgt') || 'it',
     spk: parseInt(params.get('spk')) || 1
   };
@@ -1211,9 +1207,9 @@ function shareRoom(channel) {
       switchMode(roomState.mode);
     }
     // Set translation pair
-    if (roomState.src && roomState.tgt && window.setTrPair) {
-      var label = roomState.src.toUpperCase() + ' → ' + roomState.tgt.toUpperCase();
-      setTrPair(roomState.src, roomState.tgt, label);
+    if (roomState.tgt && window.setTrTarget) {
+      var names = {it:'Italiano',fr:'Français',de:'Deutsch',es:'Español',pt:'Português',nl:'Nederlands'};
+      setTrTarget(roomState.tgt, names[roomState.tgt] || roomState.tgt);
     }
     // Update room status
     var status = document.getElementById('roomStatus');
@@ -1333,40 +1329,35 @@ function showToast(msg) {
 }
 
 
-// ═══ Translation Pair Dropdown ═══
-var currentTrSource = 'en';
+// ═══ Target Language Dropdown ═══
 var currentTrTarget = 'it';
 
 function toggleTrPairDropdown() {
   var dd = document.getElementById('trPairDropdown');
   if (dd) dd.classList.toggle('open');
 }
-function setTrPair(src, tgt, label) {
-  currentTrSource = src;
+function setTrTarget(tgt, name) {
   currentTrTarget = tgt;
-  document.getElementById('trPairBtn').textContent = label + ' ▾';
+  currentTargetLang = tgt;
+  document.getElementById('trPairBtn').textContent = 'Target: ' + tgt.toUpperCase() + ' ▾';
   document.querySelectorAll('#trPairDropdown button').forEach(function(b) {
-    b.classList.toggle('active', b.getAttribute('data-pair') === src + '-' + tgt);
+    b.classList.toggle('active', b.getAttribute('data-tgt') === tgt);
   });
   document.getElementById('trPairDropdown').classList.remove('open');
-  // Update target language button to match
-  currentTargetLang = tgt;
+  // Sync target language buttons
   document.querySelectorAll('.lang-btn').forEach(function(b) {
     b.classList.toggle('active', b.getAttribute('data-lang').toLowerCase() === tgt);
   });
-  // Update ALL line data: source in src language, translation in tgt language
+  // Update all translations
   for (var i = 0; i < _lineData.length; i++) {
     var sidx = i % SAMPLES.length;
-    _lineData[i].en = SAMPLES[sidx][src] || SAMPLES[sidx].en;
     _lineData[i].tr = SAMPLES[sidx][tgt] || SAMPLES[sidx].it;
   }
   var rt = document.getElementById('roomTarget');
   if (rt) rt.textContent = tgt.toUpperCase();
   renderLinesKeepScroll();
-  // Create room for this pair
   _createTranslateRoom();
 }
-// Close pair dropdown on outside click
 document.addEventListener('click', function(e) {
   var dd = document.getElementById('trPairDropdown');
   var btn = document.getElementById('trPairBtn');
