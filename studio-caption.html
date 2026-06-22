@@ -301,6 +301,7 @@ h2 { font-size: clamp(28px,5vw,44px); margin-bottom: 12px; }
   <button class="mode-toggle-btn" data-mode="j7b" onclick="setCaptionMode('j7b')">🪶 Shoji Airy</button>
   <span class="pill" id="liveDot"><span class="dot live"></span>LIVE</span>
   <span class="spacer"></span>
+  <button class="hamburger-btn" id="fullscreenBtn" onclick="toggleFullscreen()" title="Full screen">⛶</button>
   <div class="hamburger-menu" style="position:relative">
     <button class="hamburger-btn" onclick="toggleHamburger()" title="Menu">☰</button>
     <div class="hamburger-dropdown" id="hamburgerDropdown">
@@ -334,7 +335,6 @@ h2 { font-size: clamp(28px,5vw,44px); margin-bottom: 12px; }
       </div>
 
       <div class="caption-box" id="captionBox">
-        <button class="fullscreen-btn" id="fullscreenBtn" onclick="toggleFullscreen()" title="Full screen">⛶</button>
         <div class="caption-interim" id="captionInterim">We are discussing the future of real‑time translation…</div>
         <div class="caption-transcript" id="captionTranscript">
           <div class="line">03:42:00  And how these systems can bridge language barriers.</div>
@@ -609,26 +609,35 @@ function toggleFullscreen() {
   var btn = document.getElementById('fullscreenBtn');
   if (_isFullscreen) {
     document.body.classList.add('fullscreen-active');
-    if (btn) btn.textContent = '✕';
+    if (btn) { btn.textContent = '✕'; btn.style.background = 'var(--accent)'; btn.style.color = 'var(--card)'; }
     fitLinesToViewport();
   } else {
     document.body.classList.remove('fullscreen-active');
-    if (btn) btn.textContent = '⛶';
+    if (btn) { btn.textContent = '⛶'; btn.style.background = ''; btn.style.color = ''; }
+    // Show all lines again
+    var transcript = document.getElementById('captionTranscript');
+    if (transcript) {
+      transcript.querySelectorAll('.line').forEach(function(l) { l.style.display = ''; });
+    }
   }
 }
 function fitLinesToViewport() {
+  if (!_isFullscreen) return;
   var box = document.getElementById('captionBox');
   var transcript = document.getElementById('captionTranscript');
-  if (!box || !transcript || !_isFullscreen) return;
-  var boxH = box.clientHeight;
-  var interimH = document.getElementById('captionInterim').clientHeight;
-  var availH = boxH - interimH - 40;
-  var lineH = 28;
-  var maxLines = Math.max(1, Math.floor(availH / lineH));
-  var allLines = transcript.querySelectorAll('.line');
-  for (var i = 0; i < allLines.length; i++) {
-    allLines[i].style.display = (i >= allLines.length - maxLines) ? '' : 'none';
-  }
+  if (!box || !transcript) return;
+  setTimeout(function() {
+    var boxH = box.clientHeight;
+    var interimEl = document.getElementById('captionInterim');
+    var interimH = interimEl ? interimEl.clientHeight : 40;
+    var availH = boxH - interimH - 50;
+    var lineH = 30;
+    var maxLines = Math.max(1, Math.floor(availH / lineH));
+    var allLines = transcript.querySelectorAll('.line');
+    for (var i = 0; i < allLines.length; i++) {
+      allLines[i].style.display = (i >= allLines.length - maxLines) ? '' : 'none';
+    }
+  }, 100);
 }
 window.addEventListener('resize', function() { if (_isFullscreen) fitLinesToViewport(); });
 
