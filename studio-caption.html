@@ -288,6 +288,30 @@ h2 { font-size: clamp(28px,5vw,44px); margin-bottom: 12px; }
 .dot.blocked { background: #ef4444; box-shadow: 0 0 6px #ef4444; }
 @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
 
+
+/* ═══ FULLSCREEN MODE ═══ */
+body.fullscreen-active .topbar .pill,
+body.fullscreen-active .topbar .mode-toggle-btn,
+body.fullscreen-active .topbar .spacer,
+body.fullscreen-active .topbar .logo,
+body.fullscreen-active .topbar .hamburger-menu,
+body.fullscreen-active .h-nav-arrow,
+body.fullscreen-active #metricsPanel,
+body.fullscreen-active #vocabPanel,
+body.fullscreen-active .theme-btn,
+body.fullscreen-active .action-row { display: none !important; }
+body.fullscreen-active .h-scroll { overflow: hidden; }
+body.fullscreen-active #transcriptPanel { min-width: 100vw; }
+body.fullscreen-active .h-panel-inner { max-width: 100%; padding: 32px; }
+body.fullscreen-active .caption-box {
+  max-height: calc(100vh - 180px); overflow-y: auto;
+  padding: var(--mode-padding);
+}
+body.fullscreen-active .caption-interim { font-size: clamp(28px, 5vw, 52px); }
+body.fullscreen-active .caption-transcript { max-height: calc(100vh - 300px); }
+body.fullscreen-active .status-strip { position: absolute; top: 16px; left: 32px; }
+body.fullscreen-active #fullscreenBtn { position: fixed; top: 16px; right: 16px; z-index: 200; }
+
 </style>
 </head>
 <body>
@@ -297,9 +321,8 @@ h2 { font-size: clamp(28px,5vw,44px); margin-bottom: 12px; }
   <a href="studio-caption-mockups-888.html" class="logo">SOTTOTITOLI</a>
   <span class="spacer"></span>
   <span class="pill" id="modeBadge">Editorial</span>
-  <button class="mode-toggle-btn active" data-mode="i1" onclick="setCaptionMode('i1')">📰 Editorial</button>
-  <button class="mode-toggle-btn" data-mode="j7b" onclick="setCaptionMode('j7b')">🪶 Shoji Airy</button>
-  <span class="pill" id="liveDot"><span class="dot live"></span>LIVE</span>
+  <button class="mode-toggle-btn active" data-mode="i1" onclick="setCaptionMode('i1')">Bunko</button>
+  <button class="mode-toggle-btn" data-mode="j7b" onclick="setCaptionMode('j7b')">Shoji</button>
   <span class="spacer"></span>
   <button class="hamburger-btn" id="fullscreenBtn" onclick="toggleFullscreen()" title="Full screen">⛶</button>
   <div class="hamburger-menu" style="position:relative">
@@ -430,7 +453,7 @@ function setCaptionMode(mode) {
     b.classList.toggle('active', b.getAttribute('data-mode') === mode);
   });
   var badge = document.getElementById('modeBadge');
-  var labels = { i1: 'Editorial', j7b: 'Shoji Airy' };
+  var labels = { i1: 'Bunko', j7b: 'Shoji' };
   if (badge) badge.textContent = labels[mode] || mode;
   localStorage.setItem('sottotitoli-caption-mode', mode);
 }
@@ -609,37 +632,29 @@ function toggleFullscreen() {
   var btn = document.getElementById('fullscreenBtn');
   if (_isFullscreen) {
     document.body.classList.add('fullscreen-active');
-    if (btn) { btn.textContent = '✕'; btn.style.background = 'var(--accent)'; btn.style.color = 'var(--card)'; }
+    if (btn) btn.textContent = '✕';
     fitLinesToViewport();
   } else {
     document.body.classList.remove('fullscreen-active');
-    if (btn) { btn.textContent = '⛶'; btn.style.background = ''; btn.style.color = ''; }
-    // Show all lines again
-    var transcript = document.getElementById('captionTranscript');
-    if (transcript) {
-      transcript.querySelectorAll('.line').forEach(function(l) { l.style.display = ''; });
-    }
+    if (btn) btn.textContent = '⛶';
+    var t = document.getElementById('captionTranscript');
+    if (t) t.querySelectorAll('.line').forEach(function(l){l.style.display='';});
   }
 }
 function fitLinesToViewport() {
   if (!_isFullscreen) return;
-  var box = document.getElementById('captionBox');
-  var transcript = document.getElementById('captionTranscript');
-  if (!box || !transcript) return;
   setTimeout(function() {
-    var boxH = box.clientHeight;
-    var interimEl = document.getElementById('captionInterim');
-    var interimH = interimEl ? interimEl.clientHeight : 40;
-    var availH = boxH - interimH - 50;
-    var lineH = 30;
-    var maxLines = Math.max(1, Math.floor(availH / lineH));
-    var allLines = transcript.querySelectorAll('.line');
-    for (var i = 0; i < allLines.length; i++) {
-      allLines[i].style.display = (i >= allLines.length - maxLines) ? '' : 'none';
-    }
-  }, 100);
+    var box = document.getElementById('captionBox');
+    var t = document.getElementById('captionTranscript');
+    var interim = document.getElementById('captionInterim');
+    if (!box || !t) return;
+    var h = box.clientHeight - (interim?interim.clientHeight:40) - 60;
+    var lh = 32, max = Math.max(1, Math.floor(h/lh));
+    var lines = t.querySelectorAll('.line');
+    for (var i = 0; i < lines.length; i++) lines[i].style.display = (i>=lines.length-max)?'':'none';
+  }, 150);
 }
-window.addEventListener('resize', function() { if (_isFullscreen) fitLinesToViewport(); });
+window.addEventListener('resize', function(){if(_isFullscreen)fitLinesToViewport();});
 
 // LIVE dot reflects real mic state (no manual toggle needed)
 </script>
