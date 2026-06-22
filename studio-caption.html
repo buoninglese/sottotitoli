@@ -1,0 +1,464 @@
+<!doctype html>
+<html lang="it" data-theme="light">
+<head>
+<meta charset="utf-8">
+<title>Sottotitoli · Caption</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300;14..32,400;14..32,500;14..32,600;14..32,700;14..32,800;14..32,900&family=JetBrains+Mono:wght@300;400;500;600;700&family=Playfair+Display:ital,wght@0,400;0,600;0,700;0,900;1,400&family=Manrope:wght@300;400;500;600;700;800&family=Geist+Mono:wght@300;400;500;600;700&family=DM+Serif+Display&family=Bebas+Neue&family=Work+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+
+/* ═══ CSS VARIABLES — Editorial (default) ═══ */
+:root {
+  --bg: #fefefe; --bg2: #f8f6f2; --card: #fff; --card2: #faf8f5;
+  --line: #e8e5df; --text: #1a1a1a; --muted: #4a4a4a; --muted2: #b5ad9e;
+  --accent: #1a1a1a; --accent2: #333; --good: #16a34a; --warn: #d97706; --danger: #dc2626;
+  --glow: rgba(0,0,0,.04); --gauge-bg: #e5e0d5; --panel-bg: #faf8f5;
+  --font-display: 'Playfair Display', serif; --font-body: 'Inter', sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+  --mode-radius: 0; --mode-shadow: none; --mode-padding: 36px 40px;
+}
+
+/* ═══ Shoji Airy mode override ═══ */
+[data-caption-mode="j7b"] {
+  --bg: #fff; --bg2: #fafafa; --card: #fff; --card2: #fafafa;
+  --line: transparent; --text: #18181b; --muted: #71717a; --muted2: #d4d4d8;
+  --accent: #18181b; --accent2: #444; --good: #22c55e; --warn: #f59e0b;
+  --glow: rgba(0,0,0,.02); --gauge-bg: #f4f4f5; --panel-bg: #fafafa;
+  --font-display: 'Inter', sans-serif; --font-body: 'Manrope', sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+  --mode-radius: 4px; --mode-shadow: 0 4px 32px rgba(0,0,0,.03); --mode-padding: 48px 56px;
+}
+[data-caption-mode="j7b"] body { font-family: 'Manrope', sans-serif; font-weight: 300; }
+[data-caption-mode="j7b"] h1,[data-caption-mode="j7b"] h2,[data-caption-mode="j7b"] h3,[data-caption-mode="j7b"] .section-label { font-family: 'Inter', sans-serif; font-weight: 300; letter-spacing: -.8px; }
+[data-caption-mode="j7b"] .s-pill { border-radius: 24px; border: none; }
+[data-caption-mode="j7b"] .m-card { border-radius: 4px; border: none; }
+[data-caption-mode="j7b"] button { font-weight: 400; }
+
+body {
+  font-family: var(--font-body), system-ui, sans-serif;
+  background: var(--bg); color: var(--text);
+  height: 100vh; overflow: hidden;
+  -webkit-font-smoothing: antialiased;
+  transition: background .4s, color .4s;
+}
+
+/* ═══ TOP BAR ═══ */
+.topbar {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+  display: flex; align-items: center; gap: 10px; padding: 8px 16px;
+  background: var(--card); border-bottom: 1px solid var(--line);
+  transition: all .3s;
+}
+.topbar .logo { font-family: 'Bebas Neue', sans-serif; font-size: 18px; letter-spacing: 1px; color: var(--text); text-decoration: none; }
+.topbar .spacer { flex: 1; }
+.topbar .pill {
+  font-family: var(--font-mono); font-size: 9px; font-weight: 600;
+  padding: 4px 10px; border-radius: 100px; border: 1px solid var(--line);
+  background: var(--card2); color: var(--muted); transition: all .2s;
+}
+.mode-toggle-btn {
+  font-family: var(--font-body); font-size: 11px; font-weight: 600;
+  padding: 6px 14px; border-radius: 100px; border: 1px solid var(--line);
+  background: var(--card); color: var(--text); cursor: pointer;
+  transition: all .2s; white-space: nowrap;
+}
+.mode-toggle-btn:hover { border-color: var(--accent); }
+.mode-toggle-btn.active { background: var(--accent); color: var(--card); border-color: var(--accent); }
+
+/* ═══ HORIZONTAL SCROLL ═══ */
+.h-scroll {
+  scroll-snap-type: x proximity; overflow-x: auto; overflow-y: hidden;
+  display: flex; height: 100vh; height: 100dvh;
+  scroll-behavior: smooth; touch-action: pan-x;
+}
+.h-panel {
+  min-width: 100vw; height: 100vh; height: 100dvh;
+  scroll-snap-align: start; display: flex; align-items: center; justify-content: center;
+  position: relative; overflow: hidden; background: var(--bg);
+  transition: background .4s;
+}
+.h-panel-alt { background: var(--bg2); }
+.h-panel-inner {
+  max-width: 900px; width: 100%; padding: 80px 24px 60px;
+  text-align: center; position: relative; z-index: 1;
+  overflow-y: auto; max-height: 100vh; max-height: 100dvh;
+}
+
+/* ═══ NAV ARROWS ═══ */
+.h-nav-arrow {
+  position: fixed; top: 50%; transform: translateY(-50%); z-index: 50;
+  width: 40px; height: 40px; border-radius: 50%;
+  border: 1px solid var(--line); background: var(--card);
+  color: var(--muted); font-size: 18px; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: all .2s;
+}
+.h-nav-arrow.left { left: 12px; }
+.h-nav-arrow.right { right: 12px; }
+.h-nav-arrow:hover { border-color: var(--accent); color: var(--text); }
+
+/* ═══ STATUS PILLS ═══ */
+.status-strip { display: flex; gap: 8px; margin-bottom: 14px; flex-wrap: wrap; justify-content: center; }
+.s-pill { display: flex; align-items: center; gap: 6px; padding: 5px 12px; border-radius: 100px; font-size: 11px; font-weight: 500; background: var(--card); border: 1px solid var(--line); white-space: nowrap; transition: all .3s; }
+.s-pill .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--muted2); flex-shrink: 0; }
+.s-pill .dot.live { background: var(--good); box-shadow: 0 0 6px var(--good); animation: pulse 2s ease-in-out infinite; }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+
+/* ═══ CAPTION BOX ═══ */
+.caption-box {
+  background: var(--card); border: 1px solid var(--line);
+  border-radius: var(--mode-radius); padding: var(--mode-padding);
+  box-shadow: var(--mode-shadow); margin-bottom: 14px;
+  text-align: left; min-height: 180px; transition: all .4s;
+  position: relative; overflow: hidden;
+}
+.caption-interim {
+  font-family: var(--font-display); font-size: clamp(24px,4vw,40px);
+  font-weight: 700; color: var(--text); line-height: 1.2;
+  min-height: 48px; word-break: break-word; transition: all .3s;
+}
+.caption-interim:empty::after { content: 'Parla per vedere i sottotitoli…'; color: var(--muted2); font-size: 16px; font-style: italic; }
+.caption-transcript {
+  margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--line);
+  font-size: 15px; line-height: 1.7; color: var(--muted);
+  max-height: 200px; overflow-y: auto;
+}
+.caption-transcript .line {
+  padding: 5px 0; border-bottom: 1px solid rgba(128,128,128,.04);
+  transition: all .2s;
+}
+.caption-transcript .line:hover { background: rgba(128,128,128,.03); padding-left: 6px; border-radius: 4px; }
+
+/* ═══ ACTION BUTTONS ═══ */
+.action-row { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; margin-top: 10px; }
+.btn-grad {
+  font-family: var(--font-body); font-size: 15px; font-weight: 600;
+  padding: 14px 32px; border-radius: var(--mode-radius); border: none;
+  cursor: pointer; transition: all .25s; display: inline-flex; align-items: center; gap: 8px;
+}
+.btn-start { background: var(--accent); color: var(--card); box-shadow: 0 4px 14px rgba(0,0,0,.1); }
+.btn-start:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(0,0,0,.15); }
+.btn-stop { background: transparent; color: var(--muted); border: 1px solid var(--line); }
+.btn-stop:hover { background: var(--bg2); color: var(--text); }
+
+/* ═══ METRICS PANEL ═══ */
+.metrics-grid { display: grid; grid-template-columns: repeat(auto-fill,minmax(180px,1fr)); gap: 10px; margin-top: 14px; }
+.m-card {
+  background: var(--card); border: 1px solid var(--line);
+  border-radius: var(--mode-radius); padding: 14px;
+  transition: all .3s;
+}
+.m-card .m-title { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .1em; color: var(--muted2); margin-bottom: 8px; }
+.metric-row { display: flex; justify-content: space-between; align-items: baseline; padding: 4px 0; border-bottom: 1px solid var(--line); }
+.metric-row:last-child { border-bottom: none; }
+.metric-row .m-label { font-size: 12px; color: var(--muted); }
+.metric-row .m-value { font-size: 18px; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--text); }
+.metric-row .m-value.small { font-size: 14px; }
+.gauge-wrap { position: relative; width: 100px; height: 50px; margin: 0 auto 6px; overflow: hidden; }
+.gauge-bg { position: absolute; bottom: 0; left: 0; right: 0; height: 100px; border-radius: 100px 100px 0 0; background: var(--gauge-bg); }
+.gauge-fill { position: absolute; bottom: 0; left: 0; right: 0; border-radius: 100px 100px 0 0; background: var(--accent); height: 10%; transition: height .6s; }
+.gauge-center { text-align: center; margin-top: -4px; }
+.gauge-value { font-size: 28px; font-weight: 800; letter-spacing: -1px; }
+.gauge-label { font-size: 9px; text-transform: uppercase; letter-spacing: .1em; color: var(--muted2); }
+
+/* ═══ VOCAB PANEL ═══ */
+.vocab-chips { display: flex; flex-wrap: wrap; gap: 6px; max-height: 200px; overflow-y: auto; padding: 4px 0; min-height: 60px; justify-content: center; }
+.vocab-chip { padding: 5px 12px; border-radius: 100px; font-size: 11px; font-weight: 500; transition: all .15s; }
+.vocab-chip:hover { transform: translateY(-1px); }
+.pos-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 8px; margin-top: 12px; }
+.pos-item { background: var(--card); border: 1px solid var(--line); border-radius: var(--mode-radius); padding: 10px; text-align: center; }
+.pos-item .pos-label { font-size: 10px; color: var(--muted2); text-transform: uppercase; }
+.pos-item .pos-value { font-size: 20px; font-weight: 700; }
+
+/* ═══ THEME TOGGLE ═══ */
+.theme-btn { position: fixed; bottom: 16px; right: 16px; z-index: 100; width: 40px; height: 40px; border-radius: 50%; border: 1px solid var(--line); background: var(--card); color: var(--text); font-size: 18px; cursor: pointer; transition: all .2s; }
+.theme-btn:hover { transform: scale(1.1); }
+
+/* ═══ SECTION LABEL ═══ */
+.section-label { font-family: var(--font-display); font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .15em; color: var(--muted2); margin-bottom: 4px; }
+h2 { font-family: var(--font-display); font-size: clamp(24px,4vw,36px); font-weight: 700; letter-spacing: -.5px; line-height: 1.1; margin-bottom: 8px; }
+
+@media(max-width:768px) {
+  .h-scroll { scroll-snap-type: none; overflow-x: hidden; overflow-y: auto; flex-direction: column; }
+  .h-panel { min-width: 100%; height: auto; min-height: 100dvh; }
+  .h-nav-arrow { display: none; }
+  .h-panel-inner { padding: 70px 16px 80px; max-width: 100%; }
+  .caption-box { padding: 24px 18px; }
+  .metrics-grid { grid-template-columns: repeat(2,1fr); }
+}
+</style>
+</head>
+<body>
+
+<!-- ═══ TOP BAR ═══ -->
+<header class="topbar">
+  <a href="studio-caption-mockups-888.html" class="logo">SOTTOTITOLI</a>
+  <span class="spacer"></span>
+  <span class="pill" id="modeBadge">Editorial</span>
+  <button class="mode-toggle-btn active" data-mode="i1" onclick="setCaptionMode('i1')">📰 Editorial</button>
+  <button class="mode-toggle-btn" data-mode="j7b" onclick="setCaptionMode('j7b')">🪶 Shoji Airy</button>
+  <span class="pill" id="liveDot"><span class="dot live"></span>LIVE</span>
+</header>
+
+<!-- ═══ NAV ARROWS ═══ -->
+<button class="h-nav-arrow left" id="navLeft" title="Precedente" style="display:none">◂</button>
+<button class="h-nav-arrow right" id="navRight" title="Successivo">▸</button>
+
+<!-- ═══ HORIZONTAL SCROLL ═══ -->
+<div class="h-scroll" id="modeScroll">
+
+  <!-- PANEL 1: Transcript -->
+  <section class="h-panel" id="transcriptPanel">
+    <div class="h-panel-inner">
+
+      <div class="status-strip">
+        <div class="s-pill"><span class="dot" id="micDot"></span><span id="micStatus">Mic</span></div>
+        <div class="s-pill"><span class="dot" id="socketDot"></span><span id="socketStatus">Live</span></div>
+        <div class="s-pill">⏱ <span id="sessionTimer">00:00</span></div>
+        <div class="s-pill" id="creditPill">— min</div>
+      </div>
+
+      <div class="caption-box" id="captionBox">
+        <div class="caption-interim" id="captionInterim">Parla per vedere i sottotitoli…</div>
+        <div class="caption-transcript" id="captionTranscript"></div>
+      </div>
+
+      <div class="action-row">
+        <button class="btn-grad btn-start" id="startBtn" onclick="toggleSession()">🎤 Start Session</button>
+        <button class="btn-grad btn-stop" id="stopBtn" style="display:none" onclick="toggleSession()">⏹ Stop</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- PANEL 2: Live Metrics -->
+  <section class="h-panel h-panel-alt" id="metricsPanel">
+    <div class="h-panel-inner">
+      <div class="section-label">Live Metrics</div>
+      <h2>Statistiche<br>in tempo reale</h2>
+      <div class="metrics-grid">
+        <div class="m-card">
+          <div class="m-title">📊 CEFR Level</div>
+          <div class="gauge-wrap"><div class="gauge-bg"></div><div class="gauge-fill" id="cefrGauge" style="height:10%"></div></div>
+          <div class="gauge-center"><div class="gauge-value" id="cefrLevel">—</div><div class="gauge-label">Estimated level</div></div>
+        </div>
+        <div class="m-card">
+          <div class="m-title">⚡ Live metrics</div>
+          <div class="metric-row"><span class="m-label">WPM</span><span class="m-value" id="liveWpm">—</span></div>
+          <div class="metric-row"><span class="m-label">Words</span><span class="m-value" id="liveWords">0</span></div>
+          <div class="metric-row"><span class="m-label">Sentences</span><span class="m-value small" id="liveSentences">0</span></div>
+          <div class="metric-row"><span class="m-label">Fillers</span><span class="m-value small" id="liveFillers">0</span></div>
+        </div>
+        <div class="m-card">
+          <div class="m-title">🎯 Quality</div>
+          <div class="metric-row"><span class="m-label">Score</span><span class="m-value" id="liveQuality">—</span></div>
+          <div class="metric-row"><span class="m-label">Lexical div.</span><span class="m-value small" id="liveLexDiv">—</span></div>
+        </div>
+        <div class="m-card">
+          <div class="m-title">📈 Session</div>
+          <div class="metric-row"><span class="m-label">Lines</span><span class="m-value" id="statLines">0</span></div>
+          <div class="metric-row"><span class="m-label">Words</span><span class="m-value" id="statWords">0</span></div>
+          <div class="metric-row"><span class="m-label">Chars</span><span class="m-value" id="statChars">0</span></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- PANEL 3: Vocabulary -->
+  <section class="h-panel" id="vocabPanel">
+    <div class="h-panel-inner">
+      <div class="section-label">Vocabulary</div>
+      <h2>Vocabolario</h2>
+      <div style="background:var(--card);border:1px solid var(--line);border-radius:var(--mode-radius);padding:18px;margin:14px 0;text-align:left">
+        <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--muted2);margin-bottom:10px">🫧 CEFR Words</div>
+        <div class="vocab-chips" id="vocabChips">
+          <span style="font-size:12px;color:var(--muted2)">Avvia il microfono per vedere il vocabolario…</span>
+        </div>
+      </div>
+      <div class="pos-grid">
+        <div class="pos-item"><div class="pos-label">Verbs</div><div class="pos-value" id="posVerbs">0</div></div>
+        <div class="pos-item"><div class="pos-label">Nouns</div><div class="pos-value" id="posNouns">0</div></div>
+        <div class="pos-item"><div class="pos-label">Adjectives</div><div class="pos-value" id="posAdj">0</div></div>
+        <div class="pos-item"><div class="pos-label">Adverbs</div><div class="pos-value" id="posAdv">0</div></div>
+        <div class="pos-item"><div class="pos-label">Pronouns</div><div class="pos-value" id="posPron">0</div></div>
+        <div class="pos-item"><div class="pos-label">Prepositions</div><div class="pos-value" id="posPrep">0</div></div>
+      </div>
+    </div>
+  </section>
+</div>
+
+<button class="theme-btn" id="themeToggle" onclick="toggleTheme()" title="Toggle theme">🌙</button>
+
+<script>
+// ═══ Mode switching ═══
+var currentCaptionMode = 'i1';
+
+function setCaptionMode(mode) {
+  currentCaptionMode = mode;
+  document.documentElement.setAttribute('data-caption-mode', mode);
+  document.querySelectorAll('.mode-toggle-btn').forEach(function(b) {
+    b.classList.toggle('active', b.getAttribute('data-mode') === mode);
+  });
+  var badge = document.getElementById('modeBadge');
+  var labels = { i1: 'Editorial', j7b: 'Shoji Airy' };
+  if (badge) badge.textContent = labels[mode] || mode;
+  localStorage.setItem('sottotitoli-caption-mode', mode);
+}
+
+// Restore saved mode
+var saved = localStorage.getItem('sottotitoli-caption-mode') || 'i1';
+setCaptionMode(saved);
+
+// ═══ Theme toggle ═══
+function toggleTheme() {
+  var h = document.documentElement;
+  var t = h.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+  h.setAttribute('data-theme', t);
+  var btn = document.getElementById('themeToggle');
+  if (btn) btn.textContent = t === 'dark' ? '☀️' : '🌙';
+  localStorage.setItem('sottotitoli-theme', t);
+}
+(function() {
+  var t = localStorage.getItem('sottotitoli-theme') || 'light';
+  document.documentElement.setAttribute('data-theme', t);
+  var btn = document.getElementById('themeToggle');
+  if (btn) btn.textContent = t === 'dark' ? '☀️' : '🌙';
+})();
+
+// ═══ Horizontal nav ═══
+(function() {
+  var panels = document.querySelectorAll('.h-panel');
+  var scrollEl = document.getElementById('modeScroll');
+  var leftBtn = document.getElementById('navLeft');
+  var rightBtn = document.getElementById('navRight');
+  var total = panels.length, idx = 0;
+
+  function scrollTo(i) {
+    if (i < 0) i = 0; if (i >= total) i = total - 1;
+    idx = i;
+    panels[i].scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'start' });
+    if (leftBtn) leftBtn.style.display = i === 0 ? 'none' : '';
+    if (rightBtn) rightBtn.style.display = i === total - 1 ? 'none' : '';
+  }
+  if (leftBtn) leftBtn.addEventListener('click', function() { scrollTo(idx - 1); });
+  if (rightBtn) rightBtn.addEventListener('click', function() { scrollTo(idx + 1); });
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'ArrowRight') { e.preventDefault(); scrollTo(idx + 1); }
+    if (e.key === 'ArrowLeft') { e.preventDefault(); scrollTo(idx - 1); }
+  });
+  scrollTo(0);
+})();
+
+// ═══ Session simulation ═══
+var sessionActive = false;
+var timerInterval = null;
+var sessionSeconds = 0;
+
+function toggleSession() {
+  sessionActive = !sessionActive;
+  var startBtn = document.getElementById('startBtn');
+  var stopBtn = document.getElementById('stopBtn');
+  if (sessionActive) {
+    startBtn.style.display = 'none';
+    stopBtn.style.display = '';
+    sessionSeconds = 0;
+    timerInterval = setInterval(function() {
+      sessionSeconds++;
+      var m = Math.floor(sessionSeconds / 60);
+      var s = sessionSeconds % 60;
+      document.getElementById('sessionTimer').textContent = 
+        String(m).padStart(2,'0') + ':' + String(s).padStart(2,'0');
+      // Simulate captions
+      updateDemoCaptions();
+    }, 1000);
+  } else {
+    startBtn.style.display = '';
+    stopBtn.style.display = 'none';
+    if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
+  }
+}
+
+var demoSentences = [
+  'We are discussing the future of real-time translation.',
+  'And how these systems can bridge language barriers across the world.',
+  'Deployment at scale remains our biggest challenge this year.',
+  'We are seeing unprecedented accuracy in neural machine translation.',
+  'The advances in natural language processing are remarkable.',
+  'Let us begin this discussion on the future of language technology.',
+  'Real-time systems must handle diverse accents and dialects.',
+  'The integration of AI has transformed how we approach translation.',
+];
+var demoIndex = 0;
+
+function updateDemoCaptions() {
+  if (sessionSeconds % 4 === 0) {
+    var line = demoSentences[demoIndex % demoSentences.length];
+    var ts = new Date(); ts.setHours(3, 42, sessionSeconds);
+    var tsStr = ts.toTimeString().substring(0,8);
+    
+    var transcript = document.getElementById('captionTranscript');
+    var interim = document.getElementById('captionInterim');
+    
+    // Update interim
+    if (interim) interim.textContent = line;
+    
+    // Append to transcript
+    var div = document.createElement('div');
+    div.className = 'line';
+    div.textContent = tsStr + ' ' + line;
+    if (transcript) {
+      transcript.appendChild(div);
+      transcript.scrollTop = transcript.scrollHeight;
+    }
+    
+    // Update stats
+    document.getElementById('statLines').textContent = transcript ? transcript.querySelectorAll('.line').length : 0;
+    var allWords = (transcript ? transcript.textContent : '').match(/[a-z']+/gi) || [];
+    document.getElementById('statWords').textContent = allWords.length;
+    document.getElementById('statChars').textContent = (transcript ? transcript.textContent : '').length;
+    document.getElementById('liveWords').textContent = allWords.length;
+    document.getElementById('liveSentences').textContent = transcript ? transcript.querySelectorAll('.line').length : 0;
+    
+    // WPM
+    var wpm = sessionSeconds > 0 ? Math.round(allWords.length / (sessionSeconds / 60)) : 0;
+    document.getElementById('liveWpm').textContent = wpm;
+    
+    // Simulate vocab chips
+    var chipsEl = document.getElementById('vocabChips');
+    if (chipsEl && sessionSeconds > 5) {
+      var words = line.toLowerCase().match(/[a-z']+/g) || [];
+      var colors = ['#e5e7eb','#dbeafe','#d1fae5','#fef3c7','#ede9fe','#fce7f3'];
+      chipsEl.innerHTML = words.map(function(w, i) {
+        return '<span class="vocab-chip" style="background:'+colors[i%colors.length]+';color:#374151">'+w+'</span>';
+      }).join('');
+    }
+    
+    // CEFR gauge
+    var gauge = document.getElementById('cefrGauge');
+    var level = document.getElementById('cefrLevel');
+    if (gauge && level) {
+      var pct = Math.min(90, wpm * 0.8);
+      gauge.style.height = pct + '%';
+      level.textContent = pct > 70 ? 'C1' : pct > 50 ? 'B2' : pct > 30 ? 'B1' : pct > 10 ? 'A2' : 'A1';
+    }
+    
+    demoIndex++;
+  }
+}
+
+// ═══ LIVE dot click ═══
+document.getElementById('liveDot').addEventListener('click', function() {
+  var dot = this.querySelector('.dot');
+  if (dot.classList.contains('live')) {
+    dot.classList.remove('live');
+    this.style.opacity = '.6';
+  } else {
+    dot.classList.add('live');
+    this.style.opacity = '1';
+  }
+});
+</script>
+</body>
+</html>
