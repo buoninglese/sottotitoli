@@ -85,6 +85,12 @@ body {
 .studio-hdr .st-name {
   font-family: 'Bebas Neue', sans-serif; font-size: 22px;
   letter-spacing: 1px; color: var(--accent); line-height: 1;
+  cursor: pointer; user-select: none; position: relative;
+  transition: color .2s;
+}
+.studio-hdr .st-name:hover { opacity: .8; }
+.studio-hdr .st-name::after {
+  content: ' ▾'; font-size: 14px; opacity: .5;
 }
 .studio-hdr .spk-count {
   font-family: 'JetBrains Mono', monospace; font-size: 9px;
@@ -143,6 +149,28 @@ body {
 .spk-zh .studio-spk { background: rgba(244,114,182,.12); color: #f9a8d4; }
 .spk-ar { border-left-color: rgba(167,139,250,.35); }
 .spk-ar .studio-spk { background: rgba(167,139,250,.12); color: #c4b5fd; }
+
+/* ═══ MODE PICKER DROPDOWN ═══ */
+.mode-picker { position: relative; display: inline-flex; align-items: center; gap: 10px; }
+.mode-dropdown {
+  position: absolute; top: 100%; left: 0; margin-top: 8px;
+  background: #121620; border: 1px solid #1e2430; border-radius: 12px;
+  padding: 6px; min-width: 210px; z-index: 200;
+  box-shadow: 0 12px 40px rgba(0,0,0,.5);
+  display: none; animation: slideUp .2s cubic-bezier(.4,0,.2,1);
+}
+.mode-dropdown.open { display: block; }
+.mode-dropdown button {
+  display: flex; align-items: center; gap: 10px;
+  width: 100%; padding: 10px 14px; border: none; border-radius: 8px;
+  background: transparent; color: rgba(255,255,255,.6);
+  font-family: 'Work Sans', sans-serif; font-size: 12px; font-weight: 500;
+  cursor: pointer; transition: all .15s; text-align: left;
+}
+.mode-dropdown button:hover { background: rgba(255,255,255,.04); color: #fff; }
+.mode-dropdown button.active { background: rgba(52,211,153,.08); color: var(--accent); font-weight: 600; }
+.mode-dropdown .mode-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+.mode-dropdown .mode-badge { font-family: 'JetBrains Mono', monospace; font-size: 8px; color: rgba(255,255,255,.25); margin-left: auto; }
 
 /* Empty state */
 .studio-empty {
@@ -316,7 +344,16 @@ body {
 <!-- ═══ MAIN STAGE ═══ -->
 <div class="stage">
   <div class="studio-hdr">
-    <span class="st-name">WX · Universal</span>
+    <div class="mode-picker">
+      <span class="st-name" id="modeName" onclick="toggleModePicker()">WX · Universal</span>
+      <div class="mode-dropdown" id="modeDropdown">
+        <button data-mode="w2" onclick="switchMode('w2')"><span class="mode-dot" style="background:#6b9dff"></span>W2 · Duet<span class="mode-badge">2 SPK</span></button>
+        <button data-mode="w3" onclick="switchMode('w3')"><span class="mode-dot" style="background:#a78bfa"></span>W3 · Triad<span class="mode-badge">3 SPK</span></button>
+        <button data-mode="w4" onclick="switchMode('w4')"><span class="mode-dot" style="background:#34d399"></span>W4 · Quad<span class="mode-badge">4 SPK</span></button>
+        <button data-mode="w5" onclick="switchMode('w5')"><span class="mode-dot" style="background:#fbbf24"></span>W5 · Quintet<span class="mode-badge">5 SPK</span></button>
+        <button data-mode="wx" class="active" onclick="switchMode('wx')"><span class="mode-dot" style="background:#34d399"></span>WX · Universal<span class="mode-badge">auto</span></button>
+      </div>
+    </div>
     <span class="spk-count" id="spkCount">3 SPK</span>
   </div>
   <div class="studio-body" id="captionLines">
@@ -575,6 +612,74 @@ function showToast(msg) {
   document.body.appendChild(t);
   setTimeout(function() { t.style.opacity = '0'; t.style.transition = 'opacity .3s'; setTimeout(function() { t.remove(); }, 300); }, 2000);
 }
+
+// ═══ Mode Picker ═══
+var currentMode = 'wx';
+var MODE_CONFIGS = {
+  w2: { name: 'W2 · Duet', accent: '#6b9dff', accent2: '#8ab4ff', bg: '#0a0f1a',
+    speakers: [{tag:'EN',native:'en',color:'#6b9dff'},{tag:'IT',native:'it',color:'#f87171'}] },
+  w3: { name: 'W3 · Triad', accent: '#a78bfa', accent2: '#c4b5fd', bg: '#0f0a1a',
+    speakers: [{tag:'A',native:'auto',color:'#a78bfa'},{tag:'B',native:'auto',color:'#60a5fa'},{tag:'C',native:'auto',color:'#34d399'}] },
+  w4: { name: 'W4 · Quad', accent: '#34d399', accent2: '#6ee7b7', bg: '#050a08',
+    speakers: [{tag:'EN',native:'en',color:'#6b9dff'},{tag:'IT',native:'it',color:'#f87171'},{tag:'FR',native:'fr',color:'#60a5fa'},{tag:'DE',native:'de',color:'#34d399'}] },
+  w5: { name: 'W5 · Quintet', accent: '#fbbf24', accent2: '#fcd34d', bg: '#0f0a05',
+    speakers: [{tag:'EN',native:'en',color:'#6b9dff'},{tag:'IT',native:'it',color:'#f87171'},{tag:'ES',native:'es',color:'#fbbf24'},{tag:'ZH',native:'zh',color:'#f472b6'},{tag:'AR',native:'ar',color:'#34d399'}] },
+  wx: { name: 'WX · Universal', accent: '#34d399', accent2: '#6ee7b7', bg: '#0a0f14',
+    speakers: [{tag:'EN',native:'auto',color:'#6b9dff'},{tag:'IT',native:'auto',color:'#f87171'},{tag:'FR',native:'auto',color:'#34d399'}] }
+};
+
+function switchMode(modeId) {
+  currentMode = modeId;
+  var cfg = MODE_CONFIGS[modeId];
+  if (!cfg) return;
+  
+  // Update accent CSS variables
+  var root = document.documentElement;
+  root.style.setProperty('--accent', cfg.accent);
+  root.style.setProperty('--accent2', cfg.accent2);
+  document.body.style.background = cfg.bg;
+  
+  // Update speakers
+  speakers = JSON.parse(JSON.stringify(cfg.speakers));
+  isAutoMode = (modeId === 'wx');
+  
+  // Update UI
+  document.getElementById('modeName').textContent = cfg.name;
+  var badge = document.getElementById('modeBadge');
+  if (badge) { badge.textContent = isAutoMode ? 'AUTO' : 'MANUAL'; badge.className = 'badge' + (isAutoMode ? '' : ' manual'); }
+  
+  // Update dropdown active state
+  document.querySelectorAll('.mode-dropdown button').forEach(function(b) {
+    b.classList.toggle('active', b.getAttribute('data-mode') === modeId);
+  });
+  
+  // Close dropdown
+  document.getElementById('modeDropdown').classList.remove('open');
+  
+  // Update speaker colors for language buttons
+  document.querySelectorAll('.lang-btn.active').forEach(function(b) {
+    b.style.background = hexToRgba(cfg.accent, .12);
+    b.style.borderColor = hexToRgba(cfg.accent, .25);
+    b.style.color = cfg.accent2;
+  });
+  
+  renderLines();
+  showToast('✓ Switched to ' + cfg.name);
+}
+
+function toggleModePicker() {
+  var dd = document.getElementById('modeDropdown');
+  dd.classList.toggle('open');
+}
+
+// Close dropdown when clicking outside
+document.addEventListener('click', function(e) {
+  var dd = document.getElementById('modeDropdown');
+  var picker = document.querySelector('.mode-picker');
+  if (dd && picker && !picker.contains(e.target)) {
+    dd.classList.remove('open');
+  }
+});
 
 // ═══ Keyboard shortcuts ═══
 document.addEventListener('keydown', function(e) {
