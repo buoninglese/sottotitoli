@@ -533,7 +533,7 @@ body {
   <aside class="sidebar-left" id="speakerSidebar">
     <div class="sidebar-left-head">
       <span>🎙 Speakers</span>
-      <span class="spk-count-badge" id="sidebarSpkCount">3</span>
+      <span class="spk-count-badge" id="sidebarSpkCount">1</span>
     </div>
     <div class="sidebar-left-body" id="speakerTagList">
       <!-- Dynamically populated -->
@@ -554,7 +554,7 @@ body {
             <button data-mode="wx" class="active" onclick="switchMode('wx')"><span class="mode-dot" style="background:#34d399"></span>WX · Universal<span class="mode-badge">auto</span></button>
           </div>
         </div>
-        <span class="spk-count" id="spkCount">3 SPK</span>
+        <span class="spk-count" id="spkCount">1 SPK</span>
       </div>
       <div class="studio-ctrl" id="studioCtrlBar">
         <span class="ctrl-label">Target</span>
@@ -597,22 +597,8 @@ body {
     </div>
     <div class="sidebar-right-bottom">
       <div class="room-title">Room Info</div>
-      <div class="room-stat">
-        <span>Status</span>
-        <span class="stat-val status-connected" id="roomStatus">● Connected</span>
-      </div>
-      <div class="room-stat">
-        <span>Mic</span>
-        <span class="stat-val" id="roomMicState">Live</span>
-      </div>
-      <div class="room-stat">
-        <span>Quality</span>
-        <span class="stat-val" id="roomQuality">
-          <span class="q-bar fill"></span><span class="q-bar fill"></span><span class="q-bar fill"></span>
-        </span>
-      </div>
       <div class="room-stat"><span>Mode</span><span class="stat-val" id="roomMode">Universal</span></div>
-      <div class="room-stat"><span>Speakers</span><span class="stat-val" id="roomSpeakers">3</span></div>
+      <div class="room-stat"><span>Speakers</span><span class="stat-val" id="roomSpeakers">1</span></div>
       <div class="room-stat"><span>Target</span><span class="stat-val" id="roomTarget">IT</span></div>
     </div>
   </aside>
@@ -628,9 +614,7 @@ var LANGS = ['Auto-detect','English','Italiano','Français','Deutsch','Español'
 var LANG_CODES = ['auto','en','it','fr','de','es','pt','nl','zh','ja','ar','ru','ko'];
 
 var speakers = [
-  { tag: 'EN', native: 'auto', color: '#6b9dff' },
-  { tag: 'IT', native: 'auto', color: '#f87171' },
-  { tag: 'FR', native: 'auto', color: '#34d399' }
+  { tag: 'SPK1', native: 'auto', color: '#6b9dff' }
 ];
 var isLive = true;
 var sessionActive = false;
@@ -839,10 +823,27 @@ function cycleSpeakerColor(idx, dot) {
 }
 
 function addSpeaker() {
+  if (currentMode === 'wx' && speakers.length >= 10) {
+    showToast('⚠ Max 10 speakers in Universal mode');
+    return;
+  }
   var newColor = SPK_COLORS[speakers.length % SPK_COLORS.length];
-  var newTag = SPK_TAGS[speakers.length % SPK_TAGS.length];
+  var newTag;
+  if (currentMode === 'wx') {
+    // Find next available SPK number
+    var usedNums = [];
+    speakers.forEach(function(s) {
+      var m = s.tag.match(/^SPK(\d+)$/);
+      if (m) usedNums.push(parseInt(m[1]));
+    });
+    var n = 1;
+    while (usedNums.indexOf(n) !== -1) n++;
+    newTag = 'SPK' + n;
+    newColor = SPK_COLORS[(n-1) % SPK_COLORS.length];
+  } else {
+    newTag = SPK_TAGS[speakers.length % SPK_TAGS.length];
+  }
   speakers.push({ tag: newTag, native: 'auto', color: newColor });
-  // Rebuild modal
   var overlay = document.querySelector('.modal-overlay');
   if (overlay) overlay.remove();
   openSpeakerConfig();
@@ -857,19 +858,12 @@ function removeSpeaker(idx) {
 }
 
 function applyConfig() {
-  renderLines();
-  // Auto-detect mode from speaker count
-  var count = speakers.length;
-  var detectedMode;
-  if (count <= 2) detectedMode = 'w2';
-  else if (count === 3) detectedMode = 'w3';
-  else if (count === 4) detectedMode = 'w4';
-  else if (count === 5) detectedMode = 'w5';
-  else detectedMode = 'wx';
-  
-  if (detectedMode !== currentMode) {
-    switchMode(detectedMode);
+  // In Universal mode, enforce max 10 speakers
+  if (currentMode === 'wx' && speakers.length > 10) {
+    speakers = speakers.slice(0, 10);
+    showToast('⚠ Max 10 speakers in Universal mode');
   }
+  renderLines();
   showToast('✓ Speaker config applied — ' + speakers.length + ' speakers');
 }
 
@@ -884,15 +878,34 @@ function runSimulation() {
   btn.textContent = '⏳ Simulating…';
   btn.style.pointerEvents = 'none';
   
-  // Add a new speaker if possible
-  var usedTags = speakers.map(function(s) { return s.tag; });
-  var available = SPK_TAGS.filter(function(t) { return usedTags.indexOf(t) === -1; });
+  // Add new speaker: numbered modes use fixed tags, WX auto-assigns up to 10
   var newSpeakerAdded = false;
-  if (available.length > 0) {
-    var newTag = available[Math.floor(Math.random() * available.length)];
-    var newColor = SPK_COLORS[speakers.length % SPK_COLORS.length];
-    speakers.push({ tag: newTag, native: 'auto', color: newColor });
-    newSpeakerAdded = true;
+  if (currentMode === 'wx') {
+    // Universal: auto-assign SPK1..SPK10, max 10
+    if (speakers.length < 10) {
+      var nextNum = speakers.length + 1;
+      var newColor = SPK_COLORS[(nextNum - 1) % SPK_COLORS.length];
+      // Find unused SPK number
+      var usedNums = [];
+      speakers.forEach(function(s) {
+        var m = s.tag.match(/^SPK(\d+)$/);
+        if (m) usedNums.push(parseInt(m[1]));
+      });
+      var n = 1;
+      while (usedNums.indexOf(n) !== -1) n++;
+      speakers.push({ tag: 'SPK' + n, native: 'auto', color: SPK_COLORS[(n-1) % SPK_COLORS.length] });
+      newSpeakerAdded = true;
+    }
+  } else {
+    // Numbered modes: use predefined tags from SPK_TAGS
+    var usedTags = speakers.map(function(s) { return s.tag; });
+    var available = SPK_TAGS.filter(function(t) { return usedTags.indexOf(t) === -1; });
+    if (available.length > 0) {
+      var newTag = available[Math.floor(Math.random() * available.length)];
+      var newColor = SPK_COLORS[speakers.length % SPK_COLORS.length];
+      speakers.push({ tag: newTag, native: 'auto', color: newColor });
+      newSpeakerAdded = true;
+    }
   }
   
   // Add 3 new lines with staggered animation
@@ -1020,23 +1033,9 @@ function updateRoomInfo() {
   var elMode = document.getElementById('roomMode');
   var elSpk = document.getElementById('roomSpeakers');
   var elTarget = document.getElementById('roomTarget');
-  var elStatus = document.getElementById('roomStatus');
-  var elMic = document.getElementById('roomMicState');
-  var elQuality = document.getElementById('roomQuality');
   if (elMode) elMode.textContent = modeLabels[currentMode] || 'Universal';
   if (elSpk) elSpk.textContent = speakers.length;
   if (elTarget) elTarget.textContent = currentTargetLang.toUpperCase();
-  if (elStatus) {
-    elStatus.textContent = '● Connected';
-    elStatus.className = 'stat-val status-connected';
-  }
-  if (elMic) {
-    elMic.textContent = isLive ? 'Live' : 'Muted';
-    elMic.style.color = isLive ? '' : '#f87171';
-  }
-  if (elQuality) {
-    elQuality.innerHTML = '<span class="q-bar fill"></span><span class="q-bar fill"></span><span class="q-bar fill"></span>';
-  }
 }
 
 // ═══ Share room ═══
@@ -1156,7 +1155,7 @@ var MODE_CONFIGS = {
   w5: { name: 'W5 · Quintet', accent: '#fbbf24', accent2: '#fcd34d', bg: '#0f0a05',
     speakers: [{tag:'EN',native:'en',color:'#6b9dff'},{tag:'IT',native:'it',color:'#f87171'},{tag:'ES',native:'es',color:'#fbbf24'},{tag:'ZH',native:'zh',color:'#f472b6'},{tag:'AR',native:'ar',color:'#34d399'}] },
   wx: { name: 'WX · Universal', accent: '#34d399', accent2: '#6ee7b7', bg: '#0a0f14',
-    speakers: [{tag:'EN',native:'auto',color:'#6b9dff'},{tag:'IT',native:'auto',color:'#f87171'},{tag:'FR',native:'auto',color:'#34d399'}] }
+    speakers: [{tag:'SPK1',native:'auto',color:'#6b9dff'}] }
 };
 
 function switchMode(modeId) {
