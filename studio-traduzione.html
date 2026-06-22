@@ -1091,7 +1091,12 @@ function _getUserRoomId() {
 function _getShareUrl() {
   var roomId = _getUserRoomId();
   var base = window.location.origin + window.location.pathname;
-  return base + '?room=' + roomId;
+  var params = '?room=' + roomId;
+  params += '&mode=' + currentMode;
+  params += '&src=' + currentTrSource;
+  params += '&tgt=' + currentTrTarget;
+  params += '&spk=' + speakers.length;
+  return base + params;
 }
 
 function shareRoom(channel) {
@@ -1131,30 +1136,51 @@ function shareRoom(channel) {
   });
 }
 
-// ═══ Auth gate for shared rooms ═══
+// ═══ Auth gate for shared rooms — restores full page state ═══
 (function() {
   var params = new URLSearchParams(window.location.search);
   var roomParam = params.get('room');
   if (!roomParam) return; // not a shared room link
   
-  // Check auth
+  // Store room state from URL for restoration after auth
+  var roomState = {
+    room: roomParam,
+    mode: params.get('mode') || 'wx',
+    src: params.get('src') || 'en',
+    tgt: params.get('tgt') || 'it',
+    spk: parseInt(params.get('spk')) || 1
+  };
+  
+  function restoreRoomState() {
+    // Switch to the shared mode
+    if (roomState.mode && window.switchMode) {
+      switchMode(roomState.mode);
+    }
+    // Set translation pair
+    if (roomState.src && roomState.tgt && window.setTrPair) {
+      var label = roomState.src.toUpperCase() + ' → ' + roomState.tgt.toUpperCase();
+      setTrPair(roomState.src, roomState.tgt, label);
+    }
+    // Update room status
+    var status = document.getElementById('roomStatus');
+    if (status) {
+      status.textContent = '● Shared Room';
+      status.className = 'stat-val status-connected';
+    }
+    showToast('🔗 Joined room: ' + roomParam);
+  }
+  
   function checkRoomAuth() {
     var sb = window.sottotitoliSupabase;
     if (!sb) { setTimeout(checkRoomAuth, 300); return; }
     sb.auth.getSession().then(function(r) {
       if (!r.data?.session) {
-        // Redirect to login, preserving the room link
         localStorage.setItem('sottotitoli_return_page', window.location.pathname + window.location.search);
         window.location.href = 'https://buoninglese.github.io/sottotitoli/start.html';
         return;
       }
-      // User is logged in — show room info
-      var status = document.getElementById('roomStatus');
-      if (status) {
-        status.textContent = '● Shared Room';
-        status.className = 'stat-val status-connected';
-      }
-      showToast('🔗 Joined room: ' + roomParam);
+      // Wait for init to complete, then restore state
+      setTimeout(restoreRoomState, 800);
     });
   }
   checkRoomAuth();
