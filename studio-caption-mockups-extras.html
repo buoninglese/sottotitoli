@@ -1,0 +1,162 @@
+<!DOCTYPE html><html lang="it" data-theme="dark"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>Sottotitoli · Extra Collection</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300;14..32,400;14..32,500;14..32,600;14..32,700;14..32,900&family=JetBrains+Mono:wght@400;500;600;700&family=Space+Grotesk:wght@300;400;600;700&family=Syne:wght@400;600;700;800&family=Unbounded:wght@300;400;600;800&family=Geist+Mono:wght@400;500;700&family=Outfit:wght@300;400;600;800&family=Playfair+Display:ital,wght@0,400;0,700;0,900;1,400&family=DM+Serif+Display&family=Bebas+Neue&family=Courier+Prime:wght@400;700&family=Manrope:wght@300;400;600;800&family=Comfortaa:wght@400;700&family=Major+Mono+Display&family=Press+Start+2P&family=Caveat:wght@400;700&family=Abril+Fatface&family=Instrument+Serif&family=Work+Sans:wght@300;400;600&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Inter',system-ui,sans-serif;background:#060610;color:#e8eaed;padding:24px}
+h1{font-size:clamp(24px,5vw,40px);font-weight:900;letter-spacing:-1.5px;text-align:center;background:linear-gradient(90deg,#34d399,#60a5fa,#a78bfa,#f472b6,#34d399);background-size:300% 100%;-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;animation:titleShift 6s linear infinite;margin-bottom:2px}
+@keyframes titleShift{0%{background-position:0% 50%}100%{background-position:300% 50%}}
+.subtitle{text-align:center;color:#8b93a5;margin-bottom:20px;font-size:13px}
+.grid{display:grid;grid-template-columns:repeat(2,1fr);gap:18px;max-width:1600px;margin:0 auto}
+@media(max-width:520px){.grid{grid-template-columns:1fr}}
+.mockup-card{background:#0f121e;border:1px solid #1a1e2e;border-radius:14px;overflow:hidden;transition:all .35s;animation:fadeInUp .5s ease both}
+.mockup-card:hover{transform:translateY(-4px);box-shadow:0 12px 40px rgba(0,0,0,.5);border-color:#2a2e3e}
+.mockup-card.deleted-card{display:none!important}
+.mockup-label{display:flex;justify-content:space-between;align-items:center;padding:9px 14px;background:#1a1e2e;font-size:11px;font-weight:600;color:#8b93a5}
+.mockup-label span:last-child{font-size:9px;color:#4e5566;font-family:'JetBrains Mono',monospace}
+.mockup-body{padding:14px;min-height:320px;display:flex;flex-direction:column;gap:8px;position:relative;overflow:hidden}
+.cap-box{border-radius:10px;padding:14px;position:relative;transition:all .3s}
+.cap-interim{font-weight:600;line-height:1.2;margin-bottom:4px;font-size:14px}
+.cap-line{display:flex;gap:8px;align-items:flex-start;padding:3px 0;font-size:11px}
+.cap-ts{flex-shrink:0;font-size:8px;opacity:.4;padding-top:1px;min-width:44px}
+.chips{display:flex;gap:4px;flex-wrap:wrap;align-items:center}
+.chip{padding:4px 10px;border-radius:100px;font-size:9px;font-weight:600;display:flex;align-items:center;gap:3px;background:rgba(255,255,255,.05);color:rgba(255,255,255,.6)}
+.extra-panel{display:grid;gap:6px;margin-top:4px}
+@keyframes fadeInUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+</style>
+</head>
+<body>
+<h1>📊 40 Real-Time Extra Info II</h1><p class="subtitle">Live Word Analysis · Progressive Disclosure · Smart Annotations — June 2026</p>
+<div class="grid" id="mgrid"></div>
+
+<div class="grid" id="mgrid"></div>
+<div class="empty-state" id="empty" style="text-align:center;padding:80px 20px;color:#4e5566"><div class="icon" style="font-size:64px;margin-bottom:16px">📌</div><h2 style="font-size:20px;color:#8b93a5;margin-bottom:8px">Nessun extra ancora</h2><p style="font-size:13px;max-width:400px;margin:0 auto;line-height:1.6">Su qualsiasi pagina mockup, premi <strong>"📌 Extra"</strong> su un design per raccoglierlo qui.</p></div>
+<div class="clear-bar" id="clearBar" style="text-align:center;margin-top:24px;display:none"><button id="clearAllBtn" style="background:rgba(248,113,113,.1);color:#f87171;border:1px solid rgba(248,113,113,.2);padding:8px 20px;border-radius:8px;cursor:pointer;font-size:11px;font-weight:600;font-family:inherit;transition:all .2s">🗑 Svuota tutti gli extra</button></div>
+<script>
+(function(){
+var EXTRA_KEY='mockup_extras';
+var extras=JSON.parse(localStorage.getItem(EXTRA_KEY)||'[]');
+var grid=document.getElementById('mgrid');
+var empty=document.getElementById('empty');
+var clearBar=document.getElementById('clearBar');
+
+function render(){
+  grid.innerHTML='';
+  if(extras.length===0){
+    empty.style.display='block';clearBar.style.display='none';return;
+  }
+  empty.style.display='none';clearBar.style.display='block';
+  
+  var allStyles='';
+  var seenStyles={};
+  extras.forEach(function(e){
+    if(e.style && !seenStyles[e.style]){
+      seenStyles[e.style]=true;
+      allStyles+=e.style;
+    }
+  });
+  
+  extras.forEach(function(e,i){
+    var wrapper=document.createElement('div');
+    wrapper.className='mockup-card';
+    wrapper.style.animationDelay=(i*0.05)+'s';
+    
+    var sourceLabel=e.sourcePage?e.sourcePage.replace('studio-caption-mockups-','Pg ').replace('studio-caption-mockups','Pg 1'):'?';
+    
+    var html='';
+    if(e.style && i===0) html+='<style>'+allStyles+'</style>';
+    html+='<div style="font-size:9px;color:rgba(52,211,153,.4);margin-bottom:2px;font-family:JetBrains Mono,monospace;padding:8px 14px">← '+sourceLabel+'</div>';
+    html+=(e.html||'');
+    
+    wrapper.innerHTML=html;
+    grid.appendChild(wrapper);
+    
+    var tools=document.createElement('div');
+    tools.style.cssText='display:flex;gap:6px;padding:8px 14px;background:#0a0a0f;border:1px solid #1a1e2e;border-top:none;border-radius:0 0 14px 14px';
+    tools.innerHTML='<button class="restore-btn" style="background:rgba(96,165,250,.1);color:#60a5fa;border:1px solid rgba(96,165,250,.2);padding:6px 12px;border-radius:6px;cursor:pointer;font-size:10px;font-weight:600;font-family:inherit">↩ Ripristina</button> <button class="remove-btn" style="background:rgba(248,113,113,.15);color:#f87171;border:1px solid rgba(248,113,113,.3);padding:6px 12px;border-radius:6px;cursor:pointer;font-size:10px;font-weight:600;font-family:inherit">🗑 Rimuovi</button>';
+    wrapper.appendChild(tools);
+    
+    tools.querySelector('.remove-btn').addEventListener('click',function(){
+      if(confirm('Rimuovere "'+e.name+'"?')){
+        extras.splice(i,1);localStorage.setItem(EXTRA_KEY,JSON.stringify(extras));render();
+      }
+    });
+    tools.querySelector('.restore-btn').addEventListener('click',function(){
+      if(confirm('Ripristinare "'+e.name+'" su '+sourceLabel+'?')){
+        var delKey='mockup_deleted';
+        var deleted=JSON.parse(localStorage.getItem(delKey)||'[]');
+        deleted=deleted.filter(function(d){return !(d.name===e.name&&d.page===e.sourcePage)});
+        localStorage.setItem(delKey,JSON.stringify(deleted));
+        extras.splice(i,1);localStorage.setItem(EXTRA_KEY,JSON.stringify(extras));render();
+      }
+    });
+  });
+}
+
+render();
+
+document.getElementById('clearAllBtn').addEventListener('click',function(){
+  if(confirm('Eliminare TUTTI gli extra? Irreversibile.')){
+    localStorage.setItem(EXTRA_KEY,'[]');extras=[];render();
+  }
+});
+
+window.addEventListener('storage',function(e){
+  if(e.key===EXTRA_KEY){extras=JSON.parse(localStorage.getItem(EXTRA_KEY)||'[]');render();}
+});
+})();
+</script>
+<script>
+(function(){
+var DELETED_KEY='mockup_deleted';
+var COMMENTS_KEY='mockup_comments';
+var FAV_KEY='mockup_favorites';
+var EXTRA_KEY='mockup_extras';
+var VERSIONED_KEY='mockup_versioned';
+var deleted=JSON.parse(localStorage.getItem(DELETED_KEY)||'[]');
+var comments=JSON.parse(localStorage.getItem(COMMENTS_KEY)||'{}');
+var favorites=JSON.parse(localStorage.getItem(FAV_KEY)||'{}');
+var extras=JSON.parse(localStorage.getItem(EXTRA_KEY)||'[]');
+var versioned=JSON.parse(localStorage.getItem(VERSIONED_KEY)||'{}');
+var pageId='studio-caption-mockups-extras';
+
+var debugPanel=document.createElement('div');
+debugPanel.style.cssText='position:fixed;bottom:0;left:0;right:0;max-height:35vh;background:#0a0a14;border-top:1px solid #1a1e2e;overflow-y:auto;z-index:99999;padding:10px 14px;font-family:JetBrains Mono,monospace;font-size:10px;color:#8b93a5;display:block';
+var debugHtml='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><b style="color:#60a5fa;font-size:11px">📋 Note su questa pagina</b><span style="font-size:9px;color:#4e5566">'+pageId+'</span></div>';
+
+var pageComments=[];
+Object.keys(comments).forEach(function(k){
+  if(k.startsWith(pageId+'::')){
+    var c=comments[k];
+    if(c && c.text) pageComments.push({key:k,name:k.replace(pageId+'::',''),text:c.text,time:c.time,ver:c.ver});
+  }
+});
+if(pageComments.length===0) debugHtml+='<div style="color:#4e5566;font-size:10px;padding:4px 0">No notes yet. Click 💬 on any design.</div>';
+else {
+  debugHtml+='<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px">';
+  pageComments.forEach(function(pc){
+    var vBadge=pc.ver?' <span style="color:#fbbf24;font-size:8px">◆ v'+pc.ver+'</span>':'';
+    debugHtml+='<div style="background:#1a1e2e;border:1px solid #2a2e3e;border-radius:8px;padding:6px 10px;flex:1;min-width:200px"><div style="display:flex;justify-content:space-between"><b style="color:#e8eaed;font-size:10px">'+pc.name+vBadge+'</b><span style="font-size:8px;color:#4e5566">'+new Date(pc.time).toLocaleString()+'</span></div><div style="color:#8b93a5;margin-top:3px;line-height:1.5">'+pc.text+'</div><div style="margin-top:4px"><button style="background:rgba(96,165,250,.1);color:#60a5fa;border:1px solid rgba(96,165,250,.2);padding:3px 8px;border-radius:4px;cursor:pointer;font-size:8px" onclick="navigator.clipboard.writeText(''+pc.text.replace(/'/g,"\'")+'')">📋 Copy</button><button style="background:rgba(248,113,113,.1);color:#f87171;border:1px solid rgba(248,113,113,.2);padding:3px 8px;border-radius:4px;cursor:pointer;font-size:8px;margin-left:4px" onclick="var c=JSON.parse(localStorage.getItem('mockup_comments')||'{}');delete c[''+pc.key+''];localStorage.setItem('mockup_comments',JSON.stringify(c));location.reload()">✕</button></div></div>';
+  });
+  debugHtml+='</div>';
+}
+
+var allPageComments=[];
+Object.keys(comments).forEach(function(k){
+  var c=comments[k];
+  if(c && c.text && !k.startsWith(pageId+'::')) allPageComments.push({key:k,text:c.text,time:c.time,ver:c.ver});
+});
+if(allPageComments.length>0){
+  debugHtml+='<details style="margin-top:4px"><summary style="color:#4e5566;cursor:pointer;font-size:10px">📋 Tutte le note ('+allPageComments.length+')</summary><div style="margin-top:4px">';
+  allPageComments.forEach(function(ac){
+    var vBadge=ac.ver?' <span style="color:#fbbf24;font-size:8px">◆ v'+ac.ver+'</span>':'';
+    debugHtml+='<div style="font-size:9px;color:#4e5566;padding:2px 0">'+ac.key+vBadge+': '+ac.text.substring(0,80)+'</div>';
+  });
+  debugHtml+='</div></details>';
+}
+
+debugPanel.innerHTML=debugHtml;
+document.body.appendChild(debugPanel);
+})();
+</script>
+</body></html>
