@@ -326,6 +326,37 @@ body.fullscreen-active .fs-float-btn {
 }
 body.fullscreen-active #fullscreenBtn:hover { background: var(--accent); color: var(--card); }
 
+
+/* Topbar label + separator */
+.topbar-label { font-family: 'Inter', sans-serif; font-size: 9px; font-weight: 500; color: var(--muted2); text-transform: uppercase; letter-spacing: .5px; margin: 0 4px; }
+.topbar-sep { color: var(--line); font-size: 14px; margin: 0 2px; }
+
+/* Language dropdown */
+.lang-dropdown { position: relative; }
+.lang-dropdown-btn {
+  font-family: 'Inter', sans-serif; font-size: 10px; font-weight: 600;
+  padding: 5px 10px; border-radius: 6px; border: 1px solid var(--line);
+  background: var(--card); color: var(--text); cursor: pointer;
+  transition: all .2s; white-space: nowrap;
+}
+.lang-dropdown-btn:hover { border-color: var(--accent); }
+.lang-dropdown-menu {
+  position: absolute; top: 100%; left: 0; margin-top: 4px;
+  background: var(--card); border: 1px solid var(--line);
+  border-radius: 8px; padding: 4px; min-width: 160px; z-index: 300;
+  box-shadow: 0 8px 32px rgba(0,0,0,.1);
+  display: none; flex-direction: column;
+}
+.lang-dropdown-menu.open { display: flex; }
+.lang-dropdown-menu button {
+  font-family: 'Inter', sans-serif; font-size: 11px; font-weight: 500;
+  padding: 8px 12px; border: none; border-radius: 6px;
+  background: transparent; color: var(--text); cursor: pointer;
+  text-align: left; transition: all .15s;
+}
+.lang-dropdown-menu button:hover { background: var(--bg2); }
+.lang-dropdown-menu button.active { background: var(--accent); color: var(--card); }
+
 </style>
 </head>
 <body>
@@ -333,10 +364,22 @@ body.fullscreen-active #fullscreenBtn:hover { background: var(--accent); color: 
 <!-- ═══ TOP BAR ═══ -->
 <header class="topbar">
   <a href="studio-caption-mockups-888.html" class="logo">SOTTOTITOLI</a>
-  <span class="spacer"></span>
-  <span class="pill" id="modeBadge">Editorial</span>
+  <span class="topbar-label">change layout</span>
   <button class="mode-toggle-btn active" data-mode="i1" onclick="setCaptionMode('i1')">Bunko</button>
   <button class="mode-toggle-btn" data-mode="j7b" onclick="setCaptionMode('j7b')">Shoji</button>
+  <span class="topbar-sep">|</span>
+  <div class="lang-dropdown" style="position:relative">
+    <button class="lang-dropdown-btn" id="captionLangBtn" onclick="toggleCaptionLangDropdown()">English ▾</button>
+    <div class="lang-dropdown-menu" id="captionLangDropdown">
+      <button data-clang="en-US" class="active" onclick="setCaptionLanguage('en-US','English')">🇬🇧 English</button>
+      <button data-clang="it-IT" onclick="setCaptionLanguage('it-IT','Italiano')">🇮🇹 Italiano</button>
+      <button data-clang="fr-FR" onclick="setCaptionLanguage('fr-FR','Français')">🇫🇷 Français</button>
+      <button data-clang="de-DE" onclick="setCaptionLanguage('de-DE','Deutsch')">🇩🇪 Deutsch</button>
+      <button data-clang="es-ES" onclick="setCaptionLanguage('es-ES','Español')">🇪🇸 Español</button>
+      <button data-clang="pt-PT" onclick="setCaptionLanguage('pt-PT','Português')">🇵🇹 Português</button>
+      <button data-clang="nl-NL" onclick="setCaptionLanguage('nl-NL','Nederlands')">🇳🇱 Nederlands</button>
+    </div>
+  </div>
   <span class="spacer"></span>
   <div class="hamburger-menu" style="position:relative">
     <button class="hamburger-btn" onclick="toggleHamburger()" title="Menu">☰</button>
@@ -459,6 +502,62 @@ body.fullscreen-active #fullscreenBtn:hover { background: var(--accent); color: 
 <script src="js/real-mic.js?v=2"></script>
 
 <script>
+
+// ═══ Caption Language Dropdown ═══
+var currentCaptionLang = 'en-US';
+var currentCaptionLangName = 'English';
+
+function toggleCaptionLangDropdown() {
+  var dd = document.getElementById('captionLangDropdown');
+  if (dd) dd.classList.toggle('open');
+}
+function setCaptionLanguage(code, name) {
+  currentCaptionLang = code;
+  currentCaptionLangName = name;
+  document.getElementById('captionLangBtn').textContent = name + ' ▾';
+  document.querySelectorAll('#captionLangDropdown button').forEach(function(b) {
+    b.classList.toggle('active', b.getAttribute('data-clang') === code);
+  });
+  document.getElementById('captionLangDropdown').classList.remove('open');
+  // Update speech recognition language if active
+  if (_realMic && _realMic.recognition) {
+    _realMic.recognition.lang = code;
+  }
+  localStorage.setItem('sottotitoli-caption-lang', code);
+}
+// Close lang dropdown on outside click
+document.addEventListener('click', function(e) {
+  var dd = document.getElementById('captionLangDropdown');
+  var btn = document.getElementById('captionLangBtn');
+  if (dd && btn && !btn.contains(e.target) && !dd.contains(e.target)) {
+    dd.classList.remove('open');
+  }
+});
+// Restore saved lang
+(function() {
+  var saved = localStorage.getItem('sottotitoli-caption-lang') || 'en-US';
+  var names = {'en-US':'English','it-IT':'Italiano','fr-FR':'Français','de-DE':'Deutsch','es-ES':'Español','pt-PT':'Português','nl-NL':'Nederlands'};
+  setCaptionLanguage(saved, names[saved] || 'English');
+})();
+
+// ═══ Session saved notification ═══
+var _sessionSavedShown = false;
+function showSessionSaved() {
+  if (_sessionSavedShown) return;
+  _sessionSavedShown = true;
+  var info = document.getElementById('creditPill');
+  if (info) {
+    info.innerHTML = '<a href="account.html" style="color:var(--accent);text-decoration:underline;">Session saved →</a>';
+    setTimeout(function() { info.textContent = '— min'; _sessionSavedShown = false; }, 5000);
+  }
+}
+// Hook into stop
+var _origToggleSession = toggleSession;
+toggleSession = function() {
+  _origToggleSession();
+  if (!sessionActive) showSessionSaved();
+};
+
 // ═══ Mode switching ═══
 var currentCaptionMode = 'i1';
 
@@ -468,9 +567,7 @@ function setCaptionMode(mode) {
   document.querySelectorAll('.mode-toggle-btn').forEach(function(b) {
     b.classList.toggle('active', b.getAttribute('data-mode') === mode);
   });
-  var badge = document.getElementById('modeBadge');
-  var labels = { i1: 'Bunko', j7b: 'Shoji' };
-  if (badge) badge.textContent = labels[mode] || mode;
+  // mode badge removed — using change layout label
   localStorage.setItem('sottotitoli-caption-mode', mode);
 }
 

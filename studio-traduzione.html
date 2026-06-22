@@ -195,6 +195,36 @@ body {
 .mode-toggle-btn:hover { border-color: rgba(255,255,255,.15); color: rgba(255,255,255,.75); }
 .mode-toggle-btn.active { background: rgba(52,211,153,.12); border-color: rgba(52,211,153,.25); color: #34d399; }
 
+
+/* Language dropdown (shared with caption) */
+.lang-dropdown { position: relative; }
+.lang-dropdown-btn {
+  font-family: 'Inter', sans-serif; font-size: 10px; font-weight: 600;
+  padding: 5px 10px; border-radius: 6px; border: 1px solid rgba(255,255,255,.08);
+  background: rgba(255,255,255,.03); color: rgba(255,255,255,.6); cursor: pointer;
+  transition: all .2s; white-space: nowrap;
+}
+.lang-dropdown-btn:hover { border-color: rgba(255,255,255,.15); color: rgba(255,255,255,.85); }
+.lang-dropdown-menu {
+  position: absolute; top: 100%; left: 0; margin-top: 4px;
+  background: #151d28; border: 1px solid rgba(255,255,255,.08);
+  border-radius: 8px; padding: 4px; min-width: 180px; z-index: 300;
+  box-shadow: 0 12px 40px rgba(0,0,0,.4);
+  display: none; flex-direction: column;
+}
+.lang-dropdown-menu.open { display: flex; }
+.lang-dropdown-menu button {
+  font-family: 'Inter', sans-serif; font-size: 11px; font-weight: 500;
+  padding: 8px 12px; border: none; border-radius: 6px;
+  background: transparent; color: rgba(255,255,255,.6); cursor: pointer;
+  text-align: left; transition: all .15s;
+}
+.lang-dropdown-menu button:hover { background: rgba(255,255,255,.04); color: #fff; }
+.lang-dropdown-menu button.active { background: rgba(52,211,153,.12); color: #34d399; }
+
+/* Hamburger style awareness — match page font */
+.hamburger-dropdown a { font-family: 'Work Sans', sans-serif; font-size: 12px; }
+
 /* ═══ HAMBURGER MENU ═══ */
 .hamburger-btn {
   font-family: 'Inter', sans-serif; font-size: 15px; font-weight: 600;
@@ -508,6 +538,21 @@ body {
 <header class="topbar">
   <a href="studio-caption-mockups-10.html" class="logo">SOTTO<span>TITOLI</span></a>
   <span class="badge" id="modeBadge">Universal</span>
+  <div class="lang-dropdown" style="position:relative">
+    <button class="lang-dropdown-btn" id="trPairBtn" onclick="toggleTrPairDropdown()">EN → IT ▾</button>
+    <div class="lang-dropdown-menu" id="trPairDropdown">
+      <button data-pair="en-it" class="active" onclick="setTrPair('en','it','EN → IT')">🇬🇧 EN → 🇮🇹 IT</button>
+      <button data-pair="en-fr" onclick="setTrPair('en','fr','EN → FR')">🇬🇧 EN → 🇫🇷 FR</button>
+      <button data-pair="en-de" onclick="setTrPair('en','de','EN → DE')">🇬🇧 EN → 🇩🇪 DE</button>
+      <button data-pair="en-es" onclick="setTrPair('en','es','EN → ES')">🇬🇧 EN → 🇪🇸 ES</button>
+      <button data-pair="en-pt" onclick="setTrPair('en','pt','EN → PT')">🇬🇧 EN → 🇵🇹 PT</button>
+      <button data-pair="en-nl" onclick="setTrPair('en','nl','EN → NL')">🇬🇧 EN → 🇳🇱 NL</button>
+      <button data-pair="it-en" onclick="setTrPair('it','en','IT → EN')">🇮🇹 IT → 🇬🇧 EN</button>
+      <button data-pair="fr-en" onclick="setTrPair('fr','en','FR → EN')">🇫🇷 FR → 🇬🇧 EN</button>
+      <button data-pair="de-en" onclick="setTrPair('de','en','DE → EN')">🇩🇪 DE → 🇬🇧 EN</button>
+      <button data-pair="es-en" onclick="setTrPair('es','en','ES → EN')">🇪🇸 ES → 🇬🇧 EN</button>
+    </div>
+  </div>
   <span class="spacer"></span>
   <span class="spacer"></span>
   <button class="mode-toggle-btn" id="lightModeBtn" onclick="toggleTheme()" title="Light/Dark mode">☀️</button>
@@ -1154,6 +1199,62 @@ function showToast(msg) {
   document.body.appendChild(t);
   setTimeout(function() { t.style.opacity = '0'; t.style.transition = 'opacity .3s'; setTimeout(function() { t.remove(); }, 300); }, 2000);
 }
+
+
+// ═══ Translation Pair Dropdown ═══
+var currentTrSource = 'en';
+var currentTrTarget = 'it';
+
+function toggleTrPairDropdown() {
+  var dd = document.getElementById('trPairDropdown');
+  if (dd) dd.classList.toggle('open');
+}
+function setTrPair(src, tgt, label) {
+  currentTrSource = src;
+  currentTrTarget = tgt;
+  document.getElementById('trPairBtn').textContent = label + ' ▾';
+  document.querySelectorAll('#trPairDropdown button').forEach(function(b) {
+    b.classList.toggle('active', b.getAttribute('data-pair') === src + '-' + tgt);
+  });
+  document.getElementById('trPairDropdown').classList.remove('open');
+  // Update target language button to match
+  currentTargetLang = tgt;
+  document.querySelectorAll('.lang-btn').forEach(function(b) {
+    b.classList.toggle('active', b.getAttribute('data-lang').toLowerCase() === tgt);
+  });
+  for (var i = 0; i < _lineData.length; i++) {
+    var sidx = i % SAMPLES.length;
+    _lineData[i].tr = SAMPLES[sidx][tgt] || SAMPLES[sidx].it;
+  }
+  var rt = document.getElementById('roomTarget');
+  if (rt) rt.textContent = tgt.toUpperCase();
+  renderLinesKeepScroll();
+}
+// Close pair dropdown on outside click
+document.addEventListener('click', function(e) {
+  var dd = document.getElementById('trPairDropdown');
+  var btn = document.getElementById('trPairBtn');
+  if (dd && btn && !btn.contains(e.target) && !dd.contains(e.target)) {
+    dd.classList.remove('open');
+  }
+});
+
+// ═══ Session saved notification ═══
+var _trSessionSavedShown = false;
+function showTrSessionSaved() {
+  if (_trSessionSavedShown) return;
+  _trSessionSavedShown = true;
+  var status = document.getElementById('roomStatus');
+  if (status) {
+    status.innerHTML = '<a href="account.html" style="color:#34d399;text-decoration:underline;">Session saved →</a>';
+    setTimeout(function() { status.textContent = '● Connected'; _trSessionSavedShown = false; }, 5000);
+  }
+}
+var _origTrToggleSession = toggleSession;
+toggleSession = function() {
+  _origTrToggleSession();
+  if (!sessionActive) showTrSessionSaved();
+};
 
 // ═══ Mode Picker ═══
 var currentTargetLang = 'it'; // default target language
