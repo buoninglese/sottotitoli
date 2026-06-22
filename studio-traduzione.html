@@ -334,16 +334,16 @@ body {
 <!-- ═══ TOP BAR ═══ -->
 <header class="topbar">
   <a href="studio-caption-mockups-10.html" class="logo">SOTTO<span>TITOLI</span></a>
-  <span class="badge" id="modeBadge">AUTO</span>
+  <span class="badge" id="modeBadge">Universal</span>
   <span class="spacer"></span>
   <span class="live-dot" id="liveIndicator" onclick="toggleLive()">LIVE</span>
-  <button onclick="openSpeakerConfig()" title="Configura speakers">⚙ Setup</button>
+  <button onclick="openSpeakerConfig()" title="Configura speakers">⚙ Speaker Setup</button>
   <button onclick="simulateVoice()" title="Simula nuova voce">🎙 +Voice</button>
 </header>
 
 <!-- ═══ MAIN STAGE ═══ -->
 <div class="stage">
-  <div class="studio-hdr" onclick="if(!event.target.closest('.mode-picker'))openSpeakerConfig()" title="Click background for speaker setup">
+  <div class="studio-hdr" onclick="if(!event.target.closest('.mode-picker')&&!event.target.closest('button'))openSpeakerConfig()" title="Click background for speaker setup">
     <div class="mode-picker">
       <span class="st-name" id="modeName" onclick="event.stopPropagation();toggleModePicker()">WX · Universal</span>
       <div class="mode-dropdown" id="modeDropdown">
@@ -355,6 +355,7 @@ body {
       </div>
     </div>
     <span class="spk-count" id="spkCount">3 SPK</span>
+    <button onclick="event.stopPropagation();openSpeakerConfig()" style="margin-left:auto;font-family:'JetBrains Mono',monospace;font-size:9px;font-weight:600;padding:5px 10px;border-radius:6px;border:1px solid rgba(255,255,255,.1);background:rgba(255,255,255,.04);color:rgba(255,255,255,.5);cursor:pointer;transition:all .2s" onmouseenter="this.style.background='rgba(255,255,255,.08)';this.style.color='#fff'" onmouseleave="this.style.background='rgba(255,255,255,.04)';this.style.color='rgba(255,255,255,.5)'">⚙ Speaker Setup</button>
   </div>
   <div class="studio-body" id="captionLines">
     <!-- Dynamically populated -->
@@ -385,7 +386,6 @@ var speakers = [
   { tag: 'IT', native: 'auto', color: '#f87171' },
   { tag: 'FR', native: 'auto', color: '#34d399' }
 ];
-var isAutoMode = true;
 var isLive = true;
 var sessionActive = false;
 var lineCounter = 0;
@@ -489,14 +489,9 @@ function openSpeakerConfig() {
   html += '<div class="modal-head"><h3>⚙ Speaker Setup — '+currentModeName+'</h3><button class="modal-close" onclick="this.closest(\'.modal-overlay\').remove()">✕</button></div>';
   html += '<div class="modal-body">';
   
-  // Mode toggle
-  html += '<div class="mode-toggle">';
-  html += '<button class="mode-opt'+(isAutoMode?' active':'')+'" data-mode="auto" onclick="setMode(\'auto\',this)">🤖 Automatic</button>';
-  html += '<button class="mode-opt'+(!isAutoMode?' active':'')+'" data-mode="manual" onclick="setMode(\'manual\',this)">🛠 Manual</button>';
-  html += '</div>';
-  
-  // Speakers
+  // Speakers list — no Auto/Manual toggle, always manual mode
   html += '<div style="display:flex;flex-direction:column;gap:8px">';
+  html += '<span style="font-family:\'JetBrains Mono\',monospace;font-size:9px;color:rgba(255,255,255,.25);text-transform:uppercase;letter-spacing:2px;margin-bottom:4px">Speakers ('+speakers.length+')</span>';
   speakers.forEach(function(spk, i) {
     html += '<div class="spk-row">';
     html += '<span style="font-family:\'JetBrains Mono\',monospace;font-size:10px;color:rgba(255,255,255,.15);width:20px">#'+(i+1)+'</span>';
@@ -513,13 +508,6 @@ function openSpeakerConfig() {
   html += '<button class="add-spk-btn" onclick="addSpeaker()">+ Add Speaker</button>';
   html += '</div>';
   
-  // Auto settings
-  html += '<div'+(isAutoMode?'':' style="display:none"')+' id="autoSettings">';
-  html += '<div style="display:flex;align-items:center;gap:12px;padding:8px 0">';
-  html += '<span style="font-size:11px;color:rgba(255,255,255,.5)">Max speakers:</span>';
-  html += '<input type="number" min="1" max="12" value="6" style="width:56px;padding:6px;border-radius:6px;border:1px solid #1e2430;background:#0f1219;color:#e8eaed;font-family:\'JetBrains Mono\',monospace;text-align:center;outline:none">';
-  html += '</div></div>';
-  
   html += '</div>';
   html += '<div class="modal-foot">';
   html += '<button class="btn-cancel" onclick="this.closest(\'.modal-overlay\').remove()">Cancel</button>';
@@ -530,16 +518,6 @@ function openSpeakerConfig() {
   overlay.innerHTML = html;
   document.body.appendChild(overlay);
   overlay.addEventListener('click', function(e) { if (e.target === overlay) overlay.remove(); });
-}
-
-function setMode(mode, btn) {
-  isAutoMode = mode === 'auto';
-  document.querySelectorAll('.mode-opt').forEach(function(b) { b.classList.remove('active'); });
-  btn.classList.add('active');
-  var badge = document.getElementById('modeBadge');
-  var autoSettings = document.getElementById('autoSettings');
-  if (badge) { badge.textContent = isAutoMode ? 'AUTO' : 'MANUAL'; badge.className = 'badge' + (isAutoMode ? '' : ' manual'); }
-  if (autoSettings) autoSettings.style.display = isAutoMode ? '' : 'none';
 }
 
 function updateSpeaker(idx, field, value) {
@@ -575,12 +553,23 @@ function removeSpeaker(idx) {
 
 function applyConfig() {
   renderLines();
-  showToast('✓ Speaker config applied');
+  // Auto-detect mode from speaker count
+  var count = speakers.length;
+  var detectedMode;
+  if (count <= 2) detectedMode = 'w2';
+  else if (count === 3) detectedMode = 'w3';
+  else if (count === 4) detectedMode = 'w4';
+  else if (count === 5) detectedMode = 'w5';
+  else detectedMode = 'wx';
+  
+  if (detectedMode !== currentMode) {
+    switchMode(detectedMode);
+  }
+  showToast('✓ Speaker config applied — ' + speakers.length + ' speakers');
 }
 
-// ═══ Simulate voice detection ═══
+// ═══ Simulate voice detection (always available) ═══
 function simulateVoice() {
-  if (!isAutoMode) { showToast('Switch to Auto mode first'); return; }
   var usedTags = speakers.map(function(s) { return s.tag; });
   var available = SPK_TAGS.filter(function(t) { return usedTags.indexOf(t) === -1; });
   if (available.length === 0) { showToast('All speaker slots filled'); return; }
@@ -604,8 +593,8 @@ document.querySelectorAll('.lang-btn').forEach(function(btn) {
     document.querySelectorAll('.lang-btn').forEach(function(b) { b.classList.remove('active'); });
     this.classList.add('active');
     var lang = this.getAttribute('data-lang');
-    showToast('Target language: ' + lang);
-    // Flash all translations
+    showToast('Translating to: ' + lang + ' (live)');
+    // Flash all translations to indicate refresh
     document.querySelectorAll('.studio-trans').forEach(function(t) {
       t.style.opacity = '0.3';
       t.style.transition = 'opacity .15s';
@@ -681,12 +670,12 @@ function switchMode(modeId) {
   
   // Update speakers
   speakers = JSON.parse(JSON.stringify(cfg.speakers));
-  isAutoMode = (modeId === 'wx');
   
   // Update UI
   document.getElementById('modeName').textContent = cfg.name;
   var badge = document.getElementById('modeBadge');
-  if (badge) { badge.textContent = isAutoMode ? 'AUTO' : 'MANUAL'; badge.className = 'badge' + (isAutoMode ? '' : ' manual'); }
+  var modeLabels = { w2: 'Duet', w3: 'Triad', w4: 'Quad', w5: 'Quintet', wx: 'Universal' };
+  if (badge) { badge.textContent = modeLabels[modeId] || 'Universal'; badge.className = 'badge'; }
   
   // Update dropdown active state
   document.querySelectorAll('.mode-dropdown button').forEach(function(b) {
