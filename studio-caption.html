@@ -519,10 +519,14 @@ function setCaptionLanguage(code, name) {
     b.classList.toggle('active', b.getAttribute('data-clang') === code);
   });
   document.getElementById('captionLangDropdown').classList.remove('open');
+  // Update placeholder text to selected language
+  updateCaptionPlaceholders(code);
   // Update speech recognition language if active
   if (_realMic && _realMic.recognition) {
     _realMic.recognition.lang = code;
   }
+  // Create room in Supabase
+  _createCaptionRoom(code);
   localStorage.setItem('sottotitoli-caption-lang', code);
 }
 // Close lang dropdown on outside click
@@ -538,7 +542,87 @@ document.addEventListener('click', function(e) {
   var saved = localStorage.getItem('sottotitoli-caption-lang') || 'en-US';
   var names = {'en-US':'English','it-IT':'Italiano','fr-FR':'Français','de-DE':'Deutsch','es-ES':'Español','pt-PT':'Português','nl-NL':'Nederlands'};
   setCaptionLanguage(saved, names[saved] || 'English');
+  // Update placeholders after language is set
+  setTimeout(function() { updateCaptionPlaceholders(saved); }, 100);
 })();
+
+
+// ═══ Caption language samples ═══
+var CAPTION_SAMPLES = {
+  'en-US': [
+    'We are discussing the future of real‑time translation…',
+    'And how these systems can bridge language barriers.',
+    'Deployment at scale remains our biggest challenge.'
+  ],
+  'it-IT': [
+    'Stiamo discutendo il futuro della traduzione in tempo reale…',
+    'E come questi sistemi possono superare le barriere linguistiche.',
+    'La distribuzione su larga scala rimane la nostra sfida più grande.'
+  ],
+  'fr-FR': [
+    'Nous discutons de l\'avenir de la traduction en temps réel…',
+    'Et comment ces systèmes peuvent franchir les barrières linguistiques.',
+    'Le déploiement à grande échelle reste notre plus grand défi.'
+  ],
+  'de-DE': [
+    'Wir diskutieren die Zukunft der Echtzeitübersetzung…',
+    'Und wie diese Systeme Sprachbarrieren überwinden können.',
+    'Die Bereitstellung in großem Maßstab bleibt unsere größte Herausforderung.'
+  ],
+  'es-ES': [
+    'Estamos discutiendo el futuro de la traducción en tiempo real…',
+    'Y cómo estos sistemas pueden superar las barreras del idioma.',
+    'El despliegue a gran escala sigue siendo nuestro mayor desafío.'
+  ],
+  'pt-PT': [
+    'Estamos a discutir o futuro da tradução em tempo real…',
+    'E como estes sistemas podem ultrapassar as barreiras linguísticas.',
+    'A implementação em escala continua a ser o nosso maior desafio.'
+  ],
+  'nl-NL': [
+    'We bespreken de toekomst van realtime vertaling…',
+    'En hoe deze systemen taalbarrières kunnen overbruggen.',
+    'Uitrol op schaal blijft onze grootste uitdaging.'
+  ]
+};
+
+function updateCaptionPlaceholders(langCode) {
+  var samples = CAPTION_SAMPLES[langCode] || CAPTION_SAMPLES['en-US'];
+  var interim = document.getElementById('captionInterim');
+  var transcript = document.getElementById('captionTranscript');
+  if (interim) interim.textContent = samples[0];
+  if (transcript) {
+    var lines = transcript.querySelectorAll('.line');
+    for (var i = 0; i < Math.min(lines.length, samples.length - 1); i++) {
+      // Keep timestamp, update text
+      var parts = lines[i].textContent.split('  ');
+      var ts = parts[0] || '';
+      lines[i].textContent = ts + '  ' + samples[i + 1];
+    }
+  }
+}
+
+
+// ═══ Caption room creation ═══
+function _createCaptionRoom(langCode) {
+  var sb = window.sottotitoliSupabase;
+  if (!sb) return;
+  sb.auth.getSession().then(function(r) {
+    if (!r.data?.session) return;
+    var userId = r.data.session.user.id;
+    var roomId = 'caption-' + langCode.replace('-','').toLowerCase() + '-' + Date.now().toString(36);
+    sb.from('sessions').insert({
+      user_id: userId,
+      room: roomId,
+      mode: 'caption-' + (langCode === 'en-US' ? 'en' : langCode.split('-')[0]),
+      started_at: new Date().toISOString(),
+      language_pair: langCode,
+      session_type: 'caption'
+    }).select('id').single().then(function(res) {
+      if (res.data) localStorage.setItem('sottotitoli-caption-session', res.data.id);
+    });
+  });
+}
 
 // ═══ Session saved notification ═══
 var _sessionSavedShown = false;

@@ -1109,6 +1109,29 @@ function updateRoomInfo() {
   }
 }
 
+
+// ═══ Translation room creation ═══
+function _createTranslateRoom() {
+  var sb = window.sottotitoliSupabase;
+  if (!sb) return;
+  sb.auth.getSession().then(function(r) {
+    if (!r.data?.session) return;
+    var userId = r.data.session.user.id;
+    var roomId = 'tr-' + currentTrSource + '-' + currentTrTarget + '-' + Date.now().toString(36);
+    sb.from('sessions').insert({
+      user_id: userId,
+      room: roomId,
+      mode: 'translate-' + currentTrSource + '-' + currentTrTarget,
+      started_at: new Date().toISOString(),
+      language_pair: currentTrSource + '-' + currentTrTarget,
+      session_type: 'translation'
+    }).select('id').single().then(function(res) {
+      if (res.data) localStorage.setItem('sottotitoli-translate-session', res.data.id);
+      updateRoomInfo();
+    });
+  });
+}
+
 // ═══ Share room — auth-gated with unique room per user ═══
 function _getUserRoomId() {
   // Get or create a unique room ID for this user
@@ -1340,6 +1363,8 @@ function setTrPair(src, tgt, label) {
   var rt = document.getElementById('roomTarget');
   if (rt) rt.textContent = tgt.toUpperCase();
   renderLinesKeepScroll();
+  // Create room for this pair
+  _createTranslateRoom();
 }
 // Close pair dropdown on outside click
 document.addEventListener('click', function(e) {
@@ -1574,6 +1599,8 @@ function updateThemeUI(t) {
 renderLines();
 updateSpeakerSidebar();
 updateRoomInfo();
+// Create initial room
+setTimeout(function() { _createTranslateRoom(); }, 500);
 </script>
 
 </body>
