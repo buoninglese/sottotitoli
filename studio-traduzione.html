@@ -343,9 +343,9 @@ body {
 
 <!-- ═══ MAIN STAGE ═══ -->
 <div class="stage">
-  <div class="studio-hdr">
+  <div class="studio-hdr" onclick="if(!event.target.closest('.mode-picker'))openSpeakerConfig()" title="Click background for speaker setup">
     <div class="mode-picker">
-      <span class="st-name" id="modeName" onclick="toggleModePicker()">WX · Universal</span>
+      <span class="st-name" id="modeName" onclick="event.stopPropagation();toggleModePicker()">WX · Universal</span>
       <div class="mode-dropdown" id="modeDropdown">
         <button data-mode="w2" onclick="switchMode('w2')"><span class="mode-dot" style="background:#6b9dff"></span>W2 · Duet<span class="mode-badge">2 SPK</span></button>
         <button data-mode="w3" onclick="switchMode('w3')"><span class="mode-dot" style="background:#a78bfa"></span>W3 · Triad<span class="mode-badge">3 SPK</span></button>
@@ -431,6 +431,37 @@ function renderLines() {
   }
   container.innerHTML = html;
   document.getElementById('spkCount').textContent = speakers.length + ' SPK';
+  
+  // ═══ Attach speaker badge click handlers ═══
+  setTimeout(function() {
+    container.querySelectorAll('.studio-spk').forEach(function(badge) {
+      badge.style.cursor = 'pointer';
+      badge.title = 'Click to rename, double-click for full setup';
+      badge.addEventListener('click', function(e) {
+        e.stopPropagation();
+        var oldName = this.textContent.trim();
+        var newName = prompt('Rename speaker "' + oldName + '":', oldName);
+        if (newName && newName !== oldName) {
+          // Update speaker data
+          for (var s = 0; s < speakers.length; s++) {
+            if (speakers[s].tag === oldName) { speakers[s].tag = newName; break; }
+          }
+          renderLines();
+          showToast('Speaker: ' + oldName + ' → ' + newName);
+        }
+      });
+      badge.addEventListener('dblclick', function(e) {
+        e.stopPropagation();
+        openSpeakerConfig();
+      });
+    });
+    
+    // ═══ Line hover highlights ═══
+    container.querySelectorAll('.studio-line').forEach(function(line) {
+      line.addEventListener('mouseenter', function() { this.style.background = 'rgba(255,255,255,.02)'; });
+      line.addEventListener('mouseleave', function() { this.style.background = ''; });
+    });
+  }, 50);
 }
 
 function hexToRgba(hex, a) {
@@ -452,8 +483,10 @@ function openSpeakerConfig() {
   var overlay = document.createElement('div');
   overlay.className = 'modal-overlay';
   
+  var modeNameEl = document.getElementById('modeName');
+  var currentModeName = modeNameEl ? modeNameEl.textContent : 'Speakers';
   var html = '<div class="modal-panel">';
-  html += '<div class="modal-head"><h3>⚙ Speaker Setup — WX · Universal</h3><button class="modal-close" onclick="this.closest(\'.modal-overlay\').remove()">✕</button></div>';
+  html += '<div class="modal-head"><h3>⚙ Speaker Setup — '+currentModeName+'</h3><button class="modal-close" onclick="this.closest(\'.modal-overlay\').remove()">✕</button></div>';
   html += '<div class="modal-body">';
   
   // Mode toggle
@@ -565,12 +598,19 @@ function simulateVoice() {
   showToast('🎙 New voice detected: ' + newTag);
 }
 
-// ═══ Language toggle ═══
+// ═══ Language toggle with translation flash ═══
 document.querySelectorAll('.lang-btn').forEach(function(btn) {
   btn.addEventListener('click', function() {
     document.querySelectorAll('.lang-btn').forEach(function(b) { b.classList.remove('active'); });
     this.classList.add('active');
-    showToast('Target: ' + this.textContent);
+    var lang = this.getAttribute('data-lang');
+    showToast('Target language: ' + lang);
+    // Flash all translations
+    document.querySelectorAll('.studio-trans').forEach(function(t) {
+      t.style.opacity = '0.3';
+      t.style.transition = 'opacity .15s';
+      setTimeout(function() { t.style.opacity = ''; t.style.transition = ''; }, 150);
+    });
   });
 });
 
