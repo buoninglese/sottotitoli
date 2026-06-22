@@ -280,6 +280,14 @@ h2 { font-size: clamp(28px,5vw,44px); margin-bottom: 12px; }
   .caption-box { padding: 24px 18px; }
   .metrics-grid { grid-template-columns: repeat(2,1fr); }
 }
+
+/* ═══ MIC STATES ═══ */
+.dot.idle { background: #9ca3af; box-shadow: none; }
+.dot.warn { background: #f59e0b; box-shadow: 0 0 6px #f59e0b; animation: pulse 1.5s ease-in-out infinite; }
+.dot.live { background: #22c55e; box-shadow: 0 0 8px #22c55e; animation: pulse 1s ease-in-out infinite; }
+.dot.blocked { background: #ef4444; box-shadow: 0 0 6px #ef4444; }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+
 </style>
 </head>
 <body>
@@ -405,6 +413,11 @@ h2 { font-size: clamp(28px,5vw,44px); margin-bottom: 12px; }
 
 <button class="theme-btn" id="themeToggle" onclick="toggleTheme()" title="Toggle theme">🌙</button>
 
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="config.js?v=12"></script>
+<script src="js/auth.js?v=6"></script>
+<script src="js/real-mic.js?v=1"></script>
+
 <script>
 // ═══ Mode switching ═══
 var currentCaptionMode = 'i1';
@@ -481,114 +494,115 @@ function toggleTheme() {
   scrollTo(0);
 })();
 
-// ═══ Session simulation ═══
+// ═══ Real Mic Session ═══
 var sessionActive = false;
 var timerInterval = null;
 var sessionSeconds = 0;
+
+// Connect real mic callbacks
+_realMic.onInterim = function(text) {
+  var interim = document.getElementById('captionInterim');
+  if (interim) interim.textContent = text;
+};
+
+_realMic.onFinal = function(text) {
+  var transcript = document.getElementById('captionTranscript');
+  var interim = document.getElementById('captionInterim');
+  if (!transcript) return;
+  
+  var now = new Date();
+  var tsStr = now.toTimeString().substring(0,8);
+  var div = document.createElement('div');
+  div.className = 'line';
+  div.textContent = tsStr + ' ' + text;
+  transcript.appendChild(div);
+  transcript.scrollTop = transcript.scrollHeight;
+  
+  // Clear interim after final
+  if (interim) interim.textContent = '';
+  
+  // Update stats
+  var lineCount = transcript.querySelectorAll('.line').length;
+  var allWords = (transcript.textContent || '').match(/[a-z']+/gi) || [];
+  document.getElementById('statLines').textContent = lineCount;
+  document.getElementById('statWords').textContent = allWords.length;
+  document.getElementById('statChars').textContent = (transcript.textContent || '').length;
+  document.getElementById('liveWords').textContent = allWords.length;
+  document.getElementById('liveSentences').textContent = lineCount;
+  
+  var wpm = sessionSeconds > 0 ? Math.round(allWords.length / (sessionSeconds / 60)) : 0;
+  document.getElementById('liveWpm').textContent = wpm;
+  
+  // Vocab chips from real text
+  var chipsEl = document.getElementById('vocabChips');
+  if (chipsEl) {
+    var words = text.toLowerCase().match(/[a-z']+/g) || [];
+    var colors = ['#e5e7eb','#dbeafe','#d1fae5','#fef3c7','#ede9fe','#fce7f3'];
+    chipsEl.innerHTML = words.map(function(w, i) {
+      return '<span class="vocab-chip" style="background:'+colors[i%colors.length]+';color:#374151">'+w+'</span>';
+    }).join('');
+  }
+  
+  // CEFR gauge
+  var gauge = document.getElementById('cefrGauge');
+  var level = document.getElementById('cefrLevel');
+  if (gauge && level) {
+    var pct = Math.min(90, wpm * 0.8);
+    gauge.style.height = pct + '%';
+    level.textContent = pct > 70 ? 'C1' : pct > 50 ? 'B2' : pct > 30 ? 'B1' : pct > 10 ? 'A2' : 'A1';
+  }
+  
+  // Track Supabase session
+  if (window.sottotitoliSupabase) {
+    window.sottotitoliSupabase.auth.getSession().then(function(r) {
+      if (r.data?.session) _ensureSupabaseSession(r.data.session.user.id, 'caption-en');
+    });
+  }
+};
+
+// Reset mic to idle on load
+updateMicUI('idle');
 
 function toggleSession() {
   sessionActive = !sessionActive;
   var startBtn = document.getElementById('startBtn');
   var stopBtn = document.getElementById('stopBtn');
+  
   if (sessionActive) {
-    startBtn.style.display = 'none';
-    stopBtn.style.display = '';
-    sessionSeconds = 0;
-    timerInterval = setInterval(function() {
-      sessionSeconds++;
-      var m = Math.floor(sessionSeconds / 60);
-      var s = sessionSeconds % 60;
-      document.getElementById('sessionTimer').textContent = 
-        String(m).padStart(2,'0') + ':' + String(s).padStart(2,'0');
-      // Simulate captions
-      updateDemoCaptions();
-    }, 1000);
+    // Start real mic
+    startRealMic().then(function(ok) {
+      if (!ok) {
+        sessionActive = false;
+        startBtn.style.display = '';
+        stopBtn.style.display = 'none';
+        return;
+      }
+      startBtn.style.display = 'none';
+      stopBtn.style.display = '';
+      sessionSeconds = 0;
+      document.getElementById('liveDot').querySelector('.dot').classList.add('live');
+      document.getElementById('liveDot').style.opacity = '1';
+      timerInterval = setInterval(function() {
+        sessionSeconds++;
+        var m = Math.floor(sessionSeconds / 60);
+        var s = sessionSeconds % 60;
+        document.getElementById('sessionTimer').textContent = 
+          String(m).padStart(2,'0') + ':' + String(s).padStart(2,'0');
+      }, 1000);
+    });
   } else {
+    stopRealMic();
+    _endSupabaseSession();
     startBtn.style.display = '';
     stopBtn.style.display = 'none';
     if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
+    document.getElementById('liveDot').querySelector('.dot').classList.remove('live');
+    updateMicUI('idle');
   }
 }
 
-var demoSentences = [
-  'We are discussing the future of real-time translation.',
-  'And how these systems can bridge language barriers across the world.',
-  'Deployment at scale remains our biggest challenge this year.',
-  'We are seeing unprecedented accuracy in neural machine translation.',
-  'The advances in natural language processing are remarkable.',
-  'Let us begin this discussion on the future of language technology.',
-  'Real-time systems must handle diverse accents and dialects.',
-  'The integration of AI has transformed how we approach translation.',
-];
-var demoIndex = 0;
-
-function updateDemoCaptions() {
-  if (sessionSeconds % 4 === 0) {
-    var line = demoSentences[demoIndex % demoSentences.length];
-    var ts = new Date(); ts.setHours(3, 42, sessionSeconds);
-    var tsStr = ts.toTimeString().substring(0,8);
-    
-    var transcript = document.getElementById('captionTranscript');
-    var interim = document.getElementById('captionInterim');
-    
-    // Update interim
-    if (interim) interim.textContent = line;
-    
-    // Append to transcript
-    var div = document.createElement('div');
-    div.className = 'line';
-    div.textContent = tsStr + ' ' + line;
-    if (transcript) {
-      transcript.appendChild(div);
-      transcript.scrollTop = transcript.scrollHeight;
-    }
-    
-    // Update stats
-    document.getElementById('statLines').textContent = transcript ? transcript.querySelectorAll('.line').length : 0;
-    var allWords = (transcript ? transcript.textContent : '').match(/[a-z']+/gi) || [];
-    document.getElementById('statWords').textContent = allWords.length;
-    document.getElementById('statChars').textContent = (transcript ? transcript.textContent : '').length;
-    document.getElementById('liveWords').textContent = allWords.length;
-    document.getElementById('liveSentences').textContent = transcript ? transcript.querySelectorAll('.line').length : 0;
-    
-    // WPM
-    var wpm = sessionSeconds > 0 ? Math.round(allWords.length / (sessionSeconds / 60)) : 0;
-    document.getElementById('liveWpm').textContent = wpm;
-    
-    // Simulate vocab chips
-    var chipsEl = document.getElementById('vocabChips');
-    if (chipsEl && sessionSeconds > 5) {
-      var words = line.toLowerCase().match(/[a-z']+/g) || [];
-      var colors = ['#e5e7eb','#dbeafe','#d1fae5','#fef3c7','#ede9fe','#fce7f3'];
-      chipsEl.innerHTML = words.map(function(w, i) {
-        return '<span class="vocab-chip" style="background:'+colors[i%colors.length]+';color:#374151">'+w+'</span>';
-      }).join('');
-    }
-    
-    // CEFR gauge
-    var gauge = document.getElementById('cefrGauge');
-    var level = document.getElementById('cefrLevel');
-    if (gauge && level) {
-      var pct = Math.min(90, wpm * 0.8);
-      gauge.style.height = pct + '%';
-      level.textContent = pct > 70 ? 'C1' : pct > 50 ? 'B2' : pct > 30 ? 'B1' : pct > 10 ? 'A2' : 'A1';
-    }
-    
-    demoIndex++;
-  }
-}
-
-// ═══ LIVE dot click ═══
-document.getElementById('liveDot').addEventListener('click', function() {
-  var dot = this.querySelector('.dot');
-  if (dot.classList.contains('live')) {
-    dot.classList.remove('live');
-    this.style.opacity = '.6';
-  } else {
-    dot.classList.add('live');
-    this.style.opacity = '1';
-  }
-});
+// LIVE dot reflects real mic state (no manual toggle needed)
 </script>
+
 </body>
 </html>

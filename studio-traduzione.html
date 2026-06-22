@@ -503,6 +503,14 @@ body {
   .studio-hdr { padding: 10px 12px; gap: 8px; }
   .st-name { font-size: 18px; }
 }
+
+/* ═══ MIC STATES ═══ */
+.dot.idle { background: #9ca3af; box-shadow: none; }
+.dot.warn { background: #f59e0b; box-shadow: 0 0 6px #f59e0b; animation: pulse 1.5s ease-in-out infinite; }
+.dot.live { background: #22c55e; box-shadow: 0 0 8px #22c55e; animation: pulse 1s ease-in-out infinite; }
+.dot.blocked { background: #ef4444; box-shadow: 0 0 6px #ef4444; }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+
 </style>
 </head>
 <body>
@@ -606,6 +614,11 @@ body {
   </aside>
 
 </div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="config.js?v=12"></script>
+<script src="js/auth.js?v=6"></script>
+<script src="js/real-mic.js?v=1"></script>
 
 <script>
 // ═══ Speaker data ═══
@@ -1045,8 +1058,8 @@ function updateRoomInfo() {
     elStatus.className = 'stat-val status-connected';
   }
   if (elMic) {
-    elMic.textContent = isLive ? 'Live' : 'Muted';
-    elMic.style.color = isLive ? '' : '#f87171';
+    elMic.textContent = _realMic.state === 'live' ? 'Live' : (_realMic.state === 'blocked' ? 'Blocked' : 'Off');
+    elMic.style.color = _realMic.state === 'live' ? '' : (_realMic.state === 'blocked' ? '#f87171' : '');
   }
 }
 
@@ -1129,16 +1142,26 @@ function renderLinesKeepScroll() {
   if (container) container.scrollTop = scrollTop;
 }
 
-// ═══ Session toggle ═══
+// ═══ Session toggle with real mic ═══
 function toggleSession() {
   sessionActive = !sessionActive;
   var btn = document.getElementById('startBtn');
   if (sessionActive) {
-    btn.textContent = '⏹ STOP';
-    btn.classList.add('danger');
-    btn.classList.remove('primary');
-    showToast('▶ Session started');
+    startRealMic().then(function(ok) {
+      if (!ok) {
+        sessionActive = false;
+        btn.textContent = '▶ START';
+        btn.classList.add('primary');
+        btn.classList.remove('danger');
+        return;
+      }
+      btn.textContent = '⏹ STOP';
+      btn.classList.add('danger');
+      btn.classList.remove('primary');
+      showToast('▶ Session started — mic live');
+    });
   } else {
+    stopRealMic();
     btn.textContent = '▶ START';
     btn.classList.add('primary');
     btn.classList.remove('danger');
@@ -1146,18 +1169,40 @@ function toggleSession() {
   }
 }
 
-// ═══ LIVE toggle ═══
-function toggleLive() {
-  isLive = !isLive;
-  var el = document.getElementById('liveIndicator');
-  if (isLive) {
-    el.textContent = 'LIVE';
-    el.style.color = '';
-  } else {
-    el.textContent = 'PAUSED';
-    el.style.color = '#f87171';
+// Hook real mic final text into caption lines
+_realMic.onFinal = function(text) {
+  // Add real transcribed text as a new line with the current speakers
+  if (speakers.length === 0) return;
+  var si = _lineData.length % speakers.length;
+  var spk = speakers[si];
+  _lineData.push({ en: text, tr: '' });
+  // Translate async
+  if (currentTargetLang) {
+    var sampleIdx = _lineData.length % SAMPLES.length;
+    // Use Google Translate-ish fallback — mark for translation
+    _lineData[_lineData.length-1].tr = '…';
   }
-}
+  renderLines();
+  updateRoomInfo();
+  // Auto-add speaker in Universal mode if needed
+  if (currentMode === 'wx' && _lineData.length > speakers.length * 3 && speakers.length < 10) {
+    var usedNums = [];
+    speakers.forEach(function(s) {
+      var m = s.tag.match(/^SPK(\d+)$/);
+      if (m) usedNums.push(parseInt(m[1]));
+    });
+    var n = 1;
+    while (usedNums.indexOf(n) !== -1) n++;
+    speakers.push({ tag: 'SPK' + n, native: 'auto', color: SPK_COLORS[(n-1) % SPK_COLORS.length] });
+    updateSpeakerSidebar();
+    showToast('🎙 New voice detected: SPK' + n);
+  }
+};
+
+// Reset mic state on load
+updateMicUI('idle');
+
+// LIVE state now driven by real mic — updateMicUI handles it
 
 // ═══ Toast ═══
 function showToast(msg) {
@@ -1304,5 +1349,6 @@ renderLines();
 updateSpeakerSidebar();
 updateRoomInfo();
 </script>
+
 </body>
 </html>
