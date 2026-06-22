@@ -66,6 +66,31 @@ body {
 }
 @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
 
+/* ═══ HAMBURGER MENU ═══ */
+.hamburger-btn {
+  font-family: 'JetBrains Mono', monospace; font-size: 16px; font-weight: 700;
+  background: rgba(255,255,255,.03); border: 1px solid var(--line);
+  color: var(--muted); width: 36px; height: 36px; border-radius: 6px;
+  cursor: pointer; display: flex; align-items: center; justify-content: center;
+  transition: all .2s; padding: 0;
+}
+.hamburger-btn:hover { background: rgba(255,255,255,.06); color: var(--text); border-color: var(--accent); }
+.hamburger-dropdown {
+  position: absolute; top: 100%; right: 0; margin-top: 6px;
+  background: #111820; border: 1px solid var(--line);
+  border-radius: 8px; padding: 6px; min-width: 180px; z-index: 200;
+  box-shadow: 0 8px 32px rgba(0,0,0,.3);
+  display: none; flex-direction: column;
+}
+.hamburger-dropdown.open { display: flex; }
+.hamburger-dropdown a {
+  font-family: 'Inter', sans-serif; font-size: 13px; font-weight: 500;
+  padding: 8px 12px; border-radius: 6px; color: #d4d4d8;
+  text-decoration: none; transition: all .15s;
+}
+.hamburger-dropdown a:hover { background: rgba(255,255,255,.06); color: #fff; }
+.hamburger-dropdown hr { border: none; border-top: 1px solid var(--line); margin: 4px 0; }
+
 /* ═══ MAIN STAGE ═══ */
 .stage {
   width: 100%; max-width: 1000px; margin-top: 50px;
@@ -339,6 +364,19 @@ body {
   <span class="live-dot" id="liveIndicator" onclick="toggleLive()">LIVE</span>
   <button onclick="openSpeakerConfig()" title="Configura speakers">⚙ Speaker Setup</button>
   <button onclick="simulateVoice()" title="Simula nuova voce">🎙 +Voice</button>
+  <span class="spacer"></span>
+  <div class="hamburger-menu" style="position:relative">
+    <button class="hamburger-btn" onclick="toggleHamburger()" title="Menu">☰</button>
+    <div class="hamburger-dropdown" id="hamburgerDropdown">
+      <a href="index.html">🏠 Home</a>
+      <a href="studio.html">🎙 Studio</a>
+      <a href="studio-caption.html">📰 Caption</a>
+      <a href="analysis.html">📊 Analysis</a>
+      <a href="account.html">👤 Account</a>
+      <hr>
+      <a href="#" onclick="toggleTheme();return false">🌙 Toggle theme</a>
+    </div>
+  </div>
 </header>
 
 <!-- ═══ MAIN STAGE ═══ -->
@@ -740,6 +778,50 @@ document.addEventListener('keydown', function(e) {
   if (e.key === 'n' && e.ctrlKey) { e.preventDefault(); simulateVoice(); }
   if (e.key === ' ' && e.ctrlKey) { e.preventDefault(); toggleSession(); }
 });
+
+// ═══ Hamburger menu ═══
+function toggleHamburger() {
+  var dd = document.getElementById('hamburgerDropdown');
+  dd.classList.toggle('open');
+}
+document.addEventListener('click', function(e) {
+  var menu = document.querySelector('.hamburger-menu');
+  if (menu && !menu.contains(e.target)) {
+    var dd = document.getElementById('hamburgerDropdown');
+    if (dd) dd.classList.remove('open');
+  }
+});
+
+// ═══ Theme toggle ═══
+function toggleTheme() {
+  var h = document.documentElement;
+  var t = h.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+  h.setAttribute('data-theme', t);
+  updateThemeUI(t);
+  localStorage.setItem('sottotitoli-theme', t);
+}
+function updateThemeUI(t) {
+  var hamburgerLink = document.querySelector('.hamburger-dropdown a[href="#"]');
+  if (hamburgerLink) hamburgerLink.textContent = t === 'dark' ? '☀️ Light mode' : '🌙 Dark mode';
+  // Dark mode palette for traduzione
+  var root = document.documentElement;
+  if (t === 'light') {
+    root.style.setProperty('--bg', '#fefefe');
+    root.style.setProperty('--text', '#1a1a1a');
+    root.style.setProperty('--card', '#fff');
+    root.style.setProperty('--line', '#e5e7eb');
+  } else {
+    root.style.setProperty('--bg', '#0a0f14');
+    root.style.setProperty('--text', '#d4d4d8');
+    root.style.setProperty('--card', '#0d1117');
+    root.style.setProperty('--line', '#1e293b');
+  }
+}
+(function() {
+  var t = localStorage.getItem('sottotitoli-theme') || 'dark';
+  document.documentElement.setAttribute('data-theme', t);
+  updateThemeUI(t);
+})();
 
 // ═══ Init ═══
 renderLines();
