@@ -21,10 +21,14 @@ Create these in **https://dashboard.stripe.com/test/products** (test mode first,
 | **Price ID** | _(create in Stripe, then copy here)_ |
 | **Product ID** | _(create in Stripe, then copy here)_ |
 
-**Credits to grant in your Edge Function:**
-- `credit_seconds`: 3600 (60 min)
-- `translation_seconds`: 1800 (30 min)
+**Credits to grant in your Edge Function (NEW MODEL):**
+- `tokens`: 60 (universal voice credits)
 - `report_tokens`: 2
+- **Bonus**: +15 tokens after purchase (25% loyalty bonus)
+
+**How credits convert to minutes:**
+- Caption: 0.5 credit/min → 60 credits = 120 caption min
+- Traduzione: 1 credit/min → 60 credits = 60 traduzione min
 
 ---
 
@@ -40,9 +44,11 @@ Create these in **https://dashboard.stripe.com/test/products** (test mode first,
 | **Product ID** | _(create in Stripe, then copy here)_ |
 
 **Credits to grant:**
-- `credit_seconds`: 18000 (300 min)
-- `translation_seconds`: 9000 (150 min)
+- `tokens`: 150 (universal voice credits)
 - `report_tokens`: 10
+- **Bonus**: +37 tokens after purchase (25% loyalty bonus)
+
+**How credits convert:** Caption 0.5cr/min (300 min) · Traduzione 1cr/min (150 min)
 
 ---
 
@@ -58,9 +64,11 @@ Create these in **https://dashboard.stripe.com/test/products** (test mode first,
 | **Product ID** | _(create in Stripe, then copy here)_ |
 
 **Credits to grant:**
-- `credit_seconds`: 54000 (900 min)
-- `translation_seconds`: 27000 (450 min)
+- `tokens`: 300 (universal voice credits)
 - `report_tokens`: 40
+- **Bonus**: +75 tokens after purchase (25% loyalty bonus)
+
+**How credits convert:** Caption 0.5cr/min (600 min) · Traduzione 1cr/min (300 min)
 
 ---
 

@@ -19,8 +19,10 @@
       '<hr>' +
       '<div class="dd-credits" id="hbCredits">' +
         '<div class="dd-credit-row"><span>Crediti</span><span id="hbTokens">—</span></div>' +
-        '<div class="dd-credit-row"><span>Caption</span><span id="hbCapMin">— min</span></div>' +
-        '<div class="dd-credit-row"><span>Traduzione</span><span id="hbTraMin">— min</span></div>' +
+        '<div class="dd-credit-row"><span>Minuti</span><span id="hbCapMin">—</span></div>' +
+        '<div class="dd-credit-sub">caption</div>' +
+        '<div class="dd-credit-row"><span>Minuti</span><span id="hbTraMin">—</span></div>' +
+        '<div class="dd-credit-sub">traduzione</div>' +
       '</div>' +
       '<hr>' +
       '<a href="purchase.html">💳 Acquista crediti</a>' +
@@ -34,6 +36,8 @@
     var capEl = document.getElementById('hbCapMin');
     var traEl = document.getElementById('hbTraMin');
     if (tokensEl) tokensEl.textContent = _credits.tokens;
+    // Caption: 0.5 credit/min → 1 credit = 2 min
+    // Traduzione: 1 credit/min → 1 credit = 1 min
     if (capEl) capEl.textContent = _credits.captionMin + ' min';
     if (traEl) traEl.textContent = _credits.translationMin + ' min';
   }
@@ -46,20 +50,18 @@
       var userId = resp.data?.session?.user?.id;
       if (!userId) return;
 
-      // Fetch caption seconds
-      var cr = await sb.from('user_credits').select('balance_seconds').eq('user_id', userId).maybeSingle();
-      var captionSec = cr.data?.balance_seconds || 0;
-      _credits.captionMin = Math.round(captionSec / 60);
-      // Translation minutes = 50% of caption (standard ratio)
-      _credits.translationMin = Math.round(captionSec / 120);
-
-      // Fetch tokens
+      // Fetch tokens (universal credits)
       var tr = await sb.from('user_tokens').select('balance').eq('user_id', userId).maybeSingle();
-      _credits.tokens = tr.data?.balance || 0;
+      var tokens = tr.data?.balance || 0;
+      _credits.tokens = tokens;
+      // Caption: 0.5 credit/min → tokens × 2
+      _credits.captionMin = tokens * 2;
+      // Traduzione: 1 credit/min → tokens × 1
+      _credits.translationMin = tokens;
 
       updateCreditsDisplay();
     } catch(e) {
-      // Silently fail — credits stay as '—'
+      // Silently fail
     }
   }
 
