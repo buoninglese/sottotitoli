@@ -801,14 +801,31 @@ toggleSession = function() {
 
 // ═══ User info from auth ═══
 window.addEventListener('sottotitoli-user-ready', function(e) {
+  updateHamburgerGreeting(e.detail.name, e.detail.avatar);
+});
+// Proactive check — in case event fired before listener was registered
+setTimeout(function() {
+  var textEl = document.getElementById('hamburgerGreetingText');
+  if (textEl && textEl.textContent === 'Loading…' && window.sottotitoliSupabase) {
+    window.sottotitoliSupabase.auth.getSession().then(function(r) {
+      if (r.data?.session) {
+        var user = r.data.session.user;
+        var name = user.user_metadata?.full_name || user.email?.split('@')[0] || 'User';
+        var avatar = user.user_metadata?.avatar_url || user.user_metadata?.picture || '';
+        updateHamburgerGreeting(name, avatar);
+      }
+    });
+  }
+}, 800);
+function updateHamburgerGreeting(name, avatar) {
   var avatarEl = document.getElementById('hamburgerAvatar');
   var textEl = document.getElementById('hamburgerGreetingText');
-  if (avatarEl && e.detail.avatar) {
+  if (avatarEl && avatar) {
     avatarEl.style.background = '';
-    avatarEl.innerHTML = '<img src="'+e.detail.avatar+'" style="width:22px;height:22px;border-radius:50%;object-fit:cover" alt="">';
+    avatarEl.innerHTML = '<img src="'+avatar+'" style="width:22px;height:22px;border-radius:50%;object-fit:cover" alt="">';
   }
-  if (textEl) textEl.textContent = 'Hello, ' + e.detail.name;
-});
+  if (textEl) textEl.textContent = 'Hello, ' + name;
+}
 
 // ═══ Mode switching ═══
 var currentCaptionMode = 'i1';
