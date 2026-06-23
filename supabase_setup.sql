@@ -43,15 +43,20 @@ CREATE TABLE IF NOT EXISTS session_ai_reports (
 -- 2. CREDIT & TOKEN SYSTEM
 -- ============================================================================
 
--- Credit balances (seconds of usage time)
+-- Credit balances (minutes of usage time)
 CREATE TABLE IF NOT EXISTS user_credits (
   id BIGSERIAL PRIMARY KEY,
   user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE UNIQUE,
-  balance_seconds INTEGER NOT NULL DEFAULT 900,  -- 15 min free on signup
-  lifetime_seconds INTEGER NOT NULL DEFAULT 0,   -- total ever purchased
+  balance_seconds INTEGER NOT NULL DEFAULT 900,  -- [DEPRECATED] legacy seconds column
+  balance_minutes INTEGER NOT NULL DEFAULT 15,    -- minutes pool (caption 0.5×, translation 1×)
+  lifetime_seconds INTEGER NOT NULL DEFAULT 0,    -- total ever purchased (legacy)
   created_at TIMESTAMPTZ DEFAULT now(),
   updated_at TIMESTAMPTZ DEFAULT now()
 );
+
+-- Migration for existing data:
+-- ALTER TABLE user_credits ADD COLUMN IF NOT EXISTS balance_minutes INTEGER NOT NULL DEFAULT 15;
+-- UPDATE user_credits SET balance_minutes = GREATEST(1, ROUND(balance_seconds / 60)) WHERE balance_minutes = 15;
 
 -- Token balances (for AI reports)
 CREATE TABLE IF NOT EXISTS user_tokens (

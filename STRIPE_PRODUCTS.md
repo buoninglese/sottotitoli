@@ -21,14 +21,14 @@ Create these in **https://dashboard.stripe.com/test/products** (test mode first,
 | **Price ID** | _(create in Stripe, then copy here)_ |
 | **Product ID** | _(create in Stripe, then copy here)_ |
 
-**Credits to grant in your Edge Function (NEW MODEL):**
-- `tokens`: 60 (universal voice credits)
-- `report_tokens`: 2
-- **Bonus**: +15 tokens after purchase (25% loyalty bonus)
+**Credits to grant in your Edge Function:**
+- `balance_minutes`: 60 (minutes, shared pool for caption 0.5× & translation 1×)
+- `tokens`: 5 (report credits)
+- **Bonus**: +15 minutes after purchase (25% loyalty bonus)
 
-**How credits convert to minutes:**
-- Caption: 0.5 credit/min → 60 credits = 120 caption min
-- Traduzione: 1 credit/min → 60 credits = 60 traduzione min
+**How minutes convert:**
+- Caption: 0.5× (1 real min = 0.5 min deducted from balance)
+- Translation: 1× (1 real min = 1 min deducted)
 
 ---
 
@@ -44,11 +44,11 @@ Create these in **https://dashboard.stripe.com/test/products** (test mode first,
 | **Product ID** | _(create in Stripe, then copy here)_ |
 
 **Credits to grant:**
-- `tokens`: 150 (universal voice credits)
-- `report_tokens`: 10
-- **Bonus**: +37 tokens after purchase (25% loyalty bonus)
+- `balance_minutes`: 300 (shared pool)
+- `tokens`: 20 (report credits)
+- **Bonus**: +75 minutes after purchase (25%)
 
-**How credits convert:** Caption 0.5cr/min (300 min) · Traduzione 1cr/min (150 min)
+**How minutes convert:** Caption 0.5× · Translation 1×
 
 ---
 
@@ -76,16 +76,16 @@ Create these in **https://dashboard.stripe.com/test/products** (test mode first,
 
 **Credits to grant:**
 - `tokens`: 100 (report credits only)
-- `credit_seconds`: 0 (no minutes)
+- `balance_minutes`: 0 (no minutes)
 | **Price ID** | _(create in Stripe, then copy here)_ |
 | **Product ID** | _(create in Stripe, then copy here)_ |
 
 **Credits to grant:**
-- `tokens`: 300 (universal voice credits)
-- `report_tokens`: 40
-- **Bonus**: +75 tokens after purchase (25% loyalty bonus)
+- `balance_minutes`: 900 (shared pool)
+- `tokens`: 60 (report credits)
+- **Bonus**: +225 minutes after purchase (25%)
 
-**How credits convert:** Caption 0.5cr/min (600 min) · Traduzione 1cr/min (300 min)
+**How minutes convert:** Caption 0.5× · Translation 1×
 
 ---
 

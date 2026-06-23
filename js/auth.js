@@ -156,10 +156,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         var userId = _ref.data.session?.user?.id;
         if (userId) {
           // Minutes pool (caption 0.5× & translation 1× share this)
-          var _c = await window.sottotitoliSupabase.from('user_credits').select('balance_seconds').eq('user_id', userId).maybeSingle();
-          var sec = _c.data?.balance_seconds || 0;
+          var _c = await window.sottotitoliSupabase.from('user_credits').select('balance_minutes').eq('user_id', userId).maybeSingle();
           var minEl = document.getElementById('udMinutes');
-          if (minEl) minEl.textContent = Math.round(sec / 60) + ' min';
+          if (minEl) minEl.textContent = (_c.data?.balance_minutes || 0) + ' min';
 
           // Credits (reports only)
           var _r = await window.sottotitoliSupabase.from('user_tokens').select('balance').eq('user_id', userId).maybeSingle();
