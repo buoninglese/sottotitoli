@@ -61,34 +61,8 @@
   })();
 
   // ── Hamburger ──
-  var btn = document.getElementById('hamburger');
-  var ov = document.getElementById('overlay');
-  var toggled = false;
-
-  if (btn && ov) {
-    btn.addEventListener('click', function () {
-      toggled = !toggled;
-      btn.classList.toggle('open', toggled);
-      ov.classList.toggle('open', toggled);
-      document.body.style.overflow = toggled ? 'hidden' : '';
-    });
-    ov.addEventListener('click', function (e) {
-      if (e.target === ov) {
-        toggled = false;
-        btn.classList.remove('open');
-        ov.classList.remove('open');
-        document.body.style.overflow = '';
-      }
-    });
-    document.addEventListener('keydown', function (e) {
-      if (e.key === 'Escape' && toggled) {
-        toggled = false;
-        btn.classList.remove('open');
-        ov.classList.remove('open');
-        document.body.style.overflow = '';
-      }
-    });
-  }
+  // Now handled by js/hamburger.js (dropdown-based, replaces old overlay)
+  // Keep this block empty — hamburger.js adds its own listeners to #hamburger
 
   // ── Topbar scroll effect ──
   var bar = document.getElementById('topbar');
