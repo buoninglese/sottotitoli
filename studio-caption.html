@@ -481,6 +481,22 @@ body.fullscreen-active #fullscreenBtn:hover { background: var(--accent); color: 
 /* ═══ Stress dots (#16) ═══ */
 .stress-dot{display:inline-block;margin:0 1px;font-family:'JetBrains Mono',monospace;font-size:13px;letter-spacing:2px}
 .stress-on{color:#60a5fa}.stress-off{color:rgba(255,255,255,.15)}
+
+/* ═══ Demo button + progress ═══ */
+.btn-demo{padding:12px 28px;border-radius:100px;font-size:13px;font-weight:700;font-family:inherit;cursor:pointer;border:1.5px solid rgba(251,191,36,.3);background:rgba(251,191,36,.08);color:#fbbf24;transition:all .2s;white-space:nowrap}
+.btn-demo:hover{background:rgba(251,191,36,.18);border-color:rgba(251,191,36,.5);transform:translateY(-1px);box-shadow:0 4px 16px rgba(251,191,36,.15)}
+.btn-demo.running{background:rgba(248,113,113,.12);border-color:rgba(248,113,113,.3);color:#f87171}
+.btn-demo.running:hover{background:rgba(248,113,113,.2)}
+.demo-progress{flex:1;min-width:80px;max-width:200px;height:5px;background:rgba(255,255,255,.06);border-radius:3px;overflow:hidden;position:relative;margin-left:4px}
+.demo-progress-bar{height:100%;border-radius:3px;background:linear-gradient(90deg,#fbbf24,#f59e0b);transition:width .4s ease;width:0%}
+.demo-progress-label{position:absolute;right:0;top:-16px;font-size:8px;color:rgba(255,255,255,.2);font-family:'JetBrains Mono',monospace}
+
+/* ═══ Panel pulse on refresh ═══ */
+@keyframes panelPulse{0%{box-shadow:0 0 0 0 rgba(52,211,153,.15)}50%{box-shadow:0 0 0 4px rgba(52,211,153,.06)}100%{box-shadow:0 0 0 0 rgba(52,211,153,0)}}
+.extras-panel.pulse{animation:panelPulse .5s ease}
+
+/* Shoji mode tweaks */
+[data-caption-mode="j7b"] .btn-demo{font-family:'Inter',sans-serif;border-radius:6px}
 </style>
 </head>
 <body>
@@ -559,6 +575,8 @@ body.fullscreen-active #fullscreenBtn:hover { background: var(--accent); color: 
       <div class="action-row">
         <button class="btn-grad btn-start" id="startBtn" onclick="toggleSession()">🎤 Start Session</button>
         <button class="btn-grad btn-stop" id="stopBtn" style="display:none" onclick="toggleSession()">⏹ Stop</button>
+        <button class="btn-grad btn-demo" id="demoBtn" onclick="toggleDemo()">▶ Demo</button>
+        <div class="demo-progress" id="demoProgress" style="display:none"><div class="demo-progress-bar" id="demoProgressBar"></div><span class="demo-progress-label" id="demoProgressLabel">0/20</span></div>
       </div>
 
       <!-- ═══ #34 Word Bank Panel ═══ -->
@@ -1062,6 +1080,168 @@ _realMic.onInterim = function(text) {
   var interim = document.getElementById('captionInterim');
   if (interim) interim.textContent = text;
 };
+
+// ═══ DEMO MODE — simulates speech to showcase all extras panels ═══
+var DEMO_SCRIPT = [
+  "we are discussing the future of real-time translation",
+  "and how these systems can bridge language barriers across the world",
+  "deployment at scale remains our biggest challenge this year",
+  "the advances in neural machine translation are truly remarkable",
+  "we are seeing unprecedented accuracy in real-time speech recognition",
+  "international meetings benefit enormously from this technology",
+  "participants can speak in their native language without hesitation",
+  "the system translates everything instantly with high quality",
+  "I believe this will fundamentally change how we communicate globally",
+  "however, we must also consider the ethical implications carefully",
+  "privacy concerns need to be addressed before widespread adoption",
+  "the training data must represent diverse languages and dialects",
+  "fortunately, the research community is making great progress",
+  "new models can handle multiple languages simultaneously now",
+  "the latency has dropped below two hundred milliseconds in most cases",
+  "this means conversations feel completely natural and fluid",
+  "we should celebrate these achievements while staying vigilant",
+  "the future of language technology has never looked brighter",
+  "our team is committed to pushing these boundaries even further",
+  "thank you all for being part of this incredible journey today"
+];
+
+var _demoRunning = false;
+var _demoTimer = null;
+var _demoIndex = 0;
+var _demoSeconds = 0;
+var _demoSecondTimer = null;
+
+function toggleDemo() {
+  if (_demoRunning) {
+    stopDemo();
+  } else {
+    startDemo();
+  }
+}
+
+function startDemo() {
+  if (_demoRunning) return;
+  _demoRunning = true;
+  _demoIndex = 0;
+  _demoSeconds = 0;
+  sessionSeconds = 0;
+  sessionActive = true;
+
+  var demoBtn = document.getElementById('demoBtn');
+  var startBtn = document.getElementById('startBtn');
+  var stopBtn = document.getElementById('stopBtn');
+  var progWrap = document.getElementById('demoProgress');
+  var progBar = document.getElementById('demoProgressBar');
+  var progLabel = document.getElementById('demoProgressLabel');
+  var interim = document.getElementById('captionInterim');
+  var transcript = document.getElementById('captionTranscript');
+  var timer = document.getElementById('sessionTimer');
+
+  // UI state
+  if (demoBtn) { demoBtn.textContent = '⏹ Stop Demo'; demoBtn.classList.add('running'); }
+  if (startBtn) startBtn.style.display = 'none';
+  if (stopBtn) stopBtn.style.display = 'none';
+  if (progWrap) progWrap.style.display = 'block';
+  if (progBar) progBar.style.width = '0%';
+  if (progLabel) progLabel.textContent = '0/' + DEMO_SCRIPT.length;
+  if (transcript) transcript.innerHTML = ''; // Clear existing
+  if (interim) interim.textContent = '';
+  var liveDot = document.getElementById('liveDot');
+  if (liveDot) {
+    var dot = liveDot.querySelector('.dot');
+    if (dot) dot.classList.add('live');
+    liveDot.style.opacity = '1';
+  }
+  document.body.classList.add('session-active');
+
+  // Timer
+  if (timer) timer.textContent = '00:00';
+  _demoSecondTimer = setInterval(function() {
+    _demoSeconds++;
+    sessionSeconds = _demoSeconds;
+    var m = Math.floor(_demoSeconds / 60);
+    var s = _demoSeconds % 60;
+    if (timer) timer.textContent = String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0');
+  }, 1000);
+
+  // Fire sentences with realistic timing
+  function fireNext() {
+    if (!_demoRunning || _demoIndex >= DEMO_SCRIPT.length) {
+      stopDemo();
+      return;
+    }
+
+    var text = DEMO_SCRIPT[_demoIndex];
+
+    // Show interim first (simulate speech-in-progress)
+    if (interim) interim.textContent = text;
+
+    // After a short delay, finalize it
+    setTimeout(function() {
+      if (!_demoRunning) return;
+
+      // Fire onFinal — this triggers transcript line, stat updates, panel refresh, listen bar
+      _realMic.onFinal(text);
+
+      _demoIndex++;
+      if (progBar) progBar.style.width = (_demoIndex / DEMO_SCRIPT.length * 100) + '%';
+      if (progLabel) progLabel.textContent = _demoIndex + '/' + DEMO_SCRIPT.length;
+
+      // Clear interim
+      if (interim) interim.textContent = '';
+
+      // Next sentence after realistic gap (1.8–3.2 seconds)
+      var gap = 1800 + Math.floor(Math.random() * 1400);
+      _demoTimer = setTimeout(fireNext, gap);
+    }, 600 + Math.random() * 400); // 0.6–1s "speaking" time before finalizing
+  }
+
+  // Start after a short initial delay
+  _demoTimer = setTimeout(fireNext, 400);
+}
+
+function stopDemo() {
+  _demoRunning = false;
+  if (_demoTimer) { clearTimeout(_demoTimer); _demoTimer = null; }
+  if (_demoSecondTimer) { clearInterval(_demoSecondTimer); _demoSecondTimer = null; }
+
+  var demoBtn = document.getElementById('demoBtn');
+  var startBtn = document.getElementById('startBtn');
+  var stopBtn = document.getElementById('stopBtn');
+  var progWrap = document.getElementById('demoProgress');
+  var interim = document.getElementById('captionInterim');
+
+  if (demoBtn) { demoBtn.textContent = '▶ Demo'; demoBtn.classList.remove('running'); }
+  if (startBtn) startBtn.style.display = '';
+  if (stopBtn) stopBtn.style.display = 'none';
+  if (progWrap) progWrap.style.display = 'none';
+  if (interim) interim.textContent = '';
+
+  var liveDot2 = document.getElementById('liveDot');
+  if (liveDot2) {
+    var dot2 = liveDot2.querySelector('.dot');
+    if (dot2) dot2.classList.remove('live');
+  }
+  document.body.classList.remove('session-active');
+  sessionActive = false;
+  updateMicUI('idle');
+  if (typeof updateListenBar === 'function') updateListenBar();
+}
+
+// Also add a subtle pulse to the extras panel when it refreshes
+(function() {
+  var _origRefresh = window.refreshExtrasPanel;
+  if (typeof _origRefresh === 'function') {
+    window.refreshExtrasPanel = function() {
+      _origRefresh();
+      var panel = document.getElementById('extrasPanel');
+      if (panel && panel.classList.contains('show')) {
+        panel.classList.add('pulse');
+        setTimeout(function() { panel.classList.remove('pulse'); }, 500);
+      }
+    };
+  }
+})();
 
 // ═══ #37 Breath Group Marker — insert pause indicators into transcript ═══
 function addBreathMarks(text) {
