@@ -704,6 +704,18 @@
       alert('Sistema di pagamento in caricamento...');
       return;
     }
+    // Save purchase info for receipt
+    var p = products[selectedProduct];
+    if (p) {
+      try {
+        sessionStorage.setItem('sottotitoli_last_purchase', JSON.stringify({
+          name: p.name,
+          price: p.price,
+          desc: p.desc,
+          time: Date.now()
+        }));
+      } catch(e) {}
+    }
     confirmBtn.disabled = true;
     confirmBtn.textContent = 'Reindirizzamento a Stripe...';
     window.SottotitoliStripe.buyProduct(selectedProduct).finally(function() {
@@ -746,6 +758,33 @@
   var now = new Date().toLocaleDateString('it-IT', {day:'2-digit',month:'2-digit',year:'numeric'});
   var time = new Date().toLocaleTimeString('it-IT', {hour:'2-digit',minute:'2-digit'});
 
+  // Read actual purchase info from sessionStorage
+  var purchaseInfo = null;
+  try {
+    var stored = sessionStorage.getItem('sottotitoli_last_purchase');
+    if (stored) {
+      purchaseInfo = JSON.parse(stored);
+      // Only use if less than 30 minutes old
+      if (Date.now() - purchaseInfo.time > 1800000) purchaseInfo = null;
+    }
+  } catch(e) {}
+
+  var receiptHTML = '';
+  if (isSuccess) {
+    receiptHTML = '<div class="pay-receipt">' +
+      '<div class="pr-hdr">SOTTOTITOLI</div>' +
+      '<div class="pr-sub">buoninglese.github.io/sottotitoli</div>' +
+      '<div class="pr-divider"></div>' +
+      '<div class="pr-line"><span>Data</span><span>' + now + ' · ' + time + '</span></div>' +
+      '<div class="pr-line"><span>Stato</span><span style="color:var(--accent-green);font-weight:600">● Completato</span></div>' +
+      (purchaseInfo ? '<div class="pr-line"><span>Prodotto</span><span>' + purchaseInfo.name + '</span></div>' : '') +
+      (purchaseInfo ? '<div class="pr-line"><span>Importo</span><span>' + purchaseInfo.price + '</span></div>' : '') +
+      '<div class="pr-line"><span>Metodo</span><span>Stripe</span></div>' +
+      '<div class="pr-divider"></div>' +
+      '<div class="pr-line pr-total"><span>Ricevuta</span><span>Inviata via email</span></div>' +
+    '</div>';
+  }
+
   overlay.innerHTML =
     '<div class="pay-card">' +
       '<div class="pay-icon-ring ' + (isSuccess ? 'success' : 'fail') + '">' +
@@ -757,16 +796,7 @@
       '<p class="pay-sub">' + (isSuccess
         ? 'I minuti e i crediti sono stati accreditati al tuo account. Puoi iniziare subito.'
         : 'La transazione non è stata completata. Nessun addebito è stato effettuato.') + '</p>' +
-      (isSuccess ? '<div class="pay-receipt">' +
-        '<div class="pr-hdr">SOTTOTITOLI</div>' +
-        '<div class="pr-sub">buoninglese.github.io/sottotitoli</div>' +
-        '<div class="pr-divider"></div>' +
-        '<div class="pr-line"><span>Data</span><span>' + now + ' · ' + time + '</span></div>' +
-        '<div class="pr-line"><span>Stato</span><span style="color:var(--accent-green);font-weight:600">● Completato</span></div>' +
-        '<div class="pr-line"><span>Metodo</span><span>Stripe · Carta</span></div>' +
-        '<div class="pr-divider"></div>' +
-        '<div class="pr-line pr-total"><span>Ricevuta</span><span>Inviata via email</span></div>' +
-      '</div>' : '') +
+      receiptHTML +
       '<div class="pay-actions">' +
         (isSuccess
           ? '<a href="start.html" class="pay-btn pay-btn-success">Entra in Studio</a>'
