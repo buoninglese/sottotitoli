@@ -130,36 +130,47 @@ document.addEventListener('DOMContentLoaded', async () => {
               <div class="ud-email">${user?.email || ''}</div>
             </div>
           </div>
-          <div class="ud-section">
-            <div class="ud-label">Crediti</div>
-            <div class="ud-credits">
-              <span class="amount" id="udCreditBal">—</span>
-              <span class=\"unit\">Voice Credit</span>
-            </div>
-          </div>
-          <div class="ud-section">
-            <a href="purchase.html" class="ud-link">💳 Acquista crediti</a>
+          <a href="index.html" class="ud-link">🏠 Home</a>
+          <a href="start.html" class="ud-link">🚀 Start</a>
+          <a href="account.html" class="ud-link">👤 Profilo</a>
+          <a href="analysis.html" class="ud-link">📊 AI Reports</a>
+          <hr class="ud-divider">
+          <div class="ud-credits-section">
+            <div class="ud-credit-row"><span>Crediti</span><span id="udTokens">—</span></div>
+            <div class="ud-credit-row"><span>Caption</span><span id="udCapMin">— min</span></div>
+            <div class="ud-credit-row"><span>Traduzione</span><span id="udTraMin">— min</span></div>
           </div>
           <hr class="ud-divider">
-          <a href="account.html" class="ud-link">⚙️ Impostazioni account</a>
+          <a href="purchase.html" class="ud-link">💳 Acquista crediti</a>
+          <hr class="ud-divider">
+          <a href="account.html#cs-profile" class="ud-link">⚙️ Impostazioni</a>
           <button class="ud-link danger" id="udLogoutBtn">🚪 Esci</button>
         </div>
       </div>
     `;
     
-    // Fetch credit balance
+    // Fetch credit balances
     (async function(){
       try {
         var _ref = await window.sottotitoliSupabase.auth.getSession();
         var userId = _ref.data.session?.user?.id;
         if (userId) {
+          // Tokens
           var _r = await window.sottotitoliSupabase.from('user_tokens').select('balance').eq('user_id', userId).maybeSingle();
           var bal = _r.data?.balance;
-          var balEl = document.getElementById('udCreditBal');
-          if (balEl && bal !== undefined && bal !== null) {
-            balEl.textContent = bal;
-            balEl.title = bal + ' token disponibili';
-          }
+          var tokEl = document.getElementById('udTokens');
+          if (tokEl && bal !== undefined && bal !== null) { tokEl.textContent = bal; }
+
+          // Caption seconds
+          var _c = await window.sottotitoliSupabase.from('user_credits').select('balance_seconds').eq('user_id', userId).maybeSingle();
+          var capSec = _c.data?.balance_seconds || 0;
+          var capMin = Math.round(capSec / 60);
+          var traMin = Math.round(capSec / 120);
+          var capEl = document.getElementById('udCapMin');
+          var traEl = document.getElementById('udTraMin');
+          if (capEl) capEl.textContent = capMin + ' min';
+          if (traEl) traEl.textContent = traMin + ' min';
+
           // Load avatar if set
           var _p = await window.sottotitoliSupabase.from('profiles').select('avatar_url,full_name').eq('id', userId).maybeSingle();
           if (_p.data?.avatar_url) {
