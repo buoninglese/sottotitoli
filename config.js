@@ -470,6 +470,11 @@ window.SOTTOTITOLI_CONFIG = {
     publishableKey: "pk_test_51Tcwid1xvn5NIk3eLYEU3IQK0N4q09aU5lggFCr7TkRb2WJsm7pZJ668mUykb9N1gCnDLksDJpLa0QwP6tpE6oms00m7tQIVsx",
     checkoutFunctionUrl: "https://qzqmuegbpmvqrjrlfbgk.supabase.co/functions/v1/create-checkout-session",
     prices: {
+      // New pricing model (June 2026)
+      "sottotitoli_starter":  "Starter · 60 min caption / 30 min traduzione · 2 report AI — €4.99",
+      "sottotitoli_standard": "Standard · 300 min caption / 150 min traduzione · 10 report AI — €14.99",
+      "sottotitoli_premium":  "Premium · 900 min caption / 450 min traduzione · 40 report AI — €29.99",
+      // Legacy (keep for existing users)
       "2hours":   "120 min + 5 token — €10",
       "20hours":  "1200 min + 50 token — €50",
       "50hours":  "3000 min + 150 token — €100",
