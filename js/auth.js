@@ -28,7 +28,7 @@ window.sottotitoliSupabase = window.supabase.createClient(
 // 1.5) Auth guard — redirect to index if not signed in (skip for index.html)
 (function(){
   var path = window.location.pathname.replace(/\/$/,'').split('/').pop() || 'index.html';
-  if(path==='index.html'||path===''||path==='404.html'||path==='purchase.html'||path==='start.html'||path==='studio-caption.html'||path==='studio-traduzione.html'||path.indexOf('overlay')===0)return;
+  if(path==='index.html'||path===''||path==='404.html'||path==='purchase.html'||path==='studio-caption.html'||path==='studio-traduzione.html'||path.indexOf('overlay')===0)return;
   // Wait for session, redirect if missing
   function check(){
     var sb = window.sottotitoliSupabase;
