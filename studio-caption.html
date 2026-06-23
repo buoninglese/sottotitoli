@@ -396,6 +396,36 @@ body.fullscreen-active #fullscreenBtn:hover { background: var(--accent); color: 
 .room-stat-cap:last-child { border-bottom: none; }
 .room-stat-cap .stat-val { color: var(--text); font-weight: 600; font-size: 13px; }
 
+/* ═══ Extras Panel (toggleable — vocabulary / grammar / metrics) ═══ */
+.extras-toggle-bar{display:flex;gap:6px;justify-content:center;margin-top:10px;flex-wrap:wrap}
+.extras-toggle-btn{padding:7px 16px;border-radius:8px;font-size:10px;font-weight:700;font-family:inherit;cursor:pointer;border:1px solid rgba(255,255,255,.08);background:rgba(255,255,255,.02);color:rgba(255,255,255,.4);transition:all .2s;white-space:nowrap}
+.extras-toggle-btn:hover{background:rgba(255,255,255,.05);color:#fff;border-color:rgba(255,255,255,.15)}
+.extras-toggle-btn.active{background:rgba(52,211,153,.1);border-color:rgba(52,211,153,.25);color:#34d399}
+[data-theme="light"] .extras-toggle-btn{border-color:rgba(0,0,0,.06);background:rgba(0,0,0,.02);color:rgba(0,0,0,.4)}
+[data-theme="light"] .extras-toggle-btn:hover{background:rgba(0,0,0,.04);color:#111}
+[data-theme="light"] .extras-toggle-btn.active{background:rgba(5,150,105,.06);border-color:rgba(5,150,105,.15);color:#059669}
+
+.extras-panel{display:none;margin-top:8px;padding:16px;border-radius:14px;background:rgba(255,255,255,.015);border:1px solid rgba(255,255,255,.04)}
+.extras-panel.show{display:block}
+[data-theme="light"] .extras-panel{background:rgba(0,0,0,.01);border-color:rgba(0,0,0,.04)}
+.extras-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:8px}
+.extras-card{background:rgba(255,255,255,.025);border:1px solid rgba(255,255,255,.05);border-radius:10px;padding:10px 12px;font-size:10px;color:rgba(255,255,255,.6);line-height:1.5;transition:all .2s}
+.extras-card:hover{border-color:rgba(52,211,153,.15);background:rgba(52,211,153,.03)}
+[data-theme="light"] .extras-card{background:rgba(0,0,0,.015);border-color:rgba(0,0,0,.05);color:rgba(0,0,0,.6)}
+[data-theme="light"] .extras-card:hover{background:rgba(5,150,105,.03);border-color:rgba(5,150,105,.12)}
+.extras-card .ec-title{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px;color:rgba(255,255,255,.4)}
+[data-theme="light"] .extras-card .ec-title{color:rgba(0,0,0,.35)}
+.extras-chip{display:inline-block;padding:2px 8px;border-radius:5px;font-size:9px;font-weight:600;margin:1px}
+.extras-bar-row{display:flex;align-items:center;gap:6px;margin-bottom:3px}
+.extras-bar{flex:1;height:3px;background:rgba(255,255,255,.06);border-radius:2px;overflow:hidden}
+.extras-bar-fill{height:100%;border-radius:2px;transition:width .4s}
+.extras-meter-label{display:flex;justify-content:space-between;font-size:8px;color:rgba(255,255,255,.2);margin-top:2px}
+.extras-syn{padding:3px 6px;background:rgba(167,139,250,.06);border:1px solid rgba(167,139,250,.08);border-radius:5px;font-size:9px;margin:2px;display:inline-block}
+.extras-gauge{position:relative;width:56px;height:56px;margin:0 auto}
+.extras-gauge svg{transform:rotate(-90deg)}
+.extras-gauge-val{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-family:'JetBrains Mono',monospace;font-size:14px;font-weight:900}
+.extras-heat{display:inline-block;padding:2px 6px;border-radius:4px;font-size:9px;margin:1px}
+
 </style>
 </head>
 <body>
@@ -463,6 +493,14 @@ body.fullscreen-active #fullscreenBtn:hover { background: var(--accent); color: 
         <button class="btn-grad btn-start" id="startBtn" onclick="toggleSession()">🎤 Start Session</button>
         <button class="btn-grad btn-stop" id="stopBtn" style="display:none" onclick="toggleSession()">⏹ Stop</button>
       </div>
+
+      <!-- ═══ Extras Toggle ═══ -->
+      <div class="extras-toggle-bar" id="extrasToggleBar">
+        <button class="extras-toggle-btn" data-panel="vocab" onclick="toggleExtrasPanel('vocab',this)">📝 Vocabulary</button>
+        <button class="extras-toggle-btn" data-panel="grammar" onclick="toggleExtrasPanel('grammar',this)">📋 Grammar</button>
+        <button class="extras-toggle-btn" data-panel="metrics" onclick="toggleExtrasPanel('metrics',this)">📊 Live Metrics</button>
+      </div>
+      <div class="extras-panel" id="extrasPanel"></div>
     </div>
   </section>
 
@@ -1077,6 +1115,145 @@ function fitLinesToViewport() {
 window.addEventListener('resize', function(){if(_isFullscreen)fitLinesToViewport();});
 
 // LIVE dot reflects real mic state (no manual toggle needed)
+
+// ═══ Extras Panel — Vocabulary / Grammar / Live Metrics ═══
+(function(){
+  var activePanel = null;
+
+  // ── Vocabulary data (for panels that reference words) ──
+  var _words = [
+    {w:'discussing',pos:'VERB',cefr:'B1',syn:'debating, examining'},
+    {w:'future',pos:'NOUN',cefr:'A2',syn:'tomorrow, prospect'},
+    {w:'real-time',pos:'ADJ',cefr:'B2',syn:'instant, live'},
+    {w:'translation',pos:'NOUN',cefr:'B1',syn:'interpretation, rendering'},
+    {w:'international',pos:'ADJ',cefr:'B1',syn:'global, worldwide'},
+    {w:'meetings',pos:'NOUN',cefr:'A2',syn:'gatherings, conferences'}
+  ];
+
+  var panels = {
+    // ── Vocabulary (01, 03, 05) ──
+    vocab: function(){
+      var h = '<div class="extras-grid">';
+
+      // 01 — POS Color Tags
+      h += '<div class="extras-card"><div class="ec-title">01 · POS Tags</div>';
+      _words.forEach(function(w){
+        var c=w.pos==='VERB'?'#3b82f6':w.pos==='NOUN'?'#34d399':w.pos==='ADJ'?'#f97316':'#a78bfa';
+        h+='<span class="extras-chip" style="background:'+c+'22;color:'+c+'">'+w.w+' <small>'+w.pos+'</small></span> ';
+      });
+      h+='</div>';
+
+      // 03 — Synonym Cloud
+      h += '<div class="extras-card"><div class="ec-title">03 · Synonyms</div>';
+      _words.forEach(function(w){
+        h+='<div class="extras-syn"><strong>'+w.w+'</strong> '+w.syn+'</div>';
+      });
+      h+='</div>';
+
+      // 05 — Dual Column POS
+      h += '<div class="extras-card"><div class="ec-title">05 · Verbs/Nouns</div>';
+      var verbs=_words.filter(function(w){return w.pos==='VERB'});
+      var nouns=_words.filter(function(w){return w.pos==='NOUN'});
+      h+='<div style="display:flex;gap:6px"><div style="flex:1;font-size:9px"><span style="color:#60a5fa">🔵 Verbs</span><br>';
+      verbs.forEach(function(w){h+=w.w+'<br>'});
+      h+='</div><div style="flex:1;font-size:9px"><span style="color:#34d399">🟢 Nouns</span><br>';
+      nouns.forEach(function(w){h+=w.w+'<br>'});
+      h+='</div></div></div>';
+
+      h+='</div>';return h;
+    },
+
+    // ── Grammar (07, 10, 13, 37, 38, 39) ──
+    grammar: function(){
+      var h = '<div class="extras-grid">';
+
+      // 07 — Etymology
+      h += '<div class="extras-card"><div class="ec-title">07 · Etymology</div>';
+      h+='<div style="font-size:9px;line-height:1.7">discuss ← Lat <i>discutere</i><br>future ← Lat <i>futurus</i><br>translate ← Lat <i>translatus</i></div></div>';
+
+      // 10 — Collocation Pairs
+      h += '<div class="extras-card"><div class="ec-title">10 · Collocations</div>';
+      h+='<div style="font-size:9px"><span style="color:#60a5fa">discuss +</span> the matter, in detail<br><span style="color:#34d399">future +</span> of work, generations</div></div>';
+
+      // 13 — Semantic Field Map
+      h += '<div class="extras-card"><div class="ec-title">13 · Semantic Fields</div>';
+      var clusters=[{n:'COM',w:'discuss,translation,meetings',c:'#60a5fa'},{n:'TIME',w:'future,real-time',c:'#fbbf24'},{n:'GLOBAL',w:'international',c:'#34d399'}];
+      clusters.forEach(function(cl){
+        h+='<span class="extras-chip" style="background:'+cl.c+'18;color:'+cl.c+'">'+cl.n+': '+cl.w+'</span> ';
+      });
+      h+='</div>';
+
+      // 37 — Prepositions gauge
+      h += '<div class="extras-card"><div class="ec-title">37 · Prepositions</div>';
+      h+='<div class="extras-gauge"><svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="40" fill="none" stroke="rgba(255,255,255,.06)" stroke-width="7"/><circle cx="50" cy="50" r="40" fill="none" stroke="#a78bfa" stroke-width="7" stroke-dasharray="251.3" stroke-dashoffset="25" stroke-linecap="round"/></svg><div class="extras-gauge-val" style="color:#a78bfa">90%</div></div>';
+      h+='<div style="text-align:center;font-size:8px;color:rgba(255,255,255,.25);margin-top:4px">Accuracy</div></div>';
+
+      // 38 — Modal Verbs
+      h += '<div class="extras-card"><div class="ec-title">38 · Modal Verbs</div>';
+      h+='<div style="display:flex;gap:3px;align-items:flex-end;height:36px">';
+      [{n:'can',v:3,c:'#3b82f6'},{n:'will',v:1,c:'#34d399'},{n:'could',v:2,c:'#a78bfa'}].forEach(function(m){
+        h+='<div style="text-align:center;flex:1"><div style="height:'+(m.v*12)+'px;background:'+m.c+'55;border-radius:3px 3px 0 0"></div><div style="font-size:7px;color:rgba(255,255,255,.3)">'+m.n+' ×'+m.v+'</div></div>';
+      });
+      h+='</div></div>';
+
+      // 39 — Passive Alert
+      h += '<div class="extras-card"><div class="ec-title">39 · Passive Voice</div>';
+      h+='<div style="font-size:10px;color:#34d399">🟢 0 passive<br>constructions<br>Active voice: Clear</div></div>';
+
+      h+='</div>';return h;
+    },
+
+    // ── Live Metrics (20, 26, 30) ──
+    metrics: function(){
+      var h = '<div class="extras-grid">';
+
+      // 20 — Pace Indicator
+      h += '<div class="extras-card"><div class="ec-title">20 · Pace</div>';
+      h+='<div style="display:flex;height:6px;border-radius:3px;overflow:hidden"><div style="width:30%;background:rgba(96,165,250,.3)"></div><div style="width:40%;background:rgba(52,211,153,.5)"></div><div style="width:20%;background:rgba(251,191,36,.4)"></div><div style="width:10%;background:rgba(248,113,113,.3)"></div></div>';
+      h+='<div class="extras-meter-label"><span>Slow</span><span>Ideal</span><span>Fast</span><span>Too fast</span></div></div>';
+
+      // 26 — Silence Meter
+      h += '<div class="extras-card"><div class="ec-title">26 · Silence</div>';
+      h+='<div style="text-align:center;font-size:18px;font-weight:900;font-family:\'JetBrains Mono\',monospace;color:#a78bfa">1.2<span style="font-size:10px;color:rgba(255,255,255,.3)">s avg</span></div>';
+      h+='<div style="display:flex;height:6px;border-radius:3px;overflow:hidden;margin-top:4px">';
+      h+='<div style="width:45%;background:rgba(52,211,153,.5)"></div><div style="width:4%;background:rgba(248,113,113,.3)"></div><div style="width:38%;background:rgba(52,211,153,.5)"></div><div style="width:3%;background:rgba(248,113,113,.3)"></div><div style="width:10%;background:rgba(52,211,153,.5)"></div>';
+      h+='</div></div>';
+
+      // 30 — Hesitation Map
+      h += '<div class="extras-card"><div class="ec-title">30 · Hesitation</div>';
+      var segs=['we are','discussing','the future','of real-time','translation'];
+      var heats=[1,0,0,1,0];
+      segs.forEach(function(s,i){
+        var bg=heats[i]?'rgba(251,191,36,.15)':'rgba(52,211,153,.08)';
+        var clr=heats[i]?'rgba(255,255,255,.7)':'rgba(255,255,255,.35)';
+        h+='<span class="extras-heat" style="background:'+bg+';color:'+clr+'">'+s+'</span> ';
+      });
+      h+='</div>';
+
+      h+='</div>';return h;
+    }
+  };
+
+  // ── Toggle panel ──
+  window.toggleExtrasPanel = function(name, btn){
+    var panel = document.getElementById('extrasPanel');
+    var btns = document.querySelectorAll('.extras-toggle-btn');
+    btns.forEach(function(b){ b.classList.remove('active'); });
+
+    if (activePanel === name) {
+      // Close
+      panel.classList.remove('show');
+      panel.innerHTML = '';
+      activePanel = null;
+    } else {
+      // Open
+      btn.classList.add('active');
+      panel.innerHTML = panels[name]();
+      panel.classList.add('show');
+      activePanel = name;
+    }
+  };
+})();
 </script>
 
 </body>
