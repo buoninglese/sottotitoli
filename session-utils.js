@@ -2,6 +2,11 @@
   'use strict';
 
   function randomRoom() {
+    // Use crypto.randomUUID() for cryptographically secure room IDs
+    if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+      return crypto.randomUUID().substring(0, 8);
+    }
+    // Fallback for older browsers
     return Math.random().toString(36).slice(2, 10);
   }
 
