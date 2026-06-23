@@ -578,7 +578,7 @@ body.fullscreen-active #fullscreenBtn:hover { background: var(--accent); color: 
     if (code === 'en') code = 'en-US';
     else code = code + '-' + code.toUpperCase();
     var names = {'en-US':'English','it-IT':'Italiano','fr-FR':'Français','de-DE':'Deutsch','es-ES':'Español','pt-PT':'Português','nl-NL':'Nederlands'};
-    setTimeout(function() { setCaptionLanguage(code, names[code] || 'English'); }, 200);
+    setTimeout(function() { setCaptionLanguage(code, names[code] || 'English', true); }, 200);
   }
   if (modeParam) {
     setTimeout(function() { setCaptionMode(modeParam); }, 300);
@@ -590,7 +590,21 @@ var currentCaptionLang = 'en-US';
 var currentCaptionLangName = 'English';
 
 // Language buttons in topbar — no dropdown needed
-function setCaptionLanguage(code, name) {
+function setCaptionLanguage(code, name, skipConfirm) {
+  // If changing language while a room is active, confirm first
+  if (!skipConfirm && currentCaptionLang && code !== currentCaptionLang) {
+    var langNames = {'en-US':'English','it-IT':'Italiano','fr-FR':'Français','de-DE':'Deutsch','es-ES':'Español','pt-PT':'Português','nl-NL':'Nederlands'};
+    var newName = langNames[code] || code;
+    var oldName = langNames[currentCaptionLang] || currentCaptionLang;
+    var ok = confirm('Are you sure you want to open a new room in ' + newName + '?\n\nThis will create a fresh caption room with the new language in the URL. Your current ' + oldName + ' room will be replaced.');
+    if (!ok) {
+      // Revert button active state to current language
+      document.querySelectorAll('.cap-lang-btn').forEach(function(b) {
+        b.classList.toggle('active', b.getAttribute('data-clang') === currentCaptionLang);
+      });
+      return;
+    }
+  }
   currentCaptionLang = code;
   currentCaptionLangName = name;
   // Update topbar buttons
@@ -741,7 +755,7 @@ function _createCaptionRoom(langCode) {
 (function() {
   var saved = localStorage.getItem('sottotitoli-caption-lang') || 'en-US';
   var names = {'en-US':'English','it-IT':'Italiano','fr-FR':'Français','de-DE':'Deutsch','es-ES':'Español','pt-PT':'Português','nl-NL':'Nederlands'};
-  setCaptionLanguage(saved, names[saved] || 'English');
+  setCaptionLanguage(saved, names[saved] || 'English', true);
   // Update placeholders after language is set
   setTimeout(function() { updateCaptionPlaceholders(saved); }, 100);
   // Restore room ID display
@@ -876,8 +890,8 @@ _realMic.onFinal = function(text) {
   var div = document.createElement('div');
   div.className = 'line';
   div.textContent = tsStr + ' ' + text;
-  transcript.appendChild(div);
-  transcript.scrollTop = transcript.scrollHeight;
+  // Prepend — most recent finalized line appears right beneath the live interim box
+  transcript.insertBefore(div, transcript.firstChild);
   
   // Clear interim after final
   if (interim) interim.textContent = '';
