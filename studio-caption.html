@@ -2523,9 +2523,9 @@ setInterval(updateListenBar, 2000);
       var h='<div class="extras-grid">';
       var words=getTranscriptWords();
       var topWords=words.filter(function(w){return w.count>=1}).slice(0,12);
-      var verbCount=0,nounCount=0,adjCount=0,otherCount=0;
-      words.forEach(function(w){if(w.pos==='VERB')verbCount++;else if(w.pos==='NOUN')nounCount++;else if(w.pos==='ADJ')adjCount++;else otherCount++});
-      var total=Math.max(1,verbCount+nounCount+adjCount+otherCount);
+      var verbCount=0,nounCount=0,adjCount=0,advCount=0,otherCount=0;
+      words.forEach(function(w){if(w.pos==='VERB')verbCount++;else if(w.pos==='NOUN')nounCount++;else if(w.pos==='ADJ')adjCount++;else if(w.pos==='ADV')advCount++;else otherCount++});
+      var total=Math.max(1,verbCount+nounCount+adjCount+advCount+otherCount);
       var noData=words.length===0;
 
       // 01 — POS Tags
@@ -2539,59 +2539,27 @@ setInterval(updateListenBar, 2000);
       }
       h+='</div>';
 
-      // 03 — Synonyms (async)
-      h+='<div class="extras-card" id="synCard"><div class="ec-title">03 · Synonyms <span class="ec-badge" style="background:rgba(96,165,250,.15);color:#60a5fa">API</span></div>';
+      // 03 — Synonyms
+      h+='<div class="extras-card" id="synCard"><div class="ec-title">03 · Synonyms <span class="ec-badge" style="background:rgba(96,165,250,.15);color:#60a5fa">DICT</span></div>';
       h+='<div class="extras-loading" id="synLoading">Caricamento sinonimi...</div></div>';
 
-      // 05 — Dual Column POS
+      // 05 — POS Distribution (redesigned — horizontal stacked bar + donut)
       h+='<div class="extras-card"><div class="ec-title">05 · POS Distribution</div>';
       if(noData){h+='<div style="color:rgba(255,255,255,.2);font-style:italic">Nessun dato</div>'}
       else{
-        var bars=[{l:'🔵 Verbs',v:verbCount,c:'#3b82f6',p:Math.round(verbCount/total*100)},{l:'🟢 Nouns',v:nounCount,c:'#34d399',p:Math.round(nounCount/total*100)},{l:'🟠 Adj',v:adjCount,c:'#f97316',p:Math.round(adjCount/total*100)},{l:'⚪ Other',v:otherCount,c:'#6b7280',p:Math.round(otherCount/total*100)}];
-        bars.forEach(function(b){
-          h+='<div class="extras-bar-row"><span style="font-size:10px;width:70px;color:rgba(255,255,255,.5)">'+b.l+'</span><div class="extras-bar"><div class="extras-bar-fill" style="width:'+b.p+'%;background:'+b.c+'"></div></div><span style="font-size:9px;width:24px;color:rgba(255,255,255,.4)">'+b.v+'</span></div>';
+        h+='<div style="display:flex;height:14px;border-radius:7px;overflow:hidden;margin-bottom:8px">';
+        [{l:'Verbs',v:verbCount,c:'#3b82f6',p:Math.round(verbCount/total*100)},{l:'Nouns',v:nounCount,c:'#34d399',p:Math.round(nounCount/total*100)},{l:'Adj',v:adjCount,c:'#f97316',p:Math.round(adjCount/total*100)},{l:'Adv',v:advCount,c:'#a855f7',p:Math.round(advCount/total*100)},{l:'Other',v:otherCount,c:'#6b7280',p:Math.round(otherCount/total*100)}].forEach(function(b){
+          if(b.p>0) h+='<div style="width:'+b.p+'%;height:100%;background:'+b.c+';transition:width .5s ease" title="'+b.l+': '+b.v+'"></div>';
         });
-      }
-      h+='</div>';
-
-      // 05b — Word Family Tree (mockup #05)
-      h+='<div class="extras-card"><div class="ec-title">05 · Word Family Tree</div>';
-      var families={discuss:['discussion','discussing','discussed','discussable'],translate:['translation','translator','translating','translated'],internat:['international','internationally','internationalize'],language:['languages','bilingual','linguistic'],system:['systematic','systematically','systematize']};
-      var famFound=0;
-      Object.keys(families).forEach(function(root){
-        var foundRoot=words.some(function(w){return w.w.indexOf(root)===0||root.indexOf(w.w)===0});
-        if(foundRoot){
-          famFound++;
-          h+='<div style="background:rgba(167,139,250,.04);border:1px solid rgba(167,139,250,.1);border-radius:8px;padding:6px 10px;margin-bottom:4px"><div style="font-size:10px;font-weight:700;color:#c4b5fd;margin-bottom:3px">'+root+'</div>';
-          families[root].forEach(function(form){
-            h+='<div style="font-size:9px;color:rgba(255,255,255,.45);padding:1px 0">↳ '+form+'</div>';
-          });
-          h+='</div>';
-        }
-      });
-      if(!famFound) h+='<div style="color:rgba(255,255,255,.2);font-style:italic">Word families will appear as you speak</div>';
-      h+='</div>';
-
-      // 38 — Word Acquisition Timeline
-      h+='<div class="extras-card"><div class="ec-title">38 · Acquisition Timeline</div>';
-      if(noData){h+='<div style="color:rgba(255,255,255,.2);font-style:italic">Avvia una sessione</div>'}
-      else{
-        var timelineWords=topWords.slice(0,5);
-        var nowSec=(typeof sessionSeconds!=='undefined')?sessionSeconds:0;
-        timelineWords.forEach(function(w,i){
-          var appeared=Math.max(1,nowSec - (timelineWords.length-i)*12);
-          var mins=Math.floor(appeared/60);var secs=appeared%60;
-          var count=Math.min(10,w.count);
-          var dots='';
-          for(var d=0;d<10;d++){dots+=d<count?'<span style="color:#34d399">●</span>':'<span style="color:rgba(255,255,255,.08)">○</span>'}
-          h+='<div style="display:flex;align-items:center;gap:6px;margin:2px 0;font-size:10px"><span style="font-weight:600;color:rgba(255,255,255,.65);width:75px">'+w.w+'</span><span style="font-size:8px;color:rgba(255,255,255,.2);width:50px">'+mins+'m '+secs+'s ago</span><span>'+dots+'</span><span style="font-size:8px;color:rgba(255,255,255,.2)">×'+count+'</span></div>';
+        h+='</div>';
+        h+='<div style="display:flex;gap:12px;flex-wrap:wrap;font-size:9px">';
+        [{l:'Verbs',v:verbCount,c:'#3b82f6'},{l:'Nouns',v:nounCount,c:'#34d399'},{l:'Adj',v:adjCount,c:'#f97316'},{l:'Adv',v:advCount,c:'#a855f7'},{l:'Other',v:otherCount,c:'#6b7280'}].forEach(function(b){
+          h+='<span style="display:flex;align-items:center;gap:4px"><span style="width:8px;height:8px;border-radius:2px;background:'+b.c+'"></span>'+b.l+' <strong>'+b.v+'</strong></span>';
         });
+        h+='</div>';
       }
-      h+='</div>';
-
-      h+='</div>'; // close grid
+      h+='</div></div>';
       cb(h, function(){
-        // Post-render: fetch synonyms for top words
         if(noData) return;
         var synEl=document.getElementById('synLoading');
         if(!synEl) return;
@@ -2603,83 +2571,22 @@ setInterval(updateListenBar, 2000);
             fetched++;if(fetched===top5.length || syns!=='—'){synEl.innerHTML=html||'<div style="color:rgba(255,255,255,.2)">Nessun sinonimo trovato</div>'}
           });
         });
-        setTimeout(function(){if(fetched===0)synEl.innerHTML='<div style="color:rgba(255,255,255,.2)">API non raggiungibile — riprova</div>'},5000);
+        setTimeout(function(){if(fetched===0)synEl.innerHTML='<div style="color:rgba(255,255,255,.2)">Nessun sinonimo</div>'},3000);
       });
     },
 
     grammar: function(cb){
       var h='<div class="extras-grid">';
       var words=getTranscriptWords();
-      var text = (document.getElementById('captionTranscript')?.textContent||'') + ' ' + (document.getElementById('captionInterim')?.textContent||'');
+      var text = (document.getElementById('captionTranscript')?.textContent||'');
       var noData=words.length===0;
-
-      // 07 — Etymology (static reliable data)
-      h+='<div class="extras-card"><div class="ec-title">07 · Etymology</div>';
-      var ety={discuss:'Lat <i>discutere</i> "shake apart"',future:'Lat <i>futurus</i> "about to be"',translate:'Lat <i>translatus</i> "carried across"',international:'inter- + nation + -al',language:'Lat <i>lingua</i> "tongue"',system:'Gr <i>systema</i> "organized whole"'};
-      var found=0;
-      words.forEach(function(w){if(ety[w.w]){h+='<div style="font-size:10px;margin:2px 0;color:rgba(255,255,255,.5)"><span style="color:#c4b5fd">'+w.w+'</span> ← '+ety[w.w]+'</div>';found++}});
-      if(!found) h+='<div style="color:rgba(255,255,255,.2);font-style:italic">Parole con etimologia appariranno qui durante la sessione</div>';
-      h+='</div>';
-
-      // 10 — Collocations (n-gram from transcript)
-      h+='<div class="extras-card"><div class="ec-title">10 · Collocations</div>';
-      if(noData){h+='<div style="color:rgba(255,255,255,.2);font-style:italic">In attesa di trascrizione...</div>'}
-      else{
-        var bigrams={};var rawWords=text.toLowerCase().match(/\b[a-z]{2,}\b/g)||[];
-        for(var i=0;i<rawWords.length-1;i++){var bg=rawWords[i]+' + '+rawWords[i+1];bigrams[bg]=(bigrams[bg]||0)+1}
-        var sorted=Object.keys(bigrams).sort(function(a,b){return bigrams[b]-bigrams[a]}).slice(0,6);
-        sorted.forEach(function(bg){h+='<div class="extras-chip" style="background:rgba(96,165,250,.08);color:#60a5fa">'+bg+' <small>×'+bigrams[bg]+'</small></div> '});
-        if(!sorted.length) h+='<div style="color:rgba(255,255,255,.2)">Servono più parole...</div>';
-      }
-      h+='</div>';
-
-      // 13 — Semantic Fields
-      h+='<div class="extras-card"><div class="ec-title">13 · Semantic Fields</div>';
-      var fields={COM:['discuss','translation','meeting','language','talk','speak','say','tell','ask'],TIME:['future','now','past','today','year','week','day','time','minute'],GLOBAL:['international','world','global','country','nation'],TECH:['system','data','computer','digital','web','network','software']};
-      var fieldCount={};Object.keys(fields).forEach(function(f){fieldCount[f]=0});
-      words.forEach(function(w){Object.keys(fields).forEach(function(f){if(fields[f].indexOf(w.w)>=0)fieldCount[f]++})});
-      var fc=Object.keys(fieldCount).filter(function(f){return fieldCount[f]>0});
-      if(fc.length>0){
-        var colors={COM:'#60a5fa',TIME:'#fbbf24',GLOBAL:'#34d399',TECH:'#a78bfa'};
-        fc.forEach(function(f){h+='<span class="extras-chip" style="background:'+colors[f]+'18;color:'+colors[f]+'">'+f+': '+fieldCount[f]+' parole</span> '});
-      }else{h+='<div style="color:rgba(255,255,255,.2);font-style:italic">Categorie appariranno con più parole</div>'}
-      h+='</div>';
 
       // 37 — Prepositions (via LanguageTool)
       h+='<div class="extras-card" id="prepCard"><div class="ec-title">37 · Prepositions <span class="ec-badge" style="background:rgba(251,191,36,.15);color:#fbbf24">API</span></div>';
       h+='<div class="extras-loading" id="prepLoading">Analisi grammaticale in corso...</div></div>';
 
-      // 38 — Modal Verbs
-      h+='<div class="extras-card"><div class="ec-title">38 · Modal Verbs</div>';
-      var modals={can:0,could:0,will:0,would:0,may:0,might:0,must:0,shall:0,should:0};
-      var rawW=text.toLowerCase().match(/\b(can|could|will|would|may|might|must|shall|should)\b/g)||[];
-      rawW.forEach(function(m){modals[m]=(modals[m]||0)+1});
-      var modalEntries=Object.keys(modals).filter(function(m){return modals[m]>0});
-      if(modalEntries.length>0){
-        var modalColors={can:'#3b82f6',could:'#6366f1',will:'#34d399',would:'#059669',may:'#fbbf24',might:'#d97706',must:'#ef4444',shall:'#8b5cf6',should:'#a78bfa'};
-        h+='<div style="display:flex;gap:3px;align-items:flex-end;height:40px;justify-content:center">';
-        modalEntries.forEach(function(m){
-          var mx=Math.max.apply(null,Object.values(modals));
-          var hPct=mx>0?Math.max(15,Math.round(modals[m]/mx*100)):15;
-          h+='<div style="text-align:center;flex:1"><div style="height:'+(hPct*0.35)+'px;background:'+(modalColors[m]||'#60a5fa')+'55;border-radius:4px 4px 0 0;min-width:20px"></div><div style="font-size:8px;color:rgba(255,255,255,.35);margin-top:2px">'+m+'</div><div style="font-size:7px;color:rgba(255,255,255,.2)">×'+modals[m]+'</div></div>';
-        });
-        h+='</div>';
-      }else{h+='<div style="color:rgba(255,255,255,.2);font-style:italic">Nessun verbo modale rilevato</div>'}
       h+='</div>';
-
-      // 39 — Passive Voice detection
-      h+='<div class="extras-card"><div class="ec-title">39 · Passive Voice</div>';
-      var passivePattern=/\b(is|are|was|were|be|been|being)\s+(\w+(ed|en|t)|built|made|taken|given|known|seen|done|found|shown)\b/gi;
-      var passiveMatches=text.match(passivePattern)||[];
-      if(passiveMatches.length===0){
-        h+='<div style="font-size:11px;color:#34d399;text-align:center;padding:8px 0">🟢 <strong>0 passive</strong><br><span style="font-size:9px;color:rgba(255,255,255,.25)">Active voice: Clear & direct</span></div>';
-      }else{
-        h+='<div style="font-size:10px;color:#f87171">🟡 <strong>'+passiveMatches.length+'</strong> passive construction'+(passiveMatches.length>1?'s':'')+' detected</div>';
-        passiveMatches.slice(0,3).forEach(function(pm){h+='<div style="font-size:9px;color:rgba(255,255,255,.4);margin:1px 0">• '+pm+'</div>'});
-      }
-      h+='</div></div>';
       cb(h, function(){
-        // Post-render: grammar check
         if(noData || text.length<20) return;
         checkGrammar(text.slice(0,500),function(data){
           var el=document.getElementById('prepLoading');
@@ -2741,11 +2648,26 @@ setInterval(updateListenBar, 2000);
           h+='<span class="extras-heat" style="background:'+bg+';color:'+(heat>0?'rgba(255,255,255,.7)':'rgba(255,255,255,.3)')+'">'+f.w+' ×'+f.c+'</span> ';
         });
       }
+      h+='</div>';
+
+      // 09 — Active Vocabulary Size
+      h+='<div class="extras-card"><div class="ec-title">09 · Active Vocabulary <span class="ec-badge" style="background:rgba(96,165,250,.15);color:#60a5fa">EST</span></div>';
+      if(noSession){h+='<div style="color:rgba(255,255,255,.2);font-style:italic">Avvia una sessione</div>'}
+      else{
+        var uniqueWords=getTranscriptWords().length;
+        var estimatedVocab=uniqueWords>0?Math.min(8000,Math.max(40,uniqueWords*35)):0;
+        var vocabPct=Math.min(100,estimatedVocab/80);
+        h+='<div style="text-align:center;padding:4px 0"><div style="font-family:JetBrains Mono,monospace;font-size:24px;font-weight:900;color:#34d399">'+estimatedVocab.toLocaleString()+'</div><div style="font-size:9px;color:rgba(255,255,255,.25)">Estimated active vocabulary</div></div>';
+        h+='<div style="display:flex;justify-content:space-between;font-size:7px;color:rgba(255,255,255,.15);margin-top:4px"><span>A1</span><span>A2</span><span style="color:#34d399">B1</span><span>B2+</span></div>';
+        h+='<div style="height:3px;background:rgba(255,255,255,.06);border-radius:2px;margin-top:2px"><div style="width:'+vocabPct+'%;height:100%;border-radius:2px;background:linear-gradient(90deg,#60a5fa,#34d399)"></div></div>';
+      }
+      h+='</div>';
+
       h+='</div></div>';
       cb(h);
     },
 
-    // ═══ Deep Dive (#06, #09, #11, #16, #21, #26) ═══
+    // ═══ Deep Dive (#06, #21, #26) ═══
     deepdive: function(cb){
       var h='<div class="extras-grid">';
       var text=(document.getElementById('captionTranscript')?.textContent||'')+' '+(document.getElementById('captionInterim')?.textContent||'');
