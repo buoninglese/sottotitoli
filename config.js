@@ -470,17 +470,20 @@ window.SOTTOTITOLI_CONFIG = {
     publishableKey: "pk_test_51Tcwid1xvn5NIk3eLYEU3IQK0N4q09aU5lggFCr7TkRb2WJsm7pZJ668mUykb9N1gCnDLksDJpLa0QwP6tpE6oms00m7tQIVsx",
     checkoutFunctionUrl: "https://qzqmuegbpmvqrjrlfbgk.supabase.co/functions/v1/create-checkout-session",
     prices: {
-      // Minutes packages
-      "sottotitoli_starter":  "Starter · 60 min + 5 crediti report — €4.99",
-      "sottotitoli_standard": "Standard · 300 min + 20 crediti report — €14.99",
-      "sottotitoli_premium":  "Premium · 900 min + 60 crediti report — €29.99",
-      // Credits-only
+      "sottotitoli_starter":  "Starter · 60 min + 5 crediti — €4.99",
+      "sottotitoli_standard": "Standard · 300 min + 20 crediti — €14.99",
+      "sottotitoli_premium":  "Premium · 900 min + 60 crediti — €29.99",
       "sottotitoli_credits":  "100 crediti report — €9.99",
-      // Legacy (keep for existing users)
-      "2hours":   "120 min + 5 token — €10",
-      "20hours":  "1200 min + 50 token — €50",
-      "50hours":  "3000 min + 150 token — €100",
-      "90tokens": "90 token — €10"
+      "2hours":   "120 min + 5 token — €10 (legacy)",
+      "20hours":  "1200 min + 50 token — €50 (legacy)",
+      "50hours":  "3000 min + 150 token — €100 (legacy)",
+      "90tokens": "90 token — €10 (legacy)"
+    },
+    priceIds: {
+      "sottotitoli_starter":  "price_1TlWBS1xvn5NIk3eNfBumbXG",
+      "sottotitoli_standard": "price_1TlWC31xvn5NIk3eGfXkRcKe",
+      "sottotitoli_premium":  "price_1TlWCS1xvn5NIk3exyT6rY7P",
+      "sottotitoli_credits":  "price_1TlWD31xvn5NIk3eUugsHSJO"
     }
   }
 };
