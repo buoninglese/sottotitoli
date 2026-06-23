@@ -116,16 +116,19 @@ function stopRealMic() {
 }
 
 // Hook: connect to Supabase session tracking
-function _ensureSupabaseSession(userId, mode) {
+function _ensureSupabaseSession(userId, mode, lang) {
   if (!window.sottotitoliSupabase || !userId) return;
-  var sessionId = localStorage.getItem('sottotitoli-active-session');
-  if (sessionId) return sessionId;
+  // If a session already exists (e.g. from _createCaptionRoom), reuse it
+  var existingSession = localStorage.getItem('sottotitoli-caption-session') || localStorage.getItem('sottotitoli-active-session');
+  if (existingSession) return existingSession;
+  var langPair = lang || 'en-US';
+  var roomId = 'caption-' + langPair.replace('-','').toLowerCase() + '-' + Date.now().toString(36);
   window.sottotitoliSupabase.from('sessions').insert({
     user_id: userId,
-    room: 'caption-' + Date.now(),
+    room: roomId,
     mode: mode || 'caption-en',
     started_at: new Date().toISOString(),
-    language_pair: 'en-US',
+    language_pair: langPair,
     session_type: 'solo'
   }).select('id').single().then(function(r) {
     if (r.data) localStorage.setItem('sottotitoli-active-session', r.data.id);
