@@ -46,8 +46,8 @@
             product: productKey,
             userId: userId,
             email: email,
-            successUrl: window.location.origin + '/studio.html?payment=success',
-            cancelUrl: window.location.origin + '/studio.html?payment=cancelled'
+            successUrl: window.location.origin + '/sottotitoli/start.html?payment=success',
+            cancelUrl: window.location.origin + '/sottotitoli/purchase.html?payment=cancelled'
           })
         });
         var data = await resp.json();
