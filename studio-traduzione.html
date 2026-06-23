@@ -699,7 +699,7 @@ body {
     <div class="hamburger-dropdown" id="hamburgerDropdown">
       <div id="hamburgerUserGreeting" style="display:flex;align-items:center;gap:8px;padding:8px 12px;font-family:Work Sans,sans-serif;font-size:12px;border-bottom:1px solid rgba(255,255,255,.06);margin-bottom:4px"><span style="width:22px;height:22px;border-radius:50%;background:rgba(255,255,255,.1);flex-shrink:0;display:inline-block" id="hamburgerAvatar"></span><span id="hamburgerGreetingText" style="color:rgba(255,255,255,.45)">Loading…</span></div>
       <a href="index.html">🏠 Home</a>
-      <a href="studio.html">🎙 Studio</a>
+      <a href="start.html">🎙 Studio</a>
       <a href="studio-caption.html">📰 Caption</a>
       <a href="analysis.html">📊 Analysis</a>
       <a href="account.html">👤 Account</a>
@@ -1490,9 +1490,13 @@ var currentTrTarget = 'it';
 function setTrTarget(tgt, name) {
   currentTrTarget = tgt;
   currentTargetLang = tgt;
-  // Update topbar target buttons
+  // Update topbar target buttons — clear any leftover inline styles first
   document.querySelectorAll('.tr-tgt-btn').forEach(function(b) {
     b.classList.toggle('active', b.getAttribute('data-tgt') === tgt);
+    b.style.background = '';
+    b.style.borderColor = '';
+    b.style.color = '';
+    b.style.boxShadow = '';
   });
   // Update all translations
   for (var i = 0; i < _lineData.length; i++) {
@@ -1553,11 +1557,13 @@ function switchMode(modeId) {
   var cfg = MODE_CONFIGS[modeId];
   if (!cfg) return;
   
-  // Update accent CSS variables
+  // Update accent CSS variables (mode-specific colors)
   var root = document.documentElement;
   root.style.setProperty('--accent', cfg.accent);
   root.style.setProperty('--accent2', cfg.accent2);
-  document.body.style.background = cfg.bg;
+  // Use CSS variable for body background — light-mode CSS can override it
+  root.style.setProperty('--mode-bg', cfg.bg);
+  document.body.style.background = ''; // let CSS handle it via [data-theme]
   
   // Update speakers (preserve line data if content exists)
   var hadContent = _lineData.length > 0;
@@ -1581,13 +1587,7 @@ function switchMode(modeId) {
   // Close dropdown
   document.getElementById('modeDropdown').classList.remove('open');
   
-  // Update speaker colors for language buttons
-  document.querySelectorAll('.tr-tgt-btn.active').forEach(function(b) {
-    b.style.background = hexToRgba(cfg.accent, .12);
-    b.style.borderColor = hexToRgba(cfg.accent, .25);
-    b.style.color = cfg.accent2;
-  });
-  
+  // Let CSS handle .tr-tgt-btn.active styling — don't set inline styles (they'd persist after language change)
   renderLines();
   updateRoomInfo();
   // Update URL
