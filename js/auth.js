@@ -28,7 +28,7 @@ window.sottotitoliSupabase = window.supabase.createClient(
 // 1.5) Auth guard — redirect to index if not signed in (skip for index.html)
 (function(){
   var path = window.location.pathname.replace(/\/$/,'').split('/').pop() || 'index.html';
-  if(path==='index.html'||path===''||path==='404.html'||path.indexOf('overlay')===0)return;
+  if(path==='index.html'||path===''||path==='404.html'||path==='purchase.html'||path.indexOf('overlay')===0)return;
   // Wait for session, redirect if missing
   function check(){
     var sb = window.sottotitoliSupabase;
@@ -100,7 +100,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (btn) {
       btn.addEventListener('click', signInWithGoogle);
     }
-    document.querySelectorAll('.wallet-link').forEach(function(el){ el.style.display = 'none'; });
+    document.querySelectorAll('.purchase-link').forEach(function(el){ el.style.display = 'none'; });
   }
 
   function renderSignedIn(user) {
@@ -138,7 +138,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             </div>
           </div>
           <div class="ud-section">
-            <a href="wallet.html" class="ud-link">💳 Wallet e pagamenti</a>
+            <a href="purchase.html" class="ud-link">💳 Acquista crediti</a>
           </div>
           <hr class="ud-divider">
           <a href="account.html" class="ud-link">⚙️ Impostazioni account</a>
@@ -211,8 +211,8 @@ document.addEventListener('DOMContentLoaded', async () => {
       });
     }
     
-    // Show wallet links
-    document.querySelectorAll('.wallet-link').forEach(function(el){ el.style.display = ''; });
+    // Show purchase links
+    document.querySelectorAll('.purchase-link').forEach(function(el){ el.style.display = ''; });
   }
 
   console.log('auth.js: calling getSession...');
