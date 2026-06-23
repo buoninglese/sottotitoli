@@ -798,9 +798,9 @@ body {
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="config.js?v=13"></script>
-<script src="js/auth.js?v=7"></script>
-<script src="js/real-mic.js?v=2"></script>
+<script src="config.js?v=14"></script>
+<script src="js/auth.js?v=8"></script>
+<script src="js/real-mic.js?v=3"></script>
 
 <script>
 // ═══ Speaker data ═══
@@ -1282,22 +1282,17 @@ function _createTranslateRoom() {
   });
 }
 
-// ═══ Share room — auth-gated with unique room per user ═══
-function _getUserRoomId() {
-  // Get or create a unique room ID for this user
-  var stored = localStorage.getItem('sottotitoli-user-room');
-  if (stored) return stored;
-  var rid = 'room-' + Date.now().toString(36) + '-' + Math.random().toString(36).substr(2,6);
-  localStorage.setItem('sottotitoli-user-room', rid);
-  return rid;
-}
-
+// ═══ Share room — uses the SAME room ID as Supabase session ═══
 function _getShareUrl() {
-  var roomId = _getUserRoomId();
+  // Reuse the Supabase session room ID so share links match the DB record
+  var roomId = localStorage.getItem('sottotitoli-translate-room-id');
+  if (!roomId) {
+    roomId = 'tr-en-' + currentTrTarget + '-' + Date.now().toString(36);
+    localStorage.setItem('sottotitoli-translate-room-id', roomId);
+  }
   var base = window.location.origin + window.location.pathname;
   var params = '?room=' + roomId;
   params += '&mode=' + currentMode;
-  
   params += '&tgt=' + currentTrTarget;
   params += '&spk=' + speakers.length;
   return base + params;

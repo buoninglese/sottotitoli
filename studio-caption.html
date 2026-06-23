@@ -561,9 +561,9 @@ body.fullscreen-active #fullscreenBtn:hover { background: var(--accent); color: 
 <button class="theme-btn" id="themeToggle" onclick="toggleTheme()" title="Toggle theme">🌙</button>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="config.js?v=13"></script>
-<script src="js/auth.js?v=7"></script>
-<script src="js/real-mic.js?v=2"></script>
+<script src="config.js?v=14"></script>
+<script src="js/auth.js?v=8"></script>
+<script src="js/real-mic.js?v=3"></script>
 
 <script>
 
@@ -683,8 +683,14 @@ function updateCaptionPlaceholders(langCode) {
 
 // ═══ Caption share room ═══
 function _getCapShareUrl() {
+  // Reuse the Supabase session room ID so share links match the DB record
+  var roomId = localStorage.getItem('sottotitoli-caption-room-id');
+  if (!roomId) {
+    roomId = 'caption-' + currentCaptionLang.replace('-','').toLowerCase() + '-' + Date.now().toString(36);
+    localStorage.setItem('sottotitoli-caption-room-id', roomId);
+  }
   var base = window.location.origin + window.location.pathname;
-  var params = '?room=caption-' + Date.now().toString(36);
+  var params = '?room=' + roomId;
   params += '&lang=' + currentCaptionLang;
   params += '&mode=' + currentCaptionMode;
   return base + params;
@@ -932,10 +938,10 @@ _realMic.onFinal = function(text) {
     level.textContent = pct > 70 ? 'C1' : pct > 50 ? 'B2' : pct > 30 ? 'B1' : pct > 10 ? 'A2' : 'A1';
   }
   
-  // Track Supabase session
+  // Track Supabase session — pass actual caption language, not hardcoded 'en-US'
   if (window.sottotitoliSupabase) {
     window.sottotitoliSupabase.auth.getSession().then(function(r) {
-      if (r.data?.session) _ensureSupabaseSession(r.data.session.user.id, 'caption-en');
+      if (r.data?.session) _ensureSupabaseSession(r.data.session.user.id, 'caption-' + (currentCaptionLang === 'en-US' ? 'en' : currentCaptionLang.split('-')[0]), currentCaptionLang);
     });
   }
 };
