@@ -19,7 +19,6 @@
       '<hr>' +
       '<div class="dd-credits" id="hbCredits">' +
         '<div class="dd-credit-row"><span>Minuti</span><span id="hbMinutes">—</span></div>' +
-        '<div class="dd-credit-sub">caption 0,5× · traduzione 1×</div>' +
         '<div class="dd-credit-row"><span>Crediti report</span><span id="hbTokens">—</span></div>' +
       '</div>' +
       '<hr>' +
