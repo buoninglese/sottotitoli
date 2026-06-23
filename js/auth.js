@@ -137,8 +137,10 @@ document.addEventListener('DOMContentLoaded', async () => {
           <hr class="ud-divider">
           <div class="ud-credits-section">
             <div class="ud-credit-row"><span>Crediti</span><span id="udTokens">—</span></div>
-            <div class="ud-credit-row"><span>Caption</span><span id="udCapMin">— min</span></div>
-            <div class="ud-credit-row"><span>Traduzione</span><span id="udTraMin">— min</span></div>
+            <div class="ud-credit-row"><span>Minuti</span><span id="udCapMin">—</span></div>
+            <div class="ud-credit-sub">caption</div>
+            <div class="ud-credit-row"><span>Minuti</span><span id="udTraMin">—</span></div>
+            <div class="ud-credit-sub">traduzione</div>
           </div>
           <hr class="ud-divider">
           <a href="purchase.html" class="ud-link">💳 Acquista crediti</a>
@@ -155,21 +157,17 @@ document.addEventListener('DOMContentLoaded', async () => {
         var _ref = await window.sottotitoliSupabase.auth.getSession();
         var userId = _ref.data.session?.user?.id;
         if (userId) {
-          // Tokens
+          // Tokens (universal credits)
           var _r = await window.sottotitoliSupabase.from('user_tokens').select('balance').eq('user_id', userId).maybeSingle();
-          var bal = _r.data?.balance;
+          var tokens = _r.data?.balance || 0;
           var tokEl = document.getElementById('udTokens');
-          if (tokEl && bal !== undefined && bal !== null) { tokEl.textContent = bal; }
-
-          // Caption seconds
-          var _c = await window.sottotitoliSupabase.from('user_credits').select('balance_seconds').eq('user_id', userId).maybeSingle();
-          var capSec = _c.data?.balance_seconds || 0;
-          var capMin = Math.round(capSec / 60);
-          var traMin = Math.round(capSec / 120);
+          if (tokEl) { tokEl.textContent = tokens; }
+          // Caption: 0.5 credit/min → tokens × 2
+          // Traduzione: 1 credit/min → tokens × 1
           var capEl = document.getElementById('udCapMin');
           var traEl = document.getElementById('udTraMin');
-          if (capEl) capEl.textContent = capMin + ' min';
-          if (traEl) traEl.textContent = traMin + ' min';
+          if (capEl) capEl.textContent = (tokens * 2) + ' min';
+          if (traEl) traEl.textContent = tokens + ' min';
 
           // Load avatar if set
           var _p = await window.sottotitoliSupabase.from('profiles').select('avatar_url,full_name').eq('id', userId).maybeSingle();
