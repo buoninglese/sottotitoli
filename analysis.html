@@ -36,14 +36,31 @@ body {
 }
 .topbar .logo span { color: rgba(255,255,255,.25); }
 .topbar .spacer { flex: 1; }
-.topbar a.nav-link {
+.nav-links { display: flex; list-style: none; gap: 4px; }
+.nav-links a {
   font-family: 'Inter', sans-serif; font-size: 12px; font-weight: 500;
   padding: 5px 10px; border-radius: 6px; border: 1px solid rgba(255,255,255,.08);
   background: rgba(255,255,255,.03); color: rgba(255,255,255,.5);
   cursor: pointer; transition: all .2s; text-decoration: none;
 }
-.topbar a.nav-link:hover { background: rgba(255,255,255,.06); color: rgba(255,255,255,.75); }
-.topbar a.nav-link.active { background: rgba(52,211,153,.12); border-color: rgba(52,211,153,.25); color: var(--accent); }
+.nav-links a:hover { background: rgba(255,255,255,.06); color: rgba(255,255,255,.75); }
+.nav-links a.active { background: rgba(52,211,153,.12); border-color: rgba(52,211,153,.25); color: var(--accent); }
+.topbar a.nav-link { display: none; } /* override old nav-link style */
+
+/* Hamburger */
+.hamburger { display: flex; flex-direction: column; gap: 4px; background: none; border: 1px solid rgba(255,255,255,.08); border-radius: 6px; padding: 8px; cursor: pointer; }
+.hamburger span { display: block; width: 18px; height: 2px; background: rgba(255,255,255,.5); border-radius: 1px; transition: all .2s; }
+.hamburger:hover span { background: rgba(255,255,255,.8); }
+.hamburger.open span:nth-child(1) { transform: rotate(45deg) translate(4px,4px); }
+.hamburger.open span:nth-child(2) { opacity: 0; }
+.hamburger.open span:nth-child(3) { transform: rotate(-45deg) translate(4px,-4px); }
+
+/* Overlay */
+.overlay { display: none; position: fixed; inset: 0; z-index: 1999; background: rgba(0,0,0,.7); }
+.overlay.open { display: flex; align-items: flex-start; justify-content: center; padding-top: 70px; }
+.overlay nav { display: flex; flex-direction: column; gap: 4px; background: #121620; border: 1px solid rgba(255,255,255,.08); border-radius: 12px; padding: 8px; min-width: 200px; }
+.overlay nav a { font-family: 'Inter', sans-serif; font-size: 13px; font-weight: 500; padding: 10px 16px; border-radius: 8px; color: rgba(255,255,255,.7); text-decoration: none; transition: all .15s; }
+.overlay nav a:hover { background: rgba(255,255,255,.06); color: #fff; }
 
 /* ═══ CONTAINER ═══ */
 .container { max-width: 1060px; width: 100%; margin: 0 auto; padding: 0 24px 80px; }
@@ -151,7 +168,7 @@ body {
 @media(max-width:768px) {
   .topbar { padding: 8px 10px; gap: 5px; flex-wrap: wrap; }
   .topbar .logo { font-size: 16px; }
-  .topbar a.nav-link { font-size: 10px; padding: 3px 7px; }
+  .nav-links a { font-size: 10px; padding: 3px 7px; }
   .container { padding: 0 12px 60px; }
   .hero { padding: 32px 0 20px; }
   .hero h1 { font-size: 28px; }
@@ -162,12 +179,24 @@ body {
 <body>
 
 <header class="topbar" id="topbar">
-  <a href="index.html" class="logo">SOTTO<span>TITOLI</span></a>
-  <span class="spacer"></span>
-  <a href="index.html" class="nav-link">Home</a>
-  <a href="start.html" class="nav-link">Start</a>
-  <a href="account.html" class="nav-link">Profilo</a>
+  <a href="index.html" class="logo">Sotto<span>titoli</span><span class="dot"></span></a>
+  <ul class="nav-links">
+    <li><a href="index.html">Home</a></li>
+    <li><a href="start.html">Start</a></li>
+    <li><a href="account.html">Mio Profilo</a></li>
+    <li><a href="analysis.html" class="active">AI Reports</a></li>
+  </ul>
+  <div style="display:flex;align-items:center;gap:8px" id="authSection"></div>
+  <button class="hamburger" id="hamburger"><span></span><span></span><span></span></button>
 </header>
+<div class="overlay" id="overlay">
+  <nav>
+    <a href="index.html">Home</a>
+    <a href="start.html">Start</a>
+    <a href="account.html">Mio Profilo</a>
+    <a href="analysis.html">AI Reports</a>
+  </nav>
+</div>
 
 <div class="container">
 
@@ -217,9 +246,27 @@ body {
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="config.js?v=14"></script>
-<script src="js/auth.js?v=8"></script>
+<script src="js/auth.js?v=9"></script>
 
 <script>
+// ═══ Hamburger toggle ═══
+document.addEventListener('DOMContentLoaded', function() {
+  var hamburger = document.getElementById('hamburger');
+  var overlay = document.getElementById('overlay');
+  if (hamburger && overlay) {
+    hamburger.addEventListener('click', function() {
+      overlay.classList.toggle('open');
+      hamburger.classList.toggle('open');
+    });
+    overlay.addEventListener('click', function(e) {
+      if (e.target === overlay) {
+        overlay.classList.remove('open');
+        hamburger.classList.remove('open');
+      }
+    });
+  }
+});
+
 var REPORT_TYPES=[
   {id:'grammar',icon:'📝',name:'Grammar & Accuracy',benefit:'Scopri esattamente dove sbagli',desc:'Tempi verbali, preposizioni, articoli, concordanze. Ricevi esempi concreti dai tuoi errori reali e impara a correggerli.',price:2,color:'var(--accent)',badge:'popular',badgeText:'Più richiesto',moduleKey:'1',family:'cambridge',sessionModes:['caption']},
   {id:'vocabulary',icon:'📚',name:'Vocabulary Range',benefit:'Parli in modo più ricco e preciso',desc:'Misura la diversità del tuo vocabolario. Scopri quali parole di livello C1-C2 ti mancano per esprimerti con sicurezza.',price:2,color:'var(--accent2)',badge:'new',badgeText:'Nuovo',moduleKey:'2',family:'cambridge',sessionModes:['caption']},
