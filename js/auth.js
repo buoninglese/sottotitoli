@@ -45,7 +45,14 @@ window.sottotitoliSupabase = window.supabase.createClient(
         var user = r.data.session.user;
         var name = user.user_metadata?.full_name || user.email?.split('@')[0] || 'User';
         var avatar = user.user_metadata?.avatar_url || user.user_metadata?.picture || '';
-        window.dispatchEvent(new CustomEvent('sottotitoli-user-ready', {detail:{name:name,email:user.email,avatar:avatar}}));
+        var preset = localStorage.getItem('sottotitoli-avatar-preset') || '';
+        window.dispatchEvent(new CustomEvent('sottotitoli-user-ready', {detail:{name:name,email:user.email,avatar:avatar,preset:preset}}));
+        // Also check profiles table for a custom uploaded avatar (overrides Google OAuth photo)
+        window.sottotitoliSupabase.from('profiles').select('avatar_url').eq('id',user.id).maybeSingle().then(function(r2){
+          if (r2.data?.avatar_url) {
+            window.dispatchEvent(new CustomEvent('sottotitoli-user-ready', {detail:{name:name,email:user.email,avatar:r2.data.avatar_url,preset:preset}}));
+          }
+        });
       }
     });
   }
