@@ -44,7 +44,8 @@ window.sottotitoliSupabase = window.supabase.createClient(
         // Dispatch user info for hamburger menus
         var user = r.data.session.user;
         var name = user.user_metadata?.full_name || user.email?.split('@')[0] || 'User';
-        window.dispatchEvent(new CustomEvent('sottotitoli-user-ready', {detail:{name:name,email:user.email}}));
+        var avatar = user.user_metadata?.avatar_url || user.user_metadata?.picture || '';
+        window.dispatchEvent(new CustomEvent('sottotitoli-user-ready', {detail:{name:name,email:user.email,avatar:avatar}}));
       }
     });
   }
