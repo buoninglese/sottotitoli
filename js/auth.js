@@ -29,12 +29,6 @@ window.sottotitoliSupabase = window.supabase.createClient(
 (function(){
   var path = window.location.pathname.replace(/\/$/,'').split('/').pop() || 'index.html';
   if(path==='index.html'||path===''||path==='404.html'||path.indexOf('overlay')===0)return;
-  // Dev bypass — allows previewing without auth (URL param or localStorage flag)
-  if(/[?&]dev=1(&|$)/.test(window.location.search)){
-    localStorage.setItem('sottotitoli-dev-mode','1');
-    return;
-  }
-  if(localStorage.getItem('sottotitoli-dev-mode')==='1')return;
   // Wait for session, redirect if missing
   function check(){
     var sb = window.sottotitoliSupabase;
@@ -46,6 +40,12 @@ window.sottotitoliSupabase = window.supabase.createClient(
     });
     sb.auth.getSession().then(function(r){
       if(!r.data?.session){window.location.replace('index.html');}
+      else {
+        // Dispatch user info for hamburger menus
+        var user = r.data.session.user;
+        var name = user.user_metadata?.full_name || user.email?.split('@')[0] || 'User';
+        window.dispatchEvent(new CustomEvent('sottotitoli-user-ready', {detail:{name:name,email:user.email}}));
+      }
     });
   }
   check();
