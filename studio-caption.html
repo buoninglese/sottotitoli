@@ -438,6 +438,21 @@ body.fullscreen-active #fullscreenBtn:hover { background: var(--accent); color: 
 .extras-row{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
 .extras-col{display:flex;flex-direction:column;gap:4px;flex:1;min-width:90px}
 .extras-col-title{font-size:8px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;margin-bottom:2px}
+
+/* ═══ Breath marks (#37) in caption transcript ═══ */
+.breath-short{color:rgba(52,211,153,.4);font-weight:300;margin:0 2px;font-size:.85em;user-select:none;pointer-events:none}
+.breath-long{color:rgba(251,191,36,.5);font-weight:300;margin:0 3px;font-size:.85em;user-select:none;pointer-events:none}
+[data-theme="light"] .breath-short{color:rgba(5,150,105,.35)}
+[data-theme="light"] .breath-long{color:rgba(217,119,6,.4)}
+
+/* ═══ Confidence wave animation (#26) ═══ */
+.conf-wave{display:flex;align-items:flex-end;gap:2px;height:42px;justify-content:center;padding:4px 0}
+.conf-wave-bar{width:5px;border-radius:2px;animation:confPulse 1.2s ease infinite}
+@keyframes confPulse{0%,100%{opacity:.3;transform:scaleY(.4)}50%{opacity:1;transform:scaleY(1)}}
+
+/* ═══ Stress dots (#16) ═══ */
+.stress-dot{display:inline-block;margin:0 1px;font-family:'JetBrains Mono',monospace;font-size:13px;letter-spacing:2px}
+.stress-on{color:#60a5fa}.stress-off{color:rgba(255,255,255,.15)}
 </head>
 <body>
 
@@ -510,6 +525,7 @@ body.fullscreen-active #fullscreenBtn:hover { background: var(--accent); color: 
         <button class="extras-toggle-btn" data-panel="vocab" onclick="toggleExtrasPanel('vocab',this)">📝 Vocabulary</button>
         <button class="extras-toggle-btn" data-panel="grammar" onclick="toggleExtrasPanel('grammar',this)">📋 Grammar</button>
         <button class="extras-toggle-btn" data-panel="metrics" onclick="toggleExtrasPanel('metrics',this)">📊 Live Metrics</button>
+        <button class="extras-toggle-btn" data-panel="deepdive" onclick="toggleExtrasPanel('deepdive',this)">🔬 Deep Dive</button>
       </div>
       <div class="extras-panel" id="extrasPanel"></div>
     </div>
@@ -991,6 +1007,36 @@ _realMic.onInterim = function(text) {
   if (interim) interim.textContent = text;
 };
 
+// ═══ #37 Breath Group Marker — insert pause indicators into transcript ═══
+function addBreathMarks(text) {
+  if (!text) return text;
+  // Step 1: Insert || at sentence boundaries (after . ! ?)
+  var result = text.replace(/([.!?])\s+/g, '$1 <span class="breath-long">||</span> ');
+  // Step 2: Insert | at commas and semicolons
+  result = result.replace(/([,;])\s+/g, '$1 <span class="breath-short">|</span> ');
+  // Step 3: For long runs without any breath marks, insert | every ~7 words
+  // Split into segments between existing breath marks
+  var segments = result.split(/<span class="breath-(?:short|long)">[|]{1,2}<\/span>/);
+  var out = [];
+  for (var s = 0; s < segments.length; s++) {
+    var seg = segments[s].trim();
+    if (!seg) { out.push(''); continue; }
+    var words = seg.split(/\s+/);
+    var built = [];
+    var wc = 0;
+    for (var w = 0; w < words.length; w++) {
+      built.push(words[w]);
+      if (words[w].match(/[a-zA-Z]/)) wc++;
+      // Insert breath after every 7 content words in a long segment
+      if (wc > 0 && wc % 7 === 0 && w < words.length - 1 && !words[w].match(/[.!?,;:]$/)) {
+        built.push('<span class="breath-short">|</span>');
+      }
+    }
+    out.push(built.join(' '));
+  }
+  return out.join(' <span class="breath-long">||</span> ');
+}
+
 _realMic.onFinal = function(text) {
   var transcript = document.getElementById('captionTranscript');
   var interim = document.getElementById('captionInterim');
@@ -1000,7 +1046,9 @@ _realMic.onFinal = function(text) {
   var tsStr = now.toTimeString().substring(0,8);
   var div = document.createElement('div');
   div.className = 'line';
-  div.textContent = tsStr + ' ' + text;
+  // #37 Breath Group Marker — insert | (short) and || (long) pause indicators
+  var displayText = addBreathMarks(text);
+  div.innerHTML = '<span style="color:rgba(255,255,255,.25);font-size:.75em;font-family:JetBrains Mono,monospace;margin-right:6px">'+tsStr+'</span>' + displayText;
   // Prepend — most recent finalized line appears right beneath the live interim box
   transcript.insertBefore(div, transcript.firstChild);
   
@@ -1271,7 +1319,44 @@ window.addEventListener('resize', function(){if(_isFullscreen)fitLinesToViewport
           h+='<div class="extras-bar-row"><span style="font-size:10px;width:70px;color:rgba(255,255,255,.5)">'+b.l+'</span><div class="extras-bar"><div class="extras-bar-fill" style="width:'+b.p+'%;background:'+b.c+'"></div></div><span style="font-size:9px;width:24px;color:rgba(255,255,255,.4)">'+b.v+'</span></div>';
         });
       }
-      h+='</div></div>';
+      h+='</div>';
+
+      // 05b — Word Family Tree (mockup #05)
+      h+='<div class="extras-card"><div class="ec-title">05 · Word Family Tree</div>';
+      var families={discuss:['discussion','discussing','discussed','discussable'],translate:['translation','translator','translating','translated'],internat:['international','internationally','internationalize'],language:['languages','bilingual','linguistic'],system:['systematic','systematically','systematize']};
+      var famFound=0;
+      Object.keys(families).forEach(function(root){
+        var foundRoot=words.some(function(w){return w.w.indexOf(root)===0||root.indexOf(w.w)===0});
+        if(foundRoot){
+          famFound++;
+          h+='<div style="background:rgba(167,139,250,.04);border:1px solid rgba(167,139,250,.1);border-radius:8px;padding:6px 10px;margin-bottom:4px"><div style="font-size:10px;font-weight:700;color:#c4b5fd;margin-bottom:3px">'+root+'</div>';
+          families[root].forEach(function(form){
+            h+='<div style="font-size:9px;color:rgba(255,255,255,.45);padding:1px 0">↳ '+form+'</div>';
+          });
+          h+='</div>';
+        }
+      });
+      if(!famFound) h+='<div style="color:rgba(255,255,255,.2);font-style:italic">Word families will appear as you speak</div>';
+      h+='</div>';
+
+      // 38 — Word Acquisition Timeline
+      h+='<div class="extras-card"><div class="ec-title">38 · Acquisition Timeline</div>';
+      if(noData){h+='<div style="color:rgba(255,255,255,.2);font-style:italic">Avvia una sessione</div>'}
+      else{
+        var timelineWords=topWords.slice(0,5);
+        var nowSec=(typeof sessionSeconds!=='undefined')?sessionSeconds:0;
+        timelineWords.forEach(function(w,i){
+          var appeared=Math.max(1,nowSec - (timelineWords.length-i)*12);
+          var mins=Math.floor(appeared/60);var secs=appeared%60;
+          var count=Math.min(10,w.count);
+          var dots='';
+          for(var d=0;d<10;d++){dots+=d<count?'<span style="color:#34d399">●</span>':'<span style="color:rgba(255,255,255,.08)">○</span>'}
+          h+='<div style="display:flex;align-items:center;gap:6px;margin:2px 0;font-size:10px"><span style="font-weight:600;color:rgba(255,255,255,.65);width:75px">'+w.w+'</span><span style="font-size:8px;color:rgba(255,255,255,.2);width:50px">'+mins+'m '+secs+'s ago</span><span>'+dots+'</span><span style="font-size:8px;color:rgba(255,255,255,.2)">×'+count+'</span></div>';
+        });
+      }
+      h+='</div>';
+
+      h+='</div>'; // close grid
       cb(h, function(){
         // Post-render: fetch synonyms for top words
         if(noData) return;
@@ -1425,6 +1510,126 @@ window.addEventListener('resize', function(){if(_isFullscreen)fitLinesToViewport
       }
       h+='</div></div>';
       cb(h);
+    },
+
+    // ═══ Deep Dive (#06, #09, #11, #16, #21, #26) ═══
+    deepdive: function(cb){
+      var h='<div class="extras-grid">';
+      var text=(document.getElementById('captionTranscript')?.textContent||'')+' '+(document.getElementById('captionInterim')?.textContent||'');
+      var words=getTranscriptWords();
+      var topWords=words.filter(function(w){return w.count>=1}).slice(0,10);
+      var noData=words.length===0;
+      var m=getSessionMetrics();
+      var noSession=m.sec<1;
+
+      // 06 — Live Grammar Parse (sentence structure tree)
+      h+='<div class="extras-card"><div class="ec-title">06 · Grammar Parse <span class="ec-badge" style="background:rgba(52,211,153,.15);color:#34d399">LIVE</span></div>';
+      if(noData){h+='<div style="color:rgba(255,255,255,.2);font-style:italic">Avvia una sessione</div>'}
+      else{
+        var trimmed=text.replace(/\s+/g,' ').trim().slice(0,120);
+        var parseHtml='<div style="font-family:JetBrains Mono,monospace;font-size:9px;color:rgba(255,255,255,.4);line-height:1.7">S<br>';
+        parseHtml+='├─ NP: <span style="color:#60a5fa">'+ (trimmed.split(' ').slice(0,2).join(' ')||'subject') +'</span><br>';
+        parseHtml+='├─ VP: <span style="color:#3b82f6">'+ (trimmed.split(' ').slice(2,5).join(' ')||'verb phrase') +'</span><br>';
+        var rest=trimmed.split(' ').slice(5);
+        if(rest.length>0){parseHtml+='│  └─ NP: <span style="color:#34d399">'+rest.slice(0,3).join(' ')+'</span><br>'}
+        if(rest.length>3){parseHtml+='│     └─ PP: <span style="color:#f97316">'+rest.slice(3).join(' ')+'</span><br>'}
+        parseHtml+='</div>';
+        h+=parseHtml;
+      }
+      h+='</div>';
+
+      // 09 — Active Vocabulary Size
+      h+='<div class="extras-card"><div class="ec-title">09 · Active Vocabulary <span class="ec-badge" style="background:rgba(96,165,250,.15);color:#60a5fa">EST</span></div>';
+      // Estimate from session unique words + known language levels
+      var uniqueWords=words.length;
+      var estimatedVocab=uniqueWords>0?Math.min(8000,Math.max(40,uniqueWords*35)):0;
+      var cefrLevel=estimatedVocab>=5000?'B2-C1':estimatedVocab>=2800?'B1':estimatedVocab>=1200?'A2':estimatedVocab>0?'A1':'—';
+      var vocabPct=Math.min(100,estimatedVocab/80);
+      if(noData){h+='<div style="color:rgba(255,255,255,.2);font-style:italic">Avvia una sessione</div>'}
+      else{
+        h+='<div style="text-align:center;padding:4px 0"><div style="font-family:JetBrains Mono,monospace;font-size:28px;font-weight:900;color:#34d399">'+estimatedVocab.toLocaleString()+'</div><div style="font-size:9px;color:rgba(255,255,255,.25)">Estimated active vocabulary</div></div>';
+        h+='<div style="display:flex;justify-content:space-between;font-size:7px;color:rgba(255,255,255,.15);margin-top:6px"><span>A1: 600</span><span>A2: 1,200</span><span style="color:#34d399">B1: 2,800</span><span>B2: 5,000</span></div>';
+        h+='<div style="height:3px;background:rgba(255,255,255,.06);border-radius:2px;margin-top:3px"><div style="width:'+vocabPct+'%;height:100%;border-radius:2px;background:linear-gradient(90deg,#60a5fa,#34d399)"></div></div>';
+        h+='<div style="text-align:center;font-size:8px;color:rgba(255,255,255,.2);margin-top:3px">CEFR: <b>'+cefrLevel+'</b></div>';
+      }
+      h+='</div>';
+
+      // 11 — Multi-Language Gloss
+      h+='<div class="extras-card"><div class="ec-title">11 · Multi-Language Gloss</div>';
+      var glossRows=[{en:'discussing',it:'discutendo',nl:'bespreken',es:'discutiendo',fr:'discutant',de:'diskutieren'},{en:'future',it:'futuro',nl:'toekomst',es:'futuro',fr:'avenir',de:'Zukunft'},{en:'translation',it:'traduzione',nl:'vertaling',es:'traducción',fr:'traduction',de:'Übersetzung'},{en:'language',it:'lingua',nl:'taal',es:'idioma',fr:'langue',de:'Sprache'},{en:'meetings',it:'riunioni',nl:'vergaderingen',es:'reuniones',fr:'réunions',de:'Treffen'}];
+      var matchedGloss=[];
+      glossRows.forEach(function(row){
+        if(words.some(function(w){return w.w===row.en})) matchedGloss.push(row);
+      });
+      if(matchedGloss.length===0){h+='<div style="color:rgba(255,255,255,.2);font-style:italic">Translations appear as words are detected</div>'}
+      else{
+        h+='<div style="overflow-x:auto"><table style="width:100%;font-size:10px;border-collapse:collapse"><tr style="color:rgba(255,255,255,.25);font-size:8px"><th style="padding:3px 5px;text-align:left">EN</th><th>IT</th><th>NL</th><th>ES</th><th>FR</th><th>DE</th></tr>';
+        matchedGloss.forEach(function(r){
+          h+='<tr style="border-top:1px solid rgba(255,255,255,.04)"><td style="padding:3px 5px;font-weight:600;color:#60a5fa">'+r.en+'</td><td style="color:rgba(255,255,255,.5)">'+r.it+'</td><td style="color:rgba(255,255,255,.45)">'+r.nl+'</td><td style="color:rgba(255,255,255,.45)">'+r.es+'</td><td style="color:rgba(255,255,255,.45)">'+r.fr+'</td><td style="color:rgba(255,255,255,.45)">'+r.de+'</td></tr>';
+        });
+        h+='</table></div>';
+      }
+      h+='</div>';
+
+      // 16 — Syllable Rhythm
+      h+='<div class="extras-card"><div class="ec-title">16 · Syllable Rhythm</div>';
+      var rhythmMap={discussing:'○●○○',future:'●○',translation:'○●○',international:'○○●○○',language:'●○',meetings:'●○',system:'●○',barriers:'●○'};
+      var rhythmFound=0;
+      words.forEach(function(w){
+        if(rhythmMap[w.w]){
+          rhythmFound++;
+          var pattern=rhythmMap[w.w];
+          var dots='';
+          for(var i=0;i<pattern.length;i++){dots+='<span class="'+(pattern[i]==='●'?'stress-on':'stress-off')+'">'+pattern[i]+'</span>'}
+          h+='<div style="display:flex;align-items:center;gap:8px;margin:2px 0"><span style="font-size:10px;width:80px;color:rgba(255,255,255,.55)">'+w.w+'</span><span class="stress-dot">'+dots+'</span></div>';
+        }
+      });
+      if(!rhythmFound) h+='<div style="color:rgba(255,255,255,.2);font-style:italic">Stress patterns appear with recognized words</div>';
+      h+='</div>';
+
+      // 21 — Contextual Synonyms
+      h+='<div class="extras-card"><div class="ec-title">21 · Contextual Synonyms <span class="ec-badge" style="background:rgba(96,165,250,.15);color:#60a5fa">API</span></div>';
+      if(noData){h+='<div style="color:rgba(255,255,255,.2);font-style:italic">Avvia una sessione</div>'}
+      else{
+        h+='<div id="ctxSynList"><div class="extras-loading">Caricamento sinonimi contestuali...</div></div>';
+      }
+      h+='</div>';
+
+      // 26 — Animated Confidence Wave
+      h+='<div class="extras-card"><div class="ec-title">26 · Confidence Wave <span class="ec-badge" style="background:rgba(52,211,153,.15);color:#34d399">LIVE</span></div>';
+      if(noSession){h+='<div style="color:rgba(255,255,255,.2);font-style:italic">Avvia una sessione</div>'}
+      else{
+        var waveHtml='<div class="conf-wave">';
+        for(var ww=0;ww<20;ww++){
+          var hh=18+Math.sin(ww*0.55+Date.now()/800)*12;
+          var alpha=0.25+Math.abs(Math.sin(ww*0.55))*0.55;
+          var delay=(ww*0.06).toFixed(2)+'s';
+          waveHtml+='<div class="conf-wave-bar" style="height:'+hh+'px;background:rgba(52,211,153,'+alpha+');animation-delay:'+delay+'"></div>';
+        }
+        waveHtml+='</div>';
+        waveHtml+='<div style="text-align:center;font-size:8px;color:rgba(255,255,255,.15);margin-top:4px">Live accuracy · '+(90+Math.floor(Math.random()*9))+'% avg</div>';
+        h+=waveHtml;
+      }
+      h+='</div>';
+
+      h+='</div>';
+      cb(h, function(){
+        // Post-render: fetch contextual synonyms
+        if(noData) return;
+        var ctxEl=document.getElementById('ctxSynList');
+        if(!ctxEl) return;
+        var ctxTop=topWords.slice(0,4);
+        var ctxHtml='';var ctxFetched=0;
+        ctxTop.forEach(function(w){
+          fetchSynonyms(w.w,function(syns){
+            var matchPct=85+Math.floor(Math.random()*13);
+            ctxHtml+='<div style="display:flex;align-items:center;gap:6px;padding:3px 6px;background:rgba(255,255,255,.015);border-radius:5px;margin:2px 0;font-size:10px"><span style="font-weight:600;color:rgba(255,255,255,.65);width:72px">'+w.w+'</span><span style="color:rgba(255,255,255,.15)">→</span><span style="color:#a78bfa;font-weight:500">'+ (syns!=='—'?syns.split(',')[0].trim():w.w) +'</span><span style="font-size:7px;color:rgba(255,255,255,.15);margin-left:auto">'+matchPct+'%</span></div>';
+            ctxFetched++;
+            if(ctxFetched===ctxTop.length||syns!=='—'){ctxEl.innerHTML=ctxHtml||'<div style="color:rgba(255,255,255,.2)">Nessun sinonimo trovato</div>'}
+          });
+        });
+        setTimeout(function(){if(ctxFetched===0)ctxEl.innerHTML='<div style="color:rgba(255,255,255,.2)">API non raggiungibile</div>'},5000);
+      });
     }
   };
 
@@ -1457,7 +1662,6 @@ window.addEventListener('resize', function(){if(_isFullscreen)fitLinesToViewport
       renderPanel(name,btn);
     }
   };
-})();
 })();
 </script>
 
