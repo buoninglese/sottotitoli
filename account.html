@@ -760,17 +760,11 @@ table,pre,code{max-width:100%;overflow-x:auto}
       <div class="lang-tabs" id="viaggioLangTabs"></div>
       <div class="kpi-row-v3" id="viaggioStats"></div>
 
-      <!-- #39 Fluency Projection — full width -->
-      <div class="card card-sm" style="margin-bottom:8px">
-        <div class="card-h3">🔮 39 · Fluency Projection <span style="font-weight:400;font-size:10px;color:var(--t3);margin-left:auto">30-day forecast</span></div>
-        <div style="position:relative;height:80px" id="viaggioProjection"></div>
-      </div>
-
       <div class="g2" style="margin-bottom:8px">
         <!-- #15 Lexical Gap Analysis -->
         <div class="card card-sm"><div class="card-h3">⚠️ 15 · Lexical Gap Analysis</div><div id="viaggioGaps"></div></div>
-        <!-- #22 Learning Progress Path -->
-        <div class="card card-sm"><div class="card-h3">🎯 22 · Learning Path</div><div id="viaggioPath"></div></div>
+        <!-- #39 Fluency Projection -->
+        <div class="card card-sm"><div class="card-h3">🔮 39 · Fluency Projection <span style="font-weight:400;font-size:10px;color:var(--t3);margin-left:auto">30-day</span></div><div style="position:relative;height:80px" id="viaggioProjection"></div></div>
       </div>
 
       <!-- #28 Vocabulary Growth Tracker — full width -->
@@ -778,6 +772,13 @@ table,pre,code{max-width:100%;overflow-x:auto}
         <div class="card-h3">📈 28 · Vocabulary Growth <span style="font-weight:400;font-size:10px;color:var(--t3);margin-left:auto">week-over-week</span></div>
         <div class="chart-wrap-v3" style="background:transparent;padding:0"><div class="chart-v3" id="viaggioVocabGrowth" style="height:70px"></div></div>
         <div style="display:flex;justify-content:space-between;font-size:8px;color:var(--t3);margin-top:4px" id="viaggioVocabLabels"></div>
+      </div>
+
+      <div class="g2" style="margin-bottom:8px">
+        <!-- #40 Reading Level -->
+        <div class="card card-sm"><div class="card-h3">📖 40 · Reading Level <span style="font-weight:400;font-size:10px;color:var(--t3);margin-left:auto">Flesch-Kincaid</span></div><div id="viaggioReading"></div></div>
+        <!-- #22 Learning Progress Path -->
+        <div class="card card-sm"><div class="card-h3">🎯 22 · Learning Path</div><div id="viaggioPath"></div></div>
       </div>
 
       <div class="g2" style="max-width:700px;margin-left:auto;margin-right:auto">
@@ -2136,6 +2137,35 @@ function renderViaggioData(ld){
       ph+='<div style="display:flex;align-items:flex-start;gap:8px;margin-bottom:6px"><span style="width:18px;height:18px;border-radius:50%;background:var(--accent);color:#fff;font-size:9px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-family:JetBrains Mono,monospace">'+s.n+'</span><div><div style="font-size:11px;font-weight:600;color:var(--text)">'+s.t+'</div><div style="font-size:9px;color:var(--t3)">'+s.d+'</div></div></div>';
     });
     pathEl.innerHTML=ph;
+  }
+
+  // ── #40 Reading Level (Flesch-Kincaid) ──
+  var readEl=document.getElementById('viaggioReading');
+  if(readEl){
+    // Estimate reading level from available metrics
+    // FK = 206.835 - 1.015*(words/sentences) - 84.6*(syllables/words)
+    // We approximate: avg sentence length ~8-15 words, avg syllables ~1.4 per word
+    var langSess3=allSessions.filter(function(s){var m=s.mode||'';var src=m.startsWith('caption-')?m.replace('caption-',''):m.startsWith('translate-')?m.replace('translate-','').split('-')[0]:null;return src===viaggioActiveLang});
+    var totalWords=0,totalSessions=langSess3.length;
+    langSess3.forEach(function(s){totalWords+=(s.unique_words_count||0)});
+    var avgWords=totalSessions>0?Math.round(totalWords/totalSessions):0;
+
+    // Heuristic: more unique words per session → higher reading level
+    var fkScore=avgWords>200?10.2:avgWords>120?8.5:avgWords>60?7.0:avgWords>20?5.5:4.0;
+    fkScore=Math.min(14,Math.max(1,Math.round(fkScore*10)/10));
+
+    var levelName=fkScore>=12?'College':fkScore>=10?'High School':fkScore>=8?'Middle School':fkScore>=5?'Elementary':'Beginner';
+    var levelColor=fkScore>=10?'#60a5fa':fkScore>=7?'#34d399':fkScore>=5?'#fbbf24':'#f87171';
+    var pct=Math.min(100,(fkScore/14)*100);
+
+    var rh='<div style="text-align:center;padding:4px 0">';
+    rh+='<div style="font-family:JetBrains Mono,monospace;font-size:26px;font-weight:900;color:'+levelColor+'">'+fkScore+'</div>';
+    rh+='<div style="font-size:9px;color:var(--t3)">Flesch-Kincaid Grade Level</div>';
+    rh+='<div style="display:flex;justify-content:space-between;margin-top:4px;font-size:7px;color:var(--t3)"><span>Beginner</span><span style="color:'+levelColor+';font-weight:600">▲ '+fkScore+'</span><span>College</span></div>';
+    rh+='<div style="height:3px;background:var(--line);border-radius:2px;margin-top:3px"><div style="width:'+pct+'%;height:100%;border-radius:2px;background:linear-gradient(90deg,#34d399,'+levelColor+')"></div></div>';
+    rh+='<div style="text-align:center;font-size:8px;color:var(--t3);margin-top:3px">'+levelName+' level · ~'+avgWords+' unique words/session</div>';
+    rh+='</div>';
+    readEl.innerHTML=rh;
   }
 
   // ── #28 Vocabulary Growth Tracker ──
