@@ -137,7 +137,6 @@ document.addEventListener('DOMContentLoaded', async () => {
           <hr class="ud-divider">
           <div class="ud-credits-section">
             <div class="ud-credit-row"><span>Minuti</span><span id="udMinutes">—</span></div>
-            <div class="ud-credit-sub">caption 0,5× · traduzione 1×</div>
             <div class="ud-credit-row"><span>Crediti report</span><span id="udTokens">—</span></div>
           </div>
           <hr class="ud-divider">
