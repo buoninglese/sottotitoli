@@ -1,53 +1,163 @@
-STRIPE PRODUCT LIST — Sottotitoli
-=====================================
-Create these in https://dashboard.stripe.com/test/products
+# STRIPE SETUP — Sottotitoli · June 2026 Pricing
 
-For each product, create ONE price (one-off payment, EUR).
+## Overview
 
+The new pricing model uses **3 one-time payment products**. Each product includes caption minutes, translation minutes, and AI report credits.
 
-PRODUCT 1: "2 hours"
-  Description: 120 minutes of Sottotitoli captioning + 5 free tokens
-  Price: €10.00 EUR (one-off)
-  Price ID: price_1Tcwmm1xvn5NIk3eiKIus3c5 ✅ EXISTS
-  Product ID: prod_UcB9nEU31aiSzq ✅ EXISTS
-  Credits: 7200 seconds
-  Tokens: 5
-  Stripe key: 2hours
+## Product Configuration
 
-PRODUCT 2: "20 hours"  
-  Description: 1200 minutes of Sottotitoli captioning + 50 free tokens
-  Price: €50.00 EUR (one-off)
-  Price ID: price_1TcwoX1xvn5NIk3eJuqF8V1j ✅ EXISTS
-  Product ID: prod_UcBAcPEnicprOK ✅ EXISTS
-  Credits: 72000 seconds
-  Tokens: 50
-  Stripe key: 20hours
+Create these in **https://dashboard.stripe.com/test/products** (test mode first, then repeat in live mode).
 
-PRODUCT 3: "50 hours" (CREATE NEW)
-  Description: 3000 minutes of Sottotitoli captioning + 150 free tokens
-  Price: €100.00 EUR (one-off)
-  Price ID: (create in Stripe)
-  Product ID: (create in Stripe)
-  Credits: 180000 seconds
-  Tokens: 150
-  Stripe key: 50hours
+---
 
-PRODUCT 4: "90 Tokens" (CREATE NEW)
-  Description: 90 tokens for AI report purchases — no caption time included
-  Price: €10.00 EUR (one-off)
-  Price ID: (create in Stripe)
-  Product ID: (create in Stripe)
-  Credits: 0 seconds
-  Tokens: 90
-  Stripe key: 90tokens
+### PRODUCT 1: Starter
 
+| Field | Value |
+|---|---|
+| **Name** | Sottotitoli Starter |
+| **Description** | 60 min caption · 30 min traduzione · 2 report AI |
+| **Price** | €4.99 EUR (one-off) |
+| **Stripe key** | `sottotitoli_starter` |
+| **Price ID** | _(create in Stripe, then copy here)_ |
+| **Product ID** | _(create in Stripe, then copy here)_ |
 
-ENVIRONMENT VARIABLES (set in Supabase Dashboard → Edge Functions → create-checkout-session):
-  STRIPE_SECRET_KEY = sk_test_xxxxxxxx
-  STRIPE_PRICE_2HOURS = price_1Tcwmm1xvn5NIk3eiKIus3c5
-  STRIPE_PRICE_20HOURS = price_1TcwoX1xvn5NIk3eJuqF8V1j
-  STRIPE_PRICE_50HOURS = (after creating product 3)
-  STRIPE_PRICE_90TOKENS = (after creating product 4)
+**Credits to grant in your Edge Function:**
+- `credit_seconds`: 3600 (60 min)
+- `translation_seconds`: 1800 (30 min)
+- `report_tokens`: 2
+
+---
+
+### PRODUCT 2: Standard ⭐ (featured)
+
+| Field | Value |
+|---|---|
+| **Name** | Sottotitoli Standard |
+| **Description** | 300 min caption · 150 min traduzione · 10 report AI — AI Reports sbloccato |
+| **Price** | €14.99 EUR (one-off) |
+| **Stripe key** | `sottotitoli_standard` |
+| **Price ID** | _(create in Stripe, then copy here)_ |
+| **Product ID** | _(create in Stripe, then copy here)_ |
+
+**Credits to grant:**
+- `credit_seconds`: 18000 (300 min)
+- `translation_seconds`: 9000 (150 min)
+- `report_tokens`: 10
+
+---
+
+### PRODUCT 3: Premium
+
+| Field | Value |
+|---|---|
+| **Name** | Sottotitoli Premium |
+| **Description** | 900 min caption · 450 min traduzione · 40 report AI — Supporto prioritario |
+| **Price** | €29.99 EUR (one-off) |
+| **Stripe key** | `sottotitoli_premium` |
+| **Price ID** | _(create in Stripe, then copy here)_ |
+| **Product ID** | _(create in Stripe, then copy here)_ |
+
+**Credits to grant:**
+- `credit_seconds`: 54000 (900 min)
+- `translation_seconds`: 27000 (450 min)
+- `report_tokens`: 40
+
+---
+
+## Step-by-step: Create Products in Stripe Dashboard
+
+### 1. Go to Stripe Dashboard
+```
+https://dashboard.stripe.com/test/products
+```
+
+### 2. Click "Add product"
+
+### 3. For EACH product:
+- **Name**: `Sottotitoli Starter` (then Standard, then Premium)
+- **Description**: copy from table above
+- **Price type**: One-off
+- **Amount**: See table above in EUR
+- **Currency**: EUR
+- Click **Save product**
+
+### 4. After saving each product:
+- Copy the **Price ID** (starts with `price_...`)
+- Copy the **Product ID** (starts with `prod_...`)
+- Paste them in the table above for reference
+
+### 5. Set Environment Variables in Supabase
+
+Go to: **Supabase Dashboard → Edge Functions → create-checkout-session**
+
+Add these environment variables:
+```
+STRIPE_SECRET_KEY=sk_test_xxxxxxxxxxx    # Your real Stripe secret key
+STRIPE_PRICE_STARTER=price_xxxxxxxxxxx   # Price ID for Starter
+STRIPE_PRICE_STANDARD=price_xxxxxxxxxxx  # Price ID for Standard
+STRIPE_PRICE_PREMIUM=price_xxxxxxxxxxx   # Price ID for Premium
+```
+
+### 6. Update the Edge Function
+
+In your `create-checkout-session` Supabase Edge Function, add handling for the new product keys:
+
+```typescript
+// Map product keys to Stripe Price IDs
+const PRICE_MAP: Record<string, string> = {
+  'sottotitoli_starter':  Deno.env.get('STRIPE_PRICE_STARTER')!,
+  'sottotitoli_standard': Deno.env.get('STRIPE_PRICE_STANDARD')!,
+  'sottotitoli_premium':  Deno.env.get('STRIPE_PRICE_PREMIUM')!,
+  // Legacy (keep for existing users)
+  '2hours':  Deno.env.get('STRIPE_PRICE_2HOURS')!,
+  '20hours': Deno.env.get('STRIPE_PRICE_20HOURS')!,
+  '50hours': Deno.env.get('STRIPE_PRICE_50HOURS')!,
+  '90tokens': Deno.env.get('STRIPE_PRICE_90TOKENS')!,
+};
+```
+
+### 7. Switch to Live Mode
+
+After testing in test mode (use Stripe test card `4242 4242 4242 4242`):
+1. Repeat steps 2-5 in the **Live** dashboard
+2. Update `config.js` with your **live** publishable key (starts with `pk_live_`)
+3. Update Supabase Edge Function env vars with **live** secret key and price IDs
+
+---
+
+## Cost Analysis (for your reference)
+
+| Cost item | Provider | Approx. cost |
+|---|---|---|
+| Speech recognition | Browser Web Speech API | **Free** |
+| Translation | Google Translate / MyMemory | **Free** |
+| Speaker diarization | OpenAI Whisper | ~€0.30/hour |
+| AI Reports | GPT-4o mini | ~€0.01/report |
+| Hosting | GitHub Pages + Supabase | **Free** |
+| Payments | Stripe | ~1.5% + €0.25/txn |
+
+**Margins per product:**
+- Starter €4.99 → cost ~€0.35 → **~93% margin**
+- Standard €14.99 → cost ~€1.70 → **~89% margin**
+- Premium €29.99 → cost ~€5.10 → **~83% margin**
+
+Report credits are negligible cost (~€0.01 each). The main cost driver is diarization at ~€0.30/hour of caption time.
+
+---
+
+## Test Cards
+
+Use these in Stripe test mode:
+- **Success**: `4242 4242 4242 4242` (any future expiry, any CVC)
+- **Decline**: `4000 0000 0000 0002`
+- **3D Secure**: `4000 0000 0000 3220`
+
+## Report Rules (implemented in app logic)
+
+- Sessions must be **≥ 5 minutes** to qualify for an AI report
+- Sessions must be **≤ 120 minutes** for report eligibility
+- Each report consumes **1 credit** from the bundle
+- Report credits can also be purchased individually on the AI Reports page
 
 ENVIRONMENT VARIABLES (stripe-webhook):
   STRIPE_WEBHOOK_SECRET = whsec_xxxxxxxx (from Stripe Dashboard → Webhooks)
