@@ -45,9 +45,8 @@
       if (!userId) return;
 
       // Minutes pool (shared between caption 0.5× & translation 1×)
-      var cr = await sb.from('user_credits').select('balance_seconds').eq('user_id', userId).maybeSingle();
-      var sec = cr.data?.balance_seconds || 0;
-      _credits.minutes = Math.round(sec / 60);
+      var cr = await sb.from('user_credits').select('balance_minutes').eq('user_id', userId).maybeSingle();
+      _credits.minutes = cr.data?.balance_minutes || 0;
 
       // Credits (reports only)
       var tr = await sb.from('user_tokens').select('balance').eq('user_id', userId).maybeSingle();
