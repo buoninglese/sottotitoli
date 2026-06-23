@@ -1148,6 +1148,16 @@ _realMic.onFinal = function(text) {
       if (r.data?.session) _ensureSupabaseSession(r.data.session.user.id, 'caption-' + (currentCaptionLang === 'en-US' ? 'en' : currentCaptionLang.split('-')[0]), currentCaptionLang);
     });
   }
+
+  // ── Refresh active extras panel with new data ──
+  if (typeof window.refreshExtrasPanel === 'function') {
+    window.refreshExtrasPanel();
+  }
+
+  // ── Update listening bar immediately ──
+  if (typeof updateListenBar === 'function') {
+    updateListenBar();
+  }
 };
 
 // Reset mic to idle on load
@@ -1417,14 +1427,12 @@ setInterval(updateListenBar, 2000);
     return 'NOUN'; // default
   }
 
-  // ── Extract words from live transcript ──
+  // ── Extract words from TRANSCRIPT ONLY (no interim — only finalized sentences) ──
   function getTranscriptWords(){
     var t = document.getElementById('captionTranscript');
     if (!t) return [];
     var text = t.textContent || '';
-    // Also get interim
-    var interim = document.getElementById('captionInterim');
-    if (interim) text += ' ' + (interim.textContent || '');
+    // DO NOT include interim — only analyze finalized lines
     var words = text.toLowerCase().match(/\b[a-z]{2,}\b/g) || [];
     var seen = {};
     var unique = [];
@@ -1866,6 +1874,20 @@ setInterval(updateListenBar, 2000);
       activePanel=name;
       renderPanel(name,btn);
     }
+  };
+
+  // ── Refresh active panel (called on every onFinal) ──
+  window.refreshExtrasPanel = function(){
+    if (!activePanel) return;
+    var panel=document.getElementById('extrasPanel');
+    if (!panel || !panel.classList.contains('show')) return;
+    // Don't show loading spinner on refresh — just update content inline
+    var fn=panels[activePanel];
+    if(!fn) return;
+    fn(function(html,afterRender){
+      panel.innerHTML=html;
+      if(afterRender) afterRender();
+    });
   };
 })();
 </script>
