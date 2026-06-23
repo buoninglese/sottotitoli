@@ -771,6 +771,21 @@ body {
       <div class="studio-body" id="captionLines">
         <!-- Dynamically populated -->
       </div>
+
+      <!-- ═══ #34 Word Bank Panel ═══ -->
+      <div class="wordbank-panel" id="wordbankPanel" style="display:none;margin:0 24px 8px;padding:14px 16px;border-radius:10px;background:rgba(167,139,250,.04);border:1px solid rgba(167,139,250,.12)">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;font-size:11px;font-weight:700;color:#c4b5fd;flex-wrap:wrap;gap:6px">
+          <span>📚 My Word Bank</span>
+          <div style="display:flex;gap:4px;align-items:center">
+            <input type="text" id="wordbankInput" placeholder="Add a word…" style="padding:4px 8px;border-radius:5px;border:1px solid rgba(255,255,255,.1);background:rgba(255,255,255,.04);color:var(--text);font-size:10px;font-family:inherit;width:110px;outline:none" onkeydown="if(event.key==='Enter')addToWordBank()">
+            <button onclick="addToWordBank()" style="padding:4px 8px;border-radius:5px;border:1px solid rgba(52,211,153,.2);background:rgba(52,211,153,.1);color:#34d399;cursor:pointer;font-size:9px;font-weight:700;font-family:inherit">+</button>
+            <button onclick="clearWordBank()" style="padding:4px 6px;border-radius:5px;border:none;background:rgba(248,113,113,.1);color:#f87171;cursor:pointer;font-size:9px;font-family:inherit" title="Clear">🗑</button>
+          </div>
+        </div>
+        <div style="display:flex;flex-wrap:wrap;gap:4px;min-height:22px" id="wordbankChips"></div>
+        <div id="wordbankEmpty" style="text-align:center;font-size:9px;color:rgba(255,255,255,.12);padding:6px 0;display:none">No words saved yet.</div>
+      </div>
+
       <div class="studio-ctrl">
         <span class="ctrl-label">Metrics</span>
         <button class="metric-toggle-btn active" data-metric="1" onclick="toggleMetric(1,this)">1</button>
@@ -778,6 +793,7 @@ body {
         <button class="metric-toggle-btn" data-metric="3" onclick="toggleMetric(3,this)">3</button>
         <button class="metric-toggle-btn" data-metric="4" onclick="toggleMetric(4,this)">4</button>
         <span class="ctrl-spacer"></span>
+        <button class="metric-toggle-btn wordbank-toggle-btn" id="wordbankToggleBtn" onclick="toggleWordBank()" style="border-color:rgba(167,139,250,.25);color:#c4b5fd">📚 Bank <span id="wordbankCount" style="font-size:8px;opacity:.6">0</span></button>
         <button class="action-btn primary" id="startBtn" onclick="toggleSession()">▶ START</button>
       </div>
     </div>
@@ -1746,6 +1762,109 @@ if (savedTrRoom) {
   var el2 = document.getElementById('trRoomId');
   if (el2) el2.textContent = savedTrRoom.substring(0, 14) + '…';
 }
+
+// ═══ #34 Word Bank — shared across caption & translation ═══
+var WORD_BANK_KEY = 'sottotitoli_wordbank';
+var wordBank = JSON.parse(localStorage.getItem(WORD_BANK_KEY) || '[]');
+
+function toggleWordBank() {
+  var panel = document.getElementById('wordbankPanel');
+  var btn = document.getElementById('wordbankToggleBtn');
+  if (!panel || !btn) return;
+  var isOpen = panel.style.display === 'block';
+  if (isOpen) {
+    panel.style.display = 'none';
+    btn.classList.remove('active');
+  } else {
+    panel.style.display = 'block';
+    btn.classList.add('active');
+    renderWordBank();
+  }
+}
+
+function addToWordBank() {
+  var input = document.getElementById('wordbankInput');
+  if (!input) return;
+  var word = input.value.trim().toLowerCase();
+  if (!word || word.length < 2) return;
+  if (wordBank.indexOf(word) >= 0) { input.value = ''; return; }
+  wordBank.push(word);
+  saveWordBank();
+  input.value = '';
+  renderWordBank();
+  input.focus();
+}
+
+function removeFromWordBank(word) {
+  wordBank = wordBank.filter(function(w) { return w !== word; });
+  saveWordBank();
+  renderWordBank();
+}
+
+function clearWordBank() {
+  if (!confirm('Clear all ' + wordBank.length + ' saved words?')) return;
+  wordBank = [];
+  saveWordBank();
+  renderWordBank();
+}
+
+function saveWordBank() {
+  localStorage.setItem(WORD_BANK_KEY, JSON.stringify(wordBank));
+  var countEl = document.getElementById('wordbankCount');
+  if (countEl) countEl.textContent = wordBank.length;
+  if (window.sottotitoliSupabase) {
+    window.sottotitoliSupabase.auth.getSession().then(function(r) {
+      if (r.data?.session) {
+        window.sottotitoliSupabase.from('user_preferences').upsert({
+          user_id: r.data.session.user.id,
+          key: 'wordbank',
+          value: JSON.stringify(wordBank)
+        }, { onConflict: 'user_id,key' }).then(function() {});
+      }
+    });
+  }
+}
+
+function renderWordBank() {
+  var chips = document.getElementById('wordbankChips');
+  var empty = document.getElementById('wordbankEmpty');
+  var countEl = document.getElementById('wordbankCount');
+  if (!chips) return;
+  if (countEl) countEl.textContent = wordBank.length;
+  if (wordBank.length === 0) {
+    chips.innerHTML = '';
+    if (empty) empty.style.display = 'block';
+  } else {
+    if (empty) empty.style.display = 'none';
+    chips.innerHTML = wordBank.map(function(w) {
+      return '<span style="display:inline-flex;align-items:center;gap:3px;padding:3px 8px;border-radius:6px;font-size:9px;font-weight:600;background:rgba(167,139,250,.1);color:#c4b5fd;border:1px solid rgba(167,139,250,.15);cursor:pointer;transition:all .15s" onclick="removeFromWordBank(\'' + w.replace(/'/g, "\\'") + '\')" title="Click to remove">' + w + '</span>';
+    }).join('');
+  }
+}
+
+// Restore word bank on load
+(function() {
+  if (window.sottotitoliSupabase) {
+    window.sottotitoliSupabase.auth.getSession().then(function(r) {
+      if (r.data?.session) {
+        window.sottotitoliSupabase.from('user_preferences')
+          .select('value').eq('user_id', r.data.session.user.id).eq('key', 'wordbank').single()
+          .then(function(res) {
+            if (res.data?.value) {
+              try {
+                var remote = JSON.parse(res.data.value);
+                if (Array.isArray(remote) && remote.length > wordBank.length) {
+                  wordBank = remote;
+                  saveWordBank();
+                }
+              } catch(e) {}
+            }
+          });
+      }
+    });
+  }
+  renderWordBank();
+})();
 </script>
 
 </body>
