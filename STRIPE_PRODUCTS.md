@@ -60,6 +60,23 @@ Create these in **https://dashboard.stripe.com/test/products** (test mode first,
 | **Description** | 900 min caption · 450 min traduzione · 40 report AI — Supporto prioritario |
 | **Price** | €29.99 EUR (one-off) |
 | **Stripe key** | `sottotitoli_premium` |
+
+---
+
+### PRODUCT 4: Solo Crediti (report only, no minutes)
+
+| Field | Value |
+|---|---|
+| **Name** | Sottotitoli 100 Crediti Report |
+| **Description** | 100 crediti per acquistare report AI — nessun minuto incluso |
+| **Price** | €9.99 EUR (one-off) |
+| **Stripe key** | `sottotitoli_credits` |
+| **Price ID** | _(create in Stripe, then copy here)_ |
+| **Product ID** | _(create in Stripe, then copy here)_ |
+
+**Credits to grant:**
+- `tokens`: 100 (report credits only)
+- `credit_seconds`: 0 (no minutes)
 | **Price ID** | _(create in Stripe, then copy here)_ |
 | **Product ID** | _(create in Stripe, then copy here)_ |
 
@@ -104,6 +121,7 @@ STRIPE_SECRET_KEY=sk_test_xxxxxxxxxxx    # Your real Stripe secret key
 STRIPE_PRICE_STARTER=price_xxxxxxxxxxx   # Price ID for Starter
 STRIPE_PRICE_STANDARD=price_xxxxxxxxxxx  # Price ID for Standard
 STRIPE_PRICE_PREMIUM=price_xxxxxxxxxxx   # Price ID for Premium
+STRIPE_PRICE_CREDITS=price_xxxxxxxxxxx   # Price ID for 100 Crediti
 ```
 
 ### 6. Update the Edge Function
@@ -116,6 +134,7 @@ const PRICE_MAP: Record<string, string> = {
   'sottotitoli_starter':  Deno.env.get('STRIPE_PRICE_STARTER')!,
   'sottotitoli_standard': Deno.env.get('STRIPE_PRICE_STANDARD')!,
   'sottotitoli_premium':  Deno.env.get('STRIPE_PRICE_PREMIUM')!,
+  'sottotitoli_credits':  Deno.env.get('STRIPE_PRICE_CREDITS')!,
   // Legacy (keep for existing users)
   '2hours':  Deno.env.get('STRIPE_PRICE_2HOURS')!,
   '20hours': Deno.env.get('STRIPE_PRICE_20HOURS')!,

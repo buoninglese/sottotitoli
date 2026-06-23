@@ -4,7 +4,7 @@
 (function() {
   'use strict';
 
-  var _credits = { tokens: '—', captionMin: '—', translationMin: '—' };
+  var _credits = { tokens: '—', minutes: '—' };
 
   function buildDropdown(dd) {
     dd.innerHTML =
@@ -18,11 +18,9 @@
       '<a href="analysis.html">AI Reports</a>' +
       '<hr>' +
       '<div class="dd-credits" id="hbCredits">' +
-        '<div class="dd-credit-row"><span>Crediti</span><span id="hbTokens">—</span></div>' +
-        '<div class="dd-credit-row"><span>Minuti</span><span id="hbCapMin">—</span></div>' +
-        '<div class="dd-credit-sub">caption</div>' +
-        '<div class="dd-credit-row"><span>Minuti</span><span id="hbTraMin">—</span></div>' +
-        '<div class="dd-credit-sub">traduzione</div>' +
+        '<div class="dd-credit-row"><span>Minuti</span><span id="hbMinutes">—</span></div>' +
+        '<div class="dd-credit-sub">caption 0,5× · traduzione 1×</div>' +
+        '<div class="dd-credit-row"><span>Crediti report</span><span id="hbTokens">—</span></div>' +
       '</div>' +
       '<hr>' +
       '<a href="purchase.html">💳 Acquista crediti</a>' +
@@ -32,14 +30,10 @@
   }
 
   function updateCreditsDisplay() {
-    var tokensEl = document.getElementById('hbTokens');
-    var capEl = document.getElementById('hbCapMin');
-    var traEl = document.getElementById('hbTraMin');
-    if (tokensEl) tokensEl.textContent = _credits.tokens;
-    // Caption: 0.5 credit/min → 1 credit = 2 min
-    // Traduzione: 1 credit/min → 1 credit = 1 min
-    if (capEl) capEl.textContent = _credits.captionMin + ' min';
-    if (traEl) traEl.textContent = _credits.translationMin + ' min';
+    var minEl = document.getElementById('hbMinutes');
+    var tokEl = document.getElementById('hbTokens');
+    if (minEl) minEl.textContent = _credits.minutes + ' min';
+    if (tokEl) tokEl.textContent = _credits.tokens;
   }
 
   async function fetchCredits() {
@@ -50,19 +44,17 @@
       var userId = resp.data?.session?.user?.id;
       if (!userId) return;
 
-      // Fetch tokens (universal credits)
+      // Minutes pool (shared between caption 0.5× & translation 1×)
+      var cr = await sb.from('user_credits').select('balance_seconds').eq('user_id', userId).maybeSingle();
+      var sec = cr.data?.balance_seconds || 0;
+      _credits.minutes = Math.round(sec / 60);
+
+      // Credits (reports only)
       var tr = await sb.from('user_tokens').select('balance').eq('user_id', userId).maybeSingle();
-      var tokens = tr.data?.balance || 0;
-      _credits.tokens = tokens;
-      // Caption: 0.5 credit/min → tokens × 2
-      _credits.captionMin = tokens * 2;
-      // Traduzione: 1 credit/min → tokens × 1
-      _credits.translationMin = tokens;
+      _credits.tokens = tr.data?.balance || 0;
 
       updateCreditsDisplay();
-    } catch(e) {
-      // Silently fail
-    }
+    } catch(e) { /* silent */ }
   }
 
   function init() {
