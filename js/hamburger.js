@@ -9,8 +9,8 @@
   function buildDropdown(dd) {
     dd.innerHTML =
       '<div class="dd-greeting">' +
-        '<div class="dd-avatar" id="hbAvatar">?</div>' +
-        '<span class="dd-name" id="hbName">Hello</span>' +
+        '<div class="dd-avatar" id="hbAvatar">S</div>' +
+        '<span class="dd-name" id="hbName">Hello…</span>' +
       '</div>' +
       '<a href="index.html">Home</a>' +
       '<a href="start.html">Start</a>' +
@@ -22,17 +22,17 @@
         '<div class="dd-credit-row"><span>Crediti report</span><span id="hbTokens">—</span></div>' +
       '</div>' +
       '<hr>' +
-      '<a href="purchase.html">💳 Acquista crediti</a>' +
+      '<a href="purchase.html" style="padding-left:28px">Acquista crediti</a>' +
       '<hr>' +
-      '<a href="account.html#cs-profile">⚙️ Impostazioni</a>' +
-      '<a href="#" id="hbLogoutBtn" class="hb-logout">🚪 Esci</a>';
+      '<a href="account.html#cs-profile" style="padding-left:28px">Impostazioni</a>' +
+      '<a href="#" id="hbLogoutBtn" style="font-weight:700">Esci</a>';
   }
 
   function updateCreditsDisplay() {
     var minEl = document.getElementById('hbMinutes');
     var tokEl = document.getElementById('hbTokens');
-    if (minEl) minEl.textContent = _credits.minutes + ' min';
-    if (tokEl) tokEl.textContent = _credits.tokens;
+    if (minEl) minEl.textContent = (_credits.minutes !== '—' ? _credits.minutes : '0') + ' min';
+    if (tokEl) tokEl.textContent = _credits.tokens !== '—' ? _credits.tokens : '0';
   }
 
   async function fetchCredits() {
@@ -151,7 +151,8 @@
           avatarEl.style.backgroundSize = 'cover';
         } else {
           avatarEl.style.backgroundImage = 'linear-gradient(135deg,#7c3aed,#a78bfa)';
-          avatarEl.textContent = (detail.name || '?').charAt(0).toUpperCase();
+          var letter = (detail.name || 'S').charAt(0).toUpperCase();
+          avatarEl.textContent = letter === '?' ? 'S' : letter;
           avatarEl.style.color = '#fff';
         }
       }
