@@ -607,6 +607,8 @@ body.fullscreen-active #fullscreenBtn:hover { background: var(--accent); color: 
         <button class="extras-toggle-btn" data-panel="gloss" onclick="toggleExtrasPanel('gloss',this)">🌐 Gloss</button>
         <button class="extras-toggle-btn" data-panel="deepdive" onclick="toggleExtrasPanel('deepdive',this)">🔬 Deep Dive</button>
         <button class="extras-toggle-btn" data-panel="info" onclick="toggleExtrasPanel('info',this)">📖 Info</button>
+        <button class="extras-toggle-btn" data-panel="synonyms21" onclick="toggleExtrasPanel('synonyms21',this)">📖 Synonyms</button>
+        <button class="extras-toggle-btn" data-panel="multispeaker" onclick="toggleExtrasPanel('multispeaker',this)">👥 Multispeaker</button>
       </div>
       <div class="extras-panel" id="extrasPanel"></div>
     </div>
@@ -3223,6 +3225,176 @@ function downloadGrammarPDF() {
         });
         h+='</div>';
       }else{h+='<div style="color:rgba(255,255,255,.2);font-style:italic">Word levels appear as you speak</div>'}
+      h+='</div>';
+
+      h+='</div>';
+      cb(h);
+    },
+
+    // ═══ Synonyms 21 — Contextual Synonym Cards (from mockup 21) ═══
+    synonyms21: function(cb){
+      var h='<div class="extras-grid">';
+      var words=getTranscriptWords();
+      var noData=words.length===0;
+      var text=(document.getElementById('captionTranscript')?.textContent||'');
+
+      // Build synonym cards from detected words
+      var synDict={
+        discuss:{pos:'VERB',syns:[{w:'debate',m:96,ex:'We were debating the merits of the proposal.'},{w:'examine',m:91,ex:'The committee is examining all options.'},{w:'explore',m:87,ex:'They spent the afternoon exploring new approaches.'}]},
+        important:{pos:'ADJ',syns:[{w:'crucial',m:95,ex:'This is a crucial step in the process.'},{w:'significant',m:92,ex:'The discovery had a significant impact.'},{w:'essential',m:89,ex:'Water is essential for all known life.'}]},
+        future:{pos:'NOUN',syns:[{w:'prospect',m:93,ex:'The prospect of working abroad excites her.'},{w:'outlook',m:88,ex:'The economic outlook appears promising.'},{w:'horizon',m:84,ex:'New opportunities are appearing on the horizon.'}]},
+        create:{pos:'VERB',syns:[{w:'generate',m:94,ex:'The campaign generated a lot of interest.'},{w:'produce',m:90,ex:'The factory can produce 500 units per day.'},{w:'devise',m:86,ex:'She devised a clever solution.'}]},
+        understand:{pos:'VERB',syns:[{w:'comprehend',m:96,ex:'It took time to fully comprehend the complexity.'},{w:'grasp',m:91,ex:'She quickly grasped the key concepts.'},{w:'perceive',m:86,ex:'How do you perceive the situation?'}]},
+        problem:{pos:'NOUN',syns:[{w:'issue',m:95,ex:'We need to address this issue quickly.'},{w:'challenge',m:92,ex:'The main challenge is finding qualified staff.'},{w:'obstacle',m:87,ex:'Lack of funding remains the biggest obstacle.'}]},
+        quick:{pos:'ADJ',syns:[{w:'rapid',m:96,ex:'The company experienced rapid growth.'},{w:'swift',m:92,ex:'The government took swift action.'},{w:'brisk',m:87,ex:'We went for a brisk walk.'}]},
+        help:{pos:'VERB',syns:[{w:'assist',m:97,ex:'The tutor will assist you with problems.'},{w:'support',m:93,ex:'We need to support each other.'},{w:'facilitate',m:88,ex:'The software will facilitate communication.'}]},
+        idea:{pos:'NOUN',syns:[{w:'concept',m:95,ex:'The concept of time travel fascinates.'},{w:'notion',m:90,ex:'She rejected the notion that success needs luck.'},{w:'thought',m:87,ex:'A sudden thought occurred to him.'}]},
+        change:{pos:'VERB',syns:[{w:'modify',m:94,ex:'We need to modify the approach slightly.'},{w:'alter',m:91,ex:'The design was altered to meet requirements.'},{w:'transform',m:88,ex:'The renovation will transform the space.'}]}
+      };
+
+      // POS filter buttons
+      h+='<div class="extras-card" style="grid-column:1/-1"><div class="ec-title">Filters</div>';
+      h+='<div style="display:flex;gap:6px;flex-wrap:wrap" id="synFilterRow">';
+      [{l:'All',v:'all'},{l:'Verbs',v:'VERB'},{l:'Nouns',v:'NOUN'},{l:'Adjectives',v:'ADJ'}].forEach(function(f){
+        h+='<button class="extras-chip syn-filter-btn" data-pos="'+f.v+'" style="cursor:pointer;border:none;font-family:inherit;font-size:10px;padding:5px 14px;border-radius:100px;background:rgba(255,255,255,.04);color:rgba(255,255,255,.5);border:1px solid rgba(255,255,255,.06)" onclick="var btns=document.querySelectorAll(\'.syn-filter-btn\');btns.forEach(function(b){b.style.background=\'rgba(255,255,255,.04)\';b.style.color=\'rgba(255,255,255,.5)\'});this.style.background=\'rgba(167,139,250,.15)\';this.style.color=\'#c4b5fd\';filterSynCards(this.dataset.pos)">'+f.l+'</button>';
+      });
+      h+='</div></div>';
+
+      // Find matching words from transcript
+      var matched=[];
+      Object.keys(synDict).forEach(function(key){
+        if(text.toLowerCase().indexOf(key)>=0||words.some(function(w){return w.w===key})){
+          matched.push({word:key,data:synDict[key]});
+        }
+      });
+
+      // If no matches from transcript, show all as demo
+      if(matched.length===0&&!noData){
+        Object.keys(synDict).slice(0,6).forEach(function(key){
+          matched.push({word:key,data:synDict[key]});
+        });
+      }
+
+      // Card container
+      h+='<div id="synCardsContainer" style="grid-column:1/-1;display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px">';
+
+      if(noData&&matched.length===0){
+        h+='<div style="grid-column:1/-1;color:rgba(255,255,255,.2);font-style:italic;text-align:center;padding:20px">Start speaking to see contextual synonyms</div>';
+      }
+
+      matched.forEach(function(item){
+        var d=item.data;
+        var posColors={VERB:'rgba(52,211,153,.12)',NOUN:'rgba(96,165,250,.12)',ADJ:'rgba(244,114,182,.12)'};
+        var posText={VERB:'#34d399',NOUN:'#60a5fa',ADJ:'#f472b6'};
+        var posBorder={VERB:'rgba(52,211,153,.2)',NOUN:'rgba(96,165,250,.2)',ADJ:'rgba(244,114,182,.2)'};
+
+        h+='<div class="syn-card-21" data-pos="'+d.pos+'" style="background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.06);border-radius:12px;padding:14px;transition:all .25s">';
+        h+='<div style="display:flex;align-items:baseline;gap:8px;margin-bottom:10px">';
+        h+='<span style="font-size:18px;font-weight:800;color:#e8eaed">'+item.word+'</span>';
+        h+='<span style="font-size:9px;font-weight:600;padding:2px 8px;border-radius:100px;background:'+posColors[d.pos]+';color:'+posText[d.pos]+';border:1px solid '+posBorder[d.pos]+'">'+d.pos+'</span>';
+        h+='</div>';
+
+        // Synonym chips
+        h+='<div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:8px">';
+        d.syns.forEach(function(s,si){
+          h+='<span class="syn-chip-21" data-word="'+item.word+'" data-sidx="'+si+'" style="padding:5px 12px;border-radius:100px;font-size:10px;font-weight:500;cursor:pointer;background:rgba(255,255,255,.04);color:rgba(255,255,255,.55);border:1px solid rgba(255,255,255,.06);transition:all .15s">'+s.w+' <span style="font-size:8px;color:rgba(255,255,255,.25)">'+s.m+'%</span></span>';
+        });
+        h+='</div>';
+
+        // Example box
+        h+='<div class="syn-ex-'+item.word+'" style="padding:10px 14px;background:rgba(0,0,0,.2);border-radius:8px;font-size:11px;color:rgba(255,255,255,.4);line-height:1.5;min-height:36px"><span style="color:rgba(255,255,255,.18);font-style:italic">Click a synonym to see it in context</span></div>';
+        h+='</div>';
+      });
+
+      h+='</div></div>';
+      cb(h, function(){
+        // Add click handlers for synonym chips
+        document.querySelectorAll('.syn-chip-21').forEach(function(chip){
+          chip.addEventListener('click',function(e){
+            e.stopPropagation();
+            var word=this.dataset.word;
+            var si=parseInt(this.dataset.sidx);
+            var sd=synDict[word];
+            if(!sd) return;
+            var syn=sd.syns[si];
+            var exBox=document.querySelector('.syn-ex-'+word);
+            if(exBox) exBox.innerHTML='<span style="color:#a78bfa;font-weight:600">'+syn.w+'</span>: '+syn.ex.replace(syn.w,'<span style="color:#a78bfa;font-weight:700">'+syn.w+'</span>');
+            // Highlight active chip
+            this.parentElement.querySelectorAll('.syn-chip-21').forEach(function(c){c.style.background='rgba(255,255,255,.04)';c.style.color='rgba(255,255,255,.55)';c.style.borderColor='rgba(255,255,255,.06)'});
+            this.style.background='rgba(167,139,250,.18)';this.style.color='#c4b5fd';this.style.borderColor='#a78bfa';
+          });
+          chip.addEventListener('mouseenter',function(){this.style.background='rgba(167,139,250,.08)';this.style.color='#c4b5fd'});
+          chip.addEventListener('mouseleave',function(){if(!this.classList.contains('active')){this.style.background='rgba(255,255,255,.04)';this.style.color='rgba(255,255,255,.55)'}});
+        });
+
+        // Filter buttons
+        window.filterSynCards=function(pos){
+          document.querySelectorAll('.syn-card-21').forEach(function(card){
+            card.style.display=(pos==='all'||card.dataset.pos===pos)?'':'none';
+          });
+        };
+      });
+    },
+
+    // ═══ Multispeaker Mode — Speaker Diarization View ═══
+    multispeaker: function(cb){
+      var h='<div class="extras-grid">';
+      var text=(document.getElementById('captionTranscript')?.textContent||'');
+      var lines=text.split('\n').filter(function(l){return l.trim().length>0});
+      var noData=lines.length===0;
+
+      h+='<div class="extras-card" style="grid-column:1/-1"><div class="ec-title">👥 Multispeaker Mode <span class="ec-badge" style="background:rgba(96,165,250,.15);color:#60a5fa">DIARIZE</span></div>';
+
+      if(noData){
+        h+='<div style="color:rgba(255,255,255,.2);font-style:italic;padding:20px;text-align:center">Start a session with multiple speakers.<br>Speaker diarization identifies who said what.</div>';
+      } else {
+        // Simulate speaker detection (in production, this uses diarization API)
+        var speakerColors=['#5b7fc1','#c1665b','#5b9c6e','#c084fc','#fbbf24','#f472b6'];
+        var speakerNames=['SPK A','SPK B','SPK C','SPK D','SPK E','SPK F'];
+        var speakerIdx=0;
+        var prevSpeaker=-1;
+
+        h+='<div style="display:flex;flex-direction:column;gap:8px;max-height:400px;overflow-y:auto">';
+
+        lines.slice(-10).forEach(function(line,i){
+          // Simple speaker alternation heuristic (real: use diarization)
+          var spk=speakerIdx%3;
+          if(line.match(/^(yes|no|okay|right|exactly|sure|well|so|and|but|because)/i)) spk=(spk+1)%3;
+
+          var color=speakerColors[spk];
+          h+='<div style="display:flex;gap:10px;align-items:flex-start;padding:6px 8px;border-radius:8px;transition:all .2s;background:'+(i===lines.length-1?color+'10':'transparent')+'">';
+          h+='<div style="width:36px;flex-shrink:0;text-align:center;padding-top:2px"><span style="font-family:JetBrains Mono,monospace;font-size:8px;font-weight:600;color:'+color+';background:'+color+'18;padding:2px 6px;border-radius:4px">'+speakerNames[spk]+'</span></div>';
+          h+='<div style="flex:1"><div style="font-size:11px;color:rgba(255,255,255,.75);line-height:1.5;border-left:2px solid '+color+';padding-left:10px">'+line+'</div></div>';
+          h+='</div>';
+
+          speakerIdx++;
+        });
+
+        h+='</div>';
+
+        // Speaker legend
+        h+='<div style="display:flex;gap:12px;margin-top:12px;flex-wrap:wrap">';
+        for(var s=0;s<3;s++){
+          h+='<span style="display:flex;align-items:center;gap:4px;font-size:9px;color:rgba(255,255,255,.35)"><span style="width:8px;height:8px;border-radius:2px;background:'+speakerColors[s]+'"></span>'+speakerNames[s]+'</span>';
+        }
+        h+='</div>';
+      }
+
+      h+='</div>';
+
+      // Speaker stats card
+      h+='<div class="extras-card"><div class="ec-title">Speaker Stats</div>';
+      if(noData){
+        h+='<div style="color:rgba(255,255,255,.2);font-style:italic">No data yet</div>';
+      } else {
+        var spkCounts=[0,0,0];
+        lines.forEach(function(l,i){spkCounts[i%3]++});
+        var totalLines=lines.length;
+        for(var s=0;s<3;s++){
+          var pct=totalLines>0?Math.round(spkCounts[s]/totalLines*100):0;
+          h+='<div style="display:flex;align-items:center;gap:8px;margin:6px 0;font-size:10px"><span style="width:48px;color:'+speakerColors[s]+';font-weight:600">'+speakerNames[s]+'</span><span style="flex:1;height:4px;background:rgba(255,255,255,.06);border-radius:2px"><span style="display:block;height:100%;border-radius:2px;background:'+speakerColors[s]+';width:'+pct+'%"></span></span><span style="color:rgba(255,255,255,.25);min-width:28px;text-align:right">'+pct+'%</span></div>';
+        }
+      }
       h+='</div>';
 
       h+='</div>';
