@@ -100,8 +100,8 @@ var currentSpeaker=0,lastWordTime=0;
 var wordQueue=[];
 function triggerWordFlash(word,pos,spkIdx){
   var color=posColorMap[pos]||'#a78bfa';
-  wordFlashes.push({x:Math.random()*W,y:Math.random()*H,word:word,color:color,life:1,size:20+word.length*3});
-  if(wordFlashes.length>15) wordFlashes.shift();
+  wordFlashes.push({x:0,y:0,word:word,color:color,life:1,size:0});
+  if(wordFlashes.length>25) wordFlashes.shift();
   // Activate speaker island
   if(spkIdx!==undefined&&spkIdx<speakerIslands.length){
     speakerIslands[spkIdx].active=1;
@@ -324,8 +324,8 @@ var barFuncs=[
     var n=256;
     if(!window._brushGrowth) window._brushGrowth=0;
     if(!window._brushLastSpoke) window._brushLastSpoke=0;
-    if(v>0.07){window._brushGrowth=Math.min(1,window._brushGrowth+0.002);window._brushLastSpoke=t}
-    else{if(t-window._brushLastSpoke>700) window._brushGrowth=Math.max(0,window._brushGrowth-0.006)}
+    if(v>0.06){window._brushGrowth=Math.min(1,window._brushGrowth+0.008);window._brushLastSpoke=t}
+    else{if(t-window._brushLastSpoke>600) window._brushGrowth=Math.max(0,window._brushGrowth-0.003)}
     var growth=window._brushGrowth,scale=0.4+growth*1.8;
     for(var i=0;i<n;i++){
       var fi=0.12;
@@ -339,8 +339,8 @@ var barFuncs=[
       grad.addColorStop(0.3,c(spokeHue,themeSat(isDark),themeLum(isDark,true),themeAlpha(isDark,0.4+sv*0.4)));
       grad.addColorStop(0.7,c((spokeHue+40)%360,80,themeLum(isDark,true),themeAlpha(isDark,0.6+fi*0.3)));
       grad.addColorStop(1,c((spokeHue+80)%360,70,themeLum(isDark,true),0));
-      ctx.fillStyle=grad;var sw=1+fi*4*scale;ctx.fillRect(-sw/2,baseR,sw,spokeLen);
-      if(fi>0.2){ctx.beginPath();ctx.arc(0,baseR+spokeLen,2+fi*5*scale,0,Math.PI*2);ctx.fillStyle=c(spokeHue,90,themeLum(isDark,true),themeAlpha(isDark,0.7+sv*0.3));ctx.fill()}
+      ctx.fillStyle=grad;var sw=3+fi*10*scale;ctx.fillRect(-sw/2,baseR,sw,spokeLen);
+      if(fi>0.2){ctx.beginPath();ctx.arc(0,baseR+spokeLen,3+fi*8*scale,0,Math.PI*2);ctx.fillStyle=c(spokeHue,90,themeLum(isDark,true),themeAlpha(isDark,0.7+sv*0.3));ctx.fill()}
       ctx.restore();
     }
     var orbR=maxR*0.12+sv*maxR*0.04;
@@ -375,20 +375,33 @@ function animate(ts){
   speakerIslands.forEach(function(si){si.active*=0.96});
   
   // Decay word flashes
-  wordFlashes.forEach(function(wf){wf.life-=0.015});
-  wordFlashes=wordFlashes.filter(function(wf){return wf.life>0});
+  wordFlashes.forEach(function(wf){wf.life-=0.008});
 
   ctxRings.clearRect(0,0,W,H);
   ctxBars.clearRect(0,0,W,H);
   
-  // Draw word flashes
-  wordFlashes.forEach(function(wf){
-    var alpha=wf.life*0.6;
+  // Draw word flashes — stacked bottom-right, newest on top
+  var liveWords=wordFlashes.filter(function(wf){return wf.life>0.05});
+  liveWords.sort(function(a,b){return b.life-a.life}); // newest first
+  var baseX=W-20,baseY=H-30,lineH=22;
+  liveWords.forEach(function(wf,i){
+    if(i>12) return; // max 12 visible
+    var alpha=Math.min(1,wf.life*1.2);
+    var x=baseX,y=baseY-i*lineH;
     ctxRings.save();ctxRings.globalAlpha=alpha;
-    ctxRings.font='bold '+(wf.size*wf.life)+'px Inter,sans-serif';
+    // Background pill
+    var w=ctxRings.measureText(wf.word).width+16;
+    ctxRings.fillStyle=isDark?'rgba(6,6,16,0.6)':'rgba(250,250,248,0.6)';
+    ctxRings.beginPath();ctxRings.roundRect(x-w,y-9,w,18,9);ctxRings.fill();
+    // Border
+    ctxRings.strokeStyle=wf.color;ctxRings.lineWidth=1;
+    ctxRings.globalAlpha=alpha*0.5;ctxRings.stroke();
+    // Word text
+    ctxRings.globalAlpha=alpha;
+    ctxRings.font='bold 10px Inter,sans-serif';
     ctxRings.fillStyle=wf.color;
-    ctxRings.textAlign='center';ctxRings.textBaseline='middle';
-    ctxRings.fillText(wf.word,wf.x,wf.y);
+    ctxRings.textAlign='right';ctxRings.textBaseline='middle';
+    ctxRings.fillText(wf.word,x-6,y);
     ctxRings.restore();
   });
   
