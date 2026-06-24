@@ -28,6 +28,14 @@ body.dark .meter-bar{background:rgba(255,255,255,.06)}
 body.light .meter-fill{background:#5b7fc1}
 body.dark .meter-fill{background:linear-gradient(90deg,#34d399,#a78bfa)}
 .meter-label{font-family:'JetBrains Mono',monospace;font-size:8px;opacity:.3;min-width:40px}
+.sens-row{display:flex;align-items:center;gap:6px;margin-top:2px}
+.sens-row label{font-size:8px;opacity:.3;font-family:'JetBrains Mono',monospace;white-space:nowrap}
+.sens-slider{-webkit-appearance:none;appearance:none;width:80px;height:3px;border-radius:2px;outline:none;cursor:pointer}
+body.light .sens-slider{background:rgba(0,0,0,.08)}
+body.dark .sens-slider{background:rgba(255,255,255,.08)}
+.sens-slider::-webkit-slider-thumb{-webkit-appearance:none;width:12px;height:12px;border-radius:50%;cursor:pointer;border:1.5px solid}
+body.light .sens-slider::-webkit-slider-thumb{background:#fff;border-color:#c5c0b8}
+body.dark .sens-slider::-webkit-slider-thumb{background:#1a1a2e;border-color:rgba(255,255,255,.2)}
 .btn-row{display:flex;gap:6px;flex-wrap:wrap;justify-content:center;align-items:center}
 .btn{padding:9px 16px;border-radius:100px;border:1.5px solid;font-family:'Inter',sans-serif;font-size:10px;font-weight:600;cursor:pointer;transition:all .2s}
 body.light .btn{background:#fff;color:#666;border-color:#d9d5cc}
@@ -47,10 +55,15 @@ body.dark .btn:hover{background:rgba(255,255,255,.06);color:#fff;border-color:rg
 </div>
 <div id="ui">
   <h1 id="titleText">Sottotitoli</h1>
-  <p>Live microphone — 20 visualizations</p>
+  <p>Live mic — word-reactive, multispeaker spatial</p>
   <div class="meter-row">
     <span class="meter-label" id="meterLabel">— dB</span>
     <div class="meter-bar"><div class="meter-fill" id="meterFill"></div></div>
+  </div>
+  <div class="sens-row">
+    <label for="sensSlider">sens</label>
+    <input type="range" class="sens-slider" id="sensSlider" min="0.3" max="3" step="0.1" value="1" oninput="updateSensitivity(this.value)">
+    <span class="meter-label" id="sensLabel">1.0x</span>
   </div>
   <div class="btn-row">
     <button class="btn" id="btnMic" onclick="toggleMic()">&#127908; Start Mic</button>
@@ -73,6 +86,43 @@ var animFrame=null,currentMode='both',ringVar=0,barVar=0;
 var canvasRings,canvasBars,ctxRings,ctxBars;
 var W=window.innerWidth,H=window.innerHeight;
 var t=0;
+var sensitivity=1.0;
+function updateSensitivity(val){
+  sensitivity=parseFloat(val);
+  document.getElementById('sensLabel').textContent=sensitivity.toFixed(1)+'x';
+}
+// Word-triggered visual events
+var wordFlashes=[];
+var speakerIslands=[{x:0.25,y:0.35,color:'#5b7fc1',active:0,label:'SPK A'},{x:0.5,y:0.45,color:'#c1665b',active:0,label:'SPK B'},{x:0.75,y:0.35,color:'#5b9c6e',active:0,label:'SPK C'},{x:0.3,y:0.6,color:'#c084fc',active:0,label:'SPK D'},{x:0.7,y:0.6,color:'#fbbf24',active:0,label:'SPK E'}];
+var posColorMap={VERB:'#34d399',NOUN:'#60a5fa',ADJ:'#f472b6',ADV:'#c084fc',PREP:'#fbbf24',CONJ:'#fb923c',DET:'#22d3ee',PRON:'#a78bfa'};
+var currentSpeaker=0,lastWordTime=0;
+// Simulated word feed (in production: from WebSocket/speech API)
+var wordQueue=[];
+function triggerWordFlash(word,pos,spkIdx){
+  var color=posColorMap[pos]||'#a78bfa';
+  wordFlashes.push({x:Math.random()*W,y:Math.random()*H,word:word,color:color,life:1,size:20+word.length*3});
+  if(wordFlashes.length>15) wordFlashes.shift();
+  // Activate speaker island
+  if(spkIdx!==undefined&&spkIdx<speakerIslands.length){
+    speakerIslands[spkIdx].active=1;
+    speakerIslands[spkIdx].lastWord=word;
+  }
+  lastWordTime=t;
+}
+// Demo word feed
+function demoWordFeed(){
+  var words=['discussing','future','translation','systems','bridge','barriers','deployment','scale','challenge','neural','models','accurate','remarkably','language','cultures','different','experience','international','meetings','quickly'];
+  var poses=['VERB','NOUN','NOUN','NOUN','VERB','NOUN','NOUN','NOUN','NOUN','ADJ','NOUN','ADJ','ADV','NOUN','NOUN','ADJ','NOUN','ADJ','NOUN','ADV'];
+  var now=Date.now();
+  if(wordQueue.length===0||(now-wordQueue[0].t)>400+Math.random()*600){
+    var idx=Math.floor(Math.random()*words.length);
+    wordQueue.push({word:words[idx],pos:poses[idx],t:now,spk:Math.floor(Math.random()*3)});
+  }
+  while(wordQueue.length>0&&(now-wordQueue[0].t)>300){
+    var w=wordQueue.shift();
+    triggerWordFlash(w.word,w.pos,w.spk);
+  }
+}
 
 function initAudio(){
   if(audioCtx) return;
@@ -120,9 +170,9 @@ function readAudio(){
   if(!analyser) return;
   analyser.getByteFrequencyData(freqData);
   var sum=0;for(var i=0;i<freqData.length;i++) sum+=freqData[i];
-  volume=sum/freqData.length/255;
+  volume=Math.min(1,sum/freqData.length/255*sensitivity);
   // Heavy smoothing for visually pleasing response — slow attack, slow decay
-  smoothing=smoothing*0.88+volume*0.12;
+  smoothing=smoothing*Math.max(0.3,0.65-sensitivity*0.1)+volume*Math.min(0.7,sensitivity*0.45);
 }
 
 // ── Theme-aware color helpers ──
@@ -407,20 +457,59 @@ function animate(ts){
   animFrame=requestAnimationFrame(animate);
   t=ts||Date.now();
   if(micOn){readAudio();}else{
-    smoothing=smoothing*0.96+0.015;
-    volume=0.05+Math.sin(t/2200)*0.03+Math.sin(t/3800)*0.025+Math.sin(t/6000)*0.015;
+    smoothing=smoothing*0.92+0.04;
+    volume=0.08+Math.sin(t/1800)*0.06+Math.sin(t/3100)*0.05+Math.sin(t/5200)*0.03+Math.sin(t/7300)*0.02;
   }
   var v=smoothing||volume;
   var isDark=document.body.classList.contains('dark');
+  
+  // Demo word feed
+  if(micOn) demoWordFeed();
+  
+  // Decay speaker islands
+  speakerIslands.forEach(function(si){si.active*=0.96});
+  
+  // Decay word flashes
+  wordFlashes.forEach(function(wf){wf.life-=0.015});
+  wordFlashes=wordFlashes.filter(function(wf){return wf.life>0});
 
   ctxRings.clearRect(0,0,W,H);
   ctxBars.clearRect(0,0,W,H);
+  
+  // Draw word flashes
+  wordFlashes.forEach(function(wf){
+    var alpha=wf.life*0.6;
+    ctxRings.save();ctxRings.globalAlpha=alpha;
+    ctxRings.font='bold '+(wf.size*wf.life)+'px Inter,sans-serif';
+    ctxRings.fillStyle=wf.color;
+    ctxRings.textAlign='center';ctxRings.textBaseline='middle';
+    ctxRings.fillText(wf.word,wf.x,wf.y);
+    ctxRings.restore();
+  });
+  
+  // Draw speaker islands as subtle glows
+  speakerIslands.forEach(function(si){
+    if(si.active<0.02) return;
+    var cx=si.x*W,cy=si.y*H;
+    var r=50+si.active*80;
+    var grad=ctxRings.createRadialGradient(cx,cy,0,cx,cy,r);
+    grad.addColorStop(0,si.color+Math.floor(si.active*40).toString(16).padStart(2,'0'));
+    grad.addColorStop(1,'rgba(0,0,0,0)');
+    ctxRings.fillStyle=grad;ctxRings.fillRect(cx-r,cy-r,r*2,r*2);
+    // Speaker label
+    if(si.active>0.1){
+      ctxRings.fillStyle=isDark?'rgba(255,255,255,'+(si.active*0.4)+')':'rgba(0,0,0,'+(si.active*0.3)+')';
+      ctxRings.font=(9+si.active*4)+'px "JetBrains Mono",monospace';
+      ctxRings.textAlign='center';ctxRings.fillText(si.label,cx,cy-60-si.active*30);
+    }
+  });
 
   if(currentMode==='both'||currentMode==='rings') ringFuncs[ringVar](ctxRings,v,isDark);
   if(currentMode==='both'||currentMode==='bars') barFuncs[barVar](ctxBars,v,isDark);
 
-  document.getElementById('meterFill').style.width=(v*100)+'%';
-  document.getElementById('meterLabel').textContent=Math.round(v*100-50)+' dB';
+  var displayV=Math.min(1,v*2.5*sensitivity); // amplify for meter display
+  document.getElementById('meterFill').style.width=(displayV*100)+'%';
+  document.getElementById('meterLabel').textContent=Math.round(displayV*100-50)+' dB';
 }
 
 // ── Controls ──
