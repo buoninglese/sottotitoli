@@ -79,7 +79,8 @@ function readMicVolume(){
 function toggleDemo(){demoOn=!demoOn;document.getElementById('demoBtn').textContent=demoOn?'⏹ Stop Demo':'▶ Demo Voice';}
 function demoVolume(){
   var t=performance.now()*0.001;
-  return Math.max(0,Math.min(1,0.12+Math.sin(t*0.7)*0.2+Math.sin(t*1.3)*0.25+Math.sin(t*2.1)*0.18));
+  // Boosted demo so meter can reach max
+  return Math.max(0,Math.min(1,0.22+Math.sin(t*0.7)*0.35+Math.sin(t*1.3)*0.35+Math.sin(t*2.1)*0.25));
 }
 
 // ─── S-Curve (100×85 coord space, scaled to canvas) ───
@@ -147,7 +148,8 @@ function particleColor(i,total,vol){
 
 function initParticlesForCanvas(cw,ch,canvasIdx){
   var v=variations[currentVar];
-  var n=v.n||100;
+  // Big canvas (idx=1) gets 3x particles, small (idx=0) gets 1x
+  var n=canvasIdx===0?(v.n||100):(v.n||100)*3;
   var sPts=sampleSCurve(n);
   var sx=cw/100,sy=ch/85;
   var ps=[];
@@ -188,12 +190,12 @@ function frame(ts){
   document.getElementById('levelFill').style.width=(volume*100)+'%';
   var smoothVol=volume;
   var v=variations[currentVar];
-  var n=v.n||100;
 
   for(var ci=0;ci<canvases.length;ci++){
     var cv=canvases[ci],ctx=cv.ctx,w=cv.c.width,h=cv.c.height;
+    var expectedN=ci===0?(v.n||100):(v.n||100)*3;
     var ps=particlesPerCanvas[ci];
-    if(ps.length!==n){initParticlesForCanvas(w,h,ci);ps=particlesPerCanvas[ci];}
+    if(ps.length!==expectedN){initParticlesForCanvas(w,h,ci);ps=particlesPerCanvas[ci];}
 
     ctx.clearRect(0,0,w,h);
 

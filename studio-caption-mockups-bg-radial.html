@@ -89,6 +89,7 @@ body.dark .btn:hover{background:rgba(255,255,255,.06);color:#fff;border-color:rg
     <span class="var-label" id="varName">1/10 · Whisper Thin</span>
     <button class="btn var-nav" onclick="nextVar()" title="Next">→</button>
   </div>
+  <div id="configDisplay" style="font-family:'JetBrains Mono',monospace;font-size:9px;color:rgba(255,255,255,.2);text-align:center;max-width:600px;line-height:1.8;word-break:break-all;padding:4px 8px;cursor:pointer;user-select:all" onclick="copyConfig()" title="Click to copy">—</div>
 </div>
 <script>
 // ─── Audio ───
@@ -130,6 +131,7 @@ function toggleFX(name){
   var btn=document.getElementById(btnId);
   if(btn)btn.classList.toggle('on',f.on);
   updateFXLabels();
+  updateConfigDisplay();
 }
 function applyFXCycle(name){
   var idx=fxCycleIdx[name];
@@ -164,6 +166,7 @@ var fxCycleIdx={trails:0,reverb:0,slowmo:0,colorBoost:0,bounce:0};
 function updateSensitivity(val){
   sensitivity=parseFloat(val);
   document.getElementById('sensLabel').textContent=sensitivity.toFixed(1)+'x';
+  updateConfigDisplay();
 }
 
 function initAudio(){
@@ -482,6 +485,35 @@ function updateVarLabel(){
   var v=variations[currentVar];
   document.getElementById('varName').textContent=(currentVar+1)+'/'+variations.length+' · '+v.name;
   document.getElementById('descText').textContent=v.desc;
+  updateConfigDisplay();
+}
+
+function updateConfigDisplay(){
+  var v=variations[currentVar];
+  var parts=[
+    'var:'+v.name,
+    'sens:'+sensitivity.toFixed(1),
+    'trails:'+(fx.trails.on?fx.trails.fade:'off'),
+    'reverb:'+(fx.reverb.on?fx.reverb.delay+'f/'+fx.reverb.feed:'off'),
+    'slowmo:'+(fx.slowmo.on?fx.slowmo.speed:'1'),
+    'colorBoost:'+(fx.colorBoost.on?fx.colorBoost.boost:'off'),
+    'bounce:'+(fx.bounce.on?fx.bounce.spring:'off')
+  ];
+  var cfg=parts.join(' | ');
+  document.getElementById('configDisplay').textContent=cfg;
+  document.getElementById('configDisplay').style.color=document.body.classList.contains('dark')?'rgba(255,255,255,.22)':'rgba(0,0,0,.22)';
+}
+
+function copyConfig(){
+  var el=document.getElementById('configDisplay');
+  var txt=el.textContent;
+  if(navigator.clipboard){navigator.clipboard.writeText(txt).then(function(){
+    el.style.color='#34d399';setTimeout(function(){updateConfigDisplay();},1200);
+  })}else{
+    var ta=document.createElement('textarea');ta.value=txt;ta.style.position='fixed';ta.style.opacity='0';
+    document.body.appendChild(ta);ta.select();document.execCommand('copy');document.body.removeChild(ta);
+    el.style.color='#34d399';setTimeout(function(){updateConfigDisplay();},1200);
+  }
 }
 
 // ─── Init ───

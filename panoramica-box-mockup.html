@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Sottotitoli · Panoramica Box Picker</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300;14..32,400;14..32,500;14..32,600;14..32,700;14..32,900&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#060610;--bg2:#0d0d1a;--card:#0f121e;--line:rgba(255,255,255,.06);--t1:#e8eaed;--t2:rgba(255,255,255,.55);--t3:rgba(255,255,255,.25);--accent:#a78bfa;--green:#34d399;--blue:#60a5fa;--amber:#fbbf24;--red:#f87171}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--t1);padding:20px;min-height:100vh}
+h1{font-size:clamp(20px,4vw,26px);font-weight:900;letter-spacing:-1px;margin-bottom:4px}
+.subtitle{font-size:11px;color:var(--t3);margin-bottom:20px}
+
+/* ── KPI Row (from mockup-v6) ── */
+.kpi-row{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:28px}
+.kpi{background:var(--bg2);border-radius:10px;padding:14px 18px;text-align:center;position:relative;overflow:hidden;transition:all .2s;cursor:default;flex:1;min-width:120px}
+.kpi:hover{transform:translateY(-2px);box-shadow:0 4px 16px rgba(0,0,0,.3)}
+.kpi .v{font-family:'JetBrains Mono',monospace;font-size:24px;font-weight:800;letter-spacing:-1px;line-height:1.1;position:relative;z-index:1}
+.kpi .l{font-size:9px;text-transform:uppercase;letter-spacing:.07em;color:var(--t3);margin-top:2px;position:relative;z-index:1}
+.kpi .d{font-size:9px;font-weight:600;margin-top:3px;position:relative;z-index:1}
+.kpi .d.up{color:var(--green)}.kpi .d.warn{color:var(--amber)}
+.kpi .glow{position:absolute;top:-20px;right:-20px;width:70px;height:70px;border-radius:50%;opacity:0;transition:opacity .3s;pointer-events:none}
+.kpi:hover .glow{opacity:1}
+
+/* ── Box Grid ── */
+.section-title{font-size:13px;font-weight:700;margin-bottom:12px;display:flex;align-items:center;gap:10px}
+.section-title span{font-size:10px;font-weight:400;color:var(--t3)}
+.box-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px;margin-bottom:28px}
+.box{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px;position:relative;cursor:pointer;transition:all .2s;user-select:none}
+.box:hover{border-color:rgba(167,139,250,.25);box-shadow:0 4px 20px rgba(0,0,0,.3)}
+.box.faved{border-color:var(--accent);box-shadow:0 0 0 2px rgba(167,139,250,.15)}
+.box .box-id{position:absolute;top:8px;right:10px;font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--t3)}
+.box .box-name{font-size:11px;font-weight:700;margin-bottom:8px;letter-spacing:-.2px}
+.box .box-preview{font-size:10px;color:var(--t2);line-height:1.6}
+.box .fav-star{position:absolute;top:8px;left:10px;font-size:14px;color:var(--t3);transition:all .2s}
+.box.faved .fav-star{color:var(--amber)}
+.box .box-cat{font-size:8px;text-transform:uppercase;letter-spacing:.06em;color:var(--t3);margin-top:8px;padding-top:8px;border-top:1px solid var(--line)}
+
+/* ── Preview area ── */
+.preview-area{background:var(--bg2);border:1px dashed var(--line);border-radius:12px;padding:16px;margin-top:20px;min-height:60px}
+.preview-area h3{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--t3);margin-bottom:8px}
+.preview-list{display:flex;flex-wrap:wrap;gap:6px}
+.preview-chip{font-family:'JetBrains Mono',monospace;font-size:9px;padding:4px 10px;border-radius:100px;background:var(--card);border:1px solid var(--line);color:var(--t2);display:flex;align-items:center;gap:6px}
+.preview-chip button{background:none;border:none;color:var(--red);cursor:pointer;font-size:12px;padding:0;line-height:1}
+
+/* ─── Copy bar ─── */
+.copy-bar{display:flex;gap:8px;align-items:center;margin-top:12px;flex-wrap:wrap}
+.copy-bar input{flex:1;min-width:200px;padding:8px 12px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--t1);font-family:'JetBrains Mono',monospace;font-size:10px}
+.copy-bar button{padding:8px 16px;border-radius:100px;border:1.5px solid var(--accent);background:rgba(167,139,250,.08);color:var(--accent);font-family:'Inter',sans-serif;font-size:10px;font-weight:600;cursor:pointer}
+.copy-bar button:hover{background:rgba(167,139,250,.18)}
+.copied-toast{font-size:10px;color:var(--green);opacity:0;transition:opacity .3s}
+.copied-toast.show{opacity:1}
+
+/* ── Mini box previews inside cards ── */
+.mkpi{display:inline-flex;gap:8px;background:var(--bg2);border-radius:8px;padding:8px 12px;font-size:9px}
+.mkpi .mv{font-family:'JetBrains Mono',monospace;font-weight:800;font-size:16px}
+.mkpi .ml{text-transform:uppercase;font-size:7px;color:var(--t3);letter-spacing:.04em}
+.mcard{background:var(--bg2);border-radius:8px;padding:10px;font-size:9px}
+.mcard .mh{font-size:10px;font-weight:600;margin-bottom:4px}
+.mbars{display:flex;gap:2px;align-items:flex-end;height:24px}
+.mbars div{flex:1;border-radius:2px 2px 0 0;min-width:4px}
+.mgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:4px;text-align:center}
+.mgrid .mgv{font-family:'JetBrains Mono',monospace;font-weight:800;font-size:14px}
+.mgrid .mgl{font-size:7px;text-transform:uppercase;color:var(--t3)}
+.mheat{display:flex;gap:1px}
+.mheat span{width:8px;height:8px;border-radius:1px;background:var(--line)}
+.mheat span.hot{background:var(--accent)}
+.mheat span.warm{background:rgba(167,139,250,.4)}
+</style>
+</head>
+<body>
+<h1>Panoramica — Box Picker</h1>
+<p class="subtitle">Click boxes to favorite ★ · Then copy your picks below · Tell me which IDs to use</p>
+
+<!-- ═══ KPI ROW (always present) ═══ -->
+<div class="section-title">📊 KPI Row <span>(always included — from mockup-v6)</span></div>
+<div class="kpi-row">
+  <div class="kpi"><div class="glow" style="background:radial-gradient(circle,rgba(167,139,250,.15),transparent)"></div><div class="v" style="color:var(--accent)">155</div><div class="l">Sessioni totali</div><div class="d up">↑ 12% mese</div></div>
+  <div class="kpi"><div class="glow" style="background:radial-gradient(circle,rgba(52,211,153,.15),transparent)"></div><div class="v" style="color:var(--green)">24m</div><div class="l">Tempo parlato</div><div class="d up">↑ 8% mese</div></div>
+  <div class="kpi"><div class="glow" style="background:radial-gradient(circle,rgba(96,165,250,.15),transparent)"></div><div class="v" style="color:var(--blue)">398</div><div class="l">Parole uniche</div><div class="d up">↑ 2 mese</div></div>
+  <div class="kpi"><div class="glow" style="background:radial-gradient(circle,rgba(251,191,36,.15),transparent)"></div><div class="v" style="color:var(--amber)">1</div><div class="l">Report AI</div><div class="d">questo mese</div></div>
+</div>
+
+<!-- ═══ BOX OPTIONS ═══ -->
+<div class="section-title">🧩 Box da aggiungere <span>(click to ★ favorite)</span></div>
+<div class="box-grid" id="boxGrid"></div>
+
+<!-- ═══ YOUR PICKS ═══ -->
+<div class="preview-area" id="previewArea">
+  <h3>⭐ Your picks</h3>
+  <div class="preview-list" id="previewList"><span style="font-size:10px;color:var(--t3)">Nessun box selezionato. Clicca le stelle ★</span></div>
+  <div class="copy-bar">
+    <input type="text" id="copyInput" value="" readonly placeholder="IDs will appear here…">
+    <button onclick="copyPicks()">📋 Copy</button>
+    <span class="copied-toast" id="copiedToast">Copied!</span>
+  </div>
+</div>
+
+<script>
+var BOXES=[
+  {id:'wpm-simple',cat:'WPM',name:'WPM · Simple',preview:'<div class="mcard"><div class="mh">⚡ WPM questa settimana</div><div style="display:flex;gap:16px"><div><div style="font-size:7px;color:var(--t3)">MEDIA</div><div class="mv" style="color:var(--accent)">87</div><div style="font-size:8px;color:var(--t2)">parole/min</div></div><div><div style="font-size:7px;color:var(--t3)">PICCO</div><div class="mv" style="color:var(--green)">182</div><div style="font-size:8px;color:var(--t2)">parole/min</div></div></div></div>'},
+  {id:'wpm-bars',cat:'WPM',name:'WPM · Con barre',preview:'<div class="mcard"><div class="mh">⚡ WPM esta settimana</div><div style="display:flex;gap:16px"><div style="text-align:center"><div class="mv" style="color:var(--accent)">87</div><div style="font-size:8px;color:var(--t2)">MEDIA</div><div style="height:4px;background:var(--line);border-radius:2px;margin-top:4px;width:60px"><div style="height:100%;width:44%;background:var(--accent);border-radius:2px"></div></div></div><div style="text-align:center"><div class="mv" style="color:var(--green)">182</div><div style="font-size:8px;color:var(--t2)">PICCO</div><div style="height:4px;background:var(--line);border-radius:2px;margin-top:4px;width:60px"><div style="height:100%;width:91%;background:var(--green);border-radius:2px"></div></div></div></div></div>'},
+  {id:'sessions-grid',cat:'Sessioni',name:'Sessioni · Grid 3-col',preview:'<div class="mcard"><div class="mh">📋 Sessioni</div><div class="mgrid"><div><div class="mgv" style="color:var(--accent)">151</div><div class="mgl">Settimana</div></div><div><div class="mgv" style="color:var(--green)">320</div><div class="mgl">Mese</div></div><div><div class="mgv" style="color:var(--blue)">10.7</div><div class="mgl">Media/giorno</div></div></div></div>'},
+  {id:'sessions-list',cat:'Sessioni',name:'Sessioni · Lista verticale',preview:'<div class="mcard"><div class="mh">📋 Sessioni</div><div style="display:flex;flex-direction:column;gap:3px"><div style="display:flex;justify-content:space-between"><span style="font-size:9px;color:var(--t3)">SETTIMANA</span><span class="mv" style="font-size:14px;color:var(--accent)">151</span></div><div style="display:flex;justify-content:space-between"><span style="font-size:9px;color:var(--t3)">MESE</span><span class="mv" style="font-size:14px;color:var(--green)">320</span></div><div style="display:flex;justify-content:space-between"><span style="font-size:9px;color:var(--t3)">MEDIA/GIORNO</span><span class="mv" style="font-size:14px;color:var(--blue)">10.7</span></div></div></div>'},
+  {id:'heatmap',cat:'Attività',name:'Heatmap 12 settimane',preview:'<div class="mcard"><div class="mh">📊 Attività</div><div class="mheat">'+Array(84).fill(0).map(function(){var r=Math.random();return'<span class="'+(r>0.7?'hot':r>0.4?'warm':'')+'"></span>';}).join('')+'</div><div style="font-size:7px;color:var(--t3);margin-top:4px">12 settimane · GitHub-style</div></div>'},
+  {id:'heatmap-strip',cat:'Attività',name:'Heatmap · Striscia singola',preview:'<div class="mcard"><div class="mh">📊 Attività 12w</div><div style="display:flex;gap:1px;height:16px;align-items:flex-end">'+Array(84).fill(0).map(function(){return'<div style="flex:1;background:'+(Math.random()>0.6?'var(--accent)':'var(--line)')+';height:'+(20+Math.random()*80)+'%;border-radius:1px"></div>';}).join('')+'</div></div>'},
+  {id:'goals-typographic',cat:'Obiettivi',name:'Obiettivi · Tipografico',preview:'<div class="mcard"><div class="mh">📚 Obiettivi settimana</div><div style="display:flex;gap:16px;justify-content:center"><div style="text-align:center"><div style="font-size:22px;font-weight:900;color:var(--green)">78<span style="font-size:11px;color:var(--t3)">/120m</span></div><div style="font-size:8px;color:var(--t2)">Minuti</div></div><div style="text-align:center"><div style="font-size:22px;font-weight:900;color:var(--accent)">4<span style="font-size:11px;color:var(--t3)">/5</span></div><div style="font-size:8px;color:var(--t2)">Sessioni</div></div><div style="text-align:center"><div style="font-size:22px;font-weight:900;color:var(--blue)">142<span style="font-size:11px;color:var(--t3)">/200</span></div><div style="font-size:8px;color:var(--t2)">Parole</div></div></div></div>'},
+  {id:'goals-bars',cat:'Obiettivi',name:'Obiettivi · Barre progresso',preview:'<div class="mcard"><div class="mh">📚 Obiettivi</div><div style="display:flex;flex-direction:column;gap:6px"><div><div style="display:flex;justify-content:space-between;font-size:8px"><span style="color:var(--t2)">Minuti</span><span style="color:var(--green)">78/120</span></div><div style="height:4px;background:var(--line);border-radius:2px"><div style="height:100%;width:65%;background:var(--green);border-radius:2px"></div></div></div><div><div style="display:flex;justify-content:space-between;font-size:8px"><span style="color:var(--t2)">Sessioni</span><span style="color:var(--accent)">4/5</span></div><div style="height:4px;background:var(--line);border-radius:2px"><div style="height:100%;width:80%;background:var(--accent);border-radius:2px"></div></div></div><div><div style="display:flex;justify-content:space-between;font-size:8px"><span style="color:var(--t2)">Parole</span><span style="color:var(--blue)">142/200</span></div><div style="height:4px;background:var(--line);border-radius:2px"><div style="height:100%;width:71%;background:var(--blue);border-radius:2px"></div></div></div></div></div>'},
+  {id:'streak',cat:'Streak',name:'Streak · Giorni consecutivi',preview:'<div class="mcard"><div class="mh">🔥 Streak</div><div style="text-align:center"><div style="font-size:36px;font-weight:900;color:var(--amber)">14</div><div style="font-size:9px;color:var(--t2)">giorni consecutivi</div><div style="font-size:9px;color:var(--green);margin-top:2px">Che potenza! 🔥🔥</div></div></div>'},
+  {id:'comparison-statcards',cat:'Confronto',name:'Confronto · Stat Cards',preview:'<div class="mcard"><div class="mh">📊 Confronto mensile</div><div class="mgrid"><div><div class="mgv" style="color:var(--accent)">42</div><div class="mgl">Sessioni</div><div style="font-size:9px;color:var(--green)">↑ 12%</div></div><div><div class="mgv" style="color:var(--green)">8.2h</div><div class="mgl">Tempo</div><div style="font-size:9px;color:var(--green)">↑ 18%</div></div><div><div class="mgv" style="color:var(--blue)">1.2k</div><div class="mgl">Parole</div><div style="font-size:9px;color:var(--red)">↓ 3%</div></div></div></div>'},
+  {id:'comparison-rings',cat:'Confronto',name:'Confronto · Anelli %',preview:'<div class="mcard"><div class="mh">📊 Variazioni %</div><div style="display:flex;gap:12px;justify-content:center"><div style="text-align:center"><svg viewBox="0 0 40 40" style="width:40px;height:40px;transform:rotate(-90deg)"><circle cx="20" cy="20" r="15" fill="none" stroke="var(--line)" stroke-width="4"/><circle cx="20" cy="20" r="15" fill="none" stroke="var(--accent)" stroke-width="4" stroke-dasharray="94" stroke-dashoffset="28"/></svg><div style="font-size:8px;color:var(--t2)">+112%</div></div><div style="text-align:center"><svg viewBox="0 0 40 40" style="width:40px;height:40px;transform:rotate(-90deg)"><circle cx="20" cy="20" r="15" fill="none" stroke="var(--line)" stroke-width="4"/><circle cx="20" cy="20" r="15" fill="none" stroke="var(--green)" stroke-width="4" stroke-dasharray="94" stroke-dashoffset="18"/></svg><div style="font-size:8px;color:var(--t2)">+118%</div></div><div style="text-align:center"><svg viewBox="0 0 40 40" style="width:40px;height:40px;transform:rotate(-90deg)"><circle cx="20" cy="20" r="15" fill="none" stroke="var(--line)" stroke-width="4"/><circle cx="20" cy="20" r="15" fill="none" stroke="var(--blue)" stroke-width="4" stroke-dasharray="94" stroke-dashoffset="97"/></svg><div style="font-size:8px;color:var(--t2)">-3%</div></div></div></div>'},
+  {id:'top-metrics',cat:'Ranking',name:'Top 3 · Metriche',preview:'<div class="mcard"><div class="mh">🏅 Migliori</div><div style="display:flex;flex-direction:column;gap:1px"><div style="display:flex;align-items:center;gap:8px;padding:6px 10px;background:var(--bg2);border-radius:6px"><span>🥇</span><span style="font-size:10px;flex:1">Miglior WPM</span><span class="mv" style="font-size:13px;color:var(--accent)">182</span></div><div style="display:flex;align-items:center;gap:8px;padding:6px 10px;background:var(--bg2);border-radius:6px"><span>🥈</span><span style="font-size:10px;flex:1">Più lunga</span><span class="mv" style="font-size:13px;color:var(--green)">48m</span></div><div style="display:flex;align-items:center;gap:8px;padding:6px 10px;background:var(--bg2);border-radius:6px"><span>🥉</span><span style="font-size:10px;flex:1">Miglior qualità</span><span class="mv" style="font-size:13px;color:var(--blue)">94%</span></div></div></div>'},
+  {id:'vocab-list',cat:'Vocabolario',name:'Vocabolario · Lista',preview:'<div class="mcard"><div class="mh">📚 Parole nuove esta settimana</div><div style="font-size:9px;color:var(--t2);line-height:1.8"><span style="color:var(--accent)">eloquente</span> · <span style="color:var(--green)">pragmatico</span> · <span style="color:var(--blue)">resiliente</span> · <span style="color:var(--amber)">conciliare</span> · <span style="color:var(--accent)">ermetico</span></div></div>'},
+  {id:'speaking-fingerprint',cat:'Speaking',name:'Speaking Fingerprint',preview:'<div class="mcard"><div class="mh">🗣️ Speaking Fingerprint</div><div style="display:flex;gap:6px;flex-wrap:wrap"><span style="padding:3px 8px;border-radius:100px;font-size:8px;background:rgba(167,139,250,.12);color:var(--accent)">WPM 87</span><span style="padding:3px 8px;border-radius:100px;font-size:8px;background:rgba(52,211,153,.12);color:var(--green)">Fillers 2.1/m</span><span style="padding:3px 8px;border-radius:100px;font-size:8px;background:rgba(96,165,250,.12);color:var(--blue)">LexDiv .78</span><span style="padding:3px 8px;border-radius:100px;font-size:8px;background:rgba(251,191,36,.12);color:var(--amber)">Qual 88%</span></div></div>'},
+  {id:'trend-spark',cat:'Trend',name:'Trend · Sparklines',preview:'<div class="mcard"><div class="mh">📈 Trend 30 giorni</div><div style="display:flex;gap:6px;align-items:flex-end;height:28px">'+Array(30).fill(0).map(function(){return'<div style="flex:1;background:var(--accent);height:'+(15+Math.random()*85)+'%;border-radius:1px;opacity:'+(.3+Math.random()*.7)+'"></div>';}).join('')+'</div><div style="display:flex;gap:12px;margin-top:4px;font-size:8px"><span style="color:var(--accent)">⚡ WPM</span><span style="color:var(--green)">📖 Lex</span><span style="color:var(--blue)">🎯 Qual</span></div></div>'}
+];
+
+var favs=[];
+
+function renderBoxes(){
+  var grid=document.getElementById('boxGrid');
+  grid.innerHTML='';
+  BOXES.forEach(function(b,i){
+    var div=document.createElement('div');
+    div.className='box';
+    div.setAttribute('data-id',b.id);
+    div.innerHTML='<span class="fav-star">'+ (favs.includes(b.id)?'★':'☆') +'</span><span class="box-id">#'+(i+1)+'</span><div class="box-name">'+b.name+'</div><div class="box-preview">'+b.preview+'</div><div class="box-cat">'+b.cat+'</div>';
+    if(favs.includes(b.id))div.classList.add('faved');
+    div.addEventListener('click',function(e){
+      e.stopPropagation();
+      toggleFav(b.id);
+    });
+    grid.appendChild(div);
+  });
+}
+
+function toggleFav(id){
+  var idx=favs.indexOf(id);
+  if(idx>=0){favs.splice(idx,1);}else{favs.push(id);}
+  renderBoxes();
+  updatePreview();
+}
+
+function updatePreview(){
+  var list=document.getElementById('previewList');
+  var input=document.getElementById('copyInput');
+  if(favs.length===0){
+    list.innerHTML='<span style="font-size:10px;color:var(--t3)">Nessun box selezionato. Clicca le stelle ★</span>';
+    input.value='';
+    return;
+  }
+  var chips='';
+  favs.forEach(function(id){
+    var b=BOXES.find(function(x){return x.id===id;});
+    if(b)chips+='<div class="preview-chip">'+b.name+' <button onclick="event.stopPropagation();removeFav(\''+id+'\')">×</button></div>';
+  });
+  list.innerHTML=chips;
+  input.value='['+favs.join(', ')+']';
+}
+
+function removeFav(id){
+  var idx=favs.indexOf(id);
+  if(idx>=0)favs.splice(idx,1);
+  renderBoxes();
+  updatePreview();
+}
+
+function copyPicks(){
+  var input=document.getElementById('copyInput');
+  var toast=document.getElementById('copiedToast');
+  if(!input.value)return;
+  if(navigator.clipboard){navigator.clipboard.writeText(input.value).then(function(){
+    toast.classList.add('show');setTimeout(function(){toast.classList.remove('show');},1500);
+  })}else{
+    input.select();document.execCommand('copy');
+    toast.classList.add('show');setTimeout(function(){toast.classList.remove('show');},1500);
+  }
+}
+
+renderBoxes();
+updatePreview();
+</script>
+</body>
+</html>
