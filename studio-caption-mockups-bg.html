@@ -1,0 +1,63 @@
+<!DOCTYPE html><html lang="en" data-theme="dark"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>Sottotitoli · Live Speech Background</title><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300;14..32,400;14..32,500;14..32,600;14..32,700;14..32,900&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet"><style>*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}body{font-family:'Inter',system-ui,sans-serif;background:#fefefe;color:#111;overflow:hidden;height:100vh;position:relative}/* The live blur layer */#bgLayer{position:fixed;inset:0;z-index:0;filter:blur(60px);opacity:.35;transition:opacity 1s}#bgLayer.active{opacity:.55}/* Content overlay */#content{position:relative;z-index:1;display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;text-align:center;padding:40px}#content h1{font-size:clamp(32px,6vw,64px);font-weight:900;letter-spacing:-2px;color:#1a1a1a}#content p{font-size:16px;color:#666;margin-top:12px;max-width:500px;line-height:1.6}#content .demo-bar{display:flex;gap:10px;margin-top:32px}#content button{padding:14px 32px;border-radius:100px;border:1.5px solid #d9d5cc;background:#fff;color:#555;font-size:13px;font-weight:600;cursor:pointer;transition:all .2s;font-family:inherit}#content button:hover{background:#f5f3ef;color:#1a1a1a;border-color:#b5ad9e}#content button.primary{background:#1a1a1a;color:#fff;border-color:#1a1a1a}#content button.primary:hover{background:#333}@keyframes barDanceSlow{0%,100%{transform:scaleY(.15)}50%{transform:scaleY(.7)}}@keyframes dotPulseSlow{0%,100%{opacity:.1;transform:translateY(0)}50%{opacity:.5;transform:translateY(-12px)}}@keyframes waterfallSlow{0%{transform:translateY(-100%);opacity:0}30%{opacity:.6}100%{transform:translateY(100%);opacity:0}}@keyframes floatSlow{0%{transform:translateY(0) scale(1);opacity:.3}50%{transform:translateY(-20px) scale(1.1);opacity:.5}100%{transform:translateY(0) scale(1);opacity:.3}}</style></head><body><div id="bgLayer"></div><div id="content"><h1>Sottotitoli</h1><p>Live speech visualization — blurred background reacts to voice in real-time. Slow motion ambient layer.</p><div class="demo-bar"><button class="primary" onclick="toggleDemo()">▶ Simulate Speech</button><button onclick="stopDemo()">⏹ Stop</button></div></div><script>
+function hsl(h,s,l,a){return a!==undefined?`hsla(${h},${s}%,${l}%,${a})`:`hsl(${h},${s}%,${l}%,${l>70?30:60}%)`}
+function audioBars(n){return Array.from({length:n},(_,i)=>{const b=Math.sin(i*0.7)*0.4+0.5;const n=(Math.sin(i*2.3+1.7)*0.25)+(Math.cos(i*1.1)*0.2);return Math.max(0.08,Math.min(1,b+n))})}
+
+var demoRunning=false;var demoTimer=null;
+var bgLayer=document.getElementById('bgLayer');
+
+function buildBG(){
+  var h='';
+
+  // #15 Waterfall — left side, slow
+  h+='<div style="position:absolute;left:5%;top:0;width:25%;height:100%;overflow:hidden">';
+  for(var i=0;i<40;i++){h+=`<div style="position:absolute;left:${i*2.5}%;top:0;width:1.5px;height:${40+Math.random()*80}px;background:${hsl(200+Math.random()*40,50,70)};animation:waterfallSlow ${3+Math.random()*4}s linear infinite;animation-delay:${Math.random()*3}s;border-radius:1px"></div>`}
+  h+='</div>';
+
+  // #22 Floating Dots — center, largest
+  h+='<div style="position:absolute;left:20%;top:0;width:60%;height:100%">';
+  for(var i=0;i<60;i++){var x=Math.random()*100;var y=Math.random()*100;var s=3+Math.random()*10;
+    h+=`<div style="position:absolute;left:${x}%;top:${y}%;width:${s}px;height:${s}px;border-radius:50%;background:${hsl(180+Math.random()*120,40,70)};animation:dotPulseSlow ${2+Math.random()*3}s ease infinite;animation-delay:${Math.random()*2}s;box-shadow:0 0 ${s*4}px ${hsl(180+Math.random()*120,40,70,.3)}"></div>`}
+  h+='</div>';
+
+  // #5 Dot Wave — bottom, horizontal strip
+  h+='<div style="position:absolute;left:0;bottom:5%;width:100%;height:80px;display:flex;align-items:center;justify-content:center;gap:8px">';
+  var pts=audioBars(30);
+  pts.forEach((v,i)=>{var size=4+v*20;h+=`<div style="width:${size}px;height:${size}px;border-radius:50%;background:${hsl(260+i*5,40,70)};animation:floatSlow ${2+i*0.1}s ease infinite;animation-delay:${i*0.06}s;flex-shrink:0"></div>`});
+  h+='</div>';
+
+  // #2 Mirror Bars — right side, thin
+  h+='<div style="position:absolute;right:5%;top:10%;width:15%;height:80%;display:flex;align-items:center;justify-content:center;gap:3px">';
+  var bars=audioBars(20);
+  bars.forEach((v,i)=>{h+=`<div style="display:flex;flex-direction:column;align-items:center;gap:2px;height:100%;justify-content:center"><div style="width:3px;height:${v*40}px;background:${hsl(280+i*5,40,65)};border-radius:2px;animation:barDanceSlow ${1.5+i*0.1}s ease infinite;animation-delay:${i*0.05}s"></div><div style="width:3px;height:${v*40}px;background:${hsl(280+i*5,40,65,.6)};border-radius:2px;animation:barDanceSlow ${1.5+i*0.1}s ease infinite;animation-delay:${i*0.05}s"></div></div>`});
+  h+='</div>';
+
+  // #15 Waterfall again — right edge
+  h+='<div style="position:absolute;right:0;top:0;width:10%;height:100%;overflow:hidden">';
+  for(var i=0;i<20;i++){h+=`<div style="position:absolute;left:${i*5}%;top:0;width:1px;height:${30+Math.random()*60}px;background:${hsl(200+Math.random()*30,40,70)};animation:waterfallSlow ${4+Math.random()*3}s linear infinite;animation-delay:${Math.random()*4}s"></div>`}
+  h+='</div>';
+
+  bgLayer.innerHTML=h;
+}
+
+function toggleDemo(){
+  if(demoRunning){stopDemo();return}
+  demoRunning=true;bgLayer.classList.add('active');
+  if(!bgLayer.innerHTML)buildBG();
+  // Simulate speech bursts — add more particles periodically
+  demoTimer=setInterval(function(){
+    if(!demoRunning)return;
+    // Pulse the background opacity
+    bgLayer.style.opacity=(0.35+Math.random()*0.3);
+    setTimeout(function(){if(demoRunning)bgLayer.style.opacity='0.35'},400+Math.random()*600);
+  },1500);
+}
+
+function stopDemo(){
+  demoRunning=false;bgLayer.classList.remove('active');
+  if(demoTimer){clearInterval(demoTimer);demoTimer=null}
+  bgLayer.style.opacity='0.35';
+}
+
+// Init with static background
+buildBG();
+</script></body></html>
