@@ -28,7 +28,7 @@ h1{font-size:clamp(20px,4vw,28px);font-weight:900;letter-spacing:-1px;background
 </head>
 <body>
 <h1>Particle S 2 — Sound‑Reactive Logo</h1>
-<p style="font-size:12px;color:rgba(255,255,255,.35);margin-top:-12px">Kaleidoscope rest · S‑drift on voice</p>
+<p style="font-size:12px;color:rgba(255,255,255,.35);margin-top:-12px" id="varDesc">Kaleidoscope rest · S‑drift on voice</p>
 
 <div class="controls-row">
   <button id="micBtn" onclick="toggleMic()">🎤 Start Mic</button>
@@ -36,6 +36,12 @@ h1{font-size:clamp(20px,4vw,28px);font-weight:900;letter-spacing:-1px;background
 </div>
 <div class="mic-status off" id="micStatus"><span class="mic-dot"></span> Mic off</div>
 <div class="level-bar"><div class="level-fill" id="levelFill"></div></div>
+
+<div class="controls-row">
+  <button onclick="prevVar()" style="width:28px;height:28px;border-radius:50%;padding:0;font-size:14px;display:flex;align-items:center;justify-content:center">←</button>
+  <span id="varLabel" style="font-family:'JetBrains Mono',monospace;font-size:10px;color:rgba(255,255,255,.35);min-width:120px;text-align:center">1/10 · Original</span>
+  <button onclick="nextVar()" style="width:28px;height:28px;border-radius:50%;padding:0;font-size:14px;display:flex;align-items:center;justify-content:center">→</button>
+</div>
 
 <div class="logo-stage">
   <div class="logo-box">
@@ -101,34 +107,63 @@ function sampleSCurve(n){
   return pts;
 }
 
-// ─── Particle System ───
-var PARTICLE_COUNT=100;
-var particles=[];
+// ─── 10 Variation Configs ───
+var currentVar=0;
+var variations=[
+  {name:'Original',   desc:'100pt · balanced · classic',                    n:100, hue0:260, hueR:120, orbMin:3, orbMax:10, damp:0.88, attr:0.008, size0:1.0, sizeV:2.2, glow:0.08, kalei:1.8},
+  {name:'Cosmic Dust',desc:'200pt · wide spread · slow drift',              n:200, hue0:240, hueR:160, orbMin:5, orbMax:18, damp:0.92, attr:0.004, size0:0.7, sizeV:1.6, glow:0.04, kalei:2.4},
+  {name:'Neon Pulse', desc:'60pt · bright · snappy response',               n:60,  hue0:280, hueR:80,  orbMin:2, orbMax:6,  damp:0.82, attr:0.015, size0:1.4, sizeV:3.0, glow:0.15, kalei:1.2},
+  {name:'Ember Swarm',desc:'150pt · warm fire tones · gentle',              n:150, hue0:10,  hueR:50,  orbMin:3, orbMax:12, damp:0.90, attr:0.006, size0:0.9, sizeV:2.0, glow:0.10, kalei:2.0},
+  {name:'Frost Mist', desc:'120pt · icy blue · ghostly smooth',             n:120, hue0:190, hueR:60,  orbMin:4, orbMax:14, damp:0.94, attr:0.005, size0:0.8, sizeV:1.5, glow:0.06, kalei:2.2},
+  {name:'Lava Flow',  desc:'80pt · red-hot · heavy gravity',                n:80,  hue0:0,   hueR:40,  orbMin:2, orbMax:7,  damp:0.85, attr:0.012, size0:1.3, sizeV:2.8, glow:0.18, kalei:1.0},
+  {name:'Aurora',     desc:'100pt · green-pink shift · ethereal',           n:100, hue0:140, hueR:200, orbMin:4, orbMax:15, damp:0.91, attr:0.007, size0:1.0, sizeV:2.0, glow:0.07, kalei:2.0},
+  {name:'Quantum',    desc:'50pt · tiny dots · rapid jitter',               n:50,  hue0:260, hueR:140, orbMin:1, orbMax:4,  damp:0.78, attr:0.020, size0:0.6, sizeV:2.5, glow:0.20, kalei:0.7},
+  {name:'Tidal',      desc:'180pt · ocean hues · slow breathing',           n:180, hue0:180, hueR:80,  orbMin:3, orbMax:16, damp:0.93, attr:0.005, size0:0.8, sizeV:1.8, glow:0.05, kalei:2.5},
+  {name:'Inferno',    desc:'70pt · tight core · explosive on voice',        n:70,  hue0:20,  hueR:35,  orbMin:1, orbMax:5,  damp:0.80, attr:0.018, size0:1.5, sizeV:3.5, glow:0.22, kalei:0.8}
+];
 
+function switchVariation(idx){
+  currentVar=idx;
+  var v=variations[currentVar];
+  document.getElementById('varLabel').textContent=(currentVar+1)+'/10 · '+v.name;
+  document.getElementById('varDesc').textContent=v.desc;
+  // Re-init particles for new config
+  for(var ci=0;ci<canvases.length;ci++){
+    initParticlesForCanvas(canvases[ci].c.width,canvases[ci].c.height,ci);
+  }
+}
+function nextVar(){switchVariation((currentVar+1)%variations.length);}
+function prevVar(){switchVariation((currentVar+variations.length-1)%variations.length);}
+
+// ─── Particle System ───
 function particleColor(i,total,vol){
-  var hue=(260+i/total*120+vol*40)%360;
+  var v=variations[currentVar];
+  var hue=((v.hue0||260)+i/total*(v.hueR||120)+vol*40)%360;
   var sat=60+vol*20;
   var lit=50+vol*25;
   var alpha=0.45+vol*0.45;
   return'hsla('+hue+','+sat+'%,'+lit+'%,'+alpha+')';
 }
 
-function initParticles(cw,ch){
-  var sPts=sampleSCurve(PARTICLE_COUNT);
+function initParticlesForCanvas(cw,ch,canvasIdx){
+  var v=variations[currentVar];
+  var n=v.n||100;
+  var sPts=sampleSCurve(n);
   var sx=cw/100,sy=ch/85;
-  particles=[];
-  for(var i=0;i<PARTICLE_COUNT;i++){
+  var ps=[];
+  for(var i=0;i<n;i++){
     var tx=sPts[i].x*sx,ty=sPts[i].y*sy;
-    particles.push({
+    ps.push({
       tx:tx, ty:ty,
       x:Math.random()*cw,
       y:Math.random()*ch,
       vx:0, vy:0,
       phase:Math.random()*Math.PI*2,
       freq:0.3+Math.random()*0.7,
-      orbitR:3+Math.random()*10
+      orbitR:(v.orbMin||3)+Math.random()*((v.orbMax||10)-(v.orbMin||3))
     });
   }
+  particlesPerCanvas[canvasIdx]=ps;
 }
 
 // ─── Render ───
@@ -138,18 +173,8 @@ var bigCanvas=document.getElementById('logoBig');
 var bigCtx=bigCanvas.getContext('2d');
 var canvases=[{c:tinyCanvas,ctx:tinyCtx},{c:bigCanvas,ctx:bigCtx}];
 
-var particlesPerCanvas=[];
-canvases.forEach(function(cv){initParticles(cv.c.width,cv.c.height);particlesPerCanvas.push(particles.slice());});
-
-function ensureParticles(){
-  for(var ci=0;ci<canvases.length;ci++){
-    if(particlesPerCanvas[ci].length!==PARTICLE_COUNT){
-      initParticles(canvases[ci].c.width,canvases[ci].c.height);
-      particlesPerCanvas[ci]=particles.slice();
-    }
-  }
-}
-ensureParticles();
+var particlesPerCanvas=[[],[]];
+for(var ci=0;ci<canvases.length;ci++){initParticlesForCanvas(canvases[ci].c.width,canvases[ci].c.height,ci);}
 
 var prevT=0;
 function frame(ts){
@@ -162,17 +187,19 @@ function frame(ts){
 
   document.getElementById('levelFill').style.width=(volume*100)+'%';
   var smoothVol=volume;
+  var v=variations[currentVar];
+  var n=v.n||100;
 
   for(var ci=0;ci<canvases.length;ci++){
     var cv=canvases[ci],ctx=cv.ctx,w=cv.c.width,h=cv.c.height;
     var ps=particlesPerCanvas[ci];
-    if(ps.length!==PARTICLE_COUNT){ensureParticles();ps=particlesPerCanvas[ci];}
+    if(ps.length!==n){initParticlesForCanvas(w,h,ci);ps=particlesPerCanvas[ci];}
 
     ctx.clearRect(0,0,w,h);
 
     // Subtle S-glow when sound present
-    if(smoothVol>0.05){
-      ctx.save();ctx.globalAlpha=smoothVol*0.08;
+    if(smoothVol>0.05&&(v.glow||0.08)>0){
+      ctx.save();ctx.globalAlpha=smoothVol*(v.glow||0.08);
       ctx.filter='blur('+(4+smoothVol*12)+'px)';
       ctx.beginPath();
       var gp=sampleSCurve(30);
@@ -187,10 +214,10 @@ function frame(ts){
     // Update & draw particles
     for(var i=0;i<ps.length;i++){
       var p=ps[i];
-      var attractForce=0.008+smoothVol*0.25*dt;
+      var attractForce=(v.attr||0.008)+smoothVol*0.25*dt;
 
       // Kaleidoscope wandering (rest state)
-      var kaleiStrength=(1-smoothVol)*1.8;
+      var kaleiStrength=(1-smoothVol)*(v.kalei||1.8);
       var t=ts*0.001;
       var kx=Math.cos(t*p.freq+p.phase)*p.orbitR*kaleiStrength;
       var ky=Math.sin(t*p.freq*0.7+p.phase)*p.orbitR*kaleiStrength;
@@ -204,29 +231,30 @@ function frame(ts){
       p.vx+=dx*attractForce;
       p.vy+=dy*attractForce;
 
-      var damp=0.88+smoothVol*0.06;
+      var damp=(v.damp||0.88)+smoothVol*0.04;
       p.vx*=damp;
       p.vy*=damp;
 
       p.x+=p.vx*dt*60;
       p.y+=p.vy*dt*60;
 
-      var r=1.0+smoothVol*2.2+(1-smoothVol)*1.0*Math.abs(Math.sin(t*2+p.phase));
+      var r=(v.size0||1.0)+smoothVol*(v.sizeV||2.2)+(1-smoothVol)*1.0*Math.abs(Math.sin(t*2+p.phase));
       ctx.beginPath();
       ctx.arc(p.x,p.y,r,0,Math.PI*2);
-      ctx.fillStyle=particleColor(i,PARTICLE_COUNT,smoothVol);
+      ctx.fillStyle=particleColor(i,ps.length,smoothVol);
       ctx.fill();
 
       if(smoothVol>0.25&&r>2){
         ctx.beginPath();
         ctx.arc(p.x,p.y,r*2.5,0,Math.PI*2);
-        ctx.fillStyle='hsla('+(260+i/PARTICLE_COUNT*120)+',70%,60%,'+(smoothVol*0.08)+')';
+        ctx.fillStyle='hsla('+((v.hue0||260)+i/ps.length*(v.hueR||120))+',70%,60%,'+(smoothVol*0.08)+')';
         ctx.fill();
       }
     }
   }
 }
 requestAnimationFrame(frame);
+switchVariation(0);
 </script>
 </body>
 </html>
