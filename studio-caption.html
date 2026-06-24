@@ -2788,10 +2788,6 @@ function downloadGrammarPDF() {
       }
       h+='</div>';
 
-      // 03 — Synonyms
-      h+='<div class="extras-card" id="synCard"><div class="ec-title">03 · Synonyms <span class="ec-badge" style="background:rgba(96,165,250,.15);color:#60a5fa">DICT</span></div>';
-      h+='<div class="extras-loading" id="synLoading">Caricamento sinonimi...</div></div>';
-
       // 05 — POS Distribution (redesigned — horizontal stacked bar + donut)
       h+='<div class="extras-card"><div class="ec-title">05 · POS Distribution</div>';
       if(noData){h+='<div style="color:rgba(255,255,255,.2);font-style:italic">Nessun dato</div>'}
@@ -2808,20 +2804,7 @@ function downloadGrammarPDF() {
         h+='</div>';
       }
       h+='</div>';
-      cb(h, function(){
-        if(noData) return;
-        var synEl=document.getElementById('synLoading');
-        if(!synEl) return;
-        var top5=topWords.slice(0,5);
-        var html='';var fetched=0;
-        top5.forEach(function(w){
-          fetchSynonyms(w.w,function(syns){
-            html+='<div class="extras-syn-block"><strong>'+w.w+'</strong> → '+syns+'</div>';
-            fetched++;if(fetched===top5.length || syns!=='—'){synEl.innerHTML=html||'<div style="color:rgba(255,255,255,.2)">Nessun sinonimo trovato</div>'}
-          });
-        });
-        setTimeout(function(){if(fetched===0)synEl.innerHTML='<div style="color:rgba(255,255,255,.2)">Nessun sinonimo</div>'},3000);
-      });
+      cb(h);
     },
 
     grammar: function(cb){
@@ -3126,6 +3109,7 @@ function downloadGrammarPDF() {
         h+='</tbody></table></div>';
       }
       h+='</div>';
+      h+='<div style="font-size:7px;color:rgba(255,255,255,.12);margin-top:4px;text-align:right">Double-click any word to save to Word Bank</div>';
 
       // Card 2: Language pair stats
       h+='<div class="extras-card"><div class="ec-title">Language Pairs</div>';
@@ -3136,7 +3120,26 @@ function downloadGrammarPDF() {
       h+='</div></div>';
 
       h+='</div>';
-      cb(h);
+      cb(h, function(){
+        // Double-click words to add to word bank
+        var table=document.querySelector('#extrasPanel table');
+        if(!table) return;
+        table.querySelectorAll('td').forEach(function(td){
+          td.style.cursor='pointer';
+          td.addEventListener('dblclick',function(){
+            var word=this.textContent.trim();
+            if(!word||word.length<2) return;
+            var bank=JSON.parse(localStorage.getItem('sottotitoli-wordbank')||'[]');
+            if(bank.indexOf(word)>=0) return;
+            bank.push(word);
+            localStorage.setItem('sottotitoli-wordbank',JSON.stringify(bank));
+            // Flash feedback
+            var orig=this.style.background;
+            this.style.background='rgba(52,211,153,.2)';
+            setTimeout(function(){td.style.background=orig},400);
+          });
+        });
+      });
     },
 
     // ═══ Info — Word Family + Etymology ═══
