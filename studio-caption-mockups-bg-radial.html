@@ -61,8 +61,23 @@ body.dark .btn:hover{background:rgba(255,255,255,.06);color:#fff;border-color:rg
   </div>
   <div class="sens-row">
     <label for="sensSlider">sens</label>
-    <input type="range" class="sens-slider" id="sensSlider" min="0.1" max="5" step="0.1" value="1" oninput="updateSensitivity(this.value)">
+    <input type="range" class="sens-slider" id="sensSlider" min="0.1" max="20" step="0.1" value="1" oninput="updateSensitivity(this.value)">
     <span class="meter-label" id="sensLabel">1.0x</span>
+  </div>
+  <!-- FX Toggles -->
+  <div class="btn-row" style="margin-top:2px">
+    <button class="btn" id="btnTrails" onclick="toggleFX('trails')">👻 Trails</button>
+    <button class="btn" id="btnReverb" onclick="toggleFX('reverb')">🔁 Reverb</button>
+    <button class="btn" id="btnSlowmo" onclick="toggleFX('slowmo')">🐢 Slow‑mo</button>
+    <button class="btn" id="btnColorBoost" onclick="toggleFX('colorBoost')">🎨 Color+</button>
+    <button class="btn" id="btnBounce" onclick="toggleFX('bounce')">🏀 Bounce</button>
+  </div>
+  <div class="btn-row" style="gap:10px;margin-top:1px;margin-bottom:4px">
+    <span style="font-size:8px;opacity:.25;font-family:'JetBrains Mono',monospace;min-width:36px;text-align:center" id="fxTrailsVal">off</span>
+    <span style="font-size:8px;opacity:.25;font-family:'JetBrains Mono',monospace;min-width:36px;text-align:center" id="fxReverbVal">off</span>
+    <span style="font-size:8px;opacity:.25;font-family:'JetBrains Mono',monospace;min-width:36px;text-align:center" id="fxSlowmoVal">1×</span>
+    <span style="font-size:8px;opacity:.25;font-family:'JetBrains Mono',monospace;min-width:36px;text-align:center" id="fxColorBoostVal">off</span>
+    <span style="font-size:8px;opacity:.25;font-family:'JetBrains Mono',monospace;min-width:36px;text-align:center" id="fxBounceVal">off</span>
   </div>
   <div class="btn-row">
     <button class="btn" id="btnMic" onclick="toggleMic()">🎤 Start Mic</button>
@@ -80,6 +95,71 @@ body.dark .btn:hover{background:rgba(255,255,255,.06);color:#fff;border-color:rg
 var audioCtx=null,analyser=null,micStream=null,micOn=false;
 var freqData=null,volume=0,smoothing=0,sensitivity=1.0;
 var canvas,ctx,W,H,t=0,animFrame=null,currentVar=0;
+
+// ─── FX State ───
+var fx={
+  trails:{on:false, fade:0.15},      // fade% per frame for trail ghost
+  reverb:{on:false, delay:8, feed:0.5}, // delay frames, feedback decay
+  slowmo:{on:false, speed:0.3},       // time multiplier
+  colorBoost:{on:false, boost:1.8},   // saturation/luminosity multiplier
+  bounce:{on:false, spring:0.4}       // spring-back force
+};
+var reverbBuffer=[];  // ring buffer for delayed volume values
+var bounceVol=0;      // physics-driven volume for bounce effect
+
+function toggleFX(name){
+  var f=fx[name];
+  if(!f.on){
+    // Turn on
+    f.on=true;
+    fxCycleIdx[name]=0;
+    applyFXCycle(name);
+  }else{
+    // Cycle to next intensity
+    fxCycleIdx[name]++;
+    var cycles={trails:fxCycle.trails,reverb:fxCycle.reverbDelay,slowmo:fxCycle.slowmo,colorBoost:fxCycle.colorBoost,bounce:fxCycle.bounce};
+    if(fxCycleIdx[name]>=cycles[name].length){
+      // Turn off
+      f.on=false;
+      fxCycleIdx[name]=0;
+    }else{
+      applyFXCycle(name);
+    }
+  }
+  var btnId='btn'+{trails:'Trails',reverb:'Reverb',slowmo:'Slowmo',colorBoost:'ColorBoost',bounce:'Bounce'}[name];
+  var btn=document.getElementById(btnId);
+  if(btn)btn.classList.toggle('on',f.on);
+  updateFXLabels();
+}
+function applyFXCycle(name){
+  var idx=fxCycleIdx[name];
+  switch(name){
+    case'trails':fx.trails.fade=fxCycle.trails[idx];break;
+    case'reverb':fx.reverb.delay=fxCycle.reverbDelay[idx];fx.reverb.feed=fxCycle.reverbFeed[Math.min(idx,fxCycle.reverbFeed.length-1)];break;
+    case'slowmo':fx.slowmo.speed=fxCycle.slowmo[idx];break;
+    case'colorBoost':fx.colorBoost.boost=fxCycle.colorBoost[idx];break;
+    case'bounce':fx.bounce.spring=fxCycle.bounce[idx];break;
+  }
+}
+function updateFXLabels(){
+  var t=fx.trails,r=fx.reverb,s=fx.slowmo,c=fx.colorBoost,b=fx.bounce;
+  document.getElementById('fxTrailsVal').textContent=t.on?(t.fade*100).toFixed(0)+'%':'off';
+  document.getElementById('fxReverbVal').textContent=r.on?r.delay+'f/'+(r.feed*100).toFixed(0)+'%':'off';
+  document.getElementById('fxSlowmoVal').textContent=s.on?s.speed.toFixed(1)+'×':'1×';
+  document.getElementById('fxColorBoostVal').textContent=c.on?c.boost.toFixed(1)+'×':'off';
+  document.getElementById('fxBounceVal').textContent=b.on?(b.spring*100).toFixed(0)+'%':'off';
+}
+
+// Cycle FX intensity with repeated clicks
+var fxCycle={
+  trails:[0.05,0.10,0.15,0.25,0.40,0.60],
+  reverbDelay:[3,5,8,12,18,25],
+  reverbFeed:[0.3,0.5,0.65,0.8],
+  slowmo:[0.1,0.2,0.3,0.5,0.75],
+  colorBoost:[1.3,1.6,2.0,2.5,3.0],
+  bounce:[0.2,0.4,0.6,0.8]
+};
+var fxCycleIdx={trails:0,reverb:0,slowmo:0,colorBoost:0,bounce:0};
 
 function updateSensitivity(val){
   sensitivity=parseFloat(val);
@@ -221,11 +301,12 @@ var variations=[
 ];
 
 // ─── Main render: radial bars ───
-function drawRadial(ctx,v,isDark,params){
-  var cx=W/2,cy=H/2,hue=themeHue(isDark),sat=themeSat(isDark);
+function drawRadial(ctx,v,isDark,params,colorMul){
+  colorMul=colorMul||1;
+  var cx=W/2,cy=H/2,hue=themeHue(isDark),sat=themeSat(isDark)*colorMul;
   var maxR=Math.min(W,H)*0.49;
   var prm=params.p;
-  var sv=Math.pow(v,prm.smoothMul||1); // apply per-variation smoothing curve
+  var sv=Math.pow(v,prm.smoothMul||1);
   var nRings=prm.rings||3;
 
   // Space gradient
@@ -237,9 +318,9 @@ function drawRadial(ctx,v,isDark,params){
 
   // Outer ring guides
   ctx.beginPath();ctx.arc(cx,cy,maxR*0.92,0,Math.PI*2);
-  ctx.strokeStyle=c(hue,sat,themeLum(isDark,true),themeAlpha(isDark,0.10));ctx.lineWidth=0.5;ctx.stroke();
+  ctx.strokeStyle=c(hue,sat,themeLum(isDark,true)*colorMul,themeAlpha(isDark,0.10)*colorMul);ctx.lineWidth=0.5;ctx.stroke();
   ctx.beginPath();ctx.arc(cx,cy,maxR*0.95,0,Math.PI*2);
-  ctx.strokeStyle=c(hue+60,sat,themeLum(isDark,true),themeAlpha(isDark,0.06));ctx.lineWidth=1;ctx.stroke();
+  ctx.strokeStyle=c(hue+60,sat,themeLum(isDark,true)*colorMul,themeAlpha(isDark,0.06)*colorMul);ctx.lineWidth=1;ctx.stroke();
 
   for(var ring=0;ring<nRings;ring++){
     var ringR=maxR*(prm.startR+(ring*(prm.ringGap||0.2)));
@@ -247,7 +328,6 @@ function drawRadial(ctx,v,isDark,params){
     if(sc<20)sc=20;
 
     for(var i=0;i<sc;i++){
-      // Frequency value
       var fi=0.15;
       if(freqData&&micOn){
         var fidx=Math.floor(i*freqData.length/sc);
@@ -260,15 +340,12 @@ function drawRadial(ctx,v,isDark,params){
       var angle=(i/sc)*Math.PI*2+t/15000*(ring+1)*0.5;
       var barLen=fi*maxR*0.55*(0.6+ring*0.2);
 
-      // ── Thickness calculation ──
       var baseLw=prm.lineW;
       if(prm.feather){
-        // Feather: each ring gets thicker
         baseLw=prm.lineW+ring*(prm.lwVol-prm.lineW)/(nRings-1);
       }
       var lw=baseLw;
       if(prm.dynamicW){
-        // Dynamic: width scales with frequency amplitude in real-time
         lw=prm.lineW+fi*(prm.lwVol-prm.lineW);
       }
       lw+=sv*(prm.lwVol-baseLw)*0.4;
@@ -277,16 +354,16 @@ function drawRadial(ctx,v,isDark,params){
 
       var sg=ctx.createLinearGradient(0,ringR,0,ringR+barLen);
       var sh=(hue+i*2.5+ring*40)%360;
-      sg.addColorStop(0,c(sh,sat,themeLum(isDark,true),themeAlpha(isDark,0.02)));
-      sg.addColorStop(0.4,c(sh,sat,themeLum(isDark,true),themeAlpha(isDark,0.30+sv*0.30)));
-      sg.addColorStop(1,c(sh,sat,themeLum(isDark,true),0));
+      var brightLum=Math.min(95,themeLum(isDark,true)*colorMul);
+      sg.addColorStop(0,c(sh,sat,brightLum,themeAlpha(isDark,0.02)*colorMul));
+      sg.addColorStop(0.4,c(sh,sat,brightLum,themeAlpha(isDark,0.30+sv*0.30)*colorMul));
+      sg.addColorStop(1,c(sh,sat,brightLum,0));
       ctx.fillStyle=sg;
       ctx.fillRect(-lw/2,ringR,lw,barLen);
 
-      // Dot at tip
       if(fi>0.25&&prm.dotR>0){
         ctx.beginPath();ctx.arc(0,ringR+barLen,prm.dotR+fi*1.5,0,Math.PI*2);
-        ctx.fillStyle=c(sh,80,themeLum(isDark,true),themeAlpha(isDark,0.6+sv*0.3));
+        ctx.fillStyle=c(sh,80*colorMul,brightLum,themeAlpha(isDark,0.6+sv*0.3)*colorMul);
         ctx.fill();
       }
 
@@ -296,23 +373,22 @@ function drawRadial(ctx,v,isDark,params){
 
   // ── Central orb ──
   var orbR=maxR*prm.orbMul+sv*maxR*0.04;
+  var brightLumOrb=Math.min(95,themeLum(isDark,true)*colorMul);
   var og=ctx.createRadialGradient(cx,cy,0,cx,cy,orbR);
-  og.addColorStop(0,c(hue,60,themeLum(isDark,true),themeAlpha(isDark,0.85+sv*0.15)));
-  og.addColorStop(0.5,c(hue,sat,themeLum(isDark,true),themeAlpha(isDark,0.25)));
+  og.addColorStop(0,c(hue,60*colorMul,brightLumOrb,themeAlpha(isDark,0.85+sv*0.15)*colorMul));
+  og.addColorStop(0.5,c(hue,sat,brightLumOrb,themeAlpha(isDark,0.25)*colorMul));
   og.addColorStop(1,'rgba(0,0,0,0)');
   ctx.fillStyle=og;ctx.fillRect(cx-orbR,cy-orbR,orbR*2,orbR*2);
 
-  // Pulse ring around orb
   var pr=orbR*1.5+sv*maxR*0.25*Math.sin(t/2500);
   ctx.beginPath();ctx.arc(cx,cy,pr,0,Math.PI*2);
-  ctx.strokeStyle=c(hue,sat,themeLum(isDark,true),themeAlpha(isDark,0.12+sv*0.08));
+  ctx.strokeStyle=c(hue,sat,brightLumOrb,themeAlpha(isDark,0.12+sv*0.08)*colorMul);
   ctx.lineWidth=0.6+sv*0.8;ctx.stroke();
 
-  // Subtle glow aura (thicker lines = more glow)
   if(prm.glow>0&&sv>0.1){
     var glowR=orbR*2+sv*maxR*0.3;
     var gg=ctx.createRadialGradient(cx,cy,orbR*0.5,cx,cy,glowR);
-    gg.addColorStop(0,c(hue,70,themeLum(isDark,true),themeAlpha(isDark,prm.glow*sv)));
+    gg.addColorStop(0,c(hue,70*colorMul,brightLumOrb,themeAlpha(isDark,prm.glow*sv)*colorMul));
     gg.addColorStop(1,'rgba(0,0,0,0)');
     ctx.fillStyle=gg;ctx.fillRect(cx-glowR,cy-glowR,glowR*2,glowR*2);
   }
@@ -321,17 +397,72 @@ function drawRadial(ctx,v,isDark,params){
 // ─── Animation loop ───
 function animate(ts){
   animFrame=requestAnimationFrame(animate);
-  t=ts||Date.now();
+  var rawT=ts||Date.now();
+  // Slow-motion: scale time
+  var timeScale=fx.slowmo.on?fx.slowmo.speed:1;
+  t=rawT; // keep raw t for sin-based animations
+  var frameDt=1; // will accumulate for slow-mo
 
   if(micOn){readAudio();}else{
     smoothing=smoothing*0.92+0.04;
-    volume=0.08+Math.sin(t/1800)*0.06+Math.sin(t/3100)*0.05+Math.sin(t/5200)*0.03;
+    volume=0.08+Math.sin(rawT/1800)*0.06+Math.sin(rawT/3100)*0.05+Math.sin(rawT/5200)*0.03;
   }
-  var v=smoothing||volume;
+  var rawV=smoothing||volume;
+
+  // ── Reverb/Delay ──
+  if(fx.reverb.on){
+    // Push current volume into ring buffer
+    reverbBuffer.push(rawV);
+    if(reverbBuffer.length>fx.reverb.delay*3)reverbBuffer.shift();
+  }
+  var v=rawV;
+  if(fx.reverb.on&&reverbBuffer.length>fx.reverb.delay){
+    // Mix in delayed echo
+    var echoIdx=Math.max(0,reverbBuffer.length-1-fx.reverb.delay);
+    var echoV=reverbBuffer[echoIdx]||0;
+    v=rawV+echoV*fx.reverb.feed;
+    v=Math.min(1,v);
+  }
+
+  // ── Return Bounce (spring physics on volume) ──
+  if(fx.bounce.on){
+    var springForce=(v-bounceVol)*fx.bounce.spring;
+    bounceVol+=springForce;
+    bounceVol+=(v-bounceVol)*0.3; // follow original
+    v=bounceVol;
+  }else{
+    bounceVol=v;
+  }
+
+  // ── Color Boost ──
+  var colorMul=fx.colorBoost.on?fx.colorBoost.boost:1;
+
   var isDark=document.body.classList.contains('dark');
 
-  ctx.clearRect(0,0,W,H);
-  drawRadial(ctx,v,isDark,variations[currentVar]);
+  // ── Trails: don't clear fully, leave ghost ──
+  if(fx.trails.on){
+    ctx.fillStyle=isDark?'rgba(6,6,20,'+fx.trails.fade+')':'rgba(250,250,248,'+fx.trails.fade+')';
+    ctx.fillRect(0,0,W,H);
+  }else{
+    ctx.clearRect(0,0,W,H);
+  }
+
+  drawRadial(ctx,v,isDark,variations[currentVar],colorMul);
+
+  // If reverb active, draw extra ghost rings at delayed positions
+  if(fx.reverb.on&&reverbBuffer.length>3){
+    for(var ri=1;ri<=2;ri++){
+      var delayFrames=fx.reverb.delay*ri;
+      if(reverbBuffer.length>delayFrames){
+        var ev=reverbBuffer[reverbBuffer.length-1-delayFrames]||0;
+        if(ev>0.03){
+          ctx.globalAlpha=0.15*(fx.reverb.feed*ri);
+          drawRadial(ctx,ev*0.6,isDark,variations[currentVar],colorMul*0.7);
+          ctx.globalAlpha=1;
+        }
+      }
+    }
+  }
 
   var displayV=Math.min(1,v*2.5*sensitivity);
   document.getElementById('meterFill').style.width=(displayV*100)+'%';
