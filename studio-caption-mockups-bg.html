@@ -226,21 +226,54 @@ var ringFuncs=[
 ];
 
 var barFuncs=[
-  // Mirror
+  // Mirror — merged with Waveform chubby rest behavior
   function(ctx,v,isDark){
     var n=64,gap=2,w=(W-gap*(n+1))/n,hue=themeHue(isDark);
-    var sv=Math.pow(v,0.55);
+    var sv=Math.pow(v,0.5);
+    
+    // Rest state: when v is low, bars compact toward center
+    // Speech state: bars expand outward like mirror layout
+    var restFactor=Math.max(0.12,Math.min(1,sv*3)); // 0.12 at silence, 1.0 at full speech
+    
     for(var i=0;i<n;i++){
-      var hgt=15;
-      if(freqData&&micOn){hgt=Math.max(2,freqData[Math.floor(i*freqData.length/n)]/255*H*0.35)}
-      else{hgt=Math.max(2,(Math.sin(i*0.35+t/1300)*0.5+0.5)*H*0.25*sv*4)}
+      var fi=0.2; // base rest level
+      if(freqData&&micOn){
+        fi=freqData[Math.floor(i*freqData.length/n)]/255;
+      }else{
+        fi=0.12+Math.sin(i*0.35+t/1300)*0.25+0.15;
+      }
+      
+      // Blend: at rest, use chubby block minimum height; at speech, full mirror
+      var restHgt=Math.max(2,fi*H*0.08); // tiny blocks at rest
+      var speechHgt=Math.max(2,fi*H*0.38); // full mirror height
+      var hgt=restHgt+(speechHgt-restHgt)*restFactor;
+      
       var x=gap+i*(w+gap);
-      var g=ctx.createLinearGradient(x,0,x,H);
-      g.addColorStop(0,c((hue+i*4)%360,themeSat(isDark),themeLum(isDark,true),themeAlpha(isDark,0.6)));
-      g.addColorStop(0.5,c((hue+i*4)%360,themeSat(isDark),themeLum(isDark,false),themeAlpha(isDark,0.05)));
-      g.addColorStop(1,c((hue+180+i*4)%360,themeSat(isDark),themeLum(isDark,true),themeAlpha(isDark,0.6)));
-      ctx.fillStyle=g;ctx.fillRect(x,H/2-hgt,w,hgt*2);
+      
+      // Top half gradient (above center)
+      var gTop=ctx.createLinearGradient(x,H/2-hgt,x,H/2);
+      gTop.addColorStop(0,c((hue+i*4)%360,themeSat(isDark),themeLum(isDark,true),themeAlpha(isDark,0.15+restFactor*0.45)));
+      gTop.addColorStop(1,c((hue+i*4)%360,themeSat(isDark),themeLum(isDark,false),themeAlpha(isDark,0.02+restFactor*0.03)));
+      ctx.fillStyle=gTop;
+      ctx.fillRect(x,H/2-hgt,w,hgt);
+      
+      // Bottom half gradient (below center) — inverted hue
+      var gBot=ctx.createLinearGradient(x,H/2,x,H/2+hgt);
+      gBot.addColorStop(0,c((hue+180+i*4)%360,themeSat(isDark),themeLum(isDark,false),themeAlpha(isDark,0.02+restFactor*0.03)));
+      gBot.addColorStop(1,c((hue+180+i*4)%360,themeSat(isDark),themeLum(isDark,true),themeAlpha(isDark,0.15+restFactor*0.45)));
+      ctx.fillStyle=gBot;
+      ctx.fillRect(x,H/2,w,hgt);
+      
+      // Top highlight on active bars
+      if(fi>0.2&&restFactor>0.3){
+        ctx.fillStyle=c((hue+i*4)%360,80,themeLum(isDark,true),themeAlpha(isDark,0.4*restFactor));
+        ctx.fillRect(x,H/2-hgt,w,Math.min(3,hgt*0.1));
+      }
     }
+    
+    // Center line — brighter when speaking
+    ctx.fillStyle=isDark?'rgba(255,255,255,'+(0.03+restFactor*0.06)+')':'rgba(0,0,0,'+(0.03+restFactor*0.05)+')';
+    ctx.fillRect(0,H/2-0.5,W,1);
   },
   // Radial mandala
   function(ctx,v,isDark){
@@ -283,87 +316,44 @@ var barFuncs=[
     var pr=orbR*1.5+sv*maxR*0.25*Math.sin(t/2500);ctx.beginPath();ctx.arc(cx,cy,pr,0,Math.PI*2);
     ctx.strokeStyle=c(hue,themeSat(isDark),themeLum(isDark,true),themeAlpha(isDark,0.15+sv*0.1));ctx.lineWidth=0.8+sv;ctx.stroke();
   },
-  // Brush — 360-degree radial fill from center
+  // Brush — 360-degree radial fill
   function(ctx,v,isDark){
     var cx=W/2,cy=H/2,hue=themeHue(isDark);
     var maxR=Math.min(W,H)*0.47;
     var sv=Math.pow(v,0.4);
-    var n=256; // high resolution for smooth circle
-    
-    // Growth accumulator
+    var n=256;
     if(!window._brushGrowth) window._brushGrowth=0;
     if(!window._brushLastSpoke) window._brushLastSpoke=0;
-    if(v>0.07){
-      window._brushGrowth=Math.min(1,window._brushGrowth+0.002);
-      window._brushLastSpoke=t;
-    }else{
-      if(t-window._brushLastSpoke>700) window._brushGrowth=Math.max(0,window._brushGrowth-0.006);
-    }
-    var growth=window._brushGrowth;
-    var scale=0.4+growth*1.8;
-    
-    // Draw 360-degree frequency spokes
+    if(v>0.07){window._brushGrowth=Math.min(1,window._brushGrowth+0.002);window._brushLastSpoke=t}
+    else{if(t-window._brushLastSpoke>700) window._brushGrowth=Math.max(0,window._brushGrowth-0.006)}
+    var growth=window._brushGrowth,scale=0.4+growth*1.8;
     for(var i=0;i<n;i++){
       var fi=0.12;
-      if(freqData&&micOn){
-        var fidx=Math.floor(i*freqData.length/n);
-        fi=Math.max(0.02,freqData[fidx%freqData.length]/255);
-      }else{
-        fi=0.08+Math.sin(i*0.15+t/900)*0.2+Math.cos(i*0.08+t/700)*0.15;
-      }
-      
-      var angle=(i/n)*Math.PI*2;
-      var baseR=maxR*0.15; // inner dead zone
-      var spokeLen=fi*maxR*0.75*scale;
-      
+      if(freqData&&micOn){fi=Math.max(0.02,freqData[Math.floor(i*freqData.length/n)%freqData.length]/255)}
+      else{fi=0.08+Math.sin(i*0.15+t/900)*0.2+Math.cos(i*0.08+t/700)*0.15}
+      var angle=(i/n)*Math.PI*2,baseR=maxR*0.15,spokeLen=fi*maxR*0.75*scale;
       ctx.save();ctx.translate(cx,cy);ctx.rotate(angle);
-      
-      // Spoke from inner ring outward
       var spokeHue=(hue+i*1.5)%360;
       var grad=ctx.createLinearGradient(0,baseR,0,baseR+spokeLen);
       grad.addColorStop(0,c(spokeHue,themeSat(isDark),themeLum(isDark,true),themeAlpha(isDark,0.05)));
       grad.addColorStop(0.3,c(spokeHue,themeSat(isDark),themeLum(isDark,true),themeAlpha(isDark,0.4+sv*0.4)));
       grad.addColorStop(0.7,c((spokeHue+40)%360,80,themeLum(isDark,true),themeAlpha(isDark,0.6+fi*0.3)));
       grad.addColorStop(1,c((spokeHue+80)%360,70,themeLum(isDark,true),0));
-      ctx.fillStyle=grad;
-      
-      var sw=1+fi*4*scale;
-      ctx.fillRect(-sw/2,baseR,sw,spokeLen);
-      
-      // Bright tip for active frequencies
-      if(fi>0.2){
-        ctx.beginPath();ctx.arc(0,baseR+spokeLen,2+fi*5*scale,0,Math.PI*2);
-        ctx.fillStyle=c(spokeHue,90,themeLum(isDark,true),themeAlpha(isDark,0.7+sv*0.3));
-        ctx.fill();
-      }
+      ctx.fillStyle=grad;var sw=1+fi*4*scale;ctx.fillRect(-sw/2,baseR,sw,spokeLen);
+      if(fi>0.2){ctx.beginPath();ctx.arc(0,baseR+spokeLen,2+fi*5*scale,0,Math.PI*2);ctx.fillStyle=c(spokeHue,90,themeLum(isDark,true),themeAlpha(isDark,0.7+sv*0.3));ctx.fill()}
       ctx.restore();
     }
-    
-    // Center orb
     var orbR=maxR*0.12+sv*maxR*0.04;
     var orbGrad=ctx.createRadialGradient(cx,cy,0,cx,cy,orbR);
     orbGrad.addColorStop(0,c(hue,50,themeLum(isDark,true),themeAlpha(isDark,0.95)));
     orbGrad.addColorStop(0.6,c(hue,themeSat(isDark),themeLum(isDark,true),themeAlpha(isDark,0.3)));
-    orbGrad.addColorStop(1,'rgba(0,0,0,0)');
-    ctx.fillStyle=orbGrad;ctx.fillRect(cx-orbR,cy-orbR,orbR*2,orbR*2);
-    
-    // Inner reference ring
+    orbGrad.addColorStop(1,'rgba(0,0,0,0)');ctx.fillStyle=orbGrad;ctx.fillRect(cx-orbR,cy-orbR,orbR*2,orbR*2);
     ctx.beginPath();ctx.arc(cx,cy,maxR*0.15,0,Math.PI*2);
-    ctx.strokeStyle=c(hue,themeSat(isDark),themeLum(isDark,true),themeAlpha(isDark,0.08));
-    ctx.lineWidth=0.5;ctx.stroke();
-    
-    // Outer boundary ring
+    ctx.strokeStyle=c(hue,themeSat(isDark),themeLum(isDark,true),themeAlpha(isDark,0.08));ctx.lineWidth=0.5;ctx.stroke();
     ctx.beginPath();ctx.arc(cx,cy,maxR*0.92,0,Math.PI*2);
-    ctx.strokeStyle=c(hue,themeSat(isDark),themeLum(isDark,true),themeAlpha(isDark,0.06));
-    ctx.lineWidth=0.5;ctx.stroke();
-    
-    // Growth indicator
-    if(growth>0.03){
-      ctx.fillStyle=isDark?'rgba(255,255,255,0.04)':'rgba(0,0,0,0.04)';
-      ctx.fillRect(W-80,6,72,3);
-      ctx.fillStyle=c(hue,themeSat(isDark),themeLum(isDark,true),themeAlpha(isDark,0.5+growth*0.4));
-      ctx.fillRect(W-80,6,72*growth,3);
-    }
+    ctx.strokeStyle=c(hue,themeSat(isDark),themeLum(isDark,true),themeAlpha(isDark,0.06));ctx.lineWidth=0.5;ctx.stroke();
+    if(growth>0.03){ctx.fillStyle=isDark?'rgba(255,255,255,0.04)':'rgba(0,0,0,0.04)';ctx.fillRect(W-80,6,72,3);
+    ctx.fillStyle=c(hue,themeSat(isDark),themeLum(isDark,true),themeAlpha(isDark,0.5+growth*0.4));ctx.fillRect(W-80,6,72*growth,3)}
   }
 ];
 
