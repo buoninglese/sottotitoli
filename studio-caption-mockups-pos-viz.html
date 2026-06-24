@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Sottotitoli · POS Visualizations</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300;14..32,400;14..32,500;14..32,600;14..32,700;14..32,900&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Inter',system-ui,sans-serif;background:#060610;color:#e8eaed;padding:32px 24px}
+h1{font-size:clamp(24px,5vw,40px);font-weight:900;letter-spacing:-1.5px;text-align:center;background:linear-gradient(90deg,#34d399,#60a5fa,#a78bfa,#f472b6);background-size:300% 100%;-webkit-background-clip:text;-webkit-text-fill-color:transparent;animation:titleShift 6s linear infinite;margin-bottom:4px}
+@keyframes titleShift{0%{background-position:0% 50%}100%{background-position:300% 50%}}
+.subtitle{text-align:center;color:#8b93a5;margin-bottom:32px;font-size:12px}
+.section-title{font-size:15px;font-weight:800;color:rgba(255,255,255,.5);margin:32px 0 16px;padding-bottom:8px;border-bottom:1px solid rgba(255,255,255,.06);letter-spacing:-.3px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px;max-width:1400px;margin:0 auto}
+.card{background:#0f121e;border:1px solid #1a1e2e;border-radius:14px;padding:18px;transition:all .25s}
+.card:hover{border-color:#2a2e3e;transform:translateY(-2px);box-shadow:0 8px 30px rgba(0,0,0,.4)}
+.card-num{font-family:'JetBrains Mono',monospace;font-size:9px;color:rgba(255,255,255,.2);margin-bottom:6px}
+.card-title{font-size:11px;font-weight:700;color:rgba(255,255,255,.5);margin-bottom:12px;letter-spacing:.3px}
+.viz-area{min-height:80px;display:flex;align-items:center;justify-content:center}
+.chip{display:inline-block;padding:3px 10px;border-radius:6px;font-size:10px;font-weight:600;margin:2px}
+.bar-h{height:8px;border-radius:4px;transition:width .6s ease}
+.dot{display:inline-block;border-radius:50%}
+</style>
+</head>
+<body>
+<h1>POS Visualization Explorer</h1>
+<p class="subtitle">15 variations for 05 · POS Distribution &amp; 15 variations for 01 · POS Tags — June 2026</p>
+
+<!-- ══════════════════════════════════════ -->
+<h2 class="section-title">05 · POS Distribution — 15 Variations</h2>
+<div class="grid" id="distGrid"></div>
+
+<!-- ══════════════════════════════════════ -->
+<h2 class="section-title">01 · POS Tags — 15 Variations</h2>
+<div class="grid" id="tagGrid"></div>
+
+<script>
+// Sample data
+var DATA={Verbs:7,Nouns:12,Adj:4,Adv:3,Other:5};
+var total=DATA.Verbs+DATA.Nouns+DATA.Adj+DATA.Adv+DATA.Other;
+var tags=[{w:'discussing',pos:'VERB'},{w:'future',pos:'NOUN'},{w:'translation',pos:'NOUN'},{w:'systems',pos:'NOUN'},{w:'barriers',pos:'NOUN'},{w:'deployment',pos:'NOUN'},{w:'remains',pos:'VERB'},{w:'biggest',pos:'ADJ'},{w:'challenge',pos:'NOUN'},{w:'neural',pos:'ADJ'},{w:'remarkably',pos:'ADV'},{w:'bridge',pos:'VERB'},{w:'cultures',pos:'NOUN'},{w:'different',pos:'ADJ'},{w:'scale',pos:'NOUN'},{w:'quickly',pos:'ADV'},{w:'international',pos:'ADJ'},{w:'across',pos:'PREP'},{w:'these',pos:'DET'},{w:'and',pos:'CONJ'}];
+var posColors={VERB:'#34d399',NOUN:'#60a5fa',ADJ:'#f472b6',ADV:'#c084fc',PREP:'#fbbf24',CONJ:'#fb923c',DET:'#22d3ee',PRON:'#a78bfa',OTHER:'#6b7280'};
+var posNames={VERB:'Verbs',NOUN:'Nouns',ADJ:'Adj',ADV:'Adv',PREP:'Prep',CONJ:'Conj',DET:'Det',PRON:'Pron',OTHER:'Other'};
+
+// ══════════════════════════════════════
+// 15 POS DISTRIBUTION VARIATIONS
+// ══════════════════════════════════════
+var distVars=[
+  // 1: Horizontal stacked bar
+  function(c){
+    var h='<div style="width:100%">';
+    h+='<div style="display:flex;height:20px;border-radius:10px;overflow:hidden;margin-bottom:4px">';
+    [{l:'Verbs',v:DATA.Verbs,c:'#34d399'},{l:'Nouns',v:DATA.Nouns,c:'#60a5fa'},{l:'Adj',v:DATA.Adj,c:'#f472b6'},{l:'Adv',v:DATA.Adv,c:'#c084fc'},{l:'Other',v:DATA.Other,c:'#6b7280'}].forEach(function(b){
+      var p=Math.round(b.v/total*100);if(p>0) h+='<div style="width:'+p+'%;height:100%;background:'+b.c+'" title="'+b.l+': '+b.v+'"></div>';
+    });
+    h+='</div><div style="display:flex;gap:8px;font-size:8px;color:rgba(255,255,255,.3)">';
+    [{l:'V',v:DATA.Verbs,c:'#34d399'},{l:'N',v:DATA.Nouns,c:'#60a5fa'},{l:'J',v:DATA.Adj,c:'#f472b6'},{l:'D',v:DATA.Adv,c:'#c084fc'},{l:'O',v:DATA.Other,c:'#6b7280'}].forEach(function(b){h+='<span style="color:'+b.c+'">'+b.l+' '+b.v+'</span>'});
+    h+='</div></div>';return h;
+  },
+  // 2: Vertical columns
+  function(c){
+    var max=Math.max(DATA.Verbs,DATA.Nouns,DATA.Adj,DATA.Adv,DATA.Other);
+    var h='<div style="display:flex;align-items:flex-end;gap:12px;height:70px">';
+    [{l:'Verbs',v:DATA.Verbs,c:'#34d399'},{l:'Nouns',v:DATA.Nouns,c:'#60a5fa'},{l:'Adj',v:DATA.Adj,c:'#f472b6'},{l:'Adv',v:DATA.Adv,c:'#c084fc'},{l:'Other',v:DATA.Other,c:'#6b7280'}].forEach(function(b){
+      var hgt=Math.max(8,b.v/max*60);
+      h+='<div style="text-align:center"><div style="width:24px;height:'+hgt+'px;background:'+b.c+';border-radius:4px 4px 0 0;margin:0 auto"></div><div style="font-size:7px;color:'+b.c+';margin-top:2px">'+b.l+'</div><div style="font-size:8px;color:rgba(255,255,255,.3)">'+b.v+'</div></div>';
+    });
+    h+='</div>';return h;
+  },
+  // 3: Donut ring
+  function(c){
+    var circ=2*Math.PI*32;var offset=0;
+    var h='<svg viewBox="0 0 100 100" style="width:90px;height:90px">';
+    [{v:DATA.Verbs,c:'#34d399'},{v:DATA.Nouns,c:'#60a5fa'},{v:DATA.Adj,c:'#f472b6'},{v:DATA.Adv,c:'#c084fc'},{v:DATA.Other,c:'#6b7280'}].forEach(function(b){
+      var dash=(b.v/total)*circ;
+      h+='<circle cx="50" cy="50" r="32" fill="none" stroke="'+b.c+'" stroke-width="10" stroke-dasharray="'+dash+' '+circ+'" stroke-dashoffset="'+-offset+'" transform="rotate(-90 50 50)"/>';
+      offset+=dash;
+    });
+    h+='<text x="50" y="46" text-anchor="middle" font-family="JetBrains Mono" font-size="16" font-weight="900" fill="#e8eaed">'+total+'</text><text x="50" y="56" text-anchor="middle" font-size="6" fill="rgba(255,255,255,.3)">words</text></svg>';
+    return h;
+  },
+  // 4: Bubble chart
+  function(c){
+    var h='<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:center">';
+    [{l:'V',v:DATA.Verbs,c:'#34d399'},{l:'N',v:DATA.Nouns,c:'#60a5fa'},{l:'J',v:DATA.Adj,c:'#f472b6'},{l:'D',v:DATA.Adv,c:'#c084fc'},{l:'O',v:DATA.Other,c:'#6b7280'}].forEach(function(b){
+      var s=16+b.v*4;
+      h+='<div style="width:'+s+'px;height:'+s+'px;border-radius:50%;background:'+b.c+';display:flex;align-items:center;justify-content:center;font-size:'+(6+b.v*0.8)+'px;font-weight:700;color:#000">'+b.v+'</div>';
+    });
+    h+='</div>';return h;
+  },
+  // 5: Horizontal lollipops
+  function(c){
+    var max=Math.max(DATA.Verbs,DATA.Nouns,DATA.Adj,DATA.Adv,DATA.Other);
+    var h='<div style="display:flex;flex-direction:column;gap:4px">';
+    [{l:'Verbs',v:DATA.Verbs,c:'#34d399'},{l:'Nouns',v:DATA.Nouns,c:'#60a5fa'},{l:'Adj',v:DATA.Adj,c:'#f472b6'},{l:'Adv',v:DATA.Adv,c:'#c084fc'},{l:'Other',v:DATA.Other,c:'#6b7280'}].forEach(function(b){
+      var w=Math.max(4,b.v/max*100);
+      h+='<div style="display:flex;align-items:center;gap:6px"><span style="font-size:8px;color:rgba(255,255,255,.3);width:28px">'+b.l+'</span><div style="flex:1;height:2px;background:rgba(255,255,255,.06);position:relative"><div style="position:absolute;left:0;top:-4px;width:12px;height:12px;border-radius:50%;background:'+b.c+'"></div></div><span style="font-size:9px;color:rgba(255,255,255,.4)">'+b.v+'</span></div>';
+    });
+    h+='</div>';return h;
+  },
+  // 6: Radar/spider
+  function(c){
+    var max=Math.max(DATA.Verbs,DATA.Nouns,DATA.Adj,DATA.Adv,DATA.Other);
+    var pts=[{v:DATA.Verbs,c:'#34d399'},{v:DATA.Nouns,c:'#60a5fa'},{v:DATA.Adj,c:'#f472b6'},{v:DATA.Adv,c:'#c084fc'},{v:DATA.Other,c:'#6b7280'}];
+    var cx=50,cy=50,r=35;
+    var h='<svg viewBox="0 0 100 100" style="width:100px;height:100px">';
+    for(var ring=1;ring<=4;ring++){
+      var rr=r*ring/4;h+='<circle cx="'+cx+'" cy="'+cy+'" r="'+rr+'" fill="none" stroke="rgba(255,255,255,.04)" stroke-width="0.5"/>';
+    }
+    var path='';pts.forEach(function(p,i){
+      var angle=(i/pts.length)*Math.PI*2-Math.PI/2;
+      var pr=p.v/max*r;
+      var x=cx+Math.cos(angle)*pr,y=cy+Math.sin(angle)*pr;
+      path+=(i===0?'M':'L')+x+' '+y;
+      // Axis
+      h+='<line x1="'+cx+'" y1="'+cy+'" x2="'+(cx+Math.cos(angle)*r)+'" y2="'+(cy+Math.sin(angle)*r)+'" stroke="rgba(255,255,255,.04)" stroke-width="0.5"/>';
+      // Label
+      h+='<text x="'+(cx+Math.cos(angle)*(r+10))+'" y="'+(cy+Math.sin(angle)*(r+10))+'" text-anchor="middle" font-size="6" fill="rgba(255,255,255,.25)">'+['V','N','J','D','O'][i]+'</text>';
+    });
+    h+='<path d="'+path+'Z" fill="rgba(167,139,250,.15)" stroke="#a78bfa" stroke-width="1"/>';
+    h+='</svg>';return h;
+  },
+  // 7: Heatmap grid
+  function(c){
+    var h='<div style="display:grid;grid-template-columns:repeat(5,1fr);gap:2px;width:100%">';
+    [{l:'V',v:DATA.Verbs,c:'#34d399'},{l:'N',v:DATA.Nouns,c:'#60a5fa'},{l:'J',v:DATA.Adj,c:'#f472b6'},{l:'D',v:DATA.Adv,c:'#c084fc'},{l:'O',v:DATA.Other,c:'#6b7280'}].forEach(function(b){
+      var opacity=b.v/total;
+      h+='<div style="background:'+b.c+';opacity:'+(0.2+opacity*0.7)+';border-radius:6px;padding:8px 4px;text-align:center;font-size:8px;font-weight:700">'+b.l+'<br>'+b.v+'</div>';
+    });
+    h+='</div>';return h;
+  },
+  // 8: Waterfall cascade
+  function(c){
+    var h='<div style="display:flex;flex-direction:column;gap:1px">';
+    [{l:'Verbs',v:DATA.Verbs,c:'#34d399'},{l:'Nouns',v:DATA.Nouns,c:'#60a5fa'},{l:'Adj',v:DATA.Adj,c:'#f472b6'},{l:'Adv',v:DATA.Adv,c:'#c084fc'},{l:'Other',v:DATA.Other,c:'#6b7280'}].forEach(function(b,i){
+      var w=Math.round(b.v/total*100);
+      h+='<div style="display:flex;align-items:center;gap:6px"><span style="font-size:8px;color:rgba(255,255,255,.25);width:28px">'+b.l+'</span><div style="height:14px;width:'+w+'%;background:'+b.c+';border-radius:3px;margin-left:'+(i*3)+'%"></div><span style="font-size:9px;color:rgba(255,255,255,.3)">'+b.v+'</span></div>';
+    });
+    h+='</div>';return h;
+  },
+  // 9: Segmented arc
+  function(c){
+    var h='<svg viewBox="0 0 100 100" style="width:100px;height:100px">';
+    var startAngle=-90;var items=[{v:DATA.Verbs,c:'#34d399'},{v:DATA.Nouns,c:'#60a5fa'},{v:DATA.Adj,c:'#f472b6'},{v:DATA.Adv,c:'#c084fc'},{v:DATA.Other,c:'#6b7280'}];
+    items.forEach(function(b){
+      var sweep=(b.v/total)*360;
+      var x1=50+35*Math.cos(startAngle*Math.PI/180),y1=50+35*Math.sin(startAngle*Math.PI/180);
+      var x2=50+35*Math.cos((startAngle+sweep)*Math.PI/180),y2=50+35*Math.sin((startAngle+sweep)*Math.PI/180);
+      var large=sweep>180?1:0;
+      h+='<path d="M50 50 L'+x1+' '+y1+' A35 35 0 '+large+' 1 '+x2+' '+y2+'Z" fill="'+b.c+'" opacity="0.7"/>';
+      startAngle+=sweep;
+    });
+    h+='<circle cx="50" cy="50" r="18" fill="#0f121e"/><text x="50" y="47" text-anchor="middle" font-family="JetBrains Mono" font-size="14" font-weight="900" fill="#e8eaed">'+total+'</text><text x="50" y="55" text-anchor="middle" font-size="5" fill="rgba(255,255,255,.3)">TOTAL</text></svg>';
+    return h;
+  },
+  // 10: Treemap
+  function(c){
+    var h='<div style="display:grid;grid-template-columns:1fr 1fr;gap:2px;width:100%;height:80px">';
+    var items=[{l:'Nouns',v:DATA.Nouns,c:'#60a5fa',w:2},{l:'Verbs',v:DATA.Verbs,c:'#34d399',w:1},{l:'Adj',v:DATA.Adj,c:'#f472b6',w:1},{l:'Other',v:DATA.Other+DATA.Adv,c:'#6b7280',w:1}];
+    items.forEach(function(b){
+      h+='<div style="background:'+b.c+';opacity:0.5;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:8px;font-weight:700;grid-column:span '+b.w+'">'+b.l+' '+b.v+'</div>';
+    });
+    h+='</div>';return h;
+  },
+  // 11: Concentric rings
+  function(c){
+    var h='<div style="display:flex;align-items:center;justify-content:center;position:relative;height:70px">';
+    [{v:DATA.Other,c:'#6b7280',s:50},{v:DATA.Adv,c:'#c084fc',s:40},{v:DATA.Adj,c:'#f472b6',s:30},{v:DATA.Verbs,c:'#34d399',s:22},{v:DATA.Nouns,c:'#60a5fa',s:14}].forEach(function(b){
+      h+='<div style="position:absolute;width:'+b.s+'px;height:'+b.s+'px;border-radius:50%;background:'+b.c+';opacity:0.55"></div>';
+    });
+    h+='</div>';return h;
+  },
+  // 12: Horizontal gauge bars
+  function(c){
+    var h='<div style="display:flex;flex-direction:column;gap:5px">';
+    [{l:'Verbs',v:DATA.Verbs,c:'#34d399',pct:Math.round(DATA.Verbs/total*100)},{l:'Nouns',v:DATA.Nouns,c:'#60a5fa',pct:Math.round(DATA.Nouns/total*100)},{l:'Adj',v:DATA.Adj,c:'#f472b6',pct:Math.round(DATA.Adj/total*100)},{l:'Adv',v:DATA.Adv,c:'#c084fc',pct:Math.round(DATA.Adv/total*100)},{l:'Other',v:DATA.Other,c:'#6b7280',pct:Math.round(DATA.Other/total*100)}].forEach(function(b){
+      h+='<div style="display:flex;align-items:center;gap:6px"><span style="font-size:8px;color:rgba(255,255,255,.2);width:28px">'+b.l+'</span><div style="flex:1;height:10px;background:rgba(255,255,255,.04);border-radius:5px"><div style="height:100%;border-radius:5px;background:'+b.c+';width:'+b.pct+'%"></div></div><span style="font-size:8px;color:rgba(255,255,255,.3)">'+b.pct+'%</span></div>';
+    });
+    h+='</div>';return h;
+  },
+  // 13: Dot matrix
+  function(c){
+    var h='<div style="display:flex;gap:10px">';
+    [{l:'V',v:DATA.Verbs,c:'#34d399'},{l:'N',v:DATA.Nouns,c:'#60a5fa'},{l:'J',v:DATA.Adj,c:'#f472b6'},{l:'D',v:DATA.Adv,c:'#c084fc'},{l:'O',v:DATA.Other,c:'#6b7280'}].forEach(function(b){
+      h+='<div style="text-align:center"><div style="display:grid;grid-template-columns:repeat(3,1fr);gap:2px;margin-bottom:2px">';
+      for(var i=0;i<Math.min(b.v,15);i++) h+='<div style="width:8px;height:8px;border-radius:2px;background:'+b.c+'"></div>';
+      h+='</div><div style="font-size:7px;color:rgba(255,255,255,.2)">'+b.l+' '+b.v+'</div></div>';
+    });
+    h+='</div>';return h;
+  },
+  // 14: Wave area
+  function(c){
+    var h='<svg viewBox="0 0 200 60" style="width:100%;height:70px">';
+    var cum=0;var paths=[];
+    [{v:DATA.Verbs,c:'#34d399'},{v:DATA.Nouns,c:'#60a5fa'},{v:DATA.Adj,c:'#f472b6'},{v:DATA.Adv,c:'#c084fc'},{v:DATA.Other,c:'#6b7280'}].forEach(function(b){
+      var pct=b.v/total;var y0=(1-cum)*50;cum+=pct;var y1=(1-cum)*50;
+      var d='M0 '+y0+' Q50 '+(y0+y1)/2+' 100 '+y1+' T200 '+y1+' L200 '+y0+' L0 '+y0+'Z';
+      h+='<path d="'+d+'" fill="'+b.c+'" opacity="0.4"/>';
+      h+='<text x="102" y="'+(y1+10)+'" font-size="5" fill="rgba(255,255,255,.3)">'+['V','N','J','D','O'][paths.length]+'</text>';
+      paths.push(b);
+    });
+    h+='</svg>';return h;
+  },
+  // 15: 3D isometric blocks
+  function(c){
+    var h='<div style="display:flex;align-items:flex-end;gap:6px;height:65px;perspective:200px">';
+    [{l:'V',v:DATA.Verbs,c:'#34d399'},{l:'N',v:DATA.Nouns,c:'#60a5fa'},{l:'J',v:DATA.Adj,c:'#f472b6'},{l:'D',v:DATA.Adv,c:'#c084fc'},{l:'O',v:DATA.Other,c:'#6b7280'}].forEach(function(b){
+      var hgt=b.v*3.5;
+      h+='<div style="width:28px;text-align:center"><div style="width:28px;height:'+hgt+'px;background:linear-gradient(135deg,'+b.c+','+b.c+'88);border-radius:3px 3px 0 0;box-shadow:3px 3px 0 '+b.c+'44"></div><div style="font-size:7px;color:rgba(255,255,255,.2);margin-top:2px">'+b.l+'</div></div>';
+    });
+    h+='</div>';return h;
+  }
+];
+
+// ══════════════════════════════════════
+// 15 POS TAGS VARIATIONS
+// ══════════════════════════════════════
+var tagVars=[
+  // 1: Color-coded chips
+  function(c){
+    var h='<div style="display:flex;flex-wrap:wrap;gap:3px">';
+    tags.slice(0,12).forEach(function(t){
+      var color=posColors[t.pos];h+='<span class="chip" style="background:'+color+'18;color:'+color+';border:1px solid '+color+'22">'+t.w+' <small style="opacity:.6">'+t.pos+'</small></span>';
+    });
+    h+='</div>';return h;
+  },
+  // 2: Stacked by POS
+  function(c){
+    var h='<div style="display:flex;flex-direction:column;gap:6px">';
+    Object.keys(posNames).forEach(function(pos){
+      var words=tags.filter(function(t){return t.pos===pos});
+      if(words.length===0) return;
+      h+='<div><div style="font-size:8px;color:'+posColors[pos]+';margin-bottom:2px;font-weight:600">'+posNames[pos]+' ('+words.length+')</div><div style="display:flex;flex-wrap:wrap;gap:2px">';
+      words.forEach(function(t){h+='<span style="padding:2px 8px;border-radius:4px;background:'+posColors[pos]+'15;color:'+posColors[pos]+';font-size:9px">'+t.w+'</span>'});
+      h+='</div></div>';
+    });
+    h+='</div>';return h;
+  },
+  // 3: Flow layout
+  function(c){
+    var h='<div style="display:flex;flex-wrap:wrap;gap:4px;align-items:center">';
+    tags.slice(0,14).forEach(function(t,i){
+      var color=posColors[t.pos];
+      h+='<span style="font-size:10px;color:rgba(255,255,255,.45)">'+t.w+'</span>';
+      h+='<sup style="font-size:6px;color:'+color+';font-weight:700;background:'+color+'15;padding:1px 3px;border-radius:2px">'+t.pos+'</sup>';
+    });
+    h+='</div>';return h;
+  },
+  // 4: Table view
+  function(c){
+    var h='<table style="width:100%;font-size:9px;border-collapse:collapse">';
+    h+='<tr style="color:rgba(255,255,255,.2);font-size:7px;text-transform:uppercase"><th style="text-align:left;padding:3px">Word</th><th>POS</th><th style="text-align:right">Color</th></tr>';
+    tags.slice(0,10).forEach(function(t){
+      h+='<tr style="border-top:1px solid rgba(255,255,255,.03)"><td style="padding:3px;font-weight:500">'+t.w+'</td><td style="color:'+posColors[t.pos]+';font-weight:600;text-align:center">'+t.pos+'</td><td style="text-align:right"><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:'+posColors[t.pos]+'"></span></td></tr>';
+    });
+    h+='</table>';return h;
+  },
+  // 5: Bubble tags
+  function(c){
+    var h='<div style="display:flex;flex-wrap:wrap;gap:4px;align-items:center">';
+    var sizes={NOUN:18,VERB:16,ADJ:14,ADV:12,OTHER:11};
+    tags.slice(0,12).forEach(function(t){
+      var s=sizes[t.pos]||12;var color=posColors[t.pos];
+      h+='<span style="font-size:'+s+'px;font-weight:600;color:'+color+'">'+t.w+'</span>';
+    });
+    h+='</div>';return h;
+  },
+  // 6: Timeline
+  function(c){
+    var h='<div style="position:relative;padding-left:12px">';
+    h+='<div style="position:absolute;left:3px;top:4px;bottom:4px;width:1px;background:rgba(255,255,255,.06)"></div>';
+    tags.slice(0,8).forEach(function(t,i){
+      var color=posColors[t.pos];
+      h+='<div style="position:relative;padding:3px 0 3px 14px"><div style="position:absolute;left:-8px;top:8px;width:8px;height:8px;border-radius:50%;background:'+color+'"></div><span style="font-size:10px;color:rgba(255,255,255,.5)">'+t.w+'</span> <span style="font-size:7px;color:'+color+'">'+t.pos+'</span></div>';
+    });
+    h+='</div>';return h;
+  },
+  // 7: Pill tags with count
+  function(c){
+    var counts={};tags.forEach(function(t){counts[t.pos]=(counts[t.pos]||0)+1});
+    var h='<div style="display:flex;gap:6px;flex-wrap:wrap">';
+    Object.keys(counts).forEach(function(pos){
+      h+='<span style="padding:4px 14px;border-radius:100px;background:'+posColors[pos]+'15;color:'+posColors[pos]+';font-size:10px;font-weight:600;border:1px solid '+posColors[pos]+'25">'+posNames[pos]+' <span style="opacity:.6">'+counts[pos]+'</span></span>';
+    });
+    h+='</div>';return h;
+  },
+  // 8: Word cloud
+  function(c){
+    var h='<div style="display:flex;flex-wrap:wrap;gap:4px 8px;align-items:baseline;justify-content:center;padding:4px">';
+    var scaled=tags.slice(0,12).map(function(t,i){return{w:t.w,pos:t.pos,s:10+(12-i)*1.2}});
+    scaled.forEach(function(t){
+      h+='<span style="font-size:'+t.s+'px;font-weight:'+(t.s>16?700:400)+';color:'+posColors[t.pos]+';opacity:'+(0.5+t.s/30)+'">'+t.w+'</span>';
+    });
+    h+='</div>';return h;
+  },
+  // 9: Grid cards
+  function(c){
+    var h='<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:4px">';
+    tags.slice(0,12).forEach(function(t){
+      var color=posColors[t.pos];
+      h+='<div style="background:'+color+'10;border:1px solid '+color+'18;border-radius:6px;padding:6px 4px;text-align:center"><div style="font-size:10px;font-weight:600;color:rgba(255,255,255,.6)">'+t.w+'</div><div style="font-size:7px;color:'+color+';font-weight:700;margin-top:1px">'+t.pos+'</div></div>';
+    });
+    h+='</div>';return h;
+  },
+  // 10: Circular tag cloud
+  function(c){
+    var h='<div style="position:relative;height:90px;width:100%">';
+    var items=tags.slice(0,10);
+    items.forEach(function(t,i){
+      var angle=(i/items.length)*Math.PI*2-Math.PI/2;
+      var r=28;var cx=50,cy=40;var x=cx+Math.cos(angle)*r*3,y=cy+Math.sin(angle)*r*2;
+      h+='<span style="position:absolute;left:'+x+'%;top:'+y+'%;transform:translate(-50%,-50%);font-size:9px;color:'+posColors[t.pos]+';font-weight:500">'+t.w+'</span>';
+    });
+    h+='</div>';return h;
+  },
+  // 11: Bar chart by POS
+  function(c){
+    var counts={};tags.forEach(function(t){counts[t.pos]=(counts[t.pos]||0)+1});
+    var max=Math.max.apply(null,Object.values(counts));
+    var h='<div style="display:flex;align-items:flex-end;gap:8px;height:60px">';
+    Object.keys(counts).forEach(function(pos){
+      var hgt=Math.max(6,counts[pos]/max*50);
+      h+='<div style="text-align:center"><div style="width:20px;height:'+hgt+'px;background:'+posColors[pos]+';border-radius:3px 3px 0 0"></div><div style="font-size:6px;color:rgba(255,255,255,.2);margin-top:2px">'+pos+'</div><div style="font-size:8px;color:rgba(255,255,255,.3)">'+counts[pos]+'</div></div>';
+    });
+    h+='</div>';return h;
+  },
+  // 12: Sankey-like flow
+  function(c){
+    var h='<div style="display:flex;align-items:center;gap:2px;overflow-x:auto;padding:4px 0">';
+    tags.slice(0,15).forEach(function(t,i){
+      var color=posColors[t.pos];
+      h+='<div style="display:flex;align-items:center;gap:2px;flex-shrink:0">';
+      h+='<div style="width:6px;height:6px;border-radius:50%;background:'+color+'"></div>';
+      h+='<span style="font-size:8px;color:rgba(255,255,255,.4);white-space:nowrap">'+t.w+'</span>';
+      if(i<14) h+='<span style="color:rgba(255,255,255,.1);margin:0 1px">→</span>';
+      h+='</div>';
+    });
+    h+='</div>';return h;
+  },
+  // 13: Icon + word
+  function(c){
+    var icons={VERB:'▶',NOUN:'◆',ADJ:'●',ADV:'⬟',PREP:'→',CONJ:'＋',DET:'◇'};
+    var h='<div style="display:flex;flex-wrap:wrap;gap:5px">';
+    tags.slice(0,10).forEach(function(t){
+      var color=posColors[t.pos];var icon=icons[t.pos]||'·';
+      h+='<div style="display:flex;align-items:center;gap:3px;padding:3px 8px;border-radius:6px;background:'+color+'0A;border:1px solid '+color+'18"><span style="font-size:8px;color:'+color+'">'+icon+'</span><span style="font-size:10px;color:rgba(255,255,255,.55)">'+t.w+'</span></div>';
+    });
+    h+='</div>';return h;
+  },
+  // 14: Gradient underline
+  function(c){
+    var h='<div style="line-height:2.2;font-size:11px">';
+    tags.slice(0,15).forEach(function(t,i){
+      var color=posColors[t.pos];
+      h+='<span style="border-bottom:2px solid '+color+';padding-bottom:1px;margin:0 2px;color:rgba(255,255,255,.55)">'+t.w+'</span>';
+    });
+    h+='</div>';return h;
+  },
+  // 15: Morphing grid (density)
+  function(c){
+    var cols=5;var h='<div style="display:grid;grid-template-columns:repeat('+cols+',1fr);gap:2px">';
+    var ordered=[];Object.keys(posColors).forEach(function(pos){
+      tags.filter(function(t){return t.pos===pos}).forEach(function(t){ordered.push(t)});
+    });
+    ordered.slice(0,15).forEach(function(t){
+      var color=posColors[t.pos];
+      h+='<div style="aspect-ratio:1;background:'+color+';opacity:'+(0.3+Math.random()*0.5)+';border-radius:3px;display:flex;align-items:center;justify-content:center;font-size:7px;font-weight:700;color:#000">'+t.w.substring(0,3)+'</div>';
+    });
+    h+='</div>';return h;
+  }
+];
+
+// Render
+var distGrid=document.getElementById('distGrid');
+distVars.forEach(function(fn,i){
+  var card=document.createElement('div');card.className='card';
+  card.innerHTML='<div class="card-num">#'+(i+1)+'</div><div class="card-title">05 · POS Distribution — Variation '+(i+1)+'</div><div class="viz-area">'+fn(i)+'</div>';
+  distGrid.appendChild(card);
+});
+
+var tagGrid=document.getElementById('tagGrid');
+tagVars.forEach(function(fn,i){
+  var card=document.createElement('div');card.className='card';
+  card.innerHTML='<div class="card-num">#'+(i+1)+'</div><div class="card-title">01 · POS Tags — Variation '+(i+1)+'</div><div class="viz-area">'+fn(i)+'</div>';
+  tagGrid.appendChild(card);
+});
+</script>
+</body>
+</html>
