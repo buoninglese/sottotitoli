@@ -606,6 +606,7 @@ body.fullscreen-active #fullscreenBtn:hover { background: var(--accent); color: 
         <button class="extras-toggle-btn" data-panel="metrics" onclick="toggleExtrasPanel('metrics',this)">📊 Metrics</button>
         <button class="extras-toggle-btn" data-panel="gloss" onclick="toggleExtrasPanel('gloss',this)">🌐 Gloss</button>
         <button class="extras-toggle-btn" data-panel="deepdive" onclick="toggleExtrasPanel('deepdive',this)">🔬 Deep Dive</button>
+        <button class="extras-toggle-btn" data-panel="grammarParse" onclick="toggleExtrasPanel('grammarParse',this)">🌳 Parse</button>
         <button class="extras-toggle-btn" data-panel="info" onclick="toggleExtrasPanel('info',this)">📖 Info</button>
         <button class="extras-toggle-btn" data-panel="synonyms21" onclick="toggleExtrasPanel('synonyms21',this)">📖 Synonyms</button>
         <button class="extras-toggle-btn" data-panel="multispeaker" onclick="toggleExtrasPanel('multispeaker',this)">👥 Multispeaker</button>
@@ -3288,7 +3289,8 @@ function downloadGrammarPDF() {
         var posText={VERB:'#34d399',NOUN:'#60a5fa',ADJ:'#f472b6'};
         var posBorder={VERB:'rgba(52,211,153,.2)',NOUN:'rgba(96,165,250,.2)',ADJ:'rgba(244,114,182,.2)'};
 
-        h+='<div class="syn-card-21" data-pos="'+d.pos+'" style="background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.06);border-radius:12px;padding:14px;transition:all .25s">';
+        h+='<div class="syn-card-21" data-pos="'+d.pos+'" style="background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.06);border-radius:12px;padding:14px;transition:all .25s;position:relative">';
+        h+='<button onclick="event.stopPropagation();addToWordBank(\''+item.word+'\')" title=\"Add to Word Bank\" style=\"position:absolute;top:8px;right:8px;width:22px;height:22px;border-radius:50%;border:1px solid rgba(255,255,255,.1);background:rgba(255,255,255,.04);color:rgba(255,255,255,.3);cursor:pointer;font-size:14px;line-height:1;display:flex;align-items:center;justify-content:center;transition:all .2s;z-index:2\" onmouseenter=\"this.style.background=\'rgba(52,211,153,.15)\';this.style.borderColor=\'rgba(52,211,153,.3)\';this.style.color=\'#34d399\'\" onmouseleave=\"this.style.background=\'rgba(255,255,255,.04)\';this.style.borderColor=\'rgba(255,255,255,.1)\';this.style.color=\'rgba(255,255,255,.3)\'\">+</button>';
         h+='<div style="display:flex;align-items:baseline;gap:8px;margin-bottom:10px">';
         h+='<span style="font-size:18px;font-weight:800;color:#e8eaed">'+item.word+'</span>';
         h+='<span style="font-size:9px;font-weight:600;padding:2px 8px;border-radius:100px;background:'+posColors[d.pos]+';color:'+posText[d.pos]+';border:1px solid '+posBorder[d.pos]+'">'+d.pos+'</span>';
@@ -3337,72 +3339,202 @@ function downloadGrammarPDF() {
     },
 
     // ═══ Multispeaker Mode — Speaker Diarization View ═══
-    multispeaker: function(cb){
-      var h='<div class="extras-grid">';
+    grammarParse: function(cb){
+      var h='';
       var text=(document.getElementById('captionTranscript')?.textContent||'');
       var lines=text.split('\n').filter(function(l){return l.trim().length>0});
       var noData=lines.length===0;
-
-      h+='<div class="extras-card" style="grid-column:1/-1"><div class="ec-title">👥 Multispeaker Mode <span class="ec-badge" style="background:rgba(96,165,250,.15);color:#60a5fa">DIARIZE</span></div>';
-
+      
+      h+='<div class="ec-title" style="margin-bottom:10px">\uD83C\uDF33 06 \u00b7 Live Grammar Parse <span class="ec-badge" style="background:rgba(52,211,153,.15);color:#34d399">LIVE</span></div>';
+      
       if(noData){
-        h+='<div style="color:rgba(255,255,255,.2);font-style:italic;padding:20px;text-align:center">Start a session with multiple speakers.<br>Speaker diarization identifies who said what.</div>';
+        h+='<div style="color:rgba(255,255,255,.2);font-style:italic;padding:16px;text-align:center">Start speaking — sentences will appear here for parsing</div>';
       } else {
-        // Simulate speaker detection (in production, this uses diarization API)
-        var speakerColors=['#5b7fc1','#c1665b','#5b9c6e','#c084fc','#fbbf24','#f472b6'];
-        var speakerNames=['SPK A','SPK B','SPK C','SPK D','SPK E','SPK F'];
+        // Show last 4 sentences as clickable buttons
+        var lastLines=lines.slice(-4);
+        h+='<div id="gpBtns" style="margin-bottom:10px">';
+        lastLines.forEach(function(line,i){
+          var short=line.length>60?line.substring(0,57)+'\u2026':line;
+          var gi=lines.length-4+i;
+          h+='<button class="gp-sent-btn" data-idx="'+gi+'" style="display:block;width:100%;text-align:left;padding:8px 12px;margin-bottom:4px;border-radius:8px;border:1px solid rgba(255,255,255,.06);background:rgba(255,255,255,.015);color:rgba(255,255,255,.5);font-size:10px;cursor:pointer;font-family:inherit;transition:all .2s" onmouseenter="this.style.background=\'rgba(167,139,250,.08)\';this.style.borderColor=\'rgba(167,139,250,.2)\'" onmouseleave="if(!this.classList.contains(\'active\')){this.style.background=\'rgba(255,255,255,.015)\';this.style.borderColor=\'rgba(255,255,255,.06)\'}"><span style="font-family:JetBrains Mono,monospace;font-size:8px;color:rgba(255,255,255,.18);margin-right:6px">#'+(gi+1)+'</span>'+short+'</button>';
+        });
+        h+='</div>';
+        
+        // Parse tree output
+        h+='<div id="gpTree" style="font-family:JetBrains Mono,monospace;font-size:10px;line-height:1.8;padding:14px;background:rgba(0,0,0,.2);border-radius:10px;border:1px solid rgba(255,255,255,.04);color:rgba(255,255,255,.5);min-height:60px;white-space:pre">Click a sentence above to parse</div>';
+        
+        // Stats
+        h+='<div id="gpStats" style="margin-top:8px;font-size:9px;color:rgba(255,255,255,.2)"></div>';
+        
+        // Legend
+        h+='<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;font-size:8px;color:rgba(255,255,255,.25)">';
+        [{l:'S',c:'#e8eaed'},{l:'NP',c:'#60a5fa'},{l:'VP',c:'#34d399'},{l:'PP',c:'#fbbf24'},{l:'ADJ',c:'#f472b6'},{l:'ADV',c:'#c084fc'},{l:'CC',c:'#fb923c'}].forEach(function(x){
+          h+='<span style="display:flex;align-items:center;gap:3px"><span style="width:6px;height:6px;border-radius:1px;background:'+x.c+'"></span>'+x.l+'</span>';
+        });
+        h+='</div>';
+      }
+      
+      cb(h, function(){
+        if(noData) return;
+        // Wire up click handlers
+        document.querySelectorAll('.gp-sent-btn').forEach(function(btn){
+          btn.addEventListener('click',function(){
+            document.querySelectorAll('.gp-sent-btn').forEach(function(b){b.classList.remove('active');b.style.background='rgba(255,255,255,.015)';b.style.borderColor='rgba(255,255,255,.06)'});
+            this.classList.add('active');this.style.background='rgba(167,139,250,.1)';this.style.borderColor='rgba(167,139,250,.3)';
+            var idx=parseInt(this.dataset.idx);
+            parseAndShowLine(lines[idx]);
+          });
+        });
+        // Auto-parse last line
+        if(lastLines.length>0){
+          var lastBtn=document.querySelector('.gp-sent-btn:last-child');
+          if(lastBtn) lastBtn.click();
+        }
+      });
+      
+      // Simple POS tagger + parse (same as mockup 06)
+      function tagWord(w){
+        var POS_DICT={the:'DET',a:'DET',an:'DET',is:'VERB',are:'VERB',was:'VERB',were:'VERB',be:'VERB',been:'VERB',have:'VERB',has:'VERB',had:'VERB',do:'VERB',does:'VERB',did:'VERB',will:'AUX',would:'AUX',can:'AUX',could:'AUX',of:'PREP',in:'PREP',for:'PREP',on:'PREP',with:'PREP',at:'PREP',by:'PREP',from:'PREP',into:'PREP',about:'PREP',over:'PREP',and:'CONJ',or:'CONJ',but:'CONJ',so:'CONJ',if:'CONJ',because:'CONJ',we:'PRON',you:'PRON',he:'PRON',she:'PRON',it:'PRON',they:'PRON',i:'PRON',this:'DET',these:'DET',those:'DET',not:'PART',to:'PART',discussing:'VERB',discuss:'VERB',future:'NOUN',translation:'NOUN',systems:'NOUN',system:'NOUN',language:'NOUN',languages:'NOUN',barriers:'NOUN',barrier:'NOUN',deployment:'NOUN',scale:'NOUN',challenge:'NOUN',remains:'VERB',remain:'VERB',biggest:'ADJ',year:'NOUN',years:'NOUN',neural:'ADJ',models:'NOUN',getting:'VERB',remarkably:'ADV',good:'ADJ',handling:'VERB',edge:'NOUN',cases:'NOUN',bridge:'VERB',across:'PREP',different:'ADJ',cultures:'NOUN',real:'ADJ',time:'NOUN',quick:'ADJ',fox:'NOUN',jumps:'VERB',quickly:'ADV',lazy:'ADJ',dog:'NOUN',studying:'VERB',three:'ADJ',now:'ADV'};
+        w=w.toLowerCase().replace(/[^a-z0-9-]/g,'');
+        if(POS_DICT[w]) return POS_DICT[w];
+        if(w.endsWith('ing')) return 'VERB';if(w.endsWith('ed')&&w.length>4) return 'VERB';
+        if(w.endsWith('tion')||w.endsWith('ment')||w.endsWith('ness')) return 'NOUN';
+        if(w.endsWith('ly')) return 'ADV';if(w.endsWith('ous')||w.endsWith('ful')) return 'ADJ';
+        if(w.endsWith('s')&&w.length>4) return 'NOUN';
+        return 'NOUN';
+      }
+      
+      function parseAndShowLine(text){
+        var clean=text.trim().replace(/[,.!?;:]/g,'').replace(/^\d{2}:\d{2}:\d{2}\s*/,'');
+        var words=clean.split(/\s+/);if(words.length===0) return;
+        var tagged=[];for(var i=0;i<words.length;i++) tagged.push({w:words[i],t:tagWord(words[i])});
+        var n=tagged.length;
+        var tree=['<span style="color:#e8eaed;font-weight:700">S</span>'];
+        
+        // Find verb
+        var vi=-1;for(var i=0;i<n;i++){if(tagged[i].t==='VERB'||tagged[i].t==='AUX'){vi=i;break}}
+        if(vi<0) vi=Math.floor(n/2);
+        
+        // NP before verb
+        var ss=0;while(ss<vi&&tagged[ss].t==='ADV')ss++;
+        if(ss<vi){
+          var sw=tagged.slice(ss,vi).map(function(x){return x.w}).join(' ');
+          tree.push('\u251C\u2500 <span style="color:#60a5fa;font-weight:600">NP</span>: <span style="color:#e8eaed">'+sw+'</span>');
+        }
+        
+        // VP
+        tree.push('\u251C\u2500 <span style="color:#34d399;font-weight:600">VP</span>: <span style="color:#34d399">'+tagged[vi].w+'</span>');
+        
+        // NP after verb
+        var os=vi+1;while(os<n&&tagged[os].t==='ADV')os++;
+        var oe=n;for(var k=os;k<n;k++){if(tagged[k].t==='PREP'){oe=k;break}}
+        if(oe>os){
+          var ow=tagged.slice(os,oe).map(function(x){return x.w}).join(' ');
+          tree.push('\u2502  \u2514\u2500 <span style="color:#60a5fa">NP</span>: <span style="color:rgba(255,255,255,.5)">'+ow+'</span>');
+        }
+        
+        // PP
+        var ps=n;for(var k=vi+1;k<n;k++){if(tagged[k].t==='PREP'){ps=k;break}}
+        if(ps<n){
+          var pw=tagged.slice(ps,n).map(function(x){return x.w}).join(' ');
+          tree.push('\u2514\u2500 <span style="color:#fbbf24;font-weight:600">PP</span>: <span style="color:rgba(255,255,255,.5)">'+pw+'</span>');
+        }
+        
+        document.getElementById('gpTree').innerHTML=tree.join('\n');
+        
+        // Stats
+        var uniqueTags={};tagged.forEach(function(t){uniqueTags[t.t]=true});
+        var cefr=n>18?'B2-C1':n>12?'B1-B2':n>7?'A2-B1':'A1-A2';
+        document.getElementById('gpStats').innerHTML='<span style="padding:3px 8px;border-radius:100px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.05)">\uD83D\DCC4 <strong>'+n+' words</strong> \u00b7 Depth 3 \u00b7 '+cefr+'</span>';
+      }
+    },
+
+multispeaker: function(cb){
+      var h='';
+      var text=(document.getElementById('captionTranscript')?.textContent||'');
+      var lines=text.split('\n').filter(function(l){return l.trim().length>0});
+      var noData=lines.length===0;
+      var speakerColors=['#5b7fc1','#c1665b','#5b9c6e','#c084fc','#fbbf24','#f472b6'];
+      var speakerNames=['SPK A','SPK B','SPK C','SPK D','SPK E','SPK F'];
+      var spkCounts={};for(var s=0;s<3;s++) spkCounts[s]=0;
+
+      // Main layout: 2/3 transcript + 1/3 stats
+      h+='<div style="display:flex;gap:10px">';
+      
+      // LEFT: Transcript (2/3)
+      h+='<div style="flex:2;min-width:0">';
+      h+='<div class="ec-title" style="margin-bottom:8px">\uD83D\uDC65 Multispeaker Mode <span class="ec-badge" style="background:rgba(96,165,250,.15);color:#60a5fa">DIARIZE</span></div>';
+      
+      if(noData){
+        h+='<div style="color:rgba(255,255,255,.2);font-style:italic;padding:16px">Start a session with multiple speakers.<br>Speaker diarization identifies who said what.</div>';
+      } else {
+        h+='<div style="display:flex;flex-direction:column;gap:6px;max-height:360px;overflow-y:auto;padding-right:4px">';
         var speakerIdx=0;
-        var prevSpeaker=-1;
-
-        h+='<div style="display:flex;flex-direction:column;gap:8px;max-height:400px;overflow-y:auto">';
-
-        lines.slice(-10).forEach(function(line,i){
-          // Simple speaker alternation heuristic (real: use diarization)
+        lines.slice(-12).forEach(function(line,i){
           var spk=speakerIdx%3;
           if(line.match(/^(yes|no|okay|right|exactly|sure|well|so|and|but|because)/i)) spk=(spk+1)%3;
-
+          spkCounts[spk]=(spkCounts[spk]||0)+1;
           var color=speakerColors[spk];
-          h+='<div style="display:flex;gap:10px;align-items:flex-start;padding:6px 8px;border-radius:8px;transition:all .2s;background:'+(i===lines.length-1?color+'10':'transparent')+'">';
-          h+='<div style="width:36px;flex-shrink:0;text-align:center;padding-top:2px"><span style="font-family:JetBrains Mono,monospace;font-size:8px;font-weight:600;color:'+color+';background:'+color+'18;padding:2px 6px;border-radius:4px">'+speakerNames[spk]+'</span></div>';
-          h+='<div style="flex:1"><div style="font-size:11px;color:rgba(255,255,255,.75);line-height:1.5;border-left:2px solid '+color+';padding-left:10px">'+line+'</div></div>';
+          var isLatest=i===Math.min(lines.length-1,11);
+          
+          h+='<div class="speaker-row" style="display:flex;gap:10px;align-items:flex-start;padding:8px 10px;border-radius:8px;background:'+(isLatest?color+'0D':'transparent')+';transition:all .3s">';
+          h+='<div style="width:40px;flex-shrink:0;text-align:center;padding-top:1px">';
+          h+='<span style="font-family:JetBrains Mono,monospace;font-size:8px;font-weight:600;color:'+color+';background:'+color+'15;padding:2px 6px;border-radius:4px;letter-spacing:.5px">'+speakerNames[spk]+'</span>';
           h+='</div>';
-
+          h+='<div style="flex:1;min-width:0">';
+          h+='<div style="font-size:12px;color:rgba(255,255,255,'+(isLatest?'.85':'.55')+');line-height:1.55;border-left:2px solid '+color+';padding-left:10px;transition:color .3s">'+line+'</div>';
+          h+='</div>';
+          h+='</div>';
           speakerIdx++;
         });
-
-        h+='</div>';
-
-        // Speaker legend
-        h+='<div style="display:flex;gap:12px;margin-top:12px;flex-wrap:wrap">';
-        for(var s=0;s<3;s++){
-          h+='<span style="display:flex;align-items:center;gap:4px;font-size:9px;color:rgba(255,255,255,.35)"><span style="width:8px;height:8px;border-radius:2px;background:'+speakerColors[s]+'"></span>'+speakerNames[s]+'</span>';
-        }
         h+='</div>';
       }
-
       h+='</div>';
-
-      // Speaker stats card
-      h+='<div class="extras-card"><div class="ec-title">Speaker Stats</div>';
+      
+      // RIGHT: Speaker Stats (1/3)
+      h+='<div style="flex:1;min-width:140px;background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.05);border-radius:12px;padding:14px">';
+      h+='<div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:rgba(255,255,255,.3);margin-bottom:10px">Speaker Stats</div>';
+      
       if(noData){
-        h+='<div style="color:rgba(255,255,255,.2);font-style:italic">No data yet</div>';
+        h+='<div style="color:rgba(255,255,255,.15);font-size:9px;font-style:italic">No data yet</div>';
       } else {
-        var spkCounts=[0,0,0];
-        lines.forEach(function(l,i){spkCounts[i%3]++});
         var totalLines=lines.length;
         for(var s=0;s<3;s++){
-          var pct=totalLines>0?Math.round(spkCounts[s]/totalLines*100):0;
-          h+='<div style="display:flex;align-items:center;gap:8px;margin:6px 0;font-size:10px"><span style="width:48px;color:'+speakerColors[s]+';font-weight:600">'+speakerNames[s]+'</span><span style="flex:1;height:4px;background:rgba(255,255,255,.06);border-radius:2px"><span style="display:block;height:100%;border-radius:2px;background:'+speakerColors[s]+';width:'+pct+'%"></span></span><span style="color:rgba(255,255,255,.25);min-width:28px;text-align:right">'+pct+'%</span></div>';
+          var count=spkCounts[s]||0;
+          var pct=totalLines>0?Math.round(count/totalLines*100):0;
+          var color=speakerColors[s];
+          h+='<div style="margin-bottom:10px">';
+          h+='<div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:3px">';
+          h+='<span style="font-size:10px;font-weight:600;color:'+color+'">'+speakerNames[s]+'</span>';
+          h+='<span style="font-family:JetBrains Mono,monospace;font-size:16px;font-weight:900;color:'+color+'">'+count+'</span>';
+          h+='</div>';
+          h+='<div style="height:3px;background:rgba(255,255,255,.04);border-radius:2px;overflow:hidden">';
+          h+='<div style="height:100%;border-radius:2px;background:'+color+';width:'+pct+'%;transition:width .5s ease"></div>';
+          h+='</div>';
+          h+='<div style="font-size:7px;color:rgba(255,255,255,.15);margin-top:1px">'+pct+'% of transcript</div>';
+          h+='</div>';
         }
+        // Total
+        h+='<div style="border-top:1px solid rgba(255,255,255,.05);padding-top:6px;margin-top:4px;display:flex;justify-content:space-between;font-size:8px;color:rgba(255,255,255,.25)"><span>Total lines</span><span style="font-family:JetBrains Mono,monospace">'+totalLines+'</span></div>';
       }
       h+='</div>';
-
+      
       h+='</div>';
       cb(h);
-    }
-  };
+    }  };
 
-  // ── Render helper ──
+  // ── Word Bank add from Synonyms ──
+window.addToWordBank = function(word){
+  var bank = JSON.parse(localStorage.getItem('sottotitoli-wordbank')||'[]');
+  if(bank.indexOf(word)>=0) return;
+  bank.push(word);
+  localStorage.setItem('sottotitoli-wordbank',JSON.stringify(bank));
+  // Update wordbank count in UI
+  var wbBtn = document.querySelector('.wordbank-toggle-btn, [onclick*="Word Bank"]');
+  if(wbBtn){var c=bank.length;wbBtn.innerHTML=wbBtn.innerHTML.replace(/\d+/g,String(c))}
+};
+
+// ── Render helper ──
   function renderPanel(name,btn){
     var panel=document.getElementById('extrasPanel');
     panel.innerHTML='<div class="extras-loading">Caricamento...</div>';
