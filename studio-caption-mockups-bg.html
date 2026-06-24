@@ -226,7 +226,7 @@ var ringFuncs=[
 ];
 
 var barFuncs=[
-  // 0: Mirror
+  // Mirror
   function(ctx,v,isDark){
     var n=64,gap=2,w=(W-gap*(n+1))/n,hue=themeHue(isDark);
     var sv=Math.pow(v,0.55);
@@ -242,7 +242,7 @@ var barFuncs=[
       ctx.fillStyle=g;ctx.fillRect(x,H/2-hgt,w,hgt*2);
     }
   },
-  // 1: Radial mandala
+  // Radial mandala
   function(ctx,v,isDark){
     var cx=W/2,cy=H/2,hue=themeHue(isDark);
     var maxR=Math.min(W,H)*0.49;
@@ -283,87 +283,82 @@ var barFuncs=[
     var pr=orbR*1.5+sv*maxR*0.25*Math.sin(t/2500);ctx.beginPath();ctx.arc(cx,cy,pr,0,Math.PI*2);
     ctx.strokeStyle=c(hue,themeSat(isDark),themeLum(isDark,true),themeAlpha(isDark,0.15+sv*0.1));ctx.lineWidth=0.8+sv;ctx.stroke();
   },
-  // 2: Waveform chubby blocks
+  // Brush — 360-degree radial fill from center
   function(ctx,v,isDark){
-    var hue=themeHue(isDark);var sv=Math.pow(v,0.5);
-    var bw=Math.max(6,W/80),n=Math.floor(W/bw);
-    for(var i=0;i<n;i++){
-      var fi=freqData&&micOn?freqData[Math.floor(i/n*freqData.length)%freqData.length]/255:0.15+Math.sin(i*0.05+t/1100)*0.35;
-      var hgt=Math.max(4,fi*H*0.45*sv*3);var x=i*bw,y=H/2-hgt/2;
-      var g=ctx.createLinearGradient(x,y,x,y+hgt);var bh=(hue+i*8)%360;
-      g.addColorStop(0,c(bh,themeSat(isDark),themeLum(isDark,true),themeAlpha(isDark,0.7+sv*0.2)));
-      g.addColorStop(0.5,c((bh+30)%360,themeSat(isDark),themeLum(isDark,true),themeAlpha(isDark,0.5)));
-      g.addColorStop(1,c((bh+60)%360,themeSat(isDark),themeLum(isDark,false),themeAlpha(isDark,0.3)));
-      ctx.fillStyle=g;ctx.fillRect(x+1,y,bw-2,hgt);
-      ctx.fillStyle=c(bh,80,themeLum(isDark,true),themeAlpha(isDark,0.5));ctx.fillRect(x+1,y,bw-2,Math.min(3,hgt*0.12));
-    }
-  },
-  // 3: Dot Constellation — AMPLIFIED
-  function(ctx,v,isDark){
-    var sv=Math.pow(v,0.4); // more sensitive
-    var amp=2.5; // amplify multiplier
-    for(var i=0;i<=W;i+=2){
-      var fi=freqData&&micOn?freqData[Math.floor(i/W*freqData.length)%freqData.length]/255:0.15+Math.sin(i*0.022+t/750)*0.4+Math.sin(i*0.07+t/550)*0.15;
-      fi=Math.min(1,fi*amp); // amplify
-      var y=H/2-fi*H*0.48*sv*4;
-      var dh=(themeHue(isDark)+i*4)%360;
-      // Main dot — bigger
-      var dotR=Math.max(2.5,3+fi*8*sv*2);
-      ctx.beginPath();ctx.arc(i,y,dotR,0,Math.PI*2);
-      ctx.fillStyle=c(dh,85,themeLum(isDark,true),themeAlpha(isDark,0.9));ctx.fill();
-      // Glow halo
-      ctx.beginPath();ctx.arc(i,y,dotR*2.2,0,Math.PI*2);
-      ctx.fillStyle=c(dh,80,themeLum(isDark,true),themeAlpha(isDark,0.15+fi*0.2));ctx.fill();
-      // Trail below
-      if(fi>0.12){
-        for(var tr=1;tr<=3;tr++){
-          ctx.beginPath();ctx.arc(i,Math.min(H-2,y+tr*12+fi*25),1.5-tr*0.3,0,Math.PI*2);
-          ctx.fillStyle=c(dh,70,themeLum(isDark,false),themeAlpha(isDark,0.25-tr*0.06));ctx.fill();
-        }
-      }
-    }
-  },
-  // 4: Brush Stroke — grows with speech, above+below center, fades on restart
-  function(ctx,v,isDark){
-    var hue=themeHue(isDark);var sv=Math.pow(v,0.45);
+    var cx=W/2,cy=H/2,hue=themeHue(isDark);
+    var maxR=Math.min(W,H)*0.47;
+    var sv=Math.pow(v,0.4);
+    var n=256; // high resolution for smooth circle
     
-    // Growth accumulator — grows while speaking, decays on silence
+    // Growth accumulator
     if(!window._brushGrowth) window._brushGrowth=0;
     if(!window._brushLastSpoke) window._brushLastSpoke=0;
-    if(v>0.08){
-      window._brushGrowth=Math.min(1,window._brushGrowth+0.003);
+    if(v>0.07){
+      window._brushGrowth=Math.min(1,window._brushGrowth+0.002);
       window._brushLastSpoke=t;
-    } else {
-      // Slow decay when silent
-      if(t-window._brushLastSpoke>800) window._brushGrowth=Math.max(0,window._brushGrowth-0.008);
+    }else{
+      if(t-window._brushLastSpoke>700) window._brushGrowth=Math.max(0,window._brushGrowth-0.006);
     }
     var growth=window._brushGrowth;
-    var scale=0.5+growth*1.8; // grows from 0.5x to 2.3x
+    var scale=0.4+growth*1.8;
     
-    // Above center line
-    ctx.beginPath();ctx.moveTo(0,H/2);
-    for(var i=0;i<=W;i+=1){
-      var fi=freqData&&micOn?freqData[Math.floor(i/W*freqData.length)%freqData.length]/255:0.15+Math.sin(i*0.01+t/950)*0.35+Math.sin(i*0.04+t/600)*0.2;
-      var y=H/2-fi*H*0.45*sv*3*scale;
-      if(i===0)ctx.moveTo(i,y);else ctx.lineTo(i,y);
+    // Draw 360-degree frequency spokes
+    for(var i=0;i<n;i++){
+      var fi=0.12;
+      if(freqData&&micOn){
+        var fidx=Math.floor(i*freqData.length/n);
+        fi=Math.max(0.02,freqData[fidx%freqData.length]/255);
+      }else{
+        fi=0.08+Math.sin(i*0.15+t/900)*0.2+Math.cos(i*0.08+t/700)*0.15;
+      }
+      
+      var angle=(i/n)*Math.PI*2;
+      var baseR=maxR*0.15; // inner dead zone
+      var spokeLen=fi*maxR*0.75*scale;
+      
+      ctx.save();ctx.translate(cx,cy);ctx.rotate(angle);
+      
+      // Spoke from inner ring outward
+      var spokeHue=(hue+i*1.5)%360;
+      var grad=ctx.createLinearGradient(0,baseR,0,baseR+spokeLen);
+      grad.addColorStop(0,c(spokeHue,themeSat(isDark),themeLum(isDark,true),themeAlpha(isDark,0.05)));
+      grad.addColorStop(0.3,c(spokeHue,themeSat(isDark),themeLum(isDark,true),themeAlpha(isDark,0.4+sv*0.4)));
+      grad.addColorStop(0.7,c((spokeHue+40)%360,80,themeLum(isDark,true),themeAlpha(isDark,0.6+fi*0.3)));
+      grad.addColorStop(1,c((spokeHue+80)%360,70,themeLum(isDark,true),0));
+      ctx.fillStyle=grad;
+      
+      var sw=1+fi*4*scale;
+      ctx.fillRect(-sw/2,baseR,sw,spokeLen);
+      
+      // Bright tip for active frequencies
+      if(fi>0.2){
+        ctx.beginPath();ctx.arc(0,baseR+spokeLen,2+fi*5*scale,0,Math.PI*2);
+        ctx.fillStyle=c(spokeHue,90,themeLum(isDark,true),themeAlpha(isDark,0.7+sv*0.3));
+        ctx.fill();
+      }
+      ctx.restore();
     }
-    ctx.strokeStyle=c(hue,themeSat(isDark),themeLum(isDark,true),themeAlpha(isDark,0.8));ctx.lineWidth=4+sv*6*scale;
-    ctx.lineCap='round';ctx.lineJoin='round';ctx.stroke();
-    ctx.strokeStyle=c(hue,themeSat(isDark),themeLum(isDark,true),themeAlpha(isDark,0.25));ctx.lineWidth=8+sv*10*scale;ctx.stroke();
     
-    // Below center line (inverted, different hue)
-    ctx.beginPath();ctx.moveTo(0,H/2);
-    for(var i=0;i<=W;i+=1){
-      var fi=freqData&&micOn?freqData[Math.floor(i/W*freqData.length)%freqData.length]/255:0.15+Math.sin(i*0.01+t/950+Math.PI)*0.35+Math.sin(i*0.04+t/600+1)*0.2;
-      var y=H/2+fi*H*0.45*sv*3*scale;
-      if(i===0)ctx.moveTo(i,y);else ctx.lineTo(i,y);
-    }
-    ctx.strokeStyle=c((hue+150)%360,themeSat(isDark),themeLum(isDark,true),themeAlpha(isDark,0.7));ctx.lineWidth=3+sv*5*scale;
-    ctx.lineCap='round';ctx.lineJoin='round';ctx.stroke();
-    ctx.strokeStyle=c((hue+150)%360,themeSat(isDark),themeLum(isDark,true),themeAlpha(isDark,0.2));ctx.lineWidth=7+sv*8*scale;ctx.stroke();
+    // Center orb
+    var orbR=maxR*0.12+sv*maxR*0.04;
+    var orbGrad=ctx.createRadialGradient(cx,cy,0,cx,cy,orbR);
+    orbGrad.addColorStop(0,c(hue,50,themeLum(isDark,true),themeAlpha(isDark,0.95)));
+    orbGrad.addColorStop(0.6,c(hue,themeSat(isDark),themeLum(isDark,true),themeAlpha(isDark,0.3)));
+    orbGrad.addColorStop(1,'rgba(0,0,0,0)');
+    ctx.fillStyle=orbGrad;ctx.fillRect(cx-orbR,cy-orbR,orbR*2,orbR*2);
     
-    // Growth indicator bar at top
-    if(growth>0.05){
+    // Inner reference ring
+    ctx.beginPath();ctx.arc(cx,cy,maxR*0.15,0,Math.PI*2);
+    ctx.strokeStyle=c(hue,themeSat(isDark),themeLum(isDark,true),themeAlpha(isDark,0.08));
+    ctx.lineWidth=0.5;ctx.stroke();
+    
+    // Outer boundary ring
+    ctx.beginPath();ctx.arc(cx,cy,maxR*0.92,0,Math.PI*2);
+    ctx.strokeStyle=c(hue,themeSat(isDark),themeLum(isDark,true),themeAlpha(isDark,0.06));
+    ctx.lineWidth=0.5;ctx.stroke();
+    
+    // Growth indicator
+    if(growth>0.03){
       ctx.fillStyle=isDark?'rgba(255,255,255,0.04)':'rgba(0,0,0,0.04)';
       ctx.fillRect(W-80,6,72,3);
       ctx.fillStyle=c(hue,themeSat(isDark),themeLum(isDark,true),themeAlpha(isDark,0.5+growth*0.4));
@@ -448,19 +443,19 @@ function setMode(m){
 }
 function nextVar(){
   if(currentMode==='both'||currentMode==='rings') ringVar=(ringVar+1)%3;
-  if(currentMode==='both'||currentMode==='bars') barVar=(barVar+1)%5;
+  if(currentMode==='both'||currentMode==='bars') barVar=(barVar+1)%3;
   updateVarLabel();
 }
 function prevVar(){
   if(currentMode==='both'||currentMode==='rings') ringVar=(ringVar+2)%3;
-  if(currentMode==='both'||currentMode==='bars') barVar=(barVar+4)%5;
+  if(currentMode==='both'||currentMode==='bars') barVar=(barVar+2)%3;
   updateVarLabel();
 }
 function updateVarLabel(){
   var names=['Concentric','Spiral','Breathing'];
-  var bnames=['Mirror','Radial','Waveform','Dots','Brush'];
+  var bnames=['Mirror','Radial','Brush'];
   var rn=currentMode==='bars'?'—':names[ringVar]+' '+(ringVar+1)+'/3';
-  var bn=currentMode==='rings'?'—':bnames[barVar]+' '+(barVar+1)+'/5';
+  var bn=currentMode==='rings'?'—':bnames[barVar]+' '+(barVar+1)+'/3';
   document.getElementById('varName').textContent='Rings: '+rn+'  |  Bars: '+bn;
 }
 
