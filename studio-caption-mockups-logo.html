@@ -27,10 +27,16 @@ button.mic-btn:hover{background:rgba(167,139,250,.12)}
 <body>
 <h1>Particle Logo Explorer</h1>
 <p class="subtitle">30 variations — particles, colors, speed, smoothing &amp; more</p>
-<div class="controls"><button class="mic-btn" id="demoBtn" onclick="toggleDemo()">▶ Demo All</button></div>
+<div class="controls">
+  <button class="mic-btn" id="demoBtn" onclick="toggleDemo()">▶ Demo All</button>
+  <span style="display:inline-flex;align-items:center;gap:6px;margin-left:8px;font-size:10px;color:rgba(255,255,255,.3);font-family:'JetBrains Mono',monospace">
+    speed <input type="range" id="speedSlider" min="0.2" max="3" step="0.1" value="1" oninput="updateSpeed(this.value)" style="width:70px;accent-color:#a78bfa"> <span id="speedLabel">1.0x</span>
+  </span>
+</div>
 <div class="grid" id="grid"></div>
 <script>
-var demoRunning=false,demoAnimId=null;
+var demoRunning=false,demoAnimId=null,globalSpeed=1;
+function updateSpeed(v){globalSpeed=parseFloat(v);document.getElementById('speedLabel').textContent=globalSpeed.toFixed(1)+'x';}
 
 // ── Letter paths ──
 function getLetterPaths(W,H,fontSize){
@@ -44,7 +50,7 @@ function getLetterPaths(W,H,fontSize){
   for(var i=0;i<letters.length;i++){
     ctx.clearRect(0,0,W,H);ctx.fillText(letters[i],sx+i*lw,H/2);
     var img=ctx.getImageData(0,0,W,H);var pts=[];
-    for(var py=0;py<H;py+=3)for(var px=0;px<W;px+=3){if(img.data[(py*W+px)*4+3]>128)pts.push([px,py])}
+    for(var py=0;py<H;py+=2)for(var px=0;px<W;px+=2){if(img.data[(py*W+px)*4+3]>128)pts.push([px,py])}
     if(pts.length>0) paths.push({letter:letters[i],pts:pts});
   }
   return paths;
@@ -52,36 +58,36 @@ function getLetterPaths(W,H,fontSize){
 
 // ── 30 configuration variations ──
 var configs=[
-  {name:'Fewer particles (80)',count:80,lerp:0.08,connect:25,glow:1.8,hueBase:180,hueRange:200,fontSize:72,sample:3},
-  {name:'Tiny particles (200)',count:200,lerp:0.08,connect:25,glow:1.8,hueBase:180,hueRange:200,fontSize:72,sample:3,sizeMul:0.5},
-  {name:'Monochrome blue',count:200,lerp:0.08,connect:25,glow:1.8,hueBase:220,hueRange:5,fontSize:72,sample:3},
-  {name:'Monochrome gold',count:200,lerp:0.08,connect:25,glow:1.8,hueBase:45,hueRange:5,fontSize:72,sample:3},
-  {name:'Duotone (purple+green)',count:200,lerp:0.08,connect:25,glow:1.8,hueBase:270,hueRange:90,fontSize:72,sample:3},
-  {name:'Slow lerp (0.03)',count:200,lerp:0.03,connect:25,glow:1.8,hueBase:180,hueRange:200,fontSize:72,sample:3},
-  {name:'Fast lerp (0.2)',count:200,lerp:0.2,connect:25,glow:1.8,hueBase:180,hueRange:200,fontSize:72,sample:3},
-  {name:'No connections',count:200,lerp:0.08,connect:0,glow:1.8,hueBase:180,hueRange:200,fontSize:72,sample:3},
-  {name:'Dense connections (40px)',count:150,lerp:0.08,connect:40,glow:1.8,hueBase:180,hueRange:200,fontSize:72,sample:3},
-  {name:'No glow',count:200,lerp:0.08,connect:25,glow:0,hueBase:180,hueRange:200,fontSize:72,sample:3},
-  {name:'Big glow (4x)',count:150,lerp:0.08,connect:25,glow:4,hueBase:180,hueRange:200,fontSize:72,sample:3},
-  {name:'Large particles',count:120,lerp:0.08,connect:25,glow:1.8,hueBase:180,hueRange:200,fontSize:72,sample:3,sizeMul:2.5},
+  {name:'Fewer particles (80)',count:80,lerp:0.08,connect:25,glow:1.8,hueBase:180,hueRange:200,fontSize:80,sample:2},
+  {name:'Tiny particles (200)',count:200,lerp:0.08,connect:25,glow:1.8,hueBase:180,hueRange:200,fontSize:80,sample:2,sizeMul:0.5},
+  {name:'Monochrome blue',count:200,lerp:0.08,connect:25,glow:1.8,hueBase:220,hueRange:5,fontSize:80,sample:2},
+  {name:'Monochrome gold',count:200,lerp:0.08,connect:25,glow:1.8,hueBase:45,hueRange:5,fontSize:80,sample:2},
+  {name:'Duotone (purple+green)',count:200,lerp:0.08,connect:25,glow:1.8,hueBase:270,hueRange:90,fontSize:80,sample:2},
+  {name:'Slow lerp (0.03)',count:200,lerp:0.03,connect:25,glow:1.8,hueBase:180,hueRange:200,fontSize:80,sample:2},
+  {name:'Fast lerp (0.2)',count:200,lerp:0.2,connect:25,glow:1.8,hueBase:180,hueRange:200,fontSize:80,sample:2},
+  {name:'No connections',count:200,lerp:0.08,connect:0,glow:1.8,hueBase:180,hueRange:200,fontSize:80,sample:2},
+  {name:'Dense connections (40px)',count:150,lerp:0.08,connect:40,glow:1.8,hueBase:180,hueRange:200,fontSize:80,sample:2},
+  {name:'No glow',count:200,lerp:0.08,connect:25,glow:0,hueBase:180,hueRange:200,fontSize:80,sample:2},
+  {name:'Big glow (4x)',count:150,lerp:0.08,connect:25,glow:4,hueBase:180,hueRange:200,fontSize:80,sample:2},
+  {name:'Large particles',count:120,lerp:0.08,connect:25,glow:1.8,hueBase:180,hueRange:200,fontSize:80,sample:2,sizeMul:2.5},
   {name:'Small font (48px)',count:200,lerp:0.08,connect:25,glow:1.8,hueBase:180,hueRange:200,fontSize:48,sample:3},
   {name:'Large font (96px)',count:250,lerp:0.08,connect:25,glow:1.8,hueBase:180,hueRange:200,fontSize:96,sample:4},
-  {name:'Sparse sample (6px)',count:150,lerp:0.08,connect:25,glow:1.8,hueBase:180,hueRange:200,fontSize:72,sample:6},
-  {name:'Dense sample (2px)',count:350,lerp:0.08,connect:25,glow:1.8,hueBase:180,hueRange:200,fontSize:72,sample:2},
-  {name:'Warm palette',count:200,lerp:0.08,connect:25,glow:1.8,hueBase:10,hueRange:40,fontSize:72,sample:3},
-  {name:'Cool palette',count:200,lerp:0.08,connect:25,glow:1.8,hueBase:200,hueRange:60,fontSize:72,sample:3},
-  {name:'Pastel (hi-lum)',count:200,lerp:0.08,connect:25,glow:1.8,hueBase:180,hueRange:200,fontSize:72,sample:3,lumBase:70},
-  {name:'Dark (lo-lum)',count:200,lerp:0.08,connect:25,glow:1.8,hueBase:180,hueRange:200,fontSize:72,sample:3,lumBase:25},
-  {name:'Ultra-minimal (40)',count:40,lerp:0.06,connect:0,glow:0,hueBase:220,hueRange:5,fontSize:72,sample:5,sizeMul:1.8},
-  {name:'Dense cloud (500)',count:500,lerp:0.08,connect:30,glow:1.5,hueBase:180,hueRange:200,fontSize:72,sample:3,sizeMul:0.6},
-  {name:'Slow + no connect',count:150,lerp:0.04,connect:0,glow:1.8,hueBase:270,hueRange:60,fontSize:72,sample:3,sizeMul:1.2},
-  {name:'Fast + dense connect',count:180,lerp:0.15,connect:35,glow:2,hueBase:180,hueRange:200,fontSize:72,sample:3},
-  {name:'Tri-tone (R,G,B)',count:200,lerp:0.08,connect:25,glow:1.8,hueBase:0,hueRange:120,fontSize:72,sample:3,colorMode:'tri'},
-  {name:'Grayscale',count:200,lerp:0.08,connect:25,glow:1.8,hueBase:0,hueRange:0,fontSize:72,sample:3,satBase:0,lumBase:60},
-  {name:'Thin connections',count:200,lerp:0.08,connect:25,glow:1.8,hueBase:180,hueRange:200,fontSize:72,sample:3,connWidth:0.15},
-  {name:'Thick connections',count:150,lerp:0.08,connect:30,glow:1.8,hueBase:180,hueRange:200,fontSize:72,sample:3,connWidth:0.8},
-  {name:'Slow drift (0.02)',count:200,lerp:0.02,connect:25,glow:1.8,hueBase:180,hueRange:200,fontSize:72,sample:3},
-  {name:'Square particles',count:200,lerp:0.08,connect:25,glow:1.8,hueBase:180,hueRange:200,fontSize:72,sample:3,shape:'square'},
+  {name:'Sparse sample (6px)',count:150,lerp:0.08,connect:25,glow:1.8,hueBase:180,hueRange:200,fontSize:80,sample:3},
+  {name:'Dense sample (2px)',count:350,lerp:0.08,connect:25,glow:1.8,hueBase:180,hueRange:200,fontSize:80,sample:2},
+  {name:'Warm palette',count:200,lerp:0.08,connect:25,glow:1.8,hueBase:10,hueRange:40,fontSize:80,sample:2},
+  {name:'Cool palette',count:200,lerp:0.08,connect:25,glow:1.8,hueBase:200,hueRange:60,fontSize:80,sample:2},
+  {name:'Pastel (hi-lum)',count:200,lerp:0.08,connect:25,glow:1.8,hueBase:180,hueRange:200,fontSize:80,sample:2,lumBase:70},
+  {name:'Dark (lo-lum)',count:200,lerp:0.08,connect:25,glow:1.8,hueBase:180,hueRange:200,fontSize:80,sample:2,lumBase:25},
+  {name:'Ultra-minimal (40)',count:40,lerp:0.06,connect:0,glow:0,hueBase:220,hueRange:5,fontSize:80,sample:3,sizeMul:1.8},
+  {name:'Dense cloud (500)',count:500,lerp:0.08,connect:30,glow:1.5,hueBase:180,hueRange:200,fontSize:80,sample:2,sizeMul:0.6},
+  {name:'Slow + no connect',count:150,lerp:0.04,connect:0,glow:1.8,hueBase:270,hueRange:60,fontSize:80,sample:2,sizeMul:1.2},
+  {name:'Fast + dense connect',count:180,lerp:0.15,connect:35,glow:2,hueBase:180,hueRange:200,fontSize:80,sample:2},
+  {name:'Tri-tone (R,G,B)',count:200,lerp:0.08,connect:25,glow:1.8,hueBase:0,hueRange:120,fontSize:80,sample:2,colorMode:'tri'},
+  {name:'Grayscale',count:200,lerp:0.08,connect:25,glow:1.8,hueBase:0,hueRange:0,fontSize:80,sample:2,satBase:0,lumBase:60},
+  {name:'Thin connections',count:200,lerp:0.08,connect:25,glow:1.8,hueBase:180,hueRange:200,fontSize:80,sample:2,connWidth:0.15},
+  {name:'Thick connections',count:150,lerp:0.08,connect:30,glow:1.8,hueBase:180,hueRange:200,fontSize:80,sample:2,connWidth:0.8},
+  {name:'Slow drift (0.02)',count:200,lerp:0.02,connect:25,glow:1.8,hueBase:180,hueRange:200,fontSize:80,sample:2},
+  {name:'Square particles',count:200,lerp:0.08,connect:25,glow:1.8,hueBase:180,hueRange:200,fontSize:80,sample:2,shape:'square'},
 ];
 
 var cards=[];
@@ -100,7 +106,7 @@ function assignTargets(particles,letterPts,vol,cfg){
   var count=particles.length,total=letterPts.length;
   for(var i=0;i<count;i++){
     var p=particles[i];
-    if(vol<0.05){p.tx=Math.random()*500;p.ty=Math.random()*120}
+    if(vol<0.05){p.tx=Math.random()*520;p.ty=Math.random()*120}
     else{
       var idx=Math.floor(i/count*total);
       var lp=letterPts[idx%total];
@@ -146,8 +152,9 @@ function renderCard(crd,vol){
   
   // Particles
   crd.particles.forEach(function(p,i){
-    p.rx+=(p.tx-p.rx)*(cfg.lerp||0.08);
-    p.ry+=(p.ty-p.ry)*(cfg.lerp||0.08);
+    var spd=(cfg.lerp||0.08)*globalSpeed;
+    p.rx+=(p.tx-p.rx)*spd;
+    p.ry+=(p.ty-p.ry)*spd;
     
     var hue,sat,lum;
     if(cfg.colorMode==='tri'){
@@ -187,7 +194,7 @@ function buildAll(){
   var grid=document.getElementById('grid');
   configs.forEach(function(cfg,i){
     var card=document.createElement('div');card.className='card';
-    var c=document.createElement('canvas');c.width=500;c.height=120;
+    var c=document.createElement('canvas');c.width=520;c.height=140;
     card.innerHTML='<div class="card-num">#'+(i+1)+'</div><div class="card-title">'+cfg.name+'</div>';
     card.appendChild(c);grid.appendChild(card);
     cards.push({cfg:cfg,ctx:c.getContext('2d'),w:500,h:120,particles:buildParticles(cfg),letterPts:null});
@@ -214,7 +221,7 @@ function stopDemo(){
 function runDemo(){
   if(!demoRunning) return;
   demoAnimId=requestAnimationFrame(runDemo);
-  var cycle=5000,t=(Date.now()%cycle)/cycle;
+  var cycle=5000/globalSpeed,t=(Date.now()%cycle)/cycle;
   if(t<0.35) globalVol=Math.sin(t/0.35*Math.PI/2);
   else if(t<0.45) globalVol=1;
   else if(t<0.8) globalVol=Math.cos((t-0.45)/0.35*Math.PI/2);
