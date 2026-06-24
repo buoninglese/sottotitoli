@@ -66,18 +66,14 @@ body.dark .btn:hover{background:rgba(255,255,255,.06);color:#fff;border-color:rg
   </div>
   <!-- FX Toggles -->
   <div class="btn-row" style="margin-top:2px">
-    <button class="btn" id="btnTrails" onclick="toggleFX('trails')">👻 Trails</button>
-    <button class="btn" id="btnReverb" onclick="toggleFX('reverb')">🔁 Reverb</button>
-    <button class="btn" id="btnSlowmo" onclick="toggleFX('slowmo')">🐢 Slow‑mo</button>
-    <button class="btn" id="btnColorBoost" onclick="toggleFX('colorBoost')">🎨 Color+</button>
-    <button class="btn" id="btnBounce" onclick="toggleFX('bounce')">🏀 Bounce</button>
+    <button class="btn" id="btnSlowdown" onclick="toggleFX('slowdown')">🐢 Slow</button>
+    <button class="btn" id="btnSensBoost" onclick="toggleFX('sensBoost')">📢 Boost</button>
+    <button class="btn" id="btnBreath" onclick="toggleFX('breath')">🫁 Breath</button>
   </div>
   <div class="btn-row" style="gap:10px;margin-top:1px;margin-bottom:4px">
-    <span style="font-size:8px;opacity:.25;font-family:'JetBrains Mono',monospace;min-width:36px;text-align:center" id="fxTrailsVal">off</span>
-    <span style="font-size:8px;opacity:.25;font-family:'JetBrains Mono',monospace;min-width:36px;text-align:center" id="fxReverbVal">off</span>
-    <span style="font-size:8px;opacity:.25;font-family:'JetBrains Mono',monospace;min-width:36px;text-align:center" id="fxSlowmoVal">1×</span>
-    <span style="font-size:8px;opacity:.25;font-family:'JetBrains Mono',monospace;min-width:36px;text-align:center" id="fxColorBoostVal">off</span>
-    <span style="font-size:8px;opacity:.25;font-family:'JetBrains Mono',monospace;min-width:36px;text-align:center" id="fxBounceVal">off</span>
+    <span style="font-size:8px;opacity:.25;font-family:'JetBrains Mono',monospace;min-width:36px;text-align:center" id="fxSlowdownVal">1×</span>
+    <span style="font-size:8px;opacity:.25;font-family:'JetBrains Mono',monospace;min-width:36px;text-align:center" id="fxSensBoostVal">off</span>
+    <span style="font-size:8px;opacity:.25;font-family:'JetBrains Mono',monospace;min-width:36px;text-align:center" id="fxBreathVal">off</span>
   </div>
   <div class="btn-row">
     <button class="btn" id="btnMic" onclick="toggleMic()">🎤 Start Mic</button>
@@ -99,35 +95,23 @@ var canvas,ctx,W,H,t=0,animFrame=null,currentVar=0;
 
 // ─── FX State ───
 var fx={
-  trails:{on:false, fade:0.15},      // fade% per frame for trail ghost
-  reverb:{on:false, delay:8, feed:0.5}, // delay frames, feedback decay
-  slowmo:{on:false, speed:0.3},       // time multiplier
-  colorBoost:{on:false, boost:1.8},   // saturation/luminosity multiplier
-  bounce:{on:false, spring:0.4}       // spring-back force
+  slowdown:{on:false, speed:0.3},
+  sensBoost:{on:false, mult:3},
+  breath:{on:false, threshold:0.02}
 };
-var reverbBuffer=[];  // ring buffer for delayed volume values
-var bounceVol=0;      // physics-driven volume for bounce effect
+var reverbBuffer=[];
+var bounceVol=0;
 
 function toggleFX(name){
   var f=fx[name];
-  if(!f.on){
-    // Turn on
-    f.on=true;
-    fxCycleIdx[name]=0;
-    applyFXCycle(name);
-  }else{
-    // Cycle to next intensity
+  if(!f.on){f.on=true;fxCycleIdx[name]=0;applyFXCycle(name);}
+  else{
     fxCycleIdx[name]++;
-    var cycles={trails:fxCycle.trails,reverb:fxCycle.reverbDelay,slowmo:fxCycle.slowmo,colorBoost:fxCycle.colorBoost,bounce:fxCycle.bounce};
-    if(fxCycleIdx[name]>=cycles[name].length){
-      // Turn off
-      f.on=false;
-      fxCycleIdx[name]=0;
-    }else{
-      applyFXCycle(name);
-    }
+    var cycles={slowdown:fxCycle.slowdown,sensBoost:fxCycle.sensBoost,breath:fxCycle.breath};
+    if(fxCycleIdx[name]>=cycles[name].length){f.on=false;fxCycleIdx[name]=0;}
+    else{applyFXCycle(name);}
   }
-  var btnId='btn'+{trails:'Trails',reverb:'Reverb',slowmo:'Slowmo',colorBoost:'ColorBoost',bounce:'Bounce'}[name];
+  var btnId='btn'+{slowdown:'Slowdown',sensBoost:'SensBoost',breath:'Breath'}[name];
   var btn=document.getElementById(btnId);
   if(btn)btn.classList.toggle('on',f.on);
   updateFXLabels();
@@ -136,32 +120,24 @@ function toggleFX(name){
 function applyFXCycle(name){
   var idx=fxCycleIdx[name];
   switch(name){
-    case'trails':fx.trails.fade=fxCycle.trails[idx];break;
-    case'reverb':fx.reverb.delay=fxCycle.reverbDelay[idx];fx.reverb.feed=fxCycle.reverbFeed[Math.min(idx,fxCycle.reverbFeed.length-1)];break;
-    case'slowmo':fx.slowmo.speed=fxCycle.slowmo[idx];break;
-    case'colorBoost':fx.colorBoost.boost=fxCycle.colorBoost[idx];break;
-    case'bounce':fx.bounce.spring=fxCycle.bounce[idx];break;
+    case'slowdown':fx.slowdown.speed=fxCycle.slowdown[idx];break;
+    case'sensBoost':fx.sensBoost.mult=fxCycle.sensBoost[idx];break;
+    case'breath':fx.breath.threshold=fxCycle.breath[idx];break;
   }
 }
 function updateFXLabels(){
-  var t=fx.trails,r=fx.reverb,s=fx.slowmo,c=fx.colorBoost,b=fx.bounce;
-  document.getElementById('fxTrailsVal').textContent=t.on?(t.fade*100).toFixed(0)+'%':'off';
-  document.getElementById('fxReverbVal').textContent=r.on?r.delay+'f/'+(r.feed*100).toFixed(0)+'%':'off';
-  document.getElementById('fxSlowmoVal').textContent=s.on?s.speed.toFixed(1)+'×':'1×';
-  document.getElementById('fxColorBoostVal').textContent=c.on?c.boost.toFixed(1)+'×':'off';
-  document.getElementById('fxBounceVal').textContent=b.on?(b.spring*100).toFixed(0)+'%':'off';
+  var s=fx.slowdown,b=fx.sensBoost,br=fx.breath;
+  document.getElementById('fxSlowdownVal').textContent=s.on?s.speed.toFixed(1)+'×':'1×';
+  document.getElementById('fxSensBoostVal').textContent=b.on?b.mult.toFixed(0)+'×':'off';
+  document.getElementById('fxBreathVal').textContent=br.on?(br.threshold*100).toFixed(0)+'%':'off';
 }
 
-// Cycle FX intensity with repeated clicks
 var fxCycle={
-  trails:[0.05,0.10,0.15,0.25,0.40,0.60],
-  reverbDelay:[3,5,8,12,18,25],
-  reverbFeed:[0.3,0.5,0.65,0.8],
-  slowmo:[0.1,0.2,0.3,0.5,0.75],
-  colorBoost:[1.3,1.6,2.0,2.5,3.0],
-  bounce:[0.2,0.4,0.6,0.8]
+  slowdown:[0.1,0.2,0.35,0.5,0.75],
+  sensBoost:[2,3,5,8,12],
+  breath:[0.01,0.02,0.04,0.08]
 };
-var fxCycleIdx={trails:0,reverb:0,slowmo:0,colorBoost:0,bounce:0};
+var fxCycleIdx={slowdown:0,sensBoost:0,breath:0};
 
 function updateSensitivity(val){
   sensitivity=parseFloat(val);
@@ -224,88 +200,143 @@ function themeLum(dark,bright){return dark?(bright?78:65):(bright?42:35);}
 function themeAlpha(dark,base){return dark?base:base*0.7;}
 
 // ══════════════════════════════════════
-// 10 RADIAL BAR VARIATIONS
-// Each tuned for thickness, smoothness, mic response
+// 7 VARIATIONS — 2 Thickness + 5 Direction
 // ══════════════════════════════════════
 
 var variations=[
 
-  // ── 1. Whisper Thin ── ultra-thin lines, ghostly, heavily smoothed
+  // ── Thickness 1: Thick Smooth ──
   {
-    name:'Whisper Thin',
-    desc:'0.5px hairline · heavy smoothing · gentle bloom',
-    // params: ringCount, barsPerRing, baseLineW, lineWVar (with vol), smoothFactor, ringSpacingMul, startRadiusMul, glowAlpha
-    p:{rings:3, bars:200, lineW:0.5, lwVol:1.5, smoothMul:1.6, ringGap:0.22, startR:0.30, glow:0.02, orbMul:0.06, dotR:1.0}
-  },
-
-  // ── 2. Thin Crisp ── thin but snappy, fast mic response
-  {
-    name:'Thin Crisp',
-    desc:'1px sharp · low smoothing · fast flicker',
-    p:{rings:3, bars:160, lineW:1.0, lwVol:2.0, smoothMul:0.6, ringGap:0.20, startR:0.32, glow:0.04, orbMul:0.08, dotR:1.5}
-  },
-
-  // ── 3. Medium Balanced ── the original, well-rounded
-  {
-    name:'Medium Balanced',
-    desc:'1.5px · balanced smoothness · classic radial',
-    p:{rings:3, bars:180, lineW:1.5, lwVol:2.5, smoothMul:1.0, ringGap:0.20, startR:0.35, glow:0.06, orbMul:0.08, dotR:2.0}
-  },
-
-  // ── 4. Medium Sharp ── medium thickness, sharp attack
-  {
-    name:'Medium Sharp',
-    desc:'1.8px · snappy attack · bright tips',
-    p:{rings:3, bars:150, lineW:1.8, lwVol:3.0, smoothMul:0.5, ringGap:0.18, startR:0.30, glow:0.08, orbMul:0.10, dotR:2.5}
-  },
-
-  // ── 5. Thick Smooth ── bold lines, heavy smoothing, gentle movement
-  {
-    name:'Thick Smooth',
+    name:'Thick Smooth', type:'radial',
     desc:'3px bold · heavy smoothing · slow majestic',
     p:{rings:2, bars:120, lineW:3.0, lwVol:2.0, smoothMul:2.0, ringGap:0.25, startR:0.28, glow:0.10, orbMul:0.12, dotR:3.5}
   },
 
-  // ── 6. Thick Punchy ── bold + aggressive mic response
+  // ── Thickness 2: Thick Punchy ──
   {
-    name:'Thick Punchy',
+    name:'Thick Punchy', type:'radial',
     desc:'3.5px heavy · instant response · high contrast',
     p:{rings:2, bars:100, lineW:3.5, lwVol:4.0, smoothMul:0.35, ringGap:0.22, startR:0.25, glow:0.14, orbMul:0.14, dotR:4.0}
   },
 
-  // ── 7. Hairline Ghost ── barely-there lines, ethereal
+  // ── Direction 1: Top-Down Sweep ──
   {
-    name:'Hairline Ghost',
-    desc:'0.3px · extreme smoothing · translucent aura',
-    p:{rings:4, bars:240, lineW:0.3, lwVol:1.0, smoothMul:2.5, ringGap:0.18, startR:0.35, glow:0.01, orbMul:0.04, dotR:0.8}
+    name:'Top-Down', type:'direction', dir:'topdown',
+    desc:'Bars sweep from top · frequency drives width',
+    p:{bars:80, lineW:2, lwVol:4, smoothMul:1.0, gapMul:0.8}
   },
 
-  // ── 8. Bold Neon ── thick, saturated, low smoothing = electric feel
+  // ── Direction 2: Left-Right Flow ──
   {
-    name:'Bold Neon',
-    desc:'4px · minimal smoothing · electric flicker',
-    p:{rings:2, bars:90, lineW:4.0, lwVol:5.0, smoothMul:0.3, ringGap:0.20, startR:0.22, glow:0.18, orbMul:0.16, dotR:4.5}
+    name:'Left-Right', type:'direction', dir:'leftright',
+    desc:'Bars flow from left · amplitude = height',
+    p:{bars:60, lineW:2.5, lwVol:5, smoothMul:0.9, gapMul:0.7}
   },
 
-  // ── 9. Feather Soft ── thickness varies per ring, very smooth
+  // ── Direction 3: Corner Burst ──
   {
-    name:'Feather Soft',
-    desc:'0.8→2.5px per ring · very smooth · layered depth',
-    p:{rings:3, bars:170, lineW:0.8, lwVol:2.2, smoothMul:1.8, ringGap:0.22, startR:0.32, glow:0.04, orbMul:0.07, dotR:1.8, feather:true}
+    name:'Corner Burst', type:'direction', dir:'corner',
+    desc:'Radiate from bottom-right · volume = reach',
+    p:{bars:90, lineW:2, lwVol:3.5, smoothMul:1.1, gapMul:0.6}
   },
 
-  // ── 10. Dynamic Width ── line width pulses with amplitude in real-time
+  // ── Direction 4: Spiral ──
   {
-    name:'Dynamic Width',
-    desc:'0.5→6px live · width=bass envelope · organic',
-    p:{rings:3, bars:160, lineW:0.5, lwVol:6.0, smoothMul:0.8, ringGap:0.20, startR:0.32, glow:0.08, orbMul:0.09, dotR:2.5, dynamicW:true}
+    name:'Spiral', type:'direction', dir:'spiral',
+    desc:'Bars along spiral from center · frequency = length',
+    p:{bars:120, lineW:1.8, lwVol:3, smoothMul:1.0, gapMul:0.5}
+  },
+
+  // ── Direction 5: Columns Rise ──
+  {
+    name:'Columns Rise', type:'direction', dir:'columns',
+    desc:'Vertical bars from bottom · bass = height',
+    p:{bars:50, lineW:4, lwVol:5, smoothMul:0.8, gapMul:0.9}
   }
 
 ];
 
-// ─── Main render: radial bars ───
+// ─── Direction renderers (non-circular layouts) ───
+function drawDirection(ctx,v,isDark,params,colorMul){
+  colorMul=colorMul||1;
+  var hue=themeHue(isDark),sat=themeSat(isDark)*colorMul;
+  var prm=params.p;
+  var sv=Math.pow(v,prm.smoothMul||1);
+  var nBars=prm.bars||60;
+  var brightLum=Math.min(95,themeLum(isDark,true)*colorMul);
+  ctx.fillStyle=isDark?'rgba(6,6,20,1)':'rgba(250,250,248,1)';
+  ctx.fillRect(0,0,W,H);
+  var dir=prm.dir||'topdown';
+  var gap=8*(prm.gapMul||0.8);
+  var baseLw=prm.lineW||2,lwVol=prm.lwVol||4;
+
+  for(var i=0;i<nBars;i++){
+    var fi=0.15;
+    if(freqData&&micOn){var fidx=Math.floor(i*freqData.length/nBars);fi=freqData[fidx%freqData.length]/255;}
+    else{fi=0.1+Math.sin(i*0.5+t/1200)*0.3;}
+    if(fi<0.03)continue;
+    var sh=(hue+i*360/nBars)%360;
+    var lw=baseLw+fi*(lwVol-baseLw)*sv;
+    var barLen=fi*0.8;
+    var alpha=themeAlpha(isDark,0.15+sv*0.5)*colorMul;
+
+    if(dir==='topdown'){
+      var y=i*(H/nBars)*prm.gapMul;
+      var barW=W*barLen*0.7,x=(W-barW)/2;
+      var g=ctx.createLinearGradient(x,y,x+barW,y);
+      g.addColorStop(0,'rgba(0,0,0,0)');g.addColorStop(0.3,c(sh,sat,brightLum,alpha));g.addColorStop(0.7,c(sh,sat,brightLum,alpha));g.addColorStop(1,'rgba(0,0,0,0)');
+      ctx.fillStyle=g;ctx.fillRect(x,y,barW,lw);
+    }else if(dir==='leftright'){
+      var x=i*(W/nBars)*prm.gapMul;
+      var barH=H*barLen*0.6,y=(H-barH)/2;
+      var g=ctx.createLinearGradient(x,y,x,y+barH);
+      g.addColorStop(0,'rgba(0,0,0,0)');g.addColorStop(0.3,c(sh,sat,brightLum,alpha));g.addColorStop(0.7,c(sh,sat,brightLum,alpha));g.addColorStop(1,'rgba(0,0,0,0)');
+      ctx.fillStyle=g;ctx.fillRect(x,y,lw,barH);
+    }else if(dir==='corner'){
+      var angle=(i/nBars)*Math.PI/2;
+      var maxR=Math.sqrt(W*W+H*H),r0=maxR*0.1,r1=maxR*(0.1+barLen*0.7);
+      ctx.save();ctx.translate(W,H);ctx.rotate(-Math.PI/2+angle);
+      var g=ctx.createLinearGradient(0,r0,0,r1);
+      g.addColorStop(0,c(sh,sat,brightLum,alpha*0.1));g.addColorStop(0.5,c(sh,sat,brightLum,alpha));g.addColorStop(1,'rgba(0,0,0,0)');
+      ctx.fillStyle=g;ctx.fillRect(-lw/2,r0,lw,r1-r0);
+      ctx.restore();
+    }else if(dir==='spiral'){
+      var turns=3,spR=Math.min(W,H)*0.05;
+      var a=(i/nBars)*Math.PI*2*turns;
+      var r=spR+(i/nBars)*Math.min(W,H)*0.45;
+      var sx=W/2+Math.cos(a+t/15000)*r,sy=H/2+Math.sin(a+t/15000)*r;
+      var tang=a+Math.PI/2;
+      ctx.save();ctx.translate(sx,sy);ctx.rotate(tang);
+      var sl=fi*Math.min(W,H)*0.15+10;
+      var sg=ctx.createLinearGradient(0,0,0,sl);
+      sg.addColorStop(0,c(sh,sat,brightLum,alpha));sg.addColorStop(1,'rgba(0,0,0,0)');
+      ctx.fillStyle=sg;ctx.fillRect(-lw/2,0,lw,sl);
+      ctx.restore();
+    }else if(dir==='columns'){
+      var x=i*(W/nBars)*prm.gapMul+gap/2;
+      var colW=(W/nBars)*prm.gapMul-gap;
+      var colH=H*barLen*0.8;
+      var g=ctx.createLinearGradient(x,H-colH,x,H);
+      g.addColorStop(0,c(sh,sat,brightLum,alpha));g.addColorStop(0.6,c(sh,sat,brightLum,alpha*0.5));g.addColorStop(1,'rgba(0,0,0,0)');
+      ctx.fillStyle=g;ctx.fillRect(x,H-colH,colW,colH);
+      if(fi>0.3){ctx.fillStyle=c(sh,80,brightLum,alpha*0.8);ctx.fillRect(x,H-colH,colW,Math.max(2,lw*0.5));}
+    }
+  }
+  if(sv>0.1){
+    var orbR=Math.min(W,H)*0.03+sv*Math.min(W,H)*0.02;
+    var og=ctx.createRadialGradient(W/2,H/2,0,W/2,H/2,orbR*3);
+    og.addColorStop(0,c(hue,60,brightLum,themeAlpha(isDark,0.6+sv*0.3)*colorMul));
+    og.addColorStop(1,'rgba(0,0,0,0)');
+    ctx.fillStyle=og;ctx.fillRect(W/2-orbR*3,H/2-orbR*3,orbR*6,orbR*6);
+  }
+}
+
+// ─── Main render ───
 function drawRadial(ctx,v,isDark,params,colorMul){
   colorMul=colorMul||1;
+  // Route to direction renderer if not radial
+  if(params.type==='direction'){drawDirection(ctx,v,isDark,params,colorMul);return;}
+
   var cx=W/2,cy=H/2,hue=themeHue(isDark),sat=themeSat(isDark)*colorMul;
   var maxR=Math.min(W,H)*0.49;
   var prm=params.p;
@@ -401,71 +432,27 @@ function drawRadial(ctx,v,isDark,params,colorMul){
 function animate(ts){
   animFrame=requestAnimationFrame(animate);
   var rawT=ts||Date.now();
-  // Slow-motion: scale time
-  var timeScale=fx.slowmo.on?fx.slowmo.speed:1;
-  t=rawT; // keep raw t for sin-based animations
-  var frameDt=1; // will accumulate for slow-mo
+  var timeScale=fx.slowdown.on?fx.slowdown.speed:1;
+  t=rawT;
 
   if(micOn){readAudio();}else{
     smoothing=smoothing*0.92+0.04;
     volume=0.08+Math.sin(rawT/1800)*0.06+Math.sin(rawT/3100)*0.05+Math.sin(rawT/5200)*0.03;
   }
-  var rawV=smoothing||volume;
+  var v=smoothing||volume;
 
-  // ── Reverb/Delay ──
-  if(fx.reverb.on){
-    // Push current volume into ring buffer
-    reverbBuffer.push(rawV);
-    if(reverbBuffer.length>fx.reverb.delay*3)reverbBuffer.shift();
-  }
-  var v=rawV;
-  if(fx.reverb.on&&reverbBuffer.length>fx.reverb.delay){
-    // Mix in delayed echo
-    var echoIdx=Math.max(0,reverbBuffer.length-1-fx.reverb.delay);
-    var echoV=reverbBuffer[echoIdx]||0;
-    v=rawV+echoV*fx.reverb.feed;
-    v=Math.min(1,v);
-  }
+  // Sensitivity boost
+  if(fx.sensBoost.on)v=Math.min(1,v*fx.sensBoost.mult);
 
-  // ── Return Bounce (spring physics on volume) ──
-  if(fx.bounce.on){
-    var springForce=(v-bounceVol)*fx.bounce.spring;
-    bounceVol+=springForce;
-    bounceVol+=(v-bounceVol)*0.3; // follow original
-    v=bounceVol;
-  }else{
-    bounceVol=v;
-  }
+  // Breath detection — amplify micro-volumes
+  if(fx.breath.on&&v<fx.breath.threshold&&v>0.001)v=v*3; // boost whispers
 
-  // ── Color Boost ──
-  var colorMul=fx.colorBoost.on?fx.colorBoost.boost:1;
+  // Slowdown: reduce effective volume change rate
+  if(fx.slowdown.on){smoothing=smoothing*Math.max(0.7,fx.slowdown.speed)+volume*Math.min(0.3,(1-fx.slowdown.speed));v=smoothing;}
 
   var isDark=document.body.classList.contains('dark');
-
-  // ── Trails: don't clear fully, leave ghost ──
-  if(fx.trails.on){
-    ctx.fillStyle=isDark?'rgba(6,6,20,'+fx.trails.fade+')':'rgba(250,250,248,'+fx.trails.fade+')';
-    ctx.fillRect(0,0,W,H);
-  }else{
-    ctx.clearRect(0,0,W,H);
-  }
-
-  drawRadial(ctx,v,isDark,variations[currentVar],colorMul);
-
-  // If reverb active, draw extra ghost rings at delayed positions
-  if(fx.reverb.on&&reverbBuffer.length>3){
-    for(var ri=1;ri<=2;ri++){
-      var delayFrames=fx.reverb.delay*ri;
-      if(reverbBuffer.length>delayFrames){
-        var ev=reverbBuffer[reverbBuffer.length-1-delayFrames]||0;
-        if(ev>0.03){
-          ctx.globalAlpha=0.15*(fx.reverb.feed*ri);
-          drawRadial(ctx,ev*0.6,isDark,variations[currentVar],colorMul*0.7);
-          ctx.globalAlpha=1;
-        }
-      }
-    }
-  }
+  ctx.clearRect(0,0,W,H);
+  drawRadial(ctx,v,isDark,variations[currentVar],1);
 
   var displayV=Math.min(1,v*2.5*sensitivity);
   document.getElementById('meterFill').style.width=(displayV*100)+'%';
@@ -493,11 +480,9 @@ function updateConfigDisplay(){
   var parts=[
     'var:'+v.name,
     'sens:'+sensitivity.toFixed(1),
-    'trails:'+(fx.trails.on?fx.trails.fade:'off'),
-    'reverb:'+(fx.reverb.on?fx.reverb.delay+'f/'+fx.reverb.feed:'off'),
-    'slowmo:'+(fx.slowmo.on?fx.slowmo.speed:'1'),
-    'colorBoost:'+(fx.colorBoost.on?fx.colorBoost.boost:'off'),
-    'bounce:'+(fx.bounce.on?fx.bounce.spring:'off')
+    'slow:'+(fx.slowdown.on?fx.slowdown.speed:'1'),
+    'boost:'+(fx.sensBoost.on?fx.sensBoost.mult:'off'),
+    'breath:'+(fx.breath.on?fx.breath.threshold:'off')
   ];
   var cfg=parts.join(' | ');
   document.getElementById('configDisplay').textContent=cfg;
