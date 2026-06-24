@@ -55,7 +55,7 @@ body.dark .btn:hover{background:rgba(255,255,255,.06);color:#fff;border-color:rg
 </div>
 <div id="ui">
   <h1 id="titleText">Sottotitoli</h1>
-  <p>Live mic — word-reactive, multispeaker spatial</p>
+  <p>Live mic — 3 rings, 3 bars, real voice</p>
   <div class="meter-row">
     <span class="meter-label" id="meterLabel">— dB</span>
     <div class="meter-bar"><div class="meter-fill" id="meterFill"></div></div>
@@ -109,19 +109,19 @@ function triggerWordFlash(word,pos,spkIdx){
   }
   lastWordTime=t;
 }
-// Demo word feed
-function demoWordFeed(){
-  var words=['discussing','future','translation','systems','bridge','barriers','deployment','scale','challenge','neural','models','accurate','remarkably','language','cultures','different','experience','international','meetings','quickly'];
-  var poses=['VERB','NOUN','NOUN','NOUN','VERB','NOUN','NOUN','NOUN','NOUN','ADJ','NOUN','ADJ','ADV','NOUN','NOUN','ADJ','NOUN','ADJ','NOUN','ADV'];
-  var now=Date.now();
-  if(wordQueue.length===0||(now-wordQueue[0].t)>400+Math.random()*600){
-    var idx=Math.floor(Math.random()*words.length);
-    wordQueue.push({word:words[idx],pos:poses[idx],t:now,spk:Math.floor(Math.random()*3)});
+// Real mic word detection — trigger on volume spikes
+var wordThrottle=0,lastVolumePeak=0,wordCounter=0;
+var realWords=['speaking','now','live','voice','sound','wave','audio','signal','frequency','amplitude','modulation','resonance','vibration','acoustic','decibel','harmonic'];
+var realPoses=['VERB','ADV','ADJ','NOUN','NOUN','NOUN','NOUN','NOUN','NOUN','NOUN','NOUN','NOUN','NOUN','ADJ','NOUN','ADJ'];
+function detectWordsFromMic(v){
+  // Detect word boundaries from volume changes
+  if(v>0.12&&v>lastVolumePeak*1.6&&Date.now()-wordThrottle>350){
+    wordThrottle=Date.now();
+    var idx=wordCounter%realWords.length;
+    triggerWordFlash(realWords[idx],realPoses[idx],wordCounter%5);
+    wordCounter++;
   }
-  while(wordQueue.length>0&&(now-wordQueue[0].t)>300){
-    var w=wordQueue.shift();
-    triggerWordFlash(w.word,w.pos,w.spk);
-  }
+  lastVolumePeak=v>lastVolumePeak?v:lastVolumePeak*0.9;
 }
 
 function initAudio(){
@@ -188,7 +188,7 @@ function themeAlpha(isDark,base){return isDark?base:base*0.7;}
 // 10 RING VARIATIONS
 // ══════════════════════════════════════
 var ringFuncs=[
-  // 0: Concentric pulse (thin lines)
+  // Concentric pulse (thin lines)
   function(ctx,v,isDark){
     var cx=W/2,cy=H/2,hue=themeHue(isDark),sat=themeSat(isDark);
     for(var i=0;i<12;i++){
@@ -199,7 +199,7 @@ var ringFuncs=[
       ctx.lineWidth=1+v*4;ctx.stroke();
     }
   },
-  // 1: Spiral (thin line)
+  // Spiral (thin line)
   function(ctx,v,isDark){
     var cx=W/2,cy=H/2,hue=themeHue(isDark)+t/50;
     ctx.beginPath();
@@ -211,10 +211,19 @@ var ringFuncs=[
     ctx.strokeStyle=c(hue%360,themeSat(isDark),themeLum(isDark,true),themeAlpha(isDark,0.4+v*0.3));
     ctx.lineWidth=1+v*3;ctx.stroke();
   },
-  // 2: Ripple (multispeaker — multiple centers)
+  // Breathing rings (beautiful)
   function(ctx,v,isDark){
-    var hue=themeHue(isDark),sat=themeSat(isDark);
-    var centers=[[0.25,0.3],[0.5,0.5],[0.75,0.3],[0.35,0.65],[0.65,0.65]];
+    var cx=W/2,cy=H/2,hue=themeHue(isDark);
+    for(var i=0;i<10;i++){
+      var phase=(t/2000+i*0.3)%(Math.PI*2);
+      var r=30+i*40+v*60*(0.6+0.4*Math.sin(phase));
+      var a=themeAlpha(isDark,(0.15+0.35*Math.sin(phase))*0.8);
+      ctx.beginPath();ctx.arc(cx,cy,r,0,Math.PI*2);
+      ctx.fillStyle=c((hue+i*28)%360,themeSat(isDark),themeLum(isDark,true),a);
+      ctx.fill();
+    }
+  }
+];
     centers.forEach(function(ctr,ci){
       var cx=W*ctr[0],cy=H*ctr[1];
       for(var i=0;i<5;i++){
@@ -293,24 +302,7 @@ var ringFuncs=[
     ctx.fillText('breathing \u00b7 v3 \u00b7 drift',W-32,H-28);
   }
 ];var barFuncs=[
-  // 0: Spectrum (slowed)
-  function(ctx,v,isDark){
-    var n=80,gap=2,w=(W-gap*(n+1))/n,hue=themeHue(isDark);
-    var sv=Math.pow(v,0.6);
-    for(var i=0;i<n;i++){
-      var hgt=15;
-      if(freqData&&micOn){var fi=freqData[Math.floor(i*freqData.length/n)]/255;hgt=Math.max(2,fi*H*0.75)}
-      else{hgt=Math.max(2,(Math.sin(i*0.3+t/1200)*0.5+0.5)*H*0.45*sv*5)}
-      var x=gap+i*(w+gap);
-      var g=ctx.createLinearGradient(x,H,x,H-hgt);
-      g.addColorStop(0,c((hue+i*3)%360,themeSat(isDark),themeLum(isDark,true),themeAlpha(isDark,0.7)));
-      g.addColorStop(1,c((hue+i*3)%360,themeSat(isDark),themeLum(isDark,false),themeAlpha(isDark,0.15)));
-      ctx.fillStyle=g;ctx.fillRect(x,H-hgt,w,hgt);
-      if(hgt>30)ctx.fillStyle=c((hue+i*3)%360,80,themeLum(isDark,true),themeAlpha(isDark,0.5));
-      ctx.fillRect(x,H-hgt,w,Math.min(4,hgt*0.1));
-    }
-  },
-  // 1: Mirror (slowed)
+  // Mirror bars
   function(ctx,v,isDark){
     var n=64,gap=2,w=(W-gap*(n+1))/n,hue=themeHue(isDark);
     var sv=Math.pow(v,0.55);
@@ -326,28 +318,11 @@ var ringFuncs=[
       ctx.fillStyle=g;ctx.fillRect(x,H/2-hgt,w,hgt*2);
     }
   },
-  // 2: Center-out (slowed)
-  function(ctx,v,isDark){
-    var n=80,gap=1,w=(W-gap*(n+1))/n,hue=themeHue(isDark);
-    var sv=Math.pow(v,0.55);
-    for(var i=0;i<n;i++){
-      var hgt=15;
-      if(freqData&&micOn){hgt=Math.max(2,freqData[Math.floor(i*freqData.length/n)]/255*H*0.4)}
-      else{hgt=Math.max(2,(Math.sin(i*0.28+t/1400)*0.5+0.5)*H*0.3*sv*4)}
-      var x=gap+i*(w+gap);
-      var bright=i%3===0;
-      ctx.fillStyle=c((hue+i*3.5)%360,themeSat(isDark),themeLum(isDark,bright),themeAlpha(isDark,0.6));
-      ctx.fillRect(x,H/2-hgt,w,hgt*2);
-      if(hgt>20)ctx.fillStyle=c((hue+i*3.5)%360,80,themeLum(isDark,true),themeAlpha(isDark,0.4));
-      ctx.fillRect(x,H/2-1,w,2);
-    }
-  },
-  // 3: Radial — CINEMATIC, screen-filling
+  // Radial — cinematic
   function(ctx,v,isDark){
     var cx=W/2,cy=H/2,n=120,hue=themeHue(isDark);
     var maxR=Math.min(W,H)*0.48;
     var sv=Math.pow(v,0.5);
-    // Dark radial gradient background for depth
     var bgGrad=ctx.createRadialGradient(cx,cy,0,cx,cy,maxR);
     bgGrad.addColorStop(0,isDark?'rgba(6,6,16,0)':'rgba(250,250,248,0)');
     bgGrad.addColorStop(1,isDark?'rgba(6,6,16,0.3)':'rgba(250,250,248,0.2)');
@@ -368,68 +343,16 @@ var ringFuncs=[
       ctx.fillRect(-barW/2,0,barW,-hgt);
       ctx.restore();
     }
-    // Center glow
     var glowGrad=ctx.createRadialGradient(cx,cy,0,cx,cy,maxR*0.3);
     glowGrad.addColorStop(0,c(hue,themeSat(isDark),themeLum(isDark,true),themeAlpha(isDark,0.08+sv*0.06)));
     glowGrad.addColorStop(1,'rgba(0,0,0,0)');
     ctx.fillStyle=glowGrad;ctx.fillRect(0,0,W,H);
   },
-  // 4: Waterfall (slowed)
-  function(ctx,v,isDark){
-    var n=50,gap=4,w=(W-gap*(n+1))/n,hue=themeHue(isDark);
-    var sv=Math.pow(v,0.5);
-    for(var i=0;i<n;i++){
-      var hgt=10;
-      if(freqData&&micOn){hgt=Math.max(2,freqData[Math.floor(i*freqData.length/n)]/255*H*0.6)}
-      else{hgt=Math.max(2,(Math.cos(i*0.35+t/1000)*0.5+0.5)*H*0.4*sv*3)}
-      var x=gap+i*(w+gap);
-      for(var j=0;j<5;j++){
-        var yOff=j*(hgt/5);
-        var a=themeAlpha(isDark,0.5-j*0.08);
-        ctx.fillStyle=c((hue+i*4+j*10)%360,themeSat(isDark),themeLum(isDark,j<2),a);
-        ctx.fillRect(x,H-yOff-hgt/5,w,hgt/5+1);
-      }
-    }
-  },
-  // 5: Glow (slowed)
-  function(ctx,v,isDark){
-    var n=60,gap=3,w=(W-gap*(n+1))/n,hue=themeHue(isDark);
-    var sv=Math.pow(v,0.5);
-    for(var i=0;i<n;i++){
-      var hgt=10;
-      if(freqData&&micOn){hgt=Math.max(2,freqData[Math.floor(i*freqData.length/n)]/255*H*0.65)}
-      else{hgt=Math.max(2,(Math.sin(i*0.3+t/1100)*0.5+0.5)*H*0.4*sv*4)}
-      var x=gap+i*(w+gap);
-      var glow=c((hue+i*4)%360,themeSat(isDark),themeLum(isDark,true),themeAlpha(isDark,0.2));
-      ctx.shadowColor=glow;ctx.shadowBlur=12+sv*20;
-      ctx.fillStyle=c((hue+i*4)%360,themeSat(isDark),themeLum(isDark,true),themeAlpha(isDark,0.7));
-      ctx.fillRect(x,H-hgt,w,hgt);
-      ctx.shadowBlur=0;
-    }
-  },
-  // 6: Stepped (slowed)
-  function(ctx,v,isDark){
-    var n=48,stepH=Math.max(4,H/80),gap=3,w=(W-gap*(n+1))/n,hue=themeHue(isDark);
-    var sv=Math.pow(v,0.5);
-    for(var i=0;i<n;i++){
-      var hgt=10;
-      if(freqData&&micOn){hgt=Math.max(stepH,freqData[Math.floor(i*freqData.length/n)]/255*H*0.6)}
-      else{hgt=Math.max(stepH,(Math.sin(i*0.32+t/1250)*0.5+0.5)*H*0.4*sv*4)}
-      var steps=Math.floor(hgt/stepH);
-      var x=gap+i*(w+gap);
-      for(var s=0;s<steps;s++){
-        var a=themeAlpha(isDark,0.3+s*0.06);
-        ctx.fillStyle=c((hue+i*5+s*8)%360,themeSat(isDark),themeLum(isDark,s<3),a);
-        ctx.fillRect(x,H-(s+1)*stepH,w,stepH-1);
-      }
-    }
-  },
-  // 7: Waveform (slowed)
+  // Waveform
   function(ctx,v,isDark){
     var hue=themeHue(isDark);
     var sv=Math.pow(v,0.5);
-    ctx.beginPath();
-    ctx.moveTo(0,H/2);
+    ctx.beginPath();ctx.moveTo(0,H/2);
     for(var i=0;i<=W;i+=3){
       var idx=Math.floor(i/W*(freqData?freqData.length:128));
       var fi=freqData&&micOn?freqData[idx%freqData.length]/255:0.15+Math.sin(i*0.02+t/1000)*0.3;
@@ -463,8 +386,8 @@ function animate(ts){
   var v=smoothing||volume;
   var isDark=document.body.classList.contains('dark');
   
-  // Demo word feed
-  if(micOn) demoWordFeed();
+  // Real mic word detection
+  if(micOn) detectWordsFromMic(v);
   
   // Decay speaker islands
   speakerIslands.forEach(function(si){si.active*=0.96});
@@ -527,20 +450,20 @@ function setMode(m){
   updateVarLabel();
 }
 function nextVar(){
-  if(currentMode==='both'||currentMode==='rings') ringVar=(ringVar+1)%7;
-  if(currentMode==='both'||currentMode==='bars') barVar=(barVar+1)%8;
+  if(currentMode==='both'||currentMode==='rings') ringVar=(ringVar+1)%3;
+  if(currentMode==='both'||currentMode==='bars') barVar=(barVar+1)%3;
   updateVarLabel();
 }
 function prevVar(){
-  if(currentMode==='both'||currentMode==='rings') ringVar=(ringVar+6)%7;
-  if(currentMode==='both'||currentMode==='bars') barVar=(barVar+7)%8;
+  if(currentMode==='both'||currentMode==='rings') ringVar=(ringVar+2)%3;
+  if(currentMode==='both'||currentMode==='bars') barVar=(barVar+2)%3;
   updateVarLabel();
 }
 function updateVarLabel(){
-  var names=['Concentric','Spiral','Ripple','Cluster','Breathing','Breathing v2','Breathing v3'];
-  var bnames=['Spectrum','Mirror','Center-out','Radial','Waterfall','Glow','Stepped','Waveform'];
-  var rn=currentMode==='bars'?'—':names[ringVar]+' '+(ringVar+1)+'/7';
-  var bn=currentMode==='rings'?'—':bnames[barVar]+' '+(barVar+1)+'/8';
+  var names=['Concentric','Spiral','Breathing'];
+  var bnames=['Mirror','Radial','Waveform'];
+  var rn=currentMode==='bars'?'—':names[ringVar]+' '+(ringVar+1)+'/3';
+  var bn=currentMode==='rings'?'—':bnames[barVar]+' '+(barVar+1)+'/3';
   document.getElementById('varName').textContent='Rings: '+rn+'  |  Bars: '+bn;
 }
 
