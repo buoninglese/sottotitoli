@@ -87,33 +87,27 @@ function vc(h,vol){return hsl((h+vol*80)%360,65,55+vol*15,0.5+vol*0.5);}
 function br(t,vol){return mode==='breathe'?Math.sin(t*.003)*.15+.25+vol*.4:vol*.7+.15;}
 function pv(t,i,vol){return mode==='pulse'?Math.sin(t*.005+i)*.3+.35+vol*.5:vol*.6+.2;}
 
-// PROPER S-SHAPE: bezier path, top curve goes right, bottom curve goes left
-// S starts top-center-left, curves right for top half, curves left for bottom half, ends bottom-center-right
-var S_PATH='M38,10 C72,10 78,34 62,42 C44,51 22,46 28,62 C34,78 65,74 65,74';
+// PROPER S-SHAPE: top bulge curves LEFT, bottom bulge curves RIGHT, ends with a swirl
+// S starts top-right, sweeps left through middle, sweeps right at bottom
+var S_PATH='M55,6 C28,6 18,40 42,46 C66,52 82,46 72,66 C62,82 45,80 42,78';
 
 // Sample points along the S bezier for dot/ring/particle placement
 function sampleS(n){
   var pts=[];
-  for(var i=0;i<=n;i++){
-    var t=i/n;
-    // Cubic bezier: M38,10 C72,10 78,34 62,42  (segment 1: t 0..0.5 mapped to 0..1)
-    //               C44,51 22,46 28,62  (segment 2: t 0.5..1 mapped to 0..1)
-    //               C34,78 65,74 65,74
-    var x,y;
-    if(t<=0.333){
-      var s=t/0.333;
-      var p0x=38,p0y=10,p1x=72,p1y=10,p2x=78,p2y=34,p3x=62,p3y=42;
-      var u=1-s;x=u*u*u*p0x+3*u*u*s*p1x+3*u*s*s*p2x+s*s*s*p3x;y=u*u*u*p0y+3*u*u*s*p1y+3*u*s*s*p2y+s*s*s*p3y;
-    }else if(t<=0.666){
-      var s=(t-0.333)/0.333;
-      var p0x=62,p0y=42,p1x=44,p1y=51,p2x=22,p2y=46,p3x=28,p3y=62;
-      var u=1-s;x=u*u*u*p0x+3*u*u*s*p1x+3*u*s*s*p2x+s*s*s*p3x;y=u*u*u*p0y+3*u*u*s*p1y+3*u*s*s*p2y+s*s*s*p3y;
-    }else{
-      var s=(t-0.666)/0.334;
-      var p0x=28,p0y=62,p1x=34,p1y=78,p2x=65,p2y=74,p3x=65,p3y=74;
-      var u=1-s;x=u*u*u*p0x+3*u*u*s*p1x+3*u*s*s*p2x+s*s*s*p3x;y=u*u*u*p0y+3*u*u*s*p1y+3*u*s*s*p2y+s*s*s*p3y;
+  // 3-segment cubic bezier sampled evenly
+  var segs=[
+    {p0:[55,6],p1:[28,6],p2:[18,40],p3:[42,46]},
+    {p0:[42,46],p1:[66,52],p2:[82,46],p3:[72,66]},
+    {p0:[72,66],p1:[62,82],p2:[45,80],p3:[42,78]}
+  ];
+  for(var s=0;s<segs.length;s++){
+    var seg=segs[s];var nPts=Math.round(n/3);
+    for(var i=0;i<=nPts;i++){
+      var t=i/nPts,u=1-t;
+      var x=u*u*u*seg.p0[0]+3*u*u*t*seg.p1[0]+3*u*t*t*seg.p2[0]+t*t*t*seg.p3[0];
+      var y=u*u*u*seg.p0[1]+3*u*u*t*seg.p1[1]+3*u*t*t*seg.p2[1]+t*t*t*seg.p3[1];
+      pts.push({x:x,y:y});
     }
-    pts.push({x:x,y:y});
   }
   return pts;
 }
@@ -137,8 +131,8 @@ for(var v=1;v<=10;v++){(function(vv){logos.push({n:vv+40,name:'Particle S '+vv,b
 
 // 51-53: Special S
 logos.push({n:51,name:'Segmented S',build:function(vol,t){var pts=sampleS(18);var h='<svg viewBox="0 0 100 85" style="width:90px;height:76px">';for(var i=0;i<pts.length;i++){var p=pts[i],len=6+pv(t,i,vol)*10,ang=Math.PI/2-(i/pts.length)*Math.PI*2.2;h+='<line x1="'+p.x+'" y1="'+p.y+'" x2="'+(p.x+Math.cos(ang)*len)+'" y2="'+(p.y+Math.sin(ang)*len)+'" stroke="'+vc(250,vol)+'" stroke-width="'+(1.5+vol*2)+'" stroke-linecap="round"/>';}return h+'</svg>';}});
-logos.push({n:52,name:'Gradient S',build:function(vol,t){return'<svg viewBox="0 0 100 85" style="width:90px;height:76px"><defs><linearGradient id="gs" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="'+vc(280,vol)+'"/><stop offset="50%" stop-color="'+vc(180,vol)+'"/><stop offset="100%" stop-color="'+vc(340,vol)+'"/></linearGradient></defs><path d="'+S_PATH+'" fill="none" stroke="url(#gs)" stroke-width="'+(2+vol*3)+'" stroke-linecap="round"/></svg>';}});
-logos.push({n:53,name:'Glow S',build:function(vol,t){return'<svg viewBox="0 0 100 85" style="width:90px;height:76px"><filter id="gl"><feGaussianBlur stdDeviation="'+(1+vol*4)+'"/><feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge></filter><path d="'+S_PATH+'" fill="none" stroke="'+vc(270,vol)+'" stroke-width="2" stroke-linecap="round" filter="url(#gl)"/></svg>';}});
+logos.push({n:52,name:'Gradient S',build:function(vol,t){return'<svg viewBox="0 0 100 85" style="width:90px;height:76px"><defs><linearGradient id="gs" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="'+vc(280,vol)+'"/><stop offset="50%" stop-color="'+vc(180,vol)+'"/><stop offset="100%" stop-color="'+vc(340,vol)+'"/></linearGradient></defs><path d="'+S_PATH+'" fill="none" stroke="url(#gs)" stroke-width="'+(2.5+vol*3)+'" stroke-linecap="round"/></svg>';}});
+logos.push({n:53,name:'Swirl S',build:function(vol,t){var swirlAmp=6+vol*8;return'<svg viewBox="0 0 100 85" style="width:90px;height:76px"><defs><filter id="gl"><feGaussianBlur stdDeviation="'+(1+vol*3)+'"/><feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs><path d="'+S_PATH+'" fill="none" stroke="'+vc(270,vol)+'" stroke-width="2.5" stroke-linecap="round" filter="url(#gl)"/><path d="M42,78 C35,82 28,80 24,76 C20,72 22,66 28,64 C34,62 38,66 36,70" fill="none" stroke="'+vc(340,vol)+'" stroke-width="1.5" stroke-linecap="round" opacity="'+(.5+vol*.5)+'"/></svg>';}});
 
 var grid=document.getElementById('logoGrid');
 logos.forEach(function(l,i){
