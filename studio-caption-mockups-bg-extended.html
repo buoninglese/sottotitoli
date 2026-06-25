@@ -401,8 +401,8 @@ function animate(ts){
   var bgOp=toggles.bgOpacity||1;
   t=(ts||Date.now())*speedMul;
   
-  // Spike button — temporarily max out volume
-  if(spikeActive){v=Math.min(1,v+0.5);smoothing=v}
+  // Spike button — max everything like a car horn
+  if(spikeActive){v=1;smoothing=1;volume=1}
   
   var isDark=document.body.classList.contains('dark');
   
@@ -466,6 +466,43 @@ function animate(ts){
   if(currentMode==='both'||currentMode==='rings') ringFuncs[ringVar](ctxRings,v,isDark);
   if(currentMode==='both'||currentMode==='bars') barFuncs[barVar](ctxBars,v,isDark);
 
+  // ── Apply toggle post-effects ──
+  var glowVal=toggles.glow||1;
+  var shiftVal=toggles.colorShift||0;
+  var mirrorVal=toggles.mirror||0;
+  
+  // Glow: overlay a soft radial gradient
+  if(glowVal>1){
+    [ctxRings,ctxBars].forEach(function(ctx){
+      if(glowVal>=3){
+        var g=ctx.createRadialGradient(W/2,H/2,W*.1,W/2,H/2,W*.6);
+        g.addColorStop(0,'rgba(255,255,255,'+(0.04*glowVal)+')');
+        g.addColorStop(1,'rgba(255,255,255,0)');
+        ctx.fillStyle=g;ctx.fillRect(0,0,W,H);
+      }
+    });
+  }
+  
+  // Color shift: overlay a hue-rotated tint
+  if(shiftVal>0){
+    [ctxRings,ctxBars].forEach(function(ctx){
+      var hue=(Date.now()*shiftVal*0.01)%360;
+      ctx.fillStyle='hsla('+hue+',50%,50%,'+(0.03*shiftVal)+')';
+      ctx.fillRect(0,0,W,H);
+    });
+  }
+  
+  // Mirror: flip half the canvas
+  if(mirrorVal===1){
+    [ctxRings,ctxBars].forEach(function(ctx){
+      ctx.save();ctx.scale(-1,1);ctx.drawImage(ctx.canvas,-W,0);ctx.restore();
+    });
+  }else if(mirrorVal===2){
+    [ctxRings,ctxBars].forEach(function(ctx){
+      ctx.save();ctx.scale(1,-1);ctx.drawImage(ctx.canvas,0,-H);ctx.restore();
+    });
+  }
+
   var displayV=Math.min(1,v*2.5*sensitivity); // amplify for meter display
   document.getElementById('meterFill').style.width=(displayV*100)+'%';
   document.getElementById('meterLabel').textContent=Math.round(displayV*100-50)+' dB';
@@ -522,7 +559,7 @@ function copySettings(){
   if(navigator.clipboard){navigator.clipboard.writeText(txt).then(function(){var t=document.getElementById('copyToast');t.style.opacity=1;setTimeout(function(){t.style.opacity=0},1200)})}
 }
 var spikeActive=false,spikeVolume=0;
-function spikeOn(){spikeActive=true}
+function spikeOn(){spikeActive=true;smoothing=1;volume=1}
 function spikeOff(){spikeActive=false}
 // ── Init ──
 initCanvases();
