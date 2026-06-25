@@ -496,73 +496,67 @@ function drawRadial(ctx,v,isDark,params,colorMul){
 // ══════════════════════════════════════
 // MODE 2 — iTunes Bars (mirror freq bars, color cycling, peak particles)
 // ══════════════════════════════════════
-var iTunesParticles=[];
-function drawITunesBars(ctx,v,isDark){
-  var hue=(t/30+voiceHue)%360,sat=70;
-  var n=Math.floor(60+voiceBass*40),gap=3,w=(W-gap*(n+1))/n;
-  var sv=Math.pow(v,0.6);
-  // Dark background with subtle vignette
-  var bgGrad=ctx.createRadialGradient(W/2,H/2,0,W/2,H/2,Math.max(W,H)*0.7);
-  bgGrad.addColorStop(0,isDark?'rgba(6,6,20,0)':'rgba(250,250,248,0)');
-  bgGrad.addColorStop(1,isDark?'rgba(6,6,20,0.3)':'rgba(250,250,248,0.15)');
-  ctx.fillStyle=bgGrad;ctx.fillRect(0,0,W,H);
-  // Center reference line
-  ctx.strokeStyle=isDark?'rgba(255,255,255,0.04)':'rgba(0,0,0,0.04)';
-  ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(0,H/2);ctx.lineTo(W,H/2);ctx.stroke();
-  // Track bar peaks for particles
-  var peaks=[];
-  for(var i=0;i<n;i++){
-    var fi=0.15;
-    if(freqData&&micOn){fi=freqData[Math.floor(i*freqData.length/n)]/255}
-    else{fi=0.12+Math.sin(i*0.4+t/1000)*0.25+0.1}
-    if(fi<0.03)fi=0.03;
-    var hgt=fi*H*0.44*fx.zoom;
-    var x=gap+i*(w+gap);
-    var barHue=(hue+i*360/n+t/500)%360;
-    // Top bar (up from center)
-    var gTop=ctx.createLinearGradient(x,H/2,x,H/2-hgt);
-    gTop.addColorStop(0,c(barHue,sat,75,0.02+sv*0.03));
-    gTop.addColorStop(0.3,c(barHue,sat,80,0.25+sv*0.35));
-    gTop.addColorStop(1,c(barHue+30,80,90,0.7+sv*0.3));
-    ctx.fillStyle=gTop;ctx.fillRect(x,H/2,w,-hgt);
-    // Bottom bar (mirrored down)
-    var gBot=ctx.createLinearGradient(x,H/2,x,H/2+hgt);
-    gBot.addColorStop(0,c(barHue,sat,75,0.02+sv*0.03));
-    gBot.addColorStop(0.3,c(barHue,sat,80,0.25+sv*0.35));
-    gBot.addColorStop(1,c(barHue+30,80,90,0.7+sv*0.3));
-    ctx.fillStyle=gBot;ctx.fillRect(x,H/2,w,hgt);
-    // Bar cap glow
-    if(fi>0.15){
-      var capY=H/2-hgt,capH=Math.max(2,hgt*0.08);
-      ctx.fillStyle=c(barHue,90,95,0.8+sv*0.2);
-      ctx.fillRect(x,capY,w,capH);
-      ctx.fillRect(x,H/2+hgt-capH,w,capH);
-      peaks.push({x:x+w/2, y:capY, hue:barHue, fi:fi});
+// MODE 1 — Word Bubbles (words spawn bubbles, they interact)
+// ══════════════════════════════════════
+var bubbles=[],lastBubbleVol=0,bubbleThrottle=0;
+function spawnBubble(v){
+  if(!v||v<0.08)return;
+  if(Date.now()-bubbleThrottle<150)return;
+  var avg=lastBubbleVol*0.92+v*0.08;
+  if(v<avg*1.4){lastBubbleVol=avg;return}
+  bubbleThrottle=Date.now();
+  lastBubbleVol=v;
+  var hue=(voiceHue+t/30+Math.random()*60)%360;
+  var r=15+v*60*ptcl.size;
+  bubbles.push({
+    x:W*0.2+Math.random()*W*0.6, y:H*0.2+Math.random()*H*0.6,
+    vx:(Math.random()-0.5)*1.5, vy:(Math.random()-0.5)*1.5,
+    r:r, targetR:r, hue:hue, life:1, age:0
+  });
+  if(bubbles.length>120)bubbles.shift();
+}
+function drawWordBubbles(ctx,v,isDark){
+  spawnBubble(v);
+  ctx.fillStyle=isDark?'rgba(6,6,20,0.2)':'rgba(250,250,248,0.18)';
+  ctx.fillRect(0,0,W,H);
+  for(var i=0;i<bubbles.length;i++){
+    var b=bubbles[i];
+    b.age+=0.016;b.life-=0.0015;
+    if(b.life<=0){bubbles.splice(i,1);i--;continue}
+    for(var j=i+1;j<bubbles.length;j++){
+      var b2=bubbles[j];
+      var dx=b2.x-b.x,dy=b2.y-b.y,dist=Math.sqrt(dx*dx+dy*dy)+1;
+      if(dist<120){
+        var force=0.03/dist;
+        b.vx-=dx*force;b.vy-=dy*force;
+        b2.vx+=dx*force;b2.vy+=dy*force;
+        if(dist<80){
+          ctx.beginPath();ctx.moveTo(b.x,b.y);ctx.lineTo(b2.x,b2.y);
+          ctx.strokeStyle=c((b.hue+b2.hue)/2,50,75,0.08*(1-dist/80));
+          ctx.lineWidth=0.5;ctx.stroke();
+        }
+      }
     }
-  }
-  // Draw peak particles
-  for(var p=0;p<peaks.length;p++){
-    var pk=peaks[p];
-    var pr=2+pk.fi*8*ptcl.size;
-    var alpha=0.5+pk.fi*0.5;
-    // Glow
-    var glow=ctx.createRadialGradient(pk.x,pk.y,0,pk.x,pk.y,pr*2);
-    glow.addColorStop(0,c(pk.hue,90,95,alpha*0.6));
+    b.x+=b.vx;b.y+=b.vy;
+    b.vx*=0.98;b.vy*=0.98;
+    if(b.x<b.r){b.x=b.r;b.vx*=-0.6}
+    if(b.x>W-b.r){b.x=W-b.r;b.vx*=-0.6}
+    if(b.y<b.r){b.y=b.r;b.vy*=-0.6}
+    if(b.y>H-b.r){b.y=H-b.r;b.vy*=-0.6}
+    var pulse=1+Math.sin(b.age*3+t/800)*0.15;
+    var r=b.r*(0.6+0.4*b.life)*pulse;
+    if(r<1)continue;
+    var glow=ctx.createRadialGradient(b.x,b.y,0,b.x,b.y,r*2);
+    glow.addColorStop(0,c(b.hue,80,80,0.25*b.life));
+    glow.addColorStop(0.5,c(b.hue,60,60,0.1*b.life));
     glow.addColorStop(1,'rgba(0,0,0,0)');
-    ctx.fillStyle=glow;ctx.fillRect(pk.x-pr*2,pk.y-pr*2,pr*4,pr*4);
-    // Core dot
-    ctx.beginPath();ctx.arc(pk.x,pk.y,pr*0.6,0,Math.PI*2);
-    ctx.fillStyle=c(pk.hue,100,98,alpha);
+    ctx.fillStyle=glow;ctx.fillRect(b.x-r*2,b.y-r*2,r*4,r*4);
+    ctx.beginPath();ctx.arc(b.x,b.y,r*0.5,0,Math.PI*2);
+    ctx.fillStyle=c(b.hue,90,90,0.4*b.life);
     ctx.fill();
-    // Mirror below
-    var my=H-pk.y;
-    var glow2=ctx.createRadialGradient(pk.x,my,0,pk.x,my,pr*2);
-    glow2.addColorStop(0,c(pk.hue+30,90,95,alpha*0.6));
-    glow2.addColorStop(1,'rgba(0,0,0,0)');
-    ctx.fillStyle=glow2;ctx.fillRect(pk.x-pr*2,my-pr*2,pr*4,pr*4);
-    ctx.beginPath();ctx.arc(pk.x,my,pr*0.6,0,Math.PI*2);
-    ctx.fillStyle=c(pk.hue+30,100,98,alpha);
-    ctx.fill();
+    ctx.beginPath();ctx.arc(b.x,b.y,r,0,Math.PI*2);
+    ctx.strokeStyle=c(b.hue,70,85,0.2*b.life);
+    ctx.lineWidth=1.5*b.life;ctx.stroke();
   }
 }
 
@@ -648,7 +642,7 @@ function animate(ts){
   var isDark=document.body.classList.contains('dark');
   ctx.clearRect(0,0,W,H);
   if(currentMode===0)drawRadial(ctx,v,isDark,variations[0],1);
-  else if(currentMode===1)drawITunesBars(ctx,v,isDark);
+  else if(currentMode===1)drawWordBubbles(ctx,v,isDark);
   else drawFlowField(ctx,v,isDark);
 
   var displayV=Math.min(1,v*2.5*sensitivity);
@@ -682,8 +676,8 @@ function setTheme(t){
   document.getElementById('btnLight').className='btn'+(t==='light'?' on':'');
   document.getElementById('titleText').style.color=t==='dark'?'#e8eaed':'#1a1a1a';
 }
-var modeNames=['Thick Punchy','iTunes Bars','Flow Field'];
-var modeDescs=['3.5px heavy · instant response · high contrast','Classic mirror bars · color cycling · peak sparks','Flowing particle waves · spectral ribbons'];
+var modeNames=['Thick Punchy','Word Bubbles','Flow Field'];
+var modeDescs=['Radial bars · instant response','Each word spawns a bubble · grows from silence','Particle waves · spectral ribbons'];
 function nextMode(){currentMode=(currentMode+1)%3;updateModeLabel()}
 function prevMode(){currentMode=(currentMode+2)%3;updateModeLabel()}
 function updateModeLabel(){
