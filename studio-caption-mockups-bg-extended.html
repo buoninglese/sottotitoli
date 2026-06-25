@@ -130,7 +130,7 @@ body.light #leftPanel{background:rgba(255,255,255,.92);border-color:rgba(0,0,0,.
   </div>
   <div class="sens-row">
     <label for="sensSlider">sens</label>
-    <input type="range" class="sens-slider" id="sensSlider" min="0.1" max="5" step="0.1" value="1" oninput="updateSensitivity(this.value)">
+    <input type="range" class="sens-slider" id="sensSlider" min="0.1" max="100" step="0.5" value="1" oninput="updateSensitivity(this.value)">
     <span class="meter-label" id="sensLabel">1.0x</span>
   </div>
   <div class="btn-row">
@@ -147,7 +147,25 @@ body.light #leftPanel{background:rgba(255,255,255,.92);border-color:rgba(0,0,0,.
     <button class="btn var-nav" onclick="nextVar()" title="Next variation">&#8594;</button>
   </div>
   <div class="btn-row" style="margin-top:4px">
-    <button class="btn" id="btnDemoDeluxe" onclick="toggleDemoDeluxe()" style="border-color:rgba(251,191,36,.3);color:var(--amber);font-size:11px;padding:10px 20px">✨ DEMO DELUXE</button>
+    <div style="background:rgba(15,18,30,.85);border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:10px 14px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:center">
+      <span style="font-size:9px;opacity:.4">🎮 Emulator</span>
+      <button class="btn" id="btnEmuPlay" onclick="toggleEmulator()" style="font-size:9px;padding:5px 10px">▶ Play</button>
+      <select id="emuPattern" onchange="setEmuPattern(this.value)" style="font-size:9px;padding:3px 6px;border-radius:6px;border:1px solid rgba(255,255,255,.1);background:rgba(255,255,255,.04);color:inherit;font-family:inherit;cursor:pointer">
+        <option value="sine">Sine wave</option>
+        <option value="ramp">Ramp up/down</option>
+        <option value="burst">Burst fire</option>
+        <option value="stutter">Stutter chop</option>
+        <option value="random">Random walk</option>
+        <option value="heartbeat">Heartbeat</option>
+        <option value="siren">Siren</option>
+      </select>
+      <span style="font-size:8px;opacity:.3">spd</span>
+      <input type="range" id="emuSpeed" min="0.2" max="3" step="0.1" value="1" oninput="setEmuSpeed(this.value)" style="width:40px;height:3px">
+      <span style="font-size:8px;opacity:.3">int</span>
+      <input type="range" id="emuIntensity" min="0.1" max="1" step="0.05" value="0.7" oninput="setEmuIntensity(this.value)" style="width:40px;height:3px">
+      <span id="emuSpeedLabel" style="font-size:8px;opacity:.3">1×</span>
+      <span id="emuIntLabel" style="font-size:8px;opacity:.3">70%</span>
+    </div>
   </div>
 </div>
 <script>
@@ -424,7 +442,7 @@ var barFuncs=[
 function animate(ts){
   animFrame=requestAnimationFrame(animate);
   t=ts||Date.now();
-  if(micOn){readAudio();}else if(!demoDeluxeOn){
+  if(micOn){readAudio();}else if(!emuOn){
     smoothing=smoothing*0.92+0.04;
     volume=0.08+Math.sin(t/1800)*0.06+Math.sin(t/3100)*0.05+Math.sin(t/5200)*0.03+Math.sin(t/7300)*0.02;
   }
@@ -648,54 +666,43 @@ var spikeActive=false,spikeVolume=0;
 function spikeOn(){spikeActive=true;smoothing=1;volume=1}
 function spikeOff(){spikeActive=false}
 
-// ── Demo Deluxe: rollercoaster audio simulation ──
-var demoDeluxeOn=false,demoPhase=0,demoTime=0,demoInterval=null;
-function toggleDemoDeluxe(){
-  demoDeluxeOn=!demoDeluxeOn;
-  var btn=document.getElementById('btnDemoDeluxe');
-  if(demoDeluxeOn){
-    btn.textContent='⏹ STOP DEMO';
-    btn.style.background='rgba(251,191,36,.15)';
-    micOn=true;demoPhase=0;demoTime=0;
+// ── Audio Emulator ──
+var emuOn=false,emuPattern='sine',emuSpeed=1,emuIntensity=0.7,emuTime=0,emuInterval=null;
+function toggleEmulator(){
+  emuOn=!emuOn;
+  var btn=document.getElementById('btnEmuPlay');
+  if(emuOn){
+    btn.textContent='⏹ Stop';btn.style.background='rgba(239,68,68,.15)';btn.style.borderColor='rgba(239,68,68,.3)';btn.style.color='#ef4444';
+    micOn=true;emuTime=0;
     if(!animFrame)animate();
-    // Kill demo interval if exists
-    if(demoInterval)clearInterval(demoInterval);
-    demoInterval=setInterval(advanceDemo,50);
+    if(emuInterval)clearInterval(emuInterval);
+    emuInterval=setInterval(advanceEmulator,40);
   }else{
-    btn.textContent='✨ DEMO DELUXE';
-    btn.style.background='';
+    btn.textContent='▶ Play';btn.style.background='';btn.style.borderColor='';btn.style.color='';
     micOn=false;
-    if(demoInterval)clearInterval(demoInterval);
-    demoInterval=null;
+    if(emuInterval)clearInterval(emuInterval);emuInterval=null;
   }
 }
-function advanceDemo(){
-  demoTime+=50;
-  var t=demoTime/1000; // seconds
-  // Rollercoaster pattern: silence → build → burst → sustain → decay → quiet → stutter → blast → fade
-  
-  if(t<2){volume=0.02; smoothing=smoothing*0.9+volume*0.1}           // silence
-  else if(t<4){volume=0.05+(t-2)*0.1; smoothing=smoothing*0.85+volume*0.15} // slow build
-  else if(t<5){volume=0.3+Math.sin(t*20)*0.15; smoothing=volume}      // wobble
-  else if(t<6.5){volume=0.6+Math.sin(t*30)*0.25; smoothing=volume}    // burst incoming
-  else if(t<7){volume=1.0; smoothing=1.0}                              // FULL BLAST
-  else if(t<8){volume=0.9; smoothing=volume}                           // sustain
-  else if(t<9){volume=0.4+(8.5-t)*0.5; smoothing=smoothing*0.8+volume*0.2} // decay
-  else if(t<11){volume=0.08+Math.sin(t*3)*0.05; smoothing=smoothing*0.95+volume*0.05} // quiet
-  else if(t<13){                                                        // stutter
-    var stut=Math.floor(t*8)%3;
-    volume=stut===0?0.7:stut===1?0.1:0.4;
-    smoothing=volume;
+function setEmuPattern(v){emuPattern=v}
+function setEmuSpeed(v){emuSpeed=parseFloat(v);document.getElementById('emuSpeedLabel').textContent=v+'×'}
+function setEmuIntensity(v){emuIntensity=parseFloat(v);document.getElementById('emuIntLabel').textContent=Math.round(v*100)+'%'}
+function advanceEmulator(){
+  emuTime+=40*emuSpeed;
+  var t=emuTime/1000, I=emuIntensity;
+  switch(emuPattern){
+    case'sine':volume=0.3+Math.sin(t*2)*0.3*I+Math.sin(t*5)*0.15*I;break;
+    case'ramp':volume=((t%4)/4)*I;if((t%8)>4)volume=I-((t%4)/4)*I;break;
+    case'burst':var b=(t%3);volume=b<2?0.05:(b<2.1?I:0.05+Math.sin(t*10)*0.1*I);break;
+    case'stutter':var s=Math.floor(t*6)%4;volume=s===0?I:s===2?I*0.6:s===1?0.1:0.3*I;break;
+    case'random':volume=0.1+Math.random()*0.6*I+Math.sin(t*0.7)*0.2*I;break;
+    case'heartbeat':var h=t%2;volume=h<0.2?I:(h<0.4?0.1:h<1.6?0.05:I*0.5);break;
+    case'siren':volume=0.2+Math.abs(Math.sin(t*1.5))*0.6*I+Math.sin(t*8)*0.15*I;break;
   }
-  else if(t<14.5){volume=0.5+Math.sin(t*15)*0.3+Math.sin(t*23)*0.2; smoothing=volume} // rapid
-  else if(t<15){volume=1.0; smoothing=1.0}                              // BLAST
-  else if(t<17){volume=Math.max(0.02,1.0-(t-15)*0.5); smoothing=smoothing*0.7+volume*0.3} // fade out
-  else{demoTime=0} // loop back
-  
-  // Stutter drive speaker islands
-  if(volume>0.5&&Math.random()<0.3){
+  smoothing=smoothing*0.7+volume*0.3;
+  // Trigger speaker islands
+  if(volume>0.5&&Math.random()<0.2){
     var si=speakerIslands[Math.floor(Math.random()*speakerIslands.length)];
-    si.active=Math.min(1,si.active+0.4);
+    si.active=Math.min(1,si.active+0.3);
   }
 }
 // ── Init ──
