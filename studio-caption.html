@@ -496,6 +496,8 @@ body.fullscreen-active #fullscreenBtn:hover { background: var(--accent); color: 
 @keyframes panelPulse{0%{box-shadow:0 0 0 0 rgba(52,211,153,.15)}50%{box-shadow:0 0 0 4px rgba(52,211,153,.06)}100%{box-shadow:0 0 0 0 rgba(52,211,153,0)}}
 .extras-panel.pulse{animation:panelPulse .5s ease}
 
+
+
 /* Shoji mode tweaks */
 [data-caption-mode="j7b"] .btn-demo{font-family:'Inter',sans-serif;border-radius:6px}
 </style>
@@ -1046,6 +1048,8 @@ function toggleTheme() {
   if (btn) btn.textContent = t === 'dark' ? '☀️' : '🌙';
   if (hamburgerLink) hamburgerLink.textContent = t === 'dark' ? '☀️ Light mode' : '🌙 Dark mode';
   localStorage.setItem('sottotitoli-theme', t);
+  // Fix extras panel colors if open
+  setTimeout(function(){ window.fixExtrasPanelColors(); }, 100);
 }
 (function() {
   var t = localStorage.getItem('sottotitoli-theme') || 'light';
@@ -3612,6 +3616,57 @@ window.runDiarization = function(){
   });
 };
 
+
+// ═══ Theme-aware panel color fixer ═══
+window.fixExtrasPanelColors = function(){
+  var panel = document.getElementById('extrasPanel');
+  if(!panel) return;
+  var isLight = document.documentElement.getAttribute('data-theme') === 'light';
+  if(!isLight) return;
+  
+  // Walk all elements and swap rgba(255,255,255 → rgba(0,0,0 in inline styles
+  var all = panel.querySelectorAll('*');
+  all.forEach(function(el){
+    var st = el.getAttribute('style');
+    if(!st) return;
+    // Replace white-alpha colors with dark-alpha equivalents
+    // This handles color, background, border-color, etc.
+    var changed = false;
+    var newSt = st.replace(/rgba\(255,\s*255,\s*255,\s*([\d.]+)\)/g, function(match, alpha){
+      changed = true;
+      // Map the alpha to a darker equivalent (white at low alpha ≈ black at low alpha on light bg)
+      var a = parseFloat(alpha);
+      // Keep the alpha but swap white to black
+      return 'rgba(0,0,0,' + a + ')';
+    });
+    // Also fix hardcoded near-white colors
+    newSt = newSt.replace(/color:\s*#e8eaed/g, 'color:#1a1a1a');
+    // Fix dark table backgrounds
+    newSt = newSt.replace(/background:\s*rgba\(15,\s*18,\s*30/g, 'background:rgba(255,255,255');
+    if(changed || newSt !== st){
+      el.setAttribute('style', newSt);
+    }
+  });
+  
+  // Also fix SVG text fills
+  var texts = panel.querySelectorAll('text');
+  texts.forEach(function(t){
+    var f = t.getAttribute('fill');
+    if(f && f.indexOf('rgba(255,255,255') >= 0){
+      t.setAttribute('fill', f.replace(/rgba\(255,\s*255,\s*255/g, 'rgba(0,0,0'));
+    }
+  });
+  
+  // Fix SVG circle strokes
+  var circles = panel.querySelectorAll('circle');
+  circles.forEach(function(c){
+    var s = c.getAttribute('stroke');
+    if(s && s.indexOf('rgba(255,255,255') >= 0){
+      c.setAttribute('stroke', s.replace(/rgba\(255,\s*255,\s*255/g, 'rgba(0,0,0'));
+    }
+  });
+}
+
 // ── Render helper ──
   function renderPanel(name,btn){
     var panel=document.getElementById('extrasPanel');
@@ -3623,6 +3678,7 @@ window.runDiarization = function(){
     fn(function(html,afterRender){
       panel.innerHTML=html;
       panel.classList.remove('fetching');
+      window.fixExtrasPanelColors();
       if(afterRender) afterRender();
     });
   }
@@ -3652,6 +3708,7 @@ window.runDiarization = function(){
     if(!fn) return;
     fn(function(html,afterRender){
       panel.innerHTML=html;
+      window.fixExtrasPanelColors();
       if(afterRender) afterRender();
     });
   };
