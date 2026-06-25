@@ -6,6 +6,7 @@ var _realMic = {
   recognition: null,
   stream: null,
   state: 'idle',
+  lang: 'en-US',     // current speech recognition language
   onInterim: null,   // callback(interimText)
   onFinal: null,     // callback(finalText)
   onStateChange: null // callback(state)
@@ -59,7 +60,7 @@ async function startRealMic() {
   var rec = new SpeechRecognition();
   rec.continuous = true;
   rec.interimResults = true;
-  rec.lang = 'en-US';
+  rec.lang = _realMic.lang || 'en-US';
   
   rec.onresult = function(event) {
     var interim = '';
