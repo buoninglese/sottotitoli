@@ -304,6 +304,10 @@ body.snap-body{overflow:hidden}
   .sidebar-logo{font-size:14px;text-align:center;padding:10px 0}
   .sidebar-logo span{display:none}
   .sidebar-st{display:none}
+  .sidebar-st.clickable{display:flex;padding:8px 8px;justify-content:center}
+  .sidebar-st.clickable .st-arrow{display:none}
+  #settingsToggle{font-size:0}
+  #settingsToggle .st-icon{font-size:16px;margin:0}
   .sidebar-div{margin:4px 8px}
   .hero{flex-direction:column;text-align:center;padding:20px 16px 12px}
   .content-wrap{padding:0 16px 60px}
@@ -347,7 +351,7 @@ body.snap-body{overflow:hidden}
 /* Prevent horizontal overflow on main */
 .main{overflow-x:hidden;word-wrap:break-word;overflow-wrap:break-word}
 .content-wrap{max-width:100%}
-.card,.card-sm{max-width:100%;overflow:hidden}
+.card,.card-sm{max-width:100%;overflow:hidden;max-height:340px}
 table,pre,code{max-width:100%;overflow-x:auto}
 
 /* === PREDICTION === */
@@ -399,6 +403,18 @@ table,pre,code{max-width:100%;overflow-x:auto}
 /* KPI cards hover */
 .kpi-card:hover{transform:translateY(-2px);box-shadow:0 4px 16px rgba(0,0,0,.25)}
 @media(max-width:600px){.kpi-row-grid{grid-template-columns:repeat(2,1fr)!important}}
+
+/* === Panoramica Box Grid === */
+.box-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.box-grid .box{background:var(--card);border:none;border-radius:14px;padding:24px;position:relative;box-shadow:0 6px 20px rgba(0,0,0,.25)}
+.box-grid .box.full{grid-column:span 3}
+.box-grid .box .box-h3{font-size:14px;font-weight:700;margin-bottom:8px;color:var(--text)}
+.box-grid .box .box-body{font-size:12px;color:var(--t2);line-height:1.6}
+.box-grid .box-num{position:absolute;top:10px;right:14px;font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:700;color:#fff;background:var(--accent);width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;z-index:2}
+.box-big-num{font-family:'JetBrains Mono',monospace;font-size:30px;font-weight:800;letter-spacing:-1px}
+@media(max-width:900px){.box-grid{grid-template-columns:repeat(2,1fr)}.box-grid .box.full{grid-column:span 2}}
+@media(max-width:550px){.box-grid{grid-template-columns:1fr}.box-grid .box.full{grid-column:span 1}.box-grid .box{padding:18px}}
+
 </style>
 </head>
 <body class="snap-body hb-start">
@@ -2513,6 +2529,58 @@ document.getElementById('deleteAccountBtn')?.addEventListener('click',async func
   alert('Account eliminato. Verrai reindirizzato alla home.');
   location.href='index.html';
 });
+
+
+// ═══ Panoramica Boxes (from panoramica-replica-account) ═══
+(function(){
+  var container=document.getElementById('overviewBoxes');
+  if(!container) return;
+  
+  var boxes=[
+    {id:4,name:'Calendario mensile',body:'<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:2px;text-align:center" class="cal-gen"></div>'},
+    {id:2,name:'Streak · Giorni consecutivi',body:'<div style="text-align:center"><div class="box-big-num" style="color:var(--amber);font-size:42px">14</div><div style="font-size:11px;color:var(--t2)">giorni consecutivi</div><div style="font-size:10px;color:var(--green);margin-top:4px">Che potenza!</div></div>'},
+    {id:8,name:'Qualità speaking',body:'<div style="text-align:center"><div style="font-size:44px;font-weight:900;color:var(--green)">88<span style="font-size:18px;color:var(--t2)">/100</span></div><div style="display:flex;gap:3px;justify-content:center;margin-top:8px" class="qual-gen"></div><div class="sgrey" style="margin-top:6px;font-size:10px;color:var(--t3)">Top 15% degli utenti</div></div>'},
+    {id:10,name:'Obiettivi · Barre progresso',full:true,body:'<div style="display:flex;flex-direction:column;gap:10px"><div><div style="display:flex;justify-content:space-between;font-size:10px"><span style="color:var(--t2)">Minuti</span><span style="color:var(--green)">78/120</span></div><div style="height:6px;background:var(--line);border-radius:3px;margin-top:2px"><div style="height:100%;width:65%;background:var(--green);border-radius:3px"></div></div></div><div><div style="display:flex;justify-content:space-between;font-size:10px"><span style="color:var(--t2)">Sessioni</span><span style="color:var(--accent)">4/5</span></div><div style="height:6px;background:var(--line);border-radius:3px;margin-top:2px"><div style="height:100%;width:80%;background:var(--accent);border-radius:3px"></div></div></div><div><div style="display:flex;justify-content:space-between;font-size:10px"><span style="color:var(--t2)">Parole</span><span style="color:var(--blue)">142/200</span></div><div style="height:6px;background:var(--line);border-radius:3px;margin-top:2px"><div style="height:100%;width:71%;background:var(--blue);border-radius:3px"></div></div></div></div>'},
+    {id:6,name:'Durata sessioni',body:'<div style="display:flex;gap:2px;align-items:flex-end;height:40px" class="spark-gen"></div><div class="sgrey" style="margin-top:6px;font-size:10px;color:var(--t3)">Media 18m · Max 48m</div>'},
+    {id:3,name:'Heatmap 12 settimane',body:'<div style="display:flex;gap:2px;flex-wrap:wrap" class="hm-gen"></div><div style="font-size:10px;color:var(--t3);margin-top:8px">12 settimane · GitHub-style</div>'},
+    {id:5,name:'Sessioni recenti',body:'<div style="display:flex;flex-direction:column;gap:6px"><div style="display:flex;align-items:center;gap:10px;padding:8px 12px;background:var(--bg2);border-radius:8px;font-size:11px"><span style="color:var(--accent);font-weight:700">24 giu</span><span style="color:var(--t2)">Captions · 18m</span><span style="color:var(--green);margin-left:auto">WPM 92</span></div><div style="display:flex;align-items:center;gap:10px;padding:8px 12px;background:var(--bg2);border-radius:8px;font-size:11px"><span style="color:var(--accent);font-weight:700">23 giu</span><span style="color:var(--t2)">Traduzione · 32m</span><span style="color:var(--green);margin-left:auto">WPM 78</span></div><div style="display:flex;align-items:center;gap:10px;padding:8px 12px;background:var(--bg2);border-radius:8px;font-size:11px"><span style="color:var(--accent);font-weight:700">22 giu</span><span style="color:var(--t2)">Captions · 12m</span><span style="color:var(--green);margin-left:auto">WPM 85</span></div></div>'},
+    {id:9,name:'Confronto · Stat Cards',body:'<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;text-align:center"><div><div class="box-big-num" style="color:var(--accent)">42</div><div style="font-size:10px;color:var(--t3)">Sessioni</div><div style="font-size:10px;color:var(--green)">↑ 12%</div></div><div><div class="box-big-num" style="color:var(--green)">8.2h</div><div style="font-size:10px;color:var(--t3)">Tempo</div><div style="font-size:10px;color:var(--green)">↑ 18%</div></div><div><div class="box-big-num" style="color:var(--blue)">1.2k</div><div style="font-size:10px;color:var(--t3)">Parole</div><div style="font-size:10px;color:var(--red)">↓ 3%</div></div></div>'},
+    {id:7,name:'Distribuzione oraria',body:'<div style="display:flex;gap:6px;align-items:flex-end;height:50px"><div style="flex:1;text-align:center"><div style="height:30px;background:var(--accent);border-radius:4px 4px 0 0;opacity:.7"></div><div class="sgrey" style="margin-top:4px;font-size:10px;color:var(--t3)">Matt.</div></div><div style="flex:1;text-align:center"><div style="height:18px;background:var(--accent);border-radius:4px 4px 0 0;opacity:.4"></div><div class="sgrey" style="margin-top:4px;font-size:10px;color:var(--t3)">Pom.</div></div><div style="flex:1;text-align:center"><div style="height:42px;background:var(--accent);border-radius:4px 4px 0 0;opacity:.9"></div><div class="sgrey" style="margin-top:4px;font-size:10px;color:var(--t3)">Sera</div></div></div>'},
+    {id:1,name:'WPM · Simple',body:'<div style="display:flex;gap:32px;justify-content:center"><div style="text-align:center"><div class="sgrey" style="font-size:10px;color:var(--t3)">MEDIA</div><div class="box-big-num" style="color:var(--accent)">87</div><div style="font-size:10px;color:var(--t2)">parole/min</div></div><div style="text-align:center"><div class="sgrey" style="font-size:10px;color:var(--t3)">PICCO</div><div class="box-big-num" style="color:var(--green)">182</div><div style="font-size:10px;color:var(--t2)">parole/min</div></div></div>'},
+    {id:12,name:'Parole più usate',body:'<div style="display:flex;gap:6px;flex-wrap:wrap"><span style="padding:6px 14px;border-radius:100px;font-size:11px;background:rgba(167,139,250,.12);color:var(--accent)">quindi</span><span style="padding:6px 14px;border-radius:100px;font-size:11px;background:rgba(52,211,153,.12);color:var(--green)">praticamente</span><span style="padding:6px 14px;border-radius:100px;font-size:11px;background:rgba(96,165,250,.12);color:var(--blue)">importante</span><span style="padding:6px 14px;border-radius:100px;font-size:11px;background:rgba(251,191,36,.12);color:var(--amber)">assolutamente</span></div>'},
+    {id:15,name:'Riepilogo settimanale',body:'<div style="font-size:13px;color:var(--t2);line-height:1.8">Hai parlato per <strong style="color:var(--accent)">2.4 ore</strong> in <strong style="color:var(--green)">12 sessioni</strong>. WPM medio <strong style="color:var(--blue)">87</strong>, in rialzo del <strong style="color:var(--green)">+8%</strong>. Continua così! 🚀</div>'},
+    {id:14,name:'Mix linguistico',body:'<div style="display:flex;flex-direction:column;gap:6px"><div style="display:flex;align-items:center;gap:6px;font-size:10px"><span>🇮🇹</span><span style="color:var(--t2);width:60px">Italiano</span><span style="color:var(--accent)">68%</span><div style="width:60px;height:4px;background:var(--line);border-radius:2px"><div style="width:68%;height:100%;background:var(--accent);border-radius:2px"></div></div></div><div style="display:flex;align-items:center;gap:6px;font-size:10px"><span>🇬🇧</span><span style="color:var(--t2);width:60px">Inglese</span><span style="color:var(--green)">24%</span><div style="width:60px;height:4px;background:var(--line);border-radius:2px"><div style="width:24%;height:100%;background:var(--green);border-radius:2px"></div></div></div><div style="display:flex;align-items:center;gap:6px;font-size:10px"><span>🇪🇸</span><span style="color:var(--t2);width:60px">Spagnolo</span><span style="color:var(--blue)">8%</span><div style="width:60px;height:4px;background:var(--line);border-radius:2px"><div style="width:8%;height:100%;background:var(--blue);border-radius:2px"></div></div></div></div>'},
+    {id:13,name:'Vocabolario · Lista',body:'<div style="font-size:12px;color:var(--t2);line-height:2"><span style="color:var(--accent)">eloquente</span> · <span style="color:var(--green)">pragmatico</span> · <span style="color:var(--blue)">resiliente</span> · <span style="color:var(--amber)">conciliare</span> · <span style="color:var(--accent)">ermetico</span></div>'},
+    {id:11,name:'Obiettivo giornaliero',body:'<div style="display:flex;align-items:center;gap:16px;justify-content:center"><svg viewBox="0 0 70 70" style="width:64px;height:64px;transform:rotate(-90deg)"><circle cx="35" cy="35" r="28" fill="none" stroke="var(--line)" stroke-width="5"/><circle cx="35" cy="35" r="28" fill="none" stroke="var(--green)" stroke-width="5" stroke-linecap="round" stroke-dasharray="176" stroke-dashoffset="60"/></svg><div><div class="sgrey" style="font-size:10px;color:var(--t3)">MINUTI</div><div class="box-big-num" style="color:var(--green);font-size:24px">18/30</div><div style="font-size:10px;color:var(--t2)">60% completato</div></div></div>'}
+  ];
+  
+  var order=[4,2,8, 10, 6,3, 5,9,7, 1,12,15, 14,13, 11];
+  var fullWidth=[10];
+  
+  var grid=document.createElement('div');
+  grid.className='box-grid';
+  
+  order.forEach(function(id){
+    var b=boxes.find(function(x){return x.id===id});
+    if(!b) return;
+    var isFull=fullWidth.includes(id);
+    var div=document.createElement('div');
+    div.className='box'+(isFull?' full':'');
+    div.innerHTML='<div class="box-num">'+id+'</div><div class="box-h3">'+b.name+'</div><div class="box-body">'+b.body+'</div>';
+    grid.appendChild(div);
+  });
+  
+  container.appendChild(grid);
+  
+  // Generate dynamic content
+  setTimeout(function(){
+    document.querySelectorAll('.hm-gen').forEach(function(el){var h='';for(var i=0;i<84;i++){var r=Math.random();h+='<span style="width:12px;height:12px;border-radius:2px;background:'+(r>0.7?'var(--accent)':r>0.4?'rgba(167,139,250,.4)':'var(--line)')+'"></span>';}el.innerHTML=h;});
+    document.querySelectorAll('.cal-gen').forEach(function(el){var h='';for(var i=0;i<30;i++){var lvl=Math.random();h+='<div style="aspect-ratio:1;border-radius:3px;font-size:8px;display:flex;align-items:center;justify-content:center;background:'+(lvl>0.7?'var(--accent)':lvl>0.4?'rgba(167,139,250,.3)':'var(--line)')+';color:'+(lvl>0.4?'#fff':'var(--t3)')+'">'+(i+1)+'</div>';}el.innerHTML=h;});
+    document.querySelectorAll('.spark-gen').forEach(function(el){var h='';for(var i=0;i<30;i++){h+='<div style="flex:1;background:var(--green);height:'+(10+Math.random()*90)+'%;border-radius:1px 1px 0 0;opacity:'+(.4+Math.random()*.6)+'"></div>';}el.innerHTML=h;});
+    document.querySelectorAll('.qual-gen').forEach(function(el){var h='';for(var i=0;i<10;i++){h+='<div style="width:14px;height:14px;border-radius:3px;background:'+(i<8?'var(--green)':'var(--line)')+'"></div>';}el.innerHTML=h;});
+  },10);
+})();
+
 </script>
 
 </body>

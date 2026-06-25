@@ -398,11 +398,11 @@ body.fullscreen-active #fullscreenBtn:hover { background: var(--accent); color: 
 
 /* ═══ Extras Panel (toggleable — vocabulary / grammar / metrics) ═══ */
 .extras-toggle-bar{display:flex;gap:8px;justify-content:center;margin-top:12px;flex-wrap:wrap}
-.extras-toggle-btn{padding:9px 20px;border-radius:10px;font-size:11px;font-weight:700;font-family:inherit;cursor:pointer;border:1px solid rgba(255,255,255,.08);background:rgba(255,255,255,.02);color:rgba(255,255,255,.4);transition:all .2s;white-space:nowrap}
-.extras-toggle-btn:hover{background:rgba(255,255,255,.05);color:#fff;border-color:rgba(255,255,255,.15);transform:translateY(-1px)}
-.extras-toggle-btn.active{background:rgba(52,211,153,.12);border-color:rgba(52,211,153,.3);color:#34d399;box-shadow:0 0 16px rgba(52,211,153,.1)}
-[data-theme="light"] .extras-toggle-btn{border-color:rgba(0,0,0,.06);background:rgba(0,0,0,.02);color:rgba(0,0,0,.4)}
-[data-theme="light"] .extras-toggle-btn:hover{background:rgba(0,0,0,.04);color:#111}
+.extras-toggle-btn{padding:10px 22px;border-radius:14px;font-size:11px;font-weight:700;font-family:inherit;cursor:pointer;border:1px solid var(--line);background:var(--card);color:var(--muted);transition:all .25s;white-space:nowrap;box-shadow:0 2px 8px rgba(0,0,0,.06)}
+.extras-toggle-btn:hover{background:var(--card2);color:var(--text);border-color:var(--accent);transform:translateY(-2px);box-shadow:0 6px 20px rgba(0,0,0,.1)}
+.extras-toggle-btn.active{background:rgba(52,211,153,.12);border-color:rgba(52,211,153,.3);color:#34d399;box-shadow:0 0 20px rgba(52,211,153,.12)}
+[data-theme="light"] .extras-toggle-btn{border-color:var(--line);background:var(--card);color:var(--muted);box-shadow:0 2px 8px rgba(0,0,0,.04)}
+[data-theme="light"] .extras-toggle-btn:hover{background:var(--card2);color:var(--text);border-color:var(--accent);box-shadow:0 6px 20px rgba(0,0,0,.08)}
 [data-theme="light"] .extras-toggle-btn.active{background:rgba(5,150,105,.08);border-color:rgba(5,150,105,.2);color:#059669}
 
 .extras-panel{display:none;margin-top:10px;padding:18px;border-radius:14px;background:rgba(255,255,255,.015);border:1px solid rgba(255,255,255,.04);min-height:60px;position:relative}
@@ -3069,6 +3069,9 @@ function downloadGrammarPDF() {
       var text=(document.getElementById('captionTranscript')?.textContent||'');
       var words=getTranscriptWords();
       var noData=words.length===0;
+      var isLight=document.documentElement.getAttribute('data-theme')==='light';
+      // Theme-aware color helpers
+      var tc=function(darkColor,lightColor){return isLight?lightColor:darkColor;};
       var glossDict=[
         {en:'discussing',it:'discutendo',nl:'bespreken',es:'discutiendo',fr:'discutant',de:'diskutieren',pt:'discutindo',pl:'dyskutujac'},
         {en:'future',it:'futuro',nl:'toekomst',es:'futuro',fr:'avenir',de:'Zukunft',pt:'futuro',pl:'przyszlosc'},
@@ -3093,29 +3096,35 @@ function downloadGrammarPDF() {
       ];
 
       // Card 1: Full-width multi-language table
-      h+='<div class="extras-card" style="grid-column:1/-1"><div class="ec-title">11 \u00b7 Multi-Language Gloss <span class=\"ec-badge\" style=\"background:rgba(96,165,250,.15);color:#60a5fa\">8 LANG</span></div>';
-      if(noData){h+='<div style=\"color:rgba(255,255,255,.2);font-style:italic\">Words appear as detected in transcript</div>'}
+      h+='<div class="extras-card" style="grid-column:1/-1"><div class="ec-title">11 · Multi-Language Gloss <span class="ec-badge" style="background:rgba(96,165,250,.15);color:#60a5fa">8 LANG</span></div>';
+      if(noData){h+='<div style="color:'+tc('rgba(255,255,255,.2)','rgba(0,0,0,.25)')+';font-style:italic">Words appear as detected in transcript</div>'}
       else{
         var matched=[];
         glossDict.forEach(function(row){
           if(words.some(function(w){return w.w===row.en.replace('-','')})) matched.push(row);
         });
         if(matched.length===0) matched=glossDict.slice(0,5);
-        h+='<div style=\"overflow-x:auto\"><table style=\"width:100%;font-size:10px;border-collapse:collapse\"><thead><tr style=\"color:rgba(255,255,255,.25);font-size:8px;text-transform:uppercase;letter-spacing:.05em\"><th style=\"padding:5px 8px;text-align:left;position:sticky;left:0;background:rgba(15,18,30,.95)\">EN</th><th>IT</th><th>NL</th><th>ES</th><th>FR</th><th>DE</th><th>PT</th><th>PL</th></tr></thead><tbody>';
+        var thColor=tc('rgba(255,255,255,.25)','rgba(0,0,0,.4)');
+        var thBg=tc('rgba(15,18,30,.95)','rgba(255,255,255,.95)');
+        var rowBorder=tc('rgba(255,255,255,.04)','rgba(0,0,0,.06)');
+        var cellColor=tc('rgba(255,255,255,.55)','rgba(0,0,0,.6)');
+        var cellColor2=tc('rgba(255,255,255,.5)','rgba(0,0,0,.55)');
+        h+='<div style="overflow-x:auto"><table style="width:100%;font-size:10px;border-collapse:collapse"><thead><tr style="color:'+thColor+';font-size:8px;text-transform:uppercase;letter-spacing:.05em"><th style="padding:5px 8px;text-align:left;position:sticky;left:0;background:'+thBg+'">EN</th><th>IT</th><th>NL</th><th>ES</th><th>FR</th><th>DE</th><th>PT</th><th>PL</th></tr></thead><tbody>';
         matched.forEach(function(r,i){
-          var bg=i%2===0?'rgba(255,255,255,.01)':'transparent';
-          h+='<tr style=\"border-top:1px solid rgba(255,255,255,.04);background:'+bg+'\"><td style=\"padding:5px 8px;font-weight:600;color:#60a5fa;position:sticky;left:0;background:'+(i%2===0?'rgba(15,18,30,.97)':'rgba(15,18,30,.95)')+'\">'+r.en+'</td><td style=\"color:rgba(255,255,255,.55);padding:5px 8px\">'+r.it+'</td><td style=\"color:rgba(255,255,255,.5);padding:5px 8px\">'+r.nl+'</td><td style=\"color:rgba(255,255,255,.5);padding:5px 8px\">'+r.es+'</td><td style=\"color:rgba(255,255,255,.5);padding:5px 8px\">'+r.fr+'</td><td style=\"color:rgba(255,255,255,.5);padding:5px 8px\">'+r.de+'</td><td style=\"color:rgba(255,255,255,.5);padding:5px 8px\">'+r.pt+'</td><td style=\"color:rgba(255,255,255,.5);padding:5px 8px\">'+r.pl+'</td></tr>';
+          var bg=i%2===0?tc('rgba(255,255,255,.01)','rgba(0,0,0,.02)'):'transparent';
+          var enBg=i%2===0?tc('rgba(15,18,30,.97)','rgba(255,255,255,.97)'):tc('rgba(15,18,30,.95)','rgba(255,255,255,.95)');
+          h+='<tr style="border-top:1px solid '+rowBorder+';background:'+bg+'"><td style="padding:5px 8px;font-weight:600;color:#60a5fa;position:sticky;left:0;background:'+enBg+'">'+r.en+'</td><td style="color:'+cellColor+';padding:5px 8px">'+r.it+'</td><td style="color:'+cellColor2+';padding:5px 8px">'+r.nl+'</td><td style="color:'+cellColor2+';padding:5px 8px">'+r.es+'</td><td style="color:'+cellColor2+';padding:5px 8px">'+r.fr+'</td><td style="color:'+cellColor2+';padding:5px 8px">'+r.de+'</td><td style="color:'+cellColor2+';padding:5px 8px">'+r.pt+'</td><td style="color:'+cellColor2+';padding:5px 8px">'+r.pl+'</td></tr>';
         });
         h+='</tbody></table></div>';
       }
       h+='</div>';
-      h+='<div style="font-size:7px;color:rgba(255,255,255,.12);margin-top:4px;text-align:right">Double-click any word to save to Word Bank</div>';
+      h+='<div style="font-size:7px;color:'+tc('rgba(255,255,255,.12)','rgba(0,0,0,.15)')+';margin-top:4px;text-align:right">Double-click any word to save to Word Bank</div>';
 
       // Card 2: Language pair stats
       h+='<div class="extras-card"><div class="ec-title">Language Pairs</div>';
       h+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;font-size:9px">';
       [{pair:'EN\u2192IT',pct:94},{pair:'EN\u2192NL',pct:91},{pair:'EN\u2192ES',pct:95},{pair:'EN\u2192FR',pct:93},{pair:'EN\u2192DE',pct:90},{pair:'EN\u2192PT',pct:92},{pair:'EN\u2192PL',pct:87}].forEach(function(p){
-        h+='<div style="display:flex;align-items:center;gap:4px;padding:2px 4px"><span style="width:42px;font-weight:600;color:rgba(255,255,255,.45)">'+p.pair+'</span><span style="flex:1;height:3px;background:rgba(255,255,255,.06);border-radius:2px"><span style="display:block;height:100%;border-radius:2px;background:'+(p.pct>=93?'#34d399':p.pct>=90?'#60a5fa':'#fbbf24')+';width:'+p.pct+'%"></span></span><span style="color:rgba(255,255,255,.25)">'+p.pct+'%</span></div>';
+        h+='<div style="display:flex;align-items:center;gap:4px;padding:2px 4px"><span style="width:42px;font-weight:600;color:'+tc('rgba(255,255,255,.45)','rgba(0,0,0,.5)')+'">'+p.pair+'</span><span style="flex:1;height:3px;background:'+tc('rgba(255,255,255,.06)','rgba(0,0,0,.08)')+';border-radius:2px"><span style="display:block;height:100%;border-radius:2px;background:'+(p.pct>=93?'#34d399':p.pct>=90?'#60a5fa':'#fbbf24')+';width:'+p.pct+'%"></span></span><span style="color:'+tc('rgba(255,255,255,.25)','rgba(0,0,0,.35)')+'">'+p.pct+'%</span></div>';
       });
       h+='</div></div>';
 
@@ -3353,13 +3362,13 @@ function downloadGrammarPDF() {
       if(noData){
         h+='<div style="color:rgba(255,255,255,.2);font-style:italic;padding:16px;text-align:center">Start speaking — sentences will appear here for parsing</div>';
       } else {
-        // Show last 4 sentences as clickable buttons
-        var lastLines=lines.slice(-4);
+        // Show last 3 sentences as clickable buttons
+        var lastLines=lines.slice(-3);
         h+='<div id="gpBtns" style="margin-bottom:10px">';
         lastLines.forEach(function(line,i){
           var short=line.length>60?line.substring(0,57)+'\u2026':line;
           var gi=lines.length-4+i;
-          h+='<button class="gp-sent-btn" data-idx="'+gi+'" style="display:block;width:100%;text-align:left;padding:8px 12px;margin-bottom:4px;border-radius:8px;border:1px solid rgba(255,255,255,.06);background:rgba(255,255,255,.015);color:rgba(255,255,255,.5);font-size:10px;cursor:pointer;font-family:inherit;transition:all .2s" onmouseenter="this.style.background=\'rgba(167,139,250,.08)\';this.style.borderColor=\'rgba(167,139,250,.2)\'" onmouseleave="if(!this.classList.contains(\'active\')){this.style.background=\'rgba(255,255,255,.015)\';this.style.borderColor=\'rgba(255,255,255,.06)\'}"><span style="font-family:JetBrains Mono,monospace;font-size:8px;color:rgba(255,255,255,.18);margin-right:6px">#'+(gi+1)+'</span>'+short+'</button>';
+          h+='<button class="gp-sent-btn" data-idx="'+gi+'" style="display:block;width:100%;text-align:left;padding:8px 12px;margin-bottom:4px;border-radius:8px;border:1px solid var(--line);background:var(--card);color:var(--muted);font-size:10px;cursor:pointer;font-family:inherit;transition:all .2s" onmouseenter="this.style.background=getComputedStyle(document.documentElement).getPropertyValue('--card2');this.style.borderColor=getComputedStyle(document.documentElement).getPropertyValue('--accent')" onmouseleave="if(!this.classList.contains('active')){this.style.background=getComputedStyle(document.documentElement).getPropertyValue('--card');this.style.borderColor=getComputedStyle(document.documentElement).getPropertyValue('--line')}"><span style="font-family:JetBrains Mono,monospace;font-size:8px;color:var(--muted2);margin-right:6px">#'+(gi+1)+'</span>'+short+'</button>';
         });
         h+='</div>';
         
