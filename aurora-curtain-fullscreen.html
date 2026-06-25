@@ -35,6 +35,12 @@ body{background:#060610}
 <div id="triggerBox">
   <button id="triggerBtn" onclick="toggleAurora()">✦ Scatena Aurora</button>
   <span id="wordCount">0 parole nel campo</span>
+  <div style="display:flex;gap:6px;margin-top:4px;flex-wrap:wrap;justify-content:center">
+    <button class="varBtn" onclick="prevPalette()" style="padding:4px 10px;border-radius:100px;font-size:9px;font-family:'JetBrains Mono',monospace;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.03);color:rgba(255,255,255,.4);cursor:pointer">←</button>
+    <span id="paletteLabel" style="font-family:'JetBrains Mono',monospace;font-size:9px;color:rgba(255,255,255,.3);min-width:100px;text-align:center">1/10 · Aurora</span>
+    <button class="varBtn" onclick="nextPalette()" style="padding:4px 10px;border-radius:100px;font-size:9px;font-family:'JetBrains Mono',monospace;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.03);color:rgba(255,255,255,.4);cursor:pointer">→</button>
+    <button id="btnBump" onclick="toggleBump()" style="padding:4px 12px;border-radius:100px;font-size:9px;font-family:'JetBrains Mono',monospace;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.03);color:rgba(255,255,255,.4);cursor:pointer">💥 Bump off</button>
+  </div>
 </div>
 
 <script>
@@ -49,7 +55,39 @@ function resize(){
 }
 resize();window.addEventListener('resize',resize);
 
-// ─── Wordbank ───
+// ─── 10 Color Palettes ───
+var palettes=[
+  {name:'Aurora',      hue0:160,hueR:60, sat:70,lit:65, glow:0.4},
+  {name:'Ember',       hue0:10, hueR:40, sat:80,lit:60, glow:0.5},
+  {name:'Ocean',       hue0:200,hueR:40, sat:60,lit:70, glow:0.35},
+  {name:'Berry',       hue0:300,hueR:50, sat:75,lit:60, glow:0.45},
+  {name:'Lime',        hue0:80, hueR:40, sat:80,lit:65, glow:0.4},
+  {name:'Sunset',      hue0:25, hueR:60, sat:85,lit:62, glow:0.5},
+  {name:'Arctic',      hue0:190,hueR:30, sat:40,lit:80, glow:0.45},
+  {name:'Lavender',    hue0:270,hueR:40, sat:55,lit:68, glow:0.35},
+  {name:'Mint',        hue0:150,hueR:50, sat:65,lit:70, glow:0.4},
+  {name:'Coral',       hue0:5,  hueR:35, sat:90,lit:58, glow:0.55}
+];
+var currentPalette=0;
+var bumpOn=false;
+
+function prevPalette(){currentPalette=(currentPalette+palettes.length-1)%palettes.length;updatePaletteLabel();recolorParticles();}
+function nextPalette(){currentPalette=(currentPalette+1)%palettes.length;updatePaletteLabel();recolorParticles();}
+function updatePaletteLabel(){
+  document.getElementById('paletteLabel').textContent=(currentPalette+1)+'/10 · '+palettes[currentPalette].name;
+}
+function toggleBump(){
+  bumpOn=!bumpOn;
+  document.getElementById('btnBump').textContent=bumpOn?'💥 Bump on':'💥 Bump off';
+  document.getElementById('btnBump').style.borderColor=bumpOn?'rgba(239,68,68,.4)':'rgba(255,255,255,.12)';
+  document.getElementById('btnBump').style.color=bumpOn?'#ef4444':'rgba(255,255,255,.4)';
+}
+function recolorParticles(){
+  var pal=palettes[currentPalette];
+  particles.forEach(function(p){
+    p.hue=pal.hue0+Math.random()*pal.hueR;
+  });
+}
 var WORDBANK=[
   'sottotitoli','trascrizione','traduzione','simultanea','live','caption',
   'voce','parlato','lingua','audio','segnale','frequenza','modulazione',
@@ -70,22 +108,20 @@ var globalAlpha=1;
 var t=0;
 
 function createParticles(){
+  var pal=palettes[currentPalette];
   particles=[];
   WORDBANK.forEach(function(word,i){
     var angle=Math.random()*Math.PI*2;
     var dist=50+Math.random()*Math.min(W,H)*0.8;
     var baseX=W/2+Math.cos(angle)*dist;
-    var baseY=H/2+Math.sin(angle)*dist*0.6; // wider than tall (aurora curtain shape)
+    var baseY=H/2+Math.sin(angle)*dist*0.6;
     particles.push({
       word:word,
-      x:baseX,
-      y:baseY,
-      baseX:baseX,
-      baseY:baseY,
+      x:baseX,y:baseY,baseX:baseX,baseY:baseY,
       vx:(Math.random()-.5)*0.8,
       vy:-0.3-Math.random()*1.2,
       size:14+Math.random()*28,
-      hue:160+Math.random()*60, // teal-to-green Aurora colors
+      hue:pal.hue0+Math.random()*pal.hueR,
       life:0.6+Math.random()*0.4,
       phase:Math.random()*Math.PI*2,
       freq:0.3+Math.random()*1.5,
@@ -130,20 +166,23 @@ function draw(ts){
 
   // Aurora curtain background glow
   if(active&&globalAlpha>0.1){
+    var pal=palettes[currentPalette];
+    var gh=pal.hue0;
     var grad=ctx.createRadialGradient(W/2,H*0.4,0,W/2,H*0.4,Math.max(W,H)*0.7);
-    grad.addColorStop(0,'rgba(52,211,153,'+(0.03*globalAlpha)+')');
-    grad.addColorStop(0.4,'rgba(20,180,160,'+(0.02*globalAlpha)+')');
+    grad.addColorStop(0,hsl(gh,50,60,0.03*globalAlpha));
+    grad.addColorStop(0.4,hsl((gh+20)%360,40,55,0.02*globalAlpha));
     grad.addColorStop(1,'rgba(0,0,0,0)');
     ctx.fillStyle=grad;ctx.fillRect(0,0,W,H);
   }
 
-  // Wave curtain effect (subtle horizontal bands)
+  // Wave curtain effect
   if(active&&globalAlpha>0.2){
+    var pal=palettes[currentPalette];
     for(var band=0;band<8;band++){
       var by=H*0.1+band*H*0.1;
       var bw=W*0.6+Math.sin(t*0.0005+band)*W*0.2;
       var bx=(W-bw)/2;
-      ctx.fillStyle='rgba(52,211,153,'+(0.015*globalAlpha)+')';
+      ctx.fillStyle=hsl(pal.hue0,pal.sat,pal.lit,0.015*globalAlpha);
       ctx.fillRect(bx,by,bw,H*0.06);
     }
   }
@@ -153,39 +192,43 @@ function draw(ts){
     var p=particles[i];
     if(!active&&!fadeOut)continue;
 
-    // Aurora curtain motion: gentle upward drift + horizontal wave
     p.y+=p.vy*0.4;
     p.x+=Math.sin(t*0.001+p.phase)*p.amplitude*0.03;
-
-    // Sweep effect (left-to-right gentle push)
     p.x+=0.15*(1-p.y/H)*0.5;
-
-    // Wave Y effect
     p.y+=Math.sin(p.x*0.004+t*0.0008)*0.3;
 
-    // Wrap around
+    // Bump reaction: particles repel when close
+    if(bumpOn){
+      for(var j=i+1;j<particles.length;j++){
+        var q=particles[j];
+        var dx=p.x-q.x,dy=p.y-q.y;
+        var dist=Math.sqrt(dx*dx+dy*dy)||1;
+        var minDist=(p.size+q.size)*0.9;
+        if(dist<minDist&&dist>0){
+          var force=(minDist-dist)/minDist*0.8;
+          p.x+=dx/dist*force;p.y+=dy/dist*force;
+          q.x-=dx/dist*force;q.y-=dy/dist*force;
+        }
+      }
+    }
+
     if(p.y<-80){p.y=H+80;p.x=Math.random()*W;}
     if(p.y>H+80){p.y=-80;p.x=Math.random()*W;}
 
-    // Alpha from global + individual life
     var alpha=globalAlpha*p.life*0.8;
     if(alpha<0.02)continue;
 
-    // Draw word
-    ctx.save();
-    ctx.globalAlpha=alpha;
+    var pal=palettes[currentPalette];
+    ctx.save();ctx.globalAlpha=alpha;
     ctx.font='bold '+p.size+'px "Inter",system-ui,sans-serif';
-    ctx.fillStyle=hsl(p.hue,70,65+Math.sin(t*0.002+p.phase)*15,1);
+    ctx.fillStyle=hsl(p.hue,pal.sat,pal.lit+Math.sin(t*0.002+p.phase)*15,1);
     ctx.textAlign='center';ctx.textBaseline='middle';
-
-    // Subtle glow behind word
-    ctx.shadowColor=hsl(p.hue,80,60,0.4);
+    ctx.shadowColor=hsl(p.hue,80,60,pal.glow);
     ctx.shadowBlur=8+Math.sin(t*0.003+p.phase)*4;
     ctx.fillText(p.word,p.x,p.y);
     ctx.shadowBlur=0;
     ctx.restore();
 
-    // Occasional highlight streak
     if(Math.sin(t*0.002+p.phase)>0.85&&alpha>0.3){
       ctx.save();ctx.globalAlpha=alpha*0.3;
       ctx.fillStyle='rgba(255,255,255,0.4)';
