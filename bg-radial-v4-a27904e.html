@@ -67,8 +67,8 @@ body.dark .btn:hover{background:rgba(255,255,255,.06);color:#fff;border-color:rg
   <!-- Behavior Sliders -->
   <div class="sens-row" style="margin-top:4px">
     <label style="font-size:9px;opacity:.5;min-width:36px">🕐 Decay</label>
-    <input type="range" class="sens-slider" id="fxDecaySlider" min="0.5" max="0.995" step="0.005" value="0.93" oninput="setFXDecay(this.value)" style="width:60px">
-    <span class="meter-label" id="fxDecayVal">0.93</span>
+    <input type="range" class="sens-slider" id="fxDecaySlider" min="0.5" max="0.995" step="0.005" value="0.90" oninput="setFXDecay(this.value)" style="width:60px">
+    <span class="meter-label" id="fxDecayVal">0.90</span>
   </div>
   <div class="sens-row">
     <label style="font-size:9px;opacity:.5;min-width:36px">📈 Power</label>
@@ -79,6 +79,12 @@ body.dark .btn:hover{background:rgba(255,255,255,.06);color:#fff;border-color:rg
     <label style="font-size:9px;opacity:.5;min-width:36px">🌊 Floor</label>
     <input type="range" class="sens-slider" id="fxFloorSlider" min="0.02" max="0.4" step="0.01" value="0.25" oninput="setFXFloor(this.value)" style="width:60px">
     <span class="meter-label" id="fxFloorVal">0.25</span>
+  </div>
+  <!-- Zoom -->
+  <div class="sens-row" style="margin-top:6px">
+    <label style="font-size:9px;opacity:.5;min-width:36px">🔍 Zoom</label>
+    <input type="range" class="sens-slider" id="fxZoomSlider" min="0.5" max="1.6" step="0.05" value="1" oninput="setFXZoom(this.value)" style="width:60px">
+    <span class="meter-label" id="fxZoomVal">1×</span>
   </div>
   <!-- Voice Range Indicator -->
   <div class="sens-row" style="margin-top:2px">
@@ -95,8 +101,8 @@ body.dark .btn:hover{background:rgba(255,255,255,.06);color:#fff;border-color:rg
     <div style="background:rgba(15,18,30,.85);border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:8px 12px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:center">
       <span style="font-size:9px;opacity:.4">● Dots</span>
       <span style="font-size:8px;opacity:.3">size</span>
-      <input type="range" id="ptclSize" min="0.3" max="5" step="0.1" value="1" oninput="setPtclSize(this.value)" style="width:40px;height:3px">
-      <span id="ptclSizeVal" style="font-size:8px;opacity:.3">1×</span>
+      <input type="range" id="ptclSize" min="0.3" max="5" step="0.1" value="3" oninput="setPtclSize(this.value)" style="width:40px;height:3px">
+      <span id="ptclSizeVal" style="font-size:8px;opacity:.3">3×</span>
       <select id="ptclShape" onchange="setPtclShape(this.value)" style="font-size:9px;padding:2px 4px;border-radius:6px;border:1px solid rgba(255,255,255,.1);background:rgba(255,255,255,.04);color:inherit;font-family:inherit;cursor:pointer">
         <option value="circle">● circle</option>
         <option value="square">■ square</option>
@@ -143,9 +149,9 @@ var voiceBass=0,voiceMid=0,voiceTreble=0,voiceCentroid=0,voiceHue=0,voiceWidth=1
 var canvas,ctx,W,H,t=0,animFrame=null,currentVar=0;
 
 // ─── Behavior Sliders ───
-var fx={decay:0.93, power:2.5, floor:0.25};
+var fx={decay:0.90, power:2.5, floor:0.25, zoom:1};
 // ─── Particle Settings ───
-var ptcl={size:1, shape:'circle', behavior:'static'};
+var ptcl={size:3, shape:'circle', behavior:'static'};
 function setFXDecay(val){
   fx.decay=parseFloat(val);
   if(analyser)analyser.smoothingTimeConstant=fx.decay;
@@ -160,6 +166,11 @@ function setFXPower(val){
 function setFXFloor(val){
   fx.floor=parseFloat(val);
   document.getElementById('fxFloorVal').textContent=fx.floor.toFixed(2);
+  updateConfigDisplay();
+}
+function setFXZoom(val){
+  fx.zoom=parseFloat(val);
+  document.getElementById('fxZoomVal').textContent=fx.zoom.toFixed(2)+'×';
   updateConfigDisplay();
 }
 function setPtclSize(val){
@@ -408,7 +419,7 @@ function drawRadial(ctx,v,isDark,params,colorMul){
   if(params.type==='direction'){drawDirection(ctx,v,isDark,params,colorMul);return;}
 
   var cx=W/2,cy=H/2,hue=themeHue(isDark)+voiceHue,sat=themeSat(isDark)*colorMul;
-  var maxR=Math.min(W,H)*0.49;
+  var maxR=Math.min(W,H)*0.49*fx.zoom;
   var prm=params.p;
   var sv=Math.pow(v,prm.smoothMul||1);
   var nRings=prm.rings||3;
