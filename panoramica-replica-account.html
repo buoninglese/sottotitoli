@@ -50,6 +50,10 @@ body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--t
 .box .box-body{font-size:12px;color:var(--t2);line-height:1.6}
 .box .box-del{position:absolute;top:12px;right:14px;width:26px;height:26px;border-radius:50%;border:1.5px solid var(--red);background:transparent;color:var(--red);font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .2s;z-index:2}
 .box .box-del:hover{background:var(--red);color:#fff}
+.box .box-fav{position:absolute;top:12px;right:48px;font-size:16px;cursor:pointer;z-index:2;color:var(--t3);transition:all .2s}
+.box .box-fav:hover{color:var(--amber);transform:scale(1.2)}
+.box .box-fav.faved{color:var(--amber)}
+.box.faved{border:2px solid rgba(251,191,36,.3)}
 .box .box-cat{font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--t3);margin-top:10px;padding-top:10px;border-top:1px solid var(--line)}
 .box .box-stat{font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:600;color:var(--t2)}
 
@@ -113,6 +117,17 @@ body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--t
     <div class="section-title">Boxes <span id="boxCount">22 boxes</span></div>
     <div class="box-grid" id="boxGrid"></div>
 
+    <!-- Favorites + Copy -->
+    <div style="background:var(--bg2);border:1px dashed var(--line);border-radius:14px;padding:16px;margin-top:20px">
+      <h3 style="font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--t3);margin-bottom:8px">⭐ Your picks</h3>
+      <div id="previewList" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px"><span style="font-size:10px;color:var(--t3)">Nessun box selezionato. Clicca le stelle ★</span></div>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <input type="text" id="copyInput" readonly value="" placeholder="IDs will appear here…" style="flex:1;min-width:200px;padding:8px 12px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--text);font-family:'JetBrains Mono',monospace;font-size:10px">
+        <button class="btn-sm" onclick="copyPicks()">📋 Copy</button>
+        <span id="copiedToast" style="font-size:10px;color:var(--green);opacity:0;transition:opacity .3s">Copied!</span>
+      </div>
+    </div>
+
   </div>
 </main>
 
@@ -150,31 +165,71 @@ var boxes=[
   {id:'report-quick',cat:'NEW',name:'Ultimo report AI',body:'<div style="font-size:11px;color:var(--t2);line-height:1.7"><span style="color:var(--green)">\u2713</span> Grammatica: 94%<br><span style="color:var(--accent)">\u2713</span> Vocabolario: 312 parole<br><span style="color:var(--amber)">\u26A0</span> Fillers: 2.8/min<br><span style="color:var(--blue)">\u2192</span> <span style="text-decoration:underline;cursor:pointer">Apri report</span></div>'}
 ];
 
+var favs=[];
 function renderBoxes(){
   var grid=document.getElementById('boxGrid');
   document.getElementById('boxCount').textContent=boxes.length+' boxes';
-  if(boxes.length===0){grid.innerHTML='<div style="text-align:center;color:var(--t3);padding:32px;grid-column:1/-1">Tutti i box sono stati eliminati. Ricarica la pagina per ripristinarli.</div>';return}
+  if(boxes.length===0){grid.innerHTML='<div style="text-align:center;color:var(--t3);padding:32px;grid-column:1/-1">Tutti i box sono stati eliminati. Ricarica la pagina per ripristinarli.</div>';updatePreview();return}
   grid.innerHTML='';
   boxes.forEach(function(b,i){
+    var isFav=favs.includes(b.id);
     var div=document.createElement('div');
-    div.className='box';
+    div.className='box'+(isFav?' faved':'');
     div.id='box-'+b.id;
-    div.innerHTML='<button class="box-del" onclick="deleteBox(\''+b.id+'\')" title="Elimina box">\u2715</button><div class="box-h3">'+b.name+'</div><div class="box-body">'+b.body+'</div><div class="box-cat">'+b.cat+'</div>';
+    div.innerHTML='<span class="box-fav'+(isFav?' faved':'')+'" onclick="event.stopPropagation();toggleFav(\''+b.id+'\')">'+(isFav?'★':'☆')+'</span><button class="box-del" onclick="deleteBox(\''+b.id+'\')" title="Elimina box">\u2715</button><div class="box-h3">'+b.name+'</div><div class="box-body">'+b.body+'</div><div class="box-cat">'+b.cat+'</div>';
     grid.appendChild(div);
   });
+  updatePreview();
+}
+
+function toggleFav(id){
+  var idx=favs.indexOf(id);
+  if(idx>=0){favs.splice(idx,1)}else{favs.push(id)}
+  renderBoxes();
+}
+
+function updatePreview(){
+  var list=document.getElementById('previewList');
+  var input=document.getElementById('copyInput');
+  if(favs.length===0){list.innerHTML='<span style="font-size:10px;color:var(--t3)">Nessun box selezionato. Clicca le stelle ★</span>';input.value='';return}
+  var chips='';
+  favs.forEach(function(id){
+    var b=boxes.find(function(x){return x.id===id});
+    if(b)chips+='<span style="padding:4px 10px;border-radius:100px;font-size:10px;background:var(--card);border:1px solid var(--line);color:var(--t2);display:inline-flex;align-items:center;gap:6px">'+b.name+' <span onclick="event.stopPropagation();removeFav(\''+id+'\')" style="color:var(--red);cursor:pointer;font-size:12px">×</span></span>';
+  });
+  list.innerHTML=chips;
+  input.value='['+favs.join(', ')+']';
+}
+
+function removeFav(id){
+  var idx=favs.indexOf(id);
+  if(idx>=0)favs.splice(idx,1);
+  renderBoxes();
 }
 
 function deleteBox(id){
   var el=document.getElementById('box-'+id);
   if(!el)return;
   el.classList.add('deleting');
+  // Also remove from favs
+  var fidx=favs.indexOf(id);
+  if(fidx>=0)favs.splice(fidx,1);
   setTimeout(function(){
     boxes=boxes.filter(function(b){return b.id!==id});
     renderBoxes();
   },350);
 }
 
+function copyPicks(){
+  var input=document.getElementById('copyInput');
+  var toast=document.getElementById('copiedToast');
+  if(!input.value)return;
+  if(navigator.clipboard){navigator.clipboard.writeText(input.value).then(function(){toast.style.opacity=1;setTimeout(function(){toast.style.opacity=0},1500)})}
+  else{input.select();document.execCommand('copy');toast.style.opacity=1;setTimeout(function(){toast.style.opacity=0},1500)}
+}
+
 renderBoxes();
+updatePreview();
 </script>
 </body>
 </html>
