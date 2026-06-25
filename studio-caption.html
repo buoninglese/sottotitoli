@@ -1745,6 +1745,33 @@ function showWordDefinition(word) {
   renderWordBank();
 })();
 
+
+// ═══ Vocab definition display ═══
+window.showVocabDefinition = function(word){
+  var panel = document.getElementById('vocabDefPanel');
+  var wEl = document.getElementById('vocabDefWord');
+  var tEl = document.getElementById('vocabDefText');
+  if(!panel||!wEl||!tEl) return;
+  panel.style.display='block';
+  wEl.textContent = word + ': ';
+  var def = WORD_DEFS[word];
+  tEl.textContent = def || '(definition not available)';
+};
+
+window.removeFromVocabBank = function(word){
+  var bank = JSON.parse(localStorage.getItem('sottotitoli-wordbank')||'[]');
+  bank = bank.filter(function(w){return w!==word;});
+  localStorage.setItem('sottotitoli-wordbank',JSON.stringify(bank));
+  if(typeof window.refreshExtrasPanel === 'function'){
+    window.refreshExtrasPanel();
+  }
+  // Also refresh main wordbank panel if open
+  var wbPanel = document.getElementById('wordbankPanel');
+  if(wbPanel && wbPanel.style.display==='block'){
+    if(typeof renderWordBank === 'function') renderWordBank();
+  }
+};
+
 // ═══ Auto-collect unique content words into Word Bank from finalized sentences ═══
 var STOP_WORDS = {
   the:1,a:1,an:1,is:1,are:1,was:1,were:1,be:1,been:1,being:1,
@@ -2775,40 +2802,57 @@ function downloadGrammarPDF() {
     vocab: function(cb){
       var h='<div class="extras-grid">';
       var words=getTranscriptWords();
-      var topWords=words.filter(function(w){return w.count>=1}).slice(0,12);
-      var verbCount=0,nounCount=0,adjCount=0,advCount=0,otherCount=0;
-      words.forEach(function(w){if(w.pos==='VERB')verbCount++;else if(w.pos==='NOUN')nounCount++;else if(w.pos==='ADJ')adjCount++;else if(w.pos==='ADV')advCount++;else otherCount++});
-      var total=Math.max(1,verbCount+nounCount+adjCount+advCount+otherCount);
       var noData=words.length===0;
+      var wb = JSON.parse(localStorage.getItem('sottotitoli-wordbank')||'[]');
 
-      // 01 — POS Tags
-      h+='<div class="extras-card"><div class="ec-title">01 · POS Tags <span class="ec-badge" style="background:rgba(52,211,153,.15);color:#34d399">LIVE</span></div>';
-      if(noData){h+='<div style="color:rgba(255,255,255,.2);font-style:italic">Avvia una sessione per vedere i tag</div>'}
+      // ── WordBank Vocabulary (POS-colored chips with click/dblclick/X) ──
+      h+='<div class="extras-card" style="grid-column:1/-1"><div class="ec-title">01 · My Vocabulary <span class="ec-badge" style="background:rgba(52,211,153,.15);color:#34d399">LIVE</span></div>';
+      if(noData){h+='<div style="color:var(--muted2);font-style:italic;padding:8px 0">Start speaking — words appear here as POS-colored chips</div>'}
       else{
-        topWords.forEach(function(w){
+        h+='<div id="vocabChipsLive" style="display:flex;flex-wrap:wrap;gap:5px;max-height:200px;overflow-y:auto;padding:4px 0">';
+        var shown={};
+        words.forEach(function(w){
+          if(shown[w.w]) return; shown[w.w]=true;
           var c=w.pos==='VERB'?'#3b82f6':w.pos==='NOUN'?'#34d399':w.pos==='ADJ'?'#f97316':w.pos==='ADV'?'#a855f7':'#6b7280';
-          h+='<span class="extras-chip" style="background:'+c+'22;color:'+c+'">'+w.w+' <small>'+w.pos+'</small></span> ';
+          var inBank=wb.indexOf(w.w)>=0;
+          h+='<span class="wv-chip" data-word="'+w.w+'" style="display:inline-flex;align-items:center;gap:4px;padding:5px 10px;border-radius:8px;font-size:11px;font-weight:600;cursor:pointer;background:'+c+'18;color:'+c+';border:1px solid '+c+'30;transition:all .15s;position:relative" title="Click: definition · Double-click: add to Word Bank">'+w.w+'<small style="opacity:.6;font-size:9px">'+w.pos+'</small>';
+          if(inBank){
+            h+='<span class="wv-x" onclick="event.stopPropagation();removeFromVocabBank(\''+w.w+'\')" style="margin-left:2px;width:14px;height:14px;border-radius:50%;background:'+c+'30;color:'+c+';display:inline-flex;align-items:center;justify-content:center;font-size:9px;cursor:pointer;line-height:1" title="Remove from Word Bank">×</span>';
+          }
+          h+='</span> ';
         });
+        h+='</div>';
       }
       h+='</div>';
 
-      // 05 — POS Distribution (redesigned — horizontal stacked bar + donut)
-      h+='<div class="extras-card"><div class="ec-title">05 · POS Distribution</div>';
-      if(noData){h+='<div style="color:rgba(255,255,255,.2);font-style:italic">Nessun dato</div>'}
-      else{
-        h+='<div style="display:flex;height:14px;border-radius:7px;overflow:hidden;margin-bottom:8px">';
-        [{l:'Verbs',v:verbCount,c:'#3b82f6',p:Math.round(verbCount/total*100)},{l:'Nouns',v:nounCount,c:'#34d399',p:Math.round(nounCount/total*100)},{l:'Adj',v:adjCount,c:'#f97316',p:Math.round(adjCount/total*100)},{l:'Adv',v:advCount,c:'#a855f7',p:Math.round(advCount/total*100)},{l:'Other',v:otherCount,c:'#6b7280',p:Math.round(otherCount/total*100)}].forEach(function(b){
-          if(b.p>0) h+='<div style="width:'+b.p+'%;height:100%;background:'+b.c+';transition:width .5s ease" title="'+b.l+': '+b.v+'"></div>';
-        });
-        h+='</div>';
-        h+='<div style="display:flex;gap:12px;flex-wrap:wrap;font-size:9px">';
-        [{l:'Verbs',v:verbCount,c:'#3b82f6'},{l:'Nouns',v:nounCount,c:'#34d399'},{l:'Adj',v:adjCount,c:'#f97316'},{l:'Adv',v:advCount,c:'#a855f7'},{l:'Other',v:otherCount,c:'#6b7280'}].forEach(function(b){
-          h+='<span style="display:flex;align-items:center;gap:4px"><span style="width:8px;height:8px;border-radius:2px;background:'+b.c+'"></span>'+b.l+' <strong>'+b.v+'</strong></span>';
-        });
-        h+='</div>';
-      }
+      // ── Definition side panel ──
+      h+='<div id="vocabDefPanel" style="display:none;grid-column:1/-1;background:var(--card2);border:1px solid var(--line);border-radius:10px;padding:12px 16px;font-size:11px;color:var(--muted);line-height:1.6;margin-top:4px">';
+      h+='<span style="font-weight:700;color:var(--accent)" id="vocabDefWord"></span>';
+      h+='<span id="vocabDefText"></span>';
       h+='</div>';
-      cb(h);
+
+      cb(h, function(){
+        // Wire up click handlers
+        document.querySelectorAll('.wv-chip').forEach(function(chip){
+          chip.addEventListener('click', function(e){
+            var word = this.dataset.word;
+            showVocabDefinition(word);
+          });
+          chip.addEventListener('dblclick', function(e){
+            e.preventDefault();
+            var word = this.dataset.word;
+            addToWordBank(word);
+            // Visual feedback
+            this.style.background='rgba(52,211,153,.2)';
+            var self=this;
+            setTimeout(function(){ self.style.background=''; }, 600);
+            // Refresh vocab panel to show X button
+            if(typeof window.refreshExtrasPanel === 'function'){
+              setTimeout(function(){ window.refreshExtrasPanel(); }, 200);
+            }
+          });
+        });
+      });
     },
 
     grammar: function(cb){
@@ -2943,6 +2987,27 @@ function downloadGrammarPDF() {
       }
       h+='</div>';
 
+
+      // 05 — POS Distribution
+      var posWords=getTranscriptWords();
+      var posVerb=0,posNoun=0,posAdj=0,posAdv=0,posOther=0;
+      posWords.forEach(function(w){if(w.pos==='VERB')posVerb++;else if(w.pos==='NOUN')posNoun++;else if(w.pos==='ADJ')posAdj++;else if(w.pos==='ADV')posAdv++;else posOther++});
+      var posTotal=Math.max(1,posVerb+posNoun+posAdj+posAdv+posOther);
+      h+='<div class="extras-card"><div class="ec-title">05 · POS Distribution <span class="ec-badge" style="background:rgba(52,211,153,.15);color:#34d399">LIVE</span></div>';
+      if(posTotal<=1){h+='<div style="color:var(--muted2);font-style:italic">Speaking data needed</div>'}
+      else{
+        h+='<div style="display:flex;height:14px;border-radius:7px;overflow:hidden;margin-bottom:8px">';
+        [{l:'Verbs',v:posVerb,c:'#3b82f6',p:Math.round(posVerb/posTotal*100)},{l:'Nouns',v:posNoun,c:'#34d399',p:Math.round(posNoun/posTotal*100)},{l:'Adj',v:posAdj,c:'#f97316',p:Math.round(posAdj/posTotal*100)},{l:'Adv',v:posAdv,c:'#a855f7',p:Math.round(posAdv/posTotal*100)},{l:'Other',v:posOther,c:'#6b7280',p:Math.round(posOther/posTotal*100)}].forEach(function(b){
+          if(b.p>0) h+='<div style="width:'+b.p+'%;height:100%;background:'+b.c+';transition:width .5s ease" title="'+b.l+': '+b.v+'"></div>';
+        });
+        h+='</div>';
+        h+='<div style="display:flex;gap:12px;flex-wrap:wrap;font-size:9px">';
+        [{l:'Verbs',v:posVerb,c:'#3b82f6'},{l:'Nouns',v:posNoun,c:'#34d399'},{l:'Adj',v:posAdj,c:'#f97316'},{l:'Adv',v:posAdv,c:'#a855f7'},{l:'Other',v:posOther,c:'#6b7280'}].forEach(function(b){
+          h+='<span style="display:flex;align-items:center;gap:4px"><span style="width:8px;height:8px;border-radius:2px;background:'+b.c+'"></span>'+b.l+' <strong>'+b.v+'</strong></span>';
+        });
+        h+='</div>';
+      }
+      h+='</div>';
       h+='</div>';
       cb(h);
     },
