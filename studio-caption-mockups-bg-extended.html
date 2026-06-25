@@ -75,6 +75,7 @@ body.light #leftPanel{background:rgba(255,255,255,.92);border-color:rgba(0,0,0,.
 </head>
 <body class="dark">
 <div id="bgLayer" class="on">
+  <canvas class="bg-canvas" id="canvasTrail" style="display:none"></canvas>
   <canvas class="bg-canvas" id="canvasRings"></canvas>
   <canvas class="bg-canvas" id="canvasBars"></canvas>
 </div>
@@ -104,8 +105,8 @@ body.light #leftPanel{background:rgba(255,255,255,.92);border-color:rgba(0,0,0,.
 <!-- Left Panel: Particle/Line Behavior -->
 <div id="leftPanel">
   <button class="panel-toggle" onclick="toggleLeftPanel()" title="Toggle panel" style="left:auto;right:-32px">⚙</button>
-  <h4>🧪 Particles & Lines</h4>
-  <div class="tog-row"><span>Particles</span><span style="display:flex;gap:3px"><button class="tb" data-key="particleCount" data-val="0" onclick="setToggle(this)">Off</button><button class="tb" data-key="particleCount" data-val="30" onclick="setToggle(this)">Lo</button><button class="tb on" data-key="particleCount" data-val="80" onclick="setToggle(this)">Med</button><button class="tb" data-key="particleCount" data-val="200" onclick="setToggle(this)">Hi</button></span></div>
+  <h4>🧪 Bars & Rings FX</h4>
+  <div class="tog-row"><span>Density</span><span style="display:flex;gap:3px"><button class="tb" data-key="particleCount" data-val="0" onclick="setToggle(this)">Off</button><button class="tb" data-key="particleCount" data-val="30" onclick="setToggle(this)">Lo</button><button class="tb on" data-key="particleCount" data-val="80" onclick="setToggle(this)">Med</button><button class="tb" data-key="particleCount" data-val="200" onclick="setToggle(this)">Hi</button></span></div>
   <div class="tog-row"><span>Speed P.</span><span style="display:flex;gap:3px"><button class="tb" data-key="particleSpeed" data-val="0.2" onclick="setToggle(this)">Slo</button><button class="tb on" data-key="particleSpeed" data-val="0.6" onclick="setToggle(this)">Med</button><button class="tb" data-key="particleSpeed" data-val="1.5" onclick="setToggle(this)">Fst</button><button class="tb" data-key="particleSpeed" data-val="3" onclick="setToggle(this)">Fst+</button></span></div>
   <div class="tog-row"><span>Line W</span><span style="display:flex;gap:3px"><button class="tb" data-key="lineWidth" data-val="0.5" onclick="setToggle(this)">Thin</button><button class="tb on" data-key="lineWidth" data-val="1.5" onclick="setToggle(this)">Med</button><button class="tb" data-key="lineWidth" data-val="3" onclick="setToggle(this)">Thk</button><button class="tb" data-key="lineWidth" data-val="6" onclick="setToggle(this)">Bold</button></span></div>
   <div class="tog-row"><span>Lines #</span><span style="display:flex;gap:3px"><button class="tb" data-key="lineCount" data-val="0" onclick="setToggle(this)">Off</button><button class="tb" data-key="lineCount" data-val="20" onclick="setToggle(this)">Lo</button><button class="tb on" data-key="lineCount" data-val="60" onclick="setToggle(this)">Med</button><button class="tb" data-key="lineCount" data-val="150" onclick="setToggle(this)">Hi</button></span></div>
@@ -123,7 +124,7 @@ body.light #leftPanel{background:rgba(255,255,255,.92);border-color:rgba(0,0,0,.
 
 <div id="ui">
   <h1 id="titleText">Sottotitoli</h1>
-  <p>Live mic — 3 rings, 3 bars, real voice</p>
+  <p>Live audio — 3 rings, 5 bars · System Audio + Emulator</p>
   <div class="meter-row">
     <span class="meter-label" id="meterLabel">— dB</span>
     <div class="meter-bar"><div class="meter-fill" id="meterFill"></div></div>
@@ -173,7 +174,7 @@ body.light #leftPanel{background:rgba(255,255,255,.92);border-color:rgba(0,0,0,.
 var audioCtx=null,analyser=null,micStream=null,sysStream=null,micOn=false,sysOn=false;
 var freqData=null,volume=0,smoothing=0;
 var animFrame=null,currentMode='both',ringVar=0,barVar=0;
-var canvasRings,canvasBars,ctxRings,ctxBars;
+var canvasRings,canvasBars,canvasTrail,ctxRings,ctxBars,ctxTrail;
 var W=window.innerWidth,H=window.innerHeight;
 var t=0;
 var sensitivity=1.0;
@@ -225,14 +226,17 @@ function initAudio(){
 function initCanvases(){
   canvasRings=document.getElementById('canvasRings');
   canvasBars=document.getElementById('canvasBars');
+  canvasTrail=document.getElementById('canvasTrail');
   ctxRings=canvasRings.getContext('2d');
   ctxBars=canvasBars.getContext('2d');
+  ctxTrail=canvasTrail.getContext('2d');
   resize();
 }
 function resize(){
   W=window.innerWidth;H=window.innerHeight;
   canvasRings.width=W;canvasRings.height=H;
   canvasBars.width=W;canvasBars.height=H;
+  canvasTrail.width=W;canvasTrail.height=H;
 }
 function stopAllAudio(){
   if(micStream){micStream.getTracks().forEach(function(t){t.stop()});micStream=null}
@@ -313,7 +317,7 @@ var ringFuncs=[
       var a=themeAlpha(isDark,0.5-v*0.2)*(1-i*0.06);
       ctx.beginPath();ctx.arc(cx,cy,r,0,Math.PI*2);
       ctx.strokeStyle=c((hue+i*22)%360,sat,themeLum(isDark,true),a);
-      ctx.lineWidth=1+v*4;ctx.stroke();
+      ctx.lineWidth=(window._togLineW||1)*(1+v*4);ctx.stroke();
     }
   },
   // Spiral (thin line)
@@ -326,7 +330,7 @@ var ringFuncs=[
       if(i===0)ctx.moveTo(x,y);else ctx.lineTo(x,y);
     }
     ctx.strokeStyle=c(hue%360,themeSat(isDark),themeLum(isDark,true),themeAlpha(isDark,0.4+v*0.3));
-    ctx.lineWidth=1+v*3;ctx.stroke();
+    ctx.lineWidth=(window._togLineW||1)*(1+v*3);ctx.stroke();
   },
   // Breathing rings (beautiful)
   function(ctx,v,isDark){
@@ -345,7 +349,7 @@ var ringFuncs=[
 var barFuncs=[
   // Mirror — rest+speech blend
   function(ctx,v,isDark){
-    var n=64,gap=2,w=(W-gap*(n+1))/n,hue=themeHue(isDark);
+    var n=Math.max(16,Math.floor(64*(window._togDensity||1))),gap=2,w=(W-gap*(n+1))/n,hue=themeHue(isDark);
     var sv=Math.pow(v,0.5);
     var restFactor=Math.max(0.12,Math.min(1,sv*3));
     for(var i=0;i<n;i++){
@@ -373,7 +377,7 @@ var barFuncs=[
   function(ctx,v,isDark){
     var cx=W/2,cy=H/2,hue=themeHue(isDark);
     var maxR=Math.min(W,H)*0.49;
-    var sv=Math.pow(v,0.45),n=180;
+    var sv=Math.pow(v,0.45),n=Math.max(30,Math.floor(180*(window._togDensity||1)));
     var spaceGrad=ctx.createRadialGradient(cx,cy,maxR*0.1,cx,cy,maxR*1.3);
     spaceGrad.addColorStop(0,isDark?'rgba(6,6,20,0)':'rgba(250,250,248,0)');
     spaceGrad.addColorStop(0.5,isDark?'rgba(6,6,20,0.15)':'rgba(250,250,248,0.1)');
@@ -396,7 +400,7 @@ var barFuncs=[
         sg.addColorStop(0,c(sh,themeSat(isDark),themeLum(isDark,true),themeAlpha(isDark,0.03)));
         sg.addColorStop(0.4,c(sh,themeSat(isDark),themeLum(isDark,true),themeAlpha(isDark,0.35+sv*0.3)));
         sg.addColorStop(1,c(sh,themeSat(isDark),themeLum(isDark,true),0));
-        ctx.fillStyle=sg;var sw=1.2+fi*2.5+ring*0.3;ctx.fillRect(-sw/2,ringR,sw,sl);
+        ctx.fillStyle=sg;var sw=(window._togLineW||1)*(1.2+fi*2.5+ring*0.3);ctx.fillRect(-sw/2,ringR,sw,sl);
         if(fi>0.25){ctx.beginPath();ctx.arc(0,ringR+sl,1.5+fi*2,0,Math.PI*2);ctx.fillStyle=c(sh,80,themeLum(isDark,true),themeAlpha(isDark,0.7+sv*0.3));ctx.fill()}
         ctx.restore();
       }
@@ -458,7 +462,81 @@ var barFuncs=[
     
     // Center vertical reference line
     ctx.strokeStyle=isDark?'rgba(255,255,255,'+(0.02+sv*0.04)+')':'rgba(0,0,0,'+(0.02+sv*0.04)+')';
-    ctx.lineWidth=0.5;ctx.beginPath();ctx.moveTo(W/2,0);ctx.lineTo(W/2,H);ctx.stroke();
+    ctx.lineWidth=0.5*(window._togLineW||1);ctx.beginPath();ctx.moveTo(W/2,0);ctx.lineTo(W/2,H);ctx.stroke();
+  },
+  // Thick Smooth — imported from bg-radial (3px bold, heavy smoothing, 120 bars, 2 rings)
+  function(ctx,v,isDark){
+    var cx=W/2,cy=H/2,hue=themeHue(isDark),maxR=Math.min(W,H)*0.49;
+    var lw=(window._togLineW||3);var sv=Math.pow(v,0.5);
+    var nRings=2,nBars=Math.max(20,Math.floor(120*(window._togDensity||1)));
+    var spaceGrad=ctx.createRadialGradient(cx,cy,maxR*0.1,cx,cy,maxR*1.3);
+    spaceGrad.addColorStop(0,isDark?'rgba(6,6,20,0)':'rgba(250,250,248,0)');
+    spaceGrad.addColorStop(0.5,isDark?'rgba(6,6,20,0.12)':'rgba(250,250,248,0.08)');
+    spaceGrad.addColorStop(1,isDark?'rgba(6,6,20,0.40)':'rgba(250,250,248,0.20)');
+    ctx.fillStyle=spaceGrad;ctx.fillRect(0,0,W,H);
+    ctx.beginPath();ctx.arc(cx,cy,maxR*0.92,0,Math.PI*2);
+    ctx.strokeStyle=c(hue,themeSat(isDark),themeLum(isDark,true),themeAlpha(isDark,0.10));ctx.lineWidth=0.5;ctx.stroke();
+    ctx.beginPath();ctx.arc(cx,cy,maxR*0.95,0,Math.PI*2);
+    ctx.strokeStyle=c(hue+60,themeSat(isDark),themeLum(isDark,true),themeAlpha(isDark,0.06));ctx.lineWidth=1;ctx.stroke();
+    for(var ring=0;ring<nRings;ring++){
+      var ringR=maxR*(0.28+ring*0.25),sc=Math.max(20,nBars-(ring*30));
+      for(var i=0;i<sc;i++){
+        var fi=0.15;if(freqData&&micOn){var fidx=Math.floor(i*freqData.length/sc);fi=freqData[fidx%freqData.length]/255}else{fi=0.1+Math.sin(i*0.5+t/1200+ring)*0.3}
+        if(fi<0.04)continue;
+        var angle=(i/sc)*Math.PI*2+t/15000*(ring+1)*0.5;
+        var sl=fi*maxR*0.55*(0.6+ring*0.2);
+        ctx.save();ctx.translate(cx,cy);ctx.rotate(angle);
+        var sg=ctx.createLinearGradient(0,ringR,0,ringR+sl);
+        var sh=(hue+i*2.5+ring*40)%360;
+        sg.addColorStop(0,c(sh,themeSat(isDark),themeLum(isDark,true),themeAlpha(isDark,0.02)));
+        sg.addColorStop(0.4,c(sh,themeSat(isDark),themeLum(isDark,true),themeAlpha(isDark,0.30+sv*0.30)));
+        sg.addColorStop(1,c(sh,themeSat(isDark),themeLum(isDark,true),0));
+        ctx.fillStyle=sg;ctx.fillRect(-lw/2,ringR,lw,sl);
+        if(fi>0.25){ctx.beginPath();ctx.arc(0,ringR+sl,3.5+fi*1.5,0,Math.PI*2);ctx.fillStyle=c(sh,80,themeLum(isDark,true),themeAlpha(isDark,0.6+sv*0.3));ctx.fill()}
+        ctx.restore();
+      }
+    }
+    var orbR=maxR*0.03+sv*maxR*0.02;
+    var og=ctx.createRadialGradient(cx,cy,0,cx,cy,orbR*3);
+    og.addColorStop(0,c(hue,60,themeLum(isDark,true),themeAlpha(isDark,0.6+sv*0.3)));
+    og.addColorStop(1,'rgba(0,0,0,0)');ctx.fillStyle=og;ctx.fillRect(cx-orbR*3,cy-orbR*3,orbR*6,orbR*6);
+  },
+  // Thick Punchy — imported from bg-radial (3.5px heavy, instant response, 100 bars, 2 rings)
+  function(ctx,v,isDark){
+    var cx=W/2,cy=H/2,hue=themeHue(isDark),maxR=Math.min(W,H)*0.49;
+    var lw=(window._togLineW||3.5);var sv=v;
+    var nRings=2,nBars=Math.max(20,Math.floor(100*(window._togDensity||1)));
+    var spaceGrad=ctx.createRadialGradient(cx,cy,maxR*0.1,cx,cy,maxR*1.3);
+    spaceGrad.addColorStop(0,isDark?'rgba(6,6,20,0)':'rgba(250,250,248,0)');
+    spaceGrad.addColorStop(0.5,isDark?'rgba(6,6,20,0.12)':'rgba(250,250,248,0.08)');
+    spaceGrad.addColorStop(1,isDark?'rgba(6,6,20,0.40)':'rgba(250,250,248,0.20)');
+    ctx.fillStyle=spaceGrad;ctx.fillRect(0,0,W,H);
+    ctx.beginPath();ctx.arc(cx,cy,maxR*0.92,0,Math.PI*2);
+    ctx.strokeStyle=c(hue,themeSat(isDark),themeLum(isDark,true),themeAlpha(isDark,0.14));ctx.lineWidth=0.5;ctx.stroke();
+    ctx.beginPath();ctx.arc(cx,cy,maxR*0.95,0,Math.PI*2);
+    ctx.strokeStyle=c(hue+60,themeSat(isDark),themeLum(isDark,true),themeAlpha(isDark,0.08));ctx.lineWidth=1;ctx.stroke();
+    for(var ring=0;ring<nRings;ring++){
+      var ringR=maxR*(0.25+ring*0.22),sc=Math.max(20,nBars-(ring*30));
+      for(var i=0;i<sc;i++){
+        var fi=0.15;if(freqData&&micOn){var fidx=Math.floor(i*freqData.length/sc);fi=freqData[fidx%freqData.length]/255}else{fi=0.1+Math.sin(i*0.5+t/1200+ring)*0.3}
+        if(fi<0.04)continue;
+        var angle=(i/sc)*Math.PI*2+t/15000*(ring+1)*0.5;
+        var sl=fi*maxR*0.55*(0.6+ring*0.2);
+        ctx.save();ctx.translate(cx,cy);ctx.rotate(angle);
+        var sg=ctx.createLinearGradient(0,ringR,0,ringR+sl);
+        var sh=(hue+i*2.5+ring*40)%360;
+        sg.addColorStop(0,c(sh,themeSat(isDark),themeLum(isDark,true),themeAlpha(isDark,0.02)));
+        sg.addColorStop(0.4,c(sh,themeSat(isDark),themeLum(isDark,true),themeAlpha(isDark,0.35+sv*0.35)));
+        sg.addColorStop(1,c(sh,themeSat(isDark),themeLum(isDark,true),0));
+        ctx.fillStyle=sg;ctx.fillRect(-lw/2,ringR,lw,sl);
+        if(fi>0.25){ctx.beginPath();ctx.arc(0,ringR+sl,4+fi*2,0,Math.PI*2);ctx.fillStyle=c(sh,80,themeLum(isDark,true),themeAlpha(isDark,0.7+sv*0.3));ctx.fill()}
+        ctx.restore();
+      }
+    }
+    var orbR=maxR*0.04+sv*maxR*0.03;
+    var og=ctx.createRadialGradient(cx,cy,0,cx,cy,orbR*3);
+    og.addColorStop(0,c(hue,60,themeLum(isDark,true),themeAlpha(isDark,0.7+sv*0.3)));
+    og.addColorStop(1,'rgba(0,0,0,0)');ctx.fillStyle=og;ctx.fillRect(cx-orbR*3,cy-orbR*3,orbR*6,orbR*6);
   }
 ];
 
@@ -491,8 +569,22 @@ function animate(ts){
   // Decay word flashes
   wordFlashes.forEach(function(wf){wf.life-=0.008});
 
+  // ── Trail buffer: capture previous frame before clearing ──
+  if(window._togTrail>0){
+    ctxTrail.globalCompositeOperation='source-over';
+    ctxTrail.clearRect(0,0,W,H);
+    ctxTrail.drawImage(canvasRings,0,0);
+    ctxTrail.drawImage(canvasBars,0,0);
+  }
+
   ctxRings.clearRect(0,0,W,H);
   ctxBars.clearRect(0,0,W,H);
+
+  // ── Trail: blend previous frame at reduced alpha ──
+  if(window._togTrail>0){
+    ctxRings.globalAlpha=window._togTrail*0.3;ctxRings.drawImage(canvasTrail,0,0);ctxRings.globalAlpha=1;
+    ctxBars.globalAlpha=window._togTrail*0.3;ctxBars.drawImage(canvasTrail,0,0);ctxBars.globalAlpha=1;
+  }
   
   // Apply bg opacity toggle
   ctxRings.globalAlpha=bgOp;
@@ -539,54 +631,52 @@ function animate(ts){
     }
   });
 
-  // ── Apply toggle modifiers to volume ──
+  // ── Apply toggle modifiers ──
   var densityMul=toggles.density||1;
   var sizeMul=toggles.size||1;
   var animStyle=toggles.anim||'smooth';
   
-  // Left panel: particle/line toggles modulate volume and rendering
-  var pCount=toggles.particleCount||80;
-  var pSpeed=toggles.particleSpeed||0.6;
-  var lWidth=toggles.lineWidth||1.5;
-  var lCount=toggles.lineCount||60;
-  var trailVal=toggles.trail||0;
-  var connectD=toggles.connectDist||0;
-  var gravVal=toggles.gravity||0;
-  var repelVal=toggles.repulsion||0;
-  var randVal=toggles.randomness||0.8;
-  var colorM=toggles.colorMode||'mono';
+  // Left panel → direct rendering globals for bars & rings
+  window._togLineW   = (toggles.lineWidth||1.5) * sizeMul;
+  window._togDensity  = Math.max(0.2, (toggles.lineCount||60) / 60 * densityMul);
+  window._togTrail    = toggles.trail||0;
+  window._togConnect  = toggles.connectDist||0;
+  window._togGravity  = toggles.gravity||0;
+  window._togRepel    = toggles.repulsion||0;
+  window._togRandom   = toggles.randomness||0.8;
+  window._togColorMode = toggles.colorMode||'mono';
+  window._togWave     = toggles.wave||'sine';
+  window._togBarStyle = toggles.barStyle||'solid';
+  window._togRings    = toggles.rings||3;
+  window._togAnim     = animStyle;
   
-  // Apply left panel effects: modulate volume with particle/line behavior
-  var leftMod=1;
-  if(pCount>0)leftMod*=0.6+(pCount/300); // More particles = more visual activity
-  if(pSpeed>1)leftMod*=1+(pSpeed-1)*0.5; // Faster = more reactive
-  if(lCount>0)leftMod*=0.7+(lCount/200); // More lines = denser
-  if(lWidth>1)leftMod*=1+(lWidth-1)*0.3; // Thicker lines = more presence
-  if(gravVal>0)leftMod*=1+gravVal*2; // Gravity adds weight
-  if(repelVal>0)leftMod*=1+repelVal*0.5; // Repulsion adds energy
-  if(randVal>0.8)leftMod*=1+(randVal-0.8)*1.5; // Randomness adds chaos
+  // Particle count → visual granularity boost
+  var pGranularity = Math.max(0.2, (toggles.particleCount||80) / 80);
+  var pSpeedMul = (toggles.particleSpeed||0.6);
   
-  // Trail: decay smoothing for echo effect
-  if(trailVal>0){smoothing=smoothing*(1-trailVal*0.5)+volume*trailVal*0.5}
-  
-  // Anim: adjust based on style
+  // Anim style modifier
   if(animStyle==='sharp'){v=v<0.1?0:v}
-  else if(animStyle==='bouncy'){v=v+Math.sin(t*0.01)*0.15*leftMod}
+  else if(animStyle==='bouncy'){v=v+Math.sin(t*0.01*pSpeedMul)*0.15}
   
-  // Density & Size: scale effective volume
-  var effectiveV=Math.min(1,v*densityMul*leftMod);
-  
-  // Save sizes for render functions
-  window._togSize=sizeMul*lWidth/1.5;
-  window._togDensity=densityMul*(pCount/80);
-  window._togWave=toggles.wave||'sine';
-  window._togBarStyle=toggles.barStyle||'solid';
-  window._togRings=toggles.rings||3;
-  window._togAnim=animStyle;
-  window._togColorMode=colorM;
+  var effectiveV=Math.min(1, v * densityMul * pGranularity);
 
   if(currentMode==='both'||currentMode==='rings') ringFuncs[ringVar](ctxRings,effectiveV,isDark);
   if(currentMode==='both'||currentMode==='bars') barFuncs[barVar](ctxBars,effectiveV,isDark);
+
+  // ── Connect lines: draw lines between nearby bar peaks (post-render on bars canvas) ──
+  if(window._togConnect>0&&(currentMode==='both'||currentMode==='bars')){
+    // Sample bar canvas for bright pixels and connect nearby ones
+    // Simplified: draw radial connecting arcs at active ring distances
+    var cx=W/2,cy=H/2,maxR=Math.min(W,H)*0.49;
+    ctxBars.save();ctxBars.globalAlpha=window._togConnect*0.004;
+    ctxBars.strokeStyle=c(themeHue(isDark)+60,themeSat(isDark),themeLum(isDark,true),0.15);
+    ctxBars.lineWidth=0.5;
+    for(var ring=0;ring<3;ring++){
+      var rr=maxR*(0.28+ring*0.22);
+      ctxBars.beginPath();ctxBars.arc(cx,cy,rr,0,Math.PI*2);ctxBars.stroke();
+    }
+    ctxBars.restore();
+  }
 
   // ── Apply toggle post-effects ──
   var glowVal=toggles.glow||1;
@@ -646,19 +736,19 @@ function setMode(m){
 }
 function nextVar(){
   if(currentMode==='both'||currentMode==='rings') ringVar=(ringVar+1)%3;
-  if(currentMode==='both'||currentMode==='bars') barVar=(barVar+1)%3;
+  if(currentMode==='both'||currentMode==='bars') barVar=(barVar+1)%5;
   updateVarLabel();
 }
 function prevVar(){
   if(currentMode==='both'||currentMode==='rings') ringVar=(ringVar+2)%3;
-  if(currentMode==='both'||currentMode==='bars') barVar=(barVar+2)%3;
+  if(currentMode==='both'||currentMode==='bars') barVar=(barVar+4)%5;
   updateVarLabel();
 }
 function updateVarLabel(){
   var names=['Concentric','Spiral','Breathing'];
-  var bnames=['Mirror','Radial','Brush'];
+  var bnames=['Mirror','Radial','Brush','Thick Smooth','Thick Punchy'];
   var rn=currentMode==='bars'?'—':names[ringVar]+' '+(ringVar+1)+'/3';
-  var bn=currentMode==='rings'?'—':bnames[barVar]+' '+(barVar+1)+'/3';
+  var bn=currentMode==='rings'?'—':bnames[barVar]+' '+(barVar+1)+'/5';
   document.getElementById('varName').textContent='Rings: '+rn+'  |  Bars: '+bn;
 }
 
