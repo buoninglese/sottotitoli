@@ -159,7 +159,7 @@ body.logged-in .guest-only{display:none!important}
 <body class="snap-body hb-idx">
 
 <!-- Radial Bars background canvas -->
-<canvas id="radialBgCanvas" style="position:fixed;inset:0;width:100%;height:100%;z-index:0;pointer-events:none;opacity:.55"></canvas>
+<canvas id="radialBgCanvas" style="position:fixed;inset:0;width:100%;height:100%;z-index:0;pointer-events:none;opacity:.7"></canvas>
 
 <script>history.scrollRestoration='manual';window.scrollTo(0,0);</script>
 <script>
@@ -1090,7 +1090,7 @@ function handleHeroLogin(e){e.preventDefault();if(typeof signInWithGoogle==='fun
     <span style="flex:1;text-align:center" id="rbBreathVal">off</span>
   </div>
   <div style="display:flex;gap:4px">
-    <button id="rbBtnMic" onclick="RB.toggleMic()" style="flex:1;padding:5px 8px;border-radius:6px;font-size:9px;font-weight:600;border:1px solid rgba(255,255,255,.1);background:rgba(255,255,255,.03);color:rgba(255,255,255,.5);cursor:pointer;font-family:inherit">🎤 Start Mic</button>
+    <button id="rbBtnMic" onclick="RB.toggleMic()" style="flex:1;padding:5px 8px;border-radius:6px;font-size:9px;font-weight:600;border:1px solid rgba(255,255,255,.1);background:rgba(255,255,255,.03);color:rgba(255,255,255,.5);cursor:pointer;font-family:inherit">🎤 Allow Mic</button>
     <button id="rbBtnDark" onclick="RB.setTheme('dark')" style="padding:5px 8px;border-radius:6px;font-size:9px;font-weight:600;border:1px solid rgba(255,255,255,.1);background:rgba(255,255,255,.03);color:rgba(255,255,255,.5);cursor:pointer;font-family:inherit">🌙</button>
     <button id="rbBtnLight" onclick="RB.setTheme('light')" style="padding:5px 8px;border-radius:6px;font-size:9px;font-weight:600;border:1px solid rgba(255,255,255,.1);background:rgba(255,255,255,.03);color:rgba(255,255,255,.5);cursor:pointer;font-family:inherit">☀️</button>
   </div>
@@ -1189,7 +1189,8 @@ window.RB=(function(){
 
   function animate(ts){
     animFrame=requestAnimationFrame(animate);t=ts||Date.now();
-    if(micOn){readAudio();}else{smoothing=smoothing*0.92+0.04;volume=0.08+Math.sin(t/1800)*0.06+Math.sin(t/3100)*0.05+Math.sin(t/5200)*0.03;}
+    // Demo sine-wave when no real mic stream (always visible rest state)
+    if(micOn && micStream){readAudio();}else{smoothing=smoothing*0.92+0.04;volume=0.08+Math.sin(t/1800)*0.06+Math.sin(t/3100)*0.05+Math.sin(t/5200)*0.03;}
     var v=smoothing||volume;
     if(fx.sensBoost.on)v=Math.min(1,v*fx.sensBoost.mult);
     if(fx.breath.on&&v<fx.breath.threshold&&v>0.001)v=v*3;
@@ -1206,9 +1207,9 @@ window.RB=(function(){
     document.getElementById('rbConfigDisplay').textContent='var:'+v.name+' | sens:'+sensitivity.toFixed(1)+' | slow:'+(fx.slowdown.on?fx.slowdown.speed:'1')+' | boost:'+(fx.sensBoost.on?fx.sensBoost.mult:'off')+' | breath:'+(fx.breath.on?fx.breath.threshold:'off');
   }
 
-  // Init
+  // Init — start with gentle rest-state animation visible, mic not yet active
   resize();window.addEventListener('resize',resize);
-  micOn=true;document.getElementById('rbBtnMic').textContent='🎤 Demo Mic';
+  // Don't set micOn — let demo sine-wave drive the rest state
   if(!animFrame)animate();
   updateConfigDisplay();
 
@@ -1226,8 +1227,8 @@ window.RB=(function(){
       updateConfigDisplay();
     },
     toggleMic:function(){
-      if(micOn){if(micStream){micStream.getTracks().forEach(function(t){t.stop()});micStream=null}micOn=false;document.getElementById('rbBtnMic').textContent='🎤 Start Mic';return}
-      initAudio();navigator.mediaDevices.getUserMedia({audio:true,video:false}).then(function(s){micStream=s;audioCtx.createMediaStreamSource(s).connect(analyser);micOn=true;document.getElementById('rbBtnMic').textContent='⏹ Stop Mic';if(!animFrame)animate();}).catch(function(){micOn=true;document.getElementById('rbBtnMic').textContent='🎤 Demo Mic';if(!animFrame)animate();});
+      if(micOn){if(micStream){micStream.getTracks().forEach(function(t){t.stop()});micStream=null}micOn=false;document.getElementById('rbBtnMic').textContent='🎤 Allow Mic';return}
+      initAudio();navigator.mediaDevices.getUserMedia({audio:true,video:false}).then(function(s){micStream=s;audioCtx.createMediaStreamSource(s).connect(analyser);micOn=true;document.getElementById('rbBtnMic').textContent='⏹ Stop Mic';if(!animFrame)animate();}).catch(function(){alert('Mic access needed for the visual to react to your voice.');});
     },
     setTheme:function(t){document.getElementById('rbBtnDark').style.borderColor=t==='dark'?'rgba(52,211,153,.4)':'rgba(255,255,255,.1)';document.getElementById('rbBtnLight').style.borderColor=t==='light'?'rgba(52,211,153,.4)':'rgba(255,255,255,.1)';},
     nextVar:function(){currentVar=(currentVar+1)%variations.length;document.getElementById('rbVarName').textContent=(currentVar+1)+'/7 · '+variations[currentVar].name;updateConfigDisplay();},
