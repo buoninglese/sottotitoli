@@ -194,8 +194,8 @@ function startDemoMode(){
 var canvas,ctx,W,H,t=0,animFrame,currentVar=0;
 var variations=[
   { name:'Particle Drift', emoji:'🌫️', desc:'Gentle floating dots · dust motes in light',
-    init:function(c){this.pts=[];for(var i=0;i<60;i++)this.pts.push({x:Math.random()*W,y:Math.random()*H,r:1+Math.random()*2.5,vx:(Math.random()-.5)*.4,vy:(Math.random()-.5)*.4,o:.04+Math.random()*.08})},
-    draw:function(ctx,ts,dark){ctx.clearRect(0,0,W,H);var c=dark?'255,255,255':'100,100,120';for(var i=0;i<this.pts.length;i++){var p=this.pts[i];p.x+=p.vx;p.y+=p.vy;if(p.x<0)p.x=W;if(p.x>W)p.x=0;if(p.y<0)p.y=H;if(p.y>H)p.y=0;ctx.beginPath();ctx.arc(p.x,p.y,p.r,0,Math.PI*2);ctx.fillStyle='rgba('+c+','+p.o+')';ctx.fill()}}
+    init:function(c){this.pts=[];for(var i=0;i<60;i++)this.pts.push({x:Math.random()*W,y:Math.random()*H,r:1+Math.random()*2.5,vx:(Math.random()-.5)*.4,vy:(Math.random()-.5)*.4,o:.08+Math.random()*.12})},
+    draw:function(ctx,ts,dark,vol){ctx.clearRect(0,0,W,H);var c=dark?'255,255,255':'100,100,120';var m=vol?Math.max(0.5,vol*3):1;for(var i=0;i<this.pts.length;i++){var p=this.pts[i];p.x+=p.vx;p.y+=p.vy;if(p.x<0)p.x=W;if(p.x>W)p.x=0;if(p.y<0)p.y=H;if(p.y>H)p.y=0;ctx.beginPath();ctx.arc(p.x,p.y,p.r,0,Math.PI*2);ctx.fillStyle='rgba('+c+','+(p.o*m)+')';ctx.fill()}}
   },
   { name:'Radial Glow', emoji:'🫁', desc:'Soft pulsing glow from center',
     init:function(c){},
@@ -241,12 +241,17 @@ function nextVar(){currentVar=(currentVar+1)%variations.length;updateLabel()}
 function updateLabel(){var v=variations[currentVar];document.getElementById('varLabel').textContent=(currentVar+1)+'/'+variations.length;document.getElementById('varName').textContent=v.emoji+' '+v.name+' — '+v.desc;if(v.init)v.init()}
 function draw(ts){
   t=ts;
-  if(micOn)readAudio();
+  if(micOn){readAudio()}else{
+    // Rest-state: gentle breathing volume
+    smoothedVol=0.06+Math.sin(ts/1800)*0.04+Math.sin(ts/3100)*0.03+Math.sin(ts/5200)*0.02;
+  }
   var v=variations[currentVar];
   var dark=document.getElementById('bodyEl').className==='dark';
-  // Pass volume for audio-reactive visuals
-  var vol=smoothedVol*sensitivity;
+  var vol=Math.max(0.04, smoothedVol*sensitivity);
   v.draw(ctx,ts,dark,vol);
+  // Update meter
+  document.getElementById('meterFill').style.height=(smoothedVol*150)+'%';
+  document.getElementById('meterLabel').textContent=Math.round(smoothedVol*100-50)+' dB';
   animFrame=requestAnimationFrame(draw);
 }
 canvas=document.getElementById('bgCanvas');ctx=canvas.getContext('2d');resize();window.addEventListener('resize',function(){resize()});updateLabel();requestAnimationFrame(draw);
