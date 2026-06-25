@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Sottotitoli · 10 Content-Aware BG Visuals</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300;14..32,400;14..32,500;14..32,600;14..32,700;14..32,900&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Inter',system-ui,sans-serif;overflow:hidden;height:100vh;position:relative;transition:background .5s}
+body.light{background:#fafaf8;color:#1a1a1a}
+body.dark{background:#060610;color:#e8eaed}
+#bgCanvas{position:fixed;inset:0;z-index:0;width:100%;height:100%}
+
+/* Center content box */
+#centerBox{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);z-index:5;background:var(--card-bg);border-radius:14px;padding:32px 36px;max-width:420px;width:90%;text-align:center;box-shadow:0 8px 40px rgba(0,0,0,.4);pointer-events:auto}
+body.light #centerBox{background:rgba(255,255,255,.92);box-shadow:0 8px 40px rgba(0,0,0,.1)}
+body.dark #centerBox{background:rgba(15,18,30,.92);box-shadow:0 8px 40px rgba(0,0,0,.5)}
+#centerBox h2{font-size:20px;font-weight:800;letter-spacing:-.5px;margin-bottom:8px}
+#centerBox p{font-size:13px;line-height:1.7;opacity:.65;margin-bottom:14px}
+#centerBox .tag{display:inline-block;padding:4px 12px;border-radius:100px;font-size:10px;font-weight:600;margin:2px}
+body.light #centerBox .tag{background:rgba(0,0,0,.04);color:rgba(0,0,0,.5)}
+body.dark #centerBox .tag{background:rgba(255,255,255,.04);color:rgba(255,255,255,.4)}
+
+/* UI controls */
+#controls{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);z-index:10;display:flex;gap:8px;flex-wrap:wrap;justify-content:center;align-items:center}
+.btn{padding:9px 16px;border-radius:100px;border:1.5px solid;font-family:'Inter',sans-serif;font-size:10px;font-weight:600;cursor:pointer;transition:all .2s}
+body.light .btn{background:#fff;color:#666;border-color:#d9d5cc}
+body.light .btn:hover{background:#f5f3ef;color:#1a1a1a;border-color:#c5c0b8}
+body.dark .btn{background:rgba(255,255,255,.03);color:rgba(255,255,255,.5);border-color:rgba(255,255,255,.08)}
+body.dark .btn:hover{background:rgba(255,255,255,.06);color:#fff;border-color:rgba(255,255,255,.15)}
+.btn.on{background:rgba(167,139,250,.1)!important;border-color:rgba(167,139,250,.25)!important;color:#a78bfa!important}
+.btn.var-nav{width:28px;height:28px;border-radius:50%;padding:0;font-size:14px;display:flex;align-items:center;justify-content:center}
+.var-label{font-family:'JetBrains Mono',monospace;font-size:9px;color:rgba(255,255,255,.25);min-width:80px;text-align:center}
+body.light .var-label{color:rgba(0,0,0,.25)}
+</style>
+</head>
+<body class="dark" id="bodyEl">
+<canvas id="bgCanvas"></canvas>
+
+<!-- Center content box — the important part to keep readable -->
+<div id="centerBox">
+  <h2>Sottotitoli</h2>
+  <p>Trascrizione e traduzione in tempo reale. Le parole che contano, senza distrazioni.</p>
+  <div>
+    <span class="tag">🇮🇹 Italiano</span>
+    <span class="tag">⚡ 87 WPM</span>
+    <span class="tag">🎯 CEFR B2</span>
+    <span class="tag">📊 2.4h questa settimana</span>
+  </div>
+</div>
+
+<!-- Controls -->
+<div id="controls">
+  <button class="btn var-nav" onclick="prevVar()" title="Previous">←</button>
+  <span class="var-label" id="varLabel">1/10</span>
+  <button class="btn var-nav" onclick="nextVar()" title="Next">→</button>
+  <button class="btn on" id="btnDark" onclick="setTheme('dark')">Dark</button>
+  <button class="btn" id="btnLight" onclick="setTheme('light')">Light</button>
+  <span id="varName" style="font-size:10px;opacity:.4;margin-left:6px"></span>
+</div>
+
+<script>
+var canvas,ctx,W,H,t=0,animFrame,currentVar=0;
+var sensitivity=1.0;
+
+// ══════════════════════════════════════
+// 10 CONTENT-AWARE BG VARIATIONS
+// All designed to keep center content legible
+// ══════════════════════════════════════
+
+var variations=[
+  // 1 — Subtle Noise Field
+  { name:'Noise Field', emoji:'🌫️',
+    desc:'Barely-there particle dust · ultra-low opacity',
+    init:function(){this.particles=[];for(var i=0;i<80;i++){this.particles.push({x:Math.random()*W,y:Math.random()*H,r:1+Math.random()*2,vx:(Math.random()-.5)*.3,vy:(Math.random()-.5)*.3,o:.03+Math.random()*.06})}},
+    draw:function(ctx,t,dark){
+      ctx.clearRect(0,0,W,H);
+      var c=dark?'255,255,255':'0,0,0';
+      for(var i=0;i<this.particles.length;i++){var p=this.particles[i];p.x+=p.vx;p.y+=p.vy;if(p.x<0)p.x=W;if(p.x>W)p.x=0;if(p.y<0)p.y=H;if(p.y>H)p.y=0;
+        ctx.beginPath();ctx.arc(p.x,p.y,p.r,0,Math.PI*2);ctx.fillStyle='rgba('+c+','+p.o+')';ctx.fill()}}
+  },
+
+  // 2 — Soft Radial Pulse
+  { name:'Radial Pulse', emoji:'🫁',
+    desc:'Gentle expanding rings from center · breath-like',
+    init:function(){this.rings=[]},
+    draw:function(ctx,t,dark){
+      ctx.clearRect(0,0,W,H);
+      var cx=W/2,cy=H/2,maxR=Math.max(W,H)*.7;
+      // Add new ring every ~2.5s
+      if(t%150<1)this.rings.push({r:0,o:.06});
+      for(var i=this.rings.length-1;i>=0;i--){var r=this.rings[i];r.r+=.35;r.o-=.00015;
+        if(r.o<=0||r.r>maxR){this.rings.splice(i,1);continue}
+        var grad=ctx.createRadialGradient(cx,cy,Math.max(0,r.r-30),cx,cy,r.r);
+        grad.addColorStop(0,'rgba(167,139,250,0)');grad.addColorStop(.5,'rgba(167,139,250,'+r.o+')');grad.addColorStop(1,'rgba(167,139,250,0)');
+        ctx.fillStyle=grad;ctx.fillRect(0,0,W,H)}
+    }
+  },
+
+  // 3 — Corner Accents
+  { name:'Corner Accents', emoji:'✦',
+    desc:'Decorative elements only in corners · center untouched',
+    init:function(){this.orbs=[];for(var i=0;i<4;i++){var cx=i<2?100:W-100;var cy=i%2===0?100:H-100;this.orbs.push({cx:cx,cy:cy,r:60+Math.random()*40,a:.06+Math.random()*.06,p:Math.random()*Math.PI*2})}},
+    draw:function(ctx,t,dark){
+      ctx.clearRect(0,0,W,H);
+      var c=dark?'167,139,250':'124,58,237';
+      for(var i=0;i<this.orbs.length;i++){var o=this.orbs[i];o.p+=.003;
+        var g=ctx.createRadialGradient(o.cx+Math.sin(o.p)*20,o.cy+Math.cos(o.p)*20,0,o.cx,o.cy,o.r);
+        g.addColorStop(0,'rgba('+c+','+o.a+')');g.addColorStop(1,'rgba('+c+',0)');
+        ctx.fillStyle=g;ctx.fillRect(Math.max(0,o.cx-o.r*2),Math.max(0,o.cy-o.r*2),o.r*4,o.r*4)}
+    }
+  },
+
+  // 4 — Edge Glow
+  { name:'Edge Glow', emoji:'✨',
+    desc:'Soft color wash only at screen edges · center clear',
+    draw:function(ctx,t,dark){
+      ctx.clearRect(0,0,W,H);
+      var c=dark?'167,139,250':'124,58,237';
+      ['top','bottom','left','right'].forEach(function(edge){
+        var g,x,y,w,h;
+        if(edge==='top'){x=0;y=0;w=W;h=120;g=ctx.createLinearGradient(0,0,0,h)}
+        else if(edge==='bottom'){x=0;y=H-120;w=W;h=120;g=ctx.createLinearGradient(0,H,0,y)}
+        else if(edge==='left'){x=0;y=0;w=120;h=H;g=ctx.createLinearGradient(0,0,w,0)}
+        else{x=W-120;y=0;w=120;h=H;g=ctx.createLinearGradient(W,0,x,0)}
+        g.addColorStop(0,'rgba('+c+',.04)');g.addColorStop(1,'rgba('+c+',0)');
+        ctx.fillStyle=g;ctx.fillRect(x,y,w,h)})
+    }
+  },
+
+  // 5 — Floating Orbs
+  { name:'Floating Orbs', emoji:'🫧',
+    desc:'Large slow blurred translucent circles · dreamy',
+    init:function(){this.orbs=[];for(var i=0;i<5;i++){this.orbs.push({x:Math.random()*W,y:Math.random()*H,r:80+Math.random()*120,vx:(Math.random()-.5)*.15,vy:(Math.random()-.5)*.15,o:.03+Math.random()*.04,h:200+Math.random()*60})}},
+    draw:function(ctx,t,dark){
+      ctx.clearRect(0,0,W,H);
+      for(var i=0;i<this.orbs.length;i++){var o=this.orbs[i];o.x+=o.vx;o.y+=o.vy;if(o.x<-o.r)o.x=W+o.r;if(o.x>W+o.r)o.x=-o.r;if(o.y<-o.r)o.y=H+o.r;if(o.y>H+o.r)o.y=-o.r;
+        var g=ctx.createRadialGradient(o.x,o.y,0,o.x,o.y,o.r);
+        g.addColorStop(0,'hsla('+o.h+',60%,70%,'+o.o+')');g.addColorStop(1,'hsla('+o.h+',60%,70%,0)');
+        ctx.fillStyle=g;ctx.fillRect(o.x-o.r*2,o.y-o.r*2,o.r*4,o.r*4)}
+    }
+  },
+
+  // 6 — Gradient Breathing
+  { name:'Gradient Breath', emoji:'🌅',
+    desc:'Slow color temperature shift · barely perceptible',
+    draw:function(ctx,t,dark){
+      ctx.clearRect(0,0,W,H);
+      var hueShift=Math.sin(t*.003)*15;
+      var g=ctx.createLinearGradient(0,0,0,H);
+      if(dark){
+        g.addColorStop(0,'hsla('+(240+hueShift)+',30%,4%,1)');
+        g.addColorStop(.5,'hsla('+(250+hueShift)+',20%,5%,1)');
+        g.addColorStop(1,'hsla('+(230+hueShift)+',25%,3%,1)')}
+      else{
+        g.addColorStop(0,'hsla('+(40+hueShift)+',15%,96%,1)');
+        g.addColorStop(.5,'hsla('+(45+hueShift)+',10%,94%,1)');
+        g.addColorStop(1,'hsla('+(35+hueShift)+',12%,97%,1)')}
+      ctx.fillStyle=g;ctx.fillRect(0,0,W,H)}
+  },
+
+  // 7 — Grid Dust
+  { name:'Grid Dust', emoji:'🔲',
+    desc:'Faint dot grid that subtly shifts · structured but quiet',
+    init:function(){this.gridSize=40;this.offsetX=0;this.offsetY=0},
+    draw:function(ctx,t,dark){
+      ctx.clearRect(0,0,W,H);
+      this.offsetX=Math.sin(t*.002)*4;this.offsetY=Math.cos(t*.0015)*4;
+      var c=dark?'255,255,255':'0,0,0';
+      ctx.fillStyle='rgba('+c+',.025)';
+      for(var x=-this.gridSize;x<W+this.gridSize;x+=this.gridSize){
+        for(var y=-this.gridSize;y<H+this.gridSize;y+=this.gridSize){
+          ctx.beginPath();ctx.arc(x+this.offsetX,y+this.offsetY,1.2,0,Math.PI*2);ctx.fill()}}
+    }
+  },
+
+  // 8 — Vignette Only
+  { name:'Vignette', emoji:'🎬',
+    desc:'Soft dark vignette around edges · classic cinema',
+    draw:function(ctx,t,dark){
+      ctx.clearRect(0,0,W,H);
+      var cx=W/2,cy=H/2,maxR=Math.max(W,H)*.75;
+      var g=ctx.createRadialGradient(cx,cy,maxR*.15,cx,cy,maxR);
+      if(dark){g.addColorStop(0,'rgba(6,6,16,0)');g.addColorStop(.6,'rgba(6,6,16,0)');g.addColorStop(1,'rgba(6,6,16,.55)')}
+      else{g.addColorStop(0,'rgba(250,250,248,0)');g.addColorStop(.6,'rgba(250,250,248,0)');g.addColorStop(1,'rgba(180,175,165,.35)')}
+      ctx.fillStyle=g;ctx.fillRect(0,0,W,H)}
+  },
+
+  // 9 — Letterbox
+  { name:'Letterbox', emoji:'🎞️',
+    desc:'Subtle horizontal bars top & bottom · widescreen feel',
+    draw:function(ctx,t,dark){
+      ctx.clearRect(0,0,W,H);
+      var barH=H*.08;var c=dark?'0,0,0':'0,0,0';
+      // Top bar
+      var gTop=ctx.createLinearGradient(0,0,0,barH);
+      gTop.addColorStop(0,'rgba('+c+',.18)');gTop.addColorStop(1,'rgba('+c+',0)');
+      ctx.fillStyle=gTop;ctx.fillRect(0,0,W,barH);
+      // Bottom bar
+      var gBot=ctx.createLinearGradient(0,H-barH,0,H);
+      gBot.addColorStop(0,'rgba('+c+',0)');gBot.addColorStop(1,'rgba('+c+',.18)');
+      ctx.fillStyle=gBot;ctx.fillRect(0,H-barH,W,barH)}
+  },
+
+  // 10 — Mist Layer
+  { name:'Mist', emoji:'🌊',
+    desc:'Low-opacity fog waves · gentle horizontal drift',
+    init:function(){this.layers=[];for(var i=0;i<3;i++){this.layers.push({y:Math.random()*H,speed:.3+Math.random()*.5,amp:30+Math.random()*40,o:.03+Math.random()*.03})}},
+    draw:function(ctx,t,dark){
+      ctx.clearRect(0,0,W,H);
+      var c=dark?'255,255,255':'0,0,0';
+      for(var i=0;i<this.layers.length;i++){var l=this.layers[i];
+        ctx.beginPath();ctx.moveTo(0,H);
+        for(var x=0;x<=W;x+=20){
+          var y=l.y+Math.sin((x+t*l.speed)*.004)*l.amp+Math.cos((x-t*l.speed)*.003)*l.amp*.5;
+          ctx.lineTo(x,y)}
+        ctx.lineTo(W,H);ctx.closePath();
+        ctx.fillStyle='rgba('+c+','+l.o+')';ctx.fill()}
+    }
+  }
+];
+
+function resize(){W=window.innerWidth;H=window.innerHeight;canvas.width=W;canvas.height=H;variations.forEach(function(v){if(v.init)v.init()})}
+
+function setTheme(th){
+  document.getElementById('bodyEl').className=th;
+  document.getElementById('btnDark').className=th==='dark'?'btn on':'btn';
+  document.getElementById('btnLight').className=th==='light'?'btn on':'btn';
+}
+
+function prevVar(){currentVar=(currentVar+variations.length-1)%variations.length;updateLabel()}
+function nextVar(){currentVar=(currentVar+1)%variations.length;updateLabel()}
+
+function updateLabel(){
+  var v=variations[currentVar];
+  document.getElementById('varLabel').textContent=(currentVar+1)+'/'+variations.length;
+  document.getElementById('varName').textContent=v.emoji+' '+v.name+' — '+v.desc;
+  if(v.init)v.init();
+}
+
+function draw(ts){
+  t=ts;
+  var v=variations[currentVar];
+  var dark=document.getElementById('bodyEl').className==='dark';
+  v.draw(ctx,t,dark);
+  animFrame=requestAnimationFrame(draw);
+}
+
+// Init
+canvas=document.getElementById('bgCanvas');
+ctx=canvas.getContext('2d');
+resize();
+window.addEventListener('resize',resize);
+updateLabel();
+requestAnimationFrame(draw);
+</script>
+</body>
+</html>
