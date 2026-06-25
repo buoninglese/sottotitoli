@@ -1278,6 +1278,7 @@ async function loadAllData(supabase,userId){
   loadProgress();
   renderAchievements();
   loadRightPanel(userId);
+  renderOverviewBoxes();
 }
 
 // Kick off data loading — waits for Supabase auth to be ready
@@ -2308,29 +2309,122 @@ function downloadSessionsCsv(){
   a.download='sottotitoli-sessions.csv';a.click();
 }
 
-// ═══ Panoramica Boxes — KPI-style grid ═══
-(function(){
+// ═══ Panoramica Boxes — rendered dynamically after data loads ═══
+function renderOverviewBoxes(){
   var container=document.getElementById('overviewBoxes');
-  if(!container) return;
+  if(!container||allSessions.length===0) return;
+  container.innerHTML='';
 
+  // Compute real stats
+  var totalMin=Math.round(allSessions.reduce(function(s,x){return s+(x.duration_seconds||0)},0)/60);
+  var totalWords=allSessions.reduce(function(s,x){return s+(x.unique_words_count||0)},0);
+  var totalSess=allSessions.length;
+  var wpmVals=allSessions.filter(function(s){return s.wpm}).map(function(s){return s.wpm});
+  var avgWpm=wpmVals.length>0?Math.round(wpmVals.reduce(function(a,b){return a+b},0)/wpmVals.length):0;
+  var qualVals=allSessions.filter(function(s){return typeof s.quality_score==='number'}).map(function(s){return s.quality_score});
+  var avgQual=qualVals.length>0?Math.round(qualVals.reduce(function(a,b){return a+b},0)/qualVals.length):0;
+
+  // Language mix from session modes
+  var langMap={};
+  allSessions.forEach(function(s){
+    var m=(s.mode||'').toLowerCase();var src=null;
+    if(m.startsWith('caption-'))src=m.replace('caption-','');
+    else if(m.startsWith('translate-')){var p=m.replace('translate-','').split('-');if(p.length>=2)src=p[0];}
+    if(src){if(!langMap[src])langMap[src]=0;langMap[src]++}
+  });
+  var langEntries=Object.entries(langMap).sort(function(a,b){return b[1]-a[1]});
+  var flags={it:'🇮🇹',en:'🇬🇧',nl:'🇳🇱',es:'🇪🇸',fr:'🇫🇷',de:'🇩🇪',pt:'🇵🇹',pl:'🇵🇱'};
+  var langNames={it:'Italiano',en:'Inglese',nl:'Nederlands',es:'Spagnolo',fr:'Francese',de:'Deutsch',pt:'Portoghese',pl:'Polacco'};
+  var colors=['var(--accent)','var(--green)','var(--blue)','var(--amber)','var(--pink)','var(--cyan)','var(--orange)'];
+  var langMixHtml='';
+  langEntries.slice(0,5).forEach(function(e,i){
+    var code=e[0],pct=Math.round(e[1]/totalSess*100);
+    langMixHtml+='<div style="display:flex;align-items:center;gap:6px;font-size:10px"><span>'+(flags[code]||'🌐')+'</span><span style="color:var(--t2);width:55px">'+(langNames[code]||code)+'</span><span style="color:'+colors[i%colors.length]+';font-weight:600">'+pct+'%</span><div style="width:50px;height:4px;background:var(--line);border-radius:2px"><div style="width:'+pct+'%;height:100%;background:'+colors[i%colors.length]+';border-radius:2px"></div></div></div>';
+  });
+  if(!langMixHtml)langMixHtml='<div style="font-size:10px;color:var(--t3);text-align:center;padding:8px">Inizia una sessione per vedere il mix</div>';
+
+  // Time distribution
+  var hourBuckets={mattina:0,pome:0,sera:0};
+  allSessions.forEach(function(s){if(s.started_at){var h=new Date(s.started_at).getHours();if(h<12)hourBuckets.mattina++;else if(h<18)hourBuckets.pome++;else hourBuckets.sera++}});
+  var maxHB=Math.max(hourBuckets.mattina,hourBuckets.pome,hourBuckets.sera,1);
+  var hMatt=Math.max(8,Math.round(hourBuckets.mattina/maxHB*50));
+  var hPome=Math.max(8,Math.round(hourBuckets.pome/maxHB*50));
+  var hSera=Math.max(8,Math.round(hourBuckets.sera/maxHB*50));
+
+  // Week summary
+  var weekAgo=new Date(Date.now()-7*86400000);
+  var weekSess=allSessions.filter(function(s){return new Date(s.started_at)>=weekAgo});
+  var weekMin=Math.round(weekSess.reduce(function(s,x){return s+(x.duration_seconds||0)},0)/60);
+  var weekWpmVals=weekSess.filter(function(s){return s.wpm}).map(function(s){return s.wpm});
+  var weekAvgWpm=weekWpmVals.length>0?Math.round(weekWpmVals.reduce(function(a,b){return a+b},0)/weekWpmVals.length):0;
+  var prevWeekAgo=new Date(Date.now()-14*86400000);
+  var prevWeekSess=allSessions.filter(function(s){var d=new Date(s.started_at);return d>=prevWeekAgo&&d<weekAgo});
+  var wpmTrend=prevWeekSess.length>0&&weekAvgWpm>0?'+'+Math.round((weekAvgWpm-(prevWeekSess.filter(function(s){return s.wpm}).map(function(s){return s.wpm}).reduce(function(a,b){return a+b},0)/Math.max(1,prevWeekSess.filter(function(s){return s.wpm}).length)))/Math.max(1,weekAvgWpm)*100)+'%':'—';
+
+  // Top words (from actual sessions)
+  var wordFreq={};
+  allSessions.forEach(function(s){
+    if(s.words&&Array.isArray(s.words))s.words.forEach(function(w){var lw=w.toLowerCase();if(lw.length>3){if(!wordFreq[lw])wordFreq[lw]=0;wordFreq[lw]++}})
+  });
+  var topWords=Object.entries(wordFreq).sort(function(a,b){return b[1]-a[1]}).slice(0,6);
+  var topWordsHtml='';
+  if(topWords.length>0){
+    topWords.forEach(function(e,i){topWordsHtml+='<span style="padding:5px 12px;border-radius:100px;font-size:10px;background:'+colors[i%colors.length].replace(')',',.12)').replace('var(','rgba(')+';color:'+colors[i%colors.length]+'">'+e[0]+'</span>'});
+  }else{
+    topWordsHtml='<span style="font-size:10px;color:var(--t3)">Registra sessioni per vedere le parole più usate</span>';
+  }
+
+  // Recent sessions
+  var recentSess=allSessions.slice(0,6);
+  var recentHtml='';
+  recentSess.forEach(function(s){
+    var when=s.started_at?new Date(s.started_at).toLocaleDateString('it-IT',{day:'numeric',month:'short'}):'—';
+    var dur=s.duration_seconds?Math.round(s.duration_seconds/60)+'m':'—';
+    var modeLabel=(s.mode||'session');var modeIcon=modeLabel.toLowerCase().indexOf('caption')!==-1?'🎤':modeLabel.toLowerCase().indexOf('translat')!==-1?'🔄':'📄';
+    var wpm=s.wpm||0;
+    recentHtml+='<div style="display:flex;align-items:center;gap:8px;padding:6px 10px;background:var(--bg2);border-radius:8px;font-size:10px"><span style="color:var(--accent);font-weight:700">'+when+'</span><span style="color:var(--t2)">'+modeIcon+' '+dur+'</span>'+(wpm>0?'<span style="color:var(--green);margin-left:auto;font-weight:600">WPM '+Math.round(wpm)+'</span>':'')+'</div>';
+  });
+  if(!recentHtml)recentHtml='<div style="font-size:10px;color:var(--t3);text-align:center;padding:8px">Nessuna sessione</div>';
+
+  // Monthly calendar
+  var now=new Date();var monthStart=new Date(now.getFullYear(),now.getMonth(),1);
+  var daysInMonth=new Date(now.getFullYear(),now.getMonth()+1,0).getDate();
+  var dayData={};
+  allSessions.forEach(function(s){if(s.started_at){var key=s.started_at.split('T')[0];dayData[key]=(dayData[key]||0)+(s.duration_seconds||0)/60}});
+  var maxMinDay=Math.max.apply(null,Object.values(dayData).concat([1]));
+  var calHtml='';var dayNames=['L','M','M','G','V','S','D'];
+  calHtml+='<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:1px;margin-bottom:2px">';
+  dayNames.forEach(function(d){calHtml+='<span style="font-size:7px;color:var(--t3);text-align:center">'+d+'</span>'});
+  calHtml+='</div><div style="display:grid;grid-template-columns:repeat(7,1fr);gap:2px">';
+  var firstDay=new Date(now.getFullYear(),now.getMonth(),1).getDay();firstDay=firstDay===0?6:firstDay-1;
+  for(var pi=0;pi<firstDay;pi++)calHtml+='<span></span>';
+  for(var d2=1;d2<=daysInMonth;d2++){
+    var dateStr=now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0')+'-'+String(d2).padStart(2,'0');
+    var minVal=dayData[dateStr]||0;
+    var lvl=minVal>0?(minVal/maxMinDay>0.66?'var(--green)':minVal/maxMinDay>0.33?'rgba(52,211,153,.55)':'rgba(52,211,153,.25)'):'var(--line)';
+    calHtml+='<div title="'+Math.round(minVal)+' min · '+d2+' '+(now.toLocaleDateString('it-IT',{month:'short'}))+'" style="aspect-ratio:1;border-radius:3px;font-size:8px;display:flex;align-items:center;justify-content:center;background:'+lvl+';color:'+(minVal>0&&minVal/maxMinDay>0.33?'#fff':'var(--t3)')+';cursor:default">'+d2+'</div>';
+  }
+  calHtml+='</div>';
+
+  // Build rows
   var rows=[
     {cols:[
-      {title:'Obiettivo giornaliero',body:'<div style="display:flex;align-items:center;gap:14px;justify-content:center"><svg viewBox="0 0 70 70" style="width:56px;height:56px;transform:rotate(-90deg)"><circle cx="35" cy="35" r="28" fill="none" stroke="var(--line)" stroke-width="5"/><circle cx="35" cy="35" r="28" fill="none" stroke="var(--green)" stroke-width="5" stroke-linecap="round" stroke-dasharray="176" stroke-dashoffset="60"/></svg><div><div style="font-size:9px;color:var(--t3)">MINUTI</div><div style="font-family:JetBrains Mono,monospace;font-size:22px;font-weight:900;color:var(--green)">18/30</div><div style="font-size:9px;color:var(--t2)">60% completato</div></div></div>'},
-      {title:'Mix linguistico',body:'<div style="display:flex;flex-direction:column;gap:5px"><div style="display:flex;align-items:center;gap:6px;font-size:10px"><span>🇮🇹</span><span style="color:var(--t2);width:55px">Italiano</span><span style="color:var(--accent);font-weight:600">68%</span><div style="width:50px;height:4px;background:var(--line);border-radius:2px"><div style="width:68%;height:100%;background:var(--accent);border-radius:2px"></div></div></div><div style="display:flex;align-items:center;gap:6px;font-size:10px"><span>🇬🇧</span><span style="color:var(--t2);width:55px">Inglese</span><span style="color:var(--green);font-weight:600">24%</span><div style="width:50px;height:4px;background:var(--line);border-radius:2px"><div style="width:24%;height:100%;background:var(--green);border-radius:2px"></div></div></div><div style="display:flex;align-items:center;gap:6px;font-size:10px"><span>🇪🇸</span><span style="color:var(--t2);width:55px">Spagnolo</span><span style="color:var(--blue);font-weight:600">8%</span><div style="width:50px;height:4px;background:var(--line);border-radius:2px"><div style="width:8%;height:100%;background:var(--blue);border-radius:2px"></div></div></div></div>'},
-      {title:'Qualità speaking',body:'<div style="text-align:center"><div style="font-size:40px;font-weight:900;color:var(--green);line-height:1">88<span style="font-size:16px;color:var(--t2)">/100</span></div><div style="display:flex;gap:3px;justify-content:center;margin-top:6px" class="qual-gen"></div><div style="font-size:9px;color:var(--t3);margin-top:4px">Top 15% degli utenti</div></div>'}
+      {title:'Obiettivo giornaliero',body:'<div style="text-align:center"><div style="font-family:JetBrains Mono,monospace;font-size:22px;font-weight:900;color:var(--green)">'+Math.round(totalMin/Math.max(1,activeDaysCount||30))+'<span style="font-size:12px;color:var(--t3)">/30min</span></div><div style="font-size:9px;color:var(--t3);margin-top:2px">media giornaliera</div><div style="font-size:10px;color:var(--t2);margin-top:4px">'+totalMin+' min totali</div></div>'},
+      {title:'Mix linguistico',body:'<div style="display:flex;flex-direction:column;gap:5px">'+langMixHtml+'</div>'},
+      {title:'Qualità speaking',body:'<div style="text-align:center"><div style="font-size:40px;font-weight:900;color:'+(avgQual>=70?'var(--green)':avgQual>=50?'var(--amber)':'var(--t3)')+';line-height:1">'+(avgQual||'—')+'<span style="font-size:16px;color:var(--t2)">'+(avgQual?'/100':'')+'</span></div><div style="font-size:9px;color:var(--t3);margin-top:4px">'+qualVals.length+' sessioni con punteggio</div></div>'}
     ]},
     {cols:[
-      {title:'Confronto',body:'<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;text-align:center"><div><div style="font-family:JetBrains Mono,monospace;font-size:22px;font-weight:900;color:var(--accent)">42</div><div style="font-size:9px;color:var(--t3)">Sessioni</div><div style="font-size:9px;color:var(--green)">↑ 12%</div></div><div><div style="font-family:JetBrains Mono,monospace;font-size:22px;font-weight:900;color:var(--green)">8.2h</div><div style="font-size:9px;color:var(--t3)">Tempo</div><div style="font-size:9px;color:var(--green)">↑ 18%</div></div><div><div style="font-family:JetBrains Mono,monospace;font-size:22px;font-weight:900;color:var(--blue)">1.2k</div><div style="font-size:9px;color:var(--t3)">Parole</div><div style="font-size:9px;color:var(--red)">↓ 3%</div></div></div>'},
-      {title:'Distribuzione oraria',body:'<div style="display:flex;gap:6px;align-items:flex-end;height:50px"><div style="flex:1;text-align:center"><div style="height:30px;background:var(--accent);border-radius:4px 4px 0 0;opacity:.7"></div><div style="font-size:9px;color:var(--t3);margin-top:4px">Matt.</div></div><div style="flex:1;text-align:center"><div style="height:18px;background:var(--accent);border-radius:4px 4px 0 0;opacity:.4"></div><div style="font-size:9px;color:var(--t3);margin-top:4px">Pom.</div></div><div style="flex:1;text-align:center"><div style="height:42px;background:var(--accent);border-radius:4px 4px 0 0;opacity:.9"></div><div style="font-size:9px;color:var(--t3);margin-top:4px">Sera</div></div></div>'},
-      {title:'Riepilogo settimanale',body:'<div style="font-size:12px;color:var(--t2);line-height:1.7">Hai parlato <strong style="color:var(--accent)">2.4 ore</strong> in <strong style="color:var(--green)">12 sessioni</strong>. WPM medio <strong style="color:var(--blue)">87</strong>, +8%. 🚀</div>'}
+      {title:'Confronto',body:'<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;text-align:center"><div><div style="font-family:JetBrains Mono,monospace;font-size:22px;font-weight:900;color:var(--accent)">'+totalSess+'</div><div style="font-size:9px;color:var(--t3)">Sessioni</div></div><div><div style="font-family:JetBrains Mono,monospace;font-size:22px;font-weight:900;color:var(--green)">'+(totalMin>=60?(totalMin/60).toFixed(1)+'h':totalMin+'m')+'</div><div style="font-size:9px;color:var(--t3)">Tempo</div></div><div><div style="font-family:JetBrains Mono,monospace;font-size:22px;font-weight:900;color:var(--blue)">'+(totalWords>=1000?(totalWords/1000).toFixed(1)+'k':totalWords)+'</div><div style="font-size:9px;color:var(--t3)">Parole</div></div></div>'},
+      {title:'Distribuzione oraria',body:'<div style="display:flex;gap:6px;align-items:flex-end;height:50px"><div style="flex:1;text-align:center"><div style="height:'+hMatt+'px;background:var(--accent);border-radius:4px 4px 0 0;opacity:.7"></div><div style="font-size:9px;color:var(--t3);margin-top:4px">Matt.</div></div><div style="flex:1;text-align:center"><div style="height:'+hPome+'px;background:var(--accent);border-radius:4px 4px 0 0;opacity:.4"></div><div style="font-size:9px;color:var(--t3);margin-top:4px">Pom.</div></div><div style="flex:1;text-align:center"><div style="height:'+hSera+'px;background:var(--accent);border-radius:4px 4px 0 0;opacity:.9"></div><div style="font-size:9px;color:var(--t3);margin-top:4px">Sera</div></div></div>'},
+      {title:'Riepilogo settimanale',body:'<div style="font-size:12px;color:var(--t2);line-height:1.7">Hai parlato <strong style="color:var(--accent)">'+(weekMin>=60?(weekMin/60).toFixed(1)+' ore':weekMin+' min')+'</strong> in <strong style="color:var(--green)">'+weekSess.length+' sessioni</strong>.'+(weekAvgWpm>0?' WPM medio <strong style="color:var(--blue)">'+weekAvgWpm+'</strong>.':'')+' 🚀</div>'}
     ]},
     {cols:[
-      {title:'Parole più usate',body:'<div style="display:flex;gap:5px;flex-wrap:wrap"><span style="padding:5px 12px;border-radius:100px;font-size:10px;background:rgba(167,139,250,.12);color:var(--accent)">quindi</span><span style="padding:5px 12px;border-radius:100px;font-size:10px;background:rgba(52,211,153,.12);color:var(--green)">praticamente</span><span style="padding:5px 12px;border-radius:100px;font-size:10px;background:rgba(96,165,250,.12);color:var(--blue)">importante</span><span style="padding:5px 12px;border-radius:100px;font-size:10px;background:rgba(251,191,36,.12);color:var(--amber)">assolutamente</span></div>'},
-      {title:'Vocabolario',body:'<div style="font-size:11px;color:var(--t2);line-height:2"><span style="color:var(--accent)">eloquente</span> · <span style="color:var(--green)">pragmatico</span> · <span style="color:var(--blue)">resiliente</span> · <span style="color:var(--amber)">conciliare</span> · <span style="color:var(--accent)">ermetico</span></div>'},
-      {title:'Sessioni recenti',body:'<div style="display:flex;flex-direction:column;gap:6px;max-height:170px;overflow-y:auto"><div style="display:flex;align-items:center;gap:8px;padding:6px 10px;background:var(--bg2);border-radius:8px;font-size:10px"><span style="color:var(--accent);font-weight:700">24 giu</span><span style="color:var(--t2)">Captions · 18m</span><span style="color:var(--green);margin-left:auto;font-weight:600">WPM 92</span></div><div style="display:flex;align-items:center;gap:8px;padding:6px 10px;background:var(--bg2);border-radius:8px;font-size:10px"><span style="color:var(--accent);font-weight:700">23 giu</span><span style="color:var(--t2)">Traduzione · 32m</span><span style="color:var(--green);margin-left:auto;font-weight:600">WPM 78</span></div><div style="display:flex;align-items:center;gap:8px;padding:6px 10px;background:var(--bg2);border-radius:8px;font-size:10px"><span style="color:var(--accent);font-weight:700">22 giu</span><span style="color:var(--t2)">Captions · 12m</span><span style="color:var(--green);margin-left:auto;font-weight:600">WPM 85</span></div></div>'}
+      {title:'Parole più usate',body:'<div style="display:flex;gap:5px;flex-wrap:wrap">'+topWordsHtml+'</div>'},
+      {title:'Vocabolario',body:'<div style="font-size:11px;color:var(--t2);line-height:2"><span style="color:var(--accent)">'+totalWords+'</span> parole uniche totali · <span style="color:var(--green)">'+allSessions.length+'</span> sessioni</div>'},
+      {title:'Sessioni recenti',body:'<div style="display:flex;flex-direction:column;gap:6px;max-height:170px;overflow-y:auto">'+recentHtml+'</div>'}
     ]},
     {cols:[
-      {title:'Calendario mensile',body:'<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:2px;text-align:center;font-size:8px" class="cal-gen-hm"></div><div style="display:flex;align-items:center;gap:6px;margin-top:8px;font-size:8px;color:var(--t3);justify-content:center"><span>Meno</span><span style="width:10px;height:10px;border-radius:2px;background:var(--line)"></span><span style="width:10px;height:10px;border-radius:2px;background:rgba(52,211,153,.25)"></span><span style="width:10px;height:10px;border-radius:2px;background:rgba(52,211,153,.55)"></span><span style="width:10px;height:10px;border-radius:2px;background:var(--green)"></span><span>Più</span></div>',full:true}
+      {title:'Calendario mensile',body:calHtml+'<div style="display:flex;align-items:center;gap:6px;margin-top:8px;font-size:8px;color:var(--t3);justify-content:center"><span>Meno</span><span style="width:10px;height:10px;border-radius:2px;background:var(--line)"></span><span style="width:10px;height:10px;border-radius:2px;background:rgba(52,211,153,.25)"></span><span style="width:10px;height:10px;border-radius:2px;background:rgba(52,211,153,.55)"></span><span style="width:10px;height:10px;border-radius:2px;background:var(--green)"></span><span>Più</span></div>',full:true}
     ]}
   ];
 
@@ -2346,54 +2440,7 @@ function downloadSessionsCsv(){
     });
     container.appendChild(rowGrid);
   });
-
-  // Generate dynamic content
-  setTimeout(function(){
-    document.querySelectorAll('.cal-gen-hm').forEach(function(el){var h='';var days=['L','M','M','G','V','S','D'];h+='<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:1px;margin-bottom:2px">';days.forEach(function(d){h+='<span style="font-size:7px;color:var(--t3)">'+d+'</span>';});h+='</div>';for(var i=0;i<30;i++){var lvl=Math.random();var val=Math.floor(lvl*180);var bg=lvl>0.75?'var(--green)':lvl>0.5?'rgba(52,211,153,.55)':lvl>0.25?'rgba(52,211,153,.25)':'var(--line)';h+='<div title="'+val+' min \u00b7 '+(i+1)+' giu" style="aspect-ratio:1;border-radius:3px;font-size:8px;display:flex;align-items:center;justify-content:center;background:'+bg+';color:'+(lvl>0.5?'#fff':'var(--t3)')+';cursor:default;transition:all .15s">'+(i+1)+'</div>';}el.innerHTML=h;});
-    document.querySelectorAll('.qual-gen').forEach(function(el){var h='';for(var i=0;i<10;i++){h+='<div style="width:12px;height:12px;border-radius:3px;background:'+(i<8?'var(--green)':'var(--line)')+'"></div>';}el.innerHTML=h;});
-  },10);
-})();
-
-
-// Init streak calendar
-setTimeout(function(){
-  var el=document.querySelector('.streak-cal-gen');
-  if(el){var h='';for(var i=0;i<30;i++){var lvl=Math.random();var bg=lvl>0.7?'var(--green)':lvl>0.4?'rgba(52,211,153,.4)':'var(--line)';h+='<div style="aspect-ratio:1;border-radius:3px;font-size:7px;display:flex;align-items:center;justify-content:center;background:'+bg+';color:'+(lvl>0.4?'#fff':'var(--t3)')+'">'+(i+1)+'</div>';}el.innerHTML=h;}
-}, 200);
-// Init obiettivi sparklines
-setTimeout(function(){
-  var el=document.querySelector('.spark-goals');
-  if(el){var h='';for(var i=0;i<14;i++){h+='<div style="flex:1;background:var(--green);height:'+(8+Math.random()*85)+'%;border-radius:1px 1px 0 0;opacity:'+(.3+Math.random()*.7)+'"></div>';}el.innerHTML=h;}
-}, 100);
-// Init trend sparklines + heatmap
-setTimeout(function(){
-  var tel = document.querySelector('.trend-spark-gen');
-  if (tel) {
-    var bars = [];
-    for (var i = 0; i < 30; i++) {
-      var h = 8 + Math.random() * 88;
-      bars.push('<div style="flex:1;background:var(--green);height:' + h + '%;border-radius:1px 1px 0 0;opacity:' + (0.4 + Math.random() * 0.6) + '"></div>');
-    }
-    tel.innerHTML = bars.join('');
-  }
-  var tel2 = document.querySelector('.trend-hm-gen');
-  if (tel2) {
-    var cells = [];
-    for (var i = 0; i < 84; i++) {
-      var r = Math.random();
-      var wk = Math.ceil((i + 1) / 7);
-      var mins = Math.floor(r * 200);
-      var bg;
-      if (r > 0.7) bg = 'var(--green)';
-      else if (r > 0.4) bg = 'rgba(52,211,153,.4)';
-      else if (r > 0.15) bg = 'rgba(52,211,153,.15)';
-      else bg = 'var(--line)';
-      cells.push('<span title="Sett. ' + wk + ': ' + mins + ' min" style="width:12px;height:12px;border-radius:2px;background:' + bg + ';cursor:default;display:inline-block"></span>');
-    }
-    tel2.innerHTML = cells.join('');
-  }
-}, 150);
-
+}
 
 
 // ═══ WORD BANKS TAB ═══
