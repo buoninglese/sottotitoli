@@ -3501,35 +3501,37 @@ multispeaker: function(cb){
       var lines=text.split('\n').filter(function(l){return l.trim().length>0});
       var noData=lines.length===0;
       var speakerColors=['#5b7fc1','#c1665b','#5b9c6e','#c084fc','#fbbf24','#f472b6'];
-      var speakerNames=['SPK A','SPK B','SPK C','SPK D','SPK E','SPK F'];
+      var speakerNames=['Speaker A','Speaker B','Speaker C','Speaker D','Speaker E','Speaker F'];
       var spkCounts={};for(var s=0;s<6;s++) spkCounts[s]=0;
 
-      h+='<div class="ec-title" style="margin-bottom:10px">\ud83d\udc65 Multispeaker Diarize <span class="ec-badge" style="background:rgba(96,165,250,.15);color:#60a5fa">AI</span></div>';
+      h+='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px">';
+      h+='<div class="ec-title" style="margin:0">\ud83d\udc65 Speaker Diarization <span class="ec-badge" style="background:rgba(96,165,250,.15);color:#60a5fa">AI</span></div>';      h+='<button id="btnDiarize" onclick="runDiarization()" style="padding:8px 18px;border-radius:8px;border:1.5px solid var(--accent);background:rgba(167,139,250,.08);color:var(--accent);cursor:pointer;font-size:11px;font-weight:700;font-family:inherit;transition:all .2s">🔮 Analyze with AI</button>';
+      h+='</div>';
       
       if(noData){
-        h+='<div style="color:var(--muted2);font-style:italic;padding:16px;text-align:center">Start a session with multiple speakers.<br>Speaker diarization uses AI to identify who said what.</div>';
+        h+='<div style="text-align:center;padding:40px 20px;color:var(--muted2);background:var(--card2);border:2px dashed var(--line);border-radius:14px"><div style="font-size:36px;margin-bottom:10px">🎙️</div><div style="font-size:13px;font-weight:600;color:var(--muted)">Start a session with multiple speakers</div><div style="font-size:10px;margin-top:4px">The AI will identify who said what in real time</div></div>';
       } else {
-        h+='<div style="display:flex;gap:10px">';
+        h+='<div style="display:flex;gap:14px">';
         
-        // LEFT: Transcript (2/3)
+        // LEFT: Conversation transcript (2/3)
         h+='<div style="flex:2;min-width:0">';
-        h+='<div style="font-size:10px;color:var(--muted2);margin-bottom:6px">Last lines · <button id="btnDiarize" onclick="runDiarization()" style="padding:4px 12px;border-radius:6px;border:1px solid var(--accent);background:rgba(167,139,250,.1);color:var(--accent);cursor:pointer;font-size:10px;font-weight:600;font-family:inherit">\ud83d\udd2e Diarize with AI</button> <span id="diarizeStatus" style="font-size:9px;color:var(--amber);display:none">Analyzing...</span></div>';
-        h+='<div id="diarizeOutput" style="display:flex;flex-direction:column;gap:6px;max-height:360px;overflow-y:auto;padding-right:4px">';
+        h+='<span id="diarizeStatus" style="display:none;font-size:10px;color:var(--accent);margin-bottom:8px;display:block">⏳ Analyzing speaker patterns...</span>';
+        h+='<div id="diarizeOutput" style="display:flex;flex-direction:column;gap:8px;max-height:400px;overflow-y:auto;padding-right:6px">';
         
         var speakerIdx=0;
-        lines.slice(-12).forEach(function(line,i){
+        var lastLines=lines.slice(-12);
+        lastLines.forEach(function(line,i){
           var spk=speakerIdx%3;
           if(line.match(/^(yes|no|okay|right|exactly|sure|well|so|and|but|because)/i)) spk=(spk+1)%3;
           spkCounts[spk]=(spkCounts[spk]||0)+1;
           var color=speakerColors[spk];
-          var isLatest=i===Math.min(lines.length-1,11);
+          var isLatest=i===lastLines.length-1;
           
-          h+='<div class="speaker-row" style="display:flex;gap:10px;align-items:flex-start;padding:8px 10px;border-radius:8px;background:'+(isLatest?color+'0D':'transparent')+';transition:all .3s">';
-          h+='<div style="width:44px;flex-shrink:0;text-align:center;padding-top:1px">';
-          h+='<span class="spk-label" style="font-family:JetBrains Mono,monospace;font-size:8px;font-weight:600;color:'+color+';background:'+color+'15;padding:2px 6px;border-radius:4px;letter-spacing:.5px">'+speakerNames[spk]+'</span>';
-          h+='</div>';
+          h+='<div style="display:flex;gap:12px;align-items:flex-start;padding:12px 14px;border-radius:12px;background:'+(isLatest?color+'0A':color+'05')+';border:1px solid '+(isLatest?color+'20':'transparent')+';transition:all .3s">';
+          h+='<div style="flex-shrink:0;width:32px;height:32px;border-radius:50%;background:'+color+';color:#fff;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;font-family:JetBrains Mono,monospace;margin-top:2px">'+(spk+1)+'</div>';
           h+='<div style="flex:1;min-width:0">';
-          h+='<div style="font-size:12px;color:var(--text);line-height:1.55;border-left:2px solid '+color+';padding-left:10px;transition:color .3s;opacity:'+(isLatest?'.9':'.6')+'">'+line+'</div>';
+          h+='<div style="display:flex;align-items:baseline;gap:8px;margin-bottom:3px"><span style="font-size:12px;font-weight:700;color:'+color+'">'+speakerNames[spk]+'</span><span style="font-size:9px;color:var(--muted2);font-family:JetBrains Mono,monospace">#'+(i+1)+'</span></div>';
+          h+='<div style="font-size:13px;color:var(--text);line-height:1.6">'+line.replace(/^\d{2}:\d{2}:\d{2}\s*/,'')+'</div>';
           h+='</div>';
           h+='</div>';
           speakerIdx++;
@@ -3537,33 +3539,38 @@ multispeaker: function(cb){
         h+='</div>';
         h+='</div>';
         
-        // RIGHT: Speaker Stats (1/3)
-        h+='<div style="flex:1;min-width:140px;background:var(--card2);border:1px solid var(--line);border-radius:12px;padding:14px">';
-        h+='<div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--muted2);margin-bottom:10px">Speaker Stats</div>';
+        // RIGHT: Speaker Stats
+        h+='<div style="flex:1;min-width:150px;display:flex;flex-direction:column;gap:0">';
+        h+='<div style="background:var(--card2);border:1px solid var(--line);border-radius:14px;padding:16px">';
+        h+='<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--muted2);margin-bottom:12px">Speakers</div>';
         
-        var totalLines=lines.length;
+        var totalLines=lastLines.length;
         for(var s=0;s<3;s++){
           var count=spkCounts[s]||0;
           var pct=totalLines>0?Math.round(count/totalLines*100):0;
           var color=speakerColors[s];
-          h+='<div style="margin-bottom:10px">';
-          h+='<div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:3px">';
-          h+='<span style="font-size:10px;font-weight:600;color:'+color+'">'+speakerNames[s]+'</span>';
-          h+='<span style="font-family:JetBrains Mono,monospace;font-size:16px;font-weight:900;color:'+color+'">'+count+'</span>';
+          h+='<div style="margin-bottom:12px">';
+          h+='<div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px">';
+          h+='<span style="font-size:11px;font-weight:600;color:'+color+'">'+speakerNames[s]+'</span>';
+          h+='<span style="font-family:JetBrains Mono,monospace;font-size:18px;font-weight:900;color:'+color+'">'+count+'</span>';
           h+='</div>';
-          h+='<div style="height:3px;background:var(--line);border-radius:2px;overflow:hidden">';
-          h+='<div style="height:100%;border-radius:2px;background:'+color+';width:'+pct+'%;transition:width .5s ease"></div>';
+          h+='<div style="height:5px;background:var(--line);border-radius:3px;overflow:hidden">';
+          h+='<div style="height:100%;border-radius:3px;background:'+color+';width:'+pct+'%;transition:width .6s ease"></div>';
           h+='</div>';
-          h+='<div style="font-size:7px;color:var(--muted2);margin-top:1px">'+pct+'% of transcript</div>';
+          h+='<div style="font-size:9px;color:var(--muted2);margin-top:2px">'+pct+'% of conversation</div>';
           h+='</div>';
         }
-        h+='<div style="border-top:1px solid var(--line);padding-top:6px;margin-top:4px;display:flex;justify-content:space-between;font-size:8px;color:var(--muted2)"><span>Total lines</span><span style="font-family:JetBrains Mono,monospace">'+totalLines+'</span></div>';
+        h+='<div style="border-top:1px solid var(--line);padding-top:10px;margin-top:4px;display:flex;justify-content:space-between;font-size:10px;color:var(--muted)"><span>Total lines</span><span style="font-family:JetBrains Mono,monospace;font-weight:700">'+totalLines+'</span></div>';
+        h+='</div>';
         h+='</div>';
         h+='</div>';
       }
       
       cb(h, function(){
         window._diarizeLines = lines;
+        // Hide status initially
+        var s=document.getElementById('diarizeStatus');
+        if(s) s.style.display='none';
       });
     }  };  // ── Word Bank add from Synonyms ──
 window.addToWordBank = function(word){
