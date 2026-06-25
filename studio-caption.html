@@ -138,8 +138,10 @@ body {
   font-weight: 700; color: var(--text); line-height: 1.2;
   min-height: 48px; word-break: break-word; transition: all .3s;
 }
-.caption-interim:empty::after { content: 'Parla per vedere i sottotitoli…'; color: var(--muted2); font-size: 16px; font-style: italic; }
-body.session-active .caption-interim:empty::after { content: none; }
+.caption-interim:empty::after { content: attr(data-placeholder); color: var(--muted2); font-size: 16px; font-style: italic; }
+.caption-transcript:empty::after { content: attr(data-placeholder); color: var(--muted2); font-size: 14px; font-style: italic; display: block; text-align: left; padding: 8px 0; }
+body.session-active .caption-interim:empty::after,
+body.session-active .caption-transcript:empty::after { content: none; }
 .caption-transcript {
   margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--line);
   font-size: 15px; line-height: 1.7; color: var(--muted);
@@ -411,10 +413,10 @@ body.fullscreen-active #fullscreenBtn:hover { background: var(--accent); color: 
 .extras-panel .extras-loading{text-align:center;padding:20px;color:rgba(255,255,255,.3);font-size:12px}
 [data-theme="light"] .extras-panel{background:rgba(0,0,0,.01);border-color:rgba(0,0,0,.04)}
 .extras-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px}
-.extras-card{background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06);border-radius:12px;padding:14px 16px;font-size:11px;color:rgba(255,255,255,.6);line-height:1.5;transition:all .2s;min-height:80px}
+.extras-card{background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06);border-radius:12px;padding:14px 16px;font-size:11px;color:rgba(255,255,255,.85);line-height:1.5;transition:all .2s;min-height:80px}
 .extras-card:hover{border-color:rgba(52,211,153,.2);background:rgba(52,211,153,.04);transform:translateY(-1px)}
 .extras-card.fetching{opacity:.6;pointer-events:none}
-[data-theme="light"] .extras-card{background:rgba(0,0,0,.02);border-color:rgba(0,0,0,.06);color:rgba(0,0,0,.6)}
+[data-theme="light"] .extras-card{background:rgba(0,0,0,.02);border-color:rgba(0,0,0,.06);color:rgba(0,0,0,.75)}
 [data-theme="light"] .extras-card:hover{background:rgba(5,150,105,.04);border-color:rgba(5,150,105,.15)}
 .extras-card .ec-title{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px;color:rgba(255,255,255,.35)}
 [data-theme="light"] .extras-card .ec-title{color:rgba(0,0,0,.35)}
@@ -423,6 +425,8 @@ body.fullscreen-active #fullscreenBtn:hover { background: var(--accent); color: 
 .extras-chip:hover{transform:scale(1.05)}
 .extras-syn-block{background:rgba(167,139,250,.06);border:1px solid rgba(167,139,250,.08);border-radius:8px;padding:8px 10px;margin-bottom:5px;font-size:10px}
 .extras-syn-block strong{color:#c4b5fd}
+button[onclick*="addToWordBank"]:hover{background:rgba(52,211,153,.15)!important;border-color:rgba(52,211,153,.3)!important;color:#34d399!important}
+[data-theme="light"] button[onclick*="addToWordBank"]:hover{background:rgba(5,150,105,.1)!important;border-color:rgba(5,150,105,.25)!important;color:#059669!important}
 .extras-bar-row{display:flex;align-items:center;gap:8px;margin-bottom:4px}
 .extras-bar{flex:1;height:5px;background:rgba(255,255,255,.06);border-radius:3px;overflow:hidden}
 .extras-bar-fill{height:100%;border-radius:3px;transition:width .5s ease}
@@ -556,8 +560,8 @@ body.fullscreen-active #fullscreenBtn:hover { background: var(--accent); color: 
       </div>
 
       <div class="caption-box" id="captionBox">
-        <div class="caption-interim" id="captionInterim">We are discussing the future of real‑time translation…</div>
-        <div class="caption-transcript" id="captionTranscript">
+        <div class="caption-interim" id="captionInterim" data-placeholder="Speak to see subtitles…">We are discussing the future of real‑time translation…</div>
+        <div class="caption-transcript" id="captionTranscript" data-placeholder="Previous sentences will appear here…">
           <div class="line">03:42:00  And how these systems can bridge language barriers.</div>
           <div class="line">03:41:56  Deployment at scale remains our biggest challenge this year.</div>
         </div>
@@ -817,15 +821,30 @@ var CAPTION_SAMPLES = {
   ]
 };
 
+// Language-specific placeholder texts for empty states
+var PLACEHOLDER_TEXTS = {
+  'en-US': { interim: 'Speak to see subtitles…', transcript: 'Previous sentences will appear here…' },
+  'it-IT': { interim: 'Parla per vedere i sottotitoli…', transcript: 'Le frasi precedenti appariranno qui…' },
+  'fr-FR': { interim: 'Parlez pour voir les sous-titres…', transcript: 'Les phrases précédentes apparaîtront ici…' },
+  'de-DE': { interim: 'Sprechen Sie, um Untertitel zu sehen…', transcript: 'Vorherige Sätze erscheinen hier…' },
+  'es-ES': { interim: 'Habla para ver los subtítulos…', transcript: 'Las frases anteriores aparecerán aquí…' },
+  'pt-PT': { interim: 'Fale para ver as legendas…', transcript: 'As frases anteriores aparecerão aqui…' },
+  'nl-NL': { interim: 'Spreek om ondertiteling te zien…', transcript: 'Eerdere zinnen verschijnen hier…' }
+};
+
 function updateCaptionPlaceholders(langCode) {
   var samples = CAPTION_SAMPLES[langCode] || CAPTION_SAMPLES['en-US'];
+  var placeholders = PLACEHOLDER_TEXTS[langCode] || PLACEHOLDER_TEXTS['en-US'];
   var interim = document.getElementById('captionInterim');
   var transcript = document.getElementById('captionTranscript');
-  if (interim) interim.textContent = samples[0];
+  if (interim) {
+    interim.textContent = samples[0];
+    interim.setAttribute('data-placeholder', placeholders.interim);
+  }
   if (transcript) {
+    transcript.setAttribute('data-placeholder', placeholders.transcript);
     var lines = transcript.querySelectorAll('.line');
     for (var i = 0; i < Math.min(lines.length, samples.length - 1); i++) {
-      // Keep timestamp, update text
       var parts = lines[i].textContent.split('  ');
       var ts = parts[0] || '';
       lines[i].textContent = ts + '  ' + samples[i + 1];
@@ -1441,7 +1460,7 @@ window.addEventListener('resize', function(){if(_isFullscreen)fitLinesToViewport
 // LIVE dot reflects real mic state (no manual toggle needed)
 
 // ═══ #34 Word Bank — persistent vocabulary collection ═══
-var WORD_BANK_KEY = 'sottotitoli_wordbank';
+var WORD_BANK_KEY = 'sottotitoli_wordbank_' + (currentCaptionLang || 'en-US');
 var wordBank = JSON.parse(localStorage.getItem(WORD_BANK_KEY) || '[]');
 
 function toggleWordBank() {
@@ -1486,7 +1505,8 @@ function clearWordBank() {
 }
 
 function saveWordBank() {
-  localStorage.setItem(WORD_BANK_KEY, JSON.stringify(wordBank));
+  var key = 'sottotitoli_wordbank_' + (currentCaptionLang || 'en-US');
+  localStorage.setItem(key, JSON.stringify(wordBank));
   var countEl = document.getElementById('wordbankCount');
   if (countEl) countEl.textContent = wordBank.length;
   // Sync to Supabase if logged in
@@ -1495,7 +1515,7 @@ function saveWordBank() {
       if (r.data?.session) {
         window.sottotitoliSupabase.from('user_preferences').upsert({
           user_id: r.data.session.user.id,
-          key: 'wordbank',
+          key: 'wordbank_' + (currentCaptionLang || 'en-US'),
           value: JSON.stringify(wordBank)
         }, { onConflict: 'user_id,key' }).then(function() {});
       }
@@ -1727,7 +1747,7 @@ function showWordDefinition(word) {
     window.sottotitoliSupabase.auth.getSession().then(function(r) {
       if (r.data?.session) {
         window.sottotitoliSupabase.from('user_preferences')
-          .select('value').eq('user_id', r.data.session.user.id).eq('key', 'wordbank').single()
+          .select('value').eq('user_id', r.data.session.user.id).eq('key', 'wordbank_' + (currentCaptionLang || 'en-US')).single()
           .then(function(res) {
             if (res.data?.value) {
               try {
@@ -1759,9 +1779,10 @@ window.showVocabDefinition = function(word){
 };
 
 window.removeFromVocabBank = function(word){
-  var bank = JSON.parse(localStorage.getItem('sottotitoli-wordbank')||'[]');
+  var key = 'sottotitoli_wordbank_' + (currentCaptionLang || 'en-US');
+  var bank = JSON.parse(localStorage.getItem(key)||'[]');
   bank = bank.filter(function(w){return w!==word;});
-  localStorage.setItem('sottotitoli-wordbank',JSON.stringify(bank));
+  localStorage.setItem(bankKey,JSON.stringify(bank));
   if(typeof window.refreshExtrasPanel === 'function'){
     window.refreshExtrasPanel();
   }
@@ -2803,7 +2824,8 @@ function downloadGrammarPDF() {
       var h='<div class="extras-grid">';
       var words=getTranscriptWords();
       var noData=words.length===0;
-      var wb = JSON.parse(localStorage.getItem('sottotitoli-wordbank')||'[]');
+      var wbKey = 'sottotitoli_wordbank_' + (currentCaptionLang || 'en-US');
+      var wb = JSON.parse(localStorage.getItem(wbKey)||'[]');
 
       // ── WordBank Vocabulary (POS-colored chips with click/dblclick/X) ──
       h+='<div class="extras-card" style="grid-column:1/-1"><div class="ec-title">01 · My Vocabulary <span class="ec-badge" style="background:rgba(52,211,153,.15);color:#34d399">LIVE</span></div>';
@@ -3088,22 +3110,7 @@ function downloadGrammarPDF() {
       }
       h+='</div>';
 
-      // 26 — Animated Confidence Wave
-      h+='<div class="extras-card"><div class="ec-title">26 · Confidence Wave <span class="ec-badge" style="background:rgba(52,211,153,.15);color:#34d399">LIVE</span></div>';
-      if(noSession){h+='<div style="color:rgba(255,255,255,.2);font-style:italic">Avvia una sessione</div>'}
-      else{
-        var waveHtml='<div class="conf-wave">';
-        for(var ww=0;ww<20;ww++){
-          var hh=18+Math.sin(ww*0.55+Date.now()/800)*12;
-          var alpha=0.25+Math.abs(Math.sin(ww*0.55))*0.55;
-          var delay=(ww*0.06).toFixed(2)+'s';
-          waveHtml+='<div class="conf-wave-bar" style="height:'+hh+'px;background:rgba(52,211,153,'+alpha+');animation-delay:'+delay+'"></div>';
-        }
-        waveHtml+='</div>';
-        waveHtml+='<div style="text-align:center;font-size:8px;color:rgba(255,255,255,.15);margin-top:4px">Live accuracy · '+(90+Math.floor(Math.random()*9))+'% avg</div>';
-        h+=waveHtml;
-      }
-      h+='</div>';
+
 
       h+='</div>';
       cb(h, function(){
@@ -3167,14 +3174,14 @@ function downloadGrammarPDF() {
         });
         if(matched.length===0) matched=glossDict.slice(0,5);
         var thColor=tc('rgba(255,255,255,.25)','rgba(0,0,0,.4)');
-        var thBg=tc('rgba(15,18,30,.95)','rgba(255,255,255,.95)');
+        var thBg=tc('rgba(22,26,42,.9)','rgba(248,250,252,.95)');
         var rowBorder=tc('rgba(255,255,255,.04)','rgba(0,0,0,.06)');
         var cellColor=tc('rgba(255,255,255,.55)','rgba(0,0,0,.6)');
         var cellColor2=tc('rgba(255,255,255,.5)','rgba(0,0,0,.55)');
         h+='<div style="overflow-x:auto"><table style="width:100%;font-size:10px;border-collapse:collapse"><thead><tr style="color:'+thColor+';font-size:8px;text-transform:uppercase;letter-spacing:.05em"><th style="padding:5px 8px;text-align:left;position:sticky;left:0;background:'+thBg+'">EN</th><th>IT</th><th>NL</th><th>ES</th><th>FR</th><th>DE</th><th>PT</th><th>PL</th></tr></thead><tbody>';
         matched.forEach(function(r,i){
           var bg=i%2===0?tc('rgba(255,255,255,.01)','rgba(0,0,0,.02)'):'transparent';
-          var enBg=i%2===0?tc('rgba(15,18,30,.97)','rgba(255,255,255,.97)'):tc('rgba(15,18,30,.95)','rgba(255,255,255,.95)');
+          var enBg=i%2===0?tc('rgba(22,26,42,.92)','rgba(248,250,252,.97)'):tc('rgba(22,26,42,.88)','rgba(248,250,252,.95)');
           h+='<tr style="border-top:1px solid '+rowBorder+';background:'+bg+'"><td style="padding:5px 8px;font-weight:600;color:#60a5fa;position:sticky;left:0;background:'+enBg+'">'+r.en+'</td><td style="color:'+cellColor+';padding:5px 8px">'+r.it+'</td><td style="color:'+cellColor2+';padding:5px 8px">'+r.nl+'</td><td style="color:'+cellColor2+';padding:5px 8px">'+r.es+'</td><td style="color:'+cellColor2+';padding:5px 8px">'+r.fr+'</td><td style="color:'+cellColor2+';padding:5px 8px">'+r.de+'</td><td style="color:'+cellColor2+';padding:5px 8px">'+r.pt+'</td><td style="color:'+cellColor2+';padding:5px 8px">'+r.pl+'</td></tr>';
         });
         h+='</tbody></table></div>';
@@ -3194,10 +3201,11 @@ function downloadGrammarPDF() {
           td.addEventListener('dblclick',function(){
             var word=this.textContent.trim();
             if(!word||word.length<2) return;
-            var bank=JSON.parse(localStorage.getItem('sottotitoli-wordbank')||'[]');
+            var bankKey='sottotitoli_wordbank_'+(currentCaptionLang||'en-US');
+            var bank=JSON.parse(localStorage.getItem(bankKey)||'[]');
             if(bank.indexOf(word)>=0) return;
             bank.push(word);
-            localStorage.setItem('sottotitoli-wordbank',JSON.stringify(bank));
+            localStorage.setItem(bankKey,JSON.stringify(bank));
             // Flash feedback
             var orig=this.style.background;
             this.style.background='rgba(52,211,153,.2)';
@@ -3303,7 +3311,7 @@ function downloadGrammarPDF() {
       h+='<div class="extras-card" style="grid-column:1/-1"><div class="ec-title">Filters</div>';
       h+='<div style="display:flex;gap:6px;flex-wrap:wrap" id="synFilterRow">';
       [{l:'All',v:'all'},{l:'Verbs',v:'VERB'},{l:'Nouns',v:'NOUN'},{l:'Adjectives',v:'ADJ'}].forEach(function(f){
-        h+='<button class="extras-chip syn-filter-btn" data-pos="'+f.v+'" style="cursor:pointer;border:none;font-family:inherit;font-size:10px;padding:5px 14px;border-radius:100px;background:var(--card);color:var(--muted);border:1px solid var(--line)" onclick="var btns=document.querySelectorAll(\'.syn-filter-btn\');btns.forEach(function(b){b.style.background=\'rgba(255,255,255,.04)\';b.style.color=\'rgba(255,255,255,.5)\'});this.style.background=\'rgba(167,139,250,.15)\';this.style.color=\'#c4b5fd\';filterSynCards(this.dataset.pos)">'+f.l+'</button>';
+        h+='<button class="extras-chip syn-filter-btn" data-pos="'+f.v+'" style="cursor:pointer;border:none;font-family:inherit;font-size:10px;padding:5px 14px;border-radius:100px;background:var(--card);color:var(--muted);border:1px solid var(--line)" onclick="var isL=document.documentElement.getAttribute(\'data-theme\')===\'light\';var btns=document.querySelectorAll(\'.syn-filter-btn\');btns.forEach(function(b){b.style.background=isL?\'rgba(0,0,0,.04)\':\'rgba(255,255,255,.04)\';b.style.color=isL?\'rgba(0,0,0,.55)\':\'rgba(255,255,255,.55)\';b.style.borderColor=isL?\'rgba(0,0,0,.08)\':\'rgba(255,255,255,.08)\'});this.style.background=isL?\'rgba(124,58,237,.1)\':\'rgba(167,139,250,.15)\';this.style.color=isL?\'#7c3aed\':\'#c4b5fd\';this.style.borderColor=isL?\'rgba(124,58,237,.25)\':\'rgba(167,139,250,.25)\';filterSynCards(this.dataset.pos)">'+f.l+'</button>';
       });
       h+='</div></div>';
 
@@ -3345,12 +3353,12 @@ function downloadGrammarPDF() {
         // Synonym chips
         h+='<div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:8px">';
         d.syns.forEach(function(s,si){
-          h+='<span class="syn-chip-21" data-word="'+item.word+'" data-sidx="'+si+'" style="padding:5px 12px;border-radius:100px;font-size:10px;font-weight:500;cursor:pointer;background:var(--card2);color:var(--muted);border:1px solid var(--line);transition:all .15s">'+s.w+' <span style="font-size:8px;color:rgba(255,255,255,.25)">'+s.m+'%</span></span>';
+          h+='<span class="syn-chip-21" data-word="'+item.word+'" data-sidx="'+si+'" style="padding:5px 12px;border-radius:100px;font-size:10px;font-weight:500;cursor:pointer;background:var(--card2);color:var(--muted);border:1px solid var(--line);transition:all .15s">'+s.w+' <span style="font-size:8px;color:var(--muted2)">'+s.m+'%</span></span>';
         });
         h+='</div>';
 
         // Example box
-        h+='<div class="syn-ex-'+item.word+'" style="padding:10px 14px;background:var(--bg2);border-radius:8px;font-size:11px;color:rgba(255,255,255,.4);line-height:1.5;min-height:36px"><span style="color:rgba(255,255,255,.18);font-style:italic">Click a synonym to see it in context</span></div>';
+        h+='<div class="syn-ex-'+item.word+'" style="padding:10px 14px;background:var(--bg2);border-radius:8px;font-size:11px;color:var(--muted);line-height:1.5;min-height:36px"><span style="color:var(--muted2);font-style:italic">Click a synonym to see it in context</span></div>';
         h+='</div>';
       });
 
@@ -3368,11 +3376,11 @@ function downloadGrammarPDF() {
             var exBox=document.querySelector('.syn-ex-'+word);
             if(exBox) exBox.innerHTML='<span style="color:#a78bfa;font-weight:600">'+syn.w+'</span>: '+syn.ex.replace(syn.w,'<span style="color:#a78bfa;font-weight:700">'+syn.w+'</span>');
             // Highlight active chip
-            this.parentElement.querySelectorAll('.syn-chip-21').forEach(function(c){c.style.background='rgba(255,255,255,.04)';c.style.color='rgba(255,255,255,.55)';c.style.borderColor='rgba(255,255,255,.06)'});
-            this.style.background='rgba(167,139,250,.18)';this.style.color='#c4b5fd';this.style.borderColor='#a78bfa';
+            var il2=document.documentElement.getAttribute('data-theme')==='light';this.parentElement.querySelectorAll('.syn-chip-21').forEach(function(c){c.style.background=il2?'rgba(0,0,0,.04)':'rgba(255,255,255,.04)';c.style.color=il2?'rgba(0,0,0,.55)':'rgba(255,255,255,.55)';c.style.borderColor=il2?'rgba(0,0,0,.06)':'rgba(255,255,255,.06)'});
+            var il3=document.documentElement.getAttribute('data-theme')==='light';this.style.background=il3?'rgba(124,58,237,.12)':'rgba(167,139,250,.18)';this.style.color=il3?'#7c3aed':'#c4b5fd';this.style.borderColor=il3?'#7c3aed':'#a78bfa';
           });
-          chip.addEventListener('mouseenter',function(){this.style.background='rgba(167,139,250,.08)';this.style.color='#c4b5fd'});
-          chip.addEventListener('mouseleave',function(){if(!this.classList.contains('active')){this.style.background='rgba(255,255,255,.04)';this.style.color='rgba(255,255,255,.55)'}});
+          chip.addEventListener('mouseenter',function(){var il=document.documentElement.getAttribute('data-theme')==='light';this.style.background=il?'rgba(124,58,237,.08)':'rgba(167,139,250,.08)';this.style.color=il?'#7c3aed':'#c4b5fd'});
+          chip.addEventListener('mouseleave',function(){if(!this.classList.contains('active')){var il=document.documentElement.getAttribute('data-theme')==='light';this.style.background=il?'rgba(0,0,0,.04)':'rgba(255,255,255,.04)';this.style.color=il?'rgba(0,0,0,.55)':'rgba(255,255,255,.55)'}});
         });
 
         // Filter buttons
@@ -3392,6 +3400,7 @@ function downloadGrammarPDF() {
       var noData=lines.length===0;
       
       h+='<div class="ec-title" style="margin-bottom:10px">\uD83C\uDF33 06 \u00b7 Live Grammar Parse <span class="ec-badge" style="background:rgba(52,211,153,.15);color:#34d399">LIVE</span></div>';
+      h+='<div style="font-size:8px;color:var(--muted2);margin-bottom:6px">Most recent 3 sentences from transcript</div>';
       
       if(noData){
         h+='<div style="color:rgba(255,255,255,.2);font-style:italic;padding:16px;text-align:center">Start speaking — sentences will appear here for parsing</div>';
@@ -3574,10 +3583,11 @@ multispeaker: function(cb){
       });
     }  };  // ── Word Bank add from Synonyms ──
 window.addToWordBank = function(word){
-  var bank = JSON.parse(localStorage.getItem('sottotitoli-wordbank')||'[]');
+  var key = 'sottotitoli_wordbank_' + (currentCaptionLang || 'en-US');
+  var bank = JSON.parse(localStorage.getItem(key)||'[]');
   if(bank.indexOf(word)>=0) return;
   bank.push(word);
-  localStorage.setItem('sottotitoli-wordbank',JSON.stringify(bank));
+  localStorage.setItem(bankKey,JSON.stringify(bank));
   // Update wordbank count in UI
   var wbBtn = document.querySelector('.wordbank-toggle-btn, [onclick*="Word Bank"]');
   if(wbBtn){var c=bank.length;wbBtn.innerHTML=wbBtn.innerHTML.replace(/\d+/g,String(c))}
