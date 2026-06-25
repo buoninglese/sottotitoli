@@ -136,7 +136,8 @@ body.light #leftPanel{background:rgba(255,255,255,.92);border-color:rgba(0,0,0,.
   </div>
   <div class="btn-row">
     <button class="btn" id="btnMic" onclick="toggleMic()">&#127908; Start Mic</button>
-    <button class="btn" id="btnSys" onclick="toggleSysAudio()">&#128187; System Audio</button>
+    <button class="btn" id="btnFile" onclick="openAudioFile()">&#128196; Open Audio</button>
+    <input type="file" id="audioFileInput" accept="audio/*" style="display:none" onchange="loadAudioFile(this.files[0])">
     <button class="btn" id="btnDark" onclick="setTheme('dark')">&#127769; Dark</button>
     <button class="btn on" id="btnLight" onclick="setTheme('light')">&#9728;&#65039; Light</button>
     <button class="btn on" id="btnBoth" onclick="setMode('both')">Both</button>
@@ -171,7 +172,7 @@ body.light #leftPanel{background:rgba(255,255,255,.92);border-color:rgba(0,0,0,.
   </div>
 </div>
 <script>
-var audioCtx=null,analyser=null,micStream=null,sysStream=null,micOn=false,sysOn=false,demoOn=false;
+var audioCtx=null,analyser=null,micStream=null,sysStream=null,audioSource=null,micOn=false,sysOn=false,demoOn=false,fileOn=false;
 var freqData=null,volume=0,smoothing=0;
 var animFrame=null,currentMode='both',ringVar=0,barVar=0;
 var canvasRings,canvasBars,canvasTrail,ctxRings,ctxBars,ctxTrail;
@@ -241,15 +242,16 @@ function resize(){
 function stopAllAudio(){
   if(micStream){micStream.getTracks().forEach(function(t){t.stop()});micStream=null}
   if(sysStream){sysStream.getTracks().forEach(function(t){t.stop()});sysStream=null}
-  micOn=false;sysOn=false;demoOn=false;
+  if(audioSource){try{audioSource.stop()}catch(e){};audioSource=null}
+  micOn=false;sysOn=false;demoOn=false;fileOn=false;
   // Also stop emulator
   if(emuOn){emuOn=false;var eb=document.getElementById('btnEmuPlay');if(eb){eb.textContent='▶ Play';eb.style.background='';eb.style.borderColor='';eb.style.color=''};if(emuInterval)clearInterval(emuInterval);emuInterval=null}
   document.getElementById('btnMic').textContent='\uD83C\uDFA4 Start Mic';
   document.getElementById('btnMic').classList.remove('mic-on');
-  var btnSys=document.getElementById('btnSys');if(btnSys){btnSys.textContent='\uD83D\uDCBB System Audio';btnSys.classList.remove('mic-on');}
+  var btnF=document.getElementById('btnFile');if(btnF){btnF.textContent='\uD83D\uDCC4 Open Audio';btnF.classList.remove('mic-on');}
 }
 function toggleMic(){
-  if(micOn||sysOn){stopAllAudio();return}
+  if(micOn||sysOn||fileOn){stopAllAudio();return}
   stopAllAudio();
   initAudio();
   navigator.mediaDevices.getUserMedia({audio:true,video:false}).then(function(s){
@@ -278,6 +280,37 @@ function toggleSysAudio(){
 }
 function stopMic(){
   stopAllAudio();
+}
+// ── Audio File Playback (no screen share needed) ──
+function openAudioFile(){
+  if(fileOn){stopAllAudio();return}
+  document.getElementById('audioFileInput').click();
+}
+function loadAudioFile(file){
+  if(!file)return;
+  stopAllAudio();
+  initAudio();
+  var reader=new FileReader();
+  reader.onload=function(e){
+    audioCtx.decodeAudioData(e.target.result,function(buffer){
+      playBuffer(buffer);
+    },function(err){alert('Could not decode audio file. Try a .mp3 or .wav file.');console.error(err);startDemoMode()});
+  };
+  reader.readAsArrayBuffer(file);
+}
+function playBuffer(buffer){
+  audioSource=audioCtx.createBufferSource();
+  audioSource.buffer=buffer;
+  audioSource.loop=true;
+  audioSource.connect(analyser);
+  audioSource.connect(audioCtx.destination); // also play through speakers
+  audioSource.start(0);
+  fileOn=true;micOn=true;
+  var btnF=document.getElementById('btnFile');
+  btnF.textContent='\u23f9 Stop Audio';
+  btnF.classList.add('mic-on');
+  document.getElementById('bgLayer').classList.add('on');
+  if(!animFrame) animate();
 }
 function startDemoMode(){
   demoOn=true;micOn=true;
