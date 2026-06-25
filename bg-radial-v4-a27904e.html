@@ -67,18 +67,18 @@ body.dark .btn:hover{background:rgba(255,255,255,.06);color:#fff;border-color:rg
   <!-- Behavior Sliders -->
   <div class="sens-row" style="margin-top:4px">
     <label style="font-size:9px;opacity:.5;min-width:36px">🕐 Decay</label>
-    <input type="range" class="sens-slider" id="fxDecaySlider" min="0.5" max="0.995" step="0.005" value="0.85" oninput="setFXDecay(this.value)" style="width:60px">
-    <span class="meter-label" id="fxDecayVal">0.85</span>
+    <input type="range" class="sens-slider" id="fxDecaySlider" min="0.5" max="0.995" step="0.005" value="0.93" oninput="setFXDecay(this.value)" style="width:60px">
+    <span class="meter-label" id="fxDecayVal">0.93</span>
   </div>
   <div class="sens-row">
     <label style="font-size:9px;opacity:.5;min-width:36px">📈 Power</label>
-    <input type="range" class="sens-slider" id="fxPowerSlider" min="0.2" max="3" step="0.1" value="1" oninput="setFXPower(this.value)" style="width:60px">
-    <span class="meter-label" id="fxPowerVal">1.0</span>
+    <input type="range" class="sens-slider" id="fxPowerSlider" min="0.2" max="3" step="0.1" value="2.5" oninput="setFXPower(this.value)" style="width:60px">
+    <span class="meter-label" id="fxPowerVal">2.5</span>
   </div>
   <div class="sens-row">
     <label style="font-size:9px;opacity:.5;min-width:36px">🌊 Floor</label>
-    <input type="range" class="sens-slider" id="fxFloorSlider" min="0.02" max="0.4" step="0.01" value="0.08" oninput="setFXFloor(this.value)" style="width:60px">
-    <span class="meter-label" id="fxFloorVal">0.08</span>
+    <input type="range" class="sens-slider" id="fxFloorSlider" min="0.02" max="0.4" step="0.01" value="0.25" oninput="setFXFloor(this.value)" style="width:60px">
+    <span class="meter-label" id="fxFloorVal">0.25</span>
   </div>
   <!-- Voice Range Indicator -->
   <div class="sens-row" style="margin-top:2px">
@@ -89,6 +89,27 @@ body.dark .btn:hover{background:rgba(255,255,255,.06);color:#fff;border-color:rg
       <div id="voiceTrebBar" style="flex:2;background:rgba(96,165,250,.3);transition:opacity .3s"></div>
     </div>
     <span class="meter-label" id="voiceLabel" style="font-size:7px;opacity:.25">—</span>
+  </div>
+  <!-- Particle Controls -->
+  <div class="btn-row" style="margin-top:2px">
+    <div style="background:rgba(15,18,30,.85);border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:8px 12px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:center">
+      <span style="font-size:9px;opacity:.4">● Dots</span>
+      <span style="font-size:8px;opacity:.3">size</span>
+      <input type="range" id="ptclSize" min="0.3" max="5" step="0.1" value="1" oninput="setPtclSize(this.value)" style="width:40px;height:3px">
+      <span id="ptclSizeVal" style="font-size:8px;opacity:.3">1×</span>
+      <select id="ptclShape" onchange="setPtclShape(this.value)" style="font-size:9px;padding:2px 4px;border-radius:6px;border:1px solid rgba(255,255,255,.1);background:rgba(255,255,255,.04);color:inherit;font-family:inherit;cursor:pointer">
+        <option value="circle">● circle</option>
+        <option value="square">■ square</option>
+        <option value="diamond">◆ diamond</option>
+        <option value="star">★ star</option>
+      </select>
+      <select id="ptclBehavior" onchange="setPtclBehavior(this.value)" style="font-size:9px;padding:2px 4px;border-radius:6px;border:1px solid rgba(255,255,255,.1);background:rgba(255,255,255,.04);color:inherit;font-family:inherit;cursor:pointer">
+        <option value="static">static</option>
+        <option value="pulse">pulse</option>
+        <option value="trail">trail</option>
+        <option value="spark">spark</option>
+      </select>
+    </div>
   </div>
   <div class="btn-row">
     <button class="btn" id="btnMic" onclick="toggleMic()">🎤 Start Mic</button>
@@ -122,7 +143,9 @@ var voiceBass=0,voiceMid=0,voiceTreble=0,voiceCentroid=0,voiceHue=0,voiceWidth=1
 var canvas,ctx,W,H,t=0,animFrame=null,currentVar=0;
 
 // ─── Behavior Sliders ───
-var fx={decay:0.85, power:1, floor:0.08};
+var fx={decay:0.93, power:2.5, floor:0.25};
+// ─── Particle Settings ───
+var ptcl={size:1, shape:'circle', behavior:'static'};
 function setFXDecay(val){
   fx.decay=parseFloat(val);
   if(analyser)analyser.smoothingTimeConstant=fx.decay;
@@ -139,6 +162,12 @@ function setFXFloor(val){
   document.getElementById('fxFloorVal').textContent=fx.floor.toFixed(2);
   updateConfigDisplay();
 }
+function setPtclSize(val){
+  ptcl.size=parseFloat(val);
+  document.getElementById('ptclSizeVal').textContent=ptcl.size.toFixed(1)+'×';
+}
+function setPtclShape(val){ptcl.shape=val}
+function setPtclBehavior(val){ptcl.behavior=val}
 
 function updateSensitivity(val){
   sensitivity=parseFloat(val);
@@ -437,7 +466,17 @@ function drawRadial(ctx,v,isDark,params,colorMul){
       ctx.fillRect(-lw/2,ringR,lw,barLen);
 
       if(fi>0.25&&prm.dotR>0){
-        ctx.beginPath();ctx.arc(0,ringR+barLen,prm.dotR+fi*1.5,0,Math.PI*2);
+        var dr=(prm.dotR+fi*1.5)*ptcl.size;
+        var pulse=ptcl.behavior==='pulse'?0.7+0.3*Math.sin(t/400+angle*3):1;
+        var spark=ptcl.behavior==='spark'?0.5+Math.random()*0.5:1;
+        var trail=ptcl.behavior==='trail'?0.5+fi*0.5:1;
+        var sizeMul=pulse*spark*trail*(0.7+sv*0.3);
+        dr=Math.max(1,dr*sizeMul);
+        ctx.beginPath();
+        if(ptcl.shape==='square'){ctx.rect(-dr/2,-dr/2,dr,dr)}
+        else if(ptcl.shape==='diamond'){ctx.moveTo(0,-dr);ctx.lineTo(dr,0);ctx.lineTo(0,dr);ctx.lineTo(-dr,0);ctx.closePath()}
+        else if(ptcl.shape==='star'){for(var s=0;s<5;s++){var sa=s*Math.PI*2/5-Math.PI/2;var sr=s%2===0?dr:dr*0.4;var sx=sr*Math.cos(sa),sy=sr*Math.sin(sa);if(s===0)ctx.moveTo(sx,sy);else ctx.lineTo(sx,sy)}ctx.closePath()}
+        else{ctx.arc(0,ringR+barLen-((ptcl.shape!=='circle')?dr*0.5:0),dr,0,Math.PI*2)}
         ctx.fillStyle=c(sh,80*colorMul,brightLum,themeAlpha(isDark,0.6+sv*0.3)*colorMul);
         ctx.fill();
       }
