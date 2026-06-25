@@ -104,11 +104,6 @@ body.dark .btn:hover{background:rgba(255,255,255,.06);color:#fff;border-color:rg
       <span id="audioTime" style="font-size:8px;opacity:.3;min-width:32px">0:00</span>
     </div>
   </div>
-  <div class="btn-row">
-    <button class="btn var-nav" onclick="prevMode()" title="Previous mode">←</button>
-    <span class="var-label" id="modeName">Thick Punchy</span>
-    <button class="btn var-nav" onclick="nextMode()" title="Next mode">→</button>
-  </div>
   <div id="configDisplay" style="font-family:'JetBrains Mono',monospace;font-size:9px;color:rgba(255,255,255,.2);text-align:center;max-width:600px;line-height:1.8;word-break:break-all;padding:4px 8px;cursor:pointer;user-select:all" onclick="copyConfig()" title="Click to copy">—</div>
 </div>
 <script>
@@ -116,8 +111,8 @@ body.dark .btn:hover{background:rgba(255,255,255,.06);color:#fff;border-color:rg
 var audioCtx=null,analyser=null,micStream=null,micOn=false,fileOn=false,audioPlaying=false;
 var audioSource=null,audioBuffer=null,audioStartTime=0,audioPauseOffset=0,audioSeekInterval=null;
 var freqData=null,volume=0,smoothing=0,sensitivity=1.0;
-var voiceBass=0,voiceMid=0,voiceTreble=0,voiceCentroid=0,voiceHue=0,voiceWidth=1;
-var canvas,ctx,W,H,t=0,animFrame=null,currentMode=0;
+var voiceHue=0,voiceWidth=1;
+var canvas,ctx,W,H,t=0,animFrame=null;
 
 // ─── Behavior Sliders ───
 var fx={decay:0.90, power:2.5, floor:0.25, zoom:1};
@@ -173,7 +168,6 @@ function initAudio(){
 function resize(){
   W=window.innerWidth;H=window.innerHeight;
   canvas.width=W;canvas.height=H;
-  if(flowParticles)initFlowParticles();
 }
 
 function stopAllAudio(){
@@ -272,23 +266,6 @@ function readAudio(){
   volume=Math.min(1,sum/freqData.length/200*sensitivity);
   var d=fx.decay;
   smoothing=smoothing*d+volume*(1-d);
-  // ── Voice analysis: bass/mid/treble bands + spectral centroid ──
-  var len=freqData.length,bassEnd=Math.floor(len*0.05),midEnd=Math.floor(len*0.4);
-  var bSum=0,mSum=0,tSum=0,wSum=0,wTotal=0;
-  for(var i=0;i<len;i++){
-    var val=freqData[i];
-    wSum+=val*i;wTotal+=val;
-    if(i<bassEnd)bSum+=val;
-    else if(i<midEnd)mSum+=val;
-    else tSum+=val;
-  }
-  voiceBass=bSum/(bassEnd||1)/255;
-  voiceMid=mSum/((midEnd-bassEnd)||1)/255;
-  voiceTreble=tSum/((len-midEnd)||1)/255;
-  voiceCentroid=wTotal>0?wSum/wTotal/len:0.5;
-  // Map centroid (0=deep,1=bright) to hue shift and bar width
-  voiceHue=voiceCentroid*180-90; // -90 (warm) to +90 (cool)
-  voiceWidth=0.7+voiceCentroid*0.8; // 0.7 (thin for high voice) to 1.5 (thick for low voice)
 }
 
 // ─── Color helpers ───
@@ -493,258 +470,6 @@ function drawRadial(ctx,v,isDark,params,colorMul){
   }
 }
 
-// ══════════════════════════════════════
-// MODE 2 — iTunes Bars (mirror freq bars, color cycling, peak particles)
-// ══════════════════════════════════════
-// MODE 1 — Word Bubbles (words spawn bubbles, they interact)
-// ══════════════════════════════════════
-var bubbles=[],bubbleEnv=0,bubbleThrottle=0;
-function spawnBubble(v){
-  if(!v||v<0.06)return;
-  // Envelope follower: fast attack, slow release
-  bubbleEnv=bubbleEnv*0.94+v*0.06;
-  // Detect word onset: current volume spike above recent envelope
-  if(Date.now()-bubbleThrottle<120)return;
-  if(v<bubbleEnv*1.6)return;
-  bubbleThrottle=Date.now();
-  bubbleEnv=v; // reset envelope on word
-  var hue=(voiceHue+t/40+Math.random()*40)%360;
-  var r=12+v*55*ptcl.size;
-  // Spawn near where the last bubble is, or random
-  var lastB=bubbles.length>0?bubbles[bubbles.length-1]:null;
-  var sx=lastB?lastB.x+(Math.random()-0.5)*80:W*0.3+Math.random()*W*0.4;
-  var sy=lastB?lastB.y+(Math.random()-0.5)*60:H*0.3+Math.random()*H*0.4;
-  bubbles.push({x:sx,y:sy,vx:(Math.random()-0.5)*2,vy:(Math.random()-0.5)*2,r:r,hue:hue,life:1,age:0,links:[]});
-  if(bubbles.length>100)bubbles.shift();
-  // Link to nearby bubbles
-  for(var i=0;i<bubbles.length-1;i++){
-    var b=bubbles[i],nb=bubbles[bubbles.length-1];
-    var dx=nb.x-b.x,dy=nb.y-b.y,dist=Math.sqrt(dx*dx+dy*dy)+1;
-    if(dist<150){b.links.push(bubbles.length-1);nb.links.push(i)}
-  }
-}
-function drawWordBubbles(ctx,v,isDark){
-  spawnBubble(v);
-  ctx.fillStyle=isDark?'rgba(6,6,20,0.18)':'rgba(250,250,248,0.16)';
-  ctx.fillRect(0,0,W,H);
-  // Draw links first (behind bubbles)
-  for(var i=0;i<bubbles.length;i++){
-    var b=bubbles[i];
-    if(!b.links)continue;
-    for(var j=0;j<b.links.length;j++){
-      var b2=bubbles[b.links[j]];
-      if(!b2||b2.life<=0)continue;
-      var dx=b2.x-b.x,dy=b2.y-b.y,dist=Math.sqrt(dx*dx+dy*dy);
-      if(dist<180){
-        ctx.beginPath();ctx.moveTo(b.x,b.y);ctx.lineTo(b2.x,b2.y);
-        ctx.strokeStyle=c((b.hue+b2.hue)/2,40,75,0.06*(1-dist/180));
-        ctx.lineWidth=1;ctx.stroke();
-      }
-    }
-  }
-  for(var i=0;i<bubbles.length;i++){
-    var b=bubbles[i];
-    b.age+=0.016;b.life-=0.0012;
-    if(b.life<=0){bubbles.splice(i,1);i--;continue}
-    // Flow-field interaction
-    for(var j=i+1;j<bubbles.length;j++){
-      var b2=bubbles[j];
-      var dx=b2.x-b.x,dy=b2.y-b.y,dist=Math.sqrt(dx*dx+dy*dy)+1;
-      if(dist<130){
-        var force=0.04/dist;
-        b.vx-=dx*force;b.vy-=dy*force;
-        b2.vx+=dx*force;b2.vy+=dy*force;
-      }
-    }
-    b.x+=b.vx;b.y+=b.vy;b.vx*=0.98;b.vy*=0.98;
-    if(b.x<b.r){b.x=b.r;b.vx*=-0.5}
-    if(b.x>W-b.r){b.x=W-b.r;b.vx*=-0.5}
-    if(b.y<b.r){b.y=b.r;b.vy*=-0.5}
-    if(b.y>H-b.r){b.y=H-b.r;b.vy*=-0.5}
-    var pulse=1+Math.sin(b.age*2.5+t/700)*0.18;
-    var r=b.r*(0.5+0.5*b.life)*pulse;
-    if(r<1.5)continue;
-    var glow=ctx.createRadialGradient(b.x,b.y,0,b.x,b.y,r*2.5);
-    glow.addColorStop(0,c(b.hue,85,85,0.3*b.life));
-    glow.addColorStop(0.4,c(b.hue,65,65,0.12*b.life));
-    glow.addColorStop(1,'rgba(0,0,0,0)');
-    ctx.fillStyle=glow;ctx.fillRect(b.x-r*2.5,b.y-r*2.5,r*5,r*5);
-    ctx.beginPath();ctx.arc(b.x,b.y,r*0.45,0,Math.PI*2);
-    ctx.fillStyle=c(b.hue,95,93,0.45*b.life);ctx.fill();
-    ctx.beginPath();ctx.arc(b.x,b.y,r,0,Math.PI*2);
-    ctx.strokeStyle=c(b.hue,75,88,0.25*b.life);
-    ctx.lineWidth=1.8*b.life;ctx.stroke();
-  }
-}
-
-// ══════════════════════════════════════
-// MODE 3 — Flow Field (flowing particle waves, spectral ribbons)
-// ══════════════════════════════════════
-var flowParticles=null;
-function initFlowParticles(){
-  flowParticles=[];
-  for(var i=0;i<300;i++){
-    var zone=i<100?0:i<200?1:2; // left / center / right
-    var cx=zone===0?W*0.2:zone===1?W*0.5:W*0.8;
-    flowParticles.push({
-      x:cx+(Math.random()-0.5)*W*0.25, y:H*0.2+Math.random()*H*0.6,
-      vx:(Math.random()-0.5)*0.5, vy:(Math.random()-0.5)*0.5,
-      hue:zone===0?10:zone===1?250:170, zone:zone, size:1+Math.random()*2
-    });
-  }
-}
-function drawFlowField(ctx,v,isDark){
-  if(!flowParticles||flowParticles.length===0)initFlowParticles();
-  var sv=Math.pow(v,0.5);
-  ctx.fillStyle=isDark?'rgba(6,6,20,0.16)':'rgba(250,250,248,0.14)';
-  ctx.fillRect(0,0,W,H);
-  // Zone energies: bass→left, mid→center, treble→right
-  var zoneEnergy=[voiceBass*2.5,voiceMid*2.5,voiceTreble*2.5];
-  var zoneHue=[10,250,170];
-  // Draw zone dividers
-  for(var z=1;z<3;z++){
-    var zx=W*(z/3);
-    ctx.strokeStyle=isDark?'rgba(255,255,255,0.03)':'rgba(0,0,0,0.03)';
-    ctx.lineWidth=0.5;ctx.beginPath();ctx.moveTo(zx,0);ctx.lineTo(zx,H);ctx.stroke();
-  }
-  for(var i=0;i<flowParticles.length;i++){
-    var fp=flowParticles[i];
-    var ze=zoneEnergy[fp.zone];
-    var fq=0.1;
-    if(freqData){var freqIdx=Math.floor((fp.x/W)*freqData.length);fq=freqData&&micOn?freqData[Math.min(freqIdx,freqData.length-1)]/255:0.1;}
-    // Particles pulled toward their zone center
-    var zcx=fp.zone===0?W*0.2:fp.zone===1?W*0.5:W*0.8;
-    fp.vx+=(zcx-fp.x)*0.0003*ze;
-    fp.vy+=(H*0.5-fp.y)*0.0002*ze;
-    // Frequency modulation
-    var angle=t/6000+fp.x*0.004;
-    fp.vx+=Math.cos(angle)*0.08*fq*sv*ze;
-    fp.vy+=Math.sin(angle)*0.08*fq*sv*ze;
-    fp.vx*=0.96;fp.vy*=0.96;
-    fp.x+=fp.vx;fp.y+=fp.vy;
-    if(fp.x<0)fp.x=W;if(fp.x>W)fp.x=0;
-    if(fp.y<0)fp.y=H;if(fp.y>H)fp.y=0;
-    var ph=(zoneHue[fp.zone]+t/100+fp.x*0.2+fq*30)%360;
-    var alpha=0.1+sv*0.2+fq*0.25*ze;
-    var sz=fp.size*(0.5+fq*0.6*ze)*ptcl.size;
-    ctx.beginPath();ctx.arc(fp.x,fp.y,sz,0,Math.PI*2);
-    ctx.fillStyle=c(ph,70,78,alpha);ctx.fill();
-    if(i%4===0&&i+1<flowParticles.length&&flowParticles[i+1].zone===fp.zone){
-      var np=flowParticles[i+1];
-      var dx=np.x-fp.x,dy=np.y-fp.y,dist=Math.sqrt(dx*dx+dy*dy);
-      if(dist<50){
-        ctx.beginPath();ctx.moveTo(fp.x,fp.y);ctx.lineTo(np.x,np.y);
-        ctx.strokeStyle=c(ph,50,72,alpha*0.25);ctx.lineWidth=0.4;ctx.stroke();
-      }
-    }
-  }
-}
-
-// ══════════════════════════════════════
-// MODE 3 — Speaker Rings (3 concentric rings, one per speaker/band)
-// ══════════════════════════════════════
-function drawSpeakerRings(ctx,v,isDark){
-  var cx=W/2,cy=H/2,maxR=Math.min(W,H)*0.48*fx.zoom;
-  ctx.fillStyle=isDark?'rgba(6,6,20,0.22)':'rgba(250,250,248,0.18)';
-  ctx.fillRect(0,0,W,H);
-  // Dramatic speaker rings — thick, glowing, labeled
-  var speakers=[
-    {band:'bass',r:maxR*0.5,hue:5,energy:voiceBass,label:'SPK 1',desc:'low voice'},
-    {band:'mid',r:maxR*0.72,hue:260,energy:voiceMid,label:'SPK 2',desc:'mid voice'},
-    {band:'treble',r:maxR*0.9,hue:160,energy:voiceTreble,label:'SPK 3',desc:'high voice'}
-  ];
-  var sv=Math.pow(v,0.5);
-  // Draw background glow for most active speaker
-  var maxSp=speakers.reduce(function(a,b){return a.energy>b.energy?a:b});
-  if(maxSp.energy>0.1){
-    var bgGlow=ctx.createRadialGradient(cx,cy,maxR*0.3,cx,cy,maxR*1.1);
-    bgGlow.addColorStop(0,'rgba(0,0,0,0)');
-    bgGlow.addColorStop(1,c(maxSp.hue,30,30,maxSp.energy*0.15));
-    ctx.fillStyle=bgGlow;ctx.fillRect(0,0,W,H);
-  }
-  for(var s=0;s<speakers.length;s++){
-    var sp=speakers[s];
-    var e=Math.min(1,sp.energy*1.8); // amplify for visibility
-    var ringR=sp.r+Math.sin(t/1800+s*2)*6*e;
-    var thickness=3+e*14*sv;
-    var alpha=0.12+e*0.6*sv;
-    // Outer glow ring
-    ctx.beginPath();ctx.arc(cx,cy,ringR,0,Math.PI*2);
-    var glow=ctx.createRadialGradient(cx,cy,ringR-thickness*0.8,cx,cy,ringR+thickness*0.8);
-    glow.addColorStop(0,c(sp.hue,80,75,alpha*0.8));
-    glow.addColorStop(0.5,c(sp.hue,90,80,alpha));
-    glow.addColorStop(1,'rgba(0,0,0,0)');
-    ctx.strokeStyle=glow;ctx.lineWidth=thickness*2.5;ctx.stroke();
-    // Sharp inner ring
-    ctx.beginPath();ctx.arc(cx,cy,ringR,0,Math.PI*2);
-    ctx.strokeStyle=c(sp.hue,100,92,alpha);ctx.lineWidth=thickness*0.35;ctx.stroke();
-    // Orbiting dot
-    var dotAngle=t/2500+s*2.1+Math.sin(t/3000)*0.5;
-    var dx=cx+Math.cos(dotAngle)*ringR,dy=cy+Math.sin(dotAngle)*ringR;
-    var dotR=2.5+e*7;
-    var dotGlow=ctx.createRadialGradient(dx,dy,0,dx,dy,dotR*2.5);
-    dotGlow.addColorStop(0,c(sp.hue,100,98,alpha*1.2));
-    dotGlow.addColorStop(1,'rgba(0,0,0,0)');
-    ctx.fillStyle=dotGlow;ctx.fillRect(dx-dotR*2.5,dy-dotR*2.5,dotR*5,dotR*5);
-    ctx.beginPath();ctx.arc(dx,dy,dotR*0.5,0,Math.PI*2);
-    ctx.fillStyle=c(sp.hue,100,100,alpha);ctx.fill();
-    // Label
-    if(e>0.08){
-      ctx.fillStyle=isDark?'rgba(255,255,255,'+(e*0.7)+')':'rgba(0,0,0,'+(e*0.6)+')';
-      ctx.font=(10+e*6)+'px Inter,sans-serif';
-      ctx.textAlign='center';ctx.fillText(sp.label,dx,dy-dotR-8);
-    }
-  }
-  // Center: total speech energy
-  var orbR=6+sv*maxR*0.1;
-  var og=ctx.createRadialGradient(cx,cy,0,cx,cy,orbR*2);
-  og.addColorStop(0,c(30,50,92,0.5+sv*0.5));
-  og.addColorStop(0.5,c(30,40,80,0.2+sv*0.2));
-  og.addColorStop(1,'rgba(0,0,0,0)');
-  ctx.fillStyle=og;ctx.fillRect(cx-orbR*2,cy-orbR*2,orbR*4,orbR*4);
-}
-
-// ══════════════════════════════════════
-// MODE 4 — Voice Waves (stacked smooth waves from frequency bands)
-// ══════════════════════════════════════
-var voiceWaveSmooth=[];
-function drawVoiceWaves(ctx,v,isDark){
-  if(!freqData){ctx.fillStyle=isDark?'#060614':'#fafaf8';ctx.fillRect(0,0,W,H);return;}
-  ctx.fillStyle=isDark?'rgba(6,6,20,0.22)':'rgba(250,250,248,0.2)';
-  ctx.fillRect(0,0,W,H);
-  var waves=8,sv=Math.pow(v,0.5);
-  if(voiceWaveSmooth.length!==waves){voiceWaveSmooth=[];for(var i=0;i<waves;i++)voiceWaveSmooth[i]=0.08}
-  for(var w=0;w<waves;w++){
-    var y=H*(0.08+(w/(waves-1))*0.84);
-    var bandSize=Math.floor(freqData.length/waves);
-    var bandStart=w*bandSize;
-    var bandSum=0;
-    for(var bi=bandStart;bi<bandStart+bandSize&&bi<freqData.length;bi++){bandSum+=freqData&&micOn?freqData[bi]:0}
-    var bandEnergy=bandSum/(bandSize*255);
-    voiceWaveSmooth[w]=voiceWaveSmooth[w]*0.92+bandEnergy*0.08;
-    var smoothed=voiceWaveSmooth[w];
-    var hue=(voiceHue+t/60+w*35)%360;
-    ctx.beginPath();
-    for(var i=0;i<W;i+=3){
-      var xFrac=i/W;
-      var fi=smoothed*(0.7+0.3*Math.sin(xFrac*Math.PI));
-      var waveY=y+Math.sin(i*0.012+t/600+w*1.4)*fi*H*0.16*fx.zoom;
-      if(i===0)ctx.moveTo(i,waveY);else ctx.lineTo(i,waveY);
-    }
-    var alpha=0.15+sv*0.35+smoothed*0.4;
-    ctx.strokeStyle=c(hue,65,82,alpha);ctx.lineWidth=1+sv*2+smoothed*3;ctx.stroke();
-    if(smoothed>0.04){
-      ctx.beginPath();
-      for(var i=0;i<W;i+=3){
-        var fi2=smoothed*(0.7+0.3*Math.sin((i/W)*Math.PI));
-        var wy2=y+Math.sin(i*0.012+t/600+w*1.4)*fi2*H*0.16*fx.zoom;
-        if(i===0)ctx.moveTo(i,wy2);else ctx.lineTo(i,wy2);
-      }
-      ctx.strokeStyle=c(hue,90,95,alpha*0.5);ctx.lineWidth=0.8;ctx.stroke();
-    }
-  }
-}
-
 // ─── Animation loop ───
 function animate(ts){
   animFrame=requestAnimationFrame(animate);
@@ -761,13 +486,7 @@ function animate(ts){
 
   var isDark=document.body.classList.contains('dark');
   ctx.clearRect(0,0,W,H);
-  switch(currentMode){
-    case 0:drawRadial(ctx,v,isDark,variations[0],1);break;
-    case 1:drawWordBubbles(ctx,v,isDark);break;
-    case 2:drawFlowField(ctx,v,isDark);break;
-    case 3:drawSpeakerRings(ctx,v,isDark);break;
-    case 4:drawVoiceWaves(ctx,v,isDark);break;
-  }
+  drawRadial(ctx,v,isDark,variations[0],1);
 
   var displayV=Math.min(1,v*2.5*sensitivity);
   document.getElementById('meterFill').style.width=(displayV*100)+'%';
@@ -800,24 +519,14 @@ function setTheme(t){
   document.getElementById('btnLight').className='btn'+(t==='light'?' on':'');
   document.getElementById('titleText').style.color=t==='dark'?'#e8eaed':'#1a1a1a';
 }
-var modeNames=['Thick Punchy','Word Bubbles','Flow Field','Speaker Rings','Voice Waves'];
-var modeDescs=['Radial bars · instant response','Words spawn bubbles · grow from silence','3 speaker zones · particles cluster','3 rings = 3 speakers · who is talking','Stacked waves · voice intonation visible'];
-var totalModes=5;
-function nextMode(){currentMode=(currentMode+1)%totalModes;updateModeLabel()}
-function prevMode(){currentMode=(currentMode+totalModes-1)%totalModes;updateModeLabel()}
-function updateModeLabel(){
-  document.getElementById('modeName').textContent=modeNames[currentMode];
-  document.getElementById('descText').textContent=modeDescs[currentMode];
-  document.getElementById('titleText').textContent=modeNames[currentMode];
-  updateConfigDisplay();
-}
 function updateVarLabel(){
-  updateModeLabel();
+  document.getElementById('titleText').textContent='Thick Punchy';
+  document.getElementById('descText').textContent='Radial bars · instant response';
+  updateConfigDisplay();
 }
 
 function updateConfigDisplay(){
   var parts=[
-    'mode:'+modeNames[currentMode],
     'sens:'+sensitivity.toFixed(1),
     'decay:'+fx.decay.toFixed(3),
     'power:'+fx.power.toFixed(1),
