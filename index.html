@@ -154,6 +154,8 @@ body.logged-in .guest-only{display:none!important}
 [data-theme="light"] #login h2{color:#0f172a!important}
 [data-theme="light"] #login .fine-print,[data-theme="light"] #login .fine-print a{color:rgba(15,23,42,.4)!important}
 
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+
 </style>
 </head>
 <body class="snap-body hb-idx">
@@ -175,7 +177,11 @@ body.logged-in .guest-only{display:none!important}
 </script>
 
 <header class="topbar" id="topbar">
-  <a href="index.html" class="logo">Sotto<span>titoli</span></a>
+  <a href="index.html" style="display:flex;align-items:center;gap:8px;text-decoration:none">
+    <canvas id="topbarLogoCanvas" width="60" height="52" style="width:30px;height:26px;border-radius:5px;box-shadow:0 0 12px rgba(10,200,150,.2)"></canvas>
+    <span style="font-family:'Outfit',sans-serif;font-size:16px;font-weight:800;letter-spacing:-0.3px;color:#fff;text-shadow:0 0 20px rgba(167,139,250,.15)">Sottotitoli</span>
+    <span style="display:flex;align-items:center;gap:4px;margin-left:2px"><span style="width:6px;height:6px;border-radius:50%;background:#34d399;animation:pulse 2s ease infinite"></span><span style="font-size:7px;color:rgba(255,255,255,.4);font-weight:600;letter-spacing:.04em">LIVE</span></span>
+  </a>
   <ul class="nav-links">
     <li class="auth-only"><a href="index.html" class="active">Home</a></li>
     <li class="auth-only"><a href="start.html">Start</a></li>
@@ -1061,6 +1067,50 @@ function handleHeroLogin(e){e.preventDefault();if(typeof signInWithGoogle==='fun
     panels.forEach(function(p){if(p.classList.contains('visible'))anyVisible=true});
     if(!anyVisible) panels.forEach(function(p){p.classList.add('visible')});
   },2500);
+})();
+</script>
+
+<!-- Topbar Particle S Logo -->
+<script>
+(function(){
+  var cv=document.getElementById('topbarLogoCanvas');
+  if(!cv)return;
+  var ctx=cv.getContext('2d'),w=cv.width,h=cv.height;
+
+  // S-curve bezier (same as logo mockup)
+  function bezierPoint(p0,p1,p2,p3,t){
+    var u=1-t;
+    return{x:u*u*u*p0[0]+3*u*u*t*p1[0]+3*u*t*t*p2[0]+t*t*t*p3[0],y:u*u*u*p0[1]+3*u*u*t*p1[1]+3*u*t*t*p2[1]+t*t*t*p3[1]};
+  }
+  function sampleS(n){
+    var segs=[{p0:[55,6],p1:[28,6],p2:[18,40],p3:[42,46]},{p0:[42,46],p1:[66,52],p2:[82,46],p3:[72,66]},{p0:[72,66],p1:[62,82],p2:[45,80],p3:[42,78]}];
+    var pts=[];
+    for(var s=0;s<segs.length;s++){var seg=segs[s],np=Math.round(n/3);for(var i=0;i<=np;i++)pts.push(bezierPoint(seg.p0,seg.p1,seg.p2,seg.p3,i/np));}
+    return pts;
+  }
+
+  var N=80,sPts=sampleS(N),sx=w/100,sy=h/85;
+  var ps=[];
+  for(var i=0;i<N;i++){
+    ps.push({tx:sPts[i].x*sx,ty:sPts[i].y*sy,x:Math.random()*w,y:Math.random()*h,vx:0,vy:0,phase:Math.random()*Math.PI*2,freq:.3+Math.random()*.7,orbitR:2+Math.random()*8});
+  }
+
+  function render(ts){
+    requestAnimationFrame(render);
+    var rt=ts*.001,smoothVol=.15+Math.sin(rt*.5)*.05;
+    ctx.clearRect(0,0,w,h);
+    for(var i=0;i<ps.length;i++){
+      var p=ps[i],kalei=1.8,kx=Math.cos(rt*p.freq+p.phase)*p.orbitR*kalei,ky=Math.sin(rt*p.freq*.7+p.phase)*p.orbitR*kalei;
+      kx+=Math.cos(rt*.3+p.phase*2)*p.orbitR*.5*kalei;ky+=Math.sin(rt*.37+p.phase*1.7)*p.orbitR*.5*kalei;
+      var tx=p.tx+kx,ty=p.ty+ky;
+      p.vx+=(tx-p.x)*.006;p.vy+=(ty-p.y)*.006;p.vx*=.9;p.vy*=.9;
+      p.x+=p.vx*.06;p.y+=p.vy*.06;
+      var r=.7+Math.abs(Math.sin(rt*2+p.phase))*.5;
+      ctx.beginPath();ctx.arc(p.x,p.y,r,0,Math.PI*2);
+      ctx.fillStyle='hsla('+(10+i/N*50)+',60%,55%,.45)';ctx.fill();
+    }
+  }
+  requestAnimationFrame(render);
 })();
 </script>
 </body>
