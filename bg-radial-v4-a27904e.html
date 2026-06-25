@@ -80,6 +80,16 @@ body.dark .btn:hover{background:rgba(255,255,255,.06);color:#fff;border-color:rg
     <input type="range" class="sens-slider" id="fxFloorSlider" min="0.02" max="0.4" step="0.01" value="0.08" oninput="setFXFloor(this.value)" style="width:60px">
     <span class="meter-label" id="fxFloorVal">0.08</span>
   </div>
+  <!-- Voice Range Indicator -->
+  <div class="sens-row" style="margin-top:2px">
+    <label style="font-size:8px;opacity:.25;min-width:36px">voice</label>
+    <div style="display:flex;gap:2px;width:60px;height:4px;border-radius:2px;overflow:hidden">
+      <div id="voiceBassBar" style="flex:1;background:rgba(239,68,68,.3);transition:opacity .3s"></div>
+      <div id="voiceMidBar" style="flex:3;background:rgba(251,191,36,.3);transition:opacity .3s"></div>
+      <div id="voiceTrebBar" style="flex:2;background:rgba(96,165,250,.3);transition:opacity .3s"></div>
+    </div>
+    <span class="meter-label" id="voiceLabel" style="font-size:7px;opacity:.25">—</span>
+  </div>
   <div class="btn-row">
     <button class="btn" id="btnMic" onclick="toggleMic()">🎤 Start Mic</button>
     <button class="btn" id="btnFile" onclick="openAudioFile()">📄 Open Audio</button>
@@ -108,6 +118,7 @@ body.dark .btn:hover{background:rgba(255,255,255,.06);color:#fff;border-color:rg
 var audioCtx=null,analyser=null,micStream=null,micOn=false,fileOn=false,audioPlaying=false;
 var audioSource=null,audioBuffer=null,audioStartTime=0,audioPauseOffset=0,audioSeekInterval=null;
 var freqData=null,volume=0,smoothing=0,sensitivity=1.0;
+var voiceBass=0,voiceMid=0,voiceTreble=0,voiceCentroid=0,voiceHue=0,voiceWidth=1;
 var canvas,ctx,W,H,t=0,animFrame=null,currentVar=0;
 
 // ─── Behavior Sliders ───
@@ -245,6 +256,23 @@ function readAudio(){
   volume=Math.min(1,sum/freqData.length/200*sensitivity);
   var d=fx.decay;
   smoothing=smoothing*d+volume*(1-d);
+  // ── Voice analysis: bass/mid/treble bands + spectral centroid ──
+  var len=freqData.length,bassEnd=Math.floor(len*0.05),midEnd=Math.floor(len*0.4);
+  var bSum=0,mSum=0,tSum=0,wSum=0,wTotal=0;
+  for(var i=0;i<len;i++){
+    var val=freqData[i];
+    wSum+=val*i;wTotal+=val;
+    if(i<bassEnd)bSum+=val;
+    else if(i<midEnd)mSum+=val;
+    else tSum+=val;
+  }
+  voiceBass=bSum/(bassEnd||1)/255;
+  voiceMid=mSum/((midEnd-bassEnd)||1)/255;
+  voiceTreble=tSum/((len-midEnd)||1)/255;
+  voiceCentroid=wTotal>0?wSum/wTotal/len:0.5;
+  // Map centroid (0=deep,1=bright) to hue shift and bar width
+  voiceHue=voiceCentroid*180-90; // -90 (warm) to +90 (cool)
+  voiceWidth=0.7+voiceCentroid*0.8; // 0.7 (thin for high voice) to 1.5 (thick for low voice)
 }
 
 // ─── Color helpers ───
@@ -350,7 +378,7 @@ function drawRadial(ctx,v,isDark,params,colorMul){
   // Route to direction renderer if not radial
   if(params.type==='direction'){drawDirection(ctx,v,isDark,params,colorMul);return;}
 
-  var cx=W/2,cy=H/2,hue=themeHue(isDark),sat=themeSat(isDark)*colorMul;
+  var cx=W/2,cy=H/2,hue=themeHue(isDark)+voiceHue,sat=themeSat(isDark)*colorMul;
   var maxR=Math.min(W,H)*0.49;
   var prm=params.p;
   var sv=Math.pow(v,prm.smoothMul||1);
@@ -387,15 +415,15 @@ function drawRadial(ctx,v,isDark,params,colorMul){
       var angle=(i/sc)*Math.PI*2+t/15000*(ring+1)*0.5;
       var barLen=fi*maxR*0.55*(0.6+ring*0.2);
 
-      var baseLw=prm.lineW;
+      var baseLw=prm.lineW*voiceWidth;
       if(prm.feather){
-        baseLw=prm.lineW+ring*(prm.lwVol-prm.lineW)/(nRings-1);
+        baseLw=prm.lineW*voiceWidth+ring*(prm.lwVol*voiceWidth-prm.lineW*voiceWidth)/(nRings-1);
       }
       var lw=baseLw;
       if(prm.dynamicW){
-        lw=prm.lineW+fi*(prm.lwVol-prm.lineW);
+        lw=prm.lineW*voiceWidth+fi*(prm.lwVol*voiceWidth-prm.lineW*voiceWidth);
       }
-      lw+=sv*(prm.lwVol-baseLw)*0.4;
+      lw+=sv*(prm.lwVol*voiceWidth-baseLw)*0.4;
 
       ctx.save();ctx.translate(cx,cy);ctx.rotate(angle);
 
@@ -462,6 +490,13 @@ function animate(ts){
   var displayV=Math.min(1,v*2.5*sensitivity);
   document.getElementById('meterFill').style.width=(displayV*100)+'%';
   document.getElementById('meterLabel').textContent=Math.round(displayV*100-50)+' dB';
+  // Voice indicator
+  var bAlpha=0.4+voiceBass*0.6,mAlpha=0.4+voiceMid*0.6,tAlpha=0.4+voiceTreble*0.6;
+  document.getElementById('voiceBassBar').style.opacity=bAlpha;
+  document.getElementById('voiceMidBar').style.opacity=mAlpha;
+  document.getElementById('voiceTrebBar').style.opacity=tAlpha;
+  var vl=voiceCentroid<0.3?'low':voiceCentroid<0.6?'mid':'high';
+  document.getElementById('voiceLabel').textContent=vl;
 }
 
 // ─── Controls ───
