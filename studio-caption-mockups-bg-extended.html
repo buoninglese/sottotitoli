@@ -149,6 +149,17 @@ body.light #leftPanel{background:rgba(255,255,255,.92);border-color:rgba(0,0,0,.
     <span class="var-label" id="varName">Rings 1/10 · Bars 1/10</span>
     <button class="btn var-nav" onclick="nextVar()" title="Next variation">&#8594;</button>
   </div>
+  <!-- Audio Player bar (hidden until file loaded) -->
+  <div class="btn-row" id="audioPlayerRow" style="display:none;margin-top:4px">
+    <div style="background:rgba(15,18,30,.85);border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:10px 14px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:center">
+      <span style="font-size:9px;opacity:.4">🎵</span>
+      <span id="audioTrackName" style="font-size:9px;opacity:.6;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">—</span>
+      <button class="btn" id="btnAudioPlay" onclick="toggleAudioPlayback()" style="font-size:9px;padding:5px 10px">▶ Play</button>
+      <button class="btn" id="btnAudioStop" onclick="stopAudioFile()" style="font-size:9px;padding:5px 8px">⏹</button>
+      <input type="range" id="audioSeek" min="0" max="100" value="0" oninput="seekAudio(this.value)" style="width:50px;height:3px;cursor:pointer">
+      <span id="audioTime" style="font-size:8px;opacity:.3;min-width:36px">0:00</span>
+    </div>
+  </div>
   <div class="btn-row" style="margin-top:4px">
     <div style="background:rgba(15,18,30,.85);border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:10px 14px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:center">
       <span style="font-size:9px;opacity:.4">🎮 Emulator</span>
@@ -172,7 +183,8 @@ body.light #leftPanel{background:rgba(255,255,255,.92);border-color:rgba(0,0,0,.
   </div>
 </div>
 <script>
-var audioCtx=null,analyser=null,micStream=null,sysStream=null,audioSource=null,micOn=false,sysOn=false,demoOn=false,fileOn=false;
+var audioCtx=null,analyser=null,micStream=null,sysStream=null,audioSource=null,audioBuffer=null,micOn=false,sysOn=false,demoOn=false,fileOn=false,audioPlaying=false;
+var audioStartTime=0,audioPauseOffset=0,audioSeekInterval=null;
 var freqData=null,volume=0,smoothing=0;
 var animFrame=null,currentMode='both',ringVar=0,barVar=0;
 var canvasRings,canvasBars,canvasTrail,ctxRings,ctxBars,ctxTrail;
@@ -243,7 +255,10 @@ function stopAllAudio(){
   if(micStream){micStream.getTracks().forEach(function(t){t.stop()});micStream=null}
   if(sysStream){sysStream.getTracks().forEach(function(t){t.stop()});sysStream=null}
   if(audioSource){try{audioSource.stop()}catch(e){};audioSource=null}
-  micOn=false;sysOn=false;demoOn=false;fileOn=false;
+  if(audioSeekInterval){clearInterval(audioSeekInterval);audioSeekInterval=null}
+  micOn=false;sysOn=false;demoOn=false;fileOn=false;audioPlaying=false;
+  audioPauseOffset=0;audioStartTime=0;
+  document.getElementById('audioPlayerRow').style.display='none';
   // Also stop emulator
   if(emuOn){emuOn=false;var eb=document.getElementById('btnEmuPlay');if(eb){eb.textContent='▶ Play';eb.style.background='';eb.style.borderColor='';eb.style.color=''};if(emuInterval)clearInterval(emuInterval);emuInterval=null}
   document.getElementById('btnMic').textContent='\uD83C\uDFA4 Start Mic';
@@ -290,27 +305,98 @@ function loadAudioFile(file){
   if(!file)return;
   stopAllAudio();
   initAudio();
+  // Show loading
+  var btnF=document.getElementById('btnFile');
+  btnF.textContent='⏳ Loading…';
+  btnF.classList.add('mic-on');
   var reader=new FileReader();
   reader.onload=function(e){
     audioCtx.decodeAudioData(e.target.result,function(buffer){
-      playBuffer(buffer);
-    },function(err){alert('Could not decode audio file. Try a .mp3 or .wav file.');console.error(err);startDemoMode()});
+      audioBuffer=buffer; // store for pause/resume
+      var row=document.getElementById('audioPlayerRow');
+      row.style.display='flex';
+      document.getElementById('audioTrackName').textContent=file.name;
+      document.getElementById('audioSeek').max=buffer.duration;
+      document.getElementById('audioSeek').value=0;
+      audioPauseOffset=0;
+      // Show success briefly
+      btnF.textContent='✅ Loaded';
+      btnF.classList.add('mic-on');
+      setTimeout(function(){btnF.textContent='📄 Open Audio';btnF.classList.remove('mic-on')},1500);
+      // Auto-play
+      startAudioPlayback();
+    },function(err){
+      alert('Could not decode audio file. Try a .mp3 or .wav file.');
+      console.error(err);
+      btnF.textContent='📄 Open Audio';btnF.classList.remove('mic-on');
+      startDemoMode();
+    });
   };
   reader.readAsArrayBuffer(file);
 }
-function playBuffer(buffer){
+function startAudioPlayback(){
+  if(!audioBuffer)return;
+  if(audioSource){try{audioSource.stop()}catch(e){}}
   audioSource=audioCtx.createBufferSource();
-  audioSource.buffer=buffer;
+  audioSource.buffer=audioBuffer;
   audioSource.loop=true;
   audioSource.connect(analyser);
-  audioSource.connect(audioCtx.destination); // also play through speakers
-  audioSource.start(0);
-  fileOn=true;micOn=true;
-  var btnF=document.getElementById('btnFile');
-  btnF.textContent='\u23f9 Stop Audio';
-  btnF.classList.add('mic-on');
+  audioSource.connect(audioCtx.destination);
+  audioSource.start(0,audioPauseOffset);
+  audioStartTime=audioCtx.currentTime-audioPauseOffset;
+  audioPlaying=true;fileOn=true;micOn=true;
+  document.getElementById('btnAudioPlay').textContent='⏸ Pause';
+  document.getElementById('btnAudioPlay').classList.add('mic-on');
   document.getElementById('bgLayer').classList.add('on');
+  if(audioSeekInterval)clearInterval(audioSeekInterval);
+  audioSeekInterval=setInterval(updateAudioSeek,250);
   if(!animFrame) animate();
+}
+function toggleAudioPlayback(){
+  if(audioPlaying){pauseAudio();}else{resumeAudio();}
+}
+function pauseAudio(){
+  if(!audioSource||!audioPlaying)return;
+  audioPauseOffset=audioCtx.currentTime-audioStartTime;
+  try{audioSource.stop()}catch(e){}
+  audioSource=null;audioPlaying=false;
+  document.getElementById('btnAudioPlay').textContent='▶ Play';
+  document.getElementById('btnAudioPlay').classList.remove('mic-on');
+  if(audioSeekInterval){clearInterval(audioSeekInterval);audioSeekInterval=null}
+}
+function resumeAudio(){
+  if(!audioBuffer)return;
+  startAudioPlayback();
+}
+function stopAudioFile(){
+  stopAllAudio();
+  audioBuffer=null;
+  document.getElementById('audioPlayerRow').style.display='none';
+  document.getElementById('btnFile').textContent='📄 Open Audio';
+  document.getElementById('btnFile').classList.remove('mic-on');
+}
+function seekAudio(val){
+  audioPauseOffset=parseFloat(val);
+  if(audioPlaying){
+    try{audioSource.stop()}catch(e){}
+    audioSource=null;
+    startAudioPlayback();
+  }else{
+    document.getElementById('audioSeek').value=audioPauseOffset;
+    updateAudioTimeDisplay(audioPauseOffset);
+  }
+}
+function updateAudioSeek(){
+  if(!audioPlaying||!audioSource)return;
+  var pos=audioCtx.currentTime-audioStartTime;
+  var dur=audioBuffer.duration;
+  if(pos>=dur){audioStartTime=audioCtx.currentTime-(pos%dur);pos=pos%dur}
+  document.getElementById('audioSeek').value=pos;
+  updateAudioTimeDisplay(pos);
+}
+function updateAudioTimeDisplay(sec){
+  var m=Math.floor(sec/60),s=Math.floor(sec%60);
+  document.getElementById('audioTime').textContent=m+':'+(s<10?'0':'')+s;
 }
 function startDemoMode(){
   demoOn=true;micOn=true;
@@ -834,6 +920,7 @@ function spikeOff(){spikeActive=false}
 // ── Audio Emulator ──
 var emuOn=false,emuPattern='sine',emuSpeed=1,emuIntensity=0.7,emuTime=0,emuInterval=null;
 function toggleEmulator(){
+  if(fileOn||micOn||sysOn){stopAllAudio();return}
   emuOn=!emuOn;
   var btn=document.getElementById('btnEmuPlay');
   if(emuOn){
