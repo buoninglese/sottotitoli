@@ -99,150 +99,205 @@ function c(h,s,l,a){return'hsla('+h+','+s+'%,'+l+'%,'+a+')';}
 
 // ══════════════════════════════════════
 // 5 QUOTATION MARK SPIRAL VARIATIONS
+// Real serif " shapes — teardrop lobes, bulbous bottoms, thin curved stems
 // ══════════════════════════════════════
 
 var variations=[
 
-  // 1. Double Quotation — two separate spirals side by side like "
+  // 1. Double Teardrop — two filled teardrop spirals (most like serif ")
   {
-    name:'Double Quotation',
+    name:'Double Teardrop',
     draw:function(ctx,v,isDark){
       var hue=isDark?250:215,sat=isDark?65:55;
-      var cx1=W/2-W*0.12,cy=H/2,cx2=W/2+W*0.12;
-      var maxR=Math.min(W,H)*0.35;
-      [cx1,cx2].forEach(function(cx){
-        ctx.beginPath();
-        for(var i=0;i<360;i++){
-          var a=i/180*Math.PI,r=5+i*maxR/360+v*maxR*0.6;
-          var x=cx+Math.cos(a+t/2000)*r,y=cy+Math.sin(a+t/2000)*r;
-          if(i===0)ctx.moveTo(x,y);else ctx.lineTo(x,y);
+      var cy=H/2, maxR=Math.min(W,H)*0.38;
+      // Two teardrop lobes
+      var lobes=[
+        {cx:W/2-W*0.09, dir:1},  // left lobe
+        {cx:W/2+W*0.09, dir:-1}  // right lobe
+      ];
+      lobes.forEach(function(lobe){
+        var cx=lobe.cx;
+        // Multiple spiral arms for density
+        for(var arm=0;arm<6;arm++){
+          var armOff=(arm/6)*Math.PI*2;
+          ctx.beginPath();
+          for(var i=0;i<250;i++){
+            var frac=i/250;
+            // Teardrop shape: bulb at bottom (large r), stem at top (small r)
+            var r=3+frac*maxR*(0.4+v*0.4);
+            // The bulb: wider at bottom, tapering up
+            var a=armOff+frac*Math.PI*1.6; // spiral wraps ~1.6 turns
+            // Compress X for teardrop, shift angle so bulb is at bottom
+            var xScale=0.5+frac*0.5; // narrow at top, wide at bottom
+            var x=cx+Math.cos(a+t/2000)*r*xScale*lobe.dir;
+            var y=cy+Math.sin(a+t/2000)*r+maxR*0.2; // shift down so bulb at center
+            if(i===0)ctx.moveTo(x,y);else ctx.lineTo(x,y);
+          }
+          ctx.strokeStyle=c((hue+arm*15)%360,sat,isDark?78:42,0.25+v*0.3);
+          ctx.lineWidth=0.6+v*2.5;ctx.stroke();
         }
-        ctx.strokeStyle=c((hue+180)%360,sat,isDark?78:42,0.4+v*0.3);
-        ctx.lineWidth=1+v*3;ctx.stroke();
+        // Solid bulb fill at base
+        var bulbR=maxR*0.18+v*maxR*0.08;
+        var grad=ctx.createRadialGradient(cx,cy+maxR*0.15,0,cx,cy+maxR*0.15,bulbR);
+        grad.addColorStop(0,c(hue,60,isDark?80:45,0.6+v*0.3));
+        grad.addColorStop(1,'rgba(0,0,0,0)');
+        ctx.fillStyle=grad;
+        ctx.beginPath();ctx.arc(cx,cy+maxR*0.15,bulbR,0,Math.PI*2);ctx.fill();
       });
     }
   },
 
-  // 2. Comma Teardrop — one spiral that forms a comma/teardrop (left half of ")
+  // 2. Serif Comma — each lobe is a comma shape (thick head, thin tail curling inward)
   {
-    name:'Comma Teardrop',
+    name:'Serif Comma',
     draw:function(ctx,v,isDark){
       var hue=isDark?250:215,sat=isDark?65:55;
-      // Teardrop shape: spiral centered slightly off, compressed in X
-      var cx=W/2-W*0.06,cy=H/2;
-      var maxR=Math.min(W,H)*0.42;
-      ctx.beginPath();
-      for(var i=0;i<420;i++){
-        var a=i/210*Math.PI,r=3+i*maxR/420+v*maxR*0.55;
-        var x=cx+Math.cos(a+t/1800)*r*0.7; // compress horizontally for teardrop
-        var y=cy+Math.sin(a+t/1800)*r;
-        if(i===0)ctx.moveTo(x,y);else ctx.lineTo(x,y);
-      }
-      ctx.strokeStyle=c(hue,sat,isDark?78:42,0.35+v*0.35);
-      ctx.lineWidth=1.2+v*3.5;ctx.stroke();
-
-      // Serif foot (thick bottom)
-      ctx.beginPath();ctx.arc(cx,cy+maxR*0.7,6+v*12,0,Math.PI*2);
-      ctx.fillStyle=c(hue,sat,isDark?78:42,0.5+v*0.4);
-      ctx.fill();
+      var cy=H/2,maxR=Math.min(W,H)*0.4;
+      var lobes=[
+        {cx:W/2-W*0.1, dir:1},
+        {cx:W/2+W*0.1, dir:-1}
+      ];
+      lobes.forEach(function(lobe){
+        var cx=lobe.cx;
+        // Comma = large circular head + thin curved tail
+        // Head spiral (dense at center)
+        for(var arm=0;arm<5;arm++){
+          ctx.beginPath();
+          var armOff=(arm/5)*Math.PI*2;
+          for(var i=0;i<200;i++){
+            var frac=i/200;
+            var r=2+frac*maxR*0.35*(1+v*0.6);
+            // As spiral goes outward, it curves like a comma tail
+            var a=armOff+frac*Math.PI*2.2+Math.sin(frac*Math.PI)*0.8*lobe.dir;
+            var x=cx+Math.cos(a+t/1800)*r;
+            var y=cy+Math.sin(a+t/1800)*r*0.8+maxR*0.1;
+            if(i===0)ctx.moveTo(x,y);else ctx.lineTo(x,y);
+          }
+          ctx.strokeStyle=c((hue+arm*18)%360,sat,isDark?78:42,0.3+v*0.3);
+          ctx.lineWidth=0.7+v*2.8;ctx.stroke();
+        }
+        // Comma head (filled circle)
+        var headR=maxR*0.12+v*maxR*0.06;
+        ctx.fillStyle=c(hue,55,isDark?80:45,0.55+v*0.35);
+        ctx.beginPath();ctx.arc(cx,cy+maxR*0.08,headR,0,Math.PI*2);ctx.fill();
+        // Small serif foot
+        ctx.fillStyle=c(hue,50,isDark?75:40,0.4+v*0.3);
+        ctx.fillRect(cx-headR*1.2,cy+maxR*0.12+headR,headR*2.4,3+v*5);
+      });
     }
   },
 
-  // 3. Serif Outline — spiral traces the full " silhouette
+  // 3. Calligraphic " — variable thickness line that thickens at the bulb
   {
-    name:'Serif Outline',
+    name:'Calligraphic',
     draw:function(ctx,v,isDark){
       var hue=isDark?250:215,sat=isDark?65:55;
-      var cx=W/2,cy=H/2;
-      var maxR=Math.min(W,H)*0.38;
-      // Figure-8 / quotation outline using two offset spiral centers
-      for(var lobe=0;lobe<2;lobe++){
-        var lx=cx+(lobe===0?-W*0.1:W*0.1);
+      var cy=H/2,maxR=Math.min(W,H)*0.38;
+      var lobes=[
+        {cx:W/2-W*0.1, dir:1},
+        {cx:W/2+W*0.1, dir:-1}
+      ];
+      lobes.forEach(function(lobe){
+        var cx=lobe.cx;
         ctx.beginPath();
-        for(var i=0;i<300;i++){
-          var a=i/150*Math.PI+Math.PI*(lobe===0?0.7:0.3);
-          var r=4+i*maxR/300+v*maxR*0.5;
-          var x=lx+Math.cos(a+t/2200)*r*0.8;
-          var y=cy+Math.sin(a+t/2200)*r;
+        for(var i=0;i<400;i++){
+          var frac=i/400;
+          // Teardrop path
+          var a=lobe.dir*(Math.PI*0.2+frac*Math.PI*2.2);
+          var r=3+frac*maxR*0.5*(1+v*0.45);
+          var x=cx+Math.cos(a+t/1900)*r*0.6;
+          var y=cy+Math.sin(a+t/1900)*r+maxR*0.15;
           if(i===0)ctx.moveTo(x,y);else ctx.lineTo(x,y);
         }
-        var colH=(hue+lobe*40)%360;
-        ctx.strokeStyle=c(colH,sat,isDark?78:42,0.3+v*0.35);
-        ctx.lineWidth=1+v*3;ctx.stroke();
-      }
-      // Connecting serif bar at bottom
-      ctx.beginPath();
-      ctx.moveTo(cx-W*0.15,cy+maxR*0.9);ctx.lineTo(cx+W*0.15,cy+maxR*0.9);
-      ctx.strokeStyle=c(hue,sat,isDark?70:38,0.2+v*0.3);
-      ctx.lineWidth=2+v*6;ctx.stroke();
+        // Thick at base, thin at tip
+        var lw=1.5+v*4;
+        ctx.strokeStyle=c(hue,sat,isDark?78:42,0.35+v*0.3);
+        ctx.lineWidth=lw;ctx.stroke();
+        // Bottom serif bracket
+        ctx.fillStyle=c(hue,50,isDark?70:38,0.35+v*0.3);
+        ctx.fillRect(cx-maxR*0.12,cy+maxR*0.28,lw*6,2+v*4);
+      });
+      // Connecting baseline
+      ctx.strokeStyle=c(hue,sat,isDark?60:35,0.15+v*0.15);
+      ctx.lineWidth=1+v*2;
+      ctx.beginPath();ctx.moveTo(W/2-W*0.15,cy+maxR*0.45);ctx.lineTo(W/2+W*0.15,cy+maxR*0.45);ctx.stroke();
     }
   },
 
-  // 4. Mirrored Spirals — two interlocking spirals creating " shape
-  {
-    name:'Mirrored Spirals',
-    draw:function(ctx,v,isDark){
-      var hue=isDark?250:215,sat=isDark?65:55;
-      var cx=W/2,cy=H/2;
-      var maxR=Math.min(W,H)*0.36;
-      // Left spiral: clockwise from top
-      ctx.beginPath();
-      for(var i=0;i<360;i++){
-        var a=-i/180*Math.PI+Math.PI*1.5,r=5+i*maxR/360+v*maxR*0.5;
-        var x=cx-W*0.1+Math.cos(a+t/1900)*r*0.75;
-        var y=cy+Math.sin(a+t/1900)*r;
-        if(i===0)ctx.moveTo(x,y);else ctx.lineTo(x,y);
-      }
-      ctx.strokeStyle=c(hue,sat,isDark?80:45,0.35+v*0.3);
-      ctx.lineWidth=1+v*3;ctx.stroke();
-      // Right spiral: counter-clockwise
-      ctx.beginPath();
-      for(var i=0;i<360;i++){
-        var a=i/180*Math.PI+Math.PI*1.5,r=5+i*maxR/360+v*maxR*0.5;
-        var x=cx+W*0.1+Math.cos(a+t/1900)*r*0.75;
-        var y=cy+Math.sin(a+t/1900)*r;
-        if(i===0)ctx.moveTo(x,y);else ctx.lineTo(x,y);
-      }
-      ctx.strokeStyle=c((hue+30)%360,sat,isDark?80:45,0.35+v*0.3);
-      ctx.lineWidth=1+v*3;ctx.stroke();
-    }
-  },
-
-  // 5. Quotation Echo — spirals that pulse and echo outward
+  // 4. Double Quotation Echo — two teardrop spirals with radiating echo rings
   {
     name:'Quotation Echo',
     draw:function(ctx,v,isDark){
       var hue=isDark?250:215,sat=isDark?65:55;
-      var cx=W/2,cy=H/2;
-      var maxR=Math.min(W,H)*0.38;
-      // Multiple echo spirals at different scales
+      var cy=H/2,maxR=Math.min(W,H)*0.37;
+      var lobes=[
+        {cx:W/2-W*0.09, dir:1},
+        {cx:W/2+W*0.09, dir:-1}
+      ];
+      // Echo layers
       for(var echo=0;echo<4;echo++){
-        var echoPhase=t/1500+echo*1.2;
-        var echoScale=0.6+echo*0.15+v*(0.6+echo*0.2);
-        var echoAlpha=0.4-echo*0.09;
-        // Left lobe
-        ctx.beginPath();
-        for(var i=0;i<280;i++){
-          var a=i/140*Math.PI+Math.PI*0.75+Math.sin(echoPhase)*0.3;
-          var r=3+i*maxR/280*echoScale;
-          var x=cx-W*0.1+Math.cos(a)*r*0.7;
-          var y=cy+Math.sin(a)*r;
-          if(i===0)ctx.moveTo(x,y);else ctx.lineTo(x,y);
-        }
-        ctx.strokeStyle=c((hue+echo*20)%360,sat,isDark?78:42,echoAlpha+v*0.15);
-        ctx.lineWidth=0.8+v*2.5;ctx.stroke();
-        // Right lobe (smaller delay)
-        ctx.beginPath();
-        for(var i=0;i<280;i++){
-          var a=i/140*Math.PI+Math.PI*0.75-Math.sin(echoPhase+0.6)*0.3;
-          var r=3+i*maxR/280*echoScale*0.85;
-          var x=cx+W*0.1+Math.cos(a)*r*0.7;
-          var y=cy+Math.sin(a)*r;
-          if(i===0)ctx.moveTo(x,y);else ctx.lineTo(x,y);
-        }
-        ctx.strokeStyle(c((hue+echo*20+15)%360,sat,isDark?78:42,echoAlpha*0.8+v*0.12));
-        ctx.lineWidth=0.7+v*2;ctx.stroke();
+        var echoScale=0.5+echo*0.18+v*(0.3+echo*0.12);
+        var echoAlpha=0.5-echo*0.1;
+        lobes.forEach(function(lobe){
+          var cx=lobe.cx;
+          ctx.beginPath();
+          for(var i=0;i<220;i++){
+            var frac=i/220;
+            var r=2+frac*maxR*echoScale;
+            var a=lobe.dir*(Math.PI*0.3+frac*Math.PI*2+Math.sin(t/1500+echo)*0.3);
+            var x=cx+Math.cos(a)*r*0.6;
+            var y=cy+Math.sin(a)*r+maxR*0.1*echoScale;
+            if(i===0)ctx.moveTo(x,y);else ctx.lineTo(x,y);
+          }
+          ctx.strokeStyle=c((hue+echo*25)%360,sat,isDark?78:42,echoAlpha+v*0.15);
+          ctx.lineWidth=0.5+v*2;ctx.stroke();
+        });
       }
+      // Solid bulbs
+      lobes.forEach(function(lobe){
+        var bulbR=maxR*0.1+v*maxR*0.05;
+        ctx.fillStyle=c(hue,55,isDark?78:42,0.5+v*0.3);
+        ctx.beginPath();ctx.arc(lobe.cx,cy+maxR*0.08,bulbR,0,Math.PI*2);ctx.fill();
+      });
+    }
+  },
+
+  // 5. Serif Bloom — spirals that bloom outward from the quotation bulb
+  {
+    name:'Serif Bloom',
+    draw:function(ctx,v,isDark){
+      var hue=isDark?250:215,sat=isDark?65:55;
+      var cy=H/2,maxR=Math.min(W,H)*0.4;
+      var lobes=[
+        {cx:W/2-W*0.1, dir:1},
+        {cx:W/2+W*0.1, dir:-1}
+      ];
+      lobes.forEach(function(lobe){
+        var cx=lobe.cx;
+        // Blooming petals = multiple spiral arms from the bulb
+        var petals=8+Math.floor(v*6);
+        for(var p=0;p<petals;p++){
+          var pAngle=(p/petals)*Math.PI*2;
+          ctx.beginPath();
+          for(var i=0;i<180;i++){
+            var frac=i/180;
+            var r=3+frac*maxR*0.45*(1+v*0.5);
+            // Petal curves outward from bulb
+            var a=pAngle+frac*lobe.dir*1.8+Math.sin(frac*Math.PI)*0.6*lobe.dir;
+            var x=cx+Math.cos(a+t/2000)*r*0.55;
+            var y=cy+Math.sin(a+t/2000)*r+maxR*0.08;
+            if(i===0)ctx.moveTo(x,y);else ctx.lineTo(x,y);
+          }
+          ctx.strokeStyle=c((hue+p*20)%360,sat,isDark?78:42,0.2+v*0.3);
+          ctx.lineWidth=0.4+v*2;ctx.stroke();
+        }
+        // Dense bulb core
+        var coreR=maxR*0.08+v*maxR*0.06;
+        var cg=ctx.createRadialGradient(cx,cy+maxR*0.05,0,cx,cy+maxR*0.05,coreR*2);
+        cg.addColorStop(0,c(hue,70,isDark?85:50,0.8+v*0.2));
+        cg.addColorStop(1,'rgba(0,0,0,0)');
+        ctx.fillStyle=cg;ctx.beginPath();ctx.arc(cx,cy+maxR*0.05,coreR*2,0,Math.PI*2);ctx.fill();
+      });
     }
   }
 
