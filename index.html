@@ -159,6 +159,13 @@ body.logged-in .guest-only{display:none!important}
 </style>
 </head>
 <body class="snap-body hb-idx">
+
+<!-- Continuous particle background (Side Drift #29) -->
+<canvas id="bgParticles" style="position:fixed;inset:0;width:100%;height:100%;z-index:0;filter:blur(1.5px);opacity:.45;pointer-events:none"></canvas>
+
+<!-- Big particle S logo overlay -->
+<canvas id="bigLogoOverlay" style="position:fixed;top:60px;right:20px;width:120px;height:100px;z-index:15;pointer-events:none;opacity:.7"></canvas>
+
 <script>history.scrollRestoration='manual';window.scrollTo(0,0);</script>
 <script>
 // Old device warning — checks for APIs the site needs
@@ -1108,6 +1115,100 @@ function handleHeroLogin(e){e.preventDefault();if(typeof signInWithGoogle==='fun
       var r=.7+Math.abs(Math.sin(rt*2+p.phase))*.5;
       ctx.beginPath();ctx.arc(p.x,p.y,r,0,Math.PI*2);
       ctx.fillStyle='hsla('+(10+i/N*50)+',60%,55%,.45)';ctx.fill();
+    }
+  }
+  requestAnimationFrame(render);
+})();
+</script>
+
+<!-- BG Particle System (Side Drift #29) -->
+<script>
+(function(){
+  var cv=document.getElementById('bgParticles');
+  if(!cv)return;
+  var ctx=cv.getContext('2d'),W,H;
+
+  function resize(){W=window.innerWidth;H=window.innerHeight;cv.width=W;cv.height=H;}
+  resize();window.addEventListener('resize',resize);
+
+  // Side Drift particles: horizontal sweep + gentle wave
+  var N=120,ps=[];
+  for(var i=0;i<N;i++){
+    ps.push({
+      x:Math.random()*W,y:Math.random()*H,
+      vx:(Math.random()-.5)*0.4,
+      vy:-0.15-Math.random()*0.5,
+      size:2+Math.random()*5,
+      hue:190+Math.random()*40, // teal-blue Side Drift palette
+      phase:Math.random()*Math.PI*2,
+      life:0.5+Math.random()*0.5
+    });
+  }
+
+  function render(ts){
+    requestAnimationFrame(render);
+    var t=ts*.001;
+    if(W!==window.innerWidth||H!==window.innerHeight)resize();
+    ctx.clearRect(0,0,W,H);
+
+    for(var i=0;i<ps.length;i++){
+      var p=ps[i];
+      // Side Drift: horizontal sweep + subtle wave
+      p.x+=p.vx+0.25*(1-p.y/H); // sweep right
+      p.y+=p.vy+Math.sin(p.x*0.003+t)*0.3; // wave Y
+      if(p.y<-30){p.y=H+30;p.x=Math.random()*W;}
+      if(p.y>H+30){p.y=-30;p.x=Math.random()*W;}
+      if(p.x<-30)p.x=W+30;
+      if(p.x>W+30)p.x=-30;
+
+      var alpha=p.life*0.35;
+      ctx.beginPath();ctx.arc(p.x,p.y,p.size,0,Math.PI*2);
+      ctx.fillStyle='hsla('+p.hue+',50%,60%,'+alpha+')';
+      ctx.fill();
+    }
+  }
+  requestAnimationFrame(render);
+})();
+</script>
+
+<!-- Big Logo Overlay -->
+<script>
+(function(){
+  var cv=document.getElementById('bigLogoOverlay');
+  if(!cv)return;
+  var ctx=cv.getContext('2d'),w=cv.width=240,h=cv.height=200;
+  cv.style.width='120px';cv.style.height='100px';
+
+  function bezierPoint(p0,p1,p2,p3,t){
+    var u=1-t;
+    return{x:u*u*u*p0[0]+3*u*u*t*p1[0]+3*u*t*t*p2[0]+t*t*t*p3[0],y:u*u*u*p0[1]+3*u*u*t*p1[1]+3*u*t*t*p2[1]+t*t*t*p3[1]};
+  }
+  function sampleS(n){
+    var segs=[{p0:[55,6],p1:[28,6],p2:[18,40],p3:[42,46]},{p0:[42,46],p1:[66,52],p2:[82,46],p3:[72,66]},{p0:[72,66],p1:[62,82],p2:[45,80],p3:[42,78]}];
+    var pts=[];
+    for(var s=0;s<segs.length;s++){var seg=segs[s],np=Math.round(n/3);for(var i=0;i<=np;i++)pts.push(bezierPoint(seg.p0,seg.p1,seg.p2,seg.p3,i/np));}
+    return pts;
+  }
+
+  var N=200,sPts=sampleS(N),sx=w/100,sy=h/85;
+  var ps=[];
+  for(var i=0;i<N;i++){
+    ps.push({tx:sPts[i].x*sx,ty:sPts[i].y*sy,x:Math.random()*w,y:Math.random()*h,vx:0,vy:0,phase:Math.random()*Math.PI*2,freq:.3+Math.random()*.7,orbitR:2+Math.random()*12});
+  }
+
+  function render(ts){
+    requestAnimationFrame(render);
+    var rt=ts*.001,smoothVol=.12+Math.sin(rt*.4)*.06;
+    ctx.clearRect(0,0,w,h);
+    for(var i=0;i<ps.length;i++){
+      var p=ps[i],kalei=2.0,kx=Math.cos(rt*p.freq+p.phase)*p.orbitR*kalei,ky=Math.sin(rt*p.freq*.7+p.phase)*p.orbitR*kalei;
+      kx+=Math.cos(rt*.3+p.phase*2)*p.orbitR*.5*kalei;ky+=Math.sin(rt*.37+p.phase*1.7)*p.orbitR*.5*kalei;
+      var tx=p.tx+kx,ty=p.ty+ky;
+      p.vx+=(tx-p.x)*.005;p.vy+=(ty-p.y)*.005;p.vx*=.9;p.vy*=.9;
+      p.x+=p.vx*.06;p.y+=p.vy*.06;
+      var r=.8+Math.abs(Math.sin(rt*2+p.phase))*.8;
+      ctx.beginPath();ctx.arc(p.x,p.y,r,0,Math.PI*2);
+      ctx.fillStyle='hsla('+(10+i/N*50)+',65%,55%,.5)';ctx.fill();
     }
   }
   requestAnimationFrame(render);
