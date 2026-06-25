@@ -953,7 +953,7 @@ document.querySelectorAll('.ni[data-tab]').forEach(function(t){
     if(tab==='achievements')renderAchievements();
     if(tab==='streak')renderStreakTab();
     if(tab==='transcripts')loadTranscriptsTab();
-    if(tab==='ia-report')loadTranscriptsTab();
+    if(tab==='ia-report')loadReportsTab();
     if(tab==='speaking')loadSpeakingTab();
     if(tab==='goals')syncGoalsToTab();
     if(tab==='wordbanks')loadWordBanksTab();
@@ -1018,7 +1018,6 @@ document.querySelectorAll('.ni[data-tab]').forEach(function(t){
       var avB=document.getElementById('avatarInitialsB');if(avB)avB.textContent=initials;
       // Update top-right menu (auth section rendered by js/auth.js)
       var grEl=document.querySelector('.user-greeting');if(grEl)grEl.textContent='Ciao '+firstName;
-      var uaEl=document.getElementById('userAvatar');if(uaEl)uaEl.textContent=initials.charAt(0);
       var udName=document.querySelector('.ud-name');if(udName)udName.textContent=firstName;
       var udAv=document.querySelector('.ud-avatar');if(udAv)udAv.textContent=initials.charAt(0);
     }
@@ -1052,8 +1051,6 @@ function showAvatar(url){
   // Profilo tab avatar
   var avB=document.getElementById('avatarInitialsB');if(avB)avB.style.display='none';
   var avImgB=document.getElementById('heroAvatarImgB');if(avImgB){avImgB.src=url;avImgB.style.display='block'}
-  // Top-right menu avatar
-  var ua=document.getElementById('userAvatar');if(ua){ua.style.backgroundImage='url('+url+')';ua.style.backgroundSize='cover';ua.style.color='transparent'}
   var udAv=document.querySelector('.ud-avatar');if(udAv){udAv.style.backgroundImage='url('+url+')';udAv.style.backgroundSize='cover';udAv.style.color='transparent'}
 }
 function hideAvatar(){
@@ -1062,7 +1059,6 @@ function hideAvatar(){
   var rmBtn=document.getElementById('heroAvatarRemove');if(rmBtn)rmBtn.style.display='none';
   var avB=document.getElementById('avatarInitialsB');if(avB)avB.style.display='';
   var avImgB=document.getElementById('heroAvatarImgB');if(avImgB){avImgB.style.display='none';avImgB.src=''}
-  var ua=document.getElementById('userAvatar');if(ua){ua.style.backgroundImage='';ua.style.color='#fff'}
   var udAv=document.querySelector('.ud-avatar');if(udAv){udAv.style.backgroundImage='';udAv.style.color='#fff'}
 }
 async function removeAvatar(){
@@ -1180,7 +1176,7 @@ async function loadAllData(supabase,userId){
   var tc=document.getElementById('transcriptBadge');if(tc)tc.textContent=allSessions.length;
 
   var repResp=await supabase.from('session_ai_reports').select('id',{count:'exact',head:true}).eq('user_id',userId).eq('status','completed');
-  var rb=document.getElementById('reportBadge');if(rb)rb.textContent=repResp.count||0;
+  var rb=document.getElementById('iaReportBadge');if(rb)rb.textContent=repResp.count||0;
 
   // ── Profile: member since + plan ──
   var profResp=await supabase.from('profiles').select('created_at').eq('id',userId).maybeSingle();
@@ -1240,7 +1236,6 @@ async function loadAllData(supabase,userId){
   var xn=document.getElementById('xpNext');if(xn)xn.textContent=xpNext.toLocaleString()+' XP — Livello '+(level+1);
   var xf=document.getElementById('xpFill');if(xf)xf.style.width=xpPct+'%';
   var hl=document.getElementById('heroLvl');if(hl)hl.textContent='LVL '+level;
-  var plx=document.getElementById('profXp');if(plx)plx.textContent=xp.toLocaleString();
 
   // ── Panoramica KPIs (v3 with dual trends: week + month) ──
   var weekAgo=new Date(Date.now()-7*86400000);
@@ -1266,18 +1261,6 @@ async function loadAllData(supabase,userId){
   var repCount=repResp.count||0;
   if(document.getElementById('ovReportsV3'))document.getElementById('ovReportsV3').textContent=repCount;
   if(document.getElementById('ovReports7d')){document.getElementById('ovReports7d').textContent='questo mese';}
-  // Week display
-  var now=new Date();var weekStart=new Date(now);weekStart.setDate(now.getDate()-now.getDay()+1);
-  var weekEnd=new Date(weekStart);weekEnd.setDate(weekStart.getDate()+6);
-  var weekLabel=weekStart.toLocaleDateString('it-IT',{day:'numeric',month:'short'})+' – '+weekEnd.toLocaleDateString('it-IT',{day:'numeric',month:'short'});
-  if(document.getElementById('weekLabel'))document.getElementById('weekLabel').textContent=weekLabel;
-  if(document.getElementById('weekLabel2'))document.getElementById('weekLabel2').textContent=weekLabel;
-  // Legacy
-  var totalMin=Math.round(weekSec/60);
-  if(document.getElementById('ovTalk'))document.getElementById('ovTalk').textContent=totalMin+'m';
-  if(document.getElementById('ovSessions'))document.getElementById('ovSessions').textContent=weekSessions.length;
-  if(document.getElementById('ovWords'))document.getElementById('ovWords').textContent=weekWords;
-  if(document.getElementById('ovReports'))document.getElementById('ovReports').textContent=repCount||'—';
 
   // ── Investment (uses allSec/allWords from XP block above) ──
   var allHrs=allMin>=60?(allMin/60).toFixed(1)+'h':allMin+'m';
@@ -1287,9 +1270,7 @@ async function loadAllData(supabase,userId){
     var prefs=await window.loadUserPreferences();
     if(prefs){
       var sv=function(id,v){var el=document.getElementById(id);if(el&&v!=null)el.value=v};
-      var st=function(id,v){var el=document.getElementById(id);if(el)el.classList.toggle('on',!!v)};
-      sv('profNative',prefs.native_lang);sv('prefReportLang',prefs.report_language||prefs.native_lang||'it');sv('prefSessionsPerWeek',prefs.sessions_per_week);
-      st('prefWeeklyReports',prefs.weekly_reports);st('prefAITips',prefs.ai_tips);st('prefDarkMode',prefs.dark_mode);
+      sv('profNative',prefs.native_lang);
       if(prefs.display_name){var dn2=document.getElementById('accountDisplayName');if(dn2)dn2.textContent=prefs.display_name}
     }
   }
@@ -1303,16 +1284,6 @@ async function loadAllData(supabase,userId){
 initDataLoading();
 
 function loadProgress(){
-  // Update WPM stats in overview
-  var wpmVals=[];allSessions.forEach(function(s){if(s.wpm)wpmVals.push(s.wpm)});
-  if(wpmVals.length>0){
-    var avgWpm=Math.round(wpmVals.reduce(function(a,b){return a+b},0)/wpmVals.length);
-    var peakWpm=Math.round(Math.max.apply(null,wpmVals));
-    if(document.getElementById('wpmAvgVal'))document.getElementById('wpmAvgVal').textContent=avgWpm;
-    if(document.getElementById('wpmPeakVal'))document.getElementById('wpmPeakVal').textContent=peakWpm;
-    if(document.getElementById('wpmAvgBar'))document.getElementById('wpmAvgBar').style.width=Math.min(100,avgWpm/200*100)+'%';
-    if(document.getElementById('wpmPeakBar'))document.getElementById('wpmPeakBar').style.width=Math.min(100,peakWpm/200*100)+'%';
-  }
   renderStreakTab();
 }
 
@@ -1591,7 +1562,7 @@ function renderAchievements(){
   // Get stored tracking data (set by other pages when actions happen)
   var storedData={};
   try{storedData=JSON.parse(localStorage.getItem('sottotitoli_achievement_data')||'{}')}catch(e){}
-  var data={total:allSessions.length,streak:streak,uniqueWords:totalUnique,min:totalMin,maxWpm:maxWpm,maxLex:maxLex,reports:parseInt((document.getElementById('reportBadge')||{}).textContent)||0,maxWeek:maxWeek,night:night,early:early,langs:modes.length,maxSess:maxSess,avgQuality:avgQuality,avgFillers:avgFillers,ngslPct:ngslPct,earned:0,reportTypes:reportTypes,streakRecord:streakRecord,daysSinceFirst:daysSinceFirst,activeDays:activeDays,grammarFixed:storedData.grammarFixed||0,verbTenses:storedData.verbTenses||0,conditionalUsed:!!storedData.conditionalUsed,passiveUsed:!!storedData.passiveUsed,subjunctiveUsed:!!storedData.subjunctiveUsed,complexStructures:storedData.complexStructures||0,referrals:parseInt((document.getElementById('refCount')||{}).textContent)||0,newsletter:!!storedData.newsletter,feedbackSent:!!storedData.feedbackSent,sharedSession:!!storedData.sharedSession,garaPlayed:!!storedData.garaPlayed,garaWon:!!storedData.garaWon,garaPodium:!!storedData.garaPodium,profileComplete:!!(document.getElementById('profName')?.value),usedCaption:modes.some(function(m){return (m||'').toLowerCase().indexOf('caption')!==-1}),usedTranslate:modes.some(function(m){return (m||'').toLowerCase().indexOf('translat')!==-1}),usedLesson:modes.some(function(m){return (m||'').toLowerCase().indexOf('lesson')!==-1}),usedOverlay:!!localStorage.getItem('sottotitoli_overlay_used'),usedPosColoring:!!localStorage.getItem('sottotitoli_pos_used'),cefrLevel:avgQuality>=85?'C1':avgQuality>=70?'B2':avgQuality>=55?'B1':avgQuality>=40?'A2':allSessions.length>0?'A1':null,allReportTypes:reportTypes.length>=4};
+  var data={total:allSessions.length,streak:streak,uniqueWords:totalUnique,min:totalMin,maxWpm:maxWpm,maxLex:maxLex,reports:parseInt((document.getElementById('iaReportBadge')||{}).textContent)||0,maxWeek:maxWeek,night:night,early:early,langs:modes.length,maxSess:maxSess,avgQuality:avgQuality,avgFillers:avgFillers,ngslPct:ngslPct,earned:0,reportTypes:reportTypes,streakRecord:streakRecord,daysSinceFirst:daysSinceFirst,activeDays:activeDays,grammarFixed:storedData.grammarFixed||0,verbTenses:storedData.verbTenses||0,conditionalUsed:!!storedData.conditionalUsed,passiveUsed:!!storedData.passiveUsed,subjunctiveUsed:!!storedData.subjunctiveUsed,complexStructures:storedData.complexStructures||0,referrals:parseInt((document.getElementById('refCount')||{}).textContent)||0,newsletter:!!storedData.newsletter,feedbackSent:!!storedData.feedbackSent,sharedSession:!!storedData.sharedSession,garaPlayed:!!storedData.garaPlayed,garaWon:!!storedData.garaWon,garaPodium:!!storedData.garaPodium,profileComplete:!!(document.getElementById('profName')?.value),usedCaption:modes.some(function(m){return (m||'').toLowerCase().indexOf('caption')!==-1}),usedTranslate:modes.some(function(m){return (m||'').toLowerCase().indexOf('translat')!==-1}),usedLesson:modes.some(function(m){return (m||'').toLowerCase().indexOf('lesson')!==-1}),usedOverlay:!!localStorage.getItem('sottotitoli_overlay_used'),usedPosColoring:!!localStorage.getItem('sottotitoli_pos_used'),cefrLevel:avgQuality>=85?'C1':avgQuality>=70?'B2':avgQuality>=55?'B1':avgQuality>=40?'A2':allSessions.length>0?'A1':null,allReportTypes:reportTypes.length>=4};
   ACHIEVEMENTS.forEach(function(a){if(a.cond(data))earnedCount++;});
   data.earned=earnedCount;
 
@@ -1947,23 +1918,6 @@ function loadSpeakingTab(){
     weeks.forEach(function(wk){h+='<div class="hm-row">';wk.forEach(function(d){var lvl=d.wpm<=0?'':d.wpm<60?'l1':d.wpm<80?'l2':d.wpm<100?'l3':'l4';h+='<div class="hm-day '+lvl+'" data-tip="'+(d.wpm>0?Math.round(d.wpm)+' WPM':'—')+'"></div>'});h+='</div>'});
     hmEl.innerHTML=h;
   }
-
-  // Fingerprint
-  var fp=document.getElementById('spkFingerprint');
-  if(fp&&cW>0&&cL>0){var aw=sumWpm/cW,al=sumLex/cL,af=cF>0?(sumFil/cF):0;fp.innerHTML='Parlatore <strong style="color:var(--accent)">'+(aw>130?'veloce':aw>90?'moderato':'lento')+'</strong> con vocabolario <strong style="color:var(--green)">'+(al>0.45?'ricco':al>0.30?'buono':'in crescita')+'</strong>. Il tuo ritmo naturale è di circa <strong>'+Math.round(aw)+' WPM</strong> con diversità lessicale <strong>'+al.toFixed(2)+'</strong>.'}
-
-  // Next steps
-  var nsEl=document.getElementById('spkNextSteps');
-  if(nsEl&&allSessions.length>=3){
-    var tips=[];
-    if(cW>0&&sumWpm/cW<80)tips.push('🎯 <strong>Aumenta il ritmo:</strong> esercitati con letture ad alta voce mirando a 90-100 WPM.');
-    if(cF>0&&sumFil/cF>5)tips.push('🤫 <strong>Riduci i riempitivi:</strong> registrati e conta quanti "quindi" usi. Prova a sostituirli con pause silenziose.');
-    if(cL>0&&sumLex/cL<0.30)tips.push('📚 <strong>Espandi il vocabolario:</strong> impara 5 nuove parole al giorno e usale in una sessione.');
-    if(cQ>0&&sumQ/cQ<50)tips.push('📝 <strong>Migliora la qualità:</strong> concentrati su un aspetto grammaticale a sessione.');
-    if(tips.length===0)tips.push('🌟 <strong>Continua così!</strong> Le tue metriche sono solide. Punta a mantenere la costanza.');
-    if(allSessions.length>0){var thisWeek=allSessions.filter(function(s){return new Date(s.started_at)>=new Date(Date.now()-7*86400000)});var lastWeek=allSessions.filter(function(s){var d=new Date(s.started_at);return d>=new Date(Date.now()-14*86400000)&&d<new Date(Date.now()-7*86400000)});if(thisWeek.length>lastWeek.length)tips.push('📈 <strong>Trend in crescita:</strong> +'+(thisWeek.length-lastWeek.length)+' sessioni rispetto alla settimana scorsa!')}
-    nsEl.innerHTML=tips.map(function(t){return '<div style="margin-bottom:4px">'+t+'</div>'}).join('');
-  }
 }
 
 // ═══ TREND TAB ═══
@@ -1978,7 +1932,7 @@ function loadTrendTab(){
     if(s.fillers_per_minute!=null&&s.fillers_per_minute>=0){totalFil+=s.fillers_per_minute;filCount++;}
   });
   var totalMin=Math.round(totalSec/60),totalHrs=totalMin>=60?(totalMin/60).toFixed(1)+'h':totalMin+'m';
-  var rb=document.getElementById('reportBadge');var reportCount=parseInt(rb?.textContent)||0;
+  var rb=document.getElementById('iaReportBadge');var reportCount=parseInt(rb?.textContent)||0;
   // Trend KPIs — speaking metrics
   if(document.getElementById('trWpm'))document.getElementById('trWpm').textContent=wpmCount>0?Math.round(totalWpm/wpmCount):'—';
   if(document.getElementById('trWpmSub'))document.getElementById('trWpmSub').textContent=wpmCount>0?wpmCount+' sessioni':'—';
@@ -1988,24 +1942,6 @@ function loadTrendTab(){
   if(document.getElementById('trQualitySub'))document.getElementById('trQualitySub').textContent=qualCount>0?qualCount+' sessioni':'—';
   if(document.getElementById('trFillers'))document.getElementById('trFillers').textContent=filCount>0?(totalFil/filCount).toFixed(1):'—';
   if(document.getElementById('trFillersSub'))document.getElementById('trFillersSub').textContent=filCount>0?'al minuto':'—';
-
-  // Heatmap (12 weeks, Mon-Sun)
-  var hmEl=document.getElementById('trendHeatmap');
-  if(hmEl&&hmEl.children.length===0){
-    // Build 12 weeks of 7 days each: Mon(0) to Sun(6)
-    var today=new Date();var start=new Date(today);start.setDate(today.getDate()-83); // 12*7-1=83 days back
-    var weeks=[];for(var w=0;w<12;w++){weeks.push([]);for(var d=0;d<7;d++){var date=new Date(start);date.setDate(start.getDate()+w*7+d);var key=date.toISOString().split('T')[0];var min=0;allSessions.forEach(function(s){if(s.started_at&&s.started_at.split('T')[0]===key)min+=(s.duration_seconds||0)/60});weeks[w].push({date:key,min:min})}}
-    var allMins=[];weeks.forEach(function(w){w.forEach(function(d){allMins.push(d.min)})});var maxMin=Math.max.apply(null,allMins.concat([1]));
-    var hmh='<div style="display:flex;gap:2px">';
-    // Day labels (Mon-Sun)
-    hmh+='<div style="display:flex;flex-direction:column;gap:2px;margin-right:4px">';
-    ['L','M','M','G','V','S','D'].forEach(function(l,i){hmh+='<div style="width:14px;height:14px;font-size:8px;color:var(--t3);display:flex;align-items:center;justify-content:center">'+l+'</div>'});
-    hmh+='</div>';
-    for(var w=0;w<12;w++){hmh+='<div style="display:flex;flex-direction:column;gap:2px">';
-      for(var d=0;d<7;d++){var dayData=weeks[w][d];var lvl=dayData.min>0?(dayData.min/maxMin>0.66?'l4':dayData.min/maxMin>0.33?'l3':'l2'):'';hmh+='<div class="hm-day '+lvl+'" title="'+dayData.date+': '+Math.round(dayData.min)+' min"></div>';}
-    hmh+='</div>';}
-    hmh+='</div>';hmEl.innerHTML=hmh;
-  }
 
   // v3 Trend chart with filter chips
   var chartEl=document.getElementById('trendChartV3');
@@ -2033,15 +1969,6 @@ function loadTrendTab(){
   }
   renderTrendChart('wpm');
   if(chipsEl){chipsEl.addEventListener('click',function(e){if(e.target.classList.contains('filter-chip')){chipsEl.querySelectorAll('.filter-chip').forEach(function(x){x.classList.remove('active')});e.target.classList.add('active');activeMetric=e.target.dataset.metric;renderTrendChart(activeMetric)}})}
-
-  // Personal Records (in Trend tab)
-  var prEl=document.getElementById('trendRecords');
-  if(prEl){
-    var bestWpm=0,bestDur=0,bestWords=0,bestLex=0;allSessions.forEach(function(s){if((s.wpm||0)>bestWpm)bestWpm=s.wpm;if((s.duration_seconds||0)>bestDur)bestDur=s.duration_seconds;if((s.unique_words_count||0)>bestWords)bestWords=s.unique_words_count;if((s.lexical_diversity||0)>bestLex)bestLex=s.lexical_diversity});
-    var records=[{icon:'⚡',label:'Miglior WPM',val:Math.round(bestWpm),unit:'WPM'},{icon:'⏱️',label:'Sessione più lunga',val:Math.round(bestDur/60),unit:'min'},{icon:'📚',label:'Più parole uniche',val:bestWords,unit:'parole'},{icon:'🌈',label:'Miglior Lexical Div.',val:bestLex.toFixed(2),unit:''},{icon:'🔥',label:'Streak record',val:document.getElementById('streakRecord')?.textContent||'—',unit:'gg'},{icon:'🎯',label:'Sessioni totali',val:allSessions.length,unit:''}];
-    var prh='';records.forEach(function(r){prh+='<div class="ach earned" style="text-align:center"><span class="ai">'+r.icon+'</span><div style="font-size:10px;font-weight:700">'+r.label+'</div><div style="font-family:JetBrains Mono,monospace;font-size:16px;font-weight:800;margin-top:2px">'+r.val+'</div><div style="font-size:8px;color:var(--t3)">'+r.unit+'</div></div>'});
-    prEl.innerHTML=prh;
-  }
 
   // Render Word Bank activation status per language
   var wbGrid=document.getElementById('trendWordbankGrid');
@@ -2256,11 +2183,11 @@ function bulkDeleteSessions(){
 // ═══ REPORTS TAB ═══
 var REPORT_MODULES={1:{icon:'📝',name:'Grammar & Accuracy',color:'#7c3aed'},2:{icon:'📚',name:'Vocabulary Range',color:'#059669'},3:{icon:'💨',name:'Fluency & Coherence',color:'#2563eb'},4:{icon:'🎯',name:'CEFR Assessment',color:'#d97706'},5:{icon:'📈',name:'Progress Report',color:'#ec4899'},6:{icon:'💼',name:'Business English',color:'#2563eb'},7:{icon:'🗂️',name:'Business Vocabulary',color:'#2563eb'},8:{icon:'🎨',name:'Speaking Style',color:'#06b6d4'},9:{icon:'🔄',name:'Language Transfer',color:'#dc2626'},10:{icon:'📖',name:'Academic Vocabulary',color:'#7c3aed'},11:{icon:'🔬',name:'Discourse Analysis',color:'#7c3aed'},12:{icon:'🧮',name:'Syntax & Complexity',color:'#7c3aed'},13:{icon:'📊',name:'Lexical Analysis',color:'#059669'},14:{icon:'🌟',name:'Comprehensive',color:'#7c3aed'}};
 async function loadReportsTab(){
-  var el=document.getElementById('reportList');if(!el||el.children.length>0)return;
+  var el=document.getElementById('iaReportList');if(!el||el.children.length>0)return;
   var supabase=window.sottotitoliSupabase;if(!supabase)return;
   var r=await supabase.auth.getSession();if(!r.data?.session)return;
   var resp=await supabase.from('session_ai_reports').select('id,module_id,overall_score,summary_text,created_at').eq('user_id',r.data.session.user.id).eq('status','completed').order('created_at',{ascending:false}).limit(20);
-  if(!resp.data||resp.data.length===0){var emp=document.getElementById('reportEmpty');if(emp)emp.style.display='block';return}
+  if(!resp.data||resp.data.length===0){var emp=document.getElementById('iaReportEmpty');if(emp)emp.style.display='block';return}
   var h='';resp.data.forEach(function(rep){
     var mod=REPORT_MODULES[rep.module_id]||{icon:'📊',name:'Report',color:'var(--accent)'};
     var score=rep.overall_score?Math.round(rep.overall_score)+'%':'—';
@@ -2283,8 +2210,8 @@ async function deleteReport(reportId){
   var supabase=window.sottotitoliSupabase;if(!supabase)return;
   var {error}=await supabase.from('session_ai_reports').delete().eq('id',reportId);
   if(!error){
-    var el=document.getElementById('reportList');if(el)el.innerHTML='';
-    var rb=document.getElementById('reportBadge');if(rb){var cnt=parseInt(rb.textContent)||0;rb.textContent=Math.max(0,cnt-1)}
+    var el=document.getElementById('iaReportList');if(el)el.innerHTML='';
+    var rb=document.getElementById('iaReportBadge');if(rb){var cnt=parseInt(rb.textContent)||0;rb.textContent=Math.max(0,cnt-1)}
     loadReportsTab();
   }
 }
