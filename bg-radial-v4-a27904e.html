@@ -64,16 +64,21 @@ body.dark .btn:hover{background:rgba(255,255,255,.06);color:#fff;border-color:rg
     <input type="range" class="sens-slider" id="sensSlider" min="0.1" max="20" step="0.1" value="1" oninput="updateSensitivity(this.value)">
     <span class="meter-label" id="sensLabel">1.0x</span>
   </div>
-  <!-- FX Toggles -->
-  <div class="btn-row" style="margin-top:2px">
-    <button class="btn" id="btnSlowdown" onclick="toggleFX('slowdown')">🐢 Slow</button>
-    <button class="btn" id="btnSensBoost" onclick="toggleFX('sensBoost')">📢 Boost</button>
-    <button class="btn" id="btnBreath" onclick="toggleFX('breath')">🫁 Breath</button>
+  <!-- FX Sliders -->
+  <div class="sens-row" style="margin-top:4px">
+    <label style="font-size:9px;opacity:.5;min-width:36px">🐢 Slow</label>
+    <input type="range" class="sens-slider" id="fxSlowSlider" min="0.1" max="1" step="0.05" value="1" oninput="setFXSlow(this.value)" style="width:60px">
+    <span class="meter-label" id="fxSlowVal">1×</span>
   </div>
-  <div class="btn-row" style="gap:10px;margin-top:1px;margin-bottom:4px">
-    <span style="font-size:8px;opacity:.25;font-family:'JetBrains Mono',monospace;min-width:36px;text-align:center" id="fxSlowdownVal">1×</span>
-    <span style="font-size:8px;opacity:.25;font-family:'JetBrains Mono',monospace;min-width:36px;text-align:center" id="fxSensBoostVal">off</span>
-    <span style="font-size:8px;opacity:.25;font-family:'JetBrains Mono',monospace;min-width:36px;text-align:center" id="fxBreathVal">off</span>
+  <div class="sens-row">
+    <label style="font-size:9px;opacity:.5;min-width:36px">📢 Boost</label>
+    <input type="range" class="sens-slider" id="fxBoostSlider" min="1" max="20" step="1" value="1" oninput="setFXBoost(this.value)" style="width:60px">
+    <span class="meter-label" id="fxBoostVal">off</span>
+  </div>
+  <div class="sens-row">
+    <label style="font-size:9px;opacity:.5;min-width:36px">🫁 Breath</label>
+    <input type="range" class="sens-slider" id="fxBreathSlider" min="0.005" max="0.2" step="0.005" value="0.2" oninput="setFXBreath(this.value)" style="width:60px">
+    <span class="meter-label" id="fxBreathVal">off</span>
   </div>
   <div class="btn-row">
     <button class="btn" id="btnMic" onclick="toggleMic()">🎤 Start Mic</button>
@@ -105,51 +110,27 @@ var audioSource=null,audioBuffer=null,audioStartTime=0,audioPauseOffset=0,audioS
 var freqData=null,volume=0,smoothing=0,sensitivity=1.0;
 var canvas,ctx,W,H,t=0,animFrame=null,currentVar=0;
 
-// ─── FX State ───
+// ─── FX State (slider-driven) ───
 var fx={
-  slowdown:{on:false, speed:0.3},
-  sensBoost:{on:false, mult:3},
-  breath:{on:false, threshold:0.02}
+  slowdown:{on:false, speed:1},
+  sensBoost:{on:false, mult:1},
+  breath:{on:false, threshold:0.2}
 };
-var reverbBuffer=[];
-var bounceVol=0;
-
-function toggleFX(name){
-  var f=fx[name];
-  if(!f.on){f.on=true;fxCycleIdx[name]=0;applyFXCycle(name);}
-  else{
-    fxCycleIdx[name]++;
-    var cycles={slowdown:fxCycle.slowdown,sensBoost:fxCycle.sensBoost,breath:fxCycle.breath};
-    if(fxCycleIdx[name]>=cycles[name].length){f.on=false;fxCycleIdx[name]=0;}
-    else{applyFXCycle(name);}
-  }
-  var btnId='btn'+{slowdown:'Slowdown',sensBoost:'SensBoost',breath:'Breath'}[name];
-  var btn=document.getElementById(btnId);
-  if(btn)btn.classList.toggle('on',f.on);
-  updateFXLabels();
+function setFXSlow(val){
+  var v=parseFloat(val);fx.slowdown.speed=v;fx.slowdown.on=v<1;
+  document.getElementById('fxSlowVal').textContent=v.toFixed(2)+'×';
   updateConfigDisplay();
 }
-function applyFXCycle(name){
-  var idx=fxCycleIdx[name];
-  switch(name){
-    case'slowdown':fx.slowdown.speed=fxCycle.slowdown[idx];break;
-    case'sensBoost':fx.sensBoost.mult=fxCycle.sensBoost[idx];break;
-    case'breath':fx.breath.threshold=fxCycle.breath[idx];break;
-  }
+function setFXBoost(val){
+  var v=parseFloat(val);fx.sensBoost.mult=v;fx.sensBoost.on=v>1;
+  document.getElementById('fxBoostVal').textContent=v>1?v+'×':'off';
+  updateConfigDisplay();
 }
-function updateFXLabels(){
-  var s=fx.slowdown,b=fx.sensBoost,br=fx.breath;
-  document.getElementById('fxSlowdownVal').textContent=s.on?s.speed.toFixed(1)+'×':'1×';
-  document.getElementById('fxSensBoostVal').textContent=b.on?b.mult.toFixed(0)+'×':'off';
-  document.getElementById('fxBreathVal').textContent=br.on?(br.threshold*100).toFixed(0)+'%':'off';
+function setFXBreath(val){
+  var v=parseFloat(val);fx.breath.threshold=v;fx.breath.on=v<0.2;
+  document.getElementById('fxBreathVal').textContent=v<0.2?(v*100).toFixed(1)+'%':'off';
+  updateConfigDisplay();
 }
-
-var fxCycle={
-  slowdown:[0.1,0.2,0.35,0.5,0.75],
-  sensBoost:[2,3,5,8,12],
-  breath:[0.01,0.02,0.04,0.08]
-};
-var fxCycleIdx={slowdown:0,sensBoost:0,breath:0};
 
 function updateSensitivity(val){
   sensitivity=parseFloat(val);
@@ -514,9 +495,9 @@ function updateConfigDisplay(){
   var parts=[
     'var:'+v.name,
     'sens:'+sensitivity.toFixed(1),
-    'slow:'+(fx.slowdown.on?fx.slowdown.speed:'1'),
-    'boost:'+(fx.sensBoost.on?fx.sensBoost.mult:'off'),
-    'breath:'+(fx.breath.on?fx.breath.threshold:'off')
+    'slow:'+fx.slowdown.speed.toFixed(2)+'×',
+    'boost:'+(fx.sensBoost.on?fx.sensBoost.mult+'×':'off'),
+    'breath:'+(fx.breath.on?(fx.breath.threshold*100).toFixed(1)+'%':'off')
   ];
   var cfg=parts.join(' | ');
   document.getElementById('configDisplay').textContent=cfg;
