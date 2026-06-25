@@ -1216,7 +1216,6 @@ async function loadAllData(supabase,userId){
   // Store userId globally for share buttons
   window._userId=userId;
   // Referral
-  if(document.getElementById('refLink'))document.getElementById('refLink').textContent='buoninglese.github.io/sottotitoli/?ref='+(userId||'').substring(0,8);
   try{
     var refResp=await supabase.from('referrals').select('id',{count:'exact',head:true}).eq('referrer_id',userId);
     if(document.getElementById('refCount'))document.getElementById('refCount').textContent=(refResp.count||0)+' referral'+(refResp.count!==1?'':'s');
@@ -1304,24 +1303,16 @@ async function loadAllData(supabase,userId){
 initDataLoading();
 
 function loadProgress(){
-  var weekAgo=new Date(Date.now()-7*86400000);
-  var weekSessions=allSessions.filter(function(s){return new Date(s.started_at)>=weekAgo});
-  var totalSec=0;weekSessions.forEach(function(s){totalSec+=(s.duration_seconds||0)});
-  // Update WPM stats
+  // Update WPM stats in overview
   var wpmVals=[];allSessions.forEach(function(s){if(s.wpm)wpmVals.push(s.wpm)});
-  if(wpmVals.length>0){var avgWpm=Math.round(wpmVals.reduce(function(a,b){return a+b},0)/wpmVals.length);var peakWpm=Math.round(Math.max.apply(null,wpmVals));
+  if(wpmVals.length>0){
+    var avgWpm=Math.round(wpmVals.reduce(function(a,b){return a+b},0)/wpmVals.length);
+    var peakWpm=Math.round(Math.max.apply(null,wpmVals));
     if(document.getElementById('wpmAvgVal'))document.getElementById('wpmAvgVal').textContent=avgWpm;
     if(document.getElementById('wpmPeakVal'))document.getElementById('wpmPeakVal').textContent=peakWpm;
     if(document.getElementById('wpmAvgBar'))document.getElementById('wpmAvgBar').style.width=Math.min(100,avgWpm/200*100)+'%';
     if(document.getElementById('wpmPeakBar'))document.getElementById('wpmPeakBar').style.width=Math.min(100,peakWpm/200*100)+'%';
   }
-  // Update session stats
-  var sessMonthCount=monthSessions.length;
-  if(document.getElementById('sessWeekVal'))document.getElementById('sessWeekVal').textContent=sessCount;
-  if(document.getElementById('sessMonthVal'))document.getElementById('sessMonthVal').textContent=sessMonthCount;
-  if(document.getElementById('sessDayAvgVal')){var days=Math.max(1,Math.ceil((new Date()-new Date(new Date().getFullYear(),new Date().getMonth(),1))/86400000));document.getElementById('sessDayAvgVal').textContent=(sessMonthCount/days).toFixed(1);}
-
-  var totalMin=Math.round(totalSec/60),sessCount=weekSessions.length;
   renderStreakTab();
 }
 
@@ -1618,6 +1609,7 @@ function renderAchievements(){
   if(document.getElementById('achEarned'))document.getElementById('achEarned').textContent=earnedCount;
   if(document.getElementById('achTotal'))document.getElementById('achTotal').textContent=ACHIEVEMENTS.length;
   if(document.getElementById('achBadge'))document.getElementById('achBadge').textContent=earnedCount;
+  renderPRs();
 }
 
 // ═══ VOCAB TAB ═══
@@ -2330,27 +2322,7 @@ async function loadPaymentHistory(userId){
 
 // ═══ RIGHT PANEL ═══
 function loadRightPanel(userId){
-  // Personalized AI tips based on actual metrics
-  var tips=[];
-  if(allSessions.length===0){
-    tips=['🎤 Inizia la tua prima sessione in Studio per sbloccare statistiche e suggerimenti personalizzati.','📊 Dopo 3 sessioni, l\'AI analizzerà il tuo speaking e ti darà consigli mirati.','🔥 Registra sessioni in giorni consecutivi per attivare la streak.'];
-  }else{
-    var avgWpm=allSessions.reduce(function(s,x){return s+(x.wpm||0)},0)/allSessions.length;
-    var avgFil=allSessions.reduce(function(s,x){return s+(x.fillers_per_minute||0)},0)/allSessions.length;
-    var avgLex=allSessions.reduce(function(s,x){return s+(x.lexical_diversity||0)},0)/allSessions.length;
-    var totalMin=Math.round(allSessions.reduce(function(s,x){return s+(x.duration_seconds||0)},0)/60);
-    var streak=parseInt((document.getElementById('streakDays')||{}).textContent)||0;
-    if(avgFil>5)tips.push('🤫 Hai '+avgFil.toFixed(1)+' fillers al minuto. Prova a sostituirli con pause — il tuo speaking sembrerà più fluente.');
-    if(avgWpm<80)tips.push('⚡ Il tuo ritmo è di '+Math.round(avgWpm)+' WPM. Esercitati con letture ad alta voce per accelerare.');
-    if(avgLex<0.35)tips.push('📚 La tua diversità lessicale è '+avgLex.toFixed(2)+'. Impara 5 parole nuove a sessione.');
-    if(streak>=7)tips.push('🔥 '+streak+' giorni di streak! La costanza è il miglior predittore di progresso.');
-    if(totalMin>=300)tips.push('⏱️ Hai già parlato per '+totalMin+' minuti totali. Ogni minuto conta!');
-    if(allSessions.length>=20)tips.push('📈 Con '+allSessions.length+' sessioni, sei nella top 10% degli utenti per costanza.');
-    tips.push('💡 Alterna sessioni caption e traduzione per bilanciare ascolto e produzione.');
-    tips.push('🧠 Rivedi i tuoi report AI entro 24 ore per fissare gli apprendimenti.');
-  }
-  var tipEl=document.getElementById('rpTips');if(tipEl)tipEl.textContent=tips[Math.floor(Math.random()*tips.length)];
-  // Expanded word of the day — 30 words across categories
+  // Word of the day — 30 words across categories
   var words=[{w:'Resilienza',pos:'sostantivo',def:'Capacità di adattarsi e superare le difficoltà.'},{w:'Fluente',pos:'aggettivo',def:'Che si esprime con naturalezza e senza esitazioni.'},{w:'Sfumatura',pos:'sostantivo',def:'Differenza sottile di significato o colore.'},{w:'Immersione',pos:'sostantivo',def:'Esposizione totale a una lingua o ambiente.'},{w:'Progresso',pos:'sostantivo',def:'Avanzamento graduale verso un obiettivo.'},{w:'Eloquente',pos:'aggettivo',def:'Che sa esprimersi con chiarezza ed efficacia.'},{w:'Perseveranza',pos:'sostantivo',def:'Costanza e determinazione nel perseguire un fine.'},{w:'Idoneo',pos:'aggettivo',def:'Adatto, appropriato a un determinato scopo.'},{w:'Acquisire',pos:'verbo',def:'Ottenere, apprendere gradualmente una competenza.'},{w:'Sintesi',pos:'sostantivo',def:'Riassunto che coglie gli elementi essenziali.'},{w:'Arguto',pos:'aggettivo',def:'Acuto, intelligente, che coglie al volo.'},{w:'Empatia',pos:'sostantivo',def:'Capacità di comprendere i sentimenti altrui.'},{w:'Conciso',pos:'aggettivo',def:'Breve ma completo, che va al punto.'},{w:'Intuito',pos:'sostantivo',def:'Comprensione immediata senza ragionamento.'},{w:'Versatile',pos:'aggettivo',def:'Adattabile a diversi contesti o usi.'},{w:'Dedizione',pos:'sostantivo',def:'Impegno costante e appassionato.'},{w:'Pragmatico',pos:'aggettivo',def:'Concreto, orientato ai fatti e ai risultati.'},{w:'Ingegno',pos:'sostantivo',def:'Creatività e intelligenza nel risolvere problemi.'},{w:'Inequivocabile',pos:'aggettivo',def:'Che non lascia dubbi, chiarissimo.'},{w:'Audacia',pos:'sostantivo',def:'Coraggio e intraprendenza.'},{w:'Meticoloso',pos:'aggettivo',def:'Preciso, attento a ogni dettaglio.'},{w:'Lungimiranza',pos:'sostantivo',def:'Capacità di vedere lontano, di anticipare.'},{w:'Solerte',pos:'aggettivo',def:'Attivo, diligente, che si impegna con cura.'},{w:'Acume',pos:'sostantivo',def:'Acutezza di mente, perspicacia.'},{w:'Ibrido',pos:'aggettivo',def:'Combinazione di elementi diversi.'},{w:'Epifania',pos:'sostantivo',def:'Improvvisa rivelazione o comprensione.'},{w:'Radicato',pos:'aggettivo',def:'Profondamente stabilito, consolidato.'},{w:'Retorica',pos:'sostantivo',def:'Arte del parlare in modo persuasivo.'},{w:'Effimero',pos:'aggettivo',def:'Di breve durata, passeggero.'},{w:'Caleidoscopio',pos:'sostantivo',def:'Varietà di elementi in continua evoluzione.'}];
   var dayIdx=new Date().getDate()%words.length;
   var wotd=words[dayIdx];
@@ -2360,15 +2332,12 @@ function loadRightPanel(userId){
   var totalMin2=allSessions.reduce(function(s,x){return s+(x.duration_seconds||0)},0)/60;
   var statsEl=document.getElementById('rpStats');if(statsEl)statsEl.innerHTML='<div>🗣️ <strong>'+(totalMin2<60?Math.round(totalMin2)+' min':(totalMin2/60).toFixed(1)+' ore')+'</strong> parlato</div><div>📄 <strong>'+allSessions.length+'</strong> sessioni</div><div>🔥 Streak: <strong>'+((document.getElementById('streakDays')||{}).textContent||'0')+'</strong> giorni</div>';
   var refUrl='buoninglese.github.io/sottotitoli/?ref='+(userId||'').substring(0,8);
-  if(document.getElementById('refLink'))document.getElementById('refLink').textContent=refUrl;
   if(document.getElementById('refLinkPanel'))document.getElementById('refLinkPanel').textContent=refUrl;
 }
 
 // ═══ CEFR CHIPS ═══
 document.querySelectorAll('.cefr-chips').forEach(function(row){row.querySelectorAll('.cefr-chip').forEach(function(b){b.addEventListener('click',function(){row.querySelectorAll('.cefr-chip').forEach(function(x){x.classList.remove('active')});b.classList.add('active')})})});
 
-// ═══ TOGGLES ═══
-['prefWeeklyReports','prefAITips','prefDarkMode'].forEach(function(id){var el=document.getElementById(id);if(el)el.addEventListener('click',function(){el.classList.toggle('on')})});
 
 // ═══ QUESTIONNAIRE ═══
 document.querySelectorAll('.q-chip').forEach(function(c){
@@ -2386,26 +2355,6 @@ if(saveGoalsBtn2){saveGoalsBtn2.addEventListener('click',function(){
   localStorage.setItem('sottotitoli_goals_v2',JSON.stringify(goals));
   var msg=document.getElementById('goalsSavedMsg2');if(msg){msg.style.display='block';setTimeout(function(){msg.style.display='none'},2500)}
   syncGoalsToTab();
-})}
-
-// ═══ SAVE PREFERENCES ═══
-var saveBtn=document.getElementById('saveAllBtn'),savedMsg=document.getElementById('savedMsg');
-if(saveBtn){saveBtn.addEventListener('click',async function(){
-  saveBtn.disabled=true;saveBtn.textContent='Salvataggio…';
-  var supabase=window.sottotitoliSupabase;
-  var reportLang=document.getElementById('prefReportLang')?.value||'it';
-  var nativeLang=(document.getElementById('profNative')||{}).value||'en';
-  var prefs={native_lang:nativeLang,sessions_per_week:parseInt((document.getElementById('prefSessionsPerWeek')||{}).value)||4,weekly_reports:document.getElementById('prefWeeklyReports').classList.contains('on'),ai_tips:document.getElementById('prefAITips').classList.contains('on'),dark_mode:document.getElementById('prefDarkMode').classList.contains('on'),report_language:reportLang};
-  // Also save goals from the new Obiettivi tab inputs if present
-  var goalsMinutes=parseInt((document.getElementById('targetMinutes2')||{}).value)||120;
-  var goalsSessions=parseInt((document.getElementById('targetSessions2')||{}).value)||5;
-  var goalsWords=parseInt((document.getElementById('targetWords2')||{}).value)||200;
-  localStorage.setItem('sottotitoli_goals_v2',JSON.stringify({minutes:goalsMinutes,sessions:goalsSessions,words:goalsWords}));
-  if(supabase&&window.saveUserPreferences){var ok=await window.saveUserPreferences(prefs);if(savedMsg){savedMsg.textContent=ok?'✓ Salvato':'Errore';savedMsg.style.display='inline'}}
-  if(supabase){var r2=await supabase.auth.getSession();if(r2.data?.session){supabase.from('profiles').upsert({id:r2.data.session.user.id,native_lang:nativeLang,updated_at:new Date().toISOString()}).then(function(){})}}
-  else{localStorage.setItem('sottotitoli_prefs',JSON.stringify(prefs));if(savedMsg){savedMsg.textContent='✓ Salvato localmente';savedMsg.style.display='inline'}}
-  saveBtn.textContent='💾 Salva preferenze';saveBtn.disabled=false;setTimeout(function(){if(savedMsg)savedMsg.style.display='none'},2500);
-  loadProgress();
 })}
 
 // ═══ EXPORT ═══
@@ -2431,64 +2380,6 @@ function downloadSessionsCsv(){
   var a=document.createElement('a');a.href=URL.createObjectURL(blob);
   a.download='sottotitoli-sessions.csv';a.click();
 }
-document.getElementById('exportCsvBtn')?.addEventListener('click',function(){downloadSessionsCsv()});
-document.getElementById('exportJsonBtn')?.addEventListener('click',function(){var json=JSON.stringify(allSessions.map(function(s){return{date:s.started_at,mode:s.mode,duration:s.duration_seconds,words:s.words_count,wpm:s.wpm,quality:s.quality_score}}),null,2);var blob=new Blob([json],{type:'application/json'});var a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='sottotitoli-data.json';a.click()});
-
-// ═══ DANGER ZONE ═══
-document.getElementById('deleteSessionsBtn')?.addEventListener('click',async function(){
-  if(!confirm('Cancellare TUTTE le tue sessioni? Questa azione è irreversibile.'))return;
-  if(!confirm('Sei sicuro? Tutte le trascrizioni e i dati delle sessioni saranno eliminati.'))return;
-  var supabase=window.sottotitoliSupabase;
-  if(supabase){
-    var r=await supabase.auth.getSession();
-    if(r.data?.session){
-      var {error}=await supabase.from('sessions').delete().eq('user_id',r.data.session.user.id);
-      if(error){alert('Errore: '+error.message);return}
-    }
-  }
-  allSessions=[];
-  localStorage.removeItem('sottotitoli_favorites');
-  favorites=[];
-  alert('✓ Tutte le sessioni sono state eliminate.');
-  location.reload();
-});
-document.getElementById('resetProgressBtn')?.addEventListener('click',async function(){
-  if(!confirm('Resettare tutti i progressi? Goals, streak e preferenze saranno azzerati.'))return;
-  localStorage.removeItem('sottotitoli_goals');
-  localStorage.removeItem('sottotitoli_target_langs');
-  localStorage.removeItem('sottotitoli_streak_record');
-  localStorage.removeItem('sottotitoli_favorites');
-  localStorage.removeItem('sottotitoli_report_types');
-  localStorage.removeItem('sottotitoli_prefs');
-  var supabase=window.sottotitoliSupabase;
-  if(supabase){
-    var r=await supabase.auth.getSession();
-    if(r.data?.session){
-      await supabase.from('profiles').update({native_lang:null,location:null,updated_at:new Date().toISOString()}).eq('id',r.data.session.user.id);
-    }
-  }
-  alert('✓ Progressi resettati.');
-  location.reload();
-});
-document.getElementById('deleteAccountBtn')?.addEventListener('click',async function(){
-  if(!confirm('⚠️ Eliminare DEFINITIVAMENTE il tuo account? Tutti i dati andranno persi.'))return;
-  if(!confirm('Ultimo avviso: questa azione è irreversibile. Continuare?'))return;
-  var supabase=window.sottotitoliSupabase;
-  if(supabase){
-    var r=await supabase.auth.getSession();
-    if(r.data?.session){
-      var userId=r.data.session.user.id;
-      await supabase.from('sessions').delete().eq('user_id',userId);
-      await supabase.from('session_ai_reports').delete().eq('user_id',userId);
-      await supabase.from('profiles').delete().eq('id',userId);
-      await supabase.from('user_credits').delete().eq('user_id',userId);
-      await supabase.auth.signOut();
-    }
-  }
-  alert('Account eliminato. Verrai reindirizzato alla home.');
-  location.href='index.html';
-});
-
 
 // ═══ Panoramica Boxes — KPI-style grid ═══
 (function(){
