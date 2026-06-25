@@ -130,20 +130,20 @@ document.addEventListener('DOMContentLoaded', async () => {
               <div class="ud-email">${user?.email || ''}</div>
             </div>
           </div>
-          <a href="index.html" class="ud-link">🏠 Home</a>
-          <a href="start.html" class="ud-link">🚀 Start</a>
-          <a href="account.html" class="ud-link">👤 Profilo</a>
-          <a href="analysis.html" class="ud-link">📊 AI Reports</a>
+          <a href="index.html" class="ud-link">Home</a>
+          <a href="start.html" class="ud-link">Start</a>
+          <a href="account.html" class="ud-link">Profilo</a>
+          <a href="analysis.html" class="ud-link">AI Reports</a>
           <hr class="ud-divider">
           <div class="ud-credits-section">
             <div class="ud-credit-row"><span>Minuti</span><span id="udMinutes">—</span></div>
             <div class="ud-credit-row"><span>Crediti report</span><span id="udTokens">—</span></div>
           </div>
           <hr class="ud-divider">
-          <a href="purchase.html" class="ud-link">💳 Acquista crediti</a>
+          <a href="purchase.html" class="ud-link">Acquista crediti</a>
           <hr class="ud-divider">
-          <a href="account.html#cs-profile" class="ud-link">⚙️ Impostazioni</a>
-          <button class="ud-link danger" id="udLogoutBtn">🚪 Esci</button>
+          <a href="account.html#cs-profile" class="ud-link">Impostazioni</a>
+          <button class="ud-link danger" id="udLogoutBtn">Esci</button>
         </div>
       </div>
     `;
