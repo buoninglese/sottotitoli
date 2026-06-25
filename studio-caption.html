@@ -771,9 +771,12 @@ function setCaptionLanguage(code, name, skipConfirm) {
   });
   // Update placeholder text to selected language
   updateCaptionPlaceholders(code);
-  // Update speech recognition language if active
-  if (_realMic && _realMic.recognition) {
-    _realMic.recognition.lang = code;
+  // Update speech recognition language
+  if (_realMic) {
+    _realMic.lang = code;
+    if (_realMic.recognition) {
+      _realMic.recognition.lang = code;
+    }
   }
   // Create room in Supabase
   _createCaptionRoom(code);
@@ -1913,7 +1916,7 @@ function downloadGrammarPDF() {
   h += '.ring{text-align:center;padding:10px}.ring .label{font-size:10px;font-weight:600;margin-top:4px}.ring .sub{font-size:7px;color:#999}';
   h += '.footer{text-align:center;font-size:9px;color:#bbb;margin-top:30px;border-top:1px solid #eee;padding-top:15px}';
   h += '@media print{body{padding:20px}}</style></head><body>';
-  h += '<h1>📋 Grammar Report</h1><h2>Sottotitoli · Session ' + report.date + '</h2>';
+  h += '<h1>📋 Grammar Report</h1><h2>Sottotitoli · Session ' + report.date + ' · ' + (report.language||'English') + '</h2>';
   h += '<div class="summary">';
   h += '<div class="summary-box"><div class="val">' + totalWords + '</div><div class="lbl">Total Words</div></div>';
   h += '<div class="summary-box"><div class="val">' + min + 'm ' + sec + 's</div><div class="lbl">Time Spoken</div></div>';
@@ -2924,7 +2927,10 @@ function downloadGrammarPDF() {
 
       var R=38;var circ=2*Math.PI*R;
       h+='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;flex-wrap:wrap;gap:6px">';
+      var gramLangNames={'en-US':'English','it-IT':'Italiano','fr-FR':'Français','de-DE':'Deutsch','es-ES':'Español','pt-PT':'Português','nl-NL':'Nederlands'};
+      var gramLang=gramLangNames[currentCaptionLang]||currentCaptionLang||'English';
       h+='<div class="ec-title" style="margin:0;font-size:11px">📋 37 · Grammar Rings <span class="ec-badge" style="background:rgba(52,211,153,.15);color:#34d399">LIVE</span></div>';
+      h+='<div style="font-size:8px;color:var(--muted2);margin-top:2px">Analysis for: '+gramLang+'</div>';
       h+='<button onclick="downloadGrammarPDF()" style="padding:5px 14px;border-radius:6px;border:1px solid rgba(251,191,36,.2);background:rgba(251,191,36,.08);color:#fbbf24;cursor:pointer;font-size:10px;font-weight:600;font-family:inherit" title="Download session grammar report as PDF">📥 Download PDF</button>';
       h+='</div>';
       h+='<div style="display:grid;grid-template-columns:repeat(5,1fr);gap:10px">';
@@ -2946,7 +2952,7 @@ function downloadGrammarPDF() {
       h+='</div>';
 
       // Store for PDF
-      window._grammarReport={rings:ringData,totalWords:totalWords,totalTime:m.sec,wpm:m.wpm,date:new Date().toLocaleDateString('it-IT'),text:text};
+      window._grammarReport={rings:ringData,totalWords:totalWords,totalTime:m.sec,wpm:m.wpm,date:new Date().toLocaleDateString('it-IT'),text:text,language:gramLang};
 
       cb(h);
     },

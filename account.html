@@ -453,6 +453,7 @@ table,pre,code{max-width:100%;overflow-x:auto}
   <div class="ni" data-tab="vocabulary"><span class="ns">Voc</span><span class="nl">Vocabolario</span></div>
   <div class="ni" data-tab="grammar"><span class="ns">Gra</span><span class="nl">Grammatica</span></div>
   <div class="ni" data-tab="speaking"><span class="ns">Spk</span><span class="nl">Speaking</span></div>
+  <div class="ni" data-tab="wordbanks"><span class="ns">Wbk</span><span class="nl">Word Banks</span><span class="nb c" id="wordbankBadge">0</span></div>
   <div class="sidebar-div"></div>
   <div class="sidebar-st">Dati</div>
   <div class="ni" data-tab="transcripts"><span class="ns">Tra</span><span class="nl">Trascrizioni</span><span class="nb c" id="transcriptBadge">0</span></div>
@@ -891,6 +892,23 @@ table,pre,code{max-width:100%;overflow-x:auto}
       </div>
     </div>
 
+    <!-- ═══ WORD BANKS ═══ -->
+    <div class="cs" id="cs-wordbanks">
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <div class="card card-sm">
+          <div class="card-h3">📚 My Word Banks <span style="font-weight:400;font-size:11px;color:var(--t3)">· vocabulary by language</span></div>
+          <div id="wordbanksGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px">
+            <div style="text-align:center;color:var(--t3);font-size:12px;padding:12px;grid-column:1/-1">Loading word banks…</div>
+          </div>
+        </div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap">
+          <div class="card card-sm" style="flex:1;min-width:180px;opacity:.55"><div class="card-h3">📥 Export All</div><div style="text-align:center;color:var(--t3);font-size:11px;padding:20px">Scarica tutte le tue parole</div></div>
+          <div class="card card-sm" style="flex:1;min-width:180px;opacity:.55"><div class="card-h3">🔄 Sync</div><div style="text-align:center;color:var(--t3);font-size:11px;padding:20px">Sincronizza con il cloud</div></div>
+          <div class="card card-sm" style="flex:1;min-width:180px;opacity:.55"><div class="card-h3">🎯 Practice</div><div style="text-align:center;color:var(--t3);font-size:11px;padding:20px">Quiz con le tue parole salvate</div></div>
+        </div>
+      </div>
+    </div>
+
     <!-- ═══ IA REPORT ═══ -->
     <div class="cs" id="cs-ia-report">
       <div style="display:flex;flex-direction:column;gap:10px">
@@ -965,6 +983,7 @@ document.querySelectorAll('.ni[data-tab]').forEach(function(t){
     if(tab==='speaking')loadSpeakingTab();
     if(tab==='trend')loadViaggioTab();
     if(tab==='goals')syncGoalsToTab();
+    if(tab==='wordbanks')loadWordBanksTab();
   });
 });
 
@@ -2669,6 +2688,80 @@ setTimeout(function(){
   }
 }, 150);
 
+
+
+// ═══ WORD BANKS TAB ═══
+function loadWordBanksTab(){
+  var grid = document.getElementById('wordbanksGrid');
+  if(!grid) return;
+  
+  var languages = [
+    {code:'en-US', name:'English', flag:'🇬🇧', color:'#60a5fa'},
+    {code:'it-IT', name:'Italiano', flag:'🇮🇹', color:'#34d399'},
+    {code:'fr-FR', name:'Français', flag:'🇫🇷', color:'#3b82f6'},
+    {code:'de-DE', name:'Deutsch', flag:'🇩🇪', color:'#fbbf24'},
+    {code:'es-ES', name:'Español', flag:'🇪🇸', color:'#f97316'},
+    {code:'pt-PT', name:'Português', flag:'🇵🇹', color:'#22d3ee'},
+    {code:'nl-NL', name:'Nederlands', flag:'🇳🇱', color:'#f472b6'}
+  ];
+  
+  var totalWords = 0;
+  var html = '';
+  
+  languages.forEach(function(lang){
+    var key = 'sottotitoli_wordbank_' + lang.code;
+    var bank = [];
+    try {
+      var raw = localStorage.getItem(key);
+      if(raw) bank = JSON.parse(raw);
+    } catch(e) { bank = []; }
+    
+    totalWords += bank.length;
+    
+    if(bank.length === 0){
+      html += '<div class="card card-sm" style="opacity:.45;text-align:center">';
+      html += '<div class="card-h3">'+lang.flag+' '+lang.name+'</div>';
+      html += '<div style="color:var(--t3);font-size:11px;padding:16px 8px;font-style:italic">Start adding words to your Word Bank to see them here.</div>';
+      html += '<div style="font-size:9px;color:var(--t3);margin-top:4px">Use the 📚 Word Bank panel during a caption session</div>';
+      html += '</div>';
+    } else {
+      html += '<div class="card card-sm">';
+      html += '<div class="card-h3">'+lang.flag+' '+lang.name+' <span style="font-weight:400;font-size:10px;color:var(--t3);margin-left:auto">'+bank.length+' words</span></div>';
+      html += '<div style="display:flex;flex-wrap:wrap;gap:4px;max-height:140px;overflow-y:auto;padding:4px 0">';
+      bank.forEach(function(w){
+        html += '<span style="display:inline-block;padding:3px 10px;border-radius:100px;font-size:10px;font-weight:500;background:rgba(167,139,250,.08);color:var(--accent);border:1px solid rgba(167,139,250,.15)">'+w+'</span>';
+      });
+      html += '</div>';
+      html += '<div style="font-size:9px;color:var(--t3);margin-top:6px;text-align:right;cursor:pointer" onclick="if(confirm('Clear all '+lang.name+' words?')){localStorage.removeItem(''+key+'');loadWordBanksTab();}">🗑 Clear</div>';
+      html += '</div>';
+    }
+  });
+  
+  grid.innerHTML = html;
+  
+  // Update badge
+  var badge = document.getElementById('wordbankBadge');
+  if(badge) {
+    badge.textContent = totalWords;
+    badge.style.display = totalWords > 0 ? '' : 'none';
+  }
+}
+
+// Load word banks badge on page load
+(function(){
+  var total = 0;
+  ['en-US','it-IT','fr-FR','de-DE','es-ES','pt-PT','nl-NL'].forEach(function(code){
+    try {
+      var raw = localStorage.getItem('sottotitoli_wordbank_' + code);
+      if(raw) total += JSON.parse(raw).length;
+    } catch(e) {}
+  });
+  var badge = document.getElementById('wordbankBadge');
+  if(badge) {
+    badge.textContent = total;
+    badge.style.display = total > 0 ? '' : 'none';
+  }
+})();
 
 </script>
 
