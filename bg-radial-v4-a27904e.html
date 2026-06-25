@@ -117,15 +117,6 @@ body.dark .btn:hover{background:rgba(255,255,255,.06);color:#fff;border-color:rg
       </select>
     </div>
   </div>
-  <!-- Flow Behavior (for Flow Field mode) -->
-  <div class="btn-row" style="margin-top:2px" id="flowBehaviorRow">
-    <div style="background:rgba(15,18,30,.85);border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:6px 10px;display:flex;align-items:center;gap:6px;flex-wrap:wrap;justify-content:center">
-      <span style="font-size:9px;opacity:.4">🌊 Flow</span>
-      <select id="flowBehavSel" onchange="setFlowBehavior(this.value)" style="font-size:9px;padding:2px 4px;border-radius:6px;border:1px solid rgba(255,255,255,.1);background:rgba(255,255,255,.04);color:inherit;font-family:inherit;cursor:pointer">
-        <option value="flow">flow</option><option value="vortex">vortex</option><option value="rise">rise</option><option value="explode">explode</option><option value="orbit">orbit</option><option value="grid">grid</option><option value="swarm">swarm</option><option value="rain">rain</option><option value="pulse">pulse</option><option value="chaos">chaos</option>
-      </select>
-    </div>
-  </div>
   <div class="btn-row">
     <button class="btn" id="btnMic" onclick="toggleMic()">🎤 Start Mic</button>
     <button class="btn" id="btnFile" onclick="openAudioFile()">📄 Open Audio</button>
@@ -163,7 +154,6 @@ var canvas,ctx,W,H,t=0,animFrame=null,currentMode=0;
 var fx={decay:0.90, power:2.5, floor:0.25, zoom:1};
 // ─── Particle Settings ───
 var ptcl={size:3, shape:'circle', behavior:'static'};
-var flowBehavior='flow'; // flow field particle behavior
 function setFXDecay(val){
   fx.decay=parseFloat(val);
   if(analyser)analyser.smoothingTimeConstant=fx.decay;
@@ -191,7 +181,6 @@ function setPtclSize(val){
 }
 function setPtclShape(val){ptcl.shape=val}
 function setPtclBehavior(val){ptcl.behavior=val}
-function setFlowBehavior(val){flowBehavior=val}
 
 function updateSensitivity(val){
   sensitivity=parseFloat(val);
@@ -534,136 +523,75 @@ function drawRadial(ctx,v,isDark,params,colorMul){
 }
 
 // ══════════════════════════════════════
-// MODE 1 — Plasma (organic lava blobs)
+// MODE 2 — iTunes Bars (mirror freq bars, color cycling, peak particles)
 // ══════════════════════════════════════
-var plasmaNodes=[];
-function initPlasma(){plasmaNodes=[];for(var i=0;i<12;i++)plasmaNodes.push({x:Math.random()*W,y:Math.random()*H,r:30+Math.random()*60,vx:0,vy:0})}
-function drawPlasma(ctx,v,isDark){
-  if(!plasmaNodes.length)initPlasma();
-  ctx.fillStyle=isDark?'rgba(6,6,20,0.2)':'rgba(250,250,248,0.18)';ctx.fillRect(0,0,W,H);
-  var sv=Math.pow(v,0.5);
-  for(var i=0;i<plasmaNodes.length;i++){
-    var n=plasmaNodes[i];
-    n.vx+=(Math.random()-0.5)*0.5;n.vy+=(Math.random()-0.5)*0.5;
-    n.vx*=0.95;n.vy*=0.95;
-    n.x+=n.vx*sv*2;n.y+=n.vy*sv*2;
-    if(n.x<0)n.x=W;if(n.x>W)n.x=0;if(n.y<0)n.y=H;if(n.y>H)n.y=0;
-    var hue=(voiceHue+t/50+i*30)%360;
-    var r=n.r*(0.7+sv*0.6)*(0.8+voiceBass*1.5);
-    var grad=ctx.createRadialGradient(n.x,n.y,0,n.x,n.y,r);
-    grad.addColorStop(0,c(hue,80,80,0.35+sv*0.3));
-    grad.addColorStop(0.5,c(hue,60,60,0.15+sv*0.15));
-    grad.addColorStop(1,'rgba(0,0,0,0)');
-    ctx.fillStyle=grad;ctx.fillRect(n.x-r,n.y-r,r*2,r*2);
+var iTunesParticles=[];
+function drawITunesBars(ctx,v,isDark){
+  var hue=(t/30+voiceHue)%360,sat=70;
+  var n=Math.floor(60+voiceBass*40),gap=3,w=(W-gap*(n+1))/n;
+  var sv=Math.pow(v,0.6);
+  // Dark background with subtle vignette
+  var bgGrad=ctx.createRadialGradient(W/2,H/2,0,W/2,H/2,Math.max(W,H)*0.7);
+  bgGrad.addColorStop(0,isDark?'rgba(6,6,20,0)':'rgba(250,250,248,0)');
+  bgGrad.addColorStop(1,isDark?'rgba(6,6,20,0.3)':'rgba(250,250,248,0.15)');
+  ctx.fillStyle=bgGrad;ctx.fillRect(0,0,W,H);
+  // Center reference line
+  ctx.strokeStyle=isDark?'rgba(255,255,255,0.04)':'rgba(0,0,0,0.04)';
+  ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(0,H/2);ctx.lineTo(W,H/2);ctx.stroke();
+  // Track bar peaks for particles
+  var peaks=[];
+  for(var i=0;i<n;i++){
+    var fi=0.15;
+    if(freqData&&micOn){fi=freqData[Math.floor(i*freqData.length/n)]/255}
+    else{fi=0.12+Math.sin(i*0.4+t/1000)*0.25+0.1}
+    if(fi<0.03)fi=0.03;
+    var hgt=fi*H*0.44*fx.zoom;
+    var x=gap+i*(w+gap);
+    var barHue=(hue+i*360/n+t/500)%360;
+    // Top bar (up from center)
+    var gTop=ctx.createLinearGradient(x,H/2,x,H/2-hgt);
+    gTop.addColorStop(0,c(barHue,sat,75,0.02+sv*0.03));
+    gTop.addColorStop(0.3,c(barHue,sat,80,0.25+sv*0.35));
+    gTop.addColorStop(1,c(barHue+30,80,90,0.7+sv*0.3));
+    ctx.fillStyle=gTop;ctx.fillRect(x,H/2,w,-hgt);
+    // Bottom bar (mirrored down)
+    var gBot=ctx.createLinearGradient(x,H/2,x,H/2+hgt);
+    gBot.addColorStop(0,c(barHue,sat,75,0.02+sv*0.03));
+    gBot.addColorStop(0.3,c(barHue,sat,80,0.25+sv*0.35));
+    gBot.addColorStop(1,c(barHue+30,80,90,0.7+sv*0.3));
+    ctx.fillStyle=gBot;ctx.fillRect(x,H/2,w,hgt);
+    // Bar cap glow
+    if(fi>0.15){
+      var capY=H/2-hgt,capH=Math.max(2,hgt*0.08);
+      ctx.fillStyle=c(barHue,90,95,0.8+sv*0.2);
+      ctx.fillRect(x,capY,w,capH);
+      ctx.fillRect(x,H/2+hgt-capH,w,capH);
+      peaks.push({x:x+w/2, y:capY, hue:barHue, fi:fi});
+    }
   }
-}
-// ══════════════════════════════════════
-// MODE 2 — Spiral Tunnel (rotating vortex)
-// ══════════════════════════════════════
-function drawSpiralTunnel(ctx,v,isDark){
-  ctx.fillStyle=isDark?'rgba(6,6,20,0.25)':'rgba(250,250,248,0.2)';ctx.fillRect(0,0,W,H);
-  var cx=W/2,cy=H/2,sv=Math.pow(v,0.5),maxR=Math.min(W,H)*0.55*fx.zoom;
-  var rings=20,rotSpeed=t/3000*(0.5+sv*2)*(0.5+voiceBass*2);
-  for(var r=0;r<rings;r++){
-    var ringR=maxR*(0.1+(r/rings)*0.9);
-    var hue=(t/40+r*15+voiceHue)%360;
-    var segments=Math.floor(40+r*5);
-    ctx.beginPath();
-    for(var s=0;s<=segments;s++){
-      var angle=(s/segments)*Math.PI*2+rotSpeed*(1+r*0.3)+Math.sin(t/1500+r)*0.3*sv;
-      var rr=ringR+Math.sin(angle*6+t/800+r)*15*sv;
-      var x=cx+Math.cos(angle)*rr,y=cy+Math.sin(angle)*rr;
-      if(s===0)ctx.moveTo(x,y);else ctx.lineTo(x,y);
-    }
-    ctx.closePath();
-    ctx.strokeStyle=c(hue,70,75,0.15+sv*0.2*(1-r/rings));
-    ctx.lineWidth=1+sv*2*(1-r/rings*0.5);ctx.stroke();
-  }
-}
-// ══════════════════════════════════════
-// MODE 3 — Waveform (raw audio signal scroll)
-// ══════════════════════════════════════
-function drawWaveform(ctx,v,isDark){
-  ctx.fillStyle=isDark?'rgba(6,6,20,0.35)':'rgba(250,250,248,0.3)';ctx.fillRect(0,0,W,H);
-  var sv=Math.pow(v,0.5);
-  // Draw scrolling waveform from frequency data
-  for(var row=0;row<5;row++){
-    var y=H*(0.15+row*0.18);
-    var hue=(t/40+row*50+voiceHue)%360;
-    ctx.beginPath();
-    for(var i=0;i<W;i+=2){
-      var fidx=Math.floor((i/W)*freqData.length);
-      var fi=freqData&&micOn?freqData[fidx%freqData.length]/255:0.1+Math.sin(i*0.02+t/800+row)*0.15;
-      var waveY=y+Math.sin(i*0.03+t/600+row*1.5)*fi*H*0.12*fx.zoom;
-      if(i===0)ctx.moveTo(i,waveY);else ctx.lineTo(i,waveY);
-    }
-    ctx.strokeStyle=c(hue,80,80,0.3+sv*0.4);
-    ctx.lineWidth=1.2+sv*1.5;ctx.stroke();
-    // Mirror
-    ctx.beginPath();
-    for(var i=0;i<W;i+=2){
-      var fidx=Math.floor((i/W)*freqData.length);
-      var fi=freqData&&micOn?freqData[fidx%freqData.length]/255:0.1+Math.sin(i*0.02+t/800+row)*0.15;
-      var waveY=H-y+Math.sin(i*0.03+t/600+row*1.5)*fi*H*0.12*fx.zoom;
-      if(i===0)ctx.moveTo(i,waveY);else ctx.lineTo(i,waveY);
-    }
-    ctx.strokeStyle=c(hue+30,60,75,0.2+sv*0.3);
-    ctx.lineWidth=0.8+sv;ctx.stroke();
-  }
-}
-// ══════════════════════════════════════
-// MODE 4 — Geometric (spinning morph shapes)
-// ══════════════════════════════════════
-function drawGeometric(ctx,v,isDark){
-  ctx.fillStyle=isDark?'rgba(6,6,20,0.3)':'rgba(250,250,248,0.25)';ctx.fillRect(0,0,W,H);
-  var cx=W/2,cy=H/2,sv=Math.pow(v,0.5),maxR=Math.min(W,H)*0.4*fx.zoom;
-  var shapes=5;
-  for(var s=0;s<shapes;s++){
-    var hue=(t/30+s*50+voiceHue)%360;
-    var sides=Math.floor(3+sv*5+voiceBass*4);
-    var rot=t/4000*(s+1)*0.5+sv*2;
-    var r=maxR*(0.4+s*0.12);
-    ctx.save();ctx.translate(cx,cy);ctx.rotate(rot);
-    ctx.beginPath();
-    for(var i=0;i<=sides;i++){
-      var angle=(i/sides)*Math.PI*2-Math.PI/2;
-      var rr=r*(0.8+0.2*Math.sin(angle*3+t/600+s));
-      var x=Math.cos(angle)*rr,y=Math.sin(angle)*rr;
-      if(i===0)ctx.moveTo(x,y);else ctx.lineTo(x,y);
-    }
-    ctx.closePath();
-    ctx.strokeStyle=c(hue,75,80,0.2+sv*0.4*(1-s/shapes*0.5));
-    ctx.lineWidth=1.5+sv*2;ctx.stroke();
-    ctx.restore();
-  }
-}
-// ══════════════════════════════════════
-// MODE 5 — Starfield (hyperspace fly-through)
-// ══════════════════════════════════════
-var stars=[];
-function initStars(){stars=[];for(var i=0;i<200;i++)stars.push({x:(Math.random()-0.5)*W*2,y:(Math.random()-0.5)*H*2,z:Math.random()*500+10})}
-function drawStarfield(ctx,v,isDark){
-  if(!stars.length)initStars();
-  ctx.fillStyle=isDark?'rgba(6,6,20,0.25)':'rgba(250,250,248,0.2)';ctx.fillRect(0,0,W,H);
-  var sv=Math.pow(v,0.5),cx=W/2,cy=H/2;
-  var speed=2+sv*15+voiceBass*10;
-  for(var i=0;i<stars.length;i++){
-    var st=stars[i];
-    st.z-=speed;
-    if(st.z<1){st.x=(Math.random()-0.5)*W*2;st.y=(Math.random()-0.5)*H*2;st.z=500}
-    var sx=cx+st.x/(st.z*0.01),sy=cy+st.y/(st.z*0.01);
-    if(sx<0||sx>W||sy<0||sy>H)continue;
-    var hue=(t/30+st.z*0.5+voiceHue)%360;
-    var alpha=Math.min(1,(500-st.z)/500);
-    var sz=Math.max(0.5,3*alpha*ptcl.size);
-    ctx.beginPath();ctx.arc(sx,sy,sz,0,Math.PI*2);
-    ctx.fillStyle=c(hue,60,90,alpha*0.7);ctx.fill();
-    // Speed trail
-    if(st.z<200&&sv>0.3){
-      ctx.beginPath();ctx.moveTo(sx,sy);
-      ctx.lineTo(sx-st.x*0.02,sy-st.y*0.02);
-      ctx.strokeStyle=c(hue,80,95,alpha*0.3);ctx.lineWidth=sz*0.5;ctx.stroke();
-    }
+  // Draw peak particles
+  for(var p=0;p<peaks.length;p++){
+    var pk=peaks[p];
+    var pr=2+pk.fi*8*ptcl.size;
+    var alpha=0.5+pk.fi*0.5;
+    // Glow
+    var glow=ctx.createRadialGradient(pk.x,pk.y,0,pk.x,pk.y,pr*2);
+    glow.addColorStop(0,c(pk.hue,90,95,alpha*0.6));
+    glow.addColorStop(1,'rgba(0,0,0,0)');
+    ctx.fillStyle=glow;ctx.fillRect(pk.x-pr*2,pk.y-pr*2,pr*4,pr*4);
+    // Core dot
+    ctx.beginPath();ctx.arc(pk.x,pk.y,pr*0.6,0,Math.PI*2);
+    ctx.fillStyle=c(pk.hue,100,98,alpha);
+    ctx.fill();
+    // Mirror below
+    var my=H-pk.y;
+    var glow2=ctx.createRadialGradient(pk.x,my,0,pk.x,my,pr*2);
+    glow2.addColorStop(0,c(pk.hue+30,90,95,alpha*0.6));
+    glow2.addColorStop(1,'rgba(0,0,0,0)');
+    ctx.fillStyle=glow2;ctx.fillRect(pk.x-pr*2,my-pr*2,pr*4,pr*4);
+    ctx.beginPath();ctx.arc(pk.x,my,pr*0.6,0,Math.PI*2);
+    ctx.fillStyle=c(pk.hue+30,100,98,alpha);
+    ctx.fill();
   }
 }
 
@@ -695,37 +623,40 @@ function drawFlowField(ctx,v,isDark){
   var hueShift=t/100;
   for(var i=0;i<flowParticles.length;i++){
     var fp=flowParticles[i];
+    // Flow field behavior: particles follow sine wave patterns modulated by frequency
     var freqIdx=Math.floor((fp.x/W)*freqData.length);
     var fq=freqData&&micOn?freqData[Math.min(freqIdx,freqData.length-1)]/255:0.15;
-    var angle, force=0.1*fq*flowSpeed;
-    // ── 10 Flow Behaviors ──
-    switch(flowBehavior){
-      case'flow':angle=flowAngle+Math.sin(fp.x*0.005+t/2000)*2+Math.cos(fp.y*0.005+t/1500)*2;fp.vx+=Math.cos(angle)*force;fp.vy+=Math.sin(angle)*force;break;
-      case'vortex':var dx=fp.x-W/2,dy=fp.y-H/2,dist=Math.sqrt(dx*dx+dy*dy)+1;fp.vx+=-dy/dist*force*3-dx/dist*0.1;fp.vy+=dx/dist*force*3-dy/dist*0.1;break;
-      case'rise':fp.vy-=force*2;fp.vx+=(Math.sin(t/2000+fp.x*0.01))*force*0.5;break;
-      case'explode':var dx=fp.x-W/2,dy=fp.y-H/2,dist=Math.sqrt(dx*dx+dy*dy)+1;fp.vx+=dx/dist*force*2;fp.vy+=dy/dist*force*2;if(dist<20){fp.vx+=(Math.random()-0.5)*2;fp.vy+=(Math.random()-0.5)*2}break;
-      case'orbit':var ox=fp.x-W/2,oy=fp.y-H/2,od=Math.sqrt(ox*ox+oy*oy)+1;fp.vx+=-oy/od*force*2;fp.vy+=ox/od*force*2;fp.vx-=ox/od*0.02;fp.vy-=oy/od*0.02;break;
-      case'grid':var gx=Math.round(fp.x/40)*40,gy=Math.round(fp.y/40)*40;fp.vx+=(gx-fp.x)*0.01*force;fp.vy+=(gy-fp.y)*0.01*force;break;
-      case'swarm':if(i>0){var prev=flowParticles[i-1];fp.vx+=(prev.x-fp.x)*0.005;fp.vy+=(prev.y-fp.y)*0.005}fp.vx+=(Math.random()-0.5)*force;fp.vy+=(Math.random()-0.5)*force;break;
-      case'rain':fp.vy+=force*1.5;fp.vx+=Math.sin(t/1500+fp.x*0.01)*force*0.3;if(fp.y>H){fp.y=0;fp.x=Math.random()*W;fp.vy=0}break;
-      case'pulse':var px=fp.x-W/2,py=fp.y-H/2,pd=Math.sqrt(px*px+py*py)+1;fp.vx+=px/pd*force*Math.sin(t/500)*2;fp.vy+=py/pd*force*Math.sin(t/500)*2;break;
-      case'chaos':fp.vx+=(Math.random()-0.5)*force*3;fp.vy+=(Math.random()-0.5)*force*3;break;
-    }
+    var angle=flowAngle+Math.sin(fp.x*0.005+t/2000)*2+Math.cos(fp.y*0.005+t/1500)*2;
+    fp.vx+=Math.cos(angle)*0.1*fq*flowSpeed;
+    fp.vy+=Math.sin(angle)*0.1*fq*flowSpeed;
+    // Damping
     fp.vx*=0.96;fp.vy*=0.96;
     fp.x+=fp.vx;fp.y+=fp.vy;
+    // Wrap around
     if(fp.x<0)fp.x=W;if(fp.x>W)fp.x=0;
     if(fp.y<0)fp.y=H;if(fp.y>H)fp.y=0;
+    // Color from position + frequency
     var ph=(fp.hue+hueShift+fp.x*0.3+fp.y*0.2+fq*60)%360;
     var alpha=0.15+sv*0.25+fq*0.3;
     var sz=fp.size*(0.6+fq*0.8)*ptcl.size;
+    // Draw particle
     ctx.beginPath();ctx.arc(fp.x,fp.y,sz,0,Math.PI*2);
-    ctx.fillStyle=c(ph,70,75,alpha);ctx.fill();
+    ctx.fillStyle=c(ph,70,75,alpha);
+    ctx.fill();
+    // Occasionally draw connecting line to nearby particle
     if(i%3===0&&i+1<flowParticles.length){
       var np=flowParticles[i+1];
       var dx=np.x-fp.x,dy=np.y-fp.y,dist=Math.sqrt(dx*dx+dy*dy);
-      if(dist<60){ctx.beginPath();ctx.moveTo(fp.x,fp.y);ctx.lineTo(np.x,np.y);ctx.strokeStyle=c(ph,50,70,alpha*0.3);ctx.lineWidth=0.5;ctx.stroke()}
+      if(dist<60){
+        ctx.beginPath();ctx.moveTo(fp.x,fp.y);ctx.lineTo(np.x,np.y);
+        ctx.strokeStyle=c(ph,50,70,alpha*0.3);
+        ctx.lineWidth=0.5;ctx.stroke();
+      }
     }
-    if(fq>0.4&&Math.random()<0.05){fp.vx+=(Math.random()-0.5)*2;fp.vy+=(Math.random()-0.5)*2}
+    // Pulse based on beat
+    if(fq>0.4&&Math.random()<0.05){
+      fp.vx+=(Math.random()-0.5)*2;fp.vy+=(Math.random()-0.5)*2;
+    }
   }
 }
 
@@ -745,15 +676,9 @@ function animate(ts){
 
   var isDark=document.body.classList.contains('dark');
   ctx.clearRect(0,0,W,H);
-  switch(currentMode){
-    case 0:drawRadial(ctx,v,isDark,variations[0],1);break;
-    case 1:drawPlasma(ctx,v,isDark);break;
-    case 2:drawSpiralTunnel(ctx,v,isDark);break;
-    case 3:drawWaveform(ctx,v,isDark);break;
-    case 4:drawGeometric(ctx,v,isDark);break;
-    case 5:drawStarfield(ctx,v,isDark);break;
-    case 6:drawFlowField(ctx,v,isDark);break;
-  }
+  if(currentMode===0)drawRadial(ctx,v,isDark,variations[0],1);
+  else if(currentMode===1)drawITunesBars(ctx,v,isDark);
+  else drawFlowField(ctx,v,isDark);
 
   var displayV=Math.min(1,v*2.5*sensitivity);
   document.getElementById('meterFill').style.width=(displayV*100)+'%';
@@ -774,11 +699,10 @@ function setTheme(t){
   document.getElementById('btnLight').className='btn'+(t==='light'?' on':'');
   document.getElementById('titleText').style.color=t==='dark'?'#e8eaed':'#1a1a1a';
 }
-var modeNames=['Thick Punchy','Plasma','Spiral Tunnel','Waveform','Geometric','Starfield','Flow Field'];
-var modeDescs=['Radial bars · instant response','Organic lava blobs · bass-driven','Rotating tunnel · hypnotic','Raw waveform scroll · live signal','Spinning morph shapes · symmetric','Hyperspace fly-through · speed lines','Particle waves · spectral ribbons'];
-var totalModes=7;
-function nextMode(){currentMode=(currentMode+1)%totalModes;updateModeLabel()}
-function prevMode(){currentMode=(currentMode+totalModes-1)%totalModes;updateModeLabel()}
+var modeNames=['Thick Punchy','iTunes Bars','Flow Field'];
+var modeDescs=['3.5px heavy · instant response · high contrast','Classic mirror bars · color cycling · peak sparks','Flowing particle waves · spectral ribbons'];
+function nextMode(){currentMode=(currentMode+1)%3;updateModeLabel()}
+function prevMode(){currentMode=(currentMode+2)%3;updateModeLabel()}
 function updateModeLabel(){
   document.getElementById('modeName').textContent=modeNames[currentMode];
   document.getElementById('descText').textContent=modeDescs[currentMode];
