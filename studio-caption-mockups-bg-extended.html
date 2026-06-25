@@ -135,6 +135,7 @@ body.light #leftPanel{background:rgba(255,255,255,.92);border-color:rgba(0,0,0,.
   </div>
   <div class="btn-row">
     <button class="btn" id="btnMic" onclick="toggleMic()">&#127908; Start Mic</button>
+    <button class="btn" id="btnSys" onclick="toggleSysAudio()">&#128187; System Audio</button>
     <button class="btn" id="btnDark" onclick="setTheme('dark')">&#127769; Dark</button>
     <button class="btn on" id="btnLight" onclick="setTheme('light')">&#9728;&#65039; Light</button>
     <button class="btn on" id="btnBoth" onclick="setMode('both')">Both</button>
@@ -169,7 +170,7 @@ body.light #leftPanel{background:rgba(255,255,255,.92);border-color:rgba(0,0,0,.
   </div>
 </div>
 <script>
-var audioCtx=null,analyser=null,micStream=null,micOn=false;
+var audioCtx=null,analyser=null,micStream=null,sysStream=null,micOn=false,sysOn=false;
 var freqData=null,volume=0,smoothing=0;
 var animFrame=null,currentMode='both',ringVar=0,barVar=0;
 var canvasRings,canvasBars,ctxRings,ctxBars;
@@ -233,8 +234,17 @@ function resize(){
   canvasRings.width=W;canvasRings.height=H;
   canvasBars.width=W;canvasBars.height=H;
 }
+function stopAllAudio(){
+  if(micStream){micStream.getTracks().forEach(function(t){t.stop()});micStream=null}
+  if(sysStream){sysStream.getTracks().forEach(function(t){t.stop()});sysStream=null}
+  micOn=false;sysOn=false;
+  document.getElementById('btnMic').textContent='\uD83C\uDFA4 Start Mic';
+  document.getElementById('btnMic').classList.remove('mic-on');
+  var btnSys=document.getElementById('btnSys');if(btnSys){btnSys.textContent='\uD83D\uDCBB System Audio';btnSys.classList.remove('mic-on');}
+}
 function toggleMic(){
-  if(micOn){stopMic();return}
+  if(micOn||sysOn){stopAllAudio();if(micStream){return}}
+  stopAllAudio();
   initAudio();
   navigator.mediaDevices.getUserMedia({audio:true,video:false}).then(function(s){
     micStream=s;var src=audioCtx.createMediaStreamSource(s);src.connect(analyser);
@@ -244,10 +254,24 @@ function toggleMic(){
     if(!animFrame) animate();
   }).catch(function(){startDemoMode()});
 }
+function toggleSysAudio(){
+  if(sysOn){stopAllAudio();return}
+  stopAllAudio();
+  initAudio();
+  navigator.mediaDevices.getDisplayMedia({audio:true,video:true}).then(function(s){
+    s.getVideoTracks().forEach(function(t){t.stop()});
+    var at=s.getAudioTracks();
+    if(at.length===0){alert('Select a browser tab with audio. Enable "Share audio" in the picker.');s.getTracks().forEach(function(t){t.stop()});startDemoMode();return}
+    sysStream=s;var src=audioCtx.createMediaStreamSource(s);src.connect(analyser);
+    sysOn=true;micOn=true;
+    var btnSys=document.getElementById('btnSys');btnSys.textContent='\u23f9 Stop System';
+    btnSys.classList.add('mic-on');
+    document.getElementById('bgLayer').classList.add('on');
+    if(!animFrame) animate();
+  }).catch(function(e){console.log('System audio denied:',e);startDemoMode()});
+}
 function stopMic(){
-  if(micStream){micStream.getTracks().forEach(function(t){t.stop()});micStream=null}
-  micOn=false;document.getElementById('btnMic').textContent='\uD83C\uDFA4 Start Mic';
-  document.getElementById('btnMic').classList.remove('mic-on');
+  stopAllAudio();
 }
 function startDemoMode(){
   micOn=true;document.getElementById('btnMic').textContent='\uD83C\uDFA4 Demo Mic';
