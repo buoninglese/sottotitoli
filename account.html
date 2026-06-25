@@ -953,8 +953,18 @@ table,pre,code{max-width:100%;overflow-x:auto}
 <script>
 // ═══ GLOBAL ERROR PROTECTION ═══
 window._accountErrors=[];
-window.addEventListener('error',function(e){window._accountErrors.push('ERROR:'+e.message);console.error('Account error:',e.message);});
-window.addEventListener('unhandledrejection',function(e){window._accountErrors.push('REJECTION:'+(e.reason||'').toString().substring(0,200));console.error('Account rejection:',e.reason);});
+window.addEventListener('error',function(e){window._accountErrors.push(e.message);});
+window.addEventListener('unhandledrejection',function(e){window._accountErrors.push('REJ:'+(e.reason||'').toString().substring(0,150));});
+
+// ═══ DIAGNOSTIC: check critical globals ═══
+(function(){
+  var issues=[];
+  if(typeof window.supabase==='undefined') issues.push('supabase SDK not loaded');
+  if(typeof window.sottotitoliSupabase==='undefined') issues.push('sottotitoliSupabase not set');
+  if(!document.getElementById('sidebar')) issues.push('sidebar missing');
+  if(!document.querySelector('.right-panel')) issues.push('right-panel missing');
+  if(issues.length>0) window._accountErrors.push('DIAG:'+issues.join(' | '));
+})();
 
 // ═══ SETTINGS TOGGLE ═══
 function toggleSettings(){
@@ -965,28 +975,34 @@ function toggleSettings(){
   else{toggle.classList.add('open');sub.classList.add('open')}
 }
 
-// ═══ TAB SWITCHING ═══
-document.querySelectorAll('.ni[data-tab]').forEach(function(t){
-  t.addEventListener('click',function(){
-    var tab=this.dataset.tab;
+// ═══ TAB SWITCHING (robust — event delegation on sidebar) ═══
+(function(){
+  var sidebar=document.getElementById('sidebar');
+  if(!sidebar) return;
+  sidebar.addEventListener('click',function(e){
+    var ni=e.target.closest('.ni[data-tab]');
+    if(!ni) return;
+    var tab=ni.dataset.tab;
+    // Update active state
     document.querySelectorAll('.ni[data-tab]').forEach(function(x){x.classList.remove('active')});
-    this.classList.add('active');
+    ni.classList.add('active');
+    // Show panel
     document.querySelectorAll('.cs').forEach(function(p){p.classList.remove('active')});
     var panel=document.getElementById('cs-'+tab);
-    if(panel)panel.classList.add('active');
-    if(tab==='trend')loadTrendTab();
-    if(tab==='vocabulary')loadVocabTab();
-    if(tab==='grammar')loadGrammarTab();
-    if(tab==='achievements')renderAchievements();
-    if(tab==='streak')renderStreakTab();
-    if(tab==='transcripts')loadTranscriptsTab();
-    if(tab==='ia-report')loadTranscriptsTab();
-    if(tab==='speaking')loadSpeakingTab();
-    if(tab==='trend')loadViaggioTab();
-    if(tab==='goals')syncGoalsToTab();
-    if(tab==='wordbanks')loadWordBanksTab();
+    if(panel) panel.classList.add('active');
+    // Load tab data (safe calls — won't break if function missing)
+    try{if(tab==='trend'){if(typeof loadTrendTab==='function')loadTrendTab();if(typeof loadViaggioTab==='function')loadViaggioTab();}}catch(e){}
+    try{if(tab==='vocabulary'&&typeof loadVocabTab==='function')loadVocabTab();}catch(e){}
+    try{if(tab==='grammar'&&typeof loadGrammarTab==='function')loadGrammarTab();}catch(e){}
+    try{if(tab==='achievements'&&typeof renderAchievements==='function')renderAchievements();}catch(e){}
+    try{if(tab==='streak'&&typeof renderStreakTab==='function')renderStreakTab();}catch(e){}
+    try{if(tab==='transcripts'&&typeof loadTranscriptsTab==='function')loadTranscriptsTab();}catch(e){}
+    try{if(tab==='ia-report'&&typeof loadTranscriptsTab==='function')loadTranscriptsTab();}catch(e){}
+    try{if(tab==='speaking'&&typeof loadSpeakingTab==='function')loadSpeakingTab();}catch(e){}
+    try{if(tab==='goals'&&typeof syncGoalsToTab==='function')syncGoalsToTab();}catch(e){}
+    try{if(tab==='wordbanks'&&typeof loadWordBanksTab==='function')loadWordBanksTab();}catch(e){}
   });
-});
+})();
 
 // ═══ PROFILE INIT ═══
 (function(){
