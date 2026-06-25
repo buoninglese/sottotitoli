@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Sottotitoli · Serif Quotation Mark Spirals</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,400;14..32,500;14..32,600;14..32,700;14..32,800;14..32,900&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Inter',system-ui,sans-serif;overflow:hidden;height:100vh;position:relative;background:#060610;color:#e8eaed;transition:background .5s}
+body.light{background:#fafaf8;color:#1a1a1a}
+#bgLayer{position:fixed;inset:0;z-index:0}
+.bg-canvas{position:absolute;inset:0;width:100%;height:100%}
+#ui{position:relative;z-index:10;display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;gap:8px;padding:40px;pointer-events:none}
+#ui>*{pointer-events:auto}
+h1{font-size:clamp(22px,5vw,36px);font-weight:900;letter-spacing:-1px}
+p.sub{font-size:11px;opacity:.4;max-width:500px;text-align:center}
+.meter-row{display:flex;align-items:center;gap:8px}
+.meter-bar{width:100px;height:2px;border-radius:1px;overflow:hidden;background:rgba(255,255,255,.06)}
+.meter-fill{height:100%;border-radius:1px;background:linear-gradient(90deg,#34d399,#a78bfa);transition:width .1s;width:0%}
+.meter-label{font-family:'JetBrains Mono',monospace;font-size:8px;opacity:.3;min-width:36px}
+.btn-row{display:flex;gap:6px;flex-wrap:wrap;justify-content:center}
+.btn{padding:8px 16px;border-radius:100px;border:1.5px solid rgba(255,255,255,.1);background:rgba(255,255,255,.03);color:rgba(255,255,255,.5);font-family:'Inter',sans-serif;font-size:10px;font-weight:600;cursor:pointer;transition:all .15s}
+.btn:hover{border-color:#a78bfa;color:#a78bfa}
+.btn.on{background:rgba(52,211,153,.1)!important;border-color:rgba(52,211,153,.25)!important;color:#34d399!important}
+.btn.mic-on{background:rgba(239,68,68,.15)!important;border-color:rgba(239,68,68,.3)!important;color:#ef4444!important;animation:micPulse 1.5s ease infinite}
+.btn.var-nav{width:28px;height:28px;border-radius:50%;padding:0;font-size:14px;display:flex;align-items:center;justify-content:center}
+.var-label{font-family:'JetBrains Mono',monospace;font-size:9px;opacity:.35}
+@keyframes micPulse{0%,100%{box-shadow:0 0 0 0 rgba(239,68,68,.3)}50%{box-shadow:0 0 0 8px rgba(239,68,68,0)}}
+</style>
+</head>
+<body class="dark">
+<div id="bgLayer">
+  <canvas class="bg-canvas" id="canvasMain"></canvas>
+</div>
+<div id="ui">
+  <h1>Serif Quotation Spirals</h1>
+  <p class="sub">5 variations · spiral line evoking the serif " character</p>
+  <div class="meter-row">
+    <span class="meter-label" id="meterLabel">— dB</span>
+    <div class="meter-bar"><div class="meter-fill" id="meterFill"></div></div>
+  </div>
+  <div class="btn-row">
+    <button class="btn" id="btnMic" onclick="toggleMic()">🎤 Start Mic</button>
+    <button class="btn" id="btnDark" onclick="setTheme('dark')">🌙 Dark</button>
+    <button class="btn on" id="btnLight" onclick="setTheme('light')">☀️ Light</button>
+  </div>
+  <div class="btn-row">
+    <button class="btn var-nav" onclick="prevVar()">←</button>
+    <span class="var-label" id="varName">1/5 · Double Quotation</span>
+    <button class="btn var-nav" onclick="nextVar()">→</button>
+  </div>
+</div>
+<script>
+var audioCtx=null,analyser=null,micStream=null,micOn=false;
+var freqData=null,volume=0,smoothing=0;
+var animFrame=null,currentVar=0;
+var canvas,ctx,W,H,t=0;
+
+function initAudio(){
+  if(audioCtx)return;
+  audioCtx=new(window.AudioContext||window.webkitAudioContext)();
+  analyser=audioCtx.createAnalyser();analyser.fftSize=512;analyser.smoothingTimeConstant=0.65;
+  freqData=new Uint8Array(analyser.frequencyBinCount);
+}
+function resize(){W=window.innerWidth;H=window.innerHeight;canvas.width=W;canvas.height=H;}
+
+function toggleMic(){
+  if(micOn){stopMic();return}
+  initAudio();
+  navigator.mediaDevices.getUserMedia({audio:true,video:false}).then(function(s){
+    micStream=s;audioCtx.createMediaStreamSource(s).connect(analyser);
+    micOn=true;document.getElementById('btnMic').textContent='⏹ Stop Mic';
+    document.getElementById('btnMic').classList.add('mic-on');
+    if(!animFrame)animate();
+  }).catch(function(){startDemoMode()});
+}
+function stopMic(){
+  if(micStream){micStream.getTracks().forEach(function(t){t.stop()});micStream=null}
+  micOn=false;document.getElementById('btnMic').textContent='🎤 Start Mic';
+  document.getElementById('btnMic').classList.remove('mic-on');
+}
+function startDemoMode(){
+  micOn=true;document.getElementById('btnMic').textContent='🎤 Demo Mic';
+  document.getElementById('btnMic').classList.add('mic-on');
+  if(!animFrame)animate();
+}
+function readAudio(){
+  if(!analyser)return;
+  analyser.getByteFrequencyData(freqData);
+  var sum=0;for(var i=0;i<freqData.length;i++)sum+=freqData[i];
+  volume=Math.min(1,sum/freqData.length/200);
+  smoothing=smoothing*0.7+volume*0.3;
+}
+
+function c(h,s,l,a){return'hsla('+h+','+s+'%,'+l+'%,'+a+')';}
+
+// ══════════════════════════════════════
+// 5 QUOTATION MARK SPIRAL VARIATIONS
+// ══════════════════════════════════════
+
+var variations=[
+
+  // 1. Double Quotation — two separate spirals side by side like "
+  {
+    name:'Double Quotation',
+    draw:function(ctx,v,isDark){
+      var hue=isDark?250:215,sat=isDark?65:55;
+      var cx1=W/2-W*0.12,cy=H/2,cx2=W/2+W*0.12;
+      var maxR=Math.min(W,H)*0.35;
+      [cx1,cx2].forEach(function(cx){
+        ctx.beginPath();
+        for(var i=0;i<360;i++){
+          var a=i/180*Math.PI,r=5+i*maxR/360+v*maxR*0.6;
+          var x=cx+Math.cos(a+t/2000)*r,y=cy+Math.sin(a+t/2000)*r;
+          if(i===0)ctx.moveTo(x,y);else ctx.lineTo(x,y);
+        }
+        ctx.strokeStyle=c((hue+180)%360,sat,isDark?78:42,0.4+v*0.3);
+        ctx.lineWidth=1+v*3;ctx.stroke();
+      });
+    }
+  },
+
+  // 2. Comma Teardrop — one spiral that forms a comma/teardrop (left half of ")
+  {
+    name:'Comma Teardrop',
+    draw:function(ctx,v,isDark){
+      var hue=isDark?250:215,sat=isDark?65:55;
+      // Teardrop shape: spiral centered slightly off, compressed in X
+      var cx=W/2-W*0.06,cy=H/2;
+      var maxR=Math.min(W,H)*0.42;
+      ctx.beginPath();
+      for(var i=0;i<420;i++){
+        var a=i/210*Math.PI,r=3+i*maxR/420+v*maxR*0.55;
+        var x=cx+Math.cos(a+t/1800)*r*0.7; // compress horizontally for teardrop
+        var y=cy+Math.sin(a+t/1800)*r;
+        if(i===0)ctx.moveTo(x,y);else ctx.lineTo(x,y);
+      }
+      ctx.strokeStyle=c(hue,sat,isDark?78:42,0.35+v*0.35);
+      ctx.lineWidth=1.2+v*3.5;ctx.stroke();
+
+      // Serif foot (thick bottom)
+      ctx.beginPath();ctx.arc(cx,cy+maxR*0.7,6+v*12,0,Math.PI*2);
+      ctx.fillStyle=c(hue,sat,isDark?78:42,0.5+v*0.4);
+      ctx.fill();
+    }
+  },
+
+  // 3. Serif Outline — spiral traces the full " silhouette
+  {
+    name:'Serif Outline',
+    draw:function(ctx,v,isDark){
+      var hue=isDark?250:215,sat=isDark?65:55;
+      var cx=W/2,cy=H/2;
+      var maxR=Math.min(W,H)*0.38;
+      // Figure-8 / quotation outline using two offset spiral centers
+      for(var lobe=0;lobe<2;lobe++){
+        var lx=cx+(lobe===0?-W*0.1:W*0.1);
+        ctx.beginPath();
+        for(var i=0;i<300;i++){
+          var a=i/150*Math.PI+Math.PI*(lobe===0?0.7:0.3);
+          var r=4+i*maxR/300+v*maxR*0.5;
+          var x=lx+Math.cos(a+t/2200)*r*0.8;
+          var y=cy+Math.sin(a+t/2200)*r;
+          if(i===0)ctx.moveTo(x,y);else ctx.lineTo(x,y);
+        }
+        var colH=(hue+lobe*40)%360;
+        ctx.strokeStyle=c(colH,sat,isDark?78:42,0.3+v*0.35);
+        ctx.lineWidth=1+v*3;ctx.stroke();
+      }
+      // Connecting serif bar at bottom
+      ctx.beginPath();
+      ctx.moveTo(cx-W*0.15,cy+maxR*0.9);ctx.lineTo(cx+W*0.15,cy+maxR*0.9);
+      ctx.strokeStyle=c(hue,sat,isDark?70:38,0.2+v*0.3);
+      ctx.lineWidth=2+v*6;ctx.stroke();
+    }
+  },
+
+  // 4. Mirrored Spirals — two interlocking spirals creating " shape
+  {
+    name:'Mirrored Spirals',
+    draw:function(ctx,v,isDark){
+      var hue=isDark?250:215,sat=isDark?65:55;
+      var cx=W/2,cy=H/2;
+      var maxR=Math.min(W,H)*0.36;
+      // Left spiral: clockwise from top
+      ctx.beginPath();
+      for(var i=0;i<360;i++){
+        var a=-i/180*Math.PI+Math.PI*1.5,r=5+i*maxR/360+v*maxR*0.5;
+        var x=cx-W*0.1+Math.cos(a+t/1900)*r*0.75;
+        var y=cy+Math.sin(a+t/1900)*r;
+        if(i===0)ctx.moveTo(x,y);else ctx.lineTo(x,y);
+      }
+      ctx.strokeStyle=c(hue,sat,isDark?80:45,0.35+v*0.3);
+      ctx.lineWidth=1+v*3;ctx.stroke();
+      // Right spiral: counter-clockwise
+      ctx.beginPath();
+      for(var i=0;i<360;i++){
+        var a=i/180*Math.PI+Math.PI*1.5,r=5+i*maxR/360+v*maxR*0.5;
+        var x=cx+W*0.1+Math.cos(a+t/1900)*r*0.75;
+        var y=cy+Math.sin(a+t/1900)*r;
+        if(i===0)ctx.moveTo(x,y);else ctx.lineTo(x,y);
+      }
+      ctx.strokeStyle=c((hue+30)%360,sat,isDark?80:45,0.35+v*0.3);
+      ctx.lineWidth=1+v*3;ctx.stroke();
+    }
+  },
+
+  // 5. Quotation Echo — spirals that pulse and echo outward
+  {
+    name:'Quotation Echo',
+    draw:function(ctx,v,isDark){
+      var hue=isDark?250:215,sat=isDark?65:55;
+      var cx=W/2,cy=H/2;
+      var maxR=Math.min(W,H)*0.38;
+      // Multiple echo spirals at different scales
+      for(var echo=0;echo<4;echo++){
+        var echoPhase=t/1500+echo*1.2;
+        var echoScale=0.6+echo*0.15+v*(0.6+echo*0.2);
+        var echoAlpha=0.4-echo*0.09;
+        // Left lobe
+        ctx.beginPath();
+        for(var i=0;i<280;i++){
+          var a=i/140*Math.PI+Math.PI*0.75+Math.sin(echoPhase)*0.3;
+          var r=3+i*maxR/280*echoScale;
+          var x=cx-W*0.1+Math.cos(a)*r*0.7;
+          var y=cy+Math.sin(a)*r;
+          if(i===0)ctx.moveTo(x,y);else ctx.lineTo(x,y);
+        }
+        ctx.strokeStyle=c((hue+echo*20)%360,sat,isDark?78:42,echoAlpha+v*0.15);
+        ctx.lineWidth=0.8+v*2.5;ctx.stroke();
+        // Right lobe (smaller delay)
+        ctx.beginPath();
+        for(var i=0;i<280;i++){
+          var a=i/140*Math.PI+Math.PI*0.75-Math.sin(echoPhase+0.6)*0.3;
+          var r=3+i*maxR/280*echoScale*0.85;
+          var x=cx+W*0.1+Math.cos(a)*r*0.7;
+          var y=cy+Math.sin(a)*r;
+          if(i===0)ctx.moveTo(x,y);else ctx.lineTo(x,y);
+        }
+        ctx.strokeStyle(c((hue+echo*20+15)%360,sat,isDark?78:42,echoAlpha*0.8+v*0.12));
+        ctx.lineWidth=0.7+v*2;ctx.stroke();
+      }
+    }
+  }
+
+];
+
+// ─── Animation loop ───
+function animate(ts){
+  animFrame=requestAnimationFrame(animate);
+  t=ts||Date.now();
+  if(micOn){readAudio();}else{
+    smoothing=smoothing*0.92+0.04;
+    volume=0.08+Math.sin(t/1800)*0.06+Math.sin(t/3100)*0.05+Math.sin(t/5200)*0.03;
+  }
+  var v=smoothing||volume;
+  var isDark=document.body.classList.contains('dark');
+  ctx.clearRect(0,0,W,H);
+
+  // Subtle background
+  ctx.fillStyle=isDark?'rgba(6,6,20,0.3)':'rgba(250,250,248,0.3)';
+  ctx.fillRect(0,0,W,H);
+
+  variations[currentVar].draw(ctx,v,isDark);
+
+  var displayV=Math.min(1,v*2.5);
+  document.getElementById('meterFill').style.width=(displayV*100)+'%';
+  document.getElementById('meterLabel').textContent=Math.round(displayV*100-50)+' dB';
+}
+
+// ─── Controls ───
+function setTheme(t){
+  document.body.className=t;
+  document.getElementById('btnDark').className='btn'+(t==='dark'?' on':'');
+  document.getElementById('btnLight').className='btn'+(t==='light'?' on':'');
+}
+function nextVar(){currentVar=(currentVar+1)%variations.length;updateVarLabel();}
+function prevVar(){currentVar=(currentVar+variations.length-1)%variations.length;updateVarLabel();}
+function updateVarLabel(){
+  document.getElementById('varName').textContent=(currentVar+1)+'/'+variations.length+' · '+variations[currentVar].name;
+}
+
+// ─── Init ───
+canvas=document.getElementById('canvasMain');
+ctx=canvas.getContext('2d');
+resize();window.addEventListener('resize',resize);
+updateVarLabel();setTheme('dark');
+animate();
+setTimeout(function(){if(!micOn)startDemoMode();},600);
+</script>
+</body>
+</html>
