@@ -659,8 +659,8 @@ table,pre,code{max-width:100%;overflow-x:auto}
         </div>
         <div class="card"><div class="card-h3">🕐 Abitudini</div><div style="display:flex;gap:10px;flex-wrap:wrap"><div style="flex:1;min-width:140px"><div style="font-size:11px;font-weight:600">Orario preferito</div><div style="font-size:12px;color:var(--t2)" id="habitTime">🕕 —</div><div style="font-size:10px;color:var(--t3)" id="habitTimePct"></div></div><div style="flex:1;min-width:140px"><div style="font-size:11px;font-weight:600">Giorno più attivo</div><div style="font-size:12px;color:var(--t2)" id="habitDay">📅 —</div><div style="font-size:10px;color:var(--t3)" id="habitDayAvg"></div></div><div style="flex:1;min-width:140px"><div style="font-size:11px;font-weight:600">Media giornaliera</div><div style="font-size:12px;color:var(--t2)" id="habitDaily">—</div><div style="font-size:10px;color:var(--t3)">min/giorno</div></div></div></div>
         <div style="display:flex;gap:10px;flex-wrap:wrap">
-          <div class="card" style="flex:1;min-width:180px"><div class="card-h3">📅 Calendario Streak</div><div style="display:grid;grid-template-columns:repeat(7,1fr);gap:2px;text-align:center;padding:8px" class="streak-cal-gen"></div></div>
-          <div class="card" style="flex:1;min-width:180px"><div class="card-h3">🏅 Traguardi Streak</div><div style="display:flex;flex-direction:column;gap:6px;padding:8px"><div style="display:flex;align-items:center;gap:6px;font-size:10px"><span style="font-size:16px">✅</span><span style="color:var(--green);font-weight:600">7 giorni</span><span style="color:var(--t3);margin-left:auto">completato</span></div><div style="display:flex;align-items:center;gap:6px;font-size:10px"><span style="font-size:16px">✅</span><span style="color:var(--green);font-weight:600">30 giorni</span><span style="color:var(--t3);margin-left:auto">completato</span></div><div style="display:flex;align-items:center;gap:6px;font-size:10px"><span style="font-size:16px">🔒</span><span style="color:var(--t2);font-weight:600">100 giorni</span><span style="color:var(--t3);margin-left:auto">86 rimanenti</span></div><div style="display:flex;align-items:center;gap:6px;font-size:10px"><span style="font-size:16px">🔒</span><span style="color:var(--t2);font-weight:600">365 giorni</span><span style="color:var(--t3);margin-left:auto">351 rimanenti</span></div></div></div>
+          <div class="card" style="flex:1;min-width:180px"><div class="card-h3">📅 Calendario Streak</div><div style="display:grid;grid-template-columns:repeat(7,1fr);gap:2px;text-align:center;padding:8px;font-size:8px" id="streakCalGrid"></div></div>
+          <div class="card" style="flex:1;min-width:180px"><div class="card-h3">🏅 Traguardi Streak</div><div style="display:flex;flex-direction:column;gap:6px;padding:8px" id="streakMilestones"></div></div>
           <div class="card card-ghost" style="flex:1;min-width:180px"><div class="card-h3">📈 Trend Giornaliero</div><div style="text-align:center;color:var(--t3);font-size:11px;padding:20px">Minuti per giorno</div></div>
         </div>
       </div>
@@ -1426,6 +1426,41 @@ function renderStreakTab(){
   if(document.getElementById('habitTimePct'))document.getElementById('habitTimePct').textContent=total>0?Math.round(hourCounts[bestHour]/total*100)+'% delle sessioni':'';
   if(document.getElementById('habitDay'))document.getElementById('habitDay').textContent='📅 '+dayNames[bestDay];
   if(document.getElementById('habitDayAvg'))document.getElementById('habitDayAvg').textContent=total>0?'Media '+(dayCounts[bestDay]/Math.max(1,Math.ceil(total/7))).toFixed(1)+' sessioni':'';
+
+  // Streak calendar — current month with session days highlighted
+  var calEl=document.getElementById('streakCalGrid');
+  if(calEl){
+    var now=new Date();var monStart=new Date(now.getFullYear(),now.getMonth(),1);
+    var monDays=new Date(now.getFullYear(),now.getMonth()+1,0).getDate();
+    var firstDow=new Date(now.getFullYear(),now.getMonth(),1).getDay();firstDow=firstDow===0?6:firstDow-1;
+    var calH='';var dayLabels=['L','M','M','G','V','S','D'];
+    dayLabels.forEach(function(l){calH+='<span style="color:var(--t3)">'+l+'</span>'});
+    for(var pi=0;pi<firstDow;pi++)calH+='<span></span>';
+    for(var d=1;d<=monDays;d++){
+      var ds=now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0')+'-'+String(d).padStart(2,'0');
+      var hasSession=uniqueDays.includes(ds);
+      var isToday=ds===new Date().toISOString().split('T')[0];
+      calH+='<span style="aspect-ratio:1;border-radius:3px;display:flex;align-items:center;justify-content:center;'+(hasSession?'background:var(--green);color:#fff;font-weight:700':'color:var(--t3)')+(isToday?';box-shadow:0 0 0 2px var(--accent)':'')+'">'+d+'</span>';
+    }
+    calEl.style.gridTemplateColumns='repeat(7,1fr)';
+    calEl.innerHTML=calH;
+  }
+
+  // Streak milestones — dynamic based on actual streak
+  var milEl=document.getElementById('streakMilestones');
+  if(milEl){
+    var milestones=[{d:7,label:'7 giorni'},{d:30,label:'30 giorni'},{d:100,label:'100 giorni'},{d:365,label:'365 giorni'}];
+    var mh='';
+    milestones.forEach(function(ms){
+      var unlocked=streak>=ms.d||record>=ms.d;
+      mh+='<div style="display:flex;align-items:center;gap:6px;font-size:10px">';
+      mh+='<span style="font-size:16px">'+(unlocked?'✅':'🔒')+'</span>';
+      mh+='<span style="color:'+(unlocked?'var(--green)':'var(--t2)')+';font-weight:600">'+ms.label+'</span>';
+      mh+='<span style="color:var(--t3);margin-left:auto">'+(unlocked?'completato':(ms.d-streak)+' rimanenti')+'</span>';
+      mh+='</div>';
+    });
+    milEl.innerHTML=mh;
+  }
 }
 
 // ═══ ACHIEVEMENTS (100, categorized) ═══
