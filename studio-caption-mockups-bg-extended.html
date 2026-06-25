@@ -146,6 +146,9 @@ body.light #leftPanel{background:rgba(255,255,255,.92);border-color:rgba(0,0,0,.
     <span class="var-label" id="varName">Rings 1/10 · Bars 1/10</span>
     <button class="btn var-nav" onclick="nextVar()" title="Next variation">&#8594;</button>
   </div>
+  <div class="btn-row" style="margin-top:4px">
+    <button class="btn" id="btnDemoDeluxe" onclick="toggleDemoDeluxe()" style="border-color:rgba(251,191,36,.3);color:var(--amber);font-size:11px;padding:10px 20px">✨ DEMO DELUXE</button>
+  </div>
 </div>
 <script>
 var audioCtx=null,analyser=null,micStream=null,micOn=false;
@@ -421,7 +424,7 @@ var barFuncs=[
 function animate(ts){
   animFrame=requestAnimationFrame(animate);
   t=ts||Date.now();
-  if(micOn){readAudio();}else{
+  if(micOn){readAudio();}else if(!demoDeluxeOn){
     smoothing=smoothing*0.92+0.04;
     volume=0.08+Math.sin(t/1800)*0.06+Math.sin(t/3100)*0.05+Math.sin(t/5200)*0.03+Math.sin(t/7300)*0.02;
   }
@@ -499,20 +502,46 @@ function animate(ts){
   var sizeMul=toggles.size||1;
   var animStyle=toggles.anim||'smooth';
   
-  // Anim: adjust smoothing based on style
+  // Left panel: particle/line toggles modulate volume and rendering
+  var pCount=toggles.particleCount||80;
+  var pSpeed=toggles.particleSpeed||0.6;
+  var lWidth=toggles.lineWidth||1.5;
+  var lCount=toggles.lineCount||60;
+  var trailVal=toggles.trail||0;
+  var connectD=toggles.connectDist||0;
+  var gravVal=toggles.gravity||0;
+  var repelVal=toggles.repulsion||0;
+  var randVal=toggles.randomness||0.8;
+  var colorM=toggles.colorMode||'mono';
+  
+  // Apply left panel effects: modulate volume with particle/line behavior
+  var leftMod=1;
+  if(pCount>0)leftMod*=0.6+(pCount/300); // More particles = more visual activity
+  if(pSpeed>1)leftMod*=1+(pSpeed-1)*0.5; // Faster = more reactive
+  if(lCount>0)leftMod*=0.7+(lCount/200); // More lines = denser
+  if(lWidth>1)leftMod*=1+(lWidth-1)*0.3; // Thicker lines = more presence
+  if(gravVal>0)leftMod*=1+gravVal*2; // Gravity adds weight
+  if(repelVal>0)leftMod*=1+repelVal*0.5; // Repulsion adds energy
+  if(randVal>0.8)leftMod*=1+(randVal-0.8)*1.5; // Randomness adds chaos
+  
+  // Trail: decay smoothing for echo effect
+  if(trailVal>0){smoothing=smoothing*(1-trailVal*0.5)+volume*trailVal*0.5}
+  
+  // Anim: adjust based on style
   if(animStyle==='sharp'){v=v<0.1?0:v}
-  else if(animStyle==='bouncy'){v=v+Math.sin(t*0.01)*0.15}
+  else if(animStyle==='bouncy'){v=v+Math.sin(t*0.01)*0.15*leftMod}
   
   // Density & Size: scale effective volume
-  var effectiveV=Math.min(1,v*densityMul);
+  var effectiveV=Math.min(1,v*densityMul*leftMod);
   
-  // Save sizes for render functions to use
-  window._togSize=sizeMul;
-  window._togDensity=densityMul;
+  // Save sizes for render functions
+  window._togSize=sizeMul*lWidth/1.5;
+  window._togDensity=densityMul*(pCount/80);
   window._togWave=toggles.wave||'sine';
   window._togBarStyle=toggles.barStyle||'solid';
   window._togRings=toggles.rings||3;
   window._togAnim=animStyle;
+  window._togColorMode=colorM;
 
   if(currentMode==='both'||currentMode==='rings') ringFuncs[ringVar](ctxRings,effectiveV,isDark);
   if(currentMode==='both'||currentMode==='bars') barFuncs[barVar](ctxBars,effectiveV,isDark);
@@ -618,6 +647,57 @@ function toggleLeftPanel(){document.getElementById('leftPanel').classList.toggle
 var spikeActive=false,spikeVolume=0;
 function spikeOn(){spikeActive=true;smoothing=1;volume=1}
 function spikeOff(){spikeActive=false}
+
+// ── Demo Deluxe: rollercoaster audio simulation ──
+var demoDeluxeOn=false,demoPhase=0,demoTime=0,demoInterval=null;
+function toggleDemoDeluxe(){
+  demoDeluxeOn=!demoDeluxeOn;
+  var btn=document.getElementById('btnDemoDeluxe');
+  if(demoDeluxeOn){
+    btn.textContent='⏹ STOP DEMO';
+    btn.style.background='rgba(251,191,36,.15)';
+    micOn=true;demoPhase=0;demoTime=0;
+    if(!animFrame)animate();
+    // Kill demo interval if exists
+    if(demoInterval)clearInterval(demoInterval);
+    demoInterval=setInterval(advanceDemo,50);
+  }else{
+    btn.textContent='✨ DEMO DELUXE';
+    btn.style.background='';
+    micOn=false;
+    if(demoInterval)clearInterval(demoInterval);
+    demoInterval=null;
+  }
+}
+function advanceDemo(){
+  demoTime+=50;
+  var t=demoTime/1000; // seconds
+  // Rollercoaster pattern: silence → build → burst → sustain → decay → quiet → stutter → blast → fade
+  
+  if(t<2){volume=0.02; smoothing=smoothing*0.9+volume*0.1}           // silence
+  else if(t<4){volume=0.05+(t-2)*0.1; smoothing=smoothing*0.85+volume*0.15} // slow build
+  else if(t<5){volume=0.3+Math.sin(t*20)*0.15; smoothing=volume}      // wobble
+  else if(t<6.5){volume=0.6+Math.sin(t*30)*0.25; smoothing=volume}    // burst incoming
+  else if(t<7){volume=1.0; smoothing=1.0}                              // FULL BLAST
+  else if(t<8){volume=0.9; smoothing=volume}                           // sustain
+  else if(t<9){volume=0.4+(8.5-t)*0.5; smoothing=smoothing*0.8+volume*0.2} // decay
+  else if(t<11){volume=0.08+Math.sin(t*3)*0.05; smoothing=smoothing*0.95+volume*0.05} // quiet
+  else if(t<13){                                                        // stutter
+    var stut=Math.floor(t*8)%3;
+    volume=stut===0?0.7:stut===1?0.1:0.4;
+    smoothing=volume;
+  }
+  else if(t<14.5){volume=0.5+Math.sin(t*15)*0.3+Math.sin(t*23)*0.2; smoothing=volume} // rapid
+  else if(t<15){volume=1.0; smoothing=1.0}                              // BLAST
+  else if(t<17){volume=Math.max(0.02,1.0-(t-15)*0.5); smoothing=smoothing*0.7+volume*0.3} // fade out
+  else{demoTime=0} // loop back
+  
+  // Stutter drive speaker islands
+  if(volume>0.5&&Math.random()<0.3){
+    var si=speakerIslands[Math.floor(Math.random()*speakerIslands.length)];
+    si.active=Math.min(1,si.active+0.4);
+  }
+}
 // ── Init ──
 initCanvases();
 window.addEventListener('resize',resize);
