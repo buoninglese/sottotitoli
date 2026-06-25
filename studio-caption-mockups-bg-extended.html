@@ -463,8 +463,28 @@ function animate(ts){
     }
   });
 
-  if(currentMode==='both'||currentMode==='rings') ringFuncs[ringVar](ctxRings,v,isDark);
-  if(currentMode==='both'||currentMode==='bars') barFuncs[barVar](ctxBars,v,isDark);
+  // ── Apply toggle modifiers to volume ──
+  var densityMul=toggles.density||1;
+  var sizeMul=toggles.size||1;
+  var animStyle=toggles.anim||'smooth';
+  
+  // Anim: adjust smoothing based on style
+  if(animStyle==='sharp'){v=v<0.1?0:v}
+  else if(animStyle==='bouncy'){v=v+Math.sin(t*0.01)*0.15}
+  
+  // Density & Size: scale effective volume
+  var effectiveV=Math.min(1,v*densityMul);
+  
+  // Save sizes for render functions to use
+  window._togSize=sizeMul;
+  window._togDensity=densityMul;
+  window._togWave=toggles.wave||'sine';
+  window._togBarStyle=toggles.barStyle||'solid';
+  window._togRings=toggles.rings||3;
+  window._togAnim=animStyle;
+
+  if(currentMode==='both'||currentMode==='rings') ringFuncs[ringVar](ctxRings,effectiveV,isDark);
+  if(currentMode==='both'||currentMode==='bars') barFuncs[barVar](ctxBars,effectiveV,isDark);
 
   // ── Apply toggle post-effects ──
   var glowVal=toggles.glow||1;
