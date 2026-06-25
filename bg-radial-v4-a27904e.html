@@ -64,21 +64,21 @@ body.dark .btn:hover{background:rgba(255,255,255,.06);color:#fff;border-color:rg
     <input type="range" class="sens-slider" id="sensSlider" min="0.1" max="20" step="0.1" value="1" oninput="updateSensitivity(this.value)">
     <span class="meter-label" id="sensLabel">1.0x</span>
   </div>
-  <!-- FX Sliders -->
+  <!-- Behavior Sliders -->
   <div class="sens-row" style="margin-top:4px">
-    <label style="font-size:9px;opacity:.5;min-width:36px">🐢 Slow</label>
-    <input type="range" class="sens-slider" id="fxSlowSlider" min="0.1" max="1" step="0.05" value="1" oninput="setFXSlow(this.value)" style="width:60px">
-    <span class="meter-label" id="fxSlowVal">1×</span>
+    <label style="font-size:9px;opacity:.5;min-width:36px">🕐 Decay</label>
+    <input type="range" class="sens-slider" id="fxDecaySlider" min="0.5" max="0.995" step="0.005" value="0.85" oninput="setFXDecay(this.value)" style="width:60px">
+    <span class="meter-label" id="fxDecayVal">0.85</span>
   </div>
   <div class="sens-row">
-    <label style="font-size:9px;opacity:.5;min-width:36px">📢 Boost</label>
-    <input type="range" class="sens-slider" id="fxBoostSlider" min="1" max="20" step="1" value="1" oninput="setFXBoost(this.value)" style="width:60px">
-    <span class="meter-label" id="fxBoostVal">off</span>
+    <label style="font-size:9px;opacity:.5;min-width:36px">📈 Power</label>
+    <input type="range" class="sens-slider" id="fxPowerSlider" min="0.2" max="3" step="0.1" value="1" oninput="setFXPower(this.value)" style="width:60px">
+    <span class="meter-label" id="fxPowerVal">1.0</span>
   </div>
   <div class="sens-row">
-    <label style="font-size:9px;opacity:.5;min-width:36px">🫁 Breath</label>
-    <input type="range" class="sens-slider" id="fxBreathSlider" min="0.005" max="0.2" step="0.005" value="0.2" oninput="setFXBreath(this.value)" style="width:60px">
-    <span class="meter-label" id="fxBreathVal">off</span>
+    <label style="font-size:9px;opacity:.5;min-width:36px">🌊 Floor</label>
+    <input type="range" class="sens-slider" id="fxFloorSlider" min="0.02" max="0.4" step="0.01" value="0.08" oninput="setFXFloor(this.value)" style="width:60px">
+    <span class="meter-label" id="fxFloorVal">0.08</span>
   </div>
   <div class="btn-row">
     <button class="btn" id="btnMic" onclick="toggleMic()">🎤 Start Mic</button>
@@ -110,25 +110,22 @@ var audioSource=null,audioBuffer=null,audioStartTime=0,audioPauseOffset=0,audioS
 var freqData=null,volume=0,smoothing=0,sensitivity=1.0;
 var canvas,ctx,W,H,t=0,animFrame=null,currentVar=0;
 
-// ─── FX State (slider-driven) ───
-var fx={
-  slowdown:{on:false, speed:1},
-  sensBoost:{on:false, mult:1},
-  breath:{on:false, threshold:0.2}
-};
-function setFXSlow(val){
-  var v=parseFloat(val);fx.slowdown.speed=v;fx.slowdown.on=v<1;
-  document.getElementById('fxSlowVal').textContent=v.toFixed(2)+'×';
+// ─── Behavior Sliders ───
+var fx={decay:0.85, power:1, floor:0.08};
+function setFXDecay(val){
+  fx.decay=parseFloat(val);
+  if(analyser)analyser.smoothingTimeConstant=fx.decay;
+  document.getElementById('fxDecayVal').textContent=fx.decay.toFixed(3);
   updateConfigDisplay();
 }
-function setFXBoost(val){
-  var v=parseFloat(val);fx.sensBoost.mult=v;fx.sensBoost.on=v>1;
-  document.getElementById('fxBoostVal').textContent=v>1?v+'×':'off';
+function setFXPower(val){
+  fx.power=parseFloat(val);
+  document.getElementById('fxPowerVal').textContent=fx.power.toFixed(1);
   updateConfigDisplay();
 }
-function setFXBreath(val){
-  var v=parseFloat(val);fx.breath.threshold=v;fx.breath.on=v<0.2;
-  document.getElementById('fxBreathVal').textContent=v<0.2?(v*100).toFixed(1)+'%':'off';
+function setFXFloor(val){
+  fx.floor=parseFloat(val);
+  document.getElementById('fxFloorVal').textContent=fx.floor.toFixed(2);
   updateConfigDisplay();
 }
 
@@ -143,7 +140,7 @@ function initAudio(){
   audioCtx=new(window.AudioContext||window.webkitAudioContext)();
   analyser=audioCtx.createAnalyser();
   analyser.fftSize=512;
-  analyser.smoothingTimeConstant=0.65;
+  analyser.smoothingTimeConstant=fx.decay;
   freqData=new Uint8Array(analyser.frequencyBinCount);
 }
 
@@ -246,7 +243,8 @@ function readAudio(){
   analyser.getByteFrequencyData(freqData);
   var sum=0;for(var i=0;i<freqData.length;i++)sum+=freqData[i];
   volume=Math.min(1,sum/freqData.length/200*sensitivity);
-  smoothing=smoothing*Math.max(0.1,0.7-sensitivity*0.12)+volume*Math.min(0.85,sensitivity*0.4);
+  var d=fx.decay;
+  smoothing=smoothing*d+volume*(1-d);
 }
 
 // ─── Color helpers ───
@@ -447,23 +445,15 @@ function drawRadial(ctx,v,isDark,params,colorMul){
 function animate(ts){
   animFrame=requestAnimationFrame(animate);
   var rawT=ts||Date.now();
-  var timeScale=fx.slowdown.on?fx.slowdown.speed:1;
   t=rawT;
 
   if(micOn){readAudio();}else{
-    smoothing=smoothing*0.92+0.04;
+    smoothing=smoothing*fx.decay+0.04;
     volume=0.08+Math.sin(rawT/1800)*0.06+Math.sin(rawT/3100)*0.05+Math.sin(rawT/5200)*0.03;
   }
   var v=smoothing||volume;
-
-  // Sensitivity boost
-  if(fx.sensBoost.on)v=Math.min(1,v*fx.sensBoost.mult);
-
-  // Breath detection — amplify micro-volumes
-  if(fx.breath.on&&v<fx.breath.threshold&&v>0.001)v=v*3; // boost whispers
-
-  // Slowdown: reduce effective volume change rate
-  if(fx.slowdown.on){smoothing=smoothing*Math.max(0.7,fx.slowdown.speed)+volume*Math.min(0.3,(1-fx.slowdown.speed));v=smoothing;}
+  v=Math.pow(Math.max(0.001,v),fx.power);
+  v=Math.max(fx.floor,v);
 
   var isDark=document.body.classList.contains('dark');
   ctx.clearRect(0,0,W,H);
@@ -495,9 +485,9 @@ function updateConfigDisplay(){
   var parts=[
     'var:'+v.name,
     'sens:'+sensitivity.toFixed(1),
-    'slow:'+fx.slowdown.speed.toFixed(2)+'×',
-    'boost:'+(fx.sensBoost.on?fx.sensBoost.mult+'×':'off'),
-    'breath:'+(fx.breath.on?(fx.breath.threshold*100).toFixed(1)+'%':'off')
+    'decay:'+fx.decay.toFixed(3),
+    'power:'+fx.power.toFixed(1),
+    'floor:'+fx.floor.toFixed(2)
   ];
   var cfg=parts.join(' | ');
   document.getElementById('configDisplay').textContent=cfg;
