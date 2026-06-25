@@ -242,12 +242,14 @@ function stopAllAudio(){
   if(micStream){micStream.getTracks().forEach(function(t){t.stop()});micStream=null}
   if(sysStream){sysStream.getTracks().forEach(function(t){t.stop()});sysStream=null}
   micOn=false;sysOn=false;demoOn=false;
+  // Also stop emulator
+  if(emuOn){emuOn=false;var eb=document.getElementById('btnEmuPlay');if(eb){eb.textContent='▶ Play';eb.style.background='';eb.style.borderColor='';eb.style.color=''};if(emuInterval)clearInterval(emuInterval);emuInterval=null}
   document.getElementById('btnMic').textContent='\uD83C\uDFA4 Start Mic';
   document.getElementById('btnMic').classList.remove('mic-on');
   var btnSys=document.getElementById('btnSys');if(btnSys){btnSys.textContent='\uD83D\uDCBB System Audio';btnSys.classList.remove('mic-on');}
 }
 function toggleMic(){
-  if(micOn||sysOn){stopAllAudio();if(micStream){return}}
+  if(micOn||sysOn){stopAllAudio();return}
   stopAllAudio();
   initAudio();
   navigator.mediaDevices.getUserMedia({audio:true,video:false}).then(function(s){
@@ -546,14 +548,14 @@ var barFuncs=[
 function animate(ts){
   animFrame=requestAnimationFrame(animate);
   t=ts||Date.now();
-  if(micOn&&!demoOn){readAudio();}
-  if(!micOn||demoOn){
+  if(micOn&&!demoOn&&!emuOn){readAudio();}
+  if(!micOn||demoOn||emuOn){
     if(!emuOn){
       smoothing=smoothing*0.92+0.04;
       volume=0.15+Math.sin(t/1800)*0.1+Math.sin(t/3100)*0.08+Math.sin(t/5200)*0.05;
     }
-    // Synthetic frequency data for demo mode so bar renderers see non-zero values
-    if(demoOn&&freqData){
+    // Synthetic frequency data for demo/emulator so bar renderers see non-zero values
+    if((demoOn||emuOn)&&freqData){
       for(var fi=0;fi<freqData.length;fi++){
         freqData[fi]=Math.min(255,Math.max(0,Math.floor(
           128+Math.sin(fi*0.15+t/800)*80+Math.sin(fi*0.4+t/500)*50+Math.sin(fi*0.05+t/300)*30
