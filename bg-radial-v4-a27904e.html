@@ -70,51 +70,20 @@ body.dark .btn:hover{background:rgba(255,255,255,.06);color:#fff;border-color:rg
     <input type="range" class="sens-slider" id="fxDecaySlider" min="0.5" max="0.995" step="0.005" value="0.90" oninput="setFXDecay(this.value)" style="width:60px">
     <span class="meter-label" id="fxDecayVal">0.90</span>
   </div>
-  <div class="sens-row">
-    <label style="font-size:9px;opacity:.5;min-width:36px">📈 Power</label>
-    <input type="range" class="sens-slider" id="fxPowerSlider" min="0.2" max="3" step="0.1" value="2.5" oninput="setFXPower(this.value)" style="width:60px">
-    <span class="meter-label" id="fxPowerVal">2.5</span>
-  </div>
-  <div class="sens-row">
-    <label style="font-size:9px;opacity:.5;min-width:36px">🌊 Floor</label>
-    <input type="range" class="sens-slider" id="fxFloorSlider" min="0.02" max="0.4" step="0.01" value="0.25" oninput="setFXFloor(this.value)" style="width:60px">
-    <span class="meter-label" id="fxFloorVal">0.25</span>
-  </div>
   <!-- Zoom -->
   <div class="sens-row" style="margin-top:6px">
     <label style="font-size:9px;opacity:.5;min-width:36px">🔍 Zoom</label>
     <input type="range" class="sens-slider" id="fxZoomSlider" min="0.5" max="1.6" step="0.05" value="1" oninput="setFXZoom(this.value)" style="width:60px">
     <span class="meter-label" id="fxZoomVal">1×</span>
   </div>
-  <!-- Voice Range Indicator -->
-  <div class="sens-row" style="margin-top:2px">
-    <label style="font-size:8px;opacity:.25;min-width:36px">voice</label>
-    <div style="display:flex;gap:2px;width:60px;height:4px;border-radius:2px;overflow:hidden">
-      <div id="voiceBassBar" style="flex:1;background:rgba(239,68,68,.3);transition:opacity .3s"></div>
-      <div id="voiceMidBar" style="flex:3;background:rgba(251,191,36,.3);transition:opacity .3s"></div>
-      <div id="voiceTrebBar" style="flex:2;background:rgba(96,165,250,.3);transition:opacity .3s"></div>
-    </div>
-    <span class="meter-label" id="voiceLabel" style="font-size:7px;opacity:.25">—</span>
-  </div>
-  <!-- Particle Controls -->
+  <!-- Dots -->
   <div class="btn-row" style="margin-top:2px">
     <div style="background:rgba(15,18,30,.85);border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:8px 12px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:center">
       <span style="font-size:9px;opacity:.4">● Dots</span>
       <span style="font-size:8px;opacity:.3">size</span>
       <input type="range" id="ptclSize" min="0.3" max="5" step="0.1" value="3" oninput="setPtclSize(this.value)" style="width:40px;height:3px">
       <span id="ptclSizeVal" style="font-size:8px;opacity:.3">3×</span>
-      <select id="ptclShape" onchange="setPtclShape(this.value)" style="font-size:9px;padding:2px 4px;border-radius:6px;border:1px solid rgba(255,255,255,.1);background:rgba(255,255,255,.04);color:inherit;font-family:inherit;cursor:pointer">
-        <option value="circle">● circle</option>
-        <option value="square">■ square</option>
-        <option value="diamond">◆ diamond</option>
-        <option value="star">★ star</option>
-      </select>
-      <select id="ptclBehavior" onchange="setPtclBehavior(this.value)" style="font-size:9px;padding:2px 4px;border-radius:6px;border:1px solid rgba(255,255,255,.1);background:rgba(255,255,255,.04);color:inherit;font-family:inherit;cursor:pointer">
-        <option value="static">static</option>
-        <option value="pulse">pulse</option>
-        <option value="trail">trail</option>
-        <option value="spark">spark</option>
-      </select>
+      <button class="btn" id="btnDrift" onclick="toggleDrift()" style="font-size:9px;padding:3px 8px">🌌 Drift</button>
     </div>
   </div>
   <div class="btn-row">
@@ -152,8 +121,8 @@ var canvas,ctx,W,H,t=0,animFrame=null,currentMode=0;
 
 // ─── Behavior Sliders ───
 var fx={decay:0.90, power:2.5, floor:0.25, zoom:1};
-// ─── Particle Settings ───
-var ptcl={size:3, shape:'circle', behavior:'static'};
+var ptcl={size:3};
+var driftOn=false, freeParticles=[];
 function setFXDecay(val){
   fx.decay=parseFloat(val);
   if(analyser)analyser.smoothingTimeConstant=fx.decay;
@@ -179,8 +148,12 @@ function setPtclSize(val){
   ptcl.size=parseFloat(val);
   document.getElementById('ptclSizeVal').textContent=ptcl.size.toFixed(1)+'×';
 }
-function setPtclShape(val){ptcl.shape=val}
-function setPtclBehavior(val){ptcl.behavior=val}
+function toggleDrift(){
+  driftOn=!driftOn;
+  var btn=document.getElementById('btnDrift');
+  btn.classList.toggle('on',driftOn);
+  if(!driftOn)freeParticles=[];
+}
 
 function updateSensitivity(val){
   sensitivity=parseFloat(val);
@@ -481,18 +454,16 @@ function drawRadial(ctx,v,isDark,params,colorMul){
 
       if(fi>0.25&&prm.dotR>0){
         var dr=(prm.dotR+fi*1.5)*ptcl.size;
-        var pulse=ptcl.behavior==='pulse'?0.7+0.3*Math.sin(t/400+angle*3):1;
-        var spark=ptcl.behavior==='spark'?0.5+Math.random()*0.5:1;
-        var trail=ptcl.behavior==='trail'?0.5+fi*0.5:1;
-        var sizeMul=pulse*spark*trail*(0.7+sv*0.3);
-        dr=Math.max(1,dr*sizeMul);
-        ctx.beginPath();
-        if(ptcl.shape==='square'){ctx.rect(-dr/2,-dr/2,dr,dr)}
-        else if(ptcl.shape==='diamond'){ctx.moveTo(0,-dr);ctx.lineTo(dr,0);ctx.lineTo(0,dr);ctx.lineTo(-dr,0);ctx.closePath()}
-        else if(ptcl.shape==='star'){for(var s=0;s<5;s++){var sa=s*Math.PI*2/5-Math.PI/2;var sr=s%2===0?dr:dr*0.4;var sx=sr*Math.cos(sa),sy=sr*Math.sin(sa);if(s===0)ctx.moveTo(sx,sy);else ctx.lineTo(sx,sy)}ctx.closePath()}
-        else{ctx.arc(0,ringR+barLen-((ptcl.shape!=='circle')?dr*0.5:0),dr,0,Math.PI*2)}
-        ctx.fillStyle=c(sh,80*colorMul,brightLum,themeAlpha(isDark,0.6+sv*0.3)*colorMul);
-        ctx.fill();
+        dr=Math.max(1,dr*(0.7+sv*0.3));
+        if(driftOn&&fi>0.5&&Math.random()<0.15){
+          var worldX=cx+Math.cos(angle)*(ringR+barLen);
+          var worldY=cy+Math.sin(angle)*(ringR+barLen);
+          freeParticles.push({x:worldX,y:worldY,vx:Math.cos(angle)*0.5+Math.sin(angle)*0.3,vy:Math.sin(angle)*0.5-Math.cos(angle)*0.3,life:1,hue:sh,size:dr});
+        }else{
+          ctx.beginPath();ctx.arc(0,ringR+barLen,dr,0,Math.PI*2);
+          ctx.fillStyle=c(sh,80*colorMul,brightLum,themeAlpha(isDark,0.6+sv*0.3)*colorMul);
+          ctx.fill();
+        }
       }
 
       ctx.restore();
@@ -683,13 +654,25 @@ function animate(ts){
   var displayV=Math.min(1,v*2.5*sensitivity);
   document.getElementById('meterFill').style.width=(displayV*100)+'%';
   document.getElementById('meterLabel').textContent=Math.round(displayV*100-50)+' dB';
-  // Voice indicator
-  var bAlpha=0.4+voiceBass*0.6,mAlpha=0.4+voiceMid*0.6,tAlpha=0.4+voiceTreble*0.6;
-  document.getElementById('voiceBassBar').style.opacity=bAlpha;
-  document.getElementById('voiceMidBar').style.opacity=mAlpha;
-  document.getElementById('voiceTrebBar').style.opacity=tAlpha;
-  var vl=voiceCentroid<0.3?'low':voiceCentroid<0.6?'mid':'high';
-  document.getElementById('voiceLabel').textContent=vl;
+  if(driftOn&&freeParticles.length>0){
+    ctx.save();
+    for(var fp=0;fp<freeParticles.length;fp++){
+      var p=freeParticles[fp];
+      p.x+=p.vx;p.y+=p.vy;p.vx*=1.005;p.vy*=1.005;p.life-=0.006;
+      if(p.life<=0)continue;
+      var alpha=p.life*0.7;
+      var sz=p.size*(0.5+p.life*0.5);
+      ctx.beginPath();ctx.arc(p.x,p.y,sz,0,Math.PI*2);
+      ctx.fillStyle=c(p.hue,80,85,alpha);ctx.fill();
+      var gl=ctx.createRadialGradient(p.x,p.y,0,p.x,p.y,sz*2);
+      gl.addColorStop(0,c(p.hue,90,95,alpha*0.4));
+      gl.addColorStop(1,'rgba(0,0,0,0)');
+      ctx.fillStyle=gl;ctx.fillRect(p.x-sz*2,p.y-sz*2,sz*4,sz*4);
+    }
+    ctx.restore();
+    freeParticles=freeParticles.filter(function(p){return p.life>0});
+    if(freeParticles.length>200)freeParticles.splice(0,freeParticles.length-200);
+  }
 }
 
 // ─── Controls ───
