@@ -77,8 +77,21 @@ body.dark .btn:hover{background:rgba(255,255,255,.06);color:#fff;border-color:rg
   </div>
   <div class="btn-row">
     <button class="btn" id="btnMic" onclick="toggleMic()">🎤 Start Mic</button>
+    <button class="btn" id="btnFile" onclick="openAudioFile()">📄 Open Audio</button>
+    <input type="file" id="audioFileInput" accept="audio/*" style="display:none" onchange="loadAudioFile(this.files[0])">
     <button class="btn" id="btnDark" onclick="setTheme('dark')">🌙 Dark</button>
     <button class="btn on" id="btnLight" onclick="setTheme('light')">☀️ Light</button>
+  </div>
+  <!-- Audio Player bar (hidden until file loaded) -->
+  <div class="btn-row" id="audioPlayerRow" style="display:none;margin-top:2px">
+    <div style="background:rgba(15,18,30,.85);border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:8px 12px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:center">
+      <span style="font-size:9px;opacity:.4">🎵</span>
+      <span id="audioTrackName" style="font-size:9px;opacity:.6;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">—</span>
+      <button class="btn" id="btnAudioPlay" onclick="toggleAudioPlayback()" style="font-size:9px;padding:4px 8px">▶ Play</button>
+      <button class="btn" id="btnAudioStop" onclick="stopAudioFile()" style="font-size:9px;padding:4px 6px">⏹</button>
+      <input type="range" id="audioSeek" min="0" max="100" value="0" oninput="seekAudio(this.value)" style="width:40px;height:3px;cursor:pointer">
+      <span id="audioTime" style="font-size:8px;opacity:.3;min-width:32px">0:00</span>
+    </div>
   </div>
   <div class="btn-row">
     <span class="var-label" id="varName" style="opacity:0.5">Thick Punchy</span>
@@ -87,7 +100,8 @@ body.dark .btn:hover{background:rgba(255,255,255,.06);color:#fff;border-color:rg
 </div>
 <script>
 // ─── Audio ───
-var audioCtx=null,analyser=null,micStream=null,micOn=false;
+var audioCtx=null,analyser=null,micStream=null,micOn=false,fileOn=false,audioPlaying=false;
+var audioSource=null,audioBuffer=null,audioStartTime=0,audioPauseOffset=0,audioSeekInterval=null;
 var freqData=null,volume=0,smoothing=0,sensitivity=1.0;
 var canvas,ctx,W,H,t=0,animFrame=null,currentVar=0;
 
@@ -157,8 +171,20 @@ function resize(){
   canvas.width=W;canvas.height=H;
 }
 
+function stopAllAudio(){
+  if(micStream){micStream.getTracks().forEach(function(t){t.stop()});micStream=null}
+  if(audioSource){try{audioSource.stop()}catch(e){};audioSource=null}
+  if(audioSeekInterval){clearInterval(audioSeekInterval);audioSeekInterval=null}
+  micOn=false;fileOn=false;audioPlaying=false;
+  audioPauseOffset=0;audioStartTime=0;
+  document.getElementById('audioPlayerRow').style.display='none';
+  document.getElementById('btnMic').textContent='🎤 Start Mic';
+  document.getElementById('btnMic').classList.remove('mic-on');
+  var btnF=document.getElementById('btnFile');if(btnF){btnF.textContent='📄 Open Audio';btnF.classList.remove('mic-on')}
+}
 function toggleMic(){
-  if(micOn){stopMic();return}
+  if(micOn||fileOn){stopAllAudio();return}
+  stopAllAudio();
   initAudio();
   navigator.mediaDevices.getUserMedia({audio:true,video:false}).then(function(s){
     micStream=s;var src=audioCtx.createMediaStreamSource(s);src.connect(analyser);
@@ -169,11 +195,63 @@ function toggleMic(){
   }).catch(function(){startDemoMode()});
 }
 
-function stopMic(){
-  if(micStream){micStream.getTracks().forEach(function(t){t.stop()});micStream=null}
-  micOn=false;document.getElementById('btnMic').textContent='🎤 Start Mic';
-  document.getElementById('btnMic').classList.remove('mic-on');
+// ── Audio File Playback ──
+function openAudioFile(){
+  if(fileOn){stopAllAudio();return}
+  document.getElementById('audioFileInput').click();
 }
+function loadAudioFile(file){
+  if(!file)return;
+  stopAllAudio();initAudio();
+  var btnF=document.getElementById('btnFile');btnF.textContent='⏳ Loading…';btnF.classList.add('mic-on');
+  var reader=new FileReader();
+  reader.onload=function(e){
+    audioCtx.decodeAudioData(e.target.result,function(buffer){
+      audioBuffer=buffer;
+      var row=document.getElementById('audioPlayerRow');row.style.display='flex';
+      document.getElementById('audioTrackName').textContent=file.name;
+      document.getElementById('audioSeek').max=buffer.duration;
+      document.getElementById('audioSeek').value=0;
+      audioPauseOffset=0;
+      btnF.textContent='✅ Loaded';btnF.classList.add('mic-on');
+      setTimeout(function(){btnF.textContent='📄 Open Audio';btnF.classList.remove('mic-on')},1500);
+      startAudioPlayback();
+    },function(err){alert('Could not decode. Try .mp3 or .wav');console.error(err);btnF.textContent='📄 Open Audio';btnF.classList.remove('mic-on')});
+  };
+  reader.readAsArrayBuffer(file);
+}
+function startAudioPlayback(){
+  if(!audioBuffer)return;
+  if(audioSource){try{audioSource.stop()}catch(e){}}
+  audioSource=audioCtx.createBufferSource();
+  audioSource.buffer=audioBuffer;
+  audioSource.loop=true;
+  audioSource.connect(analyser);
+  audioSource.connect(audioCtx.destination);
+  audioSource.start(0,audioPauseOffset);
+  audioStartTime=audioCtx.currentTime-audioPauseOffset;
+  audioPlaying=true;fileOn=true;micOn=true;
+  document.getElementById('btnAudioPlay').textContent='⏸ Pause';
+  document.getElementById('btnAudioPlay').classList.add('mic-on');
+  document.getElementById('bgLayer').classList.add('on');
+  if(audioSeekInterval)clearInterval(audioSeekInterval);
+  audioSeekInterval=setInterval(updateAudioSeek,250);
+  if(!animFrame)animate();
+}
+function toggleAudioPlayback(){if(audioPlaying){pauseAudio();}else{resumeAudio();}}
+function pauseAudio(){
+  if(!audioSource||!audioPlaying)return;
+  audioPauseOffset=audioCtx.currentTime-audioStartTime;
+  try{audioSource.stop()}catch(e){};audioSource=null;audioPlaying=false;
+  document.getElementById('btnAudioPlay').textContent='▶ Play';
+  document.getElementById('btnAudioPlay').classList.remove('mic-on');
+  if(audioSeekInterval){clearInterval(audioSeekInterval);audioSeekInterval=null}
+}
+function resumeAudio(){if(!audioBuffer)return;startAudioPlayback();}
+function stopAudioFile(){stopAllAudio();audioBuffer=null;document.getElementById('audioPlayerRow').style.display='none';}
+function seekAudio(val){audioPauseOffset=parseFloat(val);if(audioPlaying){try{audioSource.stop()}catch(e){};audioSource=null;startAudioPlayback();}else{document.getElementById('audioSeek').value=audioPauseOffset;updateAudioTimeDisplay(audioPauseOffset)}}
+function updateAudioSeek(){if(!audioPlaying||!audioSource)return;var pos=audioCtx.currentTime-audioStartTime;var dur=audioBuffer.duration;if(pos>=dur){audioStartTime=audioCtx.currentTime-(pos%dur);pos=pos%dur}document.getElementById('audioSeek').value=pos;updateAudioTimeDisplay(pos)}
+function updateAudioTimeDisplay(sec){var m=Math.floor(sec/60),s=Math.floor(sec%60);document.getElementById('audioTime').textContent=m+':'+(s<10?'0':'')+s}
 
 function startDemoMode(){
   micOn=true;document.getElementById('btnMic').textContent='🎤 Demo Mic';
