@@ -341,7 +341,7 @@ var ringFuncs=[
     var cx=W/2,cy=H/2,hue=themeHue(isDark);
     for(var i=0;i<10;i++){
       var phase=(t/2000+i*0.3)%(Math.PI*2);
-      var r=30+i*40+v*60*(0.6+0.4*Math.sin(phase));
+      var r=Math.max(2,30+i*40+v*60*(0.6+0.4*Math.sin(phase)));
       var a=themeAlpha(isDark,(0.15+0.35*Math.sin(phase))*0.8);
       ctx.beginPath();ctx.arc(cx,cy,r,0,Math.PI*2);
       ctx.fillStyle=c((hue+i*28)%360,themeSat(isDark),themeLum(isDark,true),a);
@@ -471,7 +471,7 @@ var barFuncs=[
   // Thick Smooth — imported from bg-radial (3px bold, heavy smoothing, 120 bars, 2 rings)
   function(ctx,v,isDark){
     var cx=W/2,cy=H/2,hue=themeHue(isDark),maxR=Math.min(W,H)*0.49;
-    var lw=(window._togLineW||3);var sv=Math.pow(v,0.5);
+    var lw=(window._togLineW||3);var sv=Math.pow(v,2.0);
     var nRings=2,nBars=Math.max(20,Math.floor(120*(window._togDensity||1)));
     var spaceGrad=ctx.createRadialGradient(cx,cy,maxR*0.1,cx,cy,maxR*1.3);
     spaceGrad.addColorStop(0,isDark?'rgba(6,6,20,0)':'rgba(250,250,248,0)');
@@ -508,7 +508,7 @@ var barFuncs=[
   // Thick Punchy — imported from bg-radial (3.5px heavy, instant response, 100 bars, 2 rings)
   function(ctx,v,isDark){
     var cx=W/2,cy=H/2,hue=themeHue(isDark),maxR=Math.min(W,H)*0.49;
-    var lw=(window._togLineW||3.5);var sv=v;
+    var lw=(window._togLineW||3.5);var sv=Math.pow(v,0.35);
     var nRings=2,nBars=Math.max(20,Math.floor(100*(window._togDensity||1)));
     var spaceGrad=ctx.createRadialGradient(cx,cy,maxR*0.1,cx,cy,maxR*1.3);
     spaceGrad.addColorStop(0,isDark?'rgba(6,6,20,0)':'rgba(250,250,248,0)');
@@ -564,12 +564,8 @@ function animate(ts){
     }
   }
   var v=smoothing||volume;
-  // ── Ported from bg-radial: floor so visuals never die ──
+  // ── Floor so visuals never die (matches bg-radial) ──
   v=Math.max(0.08,v);
-  // Built-in gentle sensitivity boost (mimics bg-radial SensBoost at mild default)
-  v=Math.min(1,v*1.4);
-  // Breath: amplify whispers so quiet audio still moves
-  if(v<0.06&&v>0.002)v=v*3;
   
   // Apply toggles: speed, bg opacity
   var speedMul=toggles.speed||1;
@@ -671,7 +667,7 @@ function animate(ts){
   window._togRings    = toggles.rings||3;
   window._togAnim     = animStyle;
   
-  // Particle count → visual granularity boost
+  // Particle count → visual granularity boost (feeds _togDensity, not volume)
   var pGranularity = Math.max(0.2, (toggles.particleCount||80) / 80);
   var pSpeedMul = (toggles.particleSpeed||0.6);
   
@@ -679,7 +675,8 @@ function animate(ts){
   if(animStyle==='sharp'){v=v<0.1?0:v}
   else if(animStyle==='bouncy'){v=v+Math.sin(t*0.01*pSpeedMul)*0.15}
   
-  var effectiveV=Math.min(1, v * densityMul * pGranularity);
+  // effectiveV = raw v (toggles modulate _togDensity/_togLineW, not volume)
+  var effectiveV=v;
 
   if(currentMode==='both'||currentMode==='rings') ringFuncs[ringVar](ctxRings,effectiveV,isDark);
   if(currentMode==='both'||currentMode==='bars') barFuncs[barVar](ctxBars,effectiveV,isDark);
