@@ -493,12 +493,23 @@ function animate(ts){
   document.getElementById('meterLabel').textContent=Math.round(displayV*100-50)+' dB';
   if(driftOn&&freeParticles.length>0){
     ctx.save();
+    var pcx=W/2,pcy=H/2,maxDist=Math.sqrt(pcx*pcx+pcy*pcy);
     for(var fp=0;fp<freeParticles.length;fp++){
       var p=freeParticles[fp];
-      p.x+=p.vx;p.y+=p.vy;p.vx*=1.005;p.vy*=1.005;p.life-=0.006;
+      // Sound-reactive jitter — particles respond to current audio
+      var jit=v*0.7;
+      p.vx+=(Math.random()-0.5)*jit*0.35;
+      p.vy+=(Math.random()-0.5)*jit*0.35;
+      p.vx*=1.002;p.vy*=1.002;
+      p.x+=p.vx;p.y+=p.vy;
+      p.life-=0.005;
       if(p.life<=0)continue;
-      var alpha=p.life*0.7;
-      var sz=p.size*(0.5+p.life*0.5);
+      // Fade out as particle approaches canvas edge
+      var pdx=p.x-pcx,pdy=p.y-pcy,pdist=Math.sqrt(pdx*pdx+pdy*pdy);
+      var edgeFade=1-Math.min(1,pdist/maxDist*1.2);
+      var alpha=p.life*0.85*edgeFade;
+      // Size pulses with current volume
+      var sz=p.size*(0.35+p.life*0.35+v*0.3);
       ctx.beginPath();ctx.arc(p.x,p.y,sz,0,Math.PI*2);
       ctx.fillStyle=c(p.hue,80,85,alpha);ctx.fill();
       var gl=ctx.createRadialGradient(p.x,p.y,0,p.x,p.y,sz*2);
