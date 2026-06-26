@@ -1375,10 +1375,8 @@ _realMic.onFinal = function(text) {
     });
   }
 
-  // ── Auto-collect unique content words into Word Bank (#34) ──
-  if (typeof wordBank !== 'undefined') {
-    autoCollectWordBank(text);
-  }
+  // ── Word Bank: manual-add only (auto-collection disabled) ──
+  // User adds words by double-clicking chips in the Vocab panel or via the Word Bank input
 
   // ── Refresh active extras panel with new data ──
   if (typeof window.refreshExtrasPanel === 'function') {
@@ -1473,7 +1471,27 @@ window.addEventListener('resize', function(){if(_isFullscreen)fitLinesToViewport
 // LIVE dot reflects real mic state (no manual toggle needed)
 
 // ═══ #34 Word Bank — persistent vocabulary collection ═══
-var WORD_BANK_KEY = 'sottotitoli_wordbank_' + (currentCaptionLang || 'en-US');
+// Unified key shared across caption + traduzione + account pages
+var WORD_BANK_KEY = 'sottotitoli_wordbank';
+// Migrate from old language-specific key if present
+(function migrateWordBank() {
+  var oldKey = 'sottotitoli_wordbank_' + (currentCaptionLang || 'en-US');
+  var old = localStorage.getItem(oldKey);
+  var current = localStorage.getItem(WORD_BANK_KEY);
+  if (old && !current) {
+    localStorage.setItem(WORD_BANK_KEY, old);
+    localStorage.removeItem(oldKey);
+  } else if (old && current) {
+    try {
+      var oldArr = JSON.parse(old);
+      var curArr = JSON.parse(current);
+      var merged = curArr.slice();
+      oldArr.forEach(function(w) { if (merged.indexOf(w) < 0) merged.push(w); });
+      localStorage.setItem(WORD_BANK_KEY, JSON.stringify(merged));
+      localStorage.removeItem(oldKey);
+    } catch(e) {}
+  }
+})();
 var wordBank = JSON.parse(localStorage.getItem(WORD_BANK_KEY) || '[]');
 
 function toggleWordBank() {
@@ -1525,8 +1543,7 @@ function clearWordBank() {
 }
 
 function saveWordBank() {
-  var key = 'sottotitoli_wordbank_' + (currentCaptionLang || 'en-US');
-  localStorage.setItem(key, JSON.stringify(wordBank));
+  localStorage.setItem(WORD_BANK_KEY, JSON.stringify(wordBank));
   var countEl = document.getElementById('wordbankCount');
   if (countEl) countEl.textContent = wordBank.length;
   // Sync to Supabase if logged in
@@ -1535,7 +1552,7 @@ function saveWordBank() {
       if (r.data?.session) {
         window.sottotitoliSupabase.from('user_preferences').upsert({
           user_id: r.data.session.user.id,
-          key: 'wordbank_' + (currentCaptionLang || 'en-US'),
+          key: 'wordbank',
           value: JSON.stringify(wordBank)
         }, { onConflict: 'user_id,key' }).then(function() {});
       }
@@ -1767,7 +1784,7 @@ function showWordDefinition(word) {
     window.sottotitoliSupabase.auth.getSession().then(function(r) {
       if (r.data?.session) {
         window.sottotitoliSupabase.from('user_preferences')
-          .select('value').eq('user_id', r.data.session.user.id).eq('key', 'wordbank_' + (currentCaptionLang || 'en-US')).single()
+          .select('value').eq('user_id', r.data.session.user.id).eq('key', 'wordbank').single()
           .then(function(res) {
             if (res.data?.value) {
               try {
@@ -1799,10 +1816,10 @@ window.showVocabDefinition = function(word){
 };
 
 window.removeFromVocabBank = function(word){
-  var key = 'sottotitoli_wordbank_' + (currentCaptionLang || 'en-US');
+  var key = WORD_BANK_KEY;
   var bank = JSON.parse(localStorage.getItem(key)||'[]');
   bank = bank.filter(function(w){return w!==word;});
-  localStorage.setItem(bankKey,JSON.stringify(bank));
+  localStorage.setItem(key,JSON.stringify(bank));
   if(typeof window.refreshExtrasPanel === 'function'){
     window.refreshExtrasPanel();
   }
@@ -2851,25 +2868,18 @@ function downloadGrammarPDF() {
   var panels = {
     vocab: function(cb){
       var h='<div class="extras-grid">';
-      var words=getTranscriptWords();
-      var noData=words.length===0;
-      var wbKey = 'sottotitoli_wordbank_' + (currentCaptionLang || 'en-US');
+      var wbKey = WORD_BANK_KEY;
       var wb = JSON.parse(localStorage.getItem(wbKey)||'[]');
+      var noData=wb.length===0;
 
-      // ── WordBank Vocabulary (POS-colored chips with click/dblclick/X) ──
-      h+='<div class="extras-card" style="grid-column:1/-1"><div class="ec-title">01 · My Vocabulary <span class="ec-badge" style="background:rgba(52,211,153,.15);color:#34d399">LIVE</span></div>';
-      if(noData){h+='<div style="color:var(--muted2);font-style:italic;padding:8px 0">Start speaking — words appear here as POS-colored chips</div>'}
+      // ── My Vocabulary (only manually-added word bank words) ──
+      h+='<div class="extras-card" style="grid-column:1/-1"><div class="ec-title">01 · My Vocabulary <span class="ec-badge" style="background:rgba(52,211,153,.15);color:#34d399">'+wb.length+' words</span></div>';
+      if(noData){h+='<div style="color:var(--muted2);font-style:italic;padding:8px 0">Double-click any word in the transcript to add it to your Word Bank</div>'}
       else{
         h+='<div id="vocabChipsLive" style="display:flex;flex-wrap:wrap;gap:5px;max-height:200px;overflow-y:auto;padding:4px 0">';
-        var shown={};
-        words.forEach(function(w){
-          if(shown[w.w]) return; shown[w.w]=true;
-          var c=w.pos==='VERB'?'#3b82f6':w.pos==='NOUN'?'#34d399':w.pos==='ADJ'?'#f97316':w.pos==='ADV'?'#a855f7':'#6b7280';
-          var inBank=wb.indexOf(w.w)>=0;
-          h+='<span class="wv-chip" data-word="'+w.w+'" style="display:inline-flex;align-items:center;gap:4px;padding:5px 10px;border-radius:8px;font-size:11px;font-weight:600;cursor:pointer;background:'+c+'18;color:'+c+';border:1px solid '+c+'30;transition:all .15s;position:relative" title="Click: definition · Double-click: add to Word Bank">'+w.w+'<small style="opacity:.6;font-size:9px">'+w.pos+'</small>';
-          if(inBank){
-            h+='<span class="wv-x" onclick="event.stopPropagation();removeFromVocabBank(\''+w.w+'\')" style="margin-left:2px;width:14px;height:14px;border-radius:50%;background:'+c+'30;color:'+c+';display:inline-flex;align-items:center;justify-content:center;font-size:9px;cursor:pointer;line-height:1" title="Remove from Word Bank">×</span>';
-          }
+        wb.forEach(function(w){
+          h+='<span class="wv-chip" data-word="'+w+'" style="display:inline-flex;align-items:center;gap:4px;padding:5px 10px;border-radius:8px;font-size:11px;font-weight:600;cursor:pointer;background:rgba(167,139,250,.12);color:#c4b5fd;border:1px solid rgba(167,139,250,.2);transition:all .15s;position:relative" title="Click: definition · Click ×: remove">'+w;
+          h+='<span class="wv-x" onclick="event.stopPropagation();removeFromWordBank(\''+w+'\')" style="margin-left:2px;width:14px;height:14px;border-radius:50%;background:rgba(248,113,113,.15);color:#f87171;display:inline-flex;align-items:center;justify-content:center;font-size:9px;cursor:pointer;line-height:1" title="Remove from Word Bank">×</span>';
           h+='</span> ';
         });
         h+='</div>';
@@ -2883,24 +2893,11 @@ function downloadGrammarPDF() {
       h+='</div>';
 
       cb(h, function(){
-        // Wire up click handlers
         document.querySelectorAll('.wv-chip').forEach(function(chip){
           chip.addEventListener('click', function(e){
+            if(e.target.classList.contains('wv-x')) return;
             var word = this.dataset.word;
             showVocabDefinition(word);
-          });
-          chip.addEventListener('dblclick', function(e){
-            e.preventDefault();
-            var word = this.dataset.word;
-            addToWordBank(word);
-            // Visual feedback
-            this.style.background='rgba(52,211,153,.2)';
-            var self=this;
-            setTimeout(function(){ self.style.background=''; }, 600);
-            // Refresh vocab panel to show X button
-            if(typeof window.refreshExtrasPanel === 'function'){
-              setTimeout(function(){ window.refreshExtrasPanel(); }, 200);
-            }
           });
         });
       });
@@ -3494,11 +3491,11 @@ multispeaker: function(cb){
       });
     }  };  // ── Word Bank add from Synonyms ──
 window.addToWordBank = function(word){
-  var key = 'sottotitoli_wordbank_' + (currentCaptionLang || 'en-US');
+  var key = WORD_BANK_KEY;
   var bank = JSON.parse(localStorage.getItem(key)||'[]');
   if(bank.indexOf(word)>=0) return;
   bank.push(word);
-  localStorage.setItem(bankKey,JSON.stringify(bank));
+  localStorage.setItem(key,JSON.stringify(bank));
   // Update wordbank count in UI
   var wbBtn = document.querySelector('.wordbank-toggle-btn, [onclick*="Word Bank"]');
   if(wbBtn){var c=bank.length;wbBtn.innerHTML=wbBtn.innerHTML.replace(/\d+/g,String(c))}
