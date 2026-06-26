@@ -612,7 +612,6 @@ button[onclick*="addToWordBank"]:hover{background:rgba(52,211,153,.15)!important
         <button class="extras-toggle-btn" data-panel="grammar" onclick="toggleExtrasPanel('grammar',this)">📋 Grammar</button>
         <button class="extras-toggle-btn" data-panel="metrics" onclick="toggleExtrasPanel('metrics',this)">📊 Metrics</button>
         <button class="extras-toggle-btn" data-panel="gloss" onclick="toggleExtrasPanel('gloss',this)">🌐 Gloss</button>
-        <button class="extras-toggle-btn" data-panel="deepdive" onclick="toggleExtrasPanel('deepdive',this)">🔬 Deep Dive</button>
         <button class="extras-toggle-btn" data-panel="grammarParse" onclick="toggleExtrasPanel('grammarParse',this)">🌳 Parse</button>
         <button class="extras-toggle-btn" data-panel="info" onclick="toggleExtrasPanel('info',this)">📖 Info</button>
         <button class="extras-toggle-btn" data-panel="synonyms21" onclick="toggleExtrasPanel('synonyms21',this)">📖 Synonyms</button>
@@ -1492,17 +1491,24 @@ function toggleWordBank() {
   }
 }
 
-function addToWordBank() {
-  var input = document.getElementById('wordbankInput');
-  if (!input) return;
-  var word = input.value.trim().toLowerCase();
+function addToWordBank(optionalWord) {
+  var word = optionalWord || '';
+  if (!word) {
+    var input = document.getElementById('wordbankInput');
+    if (!input) return;
+    word = input.value.trim().toLowerCase();
+    if (input) input.value = '';
+  }
+  word = word.trim().toLowerCase();
   if (!word || word.length < 2) return;
-  if (wordBank.indexOf(word) >= 0) { input.value = ''; return; }
+  if (wordBank.indexOf(word) >= 0) return;
   wordBank.push(word);
   saveWordBank();
-  input.value = '';
   renderWordBank();
-  input.focus();
+  if (!optionalWord) {
+    var input = document.getElementById('wordbankInput');
+    if (input) input.focus();
+  }
 }
 
 function removeFromWordBank(word) {
@@ -3075,232 +3081,6 @@ function downloadGrammarPDF() {
       cb(h);
     },
 
-    // ═══ Deep Dive (#06, #21, #26) ═══
-    deepdive: function(cb){
-      var h='<div class="extras-grid">';
-      var text=(document.getElementById('captionTranscript')?.textContent||'')+' '+(document.getElementById('captionInterim')?.textContent||'');
-      var words=getTranscriptWords();
-      var topWords=words.filter(function(w){return w.count>=1}).slice(0,10);
-      var noData=words.length===0;
-      var m=getSessionMetrics();
-      var noSession=m.sec<1;
-
-      
-      // 09 — Active Vocabulary Size
-      h+='<div class="extras-card"><div class="ec-title">09 · Active Vocabulary <span class="ec-badge" style="background:rgba(96,165,250,.15);color:#60a5fa">EST</span></div>';
-      // Estimate from session unique words + known language levels
-      var uniqueWords=words.length;
-      var estimatedVocab=uniqueWords>0?Math.min(8000,Math.max(40,uniqueWords*35)):0;
-      var cefrLevel=estimatedVocab>=5000?'B2-C1':estimatedVocab>=2800?'B1':estimatedVocab>=1200?'A2':estimatedVocab>0?'A1':'—';
-      var vocabPct=Math.min(100,estimatedVocab/80);
-      if(noData){h+='<div style="color:rgba(255,255,255,.2);font-style:italic">Avvia una sessione</div>'}
-      else{
-        h+='<div style="text-align:center;padding:4px 0"><div style="font-family:JetBrains Mono,monospace;font-size:28px;font-weight:900;color:#34d399">'+estimatedVocab.toLocaleString()+'</div><div style="font-size:9px;color:rgba(255,255,255,.25)">Estimated active vocabulary</div></div>';
-        h+='<div style="display:flex;justify-content:space-between;font-size:7px;color:rgba(255,255,255,.15);margin-top:6px"><span>A1: 600</span><span>A2: 1,200</span><span style="color:#34d399">B1: 2,800</span><span>B2: 5,000</span></div>';
-        h+='<div style="height:3px;background:rgba(255,255,255,.06);border-radius:2px;margin-top:3px"><div style="width:'+vocabPct+'%;height:100%;border-radius:2px;background:linear-gradient(90deg,#60a5fa,#34d399)"></div></div>';
-        h+='<div style="text-align:center;font-size:8px;color:rgba(255,255,255,.2);margin-top:3px">CEFR: <b>'+cefrLevel+'</b></div>';
-      }
-      h+='</div>';
-
-      
-      // 16 — Syllable Rhythm
-      h+='<div class="extras-card"><div class="ec-title">16 · Syllable Rhythm</div>';
-      var rhythmMap={discussing:'○●○○',future:'●○',translation:'○●○',international:'○○●○○',language:'●○',meetings:'●○',system:'●○',barriers:'●○'};
-      var rhythmFound=0;
-      words.forEach(function(w){
-        if(rhythmMap[w.w]){
-          rhythmFound++;
-          var pattern=rhythmMap[w.w];
-          var dots='';
-          for(var i=0;i<pattern.length;i++){dots+='<span class="'+(pattern[i]==='●'?'stress-on':'stress-off')+'">'+pattern[i]+'</span>'}
-          h+='<div style="display:flex;align-items:center;gap:8px;margin:2px 0"><span style="font-size:10px;width:80px;color:rgba(255,255,255,.55)">'+w.w+'</span><span class="stress-dot">'+dots+'</span></div>';
-        }
-      });
-      if(!rhythmFound) h+='<div style="color:rgba(255,255,255,.2);font-style:italic">Stress patterns appear with recognized words</div>';
-      h+='</div>';
-
-      // 21 — Contextual Synonyms
-      h+='<div class="extras-card"><div class="ec-title">21 · Contextual Synonyms <span class="ec-badge" style="background:rgba(96,165,250,.15);color:#60a5fa">API</span></div>';
-      if(noData){h+='<div style="color:rgba(255,255,255,.2);font-style:italic">Avvia una sessione</div>'}
-      else{
-        h+='<div id="ctxSynList"><div class="extras-loading">Caricamento sinonimi contestuali...</div></div>';
-      }
-      h+='</div>';
-
-
-
-      h+='</div>';
-      cb(h, function(){
-        // Post-render: fetch contextual synonyms
-        if(noData) return;
-        var ctxEl=document.getElementById('ctxSynList');
-        if(!ctxEl) return;
-        var ctxTop=topWords.slice(0,4);
-        var ctxHtml='';var ctxFetched=0;
-        ctxTop.forEach(function(w){
-          fetchSynonyms(w.w,function(syns){
-            var matchPct=85+((allSessions&&allSessions.length>0?allSessions.length%13:0));
-            ctxHtml+='<div style="display:flex;align-items:center;gap:6px;padding:3px 6px;background:rgba(255,255,255,.015);border-radius:5px;margin:2px 0;font-size:10px"><span style="font-weight:600;color:rgba(255,255,255,.65);width:72px">'+w.w+'</span><span style="color:rgba(255,255,255,.15)">→</span><span style="color:#a78bfa;font-weight:500">'+ (syns!=='—'?syns.split(',')[0].trim():w.w) +'</span><span style="font-size:7px;color:rgba(255,255,255,.15);margin-left:auto">'+matchPct+'%</span></div>';
-            ctxFetched++;
-            if(ctxFetched===ctxTop.length||syns!=='—'){ctxEl.innerHTML=ctxHtml||'<div style="color:rgba(255,255,255,.2)">Nessun sinonimo trovato</div>'}
-          });
-        });
-        setTimeout(function(){if(ctxFetched===0)ctxEl.innerHTML='<div style="color:rgba(255,255,255,.2)">API non raggiungibile</div>'},5000);
-      });
-    },
-
-    // ═══ Gloss — Multi-Language Translation Table ═══
-    gloss: function(cb){
-      var h='<div class="extras-grid">';
-      var text=(document.getElementById('captionTranscript')?.textContent||'');
-      var words=getTranscriptWords();
-      var noData=words.length===0;
-      var isLight=document.documentElement.getAttribute('data-theme')==='light';
-      // Theme-aware color helpers
-      var tc=function(darkColor,lightColor){return isLight?lightColor:darkColor;};
-      var glossDict=[
-        {en:'discussing',it:'discutendo',nl:'bespreken',es:'discutiendo',fr:'discutant',de:'diskutieren',pt:'discutindo',pl:'dyskutujac'},
-        {en:'future',it:'futuro',nl:'toekomst',es:'futuro',fr:'avenir',de:'Zukunft',pt:'futuro',pl:'przyszlosc'},
-        {en:'translation',it:'traduzione',nl:'vertaling',es:'traduccion',fr:'traduction',de:'Ubersetzung',pt:'traducao',pl:'tlumaczenie'},
-        {en:'language',it:'lingua',nl:'taal',es:'idioma',fr:'langue',de:'Sprache',pt:'lingua',pl:'jezyk'},
-        {en:'barriers',it:'barriere',nl:'barrieres',es:'barreras',fr:'barrieres',de:'Barrieren',pt:'barreiras',pl:'bariery'},
-        {en:'systems',it:'sistemi',nl:'systemen',es:'sistemas',fr:'systemes',de:'Systeme',pt:'sistemas',pl:'systemy'},
-        {en:'deployment',it:'implementazione',nl:'uitrol',es:'despliegue',fr:'deploiement',de:'Bereitstellung',pt:'implantacao',pl:'wdrozenie'},
-        {en:'challenge',it:'sfida',nl:'uitdaging',es:'desafio',fr:'defi',de:'Herausforderung',pt:'desafio',pl:'wyzwanie'},
-        {en:'scale',it:'scala',nl:'schaal',es:'escala',fr:'echelle',de:'MaBstab',pt:'escala',pl:'skala'},
-        {en:'neural',it:'neurale',nl:'neuraal',es:'neuronal',fr:'neuronal',de:'neuronal',pt:'neural',pl:'neuronowy'},
-        {en:'models',it:'modelli',nl:'modellen',es:'modelos',fr:'modeles',de:'Modelle',pt:'modelos',pl:'modele'},
-        {en:'accurate',it:'accurato',nl:'nauwkeurig',es:'preciso',fr:'precis',de:'genau',pt:'preciso',pl:'dokladny'},
-        {en:'adoption',it:'adozione',nl:'adoptie',es:'adopcion',fr:'adoption',de:'Annahme',pt:'adocao',pl:'adopcja'},
-        {en:'real-time',it:'tempo reale',nl:'realtime',es:'tiempo real',fr:'temps reel',de:'Echtzeit',pt:'tempo real',pl:'czas rzeczywisty'},
-        {en:'cultures',it:'culture',nl:'culturen',es:'culturas',fr:'cultures',de:'Kulturen',pt:'culturas',pl:'kultury'},
-        {en:'experience',it:'esperienza',nl:'ervaring',es:'experiencia',fr:'experience',de:'Erfahrung',pt:'experiencia',pl:'doswiadczenie'},
-        {en:'different',it:'diverso',nl:'verschillend',es:'diferente',fr:'different',de:'unterschiedlich',pt:'diferente',pl:'rozny'},
-        {en:'remarkably',it:'notevolmente',nl:'opmerkelijk',es:'notablemente',fr:'remarquablement',de:'bemerkenswert',pt:'notavelmente',pl:'znaczaco'},
-        {en:'handling',it:'gestione',nl:'verwerking',es:'manejo',fr:'gestion',de:'Handhabung',pt:'tratamento',pl:'obsluga'},
-        {en:'cases',it:'casi',nl:'gevallen',es:'casos',fr:'cas',de:'Falle',pt:'casos',pl:'przypadki'}
-      ];
-
-      // Card 1: Full-width multi-language table
-      h+='<div class="extras-card" style="grid-column:1/-1"><div class="ec-title">11 · Multi-Language Gloss <span class="ec-badge" style="background:rgba(96,165,250,.15);color:#60a5fa">8 LANG</span></div>';
-      if(noData){h+='<div style="color:'+tc('rgba(255,255,255,.2)','rgba(0,0,0,.25)')+';font-style:italic">Words appear as detected in transcript</div>'}
-      else{
-        var matched=[];
-        glossDict.forEach(function(row){
-          if(words.some(function(w){return w.w===row.en.replace('-','')})) matched.push(row);
-        });
-        if(matched.length===0) matched=glossDict.slice(0,5);
-        var thColor=tc('rgba(255,255,255,.25)','rgba(0,0,0,.4)');
-        var thBg=tc('rgba(22,26,42,.9)','rgba(248,250,252,.95)');
-        var rowBorder=tc('rgba(255,255,255,.04)','rgba(0,0,0,.06)');
-        var cellColor=tc('rgba(255,255,255,.55)','rgba(0,0,0,.6)');
-        var cellColor2=tc('rgba(255,255,255,.5)','rgba(0,0,0,.55)');
-        h+='<div style="overflow-x:auto"><table style="width:100%;font-size:10px;border-collapse:collapse"><thead><tr style="color:'+thColor+';font-size:8px;text-transform:uppercase;letter-spacing:.05em"><th style="padding:5px 8px;text-align:left;position:sticky;left:0;background:'+thBg+'">EN</th><th>IT</th><th>NL</th><th>ES</th><th>FR</th><th>DE</th><th>PT</th><th>PL</th></tr></thead><tbody>';
-        matched.forEach(function(r,i){
-          var bg=i%2===0?tc('rgba(255,255,255,.01)','rgba(0,0,0,.02)'):'transparent';
-          var enBg=i%2===0?tc('rgba(22,26,42,.92)','rgba(248,250,252,.97)'):tc('rgba(22,26,42,.88)','rgba(248,250,252,.95)');
-          h+='<tr style="border-top:1px solid '+rowBorder+';background:'+bg+'"><td style="padding:5px 8px;font-weight:600;color:#60a5fa;position:sticky;left:0;background:'+enBg+'">'+r.en+'</td><td style="color:'+cellColor+';padding:5px 8px">'+r.it+'</td><td style="color:'+cellColor2+';padding:5px 8px">'+r.nl+'</td><td style="color:'+cellColor2+';padding:5px 8px">'+r.es+'</td><td style="color:'+cellColor2+';padding:5px 8px">'+r.fr+'</td><td style="color:'+cellColor2+';padding:5px 8px">'+r.de+'</td><td style="color:'+cellColor2+';padding:5px 8px">'+r.pt+'</td><td style="color:'+cellColor2+';padding:5px 8px">'+r.pl+'</td></tr>';
-        });
-        h+='</tbody></table></div>';
-      }
-      h+='</div>';
-      h+='<div style="font-size:7px;color:'+tc('rgba(255,255,255,.12)','rgba(0,0,0,.15)')+';margin-top:4px;text-align:right">Double-click any word to save to Word Bank</div>';
-
-      // h+='</div></div>';
-
-      h+='</div>';
-      cb(h, function(){
-        // Double-click words to add to word bank
-        var table=document.querySelector('#extrasPanel table');
-        if(!table) return;
-        table.querySelectorAll('td').forEach(function(td){
-          td.style.cursor='pointer';
-          td.addEventListener('dblclick',function(){
-            var word=this.textContent.trim();
-            if(!word||word.length<2) return;
-            var bankKey='sottotitoli_wordbank_'+(currentCaptionLang||'en-US');
-            var bank=JSON.parse(localStorage.getItem(bankKey)||'[]');
-            if(bank.indexOf(word)>=0) return;
-            bank.push(word);
-            localStorage.setItem(bankKey,JSON.stringify(bank));
-            // Flash feedback
-            var orig=this.style.background;
-            this.style.background='rgba(52,211,153,.2)';
-            setTimeout(function(){td.style.background=orig},400);
-          });
-        });
-      });
-    },
-
-    // ═══ Info — Word Family + Etymology ═══
-    info: function(cb){
-      var h='<div class="extras-grid">';
-      var words=getTranscriptWords();
-      var noData=words.length===0;
-      var text=(document.getElementById('captionTranscript')?.textContent||'');
-
-      // 05 — Word Family
-      h+='<div class="extras-card"><div class="ec-title">05 \u00b7 Word Family <span class=\"ec-badge\" style=\"background:rgba(167,139,250,.15);color:#a78bfa\">ROOTS</span></div>';
-      var families={
-        discuss:{root:'discuss',family:'discussion, discussed, discusses, discussing, discourse',origin:'Latin \u201cdiscutere\u201d \u2014 to shake apart, examine'},
-        translate:{root:'translat',family:'translation, translated, translating, translator, translatable',origin:'Latin \u201ctranslatus\u201d \u2014 carried across'},
-        language:{root:'lingu',family:'linguistic, linguist, bilingual, multilingual, lingua franca',origin:'Latin \u201clingua\u201d \u2014 tongue, speech'},
-        system:{root:'system',family:'systematic, systemic, systematically, ecosystem, subsystem',origin:'Greek \u201csystema\u201d \u2014 organized whole'},
-        culture:{root:'cultur',family:'cultural, culturally, multicultural, subculture, acculturate',origin:'Latin \u201ccultura\u201d \u2014 cultivation, tending'},
-        future:{root:'futur',family:'futuristic, futurism, futurist, future-proof',origin:'Latin \u201cfuturus\u201d \u2014 about to be'},
-        scale:{root:'scal',family:'scalable, scaling, scalability, upscale, downscale',origin:'Latin \u201cscala\u201d \u2014 ladder, staircase'},
-        model:{root:'model',family:'modeling, modeled, remodel, supermodel, role model',origin:'Latin \u201cmodulus\u201d \u2014 small measure, standard'},
-        adopt:{root:'adopt',family:'adoption, adopted, adopting, adoptive, adoptee',origin:'Latin \u201cadoptare\u201d \u2014 to choose for oneself'},
-        accurate:{root:'accur',family:'accuracy, accurately, inaccurate, inaccuracy',origin:'Latin \u201caccuratus\u201d \u2014 done with care'}
-      };
-      var foundFamilies=[];
-      Object.keys(families).forEach(function(key){
-        if(text.toLowerCase().indexOf(key)>=0) foundFamilies.push({key:key,data:families[key]});
-      });
-      if(foundFamilies.length===0) foundFamilies=[{key:'discuss',data:families.discuss},{key:'translate',data:families.translate},{key:'language',data:families.language}];
-      foundFamilies.slice(0,4).forEach(function(f){
-        h+='<div style="background:rgba(167,139,250,.04);border:1px solid rgba(167,139,250,.06);border-radius:8px;padding:8px 10px;margin-bottom:5px">';
-        h+='<div style="font-weight:700;color:#c4b5fd;font-size:11px;margin-bottom:2px">'+f.data.root+'</div>';
-        h+='<div style="font-size:9px;color:rgba(255,255,255,.45);margin-bottom:3px">'+f.data.family+'</div>';
-        h+='<div style="font-size:8px;color:rgba(255,255,255,.2);font-style:italic">'+f.data.origin+'</div>';
-        h+='</div>';
-      });
-      h+='</div>';
-
-      // 07 — Etymology
-      h+='<div class="extras-card"><div class="ec-title">07 \u00b7 Etymology <span class=\"ec-badge\" style=\"background:rgba(251,191,36,.15);color:#fbbf24\">HIST</span></div>';
-      if(noData){h+='<div style=\"color:rgba(255,255,255,.2);font-style:italic\">Avvia una sessione</div>'}
-      else{
-        var etyms=[
-          {w:'discuss',year:'1380s',from:'Old French \u201cdiscuter\u201d',meaning:'originally \u201cto shake apart, examine\u201d'},
-          {w:'future',year:'1380s',from:'Old French \u201cfutur\u201d',meaning:'\u201cthat is yet to be\u201d'},
-          {w:'translation',year:'1350s',from:'Latin \u201ctranslatio\u201d',meaning:'\u201ca carrying across, removal\u201d'},
-          {w:'language',year:'1290s',from:'Old French \u201clangage\u201d',meaning:'\u201cwords, what is said, conversation\u201d'},
-          {w:'system',year:'1610s',from:'Greek \u201csystema\u201d',meaning:'\u201corganized whole, body\u201d'},
-          {w:'barrier',year:'1325s',from:'Old French \u201cbarriere\u201d',meaning:'\u201cobstacle, gate, defense\u201d'},
-          {w:'neural',year:'1840s',from:'Greek \u201cneuron\u201d',meaning:'\u201crelating to nerves or the nervous system\u201d'},
-          {w:'scale',year:'1300s',from:'Latin \u201cscala\u201d',meaning:'\u201cladder, means of ascent\u201d'}
-        ];
-        var foundEtyms=[];
-        etyms.forEach(function(e){
-          if(text.toLowerCase().indexOf(e.w)>=0) foundEtyms.push(e);
-        });
-        if(foundEtyms.length===0) foundEtyms=etyms.slice(0,5);
-        foundEtyms.forEach(function(e){
-          h+='<div style="display:flex;align-items:baseline;gap:6px;padding:4px 6px;border-bottom:1px solid rgba(255,255,255,.03);font-size:9px">';
-          h+='<span style="font-weight:700;color:#fbbf24;min-width:72px">'+e.w+'</span>';
-          h+='<span style="color:rgba(255,255,255,.2);min-width:38px;font-family:JetBrains Mono,monospace">'+e.year+'</span>';
-          h+='<span style="color:rgba(255,255,255,.4)">'+e.from+'</span>';
-          h+='</div>';
-          h+='<div style="font-size:8px;color:rgba(255,255,255,.18);padding:0 6px 4px 116px;font-style:italic">'+e.meaning+'</div>';
-        });
-      }
-      h+='</div>';
-
-      h+='</div>';
-      cb(h);
-    },
-
     // ═══ Synonyms 21 — Contextual Synonym Cards (from mockup 21) ═══
     synonyms21: function(cb){
       var h='<div class="extras-grid">';
@@ -3431,7 +3211,7 @@ function downloadGrammarPDF() {
         h+='</div>';
         
         // Parse tree output
-        h+='<div id="gpTree" style="font-family:JetBrains Mono,monospace;font-size:10px;line-height:1.8;padding:14px;background:rgba(0,0,0,.2);border-radius:10px;border:1px solid rgba(255,255,255,.04);color:rgba(255,255,255,.5);min-height:60px;white-space:pre">Click a sentence above to parse</div>';
+        h+='<div id="gpTree" style="font-family:JetBrains Mono,monospace;font-size:10px;line-height:1.8;padding:14px;background:rgba(0,0,0,.2);border-radius:10px;border:1px solid rgba(255,255,255,.04);color:rgba(255,255,255,.5);min-height:60px;max-height:300px;overflow:auto;white-space:pre-wrap;word-break:break-word">Click a sentence above to parse</div>';
         
         // Stats
         h+='<div id="gpStats" style="margin-top:8px;font-size:9px;color:rgba(255,255,255,.2)"></div>';
