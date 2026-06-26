@@ -1334,6 +1334,10 @@ _realMic.onFinal = function(text) {
   // Prepend — most recent finalized line appears right beneath the live interim box
   transcript.insertBefore(div, transcript.firstChild);
   
+  // Accumulate lines for session-end transcript save
+  if (!window._sessionLines) window._sessionLines = [];
+  window._sessionLines.push({ en: text, time: tsStr, lang: currentCaptionLang || 'en-US' });
+  
   // Clear interim after final
   if (interim) interim.textContent = '';
   
@@ -1427,7 +1431,13 @@ function toggleSession() {
     });
   } else {
     stopRealMic();
-    _endSupabaseSession();
+    // Save session with transcript + stats
+    var sessionData = {
+      lines: window._sessionLines || [],
+      durationSeconds: sessionSeconds
+    };
+    _endSupabaseSession(sessionData);
+    window._sessionLines = [];
     startBtn.style.display = '';
     stopBtn.style.display = 'none';
     if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
