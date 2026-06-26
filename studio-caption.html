@@ -235,6 +235,8 @@ h2 { font-family: var(--font-display); font-size: clamp(24px,4vw,36px); font-wei
 .hamburger-dropdown.closing { display: flex; animation: hbGlideOut .22s ease-in forwards; }
 @keyframes hbGlideIn{from{opacity:0;transform:translateY(-16px)}to{opacity:1;transform:translateY(0)}}
 @keyframes hbGlideOut{from{opacity:1;transform:translateY(0)}to{opacity:0;transform:translateY(-10px)}}
+@keyframes toastIn{from{opacity:0;transform:translateX(-50%) translateY(20px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}
+@keyframes toastOut{from{opacity:1;transform:translateX(-50%) translateY(0)}to{opacity:0;transform:translateX(-50%) translateY(20px)}}
 .hamburger-dropdown a {
   font-family: var(--font-body); font-size: 13px; font-weight: 500;
   padding: 8px 12px; border-radius: 6px; color: var(--text);
@@ -322,7 +324,7 @@ body.fullscreen-active #vocabPanel { display: none !important; }
 body.fullscreen-active #sharePanel { display: none !important; }
 body.fullscreen-active .theme-btn { display: none !important; }
 body.fullscreen-active .action-row { display: none !important; }
-body.fullscreen-active .status-strip { display: none !important; }
+body.fullscreen-active .listen-bar { display: none !important; }
 body.fullscreen-active .h-scroll { overflow: hidden; }
 body.fullscreen-active #transcriptPanel {
   min-width: 100vw; display: flex; align-items: center; justify-content: center;
@@ -473,16 +475,12 @@ button[onclick*="addToWordBank"]:hover{background:rgba(52,211,153,.15)!important
 .conf-wave-bar{width:5px;border-radius:2px;animation:confPulse 1.2s ease infinite}
 @keyframes confPulse{0%,100%{opacity:.3;transform:scaleY(.4)}50%{opacity:1;transform:scaleY(1)}}
 
-/* ═══ Listening bar (#30) — under caption box ═══ */
-.listen-bar{display:flex;align-items:center;gap:10px;padding:10px 16px;margin-top:0;border-radius:10px;background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.04);font-size:11px;color:rgba(255,255,255,.35);font-family:'Inter',sans-serif;transition:all .3s}
+/* ═══ Status bar (#30) — unified Mic/Live/Timer under caption box ═══ */
+.listen-bar{display:flex;align-items:center;gap:10px;padding:10px 16px;margin-top:0;border-radius:10px;background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.04);font-size:11px;color:rgba(255,255,255,.35);font-family:'Inter',sans-serif;transition:all .3s;flex-wrap:wrap;justify-content:center}
 .listen-bar.active{border-color:rgba(52,211,153,.15);background:rgba(52,211,153,.03)}
-.listen-dot{width:7px;height:7px;border-radius:50%;background:rgba(255,255,255,.15);flex-shrink:0;transition:all .3s}
-.listen-dot.live{background:#34d399;box-shadow:0 0 8px rgba(52,211,153,.5);animation:pulse 1.5s ease-in-out infinite}
-.listen-sep{color:rgba(255,255,255,.1)}
-.listen-bar strong{color:rgba(255,255,255,.55);font-weight:600}
+.listen-bar .s-pill{padding:4px 10px;font-size:10px}
 [data-theme="light"] .listen-bar{background:rgba(0,0,0,.015);border-color:rgba(0,0,0,.05);color:rgba(0,0,0,.4)}
 [data-theme="light"] .listen-bar.active{border-color:rgba(5,150,105,.12);background:rgba(5,150,105,.03)}
-[data-theme="light"] .listen-bar strong{color:rgba(0,0,0,.6)}
 
 /* ═══ Word Bank (#34) ═══ */
 .wordbank-panel{margin-top:6px;padding:14px 16px;border-radius:12px;background:rgba(167,139,250,.04);border:1px solid rgba(167,139,250,.12);animation:extraIn .3s ease}
@@ -490,7 +488,8 @@ button[onclick*="addToWordBank"]:hover{background:rgba(52,211,153,.15)!important
 .wordbank-chips{display:flex;flex-wrap:wrap;gap:5px;min-height:28px}
 .wordbank-chip{display:inline-flex;align-items:center;gap:4px;padding:4px 10px;border-radius:7px;font-size:10px;font-weight:600;background:rgba(167,139,250,.1);color:#c4b5fd;border:1px solid rgba(167,139,250,.15);cursor:pointer;transition:all .15s;user-select:none}
 .wordbank-chip:hover{background:rgba(248,113,113,.08);border-color:rgba(248,113,113,.2);color:#f87171}
-.wordbank-chip:hover::after{content:'×';margin-left:2px;font-size:9px;opacity:.6}
+.wordbank-chip .wb-chip-x{margin-left:3px;width:14px;height:14px;border-radius:50%;background:rgba(248,113,113,.15);color:#f87171;display:inline-flex;align-items:center;justify-content:center;font-size:9px;line-height:1;opacity:.5;transition:opacity .15s}
+.wordbank-chip:hover .wb-chip-x{opacity:1}
 .wordbank-empty{text-align:center;font-size:10px;color:rgba(255,255,255,.15);padding:8px 0;display:none}
 .wordbank-empty.show{display:block}
 .wordbank-toggle-btn{border-color:rgba(167,139,250,.2)!important;color:#c4b5fd!important}
@@ -560,13 +559,6 @@ button[onclick*="addToWordBank"]:hover{background:rgba(52,211,153,.15)!important
   <section class="h-panel" id="transcriptPanel">
     <div class="h-panel-inner">
 
-      <div class="status-strip">
-        <div class="s-pill"><span class="dot" id="micDot"></span><span id="micStatus">Mic</span></div>
-        <div class="s-pill"><span class="dot" id="socketDot"></span><span id="socketStatus">Live</span></div>
-        <div class="s-pill">⏱ <span id="sessionTimer">00:00</span></div>
-        <div class="s-pill" id="creditPill">— min</div>
-      </div>
-
       <div class="caption-box" id="captionBox">
         <div class="caption-interim" id="captionInterim" data-placeholder="Speak to see subtitles…">We are discussing the future of real‑time translation…</div>
         <div class="caption-transcript" id="captionTranscript" data-placeholder="Previous sentences will appear here…">
@@ -575,16 +567,11 @@ button[onclick*="addToWordBank"]:hover{background:rgba(52,211,153,.15)!important
         </div>
       </div>
 
-      <!-- ═══ #30 Listening Mode — under caption box ═══ -->
+      <!-- ═══ Unified Status Bar (below caption box) ═══ -->
       <div class="listen-bar" id="listenBar">
-        <span class="listen-dot" id="listenDot30"></span>
-        <span id="listenStatus">In attesa…</span>
-        <span class="listen-sep">·</span>
-        <span>Fillers: <strong id="listenFillers">0</strong></span>
-        <span class="listen-sep">·</span>
-        <span>Speaking: <strong id="listenRatio">—%</strong></span>
-        <span class="listen-sep">·</span>
-        <span>Gaps: <strong id="listenSilence">0.0s</strong></span>
+        <span class="s-pill"><span class="dot" id="micDot"></span><span id="micStatus">Mic</span></span>
+        <span class="s-pill"><span class="dot" id="socketDot"></span><span id="socketStatus">Live</span></span>
+        <span class="s-pill">⏱ <span id="sessionTimer">00:00</span></span>
       </div>
 
       <div class="action-row">
@@ -978,11 +965,12 @@ var _sessionSavedShown = false;
 function showSessionSaved() {
   if (_sessionSavedShown) return;
   _sessionSavedShown = true;
-  var info = document.getElementById('creditPill');
-  if (info) {
-    info.innerHTML = '<a href="account.html" style="color:var(--accent);text-decoration:underline;">Session saved →</a>';
-    setTimeout(function() { info.textContent = '— min'; _sessionSavedShown = false; }, 5000);
-  }
+  // Show a brief toast since the credit pill was removed
+  var toast = document.createElement('div');
+  toast.style.cssText = 'position:fixed;bottom:20px;left:50%;transform:translateX(-50%);padding:8px 18px;border-radius:100px;background:var(--accent);color:#fff;font-weight:700;font-size:12px;z-index:99999;animation:toastIn .3s ease,toastOut .3s ease 2.5s forwards;pointer-events:none';
+  toast.textContent = '✓ Session saved — view in Account';
+  document.body.appendChild(toast);
+  setTimeout(function(){ toast.remove(); _sessionSavedShown = false; }, 3000);
 }
 // Hook into stop
 var _origToggleSession = toggleSession;
@@ -1395,6 +1383,12 @@ function toggleSession() {
       startBtn.style.display = 'none';
       stopBtn.style.display = '';
       sessionSeconds = 0;
+      // Clear session-scoped word bank & reset word tracking
+      wordBank = [];
+      saveWordBank();
+      renderWordBank();
+      // Clear synonyms panel session
+      if (typeof clearSynonymSession === 'function') clearSynonymSession();
       // Clear placeholders immediately
       var interim = document.getElementById('captionInterim');
       var transcript = document.getElementById('captionTranscript');
@@ -1423,9 +1417,17 @@ function toggleSession() {
     startBtn.style.display = '';
     stopBtn.style.display = 'none';
     if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
+    sessionSeconds = 0;
+    document.getElementById('sessionTimer').textContent = '00:00';
     document.getElementById('liveDot').querySelector('.dot').classList.remove('live');
     document.body.classList.remove('session-active');
+    // Restore placeholder state — clear boxes so ::after placeholders appear
+    var interim2 = document.getElementById('captionInterim');
+    var transcript2 = document.getElementById('captionTranscript');
+    if (interim2) { interim2.textContent = ''; interim2.removeAttribute('data-filled'); }
+    if (transcript2) { transcript2.innerHTML = ''; transcript2.removeAttribute('data-filled'); }
     updateMicUI('idle');
+    updateListenBar();
   }
 }
 
@@ -1534,6 +1536,17 @@ function clearWordBank() {
   renderWordBank();
 }
 
+// Clear session-scoped synonyms tracking
+function clearSynonymSession() {
+  // Reset the synonym word set for a fresh session
+  if (typeof window._synSessionWords !== 'undefined') {
+    window._synSessionWords = [];
+  }
+  // Clear any visible synonym cards if panel is open
+  var container = document.getElementById('synCardsContainer');
+  if (container) container.innerHTML = '<div style="grid-column:1/-1;color:var(--muted2);font-style:italic;text-align:center;padding:20px">New session — start speaking to see contextual synonyms</div>';
+}
+
 function saveWordBank() {
   localStorage.setItem(WORD_BANK_KEY, JSON.stringify(wordBank));
   var countEl = document.getElementById('wordbankCount');
@@ -1564,7 +1577,7 @@ function renderWordBank() {
   } else {
     if (empty) empty.classList.remove('show');
     chips.innerHTML = wordBank.map(function(w) {
-      return '<span class="wordbank-chip" onclick="showWordDefinition(\'' + w.replace(/'/g, "\\'") + '\')" ondblclick="removeFromWordBank(\'' + w.replace(/'/g, "\\'") + '\')" title="Click: definition · Double-click: remove">' + w + '</span>';
+      return '<span class="wordbank-chip" onclick="showWordDefinition(\'' + w.replace(/'/g, "\\'") + '\')" title="Click: definition · Double-click: remove">' + w + '<span class="wb-chip-x" onclick="event.stopPropagation();removeFromWordBank(\'' + w.replace(/'/g, "\\'") + '\')" title="Remove word">×</span></span>';
     }).join('');
   }
 }
@@ -1753,7 +1766,87 @@ var WORD_DEFS = {
   within:'inside; not beyond',
   without:'in the absence of; not having',
   world:'the earth and all its inhabitants',
-  year:'a period of 365 days'
+  year:'a period of 365 days',
+  // Dutch common words
+  als:'if; when; as',
+  dan:'then; than',
+  dat:'that',
+  die:'that; those',
+  dit:'this',
+  een:'a; an',
+  geen:'no; not any',
+  haar:'her; hair',
+  hebben:'to have',
+  heel:'whole; very',
+  hem:'him',
+  het:'the; it',
+  hij:'he',
+  hoe:'how',
+  hun:'their; them',
+  ik:'I',
+  je:'you; your',
+  kan:'can; to be able',
+  maar:'but; only',
+  met:'with',
+  naar:'to; towards',
+  niet:'not',
+  nog:'still; yet',
+  nu:'now',
+  of:'or; whether',
+  ook:'also; too',
+  over:'about; over',
+  tot:'until; to',
+  uit:'out of; from',
+  van:'of; from',
+  voor:'for; before',
+  wat:'what',
+  wel:'well; indeed',
+  waar:'where; true',
+  worden:'to become',
+  ze:'she; they; them',
+  zijn:'to be; his; its',
+  zullen:'will; shall',
+  // Italian common words
+  anche:'also; too',
+  bene:'well; good',
+  che:'that; which; what',
+  chi:'who',
+  come:'how; like; as',
+  cosa:'thing; what',
+  da:'from; by; since',
+  del:'of the; some',
+  della:'of the',
+  dopo:'after; later',
+  dove:'where',
+  fare:'to do; to make',
+  gli:'the; to him; them',
+  io:'I',
+  lei:'she; her; you (formal)',
+  loro:'they; them; their',
+  ma:'but',
+  mai:'never; ever',
+  meglio:'better; best',
+  meno:'less; minus',
+  mentre:'while; whereas',
+  molto:'very; much; a lot',
+  noi:'we; us',
+  ogni:'every; each',
+  ora:'now; hour',
+  perchè:'because; why',
+  più:'more; plus',
+  poi:'then; later',
+  può:'can; may',
+  quando:'when',
+  qui:'here',
+  senza:'without',
+  solo:'only; alone',
+  sono:'I am; they are',
+  sta:'is; stays',
+  tempo:'time; weather',
+  tutto:'all; everything',
+  uno:'one; a',
+  via:'away; street',
+  vita:'life'
 };
 
 function showWordDefinition(word) {
@@ -1761,13 +1854,44 @@ function showWordDefinition(word) {
   var defWord = document.getElementById('wordbankDefWord');
   var defText = document.getElementById('wordbankDefText');
   if (!defPanel || !defWord || !defText) return;
-  var def = WORD_DEFS[word];
+  var def = WORD_DEFS[word] || WORD_DEFS[word.toLowerCase()];
   if (def) { defWord.textContent = word + ': '; defText.textContent = def; }
-  else { defWord.textContent = word + ': '; defText.textContent = '(no definition — double-click to remove)'; }
+  else {
+    defWord.textContent = word + ': ';
+    // Try a language-aware fallback
+    var langHint = detectWordLanguage(word);
+    defText.innerHTML = '<em style="opacity:.7">Definition not yet in dictionary</em><br><small style="color:var(--accent);cursor:pointer" onclick="event.stopPropagation();lookupOnline(\''+word.replace(/'/g,"\\'")+'\')">🔍 Look up online &rarr;</small>';
+  }
   defPanel.style.display = 'block';
   var chips = document.querySelectorAll('.wordbank-chip');
   chips.forEach(function(c) { c.style.background = ''; c.style.borderColor = ''; });
   chips.forEach(function(c) { if (c.textContent === word) { c.style.background = 'rgba(167,139,250,.22)'; c.style.borderColor = 'rgba(167,139,250,.4)'; } });
+}
+
+// Simple language detection for Word Bank lookups
+function detectWordLanguage(word) {
+  // Dutch patterns: 'ij', 'aa', 'ee', 'oo', 'uu', 'sch', 'lijk', 'tje', 'ing', 'en' endings
+  if (/(ij|aa|ee|oo|uu|sch|lijk|tje|heid|ing)\b/i.test(word)) return 'nl';
+  // Italian patterns: vowels ending, 'zione', 'mente', 'gli', 'sci', 'cia'
+  if (/(zione|mente|gli|sci|cia|gio|che|chi)\b/i.test(word) || /[aeiou]$/i.test(word)) return 'it';
+  // Spanish patterns
+  if (/(ción|dad|mente|ando|iendo|illo|illa)\b/i.test(word)) return 'es';
+  // French patterns
+  if (/(eau|eur|ment|tion|sion|ique|able)\b/i.test(word)) return 'fr';
+  // Default to English
+  return 'en';
+}
+function lookupOnline(word) {
+  var lang = detectWordLanguage(word);
+  var urls = {
+    en: 'https://www.merriam-webster.com/dictionary/',
+    nl: 'https://www.vandale.nl/gratis-woordenboek/nederlands/betekenis/',
+    it: 'https://dizionario.internazionale.it/parola/',
+    es: 'https://dle.rae.es/',
+    fr: 'https://www.larousse.fr/dictionnaires/francais/'
+  };
+  var url = (urls[lang] || 'https://www.google.com/search?q=define+') + encodeURIComponent(word);
+  window.open(url, '_blank');
 }
 
 // Restore word bank from Supabase on load
@@ -1881,11 +2005,11 @@ function autoCollectWordBank(text) {
 // ═══ #30 Listening Mode — update from session ═══
 function updateListenBar() {
   var bar = document.getElementById('listenBar');
-  var dot = document.getElementById('listenDot30');
-  var status = document.getElementById('listenStatus');
-  var fillersEl = document.getElementById('listenFillers');
-  var ratioEl = document.getElementById('listenRatio');
-  var silenceEl = document.getElementById('listenSilence');
+  var micDot = document.getElementById('micDot');
+  var micStatus = document.getElementById('micStatus');
+  var socketDot = document.getElementById('socketDot');
+  var socketStatus = document.getElementById('socketStatus');
+  var timer = document.getElementById('sessionTimer');
   if (!bar) return;
 
   var isActive = (typeof sessionActive !== 'undefined') && sessionActive;
@@ -1893,30 +2017,18 @@ function updateListenBar() {
 
   if (isActive) {
     bar.classList.add('active');
-    if (dot) dot.classList.add('live');
-    if (status) status.textContent = '🎤 Speaking…';
-
-    // Count fillers from transcript
-    var t = document.getElementById('captionTranscript');
-    var text = t ? (t.textContent || '') : '';
-    var fillers = (text.match(/\b(um|uh|er|ah|hm|like|you know|i mean)\b/gi) || []).length;
-    if (fillersEl) fillersEl.textContent = fillers;
-
-    // Speaking ratio (heuristic: ~85-95% of session is speech)
-    var ratio = sec > 0 ? Math.min(98, Math.round(85 + (sec % 10))) : 0;
-    if (ratioEl) ratioEl.textContent = sec > 5 ? ratio + '%' : '—%';
-
-    // Silence gap estimate
-    var words = (text.match(/\b\w+\b/g) || []).length;
-    var avgGap = sec > 10 && words > 0 ? ((sec / Math.max(1, words)) * 0.15).toFixed(1) : '0.0';
-    if (silenceEl) silenceEl.textContent = avgGap + 's';
+    if (micDot) micDot.classList.add('live');
+    if (micStatus) micStatus.textContent = 'Live';
+    if (socketDot) socketDot.classList.add('live');
+    if (socketStatus) socketStatus.textContent = 'Live';
+    // Timer updated by setInterval already
   } else {
     bar.classList.remove('active');
-    if (dot) dot.classList.remove('live');
-    if (status) status.textContent = 'In attesa…';
-    if (fillersEl) fillersEl.textContent = '0';
-    if (ratioEl) ratioEl.textContent = '—%';
-    if (silenceEl) silenceEl.textContent = '0.0s';
+    if (micDot) micDot.classList.remove('live');
+    if (micStatus) micStatus.textContent = 'Mic';
+    if (socketDot) socketDot.classList.remove('live');
+    if (socketStatus) socketStatus.textContent = 'Idle';
+    if (timer) timer.textContent = '00:00';
   }
 }
 
@@ -1983,26 +2095,75 @@ function downloadGrammarPDF() {
     barrier:'NOUN',barriers:'NOUN',deployment:'NOUN',scale:'NOUN',challenge:'NOUN',year:'NOUN',
     real:'ADJ',international:'ADJ',biggest:'ADJ',new:'ADJ',good:'ADJ',great:'ADJ',important:'ADJ',
     discuss:'VERB',discussing:'VERB',bridge:'VERB',remain:'VERB',remains:'VERB',use:'VERB',used:'VERB',using:'VERB',
-    realtime:'ADJ','real-time':'ADJ'
+    realtime:'ADJ','real-time':'ADJ',
+    // ── Dutch common words ──
+    ik:'PRON',je:'PRON',jij:'PRON',hij:'PRON',zij:'PRON',we:'PRON',wij:'PRON',jullie:'PRON',u:'PRON',
+    me:'PRON',mij:'PRON',hem:'PRON',haar:'PRON',ons:'PRON',hen:'PRON',hun:'PRON',
+    de:'DET',het:'DET',een:'DET',
+    zijn:'VERB',is:'VERB',ben:'VERB',bent:'VERB',was:'VERB',waren:'VERB',geweest:'VERB',
+    hebben:'VERB',heb:'VERB',hebt:'VERB',heeft:'VERB',had:'VERB',hadden:'VERB',
+    worden:'VERB',word:'VERB',wordt:'VERB',werd:'VERB',werden:'VERB',geworden:'VERB',
+    kunnen:'VERB',kan:'VERB',kunt:'VERB',kon:'VERB',konden:'VERB',
+    moeten:'VERB',moet:'VERB',mogen:'VERB',mag:'VERB',zullen:'VERB',zal:'VERB',
+    doen:'VERB',doe:'VERB',doet:'VERB',deed:'VERB',deden:'VERB',gedaan:'VERB',
+    maken:'VERB',maak:'VERB',maakt:'VERB',maakte:'VERB',gemaakt:'VERB',
+    gaan:'VERB',ga:'VERB',gaat:'VERB',ging:'VERB',gingen:'VERB',gegaan:'VERB',
+    komen:'VERB',kom:'VERB',komt:'VERB',kwam:'VERB',kwamen:'VERB',gekomen:'VERB',
+    zeggen:'VERB',zeg:'VERB',zegt:'VERB',zei:'VERB',zeiden:'VERB',gezegd:'VERB',
+    niet:'ADV',wel:'ADV',ook:'ADV',nog:'ADV',hier:'ADV',daar:'ADV',dan:'ADV',nu:'ADV',
+    erg:'ADV',zeer:'ADV',heel:'ADJ',goed:'ADJ',groot:'ADJ',klein:'ADJ',mooi:'ADJ',nieuw:'ADJ',oud:'ADJ',jong:'ADJ',
+    en:'CONJ',of:'CONJ',maar:'CONJ',want:'CONJ',dus:'CONJ',
+    in:'PREP',op:'PREP',aan:'PREP',uit:'PREP',van:'PREP',voor:'PREP',naar:'PREP',over:'PREP',met:'PREP',tot:'PREP',door:'PREP',bij:'PREP',zonder:'PREP',tussen:'PREP',tijdens:'PREP',
+    // ── Italian common words ──
+    io:'PRON',tu:'PRON',lui:'PRON',lei:'PRON',noi:'PRON',voi:'PRON',loro:'PRON',
+    il:'DET',la:'DET',lo:'DET',gli:'DET',le:'DET',un:'DET',una:'DET',"un'":'DET',
+    essere:'VERB',sono:'VERB',sei:'VERB',è:'VERB',siamo:'VERB',siete:'VERB',era:'VERB',erano:'VERB',stato:'VERB',
+    avere:'VERB',ho:'VERB',hai:'VERB',ha:'VERB',hanno:'VERB',aveva:'VERB',avevano:'VERB',
+    fare:'VERB',faccio:'VERB',fai:'VERB',fa:'VERB',fanno:'VERB',faceva:'VERB',fatto:'VERB',
+    andare:'VERB',vado:'VERB',vai:'VERB',va:'VERB',vanno:'VERB',andato:'VERB',
+    venire:'VERB',vengo:'VERB',vieni:'VERB',viene:'VERB',venuto:'VERB',
+    potere:'VERB',posso:'VERB',puoi:'VERB',può:'VERB',possono:'VERB',
+    volere:'VERB',voglio:'VERB',vuoi:'VERB',vuole:'VERB',vogliono:'VERB',
+    non:'ADV',anche:'ADV',solo:'ADV',sempre:'ADV',mai:'ADV',già:'ADV',poi:'ADV',ora:'ADV',
+    bene:'ADV',molto:'ADJ',bello:'ADJ',buono:'ADJ',grande:'ADJ',piccolo:'ADJ',
+    e:'CONJ',ma:'CONJ',o:'CONJ',che:'CONJ',se:'CONJ',quando:'CONJ',dove:'CONJ',come:'CONJ',perché:'CONJ',
+    di:'PREP',a:'PREP',da:'PREP',in:'PREP',con:'PREP',su:'PREP',per:'PREP',tra:'PREP',fra:'PREP',
+    cosa:'NOUN',tempo:'NOUN',anno:'NOUN',giorno:'NOUN',uomo:'NOUN',donna:'NOUN',vita:'NOUN',mondo:'NOUN'
   };
 
   function tagWord(w){
     w = w.toLowerCase().replace(/[^a-z0-9-]/g,'');
     if (!w || w.length<2) return 'OTHER';
     if (POS_DICT[w]) return POS_DICT[w];
-    // Verb patterns (stronger signals first)
+    // ── Multi-language suffix patterns ──
+    // Verb patterns
     if (w.endsWith('ing')) return 'VERB';
     if (w.endsWith('ed') && w.length>4) return 'VERB';
+    // Dutch verb patterns: -en infinitive/plural, -t 2nd/3rd person, -de/-te past
     if (/^(is|are|was|were|be|been|being|have|has|had|do|does|did|will|would|can|could|may|might|must|shall|should|go|goes|went|come|comes|came|make|makes|made|take|takes|took|get|gets|got|see|sees|saw|know|knows|knew|think|thinks|thought|say|says|said|tell|tells|told|give|gives|gave|use|uses|used|find|finds|found|work|works|worked|try|tries|tried|ask|asks|asked|seem|seems|seemed|mean|means|meant|need|needs|needed|want|wants|wanted|keep|keeps|kept|let|lets|put|puts|set|sets)$/.test(w)) return 'VERB';
+    // Italian verb patterns: -are/-ere/-ire infinitive, -ato/-uto/-ito participle, -ando/-endo gerund
+    if (w.endsWith('are')||w.endsWith('ere')||w.endsWith('ire')) { if (w.length>4) return 'VERB'; }
+    if (w.endsWith('ato')||w.endsWith('uto')||w.endsWith('ito')) return 'VERB';
+    if (w.endsWith('ando')||w.endsWith('endo')) return 'VERB';
+    if (w.endsWith('en') && w.length>4 && !w.endsWith('een') && !w.endsWith('ien')) return 'VERB'; // Dutch infinitive/plural
     // Noun patterns
     if (w.endsWith('tion')||w.endsWith('sion')||w.endsWith('ment')||w.endsWith('ness')||w.endsWith('ity')||w.endsWith('ance')||w.endsWith('ence')) return 'NOUN';
+    if (w.endsWith('heid')) return 'NOUN'; // Dutch -heid (like -ness)
+    if (w.endsWith('zione')||w.endsWith('sione')) return 'NOUN'; // Italian -zione/-sione
+    if (w.endsWith('tà')||w.endsWith('tù')) return 'NOUN'; // Italian abstracts
     // Adverb pattern
     if (w.endsWith('ly')) return 'ADV';
+    if (w.endsWith('mente')) return 'ADV'; // Italian -mente
+    if (w.endsWith('lijk')) return 'ADV'; // Dutch -lijk (like -ly)
     // Adjective patterns
     if (w.endsWith('ous')||w.endsWith('ful')||w.endsWith('less')||w.endsWith('able')||w.endsWith('ible')||w.endsWith('ive')||w.endsWith('al')||w.endsWith('ic')) return 'ADJ';
     if (w.endsWith('er')||w.endsWith('est')) return 'ADJ';
-    // Preposition / function words
-    if (/^(the|a|an|in|on|at|to|for|of|with|by|from|into|about|over|under|between|through|during|before|after|above|below|up|down|out|off|or|and|but|so|if|when|where|how|why|who|whom|which|this|that|these|those|my|your|his|her|its|our|their|i|we|you|he|she|it|they|me|us|him|them|not|no|yes|very|just|only|also|even|still|yet|more|most|some|any|all|each|every|both|few|many|much|such|than|too|as|like|here|there|now|then|well)$/.test(w)) return 'FUNC';
+    if (w.endsWith('oso')||w.endsWith('ale')||w.endsWith('ico')||w.endsWith('istico')) return 'ADJ'; // Italian adjectives
+    if (w.endsWith('isch')||w.endsWith('baar')) return 'ADJ'; // Dutch adjectives: -isch, -baar
+    // Diminutives → likely NOUN
+    if (w.endsWith('je')||w.endsWith('tje')||w.endsWith('pje')||w.endsWith('kje')) return 'NOUN';
+    // Preposition / function words (English + Dutch + Italian)
+    if (/^(the|a|an|de|het|een|il|la|lo|gli|le|un|una|in|on|at|op|aan|to|for|of|di|da|con|su|per|tra|fra|with|met|by|door|from|van|into|about|over|under|tussen|between|through|during|tijdens|before|after|above|below|up|down|out|off|or|and|but|en|of|maar|e|o|so|if|als|wanneer|quando|where|dove|how|hoe|come|why|waarom|perché|who|wie|chi|whom|which|welke|this|dit|that|dat|these|deze|those|die|my|mijn|your|jouw|uw|his|zijn|her|haar|its|our|ons|onze|their|hun|i|ik|we|wij|you|jij|jullie|he|hij|she|zij|it|they|me|mij|us|ons|him|hem|them|hen|not|niet|non|no|nee|yes|ja|sì|very|heel|erg|zeer|molto|just|alleen|solo|only|also|ook|anche|even|zelfs|still|nog|yet|more|meer|più|most|meest|some|sommige|alcuni|any|enige|all|alle|tutti|each|elk|ogni|every|iedere|both|beide|few|weinig|pochi|many|veel|molti|much|such|zo|than|dan|too|te|as|like|als|come|here|hier|qui|there|daar|là|now|nu|ora|then|dan|poi|well|goed|bene)$/.test(w)) return 'FUNC';
     // Final noun check
     if (w.endsWith('s') && w.length>4) return 'NOUN';
     // Default: check first letter capitalization heuristic
@@ -2920,8 +3081,8 @@ function downloadGrammarPDF() {
       var prepScore=Math.min(98,Math.max(40,Math.round((prepositions.length/Math.max(1,totalWords/8))*100)));
       var articleScore=Math.min(98,Math.max(40,Math.round((articles.length/Math.max(1,totalWords/10))*100)));
       var tenseScore=Math.min(98,Math.max(40,Math.round((pastVerbs.length+presentVerbs.length)/Math.max(1,totalWords/6)*100)));
-      var svScore=noData?0:Math.min(98,78+(allSessions&&allSessions.length>0?allSessions.length%18:0));
-      var wordOrderScore=noData?0:Math.min(98,75+(allSessions&&allSessions.length>0?allSessions.length%20:0));
+      var svScore=noData?0:Math.min(98,78+(typeof allSessions!=='undefined'&&allSessions&&allSessions.length>0?allSessions.length%18:sessionMetrics.lines.length%18));
+      var wordOrderScore=noData?0:Math.min(98,75+(typeof allSessions!=='undefined'&&allSessions&&allSessions.length>0?allSessions.length%20:sessionMetrics.lines.length%20));
       var pronounScore=Math.min(98,Math.max(40,Math.round((pronouns.length/Math.max(1,totalWords/12))*100)));
       var conjScore=Math.min(98,Math.max(40,Math.round((conjunctions.length/Math.max(1,totalWords/15))*100)));
       var pluralScore=Math.min(98,Math.max(40,Math.round((plurals.length/Math.max(1,totalWords/5))*100)));
@@ -3159,7 +3320,7 @@ function downloadGrammarPDF() {
         var posBorder={VERB:'rgba(52,211,153,.2)',NOUN:'rgba(96,165,250,.2)',ADJ:'rgba(244,114,182,.2)'};
 
         h+='<div class="syn-card-21" data-pos="'+d.pos+'" style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px;transition:all .25s;position:relative">';
-        h+='<button onclick="event.stopPropagation();addToWordBank(\''+item.word+'\')" title=\"Add to Word Bank\" style=\"position:absolute;top:8px;right:8px;width:22px;height:22px;border-radius:50%;border:1px solid var(--line);background:var(--card2);color:var(--muted2);cursor:pointer;font-size:14px;line-height:1;display:flex;align-items:center;justify-content:center;transition:all .2s;z-index:2\" onmouseenter=\"this.style.background=\'rgba(52,211,153,.15)\';this.style.borderColor=\'rgba(52,211,153,.3)\';this.style.color=\'#34d399\'\" onmouseleave=\"this.style.background=\'rgba(255,255,255,.04)\';this.style.borderColor=\'rgba(255,255,255,.1)\';this.style.color=\'rgba(255,255,255,.3)\'\">+</button>';
+        h+='<button onclick="event.stopPropagation();var w=addToWordBank(\''+item.word+'\');var toast=document.createElement(\'div\');toast.style.cssText=\'position:fixed;bottom:20px;left:50%;transform:translateX(-50%);padding:8px 18px;border-radius:100px;background:#34d399;color:#000;font-weight:700;font-size:12px;z-index:99999;animation:toastIn .3s ease,toastOut .3s ease 1.5s forwards;pointer-events:none\';toast.textContent=\'✓ \\\''+item.word+'\\\' saved to Word Bank\';document.body.appendChild(toast);setTimeout(function(){toast.remove()},2000)" title="Add to Word Bank" style="position:absolute;top:8px;right:8px;width:26px;height:26px;border-radius:50%;border:1px solid var(--line);background:var(--card2);color:var(--muted2);cursor:pointer;font-size:16px;line-height:1;display:flex;align-items:center;justify-content:center;transition:all .2s;z-index:2" onmouseenter="this.style.background=\'rgba(52,211,153,.15)\';this.style.borderColor=\'rgba(52,211,153,.3)\';this.style.color=\'#34d399\'" onmouseleave="this.style.background=\'rgba(255,255,255,.04)\';this.style.borderColor=\'rgba(255,255,255,.1)\';this.style.color=\'rgba(255,255,255,.3)\'">+</button>';
         h+='<div style="display:flex;align-items:baseline;gap:8px;margin-bottom:10px">';
         h+='<span style="font-size:18px;font-weight:800;color:var(--text)">'+item.word+'</span>';
         h+='<span style="font-size:9px;font-weight:600;padding:2px 8px;border-radius:100px;background:'+posColors[d.pos]+';color:'+posText[d.pos]+';border:1px solid '+posBorder[d.pos]+'">'+d.pos+'</span>';
@@ -3227,39 +3388,94 @@ function downloadGrammarPDF() {
         h+='<div style="max-height:400px;overflow-y:auto">';
         h+='<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:6px">';
         topWords.forEach(function(w){
-          h+='<div style="background:var(--card2);border:1px solid var(--line);border-radius:8px;padding:8px 10px">';
+          var wordId = 'gw_'+w.w.replace(/[^a-zA-Z]/g,'');
+          h+='<div style="background:var(--card2);border:1px solid var(--line);border-radius:8px;padding:8px 10px" id="'+wordId+'">';
           h+='<div style="font-weight:700;font-size:13px;color:var(--text);margin-bottom:2px">'+w.w+'</div>';
           h+='<div style="font-size:9px;color:var(--muted2);margin-bottom:6px">'+w.pos+' · '+(w.count||1)+'×</div>';
-          h+='<div style="display:flex;flex-direction:column;gap:2px">';
+          h+='<div class="gloss-translations" data-word="'+w.w+'" style="display:flex;flex-direction:column;gap:2px">';
           targetLangs.slice(0,4).forEach(function(lc){
-            h+='<div style="font-size:10px;color:var(--muted2)"><span style="margin-right:4px">'+(flags[lc]||'')+'</span><span style="color:var(--muted)">…</span></div>';
+            h+='<div style="font-size:10px;color:var(--muted2)"><span style="margin-right:4px">'+(flags[lc]||'')+'</span><span class="gt-'+lc+'" style="color:var(--muted)">loading…</span></div>';
           });
           h+='</div></div>';
         });
         h+='</div></div>';
       }
-      h+='<div style="font-size:9px;color:var(--muted2);margin-top:8px;text-align:center">Translations load on demand via MyMemory API</div>';
+      h+='<div style="font-size:9px;color:var(--muted2);margin-top:8px;text-align:center">Translations load automatically via MyMemory API</div>';
       h+='</div></div>';
-      cb(h);
+      cb(h, function(){
+        // Load translations for each word
+        var glossDivs = document.querySelectorAll('.gloss-translations');
+        glossDivs.forEach(function(gd){
+          var word = gd.dataset.word;
+          if (!word) return;
+          targetLangs.slice(0,4).forEach(function(lc){
+            var span = gd.querySelector('.gt-'+lc);
+            if (!span) return;
+            // MyMemory API: free, no key needed
+            var url = 'https://api.mymemory.translated.net/get?q='+encodeURIComponent(word)+'&langpair=en|'+lc;
+            fetch(url).then(function(r){return r.json()}).then(function(data){
+              if (data.responseData && data.responseData.translatedText) {
+                span.textContent = data.responseData.translatedText;
+                span.style.color = '';
+              } else {
+                span.textContent = '—';
+                span.style.opacity = '0.4';
+              }
+            }).catch(function(){
+              span.textContent = '—';
+              span.style.opacity = '0.4';
+            });
+          });
+        });
+      });
     },
 
-    // ═══ Info — Oldest 3 sentences from live transcript + word log ═══
+    // ═══ Info — Etymology + Word Log ═══
     info: function(cb){
       var h='<div class="extras-grid">';
       var text=(document.getElementById('captionTranscript')?.textContent||'');
       var lines=text.split('\n').filter(function(l){return l.trim().length>0});
       var noData=lines.length===0;
       
-      // Oldest 3 sentences
-      h+='<div class="extras-card" style="grid-column:1/-1"><div class="ec-title">Recent Sentences <span class="ec-badge" style="background:rgba(52,211,153,.15);color:#34d399">LIVE</span></div>';
-      if(noData){
-        h+='<div style="color:var(--muted2);font-style:italic">Sentences from your live transcript appear here</div>';
-      }else{
-        var oldest=lines.slice(0,3);
-        h+='<div style="display:flex;flex-direction:column;gap:6px">';
-        oldest.forEach(function(l,i){
-          h+='<div style="padding:10px 14px;background:var(--card2);border:1px solid var(--line);border-radius:8px;font-size:12px;color:var(--text);line-height:1.5">';
-          h+='<span style="font-size:9px;color:var(--muted2);margin-right:6px">#'+(i+1)+'</span>'+l;
+      // Etymology lookup for notable words
+      h+='<div class="extras-card" style="grid-column:1/-1"><div class="ec-title">📚 Etymology <span class="ec-badge" style="background:rgba(251,191,36,.15);color:#fbbf24">ORIGIN</span></div>';
+      var words=getTranscriptWords();
+      var notableWords = words.filter(function(w){return w.pos==='NOUN'||w.pos==='VERB'||w.pos==='ADJ'}).slice(0,5);
+      if(notableWords.length===0){
+        h+='<div style="color:var(--muted2);font-style:italic">Start speaking — word origins appear here</div>';
+      } else {
+        h+='<div style="display:flex;flex-direction:column;gap:6px;max-height:250px;overflow-y:auto">';
+        var etymDB = {
+          'language':'Latin lingua (tongue) → Old French langage → Middle English',
+          'translation':'Latin translatus (carried across) → Old French translation',
+          'future':'Latin futurus (about to be) → Old French futur',
+          'system':'Greek systēma (organized whole) → Latin systema → French système',
+          'culture':'Latin cultura (growing, cultivation) → French culture',
+          'science':'Latin scientia (knowledge) → Old French science',
+          'technology':'Greek tekhnē (art, craft) + logia (study) → Modern English',
+          'communication':'Latin communicare (to share) → Old French communication',
+          'important':'Latin importare (bring in) → Medieval Latin importantia → French',
+          'different':'Latin differre (to set apart) → Old French different',
+          'education':'Latin educare (to lead out) → Old French education',
+          'experience':'Latin experientia (trial, proof) → Old French experience',
+          'information':'Latin informare (to shape, form) → Old French information',
+          'understanding':'Old English understandan (stand among/under) → comprehend',
+          'knowledge':'Old English cnāwan (to know) + -ledge (suffix) → knowing',
+          'learning':'Old English leornian (to get knowledge) → learning',
+          'world':'Old English woruld (human existence, age of man) → world',
+          'people':'Latin populus (a people, nation) → Old French pople → people',
+          'history':'Greek historia (inquiry, knowledge from investigation) → Latin → French',
+          'change':'Latin cambiare (to exchange) → Old French changier → change',
+          'challenge':'Latin calumnia (false accusation) → Old French chalonge → challenge',
+          'opportunity':'Latin opportunitas (fitness, convenience) → Old French opportunité',
+          'development':'French développer (unfold, unwrap) → development',
+          'business':'Old English bisignis (care, anxiety, occupation) → business'
+        };
+        notableWords.forEach(function(w){
+          var etym = etymDB[w.w.toLowerCase()] || 'Origin traceable through Indo-European roots — tap to explore further';
+          h+='<div style="padding:8px 10px;background:var(--card2);border:1px solid var(--line);border-radius:8px">';
+          h+='<div style="font-weight:700;font-size:11px;color:var(--text);margin-bottom:3px">'+w.w+'</div>';
+          h+='<div style="font-size:10px;color:var(--muted2);line-height:1.4">'+etym+'</div>';
           h+='</div>';
         });
         h+='</div>';
@@ -3267,8 +3483,7 @@ function downloadGrammarPDF() {
       h+='</div>';
       
       // Word log sidebar
-      h+='<div class="extras-card" style="grid-column:1/-1"><div class="ec-title">Word Log <span class="ec-badge" style="background:rgba(167,139,250,.15);color:#c4b5fd">NEW</span></div>';
-      var words=getTranscriptWords();
+      h+='<div class="extras-card" style="grid-column:1/-1"><div class="ec-title">📝 Word Log <span class="ec-badge" style="background:rgba(167,139,250,.15);color:#c4b5fd">LIVE</span></div>';
       if(words.length===0){
         h+='<div style="color:var(--muted2);font-style:italic">Words from your live speech appear here</div>';
       }else{
@@ -3308,7 +3523,7 @@ function downloadGrammarPDF() {
         h+='</div>';
         
         // Parse tree output
-        h+='<div id="gpTree" style="font-family:JetBrains Mono,monospace;font-size:10px;line-height:1.8;padding:14px;background:rgba(0,0,0,.2);border-radius:10px;border:1px solid rgba(255,255,255,.04);color:rgba(255,255,255,.5);min-height:60px;max-height:300px;overflow:auto;white-space:pre-wrap;word-break:break-word">Click a sentence above to parse</div>';
+        h+='<div id="gpTree" style="font-family:JetBrains Mono,monospace;font-size:10px;line-height:2;padding:14px;background:rgba(0,0,0,.2);border-radius:10px;border:1px solid rgba(255,255,255,.04);color:rgba(255,255,255,.5);min-height:60px;max-height:300px;overflow:auto;white-space:pre;overflow-x:auto">Click a sentence above to parse</div>';
         
         // Stats
         h+='<div id="gpStats" style="margin-top:8px;font-size:9px;color:rgba(255,255,255,.2)"></div>';
@@ -3352,7 +3567,7 @@ function downloadGrammarPDF() {
       }
       
       function parseAndShowLine(text){
-        var clean=text.trim().replace(/[,.!?;:]/g,'').replace(/^\d{2}:\d{2}:\d{2}\s*/,'');
+        var clean=text.trim().replace(/[,.!?;:"»«\(\)]/g,'').replace(/^\d{2}:\d{2}:\d{2}\s*/,'');
         var words=clean.split(/\s+/);if(words.length===0) return;
         var tagged=[];for(var i=0;i<words.length;i++) tagged.push({w:words[i],t:tagWord(words[i])});
         var n=tagged.length;
@@ -3366,25 +3581,31 @@ function downloadGrammarPDF() {
         var ss=0;while(ss<vi&&tagged[ss].t==='ADV')ss++;
         if(ss<vi){
           var sw=tagged.slice(ss,vi).map(function(x){return x.w}).join(' ');
-          tree.push('\u251C\u2500 <span style="color:#60a5fa;font-weight:600">NP</span>: <span style="color:#e8eaed">'+sw+'</span>');
+          tree.push('  ├─ <span style="color:#60a5fa;font-weight:600">NP</span>: <span style="color:#e8eaed">'+sw+'</span>');
         }
         
         // VP
-        tree.push('\u251C\u2500 <span style="color:#34d399;font-weight:600">VP</span>: <span style="color:#34d399">'+tagged[vi].w+'</span>');
+        tree.push('  ├─ <span style="color:#34d399;font-weight:600">VP</span>: <span style="color:#34d399">'+tagged[vi].w+'</span>');
         
         // NP after verb
         var os=vi+1;while(os<n&&tagged[os].t==='ADV')os++;
         var oe=n;for(var k=os;k<n;k++){if(tagged[k].t==='PREP'){oe=k;break}}
         if(oe>os){
           var ow=tagged.slice(os,oe).map(function(x){return x.w}).join(' ');
-          tree.push('\u2502  \u2514\u2500 <span style="color:#60a5fa">NP</span>: <span style="color:rgba(255,255,255,.5)">'+ow+'</span>');
+          tree.push('  │  └─ <span style="color:#60a5fa">NP</span>: <span style="color:rgba(255,255,255,.5)">'+ow+'</span>');
         }
         
         // PP
         var ps=n;for(var k=vi+1;k<n;k++){if(tagged[k].t==='PREP'){ps=k;break}}
         if(ps<n){
           var pw=tagged.slice(ps,n).map(function(x){return x.w}).join(' ');
-          tree.push('\u2514\u2500 <span style="color:#fbbf24;font-weight:600">PP</span>: <span style="color:rgba(255,255,255,.5)">'+pw+'</span>');
+          tree.push('  └─ <span style="color:#fbbf24;font-weight:600">PP</span>: <span style="color:rgba(255,255,255,.5)">'+pw+'</span>');
+        }
+        
+        // If tree is empty (no structure detected), show tagged words
+        if(tree.length <= 1) {
+          tree = ['<span style="color:#e8eaed;font-weight:700">S</span>'];
+          tree.push('  └─ <span style="color:rgba(255,255,255,.5)">[' + tagged.map(function(t){return '<span style="color:'+(t.t==='VERB'?'#34d399':t.t==='NOUN'?'#60a5fa':t.t==='ADJ'?'#f472b6':'rgba(255,255,255,.4)')+'">'+t.w+'</span>('+t.t+')'}).join(' ') + ']</span>');
         }
         
         document.getElementById('gpTree').innerHTML=tree.join('\n');
@@ -3404,9 +3625,7 @@ multispeaker: function(cb){
       var speakerColors=['#5b7fc1','#c1665b','#5b9c6e','#c084fc','#fbbf24','#f472b6'];
       var speakerNames=['Speaker A','Speaker B','Speaker C','Speaker D','Speaker E','Speaker F'];
       var spkCounts={};for(var s=0;s<6;s++) spkCounts[s]=0;
-
-      h+='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px">';
-      h+='<div class="ec-title" style="margin:0">\ud83d\udc65 Speaker Diarization <span class="ec-badge" style="background:rgba(96,165,250,.15);color:#60a5fa">AI</span></div>';      h+='<button id="btnDiarize" onclick="runDiarization()" style="padding:8px 18px;border-radius:8px;border:1.5px solid var(--accent);background:rgba(167,139,250,.08);color:var(--accent);cursor:pointer;font-size:11px;font-weight:700;font-family:inherit;transition:all .2s">🔮 Analyze with AI</button>';
+        var speakerIdx=0;
       h+='</div>';
       
       if(noData){
