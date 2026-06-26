@@ -136,12 +136,60 @@ function _ensureSupabaseSession(userId, mode, lang) {
   });
 }
 
-function _endSupabaseSession() {
-  var sessionId = localStorage.getItem('sottotitoli-active-session');
+function _endSupabaseSession(data) {
+  // Check all possible session key patterns
+  var sessionId = localStorage.getItem('sottotitoli-active-session')
+    || localStorage.getItem('sottotitoli-caption-session')
+    || localStorage.getItem('sottotitoli-translate-session');
   if (!sessionId || !window.sottotitoliSupabase) return;
-  window.sottotitoliSupabase.from('sessions').update({
-    ended_at: new Date().toISOString()
-  }).eq('id', sessionId).then(function() {
-    localStorage.removeItem('sottotitoli-active-session');
-  });
+  
+  data = data || {};
+  var updateObj = { ended_at: new Date().toISOString() };
+  
+  // Compute and save transcript + stats if provided
+  if (data.lines && data.lines.length > 0) {
+    // Join all line texts
+    var fullText = data.lines.map(function(l) { return l.en || l.text || l || ''; }).filter(Boolean).join('\n');
+    updateObj.transcript_text = fullText;
+    
+    // Word count
+    var allWords = fullText.toLowerCase().match(/[a-zàèéìòù]{2,}/g) || [];
+    updateObj.words_count = allWords.length;
+    
+    // Duration
+    if (data.durationSeconds) {
+      updateObj.duration_seconds = data.durationSeconds;
+      // WPM
+      if (data.durationSeconds > 0) {
+        updateObj.wpm = Math.round((allWords.length / data.durationSeconds) * 60);
+      }
+    }
+    
+    // Lexical diversity
+    if (allWords.length > 0) {
+      var uniqueWords = {};
+      allWords.forEach(function(w) { uniqueWords[w] = true; });
+      updateObj.unique_words_count = Object.keys(uniqueWords).length;
+      updateObj.lexical_diversity = (Object.keys(uniqueWords).length / allWords.length);
+    }
+    
+    // POS counts
+    var posCounts = data.posCounts || {};
+    if (posCounts.NOUN) updateObj.noun_count = posCounts.NOUN;
+    if (posCounts.VERB) updateObj.verb_count = posCounts.VERB;
+    if (posCounts.ADJ) updateObj.adjective_count = posCounts.ADJ;
+    if (posCounts.ADV) updateObj.adverb_count = posCounts.ADV;
+    
+    // Additional stats
+    if (data.fillersPerMinute != null) updateObj.fillers_per_minute = data.fillersPerMinute;
+    if (data.turnCount != null) updateObj.turn_count = data.turnCount;
+  }
+  
+  window.sottotitoliSupabase.from('sessions').update(updateObj)
+    .eq('id', sessionId).then(function() {
+      // Clear all session keys
+      localStorage.removeItem('sottotitoli-active-session');
+      localStorage.removeItem('sottotitoli-caption-session');
+      localStorage.removeItem('sottotitoli-translate-session');
+    });
 }
