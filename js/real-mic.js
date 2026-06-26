@@ -257,3 +257,31 @@ function _refreshCreditDisplays(newMinutesBalance) {
     });
   }
 }
+
+// ═══ Page-unload cleanup — stop mic when user leaves ═══
+// beforeunload: fires on tab close / navigation (sync only — stop mic immediately)
+window.addEventListener('beforeunload', function() {
+  if (_realMic.recognition) {
+    try { _realMic.recognition.stop(); } catch(e) {}
+    _realMic.recognition = null;
+  }
+  if (_realMic.stream) {
+    _realMic.stream.getTracks().forEach(function(t){ t.stop(); });
+    _realMic.stream = null;
+  }
+});
+
+// visibilitychange: fires on tab switch / minimize — stop mic when hidden
+document.addEventListener('visibilitychange', function() {
+  if (document.hidden && (_realMic.recognition || _realMic.stream)) {
+    if (_realMic.recognition) {
+      try { _realMic.recognition.stop(); } catch(e) {}
+      _realMic.recognition = null;
+    }
+    if (_realMic.stream) {
+      _realMic.stream.getTracks().forEach(function(t){ t.stop(); });
+      _realMic.stream = null;
+    }
+    updateMicUI('idle');
+  }
+});
