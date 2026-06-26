@@ -431,7 +431,7 @@ table,pre,code{max-width:100%;overflow-x:auto}
     <li><a href="index.html">Home</a></li>
     <li><a href="start.html">Start</a></li>
     <li><a href="account.html" class="active">Mio Profilo</a></li>
-    <li><a href="analysis.html">AI Reports</a></li>
+    <li><a href="analysis.html">Report AI</a></li>
   </ul>
   <div style="display:flex;align-items:center;gap:8px" id="authSection"></div>
   <div class="hamburger" id="hamburger"></div>
@@ -1308,6 +1308,67 @@ function autoSaveProfile(){
 
 // Remove old separate saveBio() — now handled by autoSaveProfile
 // (saveBio function removed; bio saves via autoSaveProfile on input)
+
+// ═══ USER PROFILE CONTEXT — normalizer for AI report prompts ═══
+// Transforms raw profile + learning_profile into the structured context object
+// used by the report generation pipeline. Exposed as window.getUserProfileContext()
+window.getUserProfileContext = async function(){
+  var ctx = {
+    identity: { name: '', native_language: 'it', location: '' },
+    learning: { primary_target_language: 'en', goal_primary: null, usage_contexts: [], short_term_goal: '', self_assessed_level: null },
+    personalization: { sector: null, feedback_focus: [], feedback_tone: null, preferred_register: null, wants_contextual_examples: null },
+    derived_context: { bio_summary: '', likely_needs: [], confidence_notes: ['Derived traits are probabilistic', 'Do not overclaim personality or age'] }
+  };
+  
+  // Fill identity from DOM
+  ctx.identity.name = (document.getElementById('profName')||{}).value || '';
+  ctx.identity.native_language = (document.getElementById('profNative')||{}).value || 'it';
+  ctx.identity.location = (document.getElementById('profLocation')||{}).value || '';
+  
+  // Try to get learning_profile from Supabase for most complete data
+  var supabase = window.sottotitoliSupabase;
+  if (supabase) {
+    try {
+      var r = await supabase.auth.getSession();
+      if (r.data?.session) {
+        var resp = await supabase.from('profiles').select('learning_profile').eq('id', r.data.session.user.id).maybeSingle();
+        if (resp.data?.learning_profile) {
+          var lp = typeof resp.data.learning_profile === 'string' ? JSON.parse(resp.data.learning_profile) : resp.data.learning_profile;
+          // Merge with DOM state (DOM takes precedence for unsaved changes)
+          var domLp = collectLearningProfile();
+          lp = Object.assign({}, lp, domLp);
+          
+          ctx.learning.goal_primary = lp.goal_primary || null;
+          ctx.learning.usage_contexts = lp.use_cases || [];
+          ctx.learning.short_term_goal = lp.short_term_goal || '';
+          ctx.learning.self_assessed_level = lp.self_assessed_level || null;
+          ctx.personalization.sector = lp.domain || null;
+          ctx.personalization.feedback_focus = lp.feedback_focus || [];
+          ctx.personalization.feedback_tone = lp.feedback_tone || null;
+          ctx.personalization.preferred_register = lp.preferred_register || null;
+          ctx.personalization.wants_contextual_examples = lp.wants_contextual_examples || null;
+          ctx.derived_context.bio_summary = lp.bio || (document.getElementById('profBio')||{}).value || '';
+        }
+      }
+    } catch(e) { /* use DOM values as fallback */ }
+  }
+  
+  // Derive likely needs from profile
+  if (ctx.personalization.feedback_focus.indexOf('precision') !== -1 || ctx.personalization.sector === 'engineering') {
+    ctx.derived_context.likely_needs.push('terminology accuracy');
+  }
+  if (ctx.personalization.feedback_focus.indexOf('clarity') !== -1 || ctx.personalization.preferred_register === 'professional') {
+    ctx.derived_context.likely_needs.push('concise professional phrasing');
+  }
+  if (ctx.learning.goal_primary === 'exam') {
+    ctx.derived_context.likely_needs.push('exam-ready accuracy');
+  }
+  if (ctx.learning.usage_contexts && ctx.learning.usage_contexts.indexOf('meetings') !== -1) {
+    ctx.derived_context.likely_needs.push('meeting-specific vocabulary');
+  }
+  
+  return { user_profile_context: ctx };
+};
 
 // ═══ AVATAR UPLOAD ═══
 function resizeImage(file,maxDim){

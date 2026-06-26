@@ -133,7 +133,7 @@ document.addEventListener('DOMContentLoaded', async () => {
           <a href="index.html" class="ud-link">Home</a>
           <a href="start.html" class="ud-link">Start</a>
           <a href="account.html" class="ud-link">Profilo</a>
-          <a href="analysis.html" class="ud-link">AI Reports</a>
+          <a href="analysis.html" class="ud-link">Report AI</a>
           <hr class="ud-divider">
           <div class="ud-credits-section">
             <div class="ud-credit-row"><span>Minuti</span><span id="udMinutes">—</span></div>
