@@ -38,16 +38,16 @@ body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--t
 .kpi .kl{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.1em;color:var(--t3);margin-top:2px}
 
 /* Marketplace Grid */
-.mp-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px;margin-bottom:24px}
-.mp-card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:22px;cursor:pointer;transition:all .25s;position:relative;overflow:hidden}
+.mp-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:10px;margin-bottom:16px}
+.mp-card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:18px;cursor:pointer;transition:all .25s;position:relative;overflow:hidden}
 .mp-card:hover{transform:translateY(-2px);box-shadow:0 8px 24px rgba(0,0,0,.2);border-color:rgba(52,211,153,.25)}
-.mp-icon{font-size:32px;margin-bottom:10px;display:block}
-.mp-card h3{font-size:18px;font-weight:700;margin-bottom:4px}
-.mp-benefit{font-size:13px;font-weight:600;color:var(--accent);margin-bottom:6px}
-.mp-desc{font-size:14px;color:var(--t2);line-height:1.5;margin-bottom:12px}
-.mp-meta{display:flex;justify-content:space-between;align-items:center;font-size:13px;color:var(--t3);padding-top:10px;border-top:1px solid var(--line)}
-.mp-price{font-family:'JetBrains Mono',monospace;font-weight:700;color:var(--accent);font-size:14px}
-.mp-badge{font-size:12px;font-weight:700;padding:3px 8px;border-radius:100px;position:absolute;top:14px;right:14px}
+.mp-icon{font-size:26px;margin-bottom:8px;display:block}
+.mp-card h3{font-size:16px;font-weight:700;margin-bottom:2px}
+.mp-benefit{font-size:12px;font-weight:600;color:var(--accent);margin-bottom:4px}
+.mp-desc{font-size:12px;color:var(--t2);line-height:1.4;margin-bottom:8px}
+.mp-meta{display:flex;justify-content:space-between;align-items:center;font-size:11px;color:var(--t3);padding-top:8px;border-top:1px solid var(--line)}
+.mp-price{font-family:'JetBrains Mono',monospace;font-weight:700;color:var(--accent);font-size:13px}
+.mp-badge{font-size:10px;font-weight:700;padding:2px 6px;border-radius:100px;position:absolute;top:10px;right:10px}
 .badge-popular{background:rgba(52,211,153,.1);color:var(--accent)}
 .badge-new{background:rgba(52,211,153,.1);color:#6ee7b7}
 .badge-premium{background:rgba(251,191,36,.1);color:var(--amber)}
@@ -280,6 +280,15 @@ function renderMyReports(){
 
 function openModal(reportId){
   selectedReport=REPORT_CATALOG.find(function(r){return r.id===reportId});if(!selectedReport)return;selectedSession=null;
+  // Free Snapshot: limit 1 per day
+  if(selectedReport.id==='snapshot'){
+    var today=new Date().toISOString().split('T')[0];
+    var lastSnapshot=localStorage.getItem('sottotitoli_last_snapshot_date');
+    if(lastSnapshot===today){
+      alert('Hai già generato lo Snapshot gratuito oggi. Riprova domani!');
+      return;
+    }
+  }
   document.getElementById('modTitle').textContent=selectedReport.icon+' '+selectedReport.nameIT;
   document.getElementById('modDesc').textContent=selectedReport.descIT;
   document.getElementById('modPrice').textContent=selectedReport.price>0?selectedReport.price+' crediti':'Gratuito';
@@ -307,6 +316,10 @@ document.getElementById('modBuyBtn').addEventListener('click',async function(){
     if(upRes.error){alert('Errore: '+upRes.error.message);btn.disabled=false;btn.textContent='Genera Report';return}
   }
   var insRes=await supabase.from('session_ai_reports').insert({user_id:userId,module_id:selectedReport.moduleKey,session_id:selectedSession.id,status:'processing'}).select('id').single();
+  // Track free snapshot usage
+  if(selectedReport.id==='snapshot'){
+    localStorage.setItem('sottotitoli_last_snapshot_date',new Date().toISOString().split('T')[0]);
+  }
   closeModal();
   var statusEl=document.getElementById('modStatus');statusEl.style.display='block';statusEl.innerHTML='<span class="ri-processing">In elaborazione…</span>';
   var poller=setInterval(async function(){
