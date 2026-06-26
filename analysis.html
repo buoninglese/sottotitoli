@@ -347,7 +347,17 @@ document.getElementById('modBuyBtn').addEventListener('click',async function(){
   if(selectedReport.price>0){
     var tokResp=await supabase.from('user_tokens').select('balance').eq('user_id',userId).maybeSingle();
     var bal=tokResp.data?.balance??0;if(bal<selectedReport.price){alert('Crediti insufficienti. Hai '+bal+' crediti, servono '+selectedReport.price+'.');btn.disabled=false;btn.textContent='Genera Report';return}
-    var upRes=await supabase.from('user_tokens').update({balance:bal-selectedReport.price}).eq('user_id',userId);
+    // Update all credit displays across the page
+  var newBal = bal - selectedReport.price;
+  document.getElementById('tokenBalance').textContent = newBal;
+  document.getElementById('kpiTokens').textContent = newBal;
+  // Also update hamburger + auth section if present
+  var hbTok = document.getElementById('hbTokens');
+  if (hbTok) hbTok.textContent = newBal;
+  var udTok = document.getElementById('udTokens');
+  if (udTok) udTok.textContent = newBal;
+  
+  var upRes=await supabase.from('user_tokens').update({balance:newBal}).eq('user_id',userId);
     if(upRes.error){alert('Errore: '+upRes.error.message);btn.disabled=false;btn.textContent='Genera Report';return}
   }
   var insRes=await supabase.from('session_ai_reports').insert({user_id:userId,module_id:selectedReport.moduleKey,session_id:selectedSession.id,status:'processing'}).select('id').single();
@@ -410,6 +420,12 @@ function updateKPIs(){
   document.getElementById('kpiSessions').textContent=allSessions.length;
   var avg=myReports.length>0?Math.round(myReports.reduce(function(s,r){return s+(r.overall_score||0)},0)/myReports.length):0;
   document.getElementById('kpiAvgScore').textContent=avg?avg+'%':'—';
+  // Sync hamburger credits if present
+  var tokVal = document.getElementById('tokenBalance').textContent;
+  var hbTok = document.getElementById('hbTokens');
+  if (hbTok && tokVal && tokVal !== '—') hbTok.textContent = tokVal;
+  var udTok = document.getElementById('udTokens');
+  if (udTok && tokVal && tokVal !== '—') udTok.textContent = tokVal;
 }
 
 (async function init(){
