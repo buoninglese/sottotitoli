@@ -600,8 +600,8 @@ button[onclick*="addToWordBank"]:hover{background:rgba(52,211,153,.15)!important
           <span>📚 My Word Bank</span>
           <div style="display:flex;gap:6px;align-items:center">
             <input type="text" id="wordbankInput" placeholder="Add a word…" style="padding:5px 10px;border-radius:6px;border:1px solid rgba(255,255,255,.1);background:rgba(255,255,255,.04);color:var(--text);font-size:11px;font-family:inherit;width:130px;outline:none" onkeydown="if(event.key==='Enter')addToWordBank()">
-            <button onclick="addToWordBank()" style="padding:5px 10px;border-radius:6px;border:1px solid rgba(52,211,153,.2);background:rgba(52,211,153,.1);color:#34d399;cursor:pointer;font-size:10px;font-weight:700;font-family:inherit">+ Add</button>
-            <button onclick="clearWordBank()" style="padding:5px 8px;border-radius:6px;border:none;background:rgba(248,113,113,.1);color:#f87171;cursor:pointer;font-size:10px;font-family:inherit" title="Clear all">🗑</button>
+            <button type="button" onclick="addToWordBank()" style="padding:5px 10px;border-radius:6px;border:1px solid rgba(52,211,153,.2);background:rgba(52,211,153,.1);color:#34d399;cursor:pointer;font-size:10px;font-weight:700;font-family:inherit">+ Add</button>
+            <button type="button" onclick="clearWordBank()" style="padding:5px 8px;border-radius:6px;border:none;background:rgba(248,113,113,.1);color:#f87171;cursor:pointer;font-size:10px;font-family:inherit" title="Clear all">🗑</button>
           </div>
         </div>
         <div class="wordbank-chips" id="wordbankChips"></div>
@@ -3485,6 +3485,16 @@ multispeaker: function(cb){
       });
     }  };  // ── Word Bank add from Synonyms ──
 window.addToWordBank = function(word){
+  // If called without a word (from + Add button), read from input
+  if (!word) {
+    var input = document.getElementById('wordbankInput');
+    if (!input) return;
+    word = input.value.trim().toLowerCase();
+    if (!word || word.length < 2) return;
+    input.value = '';
+    input.focus();
+  }
+  word = word.trim().toLowerCase();
   var key = WORD_BANK_KEY;
   var bank = JSON.parse(localStorage.getItem(key)||'[]');
   if(bank.indexOf(word)>=0) return;
@@ -3493,6 +3503,10 @@ window.addToWordBank = function(word){
   // Update wordbank count in UI
   var wbBtn = document.querySelector('.wordbank-toggle-btn, [onclick*="Word Bank"]');
   if(wbBtn){var c=bank.length;wbBtn.innerHTML=wbBtn.innerHTML.replace(/\d+/g,String(c))}
+  // Also refresh vocab panel if open
+  if(typeof window.refreshExtrasPanel === 'function'){
+    window.refreshExtrasPanel();
+  }
 };
 
 
