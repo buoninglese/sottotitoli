@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="it" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sottotitoli · Prompt Debugger</title>
+<meta name="robots" content="noindex, nofollow">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,400;14..32,500;14..32,600;14..32,700;14..32,800;14..32,900&family=JetBrains+Mono:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{--bg:#05070d;--card:#0f121e;--line:#1a1e2e;--text:#e8eaed;--t2:#c4c9d4;--t3:#5f6b7a;--accent:#34d399;--blue:#60a5fa;--amber:#fbbf24;--red:#f87171;--pink:#f472b6;--purple:#a78bfa;--orange:#f97316}
+[data-theme="light"]{--bg:#f7f8fa;--card:#fff;--line:#e5e7eb;--text:#111827;--t2:#4b5563;--t3:#9ca3af;--accent:#059669;--blue:#2563eb;--amber:#d97706;--red:#dc2626;--pink:#ec4899;--purple:#7c3aed;--orange:#ea580c}
+body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--text);-webkit-font-smoothing:antialiased;line-height:1.5;padding:24px}
+h1{font-size:24px;font-weight:800;letter-spacing:-.5px;margin-bottom:4px}
+.sub{font-size:13px;color:var(--t2);margin-bottom:24px}
+.toolbar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:20px;align-items:center}
+.toolbar button,.toolbar select{padding:8px 16px;border-radius:8px;font-size:12px;font-weight:600;font-family:inherit;cursor:pointer;border:1px solid var(--line);background:var(--card);color:var(--text);transition:all .15s}
+.toolbar button:hover{border-color:var(--accent);color:var(--accent)}
+.toolbar button.active{background:rgba(52,211,153,.1);border-color:var(--accent);color:var(--accent)}
+.report-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:12px;margin-bottom:24px}
+.report-card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:20px;cursor:pointer;transition:all .2s}
+.report-card:hover{border-color:var(--accent);box-shadow:0 6px 24px rgba(0,0,0,.15)}
+.report-card.selected{border-color:var(--accent);box-shadow:0 0 0 2px rgba(52,211,153,.2)}
+.report-card .rc-icon{font-size:24px;margin-bottom:8px}
+.report-card .rc-name{font-size:15px;font-weight:700;margin-bottom:2px}
+.report-card .rc-key{font-size:10px;color:var(--t3);font-family:'JetBrains Mono',monospace}
+.report-card .rc-meta{display:flex;gap:8px;margin-top:8px;font-size:10px;color:var(--t3)}
+.prompt-view{background:var(--card);border:1px solid var(--line);border-radius:14px;overflow:hidden;margin-bottom:24px}
+.prompt-view-header{display:flex;align-items:center;justify-content:space-between;padding:14px 20px;border-bottom:1px solid var(--line);flex-wrap:wrap;gap:8px}
+.prompt-view-header h3{font-size:16px;font-weight:700}
+.prompt-view-body{padding:0}
+.prompt-section{border-bottom:1px solid var(--line)}
+.prompt-section:last-child{border-bottom:none}
+.prompt-section-title{padding:10px 20px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--t3);cursor:pointer;display:flex;align-items:center;gap:8px;user-select:none;background:var(--bg)}
+.prompt-section-title:hover{color:var(--accent)}
+.prompt-section-title .ps-arrow{transition:transform .2s;font-size:8px}
+.prompt-section.open .ps-arrow{transform:rotate(90deg)}
+.prompt-section-content{display:none;padding:16px 20px}
+.prompt-section.open .prompt-section-content{display:block}
+pre{background:rgba(0,0,0,.3);border:1px solid var(--line);border-radius:10px;padding:16px;overflow-x:auto;font-family:'JetBrains Mono',monospace;font-size:11px;line-height:1.7;white-space:pre-wrap;word-break:break-word;color:var(--t2);max-height:500px;overflow-y:auto}
+pre .hl{color:var(--accent)}
+.token-bar{display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border-radius:6px;font-size:11px;font-weight:600;background:rgba(52,211,153,.08);color:var(--accent);border:1px solid rgba(52,211,153,.15)}
+.badge{display:inline-block;padding:3px 8px;border-radius:100px;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.05em}
+.badge-schema{background:rgba(167,139,250,.1);color:var(--purple)}
+.badge-rules{background:rgba(251,191,36,.1);color:var(--amber)}
+.badge-context{background:rgba(96,165,250,.1);color:var(--blue)}
+.badge-output{background:rgba(52,211,153,.1);color:var(--accent)}
+.empty-state{text-align:center;padding:40px;color:var(--t3)}
+.tabs{display:flex;gap:4px;margin-bottom:16px}
+.tab-btn{padding:8px 20px;border-radius:8px;font-size:12px;font-weight:600;font-family:inherit;cursor:pointer;border:1px solid var(--line);background:var(--card);color:var(--t2);transition:all .15s}
+.tab-btn:hover{color:var(--text);border-color:var(--accent)}
+.tab-btn.active{background:rgba(52,211,153,.08);border-color:var(--accent);color:var(--accent)}
+@media(max-width:768px){body{padding:12px}.report-grid{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+
+<h1>🧪 Prompt Debugger</h1>
+<p class="sub">Visualizza i prompt completi per ogni tipo di report. Testa con dati campione. Copia per usarli in produzione.</p>
+
+<div class="toolbar">
+  <button onclick="toggleTheme()" id="themeBtn">🌙 Dark</button>
+  <span style="font-size:11px;color:var(--t3);margin:0 8px">·</span>
+  <span style="font-size:11px;color:var(--t2)">Seleziona un report per vedere il prompt completo ↓</span>
+  <span style="flex:1"></span>
+  <span class="token-bar">7 report · 6 template · 1 JSON schema universale</span>
+</div>
+
+<div class="report-grid" id="reportGrid"></div>
+
+<div id="promptDetail" style="display:none">
+  <div class="tabs">
+    <button class="tab-btn active" data-view="prompt">📝 Prompt completo</button>
+    <button class="tab-btn" data-view="schema">📋 JSON Schema</button>
+    <button class="tab-btn" data-view="context">👤 Profile Context</button>
+  </div>
+  <div id="promptViewContent"></div>
+</div>
+
+<div class="empty-state" id="noSelection">↑ Seleziona un report per vedere il prompt completo</div>
+
+<script>
+// ═══ REPORT CATALOG with full prompt templates ═══
+var REPORT_PROMPTS = [
+  {
+    id:'snapshot', icon:'⚡', name:'Snapshot', moduleKey:'0', price:0,
+    color:'#34d399', tier:'included',
+    role:'You are Sottotitoli\'s quick-insight engine. You generate brief, useful observations after a single session.',
+    goal:'Create a Snapshot with 2–4 actionable observations on grammar, vocabulary, and fluency. Keep it short, concrete, and encouraging.',
+    eligibility:'Available after every session. Free, limited to 1 per day.',
+    rules:[
+      'Use only the provided session evidence.',
+      'Do not invent skills, habits, or goals.',
+      '2–4 observations maximum.',
+      'Each observation must reference a concrete example from the session.',
+      'Be encouraging but precise.',
+      'No CEFR claims.',
+      'Keep output under 300 words.'
+    ],
+    style:[
+      'Warm and direct.',
+      'One concrete example per observation.',
+      'Short sentences.',
+      'Actionable next step at the end.'
+    ],
+    outputSchema:{report_type:'snapshot',observations:[],next_step:'',confidence:{score:0,label:'low|medium|high'}}
+  },
+  {
+    id:'comprehensive', icon:'🌟', name:'Report Completo', moduleKey:'1', price:3,
+    color:'#34d399', tier:'core',
+    role:'You are Sottotitoli\'s report engine. You generate evidence-based language-learning reports for everyday learners.',
+    goal:'Create a Comprehensive Report that gives the user a clear picture of strengths, recurring issues, useful next steps, and personalized priorities.',
+    eligibility:'Available with 1 session, better with 2+. 3 credits.',
+    rules:[
+      'Use only the provided evidence.',
+      'Do not invent skills, habits, or goals.',
+      'Treat the profile as contextual guidance, not proof.',
+      'Distinguish clearly between strengths, recurring issues, and one-off issues.',
+      'If the evidence is limited, reduce confidence and say so.',
+      'Do not claim official CEFR certification.',
+      'If mentioning CEFR-style performance, use cautious wording.',
+      'Prioritize what the user should do next over abstract explanation.'
+    ],
+    style:[
+      'Warm, precise, and encouraging.',
+      'Never generic.',
+      'Every major point must refer to observed evidence.',
+      'Keep explanations clear for an average learner.',
+      'Personalize examples when profile context supports it.'
+    ],
+    outputSchema:{report_type:'comprehensive',summary:{it:'',en:''},strengths:[],priority_issues:[],evidence_examples:[],recommended_actions:[],confidence:{score:0,label:''}}
+  },
+  {
+    id:'repeating', icon:'🔄', name:'Errori Ricorrenti', moduleKey:'2', price:2,
+    color:'#fbbf24', tier:'unlockable',
+    role:'You are Sottotitoli\'s recurring-pattern analysis engine.',
+    goal:'Identify repeated language issues across multiple sessions and separate them from one-off mistakes.',
+    eligibility:'Requires 3 sessions minimum, best with 5. 2 credits.',
+    rules:[
+      'Minimum 3 sessions required for analysis.',
+      '5 sessions recommended for reliable results.',
+      'Only flag an error as recurring if it appears in at least 2 sessions.',
+      'Clearly separate recurring from one-off issues.',
+      'Provide concrete examples from sessions.',
+      'Suggest specific correction patterns.'
+    ],
+    style:[
+      'Precise and evidence-driven.',
+      'Pattern-first: group by error type, not by session.',
+      'Practical correction suggestions.',
+      'Avoid overwhelming the user with too many categories.'
+    ],
+    outputSchema:{report_type:'repeating_errors',recurring_patterns:[],one_off_issues:[],correction_patterns:[],confidence:{score:0,label:''}}
+  },
+  {
+    id:'vocabulary', icon:'📚', name:'Vocabolario Attivo', moduleKey:'3', price:2,
+    color:'#60a5fa', tier:'unlockable',
+    role:'You are Sottotitoli\'s vocabulary analysis engine.',
+    goal:'Discover the user\'s active vocabulary, emerging words, and learning priorities.',
+    eligibility:'Available after 2 sessions. 2 credits.',
+    rules:[
+      'Focus on words the user actually produced.',
+      'Categorize by frequency, POS, and CEFR level estimate.',
+      'Suggest 5–10 words to learn next based on gaps.',
+      'Include study-ready columns in the output.',
+      'Personalize word suggestions using profile context.'
+    ],
+    style:[
+      'Clear and organized.',
+      'Use tables/columns for word lists.',
+      'Practical study suggestions.',
+      'Connect vocabulary to the user\'s real usage contexts.'
+    ],
+    outputSchema:{report_type:'active_vocabulary',active_words:[],emerging_words:[],to_learn:[],cefr_distribution:{},study_suggestions:[]}
+  },
+  {
+    id:'cefr', icon:'🎯', name:'Precisione CEFR', moduleKey:'4', price:4,
+    color:'#a78bfa', tier:'premium',
+    role:'You are Sottotitoli\'s CEFR estimation engine.',
+    goal:'Provide a careful, evidence-based estimate of the user\'s skill profile across CEFR bands.',
+    eligibility:'Requires 2+ sessions, best with 4+. 4 credits.',
+    rules:[
+      'Do not assign official CEFR certification.',
+      'Estimate per skill: production, interaction, reception, vocabulary range, grammatical accuracy, coherence.',
+      'Use cautious phrasing: "shows evidence consistent with", "appears close to".',
+      'State clearly when evidence is missing for a skill.',
+      'Explain what is needed for the next level.',
+      'Never exaggerate confidence.'
+    ],
+    style:[
+      'Academic-precise but accessible.',
+      'Skill-by-skill breakdown.',
+      'Clear next-band requirements.',
+      'Honest about evidence limitations.'
+    ],
+    outputSchema:{report_type:'cefr_precision',skill_profile:[],descriptor_matches:[],caution_notes:[],next_level_requirements:{}}
+  },
+  {
+    id:'transfer', icon:'🔀', name:'Italiano → Inglese', moduleKey:'9', price:3,
+    color:'#f472b6', tier:'premium',
+    role:'You are Sottotitoli\'s contrastive Italian-to-English analysis engine.',
+    goal:'Identify likely Italian-to-English transfer patterns only when they are supported by observed user evidence.',
+    eligibility:'Italian native language + 2+ English sessions. 3 credits.',
+    rules:[
+      'Assume native or dominant Italian only if confirmed in profile.',
+      'Only identify transfer when the user\'s pattern is genuinely consistent with likely L1 influence.',
+      'Separate L1 transfer from general learner error.',
+      'Focus on: articles, prepositions, verb patterns, word order, lexical choices, false friends.',
+      'Give practical replacement patterns and memorable explanations.'
+    ],
+    style:[
+      'Contrastive and practical.',
+      'Italian explanations where helpful.',
+      'Clear before/after examples.',
+      'Memorable rules of thumb.'
+    ],
+    outputSchema:{report_type:'italian_to_english_transfer',transfer_patterns:[],not_transfer_but_general:[],practice_tips:[]}
+  },
+  {
+    id:'cambridge', icon:'🏅', name:'Cambridge Companion', moduleKey:'11', price:4,
+    color:'#f97316', tier:'exam',
+    role:'You are Sottotitoli\'s Cambridge Speaking exam analysis engine.',
+    goal:'Analyze a Cambridge-format speaking transcript and provide targeted observations on task performance.',
+    eligibility:'Cambridge-format transcript. 4 credits.',
+    rules:[
+      'Analyze task performance: fluency, coherence, lexical resource, grammatical range, pronunciation indicators.',
+      'Note: pronunciation indicators are from transcript behavior only, without audio.',
+      'Provide task-specific observations.',
+      'Reference Cambridge assessment criteria where relevant.',
+      'Do not assign official band scores.'
+    ],
+    style:[
+      'Exam-focused and structured.',
+      'Task-by-task breakdown.',
+      'Clear criteria references.',
+      'Practical exam technique suggestions.'
+    ],
+    outputSchema:{report_type:'cambridge_speaking',task_observations:[],fluency_notes:'',coherence_notes:'',lexical_notes:'',grammatical_notes:'',exam_tips:[]}
+  }
+];
+
+// ═══ UNIVERSAL RULES (apply to all) ═══
+var UNIVERSAL_RULES = [
+  'Base conclusions only on provided evidence.',
+  'Personalize interpretation using profile context, but do not invent facts.',
+  'Do not assign official certifications.',
+  'Distinguish observed patterns from hypotheses.',
+  'Prefer concrete examples over abstract advice.',
+  'Prioritize actionability.',
+  'Be warm, precise, and specific.',
+  'If evidence is weak, say so explicitly.',
+  'Never exaggerate confidence.',
+  'When CEFR is involved, use cautious phrasing such as "shows evidence consistent with".'
+];
+
+// ═══ PROFILE CONTEXT SAMPLE ═══
+var SAMPLE_PROFILE_CONTEXT = {
+  identity:{name:'Luca',native_language:'it',location:'Amsterdam, Paesi Bassi'},
+  learning:{primary_target_language:'en',goal_primary:'work',usage_contexts:['meetings','emails','presentations'],short_term_goal:'speak more clearly in meetings',self_assessed_level:'B1'},
+  personalization:{sector:'engineering',feedback_focus:['precision','clarity','vocabulary'],feedback_tone:'balanced',preferred_register:'professional',wants_contextual_examples:'yes'},
+  derived_context:{bio_summary:'Engineer using English for work communication',likely_needs:['terminology accuracy','concise professional phrasing'],confidence_notes:['Derived traits are probabilistic','Do not overclaim personality or age']}
+};
+
+// ═══ CANONICAL JSON OUTPUT SCHEMA ═══
+var CANONICAL_SCHEMA = {
+  report_type:'',
+  report_title_it:'',
+  report_title_en:'',
+  summary:{it:'',en:''},
+  strengths:[],
+  priority_issues:[],
+  evidence_examples:[],
+  recommended_actions:[],
+  confidence:{score:0,label:'',notes:[]},
+  personalization_notes:[],
+  eligibility_notes:[],
+  ui_blocks:{hero:{},cards:[],table_sections:[],download_sections:[]}
+};
+
+// ═══ RELIABILITY FRAMEWORK ═══
+var RELIABILITY_FRAMEWORK = {
+  reliability_score:0.78,
+  evidence_count:4,
+  coverage_notes:['Based on 4 speaking-oriented sessions','Limited evidence for formal writing'],
+  caution_flags:['No audio available for phonological control']
+};
+
+function renderReportGrid(){
+  var g=document.getElementById('reportGrid'),h='';
+  REPORT_PROMPTS.forEach(function(r){
+    h+='<div class="report-card" onclick="selectReport(\''+r.id+'\')" id="card-'+r.id+'">';
+    h+='<div class="rc-icon">'+r.icon+'</div>';
+    h+='<div class="rc-name">'+r.name+'</div>';
+    h+='<div class="rc-key">moduleKey: '+r.moduleKey+' · tier: '+r.tier+'</div>';
+    h+='<div class="rc-meta"><span>🪙 '+(r.price>0?r.price+' cr':'Free')+'</span><span>📋 '+r.rules.length+' rules</span><span>🎨 '+r.style.length+' style</span></div>';
+    h+='</div>';
+  });
+  g.innerHTML=h;
+}
+
+var selectedId=null;
+
+function selectReport(id){
+  selectedId=id;
+  document.querySelectorAll('.report-card').forEach(function(c){c.classList.remove('selected')});
+  document.getElementById('card-'+id).classList.add('selected');
+  document.getElementById('noSelection').style.display='none';
+  document.getElementById('promptDetail').style.display='block';
+  renderPromptDetail(id);
+}
+
+function renderPromptDetail(id){
+  var r=REPORT_PROMPTS.find(function(x){return x.id===id});
+  if(!r)return;
+  var activeTab=document.querySelector('.tab-btn.active')?.dataset?.view||'prompt';
+  renderView(r,activeTab);
+}
+
+function renderView(r,view){
+  var el=document.getElementById('promptViewContent'),h='';
+  if(view==='prompt'){
+    h+=buildPromptHTML(r);
+  }else if(view==='schema'){
+    h+=buildSchemaHTML(r);
+  }else if(view==='context'){
+    h+=buildContextHTML();
+  }
+  el.innerHTML=h;
+  // Wire section toggles
+  el.querySelectorAll('.prompt-section-title').forEach(function(t){
+    t.addEventListener('click',function(){this.parentElement.classList.toggle('open')});
+  });
+  // Open first section by default
+  var first=el.querySelector('.prompt-section');
+  if(first)first.classList.add('open');
+}
+
+function buildPromptHTML(r){
+  var h='';
+  // ROLE
+  h+='<div class="prompt-section open"><div class="prompt-section-title"><span class="ps-arrow">▶</span> 🎭 ROLE</div><div class="prompt-section-content"><pre>'+esc(r.role)+'</pre></div></div>';
+  // GOAL
+  h+='<div class="prompt-section"><div class="prompt-section-title"><span class="ps-arrow">▶</span> 🎯 GOAL</div><div class="prompt-section-content"><pre>'+esc(r.goal)+'</pre></div></div>';
+  // ELIGIBILITY
+  h+='<div class="prompt-section"><div class="prompt-section-title"><span class="ps-arrow">▶</span> 🔓 ELIGIBILITY</div><div class="prompt-section-content"><pre>'+esc(r.eligibility)+'</pre></div></div>';
+  // USER PROFILE CONTEXT
+  h+='<div class="prompt-section"><div class="prompt-section-title"><span class="ps-arrow">▶</span> 👤 USER PROFILE CONTEXT <span class="badge badge-context">injected</span></div><div class="prompt-section-content"><pre>'+esc(JSON.stringify(SAMPLE_PROFILE_CONTEXT,null,2))+'</pre></div></div>';
+  // EVIDENCE placeholder
+  h+='<div class="prompt-section"><div class="prompt-section-title"><span class="ps-arrow">▶</span> 📊 EVIDENCE <span class="badge badge-context">injected</span></div><div class="prompt-section-content"><pre>// {{session_evidence_bundle_json}}\n// Contains: transcript_text, words_count, wpm, lexical_diversity,\n// quality_score, fillers_per_minute, pos_counts, turn_count,\n// session duration, mode, language_pair</pre></div></div>';
+  // RELIABILITY
+  h+='<div class="prompt-section"><div class="prompt-section-title"><span class="ps-arrow">▶</span> 📊 RELIABILITY NOTES <span class="badge badge-context">injected</span></div><div class="prompt-section-content"><pre>'+esc(JSON.stringify(RELIABILITY_FRAMEWORK,null,2))+'</pre></div></div>';
+  // ANALYSIS RULES
+  h+='<div class="prompt-section"><div class="prompt-section-title"><span class="ps-arrow">▶</span> 📏 ANALYSIS RULES <span class="badge badge-rules">'+r.rules.length+' rules</span></div><div class="prompt-section-content"><pre>'+r.rules.map(function(x,i){return (i+1)+'. '+x}).join('\n')+'</pre></div></div>';
+  // STYLE RULES
+  h+='<div class="prompt-section"><div class="prompt-section-title"><span class="ps-arrow">▶</span> 🎨 STYLE RULES <span class="badge badge-rules">'+r.style.length+' rules</span></div><div class="prompt-section-content"><pre>'+r.style.map(function(x,i){return (i+1)+'. '+x}).join('\n')+'</pre></div></div>';
+  // OUTPUT SCHEMA
+  h+='<div class="prompt-section"><div class="prompt-section-title"><span class="ps-arrow">▶</span> 📤 OUTPUT SCHEMA <span class="badge badge-output">JSON</span></div><div class="prompt-section-content"><pre>'+esc(JSON.stringify(r.outputSchema,null,2))+'</pre></div></div>';
+  return h;
+}
+
+function buildSchemaHTML(r){
+  var h='';
+  h+='<div class="prompt-section open"><div class="prompt-section-title"><span class="ps-arrow">▶</span> 📋 Report-Specific Schema</div><div class="prompt-section-content"><pre>'+esc(JSON.stringify(r.outputSchema,null,2))+'</pre></div></div>';
+  h+='<div class="prompt-section"><div class="prompt-section-title"><span class="ps-arrow">▶</span> 📋 Canonical JSON Output Schema (universal)</div><div class="prompt-section-content"><pre>'+esc(JSON.stringify(CANONICAL_SCHEMA,null,2))+'</pre></div></div>';
+  return h;
+}
+
+function buildContextHTML(){
+  var h='';
+  h+='<div class="prompt-section open"><div class="prompt-section-title"><span class="ps-arrow">▶</span> 👤 Sample Profile Context</div><div class="prompt-section-content"><pre>'+esc(JSON.stringify(SAMPLE_PROFILE_CONTEXT,null,2))+'</pre></div></div>';
+  h+='<div class="prompt-section"><div class="prompt-section-title"><span class="ps-arrow">▶</span> 📊 Reliability Framework</div><div class="prompt-section-content"><pre>'+esc(JSON.stringify(RELIABILITY_FRAMEWORK,null,2))+'</pre></div></div>';
+  h+='<div class="prompt-section"><div class="prompt-section-title"><span class="ps-arrow">▶</span> 📏 Universal Rules (apply to ALL reports)</div><div class="prompt-section-content"><pre>'+UNIVERSAL_RULES.map(function(x,i){return (i+1)+'. '+x}).join('\n')+'</pre></div></div>';
+  h+='<div class="prompt-section"><div class="prompt-section-title"><span class="ps-arrow">▶</span> 🔧 Profile Context Object Structure</div><div class="prompt-section-content"><pre>'+esc(JSON.stringify({identity:{name:'',native_language:'',location:''},learning:{primary_target_language:'',goal_primary:'',usage_contexts:[],short_term_goal:'',self_assessed_level:''},personalization:{sector:'',feedback_focus:[],feedback_tone:'',preferred_register:'',wants_contextual_examples:''},derived_context:{bio_summary:'',likely_needs:[],confidence_notes:[]}},null,2))+'</pre></div></div>';
+  return h;
+}
+
+function esc(s){return s.replace(/</g,'&lt;').replace(/>/g,'&gt;')}
+
+// Tab switching
+document.querySelectorAll('.tab-btn').forEach(function(btn){
+  btn.addEventListener('click',function(){
+    document.querySelectorAll('.tab-btn').forEach(function(b){b.classList.remove('active')});
+    this.classList.add('active');
+    if(selectedId)renderPromptDetail(selectedId);
+  });
+});
+
+// Theme toggle
+function toggleTheme(){
+  var h=document.documentElement;
+  var t=h.getAttribute('data-theme')==='dark'?'light':'dark';
+  h.setAttribute('data-theme',t);
+  document.getElementById('themeBtn').textContent=t==='dark'?'🌙 Dark':'☀️ Light';
+}
+
+renderReportGrid();
+</script>
+</body>
+</html>

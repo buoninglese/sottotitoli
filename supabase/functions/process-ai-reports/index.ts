@@ -79,8 +79,59 @@ Deno.serve(async (req) => {
           }
         } catch (_) { /* keep default italiano */ }
 
+        // Build user profile context for AI personalization
+        let profileContext = '';
+        try {
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('full_name, native_lang, location, learning_profile')
+            .eq('id', request.user_id)
+            .maybeSingle();
+          
+          if (profile) {
+            const lp = profile.learning_profile || {};
+            const ctx = {
+              identity: {
+                name: profile.full_name || '',
+                native_language: profile.native_lang || 'it',
+                location: profile.location || ''
+              },
+              learning: {
+                primary_target_language: 'en',
+                goal_primary: lp.goal_primary || null,
+                usage_contexts: lp.use_cases || [],
+                short_term_goal: lp.short_term_goal || '',
+                self_assessed_level: lp.self_assessed_level || null
+              },
+              personalization: {
+                sector: lp.domain || null,
+                feedback_focus: lp.feedback_focus || [],
+                feedback_tone: lp.feedback_tone || 'balanced',
+                preferred_register: lp.preferred_register || null,
+                wants_contextual_examples: lp.wants_contextual_examples || null
+              },
+              derived_context: {
+                bio_summary: lp.bio || '',
+                likely_needs: [],
+                confidence_notes: [
+                  'Derived traits are probabilistic',
+                  'Do not overclaim personality or age'
+                ]
+              }
+            };
+            // Derive likely needs
+            if (ctx.personalization.feedback_focus.indexOf('precision') !== -1 || ctx.personalization.sector === 'engineering') {
+              ctx.derived_context.likely_needs.push('terminology accuracy');
+            }
+            if (ctx.personalization.preferred_register === 'professional') {
+              ctx.derived_context.likely_needs.push('concise professional phrasing');
+            }
+            profileContext = JSON.stringify(ctx, null, 2);
+          }
+        } catch (_) { /* continue without profile context */ }
+
         // Build prompt — getModulePrompt returns {system, user: fn(transcript)}
-        const prompt = getModulePrompt(moduleId, reportLanguage);
+        const prompt = getModulePrompt(moduleId, reportLanguage, profileContext);
         const userPrompt = prompt.user(session.transcript_text);
 
         // Call OpenAI API

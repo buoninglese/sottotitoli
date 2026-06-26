@@ -1,37 +1,137 @@
 // AI Analysis Module Prompts — multilingual, language-agnostic
 // Auto-detect transcript language. Output language comes from user preferences.
 // Never apologize for the transcript language — just analyze what's there.
+//
+// MODULE MAP (2026 catalog):
+//   0 = Snapshot (free, 1/day)
+//   1 = Comprehensive (3cr)
+//   2 = Repeating Errors (2cr)
+//   3 = Active Vocabulary (2cr)
+//   4 = CEFR Precision (4cr)
+//   9 = Italian→English Transfer (3cr)
+//  11 = Cambridge Companion (4cr)
+//
+// Legacy modules 5-14 still available for backward compatibility.
 
 function sharedRules(reportLanguage: string): string {
   return `
 Regole generali:
+- Evidence first, personalization second.
 - Rileva automaticamente la lingua del transcript e analizzala in quella lingua.
-- NON scusarti per la lingua del transcript. Non dire "il transcript è in italiano quindi…". Analizza semplicemente ciò che c'è.
+- NON scusarti per la lingua del transcript. Analizza semplicemente ciò che c'è.
 - Scrivi il report in ${reportLanguage}.
 - Includi esempi tratti dal transcript nella lingua originale, poi commentali in ${reportLanguage}.
 - Sii specifico, concreto e utile. Evita frasi generiche.
-- Usa la scala CEFR (A1-C2) dove richiesto — è valida per tutte le lingue europee.
-- Formatta il responso in modo chiaro, con sezioni numerate.
+- Distingui pattern osservati da ipotesi.
+- Se le evidenze sono deboli, dillo esplicitamente.
+- Non assegnare certificazioni ufficiali.
+- Quando menzioni il CEFR, usa frasi caute: "mostra evidenze compatibili con".
+- Prioritizza l'azionabilità: cosa dovrebbe fare l'utente dopo?
 `;
 }
 
-export const MODULE_PROMPTS: Record<number, { system: (reportLang: string) => string; user: (transcript: string, reportLang: string) => string }> = {
+export const MODULE_PROMPTS: Record<number, { system: (reportLang: string, profileCtx?: string) => string; user: (transcript: string, reportLang: string, profileCtx?: string) => string }> = {
 
-  // ═══ CAMBRIDGE-STYLE (1-4): Grammar, Vocabulary, Fluency, Pronunciation ═══
+  // ═══ 0: SNAPSHOT (free, 1/day) ═══
+  0: {
+    system: (rl: string, profileCtx?: string) => `Sei Sottotitoli, un motore di insight rapidi. Generi osservazioni brevi e utili dopo ogni sessione.${profileCtx ? '\n\nCONTESTO UTENTE:\n' + profileCtx : ''}${sharedRules(rl)}`,
+    user: (transcript: string, rl: string, profileCtx?: string) => `Genera uno Snapshot basato su questa sessione:
 
+${transcript}
+
+Scrivi il report in ${rl}. Fornisci 2–4 osservazioni concrete su grammatica, vocabolario e fluidità. Ogni osservazione deve citare un esempio dal transcript. Concludi con un passo successivo azionabile. Massimo 300 parole.`
+  },
+
+  // ═══ 1: COMPREHENSIVE (3cr) ═══
   1: {
-    system: (rl: string) => `Sei un esperto valutatore linguistico specializzato in grammatica e accuratezza (Grammatical Range & Accuracy). Lavori con qualsiasi lingua.${sharedRules(rl)}`,
-    user: (transcript: string, rl: string) => `Analizza questo transcript per Gamma e Accuratezza Grammaticale:
+    system: (rl: string, profileCtx?: string) => `Sei il motore di report principale di Sottotitoli. Generi analisi complete basate su evidenze per studenti di lingue.${profileCtx ? '\n\nCONTESTO UTENTE:\n' + profileCtx : ''}${sharedRules(rl)}`,
+    user: (transcript: string, rl: string, profileCtx?: string) => `Crea un Report Completo basato su questa sessione:
 
 ${transcript}
 
 Scrivi il report in ${rl}. Fornisci:
-1. Gamma Grammaticale (varietà di strutture usate: tempi verbali, modi, subordinate, costruzioni complesse)
-2. Accuratezza (frequenza e tipo di errori grammaticali)
-3. Errori Specifici — elenca errori concreti con la correzione
-4. Punti di Forza identificati
-5. Raccomandazioni mirate per migliorare
-6. Stima del Livello CEFR (A1-C2)`
+1. Riepilogo (2–3 frasi in italiano e inglese)
+2. Punti di forza osservati (con esempi dal transcript)
+3. Problemi prioritari (con esempi concreti)
+4. Pattern ricorrenti vs errori occasionali
+5. Azioni consigliate (cosa fare dopo, in ordine di priorità)
+6. Livello di confidenza dell'analisi (0–100, con note)`
+  },
+
+  // ═══ 2: REPEATING ERRORS (2cr) ═══
+  2: {
+    system: (rl: string, profileCtx?: string) => `Sei il motore di analisi dei pattern ricorrenti di Sottotitoli.${profileCtx ? '\n\nCONTESTO UTENTE:\n' + profileCtx : ''}${sharedRules(rl)}`,
+    user: (transcript: string, rl: string, profileCtx?: string) => `Analizza questo transcript per errori ricorrenti:
+
+${transcript}
+
+Scrivi il report in ${rl}. Fornisci:
+1. Errori che si ripetono (solo se compaiono almeno 2 volte)
+2. Errori occasionali (una tantum — non ricorrenti)
+3. Per ogni errore ricorrente: esempio concreto, pattern di correzione, spiegazione
+4. Pattern di correzione pratici
+5. Priorità: quali errori sistemare per primi`
+  },
+
+  // ═══ 3: ACTIVE VOCABULARY (2cr) ═══
+  3: {
+    system: (rl: string, profileCtx?: string) => `Sei il motore di analisi del vocabolario di Sottotitoli.${profileCtx ? '\n\nCONTESTO UTENTE:\n' + profileCtx : ''}${sharedRules(rl)}`,
+    user: (transcript: string, rl: string, profileCtx?: string) => `Analizza il vocabolario attivo in questo transcript:
+
+${transcript}
+
+Scrivi il report in ${rl}. Fornisci:
+1. Vocabolario attivo (parole usate, con frequenza)
+2. Parole emergenti (usate per la prima volta o poco frequenti)
+3. Parole da imparare (5–10 suggerimenti basati sulle lacune osservate)
+4. Distribuzione CEFR stimata del lessico
+5. Suggerimenti di studio (collegati al contesto d'uso dell'utente)
+6. Il PDF dovrebbe includere colonne chiare per studiare e ripassare`
+  },
+
+  // ═══ 4: CEFR PRECISION (4cr) ═══
+  4: {
+    system: (rl: string, profileCtx?: string) => `Sei il motore di stima CEFR di Sottotitoli. Fornisci stime prudenti e basate su evidenze. NON assegni certificazioni ufficiali.${profileCtx ? '\n\nCONTESTO UTENTE:\n' + profileCtx : ''}${sharedRules(rl)}`,
+    user: (transcript: string, rl: string, profileCtx?: string) => `Stima il profilo CEFR basato su questo transcript:
+
+${transcript}
+
+Scrivi il report in ${rl}. Fornisci:
+1. Profilo per abilità: produzione, interazione, ricezione, vocabolario, accuratezza grammaticale, coerenza
+2. Per ogni abilità: banda stimata, confidenza, evidenze a supporto, evidenze mancanti, requisiti per la banda successiva
+3. Corrispondenze con descrittori CEFR (con spiegazione)
+4. Note di cautela (cosa NON possiamo affermare con sicurezza)
+5. NON assegnare certificazioni ufficiali. Usa frasi come "mostra evidenze compatibili con"`
+  },
+
+  // ═══ 9: ITALIAN→ENGLISH TRANSFER (3cr) ═══
+  9: {
+    system: (rl: string, profileCtx?: string) => `Sei il motore di analisi contrastiva italiano-inglese di Sottotitoli.${profileCtx ? '\n\nCONTESTO UTENTE:\n' + profileCtx : ''}${sharedRules(rl)}`,
+    user: (transcript: string, rl: string, profileCtx?: string) => `Analizza questo transcript per interferenze dall'italiano:
+
+${transcript}
+
+Scrivi il report in ${rl}. Fornisci:
+1. Pattern di transfer dall'italiano (solo se supportati da evidenze)
+2. Per ogni pattern: fonte probabile (L1), evidenza osservata, spiegazione in italiano e inglese, alternativa migliore, consiglio pratico
+3. Errori NON attribuibili al transfer (errori generali da apprendente)
+4. Focus su: articoli, preposizioni, pattern verbali, ordine delle parole, scelte lessicali, falsi amici`
+  },
+
+  // ═══ 11: CAMBRIDGE COMPANION (4cr) ═══
+  11: {
+    system: (rl: string, profileCtx?: string) => `Sei il motore di analisi per esami Cambridge di Sottotitoli.${profileCtx ? '\n\nCONTESTO UTENTE:\n' + profileCtx : ''}${sharedRules(rl)}`,
+    user: (transcript: string, rl: string, profileCtx?: string) => `Analizza questo transcript in formato Cambridge Speaking:
+
+${transcript}
+
+Scrivi il report in ${rl}. Fornisci:
+1. Osservazioni per task (fluenza, coerenza, risorse lessicali, gamma grammaticale)
+2. Indicatori di pronuncia (dal solo transcript, senza audio)
+3. Punti di forza per l'esame
+4. Aree da migliorare prima dell'esame
+5. Consigli pratici per la preparazione
+6. NON assegnare punteggi di banda ufficiali`
   },
 
   2: {
@@ -236,15 +336,16 @@ Scrivi il report in ${rl}. Fornisci:
   }
 };
 
-export function getModulePrompt(moduleId: number, reportLanguage?: string): { system: string; user: (transcript: string) => string } {
+export function getModulePrompt(moduleId: number, reportLanguage?: string, profileContext?: string): { system: string; user: (transcript: string) => string } {
   const prompt = MODULE_PROMPTS[moduleId];
   if (!prompt) {
     throw new Error(`No prompt defined for module ID ${moduleId}`);
   }
   const rl = reportLanguage || 'italiano';
-  const sys = prompt.system(rl);
+  const pc = profileContext || undefined;
+  const sys = prompt.system(rl, pc);
   return {
     system: sys,
-    user: (transcript: string) => prompt.user(transcript, rl)
+    user: (transcript: string) => prompt.user(transcript, rl, pc)
   };
 }
