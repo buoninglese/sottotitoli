@@ -711,11 +711,65 @@ button[onclick*="addToWordBank"]:hover{background:rgba(52,211,153,.15)!important
   if (modeParam) {
     setTimeout(function() { setCaptionMode(modeParam); }, 300);
   }
+  // Ensure extras bar reflects language capabilities on load
+  setTimeout(function() { refreshExtrasBarForLanguage(); }, 400);
 })();
 
 // ═══ Caption Language Dropdown ═══
 var currentCaptionLang = 'en-US';
 var currentCaptionLangName = 'English';
+
+// ═══ Language Capability Gating (Phase 1 — honest feature matrix) ═══
+// Maps language code prefix → available features. English = full, Tiers 2-4 graduated.
+var LANGUAGE_CAPABILITIES = {
+  en: { translation:true, aiReports:true, pos:true, grammar:true, wordbank:true, synonyms:true, definitions:true, cefrMetrics:true },
+  it: { translation:true, aiReports:true, pos:true, grammar:true, wordbank:true, synonyms:false, definitions:false, cefrMetrics:true },
+  nl: { translation:true, aiReports:true, pos:true, grammar:false, wordbank:true, synonyms:true, definitions:false, cefrMetrics:false },
+  es: { translation:true, aiReports:true, pos:false, grammar:false, wordbank:false, synonyms:false, definitions:false, cefrMetrics:false },
+  fr: { translation:true, aiReports:true, pos:false, grammar:false, wordbank:false, synonyms:false, definitions:false, cefrMetrics:false },
+  de: { translation:true, aiReports:true, pos:false, grammar:false, wordbank:false, synonyms:false, definitions:false, cefrMetrics:false },
+  pt: { translation:true, aiReports:true, pos:false, grammar:false, wordbank:false, synonyms:false, definitions:false, cefrMetrics:false },
+  pl: { translation:true, aiReports:true, pos:false, grammar:false, wordbank:false, synonyms:false, definitions:false, cefrMetrics:false }
+};
+
+function getLangPrefix() {
+  return (currentCaptionLang || 'en-US').split('-')[0];
+}
+
+function isCapabilityAvailable(feature) {
+  var cap = LANGUAGE_CAPABILITIES[getLangPrefix()] || LANGUAGE_CAPABILITIES['en'];
+  return cap[feature] === true;
+}
+
+// Refresh extras bar buttons based on current language capabilities
+function refreshExtrasBarForLanguage() {
+  var bar = document.getElementById('extrasToggleBar');
+  if (!bar) return;
+  var hasGrammar = isCapabilityAvailable('grammar');
+  var hasSynonyms = isCapabilityAvailable('synonyms');
+  var hasWordbank = isCapabilityAvailable('wordbank');
+
+  // Show/hide Grammar button
+  var gramBtn = bar.querySelector('[data-panel="grammar"]');
+  if (gramBtn) {
+    gramBtn.style.display = hasGrammar ? '' : 'none';
+    if (!hasGrammar) gramBtn.innerHTML = '📋 Grammar <span style="font-size:7px;opacity:.5">In arrivo</span>';
+  }
+
+  // Show/hide Synonyms button
+  var synBtn = bar.querySelector('[data-panel="synonyms"]');
+  if (synBtn) {
+    synBtn.style.display = hasSynonyms ? '' : 'none';
+    if (!hasSynonyms) synBtn.innerHTML = '📖 Synonyms <span style="font-size:7px;opacity:.5">In arrivo</span>';
+  }
+
+  // Word Bank is always shown but may have reduced features
+  var wbBtn = bar.querySelector('[data-panel="wordbank"]');
+  if (wbBtn && !hasWordbank) {
+    wbBtn.style.opacity = '0.4';
+    wbBtn.title = 'Disponibile prima in inglese e italiano';
+  }
+}
 
 // ═══ Speaker Mode — color-codes transcript lines ═══
 var speakerCount = 1; // 1-6 or 'auto'
@@ -807,6 +861,11 @@ function setCaptionLanguage(code, name, skipConfirm) {
   // Update URL
   var newUrl = window.location.pathname + '?lang=' + code + '&mode=' + currentCaptionMode;
   window.history.replaceState({}, '', newUrl);
+  // Refresh extras bar for language capabilities
+  refreshExtrasBarForLanguage();
+  // If an unsupported panel is open, close it
+  if (activePanel === 'grammar' && !isCapabilityAvailable('grammar')) toggleExtrasPanel('grammar');
+  if (activePanel === 'synonyms' && !isCapabilityAvailable('synonyms')) toggleExtrasPanel('synonyms');
 }
 // Language buttons handle their own state
 var CAPTION_SAMPLES = {
@@ -1211,6 +1270,7 @@ _realMic.onFinal = function(text) {
   document.getElementById('liveWpm').textContent = wpm;
   
   // ── Word Bank: auto-add content words (nouns, verbs, adjectives) ──
+  if (isCapabilityAvailable('wordbank')) {
   var words = text.toLowerCase().match(/[a-z']+/g) || [];
   var posColors={VERB:'#34d399',NOUN:'#60a5fa',ADJ:'#f472b6',ADV:'#c084fc',FUNC:'#6b7280',WORD:'#a78bfa'};
   var posBg={VERB:'rgba(52,211,153,.12)',NOUN:'rgba(96,165,250,.12)',ADJ:'rgba(244,114,182,.12)',ADV:'rgba(192,132,252,.12)',FUNC:'rgba(107,114,128,.08)',WORD:'rgba(167,139,250,.08)'};
@@ -1225,6 +1285,7 @@ _realMic.onFinal = function(text) {
     wordBank.push(w);
   });
   saveWordBank();
+  }
   
   // Render live chips in vocabChips if present
   var chipsEl = document.getElementById('vocabChips');
@@ -2949,6 +3010,15 @@ function downloadGrammarPDF() {
     // ═══ Grammar — Compromise.js NLP-powered rings ═══
     grammar: function(cb){
       var h='';
+      // Feature gate: grammar only available for English + Italian
+      if (!isCapabilityAvailable('grammar')) {
+        h+='<div style="text-align:center;padding:40px 20px;color:var(--muted2)">';
+        h+='<div style="font-size:36px;margin-bottom:12px">📋</div>';
+        h+='<div style="font-size:14px;font-weight:600;color:var(--muted);margin-bottom:6px">Grammar Analysis</div>';
+        h+='<div style="font-size:11px;line-height:1.6">Disponibile prima in inglese e italiano.<br><span style="color:var(--accent)">In arrivo</span> per altre lingue.</div>';
+        h+='</div>';
+        cb(h); return;
+      }
       var text=(document.getElementById('captionTranscript')?.textContent||'');
       var noData=!text.trim();
       var m=getSessionMetrics();
@@ -3036,6 +3106,15 @@ function downloadGrammarPDF() {
     // ═══ Synonyms — Datamuse API-powered ═══
     synonyms: function(cb){
       var h='<div class="extras-grid">';
+      // Feature gate: synonyms only for English + Dutch (Datamuse)
+      if (!isCapabilityAvailable('synonyms')) {
+        h+='<div class="extras-card" style="grid-column:1/-1;text-align:center;padding:40px 20px;color:var(--muted2)">';
+        h+='<div style="font-size:36px;margin-bottom:12px">📖</div>';
+        h+='<div style="font-size:14px;font-weight:600;color:var(--muted);margin-bottom:6px">Live Synonyms</div>';
+        h+='<div style="font-size:11px;line-height:1.6">Disponibile prima in inglese e olandese.<br><span style="color:var(--accent)">In arrivo</span> per l\'italiano.</div>';
+        h+='</div></div>';
+        cb(h); return;
+      }
       var words=getTranscriptWords();
       var text=(document.getElementById('captionTranscript')?.textContent||'');
 
