@@ -191,5 +191,69 @@ function _endSupabaseSession(data) {
       localStorage.removeItem('sottotitoli-active-session');
       localStorage.removeItem('sottotitoli-caption-session');
       localStorage.removeItem('sottotitoli-translate-session');
+      
+      // ── Deduct minutes from user_credits ──
+      _deductSessionMinutes(data.durationSeconds || 0);
     });
+}
+
+// ═══ Minutes deduction from user_credits ═══
+function _deductSessionMinutes(durationSeconds) {
+  if (!window.sottotitoliSupabase || durationSeconds <= 0) return;
+  
+  window.sottotitoliSupabase.auth.getSession().then(function(r) {
+    if (!r.data?.session) return;
+    var userId = r.data.session.user.id;
+    
+    // Calculate minutes used (round up to nearest minute, minimum 1)
+    var minutesUsed = Math.max(1, Math.ceil(durationSeconds / 60));
+    
+    // Get current balance
+    window.sottotitoliSupabase.from('user_credits')
+      .select('balance_minutes')
+      .eq('user_id', userId)
+      .maybeSingle()
+      .then(function(cr) {
+        var currentBalance = cr.data?.balance_minutes || 0;
+        var newBalance = Math.max(0, currentBalance - minutesUsed);
+        
+        // Update balance
+        window.sottotitoliSupabase.from('user_credits')
+          .upsert({ user_id: userId, balance_minutes: newBalance, updated_at: new Date().toISOString() }, { onConflict: 'user_id' })
+          .then(function() {
+            // Update all credit displays across the UI
+            _refreshCreditDisplays(newBalance);
+          });
+      });
+  });
+}
+
+// ═══ Refresh credit/minutes displays across the page ═══
+function _refreshCreditDisplays(newMinutesBalance) {
+  // Hamburger menu
+  var hbMin = document.getElementById('hbMinutes');
+  if (hbMin) hbMin.textContent = (newMinutesBalance || 0) + ' min';
+  
+  // Auth section (topbar)
+  var udMin = document.getElementById('udMinutes');
+  if (udMin) udMin.textContent = (newMinutesBalance || 0) + ' min';
+  
+  // Also try to refresh token/credit display if available
+  if (window.sottotitoliSupabase) {
+    window.sottotitoliSupabase.auth.getSession().then(function(r) {
+      if (!r.data?.session) return;
+      var userId = r.data.session.user.id;
+      window.sottotitoliSupabase.from('user_tokens')
+        .select('balance')
+        .eq('user_id', userId)
+        .maybeSingle()
+        .then(function(tr) {
+          var tokBal = tr.data?.balance || 0;
+          var hbTok = document.getElementById('hbTokens');
+          if (hbTok) hbTok.textContent = tokBal;
+          var udTok = document.getElementById('udTokens');
+          if (udTok) udTok.textContent = tokBal;
+        });
+    });
+  }
 }
