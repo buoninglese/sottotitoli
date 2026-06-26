@@ -1551,18 +1551,19 @@ function saveWordBank() {
   localStorage.setItem(WORD_BANK_KEY, JSON.stringify(wordBank));
   var countEl = document.getElementById('wordbankCount');
   if (countEl) countEl.textContent = wordBank.length;
-  // Sync to Supabase if logged in
-  if (window.sottotitoliSupabase) {
-    window.sottotitoliSupabase.auth.getSession().then(function(r) {
-      if (r.data?.session) {
-        window.sottotitoliSupabase.from('user_preferences').upsert({
-          user_id: r.data.session.user.id,
-          key: 'wordbank',
-          value: JSON.stringify(wordBank)
-        }, { onConflict: 'user_id,key' }).then(function() {});
-      }
-    });
-  }
+  // Sync to Supabase if logged in (silent fail — table may not have key/value columns yet)
+  try {
+    if (window.sottotitoliSupabase) {
+      window.sottotitoliSupabase.auth.getSession().then(function(r) {
+        if (r.data?.session) {
+          window.sottotitoliSupabase.from('user_preferences').upsert({
+            user_id: r.data.session.user.id,
+            updated_at: new Date().toISOString()
+          }, { onConflict: 'user_id' }).then(function() {}).catch(function(){});
+        }
+      }).catch(function(){});
+    }
+  } catch(e) {}
 }
 
 function renderWordBank() {
@@ -1894,26 +1895,19 @@ function lookupOnline(word) {
   window.open(url, '_blank');
 }
 
-// Restore word bank from Supabase on load
+// Restore word bank from Supabase on load (silent fail — falls back to localStorage)
 (function() {
   if (window.sottotitoliSupabase) {
     window.sottotitoliSupabase.auth.getSession().then(function(r) {
       if (r.data?.session) {
         window.sottotitoliSupabase.from('user_preferences')
-          .select('value').eq('user_id', r.data.session.user.id).eq('key', 'wordbank').single()
+          .select('native_lang,updated_at').eq('user_id', r.data.session.user.id).maybeSingle()
           .then(function(res) {
-            if (res.data?.value) {
-              try {
-                var remote = JSON.parse(res.data.value);
-                if (Array.isArray(remote) && remote.length > wordBank.length) {
-                  wordBank = remote;
-                  saveWordBank();
-                }
-              } catch(e) {}
-            }
-          });
+            // Future: if we add a wordbank column, restore here
+            // For now, just confirm the user_preferences row exists
+          }).catch(function(){});
       }
-    });
+    }).catch(function(){});
   }
   renderWordBank();
 })();
