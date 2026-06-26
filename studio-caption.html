@@ -572,6 +572,7 @@ button[onclick*="addToWordBank"]:hover{background:rgba(52,211,153,.15)!important
         <span class="s-pill"><span class="dot" id="micDot"></span><span id="micStatus">Mic</span></span>
         <span class="s-pill"><span class="dot" id="socketDot"></span><span id="socketStatus">Live</span></span>
         <span class="s-pill">⏱ <span id="sessionTimer">00:00</span></span>
+        <span class="s-pill" style="gap:3px">👥 <select id="speakerCount" onchange="setSpeakerCount(this.value)" style="background:transparent;border:none;color:var(--text);font-size:10px;font-family:inherit;cursor:pointer;outline:none;padding:0"><option value="1">1 spk</option><option value="2">2 spk</option><option value="3">3 spk</option><option value="4">4 spk</option><option value="5">5 spk</option><option value="6">6 spk</option><option value="auto">auto</option></select></span>
       </div>
 
       <div class="action-row">
@@ -583,9 +584,7 @@ button[onclick*="addToWordBank"]:hover{background:rgba(52,211,153,.15)!important
       <div class="extras-toggle-bar" id="extrasToggleBar">
         <button type="button" class="extras-toggle-btn" data-panel="wordbank" onclick="toggleExtrasPanel('wordbank',this)">📚 Word Bank <span id="wordbankCount" style="font-size:8px;opacity:.6">0</span></button>
         <button type="button" class="extras-toggle-btn" data-panel="grammar" onclick="toggleExtrasPanel('grammar',this)">📋 Grammar</button>
-        <button type="button" class="extras-toggle-btn" data-panel="metrics" onclick="toggleExtrasPanel('metrics',this)">📊 Metrics</button>
         <button type="button" class="extras-toggle-btn" data-panel="synonyms" onclick="toggleExtrasPanel('synonyms',this)">📖 Synonyms</button>
-        <button type="button" class="extras-toggle-btn" data-panel="multispeaker" onclick="toggleExtrasPanel('multispeaker',this)">👥 Multispeaker</button>
       </div>
       <div class="extras-panel" id="extrasPanel"></div>
     </div>
@@ -717,6 +716,59 @@ button[onclick*="addToWordBank"]:hover{background:rgba(52,211,153,.15)!important
 // ═══ Caption Language Dropdown ═══
 var currentCaptionLang = 'en-US';
 var currentCaptionLangName = 'English';
+
+// ═══ Speaker Mode — color-codes transcript lines ═══
+var speakerCount = 1; // 1-6 or 'auto'
+var speakerColors = ['#5b7fc1','#c1665b','#5b9c6e','#c084fc','#fbbf24','#f472b6'];
+var _speakerIdx = 0;
+
+function setSpeakerCount(val) {
+  speakerCount = val === 'auto' ? 'auto' : parseInt(val);
+  var sel = document.getElementById('speakerCount');
+  if (sel) sel.value = val;
+  // Update existing transcript lines if any
+  recolorTranscriptLines();
+  localStorage.setItem('sottotitoli-speaker-count', val);
+}
+
+// Restore saved speaker count
+(function(){
+  var saved = localStorage.getItem('sottotitoli-speaker-count');
+  if (saved) {
+    speakerCount = saved === 'auto' ? 'auto' : parseInt(saved);
+    var sel = document.getElementById('speakerCount');
+    if (sel) sel.value = saved;
+  }
+})();
+
+// Assign speaker to a line based on heuristics and current speaker index
+function assignSpeaker(lineText) {
+  if (speakerCount === 1) return -1; // single speaker — no coloring
+  var maxSpk = speakerCount === 'auto' ? 6 : speakerCount;
+  // Speaker change signals
+  var changeSignal = /^(yes|no|okay|right|exactly|sure|thanks|thank|sorry|well|so|but|and|or|because|oh|wow|hey|hi|hello|good|great|nice|interesting|absolutely|definitely|actually|however|anyway|look|listen|wait|hold|hmm|ok|alright|yeah|nope|what|who|where|when|why|how|really|maybe|perhaps)/i.test(lineText.trim());
+  if (changeSignal) _speakerIdx = (_speakerIdx + 1) % maxSpk;
+  return _speakerIdx;
+}
+
+// Re-color existing transcript lines based on speaker assignment
+function recolorTranscriptLines() {
+  var lines = document.querySelectorAll('#captionTranscript .line');
+  if (speakerCount === 1) {
+    lines.forEach(function(l){ l.style.borderLeft = ''; });
+    return;
+  }
+  // Re-assign speakers to all lines
+  _speakerIdx = 0;
+  var prevSpeaker = 0;
+  lines.forEach(function(line, i){
+    var text = line.textContent.replace(/^\d{2}:\d{2}:\d{2}\s*/,'');
+    var spk = assignSpeaker(text);
+    var color = speakerColors[spk];
+    line.style.borderLeft = '3px solid ' + color;
+    line.style.paddingLeft = '8px';
+  });
+}
 
 // Language buttons in topbar — no dropdown needed
 function setCaptionLanguage(code, name, skipConfirm) {
@@ -1134,9 +1186,14 @@ _realMic.onFinal = function(text) {
   // Prepend — most recent finalized line appears right beneath the live interim box
   transcript.insertBefore(div, transcript.firstChild);
   
-  // Accumulate lines for session-end transcript save
-  if (!window._sessionLines) window._sessionLines = [];
-  window._sessionLines.push({ en: text, time: tsStr, lang: currentCaptionLang || 'en-US' });
+  // ── Speaker mode: color-code line by speaker ──
+  if (speakerCount !== 1) {
+    var spk = assignSpeaker(text);
+    var spkColor = speakerColors[spk];
+    div.style.borderLeft = '3px solid ' + spkColor;
+    div.style.paddingLeft = '8px';
+  }
+
   
   // Clear interim after final
   if (interim) interim.textContent = '';
@@ -2976,44 +3033,6 @@ function downloadGrammarPDF() {
     },
 
     // ═══ Metrics — trimmed (no Hesitation, no Active Vocab) ═══
-    metrics: function(cb){
-      var h='<div class="extras-grid">';
-      var m=getSessionMetrics();
-      var noSession=m.sec<1;
-
-      // ── Session Stats ──
-      h+='<div class="extras-card"><div class="ec-title">⏱ Session <span class="ec-badge" style="background:rgba(52,211,153,.15);color:#34d399">LIVE</span></div>';
-      if(noSession){
-        h+='<div style="color:var(--muted2);font-style:italic;padding:16px 0;text-align:center">Start speaking — stats appear here</div>';
-      }else{
-        var min=Math.floor(m.sec/60);
-        var secLeft=m.sec%60;
-        h+='<div style="display:flex;gap:16px;align-items:center;flex-wrap:wrap">';
-        h+='<div style="text-align:center"><div style="font-size:28px;font-weight:800;color:var(--text);font-family:JetBrains Mono,monospace">'+min+'<span style="font-size:14px;color:var(--muted2)">m</span> '+String(secLeft).padStart(2,'0')+'<span style="font-size:14px;color:var(--muted2)">s</span></div><div style="font-size:9px;color:var(--muted2)">speaking time</div></div>';
-        h+='<div style="text-align:center"><div style="font-size:28px;font-weight:800;color:#60a5fa;font-family:JetBrains Mono,monospace">'+m.words+'</div><div style="font-size:9px;color:var(--muted2)">words</div></div>';
-        h+='<div style="text-align:center"><div style="font-size:28px;font-weight:800;color:#34d399;font-family:JetBrains Mono,monospace">'+m.wpm+'</div><div style="font-size:9px;color:var(--muted2)">wpm</div></div>';
-        h+='<div style="text-align:center"><div style="font-size:28px;font-weight:800;color:#a78bfa;font-family:JetBrains Mono,monospace">'+m.lines+'</div><div style="font-size:9px;color:var(--muted2)">sentences</div></div>';
-        h+='</div>';
-      }
-      h+='</div>';
-
-      // ── POS Distribution ──
-      var posWords=getTranscriptWords();
-      var posVerb=0,posNoun=0,posAdj=0,posAdv=0,posOther=0;
-      posWords.forEach(function(w){if(w.pos==='VERB')posVerb++;else if(w.pos==='NOUN')posNoun++;else if(w.pos==='ADJ')posAdj++;else if(w.pos==='ADV')posAdv++;else posOther++});
-      var posTotal=Math.max(1,posVerb+posNoun+posAdj+posAdv+posOther);
-      h+='<div class="extras-card"><div class="ec-title">POS Distribution <span class="ec-badge" style="background:rgba(52,211,153,.15);color:#34d399">LIVE</span></div>';
-      if(posTotal<=1){h+='<div style="color:var(--muted2);font-style:italic">Speaking data needed</div>'}
-      else{
-        [{l:'Verbs',c:'#34d399',v:posVerb},{l:'Nouns',c:'#60a5fa',v:posNoun},{l:'Adjectives',c:'#f472b6',v:posAdj},{l:'Adverbs',c:'#c084fc',v:posAdv},{l:'Other',c:'#6b7280',v:posOther}].forEach(function(b){
-          var pct=Math.round(b.v/posTotal*100);
-          h+='<div style="margin-bottom:5px"><div style="display:flex;justify-content:space-between;font-size:9px;margin-bottom:2px"><span style="color:var(--muted)">'+b.l+'</span><span style="color:var(--muted2);font-family:JetBrains Mono,monospace">'+b.v+' ('+pct+'%)</span></div><div style="height:5px;background:var(--line);border-radius:3px;overflow:hidden"><div style="height:100%;border-radius:3px;background:'+b.c+';width:'+pct+'%;transition:width .5s ease"></div></div></div>';
-        });
-      }
-      h+='</div></div>';
-      cb(h);
-    },
-
     // ═══ Synonyms — Datamuse API-powered ═══
     synonyms: function(cb){
       var h='<div class="extras-grid">';
@@ -3063,98 +3082,6 @@ function downloadGrammarPDF() {
         });
       });
     },
-    multispeaker: function(cb){
-      var h='';
-      var transcriptEl=document.getElementById('captionTranscript');
-      // Read actual .line elements (textContent loses newlines between divs)
-      var lineEls=transcriptEl?transcriptEl.querySelectorAll('.line'):[];
-      var lines=[];lineEls.forEach(function(el){var t=el.textContent.trim();if(t)lines.push(t);});
-      var noData=lines.length===0;
-      var speakerColors=['#5b7fc1','#c1665b','#5b9c6e','#c084fc','#fbbf24','#f472b6'];
-      var speakerNames=['Speaker A','Speaker B','Speaker C','Speaker D','Speaker E','Speaker F'];
-      var spkCounts={};for(var s=0;s<6;s++) spkCounts[s]=0;
-      h+='</div>';
-      
-      if(noData){
-        h+='<div style="text-align:center;padding:40px 20px;color:var(--muted2);background:var(--card2);border:2px dashed var(--line);border-radius:14px"><div style="font-size:36px;margin-bottom:10px">🎙️</div><div style="font-size:13px;font-weight:600;color:var(--muted)">Start a session with multiple speakers</div><div style="font-size:10px;margin-top:4px">The AI will identify who said what in real time</div></div>';
-      } else {
-        // ── Build speaker groups ──
-        var currentSpeaker=0;
-        var lastLines=lines.slice(-20);
-        var speakerGroups=[[],[],[]]; // 3 speakers max
-        
-        lastLines.forEach(function(line,i){
-          var changeSignal=(i>0 && lastLines[i-1].trim().endsWith('?')) ||
-                           /^(yes|no|okay|right|exactly|sure|thanks|thank|sorry|well|so|but|and|or|because|oh|wow|hey|hi|hello|good|great|nice|interesting|absolutely|definitely|actually|however|anyway|look|listen|wait|hold|hmm|ok|alright|yeah|nope|what|who|where|when|why|how|really|maybe|perhaps)/i.test(line.trim());
-          if(changeSignal && i>0) currentSpeaker=(currentSpeaker+1)%3;
-          var spk=currentSpeaker;
-          spkCounts[spk]=(spkCounts[spk]||0)+1;
-          line._spk=spk;
-          speakerGroups[spk].push(line);
-        });
-
-        // ── Render: LEFT (2/3) — speaker blocks ──
-        h+='<div style="display:flex;gap:14px">';
-        h+='<div style="flex:2;min-width:0">';
-        h+='<span id="diarizeStatus" style="display:none;font-size:10px;color:var(--accent);margin-bottom:8px">⏳ Analyzing speaker patterns...</span>';
-        h+='<div id="diarizeOutput" style="display:flex;flex-direction:column;gap:12px;max-height:400px;overflow-y:auto;padding-right:6px">';
-
-        for(var s=0;s<3;s++){
-          if(speakerGroups[s].length===0) continue;
-          var color=speakerColors[s];
-          h+='<div style="background:'+color+'08;border:1px solid '+color+'20;border-radius:14px;padding:14px;transition:all .3s">';
-          h+='<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">';
-          h+='<div style="width:28px;height:28px;border-radius:50%;background:'+color+';color:#fff;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:800;font-family:JetBrains Mono,monospace">'+(s+1)+'</div>';
-          h+='<span style="font-size:12px;font-weight:700;color:'+color+'">'+speakerNames[s]+'</span>';
-          h+='<span style="font-size:9px;color:var(--muted2);font-family:JetBrains Mono,monospace">'+speakerGroups[s].length+' lines</span>';
-          h+='</div>';
-          // Lines for this speaker
-          h+='<div style="display:flex;flex-direction:column;gap:6px">';
-          speakerGroups[s].forEach(function(line){
-            h+='<div style="font-size:12px;color:var(--text);line-height:1.5;padding:6px 10px;background:var(--card2);border-radius:8px;border-left:3px solid '+color+'">'+line.replace(/^\d{2}:\d{2}:\d{2}\s*/,'')+'</div>';
-          });
-          h+='</div>';
-          h+='</div>';
-        }
-
-        if(speakerGroups.every(function(g){return g.length===0})){
-          h+='<div style="color:var(--muted2);font-style:italic;text-align:center;padding:20px">No speaker data yet — lines will be grouped here</div>';
-        }
-        h+='</div>';
-        h+='</div>';
-        
-        // ── RIGHT (1/3): Speaker Stats ──
-        h+='<div style="flex:1;min-width:150px;display:flex;flex-direction:column;gap:0">';
-        h+='<div style="background:var(--card2);border:1px solid var(--line);border-radius:14px;padding:16px">';
-        h+='<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--muted2);margin-bottom:12px">Speakers</div>';
-        
-        var totalLines=lastLines.length;
-        for(var s2=0;s2<3;s2++){
-          var count=spkCounts[s2]||0;
-          var pct=totalLines>0?Math.round(count/totalLines*100):0;
-          var color2=speakerColors[s2];
-          h+='<div style="margin-bottom:12px">';
-          h+='<div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px">';
-          h+='<span style="font-size:11px;font-weight:600;color:'+color2+'">'+speakerNames[s2]+'</span>';
-          h+='<span style="font-family:JetBrains Mono,monospace;font-size:18px;font-weight:900;color:'+color2+'">'+count+'</span>';
-          h+='</div>';
-          h+='<div style="height:5px;background:var(--line);border-radius:3px;overflow:hidden">';
-          h+='<div style="height:100%;border-radius:3px;background:'+color2+';width:'+pct+'%;transition:width .6s ease"></div>';
-          h+='</div>';
-          h+='<div style="font-size:9px;color:var(--muted2);margin-top:2px">'+pct+'% of conversation</div>';
-          h+='</div>';
-        }
-        h+='<div style="border-top:1px solid var(--line);padding-top:10px;margin-top:4px;display:flex;justify-content:space-between;font-size:10px;color:var(--muted)"><span>Total lines</span><span style="font-family:JetBrains Mono,monospace;font-weight:700">'+totalLines+'</span></div>';
-        h+='</div></div></div>';
-      }
-      
-      cb(h, function(){
-        window._diarizeLines = lines;
-        // Hide status initially
-        var s=document.getElementById('diarizeStatus');
-        if(s) s.style.display='none';
-      });
-    }
   };
 
 window.addToWordBank = function(word){
