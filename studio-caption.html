@@ -3216,6 +3216,83 @@ function downloadGrammarPDF() {
       });
     },
 
+    // ═══ Gloss — Multi-Language Gloss (connected to live transcript) ═══
+    gloss: function(cb){
+      var h='<div class="extras-grid">';
+      var text=(document.getElementById('captionTranscript')?.textContent||'');
+      var words=getTranscriptWords();
+      var noData=words.length===0;
+      
+      // Language mapping
+      var langMap={en:'English',it:'Italiano',nl:'Nederlands',es:'Español',fr:'Français',de:'Deutsch',pt:'Português',pl:'Polski'};
+      var flags={en:'🇬🇧',it:'🇮🇹',nl:'🇳🇱',es:'🇪🇸',fr:'🇫🇷',de:'🇩🇪',pt:'🇵🇹',pl:'🇵🇱'};
+      var targetLangs=['it','nl','es','fr','de','pt','pl'];
+      
+      h+='<div class="extras-card" style="grid-column:1/-1"><div class="ec-title">11 · Multi-Language Gloss <span class="ec-badge" style="background:rgba(96,165,250,.15);color:#60a5fa">8 LANG</span></div>';
+      if(noData){
+        h+='<div style="color:var(--muted2);font-style:italic;padding:8px 0">Start speaking — detected words appear here with translations</div>';
+      }else{
+        var topWords=words.slice(0,12);
+        h+='<div style="max-height:400px;overflow-y:auto">';
+        h+='<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:6px">';
+        topWords.forEach(function(w){
+          h+='<div style="background:var(--card2);border:1px solid var(--line);border-radius:8px;padding:8px 10px">';
+          h+='<div style="font-weight:700;font-size:13px;color:var(--text);margin-bottom:2px">'+w.w+'</div>';
+          h+='<div style="font-size:9px;color:var(--muted2);margin-bottom:6px">'+w.pos+' · '+(w.count||1)+'×</div>';
+          h+='<div style="display:flex;flex-direction:column;gap:2px">';
+          targetLangs.slice(0,4).forEach(function(lc){
+            h+='<div style="font-size:10px;color:var(--muted2)"><span style="margin-right:4px">'+(flags[lc]||'')+'</span><span style="color:var(--muted)">…</span></div>';
+          });
+          h+='</div></div>';
+        });
+        h+='</div></div>';
+      }
+      h+='<div style="font-size:9px;color:var(--muted2);margin-top:8px;text-align:center">Translations load on demand via MyMemory API</div>';
+      h+='</div></div>';
+      cb(h);
+    },
+
+    // ═══ Info — Oldest 3 sentences from live transcript + word log ═══
+    info: function(cb){
+      var h='<div class="extras-grid">';
+      var text=(document.getElementById('captionTranscript')?.textContent||'');
+      var lines=text.split('\n').filter(function(l){return l.trim().length>0});
+      var noData=lines.length===0;
+      
+      // Oldest 3 sentences
+      h+='<div class="extras-card" style="grid-column:1/-1"><div class="ec-title">Recent Sentences <span class="ec-badge" style="background:rgba(52,211,153,.15);color:#34d399">LIVE</span></div>';
+      if(noData){
+        h+='<div style="color:var(--muted2);font-style:italic">Sentences from your live transcript appear here</div>';
+      }else{
+        var oldest=lines.slice(0,3);
+        h+='<div style="display:flex;flex-direction:column;gap:6px">';
+        oldest.forEach(function(l,i){
+          h+='<div style="padding:10px 14px;background:var(--card2);border:1px solid var(--line);border-radius:8px;font-size:12px;color:var(--text);line-height:1.5">';
+          h+='<span style="font-size:9px;color:var(--muted2);margin-right:6px">#'+(i+1)+'</span>'+l;
+          h+='</div>';
+        });
+        h+='</div>';
+      }
+      h+='</div>';
+      
+      // Word log sidebar
+      h+='<div class="extras-card" style="grid-column:1/-1"><div class="ec-title">Word Log <span class="ec-badge" style="background:rgba(167,139,250,.15);color:#c4b5fd">NEW</span></div>';
+      var words=getTranscriptWords();
+      if(words.length===0){
+        h+='<div style="color:var(--muted2);font-style:italic">Words from your live speech appear here</div>';
+      }else{
+        h+='<div style="max-height:300px;overflow-y:auto">';
+        h+='<div style="display:flex;flex-wrap:wrap;gap:4px">';
+        words.forEach(function(w){
+          var c=w.pos==='VERB'?'#3b82f6':w.pos==='NOUN'?'#34d399':w.pos==='ADJ'?'#f97316':w.pos==='ADV'?'#a855f7':w.pos==='FUNC'?'#6b7280':'#6b7280';
+          h+='<span style="display:inline-flex;align-items:center;gap:3px;padding:3px 8px;border-radius:6px;font-size:10px;font-weight:500;background:'+c+'18;color:'+c+';border:1px solid '+c+'30;cursor:pointer" onclick="addToWordBank(''+w.w+'')" title="Click to add to Word Bank">'+w.w+'<span style="font-size:7px;opacity:.6">+</span></span>';
+        });
+        h+='</div></div>';
+      }
+      h+='</div></div>';
+      cb(h);
+    },
+
     // ═══ Multispeaker Mode — Speaker Diarization View ═══
     grammarParse: function(cb){
       var h='';
@@ -3351,14 +3428,24 @@ multispeaker: function(cb){
         h+='<span id="diarizeStatus" style="display:none;font-size:10px;color:var(--accent);margin-bottom:8px;display:block">⏳ Analyzing speaker patterns...</span>';
         h+='<div id="diarizeOutput" style="display:flex;flex-direction:column;gap:8px;max-height:400px;overflow-y:auto;padding-right:6px">';
         
-        var speakerIdx=0;
-        var lastLines=lines.slice(-12);
+        var currentSpeaker=0;
+        var lastLines=lines.slice(-20);
+        // Group consecutive lines to same speaker unless change signal
         lastLines.forEach(function(line,i){
-          var spk=speakerIdx%3;
-          if(line.match(/^(yes|no|okay|right|exactly|sure|well|so|and|but|because)/i)) spk=(spk+1)%3;
+          // Speaker change signals: line ends with ?, line starts with greeting/response word
+          var changeSignal=(i>0 && lastLines[i-1].trim().endsWith('?')) ||
+                           /^(yes|no|okay|right|exactly|sure|thanks|thank|sorry|well|so|but|and|or|because|oh|wow|hey|hi|hello|good|great|nice|interesting|absolutely|definitely|actually|however|anyway|look|listen|wait|hold|hmm|ok|alright|yeah|nope|what|who|where|when|why|how|really|maybe|perhaps)/i.test(line.trim());
+          if(changeSignal && i>0) currentSpeaker=(currentSpeaker+1)%3;
+          var spk=currentSpeaker;
           spkCounts[spk]=(spkCounts[spk]||0)+1;
           var color=speakerColors[spk];
           var isLatest=i===lastLines.length-1;
+          // If previous line was same speaker, combine into bubble
+          var sameSpeakerAsPrev=(i>0 && currentSpeaker===parseInt(lastLines[i-1]._spk));
+          if(sameSpeakerAsPrev){
+            // Append to previous bubble's content
+          }
+          line._spk=spk;
           
           h+='<div style="display:flex;gap:12px;align-items:flex-start;padding:12px 14px;border-radius:12px;background:'+(isLatest?color+'0A':color+'05')+';border:1px solid '+(isLatest?color+'20':'transparent')+';transition:all .3s">';
           h+='<div style="flex-shrink:0;width:32px;height:32px;border-radius:50%;background:'+color+';color:#fff;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;font-family:JetBrains Mono,monospace;margin-top:2px">'+(spk+1)+'</div>';
