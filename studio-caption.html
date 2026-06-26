@@ -1981,14 +1981,23 @@ function downloadGrammarPDF() {
     w = w.toLowerCase().replace(/[^a-z0-9-]/g,'');
     if (!w || w.length<2) return 'OTHER';
     if (POS_DICT[w]) return POS_DICT[w];
+    // Verb patterns (stronger signals first)
     if (w.endsWith('ing')) return 'VERB';
     if (w.endsWith('ed') && w.length>4) return 'VERB';
-    if (w.endsWith('tion')||w.endsWith('sion')||w.endsWith('ment')||w.endsWith('ness')||w.endsWith('ity')) return 'NOUN';
+    if (/^(is|are|was|were|be|been|being|have|has|had|do|does|did|will|would|can|could|may|might|must|shall|should|go|goes|went|come|comes|came|make|makes|made|take|takes|took|get|gets|got|see|sees|saw|know|knows|knew|think|thinks|thought|say|says|said|tell|tells|told|give|gives|gave|use|uses|used|find|finds|found|work|works|worked|try|tries|tried|ask|asks|asked|seem|seems|seemed|mean|means|meant|need|needs|needed|want|wants|wanted|keep|keeps|kept|let|lets|put|puts|set|sets)$/.test(w)) return 'VERB';
+    // Noun patterns
+    if (w.endsWith('tion')||w.endsWith('sion')||w.endsWith('ment')||w.endsWith('ness')||w.endsWith('ity')||w.endsWith('ance')||w.endsWith('ence')) return 'NOUN';
+    // Adverb pattern
     if (w.endsWith('ly')) return 'ADV';
-    if (w.endsWith('ous')||w.endsWith('ful')||w.endsWith('less')||w.endsWith('able')||w.endsWith('ible')) return 'ADJ';
+    // Adjective patterns
+    if (w.endsWith('ous')||w.endsWith('ful')||w.endsWith('less')||w.endsWith('able')||w.endsWith('ible')||w.endsWith('ive')||w.endsWith('al')||w.endsWith('ic')) return 'ADJ';
     if (w.endsWith('er')||w.endsWith('est')) return 'ADJ';
+    // Preposition / function words
+    if (/^(the|a|an|in|on|at|to|for|of|with|by|from|into|about|over|under|between|through|during|before|after|above|below|up|down|out|off|or|and|but|so|if|when|where|how|why|who|whom|which|this|that|these|those|my|your|his|her|its|our|their|i|we|you|he|she|it|they|me|us|him|them|not|no|yes|very|just|only|also|even|still|yet|more|most|some|any|all|each|every|both|few|many|much|such|than|too|as|like|here|there|now|then|well)$/.test(w)) return 'FUNC';
+    // Final noun check
     if (w.endsWith('s') && w.length>4) return 'NOUN';
-    return 'NOUN'; // default
+    // Default: check first letter capitalization heuristic
+    return 'WORD';
   }
 
   // ── Extract words from TRANSCRIPT ONLY (no interim — only finalized sentences) ──
@@ -2980,14 +2989,26 @@ function downloadGrammarPDF() {
       var noSession=m.sec<1;
 
       // 20 — Pace
+      var m=getSessionMetrics();
+      var wpm=m.wpm||0;
+      var paceLabel=wpm<=0?'—':wpm<80?'Lento':wpm<=120?'Ideale':wpm<=160?'Veloce':'Troppo veloce';
+      var paceColor=wpm<=0?'var(--muted2)':wpm<80?'#fbbf24':wpm<=120?'#34d399':wpm<=160?'#f97316':'#f87171';
+      var pacePct=Math.min(100,Math.round(wpm/180*100));
       h+='<div class="extras-card"><div class="ec-title">20 · Pace <span class="ec-badge" style="background:rgba(52,211,153,.15);color:#34d399">LIVE</span></div>';
-      if(noSession){
+      if(noSession||wpm<=0){
         h+='<div class="extras-stat"><div class="es-val" style="color:rgba(255,255,255,.15)">—</div><div class="es-label">Avvia una sessione</div></div>';
       }else{
-        var p=m.pacePct;
-        h+='<div class="extras-stat"><div class="es-val" style="color:#fbbf24">'+m.wpm+'</div><div class="es-label">WPM · Words/min</div></div>';
-        h+='<div style="display:flex;height:6px;border-radius:3px;overflow:hidden;margin-top:6px"><div style="width:'+p.slow+'%;background:rgba(96,165,250,.3)"></div><div style="width:'+p.ideal+'%;background:rgba(52,211,153,.5)"></div><div style="width:'+p.fast+'%;background:rgba(251,191,36,.4)"></div><div style="width:'+p.toofast+'%;background:rgba(248,113,113,.3)"></div></div>';
-        h+='<div class="extras-meter-label"><span>Slow</span><span>Ideal</span><span>Fast</span><span>Too fast</span></div>';
+        h+='<div style="text-align:center;padding:4px 0">';
+        h+='<div style="font-family:JetBrains Mono,monospace;font-size:28px;font-weight:900;color:'+paceColor+'">'+wpm+'</div>';
+        h+='<div style="font-size:10px;color:'+paceColor+';font-weight:600;margin-top:2px">'+paceLabel+' · WPM</div>';
+        h+='<div style="height:8px;background:var(--line);border-radius:4px;margin-top:10px;overflow:hidden;position:relative">';
+        h+='<div style="position:absolute;left:44.4%;top:0;width:1px;height:100%;background:rgba(255,255,255,.2)"></div>';
+        h+='<div style="position:absolute;left:66.7%;top:0;width:1px;height:100%;background:rgba(255,255,255,.2)"></div>';
+        h+='<div style="position:absolute;left:88.9%;top:0;width:1px;height:100%;background:rgba(255,255,255,.2)"></div>';
+        h+='<div style="height:100%;border-radius:4px;background:linear-gradient(90deg,#fbbf24 0%,#34d399 44.4%,#34d399 66.7%,#f97316 88.9%,#f87171 100%);width:'+pacePct+'%;transition:width .6s ease"></div>';
+        h+='</div>';
+        h+='<div style="display:flex;justify-content:space-between;font-size:8px;color:var(--muted2);margin-top:3px"><span>0</span><span>80</span><span>120</span><span>160</span><span>180+</span></div>';
+        h+='</div>';
       }
       h+='</div>';
 
@@ -2996,8 +3017,10 @@ function downloadGrammarPDF() {
       if(noSession){
         h+='<div class="extras-stat"><div class="es-val" style="color:rgba(255,255,255,.15)">—</div><div class="es-label">In attesa</div></div>';
       }else{
-        h+='<div class="extras-stat"><div class="es-val" style="color:#a78bfa">'+m.silenceAvg+'<span style="font-size:12px;color:rgba(255,255,255,.3)">s</span></div><div class="es-label">avg gap between speech</div></div>';
-        h+='<div style="display:flex;height:6px;border-radius:3px;overflow:hidden;margin-top:6px"><div style="width:45%;background:rgba(52,211,153,.5)"></div><div style="width:4%;background:rgba(248,113,113,.3)"></div><div style="width:38%;background:rgba(52,211,153,.5)"></div><div style="width:3%;background:rgba(248,113,113,.3)"></div><div style="width:10%;background:rgba(52,211,153,.5)"></div></div>';
+        h+='<div class="extras-stat"><div class="es-val" style="color:#a78bfa">'+(m.sec>0?(m.sec/60).toFixed(1):'0')+'<span style="font-size:12px;color:rgba(255,255,255,.3)">min</span></div><div class="es-label">tempo totale parlato</div></div>';
+        var speechPct=m.sec>0?Math.min(95,Math.round(m.words/(m.sec/60)*2)):0;
+        h+='<div style="height:6px;background:var(--line);border-radius:3px;overflow:hidden;margin-top:6px"><div style="height:100%;border-radius:3px;background:linear-gradient(90deg,#34d399,#a78bfa);width:'+speechPct+'%;transition:width .6s ease"></div></div>';
+        h+='<div style="font-size:8px;color:var(--muted2);margin-top:2px">'+m.words+' parole in '+m.sec+'s</div>';
       }
       h+='</div>';
 
@@ -3020,15 +3043,21 @@ function downloadGrammarPDF() {
       h+='</div>';
 
       // 09 — Active Vocabulary Size
-      h+='<div class="extras-card"><div class="ec-title">09 · Active Vocabulary <span class="ec-badge" style="background:rgba(96,165,250,.15);color:#60a5fa">EST</span></div>';
-      if(noSession){h+='<div style="color:rgba(255,255,255,.2);font-style:italic">Avvia una sessione</div>'}
+      var vocabWords=getTranscriptWords();
+      var vocabCount=vocabWords.length;
+      var nounCount=vocabWords.filter(function(w){return w.pos==='NOUN'}).length;
+      var verbCount=vocabWords.filter(function(w){return w.pos==='VERB'}).length;
+      var adjCount=vocabWords.filter(function(w){return w.pos==='ADJ'}).length;
+      h+='<div class="extras-card"><div class="ec-title">09 · Active Vocabulary <span class="ec-badge" style="background:rgba(96,165,250,.15);color:#60a5fa">'+vocabCount+' words</span></div>';
+      if(noSession||vocabCount===0){h+='<div style="color:rgba(255,255,255,.2);font-style:italic">Avvia una sessione</div>'}
       else{
-        var uniqueWords=getTranscriptWords().length;
-        var estimatedVocab=uniqueWords>0?Math.min(8000,Math.max(40,uniqueWords*35)):0;
-        var vocabPct=Math.min(100,estimatedVocab/80);
-        h+='<div style="text-align:center;padding:4px 0"><div style="font-family:JetBrains Mono,monospace;font-size:24px;font-weight:900;color:#34d399">'+estimatedVocab.toLocaleString()+'</div><div style="font-size:9px;color:rgba(255,255,255,.25)">Estimated active vocabulary</div></div>';
-        h+='<div style="display:flex;justify-content:space-between;font-size:7px;color:rgba(255,255,255,.15);margin-top:4px"><span>A1</span><span>A2</span><span style="color:#34d399">B1</span><span>B2+</span></div>';
-        h+='<div style="height:3px;background:rgba(255,255,255,.06);border-radius:2px;margin-top:2px"><div style="width:'+vocabPct+'%;height:100%;border-radius:2px;background:linear-gradient(90deg,#60a5fa,#34d399)"></div></div>';
+        var maxBar=Math.max(nounCount,verbCount,adjCount,1);
+        h+='<div style="padding:4px 0">';
+        h+='<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px"><span style="font-size:10px;color:#34d399;width:40px">Nomi</span><div style="flex:1;height:6px;background:var(--line);border-radius:3px;overflow:hidden"><div style="height:100%;border-radius:3px;background:#34d399;width:'+Math.round(nounCount/maxBar*100)+'%"></div></div><span style="font-size:10px;color:var(--muted2);font-family:JetBrains Mono,monospace">'+nounCount+'</span></div>';
+        h+='<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px"><span style="font-size:10px;color:#3b82f6;width:40px">Verbi</span><div style="flex:1;height:6px;background:var(--line);border-radius:3px;overflow:hidden"><div style="height:100%;border-radius:3px;background:#3b82f6;width:'+Math.round(verbCount/maxBar*100)+'%"></div></div><span style="font-size:10px;color:var(--muted2);font-family:JetBrains Mono,monospace">'+verbCount+'</span></div>';
+        h+='<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px"><span style="font-size:10px;color:#f97316;width:40px">Agg.</span><div style="flex:1;height:6px;background:var(--line);border-radius:3px;overflow:hidden"><div style="height:100%;border-radius:3px;background:#f97316;width:'+Math.round(adjCount/maxBar*100)+'%"></div></div><span style="font-size:10px;color:var(--muted2);font-family:JetBrains Mono,monospace">'+adjCount+'</span></div>';
+        h+='</div>';
+        h+='<div style="font-size:9px;color:var(--muted2);margin-top:4px">'+vocabCount+' parole uniche nel transcript</div>';
       }
       h+='</div>';
 
