@@ -3632,32 +3632,46 @@ window.fixExtrasPanelColors = function(){
 
 // ── Render helper ──
   function renderPanel(name,btn){
-    var panel=document.getElementById('extrasPanel');
-    panel.innerHTML='<div class="extras-loading">Caricamento...</div>';
-    panel.classList.add('show');
-    panel.classList.add('fetching');
-    var fn=panels[name];
-    if(!fn) return;
-    fn(function(html,afterRender){
-      panel.innerHTML=html;
-      panel.classList.remove('fetching');
-      window.fixExtrasPanelColors();
-      if(afterRender) afterRender();
-    });
+    try {
+      var panel=document.getElementById('extrasPanel');
+      if(!panel) return;
+      panel.innerHTML='<div class="extras-loading">Caricamento...</div>';
+      panel.classList.add('show');
+      panel.classList.add('fetching');
+      var fn=panels[name];
+      if(!fn) { panel.innerHTML='<div class="extras-loading">Panel "'+name+'" non disponibile</div>'; return; }
+      fn(function(html,afterRender){
+        panel.innerHTML=html;
+        panel.classList.remove('fetching');
+        if(typeof window.fixExtrasPanelColors === 'function') {
+          window.fixExtrasPanelColors();
+        }
+        if(afterRender) afterRender();
+      });
+    } catch(e) {
+      console.error('renderPanel error:', e);
+      var panel=document.getElementById('extrasPanel');
+      if(panel) panel.innerHTML='<div class="extras-loading">Errore: '+e.message+'</div>';
+    }
   }
 
   // ── Toggle panel ──
   window.toggleExtrasPanel = function(name, btn){
-    var panel=document.getElementById('extrasPanel');
-    var btns=document.querySelectorAll('.extras-toggle-btn');
-    if(activePanel===name){
-      panel.classList.remove('show');panel.innerHTML='';activePanel=null;
-      btns.forEach(function(b){b.classList.remove('active')});
-    }else{
-      btns.forEach(function(b){b.classList.remove('active')});
-      btn.classList.add('active');
-      activePanel=name;
-      renderPanel(name,btn);
+    try {
+      var panel=document.getElementById('extrasPanel');
+      if(!panel) { console.warn('extrasPanel not found'); return; }
+      var btns=document.querySelectorAll('.extras-toggle-btn');
+      if(activePanel===name){
+        panel.classList.remove('show');panel.innerHTML='';activePanel=null;
+        btns.forEach(function(b){b.classList.remove('active')});
+      } else {
+        btns.forEach(function(b){b.classList.remove('active')});
+        if(btn) btn.classList.add('active');
+        activePanel=name;
+        renderPanel(name,btn);
+      }
+    } catch(e) {
+      console.error('toggleExtrasPanel error:', e);
     }
   };
 
