@@ -581,34 +581,12 @@ button[onclick*="addToWordBank"]:hover{background:rgba(52,211,153,.15)!important
         <div class="demo-progress" id="demoProgress" style="display:none"><div class="demo-progress-bar" id="demoProgressBar"></div><span class="demo-progress-label" id="demoProgressLabel">0/20</span></div>
       </div>
 
-      <!-- ═══ #34 Word Bank Panel ═══ -->
-      <div class="wordbank-panel" id="wordbankPanel" style="display:none">
-        <div class="wordbank-header">
-          <span>📚 My Word Bank</span>
-          <div style="display:flex;gap:6px;align-items:center">
-            <input type="text" id="wordbankInput" placeholder="Add a word…" style="padding:5px 10px;border-radius:6px;border:1px solid rgba(255,255,255,.1);background:rgba(255,255,255,.04);color:var(--text);font-size:11px;font-family:inherit;width:130px;outline:none" onkeydown="if(event.key==='Enter')addToWordBank()">
-            <button type="button" onclick="addToWordBank()" style="padding:5px 10px;border-radius:6px;border:1px solid rgba(52,211,153,.2);background:rgba(52,211,153,.1);color:#34d399;cursor:pointer;font-size:10px;font-weight:700;font-family:inherit">+ Add</button>
-            <button type="button" onclick="clearWordBank()" style="padding:5px 8px;border-radius:6px;border:none;background:rgba(248,113,113,.1);color:#f87171;cursor:pointer;font-size:10px;font-family:inherit" title="Clear all">🗑</button>
-          </div>
-        </div>
-        <div class="wordbank-chips" id="wordbankChips"></div>
-        <div class="wordbank-definition" id="wordbankDefinition" style="display:none;margin-top:6px;padding:8px 12px;background:rgba(167,139,250,.06);border:1px solid rgba(167,139,250,.1);border-radius:8px;font-size:10px;color:rgba(255,255,255,.5);line-height:1.5;min-height:20px">
-          <span style="color:#c4b5fd;font-weight:600" id="wordbankDefWord"></span>
-          <span id="wordbankDefText"></span>
-        </div>
-        <div class="wordbank-empty" id="wordbankEmpty">No words saved yet. Add words you want to learn!</div>
-      </div>
-
       <!-- ═══ Extras Toggle ═══ -->
       <div class="extras-toggle-bar" id="extrasToggleBar">
-        <button type="button" class="extras-toggle-btn wordbank-toggle-btn" id="wordbankToggleBtn" onclick="toggleWordBank()">📚 Word Bank <span id="wordbankCount" style="font-size:8px;opacity:.6">0</span></button>
-        <button type="button" class="extras-toggle-btn" data-panel="vocab" onclick="toggleExtrasPanel('vocab',this)">📝 Vocab</button>
+        <button type="button" class="extras-toggle-btn" data-panel="wordbank" onclick="toggleExtrasPanel('wordbank',this)">📚 Word Bank <span id="wordbankCount" style="font-size:8px;opacity:.6">0</span></button>
         <button type="button" class="extras-toggle-btn" data-panel="grammar" onclick="toggleExtrasPanel('grammar',this)">📋 Grammar</button>
         <button type="button" class="extras-toggle-btn" data-panel="metrics" onclick="toggleExtrasPanel('metrics',this)">📊 Metrics</button>
-        <button type="button" class="extras-toggle-btn" data-panel="gloss" onclick="toggleExtrasPanel('gloss',this)">🌐 Gloss</button>
-        <button type="button" class="extras-toggle-btn" data-panel="grammarParse" onclick="toggleExtrasPanel('grammarParse',this)">🌳 Parse</button>
-        <button type="button" class="extras-toggle-btn" data-panel="info" onclick="toggleExtrasPanel('info',this)">📖 Info</button>
-        <button type="button" class="extras-toggle-btn" data-panel="synonyms21" onclick="toggleExtrasPanel('synonyms21',this)">📖 Synonyms</button>
+        <button type="button" class="extras-toggle-btn" data-panel="synonyms" onclick="toggleExtrasPanel('synonyms',this)">📖 Synonyms</button>
         <button type="button" class="extras-toggle-btn" data-panel="multispeaker" onclick="toggleExtrasPanel('multispeaker',this)">👥 Multispeaker</button>
       </div>
       <div class="extras-panel" id="extrasPanel"></div>
@@ -713,6 +691,7 @@ button[onclick*="addToWordBank"]:hover{background:rgba(52,211,153,.15)!important
 <button class="theme-btn" id="themeToggle" onclick="toggleTheme()" title="Toggle theme">🌙</button>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://unpkg.com/compromise@14"></script>
 <script src="config.js?v=14"></script>
 <script src="js/auth.js?v=11"></script>
 <script src="js/real-mic.js?v=3"></script>
@@ -1487,21 +1466,6 @@ var WORD_BANK_KEY = 'sottotitoli_wordbank';
   }
 })();
 var wordBank = JSON.parse(localStorage.getItem(WORD_BANK_KEY) || '[]');
-
-function toggleWordBank() {
-  var panel = document.getElementById('wordbankPanel');
-  var btn = document.getElementById('wordbankToggleBtn');
-  if (!panel || !btn) return;
-  var isOpen = panel.style.display === 'block';
-  if (isOpen) {
-    panel.style.display = 'none';
-    btn.classList.remove('active');
-  } else {
-    panel.style.display = 'block';
-    btn.classList.add('active');
-    renderWordBank();
-  }
-}
 
 function addToWordBank(optionalWord) {
   var word = optionalWord || '';
@@ -3013,605 +2977,215 @@ function downloadGrammarPDF() {
   }
 
   var panels = {
-    vocab: function(cb){
+    // ═══ Word Bank — moved into extras (Datamuse-powered definitions) ═══
+    wordbank: function(cb){
       var h='<div class="extras-grid">';
       var wbKey = WORD_BANK_KEY;
       var wb = JSON.parse(localStorage.getItem(wbKey)||'[]');
       var noData=wb.length===0;
-
-      // ── My Vocabulary (only manually-added word bank words) ──
-      h+='<div class="extras-card" style="grid-column:1/-1"><div class="ec-title">01 · My Vocabulary <span class="ec-badge" style="background:rgba(52,211,153,.15);color:#34d399">'+wb.length+' words</span></div>';
-      if(noData){h+='<div style="color:var(--muted2);font-style:italic;padding:8px 0">Double-click any word in the transcript to add it to your Word Bank</div>'}
-      else{
-        h+='<div id="vocabChipsLive" style="display:flex;flex-wrap:wrap;gap:5px;max-height:200px;overflow-y:auto;padding:4px 0">';
+      h+='<div class="extras-card" style="grid-column:1/-1"><div class="ec-title">📚 My Word Bank <span class="ec-badge" style="background:rgba(167,139,250,.15);color:#c4b5fd">'+wb.length+' words</span></div>';
+      h+='<div style="display:flex;gap:6px;align-items:center;margin-bottom:10px;flex-wrap:wrap">';
+      h+='<input type="text" id="wordbankInput" placeholder="Add a word…" style="padding:5px 10px;border-radius:6px;border:1px solid var(--line);background:var(--card2);color:var(--text);font-size:11px;font-family:inherit;width:130px;outline:none" onkeydown="if(event.key===\'Enter\')addToWordBank()">';
+      h+='<button type="button" onclick="addToWordBank()" style="padding:5px 10px;border-radius:6px;border:1px solid rgba(52,211,153,.2);background:rgba(52,211,153,.1);color:#34d399;cursor:pointer;font-size:10px;font-weight:700;font-family:inherit">+ Add</button>';
+      h+='<button type="button" onclick="clearWordBank()" style="padding:5px 8px;border-radius:6px;border:none;background:rgba(248,113,113,.1);color:#f87171;cursor:pointer;font-size:10px;font-family:inherit" title="Clear all">🗑</button>';
+      h+='</div>';
+      if(noData){
+        h+='<div style="color:var(--muted2);font-style:italic;padding:8px 0">Words you save from transcript appear here — click for definition</div>';
+      }else{
+        h+='<div id="wordbankChips" style="display:flex;flex-wrap:wrap;gap:5px;max-height:200px;overflow-y:auto;padding:4px 0">';
         wb.forEach(function(w){
-          h+='<span class="wv-chip" data-word="'+w+'" style="display:inline-flex;align-items:center;gap:4px;padding:5px 10px;border-radius:8px;font-size:11px;font-weight:600;cursor:pointer;background:rgba(167,139,250,.12);color:#c4b5fd;border:1px solid rgba(167,139,250,.2);transition:all .15s;position:relative" title="Click: definition · Click ×: remove">'+w;
-          h+='<span class="wv-x" onclick="event.stopPropagation();removeFromWordBank(\''+w+'\')" style="margin-left:2px;width:14px;height:14px;border-radius:50%;background:rgba(248,113,113,.15);color:#f87171;display:inline-flex;align-items:center;justify-content:center;font-size:9px;cursor:pointer;line-height:1" title="Remove from Word Bank">×</span>';
+          h+='<span class="wb-chip" data-word="'+w.replace(/'/g,"\\'")+'" style="display:inline-flex;align-items:center;gap:4px;padding:5px 10px;border-radius:8px;font-size:11px;font-weight:600;cursor:pointer;background:rgba(167,139,250,.12);color:#c4b5fd;border:1px solid rgba(167,139,250,.2);transition:all .15s;position:relative" onclick="showWordDefinition(\''+w.replace(/'/g,"\\'")+'\')" title="Click: definition">'+w;
+          h+='<span class="wb-x" onclick="event.stopPropagation();removeFromWordBank(\''+w.replace(/'/g,"\\'")+'\')" style="margin-left:2px;width:14px;height:14px;border-radius:50%;background:rgba(248,113,113,.15);color:#f87171;display:inline-flex;align-items:center;justify-content:center;font-size:9px;cursor:pointer;line-height:1" title="Remove">×</span>';
           h+='</span> ';
         });
         h+='</div>';
       }
+      h+='<div id="wordbankDefinition" style="display:none;margin-top:8px;padding:10px 14px;background:rgba(167,139,250,.06);border:1px solid rgba(167,139,250,.1);border-radius:8px;font-size:11px;color:var(--muted);line-height:1.5;min-height:20px">';
+      h+='<span style="color:#c4b5fd;font-weight:600" id="wordbankDefWord"></span>';
+      h+='<span id="wordbankDefText"></span>';
       h+='</div>';
-
-      // ── Definition side panel ──
-      h+='<div id="vocabDefPanel" style="display:none;grid-column:1/-1;background:var(--card2);border:1px solid var(--line);border-radius:10px;padding:12px 16px;font-size:11px;color:var(--muted);line-height:1.6;margin-top:4px">';
-      h+='<span style="font-weight:700;color:var(--accent)" id="vocabDefWord"></span>';
-      h+='<span id="vocabDefText"></span>';
-      h+='</div>'; // close vocabDefPanel
-      h+='</div>'; // close extras-grid
-
+      h+='</div></div>';
       cb(h, function(){
-        document.querySelectorAll('.wv-chip').forEach(function(chip){
+        renderWordBank();
+        document.querySelectorAll('.wb-chip').forEach(function(chip){
           chip.addEventListener('click', function(e){
-            if(e.target.classList.contains('wv-x')) return;
-            var word = this.dataset.word;
-            showVocabDefinition(word);
+            if(e.target.classList.contains('wb-x')) return;
+            showWordDefinition(this.dataset.word);
           });
         });
       });
     },
 
+    // ═══ Grammar — Compromise.js NLP-powered rings ═══
     grammar: function(cb){
       var h='';
-      var words=getTranscriptWords();
-      var text = (document.getElementById('captionTranscript')?.textContent||'');
-      var noData=words.length===0;
+      var text=(document.getElementById('captionTranscript')?.textContent||'');
+      var noData=!text.trim();
       var m=getSessionMetrics();
-      var noSession=m.sec<1;
+      var noSession=m.sec<5;
 
-      // Score calculations from real transcript data
-      var totalWords=m.words||0;
-      var prepositions=text.match(/\b(in|on|at|to|for|of|with|by|from|into|about|over|under|between|through|during|before|after|above|below)\b/gi)||[];
-      var articles=text.match(/\b(the|a|an)\b/gi)||[];
-      var pastVerbs=text.match(/\b(\w+ed|was|were|been|had|did|went|came|took|made|said|thought|knew|found|gave|told)\b/gi)||[];
-      var presentVerbs=text.match(/\b(is|are|am|has|have|does|do|go|come|take|make|say|think|know|find|give|tell|discuss|speak|talk|work|use|try|ask|seem|mean|need|want|keep|let|put|set)\b/gi)||[];
-      var plurals=text.match(/\b\w+(s|es|ies)\b/gi)||[];
-      var modalsCount=(text.match(/\b(can|could|will|would|may|might|must|shall|should)\b/gi)||[]).length;
-      var conjunctions=text.match(/\b(and|but|or|so|because|although|however|therefore|while|if|when|where)\b/gi)||[];
-      var adverbs=text.match(/\b\w+ly\b/gi)||[];
-      var pronouns=text.match(/\b(i|we|you|he|she|it|they|me|us|him|her|them|my|our|your|his|its|their|this|that|these|those)\b/gi)||[];
+      h+='<div class="ec-title" style="margin-bottom:10px">📋 Grammar Analysis <span class="ec-badge" style="background:rgba(52,211,153,.15);color:#34d399">NLP</span></div>';
 
-      // Metric scores (percentage-based heuristics)
-      var prepScore=Math.min(98,Math.max(40,Math.round((prepositions.length/Math.max(1,totalWords/8))*100)));
-      var articleScore=Math.min(98,Math.max(40,Math.round((articles.length/Math.max(1,totalWords/10))*100)));
-      var tenseScore=Math.min(98,Math.max(40,Math.round((pastVerbs.length+presentVerbs.length)/Math.max(1,totalWords/6)*100)));
-      var svScore=noData?0:Math.min(98,78+(typeof allSessions!=='undefined'&&allSessions&&allSessions.length>0?allSessions.length%18:m.lines.length%18));
-      var wordOrderScore=noData?0:Math.min(98,75+(typeof allSessions!=='undefined'&&allSessions&&allSessions.length>0?allSessions.length%20:m.lines.length%20));
-      var pronounScore=Math.min(98,Math.max(40,Math.round((pronouns.length/Math.max(1,totalWords/12))*100)));
-      var conjScore=Math.min(98,Math.max(40,Math.round((conjunctions.length/Math.max(1,totalWords/15))*100)));
-      var pluralScore=Math.min(98,Math.max(40,Math.round((plurals.length/Math.max(1,totalWords/5))*100)));
-      var adverbScore=Math.min(98,Math.max(40,Math.round((adverbs.length/Math.max(1,totalWords/20))*100)));
-      var overallScore=Math.round((prepScore+articleScore+tenseScore+svScore+wordOrderScore+pronounScore+conjScore+pluralScore+adverbScore)/9);
+      if(noData||noSession){
+        h+='<div style="color:var(--muted2);font-style:italic;text-align:center;padding:30px">Start speaking for at least 5 seconds to see grammar analysis</div>';
+      } else {
+        // ── Compromise.js NLP analysis ──
+        var doc=null;
+        try {
+          if(typeof nlp!=='undefined') doc=nlp(text);
+        } catch(e){}
 
-      var ringData=[
-        {n:'Prepositions',sub:'in, on, at, to, for',pct:prepScore,color:'#a78bfa'},
-        {n:'Articles',sub:'a, an, the',pct:articleScore,color:'#60a5fa'},
-        {n:'Verb Tense',sub:'past, present consistency',pct:tenseScore,color:'#34d399'},
-        {n:'S-V Agreement',sub:'subject verb number',pct:svScore,color:'#fbbf24'},
-        {n:'Word Order',sub:'SVO clause position',pct:wordOrderScore,color:'#f472b6'},
-        {n:'Pronoun Ref',sub:'it, they, this, which',pct:pronounScore,color:'#22d3ee'},
-        {n:'Conjunctions',sub:'and, but, because',pct:conjScore,color:'#fb923c'},
-        {n:'Plural Forms',sub:'-s, -es, irregular',pct:pluralScore,color:'#f87171'},
-        {n:'Adverb Use',sub:'-ly adverbs, modifiers',pct:adverbScore,color:'#818cf8'},
-        {n:'Overall Score',sub:'combined grammar',pct:overallScore,color:'url(#gramGrad)'}
-      ];
+        var totalWords=m.words||1;
+        var ringData=[];
 
-      var R=38;var circ=2*Math.PI*R;
-      h+='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;flex-wrap:wrap;gap:6px">';
-      var gramLangNames={'en-US':'English','it-IT':'Italiano','fr-FR':'Français','de-DE':'Deutsch','es-ES':'Español','pt-PT':'Português','nl-NL':'Nederlands'};
-      var gramLang=gramLangNames[currentCaptionLang]||currentCaptionLang||'English';
-      h+='<div class="ec-title" style="margin:0;font-size:11px">📋 37 · Grammar Rings <span class="ec-badge" style="background:rgba(52,211,153,.15);color:#34d399">LIVE</span></div>';
-      h+='<div style="font-size:8px;color:var(--muted2);margin-top:2px">Analysis for: '+gramLang+'</div>';
-      h+='<button onclick="downloadGrammarPDF()" style="padding:5px 14px;border-radius:6px;border:1px solid rgba(251,191,36,.2);background:rgba(251,191,36,.08);color:#fbbf24;cursor:pointer;font-size:10px;font-weight:600;font-family:inherit" title="Download session grammar report as PDF">📥 Download PDF</button>';
-      h+='</div>';
-      h+='<div style="display:grid;grid-template-columns:repeat(5,1fr);gap:10px">';
+        if(doc){
+          // 1. POS Balance (real NLP counts)
+          var nounCount=doc.nouns().length;
+          var verbCount=doc.verbs().length;
+          var adjCount=doc.adjectives().length;
+          var advCount=doc.adverbs().length;
+          var prepCount=doc.prepositions().length;
+          var conjCount=doc.conjunctions().length;
+          var pronCount=doc.pronouns().length;
+          var posTotal=Math.max(1,nounCount+verbCount+adjCount+advCount);
 
-      ringData.forEach(function(r){
-        var c=r.color;if(c.startsWith('url'))c='#a78bfa';
-        var dashVal=(r.pct/100)*circ;
-        h+='<div style="text-align:center;padding:10px 6px;background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.04);border-radius:10px">';
-        h+='<svg viewBox="0 0 100 100" style="width:70px;height:70px"><defs><linearGradient id="gramGrad" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" stop-color="#60a5fa"/><stop offset="50%" stop-color="#34d399"/><stop offset="100%" stop-color="#a78bfa"/></linearGradient></defs>';
-        h+='<circle cx="50" cy="50" r="'+R+'" fill="none" stroke="rgba(255,255,255,.06)" stroke-width="6"/>';
-        h+='<circle cx="50" cy="50" r="'+R+'" fill="none" stroke="'+r.color+'" stroke-width="6" stroke-dasharray="'+circ+'" stroke-dashoffset="'+(circ-dashVal)+'" stroke-linecap="round" transform="rotate(-90 50 50)" style="transition:stroke-dashoffset .8s ease"/>';
-        h+='<text x="50" y="48" text-anchor="middle" font-family="JetBrains Mono,monospace" font-size="16" font-weight="900" fill="'+c+'">'+r.pct+'%</text>';
-        h+='<text x="50" y="60" text-anchor="middle" font-family="Inter,sans-serif" font-size="7" fill="rgba(255,255,255,.25)">accuracy</text>';
-        h+='</svg>';
-        h+='<div style="font-size:11px;font-weight:600;color:var(--text);margin-top:2px">'+r.n+'</div>';
-        h+='<div style="font-size:9px;color:var(--muted2)">'+r.sub+'</div>';
+          ringData.push({n:'Nouns',sub:Math.round(nounCount/posTotal*100)+'% of vocab',pct:Math.min(98,Math.round(nounCount/posTotal*100)),color:'#60a5fa'});
+          ringData.push({n:'Verbs',sub:Math.round(verbCount/posTotal*100)+'% of vocab',pct:Math.min(98,Math.round(verbCount/posTotal*100)),color:'#34d399'});
+          ringData.push({n:'Adjectives',sub:Math.round(adjCount/posTotal*100)+'% of vocab',pct:Math.min(98,Math.round(adjCount/posTotal*100)),color:'#f472b6'});
+          ringData.push({n:'Adverbs',sub:Math.round(advCount/posTotal*100)+'% of vocab',pct:Math.min(98,Math.round(advCount/posTotal*100)),color:'#c084fc'});
+          ringData.push({n:'Prepositions',sub:prepCount+' used',pct:Math.min(98,Math.round(prepCount/Math.max(1,totalWords/5)*100)),color:'#a78bfa'});
+          ringData.push({n:'Conjunctions',sub:conjCount+' links',pct:Math.min(98,Math.round(conjCount/Math.max(1,totalWords/10)*100)),color:'#fb923c'});
+          ringData.push({n:'Pronouns',sub:pronCount+' refs',pct:Math.min(98,Math.round(pronCount/Math.max(1,totalWords/8)*100)),color:'#22d3ee'});
+
+          // S-V Agreement: check if verb subjects match in number
+          var verbs=doc.verbs();
+          var svMatch=0,svTotal=0;
+          try {
+            verbs.forEach(function(v){
+              var subjs=v.subjects();
+              if(subjs && subjs.length>0){
+                svTotal++;
+                var subjPlural=subjs.nouns().isPlural().found;
+                var verbPlural=v.isPlural();
+                if(subjPlural===verbPlural) svMatch++;
+              }
+            });
+          } catch(e){}
+          var svPct=svTotal>0?Math.round(svMatch/svTotal*100):75;
+          ringData.push({n:'S-V Agreement',sub:svTotal>0?svMatch+'/'+svTotal+' match':'low data',pct:Math.min(98,svPct),color:'#fbbf24'});
+        } else {
+          // Fallback: basic regex-based if Compromise not available
+          ringData=[
+            {n:'Words',sub:totalWords+' total',pct:Math.min(98,Math.round(totalWords*2)),color:'#60a5fa'},
+            {n:'Sentences',sub:m.lines+' lines',pct:Math.min(98,m.lines*15),color:'#34d399'},
+            {n:'WPM',sub:m.wpm+' wpm',pct:Math.min(98,m.wpm),color:'#f472b6'},
+            {n:'Duration',sub:m.sec+'s',pct:Math.min(98,Math.round(m.sec/3)),color:'#c084fc'}
+          ];
+        }
+
+        // ── Render rings ──
+        h+='<div style="display:flex;flex-wrap:wrap;gap:16px;justify-content:center;margin-bottom:16px">';
+        ringData.forEach(function(r){
+          var circumference=2*Math.PI*38;
+          var dashOffset=circumference*(1-r.pct/100);
+          h+='<div style="text-align:center;width:100px">';
+          h+='<svg width="86" height="86" viewBox="0 0 86 86"><circle cx="43" cy="43" r="38" fill="none" stroke="var(--line)" stroke-width="6"/><circle cx="43" cy="43" r="38" fill="none" stroke="'+r.color+'" stroke-width="6" stroke-dasharray="'+circumference+'" stroke-dashoffset="'+dashOffset+'" stroke-linecap="round" transform="rotate(-90 43 43)" style="transition:stroke-dashoffset .8s ease"/><text x="43" y="40" text-anchor="middle" fill="var(--text)" font-size="14" font-weight="700" font-family="JetBrains Mono,monospace">'+r.pct+'</text><text x="43" y="54" text-anchor="middle" fill="var(--muted2)" font-size="7" font-family="JetBrains Mono,monospace">%</text></svg>';
+          h+='<div style="font-size:10px;font-weight:600;color:var(--text);margin-top:2px">'+r.n+'</div>';
+          h+='<div style="font-size:8px;color:var(--muted2)">'+r.sub+'</div>';
+          h+='</div>';
+        });
         h+='</div>';
-      });
-      h+='</div>';
 
-      // Store for PDF
-      window._grammarReport={rings:ringData,totalWords:totalWords,totalTime:m.sec,wpm:m.wpm,date:new Date().toLocaleDateString('it-IT'),text:text,language:gramLang};
-
+        // Store for PDF download
+        window._grammarReport={rings:ringData,totalWords:totalWords,totalTime:m.sec,wpm:m.wpm,date:new Date().toLocaleDateString('it-IT'),text:text,language:'en'};
+      }
       cb(h);
     },
 
+    // ═══ Metrics — trimmed (no Hesitation, no Active Vocab) ═══
     metrics: function(cb){
       var h='<div class="extras-grid">';
       var m=getSessionMetrics();
       var noSession=m.sec<1;
 
-      // 20 — Pace
-      var m=getSessionMetrics();
-      var wpm=m.wpm||0;
-      var paceLabel=wpm<=0?'—':wpm<80?'Lento':wpm<=120?'Ideale':wpm<=160?'Veloce':'Troppo veloce';
-      var paceColor=wpm<=0?'var(--muted2)':wpm<80?'#fbbf24':wpm<=120?'#34d399':wpm<=160?'#f97316':'#f87171';
-      var pacePct=Math.min(100,Math.round(wpm/180*100));
-      h+='<div class="extras-card"><div class="ec-title">20 · Pace <span class="ec-badge" style="background:rgba(52,211,153,.15);color:#34d399">LIVE</span></div>';
-      if(noSession||wpm<=0){
-        h+='<div class="extras-stat"><div class="es-val" style="color:rgba(255,255,255,.15)">—</div><div class="es-label">Avvia una sessione</div></div>';
-      }else{
-        h+='<div style="text-align:center;padding:4px 0">';
-        h+='<div style="font-family:JetBrains Mono,monospace;font-size:28px;font-weight:900;color:'+paceColor+'">'+wpm+'</div>';
-        h+='<div style="font-size:10px;color:'+paceColor+';font-weight:600;margin-top:2px">'+paceLabel+' · WPM</div>';
-        h+='<div style="height:8px;background:var(--line);border-radius:4px;margin-top:10px;overflow:hidden;position:relative">';
-        h+='<div style="position:absolute;left:44.4%;top:0;width:1px;height:100%;background:rgba(255,255,255,.2)"></div>';
-        h+='<div style="position:absolute;left:66.7%;top:0;width:1px;height:100%;background:rgba(255,255,255,.2)"></div>';
-        h+='<div style="position:absolute;left:88.9%;top:0;width:1px;height:100%;background:rgba(255,255,255,.2)"></div>';
-        h+='<div style="height:100%;border-radius:4px;background:linear-gradient(90deg,#fbbf24 0%,#34d399 44.4%,#34d399 66.7%,#f97316 88.9%,#f87171 100%);width:'+pacePct+'%;transition:width .6s ease"></div>';
-        h+='</div>';
-        h+='<div style="display:flex;justify-content:space-between;font-size:8px;color:var(--muted2);margin-top:3px"><span>0</span><span>80</span><span>120</span><span>160</span><span>180+</span></div>';
-        h+='</div>';
-      }
-      h+='</div>';
-
-      // 26 — Silence
-      h+='<div class="extras-card"><div class="ec-title">26 · Silence <span class="ec-badge" style="background:rgba(52,211,153,.15);color:#34d399">LIVE</span></div>';
+      // ── Session Stats ──
+      h+='<div class="extras-card"><div class="ec-title">⏱ Session <span class="ec-badge" style="background:rgba(52,211,153,.15);color:#34d399">LIVE</span></div>';
       if(noSession){
-        h+='<div class="extras-stat"><div class="es-val" style="color:rgba(255,255,255,.15)">—</div><div class="es-label">In attesa</div></div>';
+        h+='<div class="extras-stat"><div class="es-val" style="color:rgba(255,255,255,.15)">—</div><div class="es-label">Start a session</div></div>';
       }else{
-        h+='<div class="extras-stat"><div class="es-val" style="color:#a78bfa">'+(m.sec>0?(m.sec/60).toFixed(1):'0')+'<span style="font-size:12px;color:rgba(255,255,255,.3)">min</span></div><div class="es-label">tempo totale parlato</div></div>';
-        var speechPct=m.sec>0?Math.min(95,Math.round(m.words/(m.sec/60)*2)):0;
-        h+='<div style="height:6px;background:var(--line);border-radius:3px;overflow:hidden;margin-top:6px"><div style="height:100%;border-radius:3px;background:linear-gradient(90deg,#34d399,#a78bfa);width:'+speechPct+'%;transition:width .6s ease"></div></div>';
-        h+='<div style="font-size:8px;color:var(--muted2);margin-top:2px">'+m.words+' parole in '+m.sec+'s</div>';
+        h+='<div class="extras-stat"><div class="es-val" style="color:#a78bfa">'+(m.sec>0?(m.sec/60).toFixed(1):'0')+'<span style="font-size:12px;color:rgba(255,255,255,.3)">min</span></div><div class="es-label">total speaking time</div></div>';
+        h+='<div style="height:6px;background:var(--line);border-radius:3px;overflow:hidden;margin-top:6px"><div style="height:100%;border-radius:3px;background:linear-gradient(90deg,#34d399,#a78bfa);width:'+Math.min(95,Math.round(m.words/(Math.max(1,m.sec/60))*2))+'%;transition:width .6s ease"></div></div>';
+        h+='<div style="font-size:8px;color:var(--muted2);margin-top:2px">'+m.words+' words in '+m.sec+'s · '+m.wpm+' wpm</div>';
       }
       h+='</div>';
 
-      // 30 — Hesitation
-      h+='<div class="extras-card"><div class="ec-title">30 · Hesitation <span class="ec-badge" style="background:rgba(52,211,153,.15);color:#34d399">LIVE</span></div>';
-      if(noSession){
-        h+='<div style="color:rgba(255,255,255,.2);font-style:italic">Nessun dato</div>';
-      }else{
-        h+='<div class="extras-stat" style="margin-bottom:8px"><div class="es-val" style="color:#f87171;font-size:20px">'+m.fillers+'</div><div class="es-label">fillers · '+(m.sec>0?(m.fillers/(m.sec/60)).toFixed(1):'0')+'/min</div></div>';
-        var fillerList=['um','uh','er','ah','hm','like','you know','i mean'];
-        var foundFillers=[];
-        var t=document.getElementById('captionTranscript');var txt=t?t.textContent||'':'';
-        fillerList.forEach(function(f){var re=new RegExp('\\b'+f.replace(/ /g,'\\s')+'\\b','gi');var m2=txt.match(re);if(m2)foundFillers.push({w:f,c:m2.length})});
-        foundFillers.forEach(function(f){
-          var heat=f.c>2?2:f.c>0?1:0;
-          var bg=heat===2?'rgba(248,113,113,.2)':heat===1?'rgba(251,191,36,.12)':'rgba(52,211,153,.06)';
-          h+='<span class="extras-heat" style="background:'+bg+';color:'+(heat>0?'rgba(255,255,255,.7)':'rgba(255,255,255,.3)')+'">'+f.w+' ×'+f.c+'</span> ';
-        });
-      }
-      h+='</div>';
-
-      // 09 — Active Vocabulary Size
-      var vocabWords=getTranscriptWords();
-      var vocabCount=vocabWords.length;
-      var nounCount=vocabWords.filter(function(w){return w.pos==='NOUN'}).length;
-      var verbCount=vocabWords.filter(function(w){return w.pos==='VERB'}).length;
-      var adjCount=vocabWords.filter(function(w){return w.pos==='ADJ'}).length;
-      h+='<div class="extras-card"><div class="ec-title">09 · Active Vocabulary <span class="ec-badge" style="background:rgba(96,165,250,.15);color:#60a5fa">'+vocabCount+' words</span></div>';
-      if(noSession||vocabCount===0){h+='<div style="color:rgba(255,255,255,.2);font-style:italic">Avvia una sessione</div>'}
-      else{
-        var maxBar=Math.max(nounCount,verbCount,adjCount,1);
-        h+='<div style="padding:4px 0">';
-        h+='<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px"><span style="font-size:10px;color:#34d399;width:40px">Nomi</span><div style="flex:1;height:6px;background:var(--line);border-radius:3px;overflow:hidden"><div style="height:100%;border-radius:3px;background:#34d399;width:'+Math.round(nounCount/maxBar*100)+'%"></div></div><span style="font-size:10px;color:var(--muted2);font-family:JetBrains Mono,monospace">'+nounCount+'</span></div>';
-        h+='<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px"><span style="font-size:10px;color:#3b82f6;width:40px">Verbi</span><div style="flex:1;height:6px;background:var(--line);border-radius:3px;overflow:hidden"><div style="height:100%;border-radius:3px;background:#3b82f6;width:'+Math.round(verbCount/maxBar*100)+'%"></div></div><span style="font-size:10px;color:var(--muted2);font-family:JetBrains Mono,monospace">'+verbCount+'</span></div>';
-        h+='<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px"><span style="font-size:10px;color:#f97316;width:40px">Agg.</span><div style="flex:1;height:6px;background:var(--line);border-radius:3px;overflow:hidden"><div style="height:100%;border-radius:3px;background:#f97316;width:'+Math.round(adjCount/maxBar*100)+'%"></div></div><span style="font-size:10px;color:var(--muted2);font-family:JetBrains Mono,monospace">'+adjCount+'</span></div>';
-        h+='</div>';
-        h+='<div style="font-size:9px;color:var(--muted2);margin-top:4px">'+vocabCount+' parole uniche nel transcript</div>';
-      }
-      h+='</div>';
-
-
-      // 05 — POS Distribution
+      // ── POS Distribution ──
       var posWords=getTranscriptWords();
       var posVerb=0,posNoun=0,posAdj=0,posAdv=0,posOther=0;
       posWords.forEach(function(w){if(w.pos==='VERB')posVerb++;else if(w.pos==='NOUN')posNoun++;else if(w.pos==='ADJ')posAdj++;else if(w.pos==='ADV')posAdv++;else posOther++});
       var posTotal=Math.max(1,posVerb+posNoun+posAdj+posAdv+posOther);
-      h+='<div class="extras-card"><div class="ec-title">05 · POS Distribution <span class="ec-badge" style="background:rgba(52,211,153,.15);color:#34d399">LIVE</span></div>';
+      h+='<div class="extras-card"><div class="ec-title">POS Distribution <span class="ec-badge" style="background:rgba(52,211,153,.15);color:#34d399">LIVE</span></div>';
       if(posTotal<=1){h+='<div style="color:var(--muted2);font-style:italic">Speaking data needed</div>'}
       else{
-        h+='<div style="display:flex;height:14px;border-radius:7px;overflow:hidden;margin-bottom:8px">';
-        [{l:'Verbs',v:posVerb,c:'#3b82f6',p:Math.round(posVerb/posTotal*100)},{l:'Nouns',v:posNoun,c:'#34d399',p:Math.round(posNoun/posTotal*100)},{l:'Adj',v:posAdj,c:'#f97316',p:Math.round(posAdj/posTotal*100)},{l:'Adv',v:posAdv,c:'#a855f7',p:Math.round(posAdv/posTotal*100)},{l:'Other',v:posOther,c:'#6b7280',p:Math.round(posOther/posTotal*100)}].forEach(function(b){
-          if(b.p>0) h+='<div style="width:'+b.p+'%;height:100%;background:'+b.c+';transition:width .5s ease" title="'+b.l+': '+b.v+'"></div>';
+        [{l:'Verbs',c:'#34d399',v:posVerb},{l:'Nouns',c:'#60a5fa',v:posNoun},{l:'Adjectives',c:'#f472b6',v:posAdj},{l:'Adverbs',c:'#c084fc',v:posAdv},{l:'Other',c:'#6b7280',v:posOther}].forEach(function(b){
+          var pct=Math.round(b.v/posTotal*100);
+          h+='<div style="margin-bottom:5px"><div style="display:flex;justify-content:space-between;font-size:9px;margin-bottom:2px"><span style="color:var(--muted)">'+b.l+'</span><span style="color:var(--muted2);font-family:JetBrains Mono,monospace">'+b.v+' ('+pct+'%)</span></div><div style="height:5px;background:var(--line);border-radius:3px;overflow:hidden"><div style="height:100%;border-radius:3px;background:'+b.c+';width:'+pct+'%;transition:width .5s ease"></div></div></div>';
         });
-        h+='</div>';
-        h+='<div style="display:flex;gap:12px;flex-wrap:wrap;font-size:9px">';
-        [{l:'Verbs',v:posVerb,c:'#3b82f6'},{l:'Nouns',v:posNoun,c:'#34d399'},{l:'Adj',v:posAdj,c:'#f97316'},{l:'Adv',v:posAdv,c:'#a855f7'},{l:'Other',v:posOther,c:'#6b7280'}].forEach(function(b){
-          h+='<span style="display:flex;align-items:center;gap:4px"><span style="width:8px;height:8px;border-radius:2px;background:'+b.c+'"></span>'+b.l+' <strong>'+b.v+'</strong></span>';
-        });
-        h+='</div>';
       }
-      h+='</div>';
-// CEFR Word Profile (moved from Info)
-      var cefrText=(document.getElementById('captionTranscript')?.textContent||'');
-      h+='<div class="extras-card" style="grid-column:1/-1"><div class="ec-title">CEFR Word Profile</div>';
-      var cefrLevels={A1:['the','a','is','are','we','you','he','she','it','good','new','big'],A2:['future','language','system','culture','different','important','experience','model'],B1:['discussing','translation','barriers','deployment','challenge','scale','neural','accurate'],B2:['remarkably','adoption','handling','edge','bridge','across','remains'],C1:['latency','inference','tokenization','embedding','hallucination','fine-tuning']};
-      var levels=[];
-      Object.keys(cefrLevels).forEach(function(lvl){
-        var count=0;
-        cefrLevels[lvl].forEach(function(w){
-          if(cefrText.toLowerCase().indexOf(w)>=0) count++;
-        });
-        if(count>0) levels.push({level:lvl,count:count});
-      });
-      if(levels.length>0){
-        h+='<div style="display:flex;gap:8px;flex-wrap:wrap">';
-        var colors={A1:'#34d399',A2:'#60a5fa',B1:'#fbbf24',B2:'#f97316',C1:'#ef4444'};
-        levels.forEach(function(l){
-          h+='<div style="text-align:center;background:rgba(255,255,255,.02);border-radius:8px;padding:10px 14px;border:1px solid '+colors[l.level]+'22">';
-          h+='<div style="font-family:JetBrains Mono,monospace;font-size:20px;font-weight:900;color:'+colors[l.level]+'">'+l.count+'</div>';
-          h+='<div style="font-size:8px;color:rgba(255,255,255,.2)">'+l.level+' words</div>';
-          h+='</div>';
-        });
-        h+='</div>';
-      }else{h+='<div style="color:rgba(255,255,255,.2);font-style:italic">Word levels appear as you speak</div>'}
-      
-      h+='</div>'; // close CEFR Word Profile extras-card
-      h+='</div>'; // close extras-grid
+      h+='</div></div>';
       cb(h);
     },
 
-    // ═══ Synonyms 21 — Contextual Synonym Cards (from mockup 21) ═══
-    synonyms21: function(cb){
+    // ═══ Synonyms — Datamuse API-powered ═══
+    synonyms: function(cb){
       var h='<div class="extras-grid">';
       var words=getTranscriptWords();
-      var noData=words.length===0;
       var text=(document.getElementById('captionTranscript')?.textContent||'');
 
-      // Build synonym cards from detected words
-      var synDict={
-        discuss:{pos:'VERB',syns:[{w:'debate',m:96,ex:'We were debating the merits of the proposal.'},{w:'examine',m:91,ex:'The committee is examining all options.'},{w:'explore',m:87,ex:'They spent the afternoon exploring new approaches.'}]},
-        important:{pos:'ADJ',syns:[{w:'crucial',m:95,ex:'This is a crucial step in the process.'},{w:'significant',m:92,ex:'The discovery had a significant impact.'},{w:'essential',m:89,ex:'Water is essential for all known life.'}]},
-        future:{pos:'NOUN',syns:[{w:'prospect',m:93,ex:'The prospect of working abroad excites her.'},{w:'outlook',m:88,ex:'The economic outlook appears promising.'},{w:'horizon',m:84,ex:'New opportunities are appearing on the horizon.'}]},
-        create:{pos:'VERB',syns:[{w:'generate',m:94,ex:'The campaign generated a lot of interest.'},{w:'produce',m:90,ex:'The factory can produce 500 units per day.'},{w:'devise',m:86,ex:'She devised a clever solution.'}]},
-        understand:{pos:'VERB',syns:[{w:'comprehend',m:96,ex:'It took time to fully comprehend the complexity.'},{w:'grasp',m:91,ex:'She quickly grasped the key concepts.'},{w:'perceive',m:86,ex:'How do you perceive the situation?'}]},
-        problem:{pos:'NOUN',syns:[{w:'issue',m:95,ex:'We need to address this issue quickly.'},{w:'challenge',m:92,ex:'The main challenge is finding qualified staff.'},{w:'obstacle',m:87,ex:'Lack of funding remains the biggest obstacle.'}]},
-        quick:{pos:'ADJ',syns:[{w:'rapid',m:96,ex:'The company experienced rapid growth.'},{w:'swift',m:92,ex:'The government took swift action.'},{w:'brisk',m:87,ex:'We went for a brisk walk.'}]},
-        help:{pos:'VERB',syns:[{w:'assist',m:97,ex:'The tutor will assist you with problems.'},{w:'support',m:93,ex:'We need to support each other.'},{w:'facilitate',m:88,ex:'The software will facilitate communication.'}]},
-        idea:{pos:'NOUN',syns:[{w:'concept',m:95,ex:'The concept of time travel fascinates.'},{w:'notion',m:90,ex:'She rejected the notion that success needs luck.'},{w:'thought',m:87,ex:'A sudden thought occurred to him.'}]},
-        change:{pos:'VERB',syns:[{w:'modify',m:94,ex:'We need to modify the approach slightly.'},{w:'alter',m:91,ex:'The design was altered to meet requirements.'},{w:'transform',m:88,ex:'The renovation will transform the space.'}]}
-      };
+      h+='<div class="extras-card" style="grid-column:1/-1"><div class="ec-title">📖 Live Synonyms <span class="ec-badge" style="background:rgba(96,165,250,.15);color:#60a5fa">Datamuse API</span></div>';
 
-      // POS filter buttons
-      h+='<div class="extras-card" style="grid-column:1/-1"><div class="ec-title">Filters</div>';
-      h+='<div style="display:flex;gap:6px;flex-wrap:wrap" id="synFilterRow">';
-      [{l:'All',v:'all'},{l:'Verbs',v:'VERB'},{l:'Nouns',v:'NOUN'},{l:'Adjectives',v:'ADJ'}].forEach(function(f){
-        h+='<button class="extras-chip syn-filter-btn" data-pos="'+f.v+'" style="cursor:pointer;border:none;font-family:inherit;font-size:10px;padding:5px 14px;border-radius:100px;background:var(--card);color:var(--muted);border:1px solid var(--line)" onclick="var isL=document.documentElement.getAttribute(\'data-theme\')===\'light\';var btns=document.querySelectorAll(\'.syn-filter-btn\');btns.forEach(function(b){b.style.background=isL?\'rgba(0,0,0,.04)\':\'rgba(255,255,255,.04)\';b.style.color=isL?\'rgba(0,0,0,.55)\':\'rgba(255,255,255,.55)\';b.style.borderColor=isL?\'rgba(0,0,0,.08)\':\'rgba(255,255,255,.08)\'});this.style.background=isL?\'rgba(124,58,237,.1)\':\'rgba(167,139,250,.15)\';this.style.color=isL?\'#7c3aed\':\'#c4b5fd\';this.style.borderColor=isL?\'rgba(124,58,237,.25)\':\'rgba(167,139,250,.25)\';filterSynCards(this.dataset.pos)">'+f.l+'</button>';
-      });
-      h+='</div></div>';
+      var contentWords=words.filter(function(w){return w.pos==='NOUN'||w.pos==='VERB'||w.pos==='ADJ'}).slice(0,8);
 
-      // Find matching words from transcript
-      var matched=[];
-      Object.keys(synDict).forEach(function(key){
-        if(text.toLowerCase().indexOf(key)>=0||words.some(function(w){return w.w===key})){
-          matched.push({word:key,data:synDict[key]});
-        }
-      });
-
-      // If no matches from transcript, show all as demo
-      if(matched.length===0&&!noData){
-        Object.keys(synDict).slice(0,6).forEach(function(key){
-          matched.push({word:key,data:synDict[key]});
-        });
-      }
-
-      // Card container
-      h+='<div id="synCardsContainer" style="grid-column:1/-1;display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px">';
-
-      if(noData&&matched.length===0){
-        h+='<div style="grid-column:1/-1;color:var(--muted2);font-style:italic;text-align:center;padding:20px">Start speaking to see contextual synonyms</div>';
-      }
-
-      matched.forEach(function(item){
-        var d=item.data;
-        var posColors={VERB:'rgba(52,211,153,.12)',NOUN:'rgba(96,165,250,.12)',ADJ:'rgba(244,114,182,.12)'};
-        var posText={VERB:'#34d399',NOUN:'#60a5fa',ADJ:'#f472b6'};
-        var posBorder={VERB:'rgba(52,211,153,.2)',NOUN:'rgba(96,165,250,.2)',ADJ:'rgba(244,114,182,.2)'};
-
-        h+='<div class="syn-card-21" data-pos="'+d.pos+'" style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px;transition:all .25s;position:relative">';
-        h+='<button onclick="event.stopPropagation();var w=addToWordBank(\''+item.word+'\');var toast=document.createElement(\'div\');toast.style.cssText=\'position:fixed;bottom:20px;left:50%;transform:translateX(-50%);padding:8px 18px;border-radius:100px;background:#34d399;color:#000;font-weight:700;font-size:12px;z-index:99999;animation:toastIn .3s ease,toastOut .3s ease 1.5s forwards;pointer-events:none\';toast.textContent=\'✓ \\\''+item.word+'\\\' saved to Word Bank\';document.body.appendChild(toast);setTimeout(function(){toast.remove()},2000)" title="Add to Word Bank" style="position:absolute;top:8px;right:8px;width:26px;height:26px;border-radius:50%;border:1px solid var(--line);background:var(--card2);color:var(--muted2);cursor:pointer;font-size:16px;line-height:1;display:flex;align-items:center;justify-content:center;transition:all .2s;z-index:2" onmouseenter="this.style.background=\'rgba(52,211,153,.15)\';this.style.borderColor=\'rgba(52,211,153,.3)\';this.style.color=\'#34d399\'" onmouseleave="this.style.background=\'rgba(255,255,255,.04)\';this.style.borderColor=\'rgba(255,255,255,.1)\';this.style.color=\'rgba(255,255,255,.3)\'">+</button>';
-        h+='<div style="display:flex;align-items:baseline;gap:8px;margin-bottom:10px">';
-        h+='<span style="font-size:18px;font-weight:800;color:var(--text)">'+item.word+'</span>';
-        h+='<span style="font-size:9px;font-weight:600;padding:2px 8px;border-radius:100px;background:'+posColors[d.pos]+';color:'+posText[d.pos]+';border:1px solid '+posBorder[d.pos]+'">'+d.pos+'</span>';
-        h+='</div>';
-
-        // Synonym chips
-        h+='<div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:8px">';
-        d.syns.forEach(function(s,si){
-          h+='<span class="syn-chip-21" data-word="'+item.word+'" data-sidx="'+si+'" style="padding:5px 12px;border-radius:100px;font-size:10px;font-weight:500;cursor:pointer;background:var(--card2);color:var(--muted);border:1px solid var(--line);transition:all .15s">'+s.w+' <span style="font-size:8px;color:var(--muted2)">'+s.m+'%</span></span>';
+      if(contentWords.length===0){
+        h+='<div style="color:var(--muted2);font-style:italic;text-align:center;padding:20px">Start speaking — synonyms for your nouns, verbs & adjectives will appear here</div>';
+      } else {
+        h+='<div id="synCardsContainer" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px">';
+        contentWords.forEach(function(item){
+          var safeWord=item.w.replace(/'/g,"\\'");
+          h+='<div class="syn-card" data-word="'+safeWord+'" style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px;transition:all .25s;position:relative">';
+          h+='<button onclick="event.stopPropagation();addSynonymWord(\''+safeWord+'\')" title="Add to Word Bank" style="position:absolute;top:8px;right:8px;width:26px;height:26px;border-radius:50%;border:1px solid var(--line);background:var(--card2);color:var(--muted2);cursor:pointer;font-size:16px;line-height:1;display:flex;align-items:center;justify-content:center;transition:all .2s;z-index:2">+</button>';
+          h+='<div style="font-size:16px;font-weight:800;color:var(--text);margin-bottom:4px">'+item.w+'</div>';
+          h+='<div style="font-size:9px;color:var(--muted2);margin-bottom:10px">'+item.pos+' · '+(item.count||1)+'×</div>';
+          h+='<div class="syn-list-'+item.w.replace(/[^a-zA-Z]/g,'')+'" style="display:flex;gap:4px;flex-wrap:wrap"><span style="font-size:9px;color:var(--muted2)">loading…</span></div>';
+          h+='</div>';
         });
         h+='</div>';
-
-        // Example box
-        h+='<div class="syn-ex-'+item.word+'" style="padding:10px 14px;background:var(--bg2);border-radius:8px;font-size:11px;color:var(--muted);line-height:1.5;min-height:36px"><span style="color:var(--muted2);font-style:italic">Click a synonym to see it in context</span></div>';
-        h+='</div>';
-      });
-
+      }
       h+='</div></div>';
+
       cb(h, function(){
-        // Add click handlers for synonym chips
-        document.querySelectorAll('.syn-chip-21').forEach(function(chip){
-          chip.addEventListener('click',function(e){
-            e.stopPropagation();
-            var word=this.dataset.word;
-            var si=parseInt(this.dataset.sidx);
-            var sd=synDict[word];
-            if(!sd) return;
-            var syn=sd.syns[si];
-            var exBox=document.querySelector('.syn-ex-'+word);
-            if(exBox) exBox.innerHTML='<span style="color:#a78bfa;font-weight:600">'+syn.w+'</span>: '+syn.ex.replace(syn.w,'<span style="color:#a78bfa;font-weight:700">'+syn.w+'</span>');
-            // Highlight active chip
-            var il2=document.documentElement.getAttribute('data-theme')==='light';this.parentElement.querySelectorAll('.syn-chip-21').forEach(function(c){c.style.background=il2?'rgba(0,0,0,.04)':'rgba(255,255,255,.04)';c.style.color=il2?'rgba(0,0,0,.55)':'rgba(255,255,255,.55)';c.style.borderColor=il2?'rgba(0,0,0,.06)':'rgba(255,255,255,.06)'});
-            var il3=document.documentElement.getAttribute('data-theme')==='light';this.style.background=il3?'rgba(124,58,237,.12)':'rgba(167,139,250,.18)';this.style.color=il3?'#7c3aed':'#c4b5fd';this.style.borderColor=il3?'#7c3aed':'#a78bfa';
-          });
-          chip.addEventListener('mouseenter',function(){var il=document.documentElement.getAttribute('data-theme')==='light';this.style.background=il?'rgba(124,58,237,.08)':'rgba(167,139,250,.08)';this.style.color=il?'#7c3aed':'#c4b5fd'});
-          chip.addEventListener('mouseleave',function(){if(!this.classList.contains('active')){var il=document.documentElement.getAttribute('data-theme')==='light';this.style.background=il?'rgba(0,0,0,.04)':'rgba(255,255,255,.04)';this.style.color=il?'rgba(0,0,0,.55)':'rgba(255,255,255,.55)'}});
-        });
-
-        // Filter buttons
-        window.filterSynCards=function(pos){
-          document.querySelectorAll('.syn-card-21').forEach(function(card){
-            card.style.display=(pos==='all'||card.dataset.pos===pos)?'':'none';
-          });
-        };
-      });
-    },
-
-    // ═══ Gloss — Multi-Language Gloss (connected to live transcript) ═══
-    gloss: function(cb){
-      var h='<div class="extras-grid">';
-      var text=(document.getElementById('captionTranscript')?.textContent||'');
-      var words=getTranscriptWords();
-      var noData=words.length===0;
-      
-      // Language mapping
-      var langMap={en:'English',it:'Italiano',nl:'Nederlands',es:'Español',fr:'Français',de:'Deutsch',pt:'Português',pl:'Polski'};
-      var flags={en:'🇬🇧',it:'🇮🇹',nl:'🇳🇱',es:'🇪🇸',fr:'🇫🇷',de:'🇩🇪',pt:'🇵🇹',pl:'🇵🇱'};
-      var targetLangs=['it','nl','es','fr','de','pt','pl'];
-      
-      h+='<div class="extras-card" style="grid-column:1/-1"><div class="ec-title">11 · Multi-Language Gloss <span class="ec-badge" style="background:rgba(96,165,250,.15);color:#60a5fa">8 LANG</span></div>';
-      if(noData){
-        h+='<div style="color:var(--muted2);font-style:italic;padding:8px 0">Start speaking — detected words appear here with translations</div>';
-      }else{
-        var topWords=words.slice(0,12);
-        h+='<div style="max-height:400px;overflow-y:auto">';
-        h+='<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:6px">';
-        topWords.forEach(function(w){
-          var wordId = 'gw_'+w.w.replace(/[^a-zA-Z]/g,'');
-          h+='<div style="background:var(--card2);border:1px solid var(--line);border-radius:8px;padding:8px 10px" id="'+wordId+'">';
-          h+='<div style="font-weight:700;font-size:13px;color:var(--text);margin-bottom:2px">'+w.w+'</div>';
-          h+='<div style="font-size:9px;color:var(--muted2);margin-bottom:6px">'+w.pos+' · '+(w.count||1)+'×</div>';
-          h+='<div class="gloss-translations" data-word="'+w.w+'" style="display:flex;flex-direction:column;gap:2px">';
-          targetLangs.slice(0,4).forEach(function(lc){
-            h+='<div style="font-size:10px;color:var(--muted2)"><span style="margin-right:4px">'+(flags[lc]||'')+'</span><span class="gt-'+lc+'" style="color:var(--muted)">loading…</span></div>';
-          });
-          h+='</div></div>';
-        });
-        h+='</div></div>';
-      }
-      h+='<div style="font-size:9px;color:var(--muted2);margin-top:8px;text-align:center">Translations load automatically via MyMemory API</div>';
-      h+='</div></div>';
-      cb(h, function(){
-        // Load translations for each word
-        var glossDivs = document.querySelectorAll('.gloss-translations');
-        glossDivs.forEach(function(gd){
-          var word = gd.dataset.word;
-          if (!word) return;
-          targetLangs.slice(0,4).forEach(function(lc){
-            var span = gd.querySelector('.gt-'+lc);
-            if (!span) return;
-            // MyMemory API: free, no key needed
-            var url = 'https://api.mymemory.translated.net/get?q='+encodeURIComponent(word)+'&langpair=en|'+lc;
-            fetch(url).then(function(r){return r.json()}).then(function(data){
-              if (data.responseData && data.responseData.translatedText) {
-                span.textContent = data.responseData.translatedText;
-                span.style.color = '';
-              } else {
-                span.textContent = '—';
-                span.style.opacity = '0.4';
+        contentWords.forEach(function(item){
+          var listEl=document.querySelector('.syn-list-'+item.w.replace(/[^a-zA-Z]/g,''));
+          if(!listEl) return;
+          fetch('https://api.datamuse.com/words?ml='+encodeURIComponent(item.w)+'&max=5')
+            .then(function(r){return r.json()})
+            .then(function(data){
+              listEl.innerHTML='';
+              if(!data||data.length===0){
+                listEl.innerHTML='<span style="font-size:9px;color:var(--muted2)">no synonyms</span>';
+                return;
               }
-            }).catch(function(){
-              span.textContent = '—';
-              span.style.opacity = '0.4';
+              data.forEach(function(s){
+                listEl.innerHTML+='<span style="padding:3px 8px;border-radius:100px;font-size:9px;font-weight:500;background:var(--card2);color:var(--muted);border:1px solid var(--line)">'+s.word+'</span>';
+              });
+            })
+            .catch(function(){
+              listEl.innerHTML='<span style="font-size:9px;color:var(--muted2)">unavailable</span>';
             });
-          });
         });
       });
     },
-
-    // ═══ Info — Etymology + Word Log ═══
-    info: function(cb){
-      var h='<div class="extras-grid">';
-      var text=(document.getElementById('captionTranscript')?.textContent||'');
-      var lines=text.split('\n').filter(function(l){return l.trim().length>0});
-      var noData=lines.length===0;
-      
-      // Etymology lookup for notable words
-      h+='<div class="extras-card" style="grid-column:1/-1"><div class="ec-title">📚 Etymology <span class="ec-badge" style="background:rgba(251,191,36,.15);color:#fbbf24">ORIGIN</span></div>';
-      var words=getTranscriptWords();
-      var notableWords = words.filter(function(w){return w.pos==='NOUN'||w.pos==='VERB'||w.pos==='ADJ'}).slice(0,5);
-      if(notableWords.length===0){
-        h+='<div style="color:var(--muted2);font-style:italic">Start speaking — word origins appear here</div>';
-      } else {
-        h+='<div style="display:flex;flex-direction:column;gap:6px;max-height:250px;overflow-y:auto">';
-        var etymDB = {
-          'language':'Latin lingua (tongue) → Old French langage → Middle English',
-          'translation':'Latin translatus (carried across) → Old French translation',
-          'future':'Latin futurus (about to be) → Old French futur',
-          'system':'Greek systēma (organized whole) → Latin systema → French système',
-          'culture':'Latin cultura (growing, cultivation) → French culture',
-          'science':'Latin scientia (knowledge) → Old French science',
-          'technology':'Greek tekhnē (art, craft) + logia (study) → Modern English',
-          'communication':'Latin communicare (to share) → Old French communication',
-          'important':'Latin importare (bring in) → Medieval Latin importantia → French',
-          'different':'Latin differre (to set apart) → Old French different',
-          'education':'Latin educare (to lead out) → Old French education',
-          'experience':'Latin experientia (trial, proof) → Old French experience',
-          'information':'Latin informare (to shape, form) → Old French information',
-          'understanding':'Old English understandan (stand among/under) → comprehend',
-          'knowledge':'Old English cnāwan (to know) + -ledge (suffix) → knowing',
-          'learning':'Old English leornian (to get knowledge) → learning',
-          'world':'Old English woruld (human existence, age of man) → world',
-          'people':'Latin populus (a people, nation) → Old French pople → people',
-          'history':'Greek historia (inquiry, knowledge from investigation) → Latin → French',
-          'change':'Latin cambiare (to exchange) → Old French changier → change',
-          'challenge':'Latin calumnia (false accusation) → Old French chalonge → challenge',
-          'opportunity':'Latin opportunitas (fitness, convenience) → Old French opportunité',
-          'development':'French développer (unfold, unwrap) → development',
-          'business':'Old English bisignis (care, anxiety, occupation) → business'
-        };
-        notableWords.forEach(function(w){
-          var etym = etymDB[w.w.toLowerCase()] || 'Origin traceable through Indo-European roots — tap to explore further';
-          h+='<div style="padding:8px 10px;background:var(--card2);border:1px solid var(--line);border-radius:8px">';
-          h+='<div style="font-weight:700;font-size:11px;color:var(--text);margin-bottom:3px">'+w.w+'</div>';
-          h+='<div style="font-size:10px;color:var(--muted2);line-height:1.4">'+etym+'</div>';
-          h+='</div>';
-        });
-        h+='</div>';
-      }
-      h+='</div>';
-      
-      // Word log sidebar
-      h+='<div class="extras-card" style="grid-column:1/-1"><div class="ec-title">📝 Word Log <span class="ec-badge" style="background:rgba(167,139,250,.15);color:#c4b5fd">LIVE</span></div>';
-      if(words.length===0){
-        h+='<div style="color:var(--muted2);font-style:italic">Words from your live speech appear here</div>';
-      }else{
-        h+='<div style="max-height:300px;overflow-y:auto">';
-        h+='<div style="display:flex;flex-wrap:wrap;gap:4px">';
-        words.forEach(function(w){
-          var c=w.pos==='VERB'?'#3b82f6':w.pos==='NOUN'?'#34d399':w.pos==='ADJ'?'#f97316':w.pos==='ADV'?'#a855f7':w.pos==='FUNC'?'#6b7280':'#6b7280';
-          h+='<span style="display:inline-flex;align-items:center;gap:3px;padding:3px 8px;border-radius:6px;font-size:10px;font-weight:500;background:'+c+'18;color:'+c+';border:1px solid '+c+'30;cursor:pointer" onclick="addToWordBank(\''+w.w.replace(/'/g,"\\'")+'\')" title="Click to add to Word Bank">'+w.w+'<span style="font-size:7px;opacity:.6">+</span></span>';
-        });
-        h+='</div></div>';
-      }
-      h+='</div></div>';
-      cb(h);
-    },
-
-    // ═══ Multispeaker Mode — Speaker Diarization View ═══
-    grammarParse: function(cb){
-      var h='';
-      var text=(document.getElementById('captionTranscript')?.textContent||'');
-      var lines=text.split('\n').filter(function(l){return l.trim().length>0});
-      var noData=lines.length===0;
-      
-      h+='<div class="ec-title" style="margin-bottom:10px">\uD83C\uDF33 06 \u00b7 Live Grammar Parse <span class="ec-badge" style="background:rgba(52,211,153,.15);color:#34d399">LIVE</span></div>';
-      h+='<div style="font-size:8px;color:var(--muted2);margin-bottom:6px">Most recent 3 sentences from transcript</div>';
-      
-      if(noData){
-        h+='<div style="color:rgba(255,255,255,.2);font-style:italic;padding:16px;text-align:center">Start speaking — sentences will appear here for parsing</div>';
-      } else {
-        // Show last 3 sentences as clickable buttons
-        var lastLines=lines.slice(-3);
-        h+='<div id="gpBtns" style="margin-bottom:10px">';
-        lastLines.forEach(function(line,i){
-          var short=line.length>60?line.substring(0,57)+'\u2026':line;
-          var gi=lines.length-lastLines.length+i;
-          h+='<button class="gp-sent-btn" data-idx="'+gi+'" style="display:block;width:100%;text-align:left;padding:8px 12px;margin-bottom:4px;border-radius:8px;border:1px solid var(--line);background:var(--card);color:var(--muted);font-size:10px;cursor:pointer;font-family:inherit;transition:all .2s"><span style="font-family:JetBrains Mono,monospace;font-size:8px;color:var(--muted2);margin-right:6px">#'+(gi+1)+'</span>'+short+'</button>';
-        });
-        h+='</div>';
-        
-        // Parse tree output
-        h+='<div id="gpTree" style="font-family:JetBrains Mono,monospace;font-size:10px;line-height:2;padding:14px;background:rgba(0,0,0,.2);border-radius:10px;border:1px solid rgba(255,255,255,.04);color:rgba(255,255,255,.5);min-height:60px;max-height:300px;overflow:auto;white-space:pre;overflow-x:auto">Click a sentence above to parse</div>';
-        
-        // Stats
-        h+='<div id="gpStats" style="margin-top:8px;font-size:9px;color:rgba(255,255,255,.2)"></div>';
-        
-        // Legend
-        h+='<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;font-size:8px;color:rgba(255,255,255,.25)">';
-        [{l:'S',c:'#e8eaed'},{l:'NP',c:'#60a5fa'},{l:'VP',c:'#34d399'},{l:'PP',c:'#fbbf24'},{l:'ADJ',c:'#f472b6'},{l:'ADV',c:'#c084fc'},{l:'CC',c:'#fb923c'}].forEach(function(x){
-          h+='<span style="display:flex;align-items:center;gap:3px"><span style="width:6px;height:6px;border-radius:1px;background:'+x.c+'"></span>'+x.l+'</span>';
-        });
-        h+='</div>';
-      }
-      
-      cb(h, function(){
-        if(noData) return;
-        // Wire up click handlers
-        document.querySelectorAll('.gp-sent-btn').forEach(function(btn){
-          btn.addEventListener('click',function(){
-            document.querySelectorAll('.gp-sent-btn').forEach(function(b){b.classList.remove('active');b.style.background='rgba(255,255,255,.015)';b.style.borderColor='rgba(255,255,255,.06)'});
-            this.classList.add('active');this.style.background='rgba(167,139,250,.1)';this.style.borderColor='rgba(167,139,250,.3)';
-            var idx=parseInt(this.dataset.idx);
-            parseAndShowLine(lines[idx]);
-          });
-        });
-        // Auto-parse last line
-        if(lastLines.length>0){
-          var lastBtn=document.querySelector('.gp-sent-btn:last-child');
-          if(lastBtn) lastBtn.click();
-        }
-      });
-      
-      // Simple POS tagger + parse (same as mockup 06)
-      function tagWord(w){
-        var POS_DICT={the:'DET',a:'DET',an:'DET',is:'VERB',are:'VERB',was:'VERB',were:'VERB',be:'VERB',been:'VERB',have:'VERB',has:'VERB',had:'VERB',do:'VERB',does:'VERB',did:'VERB',will:'AUX',would:'AUX',can:'AUX',could:'AUX',of:'PREP',in:'PREP',for:'PREP',on:'PREP',with:'PREP',at:'PREP',by:'PREP',from:'PREP',into:'PREP',about:'PREP',over:'PREP',and:'CONJ',or:'CONJ',but:'CONJ',so:'CONJ',if:'CONJ',because:'CONJ',we:'PRON',you:'PRON',he:'PRON',she:'PRON',it:'PRON',they:'PRON',i:'PRON',this:'DET',these:'DET',those:'DET',not:'PART',to:'PART',discussing:'VERB',discuss:'VERB',future:'NOUN',translation:'NOUN',systems:'NOUN',system:'NOUN',language:'NOUN',languages:'NOUN',barriers:'NOUN',barrier:'NOUN',deployment:'NOUN',scale:'NOUN',challenge:'NOUN',remains:'VERB',remain:'VERB',biggest:'ADJ',year:'NOUN',years:'NOUN',neural:'ADJ',models:'NOUN',getting:'VERB',remarkably:'ADV',good:'ADJ',handling:'VERB',edge:'NOUN',cases:'NOUN',bridge:'VERB',across:'PREP',different:'ADJ',cultures:'NOUN',real:'ADJ',time:'NOUN',quick:'ADJ',fox:'NOUN',jumps:'VERB',quickly:'ADV',lazy:'ADJ',dog:'NOUN',studying:'VERB',three:'ADJ',now:'ADV'};
-        w=w.toLowerCase().replace(/[^a-z0-9-]/g,'');
-        if(POS_DICT[w]) return POS_DICT[w];
-        if(w.endsWith('ing')) return 'VERB';if(w.endsWith('ed')&&w.length>4) return 'VERB';
-        if(w.endsWith('tion')||w.endsWith('ment')||w.endsWith('ness')) return 'NOUN';
-        if(w.endsWith('ly')) return 'ADV';if(w.endsWith('ous')||w.endsWith('ful')) return 'ADJ';
-        if(w.endsWith('s')&&w.length>4) return 'NOUN';
-        return 'NOUN';
-      }
-      
-      function parseAndShowLine(text){
-        var clean=text.trim().replace(/[,.!?;:"»«\(\)]/g,'').replace(/^\d{2}:\d{2}:\d{2}\s*/,'');
-        var words=clean.split(/\s+/);if(words.length===0) return;
-        var tagged=[];for(var i=0;i<words.length;i++) tagged.push({w:words[i],t:tagWord(words[i])});
-        var n=tagged.length;
-        var tree=['<span style="color:#e8eaed;font-weight:700">S</span>'];
-        
-        // Find verb
-        var vi=-1;for(var i=0;i<n;i++){if(tagged[i].t==='VERB'||tagged[i].t==='AUX'){vi=i;break}}
-        if(vi<0) vi=Math.floor(n/2);
-        
-        // NP before verb
-        var ss=0;while(ss<vi&&tagged[ss].t==='ADV')ss++;
-        if(ss<vi){
-          var sw=tagged.slice(ss,vi).map(function(x){return x.w}).join(' ');
-          tree.push('  ├─ <span style="color:#60a5fa;font-weight:600">NP</span>: <span style="color:#e8eaed">'+sw+'</span>');
-        }
-        
-        // VP
-        tree.push('  ├─ <span style="color:#34d399;font-weight:600">VP</span>: <span style="color:#34d399">'+tagged[vi].w+'</span>');
-        
-        // NP after verb
-        var os=vi+1;while(os<n&&tagged[os].t==='ADV')os++;
-        var oe=n;for(var k=os;k<n;k++){if(tagged[k].t==='PREP'){oe=k;break}}
-        if(oe>os){
-          var ow=tagged.slice(os,oe).map(function(x){return x.w}).join(' ');
-          tree.push('  │  └─ <span style="color:#60a5fa">NP</span>: <span style="color:rgba(255,255,255,.5)">'+ow+'</span>');
-        }
-        
-        // PP
-        var ps=n;for(var k=vi+1;k<n;k++){if(tagged[k].t==='PREP'){ps=k;break}}
-        if(ps<n){
-          var pw=tagged.slice(ps,n).map(function(x){return x.w}).join(' ');
-          tree.push('  └─ <span style="color:#fbbf24;font-weight:600">PP</span>: <span style="color:rgba(255,255,255,.5)">'+pw+'</span>');
-        }
-        
-        // If tree is empty (no structure detected), show tagged words
-        if(tree.length <= 1) {
-          tree = ['<span style="color:#e8eaed;font-weight:700">S</span>'];
-          tree.push('  └─ <span style="color:rgba(255,255,255,.5)">[' + tagged.map(function(t){return '<span style="color:'+(t.t==='VERB'?'#34d399':t.t==='NOUN'?'#60a5fa':t.t==='ADJ'?'#f472b6':'rgba(255,255,255,.4)')+'">'+t.w+'</span>('+t.t+')'}).join(' ') + ']</span>');
-        }
-        
-        document.getElementById('gpTree').innerHTML=tree.join('\n');
-        
-        // Stats
-        var uniqueTags={};tagged.forEach(function(t){uniqueTags[t.t]=true});
-        var cefr=n>18?'B2-C1':n>12?'B1-B2':n>7?'A2-B1':'A1-A2';
-        document.getElementById('gpStats').innerHTML='<span style="padding:3px 8px;border-radius:100px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.05)">\uD83D\DCC4 <strong>'+n+' words</strong> \u00b7 Depth 3 \u00b7 '+cefr+'</span>';
-      }
-    },
-
-multispeaker: function(cb){
+    multispeaker: function(cb){
       var h='';
       var text=(document.getElementById('captionTranscript')?.textContent||'');
       var lines=text.split('\n').filter(function(l){return l.trim().length>0});
@@ -3625,69 +3199,74 @@ multispeaker: function(cb){
       if(noData){
         h+='<div style="text-align:center;padding:40px 20px;color:var(--muted2);background:var(--card2);border:2px dashed var(--line);border-radius:14px"><div style="font-size:36px;margin-bottom:10px">🎙️</div><div style="font-size:13px;font-weight:600;color:var(--muted)">Start a session with multiple speakers</div><div style="font-size:10px;margin-top:4px">The AI will identify who said what in real time</div></div>';
       } else {
-        h+='<div style="display:flex;gap:14px">';
-        
-        // LEFT: Conversation transcript (2/3)
-        h+='<div style="flex:2;min-width:0">';
-        h+='<span id="diarizeStatus" style="display:none;font-size:10px;color:var(--accent);margin-bottom:8px;display:block">⏳ Analyzing speaker patterns...</span>';
-        h+='<div id="diarizeOutput" style="display:flex;flex-direction:column;gap:8px;max-height:400px;overflow-y:auto;padding-right:6px">';
-        
+        // ── Build speaker groups ──
         var currentSpeaker=0;
         var lastLines=lines.slice(-20);
-        // Group consecutive lines to same speaker unless change signal
+        var speakerGroups=[[],[],[]]; // 3 speakers max
+        
         lastLines.forEach(function(line,i){
-          // Speaker change signals: line ends with ?, line starts with greeting/response word
           var changeSignal=(i>0 && lastLines[i-1].trim().endsWith('?')) ||
                            /^(yes|no|okay|right|exactly|sure|thanks|thank|sorry|well|so|but|and|or|because|oh|wow|hey|hi|hello|good|great|nice|interesting|absolutely|definitely|actually|however|anyway|look|listen|wait|hold|hmm|ok|alright|yeah|nope|what|who|where|when|why|how|really|maybe|perhaps)/i.test(line.trim());
           if(changeSignal && i>0) currentSpeaker=(currentSpeaker+1)%3;
           var spk=currentSpeaker;
           spkCounts[spk]=(spkCounts[spk]||0)+1;
-          var color=speakerColors[spk];
-          var isLatest=i===lastLines.length-1;
-          // If previous line was same speaker, combine into bubble
-          var sameSpeakerAsPrev=(i>0 && currentSpeaker===parseInt(lastLines[i-1]._spk));
-          if(sameSpeakerAsPrev){
-            // Append to previous bubble's content
-          }
           line._spk=spk;
-          
-          h+='<div style="display:flex;gap:12px;align-items:flex-start;padding:12px 14px;border-radius:12px;background:'+(isLatest?color+'0A':color+'05')+';border:1px solid '+(isLatest?color+'20':'transparent')+';transition:all .3s">';
-          h+='<div style="flex-shrink:0;width:32px;height:32px;border-radius:50%;background:'+color+';color:#fff;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;font-family:JetBrains Mono,monospace;margin-top:2px">'+(spk+1)+'</div>';
-          h+='<div style="flex:1;min-width:0">';
-          h+='<div style="display:flex;align-items:baseline;gap:8px;margin-bottom:3px"><span style="font-size:12px;font-weight:700;color:'+color+'">'+speakerNames[spk]+'</span><span style="font-size:9px;color:var(--muted2);font-family:JetBrains Mono,monospace">#'+(i+1)+'</span></div>';
-          h+='<div style="font-size:13px;color:var(--text);line-height:1.6">'+line.replace(/^\d{2}:\d{2}:\d{2}\s*/,'')+'</div>';
-          h+='</div>';
-          h+='</div>';
-          speakerIdx++;
+          speakerGroups[spk].push(line);
         });
+
+        // ── Render: LEFT (2/3) — speaker blocks ──
+        h+='<div style="display:flex;gap:14px">';
+        h+='<div style="flex:2;min-width:0">';
+        h+='<span id="diarizeStatus" style="display:none;font-size:10px;color:var(--accent);margin-bottom:8px">⏳ Analyzing speaker patterns...</span>';
+        h+='<div id="diarizeOutput" style="display:flex;flex-direction:column;gap:12px;max-height:400px;overflow-y:auto;padding-right:6px">';
+
+        for(var s=0;s<3;s++){
+          if(speakerGroups[s].length===0) continue;
+          var color=speakerColors[s];
+          h+='<div style="background:'+color+'08;border:1px solid '+color+'20;border-radius:14px;padding:14px;transition:all .3s">';
+          h+='<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">';
+          h+='<div style="width:28px;height:28px;border-radius:50%;background:'+color+';color:#fff;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:800;font-family:JetBrains Mono,monospace">'+(s+1)+'</div>';
+          h+='<span style="font-size:12px;font-weight:700;color:'+color+'">'+speakerNames[s]+'</span>';
+          h+='<span style="font-size:9px;color:var(--muted2);font-family:JetBrains Mono,monospace">'+speakerGroups[s].length+' lines</span>';
+          h+='</div>';
+          // Lines for this speaker
+          h+='<div style="display:flex;flex-direction:column;gap:6px">';
+          speakerGroups[s].forEach(function(line){
+            h+='<div style="font-size:12px;color:var(--text);line-height:1.5;padding:6px 10px;background:var(--card2);border-radius:8px;border-left:3px solid '+color+'">'+line.replace(/^\d{2}:\d{2}:\d{2}\s*/,'')+'</div>';
+          });
+          h+='</div>';
+          h+='</div>';
+        }
+
+        if(speakerGroups.every(function(g){return g.length===0})){
+          h+='<div style="color:var(--muted2);font-style:italic;text-align:center;padding:20px">No speaker data yet — lines will be grouped here</div>';
+        }
         h+='</div>';
         h+='</div>';
         
-        // RIGHT: Speaker Stats
+        // ── RIGHT (1/3): Speaker Stats ──
         h+='<div style="flex:1;min-width:150px;display:flex;flex-direction:column;gap:0">';
         h+='<div style="background:var(--card2);border:1px solid var(--line);border-radius:14px;padding:16px">';
         h+='<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--muted2);margin-bottom:12px">Speakers</div>';
         
         var totalLines=lastLines.length;
-        for(var s=0;s<3;s++){
-          var count=spkCounts[s]||0;
+        for(var s2=0;s2<3;s2++){
+          var count=spkCounts[s2]||0;
           var pct=totalLines>0?Math.round(count/totalLines*100):0;
-          var color=speakerColors[s];
+          var color2=speakerColors[s2];
           h+='<div style="margin-bottom:12px">';
           h+='<div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px">';
-          h+='<span style="font-size:11px;font-weight:600;color:'+color+'">'+speakerNames[s]+'</span>';
-          h+='<span style="font-family:JetBrains Mono,monospace;font-size:18px;font-weight:900;color:'+color+'">'+count+'</span>';
+          h+='<span style="font-size:11px;font-weight:600;color:'+color2+'">'+speakerNames[s2]+'</span>';
+          h+='<span style="font-family:JetBrains Mono,monospace;font-size:18px;font-weight:900;color:'+color2+'">'+count+'</span>';
           h+='</div>';
           h+='<div style="height:5px;background:var(--line);border-radius:3px;overflow:hidden">';
-          h+='<div style="height:100%;border-radius:3px;background:'+color+';width:'+pct+'%;transition:width .6s ease"></div>';
+          h+='<div style="height:100%;border-radius:3px;background:'+color2+';width:'+pct+'%;transition:width .6s ease"></div>';
           h+='</div>';
           h+='<div style="font-size:9px;color:var(--muted2);margin-top:2px">'+pct+'% of conversation</div>';
           h+='</div>';
         }
         h+='<div style="border-top:1px solid var(--line);padding-top:10px;margin-top:4px;display:flex;justify-content:space-between;font-size:10px;color:var(--muted)"><span>Total lines</span><span style="font-family:JetBrains Mono,monospace;font-weight:700">'+totalLines+'</span></div>';
-        h+='</div>';
-        h+='</div>';
-        h+='</div>';
+        h+='</div></div></div>';
       }
       
       cb(h, function(){
@@ -3696,7 +3275,9 @@ multispeaker: function(cb){
         var s=document.getElementById('diarizeStatus');
         if(s) s.style.display='none';
       });
-    }  };  // ── Word Bank add from Synonyms ──
+    }
+  };
+
 window.addToWordBank = function(word){
   // If called without a word (from + Add button), read from input
   if (!word) {
@@ -3722,6 +3303,18 @@ window.addToWordBank = function(word){
   }
 };
 
+
+
+// Helper: add word from Synonyms panel with toast confirmation
+window.addSynonymWord = function(word){
+  if (!word) return;
+  addToWordBank(word);
+  var toast = document.createElement('div');
+  toast.style.cssText = 'position:fixed;bottom:20px;left:50%;transform:translateX(-50%);padding:8px 18px;border-radius:100px;background:#34d399;color:#000;font-weight:700;font-size:12px;z-index:99999;animation:toastIn .3s ease,toastOut .3s ease 1.5s forwards;pointer-events:none';
+  toast.textContent = '✓ \'' + word + '\' saved to Word Bank';
+  document.body.appendChild(toast);
+  setTimeout(function(){ toast.remove(); }, 2000);
+};
 
 // ═══ AI Diarization — calls Supabase Edge Function ═══
 window.runDiarization = function(){
