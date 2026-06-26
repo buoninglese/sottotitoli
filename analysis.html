@@ -94,6 +94,20 @@ body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--t
 .btn-ghost:hover{border-color:var(--accent);color:var(--accent)}
 .empty{text-align:center;padding:32px;color:var(--t3);font-size:12px}
 
+/* FAQ Accordion */
+.faq-item{background:var(--card);border:1px solid var(--line);border-radius:12px;overflow:hidden;transition:all .2s}
+.faq-item:hover{border-color:rgba(52,211,153,.2)}
+.faq-q{display:flex;align-items:center;justify-content:space-between;padding:14px 18px;cursor:pointer;font-size:13px;font-weight:600;color:var(--text);user-select:none}
+.faq-q:hover{color:var(--accent)}
+.faq-q .faq-arrow{font-size:10px;transition:transform .25s;color:var(--t3)}
+.faq-item.open .faq-arrow{transform:rotate(180deg)}
+.faq-a{max-height:0;overflow:hidden;transition:max-height .35s ease;padding:0 18px;font-size:12px;color:var(--t2);line-height:1.7}
+.faq-item.open .faq-a{max-height:300px;padding-bottom:14px}
+
+/* Why block in modal */
+.why-block{margin:10px 0;padding:10px 14px;background:rgba(52,211,153,.04);border:1px solid rgba(52,211,153,.12);border-radius:10px;font-size:11px;color:var(--t2);line-height:1.6}
+.why-block strong{color:var(--accent)}
+
 @media(max-width:768px){
   .sidebar{width:56px}.sidebar .ni{padding:10px 12px;justify-content:center}.sidebar .nl{display:none}.sidebar .nb{display:none}.sidebar-st{display:none}.sidebar-div{margin:4px 8px}
   .main{min-width:0}.content-wrap{padding:0 12px 40px}.hero{padding:20px 16px 12px}.mp-grid{grid-template-columns:1fr}
@@ -120,6 +134,7 @@ body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--t
     <div class="sidebar-st" style="padding-top:14px">Marketplace</div>
     <div class="ni active" data-tab="market"><span class="ni-icon">🛒</span><span class="nl">Report</span></div>
     <div class="ni" data-tab="myreports"><span class="ni-icon">📄</span><span class="nl">I miei report</span><span class="nb c" id="reportBadge">0</span></div>
+    <div class="ni" data-tab="faq"><span class="ni-icon">❓</span><span class="nl">FAQ</span></div>
     <div class="sidebar-div"></div>
     <div class="sidebar-st">Account</div>
     <div class="ni" onclick="window.location.href='purchase.html'"><span class="ni-icon">💰</span><span class="nl">Crediti</span></div>
@@ -151,6 +166,16 @@ body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--t
       </div>
       <div class="content-wrap">
         <div class="report-list" id="myReports"></div>
+      </div>
+    </div>
+
+    <div class="cs" id="cs-faq">
+      <div class="hero">
+        <h1>FAQ · AI Reports</h1>
+        <p class="sub">Domande frequenti sul sistema di report</p>
+      </div>
+      <div class="content-wrap">
+        <div style="max-width:680px;display:flex;flex-direction:column;gap:8px" id="faqList"></div>
       </div>
     </div>
   </main>
@@ -290,7 +315,10 @@ function openModal(reportId){
     }
   }
   document.getElementById('modTitle').textContent=selectedReport.icon+' '+selectedReport.nameIT;
-  document.getElementById('modDesc').textContent=selectedReport.descIT;
+  document.getElementById('modDesc').innerHTML=selectedReport.descIT+
+    '<div class="why-block"><strong>💡 Perché questo report</strong><br>'+
+    (selectedReport.evidenceNoteIT||'')+' · '+
+    (selectedReport.eligibilityIT||'')+'</div>';
   document.getElementById('modPrice').textContent=selectedReport.price>0?selectedReport.price+' crediti':'Gratuito';
   document.getElementById('modBuyBtn').disabled=true;
   if(selectedReport.price===0)document.getElementById('modBuyBtn').textContent='Ottieni Report Gratuito';
@@ -344,6 +372,31 @@ function viewReport(rid){
 }
 var _currentReportData=null;
 function downloadReportPDF(){if(!_currentReportData)return;var mod=REPORT_MODULES[_currentReportData.module_id]||{name:'Report'};var score=_currentReportData.overall_score?Math.round(_currentReportData.overall_score)+'%':'—';var text='Sottotitoli AI Report\n'+mod.name+'\nScore: '+score+'\n\n'+(_currentReportData.summary_text||'');var blob=new Blob([text],{type:'text/plain;charset=utf-8'});var a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='report-'+_currentReportData.id.substring(0,8)+'.txt';a.click()}
+
+// ═══ FAQ ═══
+var FAQ_DATA=[
+  {qIT:'Cosa sono gli AI Reports?',qEN:'What are AI Reports?',aIT:'Gli AI Reports sono analisi generate automaticamente basate sulle tue sessioni di caption e traduzione. Ogni report esamina aspetti diversi: grammatica, vocabolario, fluidità, interferenze dalla lingua madre, e altro ancora. I report usano solo i dati delle tue sessioni reali — non inventano nulla.',aEN:'AI Reports are automatically generated analyses based on your caption and translation sessions. Each report examines different aspects: grammar, vocabulary, fluency, native language interference, and more. Reports only use your real session data — they never invent anything.'},
+  {qIT:'Quanto sono affidabili?',qEN:'How reliable are they?',aIT:'L\'affidabilità dipende dal numero di sessioni analizzate. Più sessioni = più dati = analisi più solide. Ogni report include una nota sull\'affidabilità. I report non assegnano certificazioni ufficiali CEFR e usano un linguaggio prudente ("mostra evidenze compatibili con…").',aEN:'Reliability depends on the number of sessions analyzed. More sessions = more data = stronger analysis. Each report includes a reliability note. Reports do not assign official CEFR certifications and use cautious language ("shows evidence consistent with…").'},
+  {qIT:'Perché alcuni report sono bloccati?',qEN:'Why are some reports locked?',aIT:'Alcuni report richiedono un numero minimo di sessioni per essere affidabili. Ad esempio, il report "Errori Ricorrenti" ha bisogno di almeno 3 sessioni per distinguere un errore occasionale da un pattern. Altri report, come "Italiano → Inglese", sono pensati per parlanti italiani.',aEN:'Some reports require a minimum number of sessions to be reliable. For example, the "Repeating Errors" report needs at least 3 sessions to distinguish a one-off mistake from a pattern. Other reports, like "Italian → English", are designed for Italian speakers.'},
+  {qIT:'I crediti si consumano anche se il report fallisce?',qEN:'Are credits consumed if the report fails?',aIT:'No. I crediti vengono scalati solo quando il report viene completato con successo. Se un report va in errore, puoi riprovarlo senza costi aggiuntivi.',aEN:'No. Credits are only deducted when the report completes successfully. If a report fails, you can retry it at no additional cost.'},
+  {qIT:'Posso scaricare i report?',qEN:'Can I download reports?',aIT:'Sì! Ogni report può essere scaricato come file di testo dal pulsante 🖨️ nella vista dettaglio. I report includono il punteggio, la data, e il testo completo dell\'analisi.',aEN:'Yes! Each report can be downloaded as a text file using the 🖨️ button in the detail view. Reports include the score, date, and full analysis text.'},
+  {qIT:'Lo Snapshot gratuito ha un limite?',qEN:'Is there a limit on the free Snapshot?',aIT:'Sì, lo Snapshot è gratuito una volta al giorno. Dopo ogni sessione puoi ottenerne uno per avere un feedback immediato. Per analisi più approfondite, usa i report a pagamento.',aEN:'Yes, the Snapshot is free once per day. After each session you can get one for immediate feedback. For deeper analysis, use the paid reports.'},
+  {qIT:'Cosa significa "basato su evidenze osservate"?',qEN:'What does "based on observed evidence" mean?',aIT:'Significa che ogni conclusione del report è supportata da esempi concreti tratti dalle tue sessioni. Il report cita frasi, parole o pattern che hai effettivamente prodotto. Non fa ipotesi generiche sul tuo livello.',aEN:'It means every conclusion in the report is backed by concrete examples from your sessions. The report cites phrases, words, or patterns you actually produced. It does not make generic assumptions about your level.'},
+  {qIT:'I miei dati sono al sicuro?',qEN:'Is my data safe?',aIT:'Sì. Le tue sessioni e i tuoi report sono visibili solo a te. I dati vengono usati esclusivamente per generare i tuoi report personali e non vengono condivisi con terze parti.',aEN:'Yes. Your sessions and reports are visible only to you. Data is used exclusively to generate your personal reports and is not shared with third parties.'}
+];
+
+function renderFAQ(){
+  var el=document.getElementById('faqList');if(!el)return;
+  var h='';
+  FAQ_DATA.forEach(function(faq,i){
+    h+='<div class="faq-item">';
+    h+='<div class="faq-q" onclick="this.parentElement.classList.toggle(\'open\')">'+faq.qIT+' <span style="font-size:10px;color:var(--t3);margin-left:6px">('+faq.qEN+')</span><span class="faq-arrow">▼</span></div>';
+    h+='<div class="faq-a">'+faq.aIT+'</div>';
+    h+='</div>';
+  });
+  el.innerHTML=h;
+}
+renderFAQ();
 
 function updateKPIs(){
   document.getElementById('kpiReports').textContent=myReports.length;
