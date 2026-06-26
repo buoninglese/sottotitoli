@@ -1571,6 +1571,8 @@ function renderLinesKeepScroll() {
 }
 
 // ═══ Session toggle with real mic ═══
+var sessionSeconds = 0;
+var timerInterval = null;
 function toggleSession() {
   sessionActive = !sessionActive;
   var btn = document.getElementById('startBtn');
@@ -1579,14 +1581,19 @@ function toggleSession() {
       if (!ok) { sessionActive = false; btn.textContent = '▶ START'; btn.classList.add('primary'); btn.classList.remove('danger'); return; }
       btn.textContent = '⏹ STOP'; btn.classList.add('danger'); btn.classList.remove('primary');
       showToast('▶ Session started — mic live');
+      // Start session timer
+      sessionSeconds = 0;
+      if (timerInterval) clearInterval(timerInterval);
+      timerInterval = setInterval(function() { sessionSeconds++; }, 1000);
     });
   } else {
     stopRealMic();
+    if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
     // Save session with transcript + stats
     // Note: traduzione uses generated sentence pairs, not real-time speech
     var sessionData = {
-      lines: _lineData || []
-      // durationSeconds not tracked on traduzione; use line count as proxy
+      lines: _lineData || [],
+      durationSeconds: sessionSeconds || 0
     };
     if (typeof _endSupabaseSession === 'function') {
       _endSupabaseSession(sessionData);
