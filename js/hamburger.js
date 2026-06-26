@@ -15,7 +15,7 @@
       '<a href="index.html">Home</a>' +
       '<a href="start.html">Start</a>' +
       '<a href="account.html">Profilo</a>' +
-      '<a href="analysis.html">AI Reports</a>' +
+      '<a href="analysis.html">Report AI</a>' +
       '<hr>' +
       '<div class="dd-credits" id="hbCredits">' +
         '<div class="dd-credit-row"><span>Minuti</span><span id="hbMinutes">—</span></div>' +

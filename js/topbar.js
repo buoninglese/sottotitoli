@@ -13,7 +13,7 @@
     { href: 'index.html', label: 'Home' },
     { href: 'start.html', label: 'Start' },
     { href: 'account.html', label: 'Mio Profilo' },
-    { href: 'analysis.html', label: 'AI Reports' }
+    { href: 'analysis.html', label: 'Report AI' }
   ];
 
   var navHTML = '';
@@ -34,7 +34,7 @@
     '    <a href="index.html">Home</a>' +
     '    <a href="start.html">Start</a>' +
     '    <a href="account.html">Mio Profilo</a>' +
-    '    <a href="analysis.html">AI Reports</a>' +
+    '    <a href="analysis.html">Report AI</a>' +
     '  </nav>' +
     '</div>';
 
