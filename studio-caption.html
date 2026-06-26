@@ -577,8 +577,6 @@ button[onclick*="addToWordBank"]:hover{background:rgba(52,211,153,.15)!important
       <div class="action-row">
         <button type="button" class="btn-grad btn-start" id="startBtn" onclick="toggleSession()">🎤 Start Session</button>
         <button type="button" class="btn-grad btn-stop" id="stopBtn" style="display:none" onclick="toggleSession()">⏹ Stop</button>
-        <button type="button" class="btn-grad btn-demo" id="demoBtn" onclick="toggleDemo()">▶ Demo</button>
-        <div class="demo-progress" id="demoProgress" style="display:none"><div class="demo-progress-bar" id="demoProgressBar"></div><span class="demo-progress-label" id="demoProgressLabel">0/20</span></div>
       </div>
 
       <!-- ═══ Extras Toggle ═══ -->
@@ -1076,153 +1074,6 @@ _realMic.onInterim = function(text) {
   if (interim) interim.textContent = text;
 };
 
-// ═══ DEMO MODE — simulates speech to showcase all extras panels ═══
-var DEMO_SCRIPT = [
-  "we are discussing the future of real-time translation",
-  "and how these systems can bridge language barriers across the world",
-  "deployment at scale remains our biggest challenge this year",
-  "the advances in neural machine translation are truly remarkable",
-  "we are seeing unprecedented accuracy in real-time speech recognition",
-  "international meetings benefit enormously from this technology",
-  "participants can speak in their native language without hesitation",
-  "the system translates everything instantly with high quality",
-  "I believe this will fundamentally change how we communicate globally",
-  "however, we must also consider the ethical implications carefully",
-  "privacy concerns need to be addressed before widespread adoption",
-  "the training data must represent diverse languages and dialects",
-  "fortunately, the research community is making great progress",
-  "new models can handle multiple languages simultaneously now",
-  "the latency has dropped below two hundred milliseconds in most cases",
-  "this means conversations feel completely natural and fluid",
-  "we should celebrate these achievements while staying vigilant",
-  "the future of language technology has never looked brighter",
-  "our team is committed to pushing these boundaries even further",
-  "thank you all for being part of this incredible journey today"
-];
-
-var _demoRunning = false;
-var _demoTimer = null;
-var _demoIndex = 0;
-var _demoSeconds = 0;
-var _demoSecondTimer = null;
-
-function toggleDemo() {
-  if (_demoRunning) {
-    stopDemo();
-  } else {
-    startDemo();
-  }
-}
-
-function startDemo() {
-  if (_demoRunning) return;
-  _demoRunning = true;
-  _demoIndex = 0;
-  _demoSeconds = 0;
-  sessionSeconds = 0;
-  sessionActive = true;
-
-  var demoBtn = document.getElementById('demoBtn');
-  var startBtn = document.getElementById('startBtn');
-  var stopBtn = document.getElementById('stopBtn');
-  var progWrap = document.getElementById('demoProgress');
-  var progBar = document.getElementById('demoProgressBar');
-  var progLabel = document.getElementById('demoProgressLabel');
-  var interim = document.getElementById('captionInterim');
-  var transcript = document.getElementById('captionTranscript');
-  var timer = document.getElementById('sessionTimer');
-
-  // UI state
-  if (demoBtn) { demoBtn.textContent = '⏹ Stop Demo'; demoBtn.classList.add('running'); }
-  if (startBtn) startBtn.style.display = 'none';
-  if (stopBtn) stopBtn.style.display = 'none';
-  if (progWrap) progWrap.style.display = 'block';
-  if (progBar) progBar.style.width = '0%';
-  if (progLabel) progLabel.textContent = '0/' + DEMO_SCRIPT.length;
-  if (transcript) transcript.innerHTML = ''; // Clear existing
-  if (interim) interim.textContent = '';
-  var liveDot = document.getElementById('liveDot');
-  if (liveDot) {
-    var dot = liveDot.querySelector('.dot');
-    if (dot) dot.classList.add('live');
-    liveDot.style.opacity = '1';
-  }
-  document.body.classList.add('session-active');
-
-  // Timer
-  if (timer) timer.textContent = '00:00';
-  _demoSecondTimer = setInterval(function() {
-    _demoSeconds++;
-    sessionSeconds = _demoSeconds;
-    var m = Math.floor(_demoSeconds / 60);
-    var s = _demoSeconds % 60;
-    if (timer) timer.textContent = String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0');
-  }, 1000);
-
-  // Fire sentences with realistic timing
-  function fireNext() {
-    if (!_demoRunning || _demoIndex >= DEMO_SCRIPT.length) {
-      stopDemo();
-      return;
-    }
-
-    var text = DEMO_SCRIPT[_demoIndex];
-
-    // Show interim first (simulate speech-in-progress)
-    if (interim) interim.textContent = text;
-
-    // After a short delay, finalize it
-    setTimeout(function() {
-      if (!_demoRunning) return;
-
-      // Fire onFinal — this triggers transcript line, stat updates, panel refresh, listen bar
-      _realMic.onFinal(text);
-
-      _demoIndex++;
-      if (progBar) progBar.style.width = (_demoIndex / DEMO_SCRIPT.length * 100) + '%';
-      if (progLabel) progLabel.textContent = _demoIndex + '/' + DEMO_SCRIPT.length;
-
-      // Clear interim
-      if (interim) interim.textContent = '';
-
-      // Next sentence after realistic gap (1.8–3.2 seconds)
-      var gap = 1800 + Math.floor((_demoIndex / DEMO_SCRIPT.length) * 1400);
-      _demoTimer = setTimeout(fireNext, gap);
-    }, 600 + Math.random() * 400); // 0.6–1s "speaking" time before finalizing
-  }
-
-  // Start after a short initial delay
-  _demoTimer = setTimeout(fireNext, 400);
-}
-
-function stopDemo() {
-  _demoRunning = false;
-  if (_demoTimer) { clearTimeout(_demoTimer); _demoTimer = null; }
-  if (_demoSecondTimer) { clearInterval(_demoSecondTimer); _demoSecondTimer = null; }
-
-  var demoBtn = document.getElementById('demoBtn');
-  var startBtn = document.getElementById('startBtn');
-  var stopBtn = document.getElementById('stopBtn');
-  var progWrap = document.getElementById('demoProgress');
-  var interim = document.getElementById('captionInterim');
-
-  if (demoBtn) { demoBtn.textContent = '▶ Demo'; demoBtn.classList.remove('running'); }
-  if (startBtn) startBtn.style.display = '';
-  if (stopBtn) stopBtn.style.display = 'none';
-  if (progWrap) progWrap.style.display = 'none';
-  if (interim) interim.textContent = '';
-
-  var liveDot2 = document.getElementById('liveDot');
-  if (liveDot2) {
-    var dot2 = liveDot2.querySelector('.dot');
-    if (dot2) dot2.classList.remove('live');
-  }
-  document.body.classList.remove('session-active');
-  sessionActive = false;
-  updateMicUI('idle');
-  if (typeof updateListenBar === 'function') updateListenBar();
-}
-
 // Also add a subtle pulse to the extras panel when it refreshes
 (function() {
   var _origRefresh = window.refreshExtrasPanel;
@@ -1302,35 +1153,49 @@ _realMic.onFinal = function(text) {
   var wpm = sessionSeconds > 0 ? Math.round(allWords.length / (sessionSeconds / 60)) : 0;
   document.getElementById('liveWpm').textContent = wpm;
   
-  // Vocab chips from real text
+  // ── Word Bank: auto-add content words (nouns, verbs, adjectives) ──
+  var words = text.toLowerCase().match(/[a-z']+/g) || [];
+  var posColors={VERB:'#34d399',NOUN:'#60a5fa',ADJ:'#f472b6',ADV:'#c084fc',FUNC:'#6b7280',WORD:'#a78bfa'};
+  var posBg={VERB:'rgba(52,211,153,.12)',NOUN:'rgba(96,165,250,.12)',ADJ:'rgba(244,114,182,.12)',ADV:'rgba(192,132,252,.12)',FUNC:'rgba(107,114,128,.08)',WORD:'rgba(167,139,250,.08)'};
+  var seen={};
+  words.forEach(function(w){
+    if (seen[w] || w.length<2) return;
+    seen[w]=true;
+    var pos=tagWord(w);
+    // Only auto-add content words (not function words)
+    if (pos==='FUNC'||pos==='OTHER') return;
+    if (wordBank.indexOf(w)>=0) return; // already in bank
+    wordBank.push(w);
+  });
+  saveWordBank();
+  
+  // Render live chips in vocabChips if present
   var chipsEl = document.getElementById('vocabChips');
   if (chipsEl) {
-    var words = text.toLowerCase().match(/[a-z']+/g) || [];
-    var colors = ['#e5e7eb','#dbeafe','#d1fae5','#fef3c7','#ede9fe','#fce7f3'];
-    chipsEl.innerHTML = words.map(function(w, i) {
-      return '<span class="vocab-chip" style="background:'+colors[i%colors.length]+';color:#374151">'+w+'</span>';
+    chipsEl.innerHTML = wordBank.map(function(w) {
+      var pos=tagWord(w);
+      var c=posColors[pos]||'#a78bfa';
+      var bg=posBg[pos]||'rgba(167,139,250,.08)';
+      return '<span class="live-wb-chip" data-word="'+w.replace(/"/g,'&quot;')+'" style="display:inline-flex;align-items:center;gap:4px;padding:4px 8px;border-radius:6px;font-size:9px;font-weight:600;background:'+bg+';color:'+c+';border:1px solid '+c+'30;cursor:pointer;transition:all .15s" title="Click: definition | Double-click: remove | POS: '+pos+'">'+w+'<span style="font-size:7px;opacity:.5;margin-left:2px">'+pos+'</span><span class="live-wb-x" data-word="'+w.replace(/"/g,'&quot;')+'" style="margin-left:3px;width:12px;height:12px;border-radius:50%;background:rgba(248,113,113,.15);color:#f87171;display:inline-flex;align-items:center;justify-content:center;font-size:7px;cursor:pointer" title="Remove">×</span></span>';
     }).join('');
-  }
-  
-  // CEFR gauge
-  var gauge = document.getElementById('cefrGauge');
-  var level = document.getElementById('cefrLevel');
-  if (gauge && level) {
-    var pct = Math.min(90, wpm * 0.8);
-    gauge.style.height = pct + '%';
-    level.textContent = pct > 70 ? 'C1' : pct > 50 ? 'B2' : pct > 30 ? 'B1' : pct > 10 ? 'A2' : 'A1';
-  }
-  
-  // Track Supabase session — pass actual caption language, not hardcoded 'en-US'
-  if (window.sottotitoliSupabase) {
-    window.sottotitoliSupabase.auth.getSession().then(function(r) {
-      if (r.data?.session) _ensureSupabaseSession(r.data.session.user.id, 'caption-' + (currentCaptionLang === 'en-US' ? 'en' : currentCaptionLang.split('-')[0]), currentCaptionLang);
+    // Delegate events
+    chipsEl.querySelectorAll('.live-wb-chip').forEach(function(chip){
+      chip.addEventListener('click', function(e){
+        if (e.target.classList.contains('live-wb-x')) return;
+        showWordDefinition(this.dataset.word);
+      });
+      chip.addEventListener('dblclick', function(e){
+        e.preventDefault();
+        removeFromWordBank(this.dataset.word);
+      });
+    });
+    chipsEl.querySelectorAll('.live-wb-x').forEach(function(x){
+      x.addEventListener('click', function(e){
+        e.stopPropagation();
+        removeFromWordBank(this.dataset.word);
+      });
     });
   }
-
-  // ── Word Bank: manual-add only (auto-collection disabled) ──
-  // User adds words by double-clicking chips in the Vocab panel or via the Word Bank input
-
   // ── Refresh active extras panel with new data ──
   if (typeof window.refreshExtrasPanel === 'function') {
     window.refreshExtrasPanel();
@@ -1536,13 +1401,19 @@ function renderWordBank() {
   var countEl = document.getElementById('wordbankCount');
   if (!chips) return;
   if (countEl) countEl.textContent = wordBank.length;
+  // POS color mapping
+  var posColors={VERB:'#34d399',NOUN:'#60a5fa',ADJ:'#f472b6',ADV:'#c084fc',FUNC:'#6b7280',WORD:'#a78bfa'};
+  var posBg={VERB:'rgba(52,211,153,.1)',NOUN:'rgba(96,165,250,.1)',ADJ:'rgba(244,114,182,.1)',ADV:'rgba(192,132,252,.1)',FUNC:'rgba(107,114,128,.06)',WORD:'rgba(167,139,250,.1)'};
   if (wordBank.length === 0) {
     chips.innerHTML = '';
     if (empty) empty.classList.add('show');
   } else {
     if (empty) empty.classList.remove('show');
     chips.innerHTML = wordBank.map(function(w) {
-      return '<span class="wordbank-chip" onclick="showWordDefinition(\'' + w.replace(/'/g, "\\'") + '\')" title="Click: definition · Double-click: remove">' + w + '<span class="wb-chip-x" onclick="event.stopPropagation();removeFromWordBank(\'' + w.replace(/'/g, "\\'") + '\')" title="Remove word">×</span></span>';
+      var pos=tagWord(w);
+      var c=posColors[pos]||'#c4b5fd';
+      var bg=posBg[pos]||'rgba(167,139,250,.1)';
+      return '<span class="wordbank-chip" style="background:'+bg+';color:'+c+';border-color:'+c+'30" onclick="showWordDefinition(\'' + w.replace(/'/g, "\\'") + '\')" title="Click: definition · POS: '+pos+'">' + w + '<span style="font-size:7px;opacity:.4;margin:0 2px">'+pos+'</span><span class="wb-chip-x" onclick="event.stopPropagation();removeFromWordBank(\'' + w.replace(/'/g, "\\'") + '\')" title="Remove from Word Bank">×</span></span>';
     }).join('');
   }
 }
@@ -2093,38 +1964,40 @@ function downloadGrammarPDF() {
     w = w.toLowerCase().replace(/[^a-z0-9-]/g,'');
     if (!w || w.length<2) return 'OTHER';
     if (POS_DICT[w]) return POS_DICT[w];
-    // ── Multi-language suffix patterns ──
+    // ── Use Compromise.js for English when available ──
+    if (typeof nlp !== 'undefined') {
+      try {
+        var doc = nlp(w);
+        if (doc.adjectives().found) return 'ADJ';
+        if (doc.verbs().found) return 'VERB';
+        if (doc.nouns().found) return 'NOUN';
+        if (doc.adverbs().found) return 'ADV';
+        if (doc.prepositions().found) return 'PREP';
+        if (doc.conjunctions().found) return 'CONJ';
+        if (doc.pronouns().found) return 'PRON';
+      } catch(e) {}
+    }
+    // ── Fallback suffix patterns (English + Dutch + Italian) ──
     // Verb patterns
     if (w.endsWith('ing')) return 'VERB';
     if (w.endsWith('ed') && w.length>4) return 'VERB';
-    // Dutch verb patterns: -en infinitive/plural, -t 2nd/3rd person, -de/-te past
-    if (/^(is|are|was|were|be|been|being|have|has|had|do|does|did|will|would|can|could|may|might|must|shall|should|go|goes|went|come|comes|came|make|makes|made|take|takes|took|get|gets|got|see|sees|saw|know|knows|knew|think|thinks|thought|say|says|said|tell|tells|told|give|gives|gave|use|uses|used|find|finds|found|work|works|worked|try|tries|tried|ask|asks|asked|seem|seems|seemed|mean|means|meant|need|needs|needed|want|wants|wanted|keep|keeps|kept|let|lets|put|puts|set|sets)$/.test(w)) return 'VERB';
-    // Italian verb patterns: -are/-ere/-ire infinitive, -ato/-uto/-ito participle, -ando/-endo gerund
-    if (w.endsWith('are')||w.endsWith('ere')||w.endsWith('ire')) { if (w.length>4) return 'VERB'; }
-    if (w.endsWith('ato')||w.endsWith('uto')||w.endsWith('ito')) return 'VERB';
-    if (w.endsWith('ando')||w.endsWith('endo')) return 'VERB';
-    if (w.endsWith('en') && w.length>4 && !w.endsWith('een') && !w.endsWith('ien')) return 'VERB'; // Dutch infinitive/plural
+    if (w.endsWith('en') && w.length>4 && !w.endsWith('een') && !w.endsWith('ien')) return 'VERB';
     // Noun patterns
     if (w.endsWith('tion')||w.endsWith('sion')||w.endsWith('ment')||w.endsWith('ness')||w.endsWith('ity')||w.endsWith('ance')||w.endsWith('ence')) return 'NOUN';
-    if (w.endsWith('heid')) return 'NOUN'; // Dutch -heid (like -ness)
-    if (w.endsWith('zione')||w.endsWith('sione')) return 'NOUN'; // Italian -zione/-sione
-    if (w.endsWith('tà')||w.endsWith('tù')) return 'NOUN'; // Italian abstracts
+    if (w.endsWith('heid')||w.endsWith('tà')||w.endsWith('tù')) return 'NOUN';
     // Adverb pattern
-    if (w.endsWith('ly')) return 'ADV';
-    if (w.endsWith('mente')) return 'ADV'; // Italian -mente
-    if (w.endsWith('lijk')) return 'ADV'; // Dutch -lijk (like -ly)
-    // Adjective patterns
-    if (w.endsWith('ous')||w.endsWith('ful')||w.endsWith('less')||w.endsWith('able')||w.endsWith('ible')||w.endsWith('ive')||w.endsWith('al')||w.endsWith('ic')) return 'ADJ';
+    if (w.endsWith('ly')||w.endsWith('mente')||w.endsWith('lijk')) return 'ADV';
+    // Adjective patterns (broader coverage)
+    if (w.endsWith('ous')||w.endsWith('ful')||w.endsWith('less')||w.endsWith('able')||w.endsWith('ible')||w.endsWith('ive')||w.endsWith('al')||w.endsWith('ic')||w.endsWith('ish')) return 'ADJ';
     if (w.endsWith('er')||w.endsWith('est')) return 'ADJ';
-    if (w.endsWith('oso')||w.endsWith('ale')||w.endsWith('ico')||w.endsWith('istico')) return 'ADJ'; // Italian adjectives
-    if (w.endsWith('isch')||w.endsWith('baar')) return 'ADJ'; // Dutch adjectives: -isch, -baar
-    // Diminutives → likely NOUN
-    if (w.endsWith('je')||w.endsWith('tje')||w.endsWith('pje')||w.endsWith('kje')) return 'NOUN';
-    // Preposition / function words (English + Dutch + Italian)
-    if (/^(the|a|an|de|het|een|il|la|lo|gli|le|un|una|in|on|at|op|aan|to|for|of|di|da|con|su|per|tra|fra|with|met|by|door|from|van|into|about|over|under|tussen|between|through|during|tijdens|before|after|above|below|up|down|out|off|or|and|but|en|of|maar|e|o|so|if|als|wanneer|quando|where|dove|how|hoe|come|why|waarom|perché|who|wie|chi|whom|which|welke|this|dit|that|dat|these|deze|those|die|my|mijn|your|jouw|uw|his|zijn|her|haar|its|our|ons|onze|their|hun|i|ik|we|wij|you|jij|jullie|he|hij|she|zij|it|they|me|mij|us|ons|him|hem|them|hen|not|niet|non|no|nee|yes|ja|sì|very|heel|erg|zeer|molto|just|alleen|solo|only|also|ook|anche|even|zelfs|still|nog|yet|more|meer|più|most|meest|some|sommige|alcuni|any|enige|all|alle|tutti|each|elk|ogni|every|iedere|both|beide|few|weinig|pochi|many|veel|molti|much|such|zo|than|dan|too|te|as|like|als|come|here|hier|qui|there|daar|là|now|nu|ora|then|dan|poi|well|goed|bene)$/.test(w)) return 'FUNC';
-    // Final noun check
+    if (w.endsWith('y') && w.length>3 && !w.endsWith('ly')) return 'ADJ'; // happy, sunny, pretty
+    if (w.endsWith('oso')||w.endsWith('ale')||w.endsWith('ico')||w.endsWith('isch')||w.endsWith('baar')) return 'ADJ';
+    // Diminutives → NOUN
+    if (w.endsWith('je')||w.endsWith('tje')) return 'NOUN';
+    // Function words
+    if (/^(the|a|an|de|het|een|il|la|lo|gli|le|un|una|in|on|at|op|aan|to|for|of|di|da|con|su|per|tra|fra|with|met|by|door|from|van|into|about|over|under|tussen|between|through|during|before|after|above|below|up|down|out|off|or|and|but|en|e|o|so|if|als|where|how|why|who|this|that|these|those|my|your|his|her|its|our|their|i|we|you|he|she|it|they|me|us|him|them|not|non|no|yes|very|just|only|also|even|still|yet|more|most|some|any|all|each|every|both|few|many|much|such|than|too|as|like|here|there|now|then|well)$/.test(w)) return 'FUNC';
+    // Final noun check for -s plurals
     if (w.endsWith('s') && w.length>4) return 'NOUN';
-    // Default: check first letter capitalization heuristic
     return 'WORD';
   }
 
@@ -3111,11 +2984,16 @@ function downloadGrammarPDF() {
       // ── Session Stats ──
       h+='<div class="extras-card"><div class="ec-title">⏱ Session <span class="ec-badge" style="background:rgba(52,211,153,.15);color:#34d399">LIVE</span></div>';
       if(noSession){
-        h+='<div class="extras-stat"><div class="es-val" style="color:rgba(255,255,255,.15)">—</div><div class="es-label">Start a session</div></div>';
+        h+='<div style="color:var(--muted2);font-style:italic;padding:16px 0;text-align:center">Start speaking — stats appear here</div>';
       }else{
-        h+='<div class="extras-stat"><div class="es-val" style="color:#a78bfa">'+(m.sec>0?(m.sec/60).toFixed(1):'0')+'<span style="font-size:12px;color:rgba(255,255,255,.3)">min</span></div><div class="es-label">total speaking time</div></div>';
-        h+='<div style="height:6px;background:var(--line);border-radius:3px;overflow:hidden;margin-top:6px"><div style="height:100%;border-radius:3px;background:linear-gradient(90deg,#34d399,#a78bfa);width:'+Math.min(95,Math.round(m.words/(Math.max(1,m.sec/60))*2))+'%;transition:width .6s ease"></div></div>';
-        h+='<div style="font-size:8px;color:var(--muted2);margin-top:2px">'+m.words+' words in '+m.sec+'s · '+m.wpm+' wpm</div>';
+        var min=Math.floor(m.sec/60);
+        var secLeft=m.sec%60;
+        h+='<div style="display:flex;gap:16px;align-items:center;flex-wrap:wrap">';
+        h+='<div style="text-align:center"><div style="font-size:28px;font-weight:800;color:var(--text);font-family:JetBrains Mono,monospace">'+min+'<span style="font-size:14px;color:var(--muted2)">m</span> '+String(secLeft).padStart(2,'0')+'<span style="font-size:14px;color:var(--muted2)">s</span></div><div style="font-size:9px;color:var(--muted2)">speaking time</div></div>';
+        h+='<div style="text-align:center"><div style="font-size:28px;font-weight:800;color:#60a5fa;font-family:JetBrains Mono,monospace">'+m.words+'</div><div style="font-size:9px;color:var(--muted2)">words</div></div>';
+        h+='<div style="text-align:center"><div style="font-size:28px;font-weight:800;color:#34d399;font-family:JetBrains Mono,monospace">'+m.wpm+'</div><div style="font-size:9px;color:var(--muted2)">wpm</div></div>';
+        h+='<div style="text-align:center"><div style="font-size:28px;font-weight:800;color:#a78bfa;font-family:JetBrains Mono,monospace">'+m.lines+'</div><div style="font-size:9px;color:var(--muted2)">sentences</div></div>';
+        h+='</div>';
       }
       h+='</div>';
 
@@ -3187,13 +3065,14 @@ function downloadGrammarPDF() {
     },
     multispeaker: function(cb){
       var h='';
-      var text=(document.getElementById('captionTranscript')?.textContent||'');
-      var lines=text.split('\n').filter(function(l){return l.trim().length>0});
+      var transcriptEl=document.getElementById('captionTranscript');
+      // Read actual .line elements (textContent loses newlines between divs)
+      var lineEls=transcriptEl?transcriptEl.querySelectorAll('.line'):[];
+      var lines=[];lineEls.forEach(function(el){var t=el.textContent.trim();if(t)lines.push(t);});
       var noData=lines.length===0;
       var speakerColors=['#5b7fc1','#c1665b','#5b9c6e','#c084fc','#fbbf24','#f472b6'];
       var speakerNames=['Speaker A','Speaker B','Speaker C','Speaker D','Speaker E','Speaker F'];
       var spkCounts={};for(var s=0;s<6;s++) spkCounts[s]=0;
-        var speakerIdx=0;
       h+='</div>';
       
       if(noData){
