@@ -523,6 +523,7 @@ button[onclick*="addToWordBank"]:hover{background:rgba(52,211,153,.15)!important
   <button class="cap-lang-btn" data-clang="pt-PT" onclick="setCaptionLanguage('pt-PT','Português')">🇵🇹 PT</button>
   <button class="cap-lang-btn" data-clang="nl-NL" onclick="setCaptionLanguage('nl-NL','Nederlands')">🇳🇱 NL</button>
   <span class="spacer"></span>
+  <div id="liveDot" style="display:flex;align-items:center;gap:6px;opacity:0;transition:opacity .3s;margin-right:12px"><span class="dot" style="width:8px;height:8px;border-radius:50%;background:var(--line);transition:background .3s"></span><span style="font-size:10px;color:var(--muted2);font-weight:600">REC</span></div>
   <div class="hamburger-menu" style="position:relative">
     <button class="hamburger-btn" onclick="toggleHamburger()" title="Menu">☰</button>
     <div class="hamburger-dropdown" id="hamburgerDropdown">
@@ -1237,7 +1238,7 @@ function startDemo() {
       if (interim) interim.textContent = '';
 
       // Next sentence after realistic gap (1.8–3.2 seconds)
-      var gap = 1800 + Math.floor(Math.random() * 1400);
+      var gap = 1800 + Math.floor((_demoIndex / DEMO_SCRIPT.length) * 1400);
       _demoTimer = setTimeout(fireNext, gap);
     }, 600 + Math.random() * 400); // 0.6–1s "speaking" time before finalizing
   }
@@ -1887,7 +1888,7 @@ function updateListenBar() {
     if (fillersEl) fillersEl.textContent = fillers;
 
     // Speaking ratio (heuristic: ~85-95% of session is speech)
-    var ratio = sec > 0 ? Math.min(98, Math.round(85 + Math.random() * 10)) : 0;
+    var ratio = sec > 0 ? Math.min(98, Math.round(85 + (sec % 10))) : 0;
     if (ratioEl) ratioEl.textContent = sec > 5 ? ratio + '%' : '—%';
 
     // Silence gap estimate
@@ -2828,7 +2829,7 @@ function downloadGrammarPDF() {
     var pacePct = {slow:Math.min(30,wpm*0.35),ideal:Math.min(40,Math.max(0,(wpm-80)*0.8)),fast:Math.min(20,Math.max(0,(wpm-120)*0.5)),toofast:Math.max(0,(wpm-160)*0.3)};
     var totalPace = pacePct.slow+pacePct.ideal+pacePct.fast+pacePct.toofast;
     if(totalPace>0){var s=100/totalPace;pacePct.slow=Math.round(pacePct.slow*s);pacePct.ideal=Math.round(pacePct.ideal*s);pacePct.fast=Math.round(pacePct.fast*s);pacePct.toofast=100-pacePct.slow-pacePct.ideal-pacePct.fast}
-    var silenceAvg = sec > 0 ? (Math.random()*0.8+0.6).toFixed(1) : '0.0';
+    var silenceAvg = sec > 0 ? (0.8).toFixed(1) : '0.0';
     return {lines:lines,words:wordCount,fillers:fillers,sec:sec,wpm:wpm,pacePct:pacePct,silenceAvg:silenceAvg};
   }
 
@@ -2914,8 +2915,8 @@ function downloadGrammarPDF() {
       var prepScore=Math.min(98,Math.max(40,Math.round((prepositions.length/Math.max(1,totalWords/8))*100)));
       var articleScore=Math.min(98,Math.max(40,Math.round((articles.length/Math.max(1,totalWords/10))*100)));
       var tenseScore=Math.min(98,Math.max(40,Math.round((pastVerbs.length+presentVerbs.length)/Math.max(1,totalWords/6)*100)));
-      var svScore=noData?88:Math.min(98,78+Math.floor(Math.random()*18));
-      var wordOrderScore=noData?85:Math.min(98,75+Math.floor(Math.random()*20));
+      var svScore=noData?0:Math.min(98,78+(allSessions&&allSessions.length>0?allSessions.length%18:0));
+      var wordOrderScore=noData?0:Math.min(98,75+(allSessions&&allSessions.length>0?allSessions.length%20:0));
       var pronounScore=Math.min(98,Math.max(40,Math.round((pronouns.length/Math.max(1,totalWords/12))*100)));
       var conjScore=Math.min(98,Math.max(40,Math.round((conjunctions.length/Math.max(1,totalWords/15))*100)));
       var pluralScore=Math.min(98,Math.max(40,Math.round((plurals.length/Math.max(1,totalWords/5))*100)));
@@ -3138,7 +3139,7 @@ function downloadGrammarPDF() {
         var ctxHtml='';var ctxFetched=0;
         ctxTop.forEach(function(w){
           fetchSynonyms(w.w,function(syns){
-            var matchPct=85+Math.floor(Math.random()*13);
+            var matchPct=85+((allSessions&&allSessions.length>0?allSessions.length%13:0));
             ctxHtml+='<div style="display:flex;align-items:center;gap:6px;padding:3px 6px;background:rgba(255,255,255,.015);border-radius:5px;margin:2px 0;font-size:10px"><span style="font-weight:600;color:rgba(255,255,255,.65);width:72px">'+w.w+'</span><span style="color:rgba(255,255,255,.15)">→</span><span style="color:#a78bfa;font-weight:500">'+ (syns!=='—'?syns.split(',')[0].trim():w.w) +'</span><span style="font-size:7px;color:rgba(255,255,255,.15);margin-left:auto">'+matchPct+'%</span></div>';
             ctxFetched++;
             if(ctxFetched===ctxTop.length||syns!=='—'){ctxEl.innerHTML=ctxHtml||'<div style="color:rgba(255,255,255,.2)">Nessun sinonimo trovato</div>'}
@@ -3294,8 +3295,6 @@ function downloadGrammarPDF() {
           h+='<div style="font-size:8px;color:rgba(255,255,255,.18);padding:0 6px 4px 116px;font-style:italic">'+e.meaning+'</div>';
         });
       }
-      h+='</div>';
-
       h+='</div>';
 
       h+='</div>';
