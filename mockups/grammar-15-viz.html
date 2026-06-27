@@ -62,20 +62,20 @@ h1 span{color:var(--accent)}
 <div class="card">
 <h3>1. Bar Chart — POS Distribution</h3>
 <div class="viz"><div class="bar" id="barChart"><div class="bar-item"><span class="bar-pct" id="barPctN" style="color:var(--blue)">0%</span><div class="bar-fill" id="barFillN" style="height:4px;background:var(--blue)"></div><span class="bar-label">Nouns</span></div><div class="bar-item"><span class="bar-pct" id="barPctV" style="color:var(--green)">0%</span><div class="bar-fill" id="barFillV" style="height:4px;background:var(--green)"></div><span class="bar-label">Verbs</span></div><div class="bar-item"><span class="bar-pct" id="barPctA" style="color:var(--pink)">0%</span><div class="bar-fill" id="barFillA" style="height:4px;background:var(--pink)"></div><span class="bar-label">Adj</span></div><div class="bar-item"><span class="bar-pct" id="barPctD" style="color:var(--purple)">0%</span><div class="bar-fill" id="barFillD" style="height:4px;background:var(--purple)"></div><span class="bar-label">Adv</span></div></div></div>
-<div class="calc">posCount = tagWord(w) for each unique word in transcript<br>pct = (posCount / totalContentWords) × 100</div>
+<div class="calc">Content words only (Nouns, Verbs, Adjectives, Adverbs).<br>posCount = tagWord(w) for each unique word<br>pct = (posCount / totalContentWords) × 100</div>
 <div class="note" id="barNote">No data yet — start speaking</div>
 </div>
 
 <div class="card">
 <h3>4. Heatmap — Grammar Density</h3>
 <div class="viz"><div class="heatmap" id="heatmap"><div class="hm-cell" id="hmN" style="background:rgba(96,165,250,.08)">Nouns<br>0</div><div class="hm-cell" id="hmV" style="background:rgba(52,211,153,.08)">Verbs<br>0</div><div class="hm-cell" id="hmA" style="background:rgba(244,114,182,.08)">Adj<br>0</div><div class="hm-cell" id="hmD" style="background:rgba(192,132,252,.08)">Adv<br>0</div><div class="hm-cell" id="hmP" style="background:rgba(96,165,250,.08)">Prep<br>0</div><div class="hm-cell" id="hmX" style="background:rgba(52,211,153,.08)">Aux<br>0</div><div class="hm-cell" id="hmC" style="background:rgba(244,114,182,.08)">Conj<br>0</div><div class="hm-cell" id="hmR" style="background:rgba(192,132,252,.08)">Pron<br>0</div></div></div>
-<div class="calc">Intensity = categoryCount / maxCategoryCount<br>Opacity = 0.08 + (intensity × 0.55). Darker = more frequent.</div>
+<div class="calc">All 8 word categories including function words.<br>Intensity = categoryCount / maxCategoryCount<br>Darker = more frequent. Complements the bar chart.</div>
 </div>
 
 <div class="card">
 <h3>5. Waffle Chart — Word Type Mix</h3>
 <div class="viz"><div class="waffle" id="waffle"></div></div>
-<div class="calc">Each dot = 1 content word (max 49 shown)<br>Blue=Noun, Green=Verb, Pink=Adj, Purple=Adv</div>
+<div class="calc">Every word, in order spoken — max 49 shown.<br>Blue=Noun Green=Verb Pink=Adj Purple=Adv<br>Yellow=Prep Orange=Conj Cyan=Pron Violet=Aux Gray=Other<br>Shows word-by-word speech pattern, complements bar+heatmap.</div>
 <div class="note" id="waffleNote">No words yet — start speaking</div>
 </div>
 
@@ -95,6 +95,7 @@ function tagWord(w){w=w.toLowerCase().replace(/[^a-z0-9-]/g,'');if(!w||w.length<
 
 var posCounts={NOUN:0,VERB:0,ADJ:0,ADV:0,PREP:0,CONJ:0,PRON:0,AUX:0};
 var allContentWords=[];
+var allWordsFlat=[]; // every word, for waffle
 var sentenceLengths=[];
 var recognition=null,stream=null,isListening=false;
 
@@ -129,8 +130,12 @@ function processFinal(text){
   sentenceLengths.push(words.length);
   words.forEach(function(w){
     var pos=tagWord(w);
+    // Count all 8 categories for heatmap + bar
     if(['NOUN','VERB','ADJ','ADV','PREP','CONJ','PRON','AUX'].indexOf(pos)>=0)posCounts[pos]=(posCounts[pos]||0)+1;
+    // Unique content words for bar chart (NOUN/VERB/ADJ/ADV only)
     if(['NOUN','VERB','ADJ','ADV'].indexOf(pos)>=0&&allContentWords.indexOf(w)<0)allContentWords.push(w);
+    // Every word goes to waffle (all 8 categories + DET/PART)
+    allWordsFlat.push({w:w,pos:pos});
   });
   updateBarChart();updateHeatmap();updateWaffle();updateTimeline();
 }
@@ -151,11 +156,17 @@ function updateHeatmap(){
 }
 
 function updateWaffle(){
-  var w=document.getElementById('waffle'),total=Math.min(allContentWords.length,49);
+  var w=document.getElementById('waffle'),total=Math.min(allWordsFlat.length,49);
   if(!total){w.innerHTML='';document.getElementById('waffleNote').textContent='No words yet — start speaking';return}
-  var colors={NOUN:'var(--blue)',VERB:'var(--green)',ADJ:'var(--pink)',ADV:'var(--purple)'},html='';
-  for(var i=0;i<total;i++){var pos=tagWord(allContentWords[i]),c=colors[pos]||'var(--muted)';html+='<div class="waffle-dot" style="background:'+c+'" title="'+allContentWords[i]+' ('+pos+')"></div>'}
-  w.innerHTML=html;document.getElementById('waffleNote').textContent=total+' content words ('+allContentWords.length+' unique)';
+  var colors={NOUN:'var(--blue)',VERB:'var(--green)',ADJ:'var(--pink)',ADV:'var(--purple)',PREP:'#fbbf24',CONJ:'#fb923c',PRON:'#38bdf8',AUX:'#a78bfa',DET:'#6b7280',PART:'#6b7280',OTHER:'#6b7280'};
+  var html='';
+  for(var i=0;i<total;i++){
+    var item=allWordsFlat[i],c=colors[item.pos]||'var(--muted)';
+    html+='<div class="waffle-dot" style="background:'+c+'" title="'+item.w+' ('+item.pos+')"></div>';
+  }
+  w.innerHTML=html;
+  var uniqueMap={};allWordsFlat.forEach(function(x){uniqueMap[x.w]=true});
+  document.getElementById('waffleNote').textContent=total+' words shown, '+allWordsFlat.length+' total ('+Object.keys(uniqueMap).length+' unique)';
 }
 
 function updateTimeline(){
