@@ -46,7 +46,7 @@ serve(async (req) => {
           'line_items[0][quantity]': '1',
           'mode': 'payment',
           'success_url': successUrl || 'https://buoninglese.github.io/sottotitoli/app.html?payment=success',
-          'cancel_url': cancelUrl || 'https://buoninglese.github.io/sottotitoli/studio.html?payment=cancelled',
+          'cancel_url': cancelUrl || 'https://buoninglese.github.io/sottotitoli/start.html?payment=cancelled',
           'metadata[product]': product,
           'metadata[user_id]': userId || 'anonymous',
           'metadata[credits_seconds]': String(productConfig.creditsSeconds),

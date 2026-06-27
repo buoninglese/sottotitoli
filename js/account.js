@@ -140,7 +140,7 @@ const { data: sessions, error: sessionsError } = await accountSupabase
     currentSessions = sessions || [];
 
     if (!sessions || sessions.length === 0) {
-      if (sessionsEl) sessionsEl.innerHTML = '<div style="text-align:center;padding:24px;color:var(--text-muted);font-size:13px"><div style="font-size:32px;margin-bottom:8px">🎤</div>Nessuna sessione ancora.<br>Apri <a href=\"studio.html\" style=\"color:var(--accent-purple);font-weight:600\">Studio</a>, avvia il microfono e torna qui.</div>';
+      if (sessionsEl) sessionsEl.innerHTML = '<div style="text-align:center;padding:24px;color:var(--text-muted);font-size:13px"><div style="font-size:32px;margin-bottom:8px">🎤</div>Nessuna sessione ancora.<br>Apri <a href=\"studio-caption.html\" style=\"color:var(--accent-purple);font-weight:600\">Studio</a>, avvia il microfono e torna qui.</div>';
       if (downloadCsvBtn) downloadCsvBtn.disabled = true;
     } else {
       if (downloadCsvBtn) downloadCsvBtn.disabled = false;

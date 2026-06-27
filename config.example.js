@@ -14,6 +14,9 @@ window.SOTTOTITOLI_CONFIG = {
   /** Site display name */
   siteName: "Sottotitoli",
 
+  /** Auth redirect URL (after Google OAuth login) */
+  AUTH_REDIRECT_URL: "https://your-domain.github.io/sottotitoli/start.html",
+
   /** Translation provider settings */
   translation: {
     /** Translation provider: "auto" = Google first with MyMemory fallback.
