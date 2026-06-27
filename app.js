@@ -120,8 +120,6 @@
   }
 
   const SpeechRecognition = w.SpeechRecognition || w.webkitSpeechRecognition;
-  // Deepgram integration — set deepgram.enabled=true in config to use it as primary STT
-  const useDeepgram = !!(configRoot.deepgram && configRoot.deepgram.enabled);
   const DIARIZE_URL =
     (configRoot.analysis && configRoot.analysis.speakerEndpoint) ||
     "https://sottotitoli-websocket.onrender.com/analyze-speakers";
@@ -776,34 +774,7 @@
     }
   }
 
-  var deepgramFallbackTimer = null;
-
   async function startRecognition() {
-    // ── Deepgram path (only for English — Web Speech API handles other languages better) ──
-    var dgLang = (modeConfig && (modeConfig.sourceCode || modeConfig.sourceLang)) || 'en';
-    var canUseDeepgram = useDeepgram && (dgLang === 'en' || dgLang === 'en-US' || dgLang === 'en-GB');
-    if (canUseDeepgram && wsPublisher && wsPublisher.ws && typeof wsPublisher.ws.send === 'function') {
-      var deepgramStarted = false;
-      try {
-        await startDeepgramCapture();
-        deepgramStarted = true;
-      } catch(e) {
-        setText("statusText", "Deepgram failed, falling back to browser STT…");
-      }
-      if (deepgramStarted) {
-        // Set a safety timeout — if no transcription arrives in 5s, fall back
-        deepgramFallbackTimer = setTimeout(function(){
-          if (!lastFinalSent && !pendingInterimText) {
-            setText("statusText", "Deepgram not responding, switching to browser STT…");
-            stopDeepgramCapture();
-            shouldKeepListening = false;
-            startRecognitionWebSpeech();
-          }
-        }, 5000);
-        return;
-      }
-    }
-
     await startRecognitionWebSpeech();
   }
 
@@ -815,12 +786,6 @@
       await new Promise(function(r){ setTimeout(r, 150); }); // let old instance fully terminate
     }
     if (!SpeechRecognition) {
-      // No browser STT — if WebSocket is available, try Deepgram relay as last resort
-      if (navigator.mediaDevices?.getUserMedia && wsPublisher && wsPublisher.ws && typeof wsPublisher.ws.send === 'function') {
-        setText("statusText", "Starting audio capture via relay…");
-        startDeepgramCapture();
-        return;
-      }
       setText("statusText", "⚠️ Speech recognition is not supported. Use Chrome or Edge.");
       var startBtn = $("startBtn"); if (startBtn) startBtn.disabled = true;
       return;
@@ -901,8 +866,6 @@
       try { recognition.stop(); } catch (e) {}
       recognition = null;
     }
-    // Stop Deepgram capture if active
-    stopDeepgramCapture();
     stopAudioCapture();
     updateMicState("stopped", false);
     setText("statusText", "Saving session...");
@@ -990,125 +953,6 @@
     } catch(e) {}
   }
 
-  var deepgramMediaRecorder = null;
-  var deepgramAudioStream = null;
-  var SEND_CHUNK_MS = 300;
-
-  async function startDeepgramCapture() {
-    // Credit check (same as Chrome path)
-    if (sessionSupabase) {
-      try {
-        var sessionResp = await sessionSupabase.auth.getSession();
-        if (sessionResp.data?.session?.user?.id) {
-          var uid = sessionResp.data.session.user.id;
-          currentUserId = uid;
-          var creditResp = await sessionSupabase.from('user_credits').select('balance_seconds').eq('user_id', uid).maybeSingle();
-          var remaining;
-          if (!creditResp.data) {
-            remaining = 900;
-            await sessionSupabase.from('user_credits').insert({ user_id: uid, balance_seconds: 900, lifetime_seconds: 0 });
-            await sessionSupabase.from('credit_transactions').insert({ user_id: uid, amount_seconds: 900, type: 'signup_bonus', reference: 'signup', balance_after: 900 });
-          } else {
-            remaining = creditResp.data.balance_seconds;
-          }
-          if (remaining <= 0) {
-            setText("statusText", "⏰ Nessun credito residuo. Acquista minuti su Studio → Marketplace.");
-            return;
-          }
-          setText("creditBalance", formatCredit(remaining));
-          setText("minuteCounter", "0m usati");
-          // Show credit warning if low
-          var creditWarn2 = $("creditWarn");
-          if (creditWarn2) {
-            if (remaining < 300 && remaining > 0) creditWarn2.classList.add('visible');
-            else creditWarn2.classList.remove('visible');
-          }
-          var tokResp = await sessionSupabase.from('user_tokens').select('balance').eq('user_id', uid).maybeSingle();
-          setText("tokenBalanceApp", (tokResp.data?.balance ?? 0) + ' tok');
-        }
-      } catch(e) {}
-    }
-
-    // Use a single stream and recorder for both Deepgram + session saving
-    try {
-      deepgramAudioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-    } catch(e) {
-      setText("statusText", "Microphone access denied. Check browser permissions.");
-      return;
-    }
-
-    // Also set the global audio stream so stopAudioCapture can clean it up
-    audioStream = deepgramAudioStream;
-    audioChunks = [];
-    lastAudioBlob = null;
-    speakerAnalysisCompleted = false;
-    isAnalyzingSpeakers = false;
-
-    deepgramMediaRecorder = new MediaRecorder(deepgramAudioStream, { mimeType: 'audio/webm;codecs=opus' });
-    if (deepgramMediaRecorder.mimeType !== 'audio/webm;codecs=opus') {
-      deepgramMediaRecorder = new MediaRecorder(deepgramAudioStream);
-    }
-
-    shouldKeepListening = true;
-    clearRestartTimer();
-    pendingInterimText = "";
-    hasStartedOnce = false;
-    lastFinalSent = "";
-    transcriptLines = [];
-    translationCache = {};
-
-    setSessionUI('starting');
-
-    // Tell relay to open Deepgram
-    var lang = (modeConfig && modeConfig.sourceLang) || "en-US";
-    wsPublisher.ws.send(JSON.stringify({ type: "audio-start", lang: lang }));
-
-    deepgramMediaRecorder.ondataavailable = function(event) {
-      if (!event.data || event.data.size === 0) return;
-      // Save for session recording
-      audioChunks.push(event.data);
-      // Send to Deepgram via WebSocket
-      var reader = new FileReader();
-      reader.onloadend = function() {
-        var base64 = reader.result.split(',')[1];
-        if (base64 && wsPublisher?.ws?.readyState === WebSocket.OPEN) {
-          wsPublisher.ws.send(JSON.stringify({ type: "audio", data: base64 }));
-        }
-      };
-      reader.readAsDataURL(event.data);
-    };
-
-    deepgramMediaRecorder.onstop = function() {
-      var actualType = deepgramMediaRecorder.mimeType || "audio/webm";
-      lastAudioBlob = new Blob(audioChunks, { type: actualType });
-      if (deepgramAudioStream) {
-        deepgramAudioStream.getTracks().forEach(function(t){ t.stop(); });
-        deepgramAudioStream = null;
-        audioStream = null;
-      }
-    };
-
-    deepgramMediaRecorder.start(SEND_CHUNK_MS);
-    isRecordingAudio = true;
-    await createSessionRow();
-
-    setText("statusText", "🎤 Deepgram (" + lang + ")");
-    updateMicState("live", true);
-  }
-
-  function stopDeepgramCapture() {
-    if (deepgramFallbackTimer) { clearTimeout(deepgramFallbackTimer); deepgramFallbackTimer = null; }
-    if (deepgramMediaRecorder && deepgramMediaRecorder.state !== 'inactive') {
-      try { deepgramMediaRecorder.stop(); } catch(e) {}
-    }
-    if (wsPublisher?.ws?.readyState === WebSocket.OPEN) {
-      wsPublisher.ws.send(JSON.stringify({ type: "audio-stop" }));
-    }
-    deepgramMediaRecorder = null;
-    deepgramAudioStream = null;
-    isRecordingAudio = false;
-  }
-
   function connectSocket() {
     const cfgRoot =
       w.SOTTOTITOLI_CONFIG ||
@@ -1142,8 +986,6 @@
         try {
           var p = JSON.parse(event.data);
           if (!p || p.msg !== true) return;
-          // Clear Deepgram fallback timer — transcription is flowing
-          if (deepgramFallbackTimer) { clearTimeout(deepgramFallbackTimer); deepgramFallbackTimer = null; }
           if (p.interm) {
             // Interim — just display
             var el = $("captionInterim");

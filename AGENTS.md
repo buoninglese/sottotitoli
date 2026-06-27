@@ -17,7 +17,7 @@ Sottotitoli is a **real-time AI captioning + translation web app**, user-facing 
 | Repo | Purpose | Stack |
 |------|---------|-------|
 | `sottotitoli` (this one) | Frontend — all pages, UI, client logic | Static JS/HTML/CSS |
-| `sottotitoli-websocket` | WebSocket relay + Deepgram + OpenAI Whisper | Node.js (ESM), Render |
+| `sottotitoli-websocket` | WebSocket relay + OpenAI Whisper | Node.js (ESM), Render |
 | `sottotitoli-learning` | Lesson reports + Oxford dictionary | Node.js (CJS), Render |
 
 **Communication flow:** Browser mic → WebSocket relay → back to all clients in room. Room IDs stored in `localStorage`, passed via URL params.
@@ -45,7 +45,7 @@ Sottotitoli is a **real-time AI captioning + translation web app**, user-facing 
 
 | File | Role | Dependencies |
 |------|------|-------------|
-| `config.js` | **All configuration.** WebSocket URL, translation provider, modes, Deepgram settings. | Gitignored! Use `config.example.js` as template. |
+| `config.js` | **All configuration.** WebSocket URL, translation provider, modes. | Gitignored! Use `config.example.js` as template. |
 | `js/auth.js` | Supabase auth (Google OAuth). Defines `window.sottotitoliSupabase`. | Must load before any Supabase-using code. |
 | `js/theme.js` | Shared navbar, hamburger menu, theme toggle (day/night), iOS flexbox gap polyfill. | Load on every page. |
 | `app.js` | Main application logic — huge file, core of the cockpit. | |
@@ -167,7 +167,6 @@ window.SOTTOTITOLI_CONFIG = {
   websocketUrl: "wss://...",
   AUTH_REDIRECT_URL: "https://...",
   translation: { provider: "auto", ... },
-  deepgram: { enabled: false },
   modes: { ... }
 };
 ```
@@ -224,8 +223,7 @@ window.SOTTOTITOLI_CONFIG = {
 
 1. **Auth race condition:** Code that needs the user must wait for `window.sottotitoliSupabase.auth.getSession()`. Don't assume the user is available at script load time.
 2. **WebSocket rooms:** Room IDs come from URL params or localStorage. If WebSocket isn't connecting, check the room ID.
-3. **Deepgram is English-only reliable.** For Italian, French, Spanish, German, Dutch, Polish, Portuguese — use browser Web Speech API (default when `deepgram.enabled: false`).
-4. **Translation duplicates:** There's a known bug where translations can output duplicate/simultaneous results. The sentence concatenation issue may reappear after fixes.
+3. **Translation duplicates:** There's a known bug where translations can output duplicate/simultaneous results. The sentence concatenation issue may reappear after fixes.
 
 ### Supabase Pitfalls
 
@@ -292,7 +290,6 @@ python3 -m http.server 8000
 | Supabase | Auth, DB, Edge Functions | `js/auth.js`, Supabase dashboard |
 | Stripe | Payments (test mode) | Edge function secrets + dashboard |
 | MyMemory | Free translation API | `config.js` |
-| Deepgram | Speech-to-text (English) | `config.js` + WebSocket relay |
 | Google Cloud STT | Browser-based speech | Web Speech API (no config) |
 | OpenAI | Transcription, AI reports | WebSocket relay env vars |
 | Font Awesome 6 | Icons | CDN link in `<head>` |
