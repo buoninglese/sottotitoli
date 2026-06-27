@@ -1,0 +1,538 @@
+<!doctype html>
+<html lang="it" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<title>Sottotitoli · Unified Topbar v2</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{--bg:#0f1117;--text:#e8eaed;--muted:#9ca3af;--muted2:#5c5f6b;--accent:#a78bfa;--accent2:#c4b5fd;--line:#2f333e;--card:#1a1d26;--gold:#c9a84c;--green:#34d399;--red:#f87171}
+body{font-family:Inter,system-ui,sans-serif;background:var(--bg);color:var(--text);padding:32px 24px 80px;max-width:1200px;margin:0 auto;-webkit-font-smoothing:antialiased}
+h1{font-size:28px;font-weight:900;margin-bottom:4px;letter-spacing:-.5px}
+h1 span{color:var(--accent)}
+.sub{color:var(--muted);font-size:14px;margin-bottom:36px;line-height:1.5}
+.section{margin-bottom:48px}
+.section h2{font-size:17px;font-weight:700;margin-bottom:4px;display:flex;align-items:center;gap:8px}
+.section h2 .tag{font-size:10px;font-weight:700;padding:2px 8px;border-radius:100px;text-transform:uppercase;letter-spacing:.5px}
+.section h2 .tag.caption-tag{background:rgba(167,139,250,.12);color:var(--accent)}
+.section h2 .tag.trad-tag{background:rgba(52,211,153,.12);color:var(--green)}
+.section .desc{font-size:12px;color:var(--muted);margin-bottom:16px;line-height:1.6}
+
+/* ── Topbar mock container ── */
+.tb-wrap{margin-bottom:10px}
+.tb-main{display:flex;align-items:center;gap:12px;padding:10px 20px;background:var(--card);border:1px solid var(--line);border-radius:14px 14px 0 0;position:relative;font-size:13px}
+.tb-main .logo{font-size:18px;font-weight:800;text-decoration:none;color:var(--text);white-space:nowrap;letter-spacing:-.3px}
+.tb-main .logo span{color:var(--accent)}
+.tb-main .nav-center{display:flex;align-items:center;gap:2px;position:absolute;left:50%;transform:translateX(-50%)}
+.tb-main .nav-link{font-size:11px;font-weight:600;color:var(--muted);text-decoration:none;padding:6px 14px;border-radius:8px;transition:all .18s;white-space:nowrap}
+.tb-main .nav-link:hover{background:rgba(167,139,250,.08);color:var(--accent)}
+.tb-main .nav-link.active{color:#fff;background:var(--accent)}
+.tb-main .spacer{flex:1;min-width:0}
+.tb-main .avatar{width:28px;height:28px;border-radius:50%;background:linear-gradient(135deg,#7c3aed,#a78bfa);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#fff;flex-shrink:0}
+
+/* ── Sub bar ── */
+.tb-sub{display:flex;align-items:center;gap:10px;padding:10px 20px;background:rgba(26,29,38,.5);border:1px solid var(--line);border-top:none;border-radius:0 0 14px 14px;font-size:12px;flex-wrap:wrap}
+.tb-sub .divider{width:1px;height:18px;background:var(--line);flex-shrink:0}
+
+/* ── Buttons ── */
+.btn{font-family:inherit;font-size:11px;font-weight:600;padding:5px 14px;border-radius:100px;border:1px solid var(--line);background:transparent;color:var(--muted);cursor:pointer;white-space:nowrap;transition:all .2s}
+.btn:hover{border-color:var(--accent);color:var(--accent);background:rgba(167,139,250,.04)}
+.btn.active{background:var(--accent);color:#fff;border-color:var(--accent)}
+.btn-sm{font-size:10px;padding:4px 10px}
+
+/* ── Flag buttons (exact match to studio-caption .cap-lang-btn) ── */
+.flag-btn{font-family:Inter,sans-serif;font-size:11px;font-weight:600;padding:4px 10px;border-radius:6px;border:1px solid transparent;background:transparent;color:var(--muted);cursor:pointer;white-space:nowrap;transition:all .18s}
+.flag-btn:hover{border-color:var(--line);color:var(--text)}
+.flag-btn.active{border-color:var(--gold);color:var(--gold);box-shadow:0 0 0 1px var(--gold)}
+
+/* ── Gold target pills (exact match to studio-traduzione .tr-tgt-btn) ── */
+.tgt-btn{font-family:Inter,sans-serif;font-size:11px;font-weight:600;padding:4px 10px;border-radius:6px;border:1px solid rgba(255,255,255,.08);background:transparent;color:rgba(255,255,255,.4);cursor:pointer;white-space:nowrap;transition:all .18s}
+.tgt-btn:hover{border-color:rgba(255,255,255,.2);color:rgba(255,255,255,.7)}
+.tgt-btn.active{border-color:var(--gold);color:var(--gold);box-shadow:0 0 0 1px var(--gold)}
+
+/* ── Status pills ── */
+.status-pill{display:flex;align-items:center;gap:6px;font-size:10px;font-weight:500;color:var(--muted);padding:3px 10px;border-radius:100px;border:1px solid transparent;white-space:nowrap}
+.status-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+.status-dot.live{background:var(--green);box-shadow:0 0 6px var(--green);animation:pulse 2s ease-in-out infinite}
+.status-dot.idle{background:var(--muted2)}
+.status-dot.off{background:var(--red)}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+.timer{font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:600;color:var(--muted);letter-spacing:.5px}
+
+/* ── Badge ── */
+.badge{font-family:'JetBrains Mono',monospace;font-size:9px;font-weight:700;padding:3px 10px;border-radius:4px;letter-spacing:1px;background:rgba(52,211,153,.12);color:var(--green);border:1px solid rgba(52,211,153,.2);white-space:nowrap}
+
+/* ── Info button ── */
+.info-btn{width:22px;height:22px;border-radius:50%;border:1px solid var(--line);background:transparent;color:var(--muted);cursor:pointer;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;transition:all .2s;position:relative;flex-shrink:0}
+.info-btn:hover{background:rgba(167,139,250,.08);border-color:var(--accent);color:var(--accent)}
+.info-popup{display:none;position:absolute;bottom:calc(100% + 10px);left:50%;transform:translateX(-50%);width:280px;background:var(--card);border:1px solid var(--accent);border-radius:10px;padding:14px 16px;font-size:11px;line-height:1.6;color:var(--text);z-index:10;box-shadow:0 8px 32px rgba(0,0,0,.4)}
+.info-popup::after{content:'';position:absolute;top:100%;left:50%;transform:translateX(-50%);border:6px solid transparent;border-top-color:var(--accent)}
+.info-btn:hover .info-popup,.info-btn:focus-within .info-popup{display:block}
+.info-popup strong{color:var(--accent);font-weight:700}
+
+/* ── Hover tooltip ── */
+.has-tip{position:relative}
+.has-tip::after{content:attr(data-tip);position:absolute;bottom:calc(100% + 8px);left:50%;transform:translateX(-50%);background:var(--text);color:var(--bg);font-size:10px;font-weight:600;padding:3px 10px;border-radius:6px;white-space:nowrap;pointer-events:none;opacity:0;transition:opacity .15s;z-index:5}
+.has-tip:hover::after{opacity:1}
+
+/* ── Variant labels ── */
+.v-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--accent);margin-bottom:6px;display:flex;align-items:center;gap:6px}
+.v-label::before{content:'';display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--accent)}
+
+/* ── Animation showcase ── */
+.anim-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:8px;margin-bottom:16px}
+.anim-card{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:12px;text-align:center}
+.anim-card .label{font-size:10px;color:var(--muted);margin-bottom:8px}
+.anim-card button{pointer-events:none}
+
+/* ── Click ripple ── */
+.ripple{position:relative;overflow:hidden}
+.ripple::after{content:'';position:absolute;inset:0;background:rgba(167,139,250,.2);border-radius:inherit;opacity:0;transition:opacity .1s}
+.ripple:active::after{opacity:1;transition:opacity 0s}
+
+/* ── Hover lift ── */
+.hover-lift{transition:all .2s}
+.hover-lift:hover{transform:translateY(-1px);box-shadow:0 4px 12px rgba(0,0,0,.2)}
+
+/* ── Hover glow ── */
+.hover-glow{transition:all .2s}
+.hover-glow:hover{box-shadow:0 0 12px rgba(167,139,250,.25)}
+
+/* ── Hover expand ── */
+.hover-expand{transition:all .2s}
+.hover-expand:hover{transform:scale(1.05)}
+
+/* ── Active pop ── */
+.active-pop{transition:all .15s}
+.active-pop:active{transform:scale(.94)}
+
+/* ── Slide underline ── */
+.slide-underline{position:relative}
+.slide-underline::after{content:'';position:absolute;bottom:0;left:50%;width:0;height:2px;background:var(--accent);transition:all .25s;transform:translateX(-50%);border-radius:1px}
+.slide-underline:hover::after{width:60%}
+
+/* ── Color bleed ── */
+.color-bleed{transition:all .25s}
+.color-bleed:hover{background:rgba(167,139,250,.08);border-color:var(--accent);color:var(--accent)}
+
+/* ── Current language indicator ── */
+.curr-lang{display:flex;align-items:center;gap:4px;padding:4px 10px;border-radius:100px;background:rgba(201,168,76,.08);border:1px solid rgba(201,168,76,.15);font-size:10px;font-weight:700;color:var(--gold);white-space:nowrap}
+.curr-lang .lang-dot{width:6px;height:6px;border-radius:50%;background:var(--gold);box-shadow:0 0 4px var(--gold)}
+
+/* ── Dark/light quick-toggle ── */
+.theme-row{display:flex;align-items:center;gap:8px;margin-bottom:32px}
+.theme-row button{padding:4px 16px;border-radius:100px;border:1px solid var(--line);background:transparent;color:var(--muted);cursor:pointer;font-family:inherit;font-size:11px;font-weight:600;transition:all .15s}
+.theme-row button.active{background:var(--accent);color:#fff;border-color:var(--accent)}
+
+/* ── Mobile hint ── */
+.mobile-note{font-size:10px;color:var(--muted2);margin-top:4px;font-style:italic}
+
+@media(max-width:700px){
+  body{padding:16px 10px}
+  .tb-main{padding:8px 10px;gap:6px;font-size:11px}
+  .tb-main .logo{font-size:14px}
+  .tb-sub{padding:8px 10px;gap:6px}
+}
+
+/* ── LIGHT MODE ── */
+[data-theme="light"]{
+  --bg:#f8f6f2;--text:#1a1a1a;--muted:#6b7280;--muted2:#9ca3af;--accent:#7c3aed;--accent2:#a78bfa;--line:#e5e0d5;--card:#fff;--gold:#b8860b;--green:#059669;--red:#dc2626
+}
+[data-theme="light"] .tb-main{background:#fff;border-color:#e5e0d5}
+[data-theme="light"] .tb-sub{background:rgba(255,255,255,.6);border-color:#e5e0d5}
+[data-theme="light"] .tb-main .nav-link:hover{background:rgba(124,58,237,.06)}
+[data-theme="light"] .btn:hover{background:rgba(124,58,237,.04)}
+[data-theme="light"] .flag-btn:hover{color:#1a1a1a}
+[data-theme="light"] .tgt-btn{border-color:#d9d5cc;color:#777}
+[data-theme="light"] .tgt-btn:hover{border-color:#b5ad9e;color:#1a1a1a}
+[data-theme="light"] .tgt-btn.active{border-color:var(--gold);color:var(--gold)}
+[data-theme="light"] .badge{background:rgba(5,150,105,.08);border-color:rgba(5,150,105,.15);color:#059669}
+[data-theme="light"] .curr-lang{background:rgba(184,134,11,.06);border-color:rgba(184,134,11,.12)}
+[data-theme="light"] .info-btn:hover{background:rgba(124,58,237,.06)}
+[data-theme="light"] .info-popup{background:#fff;box-shadow:0 8px 32px rgba(0,0,0,.1)}
+[data-theme="light"] .color-bleed:hover{background:rgba(124,58,237,.04)}
+[data-theme="light"] .anim-card{background:#fff;border-color:#e5e0d5}
+[data-theme="light"] .has-tip::after{background:#1a1a1a;color:#fff}
+</style>
+</head>
+<body>
+
+<h1>Unified Topbar — <span>v2</span></h1>
+<p class="sub">
+  Exact visuals, hover states, click animations, and the real button styles from production.<br>
+  Toggle light/dark to test both modes.
+</p>
+
+<div class="theme-row">
+  <span style="font-size:11px;color:var(--muted);font-weight:600;margin-right:4px">Theme:</span>
+  <button class="active" onclick="setTheme('dark')" id="btnDark">🌙 Dark</button>
+  <button onclick="setTheme('light')" id="btnLight">☀️ Light</button>
+</div>
+
+<!-- ═══════════════════════════════════════════════════ -->
+<!-- CAPTION — 5 SUB-BAR VARIANTS -->
+<!-- ═══════════════════════════════════════════════════ -->
+
+<div class="section">
+<h2><span class="tag caption-tag">Caption</span> Unified Topbar — 5 Sub-bar Variants</h2>
+<p class="desc">
+  Main bar: Logo left, nav centered, avatar right — matching index/start/profilo.<br>
+  Sub-bar: Layout switcher | divider | language flags | divider | rec status (Mic · Idle · ⏱ 00:00 · 👥).<br>
+  Current language always visible. Rec status lives under the transcript box in the real page; shown here in the sub-bar as a compact preview.
+</p>
+
+<!-- ── Variant A: Baseline (clean, centered) ── -->
+<div class="v-label">A · Baseline — Clean, centered, exactly like production flags</div>
+<div class="tb-wrap">
+<div class="tb-main">
+  <a href="#" class="logo">Sotto<span>titoli</span></a>
+  <div class="nav-center">
+    <a href="#" class="nav-link">Start</a>
+    <a href="#" class="nav-link active">Caption</a>
+    <a href="#" class="nav-link">Profilo</a>
+  </div>
+  <span class="spacer"></span>
+  <div class="avatar">S</div>
+</div>
+<div class="tb-sub" style="justify-content:center">
+  <button class="btn btn-sm active">Bunko</button>
+  <button class="btn btn-sm">Shoji</button>
+  <span class="divider"></span>
+  <button class="flag-btn active">🇬🇧 EN</button>
+  <button class="flag-btn">🇮🇹 IT</button>
+  <button class="flag-btn">🇫🇷 FR</button>
+  <button class="flag-btn">🇩🇪 DE</button>
+  <button class="flag-btn">🇪🇸 ES</button>
+  <button class="flag-btn">🇵🇹 PT</button>
+  <button class="flag-btn">🇳🇱 NL</button>
+  <span class="divider"></span>
+  <span class="status-pill"><span class="status-dot off"></span>Mic</span>
+  <span class="status-pill"><span class="status-dot idle"></span>Idle</span>
+  <span class="timer">⏱ 00:00</span>
+  <span class="status-pill">👥 1</span>
+</div>
+</div>
+<div class="mobile-note">Flags use exact .cap-lang-btn styles. Gold ring on active. Dividers separate concerns. Rec compact.</div>
+
+<!-- ── Variant B: Left-aligned, flags spaced ── -->
+<div class="v-label" style="margin-top:24px">B · Left-aligned — Layout left, flags spread, rec at end</div>
+<div class="tb-wrap">
+<div class="tb-main">
+  <a href="#" class="logo">Sotto<span>titoli</span></a>
+  <div class="nav-center">
+    <a href="#" class="nav-link">Start</a>
+    <a href="#" class="nav-link active">Caption</a>
+    <a href="#" class="nav-link">Profilo</a>
+  </div>
+  <span class="spacer"></span>
+  <div class="avatar">S</div>
+</div>
+<div class="tb-sub">
+  <button class="btn btn-sm active">Bunko</button>
+  <button class="btn btn-sm">Shoji</button>
+  <span class="divider"></span>
+  <span style="font-size:9px;color:var(--muted2);text-transform:uppercase;letter-spacing:.5px;margin-right:2px">lang</span>
+  <button class="flag-btn active">🇬🇧 EN</button>
+  <button class="flag-btn">🇮🇹 IT</button>
+  <button class="flag-btn">🇫🇷 FR</button>
+  <button class="flag-btn">🇩🇪 DE</button>
+  <button class="flag-btn">🇪🇸 ES</button>
+  <button class="flag-btn">🇵🇹 PT</button>
+  <button class="flag-btn">🇳🇱 NL</button>
+  <span class="spacer" style="flex:1;min-width:12px"></span>
+  <span class="divider"></span>
+  <span class="status-pill"><span class="status-dot off"></span>Mic</span>
+  <span class="status-pill"><span class="status-dot idle"></span>Idle</span>
+  <span class="timer">⏱ 00:00</span>
+  <span class="status-pill">👥 1</span>
+</div>
+</div>
+<div class="mobile-note">Left-aligned with a "lang" label. Spacer pushes rec to the right. Good when the user scans left→right.</div>
+
+<!-- ── Variant C: Current-language chip, compact flags ── -->
+<div class="v-label" style="margin-top:24px">C · Current-language chip — Prominent "🇬🇧 English" indicator, condensed flags</div>
+<div class="tb-wrap">
+<div class="tb-main">
+  <a href="#" class="logo">Sotto<span>titoli</span></a>
+  <div class="nav-center">
+    <a href="#" class="nav-link">Start</a>
+    <a href="#" class="nav-link active">Caption</a>
+    <a href="#" class="nav-link">Profilo</a>
+  </div>
+  <span class="spacer"></span>
+  <div class="avatar">S</div>
+</div>
+<div class="tb-sub" style="justify-content:center">
+  <button class="btn btn-sm active">Bunko</button>
+  <button class="btn btn-sm">Shoji</button>
+  <span class="divider"></span>
+  <span class="curr-lang"><span class="lang-dot"></span>🇬🇧 English</span>
+  <button class="flag-btn">🇮🇹 IT</button>
+  <button class="flag-btn">🇫🇷 FR</button>
+  <button class="flag-btn">🇩🇪 DE</button>
+  <button class="flag-btn">🇪🇸 ES</button>
+  <button class="flag-btn">🇵🇹 PT</button>
+  <button class="flag-btn">🇳🇱 NL</button>
+  <span class="divider"></span>
+  <span class="status-pill"><span class="status-dot off"></span>Mic</span>
+  <span class="status-pill"><span class="status-dot idle"></span>Idle</span>
+  <span class="timer">⏱ 00:00</span>
+  <span class="status-pill">👥 1</span>
+</div>
+</div>
+<div class="mobile-note">The active language gets a gold pill with a dot — impossible to miss. Other flags are normal.</div>
+
+<!-- ── Variant D: Animated hover flags, pill rec ── -->
+<div class="v-label" style="margin-top:24px">D · Animated — Flags lift on hover, rec as unified pill, ripple on click</div>
+<div class="tb-wrap">
+<div class="tb-main">
+  <a href="#" class="logo">Sotto<span>titoli</span></a>
+  <div class="nav-center">
+    <a href="#" class="nav-link">Start</a>
+    <a href="#" class="nav-link active">Caption</a>
+    <a href="#" class="nav-link">Profilo</a>
+  </div>
+  <span class="spacer"></span>
+  <div class="avatar">S</div>
+</div>
+<div class="tb-sub" style="justify-content:center">
+  <button class="btn btn-sm active ripple active-pop">Bunko</button>
+  <button class="btn btn-sm ripple active-pop">Shoji</button>
+  <span class="divider"></span>
+  <button class="flag-btn active hover-lift ripple">🇬🇧 EN</button>
+  <button class="flag-btn hover-lift ripple">🇮🇹 IT</button>
+  <button class="flag-btn hover-lift ripple">🇫🇷 FR</button>
+  <button class="flag-btn hover-lift ripple">🇩🇪 DE</button>
+  <button class="flag-btn hover-lift ripple">🇪🇸 ES</button>
+  <button class="flag-btn hover-lift ripple">🇵🇹 PT</button>
+  <button class="flag-btn hover-lift ripple">🇳🇱 NL</button>
+  <span class="divider"></span>
+  <span class="status-pill" style="gap:4px;border:1px solid var(--line);padding:4px 12px">
+    <span class="status-dot off" style="width:6px;height:6px"></span>Mic
+    <span style="color:var(--muted2)">·</span>
+    <span class="status-dot idle" style="width:6px;height:6px"></span>Idle
+    <span style="color:var(--muted2)">·</span>
+    <span class="timer">00:00</span>
+    <span style="color:var(--muted2)">·</span>
+    👥1
+  </span>
+</div>
+</div>
+<div class="mobile-note">Flags lift 1px on hover + ripple on click. Rec status merged into one pill. Clean and modern.</div>
+
+<!-- ── Variant E: Underline hover, rec under textbox (conceptual) ── -->
+<div class="v-label" style="margin-top:24px">E · Subtle — Slide-underline hover, rec shown as it would appear under the transcript box</div>
+<div class="tb-wrap">
+<div class="tb-main">
+  <a href="#" class="logo">Sotto<span>titoli</span></a>
+  <div class="nav-center">
+    <a href="#" class="nav-link">Start</a>
+    <a href="#" class="nav-link active">Caption</a>
+    <a href="#" class="nav-link">Profilo</a>
+  </div>
+  <span class="spacer"></span>
+  <div class="avatar">S</div>
+</div>
+<div class="tb-sub" style="justify-content:center">
+  <button class="btn btn-sm active">Bunko</button>
+  <button class="btn btn-sm">Shoji</button>
+  <span class="divider"></span>
+  <button class="flag-btn active slide-underline color-bleed">🇬🇧 EN</button>
+  <button class="flag-btn slide-underline color-bleed">🇮🇹 IT</button>
+  <button class="flag-btn slide-underline color-bleed">🇫🇷 FR</button>
+  <button class="flag-btn slide-underline color-bleed">🇩🇪 DE</button>
+  <button class="flag-btn slide-underline color-bleed">🇪🇸 ES</button>
+  <button class="flag-btn slide-underline color-bleed">🇵🇹 PT</button>
+  <button class="flag-btn slide-underline color-bleed">🇳🇱 NL</button>
+  <span class="divider"></span>
+  <span style="font-size:9px;color:var(--muted2);text-transform:uppercase;letter-spacing:.5px">rec below ↓</span>
+</div>
+</div>
+<div style="display:flex;align-items:center;gap:16px;padding:8px 20px;background:rgba(26,29,38,.3);border:1px dashed var(--line);border-top:none;border-radius:0 0 14px 14px;justify-content:center">
+  <span class="status-pill" style="border:1px solid var(--line);padding:5px 14px"><span class="status-dot off"></span>Mic</span>
+  <span class="status-pill" style="border:1px solid var(--line);padding:5px 14px"><span class="status-dot idle"></span>Idle</span>
+  <span class="timer" style="font-size:12px">⏱ 00:00</span>
+  <span class="status-pill" style="border:1px solid var(--line);padding:5px 14px">👥 1 speaker</span>
+</div>
+<div class="mobile-note">Slide underline on flag hover. Rec status lives under the transcript box — exactly where it is on the real page.</div>
+
+<!-- ── Animation showcase ── -->
+<div style="margin-top:28px">
+<div class="v-label">Hover &amp; Click Animations — live preview</div>
+<p class="desc">Each row shows a different animation applied to the same flag button. Hover/click to see the effect.</p>
+<div class="anim-grid">
+  <div class="anim-card"><div class="label">hover-lift</div><button class="flag-btn active hover-lift ripple">🇬🇧 English</button></div>
+  <div class="anim-card"><div class="label">hover-glow</div><button class="flag-btn active hover-glow">🇮🇹 Italiano</button></div>
+  <div class="anim-card"><div class="label">hover-expand</div><button class="flag-btn active hover-expand">🇫🇷 Français</button></div>
+  <div class="anim-card"><div class="label">slide-underline</div><button class="flag-btn active slide-underline">🇩🇪 Deutsch</button></div>
+  <div class="anim-card"><div class="label">color-bleed</div><button class="flag-btn active color-bleed">🇪🇸 Español</button></div>
+  <div class="anim-card"><div class="label">active-pop (click)</div><button class="flag-btn active active-pop">🇳🇱 Nederlands</button></div>
+  <div class="anim-card"><div class="label">ripple (click)</div><button class="flag-btn active ripple">🇵🇹 Português</button></div>
+  <div class="anim-card"><div class="label">tooltip on hover</div><button class="flag-btn active has-tip" data-tip="Switch to English">🇬🇧 EN</button></div>
+</div>
+</div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════ -->
+<!-- TRADUZIONE — UNIFIED WITH INFO BUTTON -->
+<!-- ═══════════════════════════════════════════════════ -->
+
+<div class="section">
+<h2><span class="tag trad-tag">Traduzione</span> Unified Topbar — Production Buttons + Info</h2>
+<p class="desc">
+  Main bar: Logo left, nav centered, avatar right.<br>
+  Sub-bar: Mode selector (Universal / Single-lang / Multi-lang) → target language pills with <strong>exact</strong> .tr-tgt-btn production styles.<br>
+  The arrow (→) is <strong>removed</strong> — Universal is just another option, not a dropdown trigger.<br>
+  ⓘ info button explains: "You choose one target language. Speech input can be in any supported language, even with multiple speakers."
+</p>
+
+<!-- ── Traduzione: Unified ── -->
+<div class="v-label">Traduzione — Unified with info tooltip</div>
+<div class="tb-wrap">
+<div class="tb-main">
+  <a href="#" class="logo">Sotto<span>titoli</span></a>
+  <div class="nav-center">
+    <a href="#" class="nav-link">Start</a>
+    <a href="#" class="nav-link active">Traduzione</a>
+    <a href="#" class="nav-link">Profilo</a>
+  </div>
+  <span class="spacer"></span>
+  <div class="avatar">S</div>
+</div>
+<div class="tb-sub" style="justify-content:center">
+  <!-- Mode selector: three options, no arrow -->
+  <button class="badge" style="cursor:pointer;font-family:Inter,sans-serif;font-size:10px;font-weight:700;padding:5px 14px;border-radius:100px;letter-spacing:0;background:rgba(52,211,153,.12);color:var(--green);border:1px solid rgba(52,211,153,.2)">Universal</button>
+  <button class="btn btn-sm">Single-lang</button>
+  <button class="btn btn-sm">Multi-lang</button>
+  <span class="divider"></span>
+  <!-- Target language pills — EXACT .tr-tgt-btn style from production -->
+  <button class="tgt-btn active">IT</button>
+  <button class="tgt-btn">FR</button>
+  <button class="tgt-btn">DE</button>
+  <button class="tgt-btn">ES</button>
+  <button class="tgt-btn">PT</button>
+  <button class="tgt-btn">NL</button>
+  <span class="divider"></span>
+  <!-- Info button -->
+  <span style="position:relative">
+    <button class="info-btn" aria-label="How translation works">?</button>
+    <div class="info-popup">
+      <strong>How translation works</strong><br><br>
+      You choose <strong>one target language</strong> — this is the language all captions will be translated into.<br><br>
+      Your <strong>speech input</strong> can be in <em>any supported language</em>, even when multiple speakers talk in different languages.<br><br>
+      Sottotitoli detects the source language automatically and translates everything to your chosen target.
+    </div>
+  </span>
+</div>
+</div>
+
+<!-- ── Hover/Click states for traduzione buttons ── -->
+<div style="margin-top:20px">
+<div class="v-label">Traduzione Button States — exact production behavior</div>
+<p class="desc">The .tr-tgt-btn buttons: transparent bg, subtle border, gold glow on active. Hover reveals border. Click activates gold ring.</p>
+<div class="anim-grid">
+  <div class="anim-card"><div class="label">Default (inactive)</div><button class="tgt-btn">FR</button></div>
+  <div class="anim-card"><div class="label">Hover</div><button class="flag-btn active" style="animation:none">🇫🇷 FR</button><span style="font-size:9px;color:var(--muted)">border appears</span></div>
+  <div class="anim-card"><div class="label">Active (gold ring)</div><button class="tgt-btn active">IT</button></div>
+  <div class="anim-card"><div class="label">Hover-lift + active</div><button class="tgt-btn active hover-lift">ES</button></div>
+  <div class="anim-card"><div class="label">Click pop</div><button class="tgt-btn active active-pop">DE</button></div>
+  <div class="anim-card"><div class="label">Mode: Universal</div><button class="badge" style="cursor:default;font-family:Inter,sans-serif;font-size:10px;font-weight:700;padding:5px 14px;border-radius:100px;letter-spacing:0;background:rgba(52,211,153,.12);color:var(--green);border:1px solid rgba(52,211,153,.2)">Universal</button></div>
+  <div class="anim-card"><div class="label">Mode: Single-lang</div><button class="btn btn-sm">Single-lang</button></div>
+  <div class="anim-card"><div class="label">Mode: Multi-lang</div><button class="btn btn-sm">Multi-lang</button></div>
+</div>
+</div>
+
+<!-- ── Info popup detail ── -->
+<div style="margin-top:20px">
+<div class="v-label">ⓘ Info Popup — detailed view</div>
+<p class="desc">Shown on hover via CSS. Purple border, card background, explains the Universal translation concept clearly.</p>
+<div style="background:var(--card);border:1px solid var(--accent);border-radius:10px;padding:16px 20px;max-width:380px;font-size:12px;line-height:1.7;color:var(--text);box-shadow:0 8px 32px rgba(0,0,0,.3)">
+  <strong style="color:var(--accent)">How translation works</strong><br><br>
+  You choose <strong>one target language</strong> — this is the language all captions will be translated into.<br><br>
+  Your <strong>speech input</strong> can be in <em>any supported language</em>, even when multiple speakers talk in different languages.<br><br>
+  Sottotitoli detects the source language automatically and translates everything to your chosen target.
+</div>
+</div>
+
+<!-- ── Mode selector comparison ── -->
+<div style="margin-top:20px">
+<div class="v-label">Mode Selector — three ways to choose</div>
+<p class="desc">Instead of "Universal → IT | FR | DE", the mode is a separate choice. Universal = auto-detect any source → one target. Single-lang = one known source → one target. Multi-lang = each speaker → their own target.</p>
+<div style="display:flex;gap:12px;flex-wrap:wrap;align-items:center;margin-bottom:6px">
+  <span style="font-size:10px;font-weight:700;color:var(--muted)">Options:</span>
+  <button class="badge" style="cursor:pointer;font-family:Inter,sans-serif;font-size:10px;font-weight:700;padding:5px 14px;border-radius:100px;letter-spacing:0;background:rgba(52,211,153,.12);color:var(--green);border:1px solid rgba(52,211,153,.2)">Universal</button>
+  <button class="btn btn-sm hover-lift">Single-lang</button>
+  <button class="btn btn-sm hover-lift">Multi-lang</button>
+  <span style="font-size:10px;color:var(--muted2)">← no arrow, just choices</span>
+</div>
+</div>
+
+</div>
+
+<!-- ═══════════════════════════════════════════════════ -->
+<!-- SIDE-BY-SIDE -->
+<!-- ═══════════════════════════════════════════════════ -->
+
+<div class="section">
+<h2>Caption vs Traduzione — <span>Side by Side</span></h2>
+<p class="desc">Both unified under the same main bar. Sub-bars differ only in their specialized controls. Clean separation of concerns.</p>
+
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:24px">
+  <div>
+    <div style="font-size:12px;font-weight:700;color:var(--accent);margin-bottom:8px">🎤 Caption</div>
+    <div class="tb-main" style="border-radius:14px 14px 0 0">
+      <a href="#" class="logo" style="font-size:15px">Sotto<span>titoli</span></a>
+      <div class="nav-center"><a href="#" class="nav-link active" style="font-size:10px;padding:4px 10px">Caption</a></div>
+      <span class="spacer"></span>
+      <div class="avatar" style="width:24px;height:24px;font-size:9px">S</div>
+    </div>
+    <div class="tb-sub" style="border-radius:0 0 14px 14px;justify-content:center;gap:6px">
+      <button class="btn btn-sm active" style="font-size:10px;padding:3px 9px">Bunko</button>
+      <button class="btn btn-sm" style="font-size:10px;padding:3px 9px">Shoji</button>
+      <span class="divider"></span>
+      <button class="flag-btn active" style="font-size:10px;padding:3px 8px">🇬🇧 EN</button>
+      <button class="flag-btn" style="font-size:10px;padding:3px 8px">🇮🇹 IT</button>
+      <button class="flag-btn" style="font-size:10px;padding:3px 8px">🇫🇷</button>
+      <button class="flag-btn" style="font-size:10px;padding:3px 8px">🇩🇪</button>
+      <button class="flag-btn" style="font-size:10px;padding:3px 8px">🇪🇸</button>
+      <span class="divider"></span>
+      <span class="status-pill" style="font-size:9px"><span class="status-dot idle" style="width:5px;height:5px"></span>Idle</span>
+      <span class="timer" style="font-size:9px">00:00</span>
+      <span class="status-pill" style="font-size:9px">👥1</span>
+    </div>
+  </div>
+  <div>
+    <div style="font-size:12px;font-weight:700;color:var(--green);margin-bottom:8px">🌐 Traduzione</div>
+    <div class="tb-main" style="border-radius:14px 14px 0 0">
+      <a href="#" class="logo" style="font-size:15px">Sotto<span>titoli</span></a>
+      <div class="nav-center"><a href="#" class="nav-link active" style="font-size:10px;padding:4px 10px">Traduzione</a></div>
+      <span class="spacer"></span>
+      <div class="avatar" style="width:24px;height:24px;font-size:9px">S</div>
+    </div>
+    <div class="tb-sub" style="border-radius:0 0 14px 14px;justify-content:center;gap:6px">
+      <button class="badge" style="cursor:pointer;font-family:Inter,sans-serif;font-size:9px;font-weight:700;padding:4px 10px;border-radius:100px;letter-spacing:0;background:rgba(52,211,153,.12);color:var(--green);border:1px solid rgba(52,211,153,.2)">Universal</button>
+      <button class="btn btn-sm" style="font-size:10px;padding:3px 9px">Single</button>
+      <button class="btn btn-sm" style="font-size:10px;padding:3px 9px">Multi</button>
+      <span class="divider"></span>
+      <button class="tgt-btn active" style="font-size:10px;padding:3px 8px">IT</button>
+      <button class="tgt-btn" style="font-size:10px;padding:3px 8px">FR</button>
+      <button class="tgt-btn" style="font-size:10px;padding:3px 8px">DE</button>
+      <button class="tgt-btn" style="font-size:10px;padding:3px 8px">ES</button>
+      <span class="divider"></span>
+      <span style="position:relative">
+        <button class="info-btn" style="width:18px;height:18px;font-size:10px">?</button>
+      </span>
+    </div>
+  </div>
+</div>
+</div>
+
+<script>
+function setTheme(t){
+  document.documentElement.setAttribute('data-theme',t);
+  document.getElementById('btnDark').classList.toggle('active',t==='dark');
+  document.getElementById('btnLight').classList.toggle('active',t==='light');
+}
+</script>
+</body>
+</html>
