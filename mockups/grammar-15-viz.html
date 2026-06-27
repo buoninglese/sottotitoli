@@ -44,6 +44,37 @@ h1 span{color:var(--accent)}
 .timeline{display:flex;align-items:flex-end;gap:10px;height:80px}
 .timeline-bar{width:6px;border-radius:3px 3px 0 0;transition:height .4s;position:relative}
 .timeline-label{position:absolute;bottom:-18px;left:50%;transform:translateX(-50%);font-size:7px;color:var(--muted);white-space:nowrap}
+.transcript-bar{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px;margin-bottom:20px;max-height:300px;overflow-y:auto}
+.transcript-bar h3{font-size:12px;font-weight:700;color:var(--accent);margin-bottom:10px}
+.transcript-line{margin-bottom:12px;padding-bottom:10px;border-bottom:1px solid rgba(255,255,255,.04)}
+.transcript-line:last-child{border-bottom:none;margin-bottom:0;padding-bottom:0}
+.transcript-text{font-size:14px;line-height:1.6;color:var(--text);margin-bottom:4px}
+.transcript-tags{display:flex;flex-wrap:wrap;gap:3px 8px}
+.transcript-word{display:inline-flex;flex-direction:column;align-items:center}
+.transcript-word .tw{font-size:11px;font-weight:600;color:var(--text)}
+.transcript-word .tag{font-size:8px;padding:1px 4px;border-radius:3px;font-weight:700;letter-spacing:.3px}
+.tag-NOUN{background:rgba(96,165,250,.2);color:#60a5fa}
+.tag-VERB{background:rgba(52,211,153,.2);color:#34d399}
+.tag-ADJ{background:rgba(244,114,182,.2);color:#f472b6}
+.tag-ADV{background:rgba(192,132,252,.2);color:#c084fc}
+.tag-PREP{background:rgba(251,191,36,.2);color:#fbbf24}
+.tag-CONJ{background:rgba(251,146,60,.2);color:#fb923c}
+.tag-PRON{background:rgba(56,189,248,.2);color:#38bdf8}
+.tag-AUX{background:rgba(167,139,250,.2);color:#a78bfa}
+.tag-DET{background:rgba(107,114,128,.2);color:#9ca3af}
+.tag-PART{background:rgba(107,114,128,.2);color:#9ca3af}
+.tag-OTHER{background:rgba(107,114,128,.2);color:#9ca3af}
+.tag-SUBJ{background:rgba(56,189,248,.3);color:#7dd3fc;font-size:7px}
+.tag-OBJ{background:rgba(244,114,182,.3);color:#f9a8d4;font-size:7px}
+.tag-POSS{background:rgba(251,191,36,.3);color:#fcd34d;font-size:7px}
+.tag-REFL{background:rgba(167,139,250,.3);color:#c4b5fd;font-size:7px}
+.tag-PRES{background:rgba(52,211,153,.3);color:#6ee7b7;font-size:7px}
+.tag-PAST{background:rgba(96,165,250,.3);color:#93c5fd;font-size:7px}
+.tag-ING{background:rgba(251,191,36,.3);color:#fcd34d;font-size:7px}
+.tag-PARTICIPLE{background:rgba(167,139,250,.3);color:#c4b5fd;font-size:7px}
+.tag-MODAL{background:rgba(244,114,182,.3);color:#f9a8d4;font-size:7px}
+.tag-MATCH{background:rgba(52,211,153,.3);color:#6ee7b7;font-size:7px}
+.tag-MISMATCH{background:rgba(248,113,113,.3);color:#fca5a5;font-size:7px}
 </style>
 </head>
 <body>
@@ -55,6 +86,11 @@ h1 span{color:var(--accent)}
   <button class="btn-stop" id="btnStop" onclick="stopMic()" disabled>⏹ Stop</button>
   <div class="status"><span class="dot off" id="micDot"></span><span id="micLabel">Mic Off</span></div>
   <div class="interim-bar" id="interimBar">Speak to see live analysis…</div>
+</div>
+
+<div class="transcript-bar" id="transcriptBar">
+  <h3>📝 Live Transcript — word-by-word classification</h3>
+  <div id="transcriptLines" style="color:var(--muted);font-size:11px">No sentences yet. Speak to see each word tagged with its POS, pronoun type, and verb tense.</div>
 </div>
 
 <div class="grid">
@@ -194,6 +230,7 @@ function processFinal(text){
   }
   updateBarChart();updateHeatmap();updateWaffle();updateTimeline();
   updatePronouns();updateSVA();updateVerbs();
+  updateTranscript(text,words);
 }
 
 function updateBarChart(){
@@ -252,6 +289,32 @@ function updateVerbs(){
   document.getElementById('vbIng').textContent=verbCounts.ING||0;
   document.getElementById('vbPart').textContent=verbCounts.PART||0;
   document.getElementById('vbModal').textContent=verbCounts.MODAL||0;
+}
+
+// ── Transcript bar — word-by-word classification ──
+var transcriptSentences=[];
+function updateTranscript(text,words){
+  transcriptSentences.push({text:text,words:words});
+  if(transcriptSentences.length>10)transcriptSentences.shift();
+  var html='';
+  transcriptSentences.forEach(function(s){
+    html+='<div class="transcript-line"><div class="transcript-text">'+s.text+'</div><div class="transcript-tags">';
+    s.words.forEach(function(w){
+      var pos=tagWord(w);
+      var tags='<span class="tag tag-'+pos+'">'+pos+'</span>';
+      if(PRON_TYPE[w])tags+='<span class="tag tag-'+PRON_TYPE[w]+'">'+PRON_TYPE[w]+'</span>';
+      if(VERB_TENSE[w])tags+='<span class="tag tag-'+VERB_TENSE[w]+'">'+VERB_TENSE[w]+'</span>';
+      else if(pos==='VERB'){
+        if(w.endsWith('ing'))tags+='<span class="tag tag-ING">ING</span>';
+        else if(w.endsWith('ed'))tags+='<span class="tag tag-PAST">PAST</span>';
+        else tags+='<span class="tag tag-PRES">PRES</span>';
+      }
+      html+='<div class="transcript-word"><span class="tw">'+w+'</span><div style="display:flex;gap:2px">'+tags+'</div></div>';
+    });
+    html+='</div></div>';
+  });
+  document.getElementById('transcriptLines').innerHTML=html||'No sentences yet.';
+  document.getElementById('transcriptBar').scrollTop=document.getElementById('transcriptBar').scrollHeight;
 }
 </script>
 </body>
