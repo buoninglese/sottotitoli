@@ -2654,7 +2654,7 @@ async function loadPaymentHistory(userId){
   try{
     // Query token_transactions for purchases
     var resp=await supabase.from('token_transactions').select('id,amount,transaction_type,created_at,metadata').eq('user_id',userId).order('created_at',{ascending:false}).limit(10);
-    if(!resp.data||resp.data.length===0){
+    if(resp.error||!resp.data||resp.data.length===0){
       el.innerHTML='Nessun pagamento registrato finora. Quando attiverai un piano, lo storico apparirà qui.';
       return;
     }
@@ -2854,6 +2854,8 @@ function renderOverviewBoxes(){
   calHtml+='</div>';
 
   // Build rows
+  var uniqueDaysSet=new Set();allSessions.forEach(function(s){if(s.started_at)uniqueDaysSet.add(s.started_at.split('T')[0])});
+  var activeDaysCount=uniqueDaysSet.size||1;
   var rows=[
     {cols:[
       {title:'Obiettivo giornaliero',body:'<div style="text-align:center"><div style="font-family:JetBrains Mono,monospace;font-size:22px;font-weight:900;color:var(--green)">'+Math.round(totalMin/Math.max(1,activeDaysCount||30))+'<span style="font-size:12px;color:var(--t3)">/30min</span></div><div style="font-size:9px;color:var(--t3);margin-top:2px">media giornaliera</div><div style="font-size:10px;color:var(--t2);margin-top:4px">'+totalMin+' min totali</div></div>'},
