@@ -560,10 +560,8 @@ button[onclick*="addToWordBank"]:hover{background:rgba(52,211,153,.15)!important
     <div class="h-panel-inner">
 
       <div class="caption-box" id="captionBox">
-        <div class="caption-interim" id="captionInterim" data-placeholder="Speak to see subtitles…">We are discussing the future of real‑time translation…</div>
+        <div class="caption-interim" id="captionInterim" data-placeholder="Speak to see subtitles…"></div>
         <div class="caption-transcript" id="captionTranscript" data-placeholder="Previous sentences will appear here…">
-          <div class="line">03:42:00  And how these systems can bridge language barriers.</div>
-          <div class="line">03:41:56  Deployment at scale remains our biggest challenge this year.</div>
         </div>
       </div>
 
@@ -910,22 +908,15 @@ var PLACEHOLDER_TEXTS = {
 };
 
 function updateCaptionPlaceholders(langCode) {
-  var samples = CAPTION_SAMPLES[langCode] || CAPTION_SAMPLES['en-US'];
   var placeholders = PLACEHOLDER_TEXTS[langCode] || PLACEHOLDER_TEXTS['en-US'];
   var interim = document.getElementById('captionInterim');
   var transcript = document.getElementById('captionTranscript');
   if (interim) {
-    interim.textContent = samples[0];
+    if (!interim.textContent.trim()) interim.textContent = '';
     interim.setAttribute('data-placeholder', placeholders.interim);
   }
   if (transcript) {
     transcript.setAttribute('data-placeholder', placeholders.transcript);
-    var lines = transcript.querySelectorAll('.line');
-    for (var i = 0; i < Math.min(lines.length, samples.length - 1); i++) {
-      var parts = lines[i].textContent.split('  ');
-      var ts = parts[0] || '';
-      lines[i].textContent = ts + '  ' + samples[i + 1];
-    }
   }
 }
 
@@ -1364,6 +1355,11 @@ _realMic.onFinal = function(text) {
   // ── Refresh active extras panel with new data ──
   if (typeof window.refreshExtrasPanel === 'function') {
     window.refreshExtrasPanel();
+  }
+
+  // ── Always update word bank extras panel DOM (even when tab not active) ──
+  if (typeof renderWordBank === 'function') {
+    renderWordBank();
   }
 
   // ── Update listening bar immediately ──
