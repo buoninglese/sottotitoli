@@ -6,9 +6,6 @@ window.SOTTOTITOLI_CONFIG = {
     provider: "auto",  // "auto" = Google first, MyMemory fallback. Also: "google", "mymemory"
     myMemoryBase: "https://api.mymemory.translated.net/get"
   },
-  deepgram: {
-    enabled: false  // Deepgram STT: only reliable for English; browser Web Speech API handles other languages better
-  },
   analysis: {
     speakerEndpoint: "https://sottotitoli-websocket.onrender.com/analyze-speakers"
   },
@@ -467,23 +464,19 @@ window.SOTTOTITOLI_CONFIG = {
 
   /** Stripe payment integration */
   stripe: {
-    publishableKey: "pk_test_51Tcwid1xvn5NIk3eLYEU3IQK0N4q09aU5lggFCr7TkRb2WJsm7pZJ668mUykb9N1gCnDLksDJpLa0QwP6tpE6oms00m7tQIVsx",
+    publishableKey: "pk_live_51TcwiO1gZ1iapxeo1wGv4x8fl3IhLvRIofb6Y2es6fnCPuuNI3S1YtARbLhececC49qK8FGYj0Zeidlmc2HcCkzt00kIpvHznu",
     checkoutFunctionUrl: "https://qzqmuegbpmvqrjrlfbgk.supabase.co/functions/v1/create-checkout-session",
     prices: {
       "sottotitoli_starter":  "Starter · 60 min + 5 crediti — €4.99",
       "sottotitoli_standard": "Standard · 300 min + 20 crediti — €14.99",
       "sottotitoli_premium":  "Premium · 900 min + 60 crediti — €29.99",
-      "sottotitoli_credits":  "100 crediti report — €9.99",
-      "2hours":   "120 min + 5 token — €10 (legacy)",
-      "20hours":  "1200 min + 50 token — €50 (legacy)",
-      "50hours":  "3000 min + 150 token — €100 (legacy)",
-      "90tokens": "90 token — €10 (legacy)"
+      "sottotitoli_credits":  "100 crediti report — €9.99"
     },
     priceIds: {
-      "sottotitoli_starter":  "price_1TlWBS1xvn5NIk3eNfBumbXG",
-      "sottotitoli_standard": "price_1TlWC31xvn5NIk3eGfXkRcKe",
-      "sottotitoli_premium":  "price_1TlWCS1xvn5NIk3exyT6rY7P",
-      "sottotitoli_credits":  "price_1TlWD31xvn5NIk3eUugsHSJO"
+      "sottotitoli_starter":  "price_1TmsOY1gZ1iapxeouZqGzPbQ",
+      "sottotitoli_standard": "price_1TmsOb1gZ1iapxeoLTmIW3QV",
+      "sottotitoli_premium":  "price_1TmsOf1gZ1iapxeoAo9mGSNV",
+      "sottotitoli_credits":  "price_1TmsOi1gZ1iapxeoRB2FnP5w"
     }
   }
 };
