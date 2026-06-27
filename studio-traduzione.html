@@ -815,7 +815,15 @@ body.rec-collapsed { padding-top: 115px; }
 <div class="topbar-sub" id="topbarSub">
   <span class="sub-label">mode</span>
   <button class="mode-badge" id="modeAutoBtn" onclick="setTrMode('auto')">Automatico</button>
-  <button class="btn-sm" id="modeManualBtn" onclick="setTrMode('manual')">Manuale</button>
+  <button class="btn-sm" id="modeManualBtn" onclick="toggleModePicker()">Manuale ▾</button>
+  <div class="mode-dropdown" id="modeDropdown" style="position:absolute;top:100%;left:50px;margin-top:4px">
+    <button data-mode="w1" onclick="switchMode('w1');closeModePicker()"><span class="mode-dot" style="background:#c084fc"></span>W1 · Solo<span class="mode-badge">1 SPK</span></button>
+    <button data-mode="w2" onclick="switchMode('w2');closeModePicker()"><span class="mode-dot" style="background:#6b9dff"></span>W2 · Duet<span class="mode-badge">2 SPK</span></button>
+    <button data-mode="w3" onclick="switchMode('w3');closeModePicker()"><span class="mode-dot" style="background:#a78bfa"></span>W3 · Triad<span class="mode-badge">3 SPK</span></button>
+    <button data-mode="w4" onclick="switchMode('w4');closeModePicker()"><span class="mode-dot" style="background:#34d399"></span>W4 · Quad<span class="mode-badge">4 SPK</span></button>
+    <button data-mode="w5" onclick="switchMode('w5');closeModePicker()"><span class="mode-dot" style="background:#fbbf24"></span>W5 · Quintet<span class="mode-badge">5 SPK</span></button>
+    <button data-mode="wx" onclick="switchMode('wx');closeModePicker()"><span class="mode-dot" style="background:#34d399"></span>WX · Universal<span class="mode-badge">auto</span></button>
+  </div>
   <span class="divider"></span>
   <span class="sub-label">target</span>
   <button type="button" class="tr-tgt-btn active has-tip" data-tgt="it" data-tip="Italiano" onclick="setTrTarget('it','Italiano')">🇮🇹 IT</button>
@@ -866,6 +874,7 @@ body.rec-collapsed { padding-top: 115px; }
     <div class="sidebar-left-head">
       <span>🎙 Speakers</span>
       <span class="spk-count-badge" id="sidebarSpkCount">3</span>
+      <button onclick="openSpeakerConfig()" title="Setup speakers" style="margin-left:auto;background:none;border:1px solid rgba(255,255,255,.1);color:rgba(255,255,255,.4);border-radius:50%;width:22px;height:22px;cursor:pointer;font-size:14px;line-height:1;display:flex;align-items:center;justify-content:center">+</button>
     </div>
     <div class="sidebar-left-body" id="speakerTagList">
       <!-- Dynamically populated -->
@@ -876,19 +885,8 @@ body.rec-collapsed { padding-top: 115px; }
   <div class="stage-wrapper">
     <div class="stage">
       <div class="studio-hdr">
-        <div class="mode-picker">
-          <span class="st-name" id="modeName" onclick="event.stopPropagation();toggleModePicker()">WX · Universal</span>
-          <div class="mode-dropdown" id="modeDropdown">
-            <button data-mode="w1" onclick="switchMode('w1')"><span class="mode-dot" style="background:#c084fc"></span>W1 · Solo<span class="mode-badge">1 SPK</span></button>
-            <button data-mode="w2" onclick="switchMode('w2')"><span class="mode-dot" style="background:#6b9dff"></span>W2 · Duet<span class="mode-badge">2 SPK</span></button>
-            <button data-mode="w3" onclick="switchMode('w3')"><span class="mode-dot" style="background:#a78bfa"></span>W3 · Triad<span class="mode-badge">3 SPK</span></button>
-            <button data-mode="w4" onclick="switchMode('w4')"><span class="mode-dot" style="background:#34d399"></span>W4 · Quad<span class="mode-badge">4 SPK</span></button>
-            <button data-mode="w5" onclick="switchMode('w5')"><span class="mode-dot" style="background:#fbbf24"></span>W5 · Quintet<span class="mode-badge">5 SPK</span></button>
-            <button data-mode="wx" class="active" onclick="switchMode('wx')"><span class="mode-dot" style="background:#34d399"></span>WX · Universal<span class="mode-badge">auto</span></button>
-          </div>
-        </div>
-        <span class="spk-count" id="spkCount">3 SPK</span>
-        <button type="button" id="setupSpeakerBtn" onclick="event.stopPropagation();openSpeakerConfig()" style="margin-left:auto;font-family:'JetBrains Mono',monospace;font-size:9px;font-weight:600;padding:5px 10px;border-radius:6px;cursor:pointer;transition:all .2s">⚙ Setup</button>
+        <span class="spk-count" id="spkCount">1 SPK</span>
+        <div class="live-speech-bar" id="liveSpeechBar" style="flex:1;text-align:center;font-size:15px;font-weight:500;color:rgba(255,255,255,.3);padding:0 12px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis">⋯</div>
       </div>
       <div class="studio-body" id="captionLines">
         <!-- Dynamically populated -->
@@ -1226,7 +1224,7 @@ function openSpeakerConfig() {
   var modeNameEl = document.getElementById('modeName');
   var currentModeName = modeNameEl ? modeNameEl.textContent : 'Speakers';
   var html = '<div class="modal-panel">';
-  html += '<div class="modal-head"><h3>⚙ Speaker Setup — '+currentModeName+'</h3><button class="modal-close" onclick="this.closest(\'.modal-overlay\').remove()">✕</button></div>';
+  html += '<div class="modal-head"><h3>⚙ Speaker Setup</h3><button class="modal-close" onclick="this.closest(\'.modal-overlay\').remove()">✕</button></div>';
   html += '<div class="modal-body">';
   
   // Speakers list — no Auto/Manual toggle, always manual mode
@@ -1706,15 +1704,10 @@ function updateRecDash(state) {
   }
 }
 
-// Fix room mic state
-var _origUpdateRoomInfo = updateRoomInfo;
-updateRoomInfo = function() {
-  _origUpdateRoomInfo();
-  var elMic = document.getElementById('recRoomMic');
-  if (elMic) {
-    elMic.textContent = _realMic.state === 'live' ? '● Live' : '● Off';
-    elMic.className = 'rec-room-val ' + (_realMic.state === 'live' ? 'status-connected' : 'status-offline');
-  }
+// ═══ Live speech bar (interim) ═══
+_realMic.onInterim = function(text) {
+  var bar = document.getElementById('liveSpeechBar');
+  if (bar && text) bar.textContent = text;
 };
 
 // ═══ LIVE toggle ═══
@@ -1886,15 +1879,20 @@ function switchMode(modeId) {
 
 function toggleModePicker() {
   var dd = document.getElementById('modeDropdown');
+  if (!dd) return;
   dd.classList.toggle('open');
+}
+function closeModePicker() {
+  var dd = document.getElementById('modeDropdown');
+  if (dd) dd.classList.remove('open');
 }
 
 // Close mode dropdown when clicking outside
 document.addEventListener('click', function(e) {
   var dd = document.getElementById('modeDropdown');
   if (!dd || !dd.classList.contains('open')) return;
-  var picker = document.querySelector('.mode-picker');
-  if (picker && !picker.contains(e.target)) {
+  var btn = document.getElementById('modeManualBtn');
+  if (btn && !btn.contains(e.target) && !dd.contains(e.target)) {
     dd.classList.remove('open');
   }
 });
