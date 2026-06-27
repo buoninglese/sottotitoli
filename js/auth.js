@@ -50,12 +50,8 @@ window.sottotitoliSupabase = window.supabase.createClient(
         var avatar = user.user_metadata?.avatar_url || user.user_metadata?.picture || '';
         var preset = localStorage.getItem('sottotitoli-avatar-preset') || '';
         window.dispatchEvent(new CustomEvent('sottotitoli-user-ready', {detail:{name:name,email:user.email,avatar:avatar,preset:preset}}));
-        // Also check profiles table for a custom uploaded avatar (overrides Google OAuth photo)
-        window.sottotitoliSupabase.from('profiles').select('avatar_url').eq('id',user.id).maybeSingle().then(function(r2){
-          if (r2.data?.avatar_url) {
-            window.dispatchEvent(new CustomEvent('sottotitoli-user-ready', {detail:{name:name,email:user.email,avatar:r2.data.avatar_url,preset:preset}}));
-          }
-        });
+        // Skip profiles table query — columns not yet created in Supabase
+        // TODO: add columns (avatar_url, full_name, native_lang, location, learning_profile) to profiles table
       }
     });
   }
@@ -167,14 +163,8 @@ document.addEventListener('DOMContentLoaded', async () => {
           var tokEl = document.getElementById('udTokens');
           if (tokEl) tokEl.textContent = (_r.data?.balance || 0);
 
-          // Load avatar if set
-          var _p = await window.sottotitoliSupabase.from('profiles').select('avatar_url,full_name').eq('id', userId).maybeSingle();
-          if (_p.data?.avatar_url) {
-            var ua = document.getElementById('userAvatar');
-            if (ua) { ua.style.backgroundImage = 'url(' + _p.data.avatar_url + ')'; ua.style.backgroundSize = 'cover'; ua.style.color = 'transparent'; }
-            var udAv = document.querySelector('.ud-avatar');
-            if (udAv) { udAv.style.backgroundImage = 'url(' + _p.data.avatar_url + ')'; udAv.style.backgroundSize = 'cover'; udAv.style.color = 'transparent'; }
-          }
+          // Load avatar from profiles if column exists (skip for now — columns not yet created)
+          // TODO: add avatar_url, full_name columns to profiles table
         }
       } catch(e) {}
     })();
