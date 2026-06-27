@@ -846,7 +846,6 @@ body.rec-collapsed { padding-top: 115px; }
   <div class="topbar-rec-inner">
     <div class="rec-dash">
       <span class="rec-cell"><span class="status-dot off" id="recMicDot" style="width:6px;height:6px"></span><span class="cell-icon">🎤</span><span class="cell-val" id="recMicLabel">Mic</span></span>
-      <span class="rec-cell"><span class="status-dot idle" id="recIdleDot" style="width:6px;height:6px"></span><span class="cell-val" id="recIdleLabel">Idle</span></span>
       <span class="rec-cell"><span class="cell-icon">⏱</span><span class="cell-val" id="recTimer">00:00</span></span>
     </div>
     <span class="divider"></span>
@@ -1643,14 +1642,23 @@ function toggleSession() {
       if (!ok) { sessionActive = false; btn.textContent = '▶ START'; btn.classList.add('primary'); btn.classList.remove('danger'); return; }
       btn.textContent = '⏹ STOP'; btn.classList.add('danger'); btn.classList.remove('primary');
       showToast('▶ Session started — mic live');
+      updateRecDash('live');
       // Start session timer
       sessionSeconds = 0;
       if (timerInterval) clearInterval(timerInterval);
-      timerInterval = setInterval(function() { sessionSeconds++; }, 1000);
+      timerInterval = setInterval(function() {
+        sessionSeconds++;
+        var m = Math.floor(sessionSeconds / 60);
+        var s = sessionSeconds % 60;
+        var rt = document.getElementById('recTimer');
+        if (rt) rt.textContent = String(m).padStart(2,'0') + ':' + String(s).padStart(2,'0');
+      }, 1000);
     });
   } else {
     stopRealMic();
     if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
+    updateRecDash('idle');
+    var rt = document.getElementById('recTimer'); if (rt) rt.textContent = '00:00';
     // Save session with transcript + stats
     // Note: traduzione uses generated sentence pairs, not real-time speech
     var sessionData = {
@@ -1677,6 +1685,22 @@ _realMic.onFinal = function(text) {
   renderLines();
   updateRoomInfo();
 };
+// ═══ Rec dash updater ═══
+function updateRecDash(state) {
+  var micDot = document.getElementById('recMicDot');
+  var micLabel = document.getElementById('recMicLabel');
+  if (state === 'live') {
+    if (micDot) micDot.className = 'status-dot live';
+    if (micLabel) micLabel.textContent = 'Live';
+  } else if (state === 'paused') {
+    if (micDot) { micDot.className = 'status-dot'; micDot.style.background = 'var(--warn)'; }
+    if (micLabel) micLabel.textContent = 'Paused';
+  } else {
+    if (micDot) { micDot.className = 'status-dot off'; micDot.style.background = ''; }
+    if (micLabel) micLabel.textContent = 'Mic';
+  }
+}
+
 // Fix room mic state
 var _origUpdateRoomInfo = updateRoomInfo;
 updateRoomInfo = function() {
