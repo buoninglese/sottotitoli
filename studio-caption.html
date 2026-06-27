@@ -166,6 +166,9 @@ body.session-active .caption-transcript:empty::after { content: none; }
 .btn-start:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(0,0,0,.15); }
 .btn-stop { background: transparent; color: var(--muted); border: 1px solid var(--line); }
 .btn-stop:hover { background: var(--bg2); color: var(--text); }
+.btn-pause { background: transparent; color: var(--muted); border: 1px solid var(--line); }
+.btn-pause:hover { background: var(--bg2); color: var(--text); }
+.btn-pause.paused { background: var(--warn); color: #000; border-color: var(--warn); }
 
 /* ═══ METRICS PANEL ═══ */
 .metrics-grid { display: grid; grid-template-columns: repeat(auto-fill,minmax(180px,1fr)); gap: 10px; margin-top: 14px; }
@@ -577,6 +580,7 @@ button[onclick*="addToWordBank"]:hover{background:rgba(52,211,153,.15)!important
 
       <div class="action-row">
         <button type="button" class="btn-grad btn-start" id="startBtn" onclick="toggleSession()">🎤 Start Session</button>
+        <button type="button" class="btn-grad btn-pause" id="pauseBtn" style="display:none" onclick="togglePause()">⏸</button>
         <button type="button" class="btn-grad btn-stop" id="stopBtn" style="display:none" onclick="toggleSession()">⏹ Stop</button>
       </div>
 
@@ -1154,6 +1158,8 @@ function toggleTheme() {
 var sessionActive = false;
 var timerInterval = null;
 var sessionSeconds = 0;
+var paused = false;
+var pauseBtn = null;
 
 // Connect real mic callbacks
 _realMic.onInterim = function(text) {
@@ -1367,14 +1373,17 @@ function toggleSession() {
   sessionActive = !sessionActive;
   var startBtn = document.getElementById('startBtn');
   var stopBtn = document.getElementById('stopBtn');
+  pauseBtn = document.getElementById('pauseBtn');
   
   if (sessionActive) {
+    paused = false;
     // ── Credit check: prevent starting if no minutes ──
     _checkCreditsBeforeStart().then(function(hasCredits) {
       if (!hasCredits) {
         sessionActive = false;
         startBtn.style.display = '';
         stopBtn.style.display = 'none';
+        if (pauseBtn) pauseBtn.style.display = 'none';
         startBtn.disabled = false;
         setText("statusText", "⏰ Nessun credito. Acquista su Purchase.");
         return;
@@ -1392,6 +1401,8 @@ function toggleSession() {
     window._sessionLines = [];
     startBtn.style.display = '';
     stopBtn.style.display = 'none';
+    if (pauseBtn) { pauseBtn.style.display = 'none'; pauseBtn.classList.remove('paused'); }
+    paused = false;
     if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
     sessionSeconds = 0;
     document.getElementById('sessionTimer').textContent = '00:00';
@@ -1432,6 +1443,7 @@ function _doStartSession(startBtn, stopBtn) {
       }
       startBtn.style.display = 'none';
       stopBtn.style.display = '';
+      if (pauseBtn) { pauseBtn.style.display = ''; pauseBtn.classList.remove('paused'); }
       sessionSeconds = 0;
       wordBank = [];
       saveWordBank();
@@ -1452,6 +1464,49 @@ function _doStartSession(startBtn, stopBtn) {
           String(m).padStart(2,'0') + ':' + String(s).padStart(2,'0');
       }, 1000);
     });
+}
+
+// ═══ Pause / Resume ═══
+function togglePause() {
+  if (!sessionActive) return;
+  paused = !paused;
+  var btn = document.getElementById('pauseBtn');
+  if (!btn) return;
+  if (paused) {
+    // ── Pause ──
+    stopRealMic();
+    if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
+    btn.textContent = '▶';
+    btn.classList.add('paused');
+    document.body.classList.remove('session-active');
+    var liveDot = document.getElementById('liveDot');
+    if (liveDot) liveDot.querySelector('.dot').classList.remove('live');
+    var micDot = document.getElementById('micDot');
+    if (micDot) { micDot.className = 'dot'; micDot.style.background = 'var(--warn)'; }
+    var micStatus = document.getElementById('micStatus');
+    if (micStatus) micStatus.textContent = 'Paused';
+  } else {
+    // ── Resume ──
+    startRealMic().then(function(ok) {
+      if (!ok) { paused = true; return; }
+      btn.textContent = '⏸';
+      btn.classList.remove('paused');
+      document.body.classList.add('session-active');
+      var liveDot = document.getElementById('liveDot');
+      if (liveDot) liveDot.querySelector('.dot').classList.add('live');
+      var micDot = document.getElementById('micDot');
+      if (micDot) { micDot.className = 'dot live'; micDot.style.background = ''; }
+      var micStatus = document.getElementById('micStatus');
+      if (micStatus) micStatus.textContent = 'Live';
+      timerInterval = setInterval(function() {
+        sessionSeconds++;
+        var m = Math.floor(sessionSeconds / 60);
+        var s = sessionSeconds % 60;
+        document.getElementById('sessionTimer').textContent = 
+          String(m).padStart(2,'0') + ':' + String(s).padStart(2,'0');
+      }, 1000);
+    });
+  }
 }
 
 // ═══ Fullscreen toggle ═══
