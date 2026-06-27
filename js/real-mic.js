@@ -30,8 +30,8 @@ function updateMicUI(state) {
     status.textContent = labels[state] || state;
   }
   if (roomMic) {
-    roomMic.textContent = state === 'live' ? 'Live' : (state === 'blocked' ? 'Blocked' : 'Off');
-    roomMic.style.color = state === 'live' ? '' : (state === 'blocked' ? '#f87171' : '');
+    roomMic.textContent = state === 'live' ? '● Live' : (state === 'blocked' ? '● Blocked' : '● Off');
+    roomMic.className = 'stat-val ' + (state === 'live' ? 'status-connected' : (state === 'blocked' ? 'status-offline' : 'status-offline'));
   }
   if (_realMic.onStateChange) _realMic.onStateChange(state);
 }
