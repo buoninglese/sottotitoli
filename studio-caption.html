@@ -582,7 +582,6 @@ button[onclick*="addToWordBank"]:hover{background:rgba(52,211,153,.15)!important
 
       <!-- ═══ Extras Toggle ═══ -->
       <div class="extras-toggle-bar" id="extrasToggleBar">
-        <button type="button" class="extras-toggle-btn" data-panel="wordbank" onclick="toggleExtrasPanel('wordbank',this)">📚 Word Bank <span id="wordbankCount" style="font-size:8px;opacity:.6">0</span></button>
         <button type="button" class="extras-toggle-btn" data-panel="grammar" onclick="toggleExtrasPanel('grammar',this)">📋 Grammar</button>
         <button type="button" class="extras-toggle-btn" data-panel="synonyms" onclick="toggleExtrasPanel('synonyms',this)">📖 Synonyms</button>
       </div>
@@ -713,14 +712,14 @@ var currentCaptionLangName = 'English';
 // ═══ Language Capability Gating (Phase 1 — honest feature matrix) ═══
 // Maps language code prefix → available features. English = full, Tiers 2-4 graduated.
 var LANGUAGE_CAPABILITIES = {
-  en: { translation:true, aiReports:true, pos:true, grammar:true, wordbank:true, synonyms:true, definitions:true, cefrMetrics:true },
-  it: { translation:true, aiReports:true, pos:true, grammar:true, wordbank:true, synonyms:true, definitions:false, cefrMetrics:true },
-  nl: { translation:true, aiReports:true, pos:false, grammar:false, wordbank:true, synonyms:false, definitions:false, cefrMetrics:false },
-  es: { translation:true, aiReports:true, pos:false, grammar:false, wordbank:true, synonyms:false, definitions:false, cefrMetrics:false },
-  fr: { translation:true, aiReports:true, pos:false, grammar:false, wordbank:true, synonyms:false, definitions:false, cefrMetrics:false },
-  de: { translation:true, aiReports:true, pos:false, grammar:false, wordbank:true, synonyms:false, definitions:false, cefrMetrics:false },
-  pt: { translation:true, aiReports:true, pos:false, grammar:false, wordbank:true, synonyms:false, definitions:false, cefrMetrics:false },
-  pl: { translation:true, aiReports:true, pos:false, grammar:false, wordbank:true, synonyms:false, definitions:false, cefrMetrics:false }
+  en: { translation:true, aiReports:true, pos:true, grammar:true, synonyms:true, definitions:true, cefrMetrics:true },
+  it: { translation:true, aiReports:true, pos:true, grammar:true, synonyms:true, definitions:false, cefrMetrics:true },
+  nl: { translation:true, aiReports:true, pos:false, grammar:false, synonyms:false, definitions:false, cefrMetrics:false },
+  es: { translation:true, aiReports:true, pos:false, grammar:false, synonyms:false, definitions:false, cefrMetrics:false },
+  fr: { translation:true, aiReports:true, pos:false, grammar:false, synonyms:false, definitions:false, cefrMetrics:false },
+  de: { translation:true, aiReports:true, pos:false, grammar:false, synonyms:false, definitions:false, cefrMetrics:false },
+  pt: { translation:true, aiReports:true, pos:false, grammar:false, synonyms:false, definitions:false, cefrMetrics:false },
+  pl: { translation:true, aiReports:true, pos:false, grammar:false, synonyms:false, definitions:false, cefrMetrics:false }
 };
 
 function getLangPrefix() {
@@ -3007,44 +3006,6 @@ function downloadGrammarPDF() {
 
   var panels = {
     // ═══ Word Bank — moved into extras (Datamuse-powered definitions) ═══
-    wordbank: function(cb){
-      var h='<div class="extras-grid">';
-      var wbKey = WORD_BANK_KEY;
-      var wb = JSON.parse(localStorage.getItem(wbKey)||'[]');
-      var noData=wb.length===0;
-      h+='<div class="extras-card" style="grid-column:1/-1"><div class="ec-title">📚 My Word Bank <span class="ec-badge" style="background:rgba(167,139,250,.15);color:#c4b5fd">'+wb.length+' words</span></div>';
-      h+='<div style="display:flex;gap:6px;align-items:center;margin-bottom:10px;flex-wrap:wrap">';
-      h+='<input type="text" id="wordbankInput" placeholder="Add a word…" style="padding:5px 10px;border-radius:6px;border:1px solid var(--line);background:var(--card2);color:var(--text);font-size:11px;font-family:inherit;width:130px;outline:none" onkeydown="if(event.key===\'Enter\')addToWordBank()">';
-      h+='<button type="button" onclick="addToWordBank()" style="padding:5px 10px;border-radius:6px;border:1px solid rgba(52,211,153,.2);background:rgba(52,211,153,.1);color:#34d399;cursor:pointer;font-size:10px;font-weight:700;font-family:inherit">+ Add</button>';
-      h+='<button type="button" onclick="clearWordBank()" style="padding:5px 8px;border-radius:6px;border:none;background:rgba(248,113,113,.1);color:#f87171;cursor:pointer;font-size:10px;font-family:inherit" title="Clear all">🗑</button>';
-      h+='</div>';
-      if(noData){
-        h+='<div style="color:var(--muted2);font-style:italic;padding:8px 0">Words you save from transcript appear here — click for definition</div>';
-      }else{
-        h+='<div id="wordbankChips" style="display:flex;flex-wrap:wrap;gap:5px;max-height:200px;overflow-y:auto;padding:4px 0">';
-        wb.forEach(function(w){
-          h+='<span class="wb-chip" data-word="'+w.replace(/'/g,"\\'")+'" style="display:inline-flex;align-items:center;gap:4px;padding:5px 10px;border-radius:8px;font-size:11px;font-weight:600;cursor:pointer;background:rgba(167,139,250,.12);color:#c4b5fd;border:1px solid rgba(167,139,250,.2);transition:all .15s;position:relative" onclick="showWordDefinition(\''+w.replace(/'/g,"\\'")+'\')" title="Click: definition">'+w;
-          h+='<span class="wb-x" onclick="event.stopPropagation();removeFromWordBank(\''+w.replace(/'/g,"\\'")+'\')" style="margin-left:2px;width:14px;height:14px;border-radius:50%;background:rgba(248,113,113,.15);color:#f87171;display:inline-flex;align-items:center;justify-content:center;font-size:9px;cursor:pointer;line-height:1" title="Remove">×</span>';
-          h+='</span> ';
-        });
-        h+='</div>';
-      }
-      h+='<div id="wordbankDefinition" style="display:none;margin-top:8px;padding:10px 14px;background:rgba(167,139,250,.06);border:1px solid rgba(167,139,250,.1);border-radius:8px;font-size:11px;color:var(--muted);line-height:1.5;min-height:20px">';
-      h+='<span style="color:#c4b5fd;font-weight:600" id="wordbankDefWord"></span>';
-      h+='<span id="wordbankDefText"></span>';
-      h+='</div>';
-      h+='</div></div>';
-      cb(h, function(){
-        renderWordBank();
-        document.querySelectorAll('.wb-chip').forEach(function(chip){
-          chip.addEventListener('click', function(e){
-            if(e.target.classList.contains('wb-x')) return;
-            showWordDefinition(this.dataset.word);
-          });
-        });
-      });
-    },
-
     // ═══ Grammar — Compromise.js NLP-powered rings ═══
     grammar: function(cb){
       var h='';
