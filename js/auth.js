@@ -28,7 +28,10 @@ window.sottotitoliSupabase = window.supabase.createClient(
 // 1.5) Auth guard — redirect to index if not signed in (skip for index.html)
 (function(){
   var path = window.location.pathname.replace(/\/$/,'').split('/').pop() || 'index.html';
-  if(path==='index.html'||path===''||path==='404.html'||path==='purchase.html'||path==='studio-caption.html'||path==='studio-traduzione.html'||path==='account.html'||path==='account-mockup-uniform.html'||path.indexOf('overlay')===0)return;
+  // Pages that are publicly accessible (no auth required)
+  if(path==='index.html'||path===''||path==='404.html'||path.indexOf('overlay')===0)return;
+  // Save the page the user was trying to access, for post-login redirect
+  if(path!=='index.html'){localStorage.setItem('sottotitoli_return_page',path);}
   // Wait for session, redirect if missing
   function check(){
     var sb = window.sottotitoliSupabase;
