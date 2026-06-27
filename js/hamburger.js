@@ -62,7 +62,7 @@
     if (!wrapper.querySelector('.hamburger-btn')) {
       var btn = document.createElement('button');
       btn.className = 'hamburger-btn';
-      btn.textContent = 'Menu';
+      btn.textContent = '';
       btn.setAttribute('aria-label', 'Menu');
       wrapper.appendChild(btn);
 
