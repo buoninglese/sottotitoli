@@ -30,19 +30,21 @@ window.sottotitoliSupabase = window.supabase.createClient(
   var path = window.location.pathname.replace(/\/$/,'').split('/').pop() || 'index.html';
   // Pages that are publicly accessible (no auth required)
   if(path==='index.html'||path===''||path==='404.html'||path.indexOf('overlay')===0)return;
-  // Save the page the user was trying to access, for post-login redirect
-  if(path!=='index.html'){localStorage.setItem('sottotitoli_return_page',path);}
   // Wait for session, redirect if missing
   function check(){
     var sb = window.sottotitoliSupabase;
     if(!sb){setTimeout(check,200);return;}
     sb.auth.onAuthStateChange(function(event,session){
       if(event==='INITIAL_SESSION'&&!session){
+        localStorage.setItem('sottotitoli_return_page',path);
         window.location.replace('index.html');
       }
     });
     sb.auth.getSession().then(function(r){
-      if(!r.data?.session){window.location.replace('index.html');}
+      if(!r.data?.session){
+        localStorage.setItem('sottotitoli_return_page',path);
+        window.location.replace('index.html');
+      }
       else {
         // Dispatch user info for hamburger menus
         var user = r.data.session.user;
