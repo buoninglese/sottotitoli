@@ -250,13 +250,14 @@ document.addEventListener('DOMContentLoaded', async () => {
     console.log('auth.js: session found, rendering signed in');
     // Dispatch auth event for other scripts
     window.dispatchEvent(new CustomEvent('sottotitoli-auth', {detail:{user:session.user}}));
-    // If user came from another page (e.g. studio), redirect back immediately
-    var returnPage = localStorage.getItem('sottotitoli_return_page');
-    if (returnPage && window.location.pathname.indexOf(returnPage) === -1) {
-      localStorage.removeItem('sottotitoli_return_page');
-      var search = window.location.search || '';
-      window.location.replace(returnPage + search);
-      return;
+    // Only redirect back if user just completed OAuth login (has #access_token in URL)
+    if (window.location.hash.indexOf('access_token') !== -1) {
+      var returnPage = localStorage.getItem('sottotitoli_return_page');
+      if (returnPage && window.location.pathname.indexOf(returnPage) === -1) {
+        localStorage.removeItem('sottotitoli_return_page');
+        window.location.replace(returnPage);
+        return;
+      }
     }
     renderSignedIn(session?.user);
   }
