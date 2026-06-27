@@ -16,7 +16,7 @@ function updateMicUI(state) {
   _realMic.state = state;
   var dot = document.getElementById('micDot');
   var status = document.getElementById('micStatus');
-  var roomMic = document.getElementById('roomMicState');
+  var roomMic = document.getElementById('recRoomMic') || document.getElementById('roomMicState');
   
   if (dot) {
     dot.classList.remove('live','warn','idle','blocked');
