@@ -331,9 +331,10 @@ body.rec-collapsed { padding-top: 115px; }
 .topbar-rec-wrap { overflow: hidden; max-height: 60px; opacity: 1; transition: max-height .35s ease, opacity .25s ease; }
 .topbar-rec-wrap.collapsed { max-height: 0; opacity: 0; }
 .topbar-rec-inner { display: flex; align-items: center; gap: 12px; padding: 6px 20px; background: rgba(12,17,24,.6); border-bottom: 1px solid rgba(255,255,255,.04); width: 100%; flex-wrap: wrap; }
-.rec-room-info { font-size: 10px; font-weight: 500; color: rgba(255,255,255,.4); white-space: nowrap; }
-.rec-room-info.status-connected { color: #34d399; }
-.rec-room-info.status-offline { color: #f87171; }
+.rec-room-info { font-size: 9px; font-weight: 500; color: rgba(255,255,255,.2); white-space: nowrap; text-transform: uppercase; letter-spacing: .04em; }
+.rec-room-val { font-size: 10px; font-weight: 600; color: rgba(255,255,255,.45); }
+.rec-room-val.status-connected { color: #34d399; }
+.rec-room-val.status-offline { color: #f87171; }
 .rec-toggle { font-family: 'Inter', sans-serif; font-size: 9px; font-weight: 600; padding: 3px 10px; border-radius: 100px; border: 1px solid rgba(255,255,255,.08); background: transparent; color: rgba(255,255,255,.25); cursor: pointer; transition: all .15s; white-space: nowrap; }
 .rec-toggle:hover { border-color: #a78bfa; color: #a78bfa; }
 .rec-toggle.open { background: rgba(167,139,250,.1); border-color: #a78bfa; color: #a78bfa; }
@@ -853,11 +854,11 @@ body.rec-collapsed { padding-top: 115px; }
       <span class="rec-cell"><span class="cell-icon">⏱</span><span class="cell-val" id="recTimer">00:00</span></span>
     </div>
     <span class="divider"></span>
-    <span class="rec-room-info" id="recRoomStatus">● Connected</span>
-    <span class="rec-room-info" id="recRoomMic">● Off</span>
-    <span class="rec-room-info" id="recRoomMode">Universal</span>
-    <span class="rec-room-info" id="recRoomSpk">1 SPK</span>
-    <span class="rec-room-info" id="recRoomTgt">IT</span>
+    <span class="rec-room-info">Status <span class="rec-room-val status-connected" id="recRoomStatus">● Connected</span></span>
+    <span class="rec-room-info">Mic <span class="rec-room-val status-offline" id="recRoomMic">● Off</span></span>
+    <span class="rec-room-info">Mode <span class="rec-room-val" id="recRoomMode">Universal</span></span>
+    <span class="rec-room-info">Spk <span class="rec-room-val" id="recRoomSpk">1</span></span>
+    <span class="rec-room-info">→ <span class="rec-room-val" id="recRoomTgt">IT</span></span>
   </div>
 </div>
 </div><!-- /topbar-stack -->
@@ -1494,18 +1495,17 @@ function finishEditSpeakerTag(idx, input) {
 // ═══ Room info ═══
 function updateRoomInfo() {
   var modeLabels = { w2: 'Duet', w3: 'Triad', w4: 'Quad', w5: 'Quintet', wx: 'Universal' };
-  var elMode = document.getElementById('roomMode');
-  var elSpk = document.getElementById('roomSpeakers');
-  var elTarget = document.getElementById('roomTarget');
-  var elStatus = document.getElementById('roomStatus');
-  var elMic = document.getElementById('roomMicState');
-  var elQuality = document.getElementById('roomQuality');
+  var elMode = document.getElementById('recRoomMode');
+  var elSpk = document.getElementById('recRoomSpk');
+  var elTarget = document.getElementById('recRoomTgt');
+  var elStatus = document.getElementById('recRoomStatus');
+  var elMic = document.getElementById('recRoomMic');
   if (elMode) elMode.textContent = modeLabels[currentMode] || 'Universal';
   if (elSpk) elSpk.textContent = speakers.length;
   if (elTarget) elTarget.textContent = currentTargetLang.toUpperCase();
   if (elStatus) {
     elStatus.textContent = '● Connected';
-    elStatus.className = 'stat-val status-connected';
+    elStatus.className = 'rec-room-val status-connected';
   }
   if (elMic) {
     elMic.textContent = isLive ? 'Live' : 'Muted';
@@ -1631,10 +1631,10 @@ function shareRoom(channel) {
       setTrTarget(roomState.tgt, names[roomState.tgt] || roomState.tgt);
     }
     // Update room status
-    var status = document.getElementById('roomStatus');
+    var status = document.getElementById('recRoomStatus');
     if (status) {
       status.textContent = '● Shared Room';
-      status.className = 'stat-val status-connected';
+      status.className = 'rec-room-val status-connected';
     }
     showToast('🔗 Joined room: ' + roomParam);
   }
@@ -1715,8 +1715,11 @@ _realMic.onFinal = function(text) {
 var _origUpdateRoomInfo = updateRoomInfo;
 updateRoomInfo = function() {
   _origUpdateRoomInfo();
-  var elMic = document.getElementById('roomMicState');
-  if (elMic) { elMic.textContent = _realMic.state === 'live' ? 'Live' : 'Off'; elMic.style.color = _realMic.state === 'live' ? '' : '#f87171'; }
+  var elMic = document.getElementById('recRoomMic');
+  if (elMic) {
+    elMic.textContent = _realMic.state === 'live' ? '● Live' : '● Off';
+    elMic.className = 'rec-room-val ' + (_realMic.state === 'live' ? 'status-connected' : 'status-offline');
+  }
 };
 
 // ═══ LIVE toggle ═══
