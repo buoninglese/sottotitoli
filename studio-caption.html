@@ -3166,9 +3166,13 @@ function downloadGrammarPDF() {
         h+='<div id="synCardsContainer" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px">';
         contentWords.forEach(function(item){
           var safeWord=item.w.replace(/'/g,"\\'");
+          var inBank = wordBank.indexOf(item.w) >= 0;
+          var btnSymbol = inBank ? '−' : '+';
+          var btnTitle = inBank ? 'Remove from Word Bank' : 'Add to Word Bank';
           h+='<div class="syn-card" data-word="'+safeWord+'" style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px;transition:all .25s;position:relative">';
-          h+='<button onclick="event.stopPropagation();addSynonymWord(\''+safeWord+'\')" title="Add to Word Bank" style="position:absolute;top:8px;right:8px;width:26px;height:26px;border-radius:50%;border:1px solid var(--line);background:var(--card2);color:var(--muted2);cursor:pointer;font-size:16px;line-height:1;display:flex;align-items:center;justify-content:center;transition:all .2s;z-index:2">+</button>';
-          h+='<div style="font-size:16px;font-weight:800;color:var(--text);margin-bottom:4px">'+item.w+'</div>';
+          h+='<button onclick="event.stopPropagation();removeSynonymCard(this)" title="Dismiss" style="position:absolute;top:4px;right:4px;width:22px;height:22px;border-radius:50%;border:none;background:transparent;color:var(--muted2);cursor:pointer;font-size:12px;line-height:1;display:flex;align-items:center;justify-content:center;transition:all .15s;z-index:3;opacity:.4" onmouseover="this.style.opacity=\'1\';this.style.color=\'#f87171\'" onmouseout="this.style.opacity=\'.4\';this.style.color=\'var(--muted2)\'">✕</button>';
+          h+='<button onclick="event.stopPropagation();toggleSynonymWord(this,\''+safeWord+'\')" title="'+btnTitle+'" style="position:absolute;top:8px;right:28px;width:26px;height:26px;border-radius:50%;border:1px solid var(--line);background:'+(inBank?'rgba(167,139,250,.1)':'var(--card2)')+';color:'+(inBank?'var(--accent)':'var(--muted2)')+';cursor:pointer;font-size:16px;line-height:1;display:flex;align-items:center;justify-content:center;transition:all .2s;z-index:2">'+btnSymbol+'</button>';
+          h+='<div class="syn-base-word" data-word="'+safeWord+'" data-context="'+safeWord+'" style="font-size:16px;font-weight:800;color:var(--text);margin-bottom:4px;cursor:pointer;transition:color .15s" onclick="event.stopPropagation();lookupSynonym(this)" onmouseover="this.style.color=\'var(--accent)\'" onmouseout="this.style.color=\'var(--text)\'">'+item.w+'</div>';
           h+='<div style="font-size:9px;color:var(--muted2);margin-bottom:10px">'+item.pos+' · '+(item.count||1)+'×</div>';
           h+='<div class="syn-list-'+item.w.replace(/[^a-zA-Z]/g,'')+'" style="display:flex;gap:4px;flex-wrap:wrap"><span style="font-size:9px;color:var(--muted2)">loading…</span></div>';
           h+='</div>';
@@ -3239,6 +3243,51 @@ window.addSynonymWord = function(word){
   setTimeout(function(){ toast.remove(); }, 2000);
 };
 
+// ═══ Toggle synonym word — add/remove from word bank with button flip ═══
+window.toggleSynonymWord = function(btn, word) {
+  if (!word) return;
+  if (wordBank.indexOf(word) >= 0) {
+    // Remove from bank
+    removeFromWordBank(word);
+    btn.textContent = '+';
+    btn.title = 'Add to Word Bank';
+    btn.style.background = 'var(--card2)';
+    btn.style.color = 'var(--muted2)';
+  } else {
+    // Add to bank
+    addToWordBank(word);
+    btn.textContent = '−';
+    btn.title = 'Remove from Word Bank';
+    btn.style.background = 'rgba(167,139,250,.1)';
+    btn.style.color = 'var(--accent)';
+    var toast = document.createElement('div');
+    toast.style.cssText = 'position:fixed;bottom:20px;left:50%;transform:translateX(-50%);padding:8px 18px;border-radius:100px;background:#34d399;color:#000;font-weight:700;font-size:12px;z-index:99999;animation:toastIn .3s ease,toastOut .3s ease 1.5s forwards;pointer-events:none';
+    toast.textContent = '✓ \'' + word + '\' saved to Word Bank';
+    document.body.appendChild(toast);
+    setTimeout(function(){ toast.remove(); }, 2000);
+  }
+};
+
+// ═══ Remove synonym card with animation (grid auto-fills) ═══
+window.removeSynonymCard = function(btn) {
+  var card = btn.closest('.syn-card');
+  if (!card) return;
+  card.style.transition = 'all .3s ease';
+  card.style.opacity = '0';
+  card.style.transform = 'scale(.9)';
+  card.style.maxHeight = card.offsetHeight + 'px';
+  card.style.overflow = 'hidden';
+  requestAnimationFrame(function() {
+    card.style.maxHeight = '0px';
+    card.style.padding = '0px';
+    card.style.margin = '0px';
+    card.style.borderWidth = '0px';
+  });
+  setTimeout(function() {
+    card.remove();
+  }, 350);
+};
+
 // ═══ Live Synonym Lookup — click any synonym for definition + examples ═══
 window.lookupSynonym = function(el) {
   var word = el.dataset.word;
@@ -3251,13 +3300,13 @@ window.lookupSynonym = function(el) {
   
   var popup = document.createElement('div');
   popup.className = 'syn-popup';
-  popup.style.cssText = 'position:absolute;z-index:9999;background:var(--card);border:1px solid var(--accent);border-radius:12px;padding:16px;min-width:240px;max-width:300px;box-shadow:0 8px 32px rgba(0,0,0,.3);font-size:12px;line-height:1.5';
+  popup.style.cssText = 'position:absolute;z-index:9999;background:var(--card);border:1px solid #a78bfa;border-radius:12px;padding:16px;min-width:240px;max-width:300px;box-shadow:0 8px 32px rgba(0,0,0,.3);font-size:12px;line-height:1.5';
   
   var html = '<div style="font-weight:800;font-size:16px;color:var(--text);margin-bottom:4px">' + word + '</div>';
   html += '<div style="font-size:10px;color:var(--muted);margin-bottom:10px">Related to: ' + context + '</div>';
   html += '<div id="synDefContent" style="color:var(--muted);font-size:11px">Loading definition…</div>';
   html += '<div style="margin-top:10px;display:flex;gap:6px">';
-  html += '<button onclick="addSynonymWord(\'' + word + '\');var p=this.closest(\'.syn-popup\');if(p)p.remove()" style="font-family:inherit;font-size:10px;font-weight:600;padding:5px 12px;border-radius:100px;border:1px solid var(--accent);background:transparent;color:var(--accent);cursor:pointer">+ Add to Bank</button>';
+  html += '<button onclick="addSynonymWord(\'' + word + '\');var p=this.closest(\'.syn-popup\');if(p)p.remove()" style="font-family:inherit;font-size:10px;font-weight:600;padding:5px 12px;border-radius:100px;border:1px solid #a78bfa;background:transparent;color:#a78bfa;cursor:pointer">+ Add to Bank</button>';
   html += '<button onclick="this.closest(\'.syn-popup\').remove()" style="font-family:inherit;font-size:10px;font-weight:600;padding:5px 12px;border-radius:100px;border:1px solid var(--line);background:transparent;color:var(--muted);cursor:pointer">✕ Close</button>';
   html += '</div>';
   
