@@ -1369,38 +1369,17 @@ function toggleSession() {
   var stopBtn = document.getElementById('stopBtn');
   
   if (sessionActive) {
-    // Start real mic
-    startRealMic().then(function(ok) {
-      if (!ok) {
+    // ── Credit check: prevent starting if no minutes ──
+    _checkCreditsBeforeStart().then(function(hasCredits) {
+      if (!hasCredits) {
         sessionActive = false;
         startBtn.style.display = '';
         stopBtn.style.display = 'none';
+        startBtn.disabled = false;
+        setText("statusText", "⏰ Nessun credito. Acquista su Purchase.");
         return;
       }
-      startBtn.style.display = 'none';
-      stopBtn.style.display = '';
-      sessionSeconds = 0;
-      // Clear session-scoped word bank & reset word tracking
-      wordBank = [];
-      saveWordBank();
-      renderWordBank();
-      // Clear synonyms panel session
-      if (typeof clearSynonymSession === 'function') clearSynonymSession();
-      // Clear placeholders immediately
-      var interim = document.getElementById('captionInterim');
-      var transcript = document.getElementById('captionTranscript');
-      if (interim) interim.textContent = '';
-      if (transcript) transcript.innerHTML = '';
-      document.getElementById('liveDot').querySelector('.dot').classList.add('live');
-      document.body.classList.add('session-active');
-      document.getElementById('liveDot').style.opacity = '1';
-      timerInterval = setInterval(function() {
-        sessionSeconds++;
-        var m = Math.floor(sessionSeconds / 60);
-        var s = sessionSeconds % 60;
-        document.getElementById('sessionTimer').textContent = 
-          String(m).padStart(2,'0') + ':' + String(s).padStart(2,'0');
-      }, 1000);
+      _doStartSession(startBtn, stopBtn);
     });
   } else {
     stopRealMic();
@@ -1418,7 +1397,6 @@ function toggleSession() {
     document.getElementById('sessionTimer').textContent = '00:00';
     document.getElementById('liveDot').querySelector('.dot').classList.remove('live');
     document.body.classList.remove('session-active');
-    // Restore placeholder state — clear boxes so ::after placeholders appear
     var interim2 = document.getElementById('captionInterim');
     var transcript2 = document.getElementById('captionTranscript');
     if (interim2) { interim2.textContent = ''; interim2.removeAttribute('data-filled'); }
@@ -1426,6 +1404,54 @@ function toggleSession() {
     updateMicUI('idle');
     updateListenBar();
   }
+}
+
+// ── Credit pre-check before session start ──
+async function _checkCreditsBeforeStart() {
+  try {
+    var sb = window.sottotitoliSupabase;
+    if (!sb) return true; // not logged in — allow free use
+    var resp = await sb.auth.getSession();
+    var userId = resp.data?.session?.user?.id;
+    if (!userId) return true; // not logged in
+    var cr = await sb.from('user_credits').select('balance_minutes').eq('user_id', userId).maybeSingle();
+    var balance = cr.data?.balance_minutes;
+    if (balance == null) return true; // no record yet — first use
+    return balance > 0;
+  } catch(e) { return true; } // error — allow on fail-safe
+}
+
+// ── Actual session start (called after credit check passes) ──
+function _doStartSession(startBtn, stopBtn) {
+    startRealMic().then(function(ok) {
+      if (!ok) {
+        sessionActive = false;
+        startBtn.style.display = '';
+        stopBtn.style.display = 'none';
+        return;
+      }
+      startBtn.style.display = 'none';
+      stopBtn.style.display = '';
+      sessionSeconds = 0;
+      wordBank = [];
+      saveWordBank();
+      renderWordBank();
+      if (typeof clearSynonymSession === 'function') clearSynonymSession();
+      var interim = document.getElementById('captionInterim');
+      var transcript = document.getElementById('captionTranscript');
+      if (interim) interim.textContent = '';
+      if (transcript) transcript.innerHTML = '';
+      document.getElementById('liveDot').querySelector('.dot').classList.add('live');
+      document.body.classList.add('session-active');
+      document.getElementById('liveDot').style.opacity = '1';
+      timerInterval = setInterval(function() {
+        sessionSeconds++;
+        var m = Math.floor(sessionSeconds / 60);
+        var s = sessionSeconds % 60;
+        document.getElementById('sessionTimer').textContent = 
+          String(m).padStart(2,'0') + ':' + String(s).padStart(2,'0');
+      }, 1000);
+    });
 }
 
 // ═══ Fullscreen toggle ═══
