@@ -160,6 +160,28 @@
       fetchCredits();
     });
 
+    // Listen for avatar preset changes from account page
+    window.addEventListener('sottotitoli-avatar-preset-changed', function(e) {
+      var avatarEl = document.getElementById('hbAvatar');
+      if (!avatarEl || !e.detail) return;
+      var presets = {
+        purple: 'linear-gradient(135deg,#7c3aed,#a78bfa)',
+        blue: 'linear-gradient(135deg,#2563eb,#60a5fa)',
+        green: 'linear-gradient(135deg,#059669,#34d399)',
+        rose: 'linear-gradient(135deg,#e11d48,#fb7185)',
+        amber: 'linear-gradient(135deg,#d97706,#fbbf24)',
+        cyan: 'linear-gradient(135deg,#0891b2,#22d3ee)',
+        indigo: 'linear-gradient(135deg,#4f46e5,#818cf8)',
+        teal: 'linear-gradient(135deg,#0d9488,#2dd4bf)'
+      };
+      var keys = Object.keys(presets);
+      var idx = parseInt(e.detail.preset) || 0;
+      var key = keys[idx] || 'purple';
+      avatarEl.style.backgroundImage = presets[key];
+      avatarEl.style.backgroundSize = 'cover';
+      avatarEl.style.color = '#fff';
+    });
+
     // Proactive check
     if (window.__sottotitoliUserReady) {
       window.dispatchEvent(new CustomEvent('sottotitoli-user-ready', { detail: window.__sottotitoliUserReady }));
