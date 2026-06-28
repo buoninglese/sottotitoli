@@ -1369,8 +1369,13 @@ function togglePanel(which) {
   var app = document.getElementById('appMain');
   var btn = document.getElementById('speakersToggleBtn');
   if (!app || !btn) return;
+  var sidebar = document.getElementById('duoSpeakerSidebar');
+  var toggle = document.getElementById('duoToggleBtn');
   var open = app.classList.toggle('speakers-open');
   btn.classList.toggle('panel-active', open);
+  // Keep sidebar + edge button in sync
+  if (sidebar) { sidebar.classList.toggle('open', open); }
+  if (toggle) { toggle.classList.toggle('open', open); toggle.innerHTML = open ? '◂' : '▸'; }
 }
 
 // Right panel: Metrics ↔ SYN (mutually exclusive)
@@ -1522,12 +1527,14 @@ function setSpeakerMode(mode) {
     if (soloBtn) { soloBtn.className = 'btn-sm active'; }
     if (duoBtn) { duoBtn.className = 'btn-sm'; }
     setSpeakerCount('1');
-    // Hide DUO+ UI via classes
+    // Close speaker panel fully
     var app = document.getElementById('appMain');
     var sidebar = document.getElementById('duoSpeakerSidebar');
     var toggle = document.getElementById('duoToggleBtn');
     var spkBtn = document.getElementById('speakersToggleBtn');
     if (app) app.classList.remove('speakers-open');
+    if (sidebar) sidebar.classList.remove('open');
+    if (toggle) { toggle.classList.remove('open'); toggle.innerHTML = '▸'; toggle.style.display = 'none'; }
     if (spkBtn) { spkBtn.classList.remove('panel-active'); spkBtn.style.opacity = '0.4'; spkBtn.style.pointerEvents = 'none'; }
     // Disconnect WebSocket
     if (window._duoWs) { try { window._duoWs.close(); } catch(e){} window._duoWs = null; }
@@ -1536,15 +1543,15 @@ function setSpeakerMode(mode) {
     if (soloBtn) { soloBtn.className = 'btn-sm'; }
     if (duoBtn) { duoBtn.className = 'btn-sm active'; }
     setSpeakerCount('2');
-    // Show DUO+ UI via classes
+    // Open speaker panel
     var app = document.getElementById('appMain');
     var sidebar = document.getElementById('duoSpeakerSidebar');
     var toggle = document.getElementById('duoToggleBtn');
     var spkBtn = document.getElementById('speakersToggleBtn');
     if (app) app.classList.add('speakers-open');
-    if (spkBtn) { spkBtn.style.opacity = ''; spkBtn.style.pointerEvents = ''; spkBtn.classList.add('panel-active'); }
     if (sidebar) sidebar.classList.add('open');
-    if (toggle) { toggle.style.display = 'block'; toggle.classList.add('open'); }
+    if (toggle) { toggle.style.display = 'block'; toggle.classList.add('open'); toggle.innerHTML = '◂'; }
+    if (spkBtn) { spkBtn.style.opacity = ''; spkBtn.style.pointerEvents = ''; spkBtn.classList.add('panel-active'); }
     // Show host section, hide invitee section
     var hostSec = document.getElementById('duoHostSection');
     var invSec = document.getElementById('duoInviteeSection');
@@ -4669,18 +4676,24 @@ window.fixExtrasPanelColors = function(){
 
   // ═══ Toggle speaker sidebar ═══
   window.toggleDuoSidebar = function() {
-    var sidebar = document.getElementById('duoSpeakerSidebar');
-    var toggle = document.getElementById('duoToggleBtn');
-    if (!sidebar || !toggle) return;
-    var isOpen = sidebar.classList.contains('open');
-    if (isOpen) {
-      sidebar.classList.remove('open');
-      toggle.classList.remove('open');
-      toggle.innerHTML = '▸';
-    } else {
-      sidebar.classList.add('open');
-      toggle.classList.add('open');
-      toggle.innerHTML = '◂';
+    // Delegate to unified toggle — keeps sidebar + app-main + buttons in sync
+    if (typeof togglePanel === 'function') { togglePanel('speakers'); }
+    else {
+      // Fallback if togglePanel not defined yet
+      var sidebar = document.getElementById('duoSpeakerSidebar');
+      var toggle = document.getElementById('duoToggleBtn');
+      var app = document.getElementById('appMain');
+      if (!sidebar) return;
+      var isOpen = sidebar.classList.contains('open');
+      if (isOpen) {
+        sidebar.classList.remove('open');
+        if (toggle) { toggle.classList.remove('open'); toggle.innerHTML = '▸'; }
+        if (app) app.classList.remove('speakers-open');
+      } else {
+        sidebar.classList.add('open');
+        if (toggle) { toggle.classList.add('open'); toggle.innerHTML = '◂'; }
+        if (app) app.classList.add('speakers-open');
+      }
     }
   };
 
