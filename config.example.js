@@ -17,6 +17,10 @@ window.SOTTOTITOLI_CONFIG = {
   /** Auth redirect URL (after Google OAuth login) */
   AUTH_REDIRECT_URL: "https://your-domain.github.io/sottotitoli/start.html",
 
+  /** Wordnik API key for definitions + synonyms (English only).
+      Get a free key at https://developer.wordnik.com/ */
+  wordnikApiKey: "YOUR_WORDNIK_API_KEY",
+
   /** Translation provider settings */
   translation: {
     /** Translation provider: "auto" = Google first with MyMemory fallback.
