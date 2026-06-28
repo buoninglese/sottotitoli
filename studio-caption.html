@@ -837,9 +837,10 @@ button[onclick*="addToWordBank"]:hover{background:rgba(52,211,153,.15)!important
       <button class="duo-invite-btn" onclick="duoShareInvite('copy')">📋 Copy</button>
     </div>
     <div style="margin-top:10px;font-size:9px;color:var(--muted2)">
-      <div style="display:flex;justify-content:space-between;padding:3px 0"><span>Status</span><span style="color:#34d399" id="duoSideStatus">● Connected</span></div>
-      <div style="display:flex;justify-content:space-between;padding:3px 0"><span>Room</span><span style="font-family:JetBrains Mono,monospace;font-size:8px;color:var(--muted)" id="duoSideRoomId">—</span></div>
-      <div style="display:flex;justify-content:space-between;padding:3px 0"><span>Link</span><a href="#" style="color:var(--accent);font-size:8px" id="duoSideLink" onclick="navigator.clipboard.writeText(this.href);return false">📋 copy</a></div>
+      <div style="display:flex;gap:4px">
+        <button onclick="duoNewRoom()" style="flex:1;padding:5px 8px;border-radius:6px;border:1px solid rgba(255,255,255,.08);background:transparent;color:rgba(255,255,255,.45);font-size:9px;font-weight:600;cursor:pointer;font-family:'Inter',sans-serif;transition:all .2s">🔄 New Room</button>
+        <button onclick="duoShareInvite('copy')" style="flex:1;padding:5px 8px;border-radius:6px;border:1px solid rgba(255,255,255,.08);background:transparent;color:rgba(255,255,255,.45);font-size:9px;font-weight:600;cursor:pointer;font-family:'Inter',sans-serif;transition:all .2s">📋 Copy Link</button>
+      </div>
     </div>
   </div>
 </aside>
@@ -3821,6 +3822,7 @@ window.fixExtrasPanelColors = function(){
   var DUO_LABELS = ['A','B','C','D','E','F'];
   var DUO_COLORS = {A:'#6b9dff',B:'#f87171',C:'#34d399',D:'#fbbf24',E:'#a78bfa',F:'#fb923c'};
   var DUO_FLAGS = {en:'🇬🇧',it:'🇮🇹',fr:'🇫🇷',de:'🇩🇪',es:'🇪🇸',pt:'🇵🇹',nl:'🇳🇱'};
+  window.DUO_FLAGS = DUO_FLAGS;
 
   // Check if joining a room via invite link
   var params = new URLSearchParams(window.location.search);
@@ -3969,7 +3971,9 @@ window.fixExtrasPanelColors = function(){
       var s = spk.speaking;
       html += '<div class="duo-spk-pill connected'+(s?' speaking':'')+'">';
       html += '<span class="duo-spk-dot'+(s?' speaking':'')+'" style="background:'+spk.color+';color:'+spk.color+'"></span>';
-      html += '<span class="duo-spk-name">'+escapeHTML(spk.name)+'</span>';
+      var flag = (window.DUO_FLAGS && window.DUO_FLAGS[spk.lang]) ? window.DUO_FLAGS[spk.lang]+' ' : '';
+      var isHost = (spk.name === window._duoSpeakerName && window._duoRoomId);
+      html += '<span class="duo-spk-name">'+flag+(isHost?'👑 ':'')+escapeHTML(spk.name)+'</span>';
       html += '<span class="duo-spk-status'+(s?' speaking':'')+'">'+(s?'● speaking':'')+'</span>';
       html += '</div>';
     });
@@ -4060,6 +4064,12 @@ window.fixExtrasPanelColors = function(){
     // If in DUO mode and WebSocket is open, send labeled message
     if (window._duoMode && window._duoWs && window._duoWs.readyState === WebSocket.OPEN) {
       var label = duoAssignLabel(window._duoSpeakerName, window._duoSpeakerLang);
+      // Override the line border color to match DUO+ speaker color
+      var transcript = document.getElementById('captionTranscript');
+      if (transcript && window._duoSpeakerMap[label]) {
+        var firstLine = transcript.querySelector('.line:first-child');
+        if (firstLine) firstLine.style.borderLeftColor = window._duoSpeakerMap[label].color;
+      }
       window._duoWs.send(JSON.stringify({ type:'duo-speaking', name:window._duoSpeakerName, lang:window._duoSpeakerLang }));
       window._duoWs.send(JSON.stringify({ msg:true, final:text, id:Date.now(), label:label, speaker:window._duoSpeakerName, lang:window._duoSpeakerLang }));
     }
@@ -4068,6 +4078,24 @@ window.fixExtrasPanelColors = function(){
   function escapeHTML(str) {
     var div = document.createElement('div'); div.textContent = str; return div.innerHTML;
   }
+
+  // ═══ New Room ═══
+  window.duoNewRoom = function() {
+    if (!confirm('Create a new room? This will clear all captions and disconnect current speakers.')) return;
+    if (window._duoWs) { try { window._duoWs.close(); } catch(e){} window._duoWs = null; }
+    window._duoRoomId = 'cap-' + Date.now().toString(36);
+    window._duoSpeakerMap = {};
+    var transcript = document.getElementById('captionTranscript');
+    if (transcript) transcript.innerHTML = '';
+    var interim = document.getElementById('captionInterim');
+    if (interim) interim.textContent = '';
+    window._sessionLines = [];
+    ['statLines','statWords','statChars','liveWords','liveSentences'].forEach(function(id){ var el=document.getElementById(id); if(el)el.textContent='0'; });
+    duoRenderSpeakers();
+    duoConnectWebSocket();
+    duoUpdateInviteUrl();
+    var t=document.getElementById('toast'); if(t){t.textContent='🔄 New room created';t.style.opacity='1';clearTimeout(t._tt);t._tt=setTimeout(function(){t.style.opacity='0'},2000);}
+  };
 
   // ═══ Toggle speaker sidebar ═══
   window.toggleDuoSidebar = function() {
@@ -4097,6 +4125,33 @@ window.fixExtrasPanelColors = function(){
   }
   window.addEventListener('resize', duoUpdateSidebarPosition);
   // Hook into rec bar toggle
+  // ═══ Mode switch confirmation ═══
+  var _origSetSpeakerMode = window.setSpeakerMode;
+  if (typeof _origSetSpeakerMode === 'function') {
+    window.setSpeakerMode = function(mode) {
+      var currentMode = window._duoMode ? 'duo' : 'solo';
+      if (mode !== currentMode) {
+        var msg = mode === 'duo' ? 'Switch to DUO+? This will clear your captions and start a new room.' : 'Switch to SOLO? This will clear your captions and disconnect speakers.';
+        if (!confirm(msg)) return;
+        // Clear captions
+        var transcript = document.getElementById('captionTranscript');
+        if (transcript) transcript.innerHTML = '';
+        var interim = document.getElementById('captionInterim');
+        if (interim) interim.textContent = '';
+        window._sessionLines = [];
+        ['statLines','statWords','statChars','liveWords','liveSentences'].forEach(function(id){ var el=document.getElementById(id); if(el)el.textContent='0'; });
+        // Reset DUO when switching to solo
+        if (mode === 'solo') {
+          if (window._duoWs) { try { window._duoWs.close(); } catch(e){} window._duoWs = null; }
+          window._duoRoomId = '';
+          window._duoSpeakerMap = {};
+          duoRenderSpeakers();
+        }
+      }
+      _origSetSpeakerMode(mode);
+    };
+  }
+
   var _origToggleRecBar = window.toggleRecBar;
   if (typeof _origToggleRecBar === 'function') {
     window.toggleRecBar = function() {
