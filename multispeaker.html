@@ -361,13 +361,14 @@ body.rec-collapsed{padding-top:115px}
 // ═══ State ═══
 var roomId = '';
 var captions = [];
-var speakerMap = {};   // {en: {name:'Marco', lang:'en', connected:true}}
+var speakerMap = {};   // {"name:lang": {name, lang, connected, color}} — unique key
 var lineCounter = 0;
-var isHost = true;     // true = host view, false = speaker join view
+var isHost = true;
 var joinLang = 'it';
 var joinName = '';
 var joinMicActive = false;
 var ws = null;
+var wsReconnectTimer = null;
 var sessionSeconds = 0;
 var timerInterval = null;
 
@@ -427,12 +428,14 @@ function getOrCreateRoom() {
 
 // ═══ WebSocket ═══
 function connectWebSocket() {
+  if (wsReconnectTimer) { clearTimeout(wsReconnectTimer); wsReconnectTimer = null; }
   var url = (window.SOTTOTITOLI_CONFIG && window.SOTTOTITOLI_CONFIG.websocketUrl) || 'wss://sottotitoli-websocket.onrender.com';
-  try { ws = new WebSocket(url); } catch(e) { console.error('WS error:', e); return; }
+  try { ws = new WebSocket(url); } catch(e) { console.error('WS error:', e); scheduleReconnect(); return; }
 
   ws.onopen = function() {
     ws.send(JSON.stringify({ join: roomId }));
     updateConnectionStatus(true);
+    if (isHost) showToast('🔗 Connected to room');
   };
 
   ws.onmessage = function(event) {
@@ -447,11 +450,18 @@ function connectWebSocket() {
 
   ws.onclose = function() {
     updateConnectionStatus(false);
-    // Reconnect in 3s
-    setTimeout(function() { if (isHost) connectWebSocket(); }, 3000);
+    scheduleReconnect();
   };
 
   ws.onerror = function() { updateConnectionStatus(false); };
+}
+
+function scheduleReconnect() {
+  if (wsReconnectTimer) return;
+  wsReconnectTimer = setTimeout(function() {
+    wsReconnectTimer = null;
+    if (isHost || joinMicActive) connectWebSocket();
+  }, 3000);
 }
 
 function handleCaptionMessage(data) {
@@ -459,10 +469,12 @@ function handleCaptionMessage(data) {
   var lang = data.lang || 'en';
   var text = data.final;
 
-  // Register speaker
-  if (!speakerMap[lang]) {
-    speakerMap[lang] = { name: speaker, lang: lang, connected: true, color: SPK_COLORS[lang] || '#a78bfa' };
+  // Unique key: name + lang (two speakers can share a language)
+  var key = speaker + ':' + lang;
+  if (!speakerMap[key]) {
+    speakerMap[key] = { name: speaker, lang: lang, connected: true, color: SPK_COLORS[lang] || '#a78bfa' };
     updateSpeakerSidebar();
+    showToast('🎙 ' + speaker + ' (' + lang.toUpperCase() + ') joined');
   }
 
   // Add caption
@@ -516,13 +528,13 @@ function updateSpeakerSidebar() {
     return;
   }
   var html = '';
-  keys.forEach(function(lang){
-    var spk = speakerMap[lang];
-    var flag = LANG_FLAGS[lang] || '';
+  keys.forEach(function(key){
+    var spk = speakerMap[key];
+    var flag = LANG_FLAGS[spk.lang] || '';
     html += '<div class="spk-pill connected">';
     html += '<span class="spk-dot live" style="background:'+spk.color+';color:'+spk.color+'"></span>';
     html += '<span class="spk-name">'+escapeHTML(spk.name)+'</span>';
-    html += '<span class="spk-lang">'+flag+' '+lang.toUpperCase()+'</span>';
+    html += '<span class="spk-lang">'+flag+' '+spk.lang.toUpperCase()+'</span>';
     html += '<span class="spk-status on">● Live</span>';
     html += '</div>';
   });
@@ -617,8 +629,9 @@ function runSimulation() {
   
   // Register all 3 speakers
   SIM_SPEAKERS.forEach(function(spk){
-    if (!speakerMap[spk.lang]) {
-      speakerMap[spk.lang] = {name:spk.name, lang:spk.lang, connected:true, color:spk.color};
+    var key = spk.name + ':' + spk.lang;
+    if (!speakerMap[key]) {
+      speakerMap[key] = {name:spk.name, lang:spk.lang, connected:true, color:spk.color};
     }
   });
   updateSpeakerSidebar();
@@ -665,8 +678,8 @@ function toggleJoinMic() {
       ws.send(JSON.stringify({ join: roomId }));
       startJoinMic();
     };
-    ws.onerror = function() { showToast('⚠ Connection failed'); };
-    ws.onclose = function() { /* reconnect handled elsewhere */ };
+    ws.onerror = function() { showToast('⚠ Connection failed — retrying…'); scheduleReconnect(); };
+    ws.onclose = function() { if (joinMicActive) scheduleReconnect(); };
   } else {
     startJoinMic();
   }
