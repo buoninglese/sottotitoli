@@ -9,7 +9,10 @@ var _realMic = {
   lang: 'en-US',     // current speech recognition language
   onInterim: null,   // callback(interimText)
   onFinal: null,     // callback(finalText)
-  onStateChange: null // callback(state)
+  onStateChange: null, // callback(state)
+  forceFinalizeMs: 2500, // silence before forcing finalization (0 = disabled)
+  _lastInterim: 0,
+  _forceTimer: null
 };
 
 function updateMicUI(state) {
@@ -73,9 +76,12 @@ async function startRealMic() {
         interim += r[0].transcript;
       }
     }
+    // Track last speech time for force-finalize timer
+    if (interim || final) _realMic._lastInterim = Date.now();
     if (interim && _realMic.onInterim) _realMic.onInterim(interim);
     if (final && _realMic.onFinal) _realMic.onFinal(final);
   };
+  _realMic._onresult = rec.onresult;
   
   rec.onerror = function(event) {
     console.error('Speech error:', event.error);
@@ -83,6 +89,7 @@ async function startRealMic() {
     else if (event.error === 'no-speech') { /* ignore */ }
     else updateMicUI('error');
   };
+  _realMic._onerror = rec.onerror;
   
   rec.onend = function() {
     // Auto-restart if still supposed to be live
@@ -90,11 +97,13 @@ async function startRealMic() {
       try { rec.start(); } catch(e) {}
     }
   };
+  _realMic._onend = rec.onend;
   
   try {
     rec.start();
     _realMic.recognition = rec;
     updateMicUI('live');
+    _startForceFinalizeTimer();
     return true;
   } catch(e) {
     console.error('Speech start error:', e);
@@ -105,6 +114,7 @@ async function startRealMic() {
 }
 
 function stopRealMic() {
+  _stopForceFinalizeTimer();
   if (_realMic.recognition) {
     try { _realMic.recognition.stop(); } catch(e) {}
     _realMic.recognition = null;
@@ -285,3 +295,46 @@ document.addEventListener('visibilitychange', function() {
     updateMicUI('idle');
   }
 });
+
+// ═══ Force-finalize timer — restarts recognition after silence to flush results ═══
+function _startForceFinalizeTimer() {
+  _stopForceFinalizeTimer();
+  _realMic._lastInterim = Date.now();
+  _realMic._forceTimer = setInterval(function() {
+    var ms = _realMic.forceFinalizeMs;
+    if (!ms || ms <= 0) return; // disabled
+    if (!_realMic.recognition) return;
+    if (_realMic.state !== 'live') return;
+    var elapsed = Date.now() - _realMic._lastInterim;
+    if (elapsed >= ms) {
+      // Force finalize by restarting recognition
+      try { _realMic.recognition.stop(); } catch(e) {}
+      _realMic.recognition = null;
+      // Brief delay then restart
+      setTimeout(function() {
+        if (_realMic.state !== 'live') return;
+        var SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        if (!SpeechRecognition) return;
+        var rec = new SpeechRecognition();
+        rec.continuous = true;
+        rec.interimResults = true;
+        rec.lang = _realMic.lang || 'en-US';
+        rec.onresult = _realMic._onresult;
+        rec.onerror = _realMic._onerror;
+        rec.onend = _realMic._onend;
+        try { rec.start(); _realMic.recognition = rec; _realMic._lastInterim = Date.now(); } catch(e) {}
+      }, 150);
+    }
+  }, 500);
+}
+
+function _stopForceFinalizeTimer() {
+  if (_realMic._forceTimer) { clearInterval(_realMic._forceTimer); _realMic._forceTimer = null; }
+}
+
+// Set the force-finalize timeout in milliseconds (0 = disabled)
+function setForceFinalizeMs(ms) {
+  _realMic.forceFinalizeMs = ms;
+  if (_realMic._forceTimer && ms <= 0) _stopForceFinalizeTimer();
+  if (!_realMic._forceTimer && ms > 0 && _realMic.state === 'live') _startForceFinalizeTimer();
+}
