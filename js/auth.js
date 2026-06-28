@@ -34,12 +34,8 @@ window.sottotitoliSupabase = window.supabase.createClient(
   function check(){
     var sb = window.sottotitoliSupabase;
     if(!sb){setTimeout(check,200);return;}
-    sb.auth.onAuthStateChange(function(event,session){
-      if(event==='INITIAL_SESSION'&&!session){
-        localStorage.setItem('sottotitoli_return_page',path);
-        window.location.replace('index.html');
-      }
-    });
+    // Only use getSession() — onAuthStateChange INITIAL_SESSION fires before
+    // Supabase restores the session from localStorage, causing false redirects.
     sb.auth.getSession().then(function(r){
       if(!r.data?.session){
         localStorage.setItem('sottotitoli_return_page',path);
