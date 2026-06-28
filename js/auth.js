@@ -40,7 +40,7 @@ window.sottotitoliSupabase = window.supabase.createClient(
     // Supabase restores the session from localStorage, causing false redirects.
     sb.auth.getSession().then(function(r){
       if(!r.data?.session){
-        localStorage.setItem('sottotitoli_return_page',path);
+        localStorage.setItem('sottotitoli_return_page', window.location.pathname + window.location.search);
         window.location.replace('index.html');
       }
       else {
