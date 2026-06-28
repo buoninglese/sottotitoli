@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="it" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sottotitoli · Multispeaker (future)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,400;14..32,500;14..32,600;14..32,700;14..32,800;14..32,900&family=JetBrains+Mono:wght@400;500;600;700&family=Manrope:wght@300;400;500;600;700;800&family=Work+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root {
+  --bg: #0a0f14; --card: #11161d; --card2: #161c26;
+  --line: rgba(255,255,255,.06); --text: rgba(255,255,255,.85);
+  --muted: rgba(255,255,255,.45); --muted2: rgba(255,255,255,.18);
+  --accent: #7c3aed; --accent2: #a78bfa;
+}
+body {
+  font-family: 'Inter', system-ui, sans-serif;
+  background: var(--bg); color: var(--text);
+  min-height: 100dvh; display: flex; flex-direction: column;
+  -webkit-font-smoothing: antialiased; padding: 0 32px 40px;
+}
+h1 { font-family: 'Manrope',sans-serif; font-size: 28px; font-weight: 700; letter-spacing: -1px; margin: 32px 0 4px; }
+.subtitle { font-size: 13px; color: var(--muted); margin-bottom: 32px; }
+
+/* ═══ HOST VIEW ═══ */
+.host-grid { display: grid; grid-template-columns: 1fr 360px; gap: 20px; flex: 1; min-height: 0; }
+
+/* ── Stage (caption feed) ── */
+.stage-panel {
+  background: var(--card); border: 1px solid var(--line); border-radius: 16px;
+  display: flex; flex-direction: column; overflow: hidden;
+}
+.stage-header {
+  padding: 14px 20px; border-bottom: 1px solid var(--line);
+  display: flex; align-items: center; gap: 12px;
+}
+.stage-header .room-label {
+  font-family: 'JetBrains Mono',monospace; font-size: 10px; font-weight: 600;
+  color: var(--muted2); text-transform: uppercase; letter-spacing: 1px;
+}
+.stage-header .room-id {
+  font-family: 'JetBrains Mono',monospace; font-size: 13px; font-weight: 700;
+  color: var(--accent2); flex: 1;
+}
+.stage-body {
+  flex: 1; overflow-y: auto; padding: 16px 20px;
+  display: flex; flex-direction: column; gap: 8px;
+}
+.caption-line {
+  display: flex; align-items: flex-start; gap: 12px;
+  padding: 10px 14px; border-radius: 8px;
+  border-left: 3px solid transparent;
+  animation: lineIn .3s ease both;
+}
+.caption-line:nth-child(1){animation-delay:0s}
+.caption-line:nth-child(2){animation-delay:.04s}
+.caption-line:nth-child(3){animation-delay:.08s}
+@keyframes lineIn{from{opacity:0;transform:translateX(-12px)}to{opacity:1;transform:translateX(0)}}
+.speaker-tag {
+  flex-shrink: 0; min-width: 48px; font-family: 'JetBrains Mono',monospace;
+  font-size: 10px; font-weight: 700; padding: 3px 8px; border-radius: 4px; text-align: center;
+}
+.speaker-text { font-size: 15px; line-height: 1.5; font-weight: 400; flex: 1; }
+.speaker-ts {
+  font-family: 'JetBrains Mono',monospace; font-size: 9px; color: var(--muted2);
+  flex-shrink: 0; padding-top: 2px;
+}
+
+/* Speaker colors */
+.tag-en { background: rgba(107,157,255,.12); color: #8ab4ff; border-left-color: rgba(107,157,255,.35); }
+.tag-it { background: rgba(248,113,113,.12); color: #f99; border-left-color: rgba(248,113,113,.35); }
+.tag-fr { background: rgba(96,165,250,.12); color: #93c5fd; border-left-color: rgba(96,165,250,.35); }
+.tag-de { background: rgba(52,211,153,.12); color: #6ee7b7; border-left-color: rgba(52,211,153,.35); }
+
+/* ── Sidebar (speakers + invite) ── */
+.side-panel { display: flex; flex-direction: column; gap: 16px; }
+
+.speakers-card {
+  background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 20px;
+}
+.speakers-card h3 {
+  font-family: 'Manrope',sans-serif; font-size: 15px; font-weight: 600;
+  letter-spacing: -.3px; margin-bottom: 14px; color: var(--text);
+}
+.speaker-row {
+  display: flex; align-items: center; gap: 10px; padding: 10px 12px;
+  border-radius: 10px; border: 1px solid transparent; margin-bottom: 6px;
+  transition: all .2s;
+}
+.speaker-row.connected { border-color: rgba(52,211,153,.15); background: rgba(52,211,153,.03); }
+.speaker-dot {
+  width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0;
+  background: rgba(255,255,255,.1);
+}
+.speaker-dot.live { background: #34d399; box-shadow: 0 0 8px #34d399; animation: dotPulse 2s ease-in-out infinite; }
+@keyframes dotPulse{0%,100%{opacity:1}50%{opacity:.35}}
+.speaker-name { flex: 1; font-size: 13px; font-weight: 600; }
+.speaker-lang { font-size: 10px; color: var(--muted); font-family: 'JetBrains Mono',monospace; }
+.speaker-status { font-size: 9px; color: var(--muted); font-weight: 500; }
+.speaker-status.on { color: #34d399; }
+.speaker-status.waiting { color: #fbbf24; }
+
+.invite-card {
+  background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 20px;
+}
+.invite-card h3 {
+  font-family: 'Manrope',sans-serif; font-size: 15px; font-weight: 600;
+  letter-spacing: -.3px; margin-bottom: 12px;
+}
+.invite-url {
+  display: flex; align-items: center; gap: 8px; margin-bottom: 12px;
+}
+.invite-url input {
+  flex: 1; padding: 8px 12px; border-radius: 8px; border: 1px solid var(--line);
+  background: var(--card2); color: var(--text); font-family: 'JetBrains Mono',monospace;
+  font-size: 11px; outline: none;
+}
+.invite-url button {
+  padding: 8px 14px; border-radius: 8px; border: 1px solid var(--accent);
+  background: rgba(124,58,237,.1); color: var(--accent2);
+  font-family: 'Inter',sans-serif; font-size: 11px; font-weight: 600; cursor: pointer;
+}
+.qr-placeholder {
+  width: 140px; height: 140px; margin: 0 auto; background: #fff;
+  border-radius: 12px; display: flex; align-items: center; justify-content: center;
+  font-family: 'JetBrains Mono',monospace; font-size: 9px; color: #999; text-align: center;
+  line-height: 1.4; padding: 16px;
+}
+.invite-buttons { display: flex; gap: 8px; margin-top: 12px; }
+.invite-btn {
+  flex: 1; padding: 8px 0; border-radius: 100px; border: 1px solid var(--line);
+  background: transparent; color: var(--text2); font-size: 11px; font-weight: 500;
+  cursor: pointer; font-family: 'Inter',sans-serif; text-align: center; transition: all .2s;
+}
+.invite-btn:hover { border-color: rgba(255,255,255,.15); color: #fff; }
+
+/* ═══ JOIN VIEW (mobile speaker) ═══ */
+.join-sim {
+  background: var(--card); border: 1px solid var(--line); border-radius: 16px;
+  padding: 32px; max-width: 400px; margin: 0 auto; text-align: center;
+  display: none;
+}
+.join-sim h2 { font-family: 'Manrope',sans-serif; font-size: 22px; font-weight: 700; margin-bottom: 6px; }
+.join-sim p { font-size: 13px; color: var(--muted); margin-bottom: 20px; }
+.join-lang-select {
+  display: flex; gap: 6px; flex-wrap: wrap; justify-content: center; margin-bottom: 20px;
+}
+.lang-pill {
+  padding: 8px 16px; border-radius: 100px; border: 1px solid var(--line);
+  background: transparent; color: var(--text2); font-size: 13px; font-weight: 600;
+  cursor: pointer; font-family: 'Inter',sans-serif; transition: all .2s;
+}
+.lang-pill:hover { border-color: rgba(255,255,255,.2); color: #fff; }
+.lang-pill.selected { background: rgba(124,58,237,.15); border-color: var(--accent); color: var(--accent2); }
+.join-btn {
+  padding: 14px 48px; border-radius: 100px; border: none;
+  background: var(--accent); color: #fff; font-family: 'Inter',sans-serif;
+  font-size: 15px; font-weight: 700; cursor: pointer; transition: all .2s;
+}
+.join-btn:hover { transform: translateY(-1px); box-shadow: 0 8px 24px rgba(124,58,237,.3); }
+.mic-status { margin-top: 16px; font-size: 11px; color: var(--muted); }
+.mic-status .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; background: #f87171; }
+.mic-status .dot.live { background: #34d399; animation: dotPulse 2s ease-in-out infinite; }
+
+/* ═══ View toggle ═══ */
+.view-toggle {
+  display: flex; gap: 4px; margin-bottom: 24px;
+  background: var(--card); border-radius: 100px; padding: 4px; width: fit-content;
+}
+.view-btn {
+  padding: 8px 20px; border-radius: 100px; border: none;
+  background: transparent; color: var(--muted); font-size: 12px; font-weight: 600;
+  cursor: pointer; font-family: 'Inter',sans-serif; transition: all .2s;
+}
+.view-btn.active { background: var(--accent); color: #fff; }
+</style>
+</head>
+<body>
+
+<h1>🎙 Multispeaker Room</h1>
+<p class="subtitle">Host view — each speaker joins from their own phone. Captions appear live, labeled by speaker.</p>
+
+<div class="view-toggle">
+  <button class="view-btn active" onclick="showView('host')">🖥 Host View</button>
+  <button class="view-btn" onclick="showView('join')">📱 Join as Speaker</button>
+</div>
+
+<!-- ═══ HOST VIEW ═══ -->
+<div class="host-grid" id="hostView">
+
+  <!-- Caption stage -->
+  <div class="stage-panel">
+    <div class="stage-header">
+      <span class="room-label">Room</span>
+      <span class="room-id">tr-en-fr-abc123def</span>
+      <span style="margin-left:auto;display:flex;align-items:center;gap:6px;font-size:10px;color:#34d399">
+        <span style="width:6px;height:6px;border-radius:50%;background:#34d399;display:inline-block"></span> Live
+      </span>
+    </div>
+    <div class="stage-body">
+
+      <div class="caption-line tag-fr">
+        <span class="speaker-tag" style="background:rgba(96,165,250,.12);color:#93c5fd">🇫🇷 FR</span>
+        <span class="speaker-text">nous constatons une précision sans précédent dans les systèmes en temps réel</span>
+        <span class="speaker-ts">03:42:27</span>
+      </div>
+
+      <div class="caption-line tag-en">
+        <span class="speaker-tag" style="background:rgba(107,157,255,.12);color:#8ab4ff">🇬🇧 EN</span>
+        <span class="speaker-text">we are seeing unprecedented accuracy in real‑time systems</span>
+        <span class="speaker-ts">03:42:24</span>
+      </div>
+
+      <div class="caption-line tag-de">
+        <span class="speaker-tag" style="background:rgba(52,211,153,.12);color:#6ee7b7">🇩🇪 DE</span>
+        <span class="speaker-text">wir sehen eine beispiellose Genauigkeit in Echtzeitsystemen</span>
+        <span class="speaker-ts">03:42:21</span>
+      </div>
+
+      <div class="caption-line tag-fr">
+        <span class="speaker-tag" style="background:rgba(96,165,250,.12);color:#93c5fd">🇫🇷 FR</span>
+        <span class="speaker-text">le déploiement à grande échelle reste notre plus grand défi</span>
+        <span class="speaker-ts">03:42:18</span>
+      </div>
+
+      <div class="caption-line tag-en">
+        <span class="speaker-tag" style="background:rgba(107,157,255,.12);color:#8ab4ff">🇬🇧 EN</span>
+        <span class="speaker-text">deployment at scale remains our biggest challenge</span>
+        <span class="speaker-ts">03:42:15</span>
+      </div>
+
+      <div class="caption-line tag-it">
+        <span class="speaker-tag" style="background:rgba(248,113,113,.12);color:#f99">🇮🇹 IT</span>
+        <span class="speaker-text">e come questi sistemi possono superare le barriere linguistiche</span>
+        <span class="speaker-ts">03:42:12</span>
+      </div>
+
+      <div class="caption-line tag-en">
+        <span class="speaker-tag" style="background:rgba(107,157,255,.12);color:#8ab4ff">🇬🇧 EN</span>
+        <span class="speaker-text">and how these systems can bridge language barriers</span>
+        <span class="speaker-ts">03:42:09</span>
+      </div>
+
+      <div class="caption-line tag-fr">
+        <span class="speaker-tag" style="background:rgba(96,165,250,.12);color:#93c5fd">🇫🇷 FR</span>
+        <span class="speaker-text">nous discutons de l'avenir de la traduction en temps réel</span>
+        <span class="speaker-ts">03:42:06</span>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Sidebar -->
+  <div class="side-panel">
+
+    <div class="speakers-card">
+      <h3>🎙 Speakers (3/4)</h3>
+
+      <div class="speaker-row connected">
+        <span class="speaker-dot live"></span>
+        <span class="speaker-name">Marco</span>
+        <span class="speaker-lang">IT</span>
+        <span class="speaker-status on">● Live</span>
+      </div>
+
+      <div class="speaker-row connected">
+        <span class="speaker-dot live"></span>
+        <span class="speaker-name">Claire</span>
+        <span class="speaker-lang">FR</span>
+        <span class="speaker-status on">● Live</span>
+      </div>
+
+      <div class="speaker-row connected">
+        <span class="speaker-dot live"></span>
+        <span class="speaker-name">Thomas</span>
+        <span class="speaker-lang">EN</span>
+        <span class="speaker-status on">● Live</span>
+      </div>
+
+      <div class="speaker-row">
+        <span class="speaker-dot"></span>
+        <span class="speaker-name">—</span>
+        <span class="speaker-lang">DE</span>
+        <span class="speaker-status waiting">Waiting…</span>
+      </div>
+    </div>
+
+    <div class="invite-card">
+      <h3>🔗 Invite Speakers</h3>
+      <div class="invite-url">
+        <input value="sottotitoli.app/join/abc123" readonly onclick="this.select()">
+        <button>📋 Copy</button>
+      </div>
+      <div class="qr-placeholder">
+        [ QR Code ]<br>Scan to join<br>as speaker
+      </div>
+      <div class="invite-buttons">
+        <button class="invite-btn">📱 WhatsApp</button>
+        <button class="invite-btn">📧 Email</button>
+        <button class="invite-btn">🔗 Copy Link</button>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ═══ JOIN VIEW (speaker on phone) ═══ -->
+<div class="join-sim" id="joinView">
+  <h2>🎤 Join as Speaker</h2>
+  <p>Room: <strong style="font-family:'JetBrains Mono',monospace;color:var(--accent2)">abc123</strong></p>
+
+  <p style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">Your language</p>
+  <div class="join-lang-select">
+    <button class="lang-pill">🇬🇧 English</button>
+    <button class="lang-pill selected">🇮🇹 Italiano</button>
+    <button class="lang-pill">🇫🇷 Français</button>
+    <button class="lang-pill">🇩🇪 Deutsch</button>
+    <button class="lang-pill">🇪🇸 Español</button>
+  </div>
+
+  <p style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">Your name</p>
+  <input type="text" value="Marco" style="width:200px;padding:10px 14px;border-radius:100px;border:1px solid var(--line);background:var(--card2);color:var(--text);text-align:center;font-size:14px;font-family:Inter,sans-serif;outline:none;margin-bottom:20px">
+
+  <button class="join-btn">🎙 Join & Unmute</button>
+
+  <div class="mic-status">
+    <span class="dot live"></span> Mic live — speaking as <strong>Marco (IT)</strong>
+  </div>
+</div>
+
+<script>
+function showView(view) {
+  var btns = document.querySelectorAll('.view-btn');
+  btns.forEach(function(b){b.classList.remove('active')});
+  if (view==='host'){btns[0].classList.add('active');document.getElementById('hostView').style.display='grid';document.getElementById('joinView').style.display='none'}
+  else{btns[1].classList.add('active');document.getElementById('hostView').style.display='none';document.getElementById('joinView').style.display='block'}
+}
+// Click a language pill in join view
+document.querySelectorAll('.lang-pill').forEach(function(p){p.addEventListener('click',function(){document.querySelectorAll('.lang-pill').forEach(function(pp){pp.classList.remove('selected')});this.classList.add('selected')})});
+</script>
+
+</body>
+</html>
