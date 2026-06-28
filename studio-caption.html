@@ -835,8 +835,8 @@ button[onclick*="addToWordBank"]:hover{background:rgba(52,211,153,.15)!important
   <div class="duo-speaker-sidebar-body" id="duoSpeakerList">
     <div style="text-align:center;font-size:11px;color:var(--muted);padding:20px 8px">No speakers yet</div>
   </div>
-  <!-- Invite section -->
-  <div style="padding:12px;border-top:1px solid rgba(255,255,255,.06)">
+  <!-- Host invite section -->
+  <div id="duoHostSection" style="display:none;padding:12px;border-top:1px solid rgba(255,255,255,.06)">
     <div style="font-family:'Bebas Neue',sans-serif;font-size:12px;letter-spacing:1px;color:var(--muted);text-transform:uppercase;margin-bottom:6px">📨 Invite Speakers</div>
     <p style="font-size:9px;color:var(--muted2);margin-bottom:8px;line-height:1.4">Send this link to others. They can join and their speech will be tagged with their name.</p>
     <div class="duo-invite-btns">
@@ -847,6 +847,12 @@ button[onclick*="addToWordBank"]:hover{background:rgba(52,211,153,.15)!important
     <div style="margin-top:10px">
       <button onclick="duoNewRoom()" class="duo-invite-btn">🔄 New Room</button>
     </div>
+  </div>
+  <!-- Invitee info section -->
+  <div id="duoInviteeSection" style="display:none;padding:12px;border-top:1px solid rgba(255,255,255,.06)">
+    <div style="font-family:'Bebas Neue',sans-serif;font-size:12px;letter-spacing:1px;color:var(--muted);text-transform:uppercase;margin-bottom:6px">📋 Room Info</div>
+    <p style="font-size:9px;color:var(--muted2);margin-bottom:6px;line-height:1.4">You were invited by <strong style="color:var(--accent)" id="duoInvitedBy">the host</strong>.</p>
+    <button onclick="duoRefreshRoom()" class="duo-invite-btn">🔄 Refresh</button>
   </div>
 </aside>
 
@@ -1301,7 +1307,15 @@ function setSpeakerMode(mode) {
     var toggle = document.getElementById('duoToggleBtn');
     if (sidebar) { sidebar.style.display = 'flex'; sidebar.classList.add('open'); }
     if (toggle) { toggle.style.display = 'block'; toggle.classList.add('open'); }
+    // Show host section, hide invitee section
+    var hostSec = document.getElementById('duoHostSection');
+    var invSec = document.getElementById('duoInviteeSection');
+    var mgmtBtn = sidebar ? sidebar.querySelector('.duo-speaker-sidebar-head button') : null;
+    if (hostSec) hostSec.style.display = 'block';
+    if (invSec) invSec.style.display = 'none';
+    if (mgmtBtn) mgmtBtn.style.display = 'flex';
     window._duoMode = true;
+    window._duoIsHost = true;
     // Create room + connect
     if (!window._duoRoomId) {
       window._duoRoomId = 'cap-' + Date.now().toString(36);
@@ -1611,6 +1625,24 @@ _realMic.onFinal = function(text) {
 updateMicUI('idle');
 
 function toggleSession() {
+  // In DUO+ mode, only the host can start/stop the session
+  if (window._duoMode && !window._duoIsHost) {
+    // Invitee: just toggle their own mic
+    if (!sessionActive) {
+      startRealMic().then(function(ok){
+        if (!ok) { alert('⚠ Mic access denied'); return; }
+        sessionActive = true;
+        var startBtn = document.getElementById('startBtn');
+        if (startBtn) { startBtn.textContent = '⏹ Leave'; startBtn.classList.add('danger'); }
+      });
+    } else {
+      stopRealMic();
+      sessionActive = false;
+      var startBtn = document.getElementById('startBtn');
+      if (startBtn) { startBtn.textContent = '🎤 Join Conversation'; startBtn.classList.remove('danger'); }
+    }
+    return;
+  }
   sessionActive = !sessionActive;
   var startBtn = document.getElementById('startBtn');
   var stopBtn = document.getElementById('stopBtn');
@@ -3927,6 +3959,7 @@ window.fixExtrasPanelColors = function(){
     // Check if this user is the host — if so, skip join screen and enter room directly
     function proceedAsHost() {
       window._duoMode = true;
+      window._duoIsHost = true;
       window._duoSpeakerLang = (window._currentCaptionLang || 'en-US').split('-')[0];
       var sb = window.sottotitoliSupabase;
       if (sb) {
@@ -3948,6 +3981,12 @@ window.fixExtrasPanelColors = function(){
       var toggle = document.getElementById('duoToggleBtn');
       if (sidebar) { sidebar.style.display = 'flex'; sidebar.classList.add('open'); }
       if (toggle) { toggle.style.display = 'block'; toggle.classList.add('open'); }
+      // Show host section
+      var hostSec = document.getElementById('duoHostSection');
+      var invSec = document.getElementById('duoInviteeSection');
+      if (hostSec) hostSec.style.display = 'block';
+      if (invSec) invSec.style.display = 'none';
+      window._duoIsHost = true;
       var soloBtn = document.getElementById('modeSoloBtn');
       var duoBtn = document.getElementById('modeDuoBtn');
       if (soloBtn) soloBtn.className = 'btn-sm';
@@ -4194,6 +4233,14 @@ window.fixExtrasPanelColors = function(){
     window._duoSpeakerName = name;
     window._duoSpeakerLang = lang;
     window._duoMode = true;
+    window._duoIsHost = false;
+    // Set caption language to the chosen language
+    captLang = lang;
+    var locMap = {en:'en-US',it:'it-IT',fr:'fr-FR',de:'de-DE',es:'es-ES'};
+    if (typeof setCaptionLanguage === 'function') {
+      setCaptionLanguage(locMap[lang] || 'en-US', lang.charAt(0).toUpperCase()+lang.slice(1), true);
+    }
+    if (typeof setLang === 'function') setLang(lang);
 
     // Hide join screen, show normal UI
     document.getElementById('duoJoinScreen').style.display = 'none';
@@ -4202,18 +4249,48 @@ window.fixExtrasPanelColors = function(){
     document.getElementById('topbarSub').style.display = 'flex';
     document.getElementById('topbarRecWrap').style.display = '';
 
-    // Set DUO+ mode
+    // Set DUO+ UI
     var soloBtn = document.getElementById('modeSoloBtn');
     var duoBtn = document.getElementById('modeDuoBtn');
     if (soloBtn) soloBtn.className = 'btn-sm';
     if (duoBtn) duoBtn.className = 'mode-badge';
     setSpeakerCount('2');
 
-    // Show sidebar
+    // Show sidebar — invitee view
     var sidebar = document.getElementById('duoSpeakerSidebar');
     var toggle = document.getElementById('duoToggleBtn');
     if (sidebar) { sidebar.style.display = 'flex'; sidebar.classList.add('open'); }
     if (toggle) { toggle.style.display = 'block'; toggle.classList.add('open'); }
+    // Hide host section, show invitee section, hide manage button
+    var hostSec = document.getElementById('duoHostSection');
+    var invSec = document.getElementById('duoInviteeSection');
+    if (hostSec) hostSec.style.display = 'none';
+    if (invSec) invSec.style.display = 'block';
+    // Hide the + manage button for invitees
+    var mgmtBtn = sidebar ? sidebar.querySelector('.duo-speaker-sidebar-head button') : null;
+    if (mgmtBtn) mgmtBtn.style.display = 'none';
+    // Set invited-by name
+    var params = new URLSearchParams(window.location.search);
+    var hostName = params.get('host') || 'the host';
+    var el = document.getElementById('duoInvitedBy');
+    if (el) el.textContent = decodeURIComponent(hostName);
+
+    // Update START button for invitee
+    var startBtn = document.getElementById('startBtn');
+    if (startBtn) {
+      startBtn.textContent = '🎤 Join Conversation';
+      startBtn.className = 'btn-grad btn-start';
+      startBtn.onclick = function() { toggleSession(); };
+    }
+    // Show waiting message
+    var ctrl = document.querySelector('.studio-ctrl');
+    if (ctrl) {
+      var waitMsg = document.createElement('span');
+      waitMsg.id = 'duoWaitMsg';
+      waitMsg.style.cssText = 'font-size:10px;color:var(--muted);font-style:italic;margin-left:8px';
+      waitMsg.textContent = 'Waiting for host to start session…';
+      ctrl.insertBefore(waitMsg, ctrl.firstChild);
+    }
 
     duoAssignLabel(name, lang);
     window.duoConnectWebSocket();
@@ -4266,6 +4343,11 @@ window.fixExtrasPanelColors = function(){
     duoConnectWebSocket();
     duoUpdateInviteUrl();
     var t=document.getElementById('toast'); if(t){t.textContent='🔄 New room created';t.style.opacity='1';clearTimeout(t._tt);t._tt=setTimeout(function(){t.style.opacity='0'},2000);}
+  };
+
+  // ═══ Refresh room (for invitees) ═══
+  window.duoRefreshRoom = function() {
+    window.location.reload();
   };
 
   // ═══ Init host in speaker list (called from outside the module) ═══
