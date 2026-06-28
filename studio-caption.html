@@ -1454,33 +1454,54 @@ function _ensureLinesClickable() {
   });
 }
 
-// Mock dictionary for word cards (in production: API call)
-var _mockDict = {
-  "morning":{"pos":"noun","def":"The early part of the day, from sunrise to noon.","rel":[{"w":"dawn","s":true},{"w":"sunrise","s":true},{"w":"forenoon"},{"w":"AM"}]},
-  "everyone":{"pos":"pron","def":"Every person; all people.","rel":[{"w":"everybody","s":true},{"w":"all","s":true}]},
-  "started":{"pos":"verb","def":"To begin or set in motion.","rel":[{"w":"began","s":true},{"w":"commenced","s":true},{"w":"initiated"},{"w":"launched"}]},
-  "discuss":{"pos":"verb","def":"To talk about in order to exchange ideas or make a decision.","rel":[{"w":"debate","s":true},{"w":"consider","s":true},{"w":"examine"},{"w":"review"}]},
-  "quarterly":{"pos":"adj","def":"Occurring or produced four times a year.","rel":[{"w":"periodic","s":true},{"w":"trimestral","s":true}]},
-  "results":{"pos":"noun","def":"The outcome or effect of an action or process.","rel":[{"w":"outcomes","s":true},{"w":"findings","s":true},{"w":"consequences"}]},
-  "product":{"pos":"noun","def":"An article or substance manufactured for sale.","rel":[{"w":"item","s":true},{"w":"commodity","s":true},{"w":"offering"}]},
-  "launch":{"pos":"noun","def":"The act of introducing something new to the public.","rel":[{"w":"release","s":true},{"w":"rollout","s":true},{"w":"introduction"},{"w":"debut"}]},
-  "timeline":{"pos":"noun","def":"A schedule showing the order of events.","rel":[{"w":"schedule","s":true},{"w":"roadmap","s":true},{"w":"plan"}]},
-  "great":{"pos":"adj","def":"Of an extent considerably above average.","rel":[{"w":"excellent","s":true},{"w":"wonderful","s":true},{"w":"fantastic"},{"w":"terrific"}]},
-  "market":{"pos":"noun","def":"An area in which commercial dealings are conducted.","rel":[{"w":"marketplace","s":true},{"w":"sector","s":true},{"w":"industry"}]},
-  "performance":{"pos":"noun","def":"The action of carrying out a task.","rel":[{"w":"execution","s":true},{"w":"achievement","s":true},{"w":"results"}]},
-  "excellent":{"pos":"adj","def":"Extremely good; outstanding.","rel":[{"w":"outstanding","s":true},{"w":"superb","s":true},{"w":"exceptional"},{"w":"brilliant"}]},
-  "features":{"pos":"noun","def":"Distinctive attributes of something.","rel":[{"w":"characteristics","s":true},{"w":"attributes","s":true},{"w":"qualities"}]},
-  "release":{"pos":"noun","def":"The action of making available to the public.","rel":[{"w":"launch","s":true},{"w":"publication","s":true},{"w":"distribution"}]},
-  "schedule":{"pos":"verb","def":"To arrange or plan an event.","rel":[{"w":"arrange","s":true},{"w":"plan","s":true},{"w":"organize"},{"w":"book"}]},
-  "finalize":{"pos":"verb","def":"To complete or agree on a finished form.","rel":[{"w":"complete","s":true},{"w":"conclude","s":true},{"w":"settle"},{"w":"wrap up"}]},
-  "roadmap":{"pos":"noun","def":"A strategic plan defining a goal and steps.","rel":[{"w":"plan","s":true},{"w":"strategy","s":true},{"w":"blueprint"},{"w":"outline"}]},
-  "details":{"pos":"noun","def":"Individual features or particulars.","rel":[{"w":"particulars","s":true},{"w":"specifics","s":true},{"w":"points"}]},
-  "vendite":{"pos":"noun","def":"The exchange of a product for money; sales.","rel":[{"w":"sales","s":true},{"w":"revenue","s":true}]},
-  "preparato":{"pos":"verb","def":"Made ready in advance; prepared.","rel":[{"w":"prepared","s":true},{"w":"ready","s":true},{"w":"organized"}]},
-  "dati":{"pos":"noun","def":"Facts and statistics for analysis.","rel":[{"w":"data","s":true},{"w":"information","s":true}]},
-  "crescita":{"pos":"noun","def":"The process of increasing in size.","rel":[{"w":"growth","s":true},{"w":"increase","s":true},{"w":"expansion"}]},
-  "futuro":{"pos":"noun","def":"The time yet to come.","rel":[{"w":"future","s":true},{"w":"tomorrow","s":true},{"w":"prospect"}]}
-};
+// ── Fetch definition from Datamuse API ──
+function _fetchDefinition(word, callback) {
+  try {
+    var xhr = new XMLHttpRequest();
+    xhr.open('GET', 'https://api.datamuse.com/words?sp=' + encodeURIComponent(word) + '&md=d&max=1', true);
+    xhr.timeout = 4000;
+    xhr.onload = function() {
+      if (xhr.status === 200) {
+        try {
+          var data = JSON.parse(xhr.responseText);
+          if (data[0] && data[0].defs && data[0].defs[0]) {
+            var def = data[0].defs[0];
+            var parts = def.split('\t');
+            callback(parts[1] || def);
+            return;
+          }
+        } catch(e) {}
+      }
+      callback(null);
+    };
+    xhr.onerror = function() { callback(null); };
+    xhr.ontimeout = function() { callback(null); };
+    xhr.send();
+  } catch(e) { callback(null); }
+}
+
+// ── Get POS from compromise.js ──
+function _getPOS(word) {
+  try {
+    if (typeof nlp !== 'undefined') {
+      var doc = nlp(word);
+      var terms = doc.json();
+      if (terms[0] && terms[0].terms && terms[0].terms[0]) {
+        var tags = terms[0].terms[0].tags || [];
+        if (tags.indexOf('Noun') !== -1) return 'noun';
+        if (tags.indexOf('Verb') !== -1) return 'verb';
+        if (tags.indexOf('Adjective') !== -1) return 'adj';
+        if (tags.indexOf('Adverb') !== -1) return 'adv';
+        if (tags.indexOf('Preposition') !== -1) return 'prep';
+        if (tags.indexOf('Conjunction') !== -1) return 'conj';
+        if (tags.indexOf('Pronoun') !== -1) return 'pron';
+      }
+    }
+  } catch(e) {}
+  return '—';
+}
+
+// ── Build SYN cards from a line's content words ──
 var _stopWords = /^(the|and|for|are|was|with|that|this|from|have|were|they|will|what|when|your|about|which|their|there|would|could|should|does|been|being|into|more|some|than|then|also|very|just|like|over|each|said|della|del|dei|degli|delle|una|uno|per|che|con|sono|una|nel|nella|negli|nelle|dal|dallo|dalla|dai|dagli|dalle|non|più|meno|come|così|questa|questo|quella|quello|quelli|quelle)$/i;
 
 function _buildSynCards(text) {
@@ -1492,31 +1513,58 @@ function _buildSynCards(text) {
     var clean = w.replace(/[.,;:!?…'"]/g, '').toLowerCase();
     if (clean.length > 2 && !_stopWords.test(clean)) contentWords.push(clean);
   });
+
+  if (contentWords.length === 0) {
+    container.innerHTML = '<div style="text-align:center;padding:40px 20px;color:var(--muted2);font-size:12px">No content words found.<br><strong style="color:var(--accent)">Try a line with more descriptive words.</strong></div>';
+    var count = document.getElementById('rightPanelCount');
+    if (count) count.textContent = '0';
+    return;
+  }
+
+  // Build placeholder cards immediately
   var html = '';
   contentWords.forEach(function(word) {
-    var entry = _mockDict[word];
-    if (!entry) {
-      html += '<div class="syn-word" style="background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.05);border-radius:8px;padding:10px 12px">';
-      html += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px"><span style="font-size:16px;font-weight:700;color:var(--text)">' + word + '</span><span style="font-size:9px;font-weight:600;text-transform:uppercase;padding:2px 8px;border-radius:100px;background:rgba(167,139,250,.15);color:var(--accent2)">—</span></div>';
-      html += '<div style="font-size:11px;color:var(--muted)">Definition not available.</div>';
-      html += '</div>';
-    } else {
-      html += '<div class="syn-word" style="background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.05);border-radius:8px;padding:10px 12px">';
-      html += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px"><span style="font-size:16px;font-weight:700;color:var(--text)">' + word + '</span><span style="font-size:9px;font-weight:600;text-transform:uppercase;padding:2px 8px;border-radius:100px;background:rgba(167,139,250,.15);color:var(--accent2)">' + entry.pos + '</span></div>';
-      html += '<div style="font-size:11px;color:var(--muted);line-height:1.5;margin-bottom:6px">' + entry.def + '</div>';
-      html += '<div style="display:flex;flex-wrap:wrap;gap:4px">';
-      entry.rel.forEach(function(r) {
-        html += '<span style="font-size:9px;font-weight:600;padding:3px 8px;border-radius:100px;border:1px solid rgba(255,255,255,.08);color:var(--muted2)' + (r.s ? ';background:rgba(52,211,153,.06);border-color:rgba(52,211,153,.2);color:#34d399' : '') + '">' + r.w + '</span>';
-      });
-      html += '</div></div>';
-    }
+    html += '<div class="syn-word" id="synw-' + word + '" style="background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.05);border-radius:8px;padding:10px 12px">';
+    html += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px"><span style="font-size:16px;font-weight:700;color:var(--text)">' + word + '</span><span style="font-size:9px;font-weight:600;text-transform:uppercase;padding:2px 8px;border-radius:100px;background:rgba(167,139,250,.15);color:var(--accent2)">' + _getPOS(word) + '</span></div>';
+    html += '<div style="font-size:11px;color:var(--muted);line-height:1.5;margin-bottom:6px" class="syn-def">Loading…</div>';
+    html += '<div style="display:flex;flex-wrap:wrap;gap:4px;align-items:center" class="syn-rel"></div>';
+    html += '</div>';
   });
-  if (contentWords.length === 0) {
-    html = '<div style="text-align:center;padding:40px 20px;color:var(--muted2);font-size:12px">No content words found.<br><strong style="color:var(--accent)">Try a line with more descriptive words.</strong></div>';
-  }
   container.innerHTML = html;
   var count = document.getElementById('rightPanelCount');
   if (count) count.textContent = contentWords.length;
+
+  // Fetch synonyms + definitions asynchronously
+  contentWords.forEach(function(word) {
+    // Fetch definition from Datamuse
+    _fetchDefinition(word, function(def) {
+      var card = document.getElementById('synw-' + word);
+      if (!card) return;
+      var defEl = card.querySelector('.syn-def');
+      if (defEl) defEl.textContent = def || 'Definition not available.';
+    });
+
+    // Fetch synonyms from local dictionary
+    if (typeof fetchSynonyms === 'function') {
+      fetchSynonyms(word, function(syns) {
+        var card = document.getElementById('synw-' + word);
+        if (!card) return;
+        var relEl = card.querySelector('.syn-rel');
+        if (!relEl) return;
+        if (syns && syns !== '—') {
+          var list = syns.split(/,\s*/);
+          var relHtml = '';
+          list.forEach(function(s) {
+            relHtml += '<span style="font-size:9px;font-weight:600;padding:3px 8px;border-radius:100px;border:1px solid rgba(52,211,153,.2);color:#34d399;background:rgba(52,211,153,.06);margin:2px">' + s + '</span>';
+          });
+          relEl.innerHTML = relHtml;
+        }
+        // Add Word Bank button
+        var wbHtml = '<span title="Add to Word Bank" onclick="event.stopPropagation();addToWordBank(\'' + word + '\')" style="cursor:pointer;font-size:11px;padding:3px 8px;border-radius:100px;border:1px solid rgba(255,255,255,.08);color:var(--muted2);transition:all .15s;margin-left:auto" onmouseover="this.style.borderColor=\'var(--accent)\';this.style.color=\'var(--accent2)\'" onmouseout="this.style.borderColor=\'rgba(255,255,255,.08)\';this.style.color=\'var(--muted2)\'">+ Bank</span>';
+        relEl.innerHTML += wbHtml;
+      });
+    }
+  });
 }
 
 // ═══ Speaker mode (SOLO / DUO+) ═══
