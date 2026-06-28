@@ -930,6 +930,33 @@ button[onclick*="addToWordBank"]:hover{background:rgba(52,211,153,.15)!important
 
 // ═══ Read URL params (from start.html) ═══
 (function() {
+
+  // ── Override updateMicUI to use rec bar (listen-bar was removed) ──
+  var _origUpdateMicUI = window.updateMicUI;
+  window.updateMicUI = function(state) {
+    _realMic.state = state;
+    var dot = document.getElementById('recMicDot');
+    var label = document.getElementById('recMicLabel');
+    if (dot) {
+      dot.classList.remove('live','warn','idle','blocked');
+      if (state === 'live') dot.classList.add('live');
+      else if (state === 'requesting') dot.classList.add('warn');
+      else if (state === 'blocked' || state === 'error') dot.classList.add('blocked');
+      else dot.classList.add('idle');
+    }
+    if (label) {
+      if (state === 'live') label.textContent = 'Live';
+      else if (state === 'requesting') label.textContent = 'Mic…';
+      else if (state === 'blocked') label.textContent = 'Blocked';
+      else if (state === 'error') label.textContent = 'Error';
+      else label.textContent = 'Mic';
+    }
+    if (typeof _origUpdateMicUI === 'function') _origUpdateMicUI(state);
+  };
+})();
+
+// ═══ Read URL params (from start.html) ═══
+(function() {
   var params = new URLSearchParams(window.location.search);
   var langParam = params.get('lang');
   var modeParam = params.get('mode');
