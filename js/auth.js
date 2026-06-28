@@ -50,6 +50,8 @@ window.sottotitoliSupabase = window.supabase.createClient(
         var avatar = user.user_metadata?.avatar_url || user.user_metadata?.picture || '';
         var preset = localStorage.getItem('sottotitoli-avatar-preset') || '';
         window.dispatchEvent(new CustomEvent('sottotitoli-user-ready', {detail:{name:name,email:user.email,avatar:avatar,preset:preset}}));
+        // Initialize credits for new users (15 min free)
+        initUserCredits(r.data.session.user.id);
         // Skip profiles table query — columns not yet created in Supabase
         // TODO: add columns (avatar_url, full_name, native_lang, location, learning_profile) to profiles table
       }
@@ -262,3 +264,40 @@ document.addEventListener('DOMContentLoaded', async () => {
     renderSignedIn(session?.user);
   }
 });
+
+// ═══ Credit initialization — 15 min free for new users, weekly top-up ═══
+function initUserCredits(userId) {
+  if (!userId) return;
+  var sb = window.sottotitoliSupabase;
+  if (!sb) return;
+  sb.from('user_credits').select('balance_seconds, last_weekly_topup').eq('user_id', userId).maybeSingle().then(function(r){
+    if (r.error) { console.warn('Credit check failed:', r.error.message); return; }
+    var now = new Date();
+    if (!r.data) {
+      // New user — create credit row with 15 min free
+      sb.from('user_credits').insert({
+        user_id: userId,
+        balance_seconds: 900,
+        lifetime_seconds: 0,
+        last_weekly_topup: now.toISOString(),
+        updated_at: now.toISOString()
+      }).then(function(ins){
+        if (!ins.error) console.log('🎁 New user: 15 min free credits granted');
+      });
+    } else {
+      // Existing user — check weekly top-up (7 days since last)
+      var lastTopup = r.data.last_weekly_topup ? new Date(r.data.last_weekly_topup) : null;
+      var needsTopup = !lastTopup || (now - lastTopup > 7 * 24 * 60 * 60 * 1000);
+      if (needsTopup) {
+        var newBalance = (r.data.balance_seconds || 0) + 900;
+        sb.from('user_credits').update({
+          balance_seconds: newBalance,
+          last_weekly_topup: now.toISOString(),
+          updated_at: now.toISOString()
+        }).eq('user_id', userId).then(function(upd){
+          if (!upd.error) console.log('🔄 Weekly top-up: +15 min (balance: ' + Math.floor(newBalance/60) + ' min)');
+        });
+      }
+    }
+  });
+}
