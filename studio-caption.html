@@ -1344,6 +1344,7 @@ function setSpeakerMode(mode) {
     if (mgmtBtn) mgmtBtn.style.display = 'flex';
     window._duoMode = true;
     window._duoIsHost = true;
+    window._duoHostName = window._duoSpeakerName; // host is self
     // Create room + connect
     if (!window._duoRoomId) {
       window._duoRoomId = 'cap-' + Date.now().toString(36) + '-' + Math.random().toString(36).substring(2,6);
@@ -3988,6 +3989,7 @@ window.fixExtrasPanelColors = function(){
     function proceedAsHost() {
       window._duoMode = true;
       window._duoIsHost = true;
+      window._duoHostName = window._duoSpeakerName;
       window._duoSpeakerLang = (window._currentCaptionLang || 'en-US').split('-')[0];
       var sb = window.sottotitoliSupabase;
       if (sb) {
@@ -4015,6 +4017,7 @@ window.fixExtrasPanelColors = function(){
       if (hostSec) hostSec.style.display = 'block';
       if (invSec) invSec.style.display = 'none';
       window._duoIsHost = true;
+      window._duoHostName = window._duoSpeakerName;
       var soloBtn = document.getElementById('modeSoloBtn');
       var duoBtn = document.getElementById('modeDuoBtn');
       if (soloBtn) soloBtn.className = 'btn-sm';
@@ -4203,7 +4206,7 @@ window.fixExtrasPanelColors = function(){
       html += '<div class="duo-spk-pill connected'+(s?' speaking':'')+'">';
       html += '<span class="duo-spk-dot'+(s?' speaking':'')+'" style="background:'+spk.color+';color:'+spk.color+'"></span>';
       var flag = (window.DUO_FLAGS && window.DUO_FLAGS[spk.lang]) ? window.DUO_FLAGS[spk.lang]+' ' : '';
-      var isHost = (spk.name === window._duoSpeakerName && window._duoRoomId);
+      var isHost = (window._duoHostName && spk.name === window._duoHostName);
       html += '<span class="duo-spk-name">'+flag+(isHost?'👑 ':'')+escapeHTML(spk.name)+'</span>';
       html += '<span class="duo-spk-status'+(s?' speaking':'')+'">'+(s?'● speaking':'')+'</span>';
       html += '</div>';
@@ -4262,6 +4265,9 @@ window.fixExtrasPanelColors = function(){
     window._duoSpeakerLang = lang;
     window._duoMode = true;
     window._duoIsHost = false;
+    // Host name from URL
+    var params = new URLSearchParams(window.location.search);
+    window._duoHostName = decodeURIComponent(params.get('host') || 'Host');
     // Set caption language to the chosen language
     captLang = lang;
     var locMap = {en:'en-US',it:'it-IT',fr:'fr-FR',de:'de-DE',es:'es-ES'};
@@ -4305,10 +4311,15 @@ window.fixExtrasPanelColors = function(){
 
     // Update START button for invitee
     var startBtn = document.getElementById('startBtn');
+    var pauseBtn = document.getElementById('pauseBtn');
     if (startBtn) {
       startBtn.textContent = '🎤 Join Conversation';
       startBtn.className = 'btn-grad btn-start';
       startBtn.onclick = function() { toggleSession(); };
+    }
+    if (pauseBtn) {
+      pauseBtn.style.display = '';
+      pauseBtn.onclick = function() { togglePause(); };
     }
     // Show waiting message
     var ctrl = document.querySelector('.studio-ctrl');
