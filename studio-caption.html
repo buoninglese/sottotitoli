@@ -115,10 +115,10 @@ body {
 /* ── Info button ── */
 .info-btn { width: 22px; height: 22px; border-radius: 50%; border: 1px solid var(--line); background: transparent; color: var(--muted); cursor: pointer; font-size: 12px; font-weight: 700; display: flex; align-items: center; justify-content: center; transition: all .2s; position: relative; flex-shrink: 0; font-family: var(--font-body); }
 .info-btn:hover { background: rgba(124,58,237,.08); border-color: #7c3aed; color: #7c3aed; }
-.info-popup { opacity: 0; visibility: hidden; position: absolute; top: calc(100% + 10px); left: 50%; transform: translateX(-50%) translateY(-4px); width: 280px; max-width: calc(100vw - 32px); max-height: 75vh; overflow-y: auto; background: var(--card); border: 1px solid #7c3aed; border-radius: 10px; padding: 14px 16px; font-size: 11px; line-height: 1.6; color: var(--text); z-index: 10; box-shadow: 0 8px 32px rgba(0,0,0,.4); transition: opacity .2s ease, transform .2s ease, visibility .2s; }
-@media(max-width:480px){ .info-popup { left: auto; right: 0; transform: translateY(-4px); width: 260px; max-width: calc(100vw - 16px); } }
-.info-popup::after { content: ''; position: absolute; bottom: 100%; left: 50%; transform: translateX(-50%); border: 6px solid transparent; border-bottom-color: #7c3aed; }
-.info-btn:hover .info-popup, .info-btn:focus-within .info-popup, .info-popup.show { opacity: 1; visibility: visible; transform: translateX(-50%) translateY(0); }
+.info-popup { opacity: 0; visibility: hidden; position: fixed; top: 120px; right: 32px; width: 320px; max-width: calc(100vw - 32px); max-height: 70vh; overflow-y: auto; background: var(--card); border: 1px solid #7c3aed; border-radius: 10px; padding: 14px 16px; font-size: 11px; line-height: 1.6; color: var(--text); z-index: 3000; box-shadow: 0 8px 32px rgba(0,0,0,.4); transition: opacity .2s ease, visibility .2s; }
+@media(max-width:480px){ .info-popup { right: 8px; width: 280px; max-width: calc(100vw - 16px); top: 100px; } }
+.info-popup::after { display: none; }
+.info-btn:hover .info-popup, .info-btn:focus-within .info-popup, .info-popup.show { opacity: 1; visibility: visible; }
 .info-popup strong { color: #7c3aed; font-weight: 700; }
 
 /* ── Hover tooltip ── */
@@ -794,7 +794,7 @@ button[onclick*="addToWordBank"]:hover{background:rgba(52,211,153,.15)!important
 </div><!-- /topbar-stack -->
 
 <!-- ═══ APP MAIN ═══ -->
-<div class="app-main speakers-open right-open" id="appMain">
+<div class="app-main" id="appMain">
 
   <!-- ── Left: Speaker Panel ── -->
   <button class="duo-toggle-btn" id="duoToggleBtn" onclick="toggleDuoSidebar()" title="Speaker panel">▸</button>
@@ -1391,20 +1391,22 @@ function selectLine(lineIdx, el) {
   document.querySelectorAll('.caption-transcript .line').forEach(function(l){l.classList.remove('selected')});
   el.classList.add('selected');
   if (_rightMode !== 'syn') toggleRight('syn');
-  // Extract text
-  var spkEl = el.querySelector('.spk-tag');
-  var tsEl = el.querySelector('.ts');
-  var spkColor = spkEl ? spkEl.style.color : '#5b7fc1';
-  var spkName = spkEl ? spkEl.textContent : '';
-  var ts = tsEl ? tsEl.textContent : '';
-  var text = el.textContent.replace(spkName, '').replace(ts, '').trim();
+  // Extract text: remove timestamp spans and speaker tags
+  var clone = el.cloneNode(true);
+  var tsSpan = clone.querySelector('span'); // first span is always timestamp
+  if (tsSpan) tsSpan.remove();
+  var spkTag = clone.querySelector('.spk-tag');
+  var spkName = spkTag ? spkTag.textContent : '';
+  var spkColor = spkTag ? (spkTag.style.color || '#5b7fc1') : '#5b7fc1';
+  if (spkTag) spkTag.remove();
+  var text = (clone.textContent || '').trim();
+  var tsText = el.querySelector('span') ? el.querySelector('span').textContent : '';
   var preview = document.getElementById('synLinePreview');
   if (preview) {
-    preview.innerHTML = '<span style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.3px;color:' + spkColor + ';display:block;margin-bottom:4px;font-style:normal">' + spkName + ' · ' + ts + '</span>' + text;
+    var labelHtml = spkName ? '<span style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.3px;color:' + spkColor + ';display:block;margin-bottom:4px;font-style:normal">' + spkName + ' · ' + tsText + '</span>' : '<span style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.3px;color:var(--accent);display:block;margin-bottom:4px;font-style:normal">' + tsText + '</span>';
+    preview.innerHTML = labelHtml + text;
   }
-  // Build word cards from line content
   _buildSynCards(text);
-  // Scroll right panel to top
   var body = document.querySelector('.right-panel-body');
   if (body) body.scrollTop = 0;
 }
@@ -1704,6 +1706,8 @@ _realMic.onFinal = function(text) {
   window._sessionLines = window._sessionLines || [];
   window._sessionLines.push({ en: text, ts: tsStr });
 
+  // Make lines clickable for SYN panel
+  if (typeof _ensureLinesClickable === 'function') _ensureLinesClickable();
   
   // Clear interim after final
   if (interim) interim.textContent = '';
@@ -2015,19 +2019,18 @@ function togglePause() {
 var _isFullscreen = false;
 function toggleFullscreen() {
   _isFullscreen = !_isFullscreen;
-  var btn = document.getElementById('fullscreenBtn');
   if (_isFullscreen) {
     document.body.classList.add('fullscreen-active');
-    if (btn) btn.textContent = '✕';
-    fitLinesToViewport();
   } else {
     document.body.classList.remove('fullscreen-active');
-    if (btn) btn.textContent = '⛶';
     var t = document.getElementById('captionTranscript');
     if (t) t.querySelectorAll('.line').forEach(function(l){l.style.display='';});
   }
 }
-function fitLinesToViewport() {
+// Escape key to exit fullscreen
+document.addEventListener('keydown', function(e) {
+  if (e.key === 'Escape' && _isFullscreen) { toggleFullscreen(); }
+});
   if (!_isFullscreen) return;
   setTimeout(function() {
     var box = document.getElementById('captionBox');
