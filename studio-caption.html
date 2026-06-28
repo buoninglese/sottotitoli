@@ -822,7 +822,10 @@ button[onclick*="addToWordBank"]:hover{background:rgba(52,211,153,.15)!important
 <aside class="duo-speaker-sidebar" id="duoSpeakerSidebar">
   <div class="duo-speaker-sidebar-head">
     <span>🎙 Speakers</span>
-    <span style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--muted2);background:rgba(255,255,255,.03);padding:2px 8px;border-radius:4px" id="duoSpkCount">0</span>
+    <div style="display:flex;align-items:center;gap:8px">
+      <span style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--muted2);background:rgba(255,255,255,.03);padding:2px 8px;border-radius:4px" id="duoSpkCount">0</span>
+      <button onclick="duoOpenSpeakerConfig()" title="Manage speakers" style="background:none;border:1px solid rgba(255,255,255,.1);color:rgba(255,255,255,.4);border-radius:50%;width:22px;height:22px;cursor:pointer;font-size:14px;line-height:1;display:flex;align-items:center;justify-content:center">+</button>
+    </div>
   </div>
   <div class="duo-speaker-sidebar-body" id="duoSpeakerList">
     <div style="text-align:center;font-size:11px;color:var(--muted);padding:20px 8px">No speakers yet</div>
@@ -1314,6 +1317,9 @@ function setSpeakerMode(mode) {
     }
     duoConnectWebSocket();
     duoUpdateInviteUrl();
+    // Ensure host appears in speaker list immediately
+    duoAssignLabel(window._duoSpeakerName, window._duoSpeakerLang);
+    duoRenderSpeakers();
   }
   localStorage.setItem('sottotitoli-speaker-mode', mode);
 }
@@ -3995,7 +4001,8 @@ window.fixExtrasPanelColors = function(){
     window._duoWs.onmessage = function(event) {
       try {
         var data = JSON.parse(event.data);
-        if (data.type === 'duo-join') duoHandleJoin(data);
+        if (data.type === 'duo-kick') duoHandleKick(data);
+        else if (data.type === 'duo-join') duoHandleJoin(data);
         else if (data.type === 'duo-speaking') duoHandleSpeaking(data);
         else if (data.msg && data.final) duoHandleCaption(data);
       } catch(e) {}
@@ -4234,6 +4241,86 @@ window.fixExtrasPanelColors = function(){
     duoUpdateInviteUrl();
     var t=document.getElementById('toast'); if(t){t.textContent='🔄 New room created';t.style.opacity='1';clearTimeout(t._tt);t._tt=setTimeout(function(){t.style.opacity='0'},2000);}
   };
+
+  // ═══ Speaker Management Modal ═══
+  window.duoOpenSpeakerConfig = function() {
+    var existing = document.querySelector('.duo-modal-overlay');
+    if (existing) existing.remove();
+    var overlay = document.createElement('div');
+    overlay.className = 'duo-modal-overlay';
+    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:999;display:flex;align-items:center;justify-content:center';
+    var html = '<div class="duo-modal" style="background:#121620;border:1px solid #1e2430;border-radius:16px;width:400px;max-width:94vw;max-height:80vh;overflow-y:auto;box-shadow:0 24px 80px rgba(0,0,0,.6)">';
+    html += '<div style="display:flex;align-items:center;justify-content:space-between;padding:18px 22px;border-bottom:1px solid #1e2430">';
+    html += '<h3 style="font-family:Bebas Neue,sans-serif;font-size:20px;letter-spacing:1px;color:#e8eaed;margin:0">⚙ Manage Speakers</h3>';
+    html += '<button onclick="this.closest(\'.duo-modal-overlay\').remove()" style="background:none;border:none;color:#555;font-size:20px;cursor:pointer;padding:4px 8px;border-radius:6px">✕</button>';
+    html += '</div>';
+    html += '<div style="padding:16px 22px;display:flex;flex-direction:column;gap:6px">';
+    var map = window._duoSpeakerMap;
+    var keys = Object.keys(map);
+    var isHost = function(spk){ return spk.name === window._duoSpeakerName && window._duoRoomId; };
+    if (keys.length === 0) {
+      html += '<div style="text-align:center;font-size:13px;color:var(--muted);padding:20px">No speakers in room</div>';
+    } else {
+      keys.sort().forEach(function(label){
+        var spk = map[label];
+        var flag = (window.DUO_FLAGS && window.DUO_FLAGS[spk.lang]) ? window.DUO_FLAGS[spk.lang] : '';
+        var hostIcon = isHost(spk) ? ' 👑' : '';
+        html += '<div style="display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:8px;background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.04)">';
+        html += '<span style="width:10px;height:10px;border-radius:50%;background:'+spk.color+'"></span>';
+        html += '<span style="flex:1;font-size:13px;font-weight:600">'+flag+escapeHTML(spk.name)+hostIcon+'</span>';
+        html += '<span style="font-size:10px;color:var(--muted);font-family:JetBrains Mono,monospace">'+spk.lang.toUpperCase()+'</span>';
+        if (!isHost(spk)) {
+          html += '<button onclick="duoKickSpeaker(\''+label+'\')" style="background:rgba(248,113,113,.1);border:1px solid rgba(248,113,113,.2);color:#f87171;padding:4px 10px;border-radius:6px;font-size:10px;font-weight:600;cursor:pointer;font-family:Inter,sans-serif">Kick</button>';
+        }
+        html += '</div>';
+      });
+    }
+    html += '</div>';
+    html += '<div style="padding:12px 22px;border-top:1px solid #1e2430"><button onclick="this.closest(\'.duo-modal-overlay\').remove()" style="width:100%;padding:8px;border-radius:8px;border:1px solid rgba(255,255,255,.08);background:transparent;color:rgba(255,255,255,.5);font-size:12px;cursor:pointer;font-family:Inter,sans-serif">Close</button></div>';
+    html += '</div>';
+    overlay.innerHTML = html;
+    document.body.appendChild(overlay);
+    overlay.addEventListener('click', function(e){ if (e.target === overlay) overlay.remove(); });
+  };
+
+  // ═══ Kick Speaker ═══
+  window.duoKickSpeaker = function(label) {
+    var spk = window._duoSpeakerMap[label];
+    if (!spk) return;
+    if (!confirm('Remove ' + spk.name + ' from the room?')) return;
+    // Send kick message via WebSocket
+    if (window._duoWs && window._duoWs.readyState === WebSocket.OPEN) {
+      window._duoWs.send(JSON.stringify({ type:'duo-kick', label:label, name:spk.name }));
+    }
+    delete window._duoSpeakerMap[label];
+    duoRenderSpeakers();
+    // Close modal
+    var modal = document.querySelector('.duo-modal-overlay');
+    if (modal) modal.remove();
+    var t=document.getElementById('toast'); if(t){t.textContent='🚫 '+spk.name+' removed';t.style.opacity='1';clearTimeout(t._tt);t._tt=setTimeout(function(){t.style.opacity='0'},2000);}
+  };
+
+  // Handle incoming kick message
+  var _origWsOnMessage = null;
+  function duoHandleKick(data) {
+    // If we're the one being kicked
+    if (data.name === window._duoSpeakerName || (window._duoSpeakerMap[data.label] && window._duoSpeakerMap[data.label].name === window._duoSpeakerName)) {
+      alert('You have been removed from the room by the host.');
+      // Disconnect and return to solo mode
+      if (window._duoWs) { try { window._duoWs.close(); } catch(e){} window._duoWs = null; }
+      window._duoMode = false;
+      window._duoRoomId = '';
+      window._duoSpeakerMap = {};
+      document.getElementById('duoSpeakerSidebar').classList.remove('open');
+      document.getElementById('duoSpeakerSidebar').style.display = 'none';
+      document.getElementById('duoToggleBtn').style.display = 'none';
+      var soloBtn = document.getElementById('modeSoloBtn');
+      var duoBtn = document.getElementById('modeDuoBtn');
+      if (soloBtn) soloBtn.className = 'mode-badge';
+      if (duoBtn) duoBtn.className = 'btn-sm';
+      setSpeakerCount('1');
+    }
+  }
 
   // ═══ Toggle speaker sidebar ═══
   window.toggleDuoSidebar = function() {
