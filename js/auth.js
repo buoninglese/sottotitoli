@@ -30,6 +30,8 @@ window.sottotitoliSupabase = window.supabase.createClient(
   var path = window.location.pathname.replace(/\/$/,'').split('/').pop() || 'index.html';
   // Pages that are publicly accessible (no auth required)
   if(path==='index.html'||path===''||path==='404.html'||path.indexOf('overlay')===0)return;
+  // Multispeaker speaker-join mode doesn't require auth (guests join via invite link)
+  if(path==='multispeaker.html' && window.location.search.indexOf('speaker=1')!==-1)return;
   // Wait for session, redirect if missing
   function check(){
     var sb = window.sottotitoliSupabase;
