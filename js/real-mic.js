@@ -308,8 +308,10 @@ function _startForceFinalizeTimer() {
     var elapsed = Date.now() - _realMic._lastInterim;
     if (elapsed >= ms) {
       // Force finalize by restarting recognition
-      try { _realMic.recognition.stop(); } catch(e) {}
+      // Null recognition first so onend doesn't auto-restart the old instance
+      var oldRec = _realMic.recognition;
       _realMic.recognition = null;
+      try { oldRec.stop(); } catch(e) {}
       // Brief delay then restart
       setTimeout(function() {
         if (_realMic.state !== 'live') return;
@@ -335,6 +337,7 @@ function _stopForceFinalizeTimer() {
 // Set the force-finalize timeout in milliseconds (0 = disabled)
 function setForceFinalizeMs(ms) {
   _realMic.forceFinalizeMs = ms;
-  if (_realMic._forceTimer && ms <= 0) _stopForceFinalizeTimer();
-  if (!_realMic._forceTimer && ms > 0 && _realMic.state === 'live') _startForceFinalizeTimer();
+  // Restart timer with new value if mic is live
+  _stopForceFinalizeTimer();
+  if (ms > 0 && _realMic.state === 'live') _startForceFinalizeTimer();
 }
