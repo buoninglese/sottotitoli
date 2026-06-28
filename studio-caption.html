@@ -894,7 +894,7 @@ var currentCaptionLangName = 'English';
 // Maps language code prefix → available features. English = full, Tiers 2-4 graduated.
 var LANGUAGE_CAPABILITIES = {
   en: { translation:true, aiReports:true, pos:true, grammar:true, synonyms:true, definitions:true, cefrMetrics:true },
-  it: { translation:true, aiReports:true, pos:true, grammar:true, synonyms:true, definitions:false, cefrMetrics:true },
+  it: { translation:true, aiReports:true, pos:true, grammar:false, synonyms:true, definitions:false, cefrMetrics:true },
   nl: { translation:true, aiReports:true, pos:false, grammar:false, synonyms:false, definitions:false, cefrMetrics:false },
   es: { translation:true, aiReports:true, pos:false, grammar:false, synonyms:false, definitions:false, cefrMetrics:false },
   fr: { translation:true, aiReports:true, pos:false, grammar:false, synonyms:false, definitions:false, cefrMetrics:false },
@@ -3273,24 +3273,78 @@ function downloadGrammarPDF() {
     yard:'garden, court, enclosure, three feet'
   };
 
+  // ── Italian synonym dictionary ──
+  var IT_SYN_DICT = {
+    grande:'vasto, ampio, enorme, imponente, notevole',
+    piccolo:'minuscolo, ridotto, esiguo, minuto, breve',
+    bello:'splendido, magnifico, attraente, grazioso, incantevole',
+    brutto:'sgradevole, orrendo, deforme, sgraziato, ripugnante',
+    buono:'ottimo, eccellente, valido, gradevole, benefico',
+    cattivo:'malvagio, pessimo, dannoso, crudele, ostile',
+    importante:'rilevante, fondamentale, essenziale, significativo, cruciale',
+    facile:'semplice, agevole, elementare, accessibile, comprensibile',
+    difficile:'complesso, arduo, complicato, impegnativo, ostico',
+    veloce:'rapido, svelto, celere, pronto, immediato',
+    lento:'pigro, tardo, fiacco, rilassato, graduale',
+    felice:'contento, lieto, gioioso, soddisfatto, allegro',
+    triste:'malinconico, infelice, depresso, mesto, cupo',
+    intelligente:'brillante, sveglio, acuto, perspicace, astuto',
+    stupido:'sciocco, ottuso, insensato, idiota, ignorante',
+    ricco:'abbiente, facoltoso, opulento, prospero, generoso',
+    povero:'indigente, misero, bisognoso, scarso, umile',
+    forte:'potente, robusto, energico, intenso, resistente',
+    debole:'fragile, delicato, fiacco, tenue, vulnerabile',
+    nuovo:'recente, fresco, moderno, originale, inedito',
+    vecchio:'antico, anziano, superato, obsoleto, stagionato',
+    parlare:'discutere, conversare, esprimere, comunicare, dichiarare',
+    vedere:'osservare, guardare, notare, scorgere, individuare',
+    pensare:'riflettere, meditare, ragionare, credere, ritenere',
+    fare:'realizzare, compiere, eseguire, produrre, agire',
+    dire:'affermare, dichiarare, pronunciare, raccontare, comunicare',
+    andare:'procedere, dirigersi, avanzare, spostarsi, recarsi',
+    problema:'difficoltà, questione, inconveniente, ostacolo, sfida',
+    sistema:'metodo, struttura, organizzazione, apparato, meccanismo',
+    lavoro:'occupazione, impiego, attività, compito, mestiere',
+    tempo:'periodo, epoca, momento, durata, stagione',
+    cosa:'oggetto, elemento, entità, faccenda, questione',
+    persona:'individuo, soggetto, essere, carattere, figura',
+    casa:'abitazione, residenza, dimora, alloggio, edificio',
+    mondo:'universo, pianeta, terra, realtà, ambiente',
+    amore:'affetto, passione, devozione, tenerezza, adorazione',
+    luce:'chiarore, splendore, luminosità, bagliore, illuminazione',
+    acqua:'liquido, bevanda, pioggia, fonte, sorgente',
+    aiutare:'soccorrere, assistere, sostenere, favorire, supportare',
+    capire:'comprendere, afferrare, intuire, realizzare, intendere',
+    cambiare:'modificare, trasformare, mutare, alterare, variare',
+    creare:'generare, produrre, ideare, inventare, fondare',
+  };
+
   // ── Fetch synonyms (local dictionary — instant, always accurate) ──
   function fetchSynonyms(word, callback) {
-    word = word.toLowerCase().replace(/[^a-z-]/g, '');
+    var lang = (currentCaptionLang || 'en-US').split('-')[0];
+    word = word.toLowerCase().replace(/[^a-zà-ù-]/g, '');
     if (!word) { callback('—'); return; }
+    var dict = (lang === 'it') ? IT_SYN_DICT : SYN_DICT;
     // Check exact match
-    if (SYN_DICT[word]) { callback(SYN_DICT[word]); return; }
-    // Check base form (strip -ing, -ed, -s, -ly)
-    var base = word.replace(/(ing|ed|s|ly)$/, '');
-    if (base !== word && SYN_DICT[base]) { callback(SYN_DICT[base]); return; }
-    // Strip double letters + ing/ed (running → run)
-    base = word.replace(/(.)\1(ing|ed)$/, '$1');
-    if (base !== word && SYN_DICT[base]) { callback(SYN_DICT[base]); return; }
+    if (dict[word]) { callback(dict[word]); return; }
+    // Check base form (strip -ing, -ed, -s, -ly for English; -are/-ere/-ire for Italian)
+    if (lang === 'it') {
+      var baseIt = word.replace(/(ato|uto|ito|ando|endo|ante|ente|one|oni|mente)$/, '');
+      if (baseIt !== word && dict[baseIt]) { callback(dict[baseIt]); return; }
+    } else {
+      var base = word.replace(/(ing|ed|s|ly)$/, '');
+      if (base !== word && dict[base]) { callback(dict[base]); return; }
+      base = word.replace(/(.)\1(ing|ed)$/, '$1');
+      if (base !== word && dict[base]) { callback(dict[base]); return; }
+    }
     callback('—');
   }
 
-  // ── Grammar check via LanguageTool public API ──
+  // ── Grammar check via LanguageTool public API (language-aware) ──
   function checkGrammar(text,callback){
     try{
+      var lang = (currentCaptionLang || 'en-US').split('-')[0];
+      var ltLang = lang === 'en' ? 'en-US' : lang; // LT uses 'it','fr','de','es','pt','nl'
       var xhr=new XMLHttpRequest();
       xhr.open('POST','https://api.languagetool.org/v2/check',true);
       xhr.setRequestHeader('Content-Type','application/x-www-form-urlencoded');
@@ -3303,7 +3357,7 @@ function downloadGrammarPDF() {
       };
       xhr.onerror=function(){callback(null)};
       xhr.ontimeout=function(){callback(null)};
-      xhr.send('text='+encodeURIComponent(text)+'&language=en-US');
+      xhr.send('text='+encodeURIComponent(text)+'&language='+ltLang);
     }catch(e){callback(null)}
   }
 
