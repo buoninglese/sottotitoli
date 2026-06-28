@@ -58,15 +58,15 @@
 body {
   font-family: var(--font-body), system-ui, sans-serif;
   background: var(--bg); color: var(--text);
-  height: 100vh; overflow: hidden;
+  display: flex; flex-direction: column;
+  height: 100dvh; overflow: hidden;
   -webkit-font-smoothing: antialiased;
   transition: background .4s, color .4s;
 }
 
-/* ═══ UNIFIED TOP BAR (matches site standard) ═══ */
-/* ── Fixed header stack container ── */
+/* ═══ UNIFIED TOP BAR (natural flow, not fixed) ═══ */
 .topbar-stack {
-  position: fixed; top: 0; left: 0; right: 0; z-index: 2000;
+  flex-shrink: 0; z-index: 2000;
 }
 .topbar {
   display: flex; align-items: center; justify-content: space-between;
@@ -164,10 +164,8 @@ body {
 [data-theme="dark"] .rec-toggle.open { background: rgba(167,139,250,.1); border-color: #a78bfa; color: #a78bfa; }
 [data-theme="dark"] .info-btn:hover { background: rgba(167,139,250,.08); border-color: #a78bfa; color: #a78bfa; }
 
-/* Adjust panel padding for taller topbar */
-.h-panel-inner { max-width: 1100px; padding: 160px 32px 70px; }
-body:has(.topbar-rec-wrap.collapsed) .h-panel-inner,
-body.rec-collapsed .h-panel-inner { padding-top: 110px; }
+/* Panel padding — no more topbar compensation */
+.h-panel-inner { max-width: 1100px; padding: 32px 32px 28px; }
 @media (max-width: 700px) {
   .topbar .nav-links { display: none; }
   .topbar-sub { gap: 6px; padding: 8px 12px; }
@@ -176,9 +174,7 @@ body.rec-collapsed .h-panel-inner { padding-top: 110px; }
   .topbar-sub .mode-badge { font-size: 10px; padding: 4px 10px; }
   .tgt-btn { font-size: 10px; padding: 3px 7px; }
   .topbar-rec-inner { padding: 5px 12px; gap: 8px; }
-  .h-panel-inner { padding: 170px 16px 80px; max-width: 100%; }
-  body.rec-collapsed .h-panel-inner,
-  body:has(.topbar-rec-wrap.collapsed) .h-panel-inner { padding-top: 120px; }
+  .h-panel-inner { padding: 24px 16px 20px; max-width: 100%; }
   .h-nav-arrow { display: none !important; }
   .caption-box { padding: 20px 16px; }
 }
@@ -186,25 +182,36 @@ body.rec-collapsed .h-panel-inner { padding-top: 110px; }
 /* ═══ HORIZONTAL SCROLL ═══ */
 .h-scroll {
   scroll-snap-type: x proximity; overflow-x: auto; overflow-y: hidden;
-  display: flex; height: 100vh; height: 100dvh;
+  display: flex; height: 100%;
   scroll-behavior: smooth; touch-action: pan-x;
 }
 .h-panel {
-  min-width: 100vw; height: 100vh; height: 100dvh;
+  min-width: 100%; width: 100%; height: 100%;
   scroll-snap-align: start; display: flex; align-items: center; justify-content: center;
   position: relative; overflow: hidden; background: var(--bg);
   transition: background .4s;
 }
 .h-panel-alt { background: var(--bg2); }
 .h-panel-inner {
-  max-width: 900px; width: 100%; padding: 80px 24px 60px;
+  max-width: 900px; width: 100%; padding: 32px 24px 28px;
   text-align: center; position: relative; z-index: 1;
-  overflow-y: auto; max-height: 100vh; max-height: 100dvh;
+  display: flex; flex-direction: column;
+  height: 100%;
 }
+
+/* ═══ APP MAIN — fills remaining space below topbar ═══ */
+.app-main { flex: 1; min-height: 0; position: relative; background: var(--bg); }
+.app-center {
+  position: absolute; top: 0; bottom: 0; left: 0; right: 0;
+  transition: left .3s cubic-bezier(.4,0,.2,1), right .3s cubic-bezier(.4,0,.2,1);
+}
+.app-main.speakers-open .app-center { left: 200px; }
+.app-main.right-open .app-center { right: 320px; }
+.app-main.speakers-open.right-open .app-center { left: 200px; right: 320px; }
 
 /* ═══ NAV ARROWS ═══ */
 .h-nav-arrow {
-  position: fixed; top: 50%; transform: translateY(-50%); z-index: 50;
+  position: absolute; top: 50%; transform: translateY(-50%); z-index: 50;
   width: 40px; height: 40px; border-radius: 50%;
   border: 1px solid var(--line); background: var(--card);
   color: var(--muted); font-size: 18px; cursor: pointer;
@@ -227,16 +234,22 @@ body.rec-collapsed .h-panel-inner { padding-top: 110px; }
   background: var(--card); border: 1px solid var(--line);
   border-radius: var(--mode-radius); padding: var(--mode-padding);
   box-shadow: var(--mode-shadow); margin-bottom: 14px;
-  text-align: left; min-height: 180px; transition: all .4s;
+  text-align: left; display: flex; flex-direction: column;
+  flex: 1; min-height: 0; transition: all .4s;
   position: relative; overflow: hidden;
 }
 .caption-interim {
   font-family: var(--font-display); font-size: clamp(24px,4vw,40px);
   font-weight: 700; color: var(--text); line-height: 1.2;
   min-height: 48px; word-break: break-word; transition: all .3s;
+  flex-shrink: 0;
 }
 .caption-interim:empty::after { content: attr(data-placeholder); color: var(--muted2); font-size: 16px; font-style: italic; }
-.caption-transcript:empty::after { content: attr(data-placeholder); color: var(--muted2); font-size: 14px; font-style: italic; display: block; text-align: left; padding: 8px 0; }
+.caption-transcript {
+  margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--line);
+  font-size: 15px; line-height: 1.7; color: var(--muted);
+  overflow-y: auto; flex: 1; min-height: 0;
+}
 body.session-active .caption-interim:empty::after,
 body.session-active .caption-transcript:empty::after { content: none; }
 .caption-transcript {
@@ -337,7 +350,7 @@ h2 { font-family: var(--font-display); font-size: clamp(24px,4vw,36px); font-wei
 [data-theme="light"] .user-avatar,.user-dropdown .ud-avatar{background:#7c3aed}
 
 /* ═══ BIGGER PANELS ═══ */
-.h-panel-inner { max-width: 1100px; padding: 90px 32px 70px; }
+.h-panel-inner { max-width: 1100px; padding: 32px 32px 28px; }
 .metrics-grid { grid-template-columns: repeat(4,1fr); gap: 14px; }
 .m-card { padding: 20px; }
 .m-card .m-title { font-size: 11px; margin-bottom: 12px; }
@@ -365,11 +378,12 @@ h2 { font-size: clamp(28px,5vw,44px); margin-bottom: 12px; }
 
 /* ═══ CAPTION BOX bigger text ═══ */
 .caption-interim { font-size: clamp(26px,4.5vw,44px); min-height: 52px; }
-.caption-transcript { font-size: 16px; max-height: 240px; }
+.caption-transcript { font-size: 16px; }
 .caption-transcript .line { padding: 6px 0; font-size: 15px; }
 
 /* ═══ ACTION BUTTONS bigger ═══ */
 .btn-grad { font-size: 17px; padding: 16px 38px; }
+.action-row { flex-shrink: 0; padding-bottom: 4px; }
 
 /* ═══ RESPONSIVE ═══ */
 @media(max-width:1000px) { .metrics-grid { grid-template-columns: repeat(2,1fr); } }
@@ -385,11 +399,17 @@ h2 { font-size: clamp(28px,5vw,44px); margin-bottom: 12px; }
 
 @media(max-width:768px) {
   .h-scroll { scroll-snap-type: none; overflow-x: hidden; overflow-y: auto; flex-direction: column; }
-  .h-panel { min-width: 100%; height: auto; min-height: 100dvh; }
+  .h-panel { min-width: 100%; width: 100%; height: auto; min-height: 100%; }
   .h-nav-arrow { display: none; }
-  .h-panel-inner { padding: 70px 16px 80px; max-width: 100%; }
+  .h-panel-inner { padding: 24px 12px 20px; max-width: 100%; }
   .caption-box { padding: 24px 18px; }
   .metrics-grid { grid-template-columns: repeat(2,1fr); }
+  .duo-speaker-sidebar { width: 170px; }
+  .app-main.speakers-open .app-center { left: 170px; }
+  .right-panel { width: 280px; }
+  .app-main.right-open .app-center { right: 280px; }
+  .app-main.speakers-open.right-open .app-center { left: 170px; right: 280px; }
+  .duo-toggle-btn.open { left: 170px; }
 }
 
 /* ═══ MIC STATES ═══ */
@@ -401,9 +421,13 @@ h2 { font-size: clamp(28px,5vw,44px); margin-bottom: 12px; }
 
 
 /* ═══ FULLSCREEN MODE — matches standalone mockup ═══ */
-body.fullscreen-active .topbar { display: none !important; }
+body.fullscreen-active .topbar-stack { display: none !important; }
 body.fullscreen-active .h-nav-arrow { display: none !important; }
-body.fullscreen-active #metricsPanel { display: none !important; }
+body.fullscreen-active .duo-speaker-sidebar,
+body.fullscreen-active .right-panel,
+body.fullscreen-active .duo-toggle-btn { display: none !important; }
+body.fullscreen-active .app-main.speakers-open .app-center,
+body.fullscreen-active .app-main.right-open .app-center { left: 0; right: 0; }
 body.fullscreen-active #vocabPanel { display: none !important; }
 body.fullscreen-active #sharePanel { display: none !important; }
 body.fullscreen-active .theme-btn { display: none !important; }
@@ -592,14 +616,14 @@ button[onclick*="addToWordBank"]:hover{background:rgba(52,211,153,.15)!important
 
 
 /* Shoji mode tweaks */
-/* ═══ DUO+ SPEAKER SIDEBAR (attached below topbar-stack) ═══ */
+/* ═══ DUO+ SPEAKER SIDEBAR (inside .app-main) ═══ */
 .duo-speaker-sidebar {
-  position: fixed; top: var(--duo-sidebar-top, 175px); left: 0; bottom: 0; z-index: 500;
+  position: absolute; top: 0; left: 0; bottom: 0; z-index: 500;
   width: 200px; background: #0c1118; border-right: 1px solid rgba(255,255,255,.04);
-  display: none; flex-direction: column; transform: translateX(-100%);
+  display: flex; flex-direction: column; transform: translateX(-100%);
   transition: transform .3s cubic-bezier(.4,0,.2,1);
 }
-.duo-speaker-sidebar.open { display: flex; transform: translateX(0); }
+.duo-speaker-sidebar.open { transform: translateX(0); }
 .duo-speaker-sidebar-head {
   padding: 14px 12px 10px; border-bottom: 1px solid rgba(255,255,255,.06);
   font-family: 'Bebas Neue',sans-serif; font-size: 16px; letter-spacing: 1px;
@@ -642,11 +666,10 @@ button[onclick*="addToWordBank"]:hover{background:rgba(52,211,153,.15)!important
 [data-theme="light"] .rec-toggle:hover { border-color: #7c3aed; color: #7c3aed; }
 [data-theme="light"] .rec-toggle.open { background: rgba(124,58,237,.06); border-color: #7c3aed; color: #7c3aed; }
 .duo-toggle-btn {
-  position: fixed; left: 0; top: var(--duo-sidebar-top, 175px); z-index: 501;
-  margin-top: 40px;
+  position: absolute; left: 0; top: 40px; z-index: 501;
   padding: 8px 12px; border-radius: 0 8px 8px 0; border: 1px solid rgba(255,255,255,.08);
   background: #0c1118; color: rgba(255,255,255,.35); cursor: pointer;
-  font-size: 14px; transition: all .2s; display: none;
+  font-size: 14px; transition: left .3s cubic-bezier(.4,0,.2,1); display: none;
 }
 .duo-toggle-btn:hover { color: #fff; border-color: rgba(255,255,255,.2); }
 .duo-toggle-btn.open { left: 200px; }
@@ -662,8 +685,31 @@ button[onclick*="addToWordBank"]:hover{background:rgba(52,211,153,.15)!important
   .duo-invite-btn { font-size: 9px; padding: 5px 8px; }
 }
 
+/* ═══ RIGHT PANEL (Metrics / SYN) ═══ */
+.right-panel {
+  position: absolute; top: 0; right: 0; bottom: 0; z-index: 500;
+  width: 320px; background: #0c1118;
+  border-left: 1px solid rgba(255,255,255,.04);
+  display: flex; flex-direction: column;
+  transform: translateX(100%);
+  transition: transform .3s cubic-bezier(.4,0,.2,1);
+}
+.app-main.right-open .right-panel { transform: translateX(0); }
+.right-panel-head {
+  padding: 16px 14px 12px; border-bottom: 1px solid rgba(255,255,255,.06);
+  font-family: 'Bebas Neue',sans-serif; font-size: 16px; letter-spacing: 1px;
+  color: var(--accent); display: flex; align-items: center; justify-content: space-between;
+}
+.right-panel-body { flex: 1; overflow-y: auto; padding: 10px; display: flex; flex-direction: column; gap: 8px; min-height: 0; }
+.right-panel .panel-content { display: none; }
+.right-panel .panel-content.active { display: flex; flex-direction: column; gap: 8px; }
+/* Panel-active button state */
+.btn-sm.panel-active { background: rgba(124,58,237,.15); border-color: #7c3aed; color: var(--accent2); }
+[data-theme="light"] .right-panel { background: #f5f3ef; }
+[data-theme="light"] .right-panel-head { border-color: #d9d5cc; }
+
 /* ═══ DUO+ JOIN SCREEN ═══ */
-#duoJoinScreen { display: none; flex-direction: column; align-items: center; justify-content: center; flex: 1; text-align: center; padding: 40px 20px; min-height: 100dvh; background: var(--bg); color: var(--text); }
+#duoJoinScreen { display: none; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 40px 20px; position: absolute; inset: 0; z-index: 600; background: var(--bg); color: var(--text); }
 #duoJoinScreen h1 { font-family: 'Manrope',sans-serif; font-size: 26px; font-weight: 700; margin-bottom: 4px; color: var(--text); }
 #duoJoinScreen .invite-msg { font-size: 14px; color: var(--muted); margin-bottom: 24px; }
 #duoJoinScreen .invite-msg strong { color: var(--accent); }
@@ -687,7 +733,7 @@ button[onclick*="addToWordBank"]:hover{background:rgba(52,211,153,.15)!important
 </style>
 </head>
 <body class="hb-start">
-<script>if(window.location.search.indexOf('join=1')!==-1){document.getElementById('modeScroll').style.display='none';document.getElementById('themeToggle').style.display='none';document.getElementById('duoSpeakerSidebar')&&(document.getElementById('duoSpeakerSidebar').style.display='none');document.getElementById('duoToggleBtn')&&(document.getElementById('duoToggleBtn').style.display='none');}</script>
+<script>if(window.location.search.indexOf('join=1')!==-1){document.getElementById('modeScroll').style.display='none';document.getElementById('themeToggle').style.display='none';document.getElementById('duoSpeakerSidebar')&&(document.getElementById('duoSpeakerSidebar').style.display='none');document.getElementById('duoToggleBtn')&&(document.getElementById('duoToggleBtn').style.display='none');document.getElementById('rightPanel')&&(document.getElementById('rightPanel').style.display='none');document.getElementById('appCenter').style.left='0';document.getElementById('appCenter').style.right='0';}</script>
 
 <!-- ═══ UNIFIED TOP BAR ═══ -->
 <div class="topbar-stack" id="topbarStack">
@@ -705,7 +751,7 @@ button[onclick*="addToWordBank"]:hover{background:rgba(52,211,153,.15)!important
 
 <div class="topbar-sub" id="topbarSub">
   <span class="sub-label">mode</span>
-  <button class="mode-badge" id="modeSoloBtn" onclick="setSpeakerMode('solo')">SOLO</button>
+  <button class="btn-sm active" id="modeSoloBtn" onclick="setSpeakerMode('solo')">SOLO</button>
   <button class="btn-sm" id="modeDuoBtn" onclick="setSpeakerMode('duo')">DUO+</button>
   <span class="divider"></span>
   <span class="sub-label">lang</span>
@@ -718,6 +764,9 @@ button[onclick*="addToWordBank"]:hover{background:rgba(52,211,153,.15)!important
   <button class="tgt-btn" data-clang="nl-NL" onclick="setCaptionLanguage('nl-NL','Nederlands')">🇳🇱 NL</button>
   <span class="spacer" style="flex:1;min-width:12px"></span>
   <span class="divider"></span>
+  <button class="btn-sm panel-active" id="speakersToggleBtn" onclick="togglePanel('speakers')" title="Toggle speaker panel">👥 Speakers</button>
+  <button class="btn-sm" id="metricsToggleBtn" onclick="toggleRight('metrics')" title="Toggle metrics panel">📊 Metrics</button>
+  <button class="btn-sm panel-active" id="synToggleBtn" onclick="toggleRight('syn')" title="Toggle synonyms panel">📖 SYN</button>
   <button class="btn-sm" onclick="toggleFullscreen()" title="Full screen">⛶</button>
   <span style="position:relative">
     <button class="info-btn" onclick="toggleInfoPopup(this)" aria-label="Come funziona la trascrizione">?</button>
@@ -744,136 +793,112 @@ button[onclick*="addToWordBank"]:hover{background:rgba(52,211,153,.15)!important
 </div>
 </div><!-- /topbar-stack -->
 
-<!-- ═══ NAV ARROWS ═══ -->
-<button class="h-nav-arrow left" id="navLeft" title="Precedente" style="display:none">◂</button>
-<button class="h-nav-arrow right" id="navRight" title="Successivo">▸</button>
+<!-- ═══ APP MAIN ═══ -->
+<div class="app-main speakers-open right-open" id="appMain">
 
-<!-- ═══ HORIZONTAL SCROLL ═══ -->
-<div class="h-scroll" id="modeScroll">
-
-  <!-- PANEL 1: Transcript -->
-  <section class="h-panel" id="transcriptPanel">
-    <div class="h-panel-inner">
-
-      <div class="caption-box" id="captionBox">
-        <div class="caption-interim" id="captionInterim" data-placeholder="Speak to see subtitles…"></div>
-        <div class="caption-transcript" id="captionTranscript" data-placeholder="Previous sentences will appear here…">
-        </div>
-      </div>
-
-      <!-- ═══ Unified Status Bar (below caption box) ═══ -->
-      <div class="listen-bar" id="listenBar">
-        <span class="s-pill"><span class="dot" id="micDot"></span><span id="micStatus">Mic</span></span>
-        <span class="s-pill"><span class="dot" id="socketDot"></span><span id="socketStatus">Live</span></span>
-        <span class="s-pill">⏱ <span id="sessionTimer">00:00</span></span>
-        <span class="s-pill" style="gap:3px">👥 <select id="speakerCount" onchange="setSpeakerCount(this.value)" style="background:transparent;border:none;color:var(--text);font-size:10px;font-family:inherit;cursor:pointer;outline:none;padding:0"><option value="1">1 spk</option><option value="2">2 spk</option><option value="3">3 spk</option><option value="4">4 spk</option><option value="5">5 spk</option><option value="6">6 spk</option><option value="auto">auto</option></select></span>
-      </div>
-
-      <div class="action-row">
-        <button type="button" class="btn-grad btn-start" id="startBtn" onclick="toggleSession()">🎤 Start Session</button>
-        <button type="button" class="btn-grad btn-pause" id="pauseBtn" style="display:none" onclick="togglePause()">⏸</button>
-        <button type="button" class="btn-grad btn-stop" id="stopBtn" style="display:none" onclick="toggleSession()">⏹ Stop</button>
-      </div>
-
-      <!-- ═══ Extras Toggle ═══ -->
-      <div class="extras-toggle-bar" id="extrasToggleBar">
-        <button type="button" class="extras-toggle-btn" data-panel="grammar" onclick="toggleExtrasPanel('grammar',this)">📋 Grammar</button>
-        <button type="button" class="extras-toggle-btn" data-panel="synonyms" onclick="toggleExtrasPanel('synonyms',this)">📖 Synonyms</button>
-      </div>
-      <div class="extras-panel" id="extrasPanel"></div>
-    </div>
-  </section>
-
-  <!-- PANEL 2: Live Metrics -->
-  <section class="h-panel h-panel-alt" id="metricsPanel">
-    <div class="h-panel-inner">
-      <div class="section-label">Live Metrics</div>
-      <h2>Statistiche<br>in tempo reale</h2>
-      <div class="metrics-grid">
-        <div class="m-card">
-          <div class="m-title">📊 CEFR Level</div>
-          <div class="gauge-wrap"><div class="gauge-bg"></div><div class="gauge-fill" id="cefrGauge" style="height:62%"></div></div>
-          <div class="gauge-center"><div class="gauge-value" id="cefrLevel">—</div><div class="gauge-label">Estimated level</div></div>
-        </div>
-        <div class="m-card">
-          <div class="m-title">⚡ Live metrics</div>
-          <div class="metric-row"><span class="m-label">WPM</span><span class="m-value" id="liveWpm">0</span></div>
-          <div class="metric-row"><span class="m-label">Words</span><span class="m-value" id="liveWords">0</span></div>
-          <div class="metric-row"><span class="m-label">Sentences</span><span class="m-value small" id="liveSentences">0</span></div>
-          <div class="metric-row"><span class="m-label">Fillers</span><span class="m-value small" id="liveFillers">0</span></div>
-        </div>
-        <div class="m-card">
-          <div class="m-title">🎯 Quality</div>
-          <div class="metric-row"><span class="m-label">Score</span><span class="m-value" id="liveQuality">—</span></div>
-          <div class="metric-row"><span class="m-label">Lexical div.</span><span class="m-value small" id="liveLexDiv">—</span></div>
-        </div>
-        <div class="m-card">
-          <div class="m-title">📈 Session</div>
-          <div class="metric-row"><span class="m-label">Lines</span><span class="m-value" id="statLines">0</span></div>
-          <div class="metric-row"><span class="m-label">Words</span><span class="m-value" id="statWords">0</span></div>
-          <div class="metric-row"><span class="m-label">Chars</span><span class="m-value" id="statChars">0</span></div>
-        </div>
+  <!-- ── Left: Speaker Panel ── -->
+  <button class="duo-toggle-btn" id="duoToggleBtn" onclick="toggleDuoSidebar()" title="Speaker panel">▸</button>
+  <aside class="duo-speaker-sidebar" id="duoSpeakerSidebar">
+    <div class="duo-speaker-sidebar-head">
+      <span>🎙 Speakers</span>
+      <div style="display:flex;align-items:center;gap:8px">
+        <span style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--muted2);background:rgba(255,255,255,.03);padding:2px 8px;border-radius:4px" id="duoSpkCount">0</span>
+        <button onclick="duoOpenSpeakerConfig()" title="Manage speakers" style="background:none;border:1px solid rgba(255,255,255,.1);color:rgba(255,255,255,.4);border-radius:50%;width:22px;height:22px;cursor:pointer;font-size:14px;line-height:1;display:flex;align-items:center;justify-content:center">+</button>
       </div>
     </div>
-  </section>
-
-  <!-- PANEL 3: Vocabulary -->
-  <section class="h-panel" id="vocabPanel">
-    <div class="h-panel-inner">
-      <div class="section-label">Vocabulary</div>
-      <h2>Vocabolario</h2>
-      <div style="background:var(--card);border:1px solid var(--line);border-radius:var(--mode-radius);padding:18px;margin:14px 0;text-align:left">
-        <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--muted2);margin-bottom:10px">🫧 CEFR Words</div>
-        <div class="vocab-chips" id="vocabChips"></div>
+    <div class="duo-speaker-sidebar-body" id="duoSpeakerList">
+      <div style="text-align:center;font-size:11px;color:var(--muted);padding:20px 8px">No speakers yet</div>
+    </div>
+    <!-- Host invite section -->
+    <div id="duoHostSection" style="display:none;padding:12px;border-top:1px solid rgba(255,255,255,.06)">
+      <div style="font-family:'Bebas Neue',sans-serif;font-size:12px;letter-spacing:1px;color:var(--muted);text-transform:uppercase;margin-bottom:6px">📨 Invite Speakers</div>
+      <p style="font-size:9px;color:var(--muted2);margin-bottom:8px;line-height:1.4">Send this link to others. They can join and their speech will be tagged with their name.</p>
+      <div class="duo-invite-btns">
+        <button class="duo-invite-btn" onclick="duoShareInvite('email')">📧 Email</button>
+        <button class="duo-invite-btn" onclick="duoShareInvite('whatsapp')">📱 WhatsApp</button>
+        <button class="duo-invite-btn" onclick="duoShareInvite('copy')">📋 Copy</button>
       </div>
-      <div class="pos-grid">
-        <div class="pos-item"><div class="pos-label">Verbs</div><div class="pos-value" id="posVerbs">0</div></div>
-        <div class="pos-item"><div class="pos-label">Nouns</div><div class="pos-value" id="posNouns">0</div></div>
-        <div class="pos-item"><div class="pos-label">Adjectives</div><div class="pos-value" id="posAdj">0</div></div>
-        <div class="pos-item"><div class="pos-label">Adverbs</div><div class="pos-value" id="posAdv">0</div></div>
-        <div class="pos-item"><div class="pos-label">Pronouns</div><div class="pos-value" id="posPron">0</div></div>
-        <div class="pos-item"><div class="pos-label">Prepositions</div><div class="pos-value" id="posPrep">0</div></div>
+      <div style="margin-top:10px">
+        <button onclick="duoNewRoom()" class="duo-invite-btn">🔄 New Room</button>
       </div>
     </div>
-  </section>
+    <!-- Invitee info section -->
+    <div id="duoInviteeSection" style="display:none;padding:12px;border-top:1px solid rgba(255,255,255,.06)">
+      <div style="font-family:'Bebas Neue',sans-serif;font-size:12px;letter-spacing:1px;color:var(--muted);text-transform:uppercase;margin-bottom:6px">📋 Room Info</div>
+      <p style="font-size:9px;color:var(--muted2);margin-bottom:6px;line-height:1.4">You were invited by <strong style="color:var(--accent)" id="duoInvitedBy">the host</strong>.</p>
+      <button onclick="duoRefreshRoom()" class="duo-invite-btn">🔄 Refresh</button>
+    </div>
+  </aside>
 
-</div>
+  <!-- ── Right: Shared Panel (Metrics / SYN) ── -->
+  <aside class="right-panel" id="rightPanel">
+    <div class="right-panel-head">
+      <span id="rightPanelTitle">📖 SYN</span>
+      <span style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--muted2);padding:2px 8px;border-radius:4px;background:rgba(255,255,255,.03)" id="rightPanelCount">0</span>
+    </div>
+    <div class="right-panel-body">
+      <div class="panel-content" id="metricsContent"></div>
+      <div class="panel-content active" id="synContent">
+        <div class="syn-line-preview" id="synLinePreview" style="background:rgba(167,139,250,.06);border:1px solid rgba(167,139,250,.15);border-radius:8px;padding:12px;font-size:13px;line-height:1.6;color:var(--text);font-family:var(--font-display);font-style:italic">
+          <span style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.3px;color:var(--accent);display:block;margin-bottom:4px;font-style:normal">Click a transcript line</span>
+          Select a sentence to see synonyms and definitions for each word.
+        </div>
+        <div id="synWords"></div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ── Center: Scroll Area ── -->
+  <div class="app-center" id="appCenter">
+    <button class="h-nav-arrow left" id="navLeft" title="Precedente" style="display:none">◂</button>
+    <button class="h-nav-arrow right" id="navRight" title="Successivo">▸</button>
+    <div class="h-scroll" id="modeScroll">
+      <!-- PANEL 1: Transcript -->
+      <section class="h-panel" id="transcriptPanel">
+        <div class="h-panel-inner">
+          <div class="caption-box" id="captionBox">
+            <div class="caption-interim" id="captionInterim" data-placeholder="Speak to see subtitles…"></div>
+            <div class="caption-transcript" id="captionTranscript" data-placeholder="Previous sentences will appear here…"></div>
+          </div>
+          <div class="action-row">
+            <button type="button" class="btn-grad btn-start" id="startBtn" onclick="toggleSession()">🎤 Start Session</button>
+            <button type="button" class="btn-grad btn-pause" id="pauseBtn" style="display:none" onclick="togglePause()">⏸</button>
+            <button type="button" class="btn-grad btn-stop" id="stopBtn" style="display:none" onclick="toggleSession()">⏹ Stop</button>
+          </div>
+          <div class="extras-toggle-bar" id="extrasToggleBar">
+            <button type="button" class="extras-toggle-btn" data-panel="grammar" onclick="toggleExtrasPanel('grammar',this)">📋 Grammar</button>
+            <button type="button" class="extras-toggle-btn" data-panel="synonyms" onclick="toggleExtrasPanel('synonyms',this)">📖 Synonyms</button>
+          </div>
+          <div class="extras-panel" id="extrasPanel"></div>
+        </div>
+      </section>
+      <!-- PANEL 2: Metrics -->
+      <section class="h-panel h-panel-alt" id="metricsPanel">
+        <div class="h-panel-inner">
+          <div class="section-label">Live Metrics</div>
+          <h2>Statistiche<br>in tempo reale</h2>
+          <div class="metrics-grid">
+            <div class="m-card"><div class="m-title">📊 CEFR Level</div><div class="gauge-wrap"><div class="gauge-bg"></div><div class="gauge-fill" id="cefrGauge" style="height:62%"></div></div><div class="gauge-center"><div class="gauge-value" id="cefrLevel">—</div><div class="gauge-label">Estimated level</div></div></div>
+            <div class="m-card"><div class="m-title">⚡ Live metrics</div><div class="metric-row"><span class="m-label">WPM</span><span class="m-value" id="liveWpm">0</span></div><div class="metric-row"><span class="m-label">Words</span><span class="m-value" id="liveWords">0</span></div><div class="metric-row"><span class="m-label">Sentences</span><span class="m-value small" id="liveSentences">0</span></div><div class="metric-row"><span class="m-label">Fillers</span><span class="m-value small" id="liveFillers">0</span></div></div>
+            <div class="m-card"><div class="m-title">🎯 Quality</div><div class="metric-row"><span class="m-label">Score</span><span class="m-value" id="liveQuality">—</span></div><div class="metric-row"><span class="m-label">Lexical div.</span><span class="m-value small" id="liveLexDiv">—</span></div></div>
+            <div class="m-card"><div class="m-title">📈 Session</div><div class="metric-row"><span class="m-label">Lines</span><span class="m-value" id="statLines">0</span></div><div class="metric-row"><span class="m-label">Words</span><span class="m-value" id="statWords">0</span></div><div class="metric-row"><span class="m-label">Chars</span><span class="m-value" id="statChars">0</span></div></div>
+          </div>
+        </div>
+      </section>
+      <!-- PANEL 3: Vocabulary -->
+      <section class="h-panel" id="vocabPanel">
+        <div class="h-panel-inner">
+          <div class="section-label">Vocabulary</div>
+          <h2>Vocabolario</h2>
+          <div style="background:var(--card);border:1px solid var(--line);border-radius:var(--mode-radius);padding:18px;margin:14px 0;text-align:left"><div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--muted2);margin-bottom:10px">🫧 CEFR Words</div><div class="vocab-chips" id="vocabChips"></div></div>
+          <div class="pos-grid"><div class="pos-item"><div class="pos-label">Verbs</div><div class="pos-value" id="posVerbs">0</div></div><div class="pos-item"><div class="pos-label">Nouns</div><div class="pos-value" id="posNouns">0</div></div><div class="pos-item"><div class="pos-label">Adjectives</div><div class="pos-value" id="posAdj">0</div></div><div class="pos-item"><div class="pos-label">Adverbs</div><div class="pos-value" id="posAdv">0</div></div><div class="pos-item"><div class="pos-label">Pronouns</div><div class="pos-value" id="posPron">0</div></div><div class="pos-item"><div class="pos-label">Prepositions</div><div class="pos-value" id="posPrep">0</div></div></div>
+        </div>
+      </section>
+    </div>
+  </div>
+</div><!-- /app-main -->
 
 <button class="theme-btn" id="themeToggle" onclick="toggleTheme()" title="Toggle theme">🌙</button>
-
-<!-- ═══ DUO+ SPEAKER SIDEBAR ═══ -->
-<button class="duo-toggle-btn" id="duoToggleBtn" onclick="toggleDuoSidebar()" title="Speaker panel">▸</button>
-<aside class="duo-speaker-sidebar" id="duoSpeakerSidebar">
-  <div class="duo-speaker-sidebar-head">
-    <span>🎙 Speakers</span>
-    <div style="display:flex;align-items:center;gap:8px">
-      <span style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--muted2);background:rgba(255,255,255,.03);padding:2px 8px;border-radius:4px" id="duoSpkCount">0</span>
-      <button onclick="duoOpenSpeakerConfig()" title="Manage speakers" style="background:none;border:1px solid rgba(255,255,255,.1);color:rgba(255,255,255,.4);border-radius:50%;width:22px;height:22px;cursor:pointer;font-size:14px;line-height:1;display:flex;align-items:center;justify-content:center">+</button>
-    </div>
-  </div>
-  <div class="duo-speaker-sidebar-body" id="duoSpeakerList">
-    <div style="text-align:center;font-size:11px;color:var(--muted);padding:20px 8px">No speakers yet</div>
-  </div>
-  <!-- Host invite section -->
-  <div id="duoHostSection" style="display:none;padding:12px;border-top:1px solid rgba(255,255,255,.06)">
-    <div style="font-family:'Bebas Neue',sans-serif;font-size:12px;letter-spacing:1px;color:var(--muted);text-transform:uppercase;margin-bottom:6px">📨 Invite Speakers</div>
-    <p style="font-size:9px;color:var(--muted2);margin-bottom:8px;line-height:1.4">Send this link to others. They can join and their speech will be tagged with their name.</p>
-    <div class="duo-invite-btns">
-      <button class="duo-invite-btn" onclick="duoShareInvite('email')">📧 Email</button>
-      <button class="duo-invite-btn" onclick="duoShareInvite('whatsapp')">📱 WhatsApp</button>
-      <button class="duo-invite-btn" onclick="duoShareInvite('copy')">📋 Copy</button>
-    </div>
-    <div style="margin-top:10px">
-      <button onclick="duoNewRoom()" class="duo-invite-btn">🔄 New Room</button>
-    </div>
-  </div>
-  <!-- Invitee info section -->
-  <div id="duoInviteeSection" style="display:none;padding:12px;border-top:1px solid rgba(255,255,255,.06)">
-    <div style="font-family:'Bebas Neue',sans-serif;font-size:12px;letter-spacing:1px;color:var(--muted);text-transform:uppercase;margin-bottom:6px">📋 Room Info</div>
-    <p style="font-size:9px;color:var(--muted2);margin-bottom:6px;line-height:1.4">You were invited by <strong style="color:var(--accent)" id="duoInvitedBy">the host</strong>.</p>
-    <button onclick="duoRefreshRoom()" class="duo-invite-btn">🔄 Refresh</button>
-  </div>
-</aside>
 
 <!-- ═══ DUO+ JOIN SCREEN ═══ -->
 <div id="duoJoinScreen">
@@ -977,9 +1002,7 @@ var _speakerIdx = 0;
 
 function setSpeakerCount(val) {
   speakerCount = val === 'auto' ? 'auto' : parseInt(val);
-  var sel = document.getElementById('speakerCount');
-  if (sel) sel.value = val;
-  // Update existing transcript lines if any
+  // Recolor existing transcript lines
   recolorTranscriptLines();
   localStorage.setItem('sottotitoli-speaker-count', val);
 }
@@ -1002,8 +1025,6 @@ function setPauseSensitivity(val) {
   var saved = localStorage.getItem('sottotitoli-speaker-count');
   if (saved) {
     speakerCount = saved === 'auto' ? 'auto' : parseInt(saved);
-    var sel = document.getElementById('speakerCount');
-    if (sel) sel.value = saved;
   }
 })();
 
@@ -1316,30 +1337,184 @@ function toggleInfoPopup(btn) {
 }
 document.addEventListener('click', function(e) { if (!e.target.closest('.info-btn')) document.querySelectorAll('.info-popup.show').forEach(function(p) { p.classList.remove('show'); }); });
 
+// ═══ PANEL TOGGLES (new layout) ═══
+function togglePanel(which) {
+  var app = document.getElementById('appMain');
+  var btn = document.getElementById('speakersToggleBtn');
+  if (!app || !btn) return;
+  var open = app.classList.toggle('speakers-open');
+  btn.classList.toggle('panel-active', open);
+}
+
+// Right panel: Metrics ↔ SYN (mutually exclusive)
+var _rightMode = null;
+function toggleRight(mode) {
+  var app = document.getElementById('appMain');
+  var metBtn = document.getElementById('metricsToggleBtn');
+  var synBtn = document.getElementById('synToggleBtn');
+  var metContent = document.getElementById('metricsContent');
+  var synContent = document.getElementById('synContent');
+  var title = document.getElementById('rightPanelTitle');
+  if (!app) return;
+
+  if (_rightMode === mode) {
+    app.classList.remove('right-open');
+    if (metBtn) metBtn.classList.remove('panel-active');
+    if (synBtn) synBtn.classList.remove('panel-active');
+    if (metContent) metContent.classList.remove('active');
+    if (synContent) synContent.classList.remove('active');
+    _rightMode = null;
+    return;
+  }
+  _rightMode = mode;
+  app.classList.add('right-open');
+  if (mode === 'metrics') {
+    if (metBtn) metBtn.classList.add('panel-active');
+    if (synBtn) synBtn.classList.remove('panel-active');
+    if (metContent) metContent.classList.add('active');
+    if (synContent) synContent.classList.remove('active');
+    if (title) title.textContent = '📊 Metrics';
+  } else {
+    if (synBtn) synBtn.classList.add('panel-active');
+    if (metBtn) metBtn.classList.remove('panel-active');
+    if (synContent) synContent.classList.add('active');
+    if (metContent) metContent.classList.remove('active');
+    if (title) title.textContent = '📖 SYN';
+    var words = document.querySelectorAll('#synWords .syn-word');
+    var count = document.getElementById('rightPanelCount');
+    if (count) count.textContent = words.length;
+  }
+}
+
+// Click a transcript line → load SYN
+function selectLine(lineIdx, el) {
+  document.querySelectorAll('.caption-transcript .line').forEach(function(l){l.classList.remove('selected')});
+  el.classList.add('selected');
+  if (_rightMode !== 'syn') toggleRight('syn');
+  // Extract text
+  var spkEl = el.querySelector('.spk-tag');
+  var tsEl = el.querySelector('.ts');
+  var spkColor = spkEl ? spkEl.style.color : '#5b7fc1';
+  var spkName = spkEl ? spkEl.textContent : '';
+  var ts = tsEl ? tsEl.textContent : '';
+  var text = el.textContent.replace(spkName, '').replace(ts, '').trim();
+  var preview = document.getElementById('synLinePreview');
+  if (preview) {
+    preview.innerHTML = '<span style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.3px;color:' + spkColor + ';display:block;margin-bottom:4px;font-style:normal">' + spkName + ' · ' + ts + '</span>' + text;
+  }
+  // Build word cards from line content
+  _buildSynCards(text);
+  // Scroll right panel to top
+  var body = document.querySelector('.right-panel-body');
+  if (body) body.scrollTop = 0;
+}
+
+// Make transcript lines clickable if SYN is open
+function _ensureLinesClickable() {
+  var lines = document.querySelectorAll('#captionTranscript .line');
+  lines.forEach(function(l) {
+    if (!l.classList.contains('clickable')) {
+      l.classList.add('clickable');
+      l.addEventListener('click', function() { selectLine(0, l); });
+    }
+  });
+}
+
+// Mock dictionary for word cards (in production: API call)
+var _mockDict = {
+  "morning":{"pos":"noun","def":"The early part of the day, from sunrise to noon.","rel":[{"w":"dawn","s":true},{"w":"sunrise","s":true},{"w":"forenoon"},{"w":"AM"}]},
+  "everyone":{"pos":"pron","def":"Every person; all people.","rel":[{"w":"everybody","s":true},{"w":"all","s":true}]},
+  "started":{"pos":"verb","def":"To begin or set in motion.","rel":[{"w":"began","s":true},{"w":"commenced","s":true},{"w":"initiated"},{"w":"launched"}]},
+  "discuss":{"pos":"verb","def":"To talk about in order to exchange ideas or make a decision.","rel":[{"w":"debate","s":true},{"w":"consider","s":true},{"w":"examine"},{"w":"review"}]},
+  "quarterly":{"pos":"adj","def":"Occurring or produced four times a year.","rel":[{"w":"periodic","s":true},{"w":"trimestral","s":true}]},
+  "results":{"pos":"noun","def":"The outcome or effect of an action or process.","rel":[{"w":"outcomes","s":true},{"w":"findings","s":true},{"w":"consequences"}]},
+  "product":{"pos":"noun","def":"An article or substance manufactured for sale.","rel":[{"w":"item","s":true},{"w":"commodity","s":true},{"w":"offering"}]},
+  "launch":{"pos":"noun","def":"The act of introducing something new to the public.","rel":[{"w":"release","s":true},{"w":"rollout","s":true},{"w":"introduction"},{"w":"debut"}]},
+  "timeline":{"pos":"noun","def":"A schedule showing the order of events.","rel":[{"w":"schedule","s":true},{"w":"roadmap","s":true},{"w":"plan"}]},
+  "great":{"pos":"adj","def":"Of an extent considerably above average.","rel":[{"w":"excellent","s":true},{"w":"wonderful","s":true},{"w":"fantastic"},{"w":"terrific"}]},
+  "market":{"pos":"noun","def":"An area in which commercial dealings are conducted.","rel":[{"w":"marketplace","s":true},{"w":"sector","s":true},{"w":"industry"}]},
+  "performance":{"pos":"noun","def":"The action of carrying out a task.","rel":[{"w":"execution","s":true},{"w":"achievement","s":true},{"w":"results"}]},
+  "excellent":{"pos":"adj","def":"Extremely good; outstanding.","rel":[{"w":"outstanding","s":true},{"w":"superb","s":true},{"w":"exceptional"},{"w":"brilliant"}]},
+  "features":{"pos":"noun","def":"Distinctive attributes of something.","rel":[{"w":"characteristics","s":true},{"w":"attributes","s":true},{"w":"qualities"}]},
+  "release":{"pos":"noun","def":"The action of making available to the public.","rel":[{"w":"launch","s":true},{"w":"publication","s":true},{"w":"distribution"}]},
+  "schedule":{"pos":"verb","def":"To arrange or plan an event.","rel":[{"w":"arrange","s":true},{"w":"plan","s":true},{"w":"organize"},{"w":"book"}]},
+  "finalize":{"pos":"verb","def":"To complete or agree on a finished form.","rel":[{"w":"complete","s":true},{"w":"conclude","s":true},{"w":"settle"},{"w":"wrap up"}]},
+  "roadmap":{"pos":"noun","def":"A strategic plan defining a goal and steps.","rel":[{"w":"plan","s":true},{"w":"strategy","s":true},{"w":"blueprint"},{"w":"outline"}]},
+  "details":{"pos":"noun","def":"Individual features or particulars.","rel":[{"w":"particulars","s":true},{"w":"specifics","s":true},{"w":"points"}]},
+  "vendite":{"pos":"noun","def":"The exchange of a product for money; sales.","rel":[{"w":"sales","s":true},{"w":"revenue","s":true}]},
+  "preparato":{"pos":"verb","def":"Made ready in advance; prepared.","rel":[{"w":"prepared","s":true},{"w":"ready","s":true},{"w":"organized"}]},
+  "dati":{"pos":"noun","def":"Facts and statistics for analysis.","rel":[{"w":"data","s":true},{"w":"information","s":true}]},
+  "crescita":{"pos":"noun","def":"The process of increasing in size.","rel":[{"w":"growth","s":true},{"w":"increase","s":true},{"w":"expansion"}]},
+  "futuro":{"pos":"noun","def":"The time yet to come.","rel":[{"w":"future","s":true},{"w":"tomorrow","s":true},{"w":"prospect"}]}
+};
+var _stopWords = /^(the|and|for|are|was|with|that|this|from|have|were|they|will|what|when|your|about|which|their|there|would|could|should|does|been|being|into|more|some|than|then|also|very|just|like|over|each|said|della|del|dei|degli|delle|una|uno|per|che|con|sono|una|nel|nella|negli|nelle|dal|dallo|dalla|dai|dagli|dalle|non|più|meno|come|così|questa|questo|quella|quello|quelli|quelle)$/i;
+
+function _buildSynCards(text) {
+  var container = document.getElementById('synWords');
+  if (!container) return;
+  var rawWords = text.split(/\s+/);
+  var contentWords = [];
+  rawWords.forEach(function(w) {
+    var clean = w.replace(/[.,;:!?…'"]/g, '').toLowerCase();
+    if (clean.length > 2 && !_stopWords.test(clean)) contentWords.push(clean);
+  });
+  var html = '';
+  contentWords.forEach(function(word) {
+    var entry = _mockDict[word];
+    if (!entry) {
+      html += '<div class="syn-word" style="background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.05);border-radius:8px;padding:10px 12px">';
+      html += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px"><span style="font-size:16px;font-weight:700;color:var(--text)">' + word + '</span><span style="font-size:9px;font-weight:600;text-transform:uppercase;padding:2px 8px;border-radius:100px;background:rgba(167,139,250,.15);color:var(--accent2)">—</span></div>';
+      html += '<div style="font-size:11px;color:var(--muted)">Definition not available.</div>';
+      html += '</div>';
+    } else {
+      html += '<div class="syn-word" style="background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.05);border-radius:8px;padding:10px 12px">';
+      html += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px"><span style="font-size:16px;font-weight:700;color:var(--text)">' + word + '</span><span style="font-size:9px;font-weight:600;text-transform:uppercase;padding:2px 8px;border-radius:100px;background:rgba(167,139,250,.15);color:var(--accent2)">' + entry.pos + '</span></div>';
+      html += '<div style="font-size:11px;color:var(--muted);line-height:1.5;margin-bottom:6px">' + entry.def + '</div>';
+      html += '<div style="display:flex;flex-wrap:wrap;gap:4px">';
+      entry.rel.forEach(function(r) {
+        html += '<span style="font-size:9px;font-weight:600;padding:3px 8px;border-radius:100px;border:1px solid rgba(255,255,255,.08);color:var(--muted2)' + (r.s ? ';background:rgba(52,211,153,.06);border-color:rgba(52,211,153,.2);color:#34d399' : '') + '">' + r.w + '</span>';
+      });
+      html += '</div></div>';
+    }
+  });
+  if (contentWords.length === 0) {
+    html = '<div style="text-align:center;padding:40px 20px;color:var(--muted2);font-size:12px">No content words found.<br><strong style="color:var(--accent)">Try a line with more descriptive words.</strong></div>';
+  }
+  container.innerHTML = html;
+  var count = document.getElementById('rightPanelCount');
+  if (count) count.textContent = contentWords.length;
+}
+
 // ═══ Speaker mode (SOLO / DUO+) ═══
 function setSpeakerMode(mode) {
   var soloBtn = document.getElementById('modeSoloBtn');
   var duoBtn = document.getElementById('modeDuoBtn');
   if (mode === 'solo') {
-    if (soloBtn) soloBtn.className = 'mode-badge';
-    if (duoBtn) duoBtn.className = 'btn-sm';
+    if (soloBtn) { soloBtn.className = 'btn-sm active'; }
+    if (duoBtn) { duoBtn.className = 'btn-sm'; }
     setSpeakerCount('1');
-    // Hide DUO+ UI
+    // Hide DUO+ UI via classes
+    var app = document.getElementById('appMain');
     var sidebar = document.getElementById('duoSpeakerSidebar');
     var toggle = document.getElementById('duoToggleBtn');
-    if (sidebar) { sidebar.classList.remove('open'); sidebar.style.display = 'none'; }
-    if (toggle) toggle.style.display = 'none';
+    var spkBtn = document.getElementById('speakersToggleBtn');
+    if (app) app.classList.remove('speakers-open');
+    if (spkBtn) { spkBtn.classList.remove('panel-active'); spkBtn.style.opacity = '0.4'; spkBtn.style.pointerEvents = 'none'; }
     // Disconnect WebSocket
     if (window._duoWs) { try { window._duoWs.close(); } catch(e){} window._duoWs = null; }
     window._duoMode = false;
   } else {
-    if (soloBtn) soloBtn.className = 'btn-sm';
-    if (duoBtn) duoBtn.className = 'mode-badge';
+    if (soloBtn) { soloBtn.className = 'btn-sm'; }
+    if (duoBtn) { duoBtn.className = 'btn-sm active'; }
     setSpeakerCount('2');
-    // Show DUO+ UI
+    // Show DUO+ UI via classes
+    var app = document.getElementById('appMain');
     var sidebar = document.getElementById('duoSpeakerSidebar');
     var toggle = document.getElementById('duoToggleBtn');
-    if (sidebar) { sidebar.style.display = 'flex'; sidebar.classList.add('open'); }
+    var spkBtn = document.getElementById('speakersToggleBtn');
+    if (app) app.classList.add('speakers-open');
+    if (spkBtn) { spkBtn.style.opacity = ''; spkBtn.style.pointerEvents = ''; spkBtn.classList.add('panel-active'); }
+    if (sidebar) sidebar.classList.add('open');
     if (toggle) { toggle.style.display = 'block'; toggle.classList.add('open'); }
     // Show host section, hide invitee section
     var hostSec = document.getElementById('duoHostSection');
@@ -1714,7 +1889,7 @@ function toggleSession() {
     paused = false;
     if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
     sessionSeconds = 0;
-    document.getElementById('sessionTimer').textContent = '00:00';
+    document.getElementById('recTimer').textContent = '00:00';
     var rt = document.getElementById('recTimer'); if (rt) rt.textContent = '00:00';
     updateRecDash('idle');
     document.body.classList.remove('session-active');
@@ -1769,7 +1944,7 @@ function _doStartSession(startBtn, stopBtn) {
         sessionSeconds++;
         var m = Math.floor(sessionSeconds / 60);
         var s = sessionSeconds % 60;
-        document.getElementById('sessionTimer').textContent = 
+        document.getElementById('recTimer').textContent = 
           String(m).padStart(2,'0') + ':' + String(s).padStart(2,'0');
         var rt = document.getElementById('recTimer');
         if (rt) rt.textContent = String(m).padStart(2,'0') + ':' + String(s).padStart(2,'0');
@@ -1829,7 +2004,7 @@ function togglePause() {
         sessionSeconds++;
         var m = Math.floor(sessionSeconds / 60);
         var s = sessionSeconds % 60;
-        document.getElementById('sessionTimer').textContent = 
+        document.getElementById('recTimer').textContent = 
           String(m).padStart(2,'0') + ':' + String(s).padStart(2,'0');
       }, 1000);
     });
@@ -2394,30 +2569,24 @@ function autoCollectWordBank(text) {
 
 // ═══ #30 Listening Mode — update from session ═══
 function updateListenBar() {
-  var bar = document.getElementById('listenBar');
-  var micDot = document.getElementById('micDot');
-  var micStatus = document.getElementById('micStatus');
-  var socketDot = document.getElementById('socketDot');
-  var socketStatus = document.getElementById('socketStatus');
-  var timer = document.getElementById('sessionTimer');
-  if (!bar) return;
+  var micDot = document.getElementById('recMicDot');
+  var micLabel = document.getElementById('recMicLabel');
+  var idleDot = document.getElementById('recIdleDot');
+  var idleLabel = document.getElementById('recIdleLabel');
+  var timer = document.getElementById('recTimer');
 
   var isActive = (typeof sessionActive !== 'undefined') && sessionActive;
-  var sec = (typeof sessionSeconds !== 'undefined') ? sessionSeconds : 0;
 
   if (isActive) {
-    bar.classList.add('active');
-    if (micDot) micDot.classList.add('live');
-    if (micStatus) micStatus.textContent = 'Live';
-    if (socketDot) socketDot.classList.add('live');
-    if (socketStatus) socketStatus.textContent = 'Live';
-    // Timer updated by setInterval already
+    if (micDot) micDot.className = 'status-dot live';
+    if (micLabel) micLabel.textContent = 'Mic';
+    if (idleDot) idleDot.className = 'status-dot live';
+    if (idleLabel) idleLabel.textContent = 'Live';
   } else {
-    bar.classList.remove('active');
-    if (micDot) micDot.classList.remove('live');
-    if (micStatus) micStatus.textContent = 'Mic';
-    if (socketDot) socketDot.classList.remove('live');
-    if (socketStatus) socketStatus.textContent = 'Idle';
+    if (micDot) micDot.className = 'status-dot off';
+    if (micLabel) micLabel.textContent = 'Mic';
+    if (idleDot) idleDot.className = 'status-dot idle';
+    if (idleLabel) idleLabel.textContent = 'Idle';
     if (timer) timer.textContent = '00:00';
   }
 }
