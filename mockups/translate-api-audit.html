@@ -1,0 +1,509 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Translation API Audit — Sottotitoli</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,400;14..32,500;14..32,600;14..32,700;14..32,800&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #0a0f14;
+  --card: #11161d;
+  --card2: #161c26;
+  --line: rgba(255,255,255,.06);
+  --text: #e2e8f0;
+  --text2: #94a3b8;
+  --muted: #64748b;
+  --accent: #7c3aed;
+  --accent2: #a78bfa;
+  --green: #10b981;
+  --amber: #f59e0b;
+  --red: #ef4444;
+  --blue: #3b82f6;
+}
+body {
+  font-family: 'Inter', system-ui, sans-serif;
+  background: var(--bg); color: var(--text);
+  margin: 0; padding: 40px 32px;
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+}
+h1 {
+  font-family: 'Manrope', sans-serif;
+  font-size: 36px; font-weight: 700; letter-spacing: -1px;
+  margin: 0 0 8px; color: #fff;
+}
+.subtitle {
+  font-size: 14px; color: var(--text2); margin: 0 0 32px;
+}
+.lang-pair-bar {
+  display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 28px;
+}
+.lang-chip {
+  padding: 6px 14px; border-radius: 100px; font-size: 12px; font-weight: 600;
+  border: 1px solid var(--line); background: var(--card);
+  color: var(--text2); letter-spacing: -.2px;
+}
+.lang-chip.active { background: rgba(124,58,237,.15); border-color: var(--accent); color: var(--accent2); }
+
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(380px, 1fr)); gap: 20px; }
+
+.card {
+  background: var(--card); border: 1px solid var(--line); border-radius: 16px;
+  padding: 24px; transition: border-color .2s;
+}
+.card:hover { border-color: rgba(255,255,255,.1); }
+.card-header {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 16px;
+}
+.card-name {
+  font-family: 'Manrope', sans-serif; font-size: 20px; font-weight: 700;
+  letter-spacing: -.5px;
+}
+.card-badge {
+  padding: 4px 10px; border-radius: 100px; font-size: 10px; font-weight: 700;
+  letter-spacing: .3px; text-transform: uppercase;
+}
+.badge-free { background: rgba(16,185,129,.12); color: var(--green); }
+.badge-paid { background: rgba(245,158,11,.12); color: var(--amber); }
+.badge-self { background: rgba(59,130,246,.12); color: var(--blue); }
+.badge-already { background: rgba(124,58,237,.12); color: var(--accent2); }
+
+.card-desc { font-size: 13px; color: var(--text2); line-height: 1.6; margin-bottom: 16px; }
+
+.lang-matrix {
+  display: grid; grid-template-columns: repeat(6, 1fr); gap: 4px;
+  margin-bottom: 16px;
+}
+.matrix-header {
+  font-size: 9px; font-weight: 700; color: var(--muted);
+  text-align: center; padding: 4px 0; letter-spacing: .5px;
+}
+.matrix-cell {
+  text-align: center; padding: 6px 2px; border-radius: 6px;
+  font-size: 10px; font-weight: 600;
+  font-family: 'JetBrains Mono', monospace;
+}
+.cell-yes { background: rgba(16,185,129,.08); color: var(--green); }
+.cell-no  { background: rgba(239,68,68,.06); color: var(--red); }
+.cell-poor { background: rgba(245,158,11,.08); color: var(--amber); }
+
+.stats-row {
+  display: flex; gap: 12px; margin-bottom: 12px;
+}
+.stat {
+  flex: 1; padding: 10px 12px; border-radius: 10px;
+  background: var(--card2); font-size: 11px;
+}
+.stat-label { color: var(--muted); font-size: 9px; font-weight: 600; letter-spacing: .5px; text-transform: uppercase; margin-bottom: 2px; }
+.stat-val { font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 600; color: var(--text); }
+
+.pros-cons { display: flex; gap: 16px; font-size: 11px; line-height: 1.7; }
+.pros-cons h4 { font-size: 10px; font-weight: 700; letter-spacing: .5px; text-transform: uppercase; margin: 0 0 4px; }
+.pro { flex: 1; } .con { flex: 1; }
+.pro h4 { color: var(--green); } .con h4 { color: var(--red); }
+.pro ul, .con ul { margin: 0; padding-left: 16px; color: var(--text2); }
+.pro li::marker { color: var(--green); } .con li::marker { color: var(--red); }
+
+.summary-table {
+  width: 100%; border-collapse: collapse; margin-top: 32px;
+  font-size: 12px;
+}
+.summary-table th {
+  text-align: left; padding: 10px 12px; font-size: 10px; font-weight: 700;
+  letter-spacing: .5px; text-transform: uppercase; color: var(--muted);
+  border-bottom: 1px solid var(--line);
+}
+.summary-table td {
+  padding: 10px 12px; border-bottom: 1px solid var(--line);
+  font-family: 'JetBrains Mono', monospace; font-size: 11px;
+}
+.summary-table tr:hover td { background: rgba(255,255,255,.01); }
+.summary-table .name-cell { font-family: 'Inter', sans-serif; font-weight: 600; font-size: 13px; }
+.summary-table .check { color: var(--green); } .summary-table .cross { color: var(--red); }
+.summary-table .warn { color: var(--amber); }
+
+.section-title {
+  font-family: 'Manrope', sans-serif; font-size: 24px; font-weight: 700;
+  letter-spacing: -.5px; margin: 40px 0 20px; color: #fff;
+}
+.note-box {
+  background: rgba(124,58,237,.06); border: 1px solid rgba(124,58,237,.15);
+  border-radius: 12px; padding: 16px 20px; margin-top: 32px;
+  font-size: 13px; color: var(--text2); line-height: 1.7;
+}
+.note-box strong { color: var(--accent2); }
+</style>
+</head>
+<body>
+
+<h1>🌐 Translation API Audit</h1>
+<p class="subtitle">Every API option for real-time EN → {IT, FR, DE, ES, PT, NL} translation. Language pairs: 6, all from English source.</p>
+
+<div class="lang-pair-bar">
+  <span class="lang-chip active">🇮🇹 Italian</span>
+  <span class="lang-chip active">🇫🇷 French</span>
+  <span class="lang-chip active">🇩🇪 German</span>
+  <span class="lang-chip active">🇪🇸 Spanish</span>
+  <span class="lang-chip active">🇵🇹 Portuguese</span>
+  <span class="lang-chip active">🇳🇱 Dutch</span>
+</div>
+
+<div class="grid">
+
+  <!-- 1. MyMemory -->
+  <div class="card">
+    <div class="card-header">
+      <span class="card-name">MyMemory</span>
+      <span class="card-badge badge-free">Free</span>
+    </div>
+    <div class="card-desc">The world's largest translation memory. Free tier: 5000 chars/day anonymous, 100k/day with key. No credit card needed.</div>
+    <div class="lang-matrix">
+      <span class="matrix-header">IT</span><span class="matrix-header">FR</span><span class="matrix-header">DE</span><span class="matrix-header">ES</span><span class="matrix-header">PT</span><span class="matrix-header">NL</span>
+      <span class="matrix-cell cell-yes">✓</span><span class="matrix-cell cell-yes">✓</span><span class="matrix-cell cell-yes">✓</span><span class="matrix-cell cell-yes">✓</span><span class="matrix-cell cell-yes">✓</span><span class="matrix-cell cell-yes">✓</span>
+    </div>
+    <div class="stats-row">
+      <div class="stat"><div class="stat-label">Limit (free)</div><div class="stat-val">5k chars/day</div></div>
+      <div class="stat"><div class="stat-label">Latency</div><div class="stat-val">~200-500ms</div></div>
+      <div class="stat"><div class="stat-label">Quality</div><div class="stat-val">⭐⭐⭐</div></div>
+    </div>
+    <div class="pros-cons">
+      <div class="pro"><h4>✓ Pros</h4><ul><li>Completely free, no key needed</li><li>Already integrated</li><li>All 6 pairs supported</li><li>Simple REST API</li></ul></div>
+      <div class="con"><h4>✗ Cons</h4><ul><li>TM-based — can return gibberish for novel sentences</li><li>Inconsistent quality</li><li>Rate limited</li><li>No context awareness</li></ul></div>
+    </div>
+  </div>
+
+  <!-- 2. Google Translate (free endpoint) -->
+  <div class="card">
+    <div class="card-header">
+      <span class="card-name">Google Translate (free)</span>
+      <span class="card-badge badge-free">Free*</span>
+    </div>
+    <div class="card-desc">Unofficial gtx client endpoint. No API key, but no SLA. Used by Google Translate web widget. Already in translation-providers.js.</div>
+    <div class="lang-matrix">
+      <span class="matrix-header">IT</span><span class="matrix-header">FR</span><span class="matrix-header">DE</span><span class="matrix-header">ES</span><span class="matrix-header">PT</span><span class="matrix-header">NL</span>
+      <span class="matrix-cell cell-yes">✓</span><span class="matrix-cell cell-yes">✓</span><span class="matrix-cell cell-yes">✓</span><span class="matrix-cell cell-yes">✓</span><span class="matrix-cell cell-yes">✓</span><span class="matrix-cell cell-yes">✓</span>
+    </div>
+    <div class="stats-row">
+      <div class="stat"><div class="stat-label">Limit</div><div class="stat-val">Unknown / IP-based</div></div>
+      <div class="stat"><div class="stat-label">Latency</div><div class="stat-val">~100-300ms</div></div>
+      <div class="stat"><div class="stat-label">Quality</div><div class="stat-val">⭐⭐⭐⭐</div></div>
+    </div>
+    <div class="pros-cons">
+      <div class="pro"><h4>✓ Pros</h4><ul><li>No key required</li><li>Fast, high quality NMT</li><li>Already implemented</li><li>Handles slang well</li></ul></div>
+      <div class="con"><h4>✗ Cons</h4><ul><li>Unofficial — can break anytime</li><li>No SLA or support</li><li>May be IP-rate-limited</li><li>Legal gray area for commercial use</li></ul></div>
+    </div>
+  </div>
+
+  <!-- 3. Google Cloud Translation -->
+  <div class="card">
+    <div class="card-header">
+      <span class="card-name">Google Cloud Translation</span>
+      <span class="card-badge badge-paid">Paid</span>
+    </div>
+    <div class="card-desc">Official Google Cloud Translation API (v3). NMT with glossaries, auto-detection. $20/1M chars. First 500k chars/month free.</div>
+    <div class="lang-matrix">
+      <span class="matrix-header">IT</span><span class="matrix-header">FR</span><span class="matrix-header">DE</span><span class="matrix-header">ES</span><span class="matrix-header">PT</span><span class="matrix-header">NL</span>
+      <span class="matrix-cell cell-yes">✓</span><span class="matrix-cell cell-yes">✓</span><span class="matrix-cell cell-yes">✓</span><span class="matrix-cell cell-yes">✓</span><span class="matrix-cell cell-yes">✓</span><span class="matrix-cell cell-yes">✓</span>
+    </div>
+    <div class="stats-row">
+      <div class="stat"><div class="stat-label">Price</div><div class="stat-val">$20 / 1M chars</div></div>
+      <div class="stat"><div class="stat-label">Latency</div><div class="stat-val">~80-200ms</div></div>
+      <div class="stat"><div class="stat-label">Quality</div><div class="stat-val">⭐⭐⭐⭐⭐</div></div>
+    </div>
+    <div class="pros-cons">
+      <div class="pro"><h4>✓ Pros</h4><ul><li>Best-in-class NMT quality</li><li>Glossary/custom model support</li><li>SLA + 24/7 support</li><li>Batch + streaming</li></ul></div>
+      <div class="con"><h4>✗ Cons</h4><ul><li>Requires billing account</li><li>GCP setup complexity</li><li>Cost at scale (3000 min = ~$6-15)</li><li>API key must be secured server-side</li></ul></div>
+    </div>
+  </div>
+
+  <!-- 4. DeepL -->
+  <div class="card">
+    <div class="card-header">
+      <span class="card-name">DeepL</span>
+      <span class="card-badge badge-paid">Paid</span>
+    </div>
+    <div class="card-desc">Premium NMT. 500k chars/month free, then €4.99/mo + usage. Widely considered best quality for EU languages. All 6 pairs supported.</div>
+    <div class="lang-matrix">
+      <span class="matrix-header">IT</span><span class="matrix-header">FR</span><span class="matrix-header">DE</span><span class="matrix-header">ES</span><span class="matrix-header">PT</span><span class="matrix-header">NL</span>
+      <span class="matrix-cell cell-yes">✓</span><span class="matrix-cell cell-yes">✓</span><span class="matrix-cell cell-yes">✓</span><span class="matrix-cell cell-yes">✓</span><span class="matrix-cell cell-yes">✓</span><span class="matrix-cell cell-yes">✓</span>
+    </div>
+    <div class="stats-row">
+      <div class="stat"><div class="stat-label">Price</div><div class="stat-val">€20 / 1M chars</div></div>
+      <div class="stat"><div class="stat-label">Latency</div><div class="stat-val">~150-400ms</div></div>
+      <div class="stat"><div class="stat-label">Quality</div><div class="stat-val">⭐⭐⭐⭐⭐</div></div>
+    </div>
+    <div class="pros-cons">
+      <div class="pro"><h4>✓ Pros</h4><ul><li>Best EU language quality</li><li>500k chars free/month</li><li>Formality control (tu/Lei, du/Sie)</li><li>Glossary support</li></ul></div>
+      <div class="con"><h4>✗ Cons</h4><ul><li>Requires API key + CC</li><li>Cost at scale</li><li>No PT-BR vs PT-PT distinction</li><li>Rate limit: ~50 req/sec on Pro</li></ul></div>
+    </div>
+  </div>
+
+  <!-- 5. Microsoft Translator -->
+  <div class="card">
+    <div class="card-header">
+      <span class="card-name">Microsoft Translator</span>
+      <span class="card-badge badge-paid">Paid</span>
+    </div>
+    <div class="card-desc">Azure Cognitive Services. 2M chars/month free tier. Pay-as-you-go after. Solid NMT, good for all 6 pairs.</div>
+    <div class="lang-matrix">
+      <span class="matrix-header">IT</span><span class="matrix-header">FR</span><span class="matrix-header">DE</span><span class="matrix-header">ES</span><span class="matrix-header">PT</span><span class="matrix-header">NL</span>
+      <span class="matrix-cell cell-yes">✓</span><span class="matrix-cell cell-yes">✓</span><span class="matrix-cell cell-yes">✓</span><span class="matrix-cell cell-yes">✓</span><span class="matrix-cell cell-yes">✓</span><span class="matrix-cell cell-yes">✓</span>
+    </div>
+    <div class="stats-row">
+      <div class="stat"><div class="stat-label">Price</div><div class="stat-val">$10 / 1M chars</div></div>
+      <div class="stat"><div class="stat-label">Latency</div><div class="stat-val">~100-250ms</div></div>
+      <div class="stat"><div class="stat-label">Quality</div><div class="stat-val">⭐⭐⭐⭐</div></div>
+    </div>
+    <div class="pros-cons">
+      <div class="pro"><h4>✓ Pros</h4><ul><li>Generous free tier (2M chars)</li><li>Cheapest paid option</li><li>Custom Translator for domain</li><li>Good Azure ecosystem</li></ul></div>
+      <div class="con"><h4>✗ Cons</h4><ul><li>Azure account needed</li><li>Slightly worse than DeepL/Google for EU</li><li>Key must be server-side</li><li>Complex pricing tiers</li></ul></div>
+    </div>
+  </div>
+
+  <!-- 6. LibreTranslate -->
+  <div class="card">
+    <div class="card-header">
+      <span class="card-name">LibreTranslate</span>
+      <span class="card-badge badge-self">Self-host</span>
+    </div>
+    <div class="card-desc">Open-source NMT (Argos Translate engine). Self-host on Render/Railway. Free if self-hosted. Public API: rate-limited.</div>
+    <div class="lang-matrix">
+      <span class="matrix-header">IT</span><span class="matrix-header">FR</span><span class="matrix-header">DE</span><span class="matrix-header">ES</span><span class="matrix-header">PT</span><span class="matrix-header">NL</span>
+      <span class="matrix-cell cell-yes">✓</span><span class="matrix-cell cell-yes">✓</span><span class="matrix-cell cell-yes">✓</span><span class="matrix-cell cell-yes">✓</span><span class="matrix-cell cell-yes">✓</span><span class="matrix-cell cell-yes">✓</span>
+    </div>
+    <div class="stats-row">
+      <div class="stat"><div class="stat-label">Price</div><div class="stat-val">Free (self-host)</div></div>
+      <div class="stat"><div class="stat-label">Latency</div><div class="stat-val">~300-800ms</div></div>
+      <div class="stat"><div class="stat-label">Quality</div><div class="stat-val">⭐⭐</div></div>
+    </div>
+    <div class="pros-cons">
+      <div class="pro"><h4>✓ Pros</h4><ul><li>100% free, no API keys</li><li>Your own data, full privacy</li><li>Lightweight Docker deploy</li><li>No usage limits</li></ul></div>
+      <div class="con"><h4>✗ Cons</h4><ul><li>Lower quality (Argos is 2020-era)</li><li>Server costs ($7-25/mo Render)</li><li>Slower than cloud APIs</li><li>No glossary/customization</li></ul></div>
+    </div>
+  </div>
+
+  <!-- 7. OpenAI GPT -->
+  <div class="card">
+    <div class="card-header">
+      <span class="card-name">OpenAI (GPT-4o-mini)</span>
+      <span class="card-badge badge-paid">Paid</span>
+    </div>
+    <div class="card-desc">LLM-based translation via prompt. Already in use for AI reports. GPT-4o-mini: $0.15/1M input tokens. Excellent contextual quality.</div>
+    <div class="lang-matrix">
+      <span class="matrix-header">IT</span><span class="matrix-header">FR</span><span class="matrix-header">DE</span><span class="matrix-header">ES</span><span class="matrix-header">PT</span><span class="matrix-header">NL</span>
+      <span class="matrix-cell cell-yes">✓</span><span class="matrix-cell cell-yes">✓</span><span class="matrix-cell cell-yes">✓</span><span class="matrix-cell cell-yes">✓</span><span class="matrix-cell cell-yes">✓</span><span class="matrix-cell cell-yes">✓</span>
+    </div>
+    <div class="stats-row">
+      <div class="stat"><div class="stat-label">Price</div><div class="stat-val">$0.15 / 1M in</div></div>
+      <div class="stat"><div class="stat-label">Latency</div><div class="stat-val">~400-1200ms</div></div>
+      <div class="stat"><div class="stat-label">Quality</div><div class="stat-val">⭐⭐⭐⭐⭐</div></div>
+    </div>
+    <div class="pros-cons">
+      <div class="pro"><h4>✓ Pros</h4><ul><li>Best contextual/nuanced translation</li><li>Already have API key + integration</li><li>Can explain/annotate translations</li><li>Handles idioms perfectly</li></ul></div>
+      <div class="con"><h4>✗ Cons</h4><ul><li>Highest latency (LLM inference)</li><li>Cost at scale</li><li>Overkill for simple sentences</li><li>Hallucination risk on rare langs</li></ul></div>
+    </div>
+  </div>
+
+  <!-- 8. Anthropic Claude -->
+  <div class="card">
+    <div class="card-header">
+      <span class="card-name">Anthropic Claude (Haiku)</span>
+      <span class="card-badge badge-paid">Paid</span>
+    </div>
+    <div class="card-desc">Claude 3.5 Haiku: $0.25/1M input. Excellent multilingual performance, very fast for an LLM. Good alternative to GPT.</div>
+    <div class="lang-matrix">
+      <span class="matrix-header">IT</span><span class="matrix-header">FR</span><span class="matrix-header">DE</span><span class="matrix-header">ES</span><span class="matrix-header">PT</span><span class="matrix-header">NL</span>
+      <span class="matrix-cell cell-yes">✓</span><span class="matrix-cell cell-yes">✓</span><span class="matrix-cell cell-yes">✓</span><span class="matrix-cell cell-yes">✓</span><span class="matrix-cell cell-yes">✓</span><span class="matrix-cell cell-yes">✓</span>
+    </div>
+    <div class="stats-row">
+      <div class="stat"><div class="stat-label">Price</div><div class="stat-val">$0.25 / 1M in</div></div>
+      <div class="stat"><div class="stat-label">Latency</div><div class="stat-val">~300-800ms</div></div>
+      <div class="stat"><div class="stat-label">Quality</div><div class="stat-val">⭐⭐⭐⭐⭐</div></div>
+    </div>
+    <div class="pros-cons">
+      <div class="pro"><h4>✓ Pros</h4><ul><li>Excellent multilingual quality</li><li>Faster than GPT for short text</li><li>Nuanced, natural output</li></ul></div>
+      <div class="con"><h4>✗ Cons</h4><ul><li>Newer API, less ecosystem</li><li>Higher cost than dedicated MT</li><li>LLM latency still an issue</li></ul></div>
+    </div>
+  </div>
+
+  <!-- 9. ModernMT -->
+  <div class="card">
+    <div class="card-header">
+      <span class="card-name">ModernMT</span>
+      <span class="card-badge badge-paid">Paid</span>
+    </div>
+    <div class="card-desc">Context-aware adaptive NMT. Learns from corrections in real-time. €0.50/1K words. Good for specialized domains.</div>
+    <div class="lang-matrix">
+      <span class="matrix-header">IT</span><span class="matrix-header">FR</span><span class="matrix-header">DE</span><span class="matrix-header">ES</span><span class="matrix-header">PT</span><span class="matrix-header">NL</span>
+      <span class="matrix-cell cell-yes">✓</span><span class="matrix-cell cell-yes">✓</span><span class="matrix-cell cell-yes">✓</span><span class="matrix-cell cell-yes">✓</span><span class="matrix-cell cell-yes">✓</span><span class="matrix-cell cell-no">✗</span>
+    </div>
+    <div class="stats-row">
+      <div class="stat"><div class="stat-label">Price</div><div class="stat-val">€0.50 / 1K words</div></div>
+      <div class="stat"><div class="stat-label">Latency</div><div class="stat-val">~200-500ms</div></div>
+      <div class="stat"><div class="stat-label">Quality</div><div class="stat-val">⭐⭐⭐⭐</div></div>
+    </div>
+    <div class="pros-cons">
+      <div class="pro"><h4>✓ Pros</h4><ul><li>Learns from user corrections</li><li>Context-aware (uses surrounding text)</li><li>Good for repetitive/domain content</li></ul></div>
+      <div class="con"><h4>✗ Cons</h4><ul><li>NO Dutch support ✗</li><li>Expensive per-word</li><li>Fewer language pairs overall</li></ul></div>
+    </div>
+  </div>
+
+  <!-- 10. Yandex Translate -->
+  <div class="card">
+    <div class="card-header">
+      <span class="card-name">Yandex Translate</span>
+      <span class="card-badge badge-paid">Paid</span>
+    </div>
+    <div class="card-desc">Russian Yandex Cloud. 1M chars/month free, then ~$5/1M. Decent NMT for European languages. Geopolitical concerns.</div>
+    <div class="lang-matrix">
+      <span class="matrix-header">IT</span><span class="matrix-header">FR</span><span class="matrix-header">DE</span><span class="matrix-header">ES</span><span class="matrix-header">PT</span><span class="matrix-header">NL</span>
+      <span class="matrix-cell cell-yes">✓</span><span class="matrix-cell cell-yes">✓</span><span class="matrix-cell cell-yes">✓</span><span class="matrix-cell cell-yes">✓</span><span class="matrix-cell cell-yes">✓</span><span class="matrix-cell cell-no">✗</span>
+    </div>
+    <div class="stats-row">
+      <div class="stat"><div class="stat-label">Price</div><div class="stat-val">~$5 / 1M chars</div></div>
+      <div class="stat"><div class="stat-label">Latency</div><div class="stat-val">~150-400ms</div></div>
+      <div class="stat"><div class="stat-label">Quality</div><div class="stat-val">⭐⭐⭐</div></div>
+    </div>
+    <div class="pros-cons">
+      <div class="pro"><h4>✓ Pros</h4><ul><li>Cheap, 1M free tier</li><li>Good Slavic & European quality</li><li>Simple REST API</li></ul></div>
+      <div class="con"><h4>✗ Cons</h4><ul><li>NO Dutch ✗</li><li>Russian company — GDPR concerns</li><li>Data may transit through Russia</li></ul></div>
+    </div>
+  </div>
+
+  <!-- 11. Amazon Translate -->
+  <div class="card">
+    <div class="card-header">
+      <span class="card-name">Amazon Translate</span>
+      <span class="card-badge badge-paid">Paid</span>
+    </div>
+    <div class="card-desc">AWS neural MT. $15/1M chars. 2M chars/month free for first 12 months. Solid but unspectacular quality.</div>
+    <div class="lang-matrix">
+      <span class="matrix-header">IT</span><span class="matrix-header">FR</span><span class="matrix-header">DE</span><span class="matrix-header">ES</span><span class="matrix-header">PT</span><span class="matrix-header">NL</span>
+      <span class="matrix-cell cell-yes">✓</span><span class="matrix-cell cell-yes">✓</span><span class="matrix-cell cell-yes">✓</span><span class="matrix-cell cell-yes">✓</span><span class="matrix-cell cell-yes">✓</span><span class="matrix-cell cell-yes">✓</span>
+    </div>
+    <div class="stats-row">
+      <div class="stat"><div class="stat-label">Price</div><div class="stat-val">$15 / 1M chars</div></div>
+      <div class="stat"><div class="stat-label">Latency</div><div class="stat-val">~100-300ms</div></div>
+      <div class="stat"><div class="stat-label">Quality</div><div class="stat-val">⭐⭐⭐</div></div>
+    </div>
+    <div class="pros-cons">
+      <div class="pro"><h4>✓ Pros</h4><ul><li>AWS ecosystem integration</li><li>Active custom translation</li><li>Batch + real-time modes</li></ul></div>
+      <div class="con"><h4>✗ Cons</h4><ul><li>AWS account complexity</li><li>Mediocre EU language quality</li><li>Free tier only 12 months</li></ul></div>
+    </div>
+  </div>
+
+  <!-- 12. NLLB (Meta) -->
+  <div class="card">
+    <div class="card-header">
+      <span class="card-name">NLLB-200 (Meta)</span>
+      <span class="card-badge badge-self">Self-host</span>
+    </div>
+    <div class="card-desc">Meta's open-source NLLB-200 model. 200 languages. Can be deployed via HuggingFace Inference Endpoints or self-hosted GPU.</div>
+    <div class="lang-matrix">
+      <span class="matrix-header">IT</span><span class="matrix-header">FR</span><span class="matrix-header">DE</span><span class="matrix-header">ES</span><span class="matrix-header">PT</span><span class="matrix-header">NL</span>
+      <span class="matrix-cell cell-yes">✓</span><span class="matrix-cell cell-yes">✓</span><span class="matrix-cell cell-yes">✓</span><span class="matrix-cell cell-yes">✓</span><span class="matrix-cell cell-yes">✓</span><span class="matrix-cell cell-yes">✓</span>
+    </div>
+    <div class="stats-row">
+      <div class="stat"><div class="stat-label">Price</div><div class="stat-val">GPU ~$0.50-2/hr</div></div>
+      <div class="stat"><div class="stat-label">Latency</div><div class="stat-val">~200-600ms</div></div>
+      <div class="stat"><div class="stat-label">Quality</div><div class="stat-val">⭐⭐⭐⭐</div></div>
+    </div>
+    <div class="pros-cons">
+      <div class="pro"><h4>✓ Pros</h4><ul><li>200 languages, all ours covered</li><li>State-of-art open NMT</li><li>No API costs per request</li><li>Full data privacy</li></ul></div>
+      <div class="con"><h4>✗ Cons</h4><ul><li>Needs GPU (Render GPU ~$0.50/hr)</li><li>Complex deployment</li><li>600MB-3GB model download</li><li>Cold start on serverless</li></ul></div>
+    </div>
+  </div>
+
+</div>
+
+<!-- Summary Comparison Table -->
+<h2 class="section-title">📊 Side-by-Side Comparison</h2>
+<table class="summary-table">
+  <thead>
+    <tr>
+      <th>Provider</th>
+      <th>IT</th><th>FR</th><th>DE</th><th>ES</th><th>PT</th><th>NL</th>
+      <th>Free tier</th>
+      <th>Cost / 1M chars</th>
+      <th>Latency</th>
+      <th>Quality</th>
+      <th>Already built</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td class="name-cell">MyMemory</td>
+      <td class="check">✓</td><td class="check">✓</td><td class="check">✓</td><td class="check">✓</td><td class="check">✓</td><td class="check">✓</td>
+      <td>5K/day</td><td>Free</td><td>200-500ms</td><td>⭐⭐⭐</td><td class="check">✅</td>
+    </tr>
+    <tr>
+      <td class="name-cell">Google (free)</td>
+      <td class="check">✓</td><td class="check">✓</td><td class="check">✓</td><td class="check">✓</td><td class="check">✓</td><td class="check">✓</td>
+      <td>Unknown</td><td>Free</td><td>100-300ms</td><td>⭐⭐⭐⭐</td><td class="check">✅</td>
+    </tr>
+    <tr>
+      <td class="name-cell">Google Cloud</td>
+      <td class="check">✓</td><td class="check">✓</td><td class="check">✓</td><td class="check">✓</td><td class="check">✓</td><td class="check">✓</td>
+      <td>500K/mo</td><td>$20</td><td>80-200ms</td><td>⭐⭐⭐⭐⭐</td><td class="cross">—</td>
+    </tr>
+    <tr>
+      <td class="name-cell">DeepL</td>
+      <td class="check">✓</td><td class="check">✓</td><td class="check">✓</td><td class="check">✓</td><td class="check">✓</td><td class="check">✓</td>
+      <td>500K/mo</td><td>€20</td><td>150-400ms</td><td>⭐⭐⭐⭐⭐</td><td class="cross">—</td>
+    </tr>
+    <tr>
+      <td class="name-cell">Microsoft</td>
+      <td class="check">✓</td><td class="check">✓</td><td class="check">✓</td><td class="check">✓</td><td class="check">✓</td><td class="check">✓</td>
+      <td>2M/mo</td><td>$10</td><td>100-250ms</td><td>⭐⭐⭐⭐</td><td class="cross">—</td>
+    </tr>
+    <tr>
+      <td class="name-cell">LibreTranslate</td>
+      <td class="check">✓</td><td class="check">✓</td><td class="check">✓</td><td class="check">✓</td><td class="check">✓</td><td class="check">✓</td>
+      <td>Unlimited</td><td>$7-25/mo hosting</td><td>300-800ms</td><td>⭐⭐</td><td class="cross">—</td>
+    </tr>
+    <tr>
+      <td class="name-cell">OpenAI GPT-4o-mini</td>
+      <td class="check">✓</td><td class="check">✓</td><td class="check">✓</td><td class="check">✓</td><td class="check">✓</td><td class="check">✓</td>
+      <td>—</td><td>$0.15/1M tokens</td><td>400-1200ms</td><td>⭐⭐⭐⭐⭐</td><td class="warn">⚠️ keys exist</td>
+    </tr>
+    <tr>
+      <td class="name-cell">Claude Haiku</td>
+      <td class="check">✓</td><td class="check">✓</td><td class="check">✓</td><td class="check">✓</td><td class="check">✓</td><td class="check">✓</td>
+      <td>—</td><td>$0.25/1M tokens</td><td>300-800ms</td><td>⭐⭐⭐⭐⭐</td><td class="cross">—</td>
+    </tr>
+    <tr>
+      <td class="name-cell">ModernMT</td>
+      <td class="check">✓</td><td class="check">✓</td><td class="check">✓</td><td class="check">✓</td><td class="check">✓</td><td class="cross">✗</td>
+      <td>—</td><td>€0.50/1K words</td><td>200-500ms</td><td>⭐⭐⭐⭐</td><td class="cross">—</td>
+    </tr>
+    <tr>
+      <td class="name-cell">Yandex</td>
+      <td class="check">✓</td><td class="check">✓</td><td class="check">✓</td><td class="check">✓</td><td class="check">✓</td><td class="cross">✗</td>
+      <td>1M/mo</td><td>~$5</td><td>150-400ms</td><td>⭐⭐⭐</td><td class="cross">—</td>
+    </tr>
+    <tr>
+      <td class="name-cell">Amazon</td>
+      <td class="check">✓</td><td class="check">✓</td><td class="check">✓</td><td class="check">✓</td><td class="check">✓</td><td class="check">✓</td>
+      <td>2M (12mo)</td><td>$15</td><td>100-300ms</td><td>⭐⭐⭐</td><td class="cross">—</td>
+    </tr>
+    <tr>
+      <td class="name-cell">NLLB-200 (Meta)</td>
+      <td class="check">✓</td><td class="check">✓</td><td class="check">✓</td><td class="check">✓</td><td class="check">✓</td><td class="check">✓</td>
+      <td>Unlimited</td><td>GPU hosting</td><td>200-600ms</td><td>⭐⭐⭐⭐</td><td class="cross">—</td>
+    </tr>
+  </tbody>
+</table>
+
+<div class="note-box">
+  <strong>✅ DECISION: Google Translate (free endpoint) as sole provider.</strong><br><br>
+  MyMemory dropped — inconsistent quality, TM-based gibberish on novel sentences.<br><br>
+  <strong>Current implementation:</strong> `translation-providers.js` → `translateWithGoogle()` via the free <code>translate.googleapis.com</code> endpoint. Queued processing (200ms spacing) to avoid rate limiting. Falls back to showing source text if Google fails.<br><br>
+  <strong>Future upgrade path:</strong> DeepL API for premium quality (500K chars/month free covers light use). Google Cloud Translation v3 for SLA + glossaries if scale demands it.
+</div>
+
+</body>
+</html>

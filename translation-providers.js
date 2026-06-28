@@ -9,7 +9,7 @@
     const input = safeString(value).toLowerCase();
     if (!input) return '';
     const base = input.split('-')[0];
-    const allowed = ['en', 'it', 'fr', 'de', 'es', 'pt', 'nl', 'pl'];
+    const allowed = ['en', 'it', 'fr', 'de', 'es', 'pt', 'nl', 'pl', 'auto'];
     return allowed.indexOf(base) !== -1 ? base : '';
   }
 
@@ -79,14 +79,23 @@
 
     const raw = await response.text();
     // Response format: [[["translated text","original",...]],...]
+    // With sl=auto: [[["text","orig",...]],null,"detectedLang"]
     const match = raw.match(/"([^"]+)"/);
     if (!match) {
       throw new Error('Could not parse Google Translate response.');
     }
 
+    // Extract detected language when sl=auto (third element of outer array)
+    var detectedLang = null;
+    if (source === 'auto') {
+      var dlMatch = raw.match(/],null,"([a-z]{2,3})"/);
+      if (dlMatch) detectedLang = dlMatch[1];
+    }
+
     return {
       provider: 'google',
       translatedText: match[1],
+      detectedLang: detectedLang,
       raw: raw
     };
   }
