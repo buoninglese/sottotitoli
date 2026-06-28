@@ -1295,8 +1295,25 @@ function setSpeakerMode(mode) {
     // Create room + connect
     if (!window._duoRoomId) {
       window._duoRoomId = 'cap-' + Date.now().toString(36);
+      window._duoSpeakerLang = (window._currentCaptionLang || 'en-US').split('-')[0];
       window._duoSpeakerName = 'Host';
-      window._duoSpeakerLang = window._currentCaptionLang || 'en-US';
+      // Store host identity so they can re-enter without join screen
+      localStorage.setItem('sottotitoli-duo-is-host-' + window._duoRoomId, '1');
+      var sb = window.sottotitoliSupabase;
+      if (sb) {
+        sb.auth.getSession().then(function(r){
+          if (r.data?.session) {
+            var uid = r.data.session.user.id;
+            localStorage.setItem('sottotitoli-duo-host-' + window._duoRoomId, uid);
+            var n = r.data.session.user.user_metadata?.full_name || r.data.session.user.email?.split('@')[0] || 'Host';
+            window._duoSpeakerName = n;
+            duoRenderSpeakers();
+            if (window._duoWs && window._duoWs.readyState === WebSocket.OPEN) {
+              window._duoWs.send(JSON.stringify({ type:'duo-join', name:n, lang:window._duoSpeakerLang }));
+            }
+          }
+        });
+      }
     }
     duoConnectWebSocket();
     duoUpdateInviteUrl();
@@ -3829,23 +3846,83 @@ window.fixExtrasPanelColors = function(){
   if (params.get('join') === '1') {
     window._duoRoomId = params.get('room') || '';
     var host = params.get('host') || 'the host';
-    document.getElementById('duoJoinHostName').textContent = decodeURIComponent(host);
-    // Hide normal UI, show join screen
-    document.getElementById('modeScroll').style.display = 'none';
-    document.getElementById('themeToggle').style.display = 'none';
-    document.getElementById('topbarSub').style.display = 'none';
-    document.getElementById('topbarRecWrap').style.display = 'none';
-    document.getElementById('duoJoinScreen').style.display = 'flex';
-    // Pre-fill name
-    var saved = localStorage.getItem('sottotitoli-duo-speaker-name');
-    if (saved) document.getElementById('duoJoinNameInput').value = saved;
-    // Language pills
-    document.querySelectorAll('#duoJoinLangPills .duo-lang-pill').forEach(function(p){
-      p.addEventListener('click', function(){
-        document.querySelectorAll('#duoJoinLangPills .duo-lang-pill').forEach(function(pp){pp.classList.remove('selected')});
-        this.classList.add('selected');
+
+    // Check if this user is the host — if so, skip join screen and enter room directly
+    function proceedAsHost() {
+      window._duoMode = true;
+      window._duoSpeakerLang = (window._currentCaptionLang || 'en-US').split('-')[0];
+      var sb = window.sottotitoliSupabase;
+      if (sb) {
+        sb.auth.getSession().then(function(r){
+          if (r.data?.session) {
+            window._duoSpeakerName = r.data.session.user.user_metadata?.full_name || r.data.session.user.email?.split('@')[0] || 'Host';
+          } else { window._duoSpeakerName = 'Host'; }
+          enterDuoRoom();
+        });
+      } else { window._duoSpeakerName = 'Host'; enterDuoRoom(); }
+    }
+    function enterDuoRoom() {
+      document.getElementById('duoJoinScreen').style.display = 'none';
+      document.getElementById('modeScroll').style.display = '';
+      document.getElementById('themeToggle').style.display = '';
+      document.getElementById('topbarSub').style.display = 'flex';
+      document.getElementById('topbarRecWrap').style.display = '';
+      var sidebar = document.getElementById('duoSpeakerSidebar');
+      var toggle = document.getElementById('duoToggleBtn');
+      if (sidebar) { sidebar.style.display = 'flex'; sidebar.classList.add('open'); }
+      if (toggle) { toggle.style.display = 'block'; toggle.classList.add('open'); }
+      var soloBtn = document.getElementById('modeSoloBtn');
+      var duoBtn = document.getElementById('modeDuoBtn');
+      if (soloBtn) soloBtn.className = 'btn-sm';
+      if (duoBtn) duoBtn.className = 'mode-badge';
+      setSpeakerCount('2');
+      duoAssignLabel(window._duoSpeakerName, window._duoSpeakerLang);
+      duoConnectWebSocket();
+      duoUpdateInviteUrl();
+      duoRenderSpeakers();
+    }
+
+    // Check if user is the host (same Supabase user who created the room)
+    var sb = window.sottotitoliSupabase;
+    if (sb) {
+      sb.auth.getSession().then(function(r){
+        if (r.data?.session) {
+          var uid = r.data.session.user.id;
+          var storedHostId = localStorage.getItem('sottotitoli-duo-host-' + window._duoRoomId);
+          if (uid === storedHostId) {
+            // This is the host — skip join screen
+            proceedAsHost();
+            return;
+          }
+        }
+        // Not the host — show join screen
+        showJoinScreen(host);
       });
-    });
+    } else {
+      // No Supabase yet — check simple localStorage flag
+      if (localStorage.getItem('sottotitoli-duo-is-host-' + window._duoRoomId) === '1') {
+        proceedAsHost();
+        return;
+      }
+      showJoinScreen(host);
+    }
+
+    function showJoinScreen(hostName) {
+      document.getElementById('duoJoinHostName').textContent = decodeURIComponent(hostName);
+      document.getElementById('modeScroll').style.display = 'none';
+      document.getElementById('themeToggle').style.display = 'none';
+      document.getElementById('topbarSub').style.display = 'none';
+      document.getElementById('topbarRecWrap').style.display = 'none';
+      document.getElementById('duoJoinScreen').style.display = 'flex';
+      var saved = localStorage.getItem('sottotitoli-duo-speaker-name');
+      if (saved) document.getElementById('duoJoinNameInput').value = saved;
+      document.querySelectorAll('#duoJoinLangPills .duo-lang-pill').forEach(function(p){
+        p.addEventListener('click', function(){
+          document.querySelectorAll('#duoJoinLangPills .duo-lang-pill').forEach(function(pp){pp.classList.remove('selected')});
+          this.classList.add('selected');
+        });
+      });
+    }
     return; // Don't initialize rest of DUO module yet — wait for join
   }
 
@@ -4084,6 +4161,13 @@ window.fixExtrasPanelColors = function(){
     if (!confirm('Create a new room? This will clear all captions and disconnect current speakers.')) return;
     if (window._duoWs) { try { window._duoWs.close(); } catch(e){} window._duoWs = null; }
     window._duoRoomId = 'cap-' + Date.now().toString(36);
+    localStorage.setItem('sottotitoli-duo-is-host-' + window._duoRoomId, '1');
+    var sb2 = window.sottotitoliSupabase;
+    if (sb2) {
+      sb2.auth.getSession().then(function(r){
+        if (r.data?.session) localStorage.setItem('sottotitoli-duo-host-' + window._duoRoomId, r.data.session.user.id);
+      });
+    }
     window._duoSpeakerMap = {};
     var transcript = document.getElementById('captionTranscript');
     if (transcript) transcript.innerHTML = '';
