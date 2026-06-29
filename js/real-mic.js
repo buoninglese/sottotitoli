@@ -40,23 +40,25 @@ function updateMicUI(state) {
 }
 
 async function startRealMic() {
-  if (_realMic.recognition) return; // already running
+  if (_realMic.recognition) return true; // already running
   updateMicUI('requesting');
   
-  try {
-    // Request mic permission
-    _realMic.stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-  } catch(e) {
-    console.error('Mic permission denied:', e);
-    updateMicUI('blocked');
-    return false;
+  // Request mic permission (non-blocking — SpeechRecognition captures audio independently)
+  // We fire this to trigger the browser permission prompt, but don't await it.
+  // The stream is only used for cleanup; SpeechRecognition has its own audio pipeline.
+  if (!_realMic.stream) {
+    navigator.mediaDevices.getUserMedia({ audio: true }).then(function(s) {
+      _realMic.stream = s;
+    }).catch(function(e) {
+      console.warn('getUserMedia failed, SpeechRecognition may still work:', e.message);
+      // Don't set blocked — let SpeechRecognition try
+    });
   }
   
   var SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
   if (!SpeechRecognition) {
     console.error('SpeechRecognition not available');
     updateMicUI('error');
-    if (_realMic.stream) { _realMic.stream.getTracks().forEach(function(t){t.stop();}); _realMic.stream = null; }
     return false;
   }
   
