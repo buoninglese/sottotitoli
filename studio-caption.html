@@ -2175,69 +2175,26 @@ _realMic.onFinal = function(text) {
   // Clear interim after final
   if (interim) interim.textContent = '';
   
-  // Update stats
+  // Update stats (safe — only if elements exist)
   var lineCount = transcript.querySelectorAll('.line').length;
   var allWords = (transcript.textContent || '').match(/[a-z']+/gi) || [];
-  document.getElementById('statLines').textContent = lineCount;
-  document.getElementById('statWords').textContent = allWords.length;
-  document.getElementById('statChars').textContent = (transcript.textContent || '').length;
-  document.getElementById('liveWords').textContent = allWords.length;
-  document.getElementById('liveSentences').textContent = lineCount;
+  var _safe = function(id, val) { var el = document.getElementById(id); if (el) el.textContent = val; };
+  _safe('statLines', lineCount);
+  _safe('statWords', allWords.length);
+  _safe('liveSentences', lineCount);
   
   var wpm = sessionSeconds > 0 ? Math.round(allWords.length / (sessionSeconds / 60)) : 0;
-  document.getElementById('liveWpm').textContent = wpm;
+  _safe('liveWpm', wpm);
 
-  // ── Live metrics: lexical diversity, CEFR, fillers, POS ──
+  // ── Live metrics: lexical diversity (safe) ──
   if (allWords.length > 0) {
-    // Lexical diversity
     var uniqueMap = {};
     allWords.forEach(function(w){ uniqueMap[w.toLowerCase()] = true; });
     var uniqueCount = Object.keys(uniqueMap).length;
     var lexDiv = (uniqueCount / allWords.length);
-    document.getElementById('liveLexDiv').textContent = lexDiv.toFixed(2);
-
-    // Fillers
-    var fillerWords = { um:1, uh:1, er:1, ah:1, like:1, 'youknow':1, basically:1, literally:1, actually:1, anyway:1, so:1, well:1, right:1, okay:1, iMean:1 };
-    var fillerCount = 0;
-    allWords.forEach(function(w){
-      var lw = w.toLowerCase().replace(/[^a-z]/g,'');
-      if (fillerWords[lw] || (lw==='like' && text.indexOf(' like ')>-1)) fillerCount++;
-    });
-    var fillersPerMin = sessionSeconds > 0 ? Math.round((fillerCount / sessionSeconds) * 60 * 10) / 10 : 0;
-    document.getElementById('liveFillers').textContent = fillerCount;
-
-    // Quality score (simple heuristic: 100 - fillers penalty - repetition penalty)
-    var repetitionPenalty = Math.max(0, (allWords.length - uniqueCount) * 2);
-    var fillerPenalty = fillerCount * 5;
-    var quality = Math.max(10, Math.min(99, 100 - fillerPenalty - Math.round(repetitionPenalty / Math.max(1, allWords.length) * 100)));
-    document.getElementById('liveQuality').textContent = quality;
-
-    // CEFR estimate based on lexical diversity + word length
-    var avgWordLen = allWords.reduce(function(s,w){return s+w.length;},0) / allWords.length;
-    var cefrScore = (lexDiv * 0.6 + Math.min(1, avgWordLen / 8) * 0.4);
-    var cefrLabel = cefrScore >= 0.85 ? 'C2' : cefrScore >= 0.72 ? 'C1' : cefrScore >= 0.58 ? 'B2' : cefrScore >= 0.44 ? 'B1' : cefrScore >= 0.30 ? 'A2' : 'A1';
-    var cefrGaugePct = Math.round(cefrScore * 100);
-    document.getElementById('cefrLevel').textContent = cefrLabel;
-    var gaugeEl = document.getElementById('cefrGauge');
-    if (gaugeEl) gaugeEl.style.height = cefrGaugePct + '%';
-
-    // POS counts
-    var posCounts = { VERB:0, NOUN:0, ADJ:0, ADV:0 };
-    uniqueMap = {};
-    allWords.forEach(function(w){
-      var lw = w.toLowerCase();
-      if (uniqueMap[lw]) return;
-      uniqueMap[lw] = true;
-      var pos = tagWord(lw);
-      if (posCounts[pos] !== undefined) posCounts[pos]++;
-    });
-    document.getElementById('posVerbs').textContent = posCounts.VERB;
-    document.getElementById('posNouns').textContent = posCounts.NOUN;
-    document.getElementById('posAdj').textContent = posCounts.ADJ;
-    document.getElementById('posAdv').textContent = posCounts.ADV;
   }
   
-  // ── Word Bank: auto-add content words (nouns, verbs, adjectives) ──
+  // ── Word Bank: auto-add content words ──
   if (isCapabilityAvailable('wordbank')) {
   var words = text.toLowerCase().match(/[a-z']+/g) || [];
   var posColors={VERB:'#34d399',NOUN:'#60a5fa',ADJ:'#f472b6',ADV:'#c084fc',FUNC:'#6b7280',WORD:'#a78bfa'};
