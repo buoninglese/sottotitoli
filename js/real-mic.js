@@ -38,7 +38,7 @@ function updateMicUI(state) {
   if (_realMic.onStateChange) _realMic.onStateChange(state);
 }
 
-async function startRealMic() {
+function startRealMic() {
   if (_realMic.recognition) return true; // already running
   updateMicUI('requesting');
   
