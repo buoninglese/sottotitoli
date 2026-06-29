@@ -1085,7 +1085,10 @@ button[onclick*="addToWordBank"]:hover{background:rgba(52,211,153,.15)!important
 
   // ── Override updateMicUI to use rec bar ──
   var _origUpdateMicUI = window.updateMicUI;
+  var _overrideState = null; // 'paused' or null
   window.updateMicUI = function(state) {
+    // If paused, always show paused regardless of what real-mic sends
+    if (_overrideState) state = _overrideState;
     _realMic.state = state;
     var dot = document.getElementById('recMicDot');
     var label = document.getElementById('recMicLabel');
@@ -1107,21 +1110,19 @@ button[onclick*="addToWordBank"]:hover{background:rgba(52,211,153,.15)!important
       else if (state === 'error') label.textContent = 'Error';
       else label.textContent = 'Stopped';
     }
-    // Second cell: connection status
     if (idleDot) {
       idleDot.classList.remove('live','idle','paused');
-      if (state === 'live') idleDot.classList.add('live');
-      else if (state === 'paused') idleDot.classList.add('paused');
+      if (state === 'live' || state === 'paused') idleDot.classList.add('live');
       else idleDot.classList.add('idle');
     }
     if (idleLabel) {
-      if (state === 'live') idleLabel.textContent = 'Connected';
-      else if (state === 'paused') idleLabel.textContent = 'Connected';
+      if (state === 'live' || state === 'paused') idleLabel.textContent = 'Connected';
       else idleLabel.textContent = 'Idle';
     }
     if (typeof _origUpdateMicUI === 'function') _origUpdateMicUI(state);
   };
-  // Add paused dot style
+  // Expose pause override
+  window._setMicOverride = function(s) { _overrideState = s; if (s) updateMicUI(s); };
   var style = document.createElement('style');
   style.textContent = '.status-dot.paused{background:#fbbf24;box-shadow:0 0 6px #fbbf24}';
   document.head.appendChild(style);
@@ -2481,7 +2482,7 @@ async function togglePause() {
     btn.textContent = '▶';
     btn.classList.add('paused');
     updateRecDash('paused');
-    if (typeof updateMicUI === 'function') updateMicUI('paused');
+    if (typeof window._setMicOverride === 'function') window._setMicOverride('paused');
     document.body.classList.remove('session-active');
   } else {
     // ── Resume ──
@@ -2490,7 +2491,7 @@ async function togglePause() {
     btn.textContent = '⏸';
     btn.classList.remove('paused');
     updateRecDash('live');
-    if (typeof updateMicUI === 'function') updateMicUI('live');
+    if (typeof window._setMicOverride === 'function') window._setMicOverride(null);
     document.body.classList.add('session-active');
     timerInterval = setInterval(function() {
         sessionSeconds++;
