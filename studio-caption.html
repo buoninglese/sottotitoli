@@ -941,6 +941,8 @@ button[onclick*="addToWordBank"]:hover{background:rgba(52,211,153,.15)!important
               <div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.3px;color:var(--accent);margin-bottom:4px">Click a line below</div>
               <div style="font-size:13px;line-height:1.6;color:var(--muted);font-style:italic">Select a sentence to see definitions, synonyms, and POS tags for each word.</div>
             </div>
+            <!-- SYN cards (populated when clicking a grammar line) -->
+            <div id="grammarSynCards"></div>
             <!-- Recent transcript lines -->
             <div style="background:var(--card);border:1px solid var(--line);border-radius:10px;padding:12px;margin-bottom:14px;max-height:200px;overflow-y:auto" id="grammarLinesBox">
               <div style="color:var(--muted2);font-size:11px;text-align:center;padding:16px">No transcript yet. Start speaking.</div>
@@ -1741,12 +1743,14 @@ function _grammarLineClick(el) {
   document.querySelectorAll('.grammar-line').forEach(function(l){l.style.background=''});
   el.style.background = 'rgba(124,58,237,.08)';
   var text = el.getAttribute('data-text') || '';
-  // Populate SYN cards in the grammar panel
-  var panel = document.getElementById('grammarPanelContent');
-  if (!panel) return;
-  _buildSynCardsInPanel(text, panel);
+  var container = document.getElementById('grammarSynCards');
+  if (!container) return;
+  // Hide placeholder, show SYN
+  var placeholder = document.getElementById('grammarPlaceholder');
+  if (placeholder) placeholder.style.display = 'none';
+  _buildSynCardsInPanel(text, container);
 }
-function _buildSynCardsInPanel(text, panel) {
+function _buildSynCardsInPanel(text, container) {
   var rawWords = text.split(/\s+/);
   var contentWords = [];
   rawWords.forEach(function(w) {
@@ -1754,22 +1758,21 @@ function _buildSynCardsInPanel(text, panel) {
     if (clean.length > 2 && !_stopWords.test(clean)) contentWords.push(clean);
   });
   if (contentWords.length === 0) {
-    panel.innerHTML = '<div style="text-align:center;padding:20px;color:var(--muted2);font-size:12px">No content words in this line.</div>';
+    container.innerHTML = '<div style="text-align:center;padding:20px;color:var(--muted2);font-size:12px">No content words in this line.</div>';
     return;
   }
   var ts = Date.now();
-  var html = '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--muted2);margin-bottom:10px">📖 Selected: <span style="color:var(--accent2)">' + contentWords.length + ' words</span></div>';
-  html += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:8px">';
+  var html = '<div style="background:var(--card);border:1px solid var(--line);border-radius:var(--mode-radius);padding:14px;margin-bottom:14px"><div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.3px;color:var(--accent);margin-bottom:4px">Selected line</div><div style="font-size:12px;line-height:1.5;color:var(--muted);font-style:italic">' + text + '</div></div>';
+  html += '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--muted2);margin-bottom:10px">📖 ' + contentWords.length + ' Content Words</div>';
   contentWords.forEach(function(word, i) {
     var cardId = 'synwg-' + ts + '-' + i;
-    html += '<div class="syn-word" id="' + cardId + '" style="background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px">';
+    html += '<div class="syn-word" id="' + cardId + '" style="background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px;margin-bottom:8px">';
     html += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px"><span style="font-size:16px;font-weight:700;color:var(--text)">' + word + '</span><span class="syn-pos-tag" style="font-size:9px;font-weight:600;text-transform:uppercase;padding:2px 8px;border-radius:100px;background:rgba(167,139,250,.15);color:var(--accent2)">' + _getPOS(word) + '</span></div>';
     html += '<div style="font-size:11px;color:var(--muted);line-height:1.5;margin-bottom:6px" class="syn-def">Loading…</div>';
     html += '<div style="display:flex;flex-wrap:wrap;gap:4px;align-items:center;min-height:24px" class="syn-rel"></div>';
     html += '</div>';
   });
-  html += '</div>';
-  panel.innerHTML = html;
+  container.innerHTML = html;
   contentWords.forEach(function(word, i) {
     var cardId = 'synwg-' + ts + '-' + i;
     _fetchWordData(word, cardId);
