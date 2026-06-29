@@ -1126,44 +1126,6 @@ function setCaptionLanguage(code, name, skipConfirm) {
   if (window._getActivePanel && window._getActivePanel() === 'synonyms' && !isCapabilityAvailable('synonyms')) toggleExtrasPanel('synonyms');
 }
 // Language buttons handle their own state
-var CAPTION_SAMPLES = {
-  'en-US': [
-    'We are discussing the future of real‑time translation…',
-    'And how these systems can bridge language barriers.',
-    'Deployment at scale remains our biggest challenge.'
-  ],
-  'it-IT': [
-    'Stiamo discutendo il futuro della traduzione in tempo reale…',
-    'E come questi sistemi possono superare le barriere linguistiche.',
-    'La distribuzione su larga scala rimane la nostra sfida più grande.'
-  ],
-  'fr-FR': [
-    'Nous discutons de l\'avenir de la traduction en temps réel…',
-    'Et comment ces systèmes peuvent franchir les barrières linguistiques.',
-    'Le déploiement à grande échelle reste notre plus grand défi.'
-  ],
-  'de-DE': [
-    'Wir diskutieren die Zukunft der Echtzeitübersetzung…',
-    'Und wie diese Systeme Sprachbarrieren überwinden können.',
-    'Die Bereitstellung in großem Maßstab bleibt unsere größte Herausforderung.'
-  ],
-  'es-ES': [
-    'Estamos discutiendo el futuro de la traducción en tiempo real…',
-    'Y cómo estos sistemas pueden superar las barreras del idioma.',
-    'El despliegue a gran escala sigue siendo nuestro mayor desafío.'
-  ],
-  'pt-PT': [
-    'Estamos a discutir o futuro da tradução em tempo real…',
-    'E como estes sistemas podem ultrapassar as barreiras linguísticas.',
-    'A implementação em escala continua a ser o nosso maior desafio.'
-  ],
-  'nl-NL': [
-    'We bespreken de toekomst van realtime vertaling…',
-    'En hoe deze systemen taalbarrières kunnen overbruggen.',
-    'Uitrol op schaal blijft onze grootste uitdaging.'
-  ]
-};
-
 // Language-specific placeholder texts for empty states
 var PLACEHOLDER_TEXTS = {
   'en-US': { interim: 'Speak to see subtitles…', transcript: 'Previous sentences will appear here…' },
@@ -1190,48 +1152,6 @@ function updateCaptionPlaceholders(langCode) {
 
 
 
-// ═══ Caption share room ═══
-function _getCapShareUrl() {
-  // Reuse the Supabase session room ID so share links match the DB record
-  var roomId = localStorage.getItem('sottotitoli-caption-room-id');
-  if (!roomId) {
-    roomId = 'caption-' + currentCaptionLang.replace('-','').toLowerCase() + '-' + Date.now().toString(36);
-    localStorage.setItem('sottotitoli-caption-room-id', roomId);
-  }
-  var base = window.location.origin + window.location.pathname;
-  var params = '?room=' + roomId;
-  params += '&lang=' + currentCaptionLang;
-  params += '&mode=' + currentCaptionMode;
-  return base + params;
-}
-function shareCaptionRoom(channel) {
-  var sb = window.sottotitoliSupabase;
-  if (!sb) { return; }
-  sb.auth.getSession().then(function(r) {
-    if (!r.data?.session) { alert('Sign in to share your room'); return; }
-    var url = _getCapShareUrl();
-    var text = 'Join my Sottotitoli caption room';
-    var shareUrl;
-    switch(channel) {
-      case 'whatsapp': shareUrl = 'https://wa.me/?text=' + encodeURIComponent(text + ' ' + url); break;
-      case 'email': shareUrl = 'mailto:?subject=' + encodeURIComponent(text) + '&body=' + encodeURIComponent(url); break;
-      case 'telegram': shareUrl = 'https://t.me/share/url?url=' + encodeURIComponent(url) + '&text=' + encodeURIComponent(text); break;
-      case 'copy':
-        navigator.clipboard.writeText(url).then(function() {
-          var btn = document.getElementById('capCopyLinkBtn');
-          if (btn) {
-            var label = btn.querySelector('.share-label');
-            var orig = label ? label.textContent : btn.textContent;
-            if (label) label.textContent = '✓ Copied';
-            btn.classList.add('copied');
-            setTimeout(function() { btn.classList.remove('copied'); if (label) label.textContent = orig; }, 2000);
-          }
-        });
-        return;
-    }
-    if (shareUrl) window.open(shareUrl, '_blank');
-  });
-}
 // Update mic state in room info
 var _origUpdateMicUI = updateMicUI;
 updateMicUI = function(state) {
@@ -4948,6 +4868,9 @@ window.fixExtrasPanelColors = function(){
 })();
 
 </script>
+
+<!-- Toast notifications (DUO+ join/kick/new-room) -->
+<div id="toast" style="position:fixed;bottom:24px;left:50%;transform:translateX(-50%);padding:8px 20px;border-radius:100px;background:var(--accent);color:#fff;font-weight:700;font-size:12px;z-index:99999;opacity:0;transition:opacity .3s;pointer-events:none;font-family:var(--font-body)"></div>
 
 </body>
 </html>
