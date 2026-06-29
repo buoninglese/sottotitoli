@@ -120,11 +120,6 @@ body {
   border-radius: 8px; padding: 12px; font-size: 13px; line-height: 1.6;
   color: var(--text); font-style: italic; margin-bottom: 12px;
 }
-.syn-word {
-  background: var(--card); border: 1px solid var(--line);
-  border-radius: 10px; padding: 12px; margin-bottom: 8px; position: relative;
-}
-.syn-word:hover { border-color: var(--accent); }
 .syn-popup {
   position: fixed; z-index: 9999; background: var(--card);
   border: 1px solid #a78bfa; border-radius: 12px; padding: 16px;
@@ -304,7 +299,7 @@ function selectLine(lineIdx, el) {
 
 function _fetchWordData(word, cardId) {
   var card = document.getElementById(cardId); if (!card) return;
-  var defEl = card.querySelector('.syn-def'), relEl = card.querySelector('.syn-rel'), posEl = card.querySelector('.syn-pos-tag');
+  var defEl = card.querySelector('.syn-def'), relEl = card.querySelector('.syn-rel');
   var xhr = new XMLHttpRequest();
   xhr.open('GET', 'https://api.datamuse.com/words?sp=' + encodeURIComponent(word) + '&md=d&max=1', true);
   xhr.timeout = 4000;
@@ -314,7 +309,6 @@ function _fetchWordData(word, cardId) {
         if (data && data.length > 0 && data[0].defs && data[0].defs[0]) {
           var parts = data[0].defs[0].split('\t');
           if (defEl) defEl.textContent = parts[1] || data[0].defs[0];
-          if (posEl && data[0].tags && data[0].tags[0]) posEl.textContent = data[0].tags[0];
           _fetchDatamuseMeansLike(word, cardId); return;
         }
       } catch(e) {}
@@ -374,14 +368,14 @@ function _buildSynCards(text) {
   var ts = Date.now(), html = '';
   contentWords.forEach(function(word, i) {
     var cardId = 'synw-' + ts + '-' + i;
-    html += '<div class="syn-word" id="' + cardId + '" style="position:relative">';
-    // Card actions — same as Live Synonyms
     var inBank = wordBank.indexOf(word) >= 0;
-    html += '<div class="card-actions" style="position:absolute;top:8px;right:8px;display:flex;gap:6px;z-index:2">';
-    html += '<button onclick="event.stopPropagation();toggleSynonymWord(this,\'' + word + '\')" title="' + (inBank ? 'Remove from Bank' : 'Add to Bank') + '" class="card-btn bank' + (inBank ? ' in-bank' : '') + '">' + (inBank ? '−' : '+') + '</button>';
+    html += '<div class="syn-card" id="' + cardId + '" data-word="' + word + '">';
+    html += '<div class="card-actions">';
+    html += '<button onclick="event.stopPropagation();toggleSynonymWord(this,\'' + word + '\')" title="' + (inBank ? 'Remove' : 'Add') + ' to Bank" class="card-btn bank' + (inBank ? ' in-bank' : '') + '">' + (inBank ? '−' : '+') + '</button>';
     html += '<button onclick="event.stopPropagation();removeSynonymCard(this)" title="Dismiss" class="card-btn dismiss">✕</button>';
     html += '</div>';
-    html += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px"><span style="font-size:16px;font-weight:700;color:var(--text);padding-right:60px">' + word + '</span><span class="syn-pos-tag" style="font-size:9px;font-weight:600;text-transform:uppercase;padding:2px 8px;border-radius:100px;background:rgba(167,139,250,.15);color:var(--accent2)">' + _getPOS(word) + '</span></div>';
+    html += '<div class="syn-base-word" data-word="' + word + '" data-context="' + word + '" onclick="event.stopPropagation();lookupSynonym(this)">' + word + '</div>';
+    html += '<div class="syn-pos-count"><span style="font-size:9px;font-weight:600;text-transform:uppercase;padding:2px 8px;border-radius:100px;background:rgba(167,139,250,.15);color:var(--accent2)">' + _getPOS(word) + '</span></div>';
     html += '<div style="font-size:11px;color:var(--muted);line-height:1.5;margin-bottom:6px" class="syn-def">Loading…</div>';
     html += '<div style="display:flex;flex-wrap:wrap;gap:4px;align-items:center;min-height:24px" class="syn-rel"></div>';
     html += '</div>';
@@ -455,7 +449,8 @@ function updateLiveSynonyms() {
 }
 
 function removeSynonymCard(btn) {
-  var card = btn.closest('.syn-card'); if (card) { card.style.opacity = '0'; card.style.transform = 'scale(.95)'; setTimeout(function() { card.remove(); }, 250); }
+  var card = btn.closest('.syn-card') || btn.closest('.syn-word');
+  if (card) { card.style.opacity = '0'; card.style.transform = 'scale(.95)'; setTimeout(function() { card.remove(); }, 250); }
 }
 function toggleSynonymWord(btn, word) {
   var idx = wordBank.indexOf(word);
