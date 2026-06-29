@@ -4,6 +4,7 @@
 
 var _realMic = {
   recognition: null,
+  stream: null,
   state: 'idle',
   lang: 'en-US',     // current speech recognition language
   onInterim: null,   // callback(interimText)
@@ -44,10 +45,9 @@ async function startRealMic() {
   
   // Warm up audio subsystem — critical for Chrome: first rec.start()
   // silently captures silence if getUserMedia hasn't initialized audio.
-  // Acquire and immediately release the stream to unlock the hardware.
+  // Keep the stream alive — releasing it tells Chrome we're done with audio.
   try {
-    var stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-    stream.getTracks().forEach(function(t) { t.stop(); });
+    _realMic.stream = await navigator.mediaDevices.getUserMedia({ audio: true });
   } catch(e) {
     console.error('Mic permission denied:', e);
     updateMicUI('blocked');
@@ -118,6 +118,10 @@ function stopRealMic() {
   if (_realMic.recognition) {
     try { _realMic.recognition.stop(); } catch(e) {}
     _realMic.recognition = null;
+  }
+  if (_realMic.stream) {
+    _realMic.stream.getTracks().forEach(function(t){ t.stop(); });
+    _realMic.stream = null;
   }
   updateMicUI('idle');
 }
