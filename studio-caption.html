@@ -937,7 +937,7 @@ button[onclick*="addToWordBank"]:hover{background:rgba(52,211,153,.15)!important
 <script src="https://unpkg.com/compromise@14"></script>
 <script src="config.js?v=14"></script>
 <script src="js/auth.js?v=17"></script>
-<script src="js/real-mic.js?v=5"></script>
+<script src="js/real-mic.js?v=6"></script>
 <script>
 
 
@@ -2033,12 +2033,11 @@ function toggleSession() {
   if (window._duoMode && !window._duoIsHost) {
     // Invitee: just toggle their own mic
     if (!sessionActive) {
-      startRealMic().then(function(ok){
-        if (!ok) { alert('⚠ Mic access denied'); return; }
-        sessionActive = true;
-        var startBtn = document.getElementById('startBtn');
-        if (startBtn) { startBtn.textContent = '⏹ Leave'; startBtn.classList.add('danger'); }
-      });
+      var ok = startRealMic();
+      if (!ok) { alert('⚠ Mic access denied'); return; }
+      sessionActive = true;
+      var startBtn = document.getElementById('startBtn');
+      if (startBtn) { startBtn.textContent = '⏹ Leave'; startBtn.classList.add('danger'); }
     } else {
       stopRealMic();
       sessionActive = false;
@@ -2055,13 +2054,12 @@ function toggleSession() {
   if (sessionActive) {
     paused = false;
     // ── Start mic IMMEDIATELY (must happen during click gesture for Chrome) ──
-    startRealMic().then(function(ok) {
-      if (!ok) {
-        sessionActive = false;
-        startBtn.style.display = '';
-        stopBtn.style.display = 'none';
-        return;
-      }
+    var micOk = startRealMic();
+    if (!micOk) {
+      sessionActive = false;
+      startBtn.style.display = '';
+      stopBtn.style.display = 'none';
+    } else {
       // ── Credit check (mic already running — will stop if no credits) ──
       _checkCreditsBeforeStart().then(function(hasCredits) {
         if (!hasCredits) {
@@ -2077,7 +2075,7 @@ function toggleSession() {
         // ✅ Mic running + credits OK — just update UI
         _applySessionLiveUI(startBtn, stopBtn);
       });
-    });
+    }
   } else {
     stopRealMic();
     // Save session with transcript + stats
@@ -2208,21 +2206,21 @@ function togglePause() {
     document.body.classList.remove('session-active');
   } else {
     // ── Resume ──
-    startRealMic().then(function(ok) {
-      if (!ok) { paused = true; return; }
-      btn.textContent = '⏸';
-      btn.classList.remove('paused');
-      updateRecDash('live');
-      document.body.classList.add('session-active');
-      timerInterval = setInterval(function() {
+    var ok = startRealMic();
+    if (!ok) { paused = true; return; }
+    btn.textContent = '⏸';
+    btn.classList.remove('paused');
+    updateRecDash('live');
+    document.body.classList.add('session-active');
+    timerInterval = setInterval(function() {
         sessionSeconds++;
         var m = Math.floor(sessionSeconds / 60);
         var s = sessionSeconds % 60;
         document.getElementById('recTimer').textContent = 
           String(m).padStart(2,'0') + ':' + String(s).padStart(2,'0');
       }, 1000);
-    });
   }
+}
 }
 
 // ═══ Fullscreen toggle ═══
