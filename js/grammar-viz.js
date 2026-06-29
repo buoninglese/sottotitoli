@@ -1,13 +1,23 @@
 // ═══ Live Grammar Visualization Module ═══
-// Ported from mockups/grammar-15-viz.html
-// Hooks into _realMic.onFinal for real-time POS analysis
+// POS detection: compromise.js (nlp) primary, suffix heuristics fallback
+// Verb tense: compromise.js primary, suffix fallback (-ing/-ed)
+// Pronoun subtypes: PRON_TYPE dictionary (compromise doesn't categorize these)
 
-var POS_DICT={the:'DET',a:'DET',an:'DET',is:'VERB',are:'VERB',was:'VERB',were:'VERB',be:'VERB',been:'VERB',being:'VERB',have:'VERB',has:'VERB',had:'VERB',do:'VERB',does:'VERB',did:'VERB',will:'AUX',would:'AUX',can:'AUX',could:'AUX',shall:'AUX',should:'AUX',may:'AUX',might:'AUX',must:'AUX',not:'PART',to:'PART',of:'PREP',in:'PREP',for:'PREP',on:'PREP',with:'PREP',at:'PREP',by:'PREP',from:'PREP',into:'PREP',about:'PREP',and:'CONJ',or:'CONJ',but:'CONJ',so:'CONJ',if:'CONJ',because:'CONJ',when:'CONJ',where:'CONJ',how:'CONJ',that:'CONJ',we:'PRON',us:'PRON',our:'PRON',you:'PRON',your:'PRON',he:'PRON',him:'PRON',his:'PRON',she:'PRON',her:'PRON',it:'PRON',its:'PRON',they:'PRON',them:'PRON',their:'PRON',this:'DET',these:'DET',those:'DET',i:'PRON',me:'PRON',my:'PRON',very:'ADV',really:'ADV',quite:'ADV',just:'ADV',only:'ADV',also:'ADV',now:'ADV',then:'ADV',here:'ADV',there:'ADV',always:'ADV',never:'ADV',often:'ADV',well:'ADV',good:'ADJ',great:'ADJ',big:'ADJ',small:'ADJ',new:'ADJ',old:'ADJ',high:'ADJ',low:'ADJ',long:'ADJ',short:'ADJ',important:'ADJ',different:'ADJ',same:'ADJ',right:'ADJ',real:'ADJ',true:'ADJ',time:'NOUN',way:'NOUN',thing:'NOUN',people:'NOUN',world:'NOUN',life:'NOUN',day:'NOUN',year:'NOUN',work:'NOUN',system:'NOUN',language:'NOUN',word:'NOUN',sentence:'NOUN',translation:'NOUN',meeting:'NOUN',barrier:'NOUN',challenge:'NOUN',future:'NOUN',deployment:'NOUN',scale:'NOUN',bridge:'NOUN',go:'VERB',come:'VERB',make:'VERB',take:'VERB',give:'VERB',get:'VERB',know:'VERB',think:'VERB',see:'VERB',say:'VERB',use:'VERB',find:'VERB',tell:'VERB',ask:'VERB',work:'VERB',seem:'VERB',feel:'VERB',try:'VERB',leave:'VERB',call:'VERB',discuss:'VERB',remain:'VERB',help:'VERB',need:'VERB',want:'VERB',look:'VERB',like:'VERB',mean:'VERB',keep:'VERB',let:'VERB',begin:'VERB',start:'VERB',show:'VERB',hear:'VERB',play:'VERB',run:'VERB',move:'VERB',live:'VERB',believe:'VERB',hold:'VERB',bring:'VERB',happen:'VERB',write:'VERB',provide:'VERB',sit:'VERB',stand:'VERB',lose:'VERB',pay:'VERB',meet:'VERB'};
+// ── Compact suffix-based POS fallback (no dictionaries — nlp handles everything else) ──
+function _gvHeuristicPOS(w) {
+  w = w.replace(/[^a-z']/g, '').toLowerCase();
+  if (!w || w.length < 2) return 'OTHER';
+  if (w.endsWith('ing')) return 'VERB';
+  if (w.endsWith('ed') && !w.endsWith('eed')) return 'VERB';
+  if (w.endsWith('ly') && w.length > 4) return 'ADV';
+  if (w.endsWith('tion') || w.endsWith('sion') || w.endsWith('ment') || w.endsWith('ness') || w.endsWith('ity')) return 'NOUN';
+  if (w.endsWith('ous') || w.endsWith('ful') || w.endsWith('less') || w.endsWith('able') || w.endsWith('ible')) return 'ADJ';
+  if ((w.endsWith('er') || w.endsWith('est')) && w.length > 4) return 'ADJ';
+  if (w.endsWith('s') && w.length > 4 && !w.endsWith('ss')) return 'NOUN';
+  return 'OTHER';
+}
 
-var CONTRACTIONS={don:'VERB',cant:'AUX',wont:'AUX',doesnt:'VERB',didnt:'VERB',isnt:'VERB',arent:'VERB',wasnt:'VERB',werent:'VERB',havent:'VERB',hasnt:'VERB',hadnt:'VERB',im:'PRON',youre:'PRON',theyre:'PRON',hes:'PRON',shes:'PRON',ive:'PRON',youve:'PRON',weve:'PRON',theyve:'PRON',ill:'PRON',youll:'PRON',well:'PRON',theyll:'PRON',hell:'PRON',shell:'PRON',itll:'PRON',id:'PRON',youd:'PRON',wed:'PRON',theyd:'PRON',hed:'PRON',shed:'PRON',itd:'PRON',thats:'DET',whats:'PRON',lets:'VERB'};
-
-// Pronoun type map — comprehensive English pronoun classification
-// NOTE: words that can be multiple types (you, it, her) default to most common role
+// ── Pronoun type map — compromise.js doesn't categorize pronoun subtypes ──
 var PRON_TYPE={
   // Subject pronouns
   i:'SUBJ',we:'SUBJ',you:'SUBJ',he:'SUBJ',she:'SUBJ',it:'SUBJ',they:'SUBJ',
@@ -31,8 +41,6 @@ var PRON_TYPE={
   this:'PRON',these:'PRON',those:'PRON'
 };
 
-var VERB_TENSE={is:'PRES',are:'PRES',am:'PRES',was:'PAST',were:'PAST',been:'PART',being:'ING',has:'PRES',have:'PRES',had:'PAST',do:'PRES',does:'PRES',did:'PAST',will:'MODAL',would:'MODAL',can:'MODAL',could:'MODAL',shall:'MODAL',should:'MODAL',may:'MODAL',might:'MODAL',must:'MODAL',gone:'PART',seen:'PART',done:'PART',taken:'PART',given:'PART',known:'PART',thought:'PART',made:'PART',found:'PART',told:'PART',asked:'PART',worked:'PART',felt:'PART',tried:'PART',left:'PART',called:'PART',helped:'PART',needed:'PART',wanted:'PART',looked:'PART',liked:'PART',meant:'PART',kept:'PART',let:'PART',begun:'PART',started:'PART',shown:'PART',heard:'PART',played:'PART',run:'PART',moved:'PART',lived:'PART',believed:'PART',held:'PART',brought:'PART',written:'PART',provided:'PART',sat:'PART',stood:'PART',lost:'PART',paid:'PART',met:'PART'};
-
 // Grammar tracking state
 var _gv = {
   posCounts: {},
@@ -46,26 +54,6 @@ var _gv = {
   svSentences: [],
   sentenceLengths: []
 };
-
-function _gvTagWord(w) {
-  w = w.toLowerCase();
-  // Check contractions first
-  if (CONTRACTIONS[w]) return CONTRACTIONS[w];
-  // Clean punctuation
-  w = w.replace(/[^a-z']/g, '');
-  if (!w) return 'OTHER';
-  // Check POS dict
-  if (POS_DICT[w]) return POS_DICT[w];
-  // Heuristic: common suffixes
-  if (w.endsWith('ing')) return 'VERB';
-  if (w.endsWith('ed')) return 'VERB';
-  if (w.endsWith('ly')) return 'ADV';
-  if (w.endsWith('tion') || w.endsWith('sion') || w.endsWith('ment') || w.endsWith('ness') || w.endsWith('ity')) return 'NOUN';
-  if (w.endsWith('ous') || w.endsWith('ful') || w.endsWith('less') || w.endsWith('able') || w.endsWith('ible')) return 'ADJ';
-  if (w.endsWith('er') || w.endsWith('est')) return 'ADJ';
-  if (w.endsWith('s') && w.length > 3) return 'NOUN'; // plural nouns
-  return 'OTHER';
-}
 
 function _gvProcessFinal(text) {
   var rawWords = text.toLowerCase().match(/[a-z']+/g) || [];
@@ -101,8 +89,8 @@ function _gvProcessFinal(text) {
         }
       }
     } catch(e) {}
-    // Fallback to dictionary if nlp fails
-    if (pos === 'OTHER') pos = _gvTagWord(w);
+    // Fallback to suffix heuristics if nlp fails
+    if (pos === 'OTHER') pos = _gvHeuristicPOS(w);
 
     if (['NOUN','VERB','ADJ','ADV','PREP','CONJ','PRON','AUX'].indexOf(pos) >= 0) {
       _gv.posCounts[pos] = (_gv.posCounts[pos] || 0) + 1;
@@ -145,15 +133,11 @@ function _gvProcessFinal(text) {
       if (w.endsWith('ing') && w.length > 4) { _gv.verbCounts.ING = (_gv.verbCounts.ING || 0) + 1; tenseFound = true; }
       else if (w.endsWith('ed') && w.length > 4 && !w.endsWith('eed')) { _gv.verbCounts.PAST = (_gv.verbCounts.PAST || 0) + 1; tenseFound = true; }
     }
-    // Dictionary fallback
-    if (!tenseFound) {
-      if (VERB_TENSE[w]) _gv.verbCounts[VERB_TENSE[w]] = (_gv.verbCounts[VERB_TENSE[w]] || 0) + 1;
-      else if (pos === 'VERB' || pos === 'AUX') {
-        if (VERB_TENSE[w]) _gv.verbCounts[VERB_TENSE[w]] = (_gv.verbCounts[VERB_TENSE[w]] || 0) + 1;
-        else if (w.endsWith('ing')) _gv.verbCounts.ING = (_gv.verbCounts.ING || 0) + 1;
-        else if (w.endsWith('ed')) _gv.verbCounts.PAST = (_gv.verbCounts.PAST || 0) + 1;
-        else _gv.verbCounts.PRES = (_gv.verbCounts.PRES || 0) + 1;
-      }
+    // Dictionary fallback (last resort)
+    if (!tenseFound && (pos === 'VERB' || pos === 'AUX')) {
+      if (w.endsWith('ing')) _gv.verbCounts.ING = (_gv.verbCounts.ING || 0) + 1;
+      else if (w.endsWith('ed')) _gv.verbCounts.PAST = (_gv.verbCounts.PAST || 0) + 1;
+      else _gv.verbCounts.PRES = (_gv.verbCounts.PRES || 0) + 1;
     }
 
     if (!subj && PRON_TYPE[w] === 'SUBJ') subj = w;
@@ -193,7 +177,7 @@ function _gvUpdateTranscript(text, words) {
     s.words.forEach(function(w) {
       var pos = 'OTHER';
       try { if (typeof nlp !== 'undefined') { var d = nlp(w); var t = d.json(); if (t[0] && t[0].terms && t[0].terms[0]) { var tags = t[0].terms[0].tags || []; if (tags.indexOf('Noun') !== -1) pos = 'NOUN'; else if (tags.indexOf('Verb') !== -1) pos = 'VERB'; else if (tags.indexOf('Adjective') !== -1) pos = 'ADJ'; else if (tags.indexOf('Adverb') !== -1) pos = 'ADV'; else if (tags.indexOf('Preposition') !== -1) pos = 'PREP'; else if (tags.indexOf('Conjunction') !== -1) pos = 'CONJ'; else if (tags.indexOf('Pronoun') !== -1) pos = 'PRON'; else if (tags.indexOf('Determiner') !== -1) pos = 'DET'; else if (tags.indexOf('Modal') !== -1 || tags.indexOf('Auxiliary') !== -1) pos = 'AUX'; } } } catch(e) {}
-      if (pos === 'OTHER') pos = _gvTagWord(w);
+      if (pos === 'OTHER') pos = _gvHeuristicPOS(w);
       html += '<span class="transcript-word"><span class="tw">' + w + '</span><span class="tag tag-' + pos + '">' + pos + '</span></span>';
     });
     html += '</div></div>';
@@ -227,7 +211,7 @@ function _gvUpdateGrammarExamples() {
   var html = '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:8px">';
   words.forEach(function(word) {
     var cardId = 'gvex-' + word.replace(/[^a-z]/g,'');
-    var pos = _gvTagWord(word);
+    var pos = _gvHeuristicPOS(word);
     var posColors = {NOUN:'#60a5fa',VERB:'#34d399',ADJ:'#f472b6',ADV:'#c084fc'};
     var color = posColors[pos] || '#a78bfa';
     html += '<div id="' + cardId + '" style="background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px">';
