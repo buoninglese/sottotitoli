@@ -256,13 +256,4 @@ function _gvReset() {
   _gvUpdateAll();
 }
 
-// Hook into speech pipeline — wrap _realMic.onFinal
-(function() {
-  var _origOnFinal = _realMic.onFinal;
-  _realMic.onFinal = function(text) {
-    if (_origOnFinal) _origOnFinal(text);
-    try { _gvProcessFinal(text); } catch(e) {}
-  };
-})();
-
 window._gvReset = _gvReset;
