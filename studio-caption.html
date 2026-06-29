@@ -638,12 +638,6 @@ button[onclick*="addToWordBank"]:hover{background:rgba(52,211,153,.15)!important
 .extras-col{display:flex;flex-direction:column;gap:4px;flex:1;min-width:90px}
 .extras-col-title{font-size:8px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;margin-bottom:2px}
 
-/* ═══ Breath marks (#37) in caption transcript ═══ */
-.breath-short{color:rgba(52,211,153,.4);font-weight:300;margin:0 2px;font-size:.85em;user-select:none;pointer-events:none}
-.breath-long{color:rgba(251,191,36,.5);font-weight:300;margin:0 3px;font-size:.85em;user-select:none;pointer-events:none}
-[data-theme="light"] .breath-short{color:rgba(5,150,105,.35)}
-[data-theme="light"] .breath-long{color:rgba(217,119,6,.4)}
-
 /* ═══ Confidence wave animation (#26) ═══ */
 .conf-wave{display:flex;align-items:flex-end;gap:2px;height:42px;justify-content:center;padding:4px 0}
 .conf-wave-bar{width:5px;border-radius:2px;animation:confPulse 1.2s ease infinite}
@@ -2344,36 +2338,6 @@ _realMic.onInterim = function(text) {
   }
 })();
 
-// ═══ #37 Breath Group Marker — insert pause indicators into transcript ═══
-function addBreathMarks(text) {
-  if (!text) return text;
-  // Step 1: Insert || at sentence boundaries (after . ! ?)
-  var result = text.replace(/([.!?])\s+/g, '$1 <span class="breath-long">||</span> ');
-  // Step 2: Insert | at commas and semicolons
-  result = result.replace(/([,;])\s+/g, '$1 <span class="breath-short">|</span> ');
-  // Step 3: For long runs without any breath marks, insert | every ~7 words
-  // Split into segments between existing breath marks
-  var segments = result.split(/<span class="breath-(?:short|long)">[|]{1,2}<\/span>/);
-  var out = [];
-  for (var s = 0; s < segments.length; s++) {
-    var seg = segments[s].trim();
-    if (!seg) { out.push(''); continue; }
-    var words = seg.split(/\s+/);
-    var built = [];
-    var wc = 0;
-    for (var w = 0; w < words.length; w++) {
-      built.push(words[w]);
-      if (words[w].match(/[a-zA-Z]/)) wc++;
-      // Insert breath after every 7 content words in a long segment
-      if (wc > 0 && wc % 7 === 0 && w < words.length - 1 && !words[w].match(/[.!?,;:]$/)) {
-        built.push('<span class="breath-short">|</span>');
-      }
-    }
-    out.push(built.join(' '));
-  }
-  return out.join(' <span class="breath-long">||</span> ');
-}
-
 // ═══ Contraction Fix — Web Speech API strips apostrophes, restore them ═══
 var _contractionFix = {
   // Negatives
@@ -2427,12 +2391,9 @@ _realMic.onFinal = function(text) {
   var tsStr = now.toTimeString().substring(0,8);
   var div = document.createElement('div');
   div.className = 'line';
-  // #37 Breath Group Marker — insert | (short) and || (long) pause indicators
-  var displayText = addBreathMarks(_fixContractions(text));
-  // Also fix contractions in the raw text used by grammar/syn/clicks
   var fixedText = _fixContractions(text);
   div.setAttribute('data-raw', fixedText);
-  div.innerHTML = '<span style="color:var(--muted2);font-size:.75em;font-family:JetBrains Mono,monospace;margin-right:6px">'+tsStr+'</span>' + displayText;
+  div.innerHTML = '<span style="color:var(--muted2);font-size:.75em;font-family:JetBrains Mono,monospace;margin-right:6px">'+tsStr+'</span>' + fixedText;
   // Prepend — most recent finalized line appears right beneath the live interim box
   transcript.insertBefore(div, transcript.firstChild);
   
