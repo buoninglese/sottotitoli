@@ -92,9 +92,24 @@ async function startRealMic() {
   _realMic._onerror = rec.onerror;
   
   rec.onend = function() {
-    // Auto-restart if still supposed to be live
-    if (_realMic.state === 'live' && _realMic.recognition) {
-      try { rec.start(); } catch(e) {}
+    // Auto-restart if still supposed to be live.
+    // Chrome may abort recognition on silence — the old instance is dead,
+    // so create a fresh one rather than calling rec.start() on it.
+    if (_realMic.state === 'live' && _realMic.recognition === rec) {
+      _realMic.recognition = null;
+      var SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      if (!SpeechRecognition) return;
+      try {
+        var newRec = new SpeechRecognition();
+        newRec.continuous = true;
+        newRec.interimResults = true;
+        newRec.lang = _realMic.lang || 'en-US';
+        newRec.onresult = _realMic._onresult;
+        newRec.onerror = _realMic._onerror;
+        newRec.onend = _realMic._onend;
+        newRec.start();
+        _realMic.recognition = newRec;
+      } catch(e) {}
     }
   };
   _realMic._onend = rec.onend;
