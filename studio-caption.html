@@ -937,7 +937,7 @@ button[onclick*="addToWordBank"]:hover{background:rgba(52,211,153,.15)!important
 <script src="https://unpkg.com/compromise@14"></script>
 <script src="config.js?v=14"></script>
 <script src="js/auth.js?v=17"></script>
-<script src="js/real-mic.js?v=6"></script>
+<script src="js/real-mic.js?v=7"></script>
 <script>
 
 
@@ -2028,16 +2028,17 @@ _realMic.onFinal = function(text) {
 // Reset mic to idle on load
 updateMicUI('idle');
 
-function toggleSession() {
+async function toggleSession() {
   // In DUO+ mode, only the host can start/stop the session
   if (window._duoMode && !window._duoIsHost) {
     // Invitee: just toggle their own mic
     if (!sessionActive) {
-      var ok = startRealMic();
-      if (!ok) { alert('⚠ Mic access denied'); return; }
-      sessionActive = true;
-      var startBtn = document.getElementById('startBtn');
-      if (startBtn) { startBtn.textContent = '⏹ Leave'; startBtn.classList.add('danger'); }
+      startRealMic().then(function(ok){
+        if (!ok) { alert('⚠ Mic access denied'); return; }
+        sessionActive = true;
+        var startBtn = document.getElementById('startBtn');
+        if (startBtn) { startBtn.textContent = '⏹ Leave'; startBtn.classList.add('danger'); }
+      });
     } else {
       stopRealMic();
       sessionActive = false;
@@ -2053,8 +2054,8 @@ function toggleSession() {
   
   if (sessionActive) {
     paused = false;
-    // ── Start mic IMMEDIATELY (must happen during click gesture for Chrome) ──
-    var micOk = startRealMic();
+    // ── Start mic (await getUserMedia warm-up + rec.start — both during gesture) ──
+    var micOk = await startRealMic();
     if (!micOk) {
       sessionActive = false;
       startBtn.style.display = '';
@@ -2191,7 +2192,7 @@ function updateRecDash(state) {
 }
 
 // ═══ Pause / Resume ═══
-function togglePause() {
+async function togglePause() {
   if (!sessionActive) return;
   paused = !paused;
   var btn = document.getElementById('pauseBtn');
@@ -2206,7 +2207,7 @@ function togglePause() {
     document.body.classList.remove('session-active');
   } else {
     // ── Resume ──
-    var ok = startRealMic();
+    var ok = await startRealMic();
     if (!ok) { paused = true; return; }
     btn.textContent = '⏸';
     btn.classList.remove('paused');
