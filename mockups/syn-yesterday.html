@@ -1,0 +1,633 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SYN Yesterday — Old Version Test</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,400;14..32,500;14..32,600;14..32,700;14..32,800;14..32,900&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #0f1117; --card: #1a1d26; --card2: #22252f;
+  --line: rgba(255,255,255,.06); --text: #e5e7eb;
+  --muted: #9ca3af; --muted2: #6b7280;
+  --accent: #a78bfa; --accent2: #c4b5fd;
+  --font-display: 'Inter', sans-serif;
+}
+[data-theme="light"] {
+  --bg: #f0f2f5; --card: #fff; --card2: #f3f4f6;
+  --line: #e2e5ea; --text: #111827;
+  --muted: #6b7280; --muted2: #9ca3af;
+  --accent: #7c3aed; --accent2: #6d28d9;
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+body {
+  font-family: 'Inter', sans-serif; background: var(--bg); color: var(--text);
+  height: 100vh; overflow: hidden; display: flex; flex-direction: column;
+}
+/* Top bar */
+.topbar {
+  display: flex; align-items: center; gap: 12px; padding: 8px 16px;
+  background: var(--card); border-bottom: 1px solid var(--line);
+  flex-shrink: 0;
+}
+.topbar h1 { font-size: 16px; font-weight: 800; }
+.topbar .badge { font-size: 9px; color: var(--accent); font-weight: 600; text-transform: uppercase; }
+.btn { font-family: inherit; font-size: 12px; font-weight: 600; padding: 6px 16px; border-radius: 100px; border: 1px solid var(--line); background: var(--card2); color: var(--text); cursor: pointer; transition: all .15s; }
+.btn:hover { border-color: var(--accent); color: var(--accent2); }
+.btn.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+/* Main layout */
+.main { display: flex; flex: 1; overflow: hidden; }
+/* Left: transcript */
+.transcript-col {
+  width: 400px; flex-shrink: 0; display: flex; flex-direction: column;
+  border-right: 1px solid var(--line); background: var(--bg);
+}
+.transcript-head {
+  padding: 10px 16px; font-size: 10px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: .5px; color: var(--muted2);
+  border-bottom: 1px solid var(--line);
+}
+.transcript-body {
+  flex: 1; overflow-y: auto; padding: 8px;
+}
+.transcript-body .line {
+  padding: 6px 10px; border-radius: 6px; cursor: pointer;
+  font-size: 13px; line-height: 1.5; color: var(--muted);
+  border-bottom: 1px solid var(--line); transition: all .15s;
+}
+.transcript-body .line:hover { background: rgba(167,139,250,.05); }
+.transcript-body .line.selected { background: rgba(167,139,250,.1); color: var(--text); }
+.transcript-body .line span { color: var(--muted2); font-size: 9px; margin-right: 8px; }
+.transcript-body .line .spk-tag { font-size: 8px; font-weight: 700; padding: 1px 6px; border-radius: 100px; margin-right: 6px; }
+/* Center: Live Synonyms + right panel */
+.center-col {
+  flex: 1; display: flex; flex-direction: column; overflow: hidden;
+}
+/* Live Synonyms section */
+.live-syn-head {
+  padding: 10px 16px; font-size: 10px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: .5px; color: var(--muted2);
+  border-bottom: 1px solid var(--line);
+  display: flex; align-items: center; gap: 8px;
+}
+.live-syn-badge {
+  font-size: 8px; padding: 2px 8px; border-radius: 100px;
+  background: rgba(96,165,250,.15); color: #60a5fa; font-weight: 600;
+}
+.live-syn-body { flex: 1; overflow-y: auto; padding: 12px; }
+/* Syn cards (Live Synonyms) */
+.syn-card {
+  background: var(--card); border: 1px solid var(--line);
+  border-radius: 12px; padding: 14px; transition: all .25s; position: relative;
+}
+.syn-card:hover { border-color: var(--accent); }
+.syn-card .dismiss-btn {
+  position: absolute; top: 4px; right: 4px; width: 22px; height: 22px;
+  border-radius: 50%; border: none; background: transparent; color: var(--muted2);
+  cursor: pointer; font-size: 12px; display: flex; align-items: center;
+  justify-content: center; opacity: .4; transition: all .15s; z-index: 3;
+}
+.syn-card .dismiss-btn:hover { opacity: 1; color: #f87171; }
+.syn-card .bank-btn {
+  position: absolute; top: 8px; right: 28px; width: 26px; height: 26px;
+  border-radius: 50%; border: 1px solid var(--line); background: var(--card2);
+  color: var(--muted2); cursor: pointer; font-size: 16px;
+  display: flex; align-items: center; justify-content: center; transition: all .2s; z-index: 2;
+}
+.syn-card .bank-btn.in-bank { background: rgba(167,139,250,.1); color: var(--accent); }
+.syn-base-word {
+  font-size: 16px; font-weight: 800; color: var(--text); margin-bottom: 4px;
+  cursor: pointer; transition: color .15s;
+}
+.syn-base-word:hover { color: var(--accent); }
+.syn-pos-count { font-size: 9px; color: var(--muted2); margin-bottom: 10px; }
+.syn-word-chip {
+  padding: 3px 8px; border-radius: 100px; font-size: 9px; font-weight: 500;
+  background: var(--card2); color: var(--muted); border: 1px solid var(--line);
+  cursor: pointer; transition: all .15s; display: inline-block; margin: 2px;
+}
+.syn-word-chip:hover { border-color: var(--accent); color: var(--text); }
+/* Right panel */
+.right-panel {
+  width: 340px; flex-shrink: 0; display: flex; flex-direction: column;
+  border-left: 1px solid var(--line); background: var(--bg);
+}
+.right-panel-head {
+  padding: 10px 16px; display: flex; align-items: center; gap: 8px;
+  border-bottom: 1px solid var(--line);
+  font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; color: var(--muted2);
+}
+.right-panel-body { flex: 1; overflow-y: auto; padding: 12px; }
+.syn-line-preview {
+  background: rgba(167,139,250,.06); border: 1px solid rgba(167,139,250,.15);
+  border-radius: 8px; padding: 12px; font-size: 13px; line-height: 1.6;
+  color: var(--text); font-style: italic; margin-bottom: 12px;
+}
+.syn-word {
+  background: rgba(255,255,255,.02); border: 1px solid rgba(255,255,255,.05);
+  border-radius: 8px; padding: 10px 12px; margin-bottom: 6px;
+}
+/* syn-popup */
+.syn-popup {
+  position: fixed; z-index: 9999; background: var(--card);
+  border: 1px solid #a78bfa; border-radius: 12px; padding: 16px;
+  min-width: 240px; max-width: 300px; box-shadow: 0 8px 32px rgba(0,0,0,.3);
+  font-size: 12px; line-height: 1.5;
+}
+/* responsive */
+@media (max-width: 768px) {
+  .main { flex-direction: column; }
+  .transcript-col { width: 100%; max-height: 200px; }
+  .center-col { flex: 1; }
+  .right-panel { width: 100%; max-height: 300px; }
+}
+</style>
+</head>
+<body>
+
+<!-- Topbar -->
+<div class="topbar">
+  <h1>🎤 SYN Yesterday</h1>
+  <span class="badge">Old Version · Wordnik→Datamuse</span>
+  <button class="btn" id="micBtn" onclick="toggleMic()">🎙 Start Mic</button>
+  <button class="btn" onclick="toggleTheme()" id="themeBtn" style="margin-left:auto">🌙</button>
+</div>
+
+<!-- Main Layout -->
+<div class="main">
+  <!-- Left: Transcript -->
+  <div class="transcript-col">
+    <div class="transcript-head">📝 Transcript — click a line for SYN</div>
+    <div class="transcript-body" id="transcriptBody">
+      <div style="text-align:center;padding:40px;color:var(--muted2);font-size:12px">Start the mic and speak.<br>Lines will appear here.</div>
+    </div>
+  </div>
+
+  <!-- Center: Live Synonyms -->
+  <div class="center-col">
+    <div class="live-syn-head">
+      📖 Live Synonyms
+      <span class="live-syn-badge">Datamuse API</span>
+    </div>
+    <div class="live-syn-body" id="liveSynBody">
+      <div style="color:var(--muted);text-align:center;padding:40px;font-size:13px;line-height:1.6">
+        Start speaking — synonyms for your nouns, verbs &amp; adjectives will appear here
+      </div>
+    </div>
+  </div>
+
+  <!-- Right: SYN Panel -->
+  <div class="right-panel" id="rightPanel">
+    <div class="right-panel-head">
+      <span>📖 SYN</span>
+      <span style="font-family:monospace;font-size:9px;color:var(--muted2);padding:2px 8px;border-radius:4px;background:var(--card2)" id="rightPanelCount">0</span>
+    </div>
+    <div class="right-panel-body">
+      <div class="syn-line-preview" id="synLinePreview">
+        <span style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.3px;color:var(--accent);display:block;margin-bottom:4px;font-style:normal">Click a transcript line</span>
+        Select a sentence to see synonyms and definitions for each word.
+      </div>
+      <div id="synWords"></div>
+    </div>
+  </div>
+</div>
+
+<script src="../js/real-mic.js?v=13"></script>
+<script src="https://unpkg.com/compromise@14"></script>
+<script>
+// ═══ Theme toggle ═══
+function toggleTheme() {
+  var h = document.documentElement;
+  var t = h.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+  h.setAttribute('data-theme', t);
+  document.getElementById('themeBtn').textContent = t === 'dark' ? '🌙' : '☀️';
+}
+
+// ═══ Mic ═══
+var micRunning = false;
+var transcriptLines = [];
+var lineCounter = 0;
+
+function toggleMic() {
+  var btn = document.getElementById('micBtn');
+  if (!micRunning) {
+    btn.textContent = '⏳ Starting…';
+    btn.disabled = true;
+    // Warm up audio
+    navigator.mediaDevices.getUserMedia({audio:true}).then(function(stream) {
+      _realMic.stream = stream;
+      var rec = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
+      rec.continuous = true;
+      rec.interimResults = true;
+      rec.lang = 'en-US';
+      rec.onresult = function(e) {
+        var interim = '';
+        var final = '';
+        for (var i = e.resultIndex; i < e.results.length; i++) {
+          if (e.results[i].isFinal) final += e.results[i][0].transcript;
+          else interim += e.results[i][0].transcript;
+        }
+        if (final) addLine(final);
+      };
+      rec.onerror = function(e) {
+        if (e.error === 'aborted' || e.error === 'no-speech') return;
+        console.warn('Mic error:', e.error);
+      };
+      rec.onend = function() {
+        if (micRunning) {
+          try {
+            var r2 = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
+            r2.continuous = true; r2.interimResults = true; r2.lang = 'en-US';
+            r2.onresult = rec.onresult; r2.onerror = rec.onerror; r2.onend = rec.onend;
+            r2.start();
+          } catch(e) { micRunning = false; updateMicBtn(); }
+        }
+      };
+      rec.start();
+      micRunning = true;
+      updateMicBtn();
+    }).catch(function(e) {
+      btn.textContent = '🎙 Mic Blocked';
+      btn.disabled = false;
+      console.error('Mic blocked:', e);
+    });
+  } else {
+    micRunning = false;
+    if (_realMic && _realMic.stream) {
+      _realMic.stream.getTracks().forEach(function(t){t.stop();});
+      _realMic.stream = null;
+    }
+    updateMicBtn();
+  }
+}
+function updateMicBtn() {
+  var btn = document.getElementById('micBtn');
+  btn.disabled = false;
+  if (micRunning) {
+    btn.textContent = '⏹ Stop Mic';
+    btn.classList.add('active');
+  } else {
+    btn.textContent = '🎙 Start Mic';
+    btn.classList.remove('active');
+  }
+}
+
+// ═══ Transcript ═══
+function addLine(text) {
+  text = text.trim();
+  if (!text) return;
+  lineCounter++;
+  var now = new Date();
+  var ts = now.getHours().toString().padStart(2,'0') + ':' + now.getMinutes().toString().padStart(2,'0') + ':' + now.getSeconds().toString().padStart(2,'0');
+  transcriptLines.push({text: text, ts: ts, id: lineCounter});
+  if (transcriptLines.length > 50) transcriptLines.shift();
+  renderTranscript();
+  updateLiveSynonyms();
+}
+
+function renderTranscript() {
+  var body = document.getElementById('transcriptBody');
+  var html = '';
+  transcriptLines.slice(-20).forEach(function(line, i) {
+    html += '<div class="line" data-idx="' + i + '" onclick="selectLine(' + i + ', this)"><span>' + line.ts + '</span>' + line.text + '</div>';
+  });
+  body.innerHTML = html || '<div style="text-align:center;padding:40px;color:var(--muted2);font-size:12px">Waiting for speech…</div>';
+}
+
+// ═══ Click transcript line → right panel SYN ═══
+function selectLine(lineIdx, el) {
+  document.querySelectorAll('#transcriptBody .line').forEach(function(l){l.classList.remove('selected')});
+  el.classList.add('selected');
+  // Update preview
+  var line = transcriptLines[lineIdx];
+  if (!line) return;
+  var preview = document.getElementById('synLinePreview');
+  if (preview) {
+    preview.innerHTML = '<span style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.3px;color:var(--accent);display:block;margin-bottom:4px;font-style:normal">' + line.ts + '</span>' + line.text;
+  }
+  _buildSynCards(line.text);
+  document.querySelector('.right-panel-body').scrollTop = 0;
+}
+
+// ═══ Word Data Pipeline (Wordnik → Datamuse → local) — EXACTLY as old version ═══
+var WORDNIK_KEY = 'dnd12sayxilyys5tzqrb14v7jfwhambruhmgee8pnviges8ha';
+
+function _fetchWordData(word, cardId) {
+  var card = document.getElementById(cardId);
+  if (!card) return;
+  var defEl = card.querySelector('.syn-def');
+  var relEl = card.querySelector('.syn-rel');
+  var posEl = card.querySelector('.syn-pos-tag');
+  var wnUrl = 'https://api.wordnik.com/v4/word.json/' + encodeURIComponent(word) + '/definitions?limit=2&sourceDictionaries=all&api_key=' + WORDNIK_KEY;
+  try {
+    var xhr = new XMLHttpRequest();
+    xhr.open('GET', wnUrl, true);
+    xhr.timeout = 4000;
+    xhr.onload = function() {
+      if (xhr.status === 200) {
+        try {
+          var defs = JSON.parse(xhr.responseText);
+          if (defs && defs.length > 0) {
+            if (defEl) defEl.textContent = defs[0].text || '';
+            if (posEl && defs[0].partOfSpeech) posEl.textContent = defs[0].partOfSpeech;
+            _fetchWordnikSynonyms(word, cardId);
+            return;
+          }
+        } catch(e) {}
+      }
+      _fetchDatamuseFallback(word, cardId);
+    };
+    xhr.onerror = function() { _fetchDatamuseFallback(word, cardId); };
+    xhr.ontimeout = function() { _fetchDatamuseFallback(word, cardId); };
+    xhr.send();
+  } catch(e) { _fetchDatamuseFallback(word, cardId); }
+}
+
+function _fetchWordnikSynonyms(word, cardId) {
+  var card = document.getElementById(cardId);
+  if (!card) return;
+  var relEl = card.querySelector('.syn-rel');
+  var wnUrl = 'https://api.wordnik.com/v4/word.json/' + encodeURIComponent(word) + '/relatedWords?useCanonical=true&relationshipTypes=synonym&limitPerRelationshipType=8&api_key=' + WORDNIK_KEY;
+  try {
+    var xhr = new XMLHttpRequest();
+    xhr.open('GET', wnUrl, true);
+    xhr.timeout = 4000;
+    xhr.onload = function() {
+      if (xhr.status === 200) {
+        try {
+          var data = JSON.parse(xhr.responseText);
+          if (data && data.length > 0 && data[0].words && data[0].words.length > 0) {
+            var syns = data[0].words.slice(0, 8);
+            var html = '';
+            syns.forEach(function(s) {
+              html += '<span style="font-size:9px;font-weight:600;padding:3px 8px;border-radius:100px;border:1px solid rgba(52,211,153,.2);color:#34d399;background:rgba(52,211,153,.06);margin:2px">' + s + '</span>';
+            });
+            if (relEl) relEl.innerHTML = html;
+            return;
+          }
+        } catch(e) {}
+      }
+      _fetchLocalSynonyms(word, cardId);
+    };
+    xhr.onerror = function() { _fetchLocalSynonyms(word, cardId); };
+    xhr.ontimeout = function() { _fetchLocalSynonyms(word, cardId); };
+    xhr.send();
+  } catch(e) { _fetchLocalSynonyms(word, cardId); }
+}
+
+function _fetchDatamuseFallback(word, cardId) {
+  var card = document.getElementById(cardId);
+  if (!card) return;
+  var defEl = card.querySelector('.syn-def');
+  var posEl = card.querySelector('.syn-pos-tag');
+  try {
+    var xhr = new XMLHttpRequest();
+    xhr.open('GET', 'https://api.datamuse.com/words?sp=' + encodeURIComponent(word) + '&md=d&max=1', true);
+    xhr.timeout = 4000;
+    xhr.onload = function() {
+      if (xhr.status === 200) {
+        try {
+          var data = JSON.parse(xhr.responseText);
+          if (data[0] && data[0].defs && data[0].defs[0]) {
+            var parts = data[0].defs[0].split('\t');
+            if (defEl) defEl.textContent = parts[1] || data[0].defs[0];
+            if (posEl && data[0].tags && data[0].tags[0]) posEl.textContent = data[0].tags[0];
+            _fetchLocalSynonyms(word, cardId);
+            return;
+          }
+        } catch(e) {}
+      }
+      if (defEl) defEl.textContent = 'Definition not available.';
+      _fetchLocalSynonyms(word, cardId);
+    };
+    xhr.onerror = function() { if (defEl) defEl.textContent = 'Definition not available.'; _fetchLocalSynonyms(word, cardId); };
+    xhr.ontimeout = function() { if (defEl) defEl.textContent = 'Definition not available.'; _fetchLocalSynonyms(word, cardId); };
+    xhr.send();
+  } catch(e) {
+    if (defEl) defEl.textContent = 'Definition not available.';
+    _fetchLocalSynonyms(word, cardId);
+  }
+}
+
+function _fetchLocalSynonyms(word, cardId) {
+  var card = document.getElementById(cardId);
+  if (!card) return;
+  var relEl = card.querySelector('.syn-rel');
+  if (!relEl) return;
+  if (relEl.children.length === 0) {
+    relEl.innerHTML = '<span style="font-size:9px;color:var(--muted2)">—</span>';
+  }
+}
+
+function _getPOS(word) {
+  try {
+    if (typeof nlp !== 'undefined') {
+      var doc = nlp(word); var terms = doc.json();
+      if (terms[0] && terms[0].terms && terms[0].terms[0]) {
+        var tags = terms[0].terms[0].tags || [];
+        if (tags.indexOf('Noun') !== -1) return 'noun';
+        if (tags.indexOf('Verb') !== -1) return 'verb';
+        if (tags.indexOf('Adjective') !== -1) return 'adj';
+        if (tags.indexOf('Adverb') !== -1) return 'adv';
+      }
+    }
+  } catch(e) {}
+  return '—';
+}
+
+var _stopWords = /^(the|and|for|are|was|with|that|this|from|have|were|they|will|what|when|your|about|which|their|there|would|could|should|does|been|being|into|more|some|than|then|also|very|just|like|over|each|said|della|del|dei|degli|delle|una|uno|per|che|con|sono|una|nel|nella|negli|nelle|dal|dallo|dalla|dai|dagli|dalle|non|più|meno|come|così|questa|questo|quella|quello|quelli|quelle)$/i;
+
+function _buildSynCards(text) {
+  var container = document.getElementById('synWords');
+  if (!container) return;
+  var rawWords = text.split(/\s+/);
+  var contentWords = [];
+  rawWords.forEach(function(w) {
+    var clean = w.replace(/[.,;:!?…'"]/g, '').toLowerCase();
+    if (clean.length > 2 && !_stopWords.test(clean)) contentWords.push(clean);
+  });
+  if (contentWords.length === 0) {
+    container.innerHTML = '<div style="text-align:center;padding:40px 20px;color:var(--muted2);font-size:12px">No content words found.<br><strong style="color:var(--accent)">Try a line with more descriptive words.</strong></div>';
+    document.getElementById('rightPanelCount').textContent = '0';
+    return;
+  }
+  var ts = Date.now();
+  var html = '';
+  contentWords.forEach(function(word, i) {
+    var cardId = 'synw-' + ts + '-' + i;
+    html += '<div class="syn-word" id="' + cardId + '">';
+    html += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px"><span style="font-size:16px;font-weight:700;color:var(--text)">' + word + '</span><span class="syn-pos-tag" style="font-size:9px;font-weight:600;text-transform:uppercase;padding:2px 8px;border-radius:100px;background:rgba(167,139,250,.15);color:var(--accent2)">' + _getPOS(word) + '</span></div>';
+    html += '<div style="font-size:11px;color:var(--muted);line-height:1.5;margin-bottom:6px" class="syn-def">Loading…</div>';
+    html += '<div style="display:flex;flex-wrap:wrap;gap:4px;align-items:center;min-height:24px" class="syn-rel"></div>';
+    html += '</div>';
+  });
+  container.innerHTML = html;
+  document.getElementById('rightPanelCount').textContent = contentWords.length;
+  contentWords.forEach(function(word, i) {
+    _fetchWordData(word, 'synw-' + ts + '-' + i);
+  });
+}
+
+// ═══ Live Synonyms (Datamuse ml=) — the section the user loved ═══
+var wordBank = [];
+function updateLiveSynonyms() {
+  var body = document.getElementById('liveSynBody');
+  if (!body) return;
+
+  // Collect all words from transcript, tag with POS
+  var allWords = [];
+  transcriptLines.forEach(function(line) {
+    var words = line.text.split(/\s+/);
+    words.forEach(function(w) {
+      var clean = w.replace(/[.,;:!?…'"]/g, '').toLowerCase();
+      if (clean.length > 2 && !_stopWords.test(clean)) allWords.push(clean);
+    });
+  });
+
+  // Count frequency
+  var freq = {};
+  allWords.forEach(function(w) { freq[w] = (freq[w] || 0) + 1; });
+
+  // Filter to nouns, verbs, adjectives
+  var contentWords = [];
+  Object.keys(freq).forEach(function(w) {
+    var pos = _getPOS(w);
+    if (pos === 'noun' || pos === 'verb' || pos === 'adj') {
+      contentWords.push({w: w, pos: pos, count: freq[w]});
+    }
+  });
+  contentWords.sort(function(a,b){return b.count - a.count;});
+  contentWords = contentWords.slice(0, 8);
+
+  if (contentWords.length === 0) {
+    body.innerHTML = '<div style="color:var(--muted);text-align:center;padding:40px;font-size:13px;line-height:1.6">Start speaking — synonyms for your nouns, verbs &amp; adjectives will appear here</div>';
+    return;
+  }
+
+  var html = '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px">';
+  contentWords.forEach(function(item) {
+    var safeWord = item.w.replace(/'/g, "\\'");
+    var inBank = wordBank.indexOf(item.w) >= 0;
+    var btnSymbol = inBank ? '−' : '+';
+    html += '<div class="syn-card" data-word="' + safeWord + '">';
+    html += '<button onclick="event.stopPropagation();removeSynonymCard(this)" title="Dismiss" class="dismiss-btn">✕</button>';
+    html += '<button onclick="event.stopPropagation();toggleSynonymWord(this,\'' + safeWord + '\')" title="' + (inBank ? 'Remove' : 'Add') + ' to Word Bank" class="bank-btn' + (inBank ? ' in-bank' : '') + '">' + btnSymbol + '</button>';
+    html += '<div class="syn-base-word" data-word="' + safeWord + '" data-context="' + safeWord + '" onclick="event.stopPropagation();lookupSynonym(this)">' + item.w + '</div>';
+    html += '<div class="syn-pos-count">' + item.pos + ' · ' + (item.count || 1) + '×</div>';
+    html += '<div class="syn-list-' + item.w.replace(/[^a-zA-Z]/g, '') + '" style="display:flex;gap:4px;flex-wrap:wrap"><span style="font-size:9px;color:var(--muted2)">loading…</span></div>';
+    html += '</div>';
+  });
+  html += '</div>';
+  body.innerHTML = html;
+
+  // Fetch Datamuse ml= for each word
+  contentWords.forEach(function(item) {
+    var listEl = document.querySelector('.syn-list-' + item.w.replace(/[^a-zA-Z]/g, ''));
+    if (!listEl) return;
+    fetch('https://api.datamuse.com/words?ml=' + encodeURIComponent(item.w) + '&max=5')
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        listEl.innerHTML = '';
+        if (!data || data.length === 0) {
+          listEl.innerHTML = '<span style="font-size:9px;color:var(--muted2)">no synonyms</span>';
+          return;
+        }
+        data.forEach(function(s) {
+          listEl.innerHTML += '<span class="syn-word-chip" data-word="' + s.word + '" data-context="' + item.w + '" onclick="event.stopPropagation();lookupSynonym(this)">' + s.word + '</span>';
+        });
+      })
+      .catch(function() {
+        listEl.innerHTML = '<span style="font-size:9px;color:var(--muted2)">unavailable</span>';
+      });
+  });
+}
+
+function removeSynonymCard(btn) {
+  var card = btn.closest('.syn-card');
+  if (card) {
+    card.style.opacity = '0';
+    card.style.transform = 'scale(.95)';
+    setTimeout(function() { card.remove(); }, 250);
+  }
+}
+
+function toggleSynonymWord(btn, word) {
+  var idx = wordBank.indexOf(word);
+  if (idx >= 0) {
+    wordBank.splice(idx, 1);
+    btn.classList.remove('in-bank');
+    btn.textContent = '+';
+    btn.title = 'Add to Word Bank';
+  } else {
+    wordBank.push(word);
+    btn.classList.add('in-bank');
+    btn.textContent = '−';
+    btn.title = 'Remove from Word Bank';
+  }
+}
+
+// ═══ Lookup Synonym Popup (purple border) ═══
+window.lookupSynonym = function(el) {
+  var word = el.dataset.word;
+  var context = el.dataset.context || '';
+  if (!word) return;
+  var existing = document.querySelector('.syn-popup');
+  if (existing) existing.remove();
+  var popup = document.createElement('div');
+  popup.className = 'syn-popup';
+  var html = '<div style="font-weight:800;font-size:16px;color:var(--text);margin-bottom:4px">' + word + '</div>';
+  html += '<div style="font-size:10px;color:var(--muted);margin-bottom:10px">Related to: ' + context + '</div>';
+  html += '<div id="synDefContent" style="color:var(--muted);font-size:11px">Loading definition…</div>';
+  html += '<div style="margin-top:10px;display:flex;gap:6px">';
+  html += '<button onclick="addSynonymWord(\'' + word + '\');var p=this.closest(\'.syn-popup\');if(p)p.remove()" style="font-family:inherit;font-size:10px;font-weight:600;padding:5px 12px;border-radius:100px;border:1px solid #a78bfa;background:transparent;color:#a78bfa;cursor:pointer">+ Add to Bank</button>';
+  html += '<button onclick="this.closest(\'.syn-popup\').remove()" style="font-family:inherit;font-size:10px;font-weight:600;padding:5px 12px;border-radius:100px;border:1px solid var(--line);background:transparent;color:var(--muted);cursor:pointer">✕ Close</button>';
+  html += '</div>';
+  popup.innerHTML = html;
+  var rect = el.getBoundingClientRect();
+  popup.style.top = Math.min(rect.bottom + 8, window.innerHeight - 280) + 'px';
+  popup.style.left = Math.max(8, Math.min(rect.left, window.innerWidth - 310)) + 'px';
+  document.body.appendChild(popup);
+  setTimeout(function() {
+    document.addEventListener('click', function closePopup(e) {
+      if (!popup.contains(e.target) && e.target !== el) {
+        popup.remove();
+        document.removeEventListener('click', closePopup);
+      }
+    });
+  }, 100);
+  // Fetch definition
+  fetch('https://api.dictionaryapi.dev/api/v2/entries/en/' + encodeURIComponent(word))
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      var defEl = document.getElementById('synDefContent');
+      if (!defEl) return;
+      if (data && data[0] && data[0].meanings) {
+        var defHtml = '';
+        data[0].meanings.forEach(function(m) {
+          defHtml += '<div style="margin-bottom:8px"><span style="font-size:9px;font-weight:700;color:var(--accent);text-transform:uppercase">' + m.partOfSpeech + '</span>';
+          if (m.definitions && m.definitions[0]) {
+            defHtml += '<div style="margin-top:2px">' + m.definitions[0].definition + '</div>';
+            if (m.definitions[0].example) {
+              defHtml += '<div style="margin-top:3px;font-style:italic;color:var(--muted2);font-size:10px">"' + m.definitions[0].example + '"</div>';
+            }
+          }
+          defHtml += '</div>';
+        });
+        defEl.innerHTML = defHtml || 'No definition found.';
+      } else {
+        defEl.innerHTML = 'No definition found for "' + word + '".';
+      }
+    })
+    .catch(function() {
+      var defEl = document.getElementById('synDefContent');
+      if (defEl) defEl.innerHTML = 'Definition unavailable (offline or API error).';
+    });
+};
+
+window.addSynonymWord = function(word) {
+  if (wordBank.indexOf(word) < 0) wordBank.push(word);
+  updateLiveSynonyms();
+};
+</script>
+</body>
+</html>
