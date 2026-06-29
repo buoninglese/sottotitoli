@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Particle Wave — Ember Mechanics</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,400;14..32,500;14..32,600;14..32,700;14..32,800;14..32,900&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#0f1117;--card:#1a1d26;--card2:#22252f;--line:rgba(255,255,255,.06);--text:#e5e7eb;--muted:#9ca3af;--muted2:#6b7280;--accent:#a78bfa}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;padding:16px}
+h1{font-size:20px;font-weight:800;margin-bottom:2px}
+.sub{font-size:11px;color:var(--muted2);margin-bottom:14px}
+.topbar{display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap}
+.btn{font-family:inherit;font-size:11px;font-weight:600;padding:6px 14px;border-radius:100px;border:1px solid var(--line);background:var(--card2);color:var(--text);cursor:pointer;transition:all .15s}
+.btn:hover{border-color:var(--accent)}
+.btn.active{background:var(--accent);color:#fff;border-color:var(--accent)}
+.meter{width:100%;height:3px;background:var(--card2);border-radius:2px;overflow:hidden;margin-bottom:12px}
+.meter-fill{height:100%;border-radius:2px;background:linear-gradient(90deg,#60a5fa,#a78bfa,#f472b6);transition:width .04s;width:0%}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:12px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px;display:flex;flex-direction:column;gap:5px}
+.card-head{display:flex;align-items:center;justify-content:space-between}
+.card-name{font-size:11px;font-weight:700}
+.card-meta{font-size:9px;color:var(--muted2);font-family:monospace}
+.card canvas{width:100%;height:56px;border-radius:8px;background:var(--bg)}
+</style>
+</head>
+<body>
+
+<h1>🔬 Ember Mechanics — Horizontal Line</h1>
+<p class="sub">Exact logo mockup physics (raw mic, no smoothing, same formulas). 20 variations on a horizontal line.</p>
+
+<div class="topbar">
+  <button class="btn" id="micBtn" onclick="toggleMic()">🎤 Start Mic</button>
+  <span style="font-size:10px;color:var(--muted2)" id="micLabel">Mic off</span>
+</div>
+<div class="meter"><div class="meter-fill" id="meterFill"></div></div>
+
+<div class="grid" id="grid"></div>
+
+<script>
+// ═══ Audio — EXACTLY like logo mockup ═══
+var audioCtx=null,analyser=null,micStream=null,micActive=false,volume=0;
+async function toggleMic(){micActive?stopMic():startMic()}
+async function startMic(){
+  try{micStream=await navigator.mediaDevices.getUserMedia({audio:true});audioCtx=new(window.AudioContext||window.webkitAudioContext)();analyser=audioCtx.createAnalyser();analyser.fftSize=256;audioCtx.createMediaStreamSource(micStream).connect(analyser);micActive=true;updateMicUI('on')}catch(e){alert('Mic denied')}
+}
+function stopMic(){if(micStream){micStream.getTracks().forEach(function(t){t.stop()});micStream=null}if(audioCtx){audioCtx.close();audioCtx=null;analyser=null}micActive=false;volume=0;updateMicUI('off')}
+function updateMicUI(s){
+  var b=document.getElementById('micBtn'),l=document.getElementById('micLabel');
+  if(s==='on'){b.textContent='⏹ Stop Mic';b.classList.add('active');l.textContent='Mic live'}
+  else{b.textContent='🎤 Start Mic';b.classList.remove('active');l.textContent='Mic off';document.getElementById('meterFill').style.width='0%'}
+}
+function readMicVolume(){
+  if(!analyser)return 0;var d=new Uint8Array(analyser.frequencyBinCount);analyser.getByteFrequencyData(d);var s=0;for(var i=0;i<d.length;i++)s+=d[i];return Math.min(1,s/d.length/128);
+}
+
+// ═══ 20 Variations ═══
+var variants=[
+  {name:'01 · Ember Original',  desc:'The exact Ember Swarm — warm fire, gentle',       n:150,hue0:10, hueR:50, orbMin:3,orbMax:12,damp:0.90,attr:0.006,size0:0.9,sizeV:2.0,glow:0.10,kalei:2.0},
+  {name:'02 · Frost Original',  desc:'The exact Frost Mist — icy blue, ghostly',         n:120,hue0:190,hueR:60, orbMin:4,orbMax:14,damp:0.94,attr:0.005,size0:0.8,sizeV:1.5,glow:0.06,kalei:2.2},
+  {name:'03 · Wild Ember',      desc:'2× particles, wider scatter, faster',              n:300,hue0:10, hueR:80, orbMin:5,orbMax:22,damp:0.85,attr:0.010,size0:0.7,sizeV:3.0,glow:0.16,kalei:4.0},
+  {name:'04 · Tight Frost',     desc:'Dense, tight line, minimal scatter',               n:200,hue0:200,hueR:40, orbMin:1,orbMax:6, damp:0.96,attr:0.012,size0:0.5,sizeV:1.8,glow:0.05,kalei:1.2},
+  {name:'05 · Lava Flow',       desc:'Few, large, fiery — dramatic',                     n:70, hue0:5,  hueR:35, orbMin:6,orbMax:28,damp:0.80,attr:0.008,size0:1.2,sizeV:3.5,glow:0.20,kalei:5.0},
+  {name:'06 · Arctic Storm',    desc:'Many small icy dots, wide scatter',                n:180,hue0:200,hueR:50, orbMin:5,orbMax:24,damp:0.88,attr:0.007,size0:0.4,sizeV:2.2,glow:0.08,kalei:5.5},
+  {name:'07 · Sunset Drift',    desc:'Warm orange-pink gradient, lazy',                  n:100,hue0:340,hueR:80, orbMin:4,orbMax:18,damp:0.93,attr:0.004,size0:1.0,sizeV:2.0,glow:0.12,kalei:3.5},
+  {name:'08 · Neon Pulse',      desc:'Bright green, snappy response',                    n:160,hue0:120,hueR:30, orbMin:2,orbMax:10,damp:0.82,attr:0.014,size0:0.6,sizeV:2.8,glow:0.18,kalei:3.0},
+  {name:'09 · Midnight Whisper',desc:'Dark blue, sparse, subtle',                        n:50, hue0:230,hueR:30, orbMin:6,orbMax:30,damp:0.95,attr:0.003,size0:0.5,sizeV:1.2,glow:0.04,kalei:4.0},
+  {name:'10 · Desert Heat',     desc:'Sandy warm tones, shimmering',                     n:130,hue0:30, hueR:40, orbMin:3,orbMax:16,damp:0.90,attr:0.006,size0:0.8,sizeV:2.4,glow:0.11,kalei:2.8},
+  {name:'11 · Forest Canopy',   desc:'Green hues, gentle sway',                          n:140,hue0:80, hueR:60, orbMin:3,orbMax:14,damp:0.92,attr:0.005,size0:0.7,sizeV:2.0,glow:0.09,kalei:2.5},
+  {name:'12 · Volcano',         desc:'Few large particles, violent attraction',          n:60, hue0:0,  hueR:30, orbMin:8,orbMax:35,damp:0.75,attr:0.016,size0:1.3,sizeV:4.5,glow:0.25,kalei:6.0},
+  {name:'13 · Bubble Bath',     desc:'Round, soft, pastel rainbow',                      n:170,hue0:180,hueR:180,orbMin:2,orbMax:10,damp:0.89,attr:0.006,size0:0.9,sizeV:2.5,glow:0.07,kalei:2.0},
+  {name:'14 · Electric Storm',  desc:'Violet lightning, fast and sharp',                 n:110,hue0:260,hueR:100,orbMin:4,orbMax:20,damp:0.78,attr:0.015,size0:0.6,sizeV:3.5,glow:0.22,kalei:5.0},
+  {name:'15 · Cherry Blossom',  desc:'Soft pink, gentle drift, romantic',                n:120,hue0:330,hueR:40, orbMin:3,orbMax:14,damp:0.93,attr:0.004,size0:0.7,sizeV:1.8,glow:0.08,kalei:3.0},
+  {name:'16 · Deep Ocean',      desc:'Dark teal, slow, heavy',                           n:90, hue0:180,hueR:40, orbMin:5,orbMax:22,damp:0.94,attr:0.004,size0:0.6,sizeV:1.8,glow:0.06,kalei:3.5},
+  {name:'17 · Fireflies',       desc:'Tiny yellow-green dots, swarm-like',               n:200,hue0:50, hueR:30, orbMin:2,orbMax:12,damp:0.86,attr:0.008,size0:0.3,sizeV:2.0,glow:0.12,kalei:4.0},
+  {name:'18 · Cotton Candy',    desc:'Pink + cyan dual hue, fluffy',                     n:140,hue0:300,hueR:140,orbMin:3,orbMax:15,damp:0.88,attr:0.005,size0:0.8,sizeV:2.5,glow:0.09,kalei:2.8},
+  {name:'19 · Black Hole',      desc:'Dark, few particles, strong pull, mysterious',     n:40, hue0:250,hueR:20, orbMin:10,orbMax:40,damp:0.85,attr:0.020,size0:0.4,sizeV:1.5,glow:0.03,kalei:8.0},
+  {name:'20 · Rainbow Road',    desc:'Full spectrum, medium everything',                 n:150,hue0:0,  hueR:360,orbMin:3,orbMax:14,damp:0.88,attr:0.007,size0:0.7,sizeV:2.5,glow:0.10,kalei:3.0}
+];
+
+// ═══ Per-variant state ═══
+var states=[];
+function buildGrid(){
+  var g=document.getElementById('grid'),h='';
+  variants.forEach(function(v,i){
+    h+='<div class="card">';
+    h+='<div class="card-head"><span class="card-name">'+v.name+'</span><span class="card-meta">n:'+v.n+' k:'+v.kalei+' d:'+v.damp+' a:'+v.attr.toFixed(3)+'</span></div>';
+    h+='<canvas id="cv'+i+'"></canvas>';
+    h+='</div>';
+  });
+  g.innerHTML=h;
+  variants.forEach(function(v,i){
+    var cv=document.getElementById('cv'+i);initParticles(cv,i);
+  });
+}
+function initParticles(cv,idx){
+  var v=variants[idx],w=cv.clientWidth,h=56;
+  cv.width=w*devicePixelRatio;cv.height=h*devicePixelRatio;
+  var ps=[];
+  for(var i=0;i<v.n;i++){
+    var tx=(i/(v.n-1))*w,ty=h/2;
+    ps.push({tx:tx,ty:ty,x:Math.random()*w,y:5+Math.random()*(h-10),vx:0,vy:0,phase:Math.random()*Math.PI*2,freq:0.3+Math.random()*0.7,orbitR:v.orbMin+Math.random()*(v.orbMax-v.orbMin)});
+  }
+  if(!states[idx])states[idx]={particles:ps};else states[idx].particles=ps;
+}
+
+// ═══ Frame — EXACT logo mockup mechanics ═══
+function particleColor(i,total,vol,idx){
+  var v=variants[idx];
+  var hue=((v.hue0||260)+i/total*(v.hueR||120)+vol*40)%360;
+  var sat=60+vol*20,lit=50+vol*25,alpha=0.45+vol*0.45;
+  return'hsla('+hue+','+sat+'%,'+lit+'%,'+alpha+')';
+}
+var prevT=0;
+function frame(ts){
+  requestAnimationFrame(frame);
+  var dt=Math.min(50,(ts-prevT))/1000;prevT=ts;if(dt<=0)dt=0.016;
+  if(micActive)volume=readMicVolume();
+  else volume=Math.max(0,volume*0.92);
+  document.getElementById('meterFill').style.width=(volume*100)+'%';
+  variants.forEach(function(v,idx){
+    var cv=document.getElementById('cv'+idx);if(!cv)return;
+    var w=cv.clientWidth,h=56;
+    if(cv.width!==w*devicePixelRatio||cv.height!==h*devicePixelRatio){initParticles(cv,idx)}
+    var ctx=cv.getContext('2d'),dpr=devicePixelRatio;
+    ctx.setTransform(dpr,0,0,dpr,0,0);ctx.clearRect(0,0,w,h);
+    var st=states[idx];if(!st||!st.particles)return;
+    var vol=volume;
+
+    // Glow — EXACT logo mockup formula
+    if(vol>0.05&&(v.glow||0.08)>0){
+      ctx.save();ctx.globalAlpha=vol*(v.glow||0.08);
+      ctx.filter='blur('+(4+vol*12)+'px)';
+      ctx.beginPath();ctx.moveTo(0,h/2);ctx.lineTo(w,h/2);
+      ctx.strokeStyle='#a78bfa';ctx.lineWidth=2+vol*4;ctx.stroke();ctx.restore();
+    }
+    // Particle physics — EXACT logo mockup formulas
+    for(var i=0;i<st.particles.length;i++){
+      var p=st.particles[i];
+      var attractForce=(v.attr||0.008)+vol*0.25*dt;
+      var kaleiStrength=(1-vol)*(v.kalei||1.8);
+      var t=ts*0.001;
+      var kx=Math.cos(t*p.freq+p.phase)*p.orbitR*kaleiStrength;
+      var ky=Math.sin(t*p.freq*0.7+p.phase)*p.orbitR*kaleiStrength;
+      kx+=Math.cos(t*0.3+p.phase*2)*p.orbitR*0.5*kaleiStrength;
+      ky+=Math.sin(t*0.37+p.phase*1.7)*p.orbitR*0.5*kaleiStrength;
+      var dx=(p.tx+kx)-p.x,dy=(p.ty+ky)-p.y;
+      p.vx+=dx*attractForce;p.vy+=dy*attractForce;
+      p.vx*=(v.damp||0.88);p.vy*=(v.damp||0.88);
+      p.x+=p.vx*dt*60;p.y+=p.vy*dt*60;
+      var r=(v.size0||1.0)+vol*(v.sizeV||2.2)+(1-vol)*1.0*Math.abs(Math.sin(t*2+p.phase));
+      ctx.beginPath();ctx.arc(p.x,p.y,r,0,Math.PI*2);
+      ctx.fillStyle=particleColor(i,st.particles.length,vol,idx);ctx.fill();
+      if(vol>0.25&&r>2){
+        ctx.beginPath();ctx.arc(p.x,p.y,r*2.5,0,Math.PI*2);
+        ctx.fillStyle='hsla('+((v.hue0||260)+i/st.particles.length*(v.hueR||120))+',70%,60%,'+(vol*0.08)+')';ctx.fill();
+      }
+    }
+  });
+}
+buildGrid();
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>
