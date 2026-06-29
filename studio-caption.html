@@ -913,7 +913,38 @@ button[onclick*="addToWordBank"]:hover{background:rgba(52,211,153,.15)!important
       <span style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--muted2);padding:2px 8px;border-radius:4px;background:rgba(255,255,255,.03)" id="rightPanelCount">0</span>
     </div>
     <div class="right-panel-body">
-      <div class="panel-content" id="metricsContent"></div>
+      <div class="panel-content" id="metricsContent">
+        <!-- Mode toggle -->
+        <div style="display:flex;gap:4px;margin-bottom:10px">
+          <button class="toggle-pill on" id="metricsModeWaffleBtn" onclick="_switchMetricsMode('waffle',this)">Waffle</button>
+          <button class="toggle-pill" id="metricsModePosBtn" onclick="_switchMetricsMode('pos',this)">POS Tags</button>
+        </div>
+        <!-- Mode 1: Waffle Chart -->
+        <div id="metricsModeWaffle">
+          <div class="waffle-chart" id="metricsWaffleChart" style="display:flex;flex-wrap:wrap;gap:3px;justify-content:center"></div>
+          <div style="font-size:9px;color:var(--muted2);text-align:center;margin-top:6px">Every word in order — max 49.</div>
+        </div>
+        <!-- Mode 2: POS Tags grouped -->
+        <div id="metricsModePosTags" style="display:none">
+          <div class="pos-stack" id="metricsPosStack" style="font-size:10px">
+            <div style="text-align:center;padding:16px;color:var(--muted2);font-size:10px">Start speaking to see words grouped by POS.</div>
+          </div>
+        </div>
+        <!-- Divider -->
+        <div style="border-top:1px solid var(--line);margin:12px 0"></div>
+        <!-- POS Distribution donut (always visible) -->
+        <div style="text-align:center">
+          <div style="font-size:clamp(9px,1.1vw,11px);font-weight:700;color:var(--muted2);margin-bottom:8px;letter-spacing:.3px">POS Distribution</div>
+          <svg viewBox="0 0 100 100" style="width:clamp(80px,12vw,120px);height:auto;margin:0 auto;display:block" id="metricsDonutSvg">
+            <circle cx="50" cy="50" r="32" fill="none" stroke="var(--line)" stroke-width="10" stroke-dasharray="200 200" transform="rotate(-90 50 50)"/>
+            <text x="50" y="46" text-anchor="middle" font-family="JetBrains Mono" font-size="16" font-weight="900" fill="var(--text)">0</text>
+            <text x="50" y="56" text-anchor="middle" font-size="6" fill="var(--muted2)">words</text>
+          </svg>
+          <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-top:8px;font-size:9px" id="metricsDonutLegend">
+            <span style="color:#60a5fa">N 0</span><span style="color:#34d399">V 0</span><span style="color:#f472b6">J 0</span><span style="color:#c084fc">D 0</span>
+          </div>
+        </div>
+      </div>
       <div class="panel-content active" id="synContent">
         <div class="syn-line-preview" id="synLinePreview" style="background:rgba(167,139,250,.06);border:1px solid rgba(167,139,250,.15);border-radius:8px;padding:12px;font-size:13px;line-height:1.6;color:var(--text);font-family:var(--font-display);font-style:italic">
           <span style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.3px;color:var(--accent);display:block;margin-bottom:4px;font-style:normal">Click a transcript line</span>
@@ -1857,6 +1888,111 @@ function _switchAnalysisMode(mode, btn) {
   if (mode === 'tags') { if (tagged) tagged.style.display = ''; if (pills) pills.style.display = 'none'; }
   else { if (tagged) tagged.style.display = 'none'; if (pills) pills.style.display = ''; }
 }
+// ═══ Metrics panel: toggle between Waffle and POS Tags modes ═══
+function _switchMetricsMode(mode, btn) {
+  document.querySelectorAll('#metricsModeWaffleBtn,#metricsModePosBtn').forEach(function(b){b.classList.remove('on')});
+  btn.classList.add('on');
+  var waffle = document.getElementById('metricsModeWaffle');
+  var pos = document.getElementById('metricsModePosTags');
+  if (mode === 'waffle') { if (waffle) waffle.style.display = ''; if (pos) pos.style.display = 'none'; }
+  else { if (waffle) waffle.style.display = 'none'; if (pos) pos.style.display = ''; }
+}
+// ═══ Refresh metrics panel data ═══
+function _refreshMetricsPanel() {
+  // Only update if metrics panel is open (lazy)
+  var mc = document.getElementById('metricsContent');
+  if (!mc || !mc.classList.contains('active')) return;
+
+  var lines = document.querySelectorAll('#captionTranscript .line');
+  var allWords = [];
+  lines.forEach(function(l) {
+    var clone = l.cloneNode(true);
+    var spans = clone.querySelectorAll('span'); spans.forEach(function(s){s.remove()});
+    var spks = clone.querySelectorAll('.spk-tag'); spks.forEach(function(s){s.remove()});
+    (clone.textContent||'').trim().split(/\s+/).forEach(function(w){
+      var c = w.replace(/[^a-zA-Z]/g,'').toLowerCase(); if (c.length > 1) allWords.push(c);
+    });
+  });
+
+  // ── Waffle Chart ──
+  var wf = document.getElementById('metricsWaffleChart');
+  if (wf) {
+    var wfHtml = ''; var max = Math.min(allWords.length, 49);
+    var wfColors = {NOUN:'#60a5fa',VERB:'#34d399',ADJ:'#f472b6',ADV:'#c084fc',PREP:'#fbbf24',CONJ:'#fb923c',PRON:'#38bdf8',AUX:'#a78bfa',DET:'#9ca3af',OTHER:'#6b7280'};
+    for (var i = 0; i < max; i++) {
+      var pos = 'OTHER';
+      try {
+        if (typeof _gvTagWord === 'function') pos = _gvTagWord(allWords[i]);
+        else if (typeof nlp !== 'undefined') {
+          var d = nlp(allWords[i]); var t = d.json();
+          if (t[0] && t[0].terms && t[0].terms[0]) {
+            var tags = t[0].terms[0].tags || [];
+            if (tags.indexOf('Noun') !== -1) pos = 'NOUN'; else if (tags.indexOf('Verb') !== -1) pos = 'VERB';
+            else if (tags.indexOf('Adjective') !== -1) pos = 'ADJ'; else if (tags.indexOf('Adverb') !== -1) pos = 'ADV';
+          }
+        }
+      } catch(e) {}
+      wfHtml += '<div style="width:14px;height:14px;border-radius:3px;background:' + (wfColors[pos]||'#6b7280') + '" title="' + allWords[i] + ' (' + pos + ')"></div>';
+    }
+    wf.innerHTML = wfHtml || '<div style="color:var(--muted2);font-size:10px;text-align:center;padding:10px">No words yet.</div>';
+  }
+
+  // ── POS Tags grouped (Mode 2) ──
+  var mps = document.getElementById('metricsPosStack');
+  if (mps) {
+    var posMap = {}; var posOrder = ['NOUN','VERB','ADJ','ADV','PREP','CONJ','PRON','AUX'];
+    var posNames = {NOUN:'Nouns',VERB:'Verbs',ADJ:'Adjectives',ADV:'Adverbs',PREP:'Prepositions',CONJ:'Conjunctions',PRON:'Pronouns',AUX:'Auxiliaries'};
+    var posColors = {NOUN:'#60a5fa',VERB:'#34d399',ADJ:'#f472b6',ADV:'#c084fc',PREP:'#fbbf24',CONJ:'#fb923c',PRON:'#38bdf8',AUX:'#a78bfa'};
+    allWords.forEach(function(w){
+      var pos = 'OTHER';
+      try { if (typeof _gvTagWord === 'function') pos = _gvTagWord(w); } catch(e) {}
+      if (!posMap[pos]) posMap[pos] = [];
+      if (posMap[pos].indexOf(w) < 0) posMap[pos].push(w);
+    });
+    var psHtml = '';
+    posOrder.forEach(function(pos) {
+      var words = posMap[pos] || []; if (words.length === 0) return;
+      psHtml += '<div><div class="pos-row-label" style="color:' + (posColors[pos]||'#9ca3af') + '">' + posNames[pos] + ' (' + words.length + ')</div><div class="pos-row-words">';
+      words.forEach(function(w) {
+        psHtml += '<span class="pos-chip" style="background:' + (posColors[pos]||'#6b7280') + '25;color:' + (posColors[pos]||'#9ca3af') + '">' + w + '</span>';
+      });
+      psHtml += '</div></div>';
+    });
+    mps.innerHTML = psHtml || '<div style="text-align:center;padding:16px;color:var(--muted2);font-size:10px">Start speaking to see words grouped by POS.</div>';
+  }
+
+  // ── POS Distribution Donut (always visible) ──
+  var donutSvg = document.getElementById('metricsDonutSvg');
+  var donutLegend = document.getElementById('metricsDonutLegend');
+  if (donutSvg) {
+    var posCounts = {NOUN:0,VERB:0,ADJ:0,ADV:0};
+    allWords.forEach(function(w){
+      var pos = 'OTHER';
+      try { if (typeof _gvTagWord === 'function') pos = _gvTagWord(w); } catch(e) {}
+      if (posCounts.hasOwnProperty(pos)) posCounts[pos]++;
+    });
+    var total = posCounts.NOUN + posCounts.VERB + posCounts.ADJ + posCounts.ADV || 1;
+    var items = [
+      {v: posCounts.NOUN, c: '#60a5fa'},
+      {v: posCounts.VERB, c: '#34d399'},
+      {v: posCounts.ADJ, c: '#f472b6'},
+      {v: posCounts.ADV, c: '#c084fc'}
+    ];
+    var circ = 2 * Math.PI * 32;
+    var offset = 0;
+    var svgHtml = '';
+    items.forEach(function(b) {
+      if (b.v === 0) return;
+      var dash = (b.v / total) * circ;
+      svgHtml += '<circle cx="50" cy="50" r="32" fill="none" stroke="' + b.c + '" stroke-width="10" stroke-dasharray="' + dash + ' ' + circ + '" stroke-dashoffset="' + (-offset) + '" transform="rotate(-90 50 50)"/>';
+      offset += dash;
+    });
+    if (!svgHtml) svgHtml = '<circle cx="50" cy="50" r="32" fill="none" stroke="var(--line)" stroke-width="10" stroke-dasharray="200 200" transform="rotate(-90 50 50)"/>';
+    svgHtml += '<text x="50" y="46" text-anchor="middle" font-family="JetBrains Mono" font-size="16" font-weight="900" fill="var(--text)">' + total + '</text><text x="50" y="56" text-anchor="middle" font-size="6" fill="var(--muted2)">words</text>';
+    donutSvg.innerHTML = svgHtml;
+    if (donutLegend) donutLegend.innerHTML = '<span style="color:#60a5fa">N ' + items[0].v + '</span><span style="color:#34d399">V ' + items[1].v + '</span><span style="color:#f472b6">J ' + items[2].v + '</span><span style="color:#c084fc">D ' + items[3].v + '</span>';
+  }
+}
 // Click a line in grammar/analysis slide → show SYN cards
 function _slideLineClick(el) {
   document.querySelectorAll('.tline').forEach(function(l){l.style.background=''});
@@ -1893,6 +2029,7 @@ setInterval(function() {
   var lines = document.querySelectorAll('#captionTranscript .line');
   if (lines.length > 0) {
     try { _updateGrammarLines(); } catch(e) {}
+    try { _refreshMetricsPanel(); } catch(e) {}
   }
 }, 800);
 
@@ -2350,6 +2487,7 @@ _realMic.onFinal = function(text) {
 
   // ── Update slide panels with live data ──
   try { _updateGrammarLines(); } catch(e) { console.error('_updateGrammarLines error:', e); }
+  try { _refreshMetricsPanel(); } catch(e) {}
 };
 
 // Hook grammar-viz into speech pipeline
@@ -2360,6 +2498,7 @@ _realMic.onFinal = function(text) {
       if (_gvOrigOnFinal) _gvOrigOnFinal(text);
       try { _gvProcessFinal(text); } catch(e) { console.error('grammar-viz error:', e); }
       try { _updateGrammarLines(); } catch(e) { console.error('_updateGrammarLines error:', e); }
+      try { _refreshMetricsPanel(); } catch(e) {}
     };
   }
 })();
