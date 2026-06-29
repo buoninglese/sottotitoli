@@ -277,17 +277,6 @@ window.addEventListener('beforeunload', function() {
   }
 });
 
-// visibilitychange: fires on tab switch / minimize — stop mic when hidden
-document.addEventListener('visibilitychange', function() {
-  if (document.hidden && _realMic.recognition) {
-    if (_realMic.recognition) {
-      try { _realMic.recognition.stop(); } catch(e) {}
-      _realMic.recognition = null;
-    }
-    updateMicUI('idle');
-  }
-});
-
 // ═══ Force-finalize timer — restarts recognition after silence to flush results ═══
 function _startForceFinalizeTimer() {
   _stopForceFinalizeTimer();
