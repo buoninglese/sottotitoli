@@ -100,14 +100,12 @@ function _gvUpdateTranscript(text, words) {
 
   var html = '';
   _gv.transcriptSentences.forEach(function(s) {
-    html += '<div style="margin-bottom:clamp(8px,1.2vw,14px);padding-bottom:clamp(8px,1.2vw,12px);border-bottom:1px solid var(--line)">';
-    html += '<div style="font-size:clamp(13px,1.5vw,16px);color:var(--muted);margin-bottom:clamp(6px,1vw,10px);line-height:1.5">' + s.text + '</div>';
-    html += '<div style="display:flex;flex-wrap:wrap;gap:clamp(3px,.5vw,5px)">';
+    html += '<div style="margin-bottom:clamp(10px,1.5vw,16px);padding-bottom:clamp(8px,1.2vw,12px);border-bottom:1px solid var(--line)">';
+    html += '<div style="font-size:clamp(13px,1.5vw,16px);color:var(--muted);margin-bottom:clamp(8px,1.2vw,12px);line-height:1.5;font-weight:500">' + s.text + '</div>';
+    html += '<div style="display:flex;flex-wrap:wrap;gap:clamp(4px,.6vw,7px);align-items:flex-end">';
     s.words.forEach(function(w) {
       var pos = _gvTagWord(w);
-      var colorMap = {NOUN:'#60a5fa',VERB:'#34d399',ADJ:'#f472b6',ADV:'#c084fc',PREP:'#fbbf24',CONJ:'#fb923c',PRON:'#38bdf8',AUX:'#a78bfa',DET:'#6b7280',PART:'#6b7280',OTHER:'#6b7280'};
-      var color = colorMap[pos] || '#6b7280';
-      html += '<span style="padding:clamp(2px,.4vw,4px) clamp(6px,1vw,10px);border-radius:5px;font-size:clamp(10px,1.2vw,13px);font-weight:600;background:' + color + '18;color:' + color + ';border:1px solid ' + color + '22">' + w + ' <span style="opacity:.6;font-size:clamp(8px,.9vw,10px)">' + pos + '</span></span>';
+      html += '<span class="transcript-word"><span class="tw">' + w + '</span><span class="tag tag-' + pos + '">' + pos + '</span></span>';
     });
     html += '</div></div>';
   });
@@ -143,10 +141,10 @@ function _gvUpdateGrammarExamples() {
     var pos = _gvTagWord(word);
     var posColors = {NOUN:'#60a5fa',VERB:'#34d399',ADJ:'#f472b6',ADV:'#c084fc'};
     var color = posColors[pos] || '#a78bfa';
-    html += '<div id="' + cardId + '" style="background:var(--card);border:1px solid var(--line);border-radius:10px;padding:12px">';
-    html += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px"><span style="font-size:15px;font-weight:700;color:var(--text)">' + word + '</span><span style="font-size:9px;font-weight:600;text-transform:uppercase;padding:2px 8px;border-radius:100px;background:' + color + '18;color:' + color + '">' + pos + '</span></div>';
-    html += '<div style="font-size:10px;color:var(--muted);line-height:1.4" class="syn-def">Fetching…</div>';
-    html += '<div style="display:flex;flex-wrap:wrap;gap:3px;align-items:center;min-height:20px;margin-top:4px" class="syn-rel"></div>';
+    html += '<div id="' + cardId + '" style="background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px">';
+    html += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px"><span style="font-size:16px;font-weight:700;color:var(--text)">' + word + '</span><span style="font-size:9px;font-weight:600;text-transform:uppercase;padding:2px 8px;border-radius:100px;background:rgba(167,139,250,.15);color:var(--accent2)">' + pos + '</span></div>';
+    html += '<div style="font-size:11px;color:var(--muted);line-height:1.5;margin-bottom:6px" class="syn-def">Fetching…</div>';
+    html += '<div style="display:flex;flex-wrap:wrap;gap:4px;align-items:center;min-height:24px" class="syn-rel"></div>';
     html += '</div>';
   });
   html += '</div>';
