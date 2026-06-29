@@ -87,7 +87,7 @@ async function startRealMic() {
   rec.onerror = function(event) {
     console.error('Speech error:', event.error);
     if (event.error === 'not-allowed') updateMicUI('blocked');
-    else if (event.error === 'no-speech') { /* ignore */ }
+    else if (event.error === 'no-speech' || event.error === 'aborted') { /* ignore — normal during stop/restart cycles */ }
     else updateMicUI('error');
   };
   _realMic._onerror = rec.onerror;
