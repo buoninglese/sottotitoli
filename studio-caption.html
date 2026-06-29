@@ -2153,6 +2153,8 @@ async function _checkCreditsBeforeStart() {
 
 // ── Actual session start (called after credit check passes) ──
 function _doStartSession(startBtn, stopBtn) {
+    // Guard: user may have stopped or paused while credit check was in flight
+    if (!sessionActive) { stopRealMic(); return; }
     startRealMic().then(function(ok) {
       if (!ok) {
         sessionActive = false;
@@ -2160,9 +2162,19 @@ function _doStartSession(startBtn, stopBtn) {
         stopBtn.style.display = 'none';
         return;
       }
+      // Guard: check again after mic permission (user may have stopped during prompt)
+      if (!sessionActive) { stopRealMic(); return; }
       startBtn.style.display = 'none';
       stopBtn.style.display = '';
       if (pauseBtn) { pauseBtn.style.display = ''; pauseBtn.classList.remove('paused'); }
+      // If user paused while credit check was in flight, honour that
+      if (paused) {
+        stopRealMic();
+        if (pauseBtn) { pauseBtn.textContent = '▶'; pauseBtn.classList.add('paused'); }
+        updateRecDash('paused');
+        // Don't start timer, don't add session-active
+        return;
+      }
       sessionSeconds = 0;
       wordBank = [];
       saveWordBank();
