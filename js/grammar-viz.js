@@ -118,6 +118,82 @@ function _gvUpdateAll() {
   _gvUpdateHeatmap();
   _gvUpdatePronouns();
   _gvUpdateVerbs();
+  _gvUpdatePosCols();
+  _gvUpdatePosTags();
+  _gvUpdateDonut();
+}
+
+// ── Vocabolario: POS Distribution columns ──
+function _gvUpdatePosCols() {
+  var container = document.getElementById('vocabPosCols');
+  if (!container) return;
+  var counts = {Nouns: _gv.posCounts.NOUN || 0, Verbs: _gv.posCounts.VERB || 0, Adj: _gv.posCounts.ADJ || 0, Adv: _gv.posCounts.ADV || 0};
+  var max = Math.max(counts.Nouns, counts.Verbs, counts.Adj, counts.Adv, 1);
+  var colors = {Nouns: '#60a5fa', Verbs: '#34d399', Adj: '#f472b6', Adv: '#c084fc'};
+  var html = '';
+  Object.keys(counts).forEach(function(label) {
+    var hgt = Math.max(8, counts[label] / max * 60);
+    html += '<div style="text-align:center"><div style="width:24px;height:' + hgt + 'px;background:' + colors[label] + ';border-radius:4px 4px 0 0;margin:0 auto"></div><div style="font-size:7px;color:' + colors[label] + ';margin-top:2px">' + label + '</div><div style="font-size:8px;color:var(--muted2)">' + counts[label] + '</div></div>';
+  });
+  container.innerHTML = html;
+}
+
+// ── Vocabolario: POS Tags stacked ──
+function _gvUpdatePosTags() {
+  var container = document.getElementById('vocabPosTags');
+  if (!container) return;
+  var posNames = {NOUN: 'Nouns', VERB: 'Verbs', ADJ: 'Adjectives', ADV: 'Adverbs', PREP: 'Prepositions', CONJ: 'Conjunctions', PRON: 'Pronouns', AUX: 'Auxiliaries'};
+  var posColors = {NOUN: '#60a5fa', VERB: '#34d399', ADJ: '#f472b6', ADV: '#c084fc', PREP: '#fbbf24', CONJ: '#fb923c', PRON: '#38bdf8', AUX: '#a78bfa'};
+  // Collect recent words by POS
+  var byPos = {};
+  _gv.allWordsFlat.slice(-30).forEach(function(item) {
+    if (!byPos[item.pos]) byPos[item.pos] = [];
+    if (byPos[item.pos].indexOf(item.w) < 0 && byPos[item.pos].length < 5) byPos[item.pos].push(item.w);
+  });
+  var html = '';
+  Object.keys(posNames).forEach(function(pos) {
+    var words = byPos[pos];
+    if (!words || !words.length) return;
+    html += '<div><div style="font-size:8px;color:' + posColors[pos] + ';margin-bottom:2px;font-weight:600">' + posNames[pos] + ' (' + (_gv.posCounts[pos] || 0) + ')</div><div style="display:flex;flex-wrap:wrap;gap:2px">';
+    words.forEach(function(w) {
+      html += '<span style="padding:2px 8px;border-radius:4px;background:' + posColors[pos] + '12;color:' + posColors[pos] + ';font-size:9px">' + w + '</span>';
+    });
+    html += '</div></div>';
+  });
+  container.innerHTML = html || '<div style="color:var(--muted2);font-size:10px;text-align:center;padding:8px">Start speaking to see POS tags</div>';
+}
+
+// ── Metrics: POS donut chart ──
+function _gvUpdateDonut() {
+  var svg = document.getElementById('gvDonutSvg');
+  if (!svg) return;
+  var items = [
+    {v: _gv.posCounts.NOUN || 0, c: '#60a5fa'},
+    {v: _gv.posCounts.VERB || 0, c: '#34d399'},
+    {v: _gv.posCounts.ADJ || 0, c: '#f472b6'},
+    {v: _gv.posCounts.ADV || 0, c: '#c084fc'}
+  ];
+  var total = items.reduce(function(s, x) { return s + x.v; }, 0) || 1;
+  var circ = 2 * Math.PI * 32;
+  var offset = 0;
+  var html = '';
+  items.forEach(function(b) {
+    if (b.v === 0) return;
+    var dash = (b.v / total) * circ;
+    html += '<circle cx="50" cy="50" r="32" fill="none" stroke="' + b.c + '" stroke-width="10" stroke-dasharray="' + dash + ' ' + circ + '" stroke-dashoffset="' + (-offset) + '" transform="rotate(-90 50 50)"/>';
+    offset += dash;
+  });
+  // Fallback ring if empty
+  if (!html) {
+    html = '<circle cx="50" cy="50" r="32" fill="none" stroke="var(--line)" stroke-width="10" stroke-dasharray="200 200" transform="rotate(-90 50 50)"/>';
+  }
+  html += '<text x="50" y="46" text-anchor="middle" font-family="JetBrains Mono" font-size="16" font-weight="900" fill="var(--text)">' + total + '</text><text x="50" y="56" text-anchor="middle" font-size="6" fill="var(--muted2)">words</text>';
+  svg.innerHTML = html;
+  // Update legend
+  var legend = document.getElementById('gvDonutLegend');
+  if (legend) {
+    legend.innerHTML = '<span style="color:#60a5fa">N ' + (items[0].v) + '</span><span style="color:#34d399">V ' + (items[1].v) + '</span><span style="color:#f472b6">J ' + (items[2].v) + '</span><span style="color:#c084fc">D ' + (items[3].v) + '</span>';
+  }
 }
 
 function _gvUpdateHeatmap() {
