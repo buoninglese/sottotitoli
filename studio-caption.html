@@ -1499,10 +1499,11 @@ function _ensureLinesClickable() {
   });
 }
 
-// ── Wordnik API key ──
+// ── Wordnik API key (fallback only) ──
 var WORDNIK_KEY = (window.SOTTOTITOLI_CONFIG && window.SOTTOTITOLI_CONFIG.wordnikApiKey) || 'dnd12sayxilyys5tzqrb14v7jfwhambruhmgee8pnviges8ha';
 
-// ── Fetch all data for a word: Wordnik → Datamuse → local fallback ──
+// ── Fetch all data for a word: Datamuse → Wordnik fallback → local ──
+// Datamuse is fast, free, no auth — primary. Wordnik is rate-limited, slower — fallback.
 function _fetchWordData(word, cardId) {
   var card = document.getElementById(cardId);
   if (!card) return;
@@ -1510,40 +1511,109 @@ function _fetchWordData(word, cardId) {
   var relEl = card.querySelector('.syn-rel');
   var posEl = card.querySelector('.syn-pos-tag');
 
-  // 1. Try Wordnik (definitions + synonyms in one call)
+  // 1. Try Datamuse (definitions — fast, free, no auth)
+  var dmUrl = 'https://api.datamuse.com/words?sp=' + encodeURIComponent(word) + '&md=d&max=1';
+  try {
+    var xhr = new XMLHttpRequest();
+    xhr.open('GET', dmUrl, true);
+    xhr.timeout = 4000;
+    xhr.onload = function() {
+      if (xhr.status === 200) {
+        try {
+          var data = JSON.parse(xhr.responseText);
+          if (data && data.length > 0 && data[0].defs && data[0].defs[0]) {
+            var parts = data[0].defs[0].split('\t');
+            // defs format: "pos\ndefinition"
+            if (defEl) defEl.textContent = parts[1] || data[0].defs[0];
+            if (posEl && data[0].tags && data[0].tags[0]) {
+              posEl.textContent = data[0].tags[0];
+            }
+            // Now fetch Datamuse "means like" (≈ synonyms)
+            _fetchDatamuseMeansLike(word, cardId, defEl, relEl, posEl);
+            return;
+          }
+        } catch(e) { console.warn('Datamuse parse error:', e); }
+      }
+      // Datamuse failed or empty — fall back to Wordnik
+      _fetchWordnikFallback(word, cardId);
+    };
+    xhr.onerror = function() { _fetchWordnikFallback(word, cardId); };
+    xhr.ontimeout = function() { _fetchWordnikFallback(word, cardId); };
+    xhr.send();
+  } catch(e) { _fetchWordnikFallback(word, cardId); }
+}
+
+// ── Datamuse "means like" (≈ related words / synonyms) ──
+function _fetchDatamuseMeansLike(word, cardId, defEl, relEl, posEl) {
+  var dmUrl = 'https://api.datamuse.com/words?ml=' + encodeURIComponent(word) + '&max=8';
+  try {
+    var xhr = new XMLHttpRequest();
+    xhr.open('GET', dmUrl, true);
+    xhr.timeout = 4000;
+    xhr.onload = function() {
+      if (xhr.status === 200) {
+        try {
+          var data = JSON.parse(xhr.responseText);
+          if (data && data.length > 0) {
+            var words = data.slice(0, 8).map(function(d) { return d.word; });
+            var html = '';
+            words.forEach(function(w) {
+              html += '<span style="font-size:9px;font-weight:600;padding:3px 8px;border-radius:100px;border:1px solid rgba(52,211,153,.2);color:#34d399;background:rgba(52,211,153,.06);margin:2px">' + w + '</span>';
+            });
+            if (relEl) relEl.innerHTML = html;
+            _addWordBankBtn(word, relEl);
+            return;
+          }
+        } catch(e) {}
+      }
+      // No means-like — try local dict
+      _fetchLocalSynonyms(word, cardId);
+    };
+    xhr.onerror = function() { _fetchLocalSynonyms(word, cardId); };
+    xhr.ontimeout = function() { _fetchLocalSynonyms(word, cardId); };
+    xhr.send();
+  } catch(e) { _fetchLocalSynonyms(word, cardId); }
+}
+
+// ── Wordnik fallback (when Datamuse fails entirely) ──
+function _fetchWordnikFallback(word, cardId) {
+  var card = document.getElementById(cardId);
+  if (!card) return;
+  var defEl = card.querySelector('.syn-def');
+  var relEl = card.querySelector('.syn-rel');
+  var posEl = card.querySelector('.syn-pos-tag');
+
   var wnUrl = 'https://api.wordnik.com/v4/word.json/' + encodeURIComponent(word) + '/definitions?limit=2&sourceDictionaries=all&api_key=' + WORDNIK_KEY;
   try {
     var xhr = new XMLHttpRequest();
     xhr.open('GET', wnUrl, true);
-    xhr.timeout = 4000;
+    xhr.timeout = 5000;
     xhr.onload = function() {
       if (xhr.status === 200) {
         try {
           var defs = JSON.parse(xhr.responseText);
           if (defs && defs.length > 0) {
-            // First definition
             if (defEl) defEl.textContent = defs[0].text || '';
-            // POS from Wordnik
-            if (posEl && defs[0].partOfSpeech) {
-              posEl.textContent = defs[0].partOfSpeech;
-            }
-            // Now fetch synonyms
-            _fetchWordnikSynonyms(word, cardId, defEl, relEl, posEl);
+            if (posEl && defs[0].partOfSpeech) posEl.textContent = defs[0].partOfSpeech;
+            _fetchWordnikSynonyms(word, cardId);
             return;
           }
         } catch(e) {}
       }
-      // Wordnik failed — fall back to Datamuse
-      _fetchDatamuseFallback(word, cardId);
+      // Wordnik failed — local dict
+      _finalFallback(word, cardId);
     };
-    xhr.onerror = function() { _fetchDatamuseFallback(word, cardId); };
-    xhr.ontimeout = function() { _fetchDatamuseFallback(word, cardId); };
+    xhr.onerror = function() { _finalFallback(word, cardId); };
+    xhr.ontimeout = function() { _finalFallback(word, cardId); };
     xhr.send();
-  } catch(e) { _fetchDatamuseFallback(word, cardId); }
+  } catch(e) { _finalFallback(word, cardId); }
 }
 
-// ── Wordnik synonyms ──
-function _fetchWordnikSynonyms(word, cardId, defEl, relEl, posEl) {
+// ── Wordnik synonyms (only called from Wordnik fallback path) ──
+function _fetchWordnikSynonyms(word, cardId) {
+  var card = document.getElementById(cardId);
+  if (!card) return;
+  var relEl = card.querySelector('.syn-rel');
   var wnUrl = 'https://api.wordnik.com/v4/word.json/' + encodeURIComponent(word) + '/relatedWords?useCanonical=true&relationshipTypes=synonym&limitPerRelationshipType=8&api_key=' + WORDNIK_KEY;
   try {
     var xhr = new XMLHttpRequest();
@@ -1565,7 +1635,6 @@ function _fetchWordnikSynonyms(word, cardId, defEl, relEl, posEl) {
           }
         } catch(e) {}
       }
-      // No Wordnik synonyms — try local dict
       _fetchLocalSynonyms(word, cardId);
     };
     xhr.onerror = function() { _fetchLocalSynonyms(word, cardId); };
@@ -1574,49 +1643,13 @@ function _fetchWordnikSynonyms(word, cardId, defEl, relEl, posEl) {
   } catch(e) { _fetchLocalSynonyms(word, cardId); }
 }
 
-// ── Datamuse fallback (definitions) ──
-function _fetchDatamuseFallback(word, cardId) {
+// ── Final fallback: definition unavailable + local synonyms ──
+function _finalFallback(word, cardId) {
   var card = document.getElementById(cardId);
   if (!card) return;
   var defEl = card.querySelector('.syn-def');
-  var relEl = card.querySelector('.syn-rel');
-  var posEl = card.querySelector('.syn-pos-tag');
-  try {
-    var xhr = new XMLHttpRequest();
-    xhr.open('GET', 'https://api.datamuse.com/words?sp=' + encodeURIComponent(word) + '&md=d&max=1', true);
-    xhr.timeout = 4000;
-    xhr.onload = function() {
-      if (xhr.status === 200) {
-        try {
-          var data = JSON.parse(xhr.responseText);
-          if (data[0] && data[0].defs && data[0].defs[0]) {
-            var parts = data[0].defs[0].split('\t');
-            if (defEl) defEl.textContent = parts[1] || data[0].defs[0];
-            if (posEl && data[0].tags && data[0].tags[0]) {
-              posEl.textContent = data[0].tags[0];
-            }
-            _fetchLocalSynonyms(word, cardId);
-            return;
-          }
-        } catch(e) {}
-      }
-      // Datamuse also failed
-      if (defEl) defEl.textContent = 'Definition not available.';
-      _fetchLocalSynonyms(word, cardId);
-    };
-    xhr.onerror = function() {
-      if (defEl) defEl.textContent = 'Definition not available.';
-      _fetchLocalSynonyms(word, cardId);
-    };
-    xhr.ontimeout = function() {
-      if (defEl) defEl.textContent = 'Definition not available.';
-      _fetchLocalSynonyms(word, cardId);
-    };
-    xhr.send();
-  } catch(e) {
-    if (defEl) defEl.textContent = 'Definition not available.';
-    _fetchLocalSynonyms(word, cardId);
-  }
+  if (defEl) defEl.textContent = 'Definition not available.';
+  _fetchLocalSynonyms(word, cardId);
 }
 
 // ── Local synonym dictionary (last resort) ──
