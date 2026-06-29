@@ -4,7 +4,6 @@
 
 var _realMic = {
   recognition: null,
-  stream: null,
   state: 'idle',
   lang: 'en-US',     // current speech recognition language
   onInterim: null,   // callback(interimText)
@@ -42,18 +41,6 @@ function updateMicUI(state) {
 async function startRealMic() {
   if (_realMic.recognition) return true; // already running
   updateMicUI('requesting');
-  
-  // Request mic permission (non-blocking — SpeechRecognition captures audio independently)
-  // We fire this to trigger the browser permission prompt, but don't await it.
-  // The stream is only used for cleanup; SpeechRecognition has its own audio pipeline.
-  if (!_realMic.stream) {
-    navigator.mediaDevices.getUserMedia({ audio: true }).then(function(s) {
-      _realMic.stream = s;
-    }).catch(function(e) {
-      console.warn('getUserMedia failed, SpeechRecognition may still work:', e.message);
-      // Don't set blocked — let SpeechRecognition try
-    });
-  }
   
   var SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
   if (!SpeechRecognition) {
@@ -110,7 +97,6 @@ async function startRealMic() {
   } catch(e) {
     console.error('Speech start error:', e);
     updateMicUI('error');
-    if (_realMic.stream) { _realMic.stream.getTracks().forEach(function(t){t.stop();}); _realMic.stream = null; }
     return false;
   }
 }
@@ -120,10 +106,6 @@ function stopRealMic() {
   if (_realMic.recognition) {
     try { _realMic.recognition.stop(); } catch(e) {}
     _realMic.recognition = null;
-  }
-  if (_realMic.stream) {
-    _realMic.stream.getTracks().forEach(function(t){ t.stop(); });
-    _realMic.stream = null;
   }
   updateMicUI('idle');
 }
@@ -277,22 +259,14 @@ window.addEventListener('beforeunload', function() {
     try { _realMic.recognition.stop(); } catch(e) {}
     _realMic.recognition = null;
   }
-  if (_realMic.stream) {
-    _realMic.stream.getTracks().forEach(function(t){ t.stop(); });
-    _realMic.stream = null;
-  }
 });
 
 // visibilitychange: fires on tab switch / minimize — stop mic when hidden
 document.addEventListener('visibilitychange', function() {
-  if (document.hidden && (_realMic.recognition || _realMic.stream)) {
+  if (document.hidden && _realMic.recognition) {
     if (_realMic.recognition) {
       try { _realMic.recognition.stop(); } catch(e) {}
       _realMic.recognition = null;
-    }
-    if (_realMic.stream) {
-      _realMic.stream.getTracks().forEach(function(t){ t.stop(); });
-      _realMic.stream = null;
     }
     updateMicUI('idle');
   }
