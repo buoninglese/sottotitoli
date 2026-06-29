@@ -38,9 +38,21 @@ function updateMicUI(state) {
   if (_realMic.onStateChange) _realMic.onStateChange(state);
 }
 
-function startRealMic() {
+async function startRealMic() {
   if (_realMic.recognition) return true; // already running
   updateMicUI('requesting');
+  
+  // Warm up audio subsystem — critical for Chrome: first rec.start()
+  // silently captures silence if getUserMedia hasn't initialized audio.
+  // Acquire and immediately release the stream to unlock the hardware.
+  try {
+    var stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    stream.getTracks().forEach(function(t) { t.stop(); });
+  } catch(e) {
+    console.error('Mic permission denied:', e);
+    updateMicUI('blocked');
+    return false;
+  }
   
   var SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
   if (!SpeechRecognition) {
