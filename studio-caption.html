@@ -338,6 +338,19 @@ body.session-active .caption-transcript:empty::after { content: none; }
 .btn-pause { background: transparent; color: var(--muted); border: 1px solid var(--line); }
 .btn-pause:hover { background: var(--bg2); color: var(--text); }
 .btn-pause.paused { background: var(--warn); color: #000; border-color: var(--warn); }
+/* ═══ TOGGLE PILLS (slide 5 mode switch) ═══ */
+.toggle-pill {
+  font-family: var(--font-body); font-size: clamp(10px,1.1vw,12px);
+  font-weight: 600; padding: 6px 18px; border-radius: 100px;
+  border: 1px solid var(--line); background: var(--card);
+  color: var(--muted); cursor: pointer;
+  transition: all .25s; letter-spacing: .2px;
+}
+.toggle-pill:hover { border-color: var(--accent); color: var(--text); }
+.toggle-pill.on {
+  background: rgba(124,58,237,.1); border-color: var(--accent);
+  color: var(--accent); box-shadow: 0 0 14px rgba(124,58,237,.08);
+}
 /* ═══ WAVE BAR ═══ */
 .wave-bar { display: flex; align-items: center; gap: 10px; margin-top: 10px; background: var(--card); border: 1px solid var(--line); border-radius: var(--mode-radius); padding: 8px 14px; flex-shrink: 0; }
 .wave-viz { flex: 1; height: 52px; display: flex; align-items: center; justify-content: center; min-width: 0; overflow: hidden; width: 100%; }
@@ -1014,8 +1027,8 @@ button[onclick*="addToWordBank"]:hover{background:rgba(52,211,153,.15)!important
           <div class="section-label">Live Analysis</div>
           <h2 style="white-space:nowrap;font-size:clamp(18px,3vw,28px);font-weight:800;letter-spacing:-.5px">Word-by-Word Classification</h2>
           <div style="display:flex;gap:6px;margin-bottom:8px">
-            <button class="toggle-pill on" onclick="_switchAnalysisMode('tags',this)" id="analysisModeTags">Tag View</button>
-            <button class="toggle-pill" onclick="_switchAnalysisMode('raw',this)" id="analysisModeRaw">Raw Lines</button>
+            <button class="toggle-pill on" onclick="_switchAnalysisMode('tags',this)" id="analysisModeTags">Tag View 1</button>
+            <button class="toggle-pill" onclick="_switchAnalysisMode('pills',this)" id="analysisModeRaw">Tag View 2</button>
           </div>
           <div class="slide-split" style="flex:1;min-height:0">
             <div class="slide-main">
@@ -1024,7 +1037,7 @@ button[onclick*="addToWordBank"]:hover{background:rgba(52,211,153,.15)!important
                 <div id="gvTranscriptLines" style="color:var(--muted);font-size:clamp(12px,1.4vw,15px);line-height:1.8">
                   <div style="text-align:center;padding:20px;color:var(--muted);font-size:clamp(11px,1.2vw,13px)">No sentences yet. Speak to see each word tagged with its POS, pronoun type, and verb tense.</div>
                 </div>
-                <div id="gvTranscriptRaw" style="display:none;color:var(--muted);font-size:clamp(12px,1.4vw,15px);line-height:1.9">
+                <div id="gvTranscriptPills" style="display:none;color:var(--muted);font-size:clamp(12px,1.4vw,15px);line-height:1.9">
                   <div style="text-align:center;padding:20px;color:var(--muted);font-size:clamp(11px,1.2vw,13px)">No sentences yet.</div>
                 </div>
               </div>
@@ -1808,30 +1821,41 @@ function _updateGrammarLines() {
   var aStack = document.getElementById('analysisPosStack');
   var vStack = document.getElementById('vocabPosStack');
   if (aStack && vStack) aStack.innerHTML = vStack.innerHTML;
-  // Update raw transcript view on slide 5
-  var raw = document.getElementById('gvTranscriptRaw');
-  if (raw) {
-    var rawHtml = ''; var rshown = 0;
+  // Update pill transcript view on slide 5 (Tag View 2)
+  var pills = document.getElementById('gvTranscriptPills');
+  if (pills) {
+    var pHtml = ''; var pshown = 0;
     lines.forEach(function(l) {
-      if (rshown >= 15) return;
+      if (pshown >= 15) return;
       var clone = l.cloneNode(true);
       var tsSpan = clone.querySelector('span'); var tsText = tsSpan ? tsSpan.textContent : '';
       if (tsSpan) tsSpan.remove();
       var spkTag = clone.querySelector('.spk-tag'); if (spkTag) spkTag.remove();
-      var text = (clone.textContent || '').trim(); if (!text) return; rshown++;
-      rawHtml += '<div style="margin-bottom:clamp(8px,1.2vw,14px);padding-bottom:clamp(6px,1vw,10px);border-bottom:1px solid var(--line)"><span style="color:var(--muted2);font-size:clamp(9px,1vw,11px);margin-right:8px">' + tsText + '</span><span style="font-size:clamp(12px,1.4vw,15px)">' + text + '</span></div>';
+      var text = (clone.textContent || '').trim(); if (!text) return; pshown++;
+      var words = text.split(/\\s+/).filter(function(w){return w.length>0});
+      pHtml += '<div style="margin-bottom:clamp(8px,1.2vw,14px);padding-bottom:clamp(6px,1vw,10px);border-bottom:1px solid var(--line)">';
+      pHtml += '<span style="color:var(--muted2);font-size:clamp(9px,1vw,11px);margin-right:8px">' + tsText + '</span>';
+      words.forEach(function(w){
+        var clean = w.replace(/[^a-zA-Z]/g,'').toLowerCase();
+        var pos = 'OTHER';
+        try { if (typeof _gvTagWord === 'function') pos = _gvTagWord(clean); } catch(e) {}
+        var colorMap = {NOUN:'#60a5fa',VERB:'#34d399',ADJ:'#f472b6',ADV:'#c084fc',PREP:'#fbbf24',CONJ:'#fb923c',PRON:'#38bdf8',AUX:'#a78bfa',DET:'#6b7280',PART:'#6b7280',OTHER:'#6b7280'};
+        var color = colorMap[pos] || '#6b7280';
+        pHtml += '<span style="display:inline-flex;padding:clamp(2px,.4vw,4px) clamp(6px,1vw,10px);border-radius:5px;font-size:clamp(10px,1.2vw,13px);font-weight:600;background:' + color + '20;color:' + color + ';border:1px solid ' + color + '30;margin:2px">' + w + ' <span style="opacity:.55;font-size:clamp(7px,.8vw,9px);font-weight:500">' + pos + '</span></span>';
+      });
+      pHtml += '</div>';
     });
-    raw.innerHTML = rawHtml || '<div style="text-align:center;padding:20px;color:var(--muted);font-size:clamp(11px,1.2vw,13px)">No sentences yet.</div>';
+    pills.innerHTML = pHtml || '<div style="text-align:center;padding:20px;color:var(--muted);font-size:clamp(11px,1.2vw,13px)">No sentences yet.</div>';
   }
 }
-// Toggle between tagged and raw transcript views on slide 5
+// Toggle between tagged and pill transcript views on slide 5
 function _switchAnalysisMode(mode, btn) {
   document.querySelectorAll('#analysisModeTags,#analysisModeRaw').forEach(function(b){b.classList.remove('on')});
   btn.classList.add('on');
   var tagged = document.getElementById('gvTranscriptLines');
-  var raw = document.getElementById('gvTranscriptRaw');
-  if (mode === 'tags') { if (tagged) tagged.style.display = ''; if (raw) raw.style.display = 'none'; }
-  else { if (tagged) tagged.style.display = 'none'; if (raw) raw.style.display = ''; }
+  var pills = document.getElementById('gvTranscriptPills');
+  if (mode === 'tags') { if (tagged) tagged.style.display = ''; if (pills) pills.style.display = 'none'; }
+  else { if (tagged) tagged.style.display = 'none'; if (pills) pills.style.display = ''; }
 }
 // Click a line in grammar/analysis slide → show SYN cards
 function _slideLineClick(el) {
@@ -1842,8 +1866,8 @@ function _slideLineClick(el) {
   var main = document.getElementById('grammarSynMain');
   if (main) {
     var words = text.split(/\s+/).filter(function(w){return w.replace(/[^a-zA-Z]/g,'').length>1});
-    var html = '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--muted2);margin-bottom:8px">📖 ' + words.length + ' Content Words</div>';
-    html += '<div style="background:var(--card);border:1px solid rgba(167,139,250,.2);border-radius:var(--mode-radius);padding:12px;margin-bottom:10px;font-size:12px;line-height:1.5;color:var(--muted);font-style:italic">' + text + '</div>';
+    var html = '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--muted2);margin-bottom:10px">📖 ' + words.length + ' Content Words</div>';
+    html += '<div style="background:var(--card);border:1px solid var(--line);border-radius:10px;padding:12px;margin-bottom:10px;font-size:13px;line-height:1.5;color:var(--muted);font-style:italic">' + text + '</div>';
     html += '<div id="grammarSynCardsGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:8px">';
     var ts = Date.now();
     words.forEach(function(w, i){
