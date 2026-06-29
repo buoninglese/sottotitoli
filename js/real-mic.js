@@ -85,10 +85,9 @@ async function startRealMic() {
   _realMic._onresult = rec.onresult;
   
   rec.onerror = function(event) {
-    console.error('Speech error:', event.error);
-    if (event.error === 'not-allowed') updateMicUI('blocked');
-    else if (event.error === 'no-speech' || event.error === 'aborted') { /* ignore — normal during stop/restart cycles */ }
-    else updateMicUI('error');
+    if (event.error === 'not-allowed') { updateMicUI('blocked'); console.warn('Speech error:', event.error); }
+    else if (event.error === 'no-speech' || event.error === 'aborted') { /* normal — silence / stop */ }
+    else { console.error('Speech error:', event.error); updateMicUI('error'); }
   };
   _realMic._onerror = rec.onerror;
   
