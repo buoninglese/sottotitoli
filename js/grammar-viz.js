@@ -100,18 +100,18 @@ function _gvUpdateTranscript(text, words) {
 
   var html = '';
   _gv.transcriptSentences.forEach(function(s) {
-    html += '<div style="margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid var(--line)">';
-    html += '<div style="font-size:12px;color:var(--muted);margin-bottom:6px;line-height:1.5">' + s.text + '</div>';
-    html += '<div style="display:flex;flex-wrap:wrap;gap:4px">';
+    html += '<div style="margin-bottom:clamp(8px,1.2vw,14px);padding-bottom:clamp(8px,1.2vw,12px);border-bottom:1px solid var(--line)">';
+    html += '<div style="font-size:clamp(13px,1.5vw,16px);color:var(--muted);margin-bottom:clamp(6px,1vw,10px);line-height:1.5">' + s.text + '</div>';
+    html += '<div style="display:flex;flex-wrap:wrap;gap:clamp(3px,.5vw,5px)">';
     s.words.forEach(function(w) {
       var pos = _gvTagWord(w);
       var colorMap = {NOUN:'#60a5fa',VERB:'#34d399',ADJ:'#f472b6',ADV:'#c084fc',PREP:'#fbbf24',CONJ:'#fb923c',PRON:'#38bdf8',AUX:'#a78bfa',DET:'#6b7280',PART:'#6b7280',OTHER:'#6b7280'};
       var color = colorMap[pos] || '#6b7280';
-      html += '<span style="padding:2px 8px;border-radius:4px;font-size:10px;font-weight:600;background:' + color + '18;color:' + color + ';border:1px solid ' + color + '22">' + w + ' <span style="opacity:.6;font-size:8px">' + pos + '</span></span>';
+      html += '<span style="padding:clamp(2px,.4vw,4px) clamp(6px,1vw,10px);border-radius:5px;font-size:clamp(10px,1.2vw,13px);font-weight:600;background:' + color + '18;color:' + color + ';border:1px solid ' + color + '22">' + w + ' <span style="opacity:.6;font-size:clamp(8px,.9vw,10px)">' + pos + '</span></span>';
     });
     html += '</div></div>';
   });
-  el.innerHTML = html || '<div style="color:var(--muted);font-size:11px;text-align:center;padding:20px">No sentences yet. Speak to see each word tagged with its POS.</div>';
+  el.innerHTML = html || '<div style="color:var(--muted);font-size:clamp(11px,1.2vw,13px);text-align:center;padding:20px">No sentences yet. Speak to see each word tagged with its POS.</div>';
 }
 
 function _gvUpdateAll() {
@@ -288,7 +288,7 @@ function _gvReset() {
   _gv.sentenceLengths = [];
   // Reset UI
   var transcriptEl = document.getElementById('gvTranscriptLines');
-  if (transcriptEl) transcriptEl.innerHTML = '<div style="color:var(--muted);font-size:11px;text-align:center;padding:20px">No sentences yet. Speak to see each word tagged with its POS.</div>';
+  if (transcriptEl) transcriptEl.innerHTML = '<div style="color:var(--muted);font-size:clamp(11px,1.2vw,13px);text-align:center;padding:20px">No sentences yet. Speak to see each word tagged with its POS.</div>';
   _gvUpdateAll();
 }
 
