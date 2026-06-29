@@ -2374,6 +2374,50 @@ function addBreathMarks(text) {
   return out.join(' <span class="breath-long">||</span> ');
 }
 
+// ═══ Contraction Fix — Web Speech API strips apostrophes, restore them ═══
+var _contractionFix = {
+  // Negatives
+  cant:"can't", dont:"don't", wont:"won't", doesnt:"doesn't", didnt:"didn't",
+  isnt:"isn't", arent:"aren't", wasnt:"wasn't", werent:"weren't",
+  hasnt:"hasn't", havent:"haven't", hadnt:"hadn't",
+  shouldnt:"shouldn't", couldnt:"couldn't", wouldnt:"wouldn't",
+  mightnt:"mightn't", mustnt:"mustn't", neednt:"needn't",
+  // Subject + have/has
+  ive:"I've", youve:"you've", weve:"we've", theyve:"they've",
+  // Subject + will
+  ill:"I'll", youll:"you'll", hell:"he'll", shell:"she'll",
+  itll:"it'll", well:"we'll", theyll:"they'll",
+  // Subject + would/had
+  id:"I'd", youd:"you'd", hed:"he'd", shed:"she'd",
+  itd:"it'd", wed:"we'd", theyd:"they'd",
+  // Subject + are
+  youre:"you're", theyre:"they're",
+  // Subject + is/has
+  hes:"he's", shes:"she's", its:"it's", thats:"that's",
+  whats:"what's", whos:"who's", theres:"there's", heres:"here's",
+  // Subject + am
+  im:"I'm",
+  // Let us
+  lets:"let's",
+  // Misc
+  gonna:"gon'na", wanna:"wan'na", gotta:"got'ta",
+  // Possessive 's forms (common)
+  ones:"one's", everyones:"everyone's", someones:"someone's"
+};
+function _fixContractions(text) {
+  if (!text) return text;
+  var words = text.split(' ');
+  for (var i = 0; i < words.length; i++) {
+    var clean = words[i].replace(/[^a-zA-Z']/g, '').toLowerCase();
+    if (_contractionFix[clean]) {
+      // Preserve any trailing punctuation
+      var punct = words[i].match(/[^a-zA-Z']+$/) || [''];
+      words[i] = _contractionFix[clean] + punct[0];
+    }
+  }
+  return words.join(' ');
+}
+
 _realMic.onFinal = function(text) {
   var transcript = document.getElementById('captionTranscript');
   var interim = document.getElementById('captionInterim');
@@ -2384,7 +2428,10 @@ _realMic.onFinal = function(text) {
   var div = document.createElement('div');
   div.className = 'line';
   // #37 Breath Group Marker — insert | (short) and || (long) pause indicators
-  var displayText = addBreathMarks(text);
+  var displayText = addBreathMarks(_fixContractions(text));
+  // Also fix contractions in the raw text used by grammar/syn/clicks
+  var fixedText = _fixContractions(text);
+  div.setAttribute('data-raw', fixedText);
   div.innerHTML = '<span style="color:var(--muted2);font-size:.75em;font-family:JetBrains Mono,monospace;margin-right:6px">'+tsStr+'</span>' + displayText;
   // Prepend — most recent finalized line appears right beneath the live interim box
   transcript.insertBefore(div, transcript.firstChild);
@@ -2495,7 +2542,7 @@ _realMic.onFinal = function(text) {
     var _gvOrigOnFinal = _realMic.onFinal;
     _realMic.onFinal = function(text) {
       if (_gvOrigOnFinal) _gvOrigOnFinal(text);
-      try { _gvProcessFinal(text); } catch(e) { console.error('grammar-viz error:', e); }
+      try { _gvProcessFinal(_fixContractions(text)); } catch(e) { console.error('grammar-viz error:', e); }
       try { _updateGrammarLines(); } catch(e) { console.error('_updateGrammarLines error:', e); }
       try { _refreshMetricsPanel(); } catch(e) {}
     };

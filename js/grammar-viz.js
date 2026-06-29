@@ -6,7 +6,30 @@ var POS_DICT={the:'DET',a:'DET',an:'DET',is:'VERB',are:'VERB',was:'VERB',were:'V
 
 var CONTRACTIONS={don:'VERB',cant:'AUX',wont:'AUX',doesnt:'VERB',didnt:'VERB',isnt:'VERB',arent:'VERB',wasnt:'VERB',werent:'VERB',havent:'VERB',hasnt:'VERB',hadnt:'VERB',im:'PRON',youre:'PRON',theyre:'PRON',hes:'PRON',shes:'PRON',ive:'PRON',youve:'PRON',weve:'PRON',theyve:'PRON',ill:'PRON',youll:'PRON',well:'PRON',theyll:'PRON',hell:'PRON',shell:'PRON',itll:'PRON',id:'PRON',youd:'PRON',wed:'PRON',theyd:'PRON',hed:'PRON',shed:'PRON',itd:'PRON',thats:'DET',whats:'PRON',lets:'VERB'};
 
-var PRON_TYPE={i:'SUBJ',we:'SUBJ',you:'SUBJ',he:'SUBJ',she:'SUBJ',it:'SUBJ',they:'SUBJ',me:'OBJ',us:'OBJ',him:'OBJ',her:'OBJ',them:'OBJ',my:'POSS',our:'POSS',your:'POSS',his:'POSS',its:'POSS',their:'POSS',myself:'REFL',yourself:'REFL',himself:'REFL',herself:'REFL',itself:'REFL',ourselves:'REFL',yourselves:'REFL',themselves:'REFL'};
+// Pronoun type map — comprehensive English pronoun classification
+// NOTE: words that can be multiple types (you, it, her) default to most common role
+var PRON_TYPE={
+  // Subject pronouns
+  i:'SUBJ',we:'SUBJ',you:'SUBJ',he:'SUBJ',she:'SUBJ',it:'SUBJ',they:'SUBJ',
+  // Object pronouns
+  me:'OBJ',us:'OBJ',him:'OBJ',her:'OBJ',them:'OBJ',
+  // Attributive possessives (my book, your car)
+  my:'POSS',our:'POSS',your:'POSS',his:'POSS',its:'POSS',their:'POSS',
+  // Standalone possessives (that is mine, hers is bigger)
+  mine:'POSS',ours:'POSS',yours:'POSS',hers:'POSS',theirs:'POSS',
+  // Reflexive pronouns
+  myself:'REFL',yourself:'REFL',himself:'REFL',herself:'REFL',itself:'REFL',
+  ourselves:'REFL',yourselves:'REFL',themselves:'REFL',
+  // Indefinite pronouns (common ones)
+  someone:'PRON',anyone:'PRON',everyone:'PRON',noone:'PRON',
+  somebody:'PRON',anybody:'PRON',everybody:'PRON',nobody:'PRON',
+  something:'PRON',anything:'PRON',everything:'PRON',nothing:'PRON',
+  one:'PRON',ones:'PRON',none:'PRON',each:'PRON',either:'PRON',neither:'PRON',
+  // Interrogative/relative
+  who:'PRON',whom:'PRON',whose:'PRON',which:'PRON',what:'PRON',that:'PRON',
+  // Demonstrative pronouns (when used as pronouns, not determiners)
+  this:'PRON',these:'PRON',those:'PRON'
+};
 
 var VERB_TENSE={is:'PRES',are:'PRES',am:'PRES',was:'PAST',were:'PAST',been:'PART',being:'ING',has:'PRES',have:'PRES',had:'PAST',do:'PRES',does:'PRES',did:'PAST',will:'MODAL',would:'MODAL',can:'MODAL',could:'MODAL',shall:'MODAL',should:'MODAL',may:'MODAL',might:'MODAL',must:'MODAL',gone:'PART',seen:'PART',done:'PART',taken:'PART',given:'PART',known:'PART',thought:'PART',made:'PART',found:'PART',told:'PART',asked:'PART',worked:'PART',felt:'PART',tried:'PART',left:'PART',called:'PART',helped:'PART',needed:'PART',wanted:'PART',looked:'PART',liked:'PART',meant:'PART',kept:'PART',let:'PART',begun:'PART',started:'PART',shown:'PART',heard:'PART',played:'PART',run:'PART',moved:'PART',lived:'PART',believed:'PART',held:'PART',brought:'PART',written:'PART',provided:'PART',sat:'PART',stood:'PART',lost:'PART',paid:'PART',met:'PART'};
 
