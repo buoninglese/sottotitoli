@@ -1890,6 +1890,25 @@ function _switchMetricsMode(mode, btn) {
   if (mode === 'waffle') { if (waffle) waffle.style.display = ''; if (pos) pos.style.display = 'none'; }
   else { if (waffle) waffle.style.display = 'none'; if (pos) pos.style.display = ''; }
 }
+// ── Helper: POS tag using NLP (same as Vocabolario slide) ──
+function _nlpPOS(w) {
+  try {
+    if (typeof nlp !== 'undefined') {
+      var d = nlp(w); var t = d.json();
+      if (t[0] && t[0].terms && t[0].terms[0]) {
+        var tags = t[0].terms[0].tags || [];
+        if (tags.indexOf('Noun') !== -1) return 'NOUN';
+        if (tags.indexOf('Verb') !== -1) return 'VERB';
+        if (tags.indexOf('Adjective') !== -1) return 'ADJ';
+        if (tags.indexOf('Adverb') !== -1) return 'ADV';
+        if (tags.indexOf('Preposition') !== -1) return 'PREP';
+        if (tags.indexOf('Conjunction') !== -1) return 'CONJ';
+        if (tags.indexOf('Pronoun') !== -1) return 'PRON';
+      }
+    }
+  } catch(e) {}
+  return 'OTHER';
+}
 // ═══ Refresh metrics panel data ═══
 function _refreshMetricsPanel() {
   // Only update if metrics panel is open (lazy)
@@ -1914,17 +1933,7 @@ function _refreshMetricsPanel() {
     var wfColors = {NOUN:'#60a5fa',VERB:'#34d399',ADJ:'#f472b6',ADV:'#c084fc',PREP:'#fbbf24',CONJ:'#fb923c',PRON:'#38bdf8',AUX:'#a78bfa',DET:'#9ca3af',OTHER:'#6b7280'};
     for (var i = 0; i < max; i++) {
       var pos = 'OTHER';
-      try {
-        if (typeof _gvTagWord === 'function') pos = _gvTagWord(allWords[i]);
-        else if (typeof nlp !== 'undefined') {
-          var d = nlp(allWords[i]); var t = d.json();
-          if (t[0] && t[0].terms && t[0].terms[0]) {
-            var tags = t[0].terms[0].tags || [];
-            if (tags.indexOf('Noun') !== -1) pos = 'NOUN'; else if (tags.indexOf('Verb') !== -1) pos = 'VERB';
-            else if (tags.indexOf('Adjective') !== -1) pos = 'ADJ'; else if (tags.indexOf('Adverb') !== -1) pos = 'ADV';
-          }
-        }
-      } catch(e) {}
+      try { pos = _nlpPOS(allWords[i]); } catch(e) {}
       wfHtml += '<div style="width:14px;height:14px;border-radius:3px;background:' + (wfColors[pos]||'#6b7280') + '" title="' + allWords[i] + ' (' + pos + ')"></div>';
     }
     wf.innerHTML = wfHtml || '<div style="color:var(--muted2);font-size:10px;text-align:center;padding:10px">No words yet.</div>';
@@ -1937,8 +1946,7 @@ function _refreshMetricsPanel() {
     var posNames = {NOUN:'Nouns',VERB:'Verbs',ADJ:'Adjectives',ADV:'Adverbs',PREP:'Prepositions',CONJ:'Conjunctions',PRON:'Pronouns',AUX:'Auxiliaries'};
     var posColors = {NOUN:'#60a5fa',VERB:'#34d399',ADJ:'#f472b6',ADV:'#c084fc',PREP:'#fbbf24',CONJ:'#fb923c',PRON:'#38bdf8',AUX:'#a78bfa'};
     allWords.forEach(function(w){
-      var pos = 'OTHER';
-      try { if (typeof _gvTagWord === 'function') pos = _gvTagWord(w); } catch(e) {}
+      var pos = _nlpPOS(w);
       if (!posMap[pos]) posMap[pos] = [];
       if (posMap[pos].indexOf(w) < 0) posMap[pos].push(w);
     });
@@ -1960,8 +1968,7 @@ function _refreshMetricsPanel() {
   if (donutSvg) {
     var posCounts = {NOUN:0,VERB:0,ADJ:0,ADV:0};
     allWords.forEach(function(w){
-      var pos = 'OTHER';
-      try { if (typeof _gvTagWord === 'function') pos = _gvTagWord(w); } catch(e) {}
+      var pos = _nlpPOS(w);
       if (posCounts.hasOwnProperty(pos)) posCounts[pos]++;
     });
     var total = posCounts.NOUN + posCounts.VERB + posCounts.ADJ + posCounts.ADV || 1;
