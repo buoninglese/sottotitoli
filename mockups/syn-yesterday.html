@@ -162,6 +162,7 @@ body {
       📖 Live Synonyms <span class="live-syn-badge">Datamuse API</span>
     </div>
     <div class="pos-filter-bar" id="posFilterBar">
+      <button class="pos-filter-chip on" data-pos="all" onclick="toggleAllFilters(this)" style="font-weight:700">ALL</button>
       <button class="pos-filter-chip on" data-pos="noun" onclick="togglePosFilter(this)">nouns</button>
       <button class="pos-filter-chip on" data-pos="verb" onclick="togglePosFilter(this)">verbs</button>
       <button class="pos-filter-chip on" data-pos="adj" onclick="togglePosFilter(this)">adjectives</button>
@@ -201,10 +202,27 @@ function toggleTheme() {
 
 // ═══ POS Filter State ═══
 var posFilters = { noun: true, verb: true, adj: true, adv: true, other: false };
+function toggleAllFilters(chip) {
+  var allOn = !chip.classList.contains('on');
+  var chips = document.querySelectorAll('.pos-filter-chip[data-pos]');
+  chips.forEach(function(c) {
+    if (c.dataset.pos === 'all') {
+      if (allOn) c.classList.add('on'); else c.classList.remove('on');
+    } else {
+      if (allOn) { c.classList.add('on'); posFilters[c.dataset.pos] = true; }
+      else { c.classList.remove('on'); posFilters[c.dataset.pos] = false; }
+    }
+  });
+  updateLiveSynonyms();
+}
 function togglePosFilter(chip) {
   var pos = chip.dataset.pos;
   posFilters[pos] = !posFilters[pos];
   if (posFilters[pos]) { chip.classList.add('on'); } else { chip.classList.remove('on'); }
+  // Sync ALL chip
+  var allChip = document.querySelector('.pos-filter-chip[data-pos="all"]');
+  var allOn = Object.keys(posFilters).every(function(k) { return posFilters[k]; });
+  if (allChip) { if (allOn) allChip.classList.add('on'); else allChip.classList.remove('on'); }
   updateLiveSynonyms();
 }
 
@@ -390,7 +408,7 @@ function updateLiveSynonyms() {
 
   // Apply POS filters
   var filtered = uniqueInOrder.filter(function(w) { return posFilters[_getPOS(w)] === true; });
-  var contentWords = filtered.slice(0, 12);
+  var contentWords = filtered.slice(0, 50);
 
   if (contentWords.length === 0) {
     body.innerHTML = '<div style="color:var(--muted);text-align:center;padding:40px;font-size:13px;line-height:1.6">Start speaking — content words will appear here<br><span style="color:var(--muted2);font-size:10px">Use the filter bar above to toggle parts of speech</span></div>';
