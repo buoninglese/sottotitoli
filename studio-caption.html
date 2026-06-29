@@ -2094,19 +2094,30 @@ function toggleSession() {
   
   if (sessionActive) {
     paused = false;
-    // ── Credit check: prevent starting if no minutes ──
-    _checkCreditsBeforeStart().then(function(hasCredits) {
-      if (!hasCredits) {
+    // ── Start mic IMMEDIATELY (must happen during click gesture for Chrome) ──
+    startRealMic().then(function(ok) {
+      if (!ok) {
         sessionActive = false;
         startBtn.style.display = '';
         stopBtn.style.display = 'none';
-        if (pauseBtn) pauseBtn.style.display = 'none';
-        startBtn.disabled = false;
-        startBtn.textContent = '🎤 Start Session';
-        alert('⏰ Nessun credito. Acquista su Purchase.');
         return;
       }
-      _doStartSession(startBtn, stopBtn);
+      // ── Credit check (mic already running — will stop if no credits) ──
+      _checkCreditsBeforeStart().then(function(hasCredits) {
+        if (!hasCredits) {
+          stopRealMic();
+          sessionActive = false;
+          startBtn.style.display = '';
+          stopBtn.style.display = 'none';
+          if (pauseBtn) pauseBtn.style.display = 'none';
+          startBtn.disabled = false;
+          startBtn.textContent = '🎤 Start Session';
+          alert('⏰ Nessun credito. Acquista su Purchase.');
+          return;
+        }
+        // ✅ Mic running + credits OK — just update UI
+        _applySessionLiveUI(startBtn, stopBtn);
+      });
     });
   } else {
     stopRealMic();
@@ -2151,51 +2162,40 @@ async function _checkCreditsBeforeStart() {
   } catch(e) { return true; } // error — allow on fail-safe
 }
 
-// ── Actual session start (called after credit check passes) ──
-function _doStartSession(startBtn, stopBtn) {
+// ── Session UI setup (mic already running — called after credit check passes) ──
+function _applySessionLiveUI(startBtn, stopBtn) {
     // Guard: user may have stopped or paused while credit check was in flight
     if (!sessionActive) { stopRealMic(); return; }
-    startRealMic().then(function(ok) {
-      if (!ok) {
-        sessionActive = false;
-        startBtn.style.display = '';
-        stopBtn.style.display = 'none';
-        return;
-      }
-      // Guard: check again after mic permission (user may have stopped during prompt)
-      if (!sessionActive) { stopRealMic(); return; }
-      startBtn.style.display = 'none';
-      stopBtn.style.display = '';
-      if (pauseBtn) { pauseBtn.style.display = ''; pauseBtn.classList.remove('paused'); }
-      // If user paused while credit check was in flight, honour that
-      if (paused) {
-        stopRealMic();
-        if (pauseBtn) { pauseBtn.textContent = '▶'; pauseBtn.classList.add('paused'); }
-        updateRecDash('paused');
-        // Don't start timer, don't add session-active
-        return;
-      }
-      sessionSeconds = 0;
-      wordBank = [];
-      saveWordBank();
-      renderWordBank();
-      if (typeof clearSynonymSession === 'function') clearSynonymSession();
-      var interim = document.getElementById('captionInterim');
-      var transcript = document.getElementById('captionTranscript');
-      if (interim) interim.textContent = '';
-      if (transcript) transcript.innerHTML = '';
-      updateRecDash('live');
-      document.body.classList.add('session-active');
-      timerInterval = setInterval(function() {
-        sessionSeconds++;
-        var m = Math.floor(sessionSeconds / 60);
-        var s = sessionSeconds % 60;
-        document.getElementById('recTimer').textContent = 
-          String(m).padStart(2,'0') + ':' + String(s).padStart(2,'0');
-        var rt = document.getElementById('recTimer');
-        if (rt) rt.textContent = String(m).padStart(2,'0') + ':' + String(s).padStart(2,'0');
-      }, 1000);
-    });
+    // Guard: user may have paused while credit check was in flight
+    if (paused) {
+      stopRealMic();
+      if (pauseBtn) { pauseBtn.style.display = ''; pauseBtn.textContent = '▶'; pauseBtn.classList.add('paused'); }
+      updateRecDash('paused');
+      return;
+    }
+    startBtn.style.display = 'none';
+    stopBtn.style.display = '';
+    if (pauseBtn) { pauseBtn.style.display = ''; pauseBtn.classList.remove('paused'); }
+    sessionSeconds = 0;
+    wordBank = [];
+    saveWordBank();
+    renderWordBank();
+    if (typeof clearSynonymSession === 'function') clearSynonymSession();
+    var interim = document.getElementById('captionInterim');
+    var transcript = document.getElementById('captionTranscript');
+    if (interim) interim.textContent = '';
+    if (transcript) transcript.innerHTML = '';
+    updateRecDash('live');
+    document.body.classList.add('session-active');
+    timerInterval = setInterval(function() {
+      sessionSeconds++;
+      var m = Math.floor(sessionSeconds / 60);
+      var s = sessionSeconds % 60;
+      document.getElementById('recTimer').textContent = 
+        String(m).padStart(2,'0') + ':' + String(s).padStart(2,'0');
+      var rt = document.getElementById('recTimer');
+      if (rt) rt.textContent = String(m).padStart(2,'0') + ':' + String(s).padStart(2,'0');
+    }, 1000);
 }
 
 // ═══ Update rec dashboard cells ═══
