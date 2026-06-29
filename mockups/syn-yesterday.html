@@ -126,6 +126,16 @@ body {
   min-width: 240px; max-width: 300px; box-shadow: 0 8px 32px rgba(0,0,0,.3);
   font-size: 12px; line-height: 1.5;
 }
+.toast {
+  position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+  z-index: 99999; background: var(--card); border: 1px solid #34d399;
+  border-radius: 100px; padding: 8px 20px; font-size: 12px; font-weight: 600;
+  color: #34d399; box-shadow: 0 4px 20px rgba(0,0,0,.4);
+  animation: toastIn .3s ease, toastOut .3s ease 1.4s forwards;
+}
+.toast.remove { border-color: #f87171; color: #f87171; }
+@keyframes toastIn { from{opacity:0;transform:translateX(-50%) translateY(12px)} to{opacity:1;transform:translateX(-50%) translateY(0)} }
+@keyframes toastOut { from{opacity:1;transform:translateX(-50%) translateY(0)} to{opacity:0;transform:translateX(-50%) translateY(-8px)} }
 @media (max-width: 768px) {
   .main { flex-direction: column; }
   .transcript-col { width: 100%; max-height: 200px; }
@@ -386,7 +396,7 @@ function _buildSynCards(text) {
 }
 
 // ═══ Live Synonyms — all words except pronouns/articles, in sentence order ═══
-var wordBank = [];
+var wordBank = JSON.parse(localStorage.getItem('sottotitoli_wordbank_mockup') || '[]');
 var _excludeWords = /^(i|me|my|mine|myself|you|your|yours|yourself|he|him|his|himself|she|her|hers|herself|it|its|itself|we|us|our|ours|ourselves|they|them|their|theirs|themselves|the|a|an|this|that|these|those|each|every|either|neither|some|any|no|all|both|few|many|much|several|who|whom|whose|which|what|whoever|whomever|whichever|whatever)$/i;
 
 function updateLiveSynonyms() {
@@ -454,8 +464,41 @@ function removeSynonymCard(btn) {
 }
 function toggleSynonymWord(btn, word) {
   var idx = wordBank.indexOf(word);
-  if (idx >= 0) { wordBank.splice(idx, 1); btn.classList.remove('in-bank'); btn.textContent = '+'; btn.title = 'Add to Bank'; }
-  else { wordBank.push(word); btn.classList.add('in-bank'); btn.textContent = '−'; btn.title = 'Remove from Bank'; }
+  if (idx >= 0) {
+    wordBank.splice(idx, 1); btn.classList.remove('in-bank'); btn.textContent = '+'; btn.title = 'Add to Bank';
+    saveWordBank(); showToast('🗑 Removed "' + word + '" from Word Bank', true);
+  } else {
+    wordBank.push(word); btn.classList.add('in-bank'); btn.textContent = '−'; btn.title = 'Remove from Bank';
+    saveWordBank(); showToast('✅ Added "' + word + '" to Word Bank');
+  }
+  // Refresh all visible cards to sync bank state
+  refreshAllBankButtons();
+}
+function saveWordBank() { localStorage.setItem('sottotitoli_wordbank_mockup', JSON.stringify(wordBank)); }
+function showToast(msg, isRemove) {
+  var t = document.createElement('div'); t.className = 'toast' + (isRemove ? ' remove' : '');
+  t.textContent = msg; document.body.appendChild(t);
+  setTimeout(function() { t.remove(); }, 1800);
+}
+// Update all visible +/- buttons to match current bank state
+function refreshAllBankButtons() {
+  document.querySelectorAll('.card-btn.bank').forEach(function(btn) {
+    var card = btn.closest('.syn-card'); if (!card) return;
+    var word = card.dataset.word; if (!word) return;
+    var inBank = wordBank.indexOf(word) >= 0;
+    if (inBank) { btn.classList.add('in-bank'); btn.textContent = '−'; btn.title = 'Remove from Bank'; }
+    else { btn.classList.remove('in-bank'); btn.textContent = '+'; btn.title = 'Add to Bank'; }
+  });
+  // Also update the right panel cards (which use onclick with word as param)
+  document.querySelectorAll('#synWords .card-btn.bank').forEach(function(btn) {
+    var onclick = btn.getAttribute('onclick') || '';
+    var match = onclick.match(/toggleSynonymWord\(this,'([^']+)'\)/);
+    if (!match) return;
+    var word = match[1];
+    var inBank = wordBank.indexOf(word) >= 0;
+    if (inBank) { btn.classList.add('in-bank'); btn.textContent = '−'; btn.title = 'Remove from Bank'; }
+    else { btn.classList.remove('in-bank'); btn.textContent = '+'; btn.title = 'Add to Bank'; }
+  });
 }
 
 // ═══ Lookup Synonym Popup (purple border) ═══
@@ -463,11 +506,15 @@ window.lookupSynonym = function(el) {
   var word = el.dataset.word, context = el.dataset.context || ''; if (!word) return;
   var existing = document.querySelector('.syn-popup'); if (existing) existing.remove();
   var popup = document.createElement('div'); popup.className = 'syn-popup';
-  var html = '<div style="font-weight:800;font-size:16px;color:var(--text);margin-bottom:4px">' + word + '</div>';
+  var inBank = wordBank.indexOf(word) >= 0;
+  var bankBtnHtml = inBank
+    ? '<button onclick="toggleSynonymWord(this,\'' + word + '\');var p=this.closest(\'.syn-popup\');if(p)p.remove()" style="font-family:inherit;font-size:10px;font-weight:600;padding:5px 12px;border-radius:100px;border:1px solid #f87171;background:transparent;color:#f87171;cursor:pointer">− Remove</button>'
+    : '<button onclick="addSynonymWord(\'' + word + '\');var p=this.closest(\'.syn-popup\');if(p)p.remove()" style="font-family:inherit;font-size:10px;font-weight:600;padding:5px 12px;border-radius:100px;border:1px solid #a78bfa;background:transparent;color:#a78bfa;cursor:pointer">+ Add to Bank</button>';
+  var html = '<div style="font-weight:800;font-size:16px;color:var(--text);margin-bottom:4px">' + word + (inBank ? ' <span style="font-size:9px;color:#34d399">✓ In Bank</span>' : '') + '</div>';
   html += '<div style="font-size:10px;color:var(--muted);margin-bottom:10px">Related to: ' + context + '</div>';
   html += '<div id="synDefContent" style="color:var(--muted);font-size:11px">Loading definition…</div>';
   html += '<div style="margin-top:10px;display:flex;gap:6px">';
-  html += '<button onclick="addSynonymWord(\'' + word + '\');var p=this.closest(\'.syn-popup\');if(p)p.remove()" style="font-family:inherit;font-size:10px;font-weight:600;padding:5px 12px;border-radius:100px;border:1px solid #a78bfa;background:transparent;color:#a78bfa;cursor:pointer">+ Add to Bank</button>';
+  html += bankBtnHtml;
   html += '<button onclick="this.closest(\'.syn-popup\').remove()" style="font-family:inherit;font-size:10px;font-weight:600;padding:5px 12px;border-radius:100px;border:1px solid var(--line);background:transparent;color:var(--muted);cursor:pointer">✕ Close</button>';
   html += '</div>';
   popup.innerHTML = html;
@@ -490,7 +537,13 @@ window.lookupSynonym = function(el) {
       } else defEl.innerHTML = 'No definition found for "' + word + '".';
     }).catch(function() { var defEl = document.getElementById('synDefContent'); if (defEl) defEl.innerHTML = 'Definition unavailable.'; });
 };
-window.addSynonymWord = function(word) { if (wordBank.indexOf(word) < 0) wordBank.push(word); updateLiveSynonyms(); };
+window.addSynonymWord = function(word) {
+  if (wordBank.indexOf(word) < 0) {
+    wordBank.push(word); saveWordBank();
+    showToast('✅ Added "' + word + '" to Word Bank');
+    refreshAllBankButtons();
+  }
+};
 </script>
 </body>
 </html>
