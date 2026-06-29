@@ -17,6 +17,13 @@ h1{font-size:20px;font-weight:800;margin-bottom:2px}
 .btn.active{background:var(--accent);color:#fff;border-color:var(--accent)}
 .meter{width:100%;height:3px;background:var(--card2);border-radius:2px;overflow:hidden;margin-bottom:12px}
 .meter-fill{height:100%;border-radius:2px;background:linear-gradient(90deg,#60a5fa,#a78bfa,#f472b6);transition:width .04s;width:0%}
+.preset-bar{display:flex;gap:10px;margin-bottom:12px;flex-wrap:wrap}
+.btn-big{font-family:inherit;font-size:13px;font-weight:700;padding:10px 24px;border-radius:100px;border:2px solid var(--line);background:var(--card);color:var(--text);cursor:pointer;transition:all .2s;flex:1;min-width:200px;text-align:center}
+.btn-big:hover{border-color:var(--accent);background:rgba(167,139,250,.08)}
+.btn-big.ember{border-color:rgba(249,115,22,.4);color:#f97316}
+.btn-big.ember:hover{background:rgba(249,115,22,.1);border-color:#f97316}
+.btn-big.frost{border-color:rgba(56,189,248,.4);color:#38bdf8}
+.btn-big.frost:hover{background:rgba(56,189,248,.1);border-color:#38bdf8}
 .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:12px}
 .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px;display:flex;flex-direction:column;gap:5px}
 .card-head{display:flex;align-items:center;justify-content:space-between}
@@ -35,6 +42,10 @@ h1{font-size:20px;font-weight:800;margin-bottom:2px}
   <span style="font-size:10px;color:var(--muted2)" id="micLabel">Mic off</span>
 </div>
 <div class="meter"><div class="meter-fill" id="meterFill"></div></div>
+<div class="preset-bar">
+  <button class="btn-big ember" onclick="applyBigPreset('ember')">🔥 BIG ONE · Ember Swarm<br><span style="font-size:9px;font-weight:400;opacity:.7">Warm fire tones · gentle · 150pt</span></button>
+  <button class="btn-big frost" onclick="applyBigPreset('frost')">❄️ BIG TWO · Frost Mist<br><span style="font-size:9px;font-weight:400;opacity:.7">Icy blue · ghostly smooth · 120pt</span></button>
+</div>
 
 <div class="grid" id="grid"></div>
 
@@ -116,7 +127,7 @@ var prevT=0;
 function frame(ts){
   requestAnimationFrame(frame);
   var dt=Math.min(50,(ts-prevT))/1000;prevT=ts;if(dt<=0)dt=0.016;
-  if(micActive)volume=readMicVolume();
+  if(micActive)volume=readMicVolume()*2.5; // boost so normal voice forms the line
   else volume=Math.max(0,volume*0.92);
   document.getElementById('meterFill').style.width=(volume*100)+'%';
   variants.forEach(function(v,idx){
@@ -158,6 +169,34 @@ function frame(ts){
       }
     }
   });
+}
+function applyBigPreset(theme) {
+  var base = theme === 'ember'
+    ? {hue0:10,hueR:50,orbMin:3,orbMax:12,damp:0.90,attr:0.006,size0:0.9,sizeV:2.0,glow:0.10,kalei:2.0}
+    : {hue0:190,hueR:60,orbMin:4,orbMax:14,damp:0.94,attr:0.005,size0:0.8,sizeV:1.5,glow:0.06,kalei:2.2};
+  // Apply to all variants — vary n and subtle tweaks for variety
+  var tweaks = [
+    {n:150},{n:200},{n:100},{n:180},{n:80},{n:220},{n:130},{n:170},{n:60},{n:240},
+    {n:140},{n:190},{n:110},{n:160},{n:90},{n:210},{n:120},{n:230},{n:70},{n:250}
+  ];
+  variants.forEach(function(v,i) {
+    v.n = tweaks[i].n;
+    v.hue0 = base.hue0 + (Math.random()-0.5)*20;
+    v.hueR = base.hueR + (Math.random()-0.5)*20;
+    v.orbMin = Math.max(1, base.orbMin + Math.floor((Math.random()-0.5)*2));
+    v.orbMax = Math.max(4, base.orbMax + Math.floor((Math.random()-0.5)*4));
+    v.damp = Math.min(0.98, Math.max(0.70, base.damp + (Math.random()-0.5)*0.06));
+    v.attr = Math.min(0.025, Math.max(0.002, base.attr + (Math.random()-0.5)*0.004));
+    v.size0 = Math.max(0.3, base.size0 + (Math.random()-0.5)*0.3);
+    v.sizeV = Math.max(0.5, base.sizeV + (Math.random()-0.5)*1.0);
+    v.glow = Math.max(0.02, base.glow + (Math.random()-0.5)*0.04);
+    v.kalei = Math.max(0.8, base.kalei + (Math.random()-0.5)*2.0);
+    v.name = (theme==='ember'?'🔥 ':'❄️ ') + (i+1) + ' · ' + (theme==='ember'?'Ember':'Frost') + ' ' + v.n + 'pt';
+  });
+  // Rebuild grid
+  document.getElementById('grid').innerHTML='';
+  states=[];
+  buildGrid();
 }
 buildGrid();
 requestAnimationFrame(frame);
