@@ -121,6 +121,42 @@ function _gvUpdateAll() {
   _gvUpdatePosCols();
   _gvUpdatePosTags();
   _gvUpdateDonut();
+  _gvUpdateGrammarExamples();
+}
+
+// ── Grammar slide: replace example placeholders with live words ──
+function _gvUpdateGrammarExamples() {
+  var container = document.getElementById('grammarExampleWords');
+  if (!container) return;
+  var words = _gv.allContentWords.slice(-6);
+  if (!words.length) {
+    // Keep placeholder if no words yet — but hide "Example" label
+    var label = document.getElementById('grammarExampleLabel');
+    if (label) label.textContent = '📖 Recent Words';
+    return;
+  }
+  var label = document.getElementById('grammarExampleLabel');
+  if (label) label.textContent = '📖 Live Words (' + words.length + ')';
+  var html = '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:8px">';
+  words.forEach(function(word) {
+    var cardId = 'gvex-' + word.replace(/[^a-z]/g,'');
+    var pos = _gvTagWord(word);
+    var posColors = {NOUN:'#60a5fa',VERB:'#34d399',ADJ:'#f472b6',ADV:'#c084fc'};
+    var color = posColors[pos] || '#a78bfa';
+    html += '<div id="' + cardId + '" style="background:var(--card);border:1px solid var(--line);border-radius:10px;padding:12px">';
+    html += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px"><span style="font-size:15px;font-weight:700;color:var(--text)">' + word + '</span><span style="font-size:9px;font-weight:600;text-transform:uppercase;padding:2px 8px;border-radius:100px;background:' + color + '18;color:' + color + '">' + pos + '</span></div>';
+    html += '<div style="font-size:10px;color:var(--muted);line-height:1.4" class="syn-def">Fetching…</div>';
+    html += '<div style="display:flex;flex-wrap:wrap;gap:3px;align-items:center;min-height:20px;margin-top:4px" class="syn-rel"></div>';
+    html += '</div>';
+  });
+  html += '</div>';
+  container.innerHTML = html;
+  // Fetch Wordnik data for each word
+  words.forEach(function(word) {
+    var cardId = 'gvex-' + word.replace(/[^a-z]/g,'');
+    // Small delay to avoid rate limiting
+    setTimeout(function() { _fetchWordData(word, cardId); }, 100);
+  });
 }
 
 // ── Vocabolario: POS Distribution columns ──
