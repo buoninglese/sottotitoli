@@ -938,8 +938,12 @@ button[onclick*="addToWordBank"]:hover{background:rgba(52,211,153,.15)!important
           <div id="grammarPanelContent" style="text-align:left">
             <!-- Placeholder cards — cleared when session starts -->
             <div id="grammarPlaceholder" style="background:var(--card);border:1px solid var(--line);border-radius:var(--mode-radius);padding:18px;margin-bottom:14px">
-              <div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.3px;color:var(--accent);margin-bottom:4px">Click a transcript line</div>
+              <div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.3px;color:var(--accent);margin-bottom:4px">Click a line below</div>
               <div style="font-size:13px;line-height:1.6;color:var(--muted);font-style:italic">Select a sentence to see definitions, synonyms, and POS tags for each word.</div>
+            </div>
+            <!-- Recent transcript lines -->
+            <div style="background:var(--card);border:1px solid var(--line);border-radius:10px;padding:12px;margin-bottom:14px;max-height:200px;overflow-y:auto" id="grammarLinesBox">
+              <div style="color:var(--muted2);font-size:11px;text-align:center;padding:16px">No transcript yet. Start speaking.</div>
             </div>
             <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--muted2);margin-bottom:10px">📖 Example Words</div>
             <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:8px">
@@ -1459,9 +1463,11 @@ function toggleRight(mode) {
 function selectLine(lineIdx, el) {
   document.querySelectorAll('.caption-transcript .line').forEach(function(l){l.classList.remove('selected')});
   el.classList.add('selected');
-  // Extract text: remove timestamp spans and speaker tags
+  // Open SYN in right panel
+  if (_rightMode !== 'syn') toggleRight('syn');
+  // Extract text
   var clone = el.cloneNode(true);
-  var tsSpan = clone.querySelector('span'); // first span is always timestamp
+  var tsSpan = clone.querySelector('span');
   if (tsSpan) tsSpan.remove();
   var spkTag = clone.querySelector('.spk-tag');
   var spkName = spkTag ? spkTag.textContent : '';
@@ -1469,11 +1475,15 @@ function selectLine(lineIdx, el) {
   if (spkTag) spkTag.remove();
   var text = (clone.textContent || '').trim();
   var tsText = el.querySelector('span') ? el.querySelector('span').textContent : '';
-  // Build cards into the Grammar & Synonyms slide panel
+  // Update right panel preview
+  var preview = document.getElementById('synLinePreview');
+  if (preview) {
+    var labelHtml = spkName ? '<span style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.3px;color:' + spkColor + ';display:block;margin-bottom:4px;font-style:normal">' + spkName + ' · ' + tsText + '</span>' : '<span style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.3px;color:var(--accent);display:block;margin-bottom:4px;font-style:normal">' + tsText + '</span>';
+    preview.innerHTML = labelHtml + text;
+  }
   _buildSynCards(text, spkName, spkColor, tsText);
-  // Scroll to the grammar panel
-  var grammarPanel = document.getElementById('grammarPanel');
-  if (grammarPanel) grammarPanel.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'start' });
+  var body = document.querySelector('.right-panel-body');
+  if (body) body.scrollTop = 0;
 }
 
 // Make transcript lines clickable if SYN is open
@@ -1665,8 +1675,8 @@ function _getPOS(word) {
 var _stopWords = /^(the|and|for|are|was|with|that|this|from|have|were|they|will|what|when|your|about|which|their|there|would|could|should|does|been|being|into|more|some|than|then|also|very|just|like|over|each|said|della|del|dei|degli|delle|una|uno|per|che|con|sono|una|nel|nella|negli|nelle|dal|dallo|dalla|dai|dagli|dalle|non|più|meno|come|così|questa|questo|quella|quello|quelli|quelle)$/i;
 
 function _buildSynCards(text, spkName, spkColor, tsText) {
-  var panel = document.getElementById('grammarPanelContent');
-  if (!panel) return;
+  var container = document.getElementById('synWords');
+  if (!container) return;
   var rawWords = text.split(/\s+/);
   var contentWords = [];
   rawWords.forEach(function(w) {
@@ -1674,27 +1684,15 @@ function _buildSynCards(text, spkName, spkColor, tsText) {
     if (clean.length > 2 && !_stopWords.test(clean)) contentWords.push(clean);
   });
 
-  // Build preview line at top
-  var previewHTML = spkName
-    ? '<div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.3px;color:' + spkColor + ';margin-bottom:4px">' + spkName + ' · ' + tsText + '</div>'
-    : '<div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.3px;color:var(--accent);margin-bottom:4px">' + tsText + '</div>';
-
   if (contentWords.length === 0) {
-    panel.innerHTML = '<div style="background:var(--card);border:1px solid var(--line);border-radius:var(--mode-radius);padding:18px;margin-bottom:14px">' + previewHTML + '<div style="font-size:13px;line-height:1.6;color:var(--muted)">' + text + '</div></div><div style="text-align:center;padding:40px 20px;color:var(--muted);font-size:12px">No content words found.<br><strong style="color:var(--accent)">Try a line with more descriptive words.</strong></div>';
+    container.innerHTML = '<div style="text-align:center;padding:40px 20px;color:var(--muted2);font-size:12px">No content words found.<br><strong style="color:var(--accent)">Try a line with more descriptive words.</strong></div>';
+    var countEl = document.getElementById('rightPanelCount');
+    if (countEl) countEl.textContent = '0';
     return;
   }
 
   var ts = Date.now();
   var html = '';
-  // Preview
-  html += '<div style="background:var(--card);border:1px solid var(--line);border-radius:var(--mode-radius);padding:18px;margin-bottom:14px">';
-  html += previewHTML;
-  html += '<div style="font-size:13px;line-height:1.6;color:var(--muted);font-style:italic">' + text + '</div>';
-  html += '</div>';
-  // Word count label
-  html += '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--muted2);margin-bottom:10px">📖 ' + contentWords.length + ' Content Words</div>';
-  // Word cards grid
-  html += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:8px">';
   contentWords.forEach(function(word, i) {
     var cardId = 'synw-' + ts + '-' + i;
     html += '<div class="syn-word" id="' + cardId + '" style="background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px">';
@@ -1703,12 +1701,77 @@ function _buildSynCards(text, spkName, spkColor, tsText) {
     html += '<div style="display:flex;flex-wrap:wrap;gap:4px;align-items:center;min-height:24px" class="syn-rel"></div>';
     html += '</div>';
   });
-  html += '</div>';
-  panel.innerHTML = html;
+  container.innerHTML = html;
+  var countEl = document.getElementById('rightPanelCount');
+  if (countEl) countEl.textContent = contentWords.length;
 
-  // Fetch data: Wordnik → Datamuse → local dict
   contentWords.forEach(function(word, i) {
     var cardId = 'synw-' + ts + '-' + i;
+    _fetchWordData(word, cardId);
+  });
+}
+
+// ═══ Grammar slide: recent transcript lines (click to populate SYN) ═══
+function _updateGrammarLines() {
+  var box = document.getElementById('grammarLinesBox');
+  if (!box) return;
+  var lines = document.querySelectorAll('#captionTranscript .line');
+  if (!lines.length) {
+    box.innerHTML = '<div style="color:var(--muted2);font-size:11px;text-align:center;padding:16px">No transcript yet. Start speaking.</div>';
+    return;
+  }
+  var html = '';
+  var shown = 0;
+  lines.forEach(function(l) {
+    if (shown >= 8) return;
+    var clone = l.cloneNode(true);
+    var tsSpan = clone.querySelector('span');
+    var tsText = tsSpan ? tsSpan.textContent : '';
+    if (tsSpan) tsSpan.remove();
+    var spkTag = clone.querySelector('.spk-tag');
+    if (spkTag) spkTag.remove();
+    var text = (clone.textContent || '').trim();
+    if (!text) return;
+    shown++;
+    html += '<div class="grammar-line" style="padding:6px 10px;border-radius:6px;cursor:pointer;font-size:11px;color:var(--muted);border-bottom:1px solid var(--line);transition:all .15s" onclick="var el=this;_grammarLineClick(el)" data-text="' + text.replace(/"/g,'&quot;') + '"><span style="color:var(--muted2);font-size:9px;margin-right:6px">' + tsText + '</span>' + text + '</div>';
+  });
+  box.innerHTML = html;
+}
+function _grammarLineClick(el) {
+  document.querySelectorAll('.grammar-line').forEach(function(l){l.style.background=''});
+  el.style.background = 'rgba(124,58,237,.08)';
+  var text = el.getAttribute('data-text') || '';
+  // Populate SYN cards in the grammar panel
+  var panel = document.getElementById('grammarPanelContent');
+  if (!panel) return;
+  _buildSynCardsInPanel(text, panel);
+}
+function _buildSynCardsInPanel(text, panel) {
+  var rawWords = text.split(/\s+/);
+  var contentWords = [];
+  rawWords.forEach(function(w) {
+    var clean = w.replace(/[.,;:!?…'"]/g, '').toLowerCase();
+    if (clean.length > 2 && !_stopWords.test(clean)) contentWords.push(clean);
+  });
+  if (contentWords.length === 0) {
+    panel.innerHTML = '<div style="text-align:center;padding:20px;color:var(--muted2);font-size:12px">No content words in this line.</div>';
+    return;
+  }
+  var ts = Date.now();
+  var html = '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--muted2);margin-bottom:10px">📖 Selected: <span style="color:var(--accent2)">' + contentWords.length + ' words</span></div>';
+  html += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:8px">';
+  contentWords.forEach(function(word, i) {
+    var cardId = 'synwg-' + ts + '-' + i;
+    html += '<div class="syn-word" id="' + cardId + '" style="background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px">';
+    html += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px"><span style="font-size:16px;font-weight:700;color:var(--text)">' + word + '</span><span class="syn-pos-tag" style="font-size:9px;font-weight:600;text-transform:uppercase;padding:2px 8px;border-radius:100px;background:rgba(167,139,250,.15);color:var(--accent2)">' + _getPOS(word) + '</span></div>';
+    html += '<div style="font-size:11px;color:var(--muted);line-height:1.5;margin-bottom:6px" class="syn-def">Loading…</div>';
+    html += '<div style="display:flex;flex-wrap:wrap;gap:4px;align-items:center;min-height:24px" class="syn-rel"></div>';
+    html += '</div>';
+  });
+  html += '</div>';
+  panel.innerHTML = html;
+  contentWords.forEach(function(word, i) {
+    var cardId = 'synwg-' + ts + '-' + i;
     _fetchWordData(word, cardId);
   });
 }
@@ -2069,7 +2132,8 @@ _realMic.onFinal = function(text) {
     var _gvOrigOnFinal = _realMic.onFinal;
     _realMic.onFinal = function(text) {
       _gvOrigOnFinal(text);
-      try { _gvProcessFinal(text); } catch(e) {}
+      try { _gvProcessFinal(text); } catch(e) { console.error('grammar-viz error:', e); }
+      try { _updateGrammarLines(); } catch(e) {}
     };
   }
 })();
