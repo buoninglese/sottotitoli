@@ -2483,9 +2483,9 @@ var _waveVolume = 0;
 var _waveAnimId = null;
 
 var _waveThemes = {
-  ember:  { hue0: 10,  hueR: 50,  orbMin: 2, orbMax: 10, damp: 0.90, attr: 0.006, size0: 0.8, sizeV: 2.0, glow: 0.10, kalei: 2.0, n: 80 },
-  frost:  { hue0: 190, hueR: 60,  orbMin: 3, orbMax: 12, damp: 0.94, attr: 0.005, size0: 0.7, sizeV: 1.5, glow: 0.06, kalei: 2.2, n: 70 },
-  aurora: { hue0: 260, hueR: 100, orbMin: 2, orbMax: 11, damp: 0.92, attr: 0.007, size0: 0.9, sizeV: 2.2, glow: 0.08, kalei: 2.0, n: 80 }
+  ember:  { hue0: 10,  hueR: 50,  orbMin: 6, orbMax: 28, damp: 0.88, attr: 0.005, size0: 0.8, sizeV: 2.0, glow: 0.10, kalei: 6.0, n: 150 },
+  frost:  { hue0: 190, hueR: 60,  orbMin: 7, orbMax: 30, damp: 0.92, attr: 0.004, size0: 0.7, sizeV: 1.5, glow: 0.06, kalei: 6.5, n: 130 },
+  aurora: { hue0: 260, hueR: 100, orbMin: 6, orbMax: 28, damp: 0.90, attr: 0.006, size0: 0.9, sizeV: 2.2, glow: 0.08, kalei: 6.0, n: 150 }
 };
 
 function setWaveMode(mode, btn) {
@@ -2565,15 +2565,17 @@ function _renderWaveFrame(ts) {
   // Read real mic volume if audio is running
   if (_waveAudioCtx && _waveAnalyser) {
     var raw = _readWaveVolume();
-    _waveVolume += (raw - _waveVolume) * 0.35; // smooth
+    // Asymmetric: fast decay (0.80) when sound stops, moderate attack (0.55)
+    var smooth = raw > _waveVolume ? 0.55 : 0.80;
+    _waveVolume += (raw - _waveVolume) * smooth;
   } else {
-    // Fallback: use mic state for intensity
     var isLive = _realMic && _realMic.state === 'live';
-    var recentSpeech = _realMic && _realMic._lastInterim && (Date.now() - _realMic._lastInterim < 2000);
-    var target = isLive && recentSpeech ? 0.7 : (isLive ? 0.3 : 0.05);
-    _waveVolume += (target - _waveVolume) * 0.2;
+    var recentSpeech = _realMic && _realMic._lastInterim && (Date.now() - _realMic._lastInterim < 3000);
+    var target = isLive && recentSpeech ? 0.8 : (isLive ? 0.45 : 0.06);
+    var fallSmooth = target > _waveVolume ? 0.4 : 0.75;
+    _waveVolume += (target - _waveVolume) * fallSmooth;
   }
-  var vol = Math.max(0, Math.min(1, _waveVolume));
+  var vol = Math.max(0.03, Math.min(1, _waveVolume));
 
   // Subtle glow when sound present
   if (vol > 0.05 && (t.glow || 0.08) > 0) {
