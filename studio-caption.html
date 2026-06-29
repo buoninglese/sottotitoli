@@ -287,7 +287,7 @@ body.session-active .caption-transcript:empty::after { content: none; }
 .btn-pause.paused { background: var(--warn); color: #000; border-color: var(--warn); }
 /* ═══ WAVE BAR ═══ */
 .wave-bar { display: flex; align-items: center; gap: 10px; margin-top: 10px; background: var(--card); border: 1px solid var(--line); border-radius: var(--mode-radius); padding: 8px 14px; flex-shrink: 0; }
-.wave-viz { flex: 1; height: 52px; display: flex; align-items: center; justify-content: center; min-width: 0; overflow: hidden; }
+.wave-viz { flex: 1; height: 52px; display: flex; align-items: center; justify-content: center; min-width: 0; overflow: hidden; width: 100%; }
 .wave-toggles { display: flex; gap: 4px; flex-shrink: 0; }
 .wave-tgl { font-family: var(--font-body); font-size: 9px; font-weight: 600; padding: 3px 10px; border-radius: 100px; border: 1px solid var(--line); background: transparent; color: var(--muted2); cursor: pointer; white-space: nowrap; transition: all .15s; }
 .wave-tgl:hover { border-color: var(--accent); color: var(--accent2); }
@@ -878,11 +878,11 @@ button[onclick*="addToWordBank"]:hover{background:rgba(52,211,153,.15)!important
             <button type="button" class="btn-grad btn-stop" id="stopBtn" style="display:none" onclick="toggleSession()">⏹ Stop</button>
           </div>
           <div class="wave-bar" id="waveBar">
-            <div class="wave-viz" id="waveViz"></div>
+            <canvas class="wave-viz" id="waveViz"></canvas>
             <div class="wave-toggles">
-              <button class="wave-tgl active" data-wave="dot" onclick="setWaveMode('dot',this)">Dot Wave</button>
-              <button class="wave-tgl" data-wave="mirror" onclick="setWaveMode('mirror',this)">Mirror Bars</button>
-              <button class="wave-tgl" data-wave="particle" onclick="setWaveMode('particle',this)">Particle</button>
+              <button class="wave-tgl active" data-wave="ember" onclick="setWaveMode('ember',this)">🔥 Ember</button>
+              <button class="wave-tgl" data-wave="frost" onclick="setWaveMode('frost',this)">❄️ Frost</button>
+              <button class="wave-tgl" data-wave="aurora" onclick="setWaveMode('aurora',this)">🌌 Aurora</button>
             </div>
           </div>
           <div class="extras-panel" id="extrasPanel"></div>
@@ -2475,78 +2475,177 @@ function updateFontToggleUI(mode) {
   setTimeout(function(){ updateFontToggleUI(stored); }, 50);
 })();
 
-// ═══ Wave Viz — soundwave bar below caption (reacts to live mic) ═══
-var _waveMode = 'dot';
-var _waveIntensity = 0.3; // 0.1 idle → 1.0 active
-var _waveInterval = null;
-function _audioBars(n) {
-  return Array.from({length: n}, function(_, i) {
-    var b = Math.sin(i * 0.7) * 0.4 + 0.5;
-    var n2 = (Math.sin(i * 2.3 + 1.7) * 0.25) + (Math.cos(i * 1.1) * 0.2);
-    return Math.max(0.08, Math.min(1, b + n2));
-  });
-}
-function _hsl(h, s, l, a) { return a !== undefined ? 'hsla(' + h + ',' + s + '%,' + l + '%,' + a + ')' : 'hsl(' + h + ',' + s + '%,' + l + '%)'; }
+// ═══ Wave Viz — Canvas particle wave (Ember Swarm mechanics, horizontal line target) ═══
+var _waveMode = 'ember';
+var _waveCtx = null, _waveAnalyser = null, _waveAudioCtx = null, _waveStream = null;
+var _waveParticles = [];
+var _waveVolume = 0;
+var _waveAnimId = null;
+
+var _waveThemes = {
+  ember:  { hue0: 10,  hueR: 50,  orbMin: 2, orbMax: 10, damp: 0.90, attr: 0.006, size0: 0.8, sizeV: 2.0, glow: 0.10, kalei: 2.0, n: 80 },
+  frost:  { hue0: 190, hueR: 60,  orbMin: 3, orbMax: 12, damp: 0.94, attr: 0.005, size0: 0.7, sizeV: 1.5, glow: 0.06, kalei: 2.2, n: 70 },
+  aurora: { hue0: 260, hueR: 100, orbMin: 2, orbMax: 11, damp: 0.92, attr: 0.007, size0: 0.9, sizeV: 2.2, glow: 0.08, kalei: 2.0, n: 80 }
+};
+
 function setWaveMode(mode, btn) {
   _waveMode = mode;
   document.querySelectorAll('.wave-tgl').forEach(function(b) { b.classList.remove('active'); });
   if (btn) btn.classList.add('active');
   localStorage.setItem('sottotitoli-wave-mode', mode);
-  _renderWave();
+  _initWaveParticles();
 }
-function _renderWave() {
-  var viz = document.getElementById('waveViz');
-  if (!viz) return;
-  var intensity = _waveIntensity;
-  var n = _waveMode === 'particle' ? 30 : (_waveMode === 'mirror' ? 12 : 18);
-  var bars = _audioBars(n);
-  var h = '';
-  if (_waveMode === 'mirror') {
-    h = '<div style="display:flex;align-items:center;gap:2px;height:100%;width:100%">';
-    bars.forEach(function(v, i) {
-      var hh = v * 45 * intensity;
-      var sat = 40 + intensity * 30;
-      h += '<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:1px;height:100%;justify-content:center"><div style="width:100%;height:' + hh + '%;background:' + _hsl(280 + i * 5, sat, 50 + intensity * 15) + ';border-radius:2px;transition:height .15s"></div><div style="width:100%;height:' + hh + '%;background:' + _hsl(280 + i * 5, sat, 45 + intensity * 15, 0.7) + ';border-radius:2px;transition:height .15s"></div></div>';
+function _initWaveParticles() {
+  var canvas = document.getElementById('waveViz');
+  if (!canvas) return;
+  var t = _waveThemes[_waveMode] || _waveThemes.ember;
+  var w = canvas.clientWidth, h = 52;
+  canvas.width = w * devicePixelRatio;
+  canvas.height = h * devicePixelRatio;
+  var ps = [];
+  for (var i = 0; i < t.n; i++) {
+    var tx = (i / (t.n - 1)) * w; // target: evenly spaced along horizontal line
+    var ty = h / 2;
+    ps.push({
+      tx: tx, ty: ty,
+      x: Math.random() * w,
+      y: h * 0.2 + Math.random() * h * 0.6, // scatter vertically
+      vx: 0, vy: 0,
+      phase: Math.random() * Math.PI * 2,
+      freq: 0.3 + Math.random() * 0.7,
+      orbitR: t.orbMin + Math.random() * (t.orbMax - t.orbMin)
     });
-    h += '</div>';
-  } else if (_waveMode === 'particle') {
-    h = '<div style="position:relative;width:100%;height:100%">';
-    for (var i = 0; i < n; i++) {
-      var x = (i / (n - 1)) * 100;
-      var y = 22 + Math.sin(i * 0.7 + Date.now() * 0.002) * 18 * intensity;
-      var s = 2 + intensity * 4;
-      var op = 0.2 + intensity * 0.6;
-      h += '<div style="position:absolute;left:' + x + '%;top:' + y + 'px;width:' + s + 'px;height:' + s + 'px;border-radius:50%;background:' + _hsl(200 + i * 12, 60 + intensity * 20, 60 + intensity * 10, op) + ';box-shadow:0 0 ' + (s * 3) + 'px ' + _hsl(200 + i * 12, 70, 65, op * 0.5) + ';transition:all .3s"></div>';
-    }
-    h += '</div>';
-  } else {
-    h = '<div style="display:flex;align-items:center;gap:3px;height:100%;width:100%">';
-    bars.forEach(function(v, i) {
-      var size = 1 + v * 10 * intensity;
-      var sat = 50 + intensity * 30;
-      h += '<div style="width:' + size + 'px;height:' + size + 'px;border-radius:50%;background:' + _hsl(200 + i * 15, sat, 55 + intensity * 15) + ';flex-shrink:0;box-shadow:0 0 ' + (size * 2) + 'px ' + _hsl(200 + i * 15, 70, 65, 0.3 + intensity * 0.3) + ';transition:all .25s"></div>';
-    });
-    h += '</div>';
   }
-  viz.innerHTML = h;
+  _waveParticles = ps;
 }
-// Pulse wave with mic activity
-setInterval(function() {
-  var isLive = _realMic && _realMic.state === 'live';
-  var recentSpeech = _realMic && _realMic._lastInterim && (Date.now() - _realMic._lastInterim < 2000);
-  var target = isLive && recentSpeech ? 0.8 + Math.random() * 0.2 : (isLive ? 0.4 : 0.15);
-  _waveIntensity += (target - _waveIntensity) * 0.3;
-  _renderWave();
-}, 200);
-// Init wave mode
+function _startWaveAudio() {
+  if (_waveAudioCtx) return; // already running
+  // Reuse existing mic stream if available
+  if (_realMic && _realMic.stream) {
+    try {
+      _waveAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      _waveAnalyser = _waveAudioCtx.createAnalyser();
+      _waveAnalyser.fftSize = 256;
+      _waveAudioCtx.createMediaStreamSource(_realMic.stream).connect(_waveAnalyser);
+    } catch(e) { console.warn('Wave audio init failed:', e); }
+  }
+}
+function _readWaveVolume() {
+  if (!_waveAnalyser) return 0;
+  var data = new Uint8Array(_waveAnalyser.frequencyBinCount);
+  _waveAnalyser.getByteFrequencyData(data);
+  var sum = 0;
+  for (var i = 0; i < data.length; i++) sum += data[i];
+  return Math.min(1, sum / data.length / 128);
+}
+function _particleColor(i, total, vol) {
+  var t = _waveThemes[_waveMode] || _waveThemes.ember;
+  var hue = ((t.hue0 || 10) + i / total * (t.hueR || 50) + vol * 40) % 360;
+  var sat = 60 + vol * 20;
+  var lit = 50 + vol * 25;
+  var alpha = 0.45 + vol * 0.45;
+  return 'hsla(' + hue + ',' + sat + '%,' + lit + '%,' + alpha + ')';
+}
+function _renderWaveFrame(ts) {
+  _waveAnimId = requestAnimationFrame(_renderWaveFrame);
+  var canvas = document.getElementById('waveViz');
+  if (!canvas) return;
+  var t = _waveThemes[_waveMode] || _waveThemes.ember;
+  var w = canvas.clientWidth, h = 52;
+  if (canvas.width !== w * devicePixelRatio || canvas.height !== h * devicePixelRatio) {
+    canvas.width = w * devicePixelRatio;
+    canvas.height = h * devicePixelRatio;
+    _initWaveParticles();
+  }
+  var ctx = canvas.getContext('2d');
+  var dpr = devicePixelRatio;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.clearRect(0, 0, w, h);
+
+  // Read real mic volume if audio is running
+  if (_waveAudioCtx && _waveAnalyser) {
+    var raw = _readWaveVolume();
+    _waveVolume += (raw - _waveVolume) * 0.35; // smooth
+  } else {
+    // Fallback: use mic state for intensity
+    var isLive = _realMic && _realMic.state === 'live';
+    var recentSpeech = _realMic && _realMic._lastInterim && (Date.now() - _realMic._lastInterim < 2000);
+    var target = isLive && recentSpeech ? 0.7 : (isLive ? 0.3 : 0.05);
+    _waveVolume += (target - _waveVolume) * 0.2;
+  }
+  var vol = Math.max(0, Math.min(1, _waveVolume));
+
+  // Subtle glow when sound present
+  if (vol > 0.05 && (t.glow || 0.08) > 0) {
+    ctx.save();
+    ctx.globalAlpha = vol * (t.glow || 0.08);
+    ctx.filter = 'blur(' + (4 + vol * 12) + 'px)';
+    ctx.beginPath();
+    ctx.moveTo(0, h / 2);
+    ctx.lineTo(w, h / 2);
+    ctx.strokeStyle = '#a78bfa';
+    ctx.lineWidth = 2 + vol * 4;
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  // Update & draw particles
+  for (var i = 0; i < _waveParticles.length; i++) {
+    var p = _waveParticles[i];
+    if (i >= _waveParticles.length) break;
+    var attractForce = (t.attr || 0.008) + vol * 0.25 * (1 / 60);
+
+    // Kaleidoscope wandering when silent
+    var kaleiStrength = (1 - vol) * (t.kalei || 1.8);
+    var time = ts * 0.001;
+    var kx = Math.cos(time * p.freq + p.phase) * p.orbitR * kaleiStrength;
+    var ky = Math.sin(time * p.freq * 0.7 + p.phase) * p.orbitR * kaleiStrength;
+    kx += Math.cos(time * 0.3 + p.phase * 2) * p.orbitR * 0.5 * kaleiStrength;
+    ky += Math.sin(time * 0.37 + p.phase * 1.7) * p.orbitR * 0.5 * kaleiStrength;
+
+    var targetX = p.tx + kx;
+    var targetY = p.ty + ky;
+
+    var dx = targetX - p.x;
+    var dy = targetY - p.y;
+    p.vx += dx * attractForce;
+    p.vy += dy * attractForce;
+
+    var damp = (t.damp || 0.88) + vol * 0.04;
+    p.vx *= damp;
+    p.vy *= damp;
+
+    p.x += p.vx;
+    p.y += p.vy;
+
+    var r = (t.size0 || 1.0) + vol * (t.sizeV || 2.2) + (1 - vol) * 1.0 * Math.abs(Math.sin(time * 2 + p.phase));
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, r, 0, Math.PI * 2);
+    ctx.fillStyle = _particleColor(i, _waveParticles.length, vol);
+    ctx.fill();
+
+    // Glow halo when loud
+    if (vol > 0.25 && r > 1.5) {
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, r * 2.5, 0, Math.PI * 2);
+      ctx.fillStyle = 'hsla(' + ((t.hue0 || 10) + i / _waveParticles.length * (t.hueR || 50)) + ',70%,60%,' + (vol * 0.08) + ')';
+      ctx.fill();
+    }
+  }
+}
+
+// Init on load
 (function() {
-  var stored = localStorage.getItem('sottotitoli-wave-mode') || 'dot';
+  var stored = localStorage.getItem('sottotitoli-wave-mode') || 'ember';
   _waveMode = stored;
+  _initWaveParticles();
+  _waveAnimId = requestAnimationFrame(_renderWaveFrame);
+  // Try to hook into existing mic stream
   setTimeout(function() {
-    _renderWave();
+    _startWaveAudio();
     var btn = document.querySelector('.wave-tgl[data-wave="' + stored + '"]');
     if (btn) btn.classList.add('active');
-  }, 100);
+  }, 500);
 })();
 
 // LIVE dot reflects real mic state (no manual toggle needed)
