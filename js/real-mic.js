@@ -10,7 +10,7 @@ var _realMic = {
   onInterim: null,   // callback(interimText)
   onFinal: null,     // callback(finalText)
   onStateChange: null, // callback(state)
-  forceFinalizeMs: 2500, // silence before forcing finalization (0 = disabled)
+  forceFinalizeMs: 0, // silence before forcing finalization (0 = disabled)
   _lastInterim: 0,
   _forceTimer: null
 };
