@@ -118,26 +118,39 @@ function _gvProcessFinal(text) {
     // ── Verb tense via nlp/compromise ──
     var tenseFound = false;
     try {
-      if (doc && pos === 'VERB') {
+      if (doc) {
         var vMatch = doc.match(w);
         if (vMatch && vMatch.json) {
           var vj = vMatch.json();
           if (vj[0] && vj[0].terms && vj[0].terms[0]) {
             var vt = vj[0].terms[0].tags || [];
+            // Check nlp verb tags regardless of POS (catches gerunds tagged as nouns)
             if (vt.indexOf('PastTense') !== -1) { _gv.verbCounts.PAST = (_gv.verbCounts.PAST || 0) + 1; tenseFound = true; }
             else if (vt.indexOf('PresentTense') !== -1) { _gv.verbCounts.PRES = (_gv.verbCounts.PRES || 0) + 1; tenseFound = true; }
             else if (vt.indexOf('Gerund') !== -1) { _gv.verbCounts.ING = (_gv.verbCounts.ING || 0) + 1; tenseFound = true; }
             else if (vt.indexOf('Participle') !== -1) { _gv.verbCounts.PART = (_gv.verbCounts.PART || 0) + 1; tenseFound = true; }
             else if (vt.indexOf('Infinitive') !== -1) { _gv.verbCounts.PRES = (_gv.verbCounts.PRES || 0) + 1; tenseFound = true; }
+            else if (vt.indexOf('Modal') !== -1) { _gv.verbCounts.MODAL = (_gv.verbCounts.MODAL || 0) + 1; tenseFound = true; }
+            // Also check verb-specific tags even when POS is not VERB
+            if (!tenseFound && vt.indexOf('Verb') !== -1) {
+              // nlp says it's a verb but didn't give tense — check position/context
+              if (pos === 'VERB') { _gv.verbCounts.PRES = (_gv.verbCounts.PRES || 0) + 1; tenseFound = true; }
+            }
           }
         }
       }
     } catch(e) {}
-    // Fallback to dictionary + suffix heuristics
+    // Fallback: suffix-based detection (catches -ing, -ed regardless of nlp's POS decision)
+    if (!tenseFound) {
+      if (w.endsWith('ing') && w.length > 4) { _gv.verbCounts.ING = (_gv.verbCounts.ING || 0) + 1; tenseFound = true; }
+      else if (w.endsWith('ed') && w.length > 4 && !w.endsWith('eed')) { _gv.verbCounts.PAST = (_gv.verbCounts.PAST || 0) + 1; tenseFound = true; }
+    }
+    // Dictionary fallback
     if (!tenseFound) {
       if (VERB_TENSE[w]) _gv.verbCounts[VERB_TENSE[w]] = (_gv.verbCounts[VERB_TENSE[w]] || 0) + 1;
       else if (pos === 'VERB' || pos === 'AUX') {
-        if (w.endsWith('ing')) _gv.verbCounts.ING = (_gv.verbCounts.ING || 0) + 1;
+        if (VERB_TENSE[w]) _gv.verbCounts[VERB_TENSE[w]] = (_gv.verbCounts[VERB_TENSE[w]] || 0) + 1;
+        else if (w.endsWith('ing')) _gv.verbCounts.ING = (_gv.verbCounts.ING || 0) + 1;
         else if (w.endsWith('ed')) _gv.verbCounts.PAST = (_gv.verbCounts.PAST || 0) + 1;
         else _gv.verbCounts.PRES = (_gv.verbCounts.PRES || 0) + 1;
       }
