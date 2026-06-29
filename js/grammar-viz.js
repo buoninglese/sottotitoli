@@ -45,14 +45,42 @@ function _gvTagWord(w) {
 }
 
 function _gvProcessFinal(text) {
-  var words = text.toLowerCase().match(/[a-z']+/g) || [];
-  if (!words.length) return;
+  var rawWords = text.toLowerCase().match(/[a-z']+/g) || [];
+  if (!rawWords.length) return;
 
-  _gv.sentenceLengths.push(words.length);
+  _gv.sentenceLengths.push(rawWords.length);
   var subj = null, verb = null;
 
-  words.forEach(function(w) {
-    var pos = _gvTagWord(w);
+  // Build a single nlp document for the whole sentence for better accuracy
+  var doc; try { if (typeof nlp !== 'undefined') doc = nlp(text); } catch(e) {}
+
+  rawWords.forEach(function(w) {
+    // ── POS tag via nlp/compromise ──
+    var pos = 'OTHER';
+    try {
+      if (doc) {
+        var match = doc.match(w);
+        if (match && match.json) {
+          var j = match.json();
+          if (j[0] && j[0].terms && j[0].terms[0]) {
+            var tags = j[0].terms[0].tags || [];
+            if (tags.indexOf('Noun') !== -1) pos = 'NOUN';
+            else if (tags.indexOf('Verb') !== -1) pos = 'VERB';
+            else if (tags.indexOf('Adjective') !== -1) pos = 'ADJ';
+            else if (tags.indexOf('Adverb') !== -1) pos = 'ADV';
+            else if (tags.indexOf('Preposition') !== -1) pos = 'PREP';
+            else if (tags.indexOf('Conjunction') !== -1) pos = 'CONJ';
+            else if (tags.indexOf('Pronoun') !== -1) pos = 'PRON';
+            else if (tags.indexOf('Determiner') !== -1) pos = 'DET';
+            else if (tags.indexOf('Modal') !== -1) pos = 'AUX';
+            else if (tags.indexOf('Auxiliary') !== -1) pos = 'AUX';
+          }
+        }
+      }
+    } catch(e) {}
+    // Fallback to dictionary if nlp fails
+    if (pos === 'OTHER') pos = _gvTagWord(w);
+
     if (['NOUN','VERB','ADJ','ADV','PREP','CONJ','PRON','AUX'].indexOf(pos) >= 0) {
       _gv.posCounts[pos] = (_gv.posCounts[pos] || 0) + 1;
     }
@@ -61,12 +89,35 @@ function _gvProcessFinal(text) {
     }
     _gv.allWordsFlat.push({w: w, pos: pos});
 
+    // ── Pronoun types (dictionary — nlp doesn't categorize these) ──
     if (PRON_TYPE[w]) _gv.proCounts[PRON_TYPE[w]] = (_gv.proCounts[PRON_TYPE[w]] || 0) + 1;
-    if (VERB_TENSE[w]) _gv.verbCounts[VERB_TENSE[w]] = (_gv.verbCounts[VERB_TENSE[w]] || 0) + 1;
-    else if (pos === 'VERB') {
-      if (w.endsWith('ing')) _gv.verbCounts.ING = (_gv.verbCounts.ING || 0) + 1;
-      else if (w.endsWith('ed')) _gv.verbCounts.PAST = (_gv.verbCounts.PAST || 0) + 1;
-      else _gv.verbCounts.PRES = (_gv.verbCounts.PRES || 0) + 1;
+
+    // ── Verb tense via nlp/compromise ──
+    var tenseFound = false;
+    try {
+      if (doc && pos === 'VERB') {
+        var vMatch = doc.match(w);
+        if (vMatch && vMatch.json) {
+          var vj = vMatch.json();
+          if (vj[0] && vj[0].terms && vj[0].terms[0]) {
+            var vt = vj[0].terms[0].tags || [];
+            if (vt.indexOf('PastTense') !== -1) { _gv.verbCounts.PAST = (_gv.verbCounts.PAST || 0) + 1; tenseFound = true; }
+            else if (vt.indexOf('PresentTense') !== -1) { _gv.verbCounts.PRES = (_gv.verbCounts.PRES || 0) + 1; tenseFound = true; }
+            else if (vt.indexOf('Gerund') !== -1) { _gv.verbCounts.ING = (_gv.verbCounts.ING || 0) + 1; tenseFound = true; }
+            else if (vt.indexOf('Participle') !== -1) { _gv.verbCounts.PART = (_gv.verbCounts.PART || 0) + 1; tenseFound = true; }
+            else if (vt.indexOf('Infinitive') !== -1) { _gv.verbCounts.PRES = (_gv.verbCounts.PRES || 0) + 1; tenseFound = true; }
+          }
+        }
+      }
+    } catch(e) {}
+    // Fallback to dictionary + suffix heuristics
+    if (!tenseFound) {
+      if (VERB_TENSE[w]) _gv.verbCounts[VERB_TENSE[w]] = (_gv.verbCounts[VERB_TENSE[w]] || 0) + 1;
+      else if (pos === 'VERB' || pos === 'AUX') {
+        if (w.endsWith('ing')) _gv.verbCounts.ING = (_gv.verbCounts.ING || 0) + 1;
+        else if (w.endsWith('ed')) _gv.verbCounts.PAST = (_gv.verbCounts.PAST || 0) + 1;
+        else _gv.verbCounts.PRES = (_gv.verbCounts.PRES || 0) + 1;
+      }
     }
 
     if (!subj && PRON_TYPE[w] === 'SUBJ') subj = w;
@@ -87,7 +138,7 @@ function _gvProcessFinal(text) {
     }
   }
 
-  _gvUpdateTranscript(text, words);
+  _gvUpdateTranscript(text, rawWords);
   _gvUpdateAll();
 }
 
@@ -104,7 +155,9 @@ function _gvUpdateTranscript(text, words) {
     html += '<div style="font-size:clamp(13px,1.5vw,16px);color:var(--muted);margin-bottom:clamp(8px,1.2vw,12px);line-height:1.5;font-weight:500">' + s.text + '</div>';
     html += '<div style="display:flex;flex-wrap:wrap;gap:clamp(4px,.6vw,7px);align-items:flex-end">';
     s.words.forEach(function(w) {
-      var pos = _gvTagWord(w);
+      var pos = 'OTHER';
+      try { if (typeof nlp !== 'undefined') { var d = nlp(w); var t = d.json(); if (t[0] && t[0].terms && t[0].terms[0]) { var tags = t[0].terms[0].tags || []; if (tags.indexOf('Noun') !== -1) pos = 'NOUN'; else if (tags.indexOf('Verb') !== -1) pos = 'VERB'; else if (tags.indexOf('Adjective') !== -1) pos = 'ADJ'; else if (tags.indexOf('Adverb') !== -1) pos = 'ADV'; else if (tags.indexOf('Preposition') !== -1) pos = 'PREP'; else if (tags.indexOf('Conjunction') !== -1) pos = 'CONJ'; else if (tags.indexOf('Pronoun') !== -1) pos = 'PRON'; else if (tags.indexOf('Determiner') !== -1) pos = 'DET'; else if (tags.indexOf('Modal') !== -1 || tags.indexOf('Auxiliary') !== -1) pos = 'AUX'; } } } catch(e) {}
+      if (pos === 'OTHER') pos = _gvTagWord(w);
       html += '<span class="transcript-word"><span class="tw">' + w + '</span><span class="tag tag-' + pos + '">' + pos + '</span></span>';
     });
     html += '</div></div>';
