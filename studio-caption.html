@@ -837,6 +837,7 @@ button[onclick*="addToWordBank"]:hover{background:rgba(52,211,153,.15)!important
   <button class="tgt-btn" data-clang="pt-PT" onclick="setCaptionLanguage('pt-PT','Português')">🇵🇹 PT</button>
   <button class="tgt-btn" data-clang="nl-NL" onclick="setCaptionLanguage('nl-NL','Nederlands')">🇳🇱 NL</button>
   <span class="spacer" style="flex:1;min-width:12px"></span>
+  <span id="liveWordCount" style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--t3);padding:4px 10px;background:var(--bg2);border-radius:100px">0 parole</span>
   <span class="divider"></span>
   <button class="btn-sm panel-active" id="speakersToggleBtn" onclick="togglePanel('speakers')" title="Toggle speaker panel">👥 Speakers</button>
   <button class="btn-sm" id="metricsToggleBtn" onclick="toggleRight('metrics')" title="Toggle metrics panel">📊 Metrics</button>
@@ -983,7 +984,13 @@ button[onclick*="addToWordBank"]:hover{background:rgba(52,211,153,.15)!important
               <button class="wave-tgl" data-wave="aurora" onclick="setWaveMode('aurora',this)">🌌 Aurora</button>
             </div>
           </div>
-          <div class="extras-panel" id="extrasPanel"></div>
+          <div class="extras-panel" id="extrasPanel">
+            <div id="studioProfileNudge" style="display:none;padding:10px 14px;background:rgba(251,191,36,.05);border-bottom:1px solid rgba(251,191,36,.15);font-size:11.5px;color:var(--t2);margin-bottom:8px;border-radius:8px">
+              <strong style="color:var(--amber)">👤 Profilo non completo</strong><br>
+              I report AI saranno più utili se completi il tuo profilo linguistico.
+              <a href="account.html#profilo" style="color:var(--accent);font-weight:700;display:block;margin-top:4px">Completa ora →</a>
+            </div>
+          </div>
         </div>
       </section>
       <!-- PANEL 2: Vocabulary -->
@@ -1058,6 +1065,11 @@ button[onclick*="addToWordBank"]:hover{background:rgba(52,211,153,.15)!important
         <div class="h-panel-inner">
           <div class="section-label">Live Analysis</div>
           <h2 style="white-space:nowrap;font-size:clamp(18px,3vw,28px);font-weight:800;letter-spacing:-.5px">Word-by-Word Classification</h2>
+          <!-- Tag / Pill toggle -->
+          <div style="display:flex;gap:4px;margin-bottom:10px">
+            <button class="toggle-pill on" id="analysisModeTags" onclick="_switchAnalysisMode('tags',this)">Tags</button>
+            <button class="toggle-pill" id="analysisModeRaw" onclick="_switchAnalysisMode('pills',this)">Pills</button>
+          </div>
           <div class="slide-split" style="flex:1;min-height:0">
             <div class="slide-main" style="min-height:0;overflow:hidden">
               <div style="background:var(--panel-bg);border:1px solid var(--line);border-radius:var(--mode-radius);padding:clamp(14px,2vw,20px);text-align:left;flex:1;overflow-y:auto;min-height:0" id="gvTranscriptBar">
@@ -1436,6 +1448,67 @@ function showSessionSaved() {
   document.body.appendChild(toast);
   setTimeout(function(){ toast.remove(); _sessionSavedShown = false; }, 3000);
 }
+
+// ── Post-session panel ──
+function showPostSessionPanel(wordCount) {
+  var panel = document.getElementById('postSessionPanel');
+  var wc = document.getElementById('pspWordCount');
+  if (wc) wc.textContent = wordCount ? wordCount + ' parole trascritte' : '';
+  if (panel) panel.style.display = 'flex';
+}
+
+async function generateQuickSnapshot() {
+  var supabase = window.sottotitoliSupabase;
+  if (!supabase) return;
+  var r = await supabase.auth.getSession();
+  if (!r.data || !r.data.session) { window.location.href = 'analysis.html'; return; }
+  var today = new Date().toISOString().split('T')[0];
+  if (localStorage.getItem('sottotitoli_last_snapshot_date') === today) {
+    alert('Hai già generato lo Snapshot gratuito oggi. Riprova domani!');
+    return;
+  }
+  var sid = localStorage.getItem('sottotitoli-caption-session');
+  if (!sid) { window.location.href = 'analysis.html'; return; }
+  var uid = r.data.session.user.id;
+  await supabase.from('session_ai_reports').insert({
+    user_id: uid,
+    module_id: 0,
+    session_id: sid,
+    status: 'processing'
+  });
+  localStorage.setItem('sottotitoli_last_snapshot_date', today);
+  document.getElementById('postSessionPanel').style.display = 'none';
+  showToastMsg('⚡ Snapshot in elaborazione. Controlla I miei report tra qualche minuto.');
+}
+
+function showToastMsg(msg) {
+  var t = document.createElement('div');
+  t.textContent = msg;
+  t.style.cssText = 'position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:var(--card);border:1px solid var(--line);border-radius:10px;padding:10px 18px;font-size:13px;font-weight:600;color:var(--text);z-index:300;box-shadow:0 4px 20px rgba(0,0,0,.3);white-space:nowrap';
+  document.body.appendChild(t);
+  setTimeout(function(){ t.remove(); }, 4000);
+}
+
+// ── Live word count in toolbar ──
+function updateWordCount(text) {
+  var count = text ? text.trim().split(/\s+/).filter(Boolean).length : 0;
+  var el = document.getElementById('liveWordCount');
+  if (el) el.textContent = count + ' parole';
+  window.currentWordCount = count;
+}
+
+// ── Studio profile nudge ──
+(async function checkStudioProfileNudge(){
+  var supabase = window.sottotitoliSupabase;
+  if (!supabase) return;
+  var r = await supabase.auth.getSession();
+  if (!r.data || !r.data.session) return;
+  var uid = r.data.session.user.id;
+  var prof = await supabase.from('profiles').select('goal_primary').eq('id', uid).maybeSingle();
+  var incomplete = !prof.data || !prof.data.goal_primary;
+  var nudge = document.getElementById('studioProfileNudge');
+  if (nudge) nudge.style.display = incomplete ? 'block' : 'none';
+})();
 
 
 // ═══ User info from auth ═══
@@ -1830,7 +1903,14 @@ function _updateGrammarLines() {
     _updateVocabPosStack();
     return;
   }
-  // Only process new lines since last tick
+  // Only process new lines since last tick.
+  // Reset if transcript was cleared externally (e.g. language change).
+  if (lines.length < _grammarLastLineCount) {
+    _grammarLastLineCount = 0;
+    if (box) box.innerHTML = '<div style="color:var(--muted2);font-size:clamp(10px,1.1vw,12px);text-align:center;padding:16px">No transcript yet.</div>';
+    var pills2 = document.getElementById('gvTranscriptPills');
+    if (pills2) pills2.innerHTML = '<div style="text-align:center;padding:20px;color:var(--muted);font-size:clamp(11px,1.2vw,13px)">No sentences yet.</div>';
+  }
   if (lines.length === _grammarLastLineCount) return; // nothing new
   var newStart = _grammarLastLineCount;
   _grammarLastLineCount = lines.length;
@@ -1846,6 +1926,9 @@ function _updateGrammarLines() {
       if (tsSpan) tsSpan.remove();
       var spkTag = clone.querySelector('.spk-tag'); if (spkTag) spkTag.remove();
       var text = (clone.textContent || '').trim(); if (!text) continue;
+      // De-duplicate: skip if identical to the last already-appended line
+      var lastTline = box.querySelector('.tline:last-child');
+      if (lastTline && lastTline.getAttribute('data-text') === text.replace(/"/g, '&quot;')) continue;
       var div = document.createElement('div');
       div.className = 'tline';
       div.setAttribute('onclick', '_slideLineClick(this)');
@@ -1905,6 +1988,31 @@ function _updateGrammarLines() {
       pillDivs = pills.querySelectorAll('div');
     }
   }
+  // ── Safety net: sync Verb Tenses + Pronouns from grammar-viz.js state ──
+  _updateVerbAndPronounCounts();
+}
+// ── Safety net: sync Verb Tenses + Pronouns DOM from grammar-viz.js _gv state ──
+// _gvUpdateVerbs/_gvUpdatePronouns fire from the onFinal hook, but this ensures
+// the slide 2 sidebar stays in sync even if grammar-viz.js fires before DOM ready.
+function _updateVerbAndPronounCounts() {
+  if (!window._gv) return;
+  var vt = window._gv.verbCounts || {};
+  var pc = window._gv.proCounts || {};
+  var map = {
+    gvVbPres: vt.PRES || 0,
+    gvVbPast: vt.PAST || 0,
+    gvVbIng: vt.ING || 0,
+    gvVbPart: vt.PART || 0,
+    gvVbModal: vt.MODAL || 0,
+    gvProSubj: pc.SUBJ || 0,
+    gvProObj: pc.OBJ || 0,
+    gvProPoss: pc.POSS || 0,
+    gvProRefl: pc.REFL || 0
+  };
+  Object.keys(map).forEach(function(id) {
+    var el = document.getElementById(id);
+    if (el) el.textContent = map[id];
+  });
 }
 // Toggle between tagged and pill transcript views on slide 5
 function _switchAnalysisMode(mode, btn) {
@@ -2422,6 +2530,8 @@ _realMic.onFinal = function(text) {
   try { var el = document.getElementById('liveSentences'); if (el) el.textContent = lineCount; } catch(e) {}
   var wpm = sessionSeconds > 0 ? Math.round(allWords.length / (sessionSeconds / 60)) : 0;
   try { var el = document.getElementById('liveWpm'); if (el) el.textContent = wpm; } catch(e) {}
+  // Live word count in toolbar
+  updateWordCount(transcript.textContent || '');
 
   // ── Live metrics: lexical diversity (MATTR — Moving Average TTR, window=50) ──
   // MATTR is stable across sessions of different lengths, unlike raw TTR.
@@ -2591,7 +2701,12 @@ async function toggleSession() {
     };
     _endSupabaseSession(sessionData);
     // Show saved toast only if there was actual content
-    if (sessionData.lines && sessionData.lines.length > 0) showSessionSaved();
+    if (sessionData.lines && sessionData.lines.length > 0) {
+      showSessionSaved();
+      // Show post-session panel with word count
+      var wc = fullText ? fullText.trim().split(/\s+/).filter(Boolean).length : 0;
+      showPostSessionPanel(wc);
+    }
     window._sessionLines = [];
     startBtn.style.display = '';
     stopBtn.style.display = 'none';
@@ -5790,8 +5905,21 @@ window.fixExtrasPanelColors = function(){
 
 </script>
 
-<!-- Toast notifications (DUO+ join/kick/new-room) -->
+<!-- Toast notifications -->
 <div id="toast" style="position:fixed;bottom:24px;left:50%;transform:translateX(-50%);padding:8px 20px;border-radius:100px;background:var(--accent);color:#fff;font-weight:700;font-size:12px;z-index:99999;opacity:0;transition:opacity .3s;pointer-events:none;font-family:var(--font-body)"></div>
+
+<!-- Post-session panel -->
+<div id="postSessionPanel" style="display:none;position:fixed;bottom:0;left:0;right:0;background:var(--card);border-top:1px solid var(--line);padding:14px 24px;z-index:200;align-items:center;gap:16px">
+  <span style="font-size:22px">⚡</span>
+  <div style="flex:1"><strong style="font-size:13.5px">Sessione completata</strong><p style="font-size:12px;color:var(--t2);margin-top:2px">Vuoi un&apos;analisi rapida di questa sessione? <span id="pspWordCount" style="color:var(--accent);font-weight:600"></span></p></div>
+  <button class="btn btn-ghost" onclick="document.getElementById('postSessionPanel').style.display='none'" style="font-size:12px">Dopo</button>
+  <a href="analysis.html" class="btn btn-primary" style="font-size:12px;text-decoration:none">Vai ai Report AI →</a>
+  <button onclick="generateQuickSnapshot()" class="btn" style="background:rgba(52,211,153,.1);color:var(--accent);border:1px solid rgba(52,211,153,.3);font-size:12px;padding:10px 18px;border-radius:10px;font-weight:700">⚡ Snapshot gratuito</button>
+</div>
+<style>
+@keyframes slideUp{from{transform:translateY(100%);opacity:0}to{transform:translateY(0);opacity:1}}
+#postSessionPanel{animation:slideUp .3s ease}
+</style>
 
 </body>
 </html>
