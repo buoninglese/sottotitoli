@@ -17,9 +17,10 @@ window.SOTTOTITOLI_CONFIG = {
   /** Auth redirect URL (after Google OAuth login) */
   AUTH_REDIRECT_URL: "https://your-domain.github.io/sottotitoli/start.html",
 
-  /** Wordnik API key for definitions + synonyms (English only).
-      Get a free key at https://developer.wordnik.com/ */
-  wordnikApiKey: "YOUR_WORDNIK_API_KEY",
+  /** Wordnik proxy URL (Supabase Edge Function). Key is server-side only.
+      Deploy with: supabase functions deploy wordnik-proxy
+      Set secret: supabase secrets set WORDNIK_API_KEY=your_key */
+  wordnikProxyUrl: "https://qzqmuegbpmvqrjrlfbgk.supabase.co/functions/v1/wordnik-proxy",
 
   /** Translation provider settings */
   translation: {

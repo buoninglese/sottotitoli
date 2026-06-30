@@ -99,6 +99,8 @@ function _gvProcessFinal(text) {
       _gv.allContentWords.push(w);
     }
     _gv.allWordsFlat.push({w: w, pos: pos});
+    // Cap at 5000 — remove oldest 10% when exceeded (safe for 35+ min sessions)
+    if (_gv.allWordsFlat.length > 5000) _gv.allWordsFlat.splice(0, 500);
 
     // ── Pronoun types (dictionary — nlp doesn't categorize these) ──
     if (PRON_TYPE[w]) _gv.proCounts[PRON_TYPE[w]] = (_gv.proCounts[PRON_TYPE[w]] || 0) + 1;
