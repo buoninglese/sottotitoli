@@ -2428,8 +2428,34 @@ var pauseBtn = null;
 // Connect real mic callbacks
 _realMic.onInterim = function(text) {
   var interim = document.getElementById('captionInterim');
-  if (interim) interim.textContent = text;
+  if (interim) interim.textContent = formatCaptionText(text);
 };
+
+// ── Subtitle formatting: max 2 lines, max 50 chars per line ──
+// Breaks at word boundaries. Shows the most recent 2 lines of content.
+function formatCaptionText(text, maxChars, maxLines) {
+  maxChars = maxChars || 50;
+  maxLines = maxLines || 2;
+  if (!text) return '';
+  var words = text.trim().split(/\s+/);
+  var lines = [];
+  var current = '';
+  for (var i = 0; i < words.length; i++) {
+    var w = words[i];
+    var test = current ? current + ' ' + w : w;
+    if (test.length <= maxChars) {
+      current = test;
+    } else {
+      if (current) lines.push(current);
+      // If a single word exceeds maxChars, force it onto its own line
+      current = w.length > maxChars ? w.substring(0, maxChars) : w;
+    }
+  }
+  if (current) lines.push(current);
+  // Keep only the last N lines
+  while (lines.length > maxLines) lines.shift();
+  return lines.join('\n');
+}
 
 // Also add a subtle pulse to the extras panel when it refreshes
 (function() {
