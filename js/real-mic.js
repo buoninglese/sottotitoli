@@ -189,13 +189,29 @@ function _endSupabaseSession(data) {
       }
     }
     
-    // Lexical diversity
+    // Lexical diversity (MATTR — Moving Average TTR, window=50)
     if (allWords.length > 0) {
       var uniqueWords = {};
-      allWords.forEach(function(w) { uniqueWords[w] = true; });
+      allWords.forEach(function(w) { uniqueWords[w.toLowerCase()] = true; });
       updateObj.unique_words_count = Object.keys(uniqueWords).length;
-      updateObj.lexical_diversity = (Object.keys(uniqueWords).length / allWords.length);
+      // MATTR: stable across sessions of different lengths
+      var wSize = 50;
+      if (allWords.length < wSize) {
+        updateObj.lexical_diversity = Object.keys(uniqueWords).length / allWords.length;
+      } else {
+        var mattrTotal = 0, mattrWindows = 0;
+        for (var mi = 0; mi <= allWords.length - wSize; mi++) {
+          var win = {};
+          for (var mj = mi; mj < mi + wSize; mj++) win[allWords[mj]] = true;
+          mattrTotal += Object.keys(win).length / wSize;
+          mattrWindows++;
+        }
+        updateObj.lexical_diversity = mattrTotal / mattrWindows;
+      }
     }
+    
+    // Metrics version — v2 = MATTR, v1 = raw TTR (deprecated)
+    updateObj.metrics_version = 2;
     
     // POS counts
     var posCounts = data.posCounts || {};
@@ -204,9 +220,12 @@ function _endSupabaseSession(data) {
     if (posCounts.ADJ) updateObj.adjective_count = posCounts.ADJ;
     if (posCounts.ADV) updateObj.adverb_count = posCounts.ADV;
     
-    // Additional stats
+    // Additional stats — passed pre-computed from studio-caption.html
     if (data.fillersPerMinute != null) updateObj.fillers_per_minute = data.fillersPerMinute;
     if (data.turnCount != null) updateObj.turn_count = data.turnCount;
+    if (data.sentenceMetrics && data.sentenceMetrics.length > 0) updateObj.sentence_metrics = data.sentenceMetrics.slice(0, 50);
+    if (data.connectors) updateObj.connectors = data.connectors;
+    if (data.ngslCoverage != null) updateObj.ngsl_coverage = data.ngslCoverage;
   }
   
   window.sottotitoliSupabase.from('sessions').update(updateObj)

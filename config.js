@@ -2,7 +2,7 @@ window.SOTTOTITOLI_CONFIG = {
   websocketUrl: "wss://sottotitoli-websocket.onrender.com",
   siteName: "Sottotitoli",
   AUTH_REDIRECT_URL: "https://buoninglese.github.io/sottotitoli/start.html",
-  wordnikApiKey: "dnd12sayxilyys5tzqrb14v7jfwhambruhmgee8pnviges8ha",
+  wordnikProxyUrl: "https://qzqmuegbpmvqrjrlfbgk.supabase.co/functions/v1/wordnik-proxy",
   translation: {
     provider: "auto",  // "auto" = Google first, MyMemory fallback. Also: "google", "mymemory"
     myMemoryBase: "https://api.mymemory.translated.net/get"
