@@ -1893,32 +1893,41 @@ function _buildSynCards(text, spkName, spkColor, tsText) {
 
 // ═══ Grammar slide: recent transcript lines (click to populate SYN) ═══
 // Incremental: only processes new lines since last tick. Tracks index to avoid full rebuild.
+// POS/Vocab/Verb/Pronoun updates always run — they read from DOM and _gv state.
 var _grammarLastLineCount = 0;
 function _updateGrammarLines() {
   var box = document.getElementById('grammarTranscriptLines');
   var lines = document.querySelectorAll('#captionTranscript .line');
+  
+  // ── Always update POS stack + verb/pronoun counts (they read from DOM / _gv) ──
+  _updateVocabPosStack();
+  var aStack = document.getElementById('analysisPosStack');
+  var vStack = document.getElementById('vocabPosStack');
+  if (aStack && vStack) aStack.innerHTML = vStack.innerHTML;
+  _updateVerbAndPronounCounts();
+  
+  // ── Grammar sidebar + pills: only rebuild when transcript changes ──
   if (!lines.length) {
     if (box) box.innerHTML = '<div style="color:var(--muted2);font-size:clamp(10px,1.1vw,12px);text-align:center;padding:16px">No transcript yet.</div>';
     _grammarLastLineCount = 0;
-    _updateVocabPosStack();
     return;
   }
-  // Only process new lines since last tick.
-  // Reset if transcript was cleared externally (e.g. language change).
+  // Reset if transcript was cleared externally
   if (lines.length < _grammarLastLineCount) {
     _grammarLastLineCount = 0;
-    if (box) box.innerHTML = '<div style="color:var(--muted2);font-size:clamp(10px,1.1vw,12px);text-align:center;padding:16px">No transcript yet.</div>';
+    if (box) box.innerHTML = '';
     var pills2 = document.getElementById('gvTranscriptPills');
-    if (pills2) pills2.innerHTML = '<div style="text-align:center;padding:20px;color:var(--muted);font-size:clamp(11px,1.2vw,13px)">No sentences yet.</div>';
+    if (pills2) pills2.innerHTML = '';
   }
-  if (lines.length === _grammarLastLineCount) return; // nothing new
+  if (lines.length === _grammarLastLineCount) return; // nothing new for sidebar
   var newStart = _grammarLastLineCount;
   _grammarLastLineCount = lines.length;
   
   // ── Sidebar: maintain last 12 lines ──
   if (box) {
+    // Clear initial placeholder on first real content
+    if (newStart === 0) box.innerHTML = '';
     var MAX_SIDEBAR = 12;
-    // Append new lines
     for (var i = newStart; i < lines.length; i++) {
       var l = lines[i];
       var clone = l.cloneNode(true);
@@ -1926,7 +1935,7 @@ function _updateGrammarLines() {
       if (tsSpan) tsSpan.remove();
       var spkTag = clone.querySelector('.spk-tag'); if (spkTag) spkTag.remove();
       var text = (clone.textContent || '').trim(); if (!text) continue;
-      // De-duplicate: skip if identical to the last already-appended line
+      // De-duplicate
       var lastTline = box.querySelector('.tline:last-child');
       if (lastTline && lastTline.getAttribute('data-text') === text.replace(/"/g, '&quot;')) continue;
       var div = document.createElement('div');
@@ -1944,15 +1953,10 @@ function _updateGrammarLines() {
     }
   }
   
-  _updateVocabPosStack();
-  // Copy POS stack to slide 5 sidebar
-  var aStack = document.getElementById('analysisPosStack');
-  var vStack = document.getElementById('vocabPosStack');
-  if (aStack && vStack) aStack.innerHTML = vStack.innerHTML;
-  
   // ── Pill transcript view (Panel 5) — maintain last 15 lines ──
   var pills = document.getElementById('gvTranscriptPills');
   if (pills) {
+    if (newStart === 0) pills.innerHTML = '';
     var MAX_PILLS = 15;
     for (var i = newStart; i < lines.length; i++) {
       var l = lines[i];
@@ -1981,15 +1985,12 @@ function _updateGrammarLines() {
       pDiv.innerHTML = innerHtml;
       pills.appendChild(pDiv);
     }
-    // Trim excess from top
     var pillDivs = pills.querySelectorAll('div');
     while (pillDivs.length > MAX_PILLS) {
       pillDivs[0].remove();
       pillDivs = pills.querySelectorAll('div');
     }
   }
-  // ── Safety net: sync Verb Tenses + Pronouns from grammar-viz.js state ──
-  _updateVerbAndPronounCounts();
 }
 // ── Safety net: sync Verb Tenses + Pronouns DOM from grammar-viz.js _gv state ──
 // _gvUpdateVerbs/_gvUpdatePronouns fire from the onFinal hook, but this ensures
