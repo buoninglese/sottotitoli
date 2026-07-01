@@ -84,6 +84,20 @@ if (heroClose && heroBanner) {
   });
 }
 
+// ── Profilo Linguistico: chip toggle ──
+document.querySelectorAll('.q-row').forEach(function(row) {
+  row.addEventListener('click', function(e) {
+    var chip = e.target.closest('.q-chip');
+    if (!chip) return;
+    var isMulti = row.classList.contains('q-multi');
+    if (!isMulti) {
+      // Single-select: deactivate siblings
+      row.querySelectorAll('.q-chip').forEach(function(c) { c.classList.remove('active'); });
+    }
+    chip.classList.toggle('active');
+  });
+});
+
 window.addEventListener('DOMContentLoaded', function() {
   initTheme();
   requestAnimationFrame(function() { body.classList.add('is-ready'); });
