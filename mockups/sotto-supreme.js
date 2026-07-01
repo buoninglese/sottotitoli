@@ -2,12 +2,16 @@
 var body = document.body;
 var themeToggle = document.getElementById('themeToggle');
 var themeText = document.querySelector('.theme-text');
+var mobileThemeToggle = document.getElementById('mobileThemeToggle');
+var mobileThemeLabel = document.querySelector('.mobile-theme-label');
 var heroClose = document.getElementById('heroClose');
 var heroBanner = document.getElementById('heroBanner');
 
 function applyTheme(theme) {
   body.setAttribute('data-theme', theme);
-  if (themeText) themeText.textContent = theme === 'dark' ? 'Light' : 'Dark';
+  var label = theme === 'dark' ? 'Light' : 'Dark';
+  if (themeText) themeText.textContent = label;
+  if (mobileThemeLabel) mobileThemeLabel.textContent = label;
   localStorage.setItem('sotto-supreme-theme', theme);
 }
 
@@ -17,6 +21,12 @@ function initTheme() {
 }
 
 if (themeToggle) themeToggle.addEventListener('click', function() {
+  applyTheme(body.getAttribute('data-theme') === 'dark' ? 'light' : 'dark');
+});
+
+// ── Mobile theme toggle (inside user dropdown, shown at narrow widths) ──
+if (mobileThemeToggle) mobileThemeToggle.addEventListener('click', function(e) {
+  e.stopPropagation();
   applyTheme(body.getAttribute('data-theme') === 'dark' ? 'light' : 'dark');
 });
 
