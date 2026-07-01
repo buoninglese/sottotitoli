@@ -198,9 +198,9 @@
     .start-half.caption .start-flag{background:rgba(5,150,105,.03);border:1px solid rgba(5,150,105,.08)}.start-half.caption .start-flag:hover{box-shadow:0 4px 16px rgba(5,150,105,.06);transform:translateY(-1px)}
     .start-half.translate .start-flag{background:rgba(37,99,235,.03);border:1px solid rgba(37,99,235,.08)}.start-half.translate .start-flag:hover{box-shadow:0 4px 16px rgba(37,99,235,.06);transform:translateY(-1px)}
     .start-flag .fl{font-size:30px}.start-flag .hint{font-size:10px;color:var(--text-faint);font-weight:400}
-    .start-btn{min-height:48px;padding:0 28px;border-radius:14px;font-size:15px;font-weight:600;display:inline-flex;align-items:center;gap:6px;transition:all var(--transition)}.start-btn:hover{transform:translateY(-1px)}.start-btn.cap{background:var(--green);color:#fff}.start-btn.tr{background:var(--blue);color:#fff}
+    .start-btn{min-height:48px;padding:0 28px;border-radius:14px;font-size:15px;font-weight:600;display:inline-flex;align-items:center;gap:6px;transition:all var(--transition);box-shadow:0 2px 8px rgba(0,0,0,.08)}.start-btn:hover{transform:translateY(-2px);box-shadow:0 6px 18px rgba(0,0,0,.15)}.start-btn.cap{background:var(--green);color:#fff}.start-btn.cap:hover{background:#047a55}.start-btn.tr{background:var(--blue);color:#fff}.start-btn.tr:hover{background:#1d4ed8}
 
-    .start-spinner{display:none;position:absolute;inset:0;z-index:50;background:rgba(0,0,0,.92);backdrop-filter:blur(16px);flex-direction:column;align-items:center;justify-content:center;padding:20px;border-radius:32px}body[data-theme="light"] .start-spinner{background:rgba(255,255,255,.94)}.start-spinner.show{display:flex}
+    .start-spinner{display:none;position:absolute;inset:0;z-index:50;background:rgba(0,0,0,.92);backdrop-filter:blur(16px);flex-direction:column;align-items:center;justify-content:center;padding:20px}.start-spinner.show{display:flex}body[data-theme="light"] .start-spinner{background:rgba(255,255,255,.94)}
     .start-spinner .sst{font-size:15px;font-weight:700;color:#f1f5f9;margin-bottom:14px}body[data-theme="light"] .start-spinner .sst{color:#0f172a}
     .start-spinner .ssg{display:grid;grid-template-columns:1fr 1fr;gap:7px;max-width:260px;margin-bottom:14px}
     .start-spinner .ssc{padding:11px 8px;border-radius:10px;font-size:13px;font-weight:600;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);color:#cbd5e1;cursor:pointer;transition:all .2s;font-family:inherit;text-align:center}body[data-theme="light"] .start-spinner .ssc{background:rgba(0,0,0,.02);border-color:rgba(0,0,0,.06);color:#334155}
@@ -509,6 +509,7 @@
               <div class="start-flag" style="margin-bottom:0" onclick="openSSSpinner(this,'tgt')"><span class="fl" id="ssTgtFlag">🇮🇹</span><span id="ssTgtName">Italiano</span><span class="hint">sottotitoli</span></div>
             </div>
             <button class="start-btn tr">Avvia Traduzione</button>
+            <div class="start-spinner" id="ssTrSpinner"><div class="sst" id="ssTrTitle">Io parlo in…</div><div class="ssg" id="ssTrGrid"></div><button class="ssconfirm" onclick="closeSSSpinner('tr')">Conferma</button></div>
           </div>
         </div>
         <!-- Panoramica panel -->
@@ -703,11 +704,16 @@
     function openSSSpinner(el,key){
       var half=el.closest('.start-half'),spinner=half.querySelector('.start-spinner'),grid=spinner.querySelector('.ssg');
       var cur=key==='cap'?ssCapCode:key==='src'?ssSrcCode:ssTgtCode;
+      if(key==='src'){spinner.querySelector('.sst').textContent='Io parlo in…'}
+      else if(key==='tgt'){spinner.querySelector('.sst').textContent='Sottotitoli in…'}
       grid.innerHTML='';
       ssFlags.forEach(function(f){var c=document.createElement('button');c.className='ssc'+(f.code===cur?' selected':'');c.textContent=f.flag+' '+f.name;c.onclick=function(){if(key==='cap')ssCapCode=f.code;else if(key==='src')ssSrcCode=f.code;else ssTgtCode=f.code;grid.querySelectorAll('.ssc').forEach(function(x){x.classList.remove('selected')});c.classList.add('selected');updSSFlags()};grid.appendChild(c)});
       spinner.classList.add('show');
     }
-    function closeSSSpinner(key){var h=key==='cap'?document.querySelector('.start-half.caption'):document.querySelector('.start-half.translate');if(h)h.querySelector('.start-spinner').classList.remove('show')}
+    function closeSSSpinner(key){
+      var s=key==='cap'?document.getElementById('ssCapSpinner'):document.getElementById('ssTrSpinner');
+      if(s)s.classList.remove('show');
+    }
     function updSSFlags(){
       var cf=ssFlags.find(function(f){return f.code===ssCapCode}),sf=ssFlags.find(function(f){return f.code===ssSrcCode}),tf=ssFlags.find(function(f){return f.code===ssTgtCode});
       var cfEl=document.getElementById('ssCapFlag'),cnEl=document.getElementById('ssCapName');if(cfEl)cfEl.textContent=cf.flag;if(cnEl)cnEl.textContent=cf.name;
