@@ -35,11 +35,14 @@ document.querySelectorAll('.side-nav .nav-item[data-panel]').forEach(function(it
   item.addEventListener('click', function(e) {
     e.preventDefault();
     var panel = this.dataset.panel;
+    // Close start session panel if open
+    var ss=document.getElementById('startSplit');
+    if(ss&&ss.classList.contains('active')){ss.classList.remove('active');var mp=document.querySelector('.main-panel');if(mp)mp.style.overflowY='auto'}
     // Update active state
     document.querySelectorAll('.side-nav .nav-item').forEach(function(n) { n.classList.remove('active'); });
     this.classList.add('active');
     // Switch panel
-    document.querySelectorAll('.content-panel').forEach(function(p) { p.classList.remove('active'); });
+    document.querySelectorAll('.content-panel').forEach(function(p) { p.classList.remove('active');p.style.display='' });
     var target = document.getElementById('pnl-' + panel);
     if (target) requestAnimationFrame(function() { target.classList.add('active'); });
   });
