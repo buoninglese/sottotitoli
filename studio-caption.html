@@ -1972,12 +1972,25 @@ function _updateGrammarLines() {
       words.forEach(function(w){
         var clean = w.replace(/[^a-zA-Z]/g,'').toLowerCase();
         var pos = 'OTHER';
-        if (typeof _gvHeuristicPOS === 'function') {
-          pos = _gvHeuristicPOS(clean);
-        } else if (!window._gvPosWarningShown) {
-          console.warn('[grammar-viz] POS tagger not loaded — all pills defaulting to OTHER');
-          window._gvPosWarningShown = true;
-        }
+        // nlp first, then suffix fallback
+        try {
+          if (typeof nlp !== 'undefined') {
+            var d = nlp(clean); var t = d.json();
+            if (t[0] && t[0].terms && t[0].terms[0]) {
+              var tags = t[0].terms[0].tags || [];
+              if (tags.indexOf('Noun') !== -1) pos = 'NOUN';
+              else if (tags.indexOf('Verb') !== -1) pos = 'VERB';
+              else if (tags.indexOf('Adjective') !== -1) pos = 'ADJ';
+              else if (tags.indexOf('Adverb') !== -1) pos = 'ADV';
+              else if (tags.indexOf('Preposition') !== -1) pos = 'PREP';
+              else if (tags.indexOf('Conjunction') !== -1) pos = 'CONJ';
+              else if (tags.indexOf('Pronoun') !== -1) pos = 'PRON';
+              else if (tags.indexOf('Determiner') !== -1) pos = 'DET';
+              else if (tags.indexOf('Modal') !== -1 || tags.indexOf('Auxiliary') !== -1) pos = 'AUX';
+            }
+          }
+        } catch(e) {}
+        if (pos === 'OTHER' && typeof _gvHeuristicPOS === 'function') pos = _gvHeuristicPOS(clean);
         var colorMap = {NOUN:'#60a5fa',VERB:'#34d399',ADJ:'#f472b6',ADV:'#c084fc',PREP:'#fbbf24',CONJ:'#fb923c',PRON:'#38bdf8',AUX:'#a78bfa',DET:'#6b7280',PART:'#6b7280',OTHER:'#6b7280'};
         var color = colorMap[pos] || '#6b7280';
         innerHtml += '<span style="display:inline-flex;padding:clamp(2px,.4vw,4px) clamp(6px,1vw,10px);border-radius:5px;font-size:clamp(10px,1.2vw,13px);font-weight:600;background:' + color + '20;color:' + color + ';border:1px solid ' + color + '30;margin:2px">' + w + ' <span style="opacity:.55;font-size:clamp(7px,.8vw,9px);font-weight:500">' + pos + '</span></span>';
