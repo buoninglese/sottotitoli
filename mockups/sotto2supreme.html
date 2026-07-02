@@ -211,14 +211,18 @@
     .tl-item::before{content:'';position:absolute;left:-17px;top:10px;width:6px;height:6px;border-radius:50%;background:var(--line);transition:background var(--transition),box-shadow var(--transition)}
     .tl-item:hover::before{background:var(--teal-2);box-shadow:0 0 6px rgba(6,182,212,.35)}
     .tl-time{font-size:10px;color:var(--text-faint);display:block}
-    /* ═══ CAPTION STAGE — draggable divider + history + wavebar ═══ */
+    /* ═══ CAPTION STAGE — live area + divider + history + wavebar ═══ */
     .caption-stage{display:flex;flex-direction:column;flex:1;min-height:0;gap:0}
+    /* Live feed area — grows/shrinks as divider is dragged */
+    .caption-live-area{flex:1;min-height:60px;display:flex;align-items:center;justify-content:center;padding:16px 32px;overflow:hidden}
+    .caption-live-area .live-feed{font-family:var(--font-serif);font-size:clamp(28px,4.5vw,52px);font-weight:600;letter-spacing:-.02em;line-height:1.1;color:var(--text);word-break:break-word;text-align:center;transition:color .3s;width:100%}
+    .caption-live-area .live-feed:empty::after{content:attr(data-placeholder);color:var(--text-faint);font-style:italic}
     /* Draggable divider */
     .caption-divider{flex-shrink:0;height:6px;cursor:ns-resize;background:var(--line);border-radius:3px;margin:0 32px;position:relative;transition:background var(--transition);user-select:none}
     .caption-divider:hover,.caption-divider.dragging{background:var(--teal-2)}
     .caption-divider::after{content:'';position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:32px;height:3px;border-radius:3px;background:var(--text-faint);opacity:.4;transition:opacity var(--transition)}
     .caption-divider:hover::after,.caption-divider.dragging::after{opacity:.7}
-    /* History area */
+    /* History area — base size controlled by divider drag */
     .caption-history{flex:0 0 140px;overflow-y:auto;font-family:var(--font-ui);font-size:14px;color:var(--text-soft);line-height:1.7;padding:12px 32px 8px;transition:flex-basis .15s;min-height:40px}
     .c-line{padding:5px 8px;border-bottom:1px solid rgba(128,128,128,.06);transition:background .2s;border-radius:4px}
     .c-line:hover{background:rgba(6,182,212,.04);padding-left:12px}
@@ -272,7 +276,9 @@
     .toolbar-btn .icon{transition:transform var(--transition)}
     .tab-stage{max-width:1020px;margin:0 auto;position:relative}
     .content-panel{display:none;animation:paneOut 200ms ease forwards}
-    .content-panel.active{display:block;animation:paneIn 340ms cubic-bezier(.2,.8,.2,1) forwards}
+    .content-panel.active{display:flex;flex-direction:column;animation:paneIn 340ms cubic-bezier(.2,.8,.2,1) forwards}
+    /* Panoramica panel fills available height so caption-stage can flex */
+    #pnl-panoramica.active{height:100%}
     .subtab-pane{display:none}
     .subtab-pane.active{display:block;animation:paneIn 300ms cubic-bezier(.2,.8,.2,1) forwards}
     .tab-pane{display:none;animation:paneOut 200ms ease forwards}
@@ -312,7 +318,7 @@
     .hero-banner{position:relative;overflow:hidden;min-height:278px;border-radius:var(--radius-hero);margin-bottom:40px;border:1px solid rgba(255,255,255,.12);box-shadow:var(--shadow-soft);background:linear-gradient(135deg,rgba(8,60,80,.92),rgba(6,95,115,.88) 42%,rgba(14,116,144,.86) 100%);transition:transform 420ms cubic-bezier(.2,.8,.2,1),opacity 280ms ease,max-height 420ms ease,margin var(--transition),border-color var(--transition)}
     .hero-banner:hover{transform:translateY(-2px)}
     .hero-banner::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(255,255,255,.05),transparent 35%),linear-gradient(90deg,rgba(4,20,32,.18),transparent 30%,rgba(56,189,248,.08) 72%,rgba(8,40,56,.16) 100%),var(--hero-overlay);pointer-events:none}
-    .hero-banner.is-closing{opacity:0;transform:translateY(-10px);max-height:0;margin-bottom:0}
+    .hero-banner.is-closing{opacity:0;transform:translateY(-10px);max-height:0;margin-bottom:0;padding-top:0;padding-bottom:0;overflow:hidden;border-width:0}
     .hero-art{position:absolute;inset:0;overflow:hidden}
     .blob,.glow{position:absolute;display:block;border-radius:999px;filter:blur(24px);transform:translateZ(0);animation:floatSlow 11s ease-in-out infinite alternate}
     .blob-a{width:410px;height:250px;left:-20px;top:10px;background:radial-gradient(circle at 35% 40%,rgba(56,189,248,.45),transparent 55%),radial-gradient(circle at 60% 50%,rgba(14,116,144,.5),transparent 70%)}
@@ -871,14 +877,18 @@
         </div>
         <!-- Panoramica panel -->
         <div class="content-panel active" id="pnl-panoramica">
-          <section class="panel-head"><div class="live-feed" id="liveFeed" data-placeholder="Le tue parole compariranno qui…">Le tue parole compariranno qui…</div></section>
+          <section class="panel-head"><h1>Live Session</h1></section>
           <article class="hero-banner" id="heroBanner">
-            <button class="hero-close" id="heroClose" aria-label="Close banner"><svg class="icon"><use href="#i-close"></use></svg></button>
+            <button class="hero-close" id="heroClose" aria-label="Close banner" onclick="document.getElementById('heroBanner').classList.add('is-closing')"><svg class="icon"><use href="#i-close"></use></svg></button>
             <div class="hero-art" aria-hidden="true"><span class="blob blob-a"></span><span class="blob blob-b"></span><span class="blob blob-c"></span><span class="glow glow-a"></span><span class="glow glow-b"></span></div>
-            <div class="hero-content"><h2>Che dici, <em>iniziamo?</em></h2><p>Premi il pulsante <strong>Start Session</strong> qui sopra e consenti l'accesso al microfono quando il browser te lo chiede. I sottotitoli appariranno qui in tempo reale — <strong>parla liberamente</strong>. Mentre parli, tieni d'occhio le metriche nel pannello a sinistra: WPM, diversità lessicale, copertura NGSL e molto altro.</p><div class="hero-chips"><button class="hero-chip strong" onclick="document.getElementById('heroBanner').classList.add('is-closing');setTimeout(function(){document.getElementById('heroBanner').style.display='none'},420)"><svg class="icon" style="width:18px;height:18px;margin-right:4px"><use href="#i-mic"></use></svg>Ho capito, iniziamo!</button><button class="hero-chip" onclick="document.getElementById('heroBanner').classList.add('is-closing');setTimeout(function(){document.getElementById('heroBanner').style.display='none'},420)">Chiudi</button></div></div>
+            <div class="hero-content"><h2>Che dici, <em>iniziamo?</em></h2><p>Premi il pulsante <strong>Start Session</strong> qui sopra e consenti l'accesso al microfono quando il browser te lo chiede. I sottotitoli appariranno qui in tempo reale — <strong>parla liberamente</strong>. Mentre parli, tieni d'occhio le metriche nel pannello a sinistra: WPM, diversità lessicale, copertura NGSL e molto altro.</p><div class="hero-chips"><button class="hero-chip strong" onclick="document.getElementById('heroBanner').classList.add('is-closing')"><svg class="icon" style="width:18px;height:18px;margin-right:4px"><use href="#i-mic"></use></svg>Ho capito, iniziamo!</button><button class="hero-chip" onclick="document.getElementById('heroBanner').classList.add('is-closing')">Chiudi</button></div></div>
           </article>
           <!-- ═══ CAPTION WORKSPACE ═══ -->
           <div class="caption-stage" id="captionStage">
+            <!-- Live feed area — grows/shrinks as divider is dragged -->
+            <div class="caption-live-area">
+              <div class="live-feed" id="liveFeed" data-placeholder="Le tue parole compariranno qui…">Le tue parole compariranno qui…</div>
+            </div>
             <!-- Draggable divider -->
             <div class="caption-divider" id="captionDivider"></div>
             <!-- Previous sentences → resizable via divider drag -->
@@ -1137,6 +1147,22 @@
         });
       });
     })();
+    /* ── Sub-tab switching within content panels ── */
+    document.addEventListener('click', function(e){
+      var tab = e.target.closest('.tab-link[data-subtab]');
+      if(!tab) return;
+      e.preventDefault();
+      var panel = tab.closest('.content-panel');
+      if(!panel) return;
+      var subId = tab.getAttribute('data-subtab');
+      // Deactivate all tabs in this panel
+      panel.querySelectorAll('.tab-link').forEach(function(t){ t.classList.remove('active'); });
+      tab.classList.add('active');
+      // Hide all sub-panes, show matching one
+      panel.querySelectorAll('.subtab-pane').forEach(function(p){ p.classList.remove('active'); });
+      var target = document.getElementById('sub-' + subId);
+      if(target) target.classList.add('active');
+    });
   </script>
   <script>
     function toggleStartSession(){
