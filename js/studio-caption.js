@@ -311,33 +311,21 @@ function startSession() {
   var SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
   if (!SpeechRecognition) { showToast('Riconoscimento vocale non supportato su questo browser'); return; }
 
-  // Get mic permission once via getUserMedia, then start everything
-  navigator.mediaDevices.getUserMedia({ audio: true }).then(function(stream) {
-    // AudioContext for waveform from the same stream
-    try {
-      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-      analyser = audioCtx.createAnalyser();
-      analyser.fftSize = 256;
-      dataArray = new Uint8Array(analyser.fftSize);
-      var source = audioCtx.createMediaStreamSource(stream);
-      source.connect(analyser);
-    } catch(e) { console.warn('AudioContext:', e); }
-
-    // Now start speech recognition — permission already granted, won't prompt again
-    _reallyStartSession(SpeechRecognition);
-  }).catch(function(e) {
-    console.warn('Mic denied:', e);
-    showToast('Microfono non disponibile. Concedi l\'accesso e riprova.');
-  });
-}
-
-function _reallyStartSession(SpeechRecognition) {
   recognition = new SpeechRecognition();
   recognition.continuous = true;
   recognition.interimResults = true;
   recognition.lang = currentLang === 'en' ? 'en-US' : currentLang === 'it' ? 'it-IT' : currentLang === 'nl' ? 'nl-NL' : currentLang === 'es' ? 'es-ES' : currentLang === 'fr' ? 'fr-FR' : 'de-DE';
 
+  // AudioContext for waveform (no getUserMedia — SpeechRecognition handles mic)
+  try {
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    analyser = audioCtx.createAnalyser();
+    analyser.fftSize = 256;
+    dataArray = new Uint8Array(analyser.fftSize);
+  } catch(e) { console.warn('AudioContext:', e); }
+
   wordCount = 0; totalChars = 0; sessionLines = []; lineCount = 0;
+  totalFillerCount = 0; knownWords = {};
   sessionStartTime = Date.now();
   sessionActive = true; sessionPaused = false;
   setSessionState('active');
