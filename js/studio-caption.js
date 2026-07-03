@@ -2,26 +2,20 @@
 'use strict';
 
 /* ── State ── */
-var recognition = null;
-var audioCtx = null;
-var analyser = null;
-var animFrameId = null;
 var sessionActive = false;
 var sessionPaused = false;
 var sessionStartTime = null;
 var sessionInterval = null;
 var wordCount = 0;
 var totalChars = 0;
-var currentLang = 'en';
+var currentLang = localStorage.getItem('sottotitoli-study-lang') || 'en';
 var fontMode = 'crisp';
 var waveMode = 'bars';
-var waveBars = [];
 var speakerMap = {};
 var sessionLines = [];
 var lineCount = 0;
 var supabaseSessionId = null;
 var supabaseRoomId = null;
-var dataArray = null;
 
 /* ── DOM refs ── */
 var DOM = {
@@ -113,13 +107,12 @@ function showToast(msg) {
 function setSessionState(state) {
   sessionActive = (state === 'active' || state === 'paused');
   sessionPaused = (state === 'paused');
-  DOM.startBtn.disabled = sessionActive;
-  DOM.pauseBtn.disabled = !sessionActive;
-  DOM.stopBtn.disabled = !sessionActive;
-  DOM.pauseBtn.classList.toggle('paused', sessionPaused);
-  DOM.pauseBtn.textContent = sessionPaused ? '▶ Riprendi' : '⏸ Pausa';
-  DOM.sessionDot.className = 'tp-dot' + (state === 'active' ? ' live' : '');
-  DOM.sessionPillText.textContent = state === 'active' ? 'In corso' : state === 'paused' ? 'In pausa' : 'Inattivo';
+  if (DOM.startBtn) DOM.startBtn.disabled = sessionActive;
+  if (DOM.pauseBtn) DOM.pauseBtn.disabled = !sessionActive;
+  if (DOM.stopBtn) DOM.stopBtn.disabled = !sessionActive;
+  if (DOM.pauseBtn) { DOM.pauseBtn.classList.toggle('paused', sessionPaused); DOM.pauseBtn.textContent = sessionPaused ? '▶ Riprendi' : '⏸ Pausa'; }
+  if (DOM.sessionDot) DOM.sessionDot.className = 'tp-dot' + (state === 'active' ? ' live' : '');
+  if (DOM.sessionPillText) DOM.sessionPillText.textContent = state === 'active' ? 'In corso' : state === 'paused' ? 'In pausa' : 'Inattivo';
 }
 
 // Wire session control buttons explicitly
@@ -127,15 +120,16 @@ if (DOM.startBtn) DOM.startBtn.addEventListener('click', startSession);
 if (DOM.pauseBtn) DOM.pauseBtn.addEventListener('click', pauseSession);
 if (DOM.stopBtn) DOM.stopBtn.addEventListener('click', stopSession);
 
-/* ── Waveform init ── */
+/* ── Waveform (placeholder — real-mic.js handles audio) ── */
 function initWaveViz() {
+  if (!DOM.waveViz) return;
   DOM.waveViz.innerHTML = '';
   for (var i = 0; i < 32; i++) {
     var b = document.createElement('div');
     b.className = 'c-wave-bar';
+    b.style.height = '4px';
     DOM.waveViz.appendChild(b);
   }
-  waveBars = DOM.waveViz.querySelectorAll('.c-wave-bar');
 }
 initWaveViz();
 
@@ -147,15 +141,15 @@ function setWaveMode(mode) {
 }
 
 function animateWave() {
-  if (!analyser || !dataArray) { requestAnimationFrame(animateWave); return; }
-  analyser.getByteFrequencyData(dataArray);
-  if (!waveBars.length) { requestAnimationFrame(animateWave); return; }
-  var step = Math.floor(dataArray.length / waveBars.length);
-  for (var i = 0; i < waveBars.length; i++) {
-    var val = dataArray[i * step] / 255;
-    var h = Math.max(4, val * 44);
-    waveBars[i].style.height = h + 'px';
-    waveBars[i].style.opacity = 0.35 + val * 0.65;
+  // Waveform visualization via real-mic.js _readWaveVolume
+  // Placeholder animation for visual feedback
+  if (!DOM.waveViz) return;
+  var bars = DOM.waveViz.querySelectorAll('.c-wave-bar');
+  if (!bars.length) return;
+  for (var i = 0; i < bars.length; i++) {
+    var h = Math.max(4, Math.random() * 44);
+    bars[i].style.height = h + 'px';
+    bars[i].style.opacity = 0.35 + Math.random() * 0.65;
   }
   requestAnimationFrame(animateWave);
 }
@@ -163,6 +157,8 @@ function animateWave() {
 /* ── Language ── */
 function setLang(btn, lang) {
   currentLang = lang;
+  localStorage.setItem('sottotitoli-study-lang', lang);
+  if (window._realMic) _realMic.lang = lang === 'en' ? 'en-US' : lang === 'it' ? 'it-IT' : lang === 'nl' ? 'nl-NL' : lang === 'es' ? 'es-ES' : lang === 'fr' ? 'fr-FR' : 'de-DE';
   document.querySelectorAll('#leftBar .lang-opt').forEach(function(o) {
     o.classList.toggle('active', o.getAttribute('data-lang') === lang);
   });
@@ -304,78 +300,65 @@ function copyShareLink(triggerBtn) {
 })();
 
 /* ═══════════════════════════════════════════
-   SPEECH RECOGNITION + SESSION MANAGEMENT
+   SPEECH RECOGNITION via real-mic.js
    ═══════════════════════════════════════════ */
 
+// Connect real-mic.js callbacks
+_realMic.onInterim = function(text) {
+  if (DOM.liveText) DOM.liveText.textContent = text;
+};
+
+_realMic.onFinal = function(text) {
+  processFinalLine(text);
+};
+
+_realMic.onStateChange = function(state) {
+  if (state === 'live') {
+    setSessionState('active');
+    if (!sessionStartTime) {
+      sessionStartTime = Date.now();
+      startMetricsInterval();
+      createSupabaseSession();
+    }
+  } else if (state === 'idle') {
+    setSessionState('idle');
+    updateMetrics(true);
+    if (sessionInterval) { clearInterval(sessionInterval); sessionInterval = null; }
+  }
+};
+
 function startSession() {
-  var SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-  if (!SpeechRecognition) { showToast('Riconoscimento vocale non supportato su questo browser'); return; }
-
-  recognition = new SpeechRecognition();
-  recognition.continuous = true;
-  recognition.interimResults = true;
-  recognition.lang = currentLang === 'en' ? 'en-US' : currentLang === 'it' ? 'it-IT' : currentLang === 'nl' ? 'nl-NL' : currentLang === 'es' ? 'es-ES' : currentLang === 'fr' ? 'fr-FR' : 'de-DE';
-
-  // AudioContext for waveform (no getUserMedia — SpeechRecognition handles mic)
-  try {
-    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    analyser = audioCtx.createAnalyser();
-    analyser.fftSize = 256;
-    dataArray = new Uint8Array(analyser.fftSize);
-  } catch(e) { console.warn('AudioContext:', e); }
-
   wordCount = 0; totalChars = 0; sessionLines = []; lineCount = 0;
   totalFillerCount = 0; knownWords = {};
-  sessionStartTime = Date.now();
+  sessionStartTime = null;
   sessionActive = true; sessionPaused = false;
   setSessionState('active');
-  animateWave();
-  createSupabaseSession();
-
-  recognition.onresult = function(event) {
-    var interim = '';
-    var final = '';
-    for (var i = event.resultIndex; i < event.results.length; i++) {
-      var t = event.results[i][0].transcript.trim();
-      if (event.results[i].isFinal) {
-        final += t + ' ';
-        processFinalLine(t);
-      } else {
-        interim += t;
-      }
+  startRealMic().then(function(ok) {
+    if (!ok) {
+      showToast('Microfono non disponibile. Concedi l\'accesso e riprova.');
+      stopSession();
     }
-    DOM.liveText.textContent = interim || final || '';
-  };
+  });
+}
 
-  recognition.onerror = function(e) {
-    console.warn('Speech error:', e.error);
-    if (e.error === 'not-allowed') {
-      showToast('Microfono non autorizzato. Concedi l\'accesso nelle impostazioni del browser.');
-    } else if (e.error === 'no-speech') {
-      // Silent — just no speech detected yet
-    } else if (e.error) {
-      showToast('Errore riconoscimento: ' + e.error);
-    }
-  };
-  recognition.onend = function() {
-    if (sessionActive && !sessionPaused) {
-      try { recognition.start(); } catch(e) {
-        console.warn('Recognition restart failed:', e);
-        showToast('Impossibile riavviare il riconoscimento. Ricarica la pagina.');
-        stopSession();
-      }
-    }
-  };
-
-  try {
-    recognition.start();
-    startMetricsInterval();
-  } catch(e) {
-    console.error('Failed to start recognition:', e);
-    showToast('Errore avvio microfono: ' + (e.message || 'sconosciuto'));
-    stopSession();
-    return;
+function pauseSession() {
+  if (sessionPaused) {
+    sessionPaused = false;
+    startRealMic();
+  } else {
+    sessionPaused = true;
+    stopRealMic();
+    setSessionState('paused');
   }
+}
+
+function stopSession() {
+  stopRealMic();
+  sessionActive = false;
+  sessionPaused = false;
+  if (sessionInterval) { clearInterval(sessionInterval); sessionInterval = null; }
+  setSessionState('idle');
+  updateMetrics(true);
 }
 
 function pauseSession() {
