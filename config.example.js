@@ -15,7 +15,7 @@ window.SOTTOTITOLI_CONFIG = {
   siteName: "Sottotitoli",
 
   /** Auth redirect URL (after Google OAuth login) */
-  AUTH_REDIRECT_URL: "https://your-domain.github.io/sottotitoli/start.html",
+  AUTH_REDIRECT_URL: "https://buoninglese.github.io/sottotitoli/panoramica.html",
 
   /** Wordnik proxy URL (Supabase Edge Function). Key is server-side only.
       Deploy with: supabase functions deploy wordnik-proxy
