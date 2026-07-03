@@ -91,6 +91,15 @@
         themeText.textContent=t==='dark'?'Light':'Dark';
       });
     })();
+    /* ── Hero welcome card close ── */
+    (function(){
+      var btn=document.getElementById('heroClose');
+      if(!btn)return;
+      btn.addEventListener('click',function(){
+        var card=btn.closest('article');
+        if(card)card.style.display='none';
+      });
+    })();
     /* ── Language switch ── */
     var currentLang = 'en';
     function switchLang(lang, btn){
@@ -169,3 +178,18 @@
       var sfEl=document.getElementById('ssSrcFlag'),snEl=document.getElementById('ssSrcName');if(sfEl)sfEl.textContent=sf.flag;if(snEl)snEl.textContent=sf.name;
       var tfEl=document.getElementById('ssTgtFlag'),tnEl=document.getElementById('ssTgtName');if(tfEl)tfEl.textContent=tf.flag;if(tnEl)tnEl.textContent=tf.name;
     }
+    /* ── Start session buttons ── */
+    (function(){
+      var capBtn=document.querySelector('.start-btn.cap');
+      var trBtn=document.querySelector('.start-btn.tr');
+      if(capBtn){
+        capBtn.addEventListener('click',function(){
+          window.location.href='studio-caption.html?lang='+ssCapCode;
+        });
+      }
+      if(trBtn){
+        trBtn.addEventListener('click',function(){
+          window.location.href='studio-caption.html?src='+ssSrcCode+'&tgt='+ssTgtCode;
+        });
+      }
+    })();
