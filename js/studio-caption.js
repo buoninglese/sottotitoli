@@ -40,8 +40,8 @@ var DOM = {
   lexDivEl: document.getElementById('liveLexDiv'),
   sentencesEl: document.getElementById('liveSentences'),
   durationEl: document.getElementById('sessionDuration'),
-  statWords: document.getElementById('statWords'),
-  statLines: document.getElementById('statLines'),
+  sessionStatWords: document.getElementById('sessionStatWords'),
+  sessionStatLines: document.getElementById('sessionStatLines'),
   vocabChips: document.getElementById('vocabChips'),
   wordbankEmpty: document.getElementById('wordbankEmpty'),
   wordbankDefWord: document.getElementById('wordbankDefWord'),
@@ -122,6 +122,11 @@ function setSessionState(state) {
   DOM.sessionPillText.textContent = state === 'active' ? 'In corso' : state === 'paused' ? 'In pausa' : 'Inattivo';
 }
 
+// Wire session control buttons explicitly
+if (DOM.startBtn) DOM.startBtn.addEventListener('click', startSession);
+if (DOM.pauseBtn) DOM.pauseBtn.addEventListener('click', pauseSession);
+if (DOM.stopBtn) DOM.stopBtn.addEventListener('click', stopSession);
+
 /* ── Waveform init ── */
 function initWaveViz() {
   DOM.waveViz.innerHTML = '';
@@ -169,9 +174,8 @@ function setFontMode(mode) {
   document.body.classList.remove('font-crisp', 'font-anchor');
   if (mode === 'crisp') document.body.classList.add('font-crisp');
   if (mode === 'anchor') document.body.classList.add('font-anchor');
-  document.querySelectorAll('#leftBar .lb-btn-sm').forEach(function(b) {
-    var t = b.textContent.trim().toLowerCase();
-    b.classList.toggle('active', t === mode || (t === 'crisp' && mode === 'crisp'));
+  document.querySelectorAll('#leftBar .lb-btn-sm[data-fontmode]').forEach(function(b) {
+    b.classList.toggle('active', b.dataset.fontmode === mode);
   });
 }
 
@@ -189,7 +193,9 @@ function toggleShojiMode() {
 var currentMode = 'auto';
 function toggleMode() {
   currentMode = (currentMode === 'auto') ? 'solo' : 'auto';
-  DOM.modeBadgeLabel.textContent = currentMode === 'auto' ? 'Automatico' : 'SOLO';
+  if (DOM.modeBadgeLabel) DOM.modeBadgeLabel.textContent = currentMode === 'auto' ? 'Automatico' : 'SOLO';
+  var badge = document.getElementById('modeBadge');
+  if (badge) badge.setAttribute('aria-pressed', currentMode === 'solo');
 }
 
 /* ── Fullscreen ── */
@@ -201,9 +207,11 @@ function toggleFullscreen() {
 (function() {
   var divider = DOM.captionDivider;
   var historyArea = DOM.captionHistory;
+  var captionStage = document.getElementById('captionStage');
   if (!divider || !historyArea) return;
   var isDragging = false, startY, startHistH;
   divider.addEventListener('mousedown', function(e) {
+    e.preventDefault();
     isDragging = true;
     startY = e.clientY;
     startHistH = historyArea.offsetHeight;
@@ -213,7 +221,9 @@ function toggleFullscreen() {
   document.addEventListener('mousemove', function(e) {
     if (!isDragging) return;
     var delta = startY - e.clientY;
-    var newH = Math.max(40, Math.min(startHistH + delta, window.innerHeight * 0.6));
+    var containerH = captionStage ? captionStage.clientHeight : window.innerHeight;
+    var maxH = containerH * 0.8;
+    var newH = Math.max(40, Math.min(startHistH + delta, maxH));
     historyArea.style.flexBasis = newH + 'px';
   });
   document.addEventListener('mouseup', function() {
@@ -223,15 +233,18 @@ function toggleFullscreen() {
     document.body.style.userSelect = '';
   });
   divider.addEventListener('touchstart', function(e) {
+    e.preventDefault();
     isDragging = true;
     startY = e.touches[0].clientY;
     startHistH = historyArea.offsetHeight;
     divider.classList.add('dragging');
-  }, { passive: true });
+  });
   document.addEventListener('touchmove', function(e) {
     if (!isDragging) return;
     var delta = startY - e.touches[0].clientY;
-    var newH = Math.max(40, Math.min(startHistH + delta, window.innerHeight * 0.6));
+    var containerH = captionStage ? captionStage.clientHeight : window.innerHeight;
+    var maxH = containerH * 0.8;
+    var newH = Math.max(40, Math.min(startHistH + delta, maxH));
     historyArea.style.flexBasis = newH + 'px';
   }, { passive: true });
   document.addEventListener('touchend', function() {
@@ -244,6 +257,11 @@ function toggleFullscreen() {
 function shareQR() {
   var url = encodeURIComponent(window.location.href);
   DOM.qrImage.src = 'https://api.qrserver.com/v1/create-qr-code/?data=' + url + '&size=200x200&color=0e7490&bgcolor=fdfefe';
+  DOM.qrImage.onerror = function() {
+    DOM.qrImage.style.display = 'none';
+    DOM.qrUrl.textContent = 'Impossibile caricare il QR code. Controlla la connessione.';
+  };
+  DOM.qrImage.onload = function() { DOM.qrImage.style.display = ''; };
   DOM.qrUrl.textContent = window.location.href;
   DOM.qrModal.classList.add('open');
 }
@@ -379,7 +397,14 @@ function processFinalLine(text) {
   var ts = now.getHours().toString().padStart(2,'0') + ':' + now.getMinutes().toString().padStart(2,'0') + ':' + now.getSeconds().toString().padStart(2,'0');
   var line = document.createElement('div');
   line.className = 'c-line';
-  line.innerHTML = '<span class="ts">' + ts + '</span>' + text;
+  var timeSpan = document.createElement('span');
+  timeSpan.className = 'c-line-time';
+  timeSpan.textContent = ts;
+  var textSpan = document.createElement('span');
+  textSpan.className = 'c-line-text';
+  textSpan.textContent = text;
+  line.appendChild(timeSpan);
+  line.appendChild(textSpan);
   DOM.transcript.appendChild(line);
   DOM.transcript.scrollTop = DOM.transcript.scrollHeight;
 
@@ -413,22 +438,47 @@ function guessPOS(word) {
 }
 
 function addVocabChip(word, pos) {
-  DOM.wordbankEmpty.style.display = 'none';
-  var chip = document.createElement('span');
+  if (DOM.wordbankEmpty) DOM.wordbankEmpty.style.display = 'none';
+  var chip = document.createElement('button');
+  chip.type = 'button';
   chip.className = 'q-chip tag-' + pos;
   chip.textContent = word;
-  chip.style.fontSize = '12px'; chip.style.padding = '4px 10px';
-  chip.style.display = 'inline-flex'; chip.style.alignItems = 'center';
+  chip.setAttribute('aria-pressed', 'false');
   chip.addEventListener('click', function() {
-    DOM.wordbankDefWord.textContent = word;
-    DOM.wordbankDefText.textContent = pos + ' · usata ' + (knownWords[word] ? knownWords[word].count : 1) + ' volta/e';
-    if (window.nlp) {
-      var doc = window.nlp(word);
-      var w = doc.verbs().toInfinitive().out() || doc.nouns().toSingular().out() || word;
+    if (DOM.wordbankDefWord) DOM.wordbankDefWord.textContent = word;
+    if (DOM.wordbankDefText) DOM.wordbankDefText.textContent = pos + ' · usata ' + (knownWords[word] ? knownWords[word].count : 1) + ' volta/e';
+  });
+  if (DOM.vocabChips) DOM.vocabChips.appendChild(chip);
+}
+
+// Wordbank input: Enter to add word
+if (DOM.wordbankInput) {
+  DOM.wordbankInput.addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') {
+      var val = DOM.wordbankInput.value.trim();
+      if (val) {
+        addVocabChip(val, guessPOS(val));
+        DOM.wordbankInput.value = '';
+      }
     }
   });
-  DOM.vocabChips.appendChild(chip);
 }
+
+// Filler detection
+var FILLERS_EN = ['um','uh','er','ah','like','you know','i mean','so','actually','basically','literally','right','okay'];
+var FILLERS_IT = ['tipo','cioè','quindi','allora','ehm','uhm','bah','beh','insomma','praticamente','diciamo','va bene','okay'];
+function countFillers(text) {
+  var allFillers = currentLang === 'it' ? FILLERS_IT : FILLERS_EN;
+  var lower = text.toLowerCase();
+  var count = 0;
+  allFillers.forEach(function(f) {
+    var re = new RegExp('\\b' + f.replace(/\s/g,'\\s') + '\\b', 'gi');
+    var matches = lower.match(re);
+    if (matches) count += matches.length;
+  });
+  return count;
+}
+var totalFillerCount = 0;
 
 /* ── Metrics interval ── */
 function startMetricsInterval() {
@@ -445,55 +495,70 @@ function updateMetrics(final) {
   DOM.sentencesEl.textContent = lineCount;
   if (elapsed > 0) {
     var wpm = Math.round(wordCount / (elapsed / 60));
-    DOM.wpmEl.textContent = wpm || '—';
-    var fillerCount = 0;
+    if (DOM.wpmEl) DOM.wpmEl.textContent = wpm || '—';
+    // Filler detection: count across all session lines
+    var allText = sessionLines.join(' ');
+    totalFillerCount = countFillers(allText);
+    var mins = elapsed / 60;
+    var fpm = mins > 0 ? (totalFillerCount / mins).toFixed(1) : '0.0';
+    if (DOM.fillersEl) DOM.fillersEl.textContent = fpm;
     var uniqueWords = Object.keys(knownWords).length;
     var lexDiv = wordCount > 0 ? (uniqueWords / wordCount).toFixed(2) : 0;
-    DOM.lexDivEl.textContent = lexDiv;
-    DOM.fillersPerMin = '—';
+    if (DOM.lexDivEl) DOM.lexDivEl.textContent = lexDiv;
   }
   if (final) {
-    DOM.statWords.textContent = wordCount;
-    DOM.statLines.textContent = lineCount;
-    // POS stack
+    if (DOM.sessionStatWords) DOM.sessionStatWords.textContent = wordCount;
+    if (DOM.sessionStatLines) DOM.sessionStatLines.textContent = lineCount;
+    // POS stack for analysis tab
     var posCounts = {};
     Object.values(knownWords).forEach(function(k) { posCounts[k.pos] = (posCounts[k.pos]||0) + 1; });
-    DOM.analysisPosStack.innerHTML = '';
-    Object.entries(posCounts).sort(function(a,b){ return b[1]-a[1]; }).slice(0,6).forEach(function(e) {
-      var s = document.createElement('span');
-      s.className = 'q-chip tag-' + e[0];
-      s.style.cssText = 'font-size:11px;padding:3px 8px';
-      s.textContent = e[0] + ': ' + e[1];
-      DOM.analysisPosStack.appendChild(s);
-    });
-    DOM.analysisSelectedText.textContent = wordCount + ' parole in ' + lineCount + ' frasi. ' + Object.keys(knownWords).length + ' parole uniche.';
+    if (DOM.analysisPosStack) {
+      DOM.analysisPosStack.innerHTML = '';
+      Object.entries(posCounts).sort(function(a,b){ return b[1]-a[1]; }).slice(0,6).forEach(function(e) {
+        var s = document.createElement('span');
+        s.className = 'q-chip tag-' + e[0];
+        s.textContent = e[0] + ': ' + e[1];
+        DOM.analysisPosStack.appendChild(s);
+      });
+    }
+    if (DOM.analysisSelectedText) DOM.analysisSelectedText.textContent = wordCount + ' parole in ' + lineCount + ' frasi. ' + Object.keys(knownWords).length + ' parole uniche.';
   }
 }
 
 /* ── Supabase session creation ── */
 async function createSupabaseSession() {
   var sb = window.sottotitoliSupabase;
-  if (!sb) return;
-  var r = await sb.auth.getSession();
-  if (!r.data?.session) return;
-  var userId = r.data.session.user.id;
-  var langCode = currentLang === 'en' ? 'en-US' : currentLang === 'it' ? 'it-IT' : currentLang + '-' + currentLang.toUpperCase();
-  var roomId = 'caption-' + langCode.replace('-','').toLowerCase() + '-' + Date.now().toString(36);
-  var res = await sb.from('sessions').insert({
-    user_id: userId,
-    room: roomId,
-    mode: 'caption-' + (langCode === 'en-US' ? 'en' : langCode.split('-')[0]),
-    started_at: new Date().toISOString(),
-    language_pair: langCode,
-    session_type: 'caption'
-  }).select('id').single();
-  if (res.data) {
-    supabaseSessionId = res.data.id;
-    supabaseRoomId = roomId;
-    localStorage.setItem('sottotitoli-caption-session', res.data.id);
-    localStorage.setItem('sottotitoli-caption-room-id', roomId);
-    DOM.capRoomId.textContent = roomId.substring(0, 14) + '…';
-    DOM.capRoomLink.textContent = window.location.origin + '/studio-caption.html?join=1&room=' + roomId;
+  if (!sb) {
+    if (DOM.capRoomId) DOM.capRoomId.textContent = '— (offline)';
+    if (DOM.capRoomLink) DOM.capRoomLink.textContent = 'Condivisione non disponibile';
+    return;
+  }
+  try {
+    var r = await sb.auth.getSession();
+    if (!r.data?.session) return;
+    var userId = r.data.session.user.id;
+    var langCode = currentLang === 'en' ? 'en-US' : currentLang === 'it' ? 'it-IT' : currentLang + '-' + currentLang.toUpperCase();
+    var roomId = 'caption-' + langCode.replace('-','').toLowerCase() + '-' + Date.now().toString(36);
+    var res = await sb.from('sessions').insert({
+      user_id: userId,
+      room: roomId,
+      mode: 'caption-' + (langCode === 'en-US' ? 'en' : langCode.split('-')[0]),
+      started_at: new Date().toISOString(),
+      language_pair: langCode,
+      session_type: 'caption'
+    }).select('id').single();
+    if (res.data) {
+      supabaseSessionId = res.data.id;
+      supabaseRoomId = roomId;
+      localStorage.setItem('sottotitoli-caption-session', res.data.id);
+      localStorage.setItem('sottotitoli-caption-room-id', roomId);
+      if (DOM.capRoomId) DOM.capRoomId.textContent = roomId.substring(0, 14) + '…';
+      if (DOM.capRoomLink) DOM.capRoomLink.textContent = window.location.origin + '/studio-caption.html?join=1&room=' + roomId;
+    }
+  } catch(e) {
+    console.warn('Supabase session creation failed:', e);
+    if (DOM.capRoomId) DOM.capRoomId.textContent = '— (errore)';
+    if (DOM.capRoomLink) DOM.capRoomLink.textContent = 'Condivisione non disponibile';
   }
 }
 
@@ -520,8 +585,8 @@ async function createSupabaseSession() {
     var totalWords = sRes.data.reduce(function(s,r){return s+(r.words_count||0)},0);
     var totalSessions = sRes.data.length;
     var avgWpm = sRes.data.reduce(function(s,r){return s+(r.wpm_avg||0)},0)/totalSessions;
-    var elWords = document.getElementById('statWords');
-    var elLines = document.getElementById('statLines');
+    var elWords = document.getElementById('overallStatWords');
+    var elLines = document.getElementById('overallStatLines');
     if (elWords) elWords.textContent = totalWords;
     if (elLines) elLines.textContent = totalSessions;
   }
@@ -533,10 +598,11 @@ async function createSupabaseSession() {
     if (emptyEl) emptyEl.style.display = 'none';
     var chipsContainer = document.getElementById('vocabChips');
     vRes.data.forEach(function(w) {
-      var chip = document.createElement('span');
+      var chip = document.createElement('button');
+      chip.type = 'button';
       chip.className = 'q-chip tag-' + (w.pos||'NOUN');
-      chip.style.cssText = 'font-size:12px;padding:4px 10px;display:inline-flex;align-items:center';
       chip.textContent = w.word;
+      chip.setAttribute('aria-pressed', 'false');
       chip.addEventListener('click', function() {
         var defWord = document.getElementById('wordbankDefWord');
         var defText = document.getElementById('wordbankDefText');
