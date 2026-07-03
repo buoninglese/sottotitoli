@@ -247,8 +247,165 @@
   /* ── Listen for language changes ── */
   document.addEventListener('studylang-changed', function(e) {
     cacheClear();
-    // Will be re-fetched on next panel load
   });
+
+  /* ═══════════════════════════════════════════
+     WORD BANKS
+     ═══════════════════════════════════════════ */
+  async function getWordbanks(lang) {
+    lang = lang || getStudyLang();
+    var userId = await getUserId();
+    if (!userId) return [];
+    var cacheKey = 'wordbanks_' + lang;
+    var cached = cacheGet(cacheKey);
+    if (cached) return cached;
+    var r = await sb().from('user_wordbanks').select('*').eq('user_id', userId).eq('lang', lang).order('created_at');
+    if (r.error) { console.warn('wordbanks:', r.error.message); return []; }
+    cacheSet(cacheKey, r.data);
+    return r.data || [];
+  }
+
+  async function getWordbankWords(wordbankId) {
+    var r = await sb().from('user_wordbank_words').select('*').eq('wordbank_id', wordbankId).order('usage_count', { ascending: false });
+    if (r.error) return [];
+    return r.data || [];
+  }
+
+  async function addWordbank(name, lang) {
+    var userId = await getUserId();
+    if (!userId) return null;
+    var r = await sb().from('user_wordbanks').insert({ user_id: userId, name: name, lang: lang }).select().single();
+    if (r.error) { console.warn('add wordbank:', r.error.message); return null; }
+    cacheClear();
+    return r.data;
+  }
+
+  async function addWordToBank(wordbankId, word, pos) {
+    var r = await sb().from('user_wordbank_words').insert({ wordbank_id: wordbankId, word: word, pos: pos, usage_count: 0 }).select().single();
+    if (r.error) { console.warn('add word:', r.error.message); return null; }
+    return r.data;
+  }
+
+  /* ═══════════════════════════════════════════
+     VOCABULARY
+     ═══════════════════════════════════════════ */
+  async function getVocabulary(lang, limit) {
+    lang = lang || getStudyLang();
+    limit = limit || 50;
+    var userId = await getUserId();
+    if (!userId) return [];
+    var cacheKey = 'vocab_' + lang;
+    var cached = cacheGet(cacheKey);
+    if (cached) return cached.slice(0, limit);
+    var r = await sb().from('user_vocabulary').select('*').eq('user_id', userId).eq('lang', lang).order('usage_count', { ascending: false }).limit(limit);
+    if (r.error) { console.warn('vocab:', r.error.message); return []; }
+    cacheSet(cacheKey, r.data);
+    return r.data || [];
+  }
+
+  async function getVocabularyStats(lang) {
+    lang = lang || getStudyLang();
+    var userId = await getUserId();
+    if (!userId) return null;
+    var cacheKey = 'vocabStats_' + lang;
+    var cached = cacheGet(cacheKey);
+    if (cached) return cached;
+
+    // POS breakdown from user_vocabulary
+    var r = await sb().from('user_vocabulary').select('pos,cefr_level,usage_count').eq('user_id', userId).eq('lang', lang);
+    if (r.error) {
+      // Fallback: compute from sessions
+      return await getVocabularyStatsFromSessions(lang);
+    }
+    var words = r.data || [];
+    if (words.length === 0) return await getVocabularyStatsFromSessions(lang);
+
+    var posCounts = {};
+    var cefrCounts = {};
+    var totalUsages = 0;
+    words.forEach(function(w) {
+      var pos = w.pos || 'OTHER';
+      posCounts[pos] = (posCounts[pos] || 0) + (w.usage_count || 0);
+      var cefr = w.cefr_level || '?';
+      cefrCounts[cefr] = (cefrCounts[cefr] || 0) + (w.usage_count || 0);
+      totalUsages += (w.usage_count || 0);
+    });
+
+    var posPcts = {};
+    Object.keys(posCounts).forEach(function(k) { posPcts[k] = totalUsages > 0 ? Math.round(posCounts[k] / totalUsages * 100) : 0; });
+    var cefrPcts = {};
+    Object.keys(cefrCounts).forEach(function(k) { cefrPcts[k] = totalUsages > 0 ? Math.round(cefrCounts[k] / totalUsages * 100) : 0; });
+
+    var data = { totalWords: words.length, totalUsages: totalUsages, posCounts: posCounts, posPcts: posPcts, cefrCounts: cefrCounts, cefrPcts: cefrPcts, words: words };
+    cacheSet(cacheKey, data);
+    return data;
+  }
+
+  async function getVocabularyStatsFromSessions(lang) {
+    var userId = await getUserId();
+    if (!userId) return null;
+    var r = await sb().from('sessions')
+      .select('pos_nouns,pos_verbs,pos_adjectives,pos_adverbs,pos_pronouns,pos_prepositions,cefr_level,words_count')
+      .eq('user_id', userId).like('language_pair', lang + '%');
+    if (r.error) return { totalWords: 0, totalUsages: 0, posCounts: {}, posPcts: {}, cefrCounts: {}, cefrPcts: {}, words: [] };
+    var sessions = r.data || [];
+    var posCounts = { NOUN: 0, VERB: 0, ADJ: 0, ADV: 0, PRON: 0, PREP: 0 };
+    var cefrCounts = {};
+    var totalUsages = 0;
+    sessions.forEach(function(s) {
+      posCounts.NOUN += (s.pos_nouns || 0);
+      posCounts.VERB += (s.pos_verbs || 0);
+      posCounts.ADJ += (s.pos_adjectives || 0);
+      posCounts.ADV += (s.pos_adverbs || 0);
+      posCounts.PRON += (s.pos_pronouns || 0);
+      posCounts.PREP += (s.pos_prepositions || 0);
+      var cefr = s.cefr_level || '?';
+      cefrCounts[cefr] = (cefrCounts[cefr] || 0) + (s.words_count || 0);
+      totalUsages += (s.words_count || 0);
+    });
+    var posPcts = {};
+    Object.keys(posCounts).forEach(function(k) { posPcts[k] = totalUsages > 0 ? Math.round(posCounts[k] / totalUsages * 100) : 0; });
+    var cefrPcts = {};
+    Object.keys(cefrCounts).forEach(function(k) { cefrPcts[k] = totalUsages > 0 ? Math.round(cefrCounts[k] / totalUsages * 100) : 0; });
+    return { totalWords: 0, totalUsages: totalUsages, posCounts: posCounts, posPcts: posPcts, cefrCounts: cefrCounts, cefrPcts: cefrPcts, words: [] };
+  }
+
+  /* ═══════════════════════════════════════════
+     TASKS — for Insights → Compiti
+     ═══════════════════════════════════════════ */
+  async function getTasks() {
+    var userId = await getUserId();
+    if (!userId) return [];
+    var cached = cacheGet('tasks');
+    if (cached) return cached;
+    var r = await sb().from('user_tasks').select('*').eq('user_id', userId).order('created_at');
+    if (r.error) { console.warn('tasks:', r.error.message); return []; }
+    cacheSet('tasks', r.data);
+    return r.data || [];
+  }
+
+  async function addTask(title) {
+    var userId = await getUserId();
+    if (!userId) return null;
+    var r = await sb().from('user_tasks').insert({ user_id: userId, title: title, status: 'doing' }).select().single();
+    if (r.error) { console.warn('add task:', r.error.message); return null; }
+    cacheClear();
+    return r.data;
+  }
+
+  async function updateTask(id, updates) {
+    var r = await sb().from('user_tasks').update(updates).eq('id', id);
+    if (r.error) { console.warn('update task:', r.error.message); return false; }
+    cacheClear();
+    return true;
+  }
+
+  async function deleteTask(id) {
+    var r = await sb().from('user_tasks').delete().eq('id', id);
+    if (r.error) { console.warn('delete task:', r.error.message); return false; }
+    cacheClear();
+    return true;
+  }
 
   /* ═══════════════════════════════════════════
      EXPORT
@@ -265,6 +422,16 @@
     getCredits: getCredits,
     getPreferences: getPreferences,
     saveProfileField: saveProfileField,
+    getWordbanks: getWordbanks,
+    getWordbankWords: getWordbankWords,
+    addWordbank: addWordbank,
+    addWordToBank: addWordToBank,
+    getVocabulary: getVocabulary,
+    getVocabularyStats: getVocabularyStats,
+    getTasks: getTasks,
+    addTask: addTask,
+    updateTask: updateTask,
+    deleteTask: deleteTask,
     cacheClear: cacheClear
   };
 
