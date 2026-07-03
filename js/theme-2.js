@@ -81,11 +81,12 @@
       if(!btn)return;
       var themeText=btn.querySelector('.theme-text');
       if(!themeText)return;
-      var current=document.documentElement.getAttribute('data-theme')||'light';
+      var body=document.body;
+      var current=body.getAttribute('data-theme')||'light';
       themeText.textContent=current==='dark'?'Light':'Dark';
       btn.addEventListener('click',function(){
-        var t=document.documentElement.getAttribute('data-theme')==='dark'?'light':'dark';
-        document.documentElement.setAttribute('data-theme',t);
+        var t=body.getAttribute('data-theme')==='dark'?'light':'dark';
+        body.setAttribute('data-theme',t);
         themeText.textContent=t==='dark'?'Light':'Dark';
       });
     })();
