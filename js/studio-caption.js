@@ -327,24 +327,24 @@ _realMic.onStateChange = function(state) {
   }
 };
 
-function startSession() {
+async function startSession() {
   wordCount = 0; totalChars = 0; sessionLines = []; lineCount = 0;
   totalFillerCount = 0; knownWords = {};
   sessionStartTime = null;
   sessionActive = true; sessionPaused = false;
   setSessionState('active');
-  startRealMic().then(function(ok) {
-    if (!ok) {
-      showToast('Microfono non disponibile. Concedi l\'accesso e riprova.');
-      stopSession();
-    }
-  });
+  
+  var ok = await startRealMic();
+  if (!ok) {
+    showToast('Microfono non disponibile. Concedi l\'accesso e riprova.');
+    stopSession();
+  }
 }
 
-function pauseSession() {
+async function pauseSession() {
   if (sessionPaused) {
     sessionPaused = false;
-    startRealMic();
+    await startRealMic();
   } else {
     sessionPaused = true;
     stopRealMic();
