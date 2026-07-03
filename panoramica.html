@@ -540,28 +540,28 @@
       // ═══ RENDER: Panoramica hero ───
       function renderHero() {
         var s = currentStats();
-        if (!s) return;
+        var sessions = s ? s.totalSessions : 0;
+        var hours = s ? s.totalHours : '0';
+        var words = s ? (s.totalWords || 0).toLocaleString() : '0';
         var heroP = document.querySelector('.hero-content p');
         if (heroP) {
-          heroP.innerHTML = 'Hai dettato <strong>' + s.totalSessions + ' sessioni</strong> per un totale di <strong>' + s.totalHours + ' ore</strong>. Il tuo vocabolario attivo conta <strong>' + s.totalWords.toLocaleString() + ' parole</strong> uniche.';
+          heroP.innerHTML = 'Hai dettato <strong>' + sessions + ' sessioni</strong> per un totale di <strong>' + hours + ' ore</strong>. Il tuo vocabolario attivo conta <strong>' + words + ' parole</strong> uniche.';
         }
       }
 
       // ═══ RENDER: Panoramica metrics ───
       function renderMetrics() {
         var s = currentStats();
-        if (!s) return;
         var vals = {
-          totalSessions: s.totalSessions,
-          totalMinutes: s.totalMinutes + 'm',
-          totalWords: (s.totalWords > 999 ? (s.totalWords / 1000).toFixed(1) + 'k' : s.totalWords),
-          avgWpm: Math.round(s.avgWpm),
-          avgLexDiv: s.avgLexDiv.toFixed(2),
+          totalSessions: s ? s.totalSessions : 0,
+          totalMinutes: s ? s.totalMinutes + 'm' : '0m',
+          totalWords: s ? (s.totalWords > 999 ? (s.totalWords / 1000).toFixed(1) + 'k' : s.totalWords) : '0',
+          avgWpm: s ? Math.round(s.avgWpm) : '—',
+          avgLexDiv: s ? s.avgLexDiv.toFixed(2) : '—',
           reportCount: (reports || []).length,
-          dailyMin: s.thisWeekSessions > 0 ? Math.round(s.thisWeekMinutes / Math.min(7, s.thisWeekSessions || 1)) + 'm' : '0m',
-          completionPct: s.thisWeekSessions > 0 ? Math.min(100, Math.round(s.thisWeekSessions / 7 * 100)) + '%' : '0%'
+          dailyMin: (s && s.thisWeekSessions > 0) ? Math.round(s.thisWeekMinutes / Math.min(7, s.thisWeekSessions || 1)) + 'm' : '0m',
+          completionPct: (s && s.thisWeekSessions > 0) ? Math.min(100, Math.round(s.thisWeekSessions / 7 * 100)) + '%' : '0%'
         };
-        // Map metric values to their containers
         var cards = document.querySelectorAll('#pnl-panoramica .metric-card');
         var keys = ['totalSessions', 'totalMinutes', 'totalWords', 'avgWpm', 'avgLexDiv', 'reportCount'];
         cards.forEach(function (card, i) {
@@ -570,17 +570,81 @@
             valEl.textContent = vals[keys[i]];
           }
         });
-        // Daily minutes metric (7th card)
         if (cards.length > 6) {
           var dCard = cards[6];
           var dVal = dCard.querySelector('.metric-value');
           if (dVal) dVal.textContent = vals.dailyMin;
         }
-        // Completion % (8th card)
         if (cards.length > 7) {
           var cCard = cards[7];
           var cVal = cCard.querySelector('.metric-value');
           if (cVal) cVal.textContent = vals.completionPct;
+        }
+        // Subtext trend indicators — clear mock data
+        cards.forEach(function(card) {
+          var badge = card.querySelector('.metric-badge');
+          if (badge) badge.textContent = '—';
+        });
+      }
+
+      // ═══ RENDER: Insights metrics ───
+      function renderInsightsMetrics() {
+        var s = currentStats();
+        // CEFR level card
+        var levelEl = document.querySelector('#pnl-insights .alt-card h3');
+        // Clear mock trend text
+        var insightCards = document.querySelectorAll('#pnl-insights .alt-card');
+        insightCards.forEach(function(card) {
+          var ps = card.querySelectorAll('p');
+          ps.forEach(function(p) {
+            if (p.textContent.indexOf('42 ore') !== -1 || p.textContent.indexOf('C1') !== -1 || p.textContent.indexOf('60 ore') !== -1) {
+              p.innerHTML = s ? 'Basato su <strong>' + s.totalSessions + ' sessioni</strong> registrate.' : 'Nessuna sessione registrata. Inizia a parlare!';
+            }
+          });
+        });
+        // Clear objective card
+        var objP = document.querySelector('#pnl-insights .alt-card:last-child p');
+        if (objP && objP.textContent.indexOf('Parlare più fluentemente') !== -1) {
+          objP.textContent = 'Definisci un obiettivo nel tuo Profilo Linguistico per monitorare i progressi.';
+        }
+      }
+
+      // ═══ RENDER: Trascrizioni session list ───
+      async function renderSessions() {
+        var lang = window.SOTTOTITOLI_STUDY_LANG || 'en';
+        var sessions = await SottotitoliData.getSessions(lang, 10);
+        var tbody = document.querySelector('#pnl-trascrizioni .term-row')?.parentElement;
+        if (!tbody) return;
+        tbody.innerHTML = '';
+        if (!sessions || !sessions.length) {
+          tbody.innerHTML = '<div class="term-row"><span style="flex:2;color:var(--text-faint)">Nessuna sessione registrata</span><span style="flex:1"></span><span style="flex:1"></span><span style="flex:1"></span><span class="tr-action"></span></div>';
+          return;
+        }
+        sessions.forEach(function (s) {
+          var tr = document.createElement('div');
+          tr.className = 'term-row';
+          tr.innerHTML = '<span style="flex:2">' + (s.name || 'Sessione ' + s.id.substring(0, 8)) + '</span>' +
+            '<span style="flex:1;text-align:right">' + (s.words_count || 0) + '</span>' +
+            '<span style="flex:1;text-align:right">' + fmtDate(s.started_at) + '</span>' +
+            '<span style="flex:1;text-align:right;color:var(--teal)">' + (s.quality_score ? Math.round(s.quality_score * 100) + '%' : '—') + '</span>' +
+            '<span class="tr-action tr-fav' + (s.favorite ? ' active' : '') + '" onclick="event.stopPropagation();this.classList.toggle(\'active\')">★</span>';
+          tbody.appendChild(tr);
+        });
+      }
+
+      // ═══ RENDER: Invita ───
+      function renderInvita() {
+        var total = refs ? (refs.total || 0) : 0;
+        var active = refs ? (refs.active || 0) : 0;
+        var earned = refs ? (refs.earnedMinutes || 0) : 0;
+        var cards = document.querySelectorAll('#pnl-invita .metric-card');
+        if (cards.length >= 2) {
+          cards[0].querySelector('.metric-value').textContent = total;
+          cards[1].querySelector('.metric-value').textContent = active;
+        }
+        var earnedEl = document.querySelector('#pnl-invita [style*="font-size:32px"]:last-child');
+        if (earnedEl) {
+          earnedEl.innerHTML = '+' + earned + '<span style="font-size:16px">min</span>';
         }
       }
 
@@ -839,6 +903,7 @@
       // ── Initial render ──
       renderHero();
       renderMetrics();
+      renderInsightsMetrics();
       renderProfile();
       renderSessions();
       renderWordbanks();
@@ -853,6 +918,7 @@
         SottotitoliData.cacheClear();
         renderHero();
         renderMetrics();
+        renderInsightsMetrics();
         renderSessions();
         renderWordbanks();
         renderVocabolario();
