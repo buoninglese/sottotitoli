@@ -308,7 +308,7 @@
               </div>
               <div class="addRow" style="display:none;align-items:center;gap:8px;margin-top:8px;padding:8px 10px;background:var(--bg);border-radius:10px;border:1px dashed var(--line)">
                 <input placeholder="Nuovo compito..." id="newTaskInput" style="flex:1;padding:6px 10px;border-radius:8px;border:1px solid var(--line);background:var(--panel);font-size:12px;font-family:var(--font-ui);outline:none" onkeydown="if(event.key==='Enter')addTask()">
-                <button style="padding:6px 12px;border-radius:8px;border:none;background:var(--teal);color:#fff;font-size:11px;font-weight:600;cursor:pointer;font-family:var(--font-ui)" onclick="addTask()">Aggiungi</button>
+                <button style="padding:6px 12px;border-radius:8px;border:none;background:var(--teal);color:#fff;font-size:11px;font-weight:600;cursor:pointer;font-family:var(--font-ui)" onclick="addTaskSupabase()">Aggiungi</button>
               </div>
             </article><article class="alt-card"><h3>Completati di recente</h3><div style="display:flex;flex-direction:column;gap:6px;margin-top:10px"><div style="display:flex;justify-content:space-between;font-size:13px"><span>Revisione grammatica: conditionals</span><span style="color:var(--text-faint);font-size:11px">28 giu</span></div><div style="display:flex;justify-content:space-between;font-size:13px"><span>10 minuti di conversazione libera</span><span style="color:var(--text-faint);font-size:11px">25 giu</span></div></div></article></section>
           </div>
@@ -679,11 +679,172 @@
         reportList.innerHTML = html;
       }
 
+      // ═══ RENDER: Word banks ───
+      async function renderWordbanks() {
+        var lang = window.SOTTOTITOLI_STUDY_LANG || 'en';
+        var banks = await SottotitoliData.getWordbanks(lang);
+        var container = document.querySelector('#pnl-wordbanks .alt-card-grid');
+        if (!container) return;
+
+        if (!banks || !banks.length) {
+          container.innerHTML = '<article class="alt-card"><h3>Nessuna banca</h3><p style="font-size:13px;color:var(--text-soft)">Crea la tua prima banca di parole con il pulsante "Nuova banca".</p></article>';
+          return;
+        }
+
+        var html = '';
+        for (var i = 0; i < banks.length; i++) {
+          var b = banks[i];
+          var words = await SottotitoliData.getWordbankWords(b.id);
+          var chips = words.slice(0, 3).map(function(w) {
+            return '<button type="button" class="q-chip" aria-pressed="false" style="font-size:11px">' + w.word + '</button>';
+          }).join('');
+          html += '<article class="alt-card" style="cursor:pointer" onclick="toggleWordBank(this)">' +
+            '<h3>' + b.name + ' <span style="font-size:11px;font-weight:400;color:var(--text-faint);margin-left:6px">▸ espandi</span></h3>' +
+            '<div class="q-row" style="margin-top:8px">' + chips + '</div>' +
+            '<div style="display:flex;gap:8px;margin-top:12px"><span class="metric-badge">' + words.length + ' parole</span><span class="metric-badge">' + fmtDate(b.created_at) + '</span></div>' +
+            '<div class="wb-expand" style="display:none;margin-top:14px;padding-top:14px;border-top:1px solid var(--line)">' +
+            '<div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap">' +
+            '<input style="flex:1;max-width:260px;padding:8px 12px;border-radius:10px;border:1.5px solid var(--line);background:var(--bg);color:var(--text);font-size:12px;font-family:inherit;outline:none" placeholder="Cerca parola..." oninput="var v=this.value.toLowerCase();this.closest(\'.wb-expand\').querySelectorAll(\'.wb-row\').forEach(function(r){r.style.display=r.textContent.toLowerCase().includes(v)?\'\':\'none\'})">' +
+            '<button type="button" class="q-chip active" aria-pressed="true" style="font-size:10px">Tutte</button></div>' +
+            '<div class="dictionary-list-card"><div class="tbl-head"><span style="flex:2">Parola</span><span style="flex:1;text-align:right">Usi</span><span style="flex:1;text-align:right">Ultima</span><span class="th-action"></span></div>';
+          words.forEach(function(w) {
+            html += '<div class="term-row wb-row"><span style="flex:2"><strong>' + w.word + '</strong> <span style="font-size:9px;padding:2px 6px;border-radius:100px;background:var(--teal-4);color:var(--teal)">' + (w.pos || '') + '</span></span>' +
+              '<span style="flex:1;text-align:right;font-weight:600">' + (w.usage_count || 0) + '</span>' +
+              '<span style="flex:1;text-align:right;font-size:11px;color:var(--text-faint)">' + fmtDate(w.last_used) + '</span>' +
+              '<span class="tr-action tr-fav" onclick="event.stopPropagation();this.classList.toggle(\'active\')">★</span></div>';
+          });
+          html += '</div></div></article>';
+        }
+        // "Nuova banca" card
+        html += '<article class="alt-card" style="border:2px dashed var(--line);background:transparent;display:flex;align-items:center;justify-content:center;cursor:pointer;min-height:180px;transition:all var(--transition)" onmouseover="this.style.borderColor=\'var(--teal)\';this.style.color=\'var(--teal)\'" onmouseout="this.style.borderColor=\'\';this.style.color=\'\'" onclick="newWordbank()"><div style="text-align:center;color:var(--text-soft);font-size:15px;font-weight:600"><svg class="icon" style="width:13px;height:13px;margin-right:6px"><use href=\'#i-plus\'></use></svg> Nuova banca</div></article>';
+        container.innerHTML = html;
+      }
+
+      // ═══ RENDER: Vocabolario ───
+      async function renderVocabolario() {
+        var lang = window.SOTTOTITOLI_STUDY_LANG || 'en';
+        var stats = await SottotitoliData.getVocabularyStats(lang);
+        if (!stats) return;
+
+        // Panoramica tab: POS breakdown
+        var posOrder = ['NOUN', 'VERB', 'ADJ', 'ADV', 'PRON', 'PREP'];
+        var posLabels = { NOUN: 'Nouns', VERB: 'Verbs', ADJ: 'Adjectives', ADV: 'Adverbs', PRON: 'Pronouns', PREP: 'Prepositions' };
+        var posBadges = { NOUN: 'più frequenti', VERB: 'in crescita', ADJ: 'stabile', ADV: '', PRON: '', PREP: '' };
+
+        var metricsContainer = document.querySelector('#sub-voc-panoramica .stats-row');
+        if (metricsContainer) {
+          var mhtml = '';
+          posOrder.forEach(function(pos) {
+            var pct = stats.posPcts[pos] || 0;
+            if (pct === 0 && pos !== 'NOUN' && pos !== 'VERB') return;
+            var badge = posBadges[pos] ? '<div class="metric-badge">' + posBadges[pos] + '</div>' : '';
+            mhtml += '<article class="metric-card"><div class="metric-value">' + pct + '%</div><div class="metric-label">' + (posLabels[pos] || pos) + '</div>' + badge + '</article>';
+          });
+          metricsContainer.innerHTML = mhtml;
+        }
+
+        // CEFR tab: distribution
+        var cefrContainer = document.querySelector('#sub-voc-cefr');
+        if (cefrContainer && stats.cefrPcts) {
+          var cefrOrder = ['A1', 'A2', 'B1', 'B2', 'C1', 'C2'];
+          var cefrColors = { A1: 'var(--green)', A2: 'var(--teal)', B1: 'var(--teal-2)', B2: 'var(--teal)', C1: 'var(--amber)', C2: '#8b5cf6' };
+          var chtml = '<section class="alt-card-grid"><article class="alt-card"><h3>Distribuzione CEFR</h3><div style="display:flex;flex-direction:column;gap:8px;margin-top:10px">';
+          cefrOrder.forEach(function(level) {
+            var pct = stats.cefrPcts[level] || 0;
+            var color = cefrColors[level] || 'var(--line)';
+            chtml += '<div style="display:flex;align-items:center;gap:10px"><span style="width:28px;font-size:12px;font-weight:700;color:' + color + '">' + level + '</span><div style="flex:1;height:6px;border-radius:3px;background:var(--line);overflow:hidden"><div style="height:100%;width:' + pct + '%;background:' + color + ';border-radius:3px"></div></div><span style="font-size:12px;font-weight:600;color:var(--text-soft);min-width:36px">' + pct + '%</span></div>';
+          });
+          chtml += '</div></article></section>';
+          cefrContainer.innerHTML = chtml;
+        }
+
+        // Parole tab: top words list
+        var paroleContainer = document.querySelector('#sub-voc-parole');
+        if (paroleContainer && stats.words && stats.words.length > 0) {
+          var phtml = '<div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap"><input style="flex:1;max-width:300px;padding:10px 14px;border-radius:10px;border:1.5px solid var(--line);background:var(--bg);color:var(--text);font-size:13px;font-family:inherit;outline:none" placeholder="Cerca parola..." oninput="var v=this.value.toLowerCase();this.closest(\'.subtab-pane\').querySelectorAll(\'.term-row\').forEach(function(r){r.style.display=r.textContent.toLowerCase().includes(v)?\'\':\'none\'})">' +
+            '<button type="button" class="q-chip active" aria-pressed="true">Tutte</button>' +
+            '<button type="button" class="q-chip" aria-pressed="false">Nouns</button>' +
+            '<button type="button" class="q-chip" aria-pressed="false">Verbs</button>' +
+            '<button type="button" class="q-chip" aria-pressed="false">Adjectives</button></div>' +
+            '<section class="dictionary-list-card"><div class="tbl-head"><span style="flex:2">Parola</span><span style="flex:1;text-align:right">Tipo</span><span style="flex:1;text-align:right">Usi</span><span class="th-action"></span></div>';
+          stats.words.forEach(function(w) {
+            var posColor = { NOUN: 'var(--teal)', VERB: 'var(--green)', ADJ: 'var(--amber)', ADV: '#8b5cf6' };
+            var pc = posColor[w.pos] || 'var(--teal)';
+            phtml += '<div class="term-row"><span style="flex:2">' + w.word + '</span>' +
+              '<span style="flex:1;text-align:right;font-size:12px;color:var(--text-soft)">' + (w.pos || '') + '</span>' +
+              '<span style="flex:1;text-align:right;font-size:12px;color:var(--text-faint)">' + (w.usage_count || 0) + '×</span>' +
+              '<span class="tr-action tr-fav" onclick="this.classList.toggle(\'active\')">★</span>' +
+              '<span class="tr-action tr-menu" onclick="var dd=this.querySelector(\'.tr-dd\');dd.classList.toggle(\'open\');event.stopPropagation()"><span style="font-weight:700;letter-spacing:1px">•••</span><div class="tr-dd"><button type="button" class="tr-dd-item">Apri</button><button type="button" class="tr-dd-item">Rinomina</button><button type="button" class="tr-dd-item danger">Elimina</button></div></span></div>';
+          });
+          phtml += '</section>';
+          paroleContainer.innerHTML = phtml;
+        }
+      }
+
+      // ═══ RENDER: Insights tasks ───
+      async function renderTasks() {
+        var tasks = await SottotitoliData.getTasks();
+        var tbody = document.querySelector('#taskTable tbody');
+        if (!tbody) return;
+        if (!tasks || !tasks.length) {
+          tbody.innerHTML = '<tr><td colspan="4" style="padding:12px;text-align:center;color:var(--text-faint)">Nessun compito. Aggiungine uno!</td></tr>';
+          return;
+        }
+        var statusColors = { doing: 'var(--amber)', todo: 'var(--teal)', done: 'var(--green)' };
+        var statusLabels = { doing: 'In corso', todo: 'Da fare', done: 'Completato' };
+        var html = '';
+        tasks.forEach(function(t) {
+          var sc = statusColors[t.status] || 'var(--teal)';
+          html += '<tr class="task-row"><td style="padding:8px 10px"><span>' + t.title + '</span></td>' +
+            '<td style="padding:8px 10px"><select style="padding:4px 8px;border-radius:8px;border:1px solid var(--line);background:var(--bg);font-size:11px;font-family:var(--font-ui);font-weight:600;color:' + sc + ';cursor:pointer" onchange="var v=this.value;var m={doing:\'var(--amber)\',todo:\'var(--teal)\',done:\'var(--green)\'};this.style.color=m[v];SottotitoliData.updateTask(\'' + t.id + '\',{status:v})">' +
+            '<option value="doing" style="color:var(--amber)"' + (t.status === 'doing' ? ' selected' : '') + '>In corso</option>' +
+            '<option value="todo" style="color:var(--teal)"' + (t.status === 'todo' ? ' selected' : '') + '>Da fare</option>' +
+            '<option value="done" style="color:var(--green)"' + (t.status === 'done' ? ' selected' : '') + '>Completato</option></select></td>' +
+            '<td style="padding:8px 10px;font-size:11px;color:var(--text-faint)">' + fmtDate(t.created_at) + '</td>' +
+            '<td style="padding:8px 10px"><button aria-label="Elimina compito" style="border:none;background:none;color:var(--text-faint);cursor:pointer;font-size:13px;padding:2px 6px;border-radius:6px;transition:all var(--transition)" onmouseover="this.style.color=\'#dc2626\';this.style.background=\'rgba(220,38,38,.08)\'" onmouseout="this.style.color=\'\';this.style.background=\'\'" onclick="SottotitoliData.deleteTask(\'' + t.id + '\').then(function(){renderTasks()})"><svg class="icon" style="width:12px;height:12px"><use href=\'#i-close\'></use></svg></button></td></tr>';
+        });
+        tbody.innerHTML = html;
+      }
+      // Make renderTasks globally accessible for addTask/delete
+      window.renderTasks = renderTasks;
+
+      // Override addTask in theme-2.js with Supabase version
+      window.addTaskSupabase = async function() {
+        var inp = document.getElementById('newTaskInput');
+        if (!inp) return;
+        var v = inp.value.trim();
+        if (!v) return;
+        var task = await SottotitoliData.addTask(v);
+        if (task) {
+          inp.value = '';
+          var ar = inp.closest('.addRow');
+          if (ar) ar.style.display = 'none';
+          var btn = document.querySelector('#sub-compiti article button');
+          if (btn) btn.style.display = 'inline-flex';
+          renderTasks();
+        }
+      };
+
+      // ── "Nuova banca" handler ──
+      window.newWordbank = async function() {
+        var lang = window.SOTTOTITOLI_STUDY_LANG || 'en';
+        var name = prompt('Nome della nuova banca:');
+        if (!name) return;
+        var wb = await SottotitoliData.addWordbank(name.trim(), lang);
+        if (wb) {
+          SottotitoliData.cacheClear();
+          renderWordbanks();
+        }
+      };
+
       // ── Initial render ──
       renderHero();
       renderMetrics();
       renderProfile();
       renderSessions();
+      renderWordbanks();
+      renderVocabolario();
+      renderTasks();
       renderInvita();
       renderSettings();
       renderAIReports();
@@ -694,20 +855,24 @@
         renderHero();
         renderMetrics();
         renderSessions();
+        renderWordbanks();
+        renderVocabolario();
         renderAIReports();
       });
 
-      // ── Refresh sessions when Trascrizioni tab is clicked ──
+      // ── Refresh on tab clicks ──
       var trascrizioniNav = document.querySelector('[data-panel="trascrizioni"]');
       if (trascrizioniNav) {
-        trascrizioniNav.addEventListener('click', function () {
-          setTimeout(renderSessions, 100);
-        });
+        trascrizioniNav.addEventListener('click', function () { setTimeout(renderSessions, 100); });
       }
       var reportNav = document.querySelector('[data-panel="report-ai"]');
-      if (reportNav) {
-        reportNav.addEventListener('click', function () {
-          setTimeout(renderAIReports, 100);
+      if (reportNav) { reportNav.addEventListener('click', function () { setTimeout(renderAIReports, 100); }); }
+      var wbNav = document.querySelector('[data-panel="wordbanks"]');
+      if (wbNav) { wbNav.addEventListener('click', function () { setTimeout(renderWordbanks, 100); }); }
+      var vocNav = document.querySelector('[data-panel="vocabolario"]');
+      if (vocNav) { vocNav.addEventListener('click', function () { setTimeout(renderVocabolario, 100); }); }
+      var insNav = document.querySelector('[data-panel="insights"]');
+      if (insNav) { insNav.addEventListener('click', function () { setTimeout(renderTasks, 100); }); }
         });
       }
     })();
