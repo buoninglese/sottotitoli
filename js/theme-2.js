@@ -16,9 +16,14 @@
     }
     /* ── Task table helpers ── */
     function addTask(){
-      var inp=document.getElementById('newTaskInput'),v=inp.value.trim();
+      var inp=document.getElementById('newTaskInput');
+      if(!inp)return;
+      var v=inp.value.trim();
       if(!v)return;
-      var tbody=document.getElementById('taskTable').querySelector('tbody');
+      var tbody=document.getElementById('taskTable');
+      if(!tbody)return;
+      tbody=tbody.querySelector('tbody');
+      if(!tbody)return;
       var r=tbody.insertRow();r.className='task-row';
       r.innerHTML='<td style="padding:8px 10px"><span contenteditable="true" style="outline:none;border-bottom:1px dashed transparent;padding:2px 0;transition:border var(--transition)" onfocus="this.style.borderColor=\'var(--teal)\'" onblur="this.style.borderColor=\'transparent\'">'+v+'</span></td><td style="padding:8px 10px"><select style="padding:4px 8px;border-radius:8px;border:1px solid var(--line);background:var(--bg);font-size:11px;font-family:var(--font-ui);font-weight:600;color:var(--teal);cursor:pointer" onchange="var m={doing:\'#d97706\',todo:\'var(--teal)\',done:\'var(--green)\'};this.style.color=m[this.value]||\'\'"><option value="doing" style="color:#d97706">In corso</option><option value="todo" style="color:var(--teal)" selected>Da fare</option><option value="done" style="color:var(--green)">Completato</option></select></td><td style="padding:8px 10px;font-size:11px;color:var(--text-faint)">oggi</td><td style="padding:8px 10px"><button style="border:none;background:none;color:var(--text-faint);cursor:pointer;font-size:13px;padding:2px 6px;border-radius:6px;transition:all var(--transition)" onmouseover="this.style.color=\'#dc2626\';this.style.background=\'rgba(220,38,38,.08)\'" onmouseout="this.style.color=\'\';this.style.background=\'\'" onclick="this.closest(\'tr\').remove()"><i class="fa-solid fa-xmark"></i></button></td>';
       inp.value='';
@@ -73,7 +78,9 @@
     /* ── Theme toggle ── */
     (function(){
       var btn=document.getElementById('themeToggle');
+      if(!btn)return;
       var themeText=btn.querySelector('.theme-text');
+      if(!themeText)return;
       var current=document.documentElement.getAttribute('data-theme')||'light';
       themeText.textContent=current==='dark'?'Light':'Dark';
       btn.addEventListener('click',function(){
