@@ -193,3 +193,43 @@
         });
       }
     })();
+    /* ── Genera Snapshot ── */
+    var generaSnapshotBtn=document.getElementById('generaSnapshotBtn');
+    if(generaSnapshotBtn){
+      generaSnapshotBtn.addEventListener('click',function(){
+        this.disabled=true;
+        this.textContent='Analisi in corso…';
+        setTimeout(function(){
+          if(generaSnapshotBtn){generaSnapshotBtn.disabled=false;generaSnapshotBtn.textContent='Genera Snapshot'}
+          var t=document.getElementById('toastMsg');
+          if(t){t.classList.add('show');setTimeout(function(){t.classList.remove('show')},2000)}
+        },2000);
+      });
+    }
+    /* ── Genera Report completo ── */
+    var generaReportBtn=document.getElementById('generaReportBtn');
+    if(generaReportBtn){
+      generaReportBtn.addEventListener('click',function(){
+        this.disabled=true;
+        this.textContent='Elaborazione…';
+        setTimeout(function(){
+          if(generaReportBtn){generaReportBtn.disabled=false;generaReportBtn.textContent='Genera Report · 1 credito'}
+          var t=document.getElementById('toastMsg');
+          if(t){t.classList.add('show');setTimeout(function(){t.classList.remove('show')},2000)}
+        },2000);
+      });
+    }
+    /* ── Copy referral link ── */
+    var copyReferralBtn=document.getElementById('copyReferralBtn');
+    if(copyReferralBtn){
+      copyReferralBtn.addEventListener('click',function(){
+        var url='https://sottotitoli.com/invite/seba';
+        navigator.clipboard.writeText(url).then(function(){
+          copyReferralBtn.textContent='Copiato ✓';
+          setTimeout(function(){copyReferralBtn.textContent='Copia'},2000);
+        }).catch(function(){
+          copyReferralBtn.textContent='Errore';
+          setTimeout(function(){copyReferralBtn.textContent='Copia'},2000);
+        });
+      });
+    }
