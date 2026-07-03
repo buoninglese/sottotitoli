@@ -113,16 +113,46 @@
         if(card)card.style.display='none';
       });
     })();
+    /* ── Profile hero close ── */
+    (function(){
+      var btn=document.getElementById('profileHeroClose');
+      if(!btn)return;
+      btn.addEventListener('click',function(){
+        var h=document.getElementById('profileHero');
+        if(!h)return;
+        h.classList.add('is-closing');
+        setTimeout(function(){h.style.display='none'},400);
+      });
+    })();
     /* ── Language switch ── */
-    var currentLang = 'en';
+    var STUDY_LANG_KEY = 'sottotitoli-study-lang';
+    var currentLang = localStorage.getItem(STUDY_LANG_KEY) || 'en';
     function switchLang(lang, btn){
       currentLang = lang;
-      document.querySelectorAll('.lang-opt').forEach(function(o){ o.classList.remove('active'); });
-      btn.classList.add('active');
-      // Update visible data in language-dependent panels
-      var labels = document.querySelectorAll('.lang-label');
-      labels.forEach(function(l){ l.textContent = lang === 'en' ? 'English' : 'Italiano'; });
+      localStorage.setItem(STUDY_LANG_KEY, lang);
+      window.SOTTOTITOLI_STUDY_LANG = lang;
+      // Update sidebar lang-opt buttons
+      document.querySelectorAll('.lang-opt').forEach(function(o){
+        o.classList.toggle('active', o.getAttribute('data-lang') === lang);
+      });
+      // Update hero chips (visual only — they call switchLang themselves)
+      document.querySelectorAll('.hero-chip[data-lang]').forEach(function(c){
+        c.classList.toggle('active', c.getAttribute('data-lang') === lang);
+      });
+      // TODO: When panels get real Supabase data, trigger re-fetch here
+      // e.g. document.dispatchEvent(new CustomEvent('studylang-changed', {detail:lang}));
     }
+    // Init on load
+    window.SOTTOTITOLI_STUDY_LANG = currentLang;
+    (function(){
+      var lang = currentLang;
+      document.querySelectorAll('.lang-opt').forEach(function(o){
+        o.classList.toggle('active', o.getAttribute('data-lang') === lang);
+      });
+      document.querySelectorAll('.hero-chip[data-lang]').forEach(function(c){
+        c.classList.toggle('active', c.getAttribute('data-lang') === lang);
+      });
+    })();
     /* ── Sidebar nav: switch content panels ── */
     (function(){
       var navItems = document.querySelectorAll('.side-nav .nav-item[data-panel]');
@@ -171,7 +201,7 @@
       if(!ss.classList.contains('active')){document.getElementById('pnl-panoramica').classList.add('active');document.getElementById('pnl-panoramica').style.display=''}
     }
 
-    var ssFlags=[{code:'en',flag:'🇬🇧',name:'English'},{code:'it',flag:'🇮🇹',name:'Italiano'},{code:'fr',flag:'🇫🇷',name:'Francese'},{code:'de',flag:'🇩🇪',name:'Tedesco'},{code:'es',flag:'🇪🇸',name:'Spagnolo'},{code:'nl',flag:'🇳🇱',name:'Olandese'},{code:'pt',flag:'🇵🇹',name:'Portoghese'},{code:'pl',flag:'🇵🇱',name:'Polacco'}];
+    var ssFlags=[{code:'en',flag:'🇬🇧',name:'English'},{code:'it',flag:'🇮🇹',name:'Italiano'}];
     var ssCapCode='en',ssSrcCode='en',ssTgtCode='it';
 
     function openSSSpinner(el,key){
