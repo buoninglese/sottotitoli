@@ -312,33 +312,22 @@ _realMic.onFinal = function(text) {
   processFinalLine(text);
 };
 
-_realMic.onStateChange = function(state) {
-  if (state === 'live') {
-    setSessionState('active');
-    if (!sessionStartTime) {
-      sessionStartTime = Date.now();
-      startMetricsInterval();
-      createSupabaseSession();
-    }
-  } else if (state === 'idle') {
-    setSessionState('idle');
-    updateMetrics(true);
-    if (sessionInterval) { clearInterval(sessionInterval); sessionInterval = null; }
-  }
-};
-
 async function startSession() {
-  wordCount = 0; totalChars = 0; sessionLines = []; lineCount = 0;
-  totalFillerCount = 0; knownWords = {};
-  sessionStartTime = null;
-  sessionActive = true; sessionPaused = false;
-  setSessionState('active');
+  if (sessionActive) return;
   
   var ok = await startRealMic();
   if (!ok) {
     showToast('Microfono non disponibile. Concedi l\'accesso e riprova.');
-    stopSession();
+    return;
   }
+  
+  wordCount = 0; totalChars = 0; sessionLines = []; lineCount = 0;
+  totalFillerCount = 0; knownWords = {};
+  sessionStartTime = Date.now();
+  sessionActive = true; sessionPaused = false;
+  setSessionState('active');
+  startMetricsInterval();
+  createSupabaseSession();
 }
 
 async function pauseSession() {
