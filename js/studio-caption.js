@@ -182,11 +182,11 @@ function setFontMode(mode) {
 /* ── Shoji mode ── */
 function toggleShojiMode() {
   var el = document.documentElement;
-  if (el.getAttribute('data-caption-mode') === 'j7b') {
-    el.removeAttribute('data-caption-mode');
-  } else {
-    el.setAttribute('data-caption-mode', 'j7b');
-  }
+  var current = el.getAttribute('data-caption-mode');
+  var next = current === 'shoji' ? 'airy' : 'shoji';
+  el.setAttribute('data-caption-mode', next);
+  var btn = document.getElementById('shojiToggle');
+  if (btn) btn.textContent = next === 'shoji' ? 'Shoji' : 'Airy';
 }
 
 /* ── Mode toggle ── */
@@ -275,10 +275,10 @@ function shareFullPage() {
 }
 
 /* ── Copy share link ── */
-function copyShareLink() {
+function copyShareLink(triggerBtn) {
   var url = window.location.href;
   navigator.clipboard.writeText(url).then(function() {
-    var btn = document.querySelector('.share-btn-cap');
+    var btn = triggerBtn || document.querySelector('.share-btn-cap');
     if (btn) {
       var orig = btn.textContent;
       btn.textContent = 'Copiato ✓';
@@ -408,6 +408,9 @@ function processFinalLine(text) {
   DOM.transcript.appendChild(line);
   DOM.transcript.scrollTop = DOM.transcript.scrollHeight;
 
+  // Increment filler count per line (avoid O(n²) join every 500ms)
+  totalFillerCount += countFillers(text);
+
   // POS classification
   classifyLine(text);
 }
@@ -496,15 +499,13 @@ function updateMetrics(final) {
   if (elapsed > 0) {
     var wpm = Math.round(wordCount / (elapsed / 60));
     if (DOM.wpmEl) DOM.wpmEl.textContent = wpm || '—';
-    // Filler detection: count across all session lines
-    var allText = sessionLines.join(' ');
-    totalFillerCount = countFillers(allText);
+    // Filler detection: use cumulative count (incremented per line)
     var mins = elapsed / 60;
     var fpm = mins > 0 ? (totalFillerCount / mins).toFixed(1) : '0.0';
     if (DOM.fillersEl) DOM.fillersEl.textContent = fpm;
     var uniqueWords = Object.keys(knownWords).length;
     var lexDiv = wordCount > 0 ? (uniqueWords / wordCount).toFixed(2) : 0;
-    if (DOM.lexDivEl) DOM.lexDivEl.textContent = lexDiv;
+    if (DOM.lexDivEl) DOM.lexDivEl.textContent = wordCount > 0 ? lexDiv : '—';
   }
   if (final) {
     if (DOM.sessionStatWords) DOM.sessionStatWords.textContent = wordCount;
@@ -629,7 +630,6 @@ async function createSupabaseSession() {
       Object.entries(posCounts).sort(function(a,b){return b[1]-a[1]}).slice(0,8).forEach(function(e) {
         var s = document.createElement('span');
         s.className = 'q-chip tag-' + e[0];
-        s.style.cssText = 'font-size:12px;padding:4px 10px';
         s.textContent = e[0] + ': ' + Math.round(e[1]/total*100) + '%';
         posStack.appendChild(s);
       });
