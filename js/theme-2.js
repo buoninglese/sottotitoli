@@ -70,7 +70,7 @@
       document.querySelectorAll('.tr-dd.open').forEach(function(d){ d.classList.remove('open'); });
       // Close topbar dropdowns when clicking outside
       if(!e.target.closest('#notifBtn')&&!e.target.closest('#notifDropdown')){
-        document.getElementById('notifDropdown').classList.remove('open');
+        var nd=document.getElementById('notifDropdown');if(nd)nd.classList.remove('open');
       }
       if(!e.target.closest('#userBtn')&&!e.target.closest('#userDropdown')){
         var ud=document.getElementById('userDropdown');if(ud)ud.classList.remove('open');
