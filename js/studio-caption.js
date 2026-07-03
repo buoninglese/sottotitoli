@@ -522,3 +522,79 @@ async function createSupabaseSession() {
   var lang = params.get('lang');
   if (lang) setLang(null, lang);
 })();
+
+/* ═══════════════════════════════════════════
+   SUPABASE DATA LOADING (on page load)
+   ═══════════════════════════════════════════ */
+(async function loadSupabaseData() {
+  var sb = window.sottotitoliSupabase;
+  if (!sb) return;
+  var r = await sb.auth.getSession();
+  if (!r.data?.session) return;
+  var userId = r.data.session.user.id;
+
+  // ── Panoramica: session stats ──
+  var sRes = await sb.from('sessions').select('id,words_count,started_at,wpm_avg,lexical_diversity').eq('user_id',userId).order('started_at',{ascending:false});
+  if (sRes.data && sRes.data.length) {
+    var totalWords = sRes.data.reduce(function(s,r){return s+(r.words_count||0)},0);
+    var totalSessions = sRes.data.length;
+    var avgWpm = sRes.data.reduce(function(s,r){return s+(r.wpm_avg||0)},0)/totalSessions;
+    var elWords = document.getElementById('statWords');
+    var elLines = document.getElementById('statLines');
+    if (elWords) elWords.textContent = totalWords;
+    if (elLines) elLines.textContent = totalSessions;
+  }
+
+  // ── Vocabolario: saved words ──
+  var vRes = await sb.from('user_vocabulary').select('word,pos,usage_count').eq('user_id',userId).order('usage_count',{ascending:false}).limit(50);
+  if (vRes.data && vRes.data.length) {
+    var emptyEl = document.getElementById('wordbankEmpty');
+    if (emptyEl) emptyEl.style.display = 'none';
+    var chipsContainer = document.getElementById('vocabChips');
+    vRes.data.forEach(function(w) {
+      var chip = document.createElement('span');
+      chip.className = 'q-chip tag-' + (w.pos||'NOUN');
+      chip.style.cssText = 'font-size:12px;padding:4px 10px;display:inline-flex;align-items:center';
+      chip.textContent = w.word;
+      chip.addEventListener('click', function() {
+        var defWord = document.getElementById('wordbankDefWord');
+        var defText = document.getElementById('wordbankDefText');
+        if (defWord) defWord.textContent = w.word;
+        if (defText) defText.textContent = (w.pos||'') + ' · usata ' + (w.usage_count||0) + ' volta/e';
+      });
+      if (chipsContainer) chipsContainer.appendChild(chip);
+    });
+  }
+
+  // ── POS: distribution ──
+  if (vRes.data && vRes.data.length) {
+    var posCounts = {};
+    vRes.data.forEach(function(w) { posCounts[w.pos||'OTHER'] = (posCounts[w.pos||'OTHER']||0)+(w.usage_count||1); });
+    var total = Object.values(posCounts).reduce(function(a,b){return a+b},0);
+    var posMap = {NOUN:'posNouns',VERB:'posVerbs',ADJ:'posAdjectives',ADV:'posAdverbs'};
+    Object.entries(posMap).forEach(function(e) {
+      var el = document.getElementById(e[1]);
+      if (el) el.textContent = posCounts[e[0]] ? Math.round(posCounts[e[0]]/total*100)+'%' : '—';
+    });
+    var posStack = document.getElementById('posDistStack');
+    if (posStack) {
+      posStack.innerHTML = '';
+      Object.entries(posCounts).sort(function(a,b){return b[1]-a[1]}).slice(0,8).forEach(function(e) {
+        var s = document.createElement('span');
+        s.className = 'q-chip tag-' + e[0];
+        s.style.cssText = 'font-size:12px;padding:4px 10px';
+        s.textContent = e[0] + ': ' + Math.round(e[1]/total*100) + '%';
+        posStack.appendChild(s);
+      });
+    }
+  }
+
+  // ── Condividi: restore stored room/session ──
+  var storedRoom = localStorage.getItem('sottotitoli-caption-room-id');
+  if (storedRoom) {
+    var rid = document.getElementById('capRoomId');
+    var rlink = document.getElementById('capRoomLink');
+    if (rid) rid.textContent = storedRoom.substring(0,14)+'…';
+    if (rlink) rlink.textContent = window.location.origin + '/studio-caption.html?join=1&room=' + storedRoom;
+  }
+})();
