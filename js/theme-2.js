@@ -1,6 +1,16 @@
 /* ═══ Sotto Supreme Theme v2 — Shared JavaScript ═══ */
 /* Theme toggle, dropdowns, sidebar nav, sub-tabs, FAQ, word banks, tasks */
 
+/* ── q-chip toggle (for <button class="q-chip">) ── */
+    document.addEventListener('click', function(e){
+      var chip = e.target.closest('button.q-chip');
+      if (!chip) return;
+      // Skip filter chips inside word bank expands (they use a different interaction)
+      if (chip.closest('.wb-expand')) return;
+      var isPressed = chip.classList.toggle('active');
+      chip.setAttribute('aria-pressed', isPressed);
+    });
+
 /* ── Word bank expand/collapse ── */
     function toggleWordBank(card){
       var expand=card.querySelector('.wb-expand');
@@ -38,6 +48,7 @@
         wrap.style.height = wrap.scrollHeight + 'px';
         requestAnimationFrame(function() { wrap.style.height = '0px'; });
         item.classList.remove('open');
+        item.setAttribute('aria-expanded','false');
       } else {
         // Close all other open FAQs
         document.querySelectorAll('.faq-item.open').forEach(function(other){
@@ -46,8 +57,10 @@
           ow.style.height=ow.scrollHeight+'px';
           requestAnimationFrame(function(){ow.style.height='0px'});
           other.classList.remove('open');
+          other.setAttribute('aria-expanded','false');
         });
         item.classList.add('open');
+        item.setAttribute('aria-expanded','true');
         wrap.style.height = '0px';
         requestAnimationFrame(function() { wrap.style.height = wrap.scrollHeight + 'px'; });
         setTimeout(function() { if (item.classList.contains('open')) wrap.style.height = 'auto'; }, 420);
@@ -125,8 +138,9 @@
             panels.forEach(function(p){ p.style.display = ''; });
             document.querySelector('.main-panel').style.overflowY = 'auto';
           }
-          navItems.forEach(function(n){ n.classList.remove('active'); });
+          navItems.forEach(function(n){ n.classList.remove('active'); n.removeAttribute('aria-current'); });
           this.classList.add('active');
+          this.setAttribute('aria-current','page');
           panels.forEach(function(p){ p.classList.remove('active'); });
           var target = document.getElementById('pnl-' + panelId);
           if(target){ target.classList.add('active'); }
@@ -141,8 +155,9 @@
       var panel = tab.closest('.content-panel');
       if(!panel) return;
       var subId = tab.getAttribute('data-subtab');
-      panel.querySelectorAll('.tab-link').forEach(function(t){ t.classList.remove('active'); });
+      panel.querySelectorAll('.tab-link').forEach(function(t){ t.classList.remove('active'); t.setAttribute('aria-selected','false'); });
       tab.classList.add('active');
+      tab.setAttribute('aria-selected','true');
       panel.querySelectorAll('.subtab-pane').forEach(function(p){ p.classList.remove('active'); });
       var target = document.getElementById('sub-' + subId);
       if(target) target.classList.add('active');
