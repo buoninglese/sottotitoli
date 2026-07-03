@@ -285,23 +285,6 @@ function copyShareLink() {
   });
 })();
 
-/* ── Theme sync with localStorage ── */
-(function() {
-  var stored = localStorage.getItem('sotto-theme') || localStorage.getItem('sottotitoli-theme');
-  if (stored) document.documentElement.setAttribute('data-theme', stored);
-  var toggle = document.getElementById('themeToggle');
-  if (toggle) {
-    toggle.addEventListener('click', function() {
-      var current = document.documentElement.getAttribute('data-theme');
-      var next = current === 'dark' ? 'light' : 'dark';
-      document.documentElement.setAttribute('data-theme', next);
-      localStorage.setItem('sotto-theme', next);
-      localStorage.setItem('sottotitoli-theme', next);
-      toggle.querySelector('.theme-text').textContent = next === 'dark' ? 'Light' : 'Dark';
-    });
-  }
-})();
-
 /* ═══════════════════════════════════════════
    SPEECH RECOGNITION + SESSION MANAGEMENT
    ═══════════════════════════════════════════ */
