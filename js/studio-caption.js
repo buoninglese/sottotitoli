@@ -350,15 +350,35 @@ function startSession() {
     DOM.liveText.textContent = interim || final || '';
   };
 
-  recognition.onerror = function(e) { console.warn('Speech error:', e.error); };
+  recognition.onerror = function(e) {
+    console.warn('Speech error:', e.error);
+    if (e.error === 'not-allowed') {
+      showToast('Microfono non autorizzato. Concedi l\'accesso nelle impostazioni del browser.');
+    } else if (e.error === 'no-speech') {
+      // Silent — just no speech detected yet
+    } else if (e.error) {
+      showToast('Errore riconoscimento: ' + e.error);
+    }
+  };
   recognition.onend = function() {
     if (sessionActive && !sessionPaused) {
-      try { recognition.start(); } catch(e) {}
+      try { recognition.start(); } catch(e) {
+        console.warn('Recognition restart failed:', e);
+        showToast('Impossibile riavviare il riconoscimento. Ricarica la pagina.');
+        stopSession();
+      }
     }
   };
 
-  recognition.start();
-  startMetricsInterval();
+  try {
+    recognition.start();
+    startMetricsInterval();
+  } catch(e) {
+    console.error('Failed to start recognition:', e);
+    showToast('Errore avvio microfono: ' + (e.message || 'sconosciuto'));
+    stopSession();
+    return;
+  }
 }
 
 function pauseSession() {
