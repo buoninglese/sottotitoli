@@ -1520,7 +1520,7 @@
       const languagePair =
         modeKey.startsWith("translate-")
           ? modeKey.replace("translate-", "").replace("-", "->")
-          : "en-en";
+          : (modeConfig && modeConfig.sourceLang ? modeConfig.sourceLang : "en-US");
 
       const sessionType = "solo";
       const topicTag = null;
