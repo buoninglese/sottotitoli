@@ -408,6 +408,105 @@
   }
 
   /* ═══════════════════════════════════════════
+     CONTEXTUAL MESSAGES
+     ═══════════════════════════════════════════ */
+  async function getContextualMessages(stats) {
+    var r = await sb().from('contextual_messages').select('*').eq('is_active', true).order('priority', { ascending: false });
+    var allMessages = r.data || [];
+    var shown = JSON.parse(localStorage.getItem('sottotitoli-dismissed-msgs') || '{}');
+    var result = [];
+
+    for (var i = 0; i < allMessages.length; i++) {
+      var m = allMessages[i];
+      if (shown[m.id]) continue; // user dismissed this one
+
+      var match = false;
+      var text = m.message_it;
+
+      switch (m.trigger_key) {
+        case 'onboarding':
+          match = stats.totalSessions === 0;
+          break;
+        case 'no_sessions_7d':
+          match = stats.daysSinceLastSession > 7;
+          break;
+        case 'streak_3':
+          match = stats.streak >= 3 && stats.streak < 7;
+          break;
+        case 'streak_7':
+          match = stats.streak >= 7 && stats.streak < 14;
+          break;
+        case 'streak_14':
+          match = stats.streak >= 14;
+          break;
+        case 'first_report_ready':
+          match = stats.totalSessions >= 3 && stats.reportCount === 0;
+          break;
+        case 'review_due':
+          match = stats.reviewDue > 0;
+          text = text.replace('{count}', stats.reviewDue);
+          break;
+        case 'cefr_milestone':
+          match = stats.cefrMilestone !== null;
+          if (match) text = text.replace('{level}', stats.cefrMilestone);
+          break;
+        case 'no_tasks':
+          match = stats.taskCount === 0;
+          break;
+        case 'pro_trial_ending':
+          match = stats.trialDaysLeft > 0 && stats.trialDaysLeft <= 7;
+          if (match) text = text.replace('{days}', stats.trialDaysLeft);
+          break;
+        default:
+          match = false;
+      }
+
+      if (match) {
+        result.push({ id: m.id, message: text, actionLabel: m.action_label, actionPanel: m.action_panel });
+        break; // show only the highest-priority match
+      }
+    }
+
+    return result;
+  }
+
+  function dismissMessage(msgId) {
+    var shown = JSON.parse(localStorage.getItem('sottotitoli-dismissed-msgs') || '{}');
+    shown[msgId] = Date.now();
+    localStorage.setItem('sottotitoli-dismissed-msgs', JSON.stringify(shown));
+  }
+
+  /* ═══════════════════════════════════════════
+     STREAK computation
+     ═══════════════════════════════════════════ */
+  async function getStreak(lang) {
+    lang = lang || getStudyLang();
+    var userId = await getUserId();
+    if (!userId) return 0;
+    var r = await sb().from('sessions')
+      .select('started_at').eq('user_id', userId)
+      .like('language_pair', lang + '%').order('started_at', { ascending: false });
+    if (r.error || !r.data) return 0;
+    var dates = r.data.map(function(s) { return s.started_at ? s.started_at.substring(0, 10) : null; }).filter(Boolean);
+    var unique = [];
+    dates.forEach(function(d) { if (unique.indexOf(d) === -1) unique.push(d); });
+    unique.sort().reverse();
+    var streak = 0, prev = null, today = new Date().toISOString().substring(0, 10);
+    for (var i = 0; i < unique.length; i++) {
+      if (i === 0) {
+        var diff = (new Date(today) - new Date(unique[0])) / 86400000;
+        if (diff > 1) break; // streak broken if last session isn't today/yesterday
+        streak = 1; prev = unique[0];
+      } else {
+        var diff2 = (new Date(prev) - new Date(unique[i])) / 86400000;
+        if (diff2 === 1) { streak++; prev = unique[i]; }
+        else break;
+      }
+    }
+    return streak;
+  }
+
+  /* ═══════════════════════════════════════════
      EXPORT
      ═══════════════════════════════════════════ */
   window.SottotitoliData = {
@@ -432,6 +531,9 @@
     addTask: addTask,
     updateTask: updateTask,
     deleteTask: deleteTask,
+    getContextualMessages: getContextualMessages,
+    dismissMessage: dismissMessage,
+    getStreak: getStreak,
     cacheClear: cacheClear
   };
 

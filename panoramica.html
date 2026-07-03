@@ -65,10 +65,7 @@
         <div style="position:relative">
           <button class="icon-btn" id="notifBtn" aria-label="Notifications"><svg class="icon"><use href="#i-bell"></use></svg></button>
           <div class="dropdown" id="notifDropdown">
-            <button type="button" class="dropdown-item"><svg class="icon"><use href="#i-info"></use></svg> Nuova sessione completata</button>
-            <button type="button" class="dropdown-item"><svg class="icon"><use href="#i-star"></use></svg> Report AI pronto</button>
-            <div class="dropdown-div"></div>
-            <button type="button" class="dropdown-item" style="color:var(--text-faint)">Vedi tutte</button>
+            <div class="dropdown-item" style="color:var(--text-faint);cursor:default">Nessuna notifica recente</div>
           </div>
         </div>
         <div style="position:relative">
@@ -163,6 +160,13 @@
             <div class="hero-art" aria-hidden="true"><span class="blob blob-a"></span><span class="blob blob-b"></span><span class="blob blob-c"></span><span class="glow glow-a"></span><span class="glow glow-b"></span></div>
             <div class="hero-content"><h2>Ben tornato, <em>...</em></h2><p>Accedi per vedere le tue statistiche.</p><div class="hero-chips"><button class="hero-chip strong" onclick="toggleStartSession()">Inizia sessione</button><button class="hero-chip" data-lang="en" onclick="switchLang('en',this)">English</button><button class="hero-chip" data-lang="it" onclick="switchLang('it',this)">Italiano</button></div></div>
           </article>
+          <!-- Contextual message banner -->
+          <div id="contextualBanner" style="display:none;padding:14px 20px;margin-bottom:20px;background:linear-gradient(135deg,var(--teal-4),rgba(6,182,212,.05));border:1px solid rgba(14,116,144,.15);border-radius:16px;display:flex;align-items:center;gap:12px;font-size:14px;color:var(--text-soft);line-height:1.5">
+            <span style="font-size:20px;flex-shrink:0">💬</span>
+            <span class="ctx-msg-text" style="flex:1"></span>
+            <button class="ctx-msg-btn" style="display:none;padding:6px 14px;border-radius:10px;border:none;background:var(--teal);color:#fff;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;white-space:nowrap"></button>
+            <button class="ctx-msg-close" style="background:none;border:none;color:var(--text-faint);cursor:pointer;font-size:16px;padding:0 4px;flex-shrink:0" aria-label="Chiudi">×</button>
+          </div>
           <section class="stats-row">
             <article class="metric-card">
               <div class="metric-value">—</div>
@@ -914,7 +918,56 @@
         }
       };
 
-      // ═══ Strip mock data from panels without backend yet ───
+      // ═══ RENDER: Contextual messages ───
+      async function renderContextualBanner() {
+        var s = currentStats();
+        var streak = await SottotitoliData.getStreak();
+        var stats = {
+          totalSessions: s ? s.totalSessions : 0,
+          daysSinceLastSession: 0,
+          streak: streak,
+          reportCount: (reports || []).length,
+          reviewDue: 0,
+          cefrMilestone: null,
+          taskCount: 0,
+          trialDaysLeft: 0
+        };
+        // Days since last session
+        if (s) {
+          var sessions = await SottotitoliData.getSessions(window.SOTTOTITOLI_STUDY_LANG || 'en', 1);
+          if (sessions && sessions.length > 0) {
+            stats.daysSinceLastSession = Math.floor((Date.now() - new Date(sessions[0].started_at)) / 86400000);
+          } else {
+            stats.daysSinceLastSession = 999;
+          }
+        }
+        // Task count
+        var tasks = await SottotitoliData.getTasks();
+        stats.taskCount = tasks ? tasks.length : 0;
+
+        var msgs = await SottotitoliData.getContextualMessages(stats);
+        var container = document.getElementById('contextualBanner');
+        if (!container) return;
+        if (!msgs || !msgs.length) { container.style.display = 'none'; return; }
+        var m = msgs[0];
+        container.style.display = 'block';
+        container.querySelector('.ctx-msg-text').textContent = m.message;
+        var btn = container.querySelector('.ctx-msg-btn');
+        if (m.actionLabel && m.actionPanel) {
+          btn.textContent = m.actionLabel;
+          btn.style.display = 'inline-flex';
+          btn.onclick = function() {
+            var nav = document.querySelector('[data-panel="' + m.actionPanel + '"]');
+            if (nav) nav.click();
+          };
+        } else {
+          btn.style.display = 'none';
+        }
+        container.querySelector('.ctx-msg-close').onclick = function() {
+          SottotitoliData.dismissMessage(m.id);
+          container.style.display = 'none';
+        };
+      }
       function clearMockContent() {
         // Grammatica: replace all sub-tab content with empty state
         ['sub-gram-panoramica','sub-gram-tempi','sub-gram-pronomi','sub-gram-errori'].forEach(function(id) {
@@ -1002,6 +1055,7 @@
       renderSettings();
       renderAIReports();
       clearMockContent();
+      renderContextualBanner();
 
       // ── Listen for language changes ──
       document.addEventListener('studylang-changed', function () {
@@ -1014,6 +1068,7 @@
         renderVocabolario();
         renderAIReports();
         clearMockContent();
+        renderContextualBanner();
       });
 
       // ── Refresh on tab clicks ──
