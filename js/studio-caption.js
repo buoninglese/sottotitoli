@@ -308,14 +308,14 @@ function copyShareLink() {
 
 function startSession() {
   var SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-  if (!SpeechRecognition) { showToast('API non supportata'); return; }
+  if (!SpeechRecognition) { showToast('Riconoscimento vocale non supportato su questo browser'); return; }
 
   recognition = new SpeechRecognition();
   recognition.continuous = true;
   recognition.interimResults = true;
   recognition.lang = currentLang === 'en' ? 'en-US' : currentLang === 'it' ? 'it-IT' : currentLang === 'nl' ? 'nl-NL' : currentLang === 'es' ? 'es-ES' : currentLang === 'fr' ? 'fr-FR' : 'de-DE';
 
-  // AudioContext for waveform
+  // AudioContext for waveform — must be in click handler
   try {
     audioCtx = new (window.AudioContext || window.webkitAudioContext)();
     analyser = audioCtx.createAnalyser();
@@ -324,16 +324,14 @@ function startSession() {
     navigator.mediaDevices.getUserMedia({ audio: true }).then(function(stream) {
       var source = audioCtx.createMediaStreamSource(stream);
       source.connect(analyser);
-    }).catch(function() {});
-  } catch(e) {}
+    }).catch(function(e) { console.warn('Mic stream:', e); });
+  } catch(e) { console.warn('AudioContext:', e); }
 
   wordCount = 0; totalChars = 0; sessionLines = []; lineCount = 0;
   sessionStartTime = Date.now();
   sessionActive = true; sessionPaused = false;
   setSessionState('active');
   animateWave();
-
-  // Create Supabase session
   createSupabaseSession();
 
   recognition.onresult = function(event) {
