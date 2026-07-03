@@ -350,30 +350,6 @@ function stopSession() {
   updateMetrics(true);
 }
 
-function pauseSession() {
-  if (!recognition) return;
-  if (sessionPaused) {
-    // Resume
-    sessionPaused = false;
-    setSessionState('active');
-    try { recognition.start(); } catch(e) {}
-  } else {
-    // Pause
-    sessionPaused = true;
-    setSessionState('paused');
-    recognition.stop();
-  }
-}
-
-function stopSession() {
-  sessionActive = false;
-  sessionPaused = false;
-  if (recognition) { recognition.stop(); recognition = null; }
-  if (sessionInterval) { clearInterval(sessionInterval); sessionInterval = null; }
-  setSessionState('idle');
-  updateMetrics(true);
-}
-
 function processFinalLine(text) {
   if (!text) return;
   lineCount++;
