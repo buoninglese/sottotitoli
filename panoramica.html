@@ -508,20 +508,19 @@
 
       var meta = await SottotitoliData.getUserMeta();
       if (!meta) { console.warn('No session'); return; }
-      var userName = meta.full_name;
       var userEmail = meta.email || '';
 
-      // Dropdown header
+      // Dropdown header — set email only, name comes from profile
       var dd = document.getElementById('userDropdown');
       if (dd) {
         var items = dd.querySelectorAll('.dropdown-item');
-        if (items.length > 0) items[0].textContent = userName;
+        if (items.length > 0) items[0].textContent = '...';
         if (items.length > 1) items[1].textContent = userEmail;
       }
 
-      // Hero greeting
+      // Hero greeting — will be updated when profile loads
       var heroEm = document.querySelector('.hero-content h2 em');
-      if (heroEm) heroEm.textContent = userName;
+      if (heroEm) heroEm.textContent = '...';
 
       // ── Load all data in parallel ──
       var profile = await SottotitoliData.getProfile();
@@ -652,13 +651,24 @@
       function renderProfile() {
         if (!profile) return;
         var p = profile;
+        var displayName = p.display_name || '';
+        // Update hero + dropdown with display name
+        if (displayName) {
+          var heroEm = document.querySelector('.hero-content h2 em');
+          if (heroEm) heroEm.textContent = displayName;
+          var dd = document.getElementById('userDropdown');
+          if (dd) {
+            var dItems = dd.querySelectorAll('.dropdown-item');
+            if (dItems.length > 0) dItems[0].textContent = displayName;
+          }
+        }
         // Update name card title
         document.querySelectorAll('#pnl-profilo .alt-card').forEach(function (card) {
           var h3 = card.querySelector('h3');
           if (!h3) return;
           var t = h3.textContent;
-          if (t.indexOf('Seba B.') !== -1 || t.indexOf(userName) !== -1) {
-            h3.textContent = p.display_name || p.full_name || userName;
+          if (t.indexOf('Seba B.') !== -1 || t.indexOf('...') !== -1 || t.indexOf(displayName) !== -1) {
+            h3.textContent = displayName || '—';
             var rows = card.querySelectorAll('[style*="justify-content:space-between"]');
             rows.forEach(function (row) {
               var spans = row.querySelectorAll('span');
@@ -673,7 +683,7 @@
         // Display name input
         var dni = document.getElementById('displayNameInput');
         if (dni && !dni.value) {
-          dni.value = p.display_name || userName.substring(0, 10);
+          dni.value = displayName;
         }
       }
 
@@ -719,7 +729,7 @@
         var dni = document.getElementById('displayNameInput');
         if (!dni) return;
         if (!dni.value) {
-          dni.value = (profile && profile.display_name) || userName.substring(0, 10);
+          dni.value = (profile && profile.display_name) || '';
         }
       }
 
