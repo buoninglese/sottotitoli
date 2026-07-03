@@ -77,7 +77,7 @@
     // Build filter: sessions where language_pair starts with the study lang
     var langFilter = lang + '%';
     var r = await sb().from('sessions')
-      .select('id,duration_seconds,words_count,wpm_avg,lexical_diversity,quality_score,started_at,language_pair')
+      .select('id,duration_seconds,words_count,started_at,language_pair')
       .eq('user_id', userId)
       .like('language_pair', langFilter)
       .order('started_at', { ascending: false });
@@ -88,9 +88,6 @@
     var totalSessions = sessions.length;
     var totalSeconds = sessions.reduce(function(s, row) { return s + (row.duration_seconds || 0); }, 0);
     var totalWords = sessions.reduce(function(s, row) { return s + (row.words_count || 0); }, 0);
-    var avgWpm = totalSessions > 0 ? sessions.reduce(function(s, row) { return s + (row.wpm_avg || 0); }, 0) / totalSessions : 0;
-    var avgLexDiv = totalSessions > 0 ? sessions.reduce(function(s, row) { return s + (row.lexical_diversity || 0); }, 0) / totalSessions : 0;
-    var avgQuality = totalSessions > 0 ? sessions.reduce(function(s, row) { return s + (row.quality_score || 0); }, 0) / totalSessions : 0;
 
     // This week's sessions
     var now = new Date();
@@ -110,14 +107,9 @@
       totalHours: totalHours,
       totalMinutes: totalMinutes,
       totalWords: totalWords,
-      avgWpm: avgWpm,
-      avgLexDiv: avgLexDiv,
-      avgQuality: avgQuality,
-      thisWeekSessions: thisWeek.length,
-      thisWeekMinutes: Math.round(thisWeek.reduce(function(s, r) { return s + (r.duration_seconds || 0); }, 0) / 60),
-      lastWeekSessions: lastWeek.length,
-      dailyAverageMinutes: thisWeek.length > 0 ? Math.round(thisWeek.reduce(function(s, r) { return s + (r.duration_seconds || 0); }, 0) / 60 / 7) : 0,
-      // Trend indicators
+      avgWpm: 0,
+      avgLexDiv: 0,
+      avgQuality: 0,
       sessionsTrend: lastWeek.length > 0 ? Math.round((thisWeek.length - lastWeek.length) / lastWeek.length * 100) : 0,
       lang: lang
     };
@@ -138,7 +130,7 @@
     if (cached) return cached.slice(0, limit);
 
     var r = await sb().from('sessions')
-      .select('id,name,started_at,duration_seconds,words_count,quality_score,favorite,language_pair,session_type')
+      .select('id,name,started_at,duration_seconds,words_count,favorite,language_pair,session_type')
       .eq('user_id', userId)
       .like('language_pair', lang + '%')
       .order('started_at', { ascending: false })
@@ -345,24 +337,13 @@
     var userId = await getUserId();
     if (!userId) return null;
     var r = await sb().from('sessions')
-      .select('pos_nouns,pos_verbs,pos_adjectives,pos_adverbs,pos_pronouns,pos_prepositions,cefr_level,words_count')
+      .select('words_count')
       .eq('user_id', userId).like('language_pair', lang + '%');
     if (r.error) return { totalWords: 0, totalUsages: 0, posCounts: {}, posPcts: {}, cefrCounts: {}, cefrPcts: {}, words: [] };
-    var sessions = r.data || [];
+    // POS columns not yet in sessions table — return zeros
+    var totalUsages = (r.data || []).reduce(function(s, row) { return s + (row.words_count || 0); }, 0);
     var posCounts = { NOUN: 0, VERB: 0, ADJ: 0, ADV: 0, PRON: 0, PREP: 0 };
     var cefrCounts = {};
-    var totalUsages = 0;
-    sessions.forEach(function(s) {
-      posCounts.NOUN += (s.pos_nouns || 0);
-      posCounts.VERB += (s.pos_verbs || 0);
-      posCounts.ADJ += (s.pos_adjectives || 0);
-      posCounts.ADV += (s.pos_adverbs || 0);
-      posCounts.PRON += (s.pos_pronouns || 0);
-      posCounts.PREP += (s.pos_prepositions || 0);
-      var cefr = s.cefr_level || '?';
-      cefrCounts[cefr] = (cefrCounts[cefr] || 0) + (s.words_count || 0);
-      totalUsages += (s.words_count || 0);
-    });
     var posPcts = {};
     Object.keys(posCounts).forEach(function(k) { posPcts[k] = totalUsages > 0 ? Math.round(posCounts[k] / totalUsages * 100) : 0; });
     var cefrPcts = {};
