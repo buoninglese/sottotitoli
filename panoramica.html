@@ -474,95 +474,262 @@
   <script src="config.js"></script>
   <script src="js/auth.js"></script>
   <script src="js/theme-2.js"></script>
+  <script src="js/data-service.js"></script>
 
   <!-- Page-specific: Supabase data fetching -->
   <script>
-    (async function(){
-      var maxTries=50,tries=0;
-      while(!window.sottotitoliSupabase&&tries<maxTries){await new Promise(function(r){setTimeout(r,100)});tries++}
-      if(!window.sottotitoliSupabase){console.warn("Supabase not loaded");return}
-      var sb=window.sottotitoliSupabase;
-      var result=await sb.auth.getSession();
-      var session=result.data.session;
-      if(!session){console.warn("No session");return}
-      var user=session.user;
-      var userName=user.user_metadata&&user.user_metadata.full_name?user.user_metadata.full_name:(user.email?user.email.split("@")[0]:"Utente");
-      var userEmail=user.email||"";
-      var dd=document.getElementById("userDropdown");
-      if(dd){
-        var items=dd.querySelectorAll(".dropdown-item");
-        if(items.length>0)items[0].textContent=userName;
-        if(items.length>1)items[1].textContent=userEmail;
+    /* ── Utility: format seconds to "Xh Ym" or "Ym" ── */
+    function fmtDuration(sec) {
+      if (!sec || sec < 60) return '<1m';
+      var m = Math.round(sec / 60);
+      if (m < 60) return m + 'm';
+      var h = Math.floor(m / 60);
+      var rm = m % 60;
+      return rm > 0 ? h + 'h ' + rm + 'm' : h + 'h';
+    }
+    function fmtDate(iso) {
+      if (!iso) return '—';
+      return new Date(iso).toLocaleDateString('it-IT', { day: 'numeric', month: 'short' });
+    }
+
+    /* ── Wait for Supabase ── */
+    async function waitForSB() {
+      var tries = 0;
+      while (!window.sottotitoliSupabase && tries < 50) {
+        await new Promise(function (r) { setTimeout(r, 100); });
+        tries++;
       }
-      var heroEm=document.querySelector(".hero-content h2 em");
-      if(heroEm)heroEm.textContent=userName;
-      var result2=await sb.from("profiles").select("*").eq("id",user.id).single();
-      var profile=result2.data;
-      if(profile){
-        document.querySelectorAll(".alt-card").forEach(function(card){
-          var h3=card.querySelector("h3");
-          if(!h3)return;
-          if(h3.textContent.indexOf("Seba B.")!==-1){
-            h3.textContent=profile.full_name||userName;
-            var rows=card.querySelectorAll('[style*="justify-content:space-between"]');
-            rows.forEach(function(row){
-              var spans=row.querySelectorAll("span");
-              if(spans.length<2)return;
-              var label=spans[0].textContent.trim();
-              if(label==="Membro da")spans[1].textContent=profile.created_at?new Date(profile.created_at).toLocaleDateString("it-IT",{month:"long",year:"numeric"}):"—";
-              if(label==="Piano")spans[1].textContent=profile.plan||"Standard";
-              if(label==="Madrelingua")spans[1].textContent=profile.madrelingua||"—";
+      return window.sottotitoliSupabase || null;
+    }
+
+    /* ── Main init ── */
+    (async function () {
+      var sb = await waitForSB();
+      if (!sb) { console.warn('Supabase not loaded'); return; }
+
+      var meta = await SottotitoliData.getUserMeta();
+      if (!meta) { console.warn('No session'); return; }
+      var userName = meta.full_name;
+      var userEmail = meta.email || '';
+
+      // Dropdown header
+      var dd = document.getElementById('userDropdown');
+      if (dd) {
+        var items = dd.querySelectorAll('.dropdown-item');
+        if (items.length > 0) items[0].textContent = userName;
+        if (items.length > 1) items[1].textContent = userEmail;
+      }
+
+      // Hero greeting
+      var heroEm = document.querySelector('.hero-content h2 em');
+      if (heroEm) heroEm.textContent = userName;
+
+      // ── Load all data in parallel ──
+      var profile = await SottotitoliData.getProfile();
+      var statsEN = await SottotitoliData.getSessionStats('en');
+      var statsIT = await SottotitoliData.getSessionStats('it');
+      var refs = await SottotitoliData.getReferralStats();
+      var reports = await SottotitoliData.getAIReports();
+      var tokens = await SottotitoliData.getAITokens();
+      var credits = await SottotitoliData.getCredits();
+
+      // ── Pick current language stats ──
+      function currentStats() {
+        return (window.SOTTOTITOLI_STUDY_LANG || 'en') === 'en' ? statsEN : statsIT;
+      }
+
+      // ═══ RENDER: Panoramica hero ───
+      function renderHero() {
+        var s = currentStats();
+        if (!s) return;
+        var heroP = document.querySelector('.hero-content p');
+        if (heroP) {
+          heroP.innerHTML = 'Hai dettato <strong>' + s.totalSessions + ' sessioni</strong> per un totale di <strong>' + s.totalHours + ' ore</strong>. Il tuo vocabolario attivo conta <strong>' + s.totalWords.toLocaleString() + ' parole</strong> uniche.';
+        }
+      }
+
+      // ═══ RENDER: Panoramica metrics ───
+      function renderMetrics() {
+        var s = currentStats();
+        if (!s) return;
+        var vals = {
+          totalSessions: s.totalSessions,
+          totalMinutes: s.totalMinutes + 'm',
+          totalWords: (s.totalWords > 999 ? (s.totalWords / 1000).toFixed(1) + 'k' : s.totalWords),
+          avgWpm: Math.round(s.avgWpm),
+          avgLexDiv: s.avgLexDiv.toFixed(2),
+          reportCount: (reports || []).length,
+          dailyMin: s.thisWeekSessions > 0 ? Math.round(s.thisWeekMinutes / Math.min(7, s.thisWeekSessions || 1)) + 'm' : '0m',
+          completionPct: s.thisWeekSessions > 0 ? Math.min(100, Math.round(s.thisWeekSessions / 7 * 100)) + '%' : '0%'
+        };
+        // Map metric values to their containers
+        var cards = document.querySelectorAll('#pnl-panoramica .metric-card');
+        var keys = ['totalSessions', 'totalMinutes', 'totalWords', 'avgWpm', 'avgLexDiv', 'reportCount'];
+        cards.forEach(function (card, i) {
+          var valEl = card.querySelector('.metric-value');
+          if (valEl && keys[i] && vals[keys[i]] !== undefined) {
+            valEl.textContent = vals[keys[i]];
+          }
+        });
+        // Daily minutes metric (7th card)
+        if (cards.length > 6) {
+          var dCard = cards[6];
+          var dVal = dCard.querySelector('.metric-value');
+          if (dVal) dVal.textContent = vals.dailyMin;
+        }
+        // Completion % (8th card)
+        if (cards.length > 7) {
+          var cCard = cards[7];
+          var cVal = cCard.querySelector('.metric-value');
+          if (cVal) cVal.textContent = vals.completionPct;
+        }
+      }
+
+      // ═══ RENDER: Profilo ───
+      function renderProfile() {
+        if (!profile) return;
+        var p = profile;
+        // Update name card title
+        document.querySelectorAll('#pnl-profilo .alt-card').forEach(function (card) {
+          var h3 = card.querySelector('h3');
+          if (!h3) return;
+          var t = h3.textContent;
+          if (t.indexOf('Seba B.') !== -1 || t.indexOf(userName) !== -1) {
+            h3.textContent = p.display_name || p.full_name || userName;
+            var rows = card.querySelectorAll('[style*="justify-content:space-between"]');
+            rows.forEach(function (row) {
+              var spans = row.querySelectorAll('span');
+              if (spans.length < 2) return;
+              var label = spans[0].textContent.trim();
+              if (label === 'Membro da') spans[1].textContent = p.created_at ? new Date(p.created_at).toLocaleDateString('it-IT', { month: 'long', year: 'numeric' }) : '—';
+              if (label === 'Piano') spans[1].textContent = p.plan || 'Standard';
+              if (label === 'Madrelingua') spans[1].textContent = p.madrelingua || '—';
             });
           }
         });
-        var heroP=document.querySelector(".hero-content p");
-        if(heroP&&profile.sessioni_totali){
-          heroP.innerHTML="Hai dettato <strong>"+profile.sessioni_totali+" sessioni</strong> per un totale di <strong>"+profile.ore_parlate+" ore</strong>. Il tuo vocabolario attivo conta <strong>"+profile.parole_uniche+" parole</strong> uniche.";
-        }
-        // Populate display name input
-        var dni=document.getElementById("displayNameInput");
-        if(dni){
-          dni.value=profile.display_name||"";
-          // Update all name references if display_name is set
-          if(profile.display_name){
-            if(heroEm)heroEm.textContent=profile.display_name;
-            var dd2=document.getElementById("userDropdown");
-            if(dd2){
-              var items2=dd2.querySelectorAll(".dropdown-item");
-              if(items2.length>0)items2[0].textContent=profile.display_name;
-            }
-          }
+        // Display name input
+        var dni = document.getElementById('displayNameInput');
+        if (dni && !dni.value) {
+          dni.value = p.display_name || userName.substring(0, 10);
         }
       }
-      // Populate display name input even if no profile row exists yet
-      var dni2=document.getElementById("displayNameInput");
-      if(dni2&&!dni2.value)dni2.value=userName.substring(0,10);
+
+      // ═══ RENDER: Trascrizioni session list ───
+      async function renderSessions() {
+        var lang = window.SOTTOTITOLI_STUDY_LANG || 'en';
+        var sessions = await SottotitoliData.getSessions(lang, 10);
+        var tbody = document.querySelector('#pnl-trascrizioni .term-row')?.parentElement;
+        if (!tbody || !sessions.length) return;
+        // Find the tbl-head row to keep
+        var thead = tbody.previousElementSibling;
+        tbody.innerHTML = '';
+        sessions.forEach(function (s) {
+          var tr = document.createElement('div');
+          tr.className = 'term-row';
+          tr.innerHTML = '<span style="flex:2">' + (s.name || 'Sessione ' + s.id.substring(0, 8)) + '</span>' +
+            '<span style="flex:1;text-align:right">' + (s.words_count || 0) + '</span>' +
+            '<span style="flex:1;text-align:right">' + fmtDate(s.started_at) + '</span>' +
+            '<span style="flex:1;text-align:right;color:var(--teal)">' + (s.quality_score ? Math.round(s.quality_score * 100) + '%' : '—') + '</span>' +
+            '<span class="tr-action tr-fav' + (s.favorite ? ' active' : '') + '" onclick="event.stopPropagation();this.classList.toggle(\'active\')">★</span>';
+          tbody.appendChild(tr);
+        });
+      }
+
+      // ═══ RENDER: Invita ───
+      function renderInvita() {
+        if (!refs) return;
+        var cards = document.querySelectorAll('#pnl-invita .metric-card');
+        if (cards.length >= 2) {
+          cards[0].querySelector('.metric-value').textContent = refs.total || 0;
+          cards[1].querySelector('.metric-value').textContent = refs.active || 0;
+        }
+        // Earned minutes in stato inviti card
+        var earnedEl = document.querySelector('#pnl-invita [style*="font-size:32px"]:last-child');
+        if (earnedEl) {
+          var txt = earnedEl.textContent;
+          earnedEl.innerHTML = '+' + (refs.earnedMinutes || 0) + '<span style="font-size:16px">min</span>';
+        }
+      }
+
+      // ═══ RENDER: Impostazioni ───
+      function renderSettings() {
+        var dni = document.getElementById('displayNameInput');
+        if (!dni) return;
+        if (!dni.value) {
+          dni.value = (profile && profile.display_name) || userName.substring(0, 10);
+        }
+      }
+
+      // ═══ RENDER: Report AI ───
+      function renderAIReports() {
+        var badge = document.querySelector('#pnl-report-ai .alt-card:last-child p');
+        if (badge && tokens !== undefined) {
+          badge.textContent = tokens + ' crediti disponibili. Scalati solo a report completato.';
+        }
+        // Populate "I miei Report" tab
+        var reportList = document.querySelector('#sub-rai-miei');
+        if (!reportList || !reports || !reports.length) return;
+        var html = '<section class="dictionary-list-card"><div class="tbl-head"><span style="flex:2">Report</span><span style="flex:1;text-align:right">Punteggio</span><span style="flex:1;text-align:right">Data</span></div>';
+        reports.forEach(function (r) {
+          html += '<div class="term-row"><span style="flex:2">' + (r.summary || 'Report ' + r.id.substring(0, 8)) + '</span>' +
+            '<span style="flex:1;text-align:right;font-weight:600">' + (r.overall_score ? r.overall_score + '/10' : '—') + '</span>' +
+            '<span style="flex:1;text-align:right;font-size:11px;color:var(--text-faint)">' + fmtDate(r.created_at) + '</span></div>';
+        });
+        html += '</section>';
+        reportList.innerHTML = html;
+      }
+
+      // ── Initial render ──
+      renderHero();
+      renderMetrics();
+      renderProfile();
+      renderSessions();
+      renderInvita();
+      renderSettings();
+      renderAIReports();
+
+      // ── Listen for language changes ──
+      document.addEventListener('studylang-changed', function () {
+        SottotitoliData.cacheClear();
+        renderHero();
+        renderMetrics();
+        renderSessions();
+        renderAIReports();
+      });
+
+      // ── Refresh sessions when Trascrizioni tab is clicked ──
+      var trascrizioniNav = document.querySelector('[data-panel="trascrizioni"]');
+      if (trascrizioniNav) {
+        trascrizioniNav.addEventListener('click', function () {
+          setTimeout(renderSessions, 100);
+        });
+      }
+      var reportNav = document.querySelector('[data-panel="report-ai"]');
+      if (reportNav) {
+        reportNav.addEventListener('click', function () {
+          setTimeout(renderAIReports, 100);
+        });
+      }
     })();
 
     /* ── Save display name to Supabase ── */
-    async function saveDisplayName(){
-      var inp=document.getElementById("displayNameInput");
-      if(!inp)return;
-      var name=inp.value.trim().substring(0,10);
-      if(!name)return;
-      var sb=window.sottotitoliSupabase;
-      if(!sb){console.warn("Supabase not loaded");return}
-      var result=await sb.auth.getSession();
-      var user=result.data.session?.user;
-      if(!user)return;
-      // Upsert into profiles
-      await sb.from("profiles").upsert({id:user.id,display_name:name},{onConflict:"id"});
-      // Update all visible references
-      var heroEm=document.querySelector(".hero-content h2 em");
-      if(heroEm)heroEm.textContent=name;
-      var dd=document.getElementById("userDropdown");
-      if(dd){
-        var items=dd.querySelectorAll(".dropdown-item");
-        if(items.length>0)items[0].textContent=name;
+    async function saveDisplayName() {
+      var inp = document.getElementById('displayNameInput');
+      if (!inp) return;
+      var name = inp.value.trim().substring(0, 10);
+      if (!name) return;
+      var ok = await SottotitoliData.saveProfileField('display_name', name);
+      if (!ok) return;
+      // Update visible references
+      var heroEm = document.querySelector('.hero-content h2 em');
+      if (heroEm) heroEm.textContent = name;
+      var dd = document.getElementById('userDropdown');
+      if (dd) {
+        var items = dd.querySelectorAll('.dropdown-item');
+        if (items.length > 0) items[0].textContent = name;
       }
-      // Toast
-      var t=document.getElementById("toastMsg");
-      if(t){t.classList.add("show");setTimeout(function(){t.classList.remove("show")},2000)}
+      var t = document.getElementById('toastMsg');
+      if (t) { t.classList.add('show'); setTimeout(function () { t.classList.remove('show'); }, 2000); }
     }
   </script>
 </body>

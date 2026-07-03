@@ -139,8 +139,8 @@
       document.querySelectorAll('.hero-chip[data-lang]').forEach(function(c){
         c.classList.toggle('active', c.getAttribute('data-lang') === lang);
       });
-      // TODO: When panels get real Supabase data, trigger re-fetch here
-      // e.g. document.dispatchEvent(new CustomEvent('studylang-changed', {detail:lang}));
+      // Trigger data refresh for language-dependent panels
+      document.dispatchEvent(new CustomEvent('studylang-changed', {detail:lang}));
     }
     // Init on load
     window.SOTTOTITOLI_STUDY_LANG = currentLang;
