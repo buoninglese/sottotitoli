@@ -2405,6 +2405,9 @@ var paused = false;
 var pauseBtn = null;
 
 // Connect real mic callbacks
+// Continuity tracking: when live box overflows, mark continuation
+var _isContinuation = false;
+
 _realMic.onInterim = function(text) {
   var interim = document.getElementById('captionInterim');
   if (!interim) return;
@@ -2412,9 +2415,9 @@ _realMic.onInterim = function(text) {
   
   // If the box is full (overflowing 2 lines), force-finalize immediately
   if (interim.scrollHeight > interim.clientHeight && text.trim().length > 0) {
-    if (_realMic.onFinal) _realMic.onFinal(text);
+    _isContinuation = true;
+    if (_realMic.onFinal) _realMic.onFinal(text + '…');
     interim.textContent = '';
-    // Restart recognition cleanly
     if (_realMic.recognition) {
       try { _realMic.recognition.stop(); } catch(e) {}
     }
@@ -2535,6 +2538,12 @@ _realMic.onFinal = function(text) {
   var transcript = document.getElementById('captionTranscript');
   var interim = document.getElementById('captionInterim');
   if (!transcript) return;
+  
+  // Handle continuation: prepend "…" if previous line was cut off mid-speech
+  if (_isContinuation) {
+    text = '…' + text;
+    _isContinuation = false;
+  }
   
   var now = new Date();
   var tsStr = now.toTimeString().substring(0,8);
