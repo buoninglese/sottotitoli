@@ -838,7 +838,7 @@ button[onclick*="addToWordBank"]:hover{background:rgba(52,211,153,.15)!important
   <span class="cell-val" id="recMicLabel" style="font-family:JetBrains Mono,monospace;font-size:10px">Mic</span>
   <span class="status-dot idle" id="recIdleDot" style="width:6px;height:6px"></span>
   <span class="cell-val" id="recIdleLabel" style="font-family:JetBrains Mono,monospace;font-size:10px">Idle</span>
-  <select id="pauseSensitivity" onchange="setPauseSensitivity(this.value)" style="background:transparent;border:1px solid var(--line);border-radius:100px;font-family:JetBrains Mono,monospace;font-size:9px;font-weight:600;cursor:pointer;padding:2px 6px;color:var(--muted)" title="Pause sensitivity"><option value="1500">Slow</option><option value="800" selected>Normal</option><option value="400">Fast</option><option value="0">Off</option></select>
+  <select id="pauseSensitivity" onchange="setPauseSensitivity(this.value)" style="background:transparent;border:1px solid var(--line);border-radius:100px;font-family:JetBrains Mono,monospace;font-size:9px;font-weight:600;cursor:pointer;padding:2px 6px;color:var(--muted)" title="Pause sensitivity"><option value="1500">Slow</option><option value="800">Normal</option><option value="400">Fast</option><option value="0" selected>Off</option></select>
   <span style="width:1px;height:18px;background:var(--line)"></span>
   <button class="btn-sm" onclick="toggleFullscreen()" style="font-size:10px;padding:4px 10px;border-radius:100px;border:1px solid var(--line);background:transparent;color:var(--muted);cursor:pointer">⛶</button>
   <button id="speakersToggleBtn" class="btn-sm" onclick="togglePanel('speakers')" style="font-size:10px;padding:4px 10px;border-radius:100px;border:1px solid var(--line);background:transparent;color:var(--muted);cursor:pointer">👥 Speakers</button>
@@ -1244,10 +1244,10 @@ function setPauseSensitivity(val) {
   localStorage.setItem('sottotitoli-pause-sensitivity', val);
 }
 (function(){
-  var saved = localStorage.getItem('sottotitoli-pause-sensitivity') || '800';
+  var saved = localStorage.getItem('sottotitoli-pause-sensitivity') || '0';
   var sel = document.getElementById('pauseSensitivity');
   if (sel) sel.value = saved;
-  if (typeof setForceFinalizeMs === 'function') setForceFinalizeMs(parseInt(saved) || 800);
+  if (typeof setForceFinalizeMs === 'function') setForceFinalizeMs(parseInt(saved) || 0);
 })();
 
 // Restore saved speaker count
@@ -2407,11 +2407,19 @@ var pauseBtn = null;
 // Connect real mic callbacks
 _realMic.onInterim = function(text) {
   var interim = document.getElementById('captionInterim');
-  if (interim) interim.textContent = formatCaptionText(text);
+  if (!interim) return;
+  interim.textContent = formatCaptionText(text, 50, 2);
+  
+  // If the box is full (overflowing 2 lines), force-finalize immediately
+  if (interim.scrollHeight > interim.clientHeight && text.trim().length > 0) {
+    if (_realMic.onFinal) _realMic.onFinal(text);
+    interim.textContent = '';
+    // Restart recognition cleanly
+    if (_realMic.recognition) {
+      try { _realMic.recognition.stop(); } catch(e) {}
+    }
+  }
 };
-
-// Auto-finalize after 800ms of silence — sends to transcript
-if (typeof setForceFinalizeMs === 'function') setForceFinalizeMs(800);
 
 // ── Subtitle formatting: max 2 lines, max 50 chars per line ──
 // Breaks at word boundaries. Shows the most recent 2 lines of content.
