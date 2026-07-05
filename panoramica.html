@@ -481,10 +481,9 @@
 
   <!-- Page-specific: Supabase data fetching -->
   <script>
-    /* ── Utility: format seconds to "Xh Ym" or "Ym" ── */
-    function fmtDuration(sec) {
-      if (!sec || sec < 60) return '<1m';
-      var m = Math.round(sec / 60);
+    /* ── Utility: format minutes to readable string ── */
+    function fmtMinutes(m) {
+      if (!m || m < 1) return '0m';
       if (m < 60) return m + 'm';
       var h = Math.floor(m / 60);
       var rm = m % 60;
@@ -544,7 +543,8 @@
       function renderHero() {
         var s = currentStats();
         var sessions = s ? s.totalSessions : 0;
-        var hours = s ? s.totalHours : '0';
+        var mins = s ? (s.totalMinutes || 0) : 0;
+        var hours = mins >= 60 ? Math.round(mins / 60) : (mins > 0 ? '<1' : '0');
         var words = s ? (s.totalWords || 0).toLocaleString() : '0';
         var heroP = document.querySelector('.hero-content p');
         if (heroP) {
@@ -557,40 +557,29 @@
         var s = currentStats();
         var vals = {
           totalSessions: s ? s.totalSessions : 0,
-          totalMinutes: s ? s.totalMinutes + 'm' : '0m',
+          totalMinutes: s ? fmtMinutes(s.totalMinutes) : '0m',
           totalWords: s ? (s.totalWords > 999 ? (s.totalWords / 1000).toFixed(1) + 'k' : s.totalWords) : '0',
           avgWpm: s ? Math.round(s.avgWpm) : '—',
           avgLexDiv: s ? s.avgLexDiv.toFixed(2) : '—',
           reportCount: (reports || []).length,
-          dailyMin: (s && s.thisWeekSessions > 0) ? Math.round(s.thisWeekMinutes / Math.min(7, s.thisWeekSessions || 1)) + 'm' : '0m',
+          dailyMin: (s && s.thisWeekSessions > 0) ? fmtMinutes(Math.round(s.thisWeekMinutes / Math.min(7, s.thisWeekSessions || 1))) : '0m',
           completionPct: (s && s.thisWeekSessions > 0) ? Math.min(100, Math.round(s.thisWeekSessions / 7 * 100)) + '%' : '0%'
         };
-        var trendLabels = s ? [
-          (s.thisWeekSessions > 0 ? '↗ +' + s.thisWeekSessions + ' questa settimana' : '—'),
-          (s.thisWeekSessions > 0 ? '↗ +' + s.dailyAverageMinutes + 'm media giornaliera' : '—'),
-          (s.totalWords > 0 ? s.totalWords.toLocaleString() + ' parole uniche' : '—'),
-          '—','—',
-          reports && reports.length > 0 ? reports.length + ' completati' : '—',
-          '—','—'
-        ] : ['—','—','—','—','—','—','—','—'];
-        var cards = document.querySelectorAll('#pnl-panoramica .metric-card');
-        var keys = ['totalSessions', 'totalMinutes', 'totalWords', 'avgWpm', 'avgLexDiv', 'reportCount'];
-        cards.forEach(function (card, i) {
+        var badges = {
+          totalSessions: s && s.thisWeekSessions > 0 ? '↗ +' + s.thisWeekSessions + ' questa settimana' : '—',
+          totalMinutes: s && s.thisWeekSessions > 0 ? '↗ +' + s.dailyAverageMinutes + 'm media giornaliera' : '—',
+          totalWords: s && s.totalWords > 0 ? s.totalWords.toLocaleString() + ' parole uniche' : '—',
+          avgWpm: '—', avgLexDiv: '—',
+          reportCount: reports && reports.length > 0 ? reports.length + ' completati' : '—',
+          dailyMin: '—', completionPct: '—'
+        };
+        document.querySelectorAll('#pnl-panoramica .metric-card').forEach(function (card) {
+          var key = card.getAttribute('data-metric');
+          if (!key || vals[key] === undefined) return;
           var valEl = card.querySelector('.metric-value');
-          if (valEl && keys[i] && vals[keys[i]] !== undefined) {
-            valEl.textContent = String(vals[keys[i]]);
-          }
-          if (i === 6) {
-            if (valEl) valEl.textContent = vals.dailyMin;
-          }
-          if (i === 7) {
-            if (valEl) valEl.textContent = vals.completionPct;
-          }
-          // Clear all sub-text
           var badge = card.querySelector('.metric-badge');
-          if (badge) badge.textContent = trendLabels[i] || '—';
-          var para = card.querySelector('p');
-          if (para && para.textContent.indexOf('Trend') !== -1) para.textContent = '';
+          if (valEl) valEl.textContent = String(vals[key]);
+          if (badge && badges[key]) badge.textContent = badges[key];
         });
       }
 
