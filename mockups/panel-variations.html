@@ -69,7 +69,7 @@ h1{font-family:'Manrope',sans-serif;font-size:34px;font-weight:800;margin-bottom
   <!-- Word chips row -->
   <div id="d1chips" style="display:flex;gap:6px;flex-wrap:wrap;justify-content:center;min-height:32px"></div>
   <!-- Hint appears after chips, below them -->
-  <div id="d1hint" style="font-size:10px;color:rgba(255,255,255,0);transition:opacity 2.8s ease;display:none">👆 tap any word</div>
+  <div id="d1hint" style="font-size:10px;color:rgba(255,255,255,0);transition:opacity 2.8s ease,transform 2.8s ease;display:none">👆 tap any word</div>
   <!-- Card -->
   <div id="d1card" style="display:none;max-width:300px"></div>
 </div>
@@ -214,24 +214,61 @@ function animateHand(){
   var target=chipRefs['pasta'];
   if(!target)return;
   var tr=target.getBoundingClientRect(),sr=stage.getBoundingClientRect();
-  var tx=tr.left-sr.left+tr.width/2-16,ty=tr.top-sr.top-38;
-  hand.style.transition='none';hand.style.opacity='0';hand.style.left='auto';hand.style.right='12px';hand.style.top='auto';hand.style.bottom='12px';hand.style.fontSize='32px';
+  var endX=tr.left-sr.left+tr.width/2-16,endY=tr.top-sr.top-38;
+  var startX=sr.width-44,startY=sr.height-44;
+  // Control point for curved arc — high and left of center
+  var cpX=sr.width*.45,cpY=sr.height*.15;
+
+  // Reset to bottom-right
+  hand.style.transition='none';hand.style.opacity='0';hand.style.left=startX+'px';hand.style.top=startY+'px';hand.style.right='auto';hand.style.bottom='auto';hand.style.fontSize='32px';
   hand.offsetHeight;
-  hand.style.transition='left .7s cubic-bezier(.15,.8,.2,1),top .7s cubic-bezier(.15,.8,.2,1),font-size .5s ease,opacity .4s';
-  hand.style.opacity='1';
-  setTimeout(function(){hand.style.left=tx+'px';hand.style.right='auto';hand.style.top=ty+'px';hand.style.bottom='auto'},50);
-  // Dramatic slow click
-  setTimeout(function(){hand.style.top=(ty+8)+'px';hand.style.fontSize='28px'},800);
-  setTimeout(function(){hand.style.top=(ty+24)+'px';hand.style.fontSize='20px'},1350);
-  setTimeout(function(){hand.style.top=(ty+12)+'px';hand.style.fontSize='24px'},1700);
-  setTimeout(function(){hand.style.opacity='0';showCard(words['pasta']);showDoneHint()},2100);
+
+  // Quadratic bezier: B(t) = (1-t)²P0 + 2(1-t)tP1 + t²P2
+  function bezier(t){var u=1-t;return{x:u*u*startX+2*u*t*cpX+t*t*endX,y:u*u*startY+2*u*t*cpY+t*t*endY}}
+
+  // Waypoints along arc with slow→fast→slow timing
+  var waypoints=[0,.15,.35,.55,.75,.9,1]; // t values
+  var times=[0,250,500,800,1200,1600,2000]; // ms — clustered at ends for slow→fast→slow
+
+  hand.style.transition='none';hand.style.opacity='1';
+  waypoints.forEach(function(t,i){
+    setTimeout(function(){
+      var p=bezier(t);hand.style.left=p.x+'px';hand.style.top=p.y+'px';
+      if(t===1)setTimeout(doClick,300); // small settle before click
+    },times[i]);
+  });
+
+  function doClick(){
+    // Hand presses down
+    hand.style.transition='top .3s ease-in,font-size .3s ease-in';
+    hand.style.top=(endY+22)+'px';hand.style.fontSize='18px';
+    // Chip presses down
+    target.style.transition='transform .25s ease-in';target.style.transform='scale(.88)';
+    // Click ring
+    var ring=document.createElement('div');ring.style.cssText='position:absolute;width:8px;height:8px;border-radius:50%;border:2px solid rgba(6,182,212,.6);pointer-events:none;z-index:11;left:'+(endX+14)+'px;top:'+(endY+30)+'px;animation:popIn .4s ease-out;opacity:0';
+    stage.appendChild(ring);setTimeout(function(){ring.style.opacity='1'},50);setTimeout(function(){ring.remove()},500);
+    // Release
+    setTimeout(function(){
+      hand.style.transition='top .5s cubic-bezier(.15,.8,.2,1),font-size .5s ease,opacity .3s';
+      hand.style.top=(endY-8)+'px';hand.style.fontSize='24px';hand.style.opacity='0';
+      target.style.transition='transform .35s cubic-bezier(.15,.8,.2,1)';target.style.transform='scale(1)';
+      target.style.boxShadow='0 0 0 2px rgba(6,182,212,.3)';
+      showCard(words['pasta']);
+    },350);
+    // Show done hint after click
+    setTimeout(function(){showDoneHint()},900);
+  }
 }
 
 function showDoneHint(){
-  chipRefs['pasta'].style.boxShadow='0 0 0 2px rgba(6,182,212,.3)';
   hintEl.textContent='✨ now you try — tap any word';
-  hintEl.style.display='block';
-  setTimeout(function(){hintEl.style.opacity='1';hintEl.style.color='rgba(255,255,255,.4)'},50);
+  hintEl.style.display='block';hintEl.style.opacity='0';hintEl.style.transform='translateY(6px)';hintEl.style.transition='opacity 1.5s ease,transform 1.5s cubic-bezier(.15,.8,.2,1)';
+  setTimeout(function(){hintEl.style.opacity='1';hintEl.style.transform='translateY(0)'},100);
+  // Accentuate remaining chips with a subtle pulse
+  ['delicious','truly','extraordinary'].forEach(function(k,i){
+    var c=chipRefs[k];if(!c)return;
+    setTimeout(function(){c.style.boxShadow='0 0 0 2px rgba(6,182,212,.12)';setTimeout(function(){c.style.boxShadow=''},800)},i*300+600);
+  });
   replayBtn.style.display='block';
 }
 
@@ -242,7 +279,7 @@ function showCard(d){
 }
 
 function resetD1(){
-  sentEl.innerHTML='';chipEl.innerHTML='';cardEl.style.display='none';hintEl.style.display='none';hintEl.style.opacity='0';hintEl.textContent='👆 tap any word';replayBtn.style.display='none';hand.style.opacity='0';hand.style.transition='none';hand.style.left='auto';hand.style.right='12px';hand.style.top='auto';hand.style.bottom='12px';hand.style.fontSize='32px';si=0;chipsShown={};chipRefs={};demoComplete=false;active=true;
+  sentEl.innerHTML='';chipEl.innerHTML='';cardEl.style.display='none';hintEl.style.display='none';hintEl.style.opacity='0';hintEl.style.transform='';hintEl.textContent='👆 tap any word';replayBtn.style.display='none';hand.style.opacity='0';hand.style.transition='none';hand.style.left='auto';hand.style.right='12px';hand.style.top='auto';hand.style.bottom='12px';hand.style.fontSize='32px';si=0;chipsShown={};chipRefs={};demoComplete=false;active=true;
   setTimeout(typeWord,400);
 }
 active=true;setTimeout(typeWord,400);
