@@ -415,7 +415,6 @@ body {
           <div class="panel-tag">🔍 Tap to Learn</div>
           <h2 class="panel-h2">All at the touch<br><span class="hl">of a fingertip.</span></h2>
           <p class="panel-p">One tap shows definition, CEFR level, part of speech, pronunciation, and synonyms — without ever leaving the flow of conversation.</p>
-          <a href="panoramica.html" class="panel-cta">Try it live <svg class="icon" style="width:12px;height:12px"><use href="#i-arrow-right"/></svg></a>
         </div>
       </div>
       <div class="panel-right" style="align-items:center;justify-content:center;padding:20px;position:relative;overflow:visible">
@@ -423,8 +422,10 @@ body {
           <div id="idxSentence" style="text-align:center;font-size:18px;color:#fff;line-height:2;min-height:60px"></div>
           <div id="idxChips" style="display:flex;gap:5px;flex-wrap:wrap;justify-content:center;min-height:30px"></div>
           <div id="idxCard" style="display:none;width:100%;max-width:280px"></div>
-          <div id="idxHint" style="font-size:10px;color:rgba(255,255,255,.55);opacity:0;transition:opacity 2.5s ease;text-align:center">✨ now you try — tap any word</div>
+          <div id="idxHint" style="font-size:10px;color:rgba(255,255,255,.55);opacity:0;transition:opacity 2.5s ease;text-align:center">now you try — tap any word</div>
         </div>
+        <!-- Replay button -->
+        <button id="idxReplay" onclick="location.reload()" style="position:absolute;top:8px;right:12px;font-size:10px;font-weight:600;color:rgba(255,255,255,.25);background:none;border:1px solid rgba(255,255,255,.08);border-radius:6px;padding:4px 10px;cursor:pointer;font-family:Inter,sans-serif;display:none;z-index:5" onmouseover="this.style.color='#06b6d4';this.style.borderColor='rgba(6,182,212,.3)'" onmouseout="this.style.color='rgba(255,255,255,.25)';this.style.borderColor='rgba(255,255,255,.08)'">↺ replay</button>
         <!-- Pointing hand -->
         <div id="idxHand" style="position:absolute;font-size:28px;z-index:10;opacity:0;pointer-events:none;bottom:16px;right:16px;top:auto;left:auto;transition:left .7s cubic-bezier(.15,.8,.2,1),top .7s cubic-bezier(.15,.8,.2,1),font-size .4s ease,opacity .4s">☝️</div>
       </div>
@@ -505,17 +506,21 @@ body {
 var words={pasta:{w:'pasta',cefr:'A2',pos:'NOUN',ipa:'/ˈpæs.tə/',def:'An Italian dish made from wheat flour and water, often served with sauce.',syns:['noodles','spaghetti','macaroni','linguine']},delicious:{w:'delicious',cefr:'A2',pos:'ADJ',ipa:'/dɪˈlɪʃ.əs/',def:'Highly pleasant to the taste. The perfect word for food you really enjoy.',syns:['tasty','yummy','flavorful','scrumptious']},truly:{w:'truly',cefr:'B1',pos:'ADV',ipa:'/ˈtruː.li/',def:'In a truthful way; without doubt. Used to emphasize sincerity.',syns:['genuinely','really','honestly','sincerely']},extraordinary:{w:'extraordinary',cefr:'B2',pos:'ADJ',ipa:'/ɪkˈstrɔː.dɪn.ər.i/',def:'Very unusual or remarkable. Beyond what is ordinary.',syns:['remarkable','exceptional','incredible','astonishing']}};
 var cefrColors={A1:'#22c55e',A2:'#a3e635',B1:'#facc15',B2:'#fb923c',C1:'#c084fc',C2:'#f472b6'};
 var sentEl=document.getElementById('idxSentence'),chipEl=document.getElementById('idxChips'),cardEl=document.getElementById('idxCard'),hintEl=document.getElementById('idxHint'),handEl=document.getElementById('idxHand'),stageEl=handEl.parentElement;
-var script=[{w:'The',d:90},{w:'pasta',d:160,chip:'pasta'},{w:'…',d:260,pause:true},{w:'was',d:100},{w:'delicious.',d:260,chip:'delicious'},{w:'…',d:480,pause:true},{w:'Truly',d:200,chip:'truly'},{w:'…',d:240,pause:true},{w:'extraordinary.',d:300,chip:'extraordinary'}];
+// Sentence: first part, then line break, then second part
+var script=[{w:'The',d:90},{w:'pasta',d:160,chip:'pasta'},{w:'was',d:100},{w:'delicious.',d:260,chip:'delicious'},{w:'\n',d:500,br:true},{w:'Truly',d:200,chip:'truly'},{w:'extraordinary.',d:300,chip:'extraordinary'}];
 var si=0,chipsShown={},chipRefs={},ran=false;
 
 function startDemo(){
   if(ran)return;ran=true;si=0;chipsShown={};chipRefs={};sentEl.innerHTML='';chipEl.innerHTML='';cardEl.style.display='none';cardEl.innerHTML='';hintEl.style.opacity='0';
   handEl.style.transition='none';handEl.style.opacity='0';handEl.style.left='auto';handEl.style.right='16px';handEl.style.top='auto';handEl.style.bottom='16px';handEl.style.fontSize='28px';
+  document.getElementById('idxReplay').style.display='none';
   setTimeout(typeWord,300);
 }
 function typeWord(){
   if(si>=script.length){setTimeout(animateHand,2000);return}
-  var s=script[si];if(s.pause){si++;setTimeout(typeWord,s.d);return}
+  var s=script[si];
+  if(s.pause){si++;setTimeout(typeWord,s.d);return}
+  if(s.br){var br=document.createElement('br');sentEl.appendChild(br);si++;setTimeout(typeWord,s.d);return}
   var sp=document.createElement('span');sp.textContent=s.w+' ';sp.style.cssText='display:inline-block;animation:fadeIn .4s cubic-bezier(.15,.7,.2,1) both;color:#fff;margin-right:4px;font-size:17px';
   sentEl.appendChild(sp);
   if(s.chip&&!chipsShown[s.chip]){chipsShown[s.chip]=true;showChip(words[s.chip],s.chip)}
@@ -529,17 +534,19 @@ function showChip(d,key){
 function animateHand(){
   var t=chipRefs['pasta'];if(!t)return;
   var tr=t.getBoundingClientRect(),sr=stageEl.getBoundingClientRect();
-  var endX=tr.left-sr.left+tr.width/2-14,endY=tr.top-sr.top-42;
-  // Swoop from bottom-right over 1.2s
-  handEl.style.transition='left .8s cubic-bezier(.15,.8,.2,1),top .8s cubic-bezier(.15,.8,.2,1)';
-  handEl.style.opacity='1';handEl.style.left=endX+'px';handEl.style.right='auto';handEl.style.top=endY+'px';handEl.style.bottom='auto';
-  // Click after swoop
-  setTimeout(function(){
-    handEl.style.top=(endY+20)+'px';handEl.style.fontSize='22px';t.style.transform='scale(.88)';t.style.transition='transform .25s ease';
-  },900);
-  setTimeout(function(){
-    handEl.style.top=(endY-4)+'px';handEl.style.fontSize='26px';handEl.style.opacity='0';t.style.transform='scale(1)';t.style.boxShadow='0 0 0 2px rgba(6,182,212,.3)';showCard(words['pasta']);hintEl.style.opacity='1';
-  },1200);
+  var endX=tr.left-sr.left+tr.width/2-12,endY=tr.top-sr.top-40;
+  var startX=sr.width-40,startY=sr.height-40,cpX=sr.width*.4,cpY=sr.height*.12;
+  handEl.style.transition='none';handEl.style.opacity='1';handEl.style.left=startX+'px';handEl.style.top=startY+'px';handEl.style.right='auto';handEl.style.bottom='auto';handEl.style.fontSize='28px';
+  handEl.offsetHeight;
+  function bezier(t){var u=1-t;return{x:u*u*startX+2*u*t*cpX+t*t*endX,y:u*u*startY+2*u*t*cpY+t*t*endY}}
+  function ease(t){return t<.5?2*t*t:-1+(4-2*t)*t}
+  var dur=1800,st=null;
+  function frame(ts){if(!st)st=ts;var raw=Math.min((ts-st)/dur,1),p=bezier(ease(raw));handEl.style.left=p.x+'px';handEl.style.top=p.y+'px';if(raw<1){requestAnimationFrame(frame)}else{setTimeout(doClick,200)}}
+  requestAnimationFrame(frame);
+  function doClick(){
+    handEl.style.transition='top .3s ease-in,font-size .3s ease-in';handEl.style.top=(endY+20)+'px';handEl.style.fontSize='20px';t.style.transform='scale(.88)';t.style.transition='transform .25s ease';
+    setTimeout(function(){handEl.style.top=(endY-4)+'px';handEl.style.fontSize='26px';handEl.style.opacity='0';t.style.transform='scale(1)';t.style.boxShadow='0 0 0 2px rgba(6,182,212,.3)';showCard(words['pasta']);hintEl.style.opacity='1';document.getElementById('idxReplay').style.display='block'},320);
+  }
 }
 function showCard(d){
   var cc=cefrColors[d.cefr];
