@@ -1,0 +1,584 @@
+<!DOCTYPE html>
+<html lang="it" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Sottotitoli — Sottotitoli e traduzione in tempo reale</title>
+<meta name="description" content="Sottotitoli e traduzione in tempo reale per capire subito meglio riunioni, lezioni e conversazioni. Inizia gratis.">
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,400;14..32,500;14..32,600;14..32,700;14..32,800;14..32,900&family=DM+Serif+Display&family=Cormorant+Garamond:wght@500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/theme-2.css">
+<style>
+/* ═══════════════════════════════════════════════════
+   SOTTO-INDEX — Slider Supreme, theme-2 foundation
+   ═══════════════════════════════════════════════════ */
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+
+/* ── Tokens extended for slider ── */
+:root {
+  --cyan: #06b6d4;
+  --sky: #22d3ee;
+  --radius-workspace: 34px;
+  --shadow-workspace: 0 4px 32px rgba(0,0,0,.35), 0 0 0 1px rgba(255,255,255,.03);
+}
+[data-theme="light"] {
+  --cyan: #0e7490;
+  --sky: #0891b2;
+  --shadow-workspace: 0 4px 32px rgba(0,0,0,.08), 0 0 0 1px rgba(0,0,0,.03);
+}
+
+/* ── Body: fullscreen slider canvas ── */
+body {
+  font-family: 'Inter', ui-sans-serif, system-ui, sans-serif;
+  overflow: hidden;
+  height: 100dvh;
+  background: var(--bg);
+  transition: background .4s, color .4s;
+}
+
+/* ═══ TOPBAR — transparent, matching panoramica ═══ */
+.topbar {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0 22px; height: 60px;
+  background: transparent;
+  transition: background .4s;
+}
+.topbar-brand {
+  font-family: 'Inter', sans-serif; font-size: 22px; font-weight: 800;
+  color: var(--text); text-decoration: none; letter-spacing: -.5px;
+}
+.topbar-brand span { color: var(--teal); }
+.trial-pill {
+  background: rgba(6,182,212,.12); border-radius: 8px;
+  padding: 3px 8px; font-size: 11px; font-weight: 700;
+  color: var(--teal); margin-left: 8px;
+}
+.topbar-right { display: flex; align-items: center; gap: 10px; }
+.topbar-login {
+  display: inline-flex; align-items: center; gap: 6px;
+  height: 34px; padding: 0 14px; border-radius: 10px;
+  background: var(--panel-2); color: var(--text);
+  font-size: 13px; font-weight: 600;
+  border: 1px solid var(--line);
+  cursor: pointer; font-family: 'Inter', sans-serif; text-decoration: none;
+  transition: border-color .2s, background .2s;
+}
+.topbar-login:hover { border-color: var(--teal); background: var(--panel); }
+.topbar-btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  height: 34px; padding: 0 16px; border-radius: 10px;
+  background: var(--teal); color: #fff;
+  font-size: 13px; font-weight: 600; border: none;
+  cursor: pointer; font-family: 'Inter', sans-serif;
+  transition: transform .2s, box-shadow .2s;
+  box-shadow: 0 2px 10px rgba(14,116,144,.25);
+}
+.topbar-btn:hover { transform: translateY(-1px); box-shadow: 0 4px 18px rgba(14,116,144,.35); }
+[data-theme="light"] .topbar-btn { color: #fff; }
+
+/* Theme toggle in topbar */
+.theme-toggle {
+  display: inline-flex; align-items: center; gap: 6px;
+  height: 34px; padding: 0 12px; border-radius: 10px;
+  background: var(--panel-2); color: var(--text-soft);
+  font-size: 12px; font-weight: 600;
+  border: 1px solid var(--line); cursor: pointer;
+  font-family: 'Inter', sans-serif;
+  transition: border-color .2s, background .2s;
+}
+.theme-toggle:hover { border-color: var(--teal); }
+.theme-toggle .theme-icon-sun,
+.theme-toggle .theme-icon-moon { font-size: 14px; }
+[data-theme="light"] .theme-icon-moon { display: none; }
+[data-theme="dark"] .theme-icon-sun { display: none; }
+
+/* ═══ SLIDER ═══ */
+.slider { position: fixed; inset: 0; }
+.slide {
+  position: absolute; inset: 0;
+  display: flex; align-items: center; justify-content: center;
+  pointer-events: none; z-index: 0;
+  clip-path: polygon(0 0, 100% 0, 100% 100%, 0 100%);
+}
+.slide.active { z-index: 2; pointer-events: auto; }
+
+/* ── Slide background tints (subtle, theme-aware) ── */
+.s0::before, .s1::before, .s2::before, .s3::before {
+  content: ''; position: absolute; inset: 0;
+  background-size: cover; background-position: center;
+  filter: blur(24px) brightness(.35);
+  transform: scale(1.15); z-index: 0;
+  transition: filter .4s;
+}
+[data-theme="light"] .s0::before,
+[data-theme="light"] .s1::before,
+[data-theme="light"] .s2::before,
+[data-theme="light"] .s3::before {
+  filter: blur(24px) brightness(.85);
+}
+.s0::before { background-image: url('https://images.unsplash.com/photo-1559223607-a43c990c692c?w=1200&h=800&fit=crop'); }
+.s1::before { background-image: url('https://images.unsplash.com/photo-1529156069898-49953e39b3ac?w=1200&h=800&fit=crop'); }
+.s2::before { background-image: url('https://images.unsplash.com/photo-1434030216411-0b793f4b4173?w=1200&h=800&fit=crop'); }
+.s3::before { background-image: url('https://images.unsplash.com/photo-1573164713714-d95e436ab8d6?w=1200&h=800&fit=crop'); }
+
+/* ═══ WORKSPACE PANEL ═══ */
+.workspace-panel {
+  position: relative; z-index: 1;
+  width: clamp(340px, 90vw, 1100px); max-height: 88%;
+  background: var(--panel);
+  border: 2px solid var(--line-strong);
+  border-radius: var(--radius-workspace);
+  box-shadow: var(--shadow-workspace);
+  backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px);
+  display: grid; grid-template-columns: 1fr 1fr;
+  overflow: hidden;
+  transition: background .4s, border-color .4s, box-shadow .4s;
+}
+@media (max-width: 768px) {
+  .workspace-panel { grid-template-columns: 1fr; max-height: 92%; }
+}
+.slide:not(.active) .workspace-panel {
+  opacity: .4; transform: scale(.96);
+  transition: opacity .5s ease, transform .5s cubic-bezier(.25,.1,.25,1);
+}
+
+/* ═══ PANEL LEFT — text content ═══ */
+.panel-left {
+  display: flex; align-items: center;
+  padding: clamp(32px, 6vw, 56px);
+  position: relative;
+}
+.panel-left::after {
+  content: ''; position: absolute; right: 0; top: 15%; bottom: 15%;
+  width: 1px; background: linear-gradient(180deg, transparent, var(--line), transparent);
+}
+@media (max-width: 768px) {
+  .panel-left { padding: 32px 28px 20px; }
+  .panel-left::after { display: none; }
+}
+.panel-inner { max-width: 440px; width: 100%; }
+
+.panel-tag {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: 11px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: .15em;
+  color: var(--teal); margin-bottom: 16px;
+  padding: 5px 14px; border-radius: 100px;
+  background: var(--teal-4);
+  border: 1px solid rgba(14,116,144,.15);
+}
+
+.panel-h2 {
+  font-family: 'Inter', sans-serif;
+  font-size: clamp(28px, 4.5vw, 46px); font-weight: 800;
+  line-height: 1.12; letter-spacing: -1.5px;
+  color: var(--text); margin-bottom: 18px;
+}
+.panel-h2 .hl {
+  background: linear-gradient(135deg, var(--teal), var(--teal-2));
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.panel-p {
+  font-size: 15px; color: var(--text-soft);
+  line-height: 1.65; margin-bottom: 24px; max-width: 400px;
+}
+
+.panel-cta {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 12px 28px; border-radius: 14px;
+  font-size: 14px; font-weight: 700; color: #fff;
+  cursor: pointer; text-decoration: none;
+  background: var(--teal);
+  box-shadow: 0 4px 20px rgba(14,116,144,.25);
+  transition: all .3s cubic-bezier(.4,0,.2,1);
+}
+.panel-cta:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 32px rgba(14,116,144,.4);
+}
+[data-theme="light"] .panel-cta { color: #fff; }
+
+.panel-cta-ghost {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 12px 26px; border-radius: 14px;
+  font-size: 14px; font-weight: 600;
+  color: var(--text-soft); cursor: pointer; text-decoration: none;
+  background: var(--panel-2);
+  border: 1.5px solid var(--line);
+  transition: all .3s; margin-left: 10px;
+}
+.panel-cta-ghost:hover {
+  background: var(--panel); border-color: var(--teal);
+  color: var(--text);
+}
+
+/* ═══ PANEL RIGHT — Polaroid gallery ═══ */
+.panel-right {
+  position: relative; display: flex;
+  align-items: center; justify-content: center;
+  overflow: visible;
+}
+.polaroid {
+  position: absolute;
+  background: var(--panel);
+  padding: 8px 8px 30px;
+  border-radius: 3px;
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow-card);
+  transition: transform .9s cubic-bezier(.25,.1,.25,1), opacity .5s ease;
+  z-index: 1;
+}
+[data-theme="dark"] .polaroid { background: #1e1e24; border-color: #2a2a30; }
+.polaroid img {
+  display: block; width: 100%; height: 100%;
+  object-fit: cover; border-radius: 1px;
+}
+.slide:not(.active) .polaroid { opacity: .3; pointer-events: none; }
+
+/* Slide 0 — bottom-cluster cascade */
+.s0 .p1 { width: clamp(100px,20vw,260px); height: clamp(130px,26vw,330px); bottom: 8%; right: 8%;  transform: rotate(-2deg); }
+.s0 .p2 { width: clamp(90px,18vw,240px);  height: clamp(115px,23vw,300px); bottom: 14%; right: 20%; transform: rotate(4deg);  }
+.s0 .p3 { width: clamp(80px,16vw,210px);  height: clamp(100px,20vw,270px); bottom: 16%; right: 26%; transform: rotate(-5deg); }
+/* Slide 1 — overlapping fan */
+.s1 .p1 { width: clamp(120px,22vw,300px); height: clamp(155px,28vw,380px); top: 6%;  right: 10%; transform: rotate(-4deg); }
+.s1 .p2 { width: clamp(120px,22vw,300px); height: clamp(155px,28vw,380px); top: 22%; right: 8%;  transform: rotate(1deg);  }
+.s1 .p3 { width: clamp(120px,22vw,300px); height: clamp(155px,28vw,380px); top: 24%; right: 18%; transform: rotate(5deg);  }
+/* Slide 2 — mixed scatter */
+.s2 .p1 { width: clamp(110px,20vw,280px); height: clamp(140px,26vw,360px); top: 8%;  right: 6%;  transform: rotate(-2deg); }
+.s2 .p2 { width: clamp(95px,18vw,250px);  height: clamp(90px,18vw,240px);  top: 42%; right: 20%; transform: rotate(-3deg); }
+.s2 .p3 { width: clamp(90px,16vw,230px);  height: clamp(80px,15vw,210px);  bottom: 10%; right: 8%; transform: rotate(1deg);  }
+/* Active parallax */
+.s0.active .p1 { transform: rotate(-2deg) translate(-4px,-6px); }
+.s0.active .p2 { transform: rotate(4deg) translate(6px,4px);   }
+.s0.active .p3 { transform: rotate(-5deg) translate(-3px,8px); }
+.s1.active .p1 { transform: rotate(-4deg) translate(-4px,-6px); }
+.s1.active .p2 { transform: rotate(1deg) translate(6px,4px);   }
+.s1.active .p3 { transform: rotate(5deg) translate(-3px,8px);  }
+.s2.active .p1 { transform: rotate(-2deg) translate(-4px,-6px); }
+.s2.active .p2 { transform: rotate(-3deg) translate(6px,4px);  }
+.s2.active .p3 { transform: rotate(1deg) translate(-3px,8px);  }
+
+/* ═══ SLIDE 3 — Pricing grid ═══ */
+.pricing-mini {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 10px;
+  width: 100%; max-width: 360px; padding: 20px;
+}
+.pricing-mini-card {
+  background: var(--panel-2); border: 1px solid var(--line);
+  border-radius: 18px; padding: 15px; text-align: center;
+  transition: transform .3s, border-color .3s;
+}
+.pricing-mini-card:hover {
+  transform: translateY(-2px);
+  border-color: rgba(14,116,144,.2);
+}
+.pricing-mini-card.popular {
+  border-color: rgba(14,116,144,.2);
+  background: var(--teal-4);
+}
+.pricing-mini-card .price {
+  font-size: 28px; font-weight: 900; color: var(--text); margin-bottom: 2px;
+}
+.pricing-mini-card .price small {
+  font-size: 14px; font-weight: 500; color: var(--text-faint);
+}
+.pricing-mini-card .plan-name {
+  font-size: 11px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: .1em;
+  color: var(--teal); margin-bottom: 6px;
+}
+.pricing-mini-card .plan-desc {
+  font-size: 10px; color: var(--text-faint); line-height: 1.4;
+}
+
+/* ═══ NAV ARROWS ═══ */
+.nav-arrows {
+  position: fixed; right: 20px; top: 50%;
+  transform: translateY(-50%); z-index: 60;
+  display: flex; flex-direction: column; gap: 6px;
+}
+.nav-arrow {
+  width: 38px; height: 38px; border-radius: 50%;
+  border: 1.5px solid var(--line);
+  display: flex; align-items: center; justify-content: center;
+  color: var(--text-soft); font-size: 14px; cursor: pointer;
+  transition: all .25s; background: var(--panel);
+  backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+  font-family: inherit;
+}
+.nav-arrow:hover {
+  border-color: var(--teal); color: var(--teal);
+  background: var(--teal-4);
+}
+[data-theme="dark"] .nav-arrow { background: rgba(13,17,23,.6); }
+
+/* ═══ BOTTOM NAV ═══ */
+.bottom-nav {
+  position: fixed; bottom: 0; left: 0; right: 0; z-index: 60;
+  display: flex; align-items: center; justify-content: center;
+  gap: 44px; padding: 16px 20px;
+  background: linear-gradient(to top, var(--bg), transparent);
+}
+.bottom-nav a {
+  font-size: 11px; font-weight: 600;
+  text-transform: uppercase; letter-spacing: 2px;
+  color: var(--text-faint); text-decoration: none;
+  transition: color .3s;
+}
+.bottom-nav a:hover { color: var(--text-soft); }
+.nav-dots { display: flex; gap: 6px; }
+.nav-dot {
+  width: 7px; height: 7px; border-radius: 50%;
+  background: var(--line); transition: all .3s;
+}
+.nav-dot.active {
+  background: var(--teal); width: 20px; border-radius: 4px;
+}
+
+/* ═══ SLIDE MASK ANIMATION ═══ */
+.slide.mask-out {
+  animation: maskOut .5s cubic-bezier(.55,0,.12,1) forwards;
+  z-index: 3;
+}
+.slide.mask-in {
+  animation: maskIn .5s cubic-bezier(.55,0,.12,1) forwards;
+  z-index: 4;
+}
+@keyframes maskOut {
+  from { clip-path: polygon(0 0, 100% 0, 100% 100%, 0 100%); }
+  to   { clip-path: polygon(0 100%, 100% 100%, 100% 100%, 0 100%); }
+}
+@keyframes maskIn {
+  from { clip-path: polygon(0 0, 100% 0, 100% 0, 0 0); }
+  to   { clip-path: polygon(0 0, 100% 0, 100% 100%, 0 100%); }
+}
+</style>
+</head>
+<body>
+
+<!-- ═══ TOPBAR ═══ -->
+<header class="topbar">
+  <div style="display:flex;align-items:center">
+    <a href="#" class="topbar-brand">sotto<span>titoli</span></a>
+    <span class="trial-pill">Pro</span>
+  </div>
+  <div class="topbar-right">
+    <button class="theme-toggle" id="themeToggle" type="button" aria-label="Toggle color theme">
+      <span class="theme-icon-sun">☀️</span>
+      <span class="theme-icon-moon">🌙</span>
+      <span class="theme-text">Light</span>
+    </button>
+    <a href="#" class="topbar-login" id="loginBtn">
+      <svg class="icon" style="width:14px;height:14px"><use href="#i-google"/></svg>
+      Accedi
+    </a>
+    <button class="topbar-btn" onclick="window.location.href='panoramica.html'">
+      <svg class="icon" style="width:13px;height:13px"><use href="#i-mic"/></svg>
+      Start Session
+    </button>
+  </div>
+</header>
+
+<!-- ═══ SVG SPRITE ═══ -->
+<svg xmlns="http://www.w3.org/2000/svg" style="display:none">
+  <symbol id="i-google" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></symbol>
+  <symbol id="i-mic" viewBox="0 0 24 24"><path d="M12 2a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/><path d="M19 10v1a7 7 0 0 1-14 0v-1"/><line x1="12" y1="19" x2="12" y2="22"/></symbol>
+  <symbol id="i-arrow-right" viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7"/></symbol>
+  <symbol id="i-closed-captioning" viewBox="0 0 24 24"><rect x="2" y="4" width="20" height="16" rx="3"/><path d="M7 10.5c0-.8.7-1.5 1.5-1.5s1.5.7 1.5 1.5v1M7 14.5c0 .8.7 1.5 1.5 1.5s1.5-.7 1.5-1.5M12 10.5c0-.8.7-1.5 1.5-1.5s1.5.7 1.5 1.5v1M12 14.5c0 .8.7 1.5 1.5 1.5s1.5-.7 1.5-1.5"/></symbol>
+  <symbol id="i-chevron-up" viewBox="0 0 24 24"><path d="M18 15l-6-6-6 6"/></symbol>
+  <symbol id="i-chevron-down" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></symbol>
+  <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4.5"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M19.1 4.9L17 7M7 17l-2.1 2.1"/></symbol>
+  <symbol id="i-moon" viewBox="0 0 24 24"><path d="M20 14.2A8.5 8.5 0 1 1 9.8 4 7 7 0 0 0 20 14.2z"/></symbol>
+  <symbol id="i-bell" viewBox="0 0 24 24"><path d="M15 18H5.5a1.5 1.5 0 0 1-1.2-2.4L6 13.5V10a6 6 0 1 1 12 0v3.5l1.7 2.1A1.5 1.5 0 0 1 18.5 18H15M10 20a2 2 0 0 0 4 0"/></symbol>
+  <symbol id="i-user" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4.5 19a8.5 8.5 0 0 1 15 0"/></symbol>
+</svg>
+
+<!-- ═══ SLIDER ═══ -->
+<div class="slider" id="slider">
+
+  <!-- SLIDE 0: Hero -->
+  <div class="slide s0 active" data-idx="0">
+    <div class="workspace-panel">
+      <div class="panel-left">
+        <div class="panel-inner">
+          <div class="panel-tag">
+            <svg class="icon" style="width:14px;height:14px"><use href="#i-closed-captioning"/></svg>
+            Sottotitoli
+          </div>
+          <h2 class="panel-h2">Tutto chiaro.<br>Sempre. <span class="hl">Subito.</span></h2>
+          <p class="panel-p">Sottotitoli e traduzione in tempo reale per capire subito meglio riunioni, lezioni e conversazioni.</p>
+          <a href="panoramica.html" class="panel-cta">Inizia gratis <svg class="icon" style="width:12px;height:12px"><use href="#i-arrow-right"/></svg></a>
+          <a href="#" class="panel-cta-ghost">Scopri di più</a>
+        </div>
+      </div>
+      <div class="panel-right">
+        <div class="polaroid p1"><img src="https://images.unsplash.com/photo-1559223607-a43c990c692c?w=300&h=380&fit=crop" alt="Presentazione con sottotitoli" loading="lazy"></div>
+        <div class="polaroid p2"><img src="https://images.unsplash.com/photo-1573164713714-d95e436ab8d6?w=260&h=330&fit=crop" alt="Conferenza" loading="lazy"></div>
+        <div class="polaroid p3"><img src="https://images.unsplash.com/photo-1524178232363-1fb2b075b655?w=220&h=280&fit=crop" alt="Riunione" loading="lazy"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SLIDE 1: Visualizza -->
+  <div class="slide s1" data-idx="1">
+    <div class="workspace-panel">
+      <div class="panel-left">
+        <div class="panel-inner">
+          <div class="panel-tag">Visualizza</div>
+          <h2 class="panel-h2">La tua voce<br><span class="hl">in tutte le sue parti.</span></h2>
+          <p class="panel-p">Scomponiamo il tuo parlato in decine di indicatori. Uno strumento che unisce comprensione e autoanalisi in un'unica esperienza live.</p>
+          <a href="panoramica.html" class="panel-cta">Inizia gratis <svg class="icon" style="width:12px;height:12px"><use href="#i-arrow-right"/></svg></a>
+        </div>
+      </div>
+      <div class="panel-right">
+        <div class="polaroid p1"><img src="https://images.unsplash.com/photo-1573497491208-6b1acb260507?w=320&h=400&fit=crop" alt="Scambio linguistico" loading="lazy"></div>
+        <div class="polaroid p2"><img src="https://images.unsplash.com/photo-1523240795612-9a054b0db644?w=320&h=400&fit=crop" alt="Conversazione" loading="lazy"></div>
+        <div class="polaroid p3"><img src="https://images.unsplash.com/photo-1543269865-cbf427effbad?w=320&h=400&fit=crop" alt="Gruppo di discussione" loading="lazy"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SLIDE 2: Insight -->
+  <div class="slide s2" data-idx="2">
+    <div class="workspace-panel">
+      <div class="panel-left">
+        <div class="panel-inner">
+          <div class="panel-tag">Vai più a fondo</div>
+          <h2 class="panel-h2">Non solo sottotitoli.<br><span class="hl">Anche insight utili.</span></h2>
+          <p class="panel-p">Se vuoi, ogni sessione può diventare anche uno strumento per migliorare: trascrizioni, parole salvate, traduzioni e Report AI.</p>
+          <a href="panoramica.html" class="panel-cta">Inizia gratis <svg class="icon" style="width:12px;height:12px"><use href="#i-arrow-right"/></svg></a>
+        </div>
+      </div>
+      <div class="panel-right">
+        <div class="polaroid p1"><img src="https://images.unsplash.com/photo-1488190211105-8b0e65b80b4e?w=300&h=380&fit=crop" alt="Studio e apprendimento" loading="lazy"></div>
+        <div class="polaroid p2"><img src="https://images.unsplash.com/photo-1517245386807-bb43f82c33c4?w=260&h=250&fit=crop" alt="Workspace" loading="lazy"></div>
+        <div class="polaroid p3"><img src="https://images.unsplash.com/photo-1434030216411-0b793f4b4173?w=240&h=220&fit=crop" alt="Prendere appunti" loading="lazy"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SLIDE 3: Prezzi -->
+  <div class="slide s3" data-idx="3">
+    <div class="workspace-panel">
+      <div class="panel-left">
+        <div class="panel-inner">
+          <div class="panel-tag">Prezzi</div>
+          <h2 class="panel-h2">Un modo semplice<br><span class="hl">per capire meglio.</span></h2>
+          <p class="panel-p">Minuti per usare Studio. Crediti separati per i Report AI. Inizia gratis con 15 minuti a settimana.</p>
+          <a href="#" class="panel-cta">Vedi i piani <svg class="icon" style="width:12px;height:12px"><use href="#i-arrow-right"/></svg></a>
+        </div>
+      </div>
+      <div class="panel-right" style="align-items:center">
+        <div class="pricing-mini">
+          <div class="pricing-mini-card"><div class="plan-name">Gratis</div><div class="price">€0</div><div class="plan-desc">15 min / settimana<br>Per sempre</div></div>
+          <div class="pricing-mini-card popular"><div class="plan-name">Starter</div><div class="price">€4<small>,99</small></div><div class="plan-desc">60 minuti<br>+5 crediti Report AI</div></div>
+          <div class="pricing-mini-card popular"><div class="plan-name">Standard</div><div class="price">€14<small>,99</small></div><div class="plan-desc">300 minuti<br>+20 crediti Report AI</div></div>
+          <div class="pricing-mini-card"><div class="plan-name">Premium</div><div class="price">€29<small>,99</small></div><div class="plan-desc">900 minuti<br>+60 crediti Report AI</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- ═══ NAV ARROWS ═══ -->
+<div class="nav-arrows">
+  <button class="nav-arrow" id="prevBtn" aria-label="Slide precedente">
+    <svg class="icon" style="width:16px;height:16px"><use href="#i-chevron-up"/></svg>
+  </button>
+  <button class="nav-arrow" id="nextBtn" aria-label="Slide successiva">
+    <svg class="icon" style="width:16px;height:16px"><use href="#i-chevron-down"/></svg>
+  </button>
+</div>
+
+<!-- ═══ BOTTOM NAV ═══ -->
+<div class="bottom-nav">
+  <a href="privacy.html">Privacy</a>
+  <div class="nav-dots" id="navDots">
+    <span class="nav-dot active"></span>
+    <span class="nav-dot"></span>
+    <span class="nav-dot"></span>
+    <span class="nav-dot"></span>
+  </div>
+  <a href="termini.html">Contattaci</a>
+</div>
+
+<!-- ═══ SCRIPTS ═══ -->
+<script src="js/theme-2.js"></script>
+<script>
+/* ═══ Slider engine ═══ */
+(function(){
+  var slides = document.querySelectorAll('.slide');
+  var total  = slides.length;
+  var current = 0;
+  var transitioning = false;
+  var dots = document.querySelectorAll('.nav-dot');
+
+  function goTo(idx) {
+    if (transitioning || idx === current || idx < 0 || idx >= total) return;
+    transitioning = true;
+
+    var old = slides[current];
+    var neu = slides[idx];
+
+    old.classList.add('mask-out');
+    old.classList.remove('active');
+    neu.classList.add('mask-in', 'active');
+
+    dots.forEach(function(d, i) { d.classList.toggle('active', i === idx); });
+
+    setTimeout(function() {
+      old.classList.remove('mask-out');
+      neu.classList.remove('mask-in');
+      slides.forEach(function(s, i) {
+        if (i !== current && i !== idx) s.classList.remove('active', 'mask-in', 'mask-out');
+      });
+      current = idx;
+      transitioning = false;
+    }, 550);
+  }
+
+  document.getElementById('prevBtn').addEventListener('click', function() {
+    goTo(current > 0 ? current - 1 : total - 1);
+  });
+  document.getElementById('nextBtn').addEventListener('click', function() {
+    goTo(current < total - 1 ? current + 1 : 0);
+  });
+
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'ArrowDown' || e.key === 'ArrowRight') goTo(current < total - 1 ? current + 1 : 0);
+    if (e.key === 'ArrowUp'   || e.key === 'ArrowLeft')  goTo(current > 0 ? current - 1 : total - 1);
+  });
+
+  // Wheel with debounce
+  var wA = 0, wCd = false;
+  document.addEventListener('wheel', function(e) {
+    if (wCd) return;
+    wA += e.deltaY;
+    if (Math.abs(wA) > 120) {
+      if (wA > 0) goTo(current < total - 1 ? current + 1 : 0);
+      else        goTo(current > 0 ? current - 1 : total - 1);
+      wA = 0; wCd = true;
+      setTimeout(function() { wCd = false; }, 800);
+    }
+  }, { passive: true });
+
+  // Touch swipe
+  var tY = 0;
+  document.addEventListener('touchstart', function(e) { tY = e.touches[0].clientY; }, { passive: true });
+  document.addEventListener('touchend', function(e) {
+    var dY = e.changedTouches[0].clientY - tY;
+    if (Math.abs(dY) > 50) {
+      if (dY > 0) goTo(current > 0 ? current - 1 : total - 1);
+      else        goTo(current < total - 1 ? current + 1 : 0);
+    }
+  });
+})();
+</script>
+</body>
+</html>
