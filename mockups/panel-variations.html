@@ -166,17 +166,18 @@ var words={
 };
 var cefrColors={A1:'#22c55e',A2:'#a3e635',B1:'#facc15',B2:'#fb923c',C1:'#c084fc',C2:'#f472b6'};
 var sentEl=document.getElementById('d1sentence'),chipEl=document.getElementById('d1chips'),hintEl=document.getElementById('d1hint'),cardEl=document.getElementById('d1card'),stage=sentEl.parentElement;
+var demoComplete=false,chipsShown={},chipRefs={};
 
-// Natural speech rhythm: word + delay in ms
-// ~100ms for short words, ~200ms for content words, 700ms pause between sentences
+// Script: word groups with natural pauses
 var script=[
-  {w:'The',d:100},{w:'pasta',d:200,chip:'pasta'},{w:'was',d:120},{w:'delicious.',d:280,chip:'delicious'},
-  {w:'…',d:700,pause:true},
-  {w:'Truly',d:220,chip:'truly'},{w:'extraordinary.',d:320,chip:'extraordinary'}
+  {w:'The',d:90},{w:'pasta',d:160,chip:'pasta'},{w:'…',d:280,pause:true},
+  {w:'was',d:100},{w:'delicious.',d:260,chip:'delicious'},{w:'…',d:500,pause:true},
+  {w:'Truly',d:200,chip:'truly'},{w:'…',d:260,pause:true},
+  {w:'extraordinary.',d:300,chip:'extraordinary'}
 ];
-var si=0,active=false,chipsShown={};
+var si=0,active=false;
 
-// Add replay button
+// Replay button
 var replayBtn=document.createElement('button');
 replayBtn.textContent='↺ replay';replayBtn.style.cssText='position:absolute;top:8px;right:12px;font-size:10px;font-weight:600;color:rgba(255,255,255,.25);background:none;border:1px solid rgba(255,255,255,.08);border-radius:6px;padding:4px 10px;cursor:pointer;font-family:Inter,sans-serif;transition:all .2s;display:none;z-index:5';
 replayBtn.onmouseover=function(){this.style.color='#06b6d4';this.style.borderColor='rgba(6,182,212,.3)'};
@@ -184,34 +185,59 @@ replayBtn.onmouseout=function(){this.style.color='rgba(255,255,255,.25)';this.st
 replayBtn.onclick=function(){resetD1()};
 stage.appendChild(replayBtn);
 
+// Pointing hand
+var hand=document.createElement('div');
+hand.textContent='☝️';hand.style.cssText='position:absolute;font-size:28px;z-index:10;opacity:0;pointer-events:none;transition:opacity .5s';
+stage.appendChild(hand);
+
 function typeWord(){
-  if(si>=script.length){active=false;setTimeout(showHint,1200);replayBtn.style.display='block';return}
+  if(si>=script.length){active=false;demoComplete=true;setTimeout(animateHand,2400);return}
   var s=script[si];
-  if(s.pause){si++;setTimeout(typeWord,s.d);return} // pause marker — no word
+  if(s.pause){si++;setTimeout(typeWord,s.d);return}
   var sp=document.createElement('span');sp.textContent=s.w+' ';sp.style.cssText='display:inline-block;animation:fadeUp .45s cubic-bezier(.15,.7,.2,1) both;color:#fff;margin-right:4px';
   sentEl.appendChild(sp);
-  if(s.chip&&!chipsShown[s.chip]){chipsShown[s.chip]=true;showChip(words[s.chip])}
+  if(s.chip&&!chipsShown[s.chip]){chipsShown[s.chip]=true;showChip(words[s.chip],s.chip)}
   si++;setTimeout(typeWord,s.d);
 }
-function showChip(d){
+
+function showChip(d,key){
   var cc=cefrColors[d.cefr];
   var chip=document.createElement('span');
   chip.className='word-chip';chip.textContent=d.w;
   chip.style.cssText='background:'+cc+'18;color:'+cc+';border:1px solid '+cc+'33;animation:popIn .3s ease-out both';
   chip.onclick=function(){showCard(d)};
   chipEl.appendChild(chip);
+  chipRefs[key]=chip;
 }
-function showHint(){
+
+function animateHand(){
+  // Position hand above the "pasta" chip
+  var target=chipRefs['pasta'];
+  if(!target)return;
+  var tr=target.getBoundingClientRect(),sr=stage.getBoundingClientRect();
+  var tx=tr.left-sr.left+tr.width/2-14,ty=tr.top-sr.top-36;
+  hand.style.left=tx+'px';hand.style.top=ty+'px';hand.style.opacity='1';
+  // Bob down to "tap"
+  setTimeout(function(){hand.style.top=(ty+26)+'px';hand.style.fontSize='22px'},400);
+  setTimeout(function(){hand.style.opacity='0';showCard(words['pasta']);showDoneHint()},700);
+}
+
+function showDoneHint(){
+  chipRefs['pasta'].style.boxShadow='0 0 0 2px rgba(6,182,212,.3)';
+  hintEl.textContent='✨ now you try — tap any word';
   hintEl.style.display='block';
-  setTimeout(function(){hintEl.style.opacity='1';hintEl.style.color='rgba(255,255,255,.25)'},50);
+  setTimeout(function(){hintEl.style.opacity='1';hintEl.style.color='rgba(255,255,255,.4)'},50);
+  replayBtn.style.display='block';
 }
+
 function showCard(d){
   var cc=cefrColors[d.cefr];
   cardEl.innerHTML='<div class="card-pop"><div style="display:flex;align-items:baseline;gap:8px;margin-bottom:6px"><span style="font-size:18px;font-weight:800;color:#fff;font-family:Manrope,sans-serif">'+d.w+'</span><span class="badge" style="background:'+cc+'22;color:'+cc+'">'+d.cefr+'</span><span style="font-size:11px;color:rgba(255,255,255,.4)">· '+d.pos+'</span></div><div style="font-size:11px;color:#06b6d4;margin-bottom:8px">'+d.ipa+'</div><div style="font-size:12px;color:rgba(255,255,255,.55);line-height:1.55;margin-bottom:10px">'+d.def+'</div><div style="display:flex;gap:5px;flex-wrap:wrap">'+d.syns.map(function(s){return'<span class="badge" style="background:rgba(6,182,212,.1);color:#06b6d4;font-size:10px">'+s+'</span>'}).join('')+'</div></div>';
   cardEl.style.display='block';cardEl.style.animation='none';cardEl.offsetHeight;cardEl.style.animation='popIn .35s ease-out';
 }
+
 function resetD1(){
-  sentEl.innerHTML='';chipEl.innerHTML='';cardEl.style.display='none';hintEl.style.display='none';hintEl.style.opacity='0';replayBtn.style.display='none';si=0;chipsShown={};active=true;
+  sentEl.innerHTML='';chipEl.innerHTML='';cardEl.style.display='none';hintEl.style.display='none';hintEl.style.opacity='0';hintEl.textContent='👆 tap any word';replayBtn.style.display='none';hand.style.opacity='0';si=0;chipsShown={};chipRefs={};demoComplete=false;active=true;
   setTimeout(typeWord,400);
 }
 active=true;setTimeout(typeWord,400);
