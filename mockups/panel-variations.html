@@ -216,38 +216,34 @@ function animateHand(){
   var tr=target.getBoundingClientRect(),sr=stage.getBoundingClientRect();
   var endX=tr.left-sr.left+tr.width/2-16,endY=tr.top-sr.top-38;
   var startX=sr.width-44,startY=sr.height-44;
-  // Control point for curved arc — high and left of center
   var cpX=sr.width*.45,cpY=sr.height*.15;
 
-  // Reset to bottom-right
-  hand.style.transition='none';hand.style.opacity='0';hand.style.left=startX+'px';hand.style.top=startY+'px';hand.style.right='auto';hand.style.bottom='auto';hand.style.fontSize='32px';
+  // Position at start
+  hand.style.transition='none';hand.style.opacity='1';hand.style.left=startX+'px';hand.style.top=startY+'px';hand.style.right='auto';hand.style.bottom='auto';hand.style.fontSize='32px';
   hand.offsetHeight;
 
-  // Quadratic bezier: B(t) = (1-t)²P0 + 2(1-t)tP1 + t²P2
+  // Quadratic bezier
   function bezier(t){var u=1-t;return{x:u*u*startX+2*u*t*cpX+t*t*endX,y:u*u*startY+2*u*t*cpY+t*t*endY}}
 
-  // Waypoints along arc with slow→fast→slow timing
-  var waypoints=[0,.15,.35,.55,.75,.9,1]; // t values
-  var times=[0,250,500,800,1200,1600,2000]; // ms — clustered at ends for slow→fast→slow
+  // Slow→fast→slow easing on t
+  function ease(t){return t<.5?2*t*t:-1+(4-2*t)*t}
 
-  hand.style.transition='none';hand.style.opacity='1';
-  waypoints.forEach(function(t,i){
-    setTimeout(function(){
-      var p=bezier(t);hand.style.left=p.x+'px';hand.style.top=p.y+'px';
-      if(t===1)setTimeout(doClick,300); // small settle before click
-    },times[i]);
-  });
+  var duration=2000,startTime=null;
+  function frame(ts){
+    if(!startTime)startTime=ts;
+    var elapsed=ts-startTime,raw=Math.min(elapsed/duration,1),t=ease(raw);
+    var p=bezier(t);
+    hand.style.left=p.x+'px';hand.style.top=p.y+'px';
+    if(raw<1){requestAnimationFrame(frame)}else{setTimeout(doClick,250)}
+  }
+  requestAnimationFrame(frame);
 
   function doClick(){
-    // Hand presses down
     hand.style.transition='top .3s ease-in,font-size .3s ease-in';
     hand.style.top=(endY+22)+'px';hand.style.fontSize='18px';
-    // Chip presses down
     target.style.transition='transform .25s ease-in';target.style.transform='scale(.88)';
-    // Click ring
     var ring=document.createElement('div');ring.style.cssText='position:absolute;width:8px;height:8px;border-radius:50%;border:2px solid rgba(6,182,212,.6);pointer-events:none;z-index:11;left:'+(endX+14)+'px;top:'+(endY+30)+'px;animation:popIn .4s ease-out;opacity:0';
     stage.appendChild(ring);setTimeout(function(){ring.style.opacity='1'},50);setTimeout(function(){ring.remove()},500);
-    // Release
     setTimeout(function(){
       hand.style.transition='top .5s cubic-bezier(.15,.8,.2,1),font-size .5s ease,opacity .3s';
       hand.style.top=(endY-8)+'px';hand.style.fontSize='24px';hand.style.opacity='0';
@@ -255,7 +251,6 @@ function animateHand(){
       target.style.boxShadow='0 0 0 2px rgba(6,182,212,.3)';
       showCard(words['pasta']);
     },350);
-    // Show done hint after click
     setTimeout(function(){showDoneHint()},900);
   }
 }
