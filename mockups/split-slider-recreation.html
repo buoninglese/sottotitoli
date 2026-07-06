@@ -357,6 +357,9 @@ function goTo(idx){
 function doMaskTransition(idx){
   transitioning=true;
   var old=slides[current],neu=slides[idx];
+  // Reset animation flag for the slide we're leaving, so it replays on return
+  var flagNames=['ran0','ran1','ran2','ran3','ran4'];
+  if(flagNames[current])window[flagNames[current]]=false;
   old.classList.add('mask-out');old.classList.remove('active');
   neu.classList.add('mask-in','active');
   dots.forEach(function(d,i){d.classList.toggle('active',i===idx)});
@@ -438,7 +441,22 @@ function slide2Continua(){
 
 document.getElementById('prevBtn').addEventListener('click',function(){goTo(current>0?current-1:total-1)});
 document.getElementById('nextBtn').addEventListener('click',function(){goTo(current<total-1?current+1:0)});
-document.addEventListener('keydown',function(e){if(e.key==='ArrowDown'||e.key==='ArrowRight'||e.key===' '){e.preventDefault();goTo(current<total-1?current+1:0)}if(e.key==='ArrowUp'||e.key==='ArrowLeft'){e.preventDefault();goTo(current>0?current-1:total-1)}});
+
+/* ═══ Spacebar / Arrow keys trigger the same transitions as buttons ═══ */
+function advanceSlide(){
+  if(current===0)slide0Exit();
+  else if(current===1)slide1Continua();
+  else if(current===2)goTo(3);
+  else if(current===3)slide3Exit();
+  else if(current===4)slide4Exit();
+}
+function retreatSlide(){
+  goTo(current>0?current-1:total-1);
+}
+document.addEventListener('keydown',function(e){
+  if(e.key==='ArrowDown'||e.key==='ArrowRight'||e.key===' '){e.preventDefault();advanceSlide()}
+  if(e.key==='ArrowUp'||e.key==='ArrowLeft'){e.preventDefault();retreatSlide()}
+});
 var tY=0;document.addEventListener('touchstart',function(e){tY=e.touches[0].clientY},{passive:true});
 document.addEventListener('touchend',function(e){var dY=e.changedTouches[0].clientY-tY;if(Math.abs(dY)>50){if(dY>0)goTo(current>0?current-1:total-1);else goTo(current<total-1?current+1:0)}});
 
@@ -448,7 +466,7 @@ var lines=[
   {en:'We believe the key to language learning // is visualization.', it:'Crediamo che la chiave per <em>la comprensione linguistica</em> sia la visualizzazione.'},
   {en:'That\'s why we want every conversation // to be crystal clear.', it:'Per questo vogliamo che ogni conversazione <em>sia cristallina</em>.'}
 ];
-var container=document.getElementById('slide1Trans'),li=0,ran1=false,rows=[];
+var container=document.getElementById('slide1Trans'),li=0,rows=[];window.ran1=false;
 
 function tokenize(text){
   return text.split(' ').map(function(w){return w==='//'?{pause:true,d:700}:w});
@@ -494,7 +512,7 @@ function finishS1(){
   },200);
 }
 function startS1(){
-  if(ran1)return;ran1=true;
+  if(window.ran1)return;window.ran1=true;
   // Pre-allocate rows — prevents layout jump
   lines.forEach(function(l){
     var row=document.createElement('div');
@@ -505,7 +523,7 @@ function startS1(){
   });
   setTimeout(playLine,600);
 }
-setInterval(function(){if(document.querySelector('.s1.active')&&!ran1)startS1()},500);
+setInterval(function(){if(document.querySelector('.s1.active')&&!window.ran1)startS1()},500);
 })();
 
 /* ═══ SLIDE 2: Word Card Popup demo ═══ */
@@ -514,12 +532,12 @@ var words={pasta:{w:'pasta',cefr:'A2',pos:'NOUN',ipa:'/ˈpæs.tə/',def:'An Ital
 var cefrColors={A1:'#22c55e',A2:'#a3e635',B1:'#facc15',B2:'#fb923c',C1:'#c084fc',C2:'#f472b6'};
 var sentEl=document.getElementById('idxSentence'),chipEl=document.getElementById('idxChips'),cardEl=document.getElementById('idxCard'),hintEl=document.getElementById('idxHint'),handEl=document.getElementById('idxHand'),stageEl=handEl.parentElement,replayEl=document.getElementById('idxReplay');
 var script=[{w:'The',d:100},{w:'pasta',d:200,chip:'pasta'},{w:'…',d:300,pause:true},{w:'was',d:120},{w:'delicious.',d:300,chip:'delicious'},{w:'…',d:550,pause:true},{w:'Truly',d:240,chip:'truly'},{w:'…',d:280,pause:true},{w:'extraordinary.',d:340,chip:'extraordinary'}];
-var si=0,chipsShown={},chipRefs={},ran2=false;
+var si=0,chipsShown={},chipRefs={};window.ran2=false;
 
-replayEl.onclick=function(){sentEl.innerHTML='';chipEl.innerHTML='';cardEl.innerHTML='';hintEl.style.opacity='0';handEl.style.opacity='0';handEl.style.left='auto';handEl.style.right='16px';handEl.style.top='auto';handEl.style.bottom='16px';replayEl.style.display='none';ran2=false;setTimeout(function(){startDemo()},200)};
+replayEl.onclick=function(){sentEl.innerHTML='';chipEl.innerHTML='';cardEl.innerHTML='';hintEl.style.opacity='0';handEl.style.opacity='0';handEl.style.left='auto';handEl.style.right='16px';handEl.style.top='auto';handEl.style.bottom='16px';replayEl.style.display='none';window.ran2=false;setTimeout(function(){startDemo()},200)};
 
 function startDemo(){
-  if(ran2)return;ran2=true;si=0;chipsShown={};chipRefs={};
+  if(window.ran2)return;window.ran2=true;si=0;chipsShown={};chipRefs={};
   sentEl.innerHTML='';chipEl.innerHTML='';cardEl.innerHTML='';hintEl.style.opacity='0';
   handEl.style.transition='none';handEl.style.opacity='0';handEl.style.left='auto';handEl.style.right='16px';handEl.style.top='auto';handEl.style.bottom='16px';handEl.style.fontSize='28px';
   replayEl.style.display='none';
@@ -560,14 +578,14 @@ function showCard(d){
   var cc=cefrColors[d.cefr];
   cardEl.innerHTML='<div style=\"background:#141e28;border:1px solid #253545;border-radius:14px;padding:16px;box-shadow:0 8px 28px rgba(0,0,0,.5);animation:popIn .3s ease-out\"><div style=\"display:flex;align-items:baseline;gap:6px;margin-bottom:5px\"><span style=\"font-size:17px;font-weight:800;color:#fff;font-family:Manrope,sans-serif\">'+d.w+'</span><span style=\"display:inline-block;font-size:9px;padding:2px 7px;border-radius:100px;font-weight:700;background:'+cc+'22;color:'+cc+'\">'+d.cefr+'</span><span style=\"font-size:10px;color:rgba(255,255,255,.4)\">· '+d.pos+'</span></div><div style=\"font-size:10px;color:#06b6d4;margin-bottom:7px\">'+d.ipa+'</div><div style=\"font-size:11px;color:rgba(255,255,255,.55);line-height:1.5;margin-bottom:8px\">'+d.def+'</div><div style=\"display:flex;gap:4px;flex-wrap:wrap\">'+d.syns.map(function(s){return'<span style=\"display:inline-block;font-size:9px;padding:2px 7px;border-radius:100px;font-weight:600;background:rgba(6,182,212,.1);color:#06b6d4\">'+s+'</span>'}).join('')+'</div></div>';
 }
-setInterval(function(){if(document.querySelector('.s2.active')&&!ran2)startDemo()},500);
+setInterval(function(){if(document.querySelector('.s2.active')&&!window.ran2)startDemo()},500);
 })();
 
 /* ═══ SLIDE 3: Dual title fade animation ═══ */
 (function(){
-var ran3=false;
+window.ran3=false;
 function startS3(){
-  if(ran3)return;ran3=true;
+  if(window.ran3)return;window.ran3=true;
   var tL=document.getElementById('s3TitleL'),tR=document.getElementById('s3TitleR'),p=document.getElementById('s3Para'),btn=document.getElementById('s3Continua');
   // Reset
   tL.style.opacity='0';tR.style.opacity='0';p.style.opacity='0';if(btn)btn.classList.remove('show');
@@ -580,14 +598,14 @@ function startS3(){
   // Continua button
   setTimeout(function(){if(btn)btn.classList.add('show')},2800);
 }
-setInterval(function(){if(document.querySelector('.s3.active')&&!ran3)startS3()},500);
+setInterval(function(){if(document.querySelector('.s3.active')&&!window.ran3)startS3()},500);
 })();
 
 /* ═══ SLIDE 4: Title → text → underline → pricing → CTA ═══ */
 (function(){
-var ran4=false;
+window.ran4=false;
 function startS4(){
-  if(ran4)return;ran4=true;
+  if(window.ran4)return;window.ran4=true;
   var t=document.getElementById('s4Title'),txt=document.getElementById('s4Text'),ul=document.getElementById('s4UlLine'),pr=document.getElementById('s4Pricing'),cta=document.getElementById('s4CTA');
   t.style.opacity='0';txt.style.opacity='0';if(ul)ul.classList.remove('draw');pr.style.opacity='0';cta.style.opacity='0';
   // Title
@@ -601,14 +619,14 @@ function startS4(){
   // CTA button
   setTimeout(function(){cta.style.opacity='1'},2600);
 }
-setInterval(function(){if(document.querySelector('.s4.active')&&!ran4)startS4()},500);
+setInterval(function(){if(document.querySelector('.s4.active')&&!window.ran4)startS4()},500);
 })();
 
 /* ═══ SLIDE 0: Slow fade-in when becoming active ═══ */
 (function(){
-var ran0=true; // starts true because slide 0 is active on load — CSS handles initial state
+window.ran0=true; // starts true because slide 0 is active on load
 function startS0(){
-  if(ran0)return;ran0=true;
+  if(window.ran0)return;window.ran0=true;
   var hero=slides[0].querySelector('.text-side');
   if(hero){
     hero.classList.remove('slide-exit');
@@ -618,8 +636,8 @@ function startS0(){
 }
 // Reset ran0 when leaving slide 0 so fade replays on return
 setInterval(function(){
-  if(document.querySelector('.s0.active')&&!ran0)startS0();
-  if(!document.querySelector('.s0.active'))ran0=false;
+  if(document.querySelector('.s0.active')&&!window.ran0)startS0();
+  if(!document.querySelector('.s0.active'))window.ran0=false;
 },500);
 })();
 </script>
