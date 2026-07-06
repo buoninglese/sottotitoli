@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="it" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Translation Demo Tuner · Sottotitoli</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,400;14..32,500;14..32,600;14..32,700;14..32,800;14..32,900&family=Manrope:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../css/theme-2.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{--cyan:#06b6d4}
+[data-theme="light"]{--cyan:#0e7490}
+body{font-family:'Inter',ui-sans-serif,system-ui,sans-serif;overflow-x:hidden;min-height:100dvh;background:#000;color:#fff}
+
+/* ═══ TOPBAR ═══ */
+.topbar{position:fixed;top:0;left:0;right:0;z-index:100;display:flex;align-items:center;justify-content:space-between;padding:0 22px;height:72px;background:transparent}
+.topbar-right{display:flex;align-items:center;gap:10px}
+.topbar-login{display:inline-flex;align-items:center;gap:6px;height:34px;padding:0 14px;border-radius:10px;background:rgba(0,0,0,.25);color:#fff;font-size:13px;font-weight:600;border:1px solid rgba(255,255,255,.25);cursor:pointer;font-family:'Inter',sans-serif;text-decoration:none;text-shadow:0 1px 4px rgba(0,0,0,.3);transition:border-color .2s,background .2s}
+.topbar-login:hover{border-color:rgba(255,255,255,.5);background:rgba(0,0,0,.4)}
+
+/* ═══ MAIN LAYOUT ═══ */
+.page{display:flex;min-height:100dvh;padding-top:72px}
+.main{flex:1;display:flex;align-items:center;justify-content:center;padding:40px 32px}
+.sidebar{width:340px;border-left:1px solid rgba(255,255,255,.06);padding:32px 24px;display:flex;flex-direction:column;gap:28px;background:rgba(255,255,255,.015);overflow-y:auto;max-height:calc(100dvh - 72px);position:sticky;top:72px}
+@media(max-width:860px){.page{flex-direction:column}.sidebar{width:100%;border-left:none;border-top:1px solid rgba(255,255,255,.06);max-height:none;position:static}}
+
+/* ═══ DEMO AREA ═══ */
+.demo-stage{width:100%;max-width:620px}
+.trans-pair-row{margin-bottom:28px}
+.trans-en{font-size:20px;color:#fff;font-weight:600;margin-bottom:6px;min-height:28px}
+.trans-it{font-size:17px;color:var(--cyan);font-style:italic;min-height:26px;opacity:0;transition:opacity .6s ease}
+.trans-it em{font-style:italic;position:relative;white-space:nowrap}
+.trans-it em::after{content:'';position:absolute;bottom:-2px;left:0;width:0;height:2px;background:var(--cyan);border-radius:1px}
+.trans-it em.underline-on::after{animation:drawUnderline .9s ease-out forwards}
+@keyframes drawUnderline{from{width:0}to{width:100%}}
+@keyframes fadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+
+/* ═══ CONTROLS ═══ */
+.ctrl-group{display:flex;flex-direction:column;gap:8px}
+.ctrl-label{font-size:11px;font-weight:600;color:rgba(255,255,255,.35);text-transform:uppercase;letter-spacing:.06em}
+.ctrl-row{display:flex;align-items:center;gap:10px}
+.ctrl-row input[type=range]{flex:1;-webkit-appearance:none;height:4px;background:rgba(255,255,255,.1);border-radius:2px;outline:none}
+.ctrl-row input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;height:16px;border-radius:50%;background:var(--cyan);cursor:pointer}
+.ctrl-value{font-size:12px;font-weight:600;color:var(--cyan);min-width:48px;text-align:right;font-family:'JetBrains Mono',monospace}
+.ctrl-divider{height:1px;background:rgba(255,255,255,.06);margin:4px 0}
+
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:10px 18px;border-radius:100px;font-family:'Inter',sans-serif;font-size:13px;font-weight:600;cursor:pointer;border:1px solid rgba(255,255,255,.15);transition:all .2s;text-decoration:none}
+.btn-primary{background:rgba(255,255,255,.08);color:#fff}
+.btn-primary:hover{background:rgba(255,255,255,.14);border-color:rgba(255,255,255,.3)}
+.btn-cyan{background:rgba(6,182,212,.12);color:var(--cyan);border-color:rgba(6,182,212,.25)}
+.btn-cyan:hover{background:rgba(6,182,212,.2);border-color:rgba(6,182,212,.4)}
+.btn-sm{padding:7px 14px;font-size:11px}
+
+/* ═══ COPY FIELD ═══ */
+.copy-area{position:relative}
+.copy-area textarea{width:100%;height:80px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:10px;color:rgba(255,255,255,.55);font-family:'JetBrains Mono',monospace;font-size:11px;padding:10px;resize:none;line-height:1.5}
+.copy-area textarea:focus{outline:none;border-color:rgba(6,182,212,.3)}
+.copy-done{position:absolute;top:8px;right:10px;font-size:10px;color:var(--cyan);opacity:0;transition:opacity .3s;pointer-events:none}
+.copy-done.show{opacity:1}
+
+/* ═══ CHIARO REVEAL ═══ */
+.chiaro-reveal{text-align:center;margin-top:20px;opacity:0;transition:opacity .6s ease}
+.chiaro-reveal .big{font-family:'Manrope',sans-serif;font-size:clamp(64px,10vw,100px);font-weight:800;line-height:1;letter-spacing:-4px;color:#fff}
+.chiaro-reveal .dot{color:var(--cyan);opacity:0;transition:opacity .5s ease}
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <div style="display:flex;align-items:center;gap:8px">
+    <a href="#" class="topbar-brand">sotto<span>titoli</span></a>
+    <span class="trial-pill">Pro</span>
+  </div>
+  <div class="topbar-right">
+    <span style="font-size:10px;color:rgba(255,255,255,.25);text-transform:uppercase;letter-spacing:.06em">Translation Demo Tuner</span>
+  </div>
+</header>
+
+<div class="page">
+  <!-- ═══ MAIN: DEMO STAGE ═══ -->
+  <div class="main">
+    <div class="demo-stage">
+      <div id="demoTrans"></div>
+      <div class="chiaro-reveal" id="chiaroBlock">
+        <div class="big">Chiaro<span class="dot" id="chiaroDot">.</span></div>
+      </div>
+      <div style="text-align:center;margin-top:28px">
+        <button class="btn btn-primary btn-sm" id="replayBtn" style="display:none;margin:0 auto">↺ replay</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ SIDEBAR: CONTROLS ═══ -->
+  <div class="sidebar" id="sidebar">
+    <div class="ctrl-group">
+      <div class="ctrl-label">⚡ Word Speed (ms)</div>
+      <div class="ctrl-row">
+        <input type="range" id="speedSlider" min="80" max="400" value="150" step="10">
+        <span class="ctrl-value" id="speedVal">150ms</span>
+      </div>
+    </div>
+
+    <div class="ctrl-group">
+      <div class="ctrl-label">⏸ Pause Speed (ms)</div>
+      <div class="ctrl-row">
+        <input type="range" id="pauseSlider" min="150" max="800" value="700" step="10">
+        <span class="ctrl-value" id="pauseVal">700ms</span>
+      </div>
+    </div>
+
+    <div class="ctrl-group">
+      <div class="ctrl-label">⏱ Line Gap (ms)</div>
+      <div class="ctrl-row">
+        <input type="range" id="gapSlider" min="1000" max="4000" value="3000" step="100">
+        <span class="ctrl-value" id="gapVal">3000ms</span>
+      </div>
+    </div>
+
+    <div class="ctrl-group">
+      <div class="ctrl-label">🔤 English Font Size</div>
+      <div class="ctrl-row">
+        <input type="range" id="enSizeSlider" min="14" max="28" value="20" step="1">
+        <span class="ctrl-value" id="enSizeVal">20px</span>
+      </div>
+    </div>
+
+    <div class="ctrl-group">
+      <div class="ctrl-label">🔤 Italian Font Size</div>
+      <div class="ctrl-row">
+        <input type="range" id="itSizeSlider" min="12" max="24" value="17" step="1">
+        <span class="ctrl-value" id="itSizeVal">17px</span>
+      </div>
+    </div>
+
+    <div class="ctrl-divider"></div>
+
+    <div class="ctrl-group">
+      <div class="ctrl-label">🇮🇹 Italian Appears After (ms)</div>
+      <div class="ctrl-row">
+        <input type="range" id="itDelaySlider" min="0" max="2000" value="1200" step="25">
+        <span class="ctrl-value" id="itDelayVal">1200ms</span>
+      </div>
+    </div>
+
+    <div class="ctrl-group">
+      <div class="ctrl-label">🌊 Italian Fade Duration (ms)</div>
+      <div class="ctrl-row">
+        <input type="range" id="itFadeSlider" min="100" max="1500" value="600" step="25">
+        <span class="ctrl-value" id="itFadeVal">600ms</span>
+      </div>
+    </div>
+
+    <div class="ctrl-group">
+      <div class="ctrl-label">⏳ Pause Before Underline (ms)</div>
+      <div class="ctrl-row">
+        <input type="range" id="underlineDelaySlider" min="0" max="1500" value="225" step="25">
+        <span class="ctrl-value" id="underlineDelayVal">225ms</span>
+      </div>
+    </div>
+
+    <div class="ctrl-group">
+      <div class="ctrl-label">✨ Underline → Chiaro Gap (ms)</div>
+      <div class="ctrl-row">
+        <input type="range" id="chiaroGapSlider" min="100" max="2000" value="1500" step="25">
+        <span class="ctrl-value" id="chiaroGapVal">1500ms</span>
+      </div>
+    </div>
+
+    <div class="ctrl-group">
+      <div class="ctrl-label">⦿ Chiaro → Dot Pause (ms)</div>
+      <div class="ctrl-row">
+        <input type="range" id="dotDelaySlider" min="100" max="2000" value="600" step="25">
+        <span class="ctrl-value" id="dotDelayVal">600ms</span>
+      </div>
+    </div>
+
+    <div class="ctrl-divider"></div>
+
+    <button class="btn btn-cyan" id="runBtn">
+      <i class="fa-solid fa-play" style="font-size:10px"></i> Run Demo
+    </button>
+
+    <div class="ctrl-divider"></div>
+
+    <div class="ctrl-group">
+      <div class="ctrl-label">📋 Copy Settings</div>
+      <div class="copy-area">
+        <textarea id="copyField" readonly placeholder="Run the demo, then copy settings here…"></textarea>
+        <span class="copy-done" id="copyDone">Copied!</span>
+      </div>
+      <button class="btn btn-primary btn-sm" id="copyBtn" style="width:100%">
+        <i class="fa-regular fa-copy" style="font-size:10px"></i> Copy to Clipboard
+      </button>
+    </div>
+  </div>
+</div>
+
+<script src="../js/theme.js"></script>
+<script>
+/* ═══ SLIDERS → VALUES ═══ */
+var speedSlider=document.getElementById('speedSlider'),speedVal=document.getElementById('speedVal');
+var pauseSlider=document.getElementById('pauseSlider'),pauseVal=document.getElementById('pauseVal');
+var gapSlider=document.getElementById('gapSlider'),gapVal=document.getElementById('gapVal');
+var enSizeSlider=document.getElementById('enSizeSlider'),enSizeVal=document.getElementById('enSizeVal');
+var itSizeSlider=document.getElementById('itSizeSlider'),itSizeVal=document.getElementById('itSizeVal');
+var itDelaySlider=document.getElementById('itDelaySlider'),itDelayVal=document.getElementById('itDelayVal');
+var itFadeSlider=document.getElementById('itFadeSlider'),itFadeVal=document.getElementById('itFadeVal');
+var underlineDelaySlider=document.getElementById('underlineDelaySlider'),underlineDelayVal=document.getElementById('underlineDelayVal');
+var chiaroGapSlider=document.getElementById('chiaroGapSlider'),chiaroGapVal=document.getElementById('chiaroGapVal');
+var dotDelaySlider=document.getElementById('dotDelaySlider'),dotDelayVal=document.getElementById('dotDelayVal');
+
+function bind(s,v){s.oninput=function(){v.textContent=this.value+'ms'}}
+bind(speedSlider,speedVal);bind(pauseSlider,pauseVal);bind(gapSlider,gapVal);
+bind(itDelaySlider,itDelayVal);bind(itFadeSlider,itFadeVal);bind(underlineDelaySlider,underlineDelayVal);bind(chiaroGapSlider,chiaroGapVal);bind(dotDelaySlider,dotDelayVal);
+enSizeSlider.oninput=function(){enSizeVal.textContent=this.value+'px';document.querySelectorAll('.trans-en').forEach(function(e){e.style.fontSize=this.value+'px'},this)};
+itSizeSlider.oninput=function(){itSizeVal.textContent=this.value+'px';document.querySelectorAll('.trans-it').forEach(function(e){e.style.fontSize=this.value+'px'},this)};
+
+/* ═══ DEMO ENGINE ═══ */
+var lines=[
+  {en:'We believe the key to language learning // is visualization.', it:'Crediamo che la chiave per <em>la comprensione linguistica</em> sia la visualizzazione.'},
+  {en:'That\'s why we want every conversation // to be crystal clear.', it:'Per questo vogliamo che ogni conversazione <em>sia cristallina</em>.'}
+];
+var container=document.getElementById('demoTrans'),chiaroBlock=document.getElementById('chiaroBlock'),chiaroDot=document.getElementById('chiaroDot'),replayBtn=document.getElementById('replayBtn'),running=false,timeouts=[];
+
+function tokenize(text,pauseMs){
+  return text.split(' ').map(function(w){return w==='//'?{pause:true,d:pauseMs}:w});
+}
+function emphatize(text){return text.replace(/\*([^*]+)\*/g,'<em>$1</em>');}
+
+function stopAll(){timeouts.forEach(clearTimeout);timeouts=[];running=false}
+
+function runDemo(){
+  stopAll();running=true;
+  container.innerHTML='';chiaroBlock.style.opacity='0';chiaroDot.style.opacity='0';replayBtn.style.display='none';
+  var enSize=enSizeSlider.value,itSize=itSizeSlider.value;
+  var wordSpd=parseInt(speedSlider.value),pauseSpd=parseInt(pauseSlider.value),gapSpd=parseInt(gapSlider.value);
+  var itDelay=parseInt(itDelaySlider.value),itFade=parseInt(itFadeSlider.value);
+  var ulDelay=parseInt(underlineDelaySlider.value),chiaroGap=parseInt(chiaroGapSlider.value),dotDelay=parseInt(dotDelaySlider.value);
+
+  document.querySelectorAll('.trans-en').forEach(function(e){e.style.fontSize=enSize+'px'});
+  document.querySelectorAll('.trans-it').forEach(function(e){e.style.fontSize=itSize+'px'});
+
+  // Pre-allocate rows — prevents layout jump
+  var rows=[];
+  lines.forEach(function(l){
+    var row=document.createElement('div');row.className='trans-pair-row';
+    row.innerHTML='<div class=\"trans-en\" style=\"font-size:'+enSize+'px;min-height:26px\"></div><div class=\"trans-it\" style=\"font-size:'+itSize+'px;opacity:0\">'+emphatize(l.it)+'</div>';
+    container.appendChild(row);
+    rows.push(row);
+  });
+
+  var li=0;
+  function playLine(){
+    if(li>=lines.length){finish();return}
+    var row=rows[li],tokens=tokenize(lines[li].en,pauseSpd),ti=0,enEl=row.querySelector('.trans-en');
+    function typeToken(){
+      if(ti>=tokens.length){
+        var itEl=row.querySelector('.trans-it');
+        itEl.style.transition='opacity '+itFade+'ms ease';
+        var t1=setTimeout(function(){itEl.style.opacity='1'},itDelay);timeouts.push(t1);
+        // Per-line underline
+        var ems=row.querySelectorAll('em');
+        ems.forEach(function(em,i){
+          var t5=setTimeout(function(){em.classList.add('underline-on')},itDelay+200+i*ulDelay);timeouts.push(t5);
+        });
+        li++;
+        var lastUnderlineTime=(ems.length-1)*ulDelay+900;
+        var nextGap=(li>=lines.length)?(itDelay+lastUnderlineTime+chiaroGap):gapSpd;
+        var t2=setTimeout(playLine,nextGap);timeouts.push(t2);return;
+      }
+      var t=tokens[ti];
+      if(typeof t==='object'&&t.pause){ti++;var t3=setTimeout(typeToken,t.d);timeouts.push(t3);return}
+      var sp=document.createElement('span');sp.textContent=(typeof t==='string'?t:t.w)+' ';
+      sp.style.cssText='display:inline-block;animation:fadeIn .35s cubic-bezier(.15,.7,.2,1) both;margin-right:3px';
+      enEl.appendChild(sp);ti++;
+      var t4=setTimeout(typeToken,typeof t==='object'&&t.d?t.d:wordSpd);timeouts.push(t4);
+    }
+    typeToken();
+  }
+  function finish(){
+    var t6=setTimeout(function(){
+      chiaroBlock.style.opacity='1';
+      var t7=setTimeout(function(){chiaroDot.style.opacity='1';replayBtn.style.display='inline-flex';running=false},dotDelay);
+      timeouts.push(t7);
+    },100);
+    timeouts.push(t6);
+    updateCopyField();
+    replayBtn.onclick=function(){runDemo()};
+  }
+  var t0=setTimeout(playLine,400);timeouts.push(t0);
+}
+
+function getSettings(){
+  return {
+    wordSpeed: parseInt(speedSlider.value),
+    pauseSpeed: parseInt(pauseSlider.value),
+    lineGap: parseInt(gapSlider.value),
+    enFontSize: parseInt(enSizeSlider.value),
+    itFontSize: parseInt(itSizeSlider.value),
+    itDelay: parseInt(itDelaySlider.value),
+    itFade: parseInt(itFadeSlider.value),
+    underlineDelay: parseInt(underlineDelaySlider.value),
+    chiaroGap: parseInt(chiaroGapSlider.value),
+    dotDelay: parseInt(dotDelaySlider.value)
+  };
+}
+function settingsToString(s){
+  return 'wordSpeed: '+s.wordSpeed+'ms\npauseSpeed: '+s.pauseSpeed+'ms\nlineGap: '+s.lineGap+'ms\nenFontSize: '+s.enFontSize+'px\nitFontSize: '+s.itFontSize+'px\nitDelay: '+s.itDelay+'ms\nitFade: '+s.itFade+'ms\nunderlineDelay: '+s.underlineDelay+'ms\nchiaroGap: '+s.chiaroGap+'ms\ndotDelay: '+s.dotDelay+'ms';
+}
+function updateCopyField(){
+  document.getElementById('copyField').value=settingsToString(getSettings());
+}
+document.getElementById('runBtn').onclick=runDemo;
+document.getElementById('copyBtn').onclick=function(){
+  var s=getSettings();document.getElementById('copyField').value=settingsToString(s);
+  navigator.clipboard.writeText(settingsToString(s)).then(function(){
+    var done=document.getElementById('copyDone');done.classList.add('show');
+    setTimeout(function(){done.classList.remove('show')},1800);
+  });
+};
+updateCopyField();
+</script>
+</body>
+</html>
