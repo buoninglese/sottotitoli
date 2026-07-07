@@ -296,6 +296,18 @@ async function populatePanoramicaDropdown(user) {
   } catch(e) {}
 }
 
+// ═══ Top-level: populate Panoramica dropdown on every page ═══
+(function(){
+  if (document.getElementById('authSection')) return; // already handled by DOMContentLoaded
+  window.sottotitoliSupabase.auth.getSession().then(function(r){
+    if (r.data?.session?.user) {
+      populatePanoramicaDropdown(r.data.session.user);
+      // Retry after delay for slow session restore
+      setTimeout(function(){ populatePanoramicaDropdown(r.data.session.user); }, 2000);
+    }
+  });
+})();
+
 // ═══ Credit initialization — 15 min free for new users, weekly top-up ═══
 function initUserCredits(userId) {
   if (!userId) return;
