@@ -1,7 +1,9 @@
 -- ═══ Session Analytics — vocabulary + MATTR + CEFR ═══
 -- Run this migration in Supabase SQL Editor.
+-- Prerequisites: pass2_vocab_tasks.sql must already be applied (user_vocabulary table exists).
 
 -- 1) Add analytics columns to sessions table
+-- NOTE: sessions columns verified 2026-07-07 — these are the NEW columns being added.
 ALTER TABLE sessions ADD COLUMN IF NOT EXISTS mattr_score NUMERIC(4,3);
 ALTER TABLE sessions ADD COLUMN IF NOT EXISTS cefr_a1_count INTEGER DEFAULT 0;
 ALTER TABLE sessions ADD COLUMN IF NOT EXISTS cefr_a2_count INTEGER DEFAULT 0;
@@ -12,22 +14,7 @@ ALTER TABLE sessions ADD COLUMN IF NOT EXISTS cefr_c2_count INTEGER DEFAULT 0;
 ALTER TABLE sessions ADD COLUMN IF NOT EXISTS vocab_size INTEGER DEFAULT 0;
 ALTER TABLE sessions ADD COLUMN IF NOT EXISTS transcript_processed BOOLEAN DEFAULT false;
 
--- 2) User vocabulary — accumulates across all sessions
-CREATE TABLE IF NOT EXISTS user_vocabulary (
-  id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
-  lemma TEXT NOT NULL,
-  cefr TEXT,           -- A1-C2
-  first_seen TIMESTAMPTZ DEFAULT now(),
-  last_seen TIMESTAMPTZ DEFAULT now(),
-  encounter_count INTEGER DEFAULT 1,
-  UNIQUE(user_id, lemma)
-);
-
-CREATE INDEX IF NOT EXISTS idx_user_vocab_user ON user_vocabulary(user_id);
-CREATE INDEX IF NOT EXISTS idx_user_vocab_cefr ON user_vocabulary(user_id, cefr);
-
--- 3) Cumulative analytics snapshot — updated per session
+-- 2) Cumulative analytics snapshot — updated per session by edge function
 CREATE TABLE IF NOT EXISTS user_analytics_snapshot (
   user_id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
   total_sessions INTEGER DEFAULT 0,
@@ -43,27 +30,8 @@ CREATE TABLE IF NOT EXISTS user_analytics_snapshot (
   updated_at TIMESTAMPTZ DEFAULT now()
 );
 
--- 4) RLS policies
-ALTER TABLE user_vocabulary ENABLE ROW LEVEL SECURITY;
+-- 3) RLS for user_analytics_snapshot
 ALTER TABLE user_analytics_snapshot ENABLE ROW LEVEL SECURITY;
-
-DO $$ BEGIN
-  DROP POLICY IF EXISTS "Users read own vocabulary" ON user_vocabulary;
-  CREATE POLICY "Users read own vocabulary" ON user_vocabulary FOR SELECT USING (auth.uid() = user_id);
-EXCEPTION WHEN others THEN null;
-END $$;
-
-DO $$ BEGIN
-  DROP POLICY IF EXISTS "Users insert own vocabulary" ON user_vocabulary;
-  CREATE POLICY "Users insert own vocabulary" ON user_vocabulary FOR INSERT WITH CHECK (auth.uid() = user_id);
-EXCEPTION WHEN others THEN null;
-END $$;
-
-DO $$ BEGIN
-  DROP POLICY IF EXISTS "Users update own vocabulary" ON user_vocabulary;
-  CREATE POLICY "Users update own vocabulary" ON user_vocabulary FOR UPDATE USING (auth.uid() = user_id);
-EXCEPTION WHEN others THEN null;
-END $$;
 
 DO $$ BEGIN
   DROP POLICY IF EXISTS "Users read own analytics" ON user_analytics_snapshot;
@@ -76,3 +44,26 @@ DO $$ BEGIN
   CREATE POLICY "Service upsert analytics" ON user_analytics_snapshot FOR ALL USING (true) WITH CHECK (true);
 EXCEPTION WHEN others THEN null;
 END $$;
+
+-- 4) RPC: increment vocabulary usage counts (called by edge function)
+-- Bumps usage_count + last_used for existing words in user_vocabulary.
+CREATE OR REPLACE FUNCTION increment_vocab_usage(
+  p_user_id UUID,
+  p_lang TEXT,
+  p_words TEXT[]
+) RETURNS void AS $$
+BEGIN
+  UPDATE user_vocabulary
+  SET usage_count = usage_count + 1,
+      last_used = now()
+  WHERE user_id = p_user_id
+    AND lang = p_lang
+    AND word = ANY(p_words);
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- 5) Verify: check that user_vocabulary uses correct column names
+-- If the table was created by an older migration with 'lemma'/'cefr' columns,
+-- this migration assumes pass2_vocab_tasks.sql was applied (word/cefr_level/lang).
+-- Run this check query to confirm:
+-- SELECT column_name, data_type FROM information_schema.columns WHERE table_name = 'user_vocabulary' ORDER BY ordinal_position;

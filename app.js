@@ -946,7 +946,7 @@
       var uid = r.data.session.user.id;
       var tok = await sessionSupabase.from('user_tokens').select('balance').eq('user_id',uid).maybeSingle();
       setText('psCredits', tok.data?.balance ?? '0');
-      var ent = await sessionSupabase.from('user_ai_entitlements').select('report_type').eq('user_id',uid).eq('used',false);
+      var ent = await sessionSupabase.from('user_ai_entitlements').select('entitlement_key').eq('user_id',uid).eq('is_active',true);
       setText('psVouchers', (ent.data||[]).length);
       var reps = await sessionSupabase.from('session_ai_reports').select('id').eq('user_id',uid);
       setText('psReportCount', (reps.data||[]).length);
