@@ -281,6 +281,10 @@ function _refreshCreditDisplays(newMinutesBalance) {
   var udMin = document.getElementById('udMinutes');
   if (udMin) udMin.textContent = (newMinutesBalance || 0) + ' min';
   
+  // Panoramica dropdown (ddMinutes / ddTokens)
+  var ddMin = document.getElementById('ddMinutes');
+  if (ddMin) ddMin.textContent = (newMinutesBalance || 0) + ' min';
+  
   // Also try to refresh token/credit display if available
   if (window.sottotitoliSupabase) {
     window.sottotitoliSupabase.auth.getSession().then(function(r) {
@@ -296,6 +300,8 @@ function _refreshCreditDisplays(newMinutesBalance) {
           if (hbTok) hbTok.textContent = tokBal;
           var udTok = document.getElementById('udTokens');
           if (udTok) udTok.textContent = tokBal;
+          var ddTok = document.getElementById('ddTokens');
+          if (ddTok) ddTok.textContent = tokBal;
         });
     });
   }
