@@ -516,8 +516,23 @@
       var sb = await waitForSB();
       if (!sb) { console.warn('Supabase not loaded'); return; }
 
+      // Wait for auth to settle (OAuth callback may still be processing)
       var meta = await SottotitoliData.getUserMeta();
-      if (!meta) { console.warn('No session'); return; }
+      if (!meta) {
+        // Maybe OAuth token is still being processed — listen for auth event
+        console.warn('No session yet, waiting for auth event...');
+        await new Promise(function(resolve) {
+          var handler = function(e) {
+            window.removeEventListener('sottotitoli-auth', handler);
+            resolve(e.detail?.user || null);
+          };
+          window.addEventListener('sottotitoli-auth', handler);
+          // Timeout after 5 seconds
+          setTimeout(function() { window.removeEventListener('sottotitoli-auth', handler); resolve(null); }, 5000);
+        });
+        meta = await SottotitoliData.getUserMeta();
+      }
+      if (!meta) { console.warn('No session after auth wait'); return; }
 
       // Dropdown — set email immediately
       var ddEmail = document.getElementById('ddEmail');
