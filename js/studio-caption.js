@@ -546,11 +546,11 @@ async function createSupabaseSession() {
   var userId = r.data.session.user.id;
 
   // ── Panoramica: session stats ──
-  var sRes = await sb.from('sessions').select('id,words_count,started_at,wpm_avg,lexical_diversity').eq('user_id',userId).order('started_at',{ascending:false});
+  var sRes = await sb.from('sessions').select('id,words_count,started_at,wpm,lexical_diversity').eq('user_id',userId).order('started_at',{ascending:false});
   if (sRes.data && sRes.data.length) {
     var totalWords = sRes.data.reduce(function(s,r){return s+(r.words_count||0)},0);
     var totalSessions = sRes.data.length;
-    var avgWpm = sRes.data.reduce(function(s,r){return s+(r.wpm_avg||0)},0)/totalSessions;
+    var avgWpm = sRes.data.reduce(function(s,r){return s+(r.wpm||0)},0)/totalSessions;
     var elWords = document.getElementById('overallStatWords');
     var elLines = document.getElementById('overallStatLines');
     if (elWords) elWords.textContent = totalWords;
@@ -558,7 +558,8 @@ async function createSupabaseSession() {
   }
 
   // ── Vocabolario: saved words ──
-  var vRes = await sb.from('user_vocabulary').select('word,pos,usage_count').eq('user_id',userId).order('usage_count',{ascending:false}).limit(50);
+  var vocabLang = currentLang === 'it' ? 'it' : 'en';
+  var vRes = await sb.from('user_vocabulary').select('word,pos,usage_count').eq('user_id',userId).eq('lang',vocabLang).order('usage_count',{ascending:false}).limit(50);
   if (vRes.data && vRes.data.length) {
     var emptyEl = document.getElementById('wordbankEmpty');
     if (emptyEl) emptyEl.style.display = 'none';

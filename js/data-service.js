@@ -77,7 +77,7 @@
     // Build filter: sessions where language_pair starts with the study lang
     var langFilter = lang + '%';
     var r = await sb().from('sessions')
-      .select('id,duration_seconds,words_count,started_at,language_pair')
+      .select('id,duration_seconds,words_count,started_at,language_pair,wpm,lexical_diversity,quality_score')
       .eq('user_id', userId)
       .like('language_pair', langFilter)
       .order('started_at', { ascending: false });
@@ -99,17 +99,35 @@
       return d >= lastWeekStart && d < weekAgo;
     });
 
-    var totalHours = (totalSeconds / 3600).toFixed(1);
-    var totalMinutes = Math.round(totalSeconds / 60);
+    // Compute real WPM and lexical diversity from sessions that have them
+    var sessionsWithWpm = sessions.filter(function(s) { return s.wpm > 0; });
+    var avgWpm = sessionsWithWpm.length > 0
+      ? Math.round(sessionsWithWpm.reduce(function(s, r) { return s + r.wpm; }, 0) / sessionsWithWpm.length)
+      : 0;
+    var sessionsWithLexDiv = sessions.filter(function(s) { return s.lexical_diversity > 0; });
+    var avgLexDiv = sessionsWithLexDiv.length > 0
+      ? Math.round(sessionsWithLexDiv.reduce(function(s, r) { return s + r.lexical_diversity; }, 0) / sessionsWithLexDiv.length * 100) / 100
+      : 0;
+    var sessionsWithQuality = sessions.filter(function(s) { return s.quality_score > 0; });
+    var avgQuality = sessionsWithQuality.length > 0
+      ? Math.round(sessionsWithQuality.reduce(function(s, r) { return s + r.quality_score; }, 0) / sessionsWithQuality.length * 10) / 10
+      : 0;
+    // This week minutes
+    var thisWeekMinutes = Math.round(thisWeek.reduce(function(s, r) { return s + (r.duration_seconds || 0); }, 0) / 60);
+    var thisWeekSessions = thisWeek.length;
+    var dailyAverageMinutes = thisWeekSessions > 0 ? Math.round(thisWeekMinutes / Math.min(7, thisWeekSessions)) : 0;
 
     var data = {
       totalSessions: totalSessions,
       totalHours: totalHours,
       totalMinutes: totalMinutes,
       totalWords: totalWords,
-      avgWpm: 0,
-      avgLexDiv: 0,
-      avgQuality: 0,
+      avgWpm: avgWpm,
+      avgLexDiv: avgLexDiv,
+      avgQuality: avgQuality,
+      thisWeekSessions: thisWeekSessions,
+      thisWeekMinutes: thisWeekMinutes,
+      dailyAverageMinutes: dailyAverageMinutes,
       sessionsTrend: lastWeek.length > 0 ? Math.round((thisWeek.length - lastWeek.length) / lastWeek.length * 100) : 0,
       lang: lang
     };
@@ -159,7 +177,8 @@
 
     var refs = r.data || [];
     var active = refs.filter(function(ref) { return ref.status === 'active'; }).length;
-    var earnedMinutes = refs.reduce(function(s, ref) { return s + (ref.earned_minutes || 0); }, 0);
+    // earned_minutes column not on referrals table — compute from active count
+    var earnedMinutes = active * 15; // 15 min bonus per active referral
 
     var data = { total: refs.length, active: active, earnedMinutes: earnedMinutes };
     cacheSet('referrals', data);
@@ -498,10 +517,16 @@
     if (!userId) return null;
     var cached = cacheGet('analyticsSnapshot');
     if (cached) return cached;
-    var r = await sb().from('user_analytics_snapshot').select('*').eq('user_id', userId).single();
-    if (r.error) { console.warn('analytics snapshot:', r.error.message); return null; }
-    cacheSet('analyticsSnapshot', r.data);
-    return r.data;
+    // user_analytics_snapshot table may not exist yet — return null gracefully
+    try {
+      var r = await sb().from('user_analytics_snapshot').select('*').eq('user_id', userId).single();
+      if (r.error) { console.warn('analytics snapshot:', r.error.message); return null; }
+      cacheSet('analyticsSnapshot', r.data);
+      return r.data;
+    } catch(e) {
+      console.warn('analytics snapshot table not available:', e.message);
+      return null;
+    }
   }
 
   async function getCEFRBreakdown() {
