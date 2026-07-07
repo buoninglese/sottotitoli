@@ -50,8 +50,9 @@ window.sottotitoliSupabase = window.supabase.createClient(
         var avatar = user.user_metadata?.avatar_url || user.user_metadata?.picture || '';
         var preset = localStorage.getItem('sottotitoli-avatar-preset') || '';
         window.dispatchEvent(new CustomEvent('sottotitoli-user-ready', {detail:{name:name,email:user.email,avatar:avatar,preset:preset}}));
-        // Initialize credits for new users (15 min free)
+        // Initialize credits for new users (15 min free + 3 tokens)
         initUserCredits(r.data.session.user.id);
+        initUserTokens(r.data.session.user.id);
         // Skip profiles table query — columns not yet created in Supabase
         // TODO: add columns (avatar_url, full_name, native_lang, location, learning_profile) to profiles table
       }
@@ -301,9 +302,12 @@ async function populatePanoramicaDropdown(user) {
   if (document.getElementById('authSection')) return; // already handled by DOMContentLoaded
   window.sottotitoliSupabase.auth.getSession().then(function(r){
     if (r.data?.session?.user) {
-      populatePanoramicaDropdown(r.data.session.user);
+      var user = r.data.session.user;
+      populatePanoramicaDropdown(user);
+      initUserCredits(user.id);
+      initUserTokens(user.id);
       // Retry after delay for slow session restore
-      setTimeout(function(){ populatePanoramicaDropdown(r.data.session.user); }, 2000);
+      setTimeout(function(){ populatePanoramicaDropdown(user); }, 2000);
     }
   });
 })();
@@ -341,6 +345,26 @@ function initUserCredits(userId) {
           if (!upd.error) console.log('🔄 Weekly top-up: +15 min (balance: ' + Math.floor(newBalance/60) + ' min)');
         });
       }
+    }
+  });
+}
+
+// ═══ Token initialization — 3 free tokens for new users ═══
+function initUserTokens(userId) {
+  if (!userId) return;
+  var sb = window.sottotitoliSupabase;
+  if (!sb) return;
+  sb.from('user_tokens').select('balance').eq('user_id', userId).maybeSingle().then(function(r){
+    if (r.error) { console.warn('Token check failed:', r.error.message); return; }
+    if (!r.data) {
+      sb.from('user_tokens').insert({
+        user_id: userId,
+        balance: 3,
+        lifetime_tokens: 3,
+        updated_at: new Date().toISOString()
+      }).then(function(ins){
+        if (!ins.error) console.log('🎁 New user: 3 free report tokens granted');
+      });
     }
   });
 }
