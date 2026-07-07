@@ -262,8 +262,38 @@ document.addEventListener('DOMContentLoaded', async () => {
       }
     }
     renderSignedIn(session?.user);
+    // Also populate Panoramica-style dropdown if present (pages without #authSection)
+    populatePanoramicaDropdown(session.user);
   }
 });
+
+// ═══ Populate Panoramica-style dropdown (pages without #authSection) ═══
+async function populatePanoramicaDropdown(user) {
+  if (!user) return;
+  var userId = user.id;
+  var firstName = (user.user_metadata?.full_name || user.email?.split('@')[0] || '').split(' ')[0];
+  firstName = firstName.charAt(0).toUpperCase() + firstName.slice(1);
+
+  // ddName
+  var ddName = document.getElementById('ddName');
+  if (ddName) ddName.textContent = firstName || user.email?.split('@')[0] || 'Utente';
+  // ddEmail
+  var ddEmail = document.getElementById('ddEmail');
+  if (ddEmail) ddEmail.textContent = user.email || '';
+
+  // Fetch balances
+  try {
+    var sb = window.sottotitoliSupabase;
+    if (!sb) return;
+    var _c = await sb.from('user_credits').select('balance_minutes').eq('user_id', userId).maybeSingle();
+    var ddMin = document.getElementById('ddMinutes');
+    if (ddMin) ddMin.textContent = (_c.data?.balance_minutes || 0) + ' min';
+
+    var _r = await sb.from('user_tokens').select('balance').eq('user_id', userId).maybeSingle();
+    var ddTok = document.getElementById('ddTokens');
+    if (ddTok) ddTok.textContent = _r.data?.balance || 0;
+  } catch(e) {}
+}
 
 // ═══ Credit initialization — 15 min free for new users, weekly top-up ═══
 function initUserCredits(userId) {
