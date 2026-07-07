@@ -262,8 +262,9 @@ document.addEventListener('DOMContentLoaded', async () => {
       }
     }
     renderSignedIn(session?.user);
-    // Also populate Panoramica-style dropdown if present (pages without #authSection)
+    // Also populate Panoramica-style dropdown — retry after delay for session readiness
     populatePanoramicaDropdown(session.user);
+    setTimeout(function(){ populatePanoramicaDropdown(session.user); }, 2000);
   }
 });
 
