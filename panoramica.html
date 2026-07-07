@@ -71,16 +71,16 @@
         <div style="position:relative">
           <button class="icon-btn" id="userBtn" aria-label="Account"><svg class="icon"><use href="#i-user"></use></svg></button>
           <div class="dropdown" id="userDropdown">
-            <div class="dropdown-item" style="font-weight:600">Seba</div>
-            <div class="dropdown-item" style="font-size:12px;color:var(--text-faint);padding-top:2px">studiobuoninglese@gmail.com</div>
+            <div class="dropdown-item" id="ddName" style="font-weight:600">...</div>
+            <div class="dropdown-item" id="ddEmail" style="font-size:12px;color:var(--text-faint);padding-top:2px">...</div>
             <div class="dropdown-div"></div>
             <a class="dropdown-item mobile-nav-item" href="index.html"><svg class="icon"><use href="#i-home"></use></svg> Home</a>
             <a class="dropdown-item mobile-nav-item" href="panoramica.html"><svg class="icon"><use href="#i-insights"></use></svg> Panoramica</a>
             <button type="button" class="dropdown-item" onclick="document.querySelector('[data-panel=trascrizioni]').dispatchEvent(new MouseEvent('click',{bubbles:true}));document.getElementById('userDropdown').classList.remove('open')" style="cursor:pointer"><svg class="icon"><use href="#i-dictionary"></use></svg> Sessioni salvate</button>
             <button type="button" class="dropdown-item" onclick="document.querySelector('[data-panel=report-ai]').dispatchEvent(new MouseEvent('click',{bubbles:true}));setTimeout(function(){var t=document.querySelector('[data-subtab=rai-miei]');if(t)t.click()},100);document.getElementById('userDropdown').classList.remove('open')" style="cursor:pointer"><svg class="icon"><use href="#i-star"></use></svg> Report salvati</button>
             <div class="dropdown-div"></div>
-            <div class="dropdown-item" style="justify-content:space-between;cursor:default" onclick="event.stopPropagation()"><span>Minuti</span><span style="font-weight:600;color:var(--teal)">142 min</span></div>
-            <div class="dropdown-item" style="justify-content:space-between;cursor:default" onclick="event.stopPropagation()"><span>Crediti report</span><span style="font-weight:600;color:var(--teal)">3</span></div>
+            <div class="dropdown-item" style="justify-content:space-between;cursor:default" onclick="event.stopPropagation()"><span>Minuti</span><span id="ddMinutes" style="font-weight:600;color:var(--teal)">—</span></div>
+            <div class="dropdown-item" style="justify-content:space-between;cursor:default" onclick="event.stopPropagation()"><span>Crediti report</span><span id="ddTokens" style="font-weight:600;color:var(--teal)">—</span></div>
             <a class="dropdown-item" href="purchase.html" style="color:var(--blue);font-weight:600"><svg class="icon"><use href="#i-gift"></use></svg> Acquista crediti</a>
             <div class="dropdown-div"></div>
             <button type="button" class="dropdown-item" onclick="document.querySelector('[data-panel=impostazioni]').dispatchEvent(new MouseEvent('click',{bubbles:true}));document.getElementById('userDropdown').classList.remove('open')" style="cursor:pointer"><svg class="icon"><use href="#i-settings"></use></svg> Impostazioni</button>
@@ -511,19 +511,10 @@
 
       var meta = await SottotitoliData.getUserMeta();
       if (!meta) { console.warn('No session'); return; }
-      var userEmail = meta.email || '';
 
-      // Dropdown header — set email only, name comes from profile
-      var dd = document.getElementById('userDropdown');
-      if (dd) {
-        var items = dd.querySelectorAll('.dropdown-item');
-        if (items.length > 0) items[0].textContent = '...';
-        if (items.length > 1) items[1].textContent = userEmail;
-      }
-
-      // Hero greeting — will be updated when profile loads
-      var heroEm = document.querySelector('.hero-content h2 em');
-      if (heroEm) heroEm.textContent = '...';
+      // Dropdown — set email immediately
+      var ddEmail = document.getElementById('ddEmail');
+      if (ddEmail) ddEmail.textContent = meta.email || '';
 
       // ── Load all data in parallel ──
       var profile = await SottotitoliData.getProfile();
@@ -533,6 +524,20 @@
       var reports = await SottotitoliData.getAIReports();
       var tokens = await SottotitoliData.getAITokens();
       var credits = await SottotitoliData.getCredits();
+
+      // ── Update dropdown with real data ──
+      var ddName = document.getElementById('ddName');
+      if (ddName) {
+        ddName.textContent = (profile && profile.full_name) || meta.full_name || (meta.email ? meta.email.split('@')[0] : 'Utente');
+      }
+      var ddMinutes = document.getElementById('ddMinutes');
+      if (ddMinutes) {
+        ddMinutes.textContent = credits ? credits.balanceMinutes + ' min' : '—';
+      }
+      var ddTokens = document.getElementById('ddTokens');
+      if (ddTokens) {
+        ddTokens.textContent = tokens != null ? tokens : '—';
+      }
 
       // ── Pick current language stats ──
       function currentStats() {
