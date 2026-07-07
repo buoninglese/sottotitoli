@@ -490,6 +490,51 @@
   /* ═══════════════════════════════════════════
      EXPORT
      ═══════════════════════════════════════════ */
+  /* ═══════════════════════════════════════════
+     ANALYTICS SNAPSHOT — vocabulary + MATTR + CEFR
+     ═══════════════════════════════════════════ */
+  async function getAnalyticsSnapshot() {
+    var userId = await getUserId();
+    if (!userId) return null;
+    var cached = cacheGet('analyticsSnapshot');
+    if (cached) return cached;
+    var r = await sb().from('user_analytics_snapshot').select('*').eq('user_id', userId).single();
+    if (r.error) { console.warn('analytics snapshot:', r.error.message); return null; }
+    cacheSet('analyticsSnapshot', r.data);
+    return r.data;
+  }
+
+  async function getCEFRBreakdown() {
+    var snap = await getAnalyticsSnapshot();
+    if (!snap) return null;
+    return {
+      A1: snap.cefr_a1 || 0,
+      A2: snap.cefr_a2 || 0,
+      B1: snap.cefr_b1 || 0,
+      B2: snap.cefr_b2 || 0,
+      C1: snap.cefr_c1 || 0,
+      C2: snap.cefr_c2 || 0,
+      total: (snap.cefr_a1||0)+(snap.cefr_a2||0)+(snap.cefr_b1||0)+(snap.cefr_b2||0)+(snap.cefr_c1||0)+(snap.cefr_c2||0),
+      vocabSize: snap.vocab_size || 0,
+      mattr: snap.mattr_avg || 0
+    };
+  }
+
+  async function triggerSessionAnalytics(sessionId) {
+    // Calls the Supabase edge function to process a session transcript
+    try {
+      var r = await sb().functions.invoke('process-session-analytics', {
+        body: { session_id: sessionId }
+      });
+      if (r.error) { console.warn('trigger analytics:', r.error.message); return false; }
+      cacheClear();
+      return true;
+    } catch(e) {
+      console.warn('trigger analytics failed:', e.message);
+      return false;
+    }
+  }
+
   window.SottotitoliData = {
     getUserId: getUserId,
     getUserMeta: getUserMeta,
@@ -508,6 +553,9 @@
     addWordToBank: addWordToBank,
     getVocabulary: getVocabulary,
     getVocabularyStats: getVocabularyStats,
+    getAnalyticsSnapshot: getAnalyticsSnapshot,
+    getCEFRBreakdown: getCEFRBreakdown,
+    triggerSessionAnalytics: triggerSessionAnalytics,
     getTasks: getTasks,
     addTask: addTask,
     updateTask: updateTask,
