@@ -673,11 +673,26 @@
       // ═══ RENDER: Insights metrics ───
       function renderInsightsMetrics() {
         var s = currentStats();
+        // ── Stats row ──
+        var sRow = document.querySelector('#pnl-insights .stats-row');
+        if (sRow && s) {
+          var cards = sRow.querySelectorAll('.metric-card');
+          if (cards.length >= 3) {
+            // Minuti giornalieri: average of this week
+            var dailyMin = s.thisWeekSessions > 0 ? Math.round(s.thisWeekMinutes / Math.min(7, s.thisWeekSessions)) : 0;
+            if (cards[0]) cards[0].querySelector('.metric-value').innerHTML = dailyMin + '<span style="font-size:18px">/30</span>';
+            // Completamento: sessions this week out of 7
+            var completionPct = Math.min(100, Math.round((s.thisWeekSessions || 0) / 7 * 100));
+            if (cards[1]) cards[1].querySelector('.metric-value').textContent = completionPct + '%';
+            // Giorni consecutivi: from analytics or streak
+            if (cards[2]) cards[2].querySelector('.metric-value').textContent = '—';
+          }
+        }
         // ── Estimated CEFR level from analytics snapshot ──
         var estimatedLevel = '—';
         var levelSubtext = 'Nessuna sessione registrata. Inizia a parlare!';
+        var levelBarPct = 0;
         if (cefrBreakdown && cefrBreakdown.total > 0) {
-          // Determine dominant level
           var levels = [
             {k:'C2',v:cefrBreakdown.C2},{k:'C1',v:cefrBreakdown.C1},
             {k:'B2',v:cefrBreakdown.B2},{k:'B1',v:cefrBreakdown.B1},
@@ -685,28 +700,45 @@
           ];
           var dominant = levels.reduce(function(a,b){ return a.v >= b.v ? a : b; });
           estimatedLevel = dominant.k;
-          levelSubtext = 'Basato su <strong>' + cefrBreakdown.vocabSize + ' parole</strong> nel tuo vocabolario. Livello dominante: ' + dominant.k + ' (' + dominant.v + ' parole).';
+          levelBarPct = ['A1','A2','B1','B2','C1','C2'].indexOf(dominant.k) / 5 * 100;
+          levelSubtext = 'Basato su <strong>' + cefrBreakdown.vocabSize + ' parole</strong> nel tuo vocabolario. Livello dominante: ' + dominant.k + '.';
         } else if (s && s.totalSessions > 0) {
           levelSubtext = 'Basato su <strong>' + s.totalSessions + ' sessioni</strong> registrate. Attiva l\'analisi per una stima del livello.';
         }
         // Update level display
         var levelEl = document.querySelector('#pnl-insights [style*=\"font-size:56px\"]');
         if (levelEl) levelEl.textContent = estimatedLevel;
-        var trendP = document.querySelector('#pnl-insights .alt-card p');
-        if (trendP) trendP.innerHTML = levelSubtext;
-        // Update objective card
-        var objP = document.querySelector('#pnl-insights .alt-card:last-child p');
-        if (objP && objP.textContent.indexOf('Parlare più fluentemente') !== -1) {
-          objP.textContent = 'Definisci un obiettivo nel tuo Profilo Linguistico per monitorare i progressi.';
-        }
-        // Update stats row with real data
-        var sRow = document.querySelector('#pnl-insights .stats-row');
-        if (sRow && s) {
-          var cards = sRow.querySelectorAll('.metric-card');
-          if (cards.length >= 3) {
-            if (cards[0]) cards[0].querySelector('.metric-value').textContent = s.thisWeekSessions || 0;
-            if (cards[1]) cards[1].querySelector('.metric-value').textContent = s.thisWeekSessions > 0 ? Math.round(s.thisWeekSessions / 7 * 100) + '%' : '0%';
-            if (cards[2]) cards[2].querySelector('.metric-value').textContent = '—';
+        // Update level bar
+        var levelBar = document.querySelector('#pnl-insights [style*=\"linear-gradient\"]');
+        if (levelBar) levelBar.style.background = 'linear-gradient(90deg,var(--teal) ' + levelBarPct + '%,var(--line) ' + levelBarPct + '%,var(--line))';
+        // Update level subtext
+        var trendCards = document.querySelectorAll('#pnl-insights .alt-card');
+        trendCards.forEach(function(card){
+          var p = card.querySelector('p');
+          if (p && (p.textContent.indexOf('42 ore') !== -1 || p.textContent.indexOf('Basato su') !== -1)) {
+            p.innerHTML = levelSubtext;
+          }
+          // Objective
+          var p2 = card.querySelector('p');
+          if (p2 && p2.textContent.indexOf('Parlare più fluentemente') !== -1) {
+            p2.textContent = (profile && profile.goal_primary) || 'Definisci un obiettivo nel tuo Profilo Linguistico.';
+          }
+        });
+        // ── Habits — compute from session data ──
+        if (s && s.totalSessions > 0) {
+          var habChips = document.querySelectorAll('#pnl-insights .habit-chip');
+          if (habChips.length >= 4) {
+            var hvEls = document.querySelectorAll('#pnl-insights .habit-chip .hv');
+            var hlEls = document.querySelectorAll('#pnl-insights .habit-chip .hl');
+            // Show session count & daily average instead of fake time/day data
+            if (hvEls[0]) hvEls[0].textContent = s.totalSessions;
+            if (hlEls[0]) hlEls[0].textContent = 'Sessioni totali';
+            if (hvEls[1]) hvEls[1].textContent = s.avgWpm > 0 ? s.avgWpm : '—';
+            if (hlEls[1]) hlEls[1].textContent = 'WPM medio';
+            if (hvEls[2]) hvEls[2].textContent = s.avgLexDiv > 0 ? s.avgLexDiv.toFixed(2) : '—';
+            if (hlEls[2]) hlEls[2].textContent = 'Diversità less.';
+            if (hvEls[3]) hvEls[3].textContent = fmtMinutes(s.totalMinutes);
+            if (hlEls[3]) hlEls[3].textContent = 'Tempo parlato';
           }
         }
       }
@@ -739,14 +771,26 @@
         var total = refs ? (refs.total || 0) : 0;
         var active = refs ? (refs.active || 0) : 0;
         var earned = refs ? (refs.earnedMinutes || 0) : 0;
-        var cards = document.querySelectorAll('#pnl-invita .metric-card');
-        if (cards.length >= 2) {
-          cards[0].querySelector('.metric-value').textContent = total;
-          cards[1].querySelector('.metric-value').textContent = active;
+        // Update stat cards
+        var statCards = document.querySelectorAll('#pnl-invita .metric-card');
+        if (statCards.length >= 2) {
+          statCards[0].querySelector('.metric-value').textContent = total;
+          statCards[1].querySelector('.metric-value').textContent = active;
         }
-        var earnedEl = document.querySelector('#pnl-invita [style*="font-size:32px"]:last-child');
-        if (earnedEl) {
-          earnedEl.innerHTML = '+' + earned + '<span style="font-size:16px">min</span>';
+        // Update big numbers (Invitati/Attivo/Guadagnati)
+        var bigNums = document.querySelectorAll('#pnl-invita [style*="font-size:32px"]');
+        if (bigNums.length >= 3) {
+          bigNums[0].textContent = total;
+          bigNums[1].textContent = active;
+          bigNums[2].innerHTML = '+' + earned + '<span style="font-size:16px">min</span>';
+        }
+        // Update referral link with real user code
+        if (meta) {
+          var shortCode = meta.id ? meta.id.substring(0, 8).toUpperCase() : '—';
+          var linkEl = document.querySelector('#pnl-invita span[style*="font-size:12px"]');
+          if (linkEl) linkEl.textContent = 'buoninglese.github.io/sottotitoli/?ref=' + meta.id;
+          var codeEl = document.querySelector('#pnl-invita strong');
+          if (codeEl) codeEl.textContent = shortCode;
         }
       }
 
@@ -865,6 +909,16 @@
         if (!dni.value) {
           dni.value = (profile && profile.display_name) || '';
         }
+        // Update email display
+        if (meta) {
+          var emailMasked = meta.email ? meta.email.replace(/(.{2}).*(@.*)/, '$1****$2') : '—';
+          var emailEls = document.querySelectorAll('#pnl-impostazioni span');
+          emailEls.forEach(function(el){
+            if (el.textContent.indexOf('****') !== -1 || el.textContent.indexOf('@gmail') !== -1) {
+              el.textContent = emailMasked;
+            }
+          });
+        }
       }
 
       // ═══ RENDER: Report AI ───
@@ -949,6 +1003,37 @@
         html += '</div></article></section>';
         html += '<div style="margin-top:14px;padding:20px 24px;background:linear-gradient(135deg,var(--teal-4),rgba(6,182,212,.05));border:1px solid rgba(14,116,144,.15);border-radius:16px;font-size:13px;color:var(--text-soft);line-height:1.6"><p>Il tuo vocabolario conta <strong style="color:var(--teal)">' + totalWords + ' parole uniche</strong>. Ogni sessione arricchisce il tuo lessico.</p></div>';
         container.innerHTML = html;
+      }
+
+      // ═══ RENDER: Insights Traguardi ───
+      function renderInsightsTraguardi() {
+        var container = document.querySelector('#sub-traguardi');
+        if (!container) return;
+        var s = currentStats();
+        if (!s || s.totalSessions === 0) {
+          container.innerHTML = '<section class="alt-card-grid"><article class="alt-card"><h3>Traguardi</h3><p style="font-size:14px;color:var(--text-soft)">Completa le tue prime sessioni per sbloccare i traguardi.</p></article></section>';
+          return;
+        }
+        var totalMins = s.totalMinutes || 0;
+        var totalHours = Math.round(totalMins / 60);
+        var totalWords = s.totalWords || 0;
+        var totalSessions = s.totalSessions || 0;
+        var milestones = [
+          {label:'100 sessioni', cur:totalSessions, target:100},
+          {label:'50 ore parlate', cur:totalHours, target:50},
+          {label:'1,000 parole uniche', cur:totalWords, target:1000},
+          {label:'1,500 parole uniche', cur:totalWords, target:1500}
+        ];
+        var reachedHtml = '', inProgressHtml = '';
+        milestones.forEach(function(m){
+          var pct = Math.min(100, Math.round(m.cur / m.target * 100));
+          if (m.cur >= m.target) {
+            reachedHtml += '<button type="button" class="q-chip" aria-pressed="false" style="color:var(--green);border-color:var(--green)">' + m.label + '</button>';
+          } else {
+            inProgressHtml += '<div><div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px"><span style="font-weight:600">' + m.label + '</span><span style="font-weight:700;color:var(--teal)">' + pct + '%</span></div><div class="prog"><div class="prog-fill teal" style="width:' + pct + '%"></div></div></div>';
+          }
+        });
+        container.innerHTML = '<section class="alt-card-grid"><article class="alt-card"><h3>Traguardi raggiunti</h3><div class="q-row" style="margin-top:10px">' + (reachedHtml || '<span style="font-size:13px;color:var(--text-faint)">Nessun traguardo ancora</span>') + '</div></article><article class="alt-card"><h3>In corso</h3><div style="display:flex;flex-direction:column;gap:10px;margin-top:10px">' + (inProgressHtml || '<span style="font-size:13px;color:var(--text-faint)">Tutti i traguardi raggiunti! 🎉</span>') + '</div></article></section><div style="margin-top:14px;padding:20px 24px;background:linear-gradient(135deg,var(--teal-4),rgba(6,182,212,.05));border:1px solid rgba(14,116,144,.15);border-radius:16px;font-size:13px;color:var(--text-soft);line-height:1.6"><p>Hai completato <strong style="color:var(--teal)">' + totalSessions + ' sessioni</strong> per <strong style="color:var(--teal)">' + totalHours + ' ore</strong> di parlato.</p></div>';
       }
 
       // ═══ RENDER: Vocabolario ───
@@ -1200,6 +1285,7 @@
       renderHero();
       renderMetrics();
       renderInsightsMetrics();
+      renderInsightsTraguardi();
       renderPanoramicaCEFR();
       renderProfile();
       renderSessions();
@@ -1219,6 +1305,7 @@
         renderHero();
         renderMetrics();
         renderInsightsMetrics();
+        renderInsightsTraguardi();
         renderPanoramicaCEFR();
         renderSessions();
         renderWordbanks();
@@ -1256,6 +1343,7 @@
           renderHero();
           renderMetrics();
           renderInsightsMetrics();
+          renderInsightsTraguardi();
           renderPanoramicaCEFR();
           renderSessions();
           renderWordbanks();
