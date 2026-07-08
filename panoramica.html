@@ -9,6 +9,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Cormorant+Garamond:wght@500;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
   <link rel="stylesheet" href="css/theme-2.css">
+  <script src="https://unpkg.com/compromise"></script>
 </head>
 <body data-theme="light">
 
@@ -1207,16 +1208,139 @@
           container.style.display = 'none';
         };
       }
-      function clearMockContent() {
-        // Grammatica: replace all sub-tab content with empty state
-        ['sub-gram-panoramica','sub-gram-tempi','sub-gram-pronomi','sub-gram-errori'].forEach(function(id) {
-          var el = document.getElementById(id);
-          if (!el) return;
-          var hasMock = el.innerHTML.indexOf('32%') !== -1 || el.innerHTML.indexOf('58%') !== -1 || el.innerHTML.indexOf('he don') !== -1 || el.innerHTML.indexOf('SUBJ') !== -1;
-          if (hasMock) {
-            el.innerHTML = '<section class="alt-card-grid"><article class="alt-card"><h3>Prossimamente</h3><p style="font-size:14px;color:var(--text-soft)">I dati grammaticali saranno disponibili dopo l\'analisi delle tue sessioni.</p></article></section>';
-          }
+      // ═══ RENDER: Grammatica from compromise.js NLP ═══
+      async function renderGrammatica() {
+        var lang = window.SOTTOTITOLI_STUDY_LANG || 'en';
+        if (lang !== 'en') { showGrammaticaEmpty('La grammatica è disponibile solo per sessioni in inglese.'); return; }
+        if (typeof nlp === 'undefined') { showGrammaticaEmpty('Libreria NLP in caricamento...'); return; }
+        
+        // Fetch recent sessions with transcripts
+        var sessions = await SottotitoliData.getSessions('en', 10);
+        var texts = [];
+        for (var i = 0; i < sessions.length; i++) {
+          var sid = sessions[i].id;
+          // Get transcript for each session
+          try {
+            var { data } = await window.sottotitoliSupabase.from('sessions').select('transcript_text').eq('id', sid).single();
+            if (data && data.transcript_text) texts.push(data.transcript_text);
+          } catch(e) {}
+        }
+        
+        if (texts.length === 0) { showGrammaticaEmpty('Nessuna trascrizione disponibile. Completa una sessione di caption in inglese.'); return; }
+        
+        var allText = texts.join('\n');
+        var doc = nlp(allText);
+        
+        // ── Panoramica tab ──
+        var nouns = doc.match('#Noun').length;
+        var verbs = doc.match('#Verb').length;
+        var adjs = doc.match('#Adjective').length;
+        var advs = doc.match('#Adverb').length;
+        var totalWords = doc.termList().length || 1;
+        var nounPct = Math.round(nouns / totalWords * 100);
+        var verbPct = Math.round(verbs / totalWords * 100);
+        var adjPct = Math.round(adjs / totalWords * 100);
+        var advPct = Math.round(advs / totalWords * 100);
+        var sentences = doc.sentences();
+        var avgWordsPerSentence = sentences.length > 0 ? Math.round(sentences.json().reduce(function(s,se){return s+se.terms.length},0)/sentences.length) : 0;
+        var questions = sentences.isQuestion().length;
+        var negations = doc.match('(not|never|no|neither)').length;
+        
+        var panHtml = '<section class="stats-row">'+
+          '<article class="metric-card"><div class="metric-value">'+nounPct+'%</div><div class="metric-label">Nouns</div><div class="metric-badge">'+nouns+' parole</div></article>'+
+          '<article class="metric-card"><div class="metric-value">'+verbPct+'%</div><div class="metric-label">Verbs</div><div class="metric-badge">'+verbs+' parole</div></article>'+
+          '<article class="metric-card"><div class="metric-value">'+adjPct+'%</div><div class="metric-label">Adjectives</div><div class="metric-badge">'+adjs+' parole</div></article>'+
+          '<article class="metric-card"><div class="metric-value">'+negations+'</div><div class="metric-label">Negazioni</div><div class="metric-badge">in '+texts.length+' sessioni</div></article>'+
+          '</section>'+
+          '<section class="alt-card-grid"><article class="alt-card"><h3>Complessità delle frasi</h3>'+
+          '<p style="font-size:13px;color:var(--text-soft)">Lunghezza media: <strong>'+avgWordsPerSentence+' parole</strong> per frase. '+
+          'Hai fatto <strong>'+questions+' domande</strong> in '+texts.length+' sessioni. '+
+          (avgWordsPerSentence >= 10 ? 'Buona complessità! Per passare a C1, punta a 12+ parole per frase.' : 'Per migliorare, cerca di costruire frasi più articolate con subordinate e connettivi.')+
+          '</p></article></section>';
+        document.getElementById('sub-gram-panoramica').innerHTML = panHtml;
+        
+        // ── Tempi Verbali tab ──
+        var verbList = doc.verbs().json();
+        var tenseCounts = {Present:0, Past:0, Future:0, Perfect:0, Conditional:0, Passive:0, Gerund:0};
+        verbList.forEach(function(v){
+          var tags = (v.tags || []).join(' ');
+          if (tags.indexOf('PastTense') !== -1) tenseCounts.Past++;
+          else if (tags.indexOf('FutureTense') !== -1) tenseCounts.Future++;
+          else if (tags.indexOf('PerfectTense') !== -1) tenseCounts.Perfect++;
+          else if (tags.indexOf('Conditional') !== -1 || tags.indexOf('Modal') !== -1) tenseCounts.Conditional++;
+          else if (tags.indexOf('Passive') !== -1 || (v.text||'').match(/been?\s+\w+ed\b/)) tenseCounts.Passive++;
+          else if (tags.indexOf('Gerund') !== -1) tenseCounts.Gerund++;
+          else tenseCounts.Present++;
         });
+        var totalVerbs = Object.values(tenseCounts).reduce(function(a,b){return a+b;},0) || 1;
+        var tenseColors = {Present:'var(--teal)', Past:'var(--teal-2)', Future:'var(--amber)', Perfect:'var(--green)', Conditional:'#8b5cf6', Passive:'#dc2626', Gerund:'var(--blue)'};
+        var tenseLabels = {Present:'Present', Past:'Past', Future:'Future (will)', Perfect:'Present Perfect', Conditional:'Conditional', Passive:'Passive', Gerund:'Gerund'};
+        var tHtml = '<section class="alt-card-grid" style="grid-template-columns:repeat(3,1fr)">';
+        Object.keys(tenseCounts).forEach(function(t){
+          var pct = Math.round(tenseCounts[t]/totalVerbs*100);
+          tHtml += '<article class="alt-card"><h3 style="font-size:28px;font-weight:900;color:'+tenseColors[t]+';margin-bottom:4px">'+pct+'%</h3><p style="font-weight:600">'+tenseLabels[t]+'</p><div class="prog" style="margin-top:10px"><div class="prog-fill" style="width:'+pct+'%;background:'+tenseColors[t]+'"></div></div></article>';
+        });
+        tHtml += '</section>';
+        document.getElementById('sub-gram-tempi').innerHTML = tHtml;
+        
+        // ── Pronomi tab ──
+        var pronouns = doc.pronouns().json();
+        var subj = {}, obj = {}, poss = {};
+        pronouns.forEach(function(p){
+          var tags = (p.tags || []).join(' ');
+          var word = (p.text || '').toLowerCase();
+          if (tags.indexOf('Pronoun') === -1) return;
+          if (tags.indexOf('Possessive') !== -1) poss[word] = (poss[word]||0)+1;
+          else if (tags.indexOf('Object') !== -1 || word==='me'||word==='him'||word==='her'||word==='us'||word==='them') obj[word] = (obj[word]||0)+1;
+          else subj[word] = (subj[word]||0)+1;
+        });
+        var pHtml = '<section class="alt-card-grid"><article class="alt-card"><h3>Top pronomi usati</h3><div style="display:flex;flex-direction:column;gap:6px;margin-top:10px">';
+        var allPron = Object.entries(subj).concat(Object.entries(obj)).concat(Object.entries(poss)).sort(function(a,b){return b[1]-a[1];}).slice(0,6);
+        allPron.forEach(function(e){
+          var type = subj[e[0]] ? 'SUBJ' : obj[e[0]] ? 'OBJ' : 'POSS';
+          var color = type==='SUBJ'?'var(--teal-4)':'type'==='OBJ'?'var(--blue-soft)':'rgba(217,119,6,.15)';
+          var tc = type==='SUBJ'?'var(--teal)':'type'==='OBJ'?'var(--blue)':'var(--amber)';
+          pHtml += '<div style="display:flex;justify-content:space-between;font-size:13px"><span><strong>'+e[0]+'</strong> <span style="font-size:9px;padding:1px 6px;border-radius:100px;background:'+color+';color:'+tc+'">'+type+'</span></span><span style="font-weight:600">'+e[1]+'</span></div>';
+        });
+        pHtml += '</div></article><article class="alt-card"><h3>Distribuzione</h3><div style="display:flex;gap:20px;align-items:center;margin-top:10px"><div style="text-align:center"><div style="font-size:32px;font-weight:900;color:var(--teal)">'+Object.keys(subj).length+'</div><div style="font-size:10px;color:var(--text-faint)">soggetto</div></div><div style="text-align:center"><div style="font-size:32px;font-weight:900;color:var(--blue)">'+Object.keys(obj).length+'</div><div style="font-size:10px;color:var(--text-faint)">oggetto</div></div><div style="text-align:center"><div style="font-size:32px;font-weight:900;color:var(--amber)">'+Object.keys(poss).length+'</div><div style="font-size:10px;color:var(--text-faint)">possessivi</div></div></div></article></section>';
+        document.getElementById('sub-gram-pronomi').innerHTML = pHtml;
+        
+        // ── Errori tab ──
+        var errorPatterns = [];
+        // Check common errors
+        var lowerText = allText.toLowerCase();
+        if (lowerText.match(/\bhe don't\b/)) errorPatterns.push({wrong:'he don\'t', correct:'he doesn\'t', count:(lowerText.match(/\bhe don't\b/g)||[]).length});
+        if (lowerText.match(/\bshe don't\b/)) errorPatterns.push({wrong:'she don\'t', correct:'she doesn\'t', count:(lowerText.match(/\bshe don't\b/g)||[]).length});
+        if (lowerText.match(/\bmore better\b/)) errorPatterns.push({wrong:'more better', correct:'better', count:(lowerText.match(/\bmore better\b/g)||[]).length});
+        if (lowerText.match(/\bmore bigger\b/)) errorPatterns.push({wrong:'more bigger', correct:'bigger', count:(lowerText.match(/\bmore bigger\b/g)||[]).length});
+        if (lowerText.match(/\binformations?\b/)) errorPatterns.push({wrong:'informations', correct:'information', count:(lowerText.match(/\binformations?\b/g)||[]).length});
+        if (lowerText.match(/\bi have \d+ years?\b/)) errorPatterns.push({wrong:'I have X years', correct:'I am X years old', count:(lowerText.match(/\bi have \d+ years?\b/g)||[]).length});
+        if (lowerText.match(/\bcan you able to\b/)) errorPatterns.push({wrong:'can you able to', correct:'can you / are you able to', count:(lowerText.match(/\bcan you able to\b/g)||[]).length});
+        
+        var eHtml = '<section class="alt-card-grid"><article class="alt-card"><h3>Pattern di errori rilevati</h3><div style="display:flex;flex-direction:column;gap:6px;margin-top:10px">';
+        if (errorPatterns.length === 0) {
+          eHtml += '<p style="font-size:13px;color:var(--text-soft)">Nessun errore comune rilevato nelle tue trascrizioni. Continua così! 🎉</p>';
+        } else {
+          errorPatterns.slice(0,6).forEach(function(e){
+            var sev = e.count >= 5 ? '#dc2626' : e.count >= 3 ? 'var(--amber)' : 'var(--green)';
+            eHtml += '<div style="display:flex;justify-content:space-between;font-size:13px;padding:4px 0"><span><strong>"'+e.wrong+'"</strong> → "'+e.correct+'"</span><span style="color:'+sev+';font-weight:600">'+e.count+' occorrenze</span></div>';
+          });
+        }
+        eHtml += '</div></article></section>';
+        document.getElementById('sub-gram-errori').innerHTML = eHtml;
+        
+        // Source note
+        var sourceDiv = '<div style="margin-top:14px;padding:12px 20px;background:var(--bg);border:1px solid var(--line);border-radius:12px;font-size:11px;color:var(--text-faint)">Analisi basata su <strong>'+texts.length+' sessioni</strong> e <strong>'+totalWords+' parole</strong> totali.</div>';
+        document.getElementById('sub-gram-panoramica').innerHTML += sourceDiv;
+      }
+      
+      function showGrammaticaEmpty(msg) {
+        var m = msg || 'I dati grammaticali saranno disponibili dopo l\'analisi delle tue sessioni.';
+        ['sub-gram-panoramica','sub-gram-tempi','sub-gram-pronomi','sub-gram-errori'].forEach(function(id){
+          var el = document.getElementById(id);
+          if (el) el.innerHTML = '<section class="alt-card-grid"><article class="alt-card"><h3>Prossimamente</h3><p style="font-size:14px;color:var(--text-soft)">'+m+'</p></article></section>';
+        });
+      }
         // Vocabolario: remove mockup variation articles
         var vocPanel = document.getElementById('pnl-vocabolario');
         if (vocPanel) {
@@ -1297,6 +1421,7 @@
       renderSettings();
       renderAIReports();
       clearMockContent();
+      renderGrammatica();
       renderContextualBanner();
 
       // ── Listen for language changes ──
