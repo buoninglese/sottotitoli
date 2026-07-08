@@ -276,7 +276,7 @@
               <h3 style="margin-bottom:8px">Obiettivo a breve termine</h3>
               <div class="field" style="margin-bottom:0"><input placeholder="Es. Parlare in modo più naturale nelle riunioni tecniche" value="Parlare più fluentemente durante le riunioni di lavoro"></div>
             </div>
-            <div class="save-row"><button class="primary-btn" onclick="var t=document.getElementById('toastMsg');t.classList.add('show');setTimeout(function(){t.classList.remove('show')},2000)">Salva profilo</button><span class="saved-msg" style="font-size:12px;color:var(--teal)">✓ Salvato</span></div>
+            <div class="save-row"><button class="primary-btn" id="saveProfileLingBtn" onclick="saveProfiloLinguistico()">Salva profilo</button><span class="saved-msg" id="savedProfileLingMsg" style="font-size:12px;color:var(--teal);display:none">✓ Salvato</span></div>
           </div>
           <!-- Sub-tab: Preferenze -->
           <div role="tabpanel" class="subtab-pane" id="sub-preferenze">
@@ -779,8 +779,8 @@
               if (spans.length < 2) return;
               var label = spans[0].textContent.trim();
               if (label === 'Membro da') spans[1].textContent = p.created_at ? new Date(p.created_at).toLocaleDateString('it-IT', { month: 'long', year: 'numeric' }) : '—';
-              if (label === 'Piano') spans[1].textContent = 'Standard';
-              if (label === 'Madrelingua') spans[1].textContent = 'Olandese';
+              if (label === 'Piano') spans[1].textContent = (credits && credits.balanceMinutes > 15) ? 'Standard' : 'Gratuito';
+              if (label === 'Madrelingua') spans[1].textContent = p.native_lang === 'nl' ? 'Olandese' : p.native_lang === 'it' ? 'Italiano' : p.native_lang === 'en' ? 'Inglese' : (p.native_lang || '—');
             });
           }
           // ── Attività card — use real session stats ──
@@ -801,7 +801,62 @@
         if (dni && !dni.value) {
           dni.value = displayName;
         }
+        // Load Profilo Linguistico selections from saved profile
+        renderProfiloLinguistico();
       }
+
+      // ═══ Load/save Profilo Linguistico from Supabase profiles ═══
+      function renderProfiloLinguistico() {
+        if (!profile) return;
+        var p = profile;
+        // goal_primary → select matching chip
+        if (p.goal_primary) selectChipByText('#sub-profilo-ling .alt-card:nth-child(1) .q-chip', p.goal_primary);
+        // use_cases → select matching chips (multi)
+        if (p.use_cases && Array.isArray(p.use_cases)) {
+          p.use_cases.forEach(function(uc){ selectChipByText('#sub-profilo-ling .alt-card:nth-child(2) .q-chip', uc); });
+        }
+        // domain → select matching chip
+        if (p.domain) selectChipByText('#sub-profilo-ling .alt-card:nth-child(3) .q-chip', p.domain);
+        // short term goal input
+        if (p.goal_primary) {
+          var input = document.querySelector('#sub-profilo-ling input');
+          if (input) input.value = p.goal_primary;
+        }
+      }
+      function selectChipByText(selector, text) {
+        document.querySelectorAll(selector).forEach(function(chip){
+          if (chip.textContent.trim() === text || chip.textContent.trim().indexOf(text) !== -1) {
+            chip.classList.add('active');
+            chip.setAttribute('aria-pressed','true');
+          }
+        });
+      }
+      window.saveProfiloLinguistico = async function() {
+        var uid = await SottotitoliData.getUserId();
+        if (!uid || !window.sottotitoliSupabase) return;
+        // Read selections
+        var goalChips = document.querySelectorAll('#sub-profilo-ling .alt-card:nth-child(1) .q-chip.active');
+        var goal = goalChips.length > 0 ? goalChips[0].textContent.trim() : null;
+        var useChips = document.querySelectorAll('#sub-profilo-ling .alt-card:nth-child(2) .q-chip.active');
+        var useCases = Array.from(useChips).map(function(c){ return c.textContent.trim(); });
+        var domainChips = document.querySelectorAll('#sub-profilo-ling .alt-card:nth-child(3) .q-chip.active');
+        var domain = domainChips.length > 0 ? domainChips[0].textContent.trim() : null;
+        var input = document.querySelector('#sub-profilo-ling input');
+        var shortTermGoal = input ? input.value.trim() : '';
+        // Save
+        var { error } = await window.sottotitoliSupabase.from('profiles').upsert({
+          id: uid,
+          goal_primary: shortTermGoal || goal,
+          use_cases: useCases,
+          domain: domain,
+          updated_at: new Date().toISOString()
+        }, { onConflict: 'id' });
+        if (!error) {
+          var msg = document.getElementById('savedProfileLingMsg');
+          if (msg) { msg.style.display = 'inline'; setTimeout(function(){ msg.style.display = 'none'; }, 2000); }
+          SottotitoliData.cacheClear();
+        }
+      };
 
       // ═══ RENDER: Impostazioni ───
       function renderSettings() {
