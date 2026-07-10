@@ -29,7 +29,7 @@ window.sottotitoliSupabase = window.supabase.createClient(
 (function(){
   var path = window.location.pathname.replace(/\/$/,'').split('/').pop() || 'index.html';
   // Pages that are publicly accessible (no auth required)
-  if(path==='index.html'||path===''||path==='404.html'||path==='panoramica.html'||path==='studio-caption.html'||path==='studio-sotto.html'||path==='studio-sotto-mockup.html'||path==='studio-traduzione.html'||path.indexOf('overlay')===0)return;
+  if(path==='index.html'||path===''||path==='404.html'||path.indexOf('overlay')===0)return;
   // Multispeaker speaker-join mode doesn't require auth (guests join via invite link)
   if(path==='multispeaker.html' && window.location.search.indexOf('speaker=1')!==-1)return;
   // Wait for session, redirect if missing
@@ -41,7 +41,7 @@ window.sottotitoliSupabase = window.supabase.createClient(
     sb.auth.getSession().then(function(r){
       if(!r.data?.session){
         localStorage.setItem('sottotitoli_return_page', window.location.pathname + window.location.search);
-        window.location.replace('index.html');
+        window.location.replace('index.html?auth=required');
       }
       else {
         // Dispatch user info for hamburger menus
