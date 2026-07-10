@@ -153,7 +153,7 @@
           <article class="hero-banner" id="heroBanner">
             <button class="hero-close" id="heroClose" aria-label="Close banner"><svg class="icon"><use href="#i-close"></use></svg></button>
             <div class="hero-art" aria-hidden="true"><span class="blob blob-a"></span><span class="blob blob-b"></span><span class="blob blob-c"></span><span class="glow glow-a"></span><span class="glow glow-b"></span></div>
-            <div class="hero-content"><h2>Ben tornato, <em id="heroName">...</em></h2><p id="heroText">Accedi per vedere le tue statistiche.</p><div class="hero-chips"><button class="hero-chip strong" onclick="toggleStartSession()">Inizia sessione</button></div></div>
+            <div class="hero-content"><h2><span data-i18n="welcome_back">Ben tornato,</span> <em id="heroName">...</em></h2><p id="heroText" data-i18n="login_to_see_stats">Accedi per vedere le tue statistiche.</p><div class="hero-chips"><button class="hero-chip strong" onclick="toggleStartSession()" data-i18n="start_session_btn">Inizia sessione</button></div></div>
           </article>
           <!-- Contextual message banner removed -->
           <section class="stats-row">
@@ -695,10 +695,13 @@
       // ── Update hero greeting ──
       var heroName = document.getElementById('heroName');
       var heroText = document.getElementById('heroText');
-      var displayName = (profile && profile.display_name) || (profile && profile.full_name) || meta.full_name || (meta.email ? meta.email.split('@')[0] : '');
-      if (heroName) heroName.textContent = displayName || '...';
+      var displayName = (profile && profile.display_name) || (profile && profile.full_name) || (meta && meta.full_name) || (meta && meta.email ? meta.email.split('@')[0] : '');
+      if (heroName && displayName) heroName.textContent = displayName;
       if (heroText && displayName) {
+        heroText.setAttribute('data-i18n', 'your_stats_ready');
         heroText.textContent = 'Le tue statistiche di apprendimento sono pronte.';
+        // Re-apply i18n after setting text
+        if (typeof I18n !== 'undefined' && I18n.apply) { I18n.apply(heroText); }
       }
 
       // ── Pick current language stats ──
@@ -744,15 +747,15 @@
         var mins = s ? (s.totalMinutes || 0) : 0;
         var hours = mins >= 60 ? Math.round(mins / 60) : (mins > 0 ? '<1' : '0');
         var words = s ? (s.totalWords || 0).toLocaleString() : '0';
-        var heroP = document.querySelector('.hero-content p');
+        var heroP = document.getElementById('heroText');
         var mattrText = '';
         if (cefrBreakdown && cefrBreakdown.mattr > 0) {
-          mattrText = ' · Diversità lessicale (MATTR): <strong>' + cefrBreakdown.mattr.toFixed(3) + '</strong>';
+          mattrText = ' · MATTR: <strong>' + cefrBreakdown.mattr.toFixed(3) + '</strong>';
         }
-        if (heroP) {
+        if (heroP && sessions > 0) {
           heroP.innerHTML = 'Hai dettato <strong>' + sessions + ' sessioni</strong> per un totale di <strong>' + hours + ' ore</strong>. Il tuo vocabolario attivo conta <strong>' + words + ' parole</strong> uniche.' + mattrText;
+          heroP.removeAttribute('data-i18n');
         }
-      }
 
       // ═══ RENDER: Panoramica metrics ───
       function renderMetrics() {
