@@ -250,6 +250,36 @@
     return true;
   }
 
+  /* ═══════════════════════════════════════════
+     SETTINGS — Save all user settings at once
+     ═══════════════════════════════════════════ */
+  async function saveSettings(settings) {
+    var userId = await getUserId();
+    if (!userId) return false;
+    var now = new Date().toISOString();
+
+    // Save profile fields (display_name, native_lang)
+    var profileUpdate = { id: userId, updated_at: now };
+    if (settings.display_name !== undefined) profileUpdate.display_name = settings.display_name;
+    if (settings.native_lang !== undefined) profileUpdate.native_lang = settings.native_lang;
+
+    var r1 = await sb().from('profiles').upsert(profileUpdate, { onConflict: 'id' });
+    if (r1.error) { console.warn('save profile:', r1.error.message); }
+
+    // Save preferences (ui_language)
+    if (settings.ui_language !== undefined) {
+      var r2 = await sb().from('user_preferences').upsert({
+        user_id: userId,
+        ui_language: settings.ui_language,
+        updated_at: now
+      }, { onConflict: 'user_id' });
+      if (r2.error) { console.warn('save prefs:', r2.error.message); }
+    }
+
+    cacheClear();
+    return !r1.error;
+  }
+
   /* ── Listen for language changes ── */
   document.addEventListener('studylang-changed', function(e) {
     cacheClear();
@@ -567,6 +597,7 @@
     getCredits: getCredits,
     getPreferences: getPreferences,
     saveProfileField: saveProfileField,
+    saveSettings: saveSettings,
     getWordbanks: getWordbanks,
     getWordbankWords: getWordbankWords,
     addWordbank: addWordbank,
