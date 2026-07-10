@@ -1799,6 +1799,28 @@
   var btn = document.getElementById('saveSettingsBtn');
   if (!btn) return;
   
+  // ── Load email when settings panel opens ──
+  function loadEmail() {
+    var emailEl = document.getElementById('settingsEmail');
+    if (!emailEl || emailEl.textContent.trim() !== '—') return;
+    // Try to get email from Supabase session
+    try {
+      if (window.sottotitoliSupabase) {
+        window.sottotitoliSupabase.auth.getSession().then(function(r){
+          var email = r.data?.session?.user?.email;
+          if (email && emailEl) {
+            emailEl.textContent = email.replace(/(.{2}).*(@.*)/, '$1****$2');
+          }
+        });
+      }
+    } catch(e) {}
+  }
+  // Load on settings panel open
+  var impNav = document.querySelector('[data-panel="impostazioni"]');
+  if (impNav) impNav.addEventListener('click', function(){ setTimeout(loadEmail, 200); });
+  loadEmail();
+  
+  // ── Save handler ──
   btn.addEventListener('click', async function(){
     var settings = {};
     
@@ -1816,6 +1838,12 @@
     
     var anonShEl = document.getElementById('settingsAnonSharing');
     if (anonShEl) settings.anonymous_sharing = anonShEl.checked;
+    
+    // ── Green flash on button ──
+    var origBg = btn.style.background;
+    btn.style.background = 'var(--green, #059669)';
+    btn.style.transition = 'background 0.15s ease';
+    setTimeout(function(){ btn.style.background = origBg; }, 800);
     
     // Try to save via SottotitoliData
     var ok = false;
