@@ -10,7 +10,7 @@ function getAuthRedirectUrl() {
   return window.SOTTOTITOLI_CONFIG?.AUTH_REDIRECT_URL || 'https://buoninglese.github.io/sottotitoli/panoramica.html';
 }
 function getPostLogoutUrl() {
-  return window.SOTTOTITOLI_CONFIG?.AUTH_REDIRECT_URL || 'https://buoninglese.github.io/sottotitoli/panoramica.html';
+  return window.SOTTOTITOLI_CONFIG?.AUTH_REDIRECT_URL || 'https://buoninglese.github.io/sottotitoli/index.html';
 }
 
 window.sottotitoliSupabase = window.supabase.createClient(
@@ -132,20 +132,22 @@ document.addEventListener('DOMContentLoaded', async () => {
               <div class="ud-email">${user?.email || ''}</div>
             </div>
           </div>
-          <a href="index.html" class="ud-link">Home</a>
-          <a href="start.html" class="ud-link">Start</a>
-          <a href="account.html" class="ud-link">Profilo</a>
-          <a href="analysis.html" class="ud-link">Report AI</a>
+          <a href="index.html" class="ud-link" data-i18n="home"><svg class="icon" style="width:14px;height:14px;margin-right:6px;vertical-align:middle"><use href="#i-home"></use></svg> Home</a>
+          <a href="panoramica.html" class="ud-link" data-i18n="panoramica"><svg class="icon" style="width:14px;height:14px;margin-right:6px;vertical-align:middle"><use href="#i-insights"></use></svg> Panoramica</a>
+          <a href="start.html" class="ud-link" data-i18n="start"><svg class="icon" style="width:14px;height:14px;margin-right:6px;vertical-align:middle"><use href="#i-mic"></use></svg> Start</a>
+          <a href="account.html" class="ud-link" data-i18n="profilo"><svg class="icon" style="width:14px;height:14px;margin-right:6px;vertical-align:middle"><use href="#i-user"></use></svg> Profilo</a>
+          <a href="analysis.html" class="ud-link" data-i18n="report_ai"><svg class="icon" style="width:14px;height:14px;margin-right:6px;vertical-align:middle"><use href="#i-star"></use></svg> Report AI</a>
           <hr class="ud-divider">
           <div class="ud-credits-section">
-            <div class="ud-credit-row"><span>Minuti</span><span id="udMinutes">—</span></div>
-            <div class="ud-credit-row"><span>Crediti report</span><span id="udTokens">—</span></div>
+            <div class="ud-credit-row"><span data-i18n="minutes">Minuti</span><span id="udMinutes">—</span></div>
+            <div class="ud-credit-row"><span data-i18n="credits_report">Crediti report</span><span id="udTokens">—</span></div>
           </div>
           <hr class="ud-divider">
-          <a href="purchase.html" class="ud-link">Acquista crediti</a>
+          <a href="purchase.html" class="ud-link" data-i18n="buy_credits" style="color:var(--blue);font-weight:600"><svg class="icon" style="width:14px;height:14px;margin-right:6px;vertical-align:middle"><use href="#i-gift"></use></svg> Acquista crediti</a>
           <hr class="ud-divider">
-          <a href="account.html#cs-profile" class="ud-link">Impostazioni</a>
-          <button class="ud-link danger" id="udLogoutBtn">Esci</button>
+          <a href="account.html#cs-profile" class="ud-link" data-i18n="settings">Impostazioni</a>
+          <a href="panoramica.html#aiuto" class="ud-link" data-i18n="aiuto">Aiuto</a>
+          <button class="ud-link danger" id="udLogoutBtn" data-i18n="logout">Esci</button>
         </div>
       </div>
     `;

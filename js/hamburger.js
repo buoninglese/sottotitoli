@@ -12,19 +12,21 @@
         '<div class="dd-avatar" id="hbAvatar">S</div>' +
         '<span class="dd-name" id="hbName">Hello…</span>' +
       '</div>' +
-      '<a href="index.html">Home</a>' +
-      '<a href="start.html">Start</a>' +
-      '<a href="account.html">Profilo</a>' +
-      '<a href="analysis.html">Report AI</a>' +
+      '<a href="index.html"><svg class="icon" style="width:14px;height:14px;margin-right:6px;vertical-align:middle"><use href="#i-home"></use></svg> Home</a>' +
+      '<a href="panoramica.html"><svg class="icon" style="width:14px;height:14px;margin-right:6px;vertical-align:middle"><use href="#i-insights"></use></svg> Panoramica</a>' +
+      '<a href="start.html"><svg class="icon" style="width:14px;height:14px;margin-right:6px;vertical-align:middle"><use href="#i-mic"></use></svg> Start</a>' +
+      '<a href="account.html"><svg class="icon" style="width:14px;height:14px;margin-right:6px;vertical-align:middle"><use href="#i-user"></use></svg> Profilo</a>' +
+      '<a href="analysis.html"><svg class="icon" style="width:14px;height:14px;margin-right:6px;vertical-align:middle"><use href="#i-star"></use></svg> Report AI</a>' +
       '<hr>' +
       '<div class="dd-credits" id="hbCredits">' +
         '<div class="dd-credit-row"><span>Minuti</span><span id="hbMinutes">—</span></div>' +
         '<div class="dd-credit-row"><span>Crediti report</span><span id="hbTokens">—</span></div>' +
       '</div>' +
       '<hr>' +
-      '<a href="purchase.html" style="padding-left:28px">Acquista crediti</a>' +
+      '<a href="purchase.html" style="color:var(--blue);font-weight:600"><svg class="icon" style="width:14px;height:14px;margin-right:6px;vertical-align:middle"><use href="#i-gift"></use></svg> Acquista crediti</a>' +
       '<hr>' +
-      '<a href="account.html#cs-profile" style="padding-left:28px">Impostazioni</a>' +
+      '<a href="account.html#cs-profile">Impostazioni</a>' +
+      '<a href="panoramica.html#aiuto">Aiuto</a>' +
       '<a href="#" id="hbLogoutBtn" style="font-weight:700">Esci</a>';
   }
 

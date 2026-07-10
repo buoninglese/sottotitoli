@@ -6,6 +6,7 @@
     it: {
       // ── Topbar ──
       "start_session": "Start Session",
+      "start": "Start",
       "dark": "Dark",
       "light": "Light",
       "no_notifications": "Nessuna notifica recente",
@@ -332,6 +333,7 @@
     en: {
       // ── Topbar ──
       "start_session": "Start Session",
+      "start": "Start",
       "dark": "Dark",
       "light": "Light",
       "no_notifications": "No recent notifications",
