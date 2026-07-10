@@ -306,6 +306,7 @@
       "c2_mastery": "C2 · Padronanza",
 
       // ── FAQ ──
+      "faq_subtitle": "Domande frequenti sul sistema di report, crediti, e sull'affidabilità delle analisi.",
       "faq_q1": "Cosa sono gli AI Reports?",
       "faq_a1": "Gli AI Reports sono analisi generate automaticamente basate sulle tue sessioni di caption e traduzione. Ogni report esamina aspetti diversi: grammatica, vocabolario, fluidità, interferenze dalla lingua madre, e altro ancora. I report usano solo i dati delle tue sessioni reali — non inventano nulla.",
       "faq_q2": "Quanto sono affidabili?",
@@ -633,6 +634,7 @@
       "c2_mastery": "C2 · Mastery",
 
       // ── FAQ ──
+      "faq_subtitle": "Frequently asked questions about the report system, credits, and analysis reliability.",
       "faq_q1": "What are AI Reports?",
       "faq_a1": "AI Reports are automatically generated analyses based on your caption and translation sessions. Each report examines different aspects: grammar, vocabulary, fluency, native language interference, and more. Reports use only your real session data — they don't invent anything.",
       "faq_q2": "How reliable are they?",
