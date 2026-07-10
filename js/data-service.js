@@ -266,13 +266,14 @@
     var r1 = await sb().from('profiles').upsert(profileUpdate, { onConflict: 'id' });
     if (r1.error) { console.warn('save profile:', r1.error.message); }
 
-    // Save preferences (ui_language)
-    if (settings.ui_language !== undefined) {
-      var r2 = await sb().from('user_preferences').upsert({
-        user_id: userId,
-        ui_language: settings.ui_language,
-        updated_at: now
-      }, { onConflict: 'user_id' });
+    // Save preferences (ui_language, save_sessions, anonymous_sharing)
+    var prefUpdate = { user_id: userId, updated_at: now };
+    var hasPrefs = false;
+    if (settings.ui_language !== undefined) { prefUpdate.ui_language = settings.ui_language; hasPrefs = true; }
+    if (settings.save_sessions !== undefined) { prefUpdate.save_sessions = settings.save_sessions; hasPrefs = true; }
+    if (settings.anonymous_sharing !== undefined) { prefUpdate.anonymous_sharing = settings.anonymous_sharing; hasPrefs = true; }
+    if (hasPrefs) {
+      var r2 = await sb().from('user_preferences').upsert(prefUpdate, { onConflict: 'user_id' });
       if (r2.error) { console.warn('save prefs:', r2.error.message); }
     }
 

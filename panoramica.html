@@ -538,14 +538,28 @@
     </article>
     <article class="alt-card">
       <h3>Privacy</h3>
-      <div style="display:flex;flex-direction:column;gap:10px;margin-top:10px">
-        <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0">
-          <span style="font-size:14px">Dati sessione</span>
-          <span style="font-size:13px;color:var(--green);font-weight:600">Salvati</span>
+      <div style="display:flex;flex-direction:column;gap:12px;margin-top:10px">
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:6px 0">
+          <span style="font-size:14px;display:flex;align-items:center;gap:6px">
+            Dati sessione
+            <span class="info-dot" title="Quando attivo, le tue sessioni (trascrizioni, parole, metriche) vengono salvate su Supabase e compaiono nella tab Trascrizioni. Disattiva se preferisci non conservare lo storico." style="display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:50%;background:var(--line);color:var(--text-faint);font-size:11px;font-weight:700;cursor:help;flex-shrink:0">?</span>
+          </span>
+          <label class="toggle-switch" style="position:relative;display:inline-block;width:44px;height:24px;flex-shrink:0">
+            <input type="checkbox" id="settingsSaveSessions" onchange="var s=this.nextElementSibling;s.style.background=this.checked?'var(--teal)':'var(--line)';var k=document.getElementById('settingsSaveSessionsKnob');k.style.transform=this.checked?'translateX(20px)':'translateX(0)'" style="position:absolute;opacity:0;width:44px;height:24px;z-index:2;cursor:pointer;margin:0">
+            <span class="toggle-slider" style="position:absolute;cursor:pointer;top:0;left:0;right:0;bottom:0;background:var(--teal);border-radius:24px;transition:background .25s"></span>
+            <span style="position:absolute;content:'';top:3px;left:3px;width:18px;height:18px;border-radius:50%;background:#fff;transition:transform .25s;box-shadow:0 1px 3px rgba(0,0,0,.15)" id="settingsSaveSessionsKnob"></span>
+          </label>
         </div>
-        <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0">
-          <span style="font-size:14px">Condivisione anonima</span>
-          <span style="font-size:13px;color:var(--text-faint)">Disattivata</span>
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:6px 0">
+          <span style="font-size:14px;display:flex;align-items:center;gap:6px">
+            Condivisione anonima
+            <span class="info-dot" title="Se attivo, dati anonimi sulle tue sessioni (mai il contenuto delle trascrizioni) possono essere usati per migliorare i modelli di analisi. Nessun dato personale viene mai condiviso." style="display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:50%;background:var(--line);color:var(--text-faint);font-size:11px;font-weight:700;cursor:help;flex-shrink:0">?</span>
+          </span>
+          <label class="toggle-switch" style="position:relative;display:inline-block;width:44px;height:24px;flex-shrink:0">
+            <input type="checkbox" id="settingsAnonSharing" onchange="var s=this.nextElementSibling;s.style.background=this.checked?'var(--teal)':'var(--line)';var k=document.getElementById('settingsAnonSharingKnob');k.style.transform=this.checked?'translateX(20px)':'translateX(0)'" style="position:absolute;opacity:0;width:44px;height:24px;z-index:2;cursor:pointer;margin:0">
+            <span class="toggle-slider" style="position:absolute;cursor:pointer;top:0;left:0;right:0;bottom:0;background:var(--line);border-radius:24px;transition:background .25s"></span>
+            <span style="position:absolute;content:'';top:3px;left:3px;width:18px;height:18px;border-radius:50%;background:#fff;transition:transform .25s;box-shadow:0 1px 3px rgba(0,0,0,.15)" id="settingsAnonSharingKnob"></span>
+          </label>
         </div>
       </div>
     </article>
@@ -645,12 +659,15 @@
 
       // ── Load all data in parallel ──
       var profile = await SottotitoliData.getProfile();
+      window._sottotitoliProfile = profile; // expose for saveSettings
       var statsEN = await SottotitoliData.getSessionStats('en');
       var statsIT = await SottotitoliData.getSessionStats('it');
       var refs = await SottotitoliData.getReferralStats();
       var reports = await SottotitoliData.getAIReports();
       var tokens = await SottotitoliData.getAITokens();
       var credits = await SottotitoliData.getCredits();
+      var prefs = await SottotitoliData.getPreferences();
+      window._sottotitoliPrefs = prefs; // expose for saveSettings
       var cefrBreakdown = await SottotitoliData.getCEFRBreakdown();
 
       // ── Update dropdown with real data ──
@@ -1165,6 +1182,27 @@
         if (natLang && !natLang.dataset.loaded && profile) {
           natLang.dataset.loaded = '1';
           natLang.value = profile.native_lang || '';
+        }
+        // Privacy toggles — load from preferences
+        var saveSess = document.getElementById('settingsSaveSessions');
+        if (saveSess && !saveSess.dataset.loaded) {
+          saveSess.dataset.loaded = '1';
+          // Default: true (save sessions)
+          var saveVal = prefs && prefs.save_sessions !== undefined ? prefs.save_sessions : true;
+          saveSess.checked = saveVal;
+          saveSess.nextElementSibling.style.background = saveVal ? 'var(--teal)' : 'var(--line)';
+          var knob1 = document.getElementById('settingsSaveSessionsKnob');
+          if (knob1) knob1.style.transform = saveVal ? 'translateX(20px)' : 'translateX(0)';
+        }
+        var anonSh = document.getElementById('settingsAnonSharing');
+        if (anonSh && !anonSh.dataset.loaded) {
+          anonSh.dataset.loaded = '1';
+          // Default: false (no anonymous sharing)
+          var anonVal = prefs && prefs.anonymous_sharing !== undefined ? prefs.anonymous_sharing : false;
+          anonSh.checked = anonVal;
+          anonSh.nextElementSibling.style.background = anonVal ? 'var(--teal)' : 'var(--line)';
+          var knob2 = document.getElementById('settingsAnonSharingKnob');
+          if (knob2) knob2.style.transform = anonVal ? 'translateX(20px)' : 'translateX(0)';
         }
       }
 
@@ -1728,6 +1766,12 @@
         settings.native_lang = natEl.value || null;
       }
 
+      // Privacy toggles
+      var saveSessEl = document.getElementById('settingsSaveSessions');
+      if (saveSessEl) settings.save_sessions = saveSessEl.checked;
+      var anonShEl = document.getElementById('settingsAnonSharing');
+      if (anonShEl) settings.anonymous_sharing = anonShEl.checked;
+
       var ok = await SottotitoliData.saveSettings(settings);
       if (!ok) { alert('Errore durante il salvataggio.'); return; }
 
@@ -1744,10 +1788,16 @@
         I18n.setLang(settings.ui_language);
       }
 
-      // Update profile cache
+      // Update local caches
+      var profile = window._sottotitoliProfile;
+      var prefs = window._sottotitoliPrefs;
       if (profile) {
         if (settings.display_name) profile.display_name = settings.display_name;
         if (settings.native_lang !== undefined) profile.native_lang = settings.native_lang;
+      }
+      if (prefs) {
+        if (settings.save_sessions !== undefined) prefs.save_sessions = settings.save_sessions;
+        if (settings.anonymous_sharing !== undefined) prefs.anonymous_sharing = settings.anonymous_sharing;
       }
 
       // Show toast
