@@ -640,13 +640,13 @@
 
   function apply(root) {
     root = root || document;
-    // data-i18n attributes
+    // data-i18n attributes on elements
     root.querySelectorAll('[data-i18n]').forEach(function(el){
       var key = el.getAttribute('data-i18n');
       if (!key) return;
-      // Only translate if element has Italian or English text (not dynamic data)
-      var text = DICT.it[key] || key;
-      if (el.textContent.trim() === text || el.textContent.trim() === (DICT.en[key] || key)) {
+      var itText = DICT.it[key] || key;
+      var enText = DICT.en[key] || key;
+      if (el.textContent.trim() === itText || el.textContent.trim() === enText) {
         el.textContent = t(key);
       }
     });
@@ -665,6 +665,23 @@
       var key = el.getAttribute('data-i18n');
       if (key) el.textContent = t(key);
     });
+    // Walk text nodes and translate known Italian strings
+    if (_lang === 'en') {
+      var walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, null, false);
+      var textNodes = [];
+      while(walker.nextNode()) textNodes.push(walker.currentNode);
+      textNodes.forEach(function(tn){
+        var text = tn.textContent.trim();
+        if (!text || text.length < 2) return;
+        // Check if this matches any Italian key (reverse lookup)
+        for (var k in DICT.it) {
+          if (DICT.it[k] === text && DICT.en[k] && DICT.en[k] !== text) {
+            tn.textContent = tn.textContent.replace(text, DICT.en[k]);
+            break;
+          }
+        }
+      });
+    }
   }
 
   function setLang(lang) {
@@ -687,6 +704,7 @@
     apply();
     // Dispatch event for page-specific handlers
     window.dispatchEvent(new CustomEvent('i18n-changed', { detail: { lang: lang } }));
+    updateToggleBtns();
     return lang;
   }
 
@@ -710,7 +728,39 @@
         }
       }
     } catch(e) {}
+    // Inject language toggle into user dropdown
+    injectLangToggle();
     return setLang(lang);
+  }
+
+  function injectLangToggle() {
+    // Find any user dropdown and inject language toggle
+    var targets = document.querySelectorAll('#userDropdown, .user-dropdown, [data-dropdown="user"]');
+    targets.forEach(function(dd){
+      if (dd.querySelector('.i18n-toggle')) return; // already injected
+      var div = document.createElement('div');
+      div.className = 'i18n-toggle';
+      div.style.cssText = 'padding:10px 14px;display:flex;align-items:center;justify-content:space-between;font-size:13px;border-top:1px solid var(--line, #e2e5ea)';
+      div.innerHTML = '<span>'+t('language')+'</span><span>'+
+        '<button onclick="I18n.setLang(\'it\')" style="border:none;background:none;cursor:pointer;font-weight:600;font-size:13px;font-family:inherit;padding:2px 6px;color:'+(_lang==='it'?'var(--teal, #059669)':'var(--text-faint, #9ca3af)')+'" class="i18n-btn-it">IT</button> '+
+        '<span style="color:var(--text-faint, #9ca3af)">|</span> '+
+        '<button onclick="I18n.setLang(\'en\')" style="border:none;background:none;cursor:pointer;font-weight:600;font-size:13px;font-family:inherit;padding:2px 6px;color:'+(_lang==='en'?'var(--teal, #059669)':'var(--text-faint, #9ca3af)')+'" class="i18n-btn-en">EN</button>'+
+        '</span>';
+      // Insert before logout/exit button or at end
+      var exitBtn = dd.querySelector('[onclick*="signOut"], .ud-link.danger, button:last-of-type');
+      if (exitBtn && exitBtn.parentElement === dd) {
+        dd.insertBefore(div, exitBtn.closest('button, a, .dropdown-item'));
+      } else {
+        dd.appendChild(div);
+      }
+    });
+    // Update toggle highlight
+    updateToggleBtns();
+  }
+
+  function updateToggleBtns() {
+    document.querySelectorAll('.i18n-btn-it').forEach(function(b){ b.style.color = _lang==='it' ? 'var(--teal, #059669)' : 'var(--text-faint, #9ca3af)'; });
+    document.querySelectorAll('.i18n-btn-en').forEach(function(b){ b.style.color = _lang==='en' ? 'var(--teal, #059669)' : 'var(--text-faint, #9ca3af)'; });
   }
 
   window.I18n = {
@@ -728,4 +778,20 @@
   } else {
     init();
   }
+
+  // ── MutationObserver: auto-translate dynamically added content ──
+  var _observer = new MutationObserver(function(mutations){
+    mutations.forEach(function(m){
+      m.addedNodes.forEach(function(node){
+        if (node.nodeType === 1) {
+          apply(node);
+          if (node.querySelector && (node.querySelector('#userDropdown') || node.classList.contains('user-dropdown'))) {
+            injectLangToggle();
+          }
+        }
+      });
+    });
+  });
+  _observer.observe(document.body || document.documentElement, { childList: true, subtree: true });
+
 })();
