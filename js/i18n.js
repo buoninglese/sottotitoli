@@ -1,7 +1,6 @@
 /* ═══ Sottotitoli i18n — Italian/English translations ═══ */
 (function(){
   'use strict';
-  window.__I18N_LOADED = (window.__I18N_LOADED || 0) + 1;
 
   var DICT = {
     it: {
