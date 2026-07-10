@@ -536,7 +536,7 @@
         <div style="display:flex;align-items:center;justify-content:space-between;padding:6px 0">
           <span style="font-size:14px;display:flex;align-items:center;gap:6px">
             Dati sessione
-            <span class="info-dot" title="Quando attivo, le tue sessioni (trascrizioni, parole, metriche) vengono salvate su Supabase e compaiono nella tab Trascrizioni. Disattiva se preferisci non conservare lo storico." style="display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:50%;background:var(--line);color:var(--text-faint);font-size:11px;font-weight:700;cursor:help;flex-shrink:0">?</span>
+            <span class="info-dot" data-i18n-title="privacy_sessions_info" title="Quando attivo, le tue sessioni (trascrizioni, parole, metriche) vengono salvate su Supabase e compaiono nella tab Trascrizioni. Disattiva se preferisci non conservare lo storico." style="display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:50%;background:var(--line);color:var(--text-faint);font-size:11px;font-weight:700;cursor:help;flex-shrink:0">?</span>
           </span>
           <label class="toggle-switch" style="position:relative;display:inline-block;width:44px;height:24px;flex-shrink:0">
             <input type="checkbox" id="settingsSaveSessions" onchange="var s=this.nextElementSibling;s.style.background=this.checked?'var(--teal)':'var(--line)';var k=document.getElementById('settingsSaveSessionsKnob');k.style.transform=this.checked?'translateX(20px)':'translateX(0)'" style="position:absolute;opacity:0;width:44px;height:24px;z-index:2;cursor:pointer;margin:0">
@@ -547,7 +547,7 @@
         <div style="display:flex;align-items:center;justify-content:space-between;padding:6px 0">
           <span style="font-size:14px;display:flex;align-items:center;gap:6px">
             Condivisione anonima
-            <span class="info-dot" title="Se attivo, dati anonimi sulle tue sessioni (mai il contenuto delle trascrizioni) possono essere usati per migliorare i modelli di analisi. Nessun dato personale viene mai condiviso." style="display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:50%;background:var(--line);color:var(--text-faint);font-size:11px;font-weight:700;cursor:help;flex-shrink:0">?</span>
+            <span class="info-dot" data-i18n-title="privacy_anon_info" title="Se attivo, dati anonimi sulle tue sessioni (mai il contenuto delle trascrizioni) possono essere usati per migliorare i modelli di analisi. Nessun dato personale viene mai condiviso." style="display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:50%;background:var(--line);color:var(--text-faint);font-size:11px;font-weight:700;cursor:help;flex-shrink:0">?</span>
           </span>
           <label class="toggle-switch" style="position:relative;display:inline-block;width:44px;height:24px;flex-shrink:0">
             <input type="checkbox" id="settingsAnonSharing" onchange="var s=this.nextElementSibling;s.style.background=this.checked?'var(--teal)':'var(--line)';var k=document.getElementById('settingsAnonSharingKnob');k.style.transform=this.checked?'translateX(20px)':'translateX(0)'" style="position:absolute;opacity:0;width:44px;height:24px;z-index:2;cursor:pointer;margin:0">
@@ -559,7 +559,7 @@
     </article>
   </section>
   <div class="save-row">
-    <button class="primary-btn" onclick="saveSettings()">Salva impostazioni</button>
+    <button class="primary-btn" onclick="saveSettings()" data-i18n="save_settings">Salva impostazioni</button>
     <span class="saved-msg" id="settingsSavedMsg" style="font-size:12px;color:var(--teal);display:none">&check; Salvato</span>
   </div>
 </div>
@@ -1751,7 +1751,16 @@
       if (anonShEl) settings.anonymous_sharing = anonShEl.checked;
 
       var ok = await SottotitoliData.saveSettings(settings);
-      if (!ok) { alert('Errore durante il salvataggio.'); return; }
+
+      // Show toast always (even if save failed silently)
+      var toast = document.getElementById('toastMsg');
+      if (toast) { toast.textContent = ok ? '✓ Salvato con successo' : '⚠️ Accesso richiesto per salvare'; toast.classList.add('show'); setTimeout(function(){ toast.classList.remove('show'); }, 2500); }
+
+      // Flash saved msg
+      var msg = document.getElementById('settingsSavedMsg');
+      if (msg) { msg.style.display = 'inline'; setTimeout(function(){ msg.style.display = 'none'; }, 2500); }
+
+      if (!ok) return;
 
       // Update visible references
       if (settings.display_name) {
