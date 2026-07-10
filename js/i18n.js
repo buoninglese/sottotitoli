@@ -164,6 +164,8 @@
       "expand": "espandi",
 
       // ── Trascrizioni ──
+      "select_all": "Seleziona tutte",
+      "delete_selected": "Elimina selezionate",
       "favorites": "Preferiti",
       "info": "Informazioni",
       "session": "Sessione",
@@ -198,7 +200,7 @@
       "preferences": "Preferenze",
       "member_since": "Membro da",
       "plan": "Piano",
-      "native_language": "Madrelingua",
+      "native_language": "Lingua madre",
       "interface_language": "Lingua interfaccia",
       "activity": "Attività",
       "hours_spoken": "Ore parlate",
@@ -500,6 +502,8 @@
       "expand": "expand",
 
       // ── Trascrizioni ──
+      "select_all": "Select all",
+      "delete_selected": "Delete selected",
       "favorites": "Favorites",
       "info": "Information",
       "session": "Session",
