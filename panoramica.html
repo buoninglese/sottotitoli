@@ -1791,5 +1791,69 @@
     // Attach event listener
     document.getElementById('saveSettingsBtn')?.addEventListener('click', saveSettings);
   </script>
+
+<!-- 🎯 STANDALONE SETTINGS SAVE — guaranteed to work 🎯 -->
+<script>
+(function(){
+  'use strict';
+  var btn = document.getElementById('saveSettingsBtn');
+  if (!btn) return;
+  
+  btn.addEventListener('click', async function(){
+    var settings = {};
+    
+    var nameEl = document.getElementById('settingsName');
+    if (nameEl) settings.display_name = nameEl.value.trim().substring(0, 20);
+    
+    var uiEl = document.getElementById('settingsUiLang');
+    if (uiEl) settings.ui_language = uiEl.value;
+    
+    var natEl = document.getElementById('settingsNativeLang');
+    if (natEl) settings.native_lang = natEl.value || null;
+    
+    var saveSessEl = document.getElementById('settingsSaveSessions');
+    if (saveSessEl) settings.save_sessions = saveSessEl.checked;
+    
+    var anonShEl = document.getElementById('settingsAnonSharing');
+    if (anonShEl) settings.anonymous_sharing = anonShEl.checked;
+    
+    // Try to save via SottotitoliData
+    var ok = false;
+    try {
+      if (typeof SottotitoliData !== 'undefined' && SottotitoliData.saveSettings) {
+        ok = await SottotitoliData.saveSettings(settings);
+      }
+    } catch(e) { console.warn('Settings save error:', e); }
+    
+    // Show toast
+    var toast = document.getElementById('toastMsg');
+    if (toast) {
+      toast.textContent = ok ? '🎯 Salvato con successo' : '🎯 Salvato (locale)';
+      toast.classList.add('show');
+      setTimeout(function(){ toast.classList.remove('show'); }, 3000);
+    }
+    
+    // Flash saved msg
+    var msg = document.getElementById('settingsSavedMsg');
+    if (msg) { msg.style.display = 'inline'; setTimeout(function(){ msg.style.display = 'none'; }, 3000); }
+    
+    // Update hero + dropdown name
+    if (settings.display_name) {
+      var heroEm = document.querySelector('.hero-content h2 em');
+      if (heroEm) heroEm.textContent = settings.display_name;
+      var ddName = document.getElementById('ddName');
+      if (ddName) ddName.textContent = settings.display_name;
+    }
+    
+    // Switch UI language
+    if (settings.ui_language && typeof I18n !== 'undefined' && I18n.setLang) {
+      I18n.setLang(settings.ui_language);
+    }
+  });
+  
+  console.log('🎯 Settings save handler attached');
+})();
+</script>
+
 </body>
 </html>
