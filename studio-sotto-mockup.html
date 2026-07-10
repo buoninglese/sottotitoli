@@ -96,7 +96,7 @@
 .cap-var7 .caption-interim:empty::after { color: rgba(255,255,255,.25); -webkit-text-stroke: 0; }
 /* VAR 8 — YouTube compact */
 .cap-var8 #captionPanel { background: rgba(23,23,23,.94) !important; border-color: transparent !important; box-shadow: none !important; border-radius: 4px !important; }
-.cap-var8 .caption-interim { color: #fff; background: transparent; text-shadow: none; -webkit-text-stroke: 0; font-weight: 600; font-size: clamp(14px,1.8vw,20px) !important; }
+.cap-var8 .caption-interim { color: #fff; background: transparent; text-shadow: none; -webkit-text-stroke: 0; font-weight: 600; }
 .cap-var8 .caption-interim:empty::after { color: rgba(255,255,255,.3); }
 /* VAR 9 — Warm cinema glow */
 .cap-var9 #captionPanel { background: rgba(20,16,12,.85) !important; border-color: transparent !important; box-shadow: 0 0 60px rgba(0,0,0,.5), inset 0 1px 0 rgba(255,255,255,.04) !important; }
@@ -365,7 +365,7 @@ body {
   position: relative; overflow: hidden;
 }
 .caption-interim {
-  font-family: var(--font-live); font-size: var(--font-live-size);
+  font-family: var(--font-live); font-size: var(--font-size-override, var(--font-live-size));
   font-weight: var(--font-live-weight);
   letter-spacing: var(--font-live-ls); line-height: var(--font-live-lh);
   color: var(--text);
@@ -374,7 +374,7 @@ body {
   flex-shrink: 0; border-top: none; padding: 0; margin: 0;
   display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
 }
-.caption-interim:empty::after { content: attr(data-placeholder); color: var(--muted); font-family: var(--font-live); font-weight: var(--font-live-weight); font-size: var(--font-live-size); letter-spacing: var(--font-live-ls); }
+.caption-interim:empty::after { content: attr(data-placeholder); color: var(--muted); font-family: var(--font-live); font-weight: var(--font-live-weight); font-size: var(--font-size-override, var(--font-live-size)); letter-spacing: var(--font-live-ls); }
 /* Subtitle mode: Arial, italic, yellow */
 .font-subtitle .caption-interim { color: #fbbf24; font-style: italic; }
 .font-subtitle .caption-interim:empty::after { color: rgba(251,191,36,.4); font-style: italic; }
@@ -1096,7 +1096,7 @@ button[onclick*="addToWordBank"]:hover{background:rgba(52,211,153,.15)!important
 <!-- ═══ BOTTOM CAPTION BAR — outside workspace, always visible ═══ -->
 <div style="flex-shrink:0;padding:0 14px 8px 14px;background:var(--bg)">
   <div id="captionPanel" style="background:var(--panel,var(--card));border:2px solid var(--line-strong,var(--line));border-radius:34px;padding:14px 24px;box-shadow:0 4px 32px rgba(0,0,0,.06)">
-    <div class="caption-interim" id="captionInterim" data-placeholder="Speak to see subtitles…" style="text-align:center;font-size:clamp(18px,2.5vw,28px);min-height:150px;display:flex;align-items:center;justify-content:center"></div>
+    <div class="caption-interim" id="captionInterim" data-placeholder="Speak to see subtitles…" style="text-align:center;min-height:150px;display:flex;align-items:center;justify-content:center"></div>
   </div>
   <!-- Transport controls — on the background, not in a box -->
   <div class="action-bar" id="actionBar" style="margin-top:10px;display:flex;align-items:center;justify-content:center;gap:16px">
@@ -1106,6 +1106,14 @@ button[onclick*="addToWordBank"]:hover{background:rgba(52,211,153,.15)!important
     <span class="topbar-pill" style="border:none;background:transparent;padding:0">
       <span class="tp-dot" id="micDot"></span>
       <span id="micStatus" style="font-size:13px;font-weight:600;color:var(--muted)">Mic Off</span>
+    </span>
+    <span style="display:inline-flex;align-items:center;gap:4px" title="Font size">
+      <span style="font-size:10px;color:var(--muted)">A⁻</span>
+      <input type="range" id="fontSizeSlider" min="10" max="80" value="0" step="1"
+        style="width:60px;height:4px;accent-color:var(--accent);cursor:pointer;appearance:none;background:var(--line);border-radius:2px;outline:none"
+        oninput="updateFontSize(this.value)">
+      <span style="font-size:14px;color:var(--muted)">A⁺</span>
+      <span id="fontSizeLabel" style="font-size:10px;font-weight:600;color:var(--text2);min-width:24px;text-align:center;cursor:pointer" onclick="resetFontSize()" title="Click to reset">auto</span>
     </span>
     <select id="varSelect" onchange="switchCaptionVar(this.value)" style="font-family:Inter,sans-serif;font-size:12px;font-weight:600;padding:6px 10px;border-radius:8px;border:1px solid var(--line);background:var(--panel,var(--card));color:var(--text);cursor:pointer;outline:none" title="Caption background variation">
       <option value="0">🎨 BG</option>
@@ -3194,7 +3202,35 @@ function updateFontToggleUI(mode) {
   setTimeout(function(){ updateFontToggleUI(stored); }, 50);
 })();
 
-// ═══ Caption BG Variation switcher (VAR 1–10) ═══
+// ═══ Font size slider ═══
+function updateFontSize(val) {
+  var html = document.documentElement;
+  var label = document.getElementById('fontSizeLabel');
+  var slider = document.getElementById('fontSizeSlider');
+  if (val === '0' || val === 0 || val === '') {
+    html.style.removeProperty('--font-size-override');
+    if (label) label.textContent = 'auto';
+    if (slider) slider.value = 0;
+    localStorage.removeItem('sottotitoli-font-size');
+  } else {
+    var px = val + 'px';
+    html.style.setProperty('--font-size-override', px);
+    if (label) label.textContent = val + 'px';
+    localStorage.setItem('sottotitoli-font-size', val);
+  }
+}
+function resetFontSize() {
+  updateFontSize(0);
+}
+// Restore saved font size
+(function(){
+  var saved = localStorage.getItem('sottotitoli-font-size');
+  if (saved && saved !== '0') {
+    var slider = document.getElementById('fontSizeSlider');
+    if (slider) slider.value = saved;
+    updateFontSize(saved);
+  }
+})();
 function switchCaptionVar(val) {
   var html = document.documentElement;
   // Remove all existing VAR classes
