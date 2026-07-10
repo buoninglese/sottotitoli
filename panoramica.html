@@ -1150,17 +1150,14 @@
       };
 
       // ═══ RENDER: Impostazioni ───
-      async function renderSettings() {
-        // Always fetch fresh settings from Supabase (with localStorage fallback)
-        var s = null;
-        if (typeof SottotitoliData !== 'undefined' && SottotitoliData.loadSettings) {
-          s = await SottotitoliData.loadSettings();
-        }
-        if (!s) s = {};
+      // simple sync render — settingsData must be loaded before calling
+      function renderSettings(settingsData) {
+        var s = settingsData || {};
+        console.log('🎨 renderSettings called with:', JSON.stringify(s));
 
         // Name
         var nameEl = document.getElementById('settingsName');
-        if (nameEl && s.display_name) nameEl.value = s.display_name;
+        if (nameEl && s.display_name) { nameEl.value = s.display_name; console.log('  nameEl ←', s.display_name); }
 
         // Email
         var emailEl = document.getElementById('settingsEmail');
@@ -1181,11 +1178,12 @@
         if (uiLang) {
           var currentUi = (typeof I18n !== 'undefined' && I18n.getLang) ? I18n.getLang() : 'it';
           uiLang.value = s.ui_language || currentUi;
+          console.log('  uiLang ←', uiLang.value);
         }
 
         // Native Language
         var natLang = document.getElementById('settingsNativeLang');
-        if (natLang) natLang.value = s.native_lang || '';
+        if (natLang) { natLang.value = s.native_lang || ''; console.log('  natLang ←', natLang.value); }
 
         // Privacy toggles
         var saveSess = document.getElementById('settingsSaveSessions');
@@ -1669,6 +1667,13 @@
         }
       }
 
+      // ── Load settings from Supabase BEFORE rendering ──
+      var settingsData = null;
+      if (typeof SottotitoliData !== 'undefined' && SottotitoliData.loadSettings) {
+        settingsData = await SottotitoliData.loadSettings();
+      }
+      window._settingsData = settingsData; // cache for panel reopen
+
       // ── Initial render ──
       renderHero();
       renderMetrics();
@@ -1682,7 +1687,7 @@
       renderVocabTraguardi();
       renderTasks();
       renderInvita();
-      renderSettings();
+      renderSettings(settingsData);
       renderAIReports();
       clearMockContent();
       renderGrammatica();
@@ -1701,7 +1706,14 @@
       var insNav = document.querySelector('[data-panel="insights"]');
       if (insNav) { insNav.addEventListener('click', function () { setTimeout(renderTasks, 100); }); }
       var impNav = document.querySelector('[data-panel="impostazioni"]');
-      if (impNav) { impNav.addEventListener('click', function () { setTimeout(renderSettings, 100); }); }
+      if (impNav) { impNav.addEventListener('click', async function () {
+        var sd = null;
+        if (typeof SottotitoliData !== 'undefined' && SottotitoliData.loadSettings) {
+          sd = await SottotitoliData.loadSettings();
+        }
+        window._settingsData = sd;
+        setTimeout(function(){ renderSettings(sd); }, 100);
+      }); }
       // ── Reveal content (no more flash of mock HTML) ──
       var mainPanel = document.querySelector('.main-panel');
       if (mainPanel) {
