@@ -1,0 +1,731 @@
+/* ═══ Sottotitoli i18n — Italian/English translations ═══ */
+(function(){
+  'use strict';
+
+  var DICT = {
+    it: {
+      // ── Topbar ──
+      "start_session": "Start Session",
+      "dark": "Dark",
+      "light": "Light",
+      "no_notifications": "Nessuna notifica recente",
+      "minutes": "Minuti",
+      "credits_report": "Crediti report",
+      "buy_credits": "Acquista crediti",
+      "settings": "Impostazioni",
+      "help": "Aiuto",
+      "logout": "Esci",
+      "saved_sessions": "Sessioni salvate",
+      "saved_reports": "Report salvati",
+      "home": "Home",
+      "panoramica": "Panoramica",
+      "language": "Lingua",
+
+      // ── Sidebar ──
+      "study_language": "Lingua studio",
+      "insights": "Insights",
+      "word_banks": "Word banks",
+      "vocabolario": "Vocabolario",
+      "grammatica": "Grammatica",
+      "trascrizioni": "Trascrizioni",
+      "report_ai": "Report AI",
+      "invita": "Invita",
+      "profilo": "Profilo",
+      "aiuto": "Aiuto",
+      "trial_ends": "Trial ends in",
+      "days": "giorni",
+      "upgrade_pro": "Upgrade to Pro",
+      "pro": "Pro",
+
+      // ── Panoramica ──
+      "welcome_back": "Ben tornato,",
+      "login_to_see_stats": "Accedi per vedere le tue statistiche.",
+      "your_stats_ready": "Le tue statistiche di apprendimento sono pronte.",
+      "start_session_btn": "Inizia sessione",
+      "total_sessions": "Sessioni totali",
+      "spoken_time": "Tempo parlato",
+      "unique_words": "Parole uniche",
+      "avg_wpm": "WPM medio",
+      "lexical_diversity": "Diversità lessicale",
+      "ai_reports_generated": "Report AI generati",
+      "generate_report": "Genera report →",
+      "daily_minutes": "Minuti giornalieri",
+      "completion": "Completamento",
+      "monthly_goal": "obiettivo mensile",
+      "last_30d": "ultimi 30gg",
+      "cefr_distribution": "Distribuzione CEFR",
+      "loading": "Caricamento...",
+      "complete_sessions_cefr": "Completa alcune sessioni per vedere la distribuzione CEFR del tuo vocabolario.",
+      "total_vocabulary": "Vocabolario totale",
+      "words": "parole",
+      "click_to_edit": "clicca per modificare",
+
+      // ── Insights ──
+      "objectives": "Obiettivi",
+      "tasks": "Compiti",
+      "milestones": "Traguardi",
+      "estimated_level": "Livello stimato",
+      "short_term_objective": "Obiettivo a breve termine",
+      "habits": "Abitudini",
+      "no_sessions_insights": "Nessuna sessione registrata. Inizia a parlare!",
+      "based_on_sessions": "Basato su",
+      "sessions_registered": "sessioni registrate.",
+      "based_on_words": "Basato su",
+      "words_in_vocab": "parole nel tuo vocabolario.",
+      "dominant_level": "Livello dominante:",
+      "define_objective": "Definisci un obiettivo nel tuo Profilo Linguistico per monitorare i progressi.",
+      "active_tasks": "Compiti attivi",
+      "add_task": "Aggiungi",
+      "recently_completed": "Completati di recente",
+      "achieved_milestones": "Traguardi raggiunti",
+      "in_progress": "In corso",
+      "no_milestones": "Nessun traguardo ancora. Continua a parlare!",
+      "all_achieved": "Tutti i traguardi raggiunti! 🎉",
+      "new_task": "Nuovo compito...",
+      "no_tasks": "Nessun compito. Aggiungine uno!",
+      "doing": "In corso",
+      "todo": "Da fare",
+      "done": "Completato",
+      "preferred_time": "Orario preferito",
+      "most_active_day": "Giorno più attivo",
+      "of_sessions": "delle sessioni",
+      "daily_average": "Media giornaliera",
+      "delete_task": "Elimina compito",
+
+      // ── Grammatica ──
+      "grammar_panoramica": "Panoramica",
+      "verb_tenses": "Tempi Verbali",
+      "pronouns": "Pronomi",
+      "errors": "Errori",
+      "nouns": "Nouns",
+      "verbs": "Verbs",
+      "adjectives": "Adjectives",
+      "negations": "Negazioni",
+      "complexity": "Complessità delle frasi",
+      "grammar_coming_soon": "I dati grammaticali saranno disponibili dopo l'analisi delle tue sessioni.",
+      "no_transcripts_grammar": "Nessuna trascrizione disponibile. Completa una sessione di caption in inglese.",
+      "grammar_en_only": "La grammatica è disponibile solo per sessioni in inglese.",
+      "nlp_loading": "Libreria NLP in caricamento...",
+      "analysis_based_on": "Analisi basata su",
+      "and": "e",
+      "total_words_analysis": "parole totali.",
+      "avg_sentence_length": "Lunghezza media:",
+      "words_per_sentence": "parole per frase.",
+      "questions_asked": "Hai fatto",
+      "questions": "domande",
+      "good_complexity": "Buona complessità! Per passare a C1, punta a 12+ parole per frase.",
+      "improve_complexity": "Per migliorare, cerca di costruire frasi più articolate con subordinate e connettivi.",
+      "present": "Present",
+      "past": "Past",
+      "future": "Future (will)",
+      "perfect": "Present Perfect",
+      "conditional": "Conditional",
+      "passive": "Passive",
+      "gerund": "Gerund",
+      "top_pronouns": "Top pronomi usati",
+      "distribution": "Distribuzione",
+      "subject": "soggetto",
+      "object": "oggetto",
+      "possessive": "possessivi",
+      "error_patterns": "Pattern di errori rilevati",
+      "no_errors": "Nessun errore comune rilevato nelle tue trascrizioni. Continua così! 🎉",
+      "occurrences": "occorrenze",
+
+      // ── Vocabolario ──
+      "vocab_panoramica": "Panoramica",
+      "cefr": "CEFR",
+      "vocab_words": "Parole",
+      "media_usage": "Media utilizzi",
+      "ngsl_coverage": "Copertura NGSL",
+      "common_words": "parole comuni",
+      "per_word": "per parola",
+      "status_current": "Stato attuale",
+      "next_steps": "Prossimi Passi",
+      "expand_b2": "Espandi lessico B2",
+      "technical_words": "Parole tecniche",
+      "read_articles": "Leggi 3 articoli/settimana",
+      "cefr_distribution_title": "Distribuzione per livello",
+      "your_vocab_count": "Il tuo vocabolario conta",
+      "unique_words_count": "parole uniche",
+      "every_session_enriches": "Ogni sessione arricchisce il tuo lessico.",
+      "search_word": "Cerca parola...",
+      "all": "Tutte",
+      "type": "Tipo",
+      "uses": "Usi",
+      "last_used": "Ultima",
+
+      // ── Word Banks ──
+      "no_banks": "Nessuna banca",
+      "create_first_bank": "Crea la tua prima banca di parole per organizzare il vocabolario che vuoi imparare.",
+      "new_bank": "Nuova banca",
+      "add_word": "Aggiungi parola...",
+      "add": "Aggiungi",
+      "expand": "espandi",
+
+      // ── Trascrizioni ──
+      "favorites": "Preferiti",
+      "info": "Informazioni",
+      "session": "Sessione",
+      "words_count": "Parole",
+      "date": "Data",
+      "quality": "Qualità",
+      "no_sessions": "Nessuna sessione registrata",
+      "rename_info": "Puoi rinominare qualsiasi sessione cliccando sul menu",
+      "pdf_info": "Per salvare una trascrizione come PDF, apri il menu e scegli Scarica PDF.",
+      "analysis_info": "Per un'analisi approfondita di grammatica, vocabolario e fluidità, vai alla tab",
+
+      // ── Report AI ──
+      "create_report": "Crea Report",
+      "my_reports": "I miei Report",
+      "ai_settings": "Impostazioni",
+      "quick_snapshot": "Snapshot rapido",
+      "snapshot_desc": "Analisi immediata dell'ultima sessione. Gratuito una volta al giorno.",
+      "generate_snapshot": "Genera Snapshot",
+      "full_report": "Report completo",
+      "full_report_desc": "Analisi approfondita su grammatica, vocabolario, fluidità e interferenze. Consuma 1 credito.",
+      "generate_report_btn": "Genera Report · 1 credito",
+      "credits_available": "crediti disponibili. Scalati solo a report completato.",
+      "ai_preferences": "Preferenze AI",
+      "focus": "Focus",
+      "feedback_tone": "Tono feedback",
+      "register": "Registro",
+      "credits": "Crediti",
+
+      // ── Profilo ──
+      "general": "Generale",
+      "linguistic_profile": "Profilo Linguistico",
+      "preferences": "Preferenze",
+      "member_since": "Membro da",
+      "plan": "Piano",
+      "native_language": "Madrelingua",
+      "interface_language": "Lingua interfaccia",
+      "activity": "Attività",
+      "hours_spoken": "Ore parlate",
+      "consecutive_days": "Giorni consecutivi",
+      "why_study": "Perché studi questa lingua?",
+      "use_situations": "In quali situazioni la usi?",
+      "multi_select": "seleziona più opzioni",
+      "your_sector": "Qual è il tuo settore?",
+      "your_level": "Come valuti il tuo livello attuale?",
+      "short_term_goal": "Obiettivo a breve termine",
+      "save_profile": "Salva profilo",
+      "saved": "Salvato",
+      "go_to_linguistic_profile": "Vai a Profilo Linguistico",
+      "profile_help_text": "Rispondi alle domande di Profilo Linguistico per aiutare i Report AI a essere più precisi. Più il tuo profilo è completo, più i consigli rispecchieranno il tuo contesto reale: settore, obiettivi e livello.",
+      "language_settings": "Lingua",
+      "appearance": "Aspetto",
+      "theme": "Tema",
+      "font_preference": "Preferenza font",
+      "notifications": "Notifiche",
+      "ai_report_ready": "Report AI pronto",
+      "goals_reached": "Obiettivi raggiunti",
+      "newsletter": "Newsletter",
+      "active": "Attive",
+      "disabled": "Disattivata",
+      "save_preferences": "Salva preferenze",
+      "account": "Account",
+      "name": "Nome",
+      "email": "Email",
+      "privacy": "Privacy",
+      "session_data": "Dati sessione",
+
+      // ── Invita ──
+      "invite_link": "Link",
+      "invite_credits": "Crediti",
+      "share_link": "Condividi il link",
+      "referral_code": "Codice referral",
+      "invite_status": "Stato inviti",
+      "invited": "Invitati",
+      "active_invites": "Attivo",
+      "earned": "Guadagnati",
+      "copy": "Copia",
+
+      // ── Impostazioni ──
+      "your_name": "Il tuo nome",
+
+      // ── Start Session ──
+      "caption": "Caption",
+      "translate": "Translate",
+      "caption_desc": "Sottotitoli in una sola lingua",
+      "caption_sub": "Scegli la lingua e avvia i sottotitoli in tempo reale.",
+      "translate_desc": "Traduzione in tempo reale",
+      "translate_sub": "Scegli la lingua che parli e quella per i sottotitoli.",
+      "start_caption": "Avvia Caption",
+      "start_translate": "Avvia Traduzione",
+      "choose_language": "Scegli la lingua",
+      "confirm": "Conferma",
+      "spoken": "parlato",
+      "subtitles": "sottotitoli",
+      "click_to_change": "clicca per cambiare",
+      "i_speak": "Io parlo in…",
+
+      // ── AI Reports settings ──
+      "precision_vocab": "Precisione, Vocabolario",
+      "grammar_errors_opt": "Grammatica, Errori",
+      "fluency_pronunciation": "Fluidità, Pronuncia",
+      "comprehension_interference": "Comprensione, Interferenze",
+      "complete_all": "Completo (tutti gli aspetti)",
+      "encouraging": "Incoraggiante",
+      "direct": "Diretto",
+      "analytical": "Analitico",
+      "balanced": "Bilanciato",
+      "professional": "Professionale",
+      "informal": "Informale",
+      "academic": "Accademico",
+      "technical": "Tecnico",
+      "standard": "Standard",
+      "free": "Gratuito",
+
+      // ── Profilo Linguistico chips ──
+      "work": "Lavoro",
+      "study": "Studio",
+      "travel": "Viaggi",
+      "conversation": "Conversazione",
+      "exams": "Esami",
+      "relocation": "Trasferimento",
+      "film_content": "Film e contenuti",
+      "meetings": "Riunioni",
+      "emails": "Email",
+      "presentations": "Presentazioni",
+      "phone_calls": "Telefonate",
+      "social": "Sociale",
+      "reading": "Lettura",
+      "engineering": "Ingegneria",
+      "business": "Business",
+      "design": "Design",
+      "marketing": "Marketing",
+      "healthcare": "Sanità",
+      "education": "Istruzione",
+      "technology": "Tecnologia",
+      "a1_beginner": "A1 · Principiante",
+      "a2_elementary": "A2 · Base",
+      "b1_intermediate": "B1 · Intermedio",
+      "b2_advanced": "B2 · Avanzato",
+      "c1_fluent": "C1 · Fluente",
+      "c2_mastery": "C2 · Padronanza",
+
+      // ── Dynamic ──
+      "sessions_completed": "sessioni",
+      "hours_total": "ore",
+      "this_week": "questa settimana",
+      "in": "in",
+    },
+
+    en: {
+      // ── Topbar ──
+      "start_session": "Start Session",
+      "dark": "Dark",
+      "light": "Light",
+      "no_notifications": "No recent notifications",
+      "minutes": "Minutes",
+      "credits_report": "Report credits",
+      "buy_credits": "Buy credits",
+      "settings": "Settings",
+      "help": "Help",
+      "logout": "Sign out",
+      "saved_sessions": "Saved sessions",
+      "saved_reports": "Saved reports",
+      "home": "Home",
+      "panoramica": "Dashboard",
+      "language": "Language",
+
+      // ── Sidebar ──
+      "study_language": "Study language",
+      "insights": "Insights",
+      "word_banks": "Word banks",
+      "vocabolario": "Vocabulary",
+      "grammatica": "Grammar",
+      "trascrizioni": "Transcripts",
+      "report_ai": "AI Reports",
+      "invita": "Invite",
+      "profilo": "Profile",
+      "aiuto": "Help",
+      "trial_ends": "Trial ends in",
+      "days": "days",
+      "upgrade_pro": "Upgrade to Pro",
+      "pro": "Pro",
+
+      // ── Panoramica ──
+      "welcome_back": "Welcome back,",
+      "login_to_see_stats": "Sign in to see your statistics.",
+      "your_stats_ready": "Your learning statistics are ready.",
+      "start_session_btn": "Start session",
+      "total_sessions": "Total sessions",
+      "spoken_time": "Spoken time",
+      "unique_words": "Unique words",
+      "avg_wpm": "Avg WPM",
+      "lexical_diversity": "Lexical diversity",
+      "ai_reports_generated": "AI reports generated",
+      "generate_report": "Generate report →",
+      "daily_minutes": "Daily minutes",
+      "completion": "Completion",
+      "monthly_goal": "monthly goal",
+      "last_30d": "last 30 days",
+      "cefr_distribution": "CEFR Distribution",
+      "loading": "Loading...",
+      "complete_sessions_cefr": "Complete some sessions to see your CEFR vocabulary distribution.",
+      "total_vocabulary": "Total vocabulary",
+      "words": "words",
+      "click_to_edit": "click to edit",
+
+      // ── Insights ──
+      "objectives": "Objectives",
+      "tasks": "Tasks",
+      "milestones": "Milestones",
+      "estimated_level": "Estimated level",
+      "short_term_objective": "Short-term objective",
+      "habits": "Habits",
+      "no_sessions_insights": "No sessions recorded. Start speaking!",
+      "based_on_sessions": "Based on",
+      "sessions_registered": "registered sessions.",
+      "based_on_words": "Based on",
+      "words_in_vocab": "words in your vocabulary.",
+      "dominant_level": "Dominant level:",
+      "define_objective": "Define an objective in your Linguistic Profile to track progress.",
+      "active_tasks": "Active tasks",
+      "add_task": "Add",
+      "recently_completed": "Recently completed",
+      "achieved_milestones": "Achieved milestones",
+      "in_progress": "In progress",
+      "no_milestones": "No milestones yet. Keep speaking!",
+      "all_achieved": "All milestones achieved! 🎉",
+      "new_task": "New task...",
+      "no_tasks": "No tasks. Add one!",
+      "doing": "In progress",
+      "todo": "To do",
+      "done": "Completed",
+      "preferred_time": "Preferred time",
+      "most_active_day": "Most active day",
+      "of_sessions": "of sessions",
+      "daily_average": "Daily average",
+      "delete_task": "Delete task",
+
+      // ── Grammatica ──
+      "grammar_panoramica": "Overview",
+      "verb_tenses": "Verb Tenses",
+      "pronouns": "Pronouns",
+      "errors": "Errors",
+      "nouns": "Nouns",
+      "verbs": "Verbs",
+      "adjectives": "Adjectives",
+      "negations": "Negations",
+      "complexity": "Sentence complexity",
+      "grammar_coming_soon": "Grammar data will be available after your sessions are analyzed.",
+      "no_transcripts_grammar": "No transcripts available. Complete an English caption session.",
+      "grammar_en_only": "Grammar is only available for English sessions.",
+      "nlp_loading": "NLP library loading...",
+      "analysis_based_on": "Analysis based on",
+      "and": "and",
+      "total_words_analysis": "total words.",
+      "avg_sentence_length": "Average length:",
+      "words_per_sentence": "words per sentence.",
+      "questions_asked": "You asked",
+      "questions": "questions",
+      "good_complexity": "Good complexity! To reach C1, aim for 12+ words per sentence.",
+      "improve_complexity": "To improve, try building more complex sentences with clauses and connectors.",
+      "present": "Present",
+      "past": "Past",
+      "future": "Future (will)",
+      "perfect": "Present Perfect",
+      "conditional": "Conditional",
+      "passive": "Passive",
+      "gerund": "Gerund",
+      "top_pronouns": "Top pronouns used",
+      "distribution": "Distribution",
+      "subject": "subject",
+      "object": "object",
+      "possessive": "possessives",
+      "error_patterns": "Error patterns detected",
+      "no_errors": "No common errors detected in your transcripts. Keep it up! 🎉",
+      "occurrences": "occurrences",
+
+      // ── Vocabolario ──
+      "vocab_panoramica": "Overview",
+      "cefr": "CEFR",
+      "vocab_words": "Words",
+      "media_usage": "Avg usage",
+      "ngsl_coverage": "NGSL Coverage",
+      "common_words": "common words",
+      "per_word": "per word",
+      "status_current": "Current status",
+      "next_steps": "Next steps",
+      "expand_b2": "Expand B2 vocabulary",
+      "technical_words": "Technical words",
+      "read_articles": "Read 3 articles/week",
+      "cefr_distribution_title": "Level distribution",
+      "your_vocab_count": "Your vocabulary has",
+      "unique_words_count": "unique words",
+      "every_session_enriches": "Every session enriches your vocabulary.",
+      "search_word": "Search word...",
+      "all": "All",
+      "type": "Type",
+      "uses": "Uses",
+      "last_used": "Last used",
+
+      // ── Word Banks ──
+      "no_banks": "No word banks",
+      "create_first_bank": "Create your first word bank to organize the vocabulary you want to learn.",
+      "new_bank": "New bank",
+      "add_word": "Add word...",
+      "add": "Add",
+      "expand": "expand",
+
+      // ── Trascrizioni ──
+      "favorites": "Favorites",
+      "info": "Information",
+      "session": "Session",
+      "words_count": "Words",
+      "date": "Date",
+      "quality": "Quality",
+      "no_sessions": "No sessions recorded",
+      "rename_info": "You can rename any session by clicking the menu",
+      "pdf_info": "To save a transcript as PDF, open the menu and choose Download PDF.",
+      "analysis_info": "For in-depth grammar, vocabulary and fluency analysis, go to the",
+
+      // ── Report AI ──
+      "create_report": "Create Report",
+      "my_reports": "My Reports",
+      "ai_settings": "Settings",
+      "quick_snapshot": "Quick snapshot",
+      "snapshot_desc": "Instant analysis of your last session. Free once per day.",
+      "generate_snapshot": "Generate Snapshot",
+      "full_report": "Full report",
+      "full_report_desc": "In-depth analysis of grammar, vocabulary, fluency and interference. Uses 1 credit.",
+      "generate_report_btn": "Generate Report · 1 credit",
+      "credits_available": "credits available. Only charged on completion.",
+      "ai_preferences": "AI Preferences",
+      "focus": "Focus",
+      "feedback_tone": "Feedback tone",
+      "register": "Register",
+      "credits": "Credits",
+
+      // ── Profilo ──
+      "general": "General",
+      "linguistic_profile": "Linguistic Profile",
+      "preferences": "Preferences",
+      "member_since": "Member since",
+      "plan": "Plan",
+      "native_language": "Native language",
+      "interface_language": "Interface language",
+      "activity": "Activity",
+      "hours_spoken": "Hours spoken",
+      "consecutive_days": "Consecutive days",
+      "why_study": "Why are you studying this language?",
+      "use_situations": "In what situations do you use it?",
+      "multi_select": "select multiple",
+      "your_sector": "What is your field?",
+      "your_level": "How do you rate your current level?",
+      "short_term_goal": "Short-term goal",
+      "save_profile": "Save profile",
+      "saved": "Saved",
+      "go_to_linguistic_profile": "Go to Linguistic Profile",
+      "profile_help_text": "Answer the Linguistic Profile questions to help AI Reports be more precise. The more complete your profile, the more the advice will reflect your real context: field, objectives and level.",
+      "language_settings": "Language",
+      "appearance": "Appearance",
+      "theme": "Theme",
+      "font_preference": "Font preference",
+      "notifications": "Notifications",
+      "ai_report_ready": "AI Report ready",
+      "goals_reached": "Goals reached",
+      "newsletter": "Newsletter",
+      "active": "Active",
+      "disabled": "Disabled",
+      "save_preferences": "Save preferences",
+      "account": "Account",
+      "name": "Name",
+      "email": "Email",
+      "privacy": "Privacy",
+      "session_data": "Session data",
+
+      // ── Invita ──
+      "invite_link": "Link",
+      "invite_credits": "Credits",
+      "share_link": "Share the link",
+      "referral_code": "Referral code",
+      "invite_status": "Invite status",
+      "invited": "Invited",
+      "active_invites": "Active",
+      "earned": "Earned",
+      "copy": "Copy",
+
+      // ── Impostazioni ──
+      "your_name": "Your name",
+
+      // ── Start Session ──
+      "caption": "Caption",
+      "translate": "Translate",
+      "caption_desc": "Subtitles in a single language",
+      "caption_sub": "Choose a language and start real-time subtitles.",
+      "translate_desc": "Real-time translation",
+      "translate_sub": "Choose your spoken language and subtitle language.",
+      "start_caption": "Start Caption",
+      "start_translate": "Start Translation",
+      "choose_language": "Choose language",
+      "confirm": "Confirm",
+      "spoken": "spoken",
+      "subtitles": "subtitles",
+      "click_to_change": "click to change",
+      "i_speak": "I speak in…",
+
+      // ── AI Reports settings ──
+      "precision_vocab": "Precision, Vocabulary",
+      "grammar_errors_opt": "Grammar, Errors",
+      "fluency_pronunciation": "Fluency, Pronunciation",
+      "comprehension_interference": "Comprehension, Interference",
+      "complete_all": "Complete (all aspects)",
+      "encouraging": "Encouraging",
+      "direct": "Direct",
+      "analytical": "Analytical",
+      "balanced": "Balanced",
+      "professional": "Professional",
+      "informal": "Informal",
+      "academic": "Academic",
+      "technical": "Technical",
+      "standard": "Standard",
+      "free": "Free",
+
+      // ── Profilo Linguistico chips ──
+      "work": "Work",
+      "study": "Study",
+      "travel": "Travel",
+      "conversation": "Conversation",
+      "exams": "Exams",
+      "relocation": "Relocation",
+      "film_content": "Films & content",
+      "meetings": "Meetings",
+      "emails": "Emails",
+      "presentations": "Presentations",
+      "phone_calls": "Phone calls",
+      "social": "Social",
+      "reading": "Reading",
+      "engineering": "Engineering",
+      "business": "Business",
+      "design": "Design",
+      "marketing": "Marketing",
+      "healthcare": "Healthcare",
+      "education": "Education",
+      "technology": "Technology",
+      "a1_beginner": "A1 · Beginner",
+      "a2_elementary": "A2 · Elementary",
+      "b1_intermediate": "B1 · Intermediate",
+      "b2_advanced": "B2 · Advanced",
+      "c1_fluent": "C1 · Fluent",
+      "c2_mastery": "C2 · Mastery",
+
+      // ── Dynamic ──
+      "sessions_completed": "sessions",
+      "hours_total": "hours",
+      "this_week": "this week",
+      "in": "in",
+    }
+  };
+
+  var _lang = 'it';
+  var _loaded = false;
+
+  function detectLang() {
+    // 1. Check localStorage
+    var stored = localStorage.getItem('sottotitoli-lang');
+    if (stored === 'en' || stored === 'it') return stored;
+    // 2. Browser preference
+    var browser = (navigator.language || 'it').split('-')[0];
+    if (browser === 'en') return 'en';
+    return 'it';
+  }
+
+  function t(key) {
+    var dict = DICT[_lang] || DICT.it;
+    return dict[key] || key;
+  }
+
+  function apply(root) {
+    root = root || document;
+    // data-i18n attributes
+    root.querySelectorAll('[data-i18n]').forEach(function(el){
+      var key = el.getAttribute('data-i18n');
+      if (!key) return;
+      // Only translate if element has Italian or English text (not dynamic data)
+      var text = DICT.it[key] || key;
+      if (el.textContent.trim() === text || el.textContent.trim() === (DICT.en[key] || key)) {
+        el.textContent = t(key);
+      }
+    });
+    // data-i18n-placeholder
+    root.querySelectorAll('[data-i18n-placeholder]').forEach(function(el){
+      var key = el.getAttribute('data-i18n-placeholder');
+      if (key) el.placeholder = t(key);
+    });
+    // data-i18n-title
+    root.querySelectorAll('[data-i18n-title]').forEach(function(el){
+      var key = el.getAttribute('data-i18n-title');
+      if (key) el.title = t(key);
+    });
+    // Translate select options
+    root.querySelectorAll('option[data-i18n]').forEach(function(el){
+      var key = el.getAttribute('data-i18n');
+      if (key) el.textContent = t(key);
+    });
+  }
+
+  function setLang(lang) {
+    if (lang !== 'en' && lang !== 'it') lang = detectLang();
+    _lang = lang;
+    localStorage.setItem('sottotitoli-lang', lang);
+    document.documentElement.setAttribute('lang', lang);
+    // Save to Supabase if available
+    try {
+      var sb = window.sottotitoliSupabase;
+      if (sb) {
+        sb.auth.getSession().then(function(r){
+          var uid = r.data?.session?.user?.id;
+          if (uid) {
+            sb.from('user_preferences').upsert({ user_id: uid, ui_language: lang }, { onConflict: 'user_id' }).then(function(){});
+          }
+        });
+      }
+    } catch(e) {}
+    apply();
+    // Dispatch event for page-specific handlers
+    window.dispatchEvent(new CustomEvent('i18n-changed', { detail: { lang: lang } }));
+    return lang;
+  }
+
+  async function init() {
+    if (_loaded) return _lang;
+    _loaded = true;
+    var lang = detectLang();
+    // Try Supabase first
+    try {
+      var sb = window.sottotitoliSupabase;
+      if (sb) {
+        var r = await sb.auth.getSession();
+        var uid = r.data?.session?.user?.id;
+        if (uid) {
+          try {
+            var pref = await sb.from('user_preferences').select('ui_language').eq('user_id', uid).maybeSingle();
+            if (pref.data?.ui_language === 'en' || pref.data?.ui_language === 'it') {
+              lang = pref.data.ui_language;
+            }
+          } catch(e) {}
+        }
+      }
+    } catch(e) {}
+    return setLang(lang);
+  }
+
+  window.I18n = {
+    init: init,
+    setLang: setLang,
+    t: t,
+    apply: apply,
+    getLang: function(){ return _lang; },
+    DICT: DICT
+  };
+
+  // Auto-init on DOM ready
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', function(){ init(); });
+  } else {
+    init();
+  }
+})();
