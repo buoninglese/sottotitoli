@@ -624,7 +624,7 @@
     if (cached) return cached;
     // user_analytics_snapshot table may not exist yet — return null gracefully
     try {
-      var r = await sb().from('user_analytics_snapshot').select('*').eq('user_id', userId).single();
+      var r = await sb().from('user_analytics_snapshot').select('*').eq('user_id', userId).maybeSingle();
       if (r.error) { console.warn('analytics snapshot:', r.error.message); return null; }
       cacheSet('analyticsSnapshot', r.data);
       return r.data;
