@@ -59,6 +59,8 @@
     if (cached) return cached;
     var r = await sb().from('profiles').select('*').eq('id', userId).single();
     if (r.error) { console.warn('profile fetch:', r.error.message); return null; }
+    // Normalize: ensure display_name is populated (column may not exist yet)
+    if (r.data && !r.data.display_name) r.data.display_name = r.data.full_name || '';
     cacheSet('profile', r.data);
     return r.data;
   }
@@ -237,16 +239,20 @@
   async function saveProfileField(field, value) {
     var userId = await getUserId();
     if (!userId) return false;
-    var update = {};
-    update[field] = value;
-    update.updated_at = new Date().toISOString();
-    var r = await sb().from('profiles').upsert({ id: userId, updated_at: new Date().toISOString(), display_name: (field==='display_name'?value:undefined) }, { onConflict: 'id' });
-    // For display_name specifically, use upsert
-    if (field === 'display_name') {
-      r = await sb().from('profiles').upsert({ id: userId, display_name: value, updated_at: new Date().toISOString() }, { onConflict: 'id' });
+    var update = { id: userId, updated_at: new Date().toISOString() };
+    // Map display_name to full_name column (which exists in DB)
+    // getProfile() normalizes back to display_name for consumers
+    update[field === 'display_name' ? 'full_name' : field] = value;
+    // Also set display_name if the column exists (harmless if it doesn't)
+    if (field === 'display_name') update.display_name = value;
+    var r = await sb().from('profiles').upsert(update, { onConflict: 'id' });
+    if (r.error && r.error.message && r.error.message.indexOf('display_name') !== -1) {
+      // Column doesn't exist yet — retry without it
+      delete update.display_name;
+      r = await sb().from('profiles').upsert(update, { onConflict: 'id' });
     }
-    if (r.error) { console.warn('save profile:', r.error.message); return false; }
-    cacheClear(); // invalidate all cache on write
+    if (r.error) { console.warn('save profile field:', r.error.message); return false; }
+    cacheClear();
     return true;
   }
 
@@ -257,16 +263,34 @@
     var userId = await getUserId();
     if (!userId) return false;
     var now = new Date().toISOString();
+    var anyError = false;
 
-    // Save profile fields (display_name, native_lang)
+    // Save profile fields
+    // NOTE: We save display_name to full_name column (which exists in DB).
+    // The display_name column may not exist yet — migration add_display_name.sql will add it.
+    // getProfile() normalizes both columns into display_name for all consumers.
     var profileUpdate = { id: userId, updated_at: now };
-    if (settings.display_name !== undefined) profileUpdate.display_name = settings.display_name;
+    if (settings.display_name !== undefined) {
+      profileUpdate.full_name = settings.display_name;
+      profileUpdate.display_name = settings.display_name; // harmless if column missing? Let caller handle
+    }
     if (settings.native_lang !== undefined) profileUpdate.native_lang = settings.native_lang;
 
+    // Try upsert with display_name; if column missing, retry without it
     var r1 = await sb().from('profiles').upsert(profileUpdate, { onConflict: 'id' });
-    if (r1.error) { console.warn('save profile:', r1.error.message); }
+    if (r1.error) {
+      console.warn('save profile (attempt 1):', r1.error.message);
+      // If display_name column doesn't exist, retry without it
+      if (r1.error.message && r1.error.message.indexOf('display_name') !== -1) {
+        delete profileUpdate.display_name;
+        r1 = await sb().from('profiles').upsert(profileUpdate, { onConflict: 'id' });
+        if (r1.error) { console.warn('save profile (attempt 2):', r1.error.message); anyError = true; }
+      } else {
+        anyError = true;
+      }
+    }
 
-    // Save preferences (ui_language, save_sessions, anonymous_sharing)
+    // Save preferences (ui_language, save_sessions, anonymous_sharing) — independent of profile save
     var prefUpdate = { user_id: userId, updated_at: now };
     var hasPrefs = false;
     if (settings.ui_language !== undefined) { prefUpdate.ui_language = settings.ui_language; hasPrefs = true; }
@@ -274,11 +298,11 @@
     if (settings.anonymous_sharing !== undefined) { prefUpdate.anonymous_sharing = settings.anonymous_sharing; hasPrefs = true; }
     if (hasPrefs) {
       var r2 = await sb().from('user_preferences').upsert(prefUpdate, { onConflict: 'user_id' });
-      if (r2.error) { console.warn('save prefs:', r2.error.message); }
+      if (r2.error) { console.warn('save prefs:', r2.error.message); anyError = true; }
     }
 
     cacheClear();
-    return !r1.error;
+    return !anyError;
   }
 
   /* ── Listen for language changes ── */
