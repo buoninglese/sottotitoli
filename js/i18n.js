@@ -1,6 +1,7 @@
 /* ═══ Sottotitoli i18n — Italian/English translations ═══ */
 (function(){
   'use strict';
+  window.__I18N_LOADED = (window.__I18N_LOADED || 0) + 1;
 
   var DICT = {
     it: {
@@ -631,24 +632,6 @@
       "b2_advanced": "B2 · Advanced",
       "c1_fluent": "C1 · Fluent",
       "c2_mastery": "C2 · Mastery",
-
-      // ── FAQ ──
-      "faq_q1": "Cosa sono gli AI Reports?",
-      "faq_a1": "Gli AI Reports sono analisi generate automaticamente basate sulle tue sessioni di caption e traduzione. Ogni report esamina aspetti diversi: grammatica, vocabolario, fluidità, interferenze dalla lingua madre, e altro ancora. I report usano solo i dati delle tue sessioni reali — non inventano nulla.",
-      "faq_q2": "Quanto sono affidabili?",
-      "faq_a2": "L'affidabilità dipende dal numero di sessioni analizzate. Più sessioni = più dati = analisi più solide. Ogni report include una nota sull'affidabilità. I report non assegnano certificazioni ufficiali CEFR e usano un linguaggio prudente.",
-      "faq_q3": "Perché alcuni report sono bloccati?",
-      "faq_a3": "Alcuni report richiedono un numero minimo di sessioni per essere affidabili. Ad esempio, il report \"Errori Ricorrenti\" ha bisogno di almeno 3 sessioni per distinguere un errore occasionale da un pattern.",
-      "faq_q4": "I crediti si consumano se il report fallisce?",
-      "faq_a4": "No. I crediti vengono scalati solo quando il report viene completato con successo. Se un report va in errore, puoi riprovarlo senza costi aggiuntivi.",
-      "faq_q5": "Posso scaricare i report?",
-      "faq_a5": "Sì. Ogni report può essere scaricato come file di testo. I report includono il punteggio, la data, e il testo completo dell'analisi.",
-      "faq_q6": "Il mio profilo influenza i report?",
-      "faq_a6": "Sì. Obiettivi, settore, preferenze di feedback e lingua madre aiutano l'AI a produrre consigli più pertinenti. Più il profilo è completo, più i report rispecchiano il tuo contesto reale.",
-      "faq_q7": "I miei dati sono al sicuro?",
-      "faq_a7": "Sì. Le tue sessioni e i tuoi report sono visibili solo a te. I dati vengono usati esclusivamente per generare i tuoi report personali e non vengono condivisi con terze parti.",
-      "faq_q8": "Il report sostituisce un insegnante?",
-      "faq_a8": "No. È uno strumento di analisi e orientamento: trasforma dati reali in feedback utile. Non valuta la tua pronuncia, non interagisce con te, e non sostituisce il giudizio di un professionista.",
 
       // ── FAQ ──
       "faq_q1": "What are AI Reports?",
