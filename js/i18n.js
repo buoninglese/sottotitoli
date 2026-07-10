@@ -737,7 +737,7 @@
     // Find any user dropdown and inject language toggle
     var targets = document.querySelectorAll('#userDropdown, .user-dropdown, [data-dropdown="user"]');
     targets.forEach(function(dd){
-      if (dd.querySelector('.i18n-toggle')) return; // already injected
+      if (dd.querySelector('.i18n-toggle, [onclick*="I18n.setLang"]')) return; // already has toggle
       var div = document.createElement('div');
       div.className = 'i18n-toggle';
       div.style.cssText = 'padding:10px 14px;display:flex;align-items:center;justify-content:space-between;font-size:13px;border-top:1px solid var(--line, #e2e5ea)';
