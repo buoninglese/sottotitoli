@@ -12,18 +12,18 @@
         '<div class="dd-avatar" id="hbAvatar">S</div>' +
         '<span class="dd-name" id="hbName">Hello…</span>' +
       '</div>' +
-      '<a href="index.html"><svg class="icon" style="width:14px;height:14px;margin-right:6px;vertical-align:middle"><use href="#i-home"></use></svg> Home</a>' +
-      '<a href="panoramica.html"><svg class="icon" style="width:14px;height:14px;margin-right:6px;vertical-align:middle"><use href="#i-insights"></use></svg> Panoramica</a>' +
-      '<a href="start.html"><svg class="icon" style="width:14px;height:14px;margin-right:6px;vertical-align:middle"><use href="#i-mic"></use></svg> Start</a>' +
-      '<a href="account.html"><svg class="icon" style="width:14px;height:14px;margin-right:6px;vertical-align:middle"><use href="#i-user"></use></svg> Profilo</a>' +
-      '<a href="analysis.html"><svg class="icon" style="width:14px;height:14px;margin-right:6px;vertical-align:middle"><use href="#i-star"></use></svg> Report AI</a>' +
+      '<a href="index.html"><i class="fa-solid fa-house" style="width:16px;text-align:center;margin-right:8px;font-size:13px"></i> Home</a>' +
+      '<a href="panoramica.html"><i class="fa-solid fa-table-cells" style="width:16px;text-align:center;margin-right:8px;font-size:13px"></i> Panoramica</a>' +
+      '<a href="start.html"><i class="fa-solid fa-microphone" style="width:16px;text-align:center;margin-right:8px;font-size:13px"></i> Start</a>' +
+      '<a href="account.html"><i class="fa-solid fa-user" style="width:16px;text-align:center;margin-right:8px;font-size:13px"></i> Profilo</a>' +
+      '<a href="analysis.html"><i class="fa-solid fa-star" style="width:16px;text-align:center;margin-right:8px;font-size:13px"></i> Report AI</a>' +
       '<hr>' +
       '<div class="dd-credits" id="hbCredits">' +
         '<div class="dd-credit-row"><span>Minuti</span><span id="hbMinutes">—</span></div>' +
         '<div class="dd-credit-row"><span>Crediti report</span><span id="hbTokens">—</span></div>' +
       '</div>' +
       '<hr>' +
-      '<a href="purchase.html" style="color:var(--blue);font-weight:600"><svg class="icon" style="width:14px;height:14px;margin-right:6px;vertical-align:middle"><use href="#i-gift"></use></svg> Acquista crediti</a>' +
+      '<a href="purchase.html" style="color:var(--blue);font-weight:600"><i class="fa-solid fa-gift" style="width:16px;text-align:center;margin-right:8px;font-size:13px"></i> Acquista crediti</a>' +
       '<hr>' +
       '<a href="account.html#cs-profile">Impostazioni</a>' +
       '<a href="panoramica.html#aiuto">Aiuto</a>' +
