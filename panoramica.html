@@ -632,7 +632,6 @@
       // Wait for auth to settle (OAuth callback may still be processing)
       var meta = await SottotitoliData.getUserMeta();
       if (!meta) {
-        // Maybe OAuth token is still being processed — listen for auth event
         console.warn('No session yet, waiting for auth event...');
         await new Promise(function(resolve) {
           var handler = function(e) {
@@ -640,12 +639,25 @@
             resolve(e.detail?.user || null);
           };
           window.addEventListener('sottotitoli-auth', handler);
-          // Timeout after 5 seconds
           setTimeout(function() { window.removeEventListener('sottotitoli-auth', handler); resolve(null); }, 5000);
         });
         meta = await SottotitoliData.getUserMeta();
       }
-      if (!meta) { console.warn('No session after auth wait'); return; }
+
+      // ── Load settings (works with OR without auth — falls back to localStorage) ──
+      var settingsData = null;
+      if (typeof SottotitoliData !== 'undefined' && SottotitoliData.loadSettings) {
+        settingsData = await SottotitoliData.loadSettings();
+      }
+      window._settingsData = settingsData;
+
+      // ── If not logged in, still render what we can ──
+      if (!meta) {
+        console.warn('No session — rendering offline mode');
+        renderHero();
+        renderSettings(settingsData);
+        return;
+      }
 
       // Dropdown — set email immediately
       var ddEmail = document.getElementById('ddEmail');
@@ -1667,14 +1679,8 @@
         }
       }
 
-      // ── Load settings from Supabase BEFORE rendering ──
-      var settingsData = null;
-      if (typeof SottotitoliData !== 'undefined' && SottotitoliData.loadSettings) {
-        settingsData = await SottotitoliData.loadSettings();
-      }
-      window._settingsData = settingsData; // cache for panel reopen
-
-      // ── Initial render ──
+      // ── Initial render (settingsData already loaded above) ──
+      var _sd = window._settingsData;
       renderHero();
       renderMetrics();
       renderInsightsMetrics();
@@ -1687,7 +1693,7 @@
       renderVocabTraguardi();
       renderTasks();
       renderInvita();
-      renderSettings(settingsData);
+      renderSettings(_sd);
       renderAIReports();
       clearMockContent();
       renderGrammatica();
