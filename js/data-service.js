@@ -50,19 +50,17 @@
   }
 
   /* ═══════════════════════════════════════════
-     PROFILE
+     PROFILE — always fresh, no cache
      ═══════════════════════════════════════════ */
   async function getProfile() {
     var userId = await getUserId();
     if (!userId) return null;
-    var cached = cacheGet('profile');
-    if (cached) return cached;
-    var r = await sb().from('profiles').select('*').eq('id', userId).single();
-    if (r.error) { console.warn('profile fetch:', r.error.message); return null; }
-    // Normalize: ensure display_name is populated (column may not exist yet)
-    if (r.data && !r.data.display_name) r.data.display_name = r.data.full_name || '';
-    cacheSet('profile', r.data);
-    return r.data;
+    var r = await sb().from('profiles').select('*').eq('id', userId).maybeSingle();
+    if (r.error) { console.warn('getProfile:', r.error.message); return null; }
+    var d = r.data || {};
+    // Normalize: display_name comes from display_name or full_name column
+    if (!d.display_name) d.display_name = d.full_name || '';
+    return d;
   }
 
   /* ═══════════════════════════════════════════
@@ -234,75 +232,129 @@
   }
 
   /* ═══════════════════════════════════════════
-     SAVE — display name
+     LOAD ALL SETTINGS — single unified call
+     Returns { display_name, native_lang, ui_language, save_sessions, anonymous_sharing }
+     Always fresh from Supabase, falls back to localStorage.
      ═══════════════════════════════════════════ */
-  async function saveProfileField(field, value) {
+  async function loadSettings() {
     var userId = await getUserId();
-    if (!userId) return false;
-    var update = { id: userId, updated_at: new Date().toISOString() };
-    // Map display_name to full_name column (which exists in DB)
-    // getProfile() normalizes back to display_name for consumers
-    update[field === 'display_name' ? 'full_name' : field] = value;
-    // Also set display_name if the column exists (harmless if it doesn't)
-    if (field === 'display_name') update.display_name = value;
-    var r = await sb().from('profiles').upsert(update, { onConflict: 'id' });
-    if (r.error && r.error.message && r.error.message.indexOf('display_name') !== -1) {
-      // Column doesn't exist yet — retry without it
-      delete update.display_name;
-      r = await sb().from('profiles').upsert(update, { onConflict: 'id' });
+    if (!userId) { console.warn('loadSettings: no user id'); return loadLocalSettings(); }
+
+    var _a = await Promise.all([
+      sb().from('profiles').select('full_name,display_name,native_lang').eq('id', userId).maybeSingle(),
+      sb().from('user_preferences').select('ui_language,save_sessions,anonymous_sharing').eq('user_id', userId).maybeSingle()
+    ]);
+
+    var profileR = _a[0], prefsR = _a[1];
+    var profile = profileR.data || {};
+    var prefs = prefsR.data || {};
+
+    if (profileR.error) console.warn('loadSettings profiles:', profileR.error.message);
+    if (prefsR.error) console.warn('loadSettings prefs:', prefsR.error.message);
+
+    var result = {
+      display_name: profile.display_name || profile.full_name || '',
+      native_lang: profile.native_lang || '',
+      ui_language: prefs.ui_language || 'it',
+      save_sessions: prefs.save_sessions !== undefined ? prefs.save_sessions : true,
+      anonymous_sharing: prefs.anonymous_sharing !== undefined ? prefs.anonymous_sharing : false
+    };
+
+    // Fallback: merge with localStorage for any missing fields
+    var local = loadLocalSettings();
+    if (local) {
+      if (!result.display_name && local.display_name) result.display_name = local.display_name;
+      if (!result.native_lang && local.native_lang) result.native_lang = local.native_lang;
     }
-    if (r.error) { console.warn('save profile field:', r.error.message); return false; }
-    cacheClear();
-    return true;
+
+    console.log('loadSettings:', JSON.stringify(result));
+    return result;
+  }
+
+  /* ── Load settings from localStorage (offline fallback) ── */
+  function loadLocalSettings() {
+    try {
+      var raw = localStorage.getItem('sottotitoli-settings');
+      return raw ? JSON.parse(raw) : null;
+    } catch(e) { return null; }
   }
 
   /* ═══════════════════════════════════════════
-     SETTINGS — Save all user settings at once
+     SAVE SETTINGS — unified, per-field error reporting
+     Returns { ok: bool, errors: [...] }
      ═══════════════════════════════════════════ */
   async function saveSettings(settings) {
     var userId = await getUserId();
-    if (!userId) return false;
-    var now = new Date().toISOString();
-    var anyError = false;
+    if (!userId) {
+      console.warn('saveSettings: no user id — saving to localStorage only');
+      saveLocalSettings(settings);
+      return { ok: false, errors: ['Not authenticated — saved locally'] };
+    }
 
-    // Save profile fields
-    // NOTE: We save display_name to full_name column (which exists in DB).
-    // The display_name column may not exist yet — migration add_display_name.sql will add it.
-    // getProfile() normalizes both columns into display_name for all consumers.
+    var now = new Date().toISOString();
+    var errors = [];
+
+    // ── Save to profiles (display_name → full_name column) ──
     var profileUpdate = { id: userId, updated_at: now };
     if (settings.display_name !== undefined) {
       profileUpdate.full_name = settings.display_name;
-      profileUpdate.display_name = settings.display_name; // harmless if column missing? Let caller handle
+      profileUpdate.display_name = settings.display_name;
     }
-    if (settings.native_lang !== undefined) profileUpdate.native_lang = settings.native_lang;
-
-    // Try upsert with display_name; if column missing, retry without it
-    var r1 = await sb().from('profiles').upsert(profileUpdate, { onConflict: 'id' });
-    if (r1.error) {
-      console.warn('save profile (attempt 1):', r1.error.message);
-      // If display_name column doesn't exist, retry without it
-      if (r1.error.message && r1.error.message.indexOf('display_name') !== -1) {
-        delete profileUpdate.display_name;
-        r1 = await sb().from('profiles').upsert(profileUpdate, { onConflict: 'id' });
-        if (r1.error) { console.warn('save profile (attempt 2):', r1.error.message); anyError = true; }
-      } else {
-        anyError = true;
+    if (settings.native_lang !== undefined) {
+      profileUpdate.native_lang = settings.native_lang;
+    }
+    if (settings.display_name !== undefined || settings.native_lang !== undefined) {
+      var r1 = await sb().from('profiles').upsert(profileUpdate, { onConflict: 'id' });
+      if (r1.error) {
+        if (r1.error.message && r1.error.message.indexOf('display_name') !== -1) {
+          delete profileUpdate.display_name;
+          r1 = await sb().from('profiles').upsert(profileUpdate, { onConflict: 'id' });
+        }
+        if (r1.error) {
+          errors.push('profiles: ' + r1.error.message);
+          console.warn('saveSettings profiles:', r1.error.message);
+        }
       }
     }
 
-    // Save preferences (ui_language, save_sessions, anonymous_sharing) — independent of profile save
+    // ── Save to user_preferences ──
     var prefUpdate = { user_id: userId, updated_at: now };
-    var hasPrefs = false;
-    if (settings.ui_language !== undefined) { prefUpdate.ui_language = settings.ui_language; hasPrefs = true; }
-    if (settings.save_sessions !== undefined) { prefUpdate.save_sessions = settings.save_sessions; hasPrefs = true; }
-    if (settings.anonymous_sharing !== undefined) { prefUpdate.anonymous_sharing = settings.anonymous_sharing; hasPrefs = true; }
-    if (hasPrefs) {
+    if (settings.ui_language !== undefined) prefUpdate.ui_language = settings.ui_language;
+    if (settings.save_sessions !== undefined) prefUpdate.save_sessions = settings.save_sessions;
+    if (settings.anonymous_sharing !== undefined) prefUpdate.anonymous_sharing = settings.anonymous_sharing;
+    if (settings.ui_language !== undefined || settings.save_sessions !== undefined || settings.anonymous_sharing !== undefined) {
       var r2 = await sb().from('user_preferences').upsert(prefUpdate, { onConflict: 'user_id' });
-      if (r2.error) { console.warn('save prefs:', r2.error.message); anyError = true; }
+      if (r2.error) {
+        errors.push('preferences: ' + r2.error.message);
+        console.warn('saveSettings preferences:', r2.error.message);
+      }
     }
 
-    cacheClear();
-    return !anyError;
+    // ── Always save to localStorage as backup ──
+    saveLocalSettings(settings);
+
+    var ok = errors.length === 0;
+    console.log('saveSettings:', { ok: ok, errors: errors });
+    return { ok: ok, errors: errors };
+  }
+
+  function saveLocalSettings(settings) {
+    try {
+      var existing = loadLocalSettings() || {};
+      if (settings.display_name !== undefined) existing.display_name = settings.display_name;
+      if (settings.native_lang !== undefined) existing.native_lang = settings.native_lang;
+      if (settings.ui_language !== undefined) existing.ui_language = settings.ui_language;
+      if (settings.save_sessions !== undefined) existing.save_sessions = settings.save_sessions;
+      if (settings.anonymous_sharing !== undefined) existing.anonymous_sharing = settings.anonymous_sharing;
+      localStorage.setItem('sottotitoli-settings', JSON.stringify(existing));
+    } catch(e) {}
+  }
+
+  /* ── Single field save (backward compat) ── */
+  async function saveProfileField(field, value) {
+    var s = {}; s[field] = value;
+    var r = await saveSettings(s);
+    return r.ok;
   }
 
   /* ── Listen for language changes ── */
@@ -621,6 +673,7 @@
     getAITokens: getAITokens,
     getCredits: getCredits,
     getPreferences: getPreferences,
+    loadSettings: loadSettings,
     saveProfileField: saveProfileField,
     saveSettings: saveSettings,
     getWordbanks: getWordbanks,

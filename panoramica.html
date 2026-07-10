@@ -1150,17 +1150,24 @@
       };
 
       // ═══ RENDER: Impostazioni ───
-      function renderSettings() {
+      async function renderSettings() {
+        // Always fetch fresh settings from Supabase (with localStorage fallback)
+        var s = null;
+        if (typeof SottotitoliData !== 'undefined' && SottotitoliData.loadSettings) {
+          s = await SottotitoliData.loadSettings();
+        }
+        if (!s) s = {};
+
         // Name
         var nameEl = document.getElementById('settingsName');
-        if (nameEl && !nameEl.value && profile) {
-          nameEl.value = profile.display_name || '';
-        }
+        if (nameEl && s.display_name) nameEl.value = s.display_name;
+
         // Email
         var emailEl = document.getElementById('settingsEmail');
         if (emailEl && meta && meta.email) {
           emailEl.textContent = meta.email.replace(/(.{2}).*(@.*)/, '$1****$2');
         }
+
         // Plan
         var planEl = document.getElementById('settingsPlan');
         if (planEl && credits) {
@@ -1168,35 +1175,31 @@
           planEl.setAttribute('data-i18n', credits.balanceMinutes > 15 ? 'standard_plan' : 'free_plan');
           planEl.style.color = credits.balanceMinutes > 15 ? 'var(--teal)' : 'var(--amber)';
         }
+
         // UI Language
         var uiLang = document.getElementById('settingsUiLang');
-        if (uiLang && !uiLang.dataset.loaded) {
-          uiLang.dataset.loaded = '1';
+        if (uiLang) {
           var currentUi = (typeof I18n !== 'undefined' && I18n.getLang) ? I18n.getLang() : 'it';
-          uiLang.value = currentUi;
+          uiLang.value = s.ui_language || currentUi;
         }
+
         // Native Language
         var natLang = document.getElementById('settingsNativeLang');
-        if (natLang && !natLang.dataset.loaded && profile) {
-          natLang.dataset.loaded = '1';
-          natLang.value = profile.native_lang || '';
-        }
-        // Privacy toggles — load from preferences
+        if (natLang) natLang.value = s.native_lang || '';
+
+        // Privacy toggles
         var saveSess = document.getElementById('settingsSaveSessions');
-        if (saveSess && !saveSess.dataset.loaded) {
-          saveSess.dataset.loaded = '1';
-          // Default: true (save sessions)
-          var saveVal = prefs && prefs.save_sessions !== undefined ? prefs.save_sessions : true;
+        if (saveSess) {
+          var saveVal = s.save_sessions !== undefined ? s.save_sessions : true;
           saveSess.checked = saveVal;
           saveSess.nextElementSibling.style.background = saveVal ? 'var(--teal)' : 'var(--line)';
           var knob1 = document.getElementById('settingsSaveSessionsKnob');
           if (knob1) knob1.style.transform = saveVal ? 'translateX(20px)' : 'translateX(0)';
         }
+
         var anonSh = document.getElementById('settingsAnonSharing');
-        if (anonSh && !anonSh.dataset.loaded) {
-          anonSh.dataset.loaded = '1';
-          // Default: false (no anonymous sharing)
-          var anonVal = prefs && prefs.anonymous_sharing !== undefined ? prefs.anonymous_sharing : false;
+        if (anonSh) {
+          var anonVal = s.anonymous_sharing !== undefined ? s.anonymous_sharing : false;
           anonSh.checked = anonVal;
           anonSh.nextElementSibling.style.background = anonVal ? 'var(--teal)' : 'var(--line)';
           var knob2 = document.getElementById('settingsAnonSharingKnob');
@@ -1726,147 +1729,83 @@
       });
     })();
 
-    /* ── Save all settings to Supabase ── */
-    async function saveSettings() {
-      var settings = {};
-
-      // Name
-      var nameEl = document.getElementById('settingsName');
-      if (nameEl) {
-        settings.display_name = nameEl.value.trim().substring(0, 20);
-      }
-
-      // UI Language
-      var uiEl = document.getElementById('settingsUiLang');
-      if (uiEl) {
-        settings.ui_language = uiEl.value;
-      }
-
-      // Native Language
-      var natEl = document.getElementById('settingsNativeLang');
-      if (natEl) {
-        settings.native_lang = natEl.value || null;
-      }
-
-      // Privacy toggles
-      var saveSessEl = document.getElementById('settingsSaveSessions');
-      if (saveSessEl) settings.save_sessions = saveSessEl.checked;
-      var anonShEl = document.getElementById('settingsAnonSharing');
-      if (anonShEl) settings.anonymous_sharing = anonShEl.checked;
-
-      var ok = await SottotitoliData.saveSettings(settings);
-
-      // Show toast always (even if save failed silently)
-      var toast = document.getElementById('toastMsg');
-      if (toast) { toast.textContent = ok ? '✓ Salvato con successo' : '⚠️ Accesso richiesto per salvare'; toast.classList.add('show'); setTimeout(function(){ toast.classList.remove('show'); }, 2500); }
-
-      // Flash saved msg
-      var msg = document.getElementById('settingsSavedMsg');
-      if (msg) { msg.style.display = 'inline'; setTimeout(function(){ msg.style.display = 'none'; }, 2500); }
-
-      if (!ok) return;
-
-      // Update visible references
-      if (settings.display_name) {
-        var heroEm = document.querySelector('.hero-content h2 em');
-        if (heroEm) heroEm.textContent = settings.display_name;
-        var ddName = document.getElementById('ddName');
-        if (ddName) ddName.textContent = settings.display_name;
-      }
-
-      // Switch UI language if changed
-      if (settings.ui_language && typeof I18n !== 'undefined' && I18n.setLang) {
-        I18n.setLang(settings.ui_language);
-      }
-
-      // Update local caches
-      var profile = window._sottotitoliProfile;
-      var prefs = window._sottotitoliPrefs;
-      if (profile) {
-        if (settings.display_name) profile.display_name = settings.display_name;
-        if (settings.native_lang !== undefined) profile.native_lang = settings.native_lang;
-      }
-      if (prefs) {
-        if (settings.save_sessions !== undefined) prefs.save_sessions = settings.save_sessions;
-        if (settings.anonymous_sharing !== undefined) prefs.anonymous_sharing = settings.anonymous_sharing;
-      }
-    }
-    // NOTE: Event listener handled by 🎯 standalone script below
+    // ── Settings save: single handler, no duplicates ──
+    // (the old inline saveSettings function is removed — only the 🎯 standalone below handles saves)
   </script>
 
-<!-- 🎯 STANDALONE SETTINGS SAVE — guaranteed to work 🎯 -->
+<!-- 🎯 SETTINGS SAVE — single unified handler 🎯 -->
 <script>
 (function(){
   'use strict';
   var btn = document.getElementById('saveSettingsBtn');
   if (!btn) return;
-  
+
   // ── Load email when settings panel opens ──
   function loadEmail() {
     var emailEl = document.getElementById('settingsEmail');
     if (!emailEl || emailEl.textContent.trim() !== '—') return;
-    // Try to get email from Supabase session
     try {
       if (window.sottotitoliSupabase) {
         window.sottotitoliSupabase.auth.getSession().then(function(r){
           var email = r.data?.session?.user?.email;
-          if (email && emailEl) {
-            emailEl.textContent = email.replace(/(.{2}).*(@.*)/, '$1****$2');
-          }
+          if (email && emailEl) emailEl.textContent = email.replace(/(.{2}).*(@.*)/, '$1****$2');
         });
       }
     } catch(e) {}
   }
-  // Load on settings panel open
   var impNav = document.querySelector('[data-panel="impostazioni"]');
   if (impNav) impNav.addEventListener('click', function(){ setTimeout(loadEmail, 200); });
   loadEmail();
-  
-  // ── Save handler ──
+
+  // ── Save handler (only one!) ──
   btn.addEventListener('click', async function(){
     var settings = {};
-    
     var nameEl = document.getElementById('settingsName');
     if (nameEl) settings.display_name = nameEl.value.trim().substring(0, 20);
-    
     var uiEl = document.getElementById('settingsUiLang');
     if (uiEl) settings.ui_language = uiEl.value;
-    
     var natEl = document.getElementById('settingsNativeLang');
     if (natEl) settings.native_lang = natEl.value || null;
-    
     var saveSessEl = document.getElementById('settingsSaveSessions');
     if (saveSessEl) settings.save_sessions = saveSessEl.checked;
-    
     var anonShEl = document.getElementById('settingsAnonSharing');
     if (anonShEl) settings.anonymous_sharing = anonShEl.checked;
-    
-    // ── Green flash on button ──
+
+    // Green flash
     var origBg = btn.style.background;
     btn.style.background = 'var(--green, #059669)';
     btn.style.transition = 'background 0.15s ease';
     setTimeout(function(){ btn.style.background = origBg; }, 800);
-    
-    // Try to save via SottotitoliData
-    var ok = false;
+
+    // Save via unified API → returns { ok, errors }
+    var result = { ok: false, errors: ['Nessuna connessione'] };
     try {
       if (typeof SottotitoliData !== 'undefined' && SottotitoliData.saveSettings) {
-        ok = await SottotitoliData.saveSettings(settings);
+        result = await SottotitoliData.saveSettings(settings);
       }
-    } catch(e) { console.warn('Settings save error:', e); }
-    
-    // Show toast
+    } catch(e) { result = { ok: false, errors: [e.message] }; }
+
+    // Toast with clear feedback
     var toast = document.getElementById('toastMsg');
     if (toast) {
-      toast.textContent = ok ? '🎯 Salvato con successo' : '🎯 Salvato (locale)';
+      if (result.ok) {
+        toast.textContent = '✓ Salvato su Supabase';
+        toast.style.background = 'var(--green, #059669)';
+      } else if (result.errors && result.errors[0] && result.errors[0].indexOf('locally') !== -1) {
+        toast.textContent = '⚠️ Salvato in locale (accedi per sync)';
+        toast.style.background = 'var(--amber, #d97706)';
+      } else {
+        toast.textContent = '⚠️ ' + (result.errors ? result.errors[0] : 'Errore sconosciuto');
+        toast.style.background = 'var(--red, #dc2626)';
+      }
       toast.classList.add('show');
-      setTimeout(function(){ toast.classList.remove('show'); }, 3000);
+      setTimeout(function(){ toast.classList.remove('show'); toast.style.background = ''; }, 3500);
     }
-    
+
     // Flash saved msg
     var msg = document.getElementById('settingsSavedMsg');
     if (msg) { msg.style.display = 'inline'; setTimeout(function(){ msg.style.display = 'none'; }, 3000); }
-    
+
     // Update hero + dropdown name
     if (settings.display_name) {
       var heroEm = document.querySelector('.hero-content h2 em');
@@ -1874,25 +1813,27 @@
       var ddName = document.getElementById('ddName');
       if (ddName) ddName.textContent = settings.display_name;
     }
-    
-    // Switch UI language
+
+    // Switch UI language if changed
     if (settings.ui_language && typeof I18n !== 'undefined' && I18n.setLang) {
       I18n.setLang(settings.ui_language);
     }
-    
-    // Update local caches so other panels see changes immediately
+
+    // Update local caches
     var profile = window._sottotitoliProfile;
-    var prefs = window._sottotitoliPrefs;
     if (profile) {
       if (settings.display_name) profile.display_name = settings.display_name;
       if (settings.native_lang !== undefined) profile.native_lang = settings.native_lang;
     }
+    var prefs = window._sottotitoliPrefs;
     if (prefs) {
       if (settings.save_sessions !== undefined) prefs.save_sessions = settings.save_sessions;
       if (settings.anonymous_sharing !== undefined) prefs.anonymous_sharing = settings.anonymous_sharing;
     }
+
+    console.log('🎯 Settings saved:', result);
   });
-  
+
   console.log('🎯 Settings save handler attached');
 })();
 </script>
