@@ -700,6 +700,8 @@
         settingsData = await SottotitoliData.loadSettings();
       }
       window._settingsData = settingsData;
+      // Apply saved theme immediately
+      if (settingsData && settingsData.theme) applyTheme(settingsData.theme);
 
       // ── If not logged in, still render what we can ──
       if (!meta) {
@@ -1266,6 +1268,27 @@
           var knob2 = document.getElementById('settingsAnonSharingKnob');
           if (knob2) knob2.style.transform = anonVal ? 'translateX(20px)' : 'translateX(0)';
         }
+
+        // Aspetto — Theme
+        var themeEl = document.getElementById('settingsTheme');
+        if (themeEl) { themeEl.value = s.theme || 'auto'; applyTheme(s.theme || 'auto'); }
+
+        // Aspetto — Font
+        var fontEl = document.getElementById('settingsFont');
+        if (fontEl) fontEl.value = s.font_pref || 'sans';
+      }
+
+      // ── Apply theme immediately (called from settings + on page load) ──
+      function applyTheme(t) {
+        if (t === 'auto') {
+          // Auto: use system preference
+          t = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+        }
+        document.documentElement.setAttribute('data-theme', t);
+        localStorage.setItem('sottotitoli-theme', t);
+        // Update theme toggle button text
+        var tt = document.querySelector('#themeToggle .theme-text');
+        if (tt) tt.textContent = t === 'dark' ? 'Light' : 'Dark';
       }
 
       // ═══ RENDER: Report AI ───
@@ -1828,6 +1851,10 @@
   if (impNav) impNav.addEventListener('click', function(){ setTimeout(loadEmail, 200); });
   loadEmail();
 
+  // ── Theme select: apply immediately on change ──
+  var themeSel = document.getElementById('settingsTheme');
+  if (themeSel) themeSel.addEventListener('change', function(){ applyTheme(this.value); });
+
   // ── Save handler (only one!) ──
   btn.addEventListener('click', async function(){
     var settings = {};
@@ -1842,6 +1869,10 @@
     if (saveSessEl) settings.save_sessions = saveSessEl.checked;
     var anonShEl = document.getElementById('settingsAnonSharing');
     if (anonShEl) settings.anonymous_sharing = anonShEl.checked;
+    var themeEl = document.getElementById('settingsTheme');
+    if (themeEl) settings.theme = themeEl.value;
+    var fontEl = document.getElementById('settingsFont');
+    if (fontEl) settings.font_pref = fontEl.value;
 
     // Green flash
     var origBg = btn.style.background;

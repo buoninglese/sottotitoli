@@ -245,7 +245,7 @@
 
     var _a = await Promise.all([
       sb().from('profiles').select('full_name,display_name,native_lang').eq('id', userId).maybeSingle(),
-      sb().from('user_preferences').select('ui_language,save_sessions,anonymous_sharing').eq('user_id', userId).maybeSingle()
+      sb().from('user_preferences').select('ui_language,save_sessions,anonymous_sharing,theme,font_pref').eq('user_id', userId).maybeSingle()
     ]);
 
     var profileR = _a[0], prefsR = _a[1];
@@ -260,7 +260,9 @@
       native_lang: profile.native_lang || '',
       ui_language: prefs.ui_language || 'it',
       save_sessions: prefs.save_sessions !== undefined ? prefs.save_sessions : true,
-      anonymous_sharing: prefs.anonymous_sharing !== undefined ? prefs.anonymous_sharing : false
+      anonymous_sharing: prefs.anonymous_sharing !== undefined ? prefs.anonymous_sharing : false,
+      theme: prefs.theme || 'auto',
+      font_pref: prefs.font_pref || 'sans'
     };
 
     // Fallback: merge with localStorage for any missing fields
@@ -325,7 +327,9 @@
     if (settings.ui_language !== undefined) prefUpdate.ui_language = settings.ui_language;
     if (settings.save_sessions !== undefined) prefUpdate.save_sessions = settings.save_sessions;
     if (settings.anonymous_sharing !== undefined) prefUpdate.anonymous_sharing = settings.anonymous_sharing;
-    if (settings.ui_language !== undefined || settings.save_sessions !== undefined || settings.anonymous_sharing !== undefined) {
+    if (settings.theme !== undefined) prefUpdate.theme = settings.theme;
+    if (settings.font_pref !== undefined) prefUpdate.font_pref = settings.font_pref;
+    if (settings.ui_language !== undefined || settings.save_sessions !== undefined || settings.anonymous_sharing !== undefined || settings.theme !== undefined || settings.font_pref !== undefined) {
       var r2 = await sb().from('user_preferences').upsert(prefUpdate, { onConflict: 'user_id' });
       if (r2.error) {
         errors.push('preferences: ' + r2.error.message);
@@ -349,6 +353,8 @@
       if (settings.ui_language !== undefined) existing.ui_language = settings.ui_language;
       if (settings.save_sessions !== undefined) existing.save_sessions = settings.save_sessions;
       if (settings.anonymous_sharing !== undefined) existing.anonymous_sharing = settings.anonymous_sharing;
+      if (settings.theme !== undefined) existing.theme = settings.theme;
+      if (settings.font_pref !== undefined) existing.font_pref = settings.font_pref;
       localStorage.setItem('sottotitoli-settings', JSON.stringify(existing));
     } catch(e) {}
   }
