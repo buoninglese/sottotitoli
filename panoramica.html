@@ -1039,7 +1039,7 @@
           var favClass = s.favorite ? ' active' : '';
           html += '<div class="term-row" data-sid="' + (s.id||'') + '">' +
             '<span style="width:32px;flex-shrink:0;display:flex;align-items:center"><input type="checkbox" class="session-checkbox" data-sid="' + (s.id||'') + '" onchange="updateDeleteBtn()" style="accent-color:var(--teal);width:15px;height:15px;cursor:pointer"></span>' +
-            '<span style="flex:2;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + name.replace(/"/g,'&quot;') + '">' + name + '</span>' +
+            '<span style="flex:2;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:text" title="Clicca per rinominare" onclick="event.stopPropagation();renameSession(this,\'' + (s.id||'') + '\')">' + name + '</span>' +
             '<span style="flex:0.7;text-align:right;font-weight:600;font-size:13px">' + words + '</span>' +
             '<span style="flex:1;text-align:right;font-size:12px;color:var(--text-faint)">' + dateStr + '</span>' +
             '<span style="flex:0.7;text-align:right;font-weight:600;color:' + qColor + ';font-size:13px">' + quality + '</span>' +
@@ -1106,6 +1106,28 @@
         }
       }
 
+      // ── Rename session (inline edit) ──
+      async function renameSession(span, sid) {
+        var oldName = span.textContent.trim();
+        var input = document.createElement('input');
+        input.value = oldName;
+        input.style.cssText = 'width:100%;border:none;outline:none;background:transparent;font:inherit;color:var(--text);padding:0;margin:0';
+        span.textContent = '';
+        span.appendChild(input);
+        input.focus();
+        input.select();
+        var save = async function(){
+          var newName = input.value.trim() || oldName;
+          span.textContent = newName;
+          try {
+            var sb = window.sottotitoliSupabase;
+            if (sb) await sb.from('sessions').update({ name: newName }).eq('id', sid);
+          } catch(e) {}
+        };
+        input.addEventListener('blur', save);
+        input.addEventListener('keydown', function(e){ if (e.key === 'Enter') { input.blur(); } });
+      }
+
       // ── Delete single session ──
       async function deleteSession(sid, el) {
         if (!confirm('Eliminare questa sessione?')) return;
@@ -1170,18 +1192,19 @@
         var total = refs ? (refs.total || 0) : 0;
         var active = refs ? (refs.active || 0) : 0;
         var earned = refs ? (refs.earnedMinutes || 0) : 0;
-        // Update stat cards
-        var statCards = document.querySelectorAll('#pnl-invita .metric-card');
-        if (statCards.length >= 2) {
-          statCards[0].querySelector('.metric-value').textContent = total;
-          statCards[1].querySelector('.metric-value').textContent = active;
-        }
+        // Update metric cards by ID
+        var cd = document.getElementById('invCreditiDisp');
+        var ia = document.getElementById('invInAttesa');
+        var tc = document.getElementById('invTassoConv');
+        if (cd) cd.textContent = earned;
+        if (ia) ia.textContent = total - active;
+        if (tc) tc.textContent = total > 0 ? Math.round(active / total * 100) + '%' : '0%';
         // Update big numbers (Invitati/Attivo/Guadagnati)
         var bigNums = document.querySelectorAll('#pnl-invita [style*="font-size:36px"]');
         if (bigNums.length >= 3) {
           bigNums[0].textContent = total;
           bigNums[1].textContent = active;
-          bigNums[2].innerHTML = '+' + earned + '<span style="font-size:16px">min</span>';
+          bigNums[2].innerHTML = '+' + earned + '<span style="font-size:18px">min</span>';
         }
         // Update referral link with real user code
         if (meta) {
