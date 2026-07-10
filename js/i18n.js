@@ -243,6 +243,9 @@
 
       // ── Impostazioni ──
       "save_settings": "Salva impostazioni",
+      "website_language": "Lingua del sito",
+      "anonymous_sharing_label": "Condivisione anonima",
+      "saved_check": "✓ Salvato",
       "privacy_sessions_info": "Quando attivo, le tue sessioni (trascrizioni, parole, metriche) vengono salvate su Supabase e compaiono nella tab Trascrizioni. Disattiva se preferisci non conservare lo storico.",
       "privacy_anon_info": "Se attivo, dati anonimi sulle tue sessioni (mai il contenuto delle trascrizioni) possono essere usati per migliorare i modelli di analisi. Nessun dato personale viene mai condiviso.",
       "your_name": "Il tuo nome",
@@ -278,7 +281,9 @@
       "academic": "Accademico",
       "technical": "Tecnico",
       "standard": "Standard",
+      "standard_plan": "Standard",
       "free": "Gratuito",
+      "free_plan": "Gratuito",
 
       // ── Profilo Linguistico chips ──
       "work": "Lavoro",
@@ -574,6 +579,9 @@
 
       // ── Impostazioni ──
       "save_settings": "Save settings",
+      "website_language": "Website language",
+      "anonymous_sharing_label": "Anonymous sharing",
+      "saved_check": "✓ Saved",
       "privacy_sessions_info": "When enabled, your sessions (transcripts, words, metrics) are saved to Supabase and appear in the Sessions tab. Disable if you prefer not to keep history.",
       "privacy_anon_info": "When enabled, anonymous data about your sessions (never the transcript content) may be used to improve analysis models. No personal data is ever shared.",
       "your_name": "Your name",
@@ -609,7 +617,9 @@
       "academic": "Academic",
       "technical": "Technical",
       "standard": "Standard",
+      "standard_plan": "Standard",
       "free": "Free",
+      "free_plan": "Free",
 
       // ── Profilo Linguistico chips ──
       "work": "Work",
