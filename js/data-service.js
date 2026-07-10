@@ -117,6 +117,9 @@
     var thisWeekSessions = thisWeek.length;
     var dailyAverageMinutes = thisWeekSessions > 0 ? Math.round(thisWeekMinutes / Math.min(7, thisWeekSessions)) : 0;
 
+    var totalHours = Math.round(totalSeconds / 3600);
+    var totalMinutes = Math.round(totalSeconds / 60);
+
     var data = {
       totalSessions: totalSessions,
       totalHours: totalHours,
