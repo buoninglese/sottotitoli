@@ -143,21 +143,16 @@
     limit = limit || 20;
     var userId = await getUserId();
     if (!userId) return [];
-    var cacheKey = 'sessions_' + lang;
-    var cached = cacheGet(cacheKey);
-    if (cached) return cached.slice(0, limit);
 
     var r = await sb().from('sessions')
-      .select('id,name,started_at,duration_seconds,words_count,favorite,language_pair,session_type')
+      .select('id,name,started_at,duration_seconds,words_count,favorite,language_pair,session_type,quality_score')
       .eq('user_id', userId)
       .like('language_pair', lang + '%')
       .order('started_at', { ascending: false })
       .limit(limit);
 
     if (r.error) { console.warn('sessions:', r.error.message); return []; }
-    var data = r.data || [];
-    cacheSet(cacheKey, data);
-    return data;
+    return r.data || [];
   }
 
   /* ═══════════════════════════════════════════
