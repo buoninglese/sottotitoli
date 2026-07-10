@@ -1199,46 +1199,26 @@
         var p = profile;
         var displayName = p.display_name || '';
         var s = currentStats();
+        
         // Update hero + dropdown with display name
         if (displayName) {
           var heroEm = document.querySelector('.hero-content h2 em');
           if (heroEm) heroEm.textContent = displayName;
-          var dd = document.getElementById('userDropdown');
-          if (dd) {
-            var dItems = dd.querySelectorAll('.dropdown-item');
-            if (dItems.length > 0) dItems[0].textContent = displayName;
-          }
         }
-        // Update name card and attività card
-        document.querySelectorAll('#pnl-profilo .alt-card').forEach(function (card) {
-          var h3 = card.querySelector('h3');
-          if (!h3) return;
-          var t = h3.textContent;
-          if (t.indexOf('Seba B.') !== -1 || t.indexOf('...') !== -1 || t.indexOf(displayName) !== -1) {
-            h3.textContent = displayName || '—';
-            var rows = card.querySelectorAll('[style*="justify-content:space-between"]');
-            rows.forEach(function (row) {
-              var spans = row.querySelectorAll('span');
-              if (spans.length < 2) return;
-              var label = spans[0].textContent.trim();
-              if (label === 'Membro da') spans[1].textContent = p.created_at ? new Date(p.created_at).toLocaleDateString('it-IT', { month: 'long', year: 'numeric' }) : '—';
-              if (label === 'Piano') spans[1].textContent = (credits && credits.balanceMinutes > 15) ? 'Standard' : 'Gratuito';
-              if (label === 'Lingua madre') spans[1].textContent = p.native_lang === 'nl' ? 'Olandese' : p.native_lang === 'it' ? 'Italiano' : p.native_lang === 'en' ? 'Inglese' : (p.native_lang || '—');
-            });
-          }
-          // ── Attività card — use real session stats ──
-          if (t.indexOf('Attività') !== -1 && s) {
-            var aRows = card.querySelectorAll('[style*="justify-content:space-between"]');
-            aRows.forEach(function (row) {
-              var spans = row.querySelectorAll('span');
-              if (spans.length < 2) return;
-              var label = spans[0].textContent.trim();
-              if (label === 'Sessioni totali') spans[1].textContent = String(s.totalSessions);
-              if (label === 'Ore parlate') spans[1].textContent = String(Math.round(s.totalMinutes / 60));
-              if (label === 'Parole uniche') spans[1].textContent = (s.totalWords || 0).toLocaleString();
-            });
-          }
-        });
+
+        // ── Attività card — use real session stats (by ID, not label matching) ──
+        var elSessions = document.getElementById('profileTotalSessions');
+        var elHours = document.getElementById('profileTotalHours');
+        var elWords = document.getElementById('profileTotalWords');
+        var elStreak = document.getElementById('profileStreak');
+        if (s) {
+          if (elSessions) elSessions.textContent = s.totalSessions || 0;
+          if (elHours) elHours.textContent = Math.round((s.totalMinutes || 0) / 60);
+          if (elWords) elWords.textContent = (s.totalWords || 0).toLocaleString();
+        }
+        // Consecutive days — from stats or fallback
+        if (elStreak) elStreak.textContent = (s && s.thisWeekSessions) ? s.thisWeekSessions : '—';
+
         // Display name input
         var dni = document.getElementById('displayNameInput');
         if (dni && !dni.value) {
