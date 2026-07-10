@@ -33,23 +33,10 @@ h1{font-size:30px;font-weight:800;letter-spacing:-.03em}
 .play-dot{width:6px;height:6px;border-radius:50%;background:var(--green);animation:playPulse 1s infinite}
 @keyframes playPulse{0%,100%{opacity:1}50%{opacity:.3}}
 
-/* Shared word editor */
-.wp{display:none;position:fixed;z-index:999;background:var(--card);border:1.5px solid var(--accent);border-radius:10px;padding:12px 14px;box-shadow:0 12px 40px rgba(0,0,0,.6);min-width:160px}
-.wp.on{display:block}
-.wp input{width:100%;background:var(--bg);border:1px solid var(--line);border-radius:6px;color:var(--text);font:inherit;font-size:13px;padding:7px 10px;outline:none}
-.wp input:focus{border-color:var(--accent)}
-.wp .wa{display:flex;gap:5px;margin-top:7px}
-.wp .wa button{font-size:11px;font-weight:600;padding:4px 10px;border-radius:5px;border:none;cursor:pointer}
-.wps{background:var(--accent);color:#fff}
-.wpc{background:var(--line);color:var(--t2)}
-
-/* Word spans — shared interactive style */
-.word{display:inline-block;padding:0 1px;border-radius:3px;transition:all .1s;cursor:pointer;position:relative}
-.word:hover{background:rgba(59,130,246,.25);outline:1.5px dashed rgba(59,130,246,.5)}
+/* Word spans — visual only (no click-to-edit) */
+.word{display:inline-block;padding:0 1px;border-radius:2px}
 .word.alt{color:var(--amber);text-decoration:underline wavy rgba(245,158,11,.35);text-underline-offset:4px}
 .sel{outline:2px solid var(--accent);outline-offset:-2px;border-radius:5px;background:rgba(124,58,237,.1)!important;transition:all .15s}
-@keyframes pop{0%{transform:scale(1)}50%{transform:scale(1.1);background:rgba(124,58,237,.25)}100%{transform:scale(1)}}
-.pop{animation:pop .25s ease-out}
 
 /* Smooth scrolling + GPU hints */
 .mc *{will-change:transform,opacity}
@@ -583,41 +570,13 @@ function advanceDemo(id){
 // ═══ Stop any demo if user scrolls/interacts with the card body ═══
 // (Keep it simple — clicking play is the only control)
 
-// ═══ WORD CLICK EDITOR ═══
+// ═══ Global: click sentence to select ═══
 document.addEventListener('click',function(e){
-  var word=e.target.closest('.word');
-  if(!word)return;
-  document.querySelectorAll('.wp').forEach(function(p){p.remove()});
-  var popup=document.createElement('div');
-  popup.className='wp on';
-  popup.innerHTML='<input value="'+word.textContent.replace(/"/g,'&quot;')+'"><div class="wa"><button class="wps" onclick="saveWord(this)">Save</button><button class="wpc" onclick="this.closest(\'.wp\').remove()">Cancel</button></div>';
-  word.appendChild(popup);
-  word.classList.add('pop');
-  setTimeout(function(){word.classList.remove('pop')},250);
-  setTimeout(function(){var i=popup.querySelector('input');if(i){i.focus();i.select()}},10);
-});
-document.addEventListener('click',function(e){
-  if(!e.target.closest('.wp')&&!e.target.closest('.word')){
-    document.querySelectorAll('.wp').forEach(function(p){p.remove()});
-  }
-});
-function saveWord(btn){
-  var popup=btn.closest('.wp');
-  var word=popup.parentElement;
-  var input=popup.querySelector('input');
-  if(input&&input.value.trim()){word.textContent=input.value.trim();word.classList.add('pop');setTimeout(function(){word.classList.remove('pop')},250)}
-  popup.remove();
-}
-
-// ═══ Global: click sentence to select (not when clicking a word or button) ═══
-document.addEventListener('click',function(e){
-  if(e.target.closest('.word')||e.target.closest('.wp')||e.target.closest('button')||e.target.closest('input')||e.target.closest('select'))return;
-  // Find nearest sentence element (direct child of a variation body)
+  if(e.target.closest('button')||e.target.closest('input')||e.target.closest('select'))return;
   var el=e.target;
   while(el&&!el.classList.contains('mc')){
-    // Check if this element looks like a sentence (has class like v1b, v2i, v3r, etc.)
     var cn=el.className&&el.className.split?el.className.split(' ')[0]:'';
-    if(/^v\d/.test(cn)&&el.parentElement&&el.parentElement.classList.contains('mc')===false&&el.closest('.mc')){
+    if(/^v\d/.test(cn)&&el.parentElement&&!el.parentElement.classList.contains('mc')&&el.closest('.mc')){
       el.classList.toggle('sel');
       return;
     }
