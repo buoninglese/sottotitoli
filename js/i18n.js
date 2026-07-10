@@ -766,7 +766,11 @@
     if (_loaded) return _lang;
     _loaded = true;
     var lang = detectLang();
-    // Try Supabase first
+
+    // Inject toggle immediately — don't wait for Supabase
+    injectLangToggle();
+
+    // Try Supabase for saved language preference
     try {
       var sb = window.sottotitoliSupabase;
       if (sb) {
@@ -782,8 +786,6 @@
         }
       }
     } catch(e) {}
-    // Inject language toggle into user dropdown
-    injectLangToggle();
     return setLang(lang);
   }
 
