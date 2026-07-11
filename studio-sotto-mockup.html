@@ -6236,16 +6236,28 @@ window.fixExtrasPanelColors = function(){
     });
     observer.observe(ct, { childList: true });
 
-    // Reset V20quint state when starting a new session
+    // Reset V20quint state when starting a new session.
+    // The original toggleSession does transcript.innerHTML='' which destroys
+    // #v20qContent (it's a child of #captionTranscript). We must recreate it.
     var origToggle = window.toggleSession;
     if (typeof origToggle === 'function') {
       window.toggleSession = function(){
         var wasActive = document.body.classList.contains('session-active');
         var result = origToggle.apply(this, arguments);
         if (!wasActive) {
+          // Ensure #v20qContent exists (may have been destroyed by innerHTML='')
+          var ct2 = document.getElementById('captionTranscript');
+          var vc = document.getElementById('v20qContent');
+          if (ct2 && !vc) {
+            var div = document.createElement('div');
+            div.className = 'v20q-content';
+            div.id = 'v20qContent';
+            ct2.appendChild(div);
+          }
           v20q.sentences = []; v20q.sIdx = 0; v20q.words = [];
           v20q.baseSec = Math.floor(Math.random() * 120);
-          var c2 = document.getElementById('v20qContent'); if (c2) c2.innerHTML = '';
+          vc = document.getElementById('v20qContent');
+          if (vc) vc.innerHTML = '';
           v20q_updateBadge();
         }
         return result;
