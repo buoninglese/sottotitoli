@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="it" data-theme="light" data-caption-mode="j7b" class="font-crisp" data-v20q="28">
+<html lang="it" data-theme="light" data-caption-mode="j7b" class="font-crisp" data-v20q="29">
 <head>
 <meta charset="utf-8">
 <link rel="icon" type="image/svg+xml" href="favicon.svg">
@@ -925,7 +925,7 @@ button[onclick*="addToWordBank"]:hover{background:rgba(52,211,153,.15)!important
   <div style="display:flex;align-items:center;gap:8px">
     <a href="panoramica.html" class="topbar-brand">sotto<span>titoli</span></a>
     <span class="trial-pill">Pro</span>
-    <span style="font-size:9px;color:var(--muted2);font-family:monospace;opacity:.5;margin-left:2px" title="V20quint version">v28</span>
+    <span style="font-size:9px;color:var(--muted2);font-family:monospace;opacity:.5;margin-left:2px" title="V20quint version">v29</span>
     <a href="panoramica.html" style="text-decoration:none;color:var(--text-soft);font-size:13px;font-weight:500;margin-left:4px">← Dashboard</a>
   </div>
   <div style="flex:1;display:flex;justify-content:center;align-items:center;gap:8px">
@@ -1126,34 +1126,30 @@ button[onclick*="addToWordBank"]:hover{background:rgba(52,211,153,.15)!important
           </div>
         </div>
       </section>
-      <!-- PANEL 4: Live Analysis (swapped: transcript left, grammar lines right) -->
+      <!-- PANEL 4: Live Analysis — transcript lines right, POS tags left for selected sentence -->
       <section class="h-panel h-panel-scroll" id="liveAnalysisPanel">
         <div class="h-panel-inner">
           <div class="slide-split" style="flex:1;min-height:0">
-            <div class="slide-main" style="min-height:0;overflow:hidden">
+            <div class="slide-main" style="min-height:0;overflow-y:auto">
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+                <span style="font-size:10px;color:var(--muted2);text-transform:uppercase;letter-spacing:.5px">POS Tags</span>
+                <div style="display:flex;gap:3px" id="posFilterPills2">
+                  <button class="toggle-pill on" onclick="_filterPOS2('ALL',this)" style="font-size:9px;padding:3px 8px">ALL</button>
+                  <button class="toggle-pill" onclick="_filterPOS2('Nouns',this)" style="font-size:9px;padding:3px 8px">N</button>
+                  <button class="toggle-pill" onclick="_filterPOS2('Adjectives',this)" style="font-size:9px;padding:3px 8px">ADJ</button>
+                  <button class="toggle-pill" onclick="_filterPOS2('Verbs',this)" style="font-size:9px;padding:3px 8px">V</button>
+                </div>
+              </div>
+              <div id="gvSelectedPOS" style="flex:1;overflow-y:auto;min-height:0">
+                <div style="text-align:center;padding:20px;color:var(--muted2);font-size:13px">Click a line → to see POS tags here.</div>
+              </div>
+            </div>
+            <div class="slide-side">
               <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
                 <span style="font-size:10px;color:var(--muted2);text-transform:uppercase;letter-spacing:.5px">Transcript</span>
                 <div style="display:flex;align-items:center;gap:2px">
                   <button class="grammar-font-btn" onclick="adjustGrammarFont(-1)" title="Smaller">A⁻</button>
                   <span id="grammarFontSize2" style="font-size:10px;color:var(--muted);min-width:28px;text-align:center;font-family:'JetBrains Mono',monospace">15px</span>
-                  <button class="grammar-font-btn" onclick="adjustGrammarFont(1)" title="Larger">A⁺</button>
-                </div>
-              </div>
-              <div class="transcript-line-box" id="gvTranscriptLines" style="font-size:13px;flex:1;overflow-y:auto">
-                <div style="text-align:center;padding:20px;color:var(--muted);font-size:13px">No sentences yet. Speak to see each word tagged with its POS, pronoun type, and verb tense.</div>
-              </div>
-            </div>
-            <div class="slide-side">
-              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
-                <div style="display:flex;gap:3px" id="posFilterPills2">
-                  <button class="toggle-pill on" onclick="_filterSynByPOS('ALL',this)" style="font-size:9px;padding:3px 8px">ALL</button>
-                  <button class="toggle-pill" onclick="_filterSynByPOS('Nouns',this)" style="font-size:9px;padding:3px 8px">N</button>
-                  <button class="toggle-pill" onclick="_filterSynByPOS('Adjectives',this)" style="font-size:9px;padding:3px 8px">ADJ</button>
-                  <button class="toggle-pill" onclick="_filterSynByPOS('Verbs',this)" style="font-size:9px;padding:3px 8px">V</button>
-                </div>
-                <div style="display:flex;align-items:center;gap:2px">
-                  <button class="grammar-font-btn" onclick="adjustGrammarFont(-1)" title="Smaller">A⁻</button>
-                  <span id="grammarFontSize3" style="font-size:10px;color:var(--muted);min-width:28px;text-align:center;font-family:'JetBrains Mono',monospace">15px</span>
                   <button class="grammar-font-btn" onclick="adjustGrammarFont(1)" title="Larger">A⁺</button>
                 </div>
               </div>
@@ -2102,9 +2098,30 @@ function _updateGrammarLines() {
       tlines = box.querySelectorAll('.tline');
     }
   }
-  // ── Mirror to slide 4 right panel ──
-  var box3 = document.getElementById('gvTranscriptLines2');
-  if (box3 && box) { box3.innerHTML = box.innerHTML; }
+  // ── Slide 4 right panel: independent transcript lines ──
+  var box4 = document.getElementById('gvTranscriptLines2');
+  if (box4 && lines.length) {
+    if (newStart === 0) box4.innerHTML = '';
+    var MAX_S4 = 15;
+    for (var i = newStart; i < lines.length; i++) {
+      var l = lines[i];
+      var clone = l.cloneNode(true);
+      var tsSpan = clone.querySelector('span'); var tsText = tsSpan ? tsSpan.textContent : '';
+      if (tsSpan) tsSpan.remove();
+      var spkTag = clone.querySelector('.spk-tag'); if (spkTag) spkTag.remove();
+      var txt = (clone.textContent || '').trim(); if (!txt) continue;
+      var lastTline = box4.querySelector('.tline:last-child');
+      if (lastTline && lastTline.getAttribute('data-text') === txt.replace(/"/g, '&quot;')) continue;
+      var div = document.createElement('div');
+      div.className = 'tline';
+      div.setAttribute('onclick', '_s4LineClick(this)');
+      div.setAttribute('data-text', txt.replace(/"/g, '&quot;'));
+      div.innerHTML = '<span class="ts">' + tsText + '</span>' + txt;
+      box4.appendChild(div);
+    }
+    var tlines4 = box4.querySelectorAll('.tline');
+    while (tlines4.length > MAX_S4) { tlines4[0].remove(); tlines4 = box4.querySelectorAll('.tline'); }
+  }
   
   // ── Pill transcript view (Panel 5) — maintain last 15 lines ──
   var pills = document.getElementById('gvTranscriptPills');
@@ -2302,38 +2319,64 @@ function _refreshMetricsPanel() {
   }
 }
 // Click a line in grammar/analysis slide → show SYN cards
-function _slideLineClick(el) {
-  document.querySelectorAll('.tline').forEach(function(l){l.style.background=''});
+function _s4LineClick(el) {
+  // Highlight selected line in slide 4
+  var box4 = document.getElementById('gvTranscriptLines2');
+  if (box4) { box4.querySelectorAll('.tline').forEach(function(l){l.style.background=''}); }
   el.style.background = 'rgba(124,58,237,.1)';
   var text = el.getAttribute('data-text') || '';
-  // Populate the grammar slide SYN area
-  var main = document.getElementById('grammarSynMain');
-  if (main) {
-    var words = text.split(/\s+/).filter(function(w){return w.replace(/[^a-zA-Z]/g,'').length>1});
-    var html = '';
-    html += '<div id="grammarSynCardsGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:8px">';
-    var ts = Date.now();
-    words.forEach(function(w, i){
-      var cardId = 'gsyn-' + ts + '-' + i;
-      html += '<div class="syn-card" id="' + cardId + '" data-word="' + w + '" style="background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px;position:relative">';
-      html += '<div style="position:absolute;top:8px;right:8px;display:flex;gap:4px;z-index:2">';
-      html += '<button onclick="this.classList.toggle(\'saved\');this.textContent=this.classList.contains(\'saved\')?\'✓\':\'+\'" style="width:24px;height:24px;border-radius:50%;border:1px solid var(--line);background:var(--card2);color:var(--muted2);cursor:pointer;font-size:20px;display:flex;align-items:center;justify-content:center;line-height:1" title="Add to word bank">+</button>';
-      html += '<button onclick="var c=document.getElementById(\''+cardId+'\');c.style.opacity=\'0\';c.style.transform=\'scale(.95)\';c.style.transition=\'all .2s\';setTimeout(function(){c.remove()},200)" style="width:24px;height:24px;border-radius:50%;border:1px solid var(--line);background:var(--card2);color:var(--muted2);cursor:pointer;font-size:20px;display:flex;align-items:center;justify-content:center;line-height:1" title="Dismiss">×</button>';
-      html += '</div>';
-      html += '<div style="margin-bottom:2px;padding-right:56px"><span class="syn-base-word" data-word="' + w + '" data-context="' + text.slice(0,30) + '" onclick="event.stopPropagation();lookupSynonym(this)" style="font-size:17px;font-weight:700;color:var(--text);cursor:pointer">' + w + '</span></div>';
-      html += '<div style="margin-bottom:6px;padding-right:56px"><span style="font-size:12px;font-weight:600;text-transform:uppercase;padding:2px 8px;border-radius:100px;background:rgba(167,139,250,.15);color:var(--accent2)">' + (typeof _getPOS==='function'?_getPOS(w):'—') + '</span></div>';
-      html += '<div style="font-size:14px;color:var(--muted);line-height:1.5;margin-bottom:6px" class="syn-def">Loading…</div>';
-      html += '<div style="display:flex;flex-wrap:wrap;gap:4px;align-items:center;min-height:24px" class="syn-rel"></div>';
-      html += '</div>';
-    });
-    html += '</div>';
-    main.innerHTML = html;
-    // Fetch data for each word
-    words.forEach(function(w, i) {
-      var cardId = 'gsyn-' + ts + '-' + i;
-      if (typeof _fetchWordData === 'function') _fetchWordData(w, cardId);
-    });
-  }
+  // Populate left side with POS-tagged pills for this sentence
+  var container = document.getElementById('gvSelectedPOS');
+  if (!container) return;
+  var words = text.split(/\s+/).filter(function(w){return w.replace(/[^a-zA-Z]/g,'').length>0});
+  if (!words.length) { container.innerHTML = '<div style="text-align:center;padding:20px;color:var(--muted2);font-size:13px">No words found.</div>'; return; }
+  var seen = {};
+  var html = '<div id="gvSelectedPOSInner" style="display:flex;flex-wrap:wrap;gap:8px;align-items:flex-start">';
+  words.forEach(function(w){
+    var clean = w.replace(/[^a-zA-Z]/g,'').toLowerCase();
+    if (seen[clean]) return;
+    seen[clean] = true;
+    var pos = 'OTHER';
+    try {
+      if (typeof nlp !== 'undefined') {
+        var d = nlp(clean); var t = d.json();
+        if (t[0] && t[0].terms && t[0].terms[0]) {
+          var tags = t[0].terms[0].tags || [];
+          if (tags.indexOf('Noun') !== -1) pos = 'NOUN';
+          else if (tags.indexOf('Verb') !== -1) pos = 'VERB';
+          else if (tags.indexOf('Adjective') !== -1) pos = 'ADJ';
+          else if (tags.indexOf('Adverb') !== -1) pos = 'ADV';
+          else if (tags.indexOf('Preposition') !== -1) pos = 'PREP';
+          else if (tags.indexOf('Conjunction') !== -1) pos = 'CONJ';
+          else if (tags.indexOf('Pronoun') !== -1) pos = 'PRON';
+          else if (tags.indexOf('Determiner') !== -1) pos = 'DET';
+          else if (tags.indexOf('Modal') !== -1 || tags.indexOf('Auxiliary') !== -1) pos = 'AUX';
+        }
+      }
+    } catch(e) {}
+    if (pos === 'OTHER' && typeof _gvHeuristicPOS === 'function') pos = _gvHeuristicPOS(clean);
+    var colorMap = {NOUN:'#60a5fa',VERB:'#34d399',ADJ:'#f472b6',ADV:'#c084fc',PREP:'#fbbf24',CONJ:'#fb923c',PRON:'#38bdf8',AUX:'#a78bfa',DET:'#6b7280',OTHER:'#6b7280'};
+    var color = colorMap[pos] || '#6b7280';
+    html += '<span class="s4-pos-pill" data-pos="'+pos+'" style="display:inline-flex;padding:clamp(4px,.5vw,8px) clamp(8px,1.2vw,14px);border-radius:8px;font-size:clamp(12px,1.3vw,16px);font-weight:600;background:' + color + '20;color:' + color + ';border:1px solid ' + color + '30">' + w + ' <span style="opacity:.55;font-size:clamp(8px,.9vw,10px);font-weight:500;margin-left:4px">' + pos + '</span></span>';
+  });
+  html += '</div>';
+  container.innerHTML = html;
+}
+// ── POS filter for slide 4 left panel ──
+function _filterPOS2(posCat, btn) {
+  var container = document.getElementById('posFilterPills2');
+  if (container) { container.querySelectorAll('.toggle-pill').forEach(function(b){b.classList.remove('on')}); }
+  btn.classList.add('on');
+  var pills = document.querySelectorAll('#gvSelectedPOSInner .s4-pos-pill');
+  pills.forEach(function(pill) {
+    if (posCat === 'ALL') { pill.style.display = ''; return; }
+    var p = pill.getAttribute('data-pos') || '';
+    var show = false;
+    if (posCat === 'Nouns' && (p === 'NOUN' || p === 'PRON')) show = true;
+    if (posCat === 'Adjectives' && p === 'ADJ') show = true;
+    if (posCat === 'Verbs' && (p === 'VERB' || p === 'AUX')) show = true;
+    pill.style.display = show ? '' : 'none';
+  });
 }
 // ═══ POS Filter for Word Meaning cards ═══
 function _filterSynByPOS(pos, btn) {
@@ -2687,16 +2730,12 @@ function adjustGrammarFont(delta){
   _grammarFontSize=Math.max(8,Math.min(24,_grammarFontSize+delta));
   var box=document.getElementById('grammarTranscriptLines');
   if(box)box.style.setProperty('--grammar-fs',_grammarFontSize+'px');
-  var box2=document.getElementById('gvTranscriptLines');
+  var box2=document.getElementById('gvTranscriptLines2');
   if(box2)box2.style.setProperty('--grammar-fs',_grammarFontSize+'px');
-  var box3=document.getElementById('gvTranscriptLines2');
-  if(box3)box3.style.setProperty('--grammar-fs',_grammarFontSize+'px');
   var label=document.getElementById('grammarFontSize');
   if(label)label.textContent=_grammarFontSize+'px';
   var label2=document.getElementById('grammarFontSize2');
   if(label2)label2.textContent=_grammarFontSize+'px';
-  var label3=document.getElementById('grammarFontSize3');
-  if(label3)label3.textContent=_grammarFontSize+'px';
 }
 
 // ═══ Real Mic Session ═══
@@ -6159,7 +6198,7 @@ window.fixExtrasPanelColors = function(){
 
 </script>
 
-<!-- ═══ V20quint Transcript Engine v28 ═══ -->
+<!-- ═══ V20quint Transcript Engine v29 ═══ -->
 <script>
 (function(){
   // ── State ──
