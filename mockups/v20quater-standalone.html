@@ -1,0 +1,311 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<title>V20quater · 3-in-1 Transcript Box</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#0b0f15;--card:#131820;--line:#1e2632;--line2:#283242;--text:#e2e4e9;--t2:#9099a8;--t3:#5e6676;--accent:#7c3aed;--a2:#a78bfa;--green:#22c55e;--amber:#f59e0b;--blue:#3b82f6;--red:#ef4444;--teal:#14b8a6;--r:14px;--f:'Inter',sans-serif;--mono:'JetBrains Mono',monospace}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--text);font-family:var(--f);min-height:100vh;display:flex;align-items:center;justify-content:center}
+.page{width:100%;max-width:700px;padding:24px}
+h1{font-size:26px;font-weight:800;letter-spacing:-.03em;margin-bottom:4px}
+.sub{font-size:13px;color:var(--t3);margin-bottom:20px}
+
+/* Card */
+.m{background:var(--card);border:1px solid var(--line);border-radius:var(--r);overflow:hidden;display:flex;flex-direction:column}
+.mh{padding:12px 16px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;flex-shrink:0}
+.mn{font-size:11px;font-weight:700;color:var(--a2);letter-spacing:.08em}
+.mt{font-size:13px;font-weight:600;color:var(--text);flex:1;margin-left:8px}
+.mc{flex:1;overflow:hidden;position:relative;min-height:380px;max-height:520px;display:flex;flex-direction:column}
+
+/* ═══ TOGGLE BARS ═══ */
+.tbar{display:flex;gap:4px;padding:6px 10px;align-items:center;flex-shrink:0}
+.tbar+.tbar{border-top:1px solid var(--line)}
+.tbar .tlabel{font-size:9px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:.08em;margin-right:6px;min-width:32px}
+.tbar .tsep{width:1px;height:14px;background:var(--line);margin:0 4px}
+.tbtn{width:28px;height:28px;border-radius:50%;border:1.5px solid var(--line2);background:transparent;color:var(--t3);cursor:pointer;font-size:12px;display:flex;align-items:center;justify-content:center;transition:all .15s}
+.tbtn:hover{border-color:var(--accent);color:var(--accent)}
+.tbtn.active{background:var(--accent);border-color:var(--accent);color:#fff}
+.tbtn[data-val="edit"].active{background:var(--blue);border-color:var(--blue)}
+.tbtn[data-val="collect"].active{background:var(--green);border-color:var(--green)}
+.tbtn[data-val="rows"].active{background:var(--accent);border-color:var(--a2)}
+.badge{font-size:10px;font-weight:700;color:var(--green);margin-left:auto;display:flex;align-items:center;gap:3px;opacity:0;transition:opacity .2s}
+.badge.show{opacity:1}
+
+/* Play button */
+.play-btn{width:26px;height:26px;border-radius:50%;border:1.5px solid var(--line2);background:transparent;color:var(--t2);cursor:pointer;font-size:10px;display:flex;align-items:center;justify-content:center;transition:all .2s;flex-shrink:0;margin-left:4px}
+.play-btn:hover{border-color:var(--accent);color:var(--accent);background:rgba(124,58,237,.1)}
+.play-btn.playing{border-color:var(--green);color:var(--green);background:rgba(34,197,94,.1)}
+
+/* ═══ CONTENT AREA ═══ */
+.content{flex:1;overflow-y:auto;scroll-behavior:smooth;padding:10px 16px;display:flex;flex-direction:column;justify-content:flex-end;gap:7px}
+
+/* ── Style: Lines (highlight reel) ── */
+.line-v20{padding:10px 38px 10px 14px;border-radius:7px;font-size:15px;line-height:1.45;opacity:0;animation:v20in 1.4s cubic-bezier(.16,1,.3,1) forwards;background:rgba(20,184,166,.06);border:1px solid rgba(20,184,166,.15);position:relative}
+.line-v20 .qw{display:inline-block;padding:0 2px;border-radius:2px;border:1px solid transparent;transition:all .1s}
+@keyframes v20in{0%{opacity:0;transform:translateY(20px);filter:blur(3px)}100%{opacity:1;transform:translateY(0);filter:blur(0)}}
+
+/* ── Style: Rows (word bank) ── */
+.row-v3{display:flex;align-items:center;gap:8px;padding:8px 16px;border-bottom:1px solid var(--line);font-size:15px;opacity:0;animation:v3in .4s ease-out forwards}
+.row-v3:nth-child(even){background:rgba(255,255,255,.008)}
+.row-v3 .rIdx{font-size:10px;color:var(--t3);font-family:var(--mono);min-width:18px;text-align:right;flex-shrink:0}
+.row-v3 .rWords{flex:1;line-height:1.4}
+.row-v3 .qw{display:inline-block;padding:0 2px;border-radius:2px;border:1px solid transparent;transition:all .1s;font-size:15px;line-height:1.3}
+@keyframes v3in{to{opacity:1}}
+
+/* Mode-dependent word styling */
+[data-mode="view"] .qw{cursor:default}
+[data-mode="edit"] .qw{cursor:text}
+[data-mode="edit"] .qw:hover{border-color:rgba(59,130,246,.4);background:rgba(59,130,246,.08)}
+[data-mode="collect"] .qw{cursor:pointer}
+[data-mode="collect"] .qw:hover{border-color:rgba(34,197,94,.4);background:rgba(34,197,94,.08)}
+[data-mode="collect"] .qw.collected{background:rgba(34,197,94,.15);border-color:var(--green);color:var(--green);font-weight:600}
+.qw.edited{text-decoration:underline;text-decoration-color:var(--green);text-underline-offset:3px}
+
+/* Action icons */
+.act-icons{position:absolute;right:5px;top:50%;transform:translateY(-50%);display:flex;gap:3px;opacity:0;transition:opacity .15s}
+.line-v20:hover .act-icons,.row-v3:hover .act-icons{opacity:1}
+.act-icons button{width:22px;height:22px;border-radius:50%;border:1px solid rgba(255,255,255,.15);background:rgba(255,255,255,.05);color:var(--t3);cursor:pointer;font-size:9px;display:flex;align-items:center;justify-content:center;transition:all .12s}
+.act-icons button:hover{border-color:var(--accent);color:var(--accent)}
+.act-icons .del:hover{border-color:var(--red);color:var(--red)}
+.act-icons .bm:hover{border-color:var(--amber);color:var(--amber)}
+
+/* Toast */
+.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--green);color:#000;font-size:13px;font-weight:700;padding:10px 20px;border-radius:99px;z-index:999;opacity:0;animation:toastIn 1.5s ease-out forwards;pointer-events:none}
+@keyframes toastIn{0%{opacity:0;transform:translateX(-50%) translateY(10px)}20%{opacity:1;transform:translateX(-50%) translateY(0)}80%{opacity:1}100%{opacity:0;transform:translateX(-50%) translateY(-10px)}}
+
+::-webkit-scrollbar{width:5px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:var(--line2);border-radius:3px}
+</style>
+</head>
+<body>
+<div class="page">
+  <h1>🎛 V20quater · 3-in-1 Transcript Box</h1>
+  <p class="sub">Mode toggle (what clicking words does) + Style toggle (how lines look) — click ▶ to play demo</p>
+
+  <div class="m" id="card">
+    <!-- Header -->
+    <div class="mh">
+      <span class="mn">V20quater</span>
+      <span class="mt">3-in-1 · View / Edit / Collect</span>
+      <button class="play-btn" id="playBtn" onclick="toggleDemo()" title="Play demo">▶</button>
+    </div>
+
+    <!-- Mode toggle bar -->
+    <div class="tbar" id="modeBar">
+      <span class="tlabel">Mode</span>
+      <button class="tbtn active" data-val="view" onclick="setMode('view')" title="View only">👁</button>
+      <button class="tbtn" data-val="edit" onclick="setMode('edit')" title="Edit words">✎</button>
+      <button class="tbtn" data-val="collect" onclick="setMode('collect')" title="Collect words">🟢</button>
+      <span class="badge" id="wordBadge"></span>
+    </div>
+
+    <!-- Style toggle bar -->
+    <div class="tbar" id="styleBar">
+      <span class="tlabel">Style</span>
+      <button class="tbtn active" data-val="lines" onclick="setStyle('lines')" title="Highlight reel lines">📋</button>
+      <button class="tbtn" data-val="rows" onclick="setStyle('rows')" title="Word bank rows">📑</button>
+    </div>
+
+    <!-- Content -->
+    <div class="mc" id="mc" data-mode="view" data-style="lines" onclick="handleWordClick(event)">
+      <div class="content" id="content"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ═══ STATE ═══
+var state = { mode:'view', style:'lines', words:[], playing:false, idx:0, timer:null, sentences:[] };
+
+// ═══ SENTENCE POOL ═══
+var S = [
+  'The <span class="word">weather</span> <span class="word">today</span> <span class="word">is</span> <span class="word">quite</span> <span class="word alt" title="Maybe: lovely">lovly</span>.',
+  'Ik <span class="word">wil</span> <span class="word">graag</span> <span class="word">een</span> <span class="word">kopje</span> <span class="word">koffie</span> <span class="word">alsjeblieft</span>.',
+  'The <span class="word">project</span> <span class="word">deadline</span> <span class="word">has</span> <span class="word">been</span> <span class="word">extended</span> <span class="word">to</span> <span class="word">Friday</span>.',
+  'We <span class="word">moeten</span> <span class="word">nog</span> <span class="word">even</span> <span class="word">geduld</span> <span class="word alt" title="Maybe: hebben">hebben</span> <span class="word">met</span> <span class="word">de</span> <span class="word">resultaten</span>.',
+  'She <span class="word">said</span> <span class="word">she</span> <span class="word">would</span> <span class="word">call</span> <span class="word">back</span> <span class="word">within</span> <span class="word">the</span> <span class="word">hour</span>.',
+  'Het <span class="word">is</span> <span class="word">vandaag</span> <span class="word">echt</span> <span class="word">prachtig</span> <span class="word">weer</span> <span class="word">buiten</span>.',
+  'Can <span class="word">you</span> <span class="word">send</span> <span class="word">me</span> <span class="word">the</span> <span class="word alt" title="Maybe: document">documment</span> <span class="word">by</span> <span class="word">email</span>?',
+  'Ik <span class="word">denk</span> <span class="word">dat</span> <span class="word">we</span> <span class="word">morgen</span> <span class="word">een</span> <span class="word">beslissing</span> <span class="word">kunnen</span> <span class="word">nemen</span>.',
+  'The <span class="word">meeting</span> <span class="word">room</span> <span class="word">is</span> <span class="word">on</span> <span class="word">the</span> <span class="word">third</span> <span class="word">floor</span>.',
+  'Dat <span class="word">klinkt</span> <span class="word">als</span> <span class="word">een</span> <span class="word">uitstekend</span> <span class="word">plan</span> <span class="word">voor</span> <span class="word">vanavond</span>.',
+  'I <span class="word">really</span> <span class="word">appreciate</span> <span class="word">your</span> <span class="word">help</span> <span class="word">with</span> <span class="word">this</span>.',
+  'Zij <span class="word">heeft</span> <span class="word">gisteren</span> <span class="word">nog</span> <span class="word">gebeld</span> <span class="word">over</span> <span class="word">de</span> <span class="word">afspraak</span>.'
+];
+var DEMO_ORDER = [2,5,8,11,0];
+var demoIdx = 0;
+
+// ═══ TOGGLE: MODE ═══
+function setMode(mode) {
+  state.mode = mode;
+  var mc = document.getElementById('mc');
+  mc.setAttribute('data-mode', mode);
+  // Update buttons
+  var btns = document.querySelectorAll('#modeBar .tbtn');
+  btns.forEach(function(b) { b.classList.toggle('active', b.dataset.val === mode); });
+}
+
+// ═══ TOGGLE: STYLE ═══
+function setStyle(style) {
+  state.style = style;
+  // Update buttons
+  var btns = document.querySelectorAll('#styleBar .tbtn');
+  btns.forEach(function(b) { b.classList.toggle('active', b.dataset.val === style); });
+  // Re-render all accumulated sentences in the new style
+  rerenderAll();
+}
+
+// ═══ WORD CLICK HANDLER (delegated) ═══
+function handleWordClick(e) {
+  var span = e.target.closest('.qw');
+  if (!span) return;
+  e.stopPropagation();
+  var mode = state.mode;
+  if (mode === 'edit') {
+    editWord(span);
+  } else if (mode === 'collect') {
+    span.classList.toggle('collected');
+    var w = span.textContent.trim().toLowerCase();
+    if (span.classList.contains('collected')) {
+      if (state.words.indexOf(w) === -1) state.words.push(w);
+      showToast('✓ Added: ' + w);
+    } else {
+      state.words = state.words.filter(function(x) { return x !== w; });
+    }
+    updateBadge();
+  }
+}
+
+function editWord(span) {
+  var orig = span.textContent;
+  var inp = document.createElement('input');
+  inp.value = orig;
+  inp.style.cssText = 'width:' + (orig.length + 2) + 'ch;background:var(--card);border:1px solid var(--accent);border-radius:3px;color:var(--text);font:inherit;font-size:14px;padding:2px 4px;outline:none';
+  span.textContent = '';
+  span.appendChild(inp);
+  inp.focus();
+  inp.select();
+  inp.onblur = function() {
+    span.textContent = inp.value || orig;
+    inp.remove();
+    if (inp.value !== orig) span.classList.add('edited');
+  };
+  inp.onkeydown = function(e) {
+    if (e.key === 'Enter') inp.blur();
+    if (e.key === 'Escape') { inp.value = orig; inp.blur(); }
+  };
+}
+
+function updateBadge() {
+  var badge = document.getElementById('wordBadge');
+  var n = state.words.length;
+  badge.textContent = n ? '📚 ' + n : '';
+  badge.classList.toggle('show', n > 0);
+}
+
+function showToast(msg) {
+  var t = document.createElement('div');
+  t.className = 'toast';
+  t.textContent = msg;
+  document.body.appendChild(t);
+  setTimeout(function() { t.remove(); }, 1600);
+}
+
+// ═══ EXTRACT WORDS FROM SENTENCE ═══
+function extractWords(s) {
+  var words = s.match(/<span[^>]*>.*?<\/span>|\S+/g) || [];
+  return words.map(function(wd) {
+    return wd.replace(/<[^>]*>/g, '');
+  });
+}
+
+// ═══ RENDER ONE SENTENCE ═══
+function renderSentence(s, idx, total) {
+  var content = document.getElementById('content');
+  var words = extractWords(s);
+  var wordHtml = words.map(function(w) {
+    return '<span class="qw">' + w + '</span>';
+  }).join(' ');
+
+  var actIcons = '<div class="act-icons"><button title="Edit" onclick="event.stopPropagation()">✎</button><button class="bm" title="Bookmark" onclick="event.stopPropagation()">☆</button><button class="del" title="Delete" onclick="event.stopPropagation();this.closest(\'.line-v20,.row-v3\').style.opacity=\'0.2\'">🗑</button></div>';
+
+  var el;
+  if (state.style === 'lines') {
+    el = document.createElement('div');
+    el.className = 'line-v20';
+    el.innerHTML = wordHtml + actIcons;
+  } else {
+    // rows style (V3)
+    el = document.createElement('div');
+    el.className = 'row-v3';
+    el.innerHTML = '<span class="rIdx">' + (idx + 1).toString().padStart(2, '0') + '</span><span class="rWords">' + wordHtml + '</span>' + actIcons;
+  }
+
+  content.appendChild(el);
+  content.scrollTo({ top: content.scrollHeight, behavior: 'smooth' });
+}
+
+// ═══ RE-RENDER ALL (called on style change) ═══
+function rerenderAll() {
+  var content = document.getElementById('content');
+  content.innerHTML = '';
+  // Re-render with new index numbers starting from 0
+  state.sentences.forEach(function(s, i) {
+    renderSentence(s, i, state.sentences.length);
+  });
+}
+
+// ═══ DEMO PLAYER ═══
+function toggleDemo() {
+  if (state.playing) {
+    stopDemo();
+    return;
+  }
+  startDemo();
+}
+
+function startDemo() {
+  state.playing = true;
+  demoIdx = 0;
+  state.sentences = [];
+  state.words = [];
+  updateBadge();
+  document.getElementById('content').innerHTML = '';
+  var btn = document.getElementById('playBtn');
+  btn.textContent = '⏹';
+  btn.classList.add('playing');
+  btn.title = 'Stop demo';
+  advanceDemo();
+}
+
+function stopDemo() {
+  if (state.timer) { clearTimeout(state.timer); state.timer = null; }
+  state.playing = false;
+  var btn = document.getElementById('playBtn');
+  btn.textContent = '▶';
+  btn.classList.remove('playing');
+  btn.title = 'Play demo';
+  // Keep content visible, just stop advancing
+}
+
+function advanceDemo() {
+  if (!state.playing) return;
+  if (demoIdx < DEMO_ORDER.length) {
+    var si = DEMO_ORDER[demoIdx];
+    var s = S[si];
+    state.sentences.push(s);
+    renderSentence(s, demoIdx, DEMO_ORDER.length);
+    demoIdx++;
+    var gap = 2200 + Math.random() * 1200;
+    state.timer = setTimeout(advanceDemo, gap);
+  } else {
+    state.timer = setTimeout(stopDemo, 5000);
+  }
+}
+</script>
+</body>
+</html>
