@@ -236,12 +236,12 @@
       var trBtn=document.querySelector('.start-btn.tr');
       if(capBtn){
         capBtn.addEventListener('click',function(){
-          window.location.href='studio-caption.html?lang='+ssCapCode;
+          window.location.href='caption-s8t.html?lang='+ssCapCode;
         });
       }
       if(trBtn){
         trBtn.addEventListener('click',function(){
-          window.location.href='studio-caption.html?src='+ssSrcCode+'&tgt='+ssTgtCode;
+          window.location.href='caption-s8t.html?src='+ssSrcCode+'&tgt='+ssTgtCode;
         });
       }
     })();
