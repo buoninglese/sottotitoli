@@ -519,7 +519,7 @@ async function createSupabaseSession() {
       localStorage.setItem('sottotitoli-caption-session', res.data.id);
       localStorage.setItem('sottotitoli-caption-room-id', roomId);
       if (DOM.capRoomId) DOM.capRoomId.textContent = roomId.substring(0, 14) + '…';
-      if (DOM.capRoomLink) DOM.capRoomLink.textContent = window.location.origin + '/studio-caption.html?join=1&room=' + roomId;
+      if (DOM.capRoomLink) DOM.capRoomLink.textContent = window.location.origin + '/caption-s8t.html?join=1&room=' + roomId;
     }
   } catch(e) {
     console.warn('Supabase session creation failed:', e);
@@ -608,6 +608,6 @@ async function createSupabaseSession() {
     var rid = document.getElementById('capRoomId');
     var rlink = document.getElementById('capRoomLink');
     if (rid) rid.textContent = storedRoom.substring(0,14)+'…';
-    if (rlink) rlink.textContent = window.location.origin + '/studio-caption.html?join=1&room=' + storedRoom;
+    if (rlink) rlink.textContent = window.location.origin + '/caption-s8t.html?join=1&room=' + storedRoom;
   }
 })();
