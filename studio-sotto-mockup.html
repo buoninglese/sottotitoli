@@ -6202,51 +6202,53 @@ window.fixExtrasPanelColors = function(){
     v20q.sentences.forEach(function(s, i){ v20q_render(s, i); });
   }
 
-  // ── Hook into real-mic via MutationObserver (robust, survives overwrites) ──
+  // ── V20quint: watch DOM for .line divs added by speech pipeline ──
+  // The original _realMic.onFinal → DUO wrapper → grammar-viz → original handler
+  // creates .line divs in #captionTranscript. We intercept those via MutationObserver
+  // rather than wrapping onFinal (which gets overwritten). Timing-independent.
   function v20q_bootstrap(){
     var ct = document.getElementById('captionTranscript');
     if (!ct) { setTimeout(v20q_bootstrap, 200); return; }
-    // Watch for .line divs added by original onFinal — convert to V20quint
     var observer = new MutationObserver(function(mutations) {
       mutations.forEach(function(m) {
         m.addedNodes.forEach(function(node) {
-          if (node.nodeType === 1 && node.classList && node.classList.contains('line')) {
-            // Extract text from the .line div (skip the timestamp span)
-            var text = '';
-            var children = node.childNodes;
-            for (var i = 0; i < children.length; i++) {
-              if (children[i].nodeType === 3) text += children[i].textContent;
-              else if (children[i].nodeType === 1 && !children[i].classList.contains('ts')) text += children[i].textContent;
+          if (node.nodeType !== 1 || !node.classList || !node.classList.contains('line')) return;
+          // Extract sentence text, skipping the timestamp <span> (identified by monospace font)
+          var text = '';
+          var children = node.childNodes;
+          for (var i = 0; i < children.length; i++) {
+            var c = children[i];
+            if (c.nodeType === 3) { text += c.textContent; }
+            else if (c.nodeType === 1) {
+              var isTs = c.tagName === 'SPAN' && c.style && c.style.fontFamily && c.style.fontFamily.indexOf('mono') !== -1;
+              if (!isTs) text += c.textContent;
             }
-            text = text.trim();
-            // Remove the original .line div
-            node.remove();
-            // Render in V20quint style
-            if (text) {
-              v20q.sentences.push(text);
-              v20q_render(text, v20q.sIdx);
-              v20q.sIdx++;
-            }
+          }
+          text = text.trim();
+          node.remove();
+          if (text) {
+            v20q.sentences.push(text);
+            v20q_render(text, v20q.sIdx);
+            v20q.sIdx++;
           }
         });
       });
     });
     observer.observe(ct, { childList: true });
-    // Store observer for cleanup
-    v20q._observer = observer;
 
-    // Hook into session start to reset
+    // Reset V20quint state when starting a new session
     var origToggle = window.toggleSession;
     if (typeof origToggle === 'function') {
       window.toggleSession = function(){
         var wasActive = document.body.classList.contains('session-active');
-        origToggle();
+        var result = origToggle.apply(this, arguments);
         if (!wasActive) {
           v20q.sentences = []; v20q.sIdx = 0; v20q.words = [];
           v20q.baseSec = Math.floor(Math.random() * 120);
-          var container = document.getElementById('v20qContent'); if (container) container.innerHTML = '';
+          var c2 = document.getElementById('v20qContent'); if (c2) c2.innerHTML = '';
           v20q_updateBadge();
         }
+        return result;
       };
     }
   }
