@@ -6203,9 +6203,9 @@ window.fixExtrasPanelColors = function(){
   }
 
   // ── V20quint: watch DOM for .line divs added by speech pipeline ──
-  // The original _realMic.onFinal → DUO wrapper → grammar-viz → original handler
-  // creates .line divs in #captionTranscript. We intercept those via MutationObserver
-  // rather than wrapping onFinal (which gets overwritten). Timing-independent.
+  // NON-DESTRUCTIVE: hides original .line divs instead of removing them.
+  // The original pipeline (grammar-viz, stats, CEFR, speaker colors) depends
+  // on .line elements in the DOM — removing them breaks the entire flow.
   function v20q_bootstrap(){
     var ct = document.getElementById('captionTranscript');
     if (!ct) { setTimeout(v20q_bootstrap, 200); return; }
@@ -6213,6 +6213,8 @@ window.fixExtrasPanelColors = function(){
       mutations.forEach(function(m) {
         m.addedNodes.forEach(function(node) {
           if (node.nodeType !== 1 || !node.classList || !node.classList.contains('line')) return;
+          // Hide the original .line (but keep it in DOM for grammar/stats/CEFR)
+          node.style.display = 'none';
           // Extract sentence text, skipping the timestamp <span> (identified by monospace font)
           var text = '';
           var children = node.childNodes;
@@ -6225,7 +6227,6 @@ window.fixExtrasPanelColors = function(){
             }
           }
           text = text.trim();
-          node.remove();
           if (text) {
             v20q.sentences.push(text);
             v20q_render(text, v20q.sIdx);
@@ -6236,16 +6237,13 @@ window.fixExtrasPanelColors = function(){
     });
     observer.observe(ct, { childList: true });
 
-    // Reset V20quint state when starting a new session.
-    // The original toggleSession does transcript.innerHTML='' which destroys
-    // #v20qContent (it's a child of #captionTranscript). We must recreate it.
+    // Ensure #v20qContent is recreated after toggleSession clears transcript
     var origToggle = window.toggleSession;
     if (typeof origToggle === 'function') {
       window.toggleSession = function(){
         var wasActive = document.body.classList.contains('session-active');
         var result = origToggle.apply(this, arguments);
         if (!wasActive) {
-          // Ensure #v20qContent exists (may have been destroyed by innerHTML='')
           var ct2 = document.getElementById('captionTranscript');
           var vc = document.getElementById('v20qContent');
           if (ct2 && !vc) {
