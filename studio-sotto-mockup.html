@@ -6205,16 +6205,21 @@ window.fixExtrasPanelColors = function(){
   // ── Hook into real-mic ──
   function v20q_bootstrap(){
     if (typeof _realMic === 'undefined') { setTimeout(v20q_bootstrap, 200); return; }
+    if (typeof _realMic.onFinal !== 'function') { setTimeout(v20q_bootstrap, 300); return; }
     var origOnFinal = _realMic.onFinal;
     _realMic.onFinal = function(text){
       // Call original first (speaker coloring, stats, word bank, etc.)
       if (typeof origOnFinal === 'function') origOnFinal(text);
       // Remove duplicate .line divs from the original onFinal (V20quint renders its own)
-      var ct = document.getElementById('captionTranscript');
-      if (ct) {
-        var lines = ct.querySelectorAll(':scope > .line');
-        lines.forEach(function(l){ l.remove(); });
-      }
+      try {
+        var ct = document.getElementById('captionTranscript');
+        if (ct) {
+          var lines = ct.querySelectorAll('.line');
+          for (var li = 0; li < lines.length; li++) {
+            if (lines[li].parentNode === ct) lines[li].remove();
+          }
+        }
+      } catch(e) {}
       // Also render in V20quint style
       v20q.sentences.push(text);
       v20q_render(text, v20q.sIdx);
