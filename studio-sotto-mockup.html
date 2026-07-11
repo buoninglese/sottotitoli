@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="it" data-theme="light" data-caption-mode="j7b" class="font-crisp" data-v20q="31">
+<html lang="it" data-theme="light" data-caption-mode="j7b" class="font-crisp" data-v20q="32">
 <head>
 <meta charset="utf-8">
 <link rel="icon" type="image/svg+xml" href="favicon.svg">
@@ -925,7 +925,7 @@ button[onclick*="addToWordBank"]:hover{background:rgba(52,211,153,.15)!important
   <div style="display:flex;align-items:center;gap:8px">
     <a href="panoramica.html" class="topbar-brand">sotto<span>titoli</span></a>
     <span class="trial-pill">Pro</span>
-    <span style="font-size:9px;color:var(--muted2);font-family:monospace;opacity:.5;margin-left:2px" title="V20quint version">v31</span>
+    <span style="font-size:9px;color:var(--muted2);font-family:monospace;opacity:.5;margin-left:2px" title="V20quint version">v32</span>
     <a href="panoramica.html" style="text-decoration:none;color:var(--text-soft);font-size:13px;font-weight:500;margin-left:4px">← Dashboard</a>
   </div>
   <div style="flex:1;display:flex;justify-content:center;align-items:center;gap:8px">
@@ -2315,7 +2315,39 @@ function _refreshMetricsPanel() {
     if (donutLegend) donutLegend.innerHTML = '<span style="color:#60a5fa">N ' + items[0].v + '</span><span style="color:#34d399">V ' + items[1].v + '</span><span style="color:#f472b6">J ' + items[2].v + '</span><span style="color:#c084fc">D ' + items[3].v + '</span>';
   }
 }
-// Click a line in grammar/analysis slide → show SYN cards
+// Click a line in slide 3 (grammar) → show word cards
+function _slideLineClick(el) {
+  document.querySelectorAll('#grammarTranscriptLines .tline').forEach(function(l){l.style.background=''});
+  el.style.background = 'rgba(124,58,237,.1)';
+  var text = el.getAttribute('data-text') || '';
+  var main = document.getElementById('grammarSynMain');
+  if (main) {
+    var words = text.split(/\s+/).filter(function(w){return w.replace(/[^a-zA-Z]/g,'').length>1});
+    var html = '';
+    html += '<div id="grammarSynCardsGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:8px">';
+    var ts = Date.now();
+    words.forEach(function(w, i){
+      var cardId = 'gsyn-' + ts + '-' + i;
+      html += '<div class="syn-card" id="' + cardId + '" data-word="' + w + '" style="background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px;position:relative">';
+      html += '<div style="position:absolute;top:8px;right:8px;display:flex;gap:4px;z-index:2">';
+      html += '<button onclick="this.classList.toggle(\'saved\');this.textContent=this.classList.contains(\'saved\')?\'✓\':\'+\'" style="width:24px;height:24px;border-radius:50%;border:1px solid var(--line);background:var(--card2);color:var(--muted2);cursor:pointer;font-size:20px;display:flex;align-items:center;justify-content:center;line-height:1" title="Add to word bank">+</button>';
+      html += '<button onclick="var c=document.getElementById(\''+cardId+'\');c.style.opacity=\'0\';c.style.transform=\'scale(.95)\';c.style.transition=\'all .2s\';setTimeout(function(){c.remove()},200)" style="width:24px;height:24px;border-radius:50%;border:1px solid var(--line);background:var(--card2);color:var(--muted2);cursor:pointer;font-size:20px;display:flex;align-items:center;justify-content:center;line-height:1" title="Dismiss">×</button>';
+      html += '</div>';
+      html += '<div style="margin-bottom:2px;padding-right:56px"><span class="syn-base-word" data-word="' + w + '" data-context="' + text.slice(0,30) + '" onclick="event.stopPropagation();lookupSynonym(this)" style="font-size:17px;font-weight:700;color:var(--text);cursor:pointer">' + w + '</span></div>';
+      html += '<div style="margin-bottom:6px;padding-right:56px"><span style="font-size:12px;font-weight:600;text-transform:uppercase;padding:2px 8px;border-radius:100px;background:rgba(167,139,250,.15);color:var(--accent2)">' + (typeof _getPOS==='function'?_getPOS(w):'—') + '</span></div>';
+      html += '<div style="font-size:14px;color:var(--muted);line-height:1.5;margin-bottom:6px" class="syn-def">Loading…</div>';
+      html += '<div style="display:flex;flex-wrap:wrap;gap:4px;align-items:center;min-height:24px" class="syn-rel"></div>';
+      html += '</div>';
+    });
+    html += '</div>';
+    main.innerHTML = html;
+    words.forEach(function(w, i) {
+      var cardId = 'gsyn-' + ts + '-' + i;
+      if (typeof _fetchWordData === 'function') _fetchWordData(w, cardId);
+    });
+  }
+}
+// Click a line in slide 4 (live analysis) → show POS pills
 function _s4LineClick(el) {
   // Highlight selected line in slide 4
   var box4 = document.getElementById('gvTranscriptLines2');
@@ -6195,7 +6227,7 @@ window.fixExtrasPanelColors = function(){
 
 </script>
 
-<!-- ═══ V20quint Transcript Engine v31 ═══ -->
+<!-- ═══ V20quint Transcript Engine v32 ═══ -->
 <script>
 (function(){
   // ── State ──
