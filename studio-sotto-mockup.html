@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="it" data-theme="light" data-caption-mode="j7b" class="font-crisp" data-v20q="18">
+<html lang="it" data-theme="light" data-caption-mode="j7b" class="font-crisp" data-v20q="19">
 <head>
 <meta charset="utf-8">
 <link rel="icon" type="image/svg+xml" href="favicon.svg">
@@ -874,6 +874,11 @@ button[onclick*="addToWordBank"]:hover{background:rgba(52,211,153,.15)!important
 .v20q-act button:hover{border-color:var(--accent);color:var(--accent)}
 .v20q-act .v20q-del:hover{border-color:var(--danger);color:var(--danger)}
 .v20q-act .v20q-bm:hover{border-color:var(--warn);color:var(--warn)}
+.v20q-act .v20q-bm-on,.v20q-act .v20q-bm-on:hover{color:#f59e0b;border-color:rgba(245,158,11,.4)}
+/* Bookmarked line */
+.v20q-bookmarked{border-left:3px solid rgba(245,158,11,.5) !important}
+/* Bookmark panel */
+.v20q-bookmark-panel{display:none;position:absolute;bottom:100%;right:0;margin-bottom:8px;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px;min-width:320px;max-height:300px;overflow-y:auto;box-shadow:0 8px 32px rgba(0,0,0,.2);z-index:100;font-family:var(--font-body)}
 @keyframes v20qIn{0%{opacity:.4;transform:translateY(16px) scale(.98)}100%{opacity:1;transform:translateY(0) scale(1)}}
 </style>
 </head>
@@ -900,7 +905,7 @@ button[onclick*="addToWordBank"]:hover{background:rgba(52,211,153,.15)!important
   <div style="display:flex;align-items:center;gap:8px">
     <a href="panoramica.html" class="topbar-brand">sotto<span>titoli</span></a>
     <span class="trial-pill">Pro</span>
-    <span style="font-size:9px;color:var(--muted2);font-family:monospace;opacity:.5;margin-left:2px" title="V20quint version">v18</span>
+    <span style="font-size:9px;color:var(--muted2);font-family:monospace;opacity:.5;margin-left:2px" title="V20quint version">v19</span>
     <a href="panoramica.html" style="text-decoration:none;color:var(--text-soft);font-size:13px;font-weight:500;margin-left:4px">← Dashboard</a>
   </div>
   <div style="flex:1;display:flex;justify-content:center;align-items:center;gap:8px">
@@ -1155,6 +1160,11 @@ button[onclick*="addToWordBank"]:hover{background:rgba(52,211,153,.15)!important
       <span class="v20q-label">Style</span>
       <button class="v20q-tbtn active" data-val="lines" onclick="v20q_setStyle('lines')">📋</button>
       <button class="v20q-tbtn" data-val="rows" onclick="v20q_setStyle('rows')">📑</button>
+    </span>
+    <!-- Bookmarks -->
+    <span style="position:relative">
+      <button class="v20q-tbtn" onclick="v20q_showBookmarks()" title="Bookmarked sentences" style="color:var(--warn);border-color:rgba(245,158,11,.3)">☆</button>
+      <div class="v20q-bookmark-panel" id="v20qBookmarkPanel"></div>
     </span>
     <button type="button" class="btn-grad btn-start" id="startBtn" onclick="toggleSession()" style="font-size:15px;padding:8px 22px;border-radius:100px">🎤 Start</button>
     <button type="button" class="btn-grad btn-pause" id="pauseBtn" style="display:none;font-size:15px;padding:8px 22px;border-radius:100px" onclick="togglePause()">▶ Paused</button>
@@ -6109,11 +6119,11 @@ window.fixExtrasPanelColors = function(){
 
 </script>
 
-<!-- ═══ V20quint Transcript Engine v18 ═══ -->
+<!-- ═══ V20quint Transcript Engine v19 ═══ -->
 <script>
 (function(){
   // ── State ──
-  var v20q = { mode:'view', style:'lines', words:[], sentences:[], timer:0, baseSec:0, sIdx:0 };
+  var v20q = { mode:'view', style:'lines', words:[], sentences:[], timer:0, baseSec:0, sIdx:0, bookmarks:[] };
 
   // ── Helpers ──
   function v20q_fmtTime(sec){ var m=Math.floor(sec/60); var s=sec%60; return (m<10?'0':'')+m+':'+(s<10?'0':'')+s; }
@@ -6185,13 +6195,16 @@ window.fixExtrasPanelColors = function(){
     var wordHtml = v20q_makeWordHtml(words);
     var num = idx + 1;
     var time = v20q_fmtTime(v20q.baseSec + idx * 6);
-    var actIcons = '<div class="v20q-act"><button title="Edit" onclick="event.stopPropagation()">✎</button><button class="v20q-bm" title="Bookmark" onclick="event.stopPropagation()">☆</button><button class="v20q-del" title="Delete" onclick="event.stopPropagation();this.closest(\'.v20q-line,.v20q-row\').style.opacity=\'0.2\'">🗑</button></div>';
+    var isBm = v20q.bookmarks.indexOf(idx) !== -1;
+    var bmIcon = isBm ? '★' : '☆';
+    var bmCls = isBm ? ' v20q-bm-on' : '';
+    var actIcons = '<div class="v20q-act"><button title="Edit" onclick="event.stopPropagation()">✎</button><button class="v20q-bm'+bmCls+'" title="'+(isBm?'Unbookmark':'Bookmark')+'" onclick="event.stopPropagation();v20q_toggleBookmark('+idx+')">'+bmIcon+'</button><button class="v20q-del" title="Delete" onclick="event.stopPropagation();this.closest(\'.v20q-line,.v20q-row\').style.opacity=\'0.2\'">🗑</button></div>';
     var el = document.createElement('div');
     if (v20q.style === 'lines') {
-      el.className = 'v20q-line';
+      el.className = 'v20q-line' + (isBm ? ' v20q-bookmarked' : '');
       el.innerHTML = '<span class="v20q-meta"><span class="v20q-num">#'+num+'</span><span class="v20q-time">'+time+'</span></span><span class="v20q-text">'+wordHtml+'</span>'+actIcons;
     } else {
-      el.className = 'v20q-row';
+      el.className = 'v20q-row' + (isBm ? ' v20q-bookmarked' : '');
       el.innerHTML = '<span class="v20q-rmeta"><span class="v20q-rnum">'+num.toString().padStart(2,'0')+'</span><span class="v20q-rtime">'+time+'</span></span><span class="v20q-rwords">'+wordHtml+'</span>'+actIcons;
     }
     container.appendChild(el);
@@ -6204,6 +6217,40 @@ window.fixExtrasPanelColors = function(){
     container.innerHTML = '';
     v20q.sentences.forEach(function(s, i){ v20q_render(s, i); });
   }
+
+  // ── Bookmark toggle ──
+  window.v20q_toggleBookmark = function(idx){
+    var pos = v20q.bookmarks.indexOf(idx);
+    if (pos === -1) { v20q.bookmarks.push(idx); }
+    else { v20q.bookmarks.splice(pos, 1); }
+    v20q_rerender(); // re-render to update star icons
+  };
+  // ── Show bookmarks panel ──
+  window.v20q_showBookmarks = function(){
+    var panel = document.getElementById('v20qBookmarkPanel');
+    if (!panel) return;
+    if (panel.style.display === 'block') { panel.style.display = 'none'; return; }
+    var html = '';
+    if (v20q.bookmarks.length === 0) {
+      html = '<div style="text-align:center;padding:16px;color:var(--muted2);font-size:12px">No bookmarked sentences yet.<br>Click ☆ on any sentence to save it here.</div>';
+    } else {
+      html = '<div style="font-size:10px;font-weight:700;color:var(--muted2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">📌 Bookmarked (' + v20q.bookmarks.length + ')</div>';
+      v20q.bookmarks.forEach(function(bi){
+        var s = v20q.sentences[bi] || '';
+        var words = v20q_extractWords(s);
+        var text = words.join(' ');
+        var time = v20q_fmtTime(v20q.baseSec + bi * 6);
+        html += '<div style="display:flex;align-items:center;gap:8px;padding:6px 8px;border-bottom:1px solid var(--line);font-size:13px;cursor:pointer" onmouseover="this.style.background=\'rgba(255,255,255,.02)\'" onmouseout="this.style.background=\'transparent\'" onclick="v20q_toggleBookmark('+bi+');v20q_showBookmarks()">';
+        html += '<span style="color:#f59e0b;flex-shrink:0">★</span>';
+        html += '<span style="color:var(--muted2);font-family:var(--font-mono);font-size:10px;flex-shrink:0">'+time+'</span>';
+        html += '<span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text)">'+text+'</span>';
+        html += '<span style="color:var(--muted2);font-size:9px;flex-shrink:0">#'+(bi+1)+'</span>';
+        html += '</div>';
+      });
+    }
+    panel.innerHTML = html;
+    panel.style.display = 'block';
+  };
 
   // ── V20quint: watch DOM for .line divs added by speech pipeline ──
   // Self-healing: if #v20qContent is destroyed (by innerHTML clear), recreates it.
