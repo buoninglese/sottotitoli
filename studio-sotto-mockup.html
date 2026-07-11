@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="it" data-theme="light" data-caption-mode="j7b" class="font-crisp" data-v20q="13">
+<html lang="it" data-theme="light" data-caption-mode="j7b" class="font-crisp" data-v20q="14">
 <head>
 <meta charset="utf-8">
 <link rel="icon" type="image/svg+xml" href="favicon.svg">
@@ -900,7 +900,7 @@ button[onclick*="addToWordBank"]:hover{background:rgba(52,211,153,.15)!important
   <div style="display:flex;align-items:center;gap:8px">
     <a href="panoramica.html" class="topbar-brand">sotto<span>titoli</span></a>
     <span class="trial-pill">Pro</span>
-    <span style="font-size:9px;color:var(--muted2);font-family:monospace;opacity:.5;margin-left:2px" title="V20quint version">v13</span>
+    <span style="font-size:9px;color:var(--muted2);font-family:monospace;opacity:.5;margin-left:2px" title="V20quint version">v14</span>
     <a href="panoramica.html" style="text-decoration:none;color:var(--text-soft);font-size:13px;font-weight:500;margin-left:4px">← Dashboard</a>
   </div>
   <div style="flex:1;display:flex;justify-content:center;align-items:center;gap:8px">
@@ -6109,7 +6109,7 @@ window.fixExtrasPanelColors = function(){
 
 </script>
 
-<!-- ═══ V20quint Transcript Engine v13 ═══ -->
+<!-- ═══ V20quint Transcript Engine v14 ═══ -->
 <script>
 (function(){
   // ── State ──
@@ -6204,9 +6204,8 @@ window.fixExtrasPanelColors = function(){
   }
 
   // ── V20quint: watch DOM for .line divs added by speech pipeline ──
-  // NON-DESTRUCTIVE: hides original .line divs instead of removing them.
-  // The original pipeline (grammar-viz, stats, CEFR, speaker colors) depends
-  // on .line elements in the DOM — removing them breaks the entire flow.
+  // Self-healing: if #v20qContent is destroyed (by innerHTML clear), recreates it.
+  // Does NOT wrap toggleSession — leaves the original mic flow untouched.
   function v20q_bootstrap(){
     var ct = document.getElementById('captionTranscript');
     if (!ct) { setTimeout(v20q_bootstrap, 200); return; }
@@ -6214,9 +6213,19 @@ window.fixExtrasPanelColors = function(){
       mutations.forEach(function(m) {
         m.addedNodes.forEach(function(node) {
           if (node.nodeType !== 1 || !node.classList || !node.classList.contains('line')) return;
-          // Hide the original .line (but keep it in DOM for grammar/stats/CEFR)
+          // Self-heal: ensure #v20qContent exists
+          var vc = document.getElementById('v20qContent');
+          if (!vc) {
+            vc = document.createElement('div');
+            vc.className = 'v20q-content';
+            vc.id = 'v20qContent';
+            ct.appendChild(vc);
+            v20q.sentences = []; v20q.sIdx = 0;
+            v20q.baseSec = Math.floor(Math.random() * 120);
+          }
+          // Hide the original .line (keep in DOM for grammar/stats/CEFR)
           node.style.display = 'none';
-          // Extract sentence text, skipping the timestamp <span> (identified by monospace font)
+          // Extract sentence text, skip timestamp span
           var text = '';
           var children = node.childNodes;
           for (var i = 0; i < children.length; i++) {
@@ -6237,31 +6246,6 @@ window.fixExtrasPanelColors = function(){
       });
     });
     observer.observe(ct, { childList: true });
-
-    // Ensure #v20qContent is recreated after toggleSession clears transcript
-    var origToggle = window.toggleSession;
-    if (typeof origToggle === 'function') {
-      window.toggleSession = function(){
-        var wasActive = document.body.classList.contains('session-active');
-        var result = origToggle.apply(this, arguments);
-        if (!wasActive) {
-          var ct2 = document.getElementById('captionTranscript');
-          var vc = document.getElementById('v20qContent');
-          if (ct2 && !vc) {
-            var div = document.createElement('div');
-            div.className = 'v20q-content';
-            div.id = 'v20qContent';
-            ct2.appendChild(div);
-          }
-          v20q.sentences = []; v20q.sIdx = 0; v20q.words = [];
-          v20q.baseSec = Math.floor(Math.random() * 120);
-          vc = document.getElementById('v20qContent');
-          if (vc) vc.innerHTML = '';
-          v20q_updateBadge();
-        }
-        return result;
-      };
-    }
   }
   v20q_bootstrap();
 })();
