@@ -176,6 +176,30 @@ h1{font-size:30px;font-weight:800;letter-spacing:-.03em}
 .v20trisl .v20act{position:absolute;right:5px;top:50%;transform:translateY(-50%);display:flex;gap:3px;opacity:0;transition:opacity .15s}
 .v20trisl:hover .v20act{opacity:1}
 
+/* V20quater — 3-in-1 mode toggle: View / Edit / Collect */
+.v20quater{display:flex;flex-direction:column;height:100%}
+.v20qmodes{display:flex;gap:4px;padding:8px 12px;border-bottom:1px solid var(--line);flex-shrink:0;background:var(--card);position:sticky;top:0;z-index:2;align-items:center}
+.v20qmodes .v20qsep{width:1px;height:16px;background:var(--line);margin:0 4px}
+.v20qmode{width:28px;height:28px;border-radius:50%;border:1.5px solid var(--line2);background:transparent;color:var(--t3);cursor:pointer;font-size:12px;display:flex;align-items:center;justify-content:center;transition:all .15s}
+.v20qmode:hover{border-color:var(--accent);color:var(--accent)}
+.v20qmode.active{background:var(--accent);border-color:var(--accent);color:#fff}
+.v20qmode[data-mode="edit"].active{background:var(--blue);border-color:var(--blue)}
+.v20qmode[data-mode="collect"].active{background:var(--green);border-color:var(--green)}
+.v20qbadge{font-size:10px;font-weight:700;color:var(--green);margin-left:auto;display:flex;align-items:center;gap:3px;opacity:0;transition:opacity .2s}
+.v20qbadge.show{opacity:1}
+.v20qlist{padding:12px 16px;display:flex;flex-direction:column;justify-content:flex-end;gap:7px;flex:1;overflow-y:auto;scroll-behavior:smooth}
+.v20ql{padding:10px 38px 10px 14px;border-radius:7px;font-size:15px;line-height:1.45;opacity:0;animation:v20in 1.4s cubic-bezier(.16,1,.3,1) forwards;background:rgba(20,184,166,.06);border:1px solid rgba(20,184,166,.15);position:relative}
+.v20ql .v20qw{display:inline-block;padding:0 2px;border-radius:2px;border:1px solid transparent;transition:all .1s}
+.v20quater[data-mode="view"] .v20qw{cursor:default}
+.v20quater[data-mode="edit"] .v20qw{cursor:text}
+.v20quater[data-mode="edit"] .v20qw:hover{border-color:rgba(59,130,246,.4);background:rgba(59,130,246,.08)}
+.v20quater[data-mode="collect"] .v20qw{cursor:pointer}
+.v20quater[data-mode="collect"] .v20qw:hover{border-color:rgba(34,197,94,.4);background:rgba(34,197,94,.08)}
+.v20quater[data-mode="collect"] .v20qw.collected{background:rgba(34,197,94,.15);border-color:var(--green);color:var(--green);font-weight:600}
+.v20ql .v20qw.edited{text-decoration:underline;text-decoration-color:var(--green);text-underline-offset:3px}
+.v20ql .v20act{position:absolute;right:5px;top:50%;transform:translateY(-50%);display:flex;gap:3px;opacity:0;transition:opacity .15s}
+.v20ql:hover .v20act{opacity:1}
+
 /* V25 Film Strip — with action icons */
 .v25{display:flex;flex-direction:column;overflow-y:auto;gap:6px;padding:10px 8px;overflow-x:hidden}
 .v25f{padding:14px 16px;background:#111;border:2px solid #333;border-radius:5px;font-size:13px;line-height:1.45;color:var(--text);position:relative;opacity:0;animation:v25in .6s ease-out forwards}
@@ -361,6 +385,74 @@ define('V20tris','Highlight Reel · Interactive','ba bs',
     body.scrollTo({top:body.scrollHeight,behavior:'smooth'});
   }
 );
+
+// ═══ V20quater — 3-in-1: View / Edit / Collect ═══
+var v20qState = { mode: 'view', words: [], container: null };
+function v20qSetMode(mode) {
+  v20qState.mode = mode;
+  var c = v20qState.container;
+  if (c) {
+    c.setAttribute('data-mode', mode);
+    var btns = c.querySelectorAll('.v20qmode');
+    btns.forEach(function(b) { b.classList.toggle('active', b.dataset.mode === mode); });
+  }
+}
+function v20qHandleWord(e) {
+  var span = e.target.closest('.v20qw');
+  if (!span) return;
+  e.stopPropagation();
+  var mode = v20qState.mode;
+  if (mode === 'edit') {
+    v25tEdit(span);
+  } else if (mode === 'collect') {
+    span.classList.toggle('collected');
+    var w = span.textContent.trim().toLowerCase();
+    if (span.classList.contains('collected')) {
+      if (v20qState.words.indexOf(w) === -1) v20qState.words.push(w);
+      showV3Toast('✓ Added: ' + w);
+    } else {
+      v20qState.words = v20qState.words.filter(function(x) { return x !== w; });
+    }
+    v20qUpdateBadge();
+  }
+}
+function v20qUpdateBadge() {
+  var badge = document.getElementById('v20qbadge');
+  if (badge) {
+    var n = v20qState.words.length;
+    badge.textContent = n ? '📚 ' + n : '';
+    badge.classList.toggle('show', n > 0);
+  }
+}
+function v20qReset() {
+  v20qState.mode = 'view';
+  v20qState.words = [];
+  v20qState.container = null;
+  var badge = document.getElementById('v20qbadge');
+  if (badge) { badge.textContent = ''; badge.classList.remove('show'); }
+}
+// Register V20quater variation
+define('V20quater','3-in-1 · View/Edit/Collect','bt ba be bs',
+  '<div class="v20quater" id="v20qb" onclick="v20qHandleWord(event)" data-mode="view"><div class="v20qmodes"><button class="v20qmode active" data-mode="view" onclick="v20qSetMode(\'view\');event.stopPropagation()" title="View">👁</button><button class="v20qmode" data-mode="edit" onclick="v20qSetMode(\'edit\');event.stopPropagation()" title="Edit words">✎</button><button class="v20qmode" data-mode="collect" onclick="v20qSetMode(\'collect\');event.stopPropagation()" title="Collect words">🟢</button><span class="v20qbadge" id="v20qbadge"></span></div><div class="v20qlist" id="v20qlist"></div></div>',
+  [2,5,8,11,0],
+  function(body,s,i){
+    v20qState.container = body;
+    var list = body.querySelector('#v20qlist');
+    var d = document.createElement('div');
+    d.className = 'v20ql';
+    // Wrap words in spans for mode-dependent interaction
+    var words = s.match(/<span[^>]*>.*?<\/span>|\S+/g) || [];
+    var wordHtml = '';
+    words.forEach(function(wd) {
+      var txt = wd.replace(/<[^>]*>/g, '');
+      wordHtml += '<span class="v20qw">' + txt + '</span> ';
+    });
+    d.innerHTML = wordHtml + '<div class="v20act"><button title="Edit" onclick="event.stopPropagation()">✎</button><button class="v20bm" title="Bookmark" onclick="event.stopPropagation()">☆</button><button class="v20del" title="Delete" onclick="event.stopPropagation();this.closest(\'.v20ql\').style.opacity=\'0.2\'">🗑</button></div>';
+    list.appendChild(d);
+    list.scrollTo({ top: list.scrollHeight, behavior: 'smooth' });
+  }
+);
+
 // V25t — Film Strip cards with icons + single-click word edit
 define('V25t','Film Strip · Cards','bs ba',
   '<div class="v25t" id="v25tb"></div>',
@@ -433,6 +525,7 @@ function stopDemo(id){
   ps.phase='idle';
   // Reset body HTML
   ps.body.innerHTML=ps.def.bodyHtml.replace(/ id="[^"]*"/,'');
+  if(id==='V20quater') v20qReset();
   // Update button
   var btn=cardMap[id].querySelector('.play-btn');
   if(btn){btn.textContent='▶';btn.classList.remove('playing');btn.title='Play demo';}
@@ -449,6 +542,7 @@ function toggleDemo(id){
   ps.playing=true;
   ps.idx=0;
   ps.phase='adding';
+  if(id==='V20quater') v20qReset();
   var btn=cardMap[id].querySelector('.play-btn');
   if(btn){btn.textContent='⏹';btn.classList.add('playing');btn.title='Stop demo';}
   // Clear & start
