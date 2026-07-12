@@ -187,33 +187,16 @@
               <div class="metric-badge">—</div>
               <div class="prog"><div class="prog-fill teal" style="width:79%"></div></div>
             </article>
-            <article class="metric-card" data-metric="reportCount">
-              <div class="metric-value" style="color:var(--text-faint)">—</div>
-              <div class="metric-label" data-i18n="ai_reports_generated">Report AI generati</div>
-              <div class="metric-badge">—</div>
-              <button id="goToReportBtn" class="btn-outline-teal" onclick="document.querySelector('[data-panel=report-ai]').dispatchEvent(new MouseEvent('click',{bubbles:true}))">Genera report →</button>
-            </article>
-            <!-- ── Mockup-22 Metric V1: Minuti giornalieri ── -->
-            <article class="metric-card" data-metric="dailyMin" style="text-align:center;display:flex;flex-direction:column;justify-content:space-between;min-height:180px">
-              <div class="metric-value" style="font-size:44px;margin-bottom:0">—</div>
-              <div class="metric-label" style="font-size:17px;margin-bottom:4px" data-i18n="daily_minutes">Minuti giornalieri</div>
-              <div class="sparkline"><div class="bar" style="height:55%"></div><div class="bar" style="height:75%"></div><div class="bar" style="height:45%"></div><div class="bar" style="height:85%"></div><div class="bar" style="height:60%"></div><div class="bar" style="height:95%"></div></div>
-              <div class="metric-badge">—</div>
-            </article>
-            <!-- ── Mockup-22 Metric V2: Completamento ── -->
-            <article class="metric-card" data-metric="completionPct" style="display:flex;flex-direction:column;justify-content:space-between;min-height:180px;grid-column:span 2">
-              <div style="display:flex;align-items:center;gap:18px;flex:1">
-                <div class="metric-value" style="margin:0;font-size:44px;flex-shrink:0">—</div>
-                <div style="flex:1;display:flex;flex-direction:column;justify-content:center">
-                  <div class="metric-label" style="margin:0 0 2px;font-size:17px" data-i18n="completion">Completamento</div>
-                  <div style="font-size:11px;color:var(--text-faint)">obiettivo mensile</div>
-                </div>
+            <!-- 14-day session minutes chart -->
+            <article class="metric-card" data-metric="dailyChart" style="grid-column:1/-1;display:flex;flex-direction:column;min-height:160px">
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+                <div class="metric-label" style="font-size:14px;margin:0">Minuti in sessione — ultimi 14 giorni</div>
+                <span style="font-size:11px;color:var(--text-faint)" id="dailyChartTotal">—</span>
               </div>
-              <div class="sparkline"><div class="bar" style="height:60%"></div><div class="bar" style="height:80%"></div><div class="bar" style="height:50%"></div><div class="bar" style="height:90%"></div><div class="bar" style="height:65%"></div><div class="bar" style="height:100%"></div></div>
-              <div style="display:flex;justify-content:space-between;margin-top:8px">
-                <span class="metric-badge">—</span>
-                <span style="font-size:11px;color:var(--text-faint)">ultimi 30gg</span>
+              <div id="dailyChart" style="display:flex;align-items:flex-end;gap:4px;flex:1;min-height:90px;padding:0 2px">
+                <span style="font-size:12px;color:var(--text-faint);align-self:center;width:100%;text-align:center">Caricamento…</span>
               </div>
+              <div style="display:flex;justify-content:space-between;margin-top:6px;font-size:9px;color:var(--text-faint);padding:0 2px" id="dailyChartLabels"></div>
             </article>
           </section>
           <!-- CEFR Distribution -->
@@ -944,6 +927,53 @@
           if (valEl) valEl.textContent = String(vals[key]);
           if (badge && badges[key]) badge.textContent = badges[key];
         });
+        // ── Render 14-day chart ──
+        renderDailyChart();
+      }
+
+      // ═══ RENDER: Daily session minutes chart ───
+      async function renderDailyChart() {
+        var container = document.getElementById('dailyChart');
+        var labelsEl = document.getElementById('dailyChartLabels');
+        var totalEl = document.getElementById('dailyChartTotal');
+        if (!container || !labelsEl) return;
+        try {
+          var sb = window.sottotitoliSupabase;
+          if (!sb) { container.innerHTML = '<span style="font-size:12px;color:var(--text-faint);align-self:center;width:100%;text-align:center">Accedi per vedere il grafico</span>'; return; }
+          var r = await sb.auth.getSession();
+          if (!r.data?.session) { container.innerHTML = '<span style="font-size:12px;color:var(--text-faint);align-self:center;width:100%;text-align:center">Accedi per vedere il grafico</span>'; return; }
+          var userId = r.data.session.user.id;
+          var now = new Date();
+          var days = [];
+          for (var d = 13; d >= 0; d--) {
+            var date = new Date(now.getTime() - d * 86400000);
+            days.push({ date: date, label: date.toLocaleDateString('it-IT', { weekday: 'short' }).substring(0, 3), iso: date.toISOString().substring(0, 10), minutes: 0 });
+          }
+          var startDate = days[0].iso;
+          var endDate = new Date(now.getTime() + 86400000).toISOString().substring(0, 10);
+          var sRes = await sb.from('sessions').select('duration_seconds,started_at').eq('user_id', userId).gte('started_at', startDate).lt('started_at', endDate).order('started_at');
+          if (sRes.data) {
+            sRes.data.forEach(function(s) {
+              var dayIso = s.started_at.substring(0, 10);
+              var day = days.find(function(d) { return d.iso === dayIso; });
+              if (day) day.minutes += Math.round((s.duration_seconds || 0) / 60);
+            });
+          }
+          var maxMin = Math.max.apply(null, days.map(function(d) { return d.minutes; })) || 1;
+          var totalMin = days.reduce(function(s, d) { return s + d.minutes; }, 0);
+          if (totalEl) totalEl.textContent = totalMin + ' min totali';
+          // Render bars
+          var barHtml = '';
+          var labelHtml = '';
+          days.forEach(function(day) {
+            var h = Math.max(4, Math.round((day.minutes / maxMin) * 100));
+            var color = day.minutes > 0 ? 'var(--accent)' : 'var(--line)';
+            barHtml += '<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:3px"><span style="font-size:9px;color:var(--text-faint)">' + (day.minutes || '') + '</span><div style="width:100%;height:' + h + '%;min-height:' + (day.minutes > 0 ? '4px' : '2px') + ';background:' + color + ';border-radius:3px 3px 0 0;transition:height .4s ease" title="' + day.iso + ': ' + day.minutes + ' min"></div></div>';
+            labelHtml += '<span style="flex:1;text-align:center">' + day.label + '</span>';
+          });
+          container.innerHTML = barHtml;
+          labelsEl.innerHTML = labelHtml;
+        } catch(e) { container.innerHTML = '<span style="font-size:12px;color:var(--text-faint);align-self:center;width:100%;text-align:center">Errore nel caricamento</span>'; }
       }
 
       // ═══ RENDER: Insights metrics ───
