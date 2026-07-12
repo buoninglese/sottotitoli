@@ -786,6 +786,71 @@
         if (typeof I18n !== 'undefined' && I18n.apply) { I18n.apply(heroText); }
       }
 
+      // ── Save Profilo Linguistico ──
+      async function saveProfiloLinguistico() {
+        var btn = document.getElementById('saveProfileLingBtn');
+        var msg = document.getElementById('savedProfileLingMsg');
+        if (btn) { btn.disabled = true; btn.textContent = 'Salvataggio…'; }
+        try {
+          // Collect all selected values
+          function getSelected(containerId) {
+            var el = document.getElementById(containerId);
+            if (!el) return null;
+            var active = el.querySelector('.q-chip.active, .q-chip[aria-pressed="true"]');
+            return active ? active.getAttribute('data-val') : null;
+          }
+          function getMultiSelected(containerId) {
+            var el = document.getElementById(containerId);
+            if (!el) return [];
+            var chips = el.querySelectorAll('.q-chip.active, .q-chip[aria-pressed="true"]');
+            return Array.from(chips).map(function(c) { return c.getAttribute('data-val'); });
+          }
+          var profile = {
+            native_proficiency: getSelected('nativeProficiency'),
+            native_contexts: getMultiSelected('nativeContexts'),
+            native_improve: getMultiSelected('nativeImprove'),
+            native_goals: document.getElementById('nativeGoalsInput')?.value?.trim() || null,
+            target_purpose: getSelected('targetPurpose'),
+            target_situations: getMultiSelected('targetSituations'),
+            target_sector: getSelected('targetSector'),
+            target_level: getSelected('targetLevel'),
+            goal_primary: document.getElementById('targetGoalInput')?.value?.trim() || null
+          };
+          // Save to Supabase
+          var sb = window.sottotitoliSupabase;
+          if (sb) {
+            var r = await sb.auth.getSession();
+            if (r.data?.session) {
+              var uid = r.data.session.user.id;
+              await sb.from('profiles').upsert({ id: uid, ...profile }, { onConflict: 'id' });
+            }
+          }
+          // Update local cache
+          window._sottotitoliProfile = window._sottotitoliProfile || {};
+          Object.assign(window._sottotitoliProfile, profile);
+          // Show success
+          if (msg) { msg.style.display = 'inline'; setTimeout(function() { msg.style.display = 'none'; }, 2500); }
+          // Toast
+          var t = document.createElement('div');
+          t.style.cssText = 'position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--green);color:#fff;font-size:13px;font-weight:700;padding:10px 24px;border-radius:99px;z-index:99999;opacity:0;transition:opacity .3s;pointer-events:none;font-family:var(--font-body)';
+          t.textContent = '✓ Profilo salvato';
+          document.body.appendChild(t);
+          requestAnimationFrame(function(){ t.style.opacity = '1'; });
+          setTimeout(function(){ t.style.opacity = '0'; setTimeout(function(){ t.remove(); }, 300); }, 2000);
+        } catch(e) {
+          console.warn('saveProfile:', e);
+          var t = document.createElement('div');
+          t.style.cssText = 'position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#dc2626;color:#fff;font-size:13px;font-weight:700;padding:10px 24px;border-radius:99px;z-index:99999;opacity:0;transition:opacity .3s;pointer-events:none;font-family:var(--font-body)';
+          t.textContent = '⚠ Errore: ' + (e.message || 'riprova');
+          document.body.appendChild(t);
+          requestAnimationFrame(function(){ t.style.opacity = '1'; });
+          setTimeout(function(){ t.style.opacity = '0'; setTimeout(function(){ t.remove(); }, 300); }, 3000);
+        }
+        if (btn) { btn.disabled = false; btn.textContent = 'Salva profilo'; }
+      }
+      // Expose globally since onclick calls it
+      window.saveProfiloLinguistico = saveProfiloLinguistico;
+
       // ── Pick current language stats ──
       function currentStats() {
         return (window.SOTTOTITOLI_STUDY_LANG || 'en') === 'en' ? statsEN : statsIT;
