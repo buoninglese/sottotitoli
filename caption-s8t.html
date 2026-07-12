@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="it" data-theme="light" data-caption-mode="j7b" class="font-crisp" data-v20q="38">
+<html lang="it" data-theme="light" data-caption-mode="j7b" class="font-crisp" data-v20q="39">
 <head>
 <meta charset="utf-8">
 <link rel="icon" type="image/svg+xml" href="favicon.svg">
@@ -927,7 +927,7 @@ button[onclick*="addToWordBank"]:hover{background:rgba(52,211,153,.15)!important
   <div style="display:flex;align-items:center;gap:8px">
     <a href="panoramica.html" class="topbar-brand">sotto<span>titoli</span></a>
     <span class="trial-pill">Pro</span>
-    <span style="font-size:9px;color:var(--muted2);font-family:monospace;opacity:.5;margin-left:2px" title="V20quint version">v38</span>
+    <span style="font-size:9px;color:var(--muted2);font-family:monospace;opacity:.5;margin-left:2px" title="V20quint version">v39</span>
     <a href="panoramica.html" style="text-decoration:none;color:var(--text-soft);font-size:13px;font-weight:500;margin-left:4px">← Dashboard</a>
   </div>
   <div style="flex:1;display:flex;justify-content:center;align-items:center;gap:8px">
@@ -2330,7 +2330,7 @@ function _slideLineClick(el) {
       var cardId = 'gsyn-' + ts + '-' + i;
       html += '<div class="syn-card" id="' + cardId + '" data-word="' + w + '" style="background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px;position:relative">';
       html += '<div style="position:absolute;top:8px;right:8px;display:flex;gap:4px;z-index:2">';
-      html += '<button onclick="this.classList.toggle(\'saved\');this.textContent=this.classList.contains(\'saved\')?\'✓\':\'+\'" style="width:24px;height:24px;border-radius:50%;border:1px solid var(--line);background:var(--card2);color:var(--muted2);cursor:pointer;font-size:20px;display:flex;align-items:center;justify-content:center;line-height:1" title="Add to word bank">+</button>';
+      html += '<button onclick="var w=this.closest(\'.syn-card\').getAttribute(\'data-word\');this.classList.toggle(\'saved\');if(this.classList.contains(\'saved\')){this.textContent=\'✓\';if(typeof addToWordBank===\'function\')addToWordBank(w)}else{this.textContent=\'+\';if(typeof removeFromWordBank===\'function\')removeFromWordBank(w)}" style="width:24px;height:24px;border-radius:50%;border:1px solid var(--line);background:var(--card2);color:var(--muted2);cursor:pointer;font-size:20px;display:flex;align-items:center;justify-content:center;line-height:1" title="Add to word bank">+</button>';
       html += '<button onclick="var c=document.getElementById(\''+cardId+'\');c.style.opacity=\'0\';c.style.transform=\'scale(.95)\';c.style.transition=\'all .2s\';setTimeout(function(){c.remove()},200)" style="width:24px;height:24px;border-radius:50%;border:1px solid var(--line);background:var(--card2);color:var(--muted2);cursor:pointer;font-size:20px;display:flex;align-items:center;justify-content:center;line-height:1" title="Dismiss">×</button>';
       html += '</div>';
       html += '<div style="margin-bottom:2px;padding-right:56px"><span class="syn-base-word" data-word="' + w + '" data-context="' + text.slice(0,30) + '" onclick="event.stopPropagation();lookupSynonym(this)" style="font-size:17px;font-weight:700;color:var(--text);cursor:pointer">' + w + '</span></div>';
@@ -3508,19 +3508,47 @@ function saveWordBank() {
   localStorage.setItem(WORD_BANK_KEY, JSON.stringify(wordBank));
   var countEl = document.getElementById('wordbankCount');
   if (countEl) countEl.textContent = wordBank.length;
-  // Sync to Supabase if logged in (silent fail — table may not have key/value columns yet)
+  // Sync to Supabase user_wordbank_words via "Saved from sessions" bank
+  syncWordBankToSupabase();
+}
+
+// ── Supabase word bank sync ──
+var _wbSyncTimer = null;
+function syncWordBankToSupabase() {
+  clearTimeout(_wbSyncTimer);
+  _wbSyncTimer = setTimeout(_doWbSync, 600); // debounce
+}
+async function _doWbSync() {
   try {
-    if (window.sottotitoliSupabase) {
-      window.sottotitoliSupabase.auth.getSession().then(function(r) {
-        if (r.data?.session) {
-          window.sottotitoliSupabase.from('user_preferences').upsert({
-            user_id: r.data.session.user.id,
-            updated_at: new Date().toISOString()
-          }, { onConflict: 'user_id' }).then(function() {}).catch(function(){});
-        }
-      }).catch(function(){});
+    if (!window.sottotitoliSupabase) return;
+    var sb = window.sottotitoliSupabase;
+    var r = await sb.auth.getSession();
+    if (!r.data?.session) return;
+    var userId = r.data.session.user.id;
+    var lang = 'en'; // caption language — saved words are from English speech
+    // 1. Find or create "Saved from sessions" wordbank
+    var wbRes = await sb.from('user_wordbanks').select('id').eq('user_id', userId).eq('name', 'Saved from sessions').maybeSingle();
+    var wbId;
+    if (wbRes.data) {
+      wbId = wbRes.data.id;
+    } else {
+      var createRes = await sb.from('user_wordbanks').insert({ user_id: userId, name: 'Saved from sessions', lang: lang }).select('id').single();
+      if (createRes.error) { console.warn('wb create:', createRes.error.message); return; }
+      wbId = createRes.data.id;
     }
-  } catch(e) {}
+    // 2. Upsert all current words
+    for (var i = 0; i < wordBank.length; i++) {
+      var w = wordBank[i];
+      // Check if word already exists in this bank
+      var exRes = await sb.from('user_wordbank_words').select('id,usage_count').eq('wordbank_id', wbId).eq('word', w).maybeSingle();
+      if (exRes.data) {
+        // Increment usage
+        await sb.from('user_wordbank_words').update({ usage_count: (exRes.data.usage_count || 0) + 1 }).eq('id', exRes.data.id);
+      } else {
+        await sb.from('user_wordbank_words').insert({ wordbank_id: wbId, word: w, pos: '', usage_count: 1 });
+      }
+    }
+  } catch(e) { /* silent */ }
 }
 
 function renderWordBank() {
@@ -6232,7 +6260,7 @@ window.fixExtrasPanelColors = function(){
 
 </script>
 
-<!-- ═══ V20quint Transcript Engine v38 ═══ -->
+<!-- ═══ V20quint Transcript Engine v39 ═══ -->
 <script>
 (function(){
   // ── State ──
