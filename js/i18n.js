@@ -676,7 +676,7 @@
       "relocation": "Relocation",
       "film_content": "Films & content",
       "meetings": "Meetings",
-      "emails": "Emails",
+      "emails": "Email",
       "presentations": "Presentations",
       "phone_calls": "Phone calls",
       "social": "Social",
