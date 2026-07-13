@@ -217,6 +217,7 @@
 <script src="js/cefr-levels.js"></script>
 <script src="js/traduzione/state.js"></script>
 <script src="js/traduzione/segments.js"></script>
+<script src="js/traduzione/vocabulary.js"></script>
 <script src="js/traduzione/api-client.js"></script>
 
 <script>
@@ -231,6 +232,11 @@
 
   // ── Init (bootstraps room, TTL, bridging, join mode, demo) ──
   async function init(){
+    // Initialize vocabulary (loads local cache, syncs with Supabase)
+    S8T_VOCAB.init().then(function(){
+      // Re-tokenize any existing transcript words
+      if (S8T_SEGMENTS.count() > 0) reRenderAll();
+    });
     var roomMode = S8T.initRoom();
     if (roomMode === 'invite') {
       // Guest joining via invite token — call the server
@@ -464,13 +470,13 @@
     if (bridge === 'b1') {
       var words = orig.split(/\s+/);
       var knownWords = words.filter(function(w){
-        return savedWords[w.toLowerCase().replace(/[.,!?;:…]$/,'')];
+        return S8T_VOCAB.cache[w.toLowerCase().replace(/[.,!?;:…]$/,'')];
       });
       if (knownWords.length >= words.length * 0.7) {
         // User knows >70% of words — show partial translation with unknown words highlighted
         var partial = words.map(function(w){
           var lower = w.toLowerCase().replace(/[.,!?;:…]$/,'');
-          return savedWords[lower] ? w : '___';
+          return S8T_VOCAB.cache[lower] ? w : '___';
         }).join(' ');
         commitSentence(speaker, orig, partial + ' ⚡');
         return;
@@ -531,7 +537,7 @@
     var seen = {};
     allWords.forEach(function(w){
       var lower = w.toLowerCase();
-      if (savedWords[lower]) known++;
+      if (S8T_VOCAB.cache[lower]) known++;
       else if (!seen[lower]) { seen[lower]=true; newWords.push(lower); }
     });
     var pct = total > 0 ? Math.round(known/total*100) : 0;
@@ -825,7 +831,7 @@
     filter = filter || 'all';
     var container = document.getElementById('glossaryList');
     if (!container) return;
-    var words = Object.keys(savedWords);
+    var words = Object.keys(S8T_VOCAB.cache);
     if (words.length === 0) {
       container.innerHTML = '<div style="color:var(--t3);font-size:13px;padding:20px">Nessuna parola salvata. Tocca una parola nella trascrizione e premi "💾 Salva".</div>';
       return;
@@ -839,16 +845,16 @@
     });
     var filtered = words.filter(function(w){
       if (filter === 'all') return true;
-      return savedWords[w].level === filter;
+      return (S8T_VOCAB.cache[w]||{}).level === filter;
     });
     if (filtered.length === 0) {
       container.innerHTML = '<div style="color:var(--t3);font-size:13px;padding:20px">Nessuna parola di livello '+filter+' nel tuo vocabolario.</div>';
       return;
     }
-    filtered.sort(function(a,b){ return (savedWords[b].savedAt||'').localeCompare(savedWords[a].savedAt||''); });
+    filtered.sort(function(a,b){ return ((S8T_VOCAB.cache[b]||{}).savedAt||'').localeCompare((S8T_VOCAB.cache[a]||{}).savedAt||''); });
     var html = '';
     filtered.forEach(function(w){
-      var info = savedWords[w];
+      var info = S8T_VOCAB.cache[w];
       var level = info.level || '';
       var cefr = (window.CEFR_COLORS && level) ? window.CEFR_COLORS[level] : null;
       html += '<div class="gloss-card" style="background:var(--card2);border:1px solid var(--line);border-radius:12px;padding:12px 16px;display:flex;flex-direction:column;gap:6px;min-width:140px;max-width:200px;flex:1;transition:all .2s;cursor:pointer" onclick="showToast(\''+escAttr(w)+' · '+escAttr(level||'?')+'\')" title="'+escAttr(w)+'">'+
@@ -901,16 +907,16 @@
   };
 
   // ═══ WORD LENS — tap-to-explore ═══
-  var savedWords = {};
-  try { savedWords = JSON.parse(localStorage.getItem('sottotitoli-saved-words') || '{}'); } catch(e) {}
+  // Vocabulary is managed by S8T_VOCAB (server-synced with localStorage fallback)
 
   function tokenizeHTML(text, lang){
     if (!text || text === '…') return esc(text||'');
+    var cache = S8T_VOCAB.cache;
     return text.replace(/([\wÀ-ÿ']+)|([^\wÀ-ÿ']+)/g, function(match, word, punct){
       if (punct) return esc(punct);
       var lower = word.toLowerCase().replace(/'s$/,'').replace(/[.,!?;:…]$/,'');
       var level = window.getCEFRLevel ? window.getCEFRLevel(lower) : '';
-      var isSaved = savedWords[lower] ? ' saved' : '';
+      var isSaved = cache[lower] ? ' saved' : '';
       return '<span class="tw-word'+isSaved+'" data-word="'+escAttr(lower)+'" data-lang="'+escAttr(lang)+'" data-level="'+level+'" title="'+escAttr(word)+(level?' · '+level:'')+'">'+esc(word)+'</span>';
     });
   }
@@ -926,7 +932,7 @@
     var word = el.getAttribute('data-word');
     var lang = el.getAttribute('data-lang') || 'en';
     var level = el.getAttribute('data-level') || '';
-    var isSaved = savedWords[word];
+    var isSaved = S8T_VOCAB.isSaved(word);
     var rect = el.getBoundingClientRect();
     var popup = document.getElementById('twPopup');
     if (!popup) {
@@ -967,31 +973,31 @@
   }
 
   window._twSave = function(word, lang, level){
-    savedWords[word] = {lang:lang, level:level, savedAt:new Date().toISOString()};
-    localStorage.setItem('sottotitoli-saved-words', JSON.stringify(savedWords));
-    document.querySelectorAll('.tw-word[data-word="'+escAttr(word)+'"]').forEach(function(el){
-      el.classList.add('saved');
+    S8T_VOCAB.saveWord(word, lang, level).then(function(){
+      document.querySelectorAll('.tw-word[data-word="'+escAttr(word)+'"]').forEach(function(el){
+        el.classList.add('saved');
+      });
+      var popup = document.getElementById('twPopup');
+      if (popup) {
+        var btn = popup.querySelector('.tw-btn-save');
+        if (btn) { btn.className = 'tw-btn tw-btn-saved'; btn.textContent = '💾 Salvata'; btn.onclick = function(){ window._twUnsave(word); }; }
+      }
+      showToast('💾 '+word+' salvata nel tuo vocabolario');
     });
-    var popup = document.getElementById('twPopup');
-    if (popup) {
-      var btn = popup.querySelector('.tw-btn-save');
-      if (btn) { btn.className = 'tw-btn tw-btn-saved'; btn.textContent = '💾 Salvata'; btn.onclick = function(){ window._twUnsave(''+escAttr(word)+''); }; }
-    }
-    showToast('💾 '+word+' salvata nel tuo vocabolario');
   };
 
   window._twUnsave = function(word){
-    delete savedWords[word];
-    localStorage.setItem('sottotitoli-saved-words', JSON.stringify(savedWords));
-    document.querySelectorAll('.tw-word[data-word="'+escAttr(word)+'"]').forEach(function(el){
-      el.classList.remove('saved');
+    S8T_VOCAB.unsaveWord(word).then(function(){
+      document.querySelectorAll('.tw-word[data-word="'+escAttr(word)+'"]').forEach(function(el){
+        el.classList.remove('saved');
+      });
+      var popup = document.getElementById('twPopup');
+      if (popup) {
+        var btn = popup.querySelector('.tw-btn-saved');
+        if (btn) { btn.className = 'tw-btn tw-btn-save'; btn.textContent = '💾 Salva parola'; btn.onclick = function(){ window._twSave(word,'',''); }; }
+      }
+      showToast('🗑️ '+word+' rimossa dal vocabolario');
     });
-    var popup = document.getElementById('twPopup');
-    if (popup) {
-      var btn = popup.querySelector('.tw-btn-saved');
-      if (btn) { btn.className = 'tw-btn tw-btn-save'; btn.textContent = '💾 Salva parola'; btn.onclick = function(){ window._twSave(''+escAttr(word)+'','en',''); }; }
-    }
-    showToast('🗑️ '+word+' rimossa dal vocabolario');
   };
 
   function esc(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
