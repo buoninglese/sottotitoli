@@ -218,6 +218,7 @@
 <script src="js/traduzione/state.js"></script>
 <script src="js/traduzione/segments.js"></script>
 <script src="js/traduzione/vocabulary.js"></script>
+<script src="js/traduzione/realtime.js"></script>
 <script src="js/traduzione/api-client.js"></script>
 
 <script>
@@ -737,9 +738,17 @@
         DUO.timer++; var m=Math.floor(DUO.timer/60), s=DUO.timer%60;
         document.getElementById('duoTimer').textContent = (m<10?'0':'')+m+':'+(s<10?'0':'')+s;
       },1000);
-      // Connect WebSocket
+      // Connect WebSocket + Realtime
       initWS();
       wsPublisher.connect();
+      S8T_REALTIME.subscribe(DUO.roomId, function(seg){
+        // Another user sent a segment — render it locally
+        if (seg.sourceText) {
+          var speaker = 'Guest'; // TODO: resolve from room_members
+          if (!DUO.speakers[speaker]) duoAddSpeaker(speaker, seg.sourceLanguage || 'en');
+          addSentence(speaker, seg.sourceText, null);
+        }
+      });
       addLogEntry('🎬','Sessione avviata · Room '+DUO.roomId.substring(0,8));
       // Show message input
       document.getElementById('duoMsgInput').style.display = '';
@@ -752,6 +761,7 @@
       startBtn.style.display = ''; stopBtn.style.display = 'none';
       clearInterval(DUO.timerInt);
       if (wsPublisher) wsPublisher.disconnect();
+      S8T_REALTIME.unsubscribe();
       // Hide message input
       document.getElementById('duoMsgInput').style.display = 'none';
       document.getElementById('duoSendBtn').style.display = 'none';
