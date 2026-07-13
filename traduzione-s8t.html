@@ -28,7 +28,7 @@
     <a href="panoramica.html" style="text-decoration:none;color:var(--text-soft);font-size:13px;font-weight:500;margin-left:4px">← Dashboard</a>
   </div>
   <div style="flex:1;display:flex;justify-content:center;align-items:center;gap:8px">
-    <span style="font-family:var(--mono);font-size:11px;color:var(--muted);display:flex;align-items:center;gap:4px">Room <code style="background:var(--bg);padding:2px 8px;border-radius:4px;font-size:12px" id="duoRoomCode">———</code><span id="wsIndicator" style="display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--t3);margin-left:2px" title="WebSocket: idle"></span></span>
+    <span style="font-family:var(--mono);font-size:11px;color:var(--muted);display:flex;align-items:center;gap:4px">Room <code style="background:var(--bg);padding:2px 8px;border-radius:4px;font-size:12px" id="duoRoomCode">———</code><span id="wsIndicator" style="display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--t3);margin-left:2px" title="WebSocket: idle"></span><span id="micIndicator" style="display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--t3);margin-left:2px" title="Microfono: spento"></span></span>
   </div>
   <div class="topbar-tools">
     <button type="button" class="theme-toggle" id="themeToggle" aria-label="Toggle color theme">
@@ -227,6 +227,7 @@
 <script src="js/traduzione/state.js"></script>
 <script src="js/traduzione/segments.js"></script>
 <script src="js/traduzione/vocabulary.js"></script>
+<script src="js/traduzione/speech-service.js"></script>
 <script src="js/traduzione/realtime.js"></script>
 <script src="js/traduzione/api-client.js"></script>
 
@@ -249,7 +250,7 @@
     });
     var roomMode = S8T.initRoom();
     if (roomMode === 'invite') {
-      // Guest joining via invite token — call the server
+      // Guest joining via invite token — must succeed or fail visibly
       try {
         var result = await S8T_API.joinRoom(DUO.inviteToken, null, DUO.myTTL);
         DUO.roomId = result.room.id;
@@ -258,10 +259,9 @@
         showToast('🔗 Sei entrato nella stanza!');
       } catch(e) {
         console.error('Join room failed:', e);
-        showToast('⚠️ Link di invito non valido o scaduto');
-        // Fall back to a local room so the page still works
-        DUO.roomId = S8T.generateRoomId();
-        localStorage.setItem('duo-room-id', DUO.roomId);
+        // Fail closed — do NOT create a local room
+        showJoinError(e.message || 'Link di invito non valido o scaduto');
+        return; // Stop initialization — page stays on error state
       }
     }
     document.getElementById('duoRoomCode').textContent = DUO.roomId.substring(0,8);
@@ -751,17 +751,45 @@
         DUO.timer++; var m=Math.floor(DUO.timer/60), s=DUO.timer%60;
         document.getElementById('duoTimer').textContent = (m<10?'0':'')+m+':'+(s<10?'0':'')+s;
       },1000);
-      // Connect WebSocket + Realtime
+      // Connect WebSocket + Realtime + Speech
       initWS();
       wsPublisher.connect();
       S8T_REALTIME.subscribe(DUO.roomId, function(seg){
-        // Another user sent a segment — render it locally
         if (seg.sourceText) {
-          var speaker = 'Guest'; // TODO: resolve from room_members
+          var speaker = 'Guest';
           if (!DUO.speakers[speaker]) duoAddSpeaker(speaker, seg.sourceLanguage || 'en');
           addSentence(speaker, seg.sourceText, null);
         }
       });
+      // Initialize speech recognition for the first speaker's language
+      var firstSpk = DUO.speakerOrder[0];
+      var spkLang = firstSpk ? DUO.speakers[firstSpk].snl : 'en';
+      S8T_SPEECH.init(spkLang, {
+        onInterim: function(text){
+          var interim = document.getElementById('duoInterim');
+          if (interim) { interim.textContent = text; interim.style.color = 'var(--t2)'; }
+        },
+        onFinal: function(text){
+          var interim = document.getElementById('duoInterim');
+          if (interim) interim.textContent = '';
+          var me = DUO.speakerOrder[0] || DUO.myName;
+          addSentence(me, text, null);
+        },
+        onState: function(state){
+          var micDot = document.getElementById('micIndicator');
+          if (micDot) {
+            micDot.style.background = state === 'listening' ? 'var(--green)' : state === 'connecting' ? 'var(--amber)' : 'var(--t3)';
+          }
+        },
+        onError: function(code, msg){
+          console.warn('Speech error:', code, msg);
+          // Fall back to typed input — already visible
+          var interim = document.getElementById('duoInterim');
+          if (interim) { interim.textContent = '🎤 ' + (code === 'unsupported' ? 'Riconoscimento vocale non supportato. Usa la tastiera.' : 'Microfono non disponibile. Usa la tastiera.'); interim.style.color = 'var(--t3)'; }
+        }
+      });
+      // Try to start speech — if it fails, typed input is the fallback
+      S8T_SPEECH.start().catch(function(){});
       addLogEntry('🎬','Sessione avviata · Room '+DUO.roomId.substring(0,8));
       // Show message input
       document.getElementById('duoMsgInput').style.display = '';
@@ -775,6 +803,7 @@
       clearInterval(DUO.timerInt);
       if (wsPublisher) wsPublisher.disconnect();
       S8T_REALTIME.unsubscribe();
+      S8T_SPEECH.stop();
       // Hide message input
       document.getElementById('duoMsgInput').style.display = 'none';
       document.getElementById('duoSendBtn').style.display = 'none';
@@ -797,15 +826,6 @@
         '<div class="duo-spk-status online"></div></div>';
     });
     list.innerHTML = html || '<div style="text-align:center;font-size:11px;color:var(--t3);padding:20px 8px">Nessun partecipante.<br>Usa le impostazioni qui sotto per aggiungerne.</div>';
-  }
-
-  // ── DOM rendering ──
-  function renderSentence(speaker, orig, tran){
-    var container = document.getElementById('duoTranscript');
-    var el = buildSentenceDOM(speaker, orig, tran);
-    container.appendChild(el);
-    requestAnimationFrame(function(){ el.style.opacity = '1'; });
-    container.scrollTo({top:container.scrollHeight,behavior:'smooth'});
   }
 
   function reRenderAll(){
@@ -916,32 +936,45 @@
   window.duoCopyRoom=function(){ navigator.clipboard.writeText(DUO.roomId).then(function(){showToast('📋 ID stanza copiato!')}); };
   window.duoShareWhatsApp=function(){ window.open('https://wa.me/?text='+encodeURIComponent(document.getElementById('duoInviteLink').textContent),'_blank'); };
   window.duoShareEmail=function(){ window.location.href='mailto:?subject=Unisciti alla mia sessione di traduzione&body='+encodeURIComponent(document.getElementById('duoInviteLink').textContent); };
-  window.duoNewRoom=function(){
-    // Try server room creation if authenticated
-    if (window.S8T_API && window.sottotitoliSupabase) {
-      S8T_API.createRoom(null).then(function(result){
-        DUO.roomId = result.room.id;
-        DUO.inviteToken = result.inviteToken;
-        localStorage.setItem('duo-room-id', DUO.roomId);
-        document.getElementById('duoRoomCode').textContent = DUO.roomId.substring(0,8);
-        updateInviteLink();
-        showToast('🔄 Stanza creata · Invita i partecipanti!');
-      }).catch(function(){
-        // Fall back to local room
-        DUO.roomId = S8T.generateRoomId();
-        DUO.inviteToken = '';
-        localStorage.setItem('duo-room-id', DUO.roomId);
-        document.getElementById('duoRoomCode').textContent = DUO.roomId.substring(0,8);
-        updateInviteLink();
-        showToast('🔄 Nuova stanza locale!');
-      });
-    } else {
-      DUO.roomId = S8T.generateRoomId();
-      DUO.inviteToken = '';
+  window.duoNewRoom = function(){
+    // 1. If live, stop the session first
+    if (DUO.session) {
+      duoToggleSession(); // stops timer, disconnects WS, unsubscribes realtime
+    }
+    // 2. Clear old room state
+    if (wsPublisher) { wsPublisher.disconnect(); wsPublisher = null; }
+    S8T_REALTIME.unsubscribe();
+    S8T_SEGMENTS.clear();
+    DUO.sentences = [];
+    DUO.translations = 0;
+    DUO.speakers = {};
+    DUO.speakerOrder = [];
+    DUO.nextSpkId = 1;
+    document.getElementById('duoTranscript').innerHTML = '';
+    // 3. Create new room
+    var createRoom = function(roomId, inviteToken){
+      DUO.roomId = roomId;
+      DUO.inviteToken = inviteToken || '';
       localStorage.setItem('duo-room-id', DUO.roomId);
       document.getElementById('duoRoomCode').textContent = DUO.roomId.substring(0,8);
       updateInviteLink();
-      showToast('🔄 Nuova stanza!');
+      renderSpeakers();
+      renderSpeakerConfigs();
+      if (inviteToken) {
+        showToast('🔄 Stanza creata · Invita i partecipanti!');
+      } else {
+        showToast('🔄 Nuova stanza!');
+      }
+    };
+    // Try server room, fall back to local
+    if (window.S8T_API && window.sottotitoliSupabase) {
+      S8T_API.createRoom(null).then(function(result){
+        createRoom(result.room.id, result.inviteToken);
+      }).catch(function(){
+        createRoom(S8T.generateRoomId(), '');
+      });
+    } else {
+      createRoom(S8T.generateRoomId(), '');
     }
   };
 
@@ -1096,6 +1129,20 @@
     t.style.background='var(--accent)'; t.style.color='#fff'; document.body.appendChild(t);
     requestAnimationFrame(function(){t.style.opacity='1';});
     setTimeout(function(){t.style.opacity='0';setTimeout(function(){t.remove()},300);},2500);
+  }
+
+  function showJoinError(msg){
+    var main = document.querySelector('.duo-center') || document.getElementById('appMain');
+    if (!main) return;
+    main.innerHTML = '<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:20px;padding:40px;text-align:center">'+
+      '<div style="font-size:48px">⚠️</div>'+
+      '<h2 style="color:var(--text);margin:0">Invito non valido</h2>'+
+      '<p style="color:var(--t2);max-width:400px;line-height:1.5">'+esc(msg)+'</p>'+
+      '<p style="color:var(--t3);font-size:13px">Chiedi all\'organizzatore un nuovo link di invito.</p>'+
+      '<div style="display:flex;gap:10px;margin-top:8px">'+
+        '<button onclick="location.reload()" style="font-family:var(--f);padding:10px 24px;border-radius:99px;border:none;background:var(--accent);color:#fff;cursor:pointer;font-weight:700;font-size:13px">🔄 Riprova</button>'+
+        '<button onclick="window.location.href=\'panoramica.html\'" style="font-family:var(--f);padding:10px 24px;border-radius:99px;border:1.5px solid var(--line);background:transparent;color:var(--text);cursor:pointer;font-weight:600;font-size:13px">← Dashboard</button>'+
+      '</div></div>';
   }
 
   // ── Demo ──
