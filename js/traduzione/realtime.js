@@ -53,7 +53,8 @@
         {
           event: 'UPDATE',
           schema: 'public',
-          table: 'segment_translations'
+          table: 'segment_translations',
+          filter: 'room_id=eq.' + roomId
         },
         async function(payload) {
           if (!payload.new || !payload.new.segment_id) return;
