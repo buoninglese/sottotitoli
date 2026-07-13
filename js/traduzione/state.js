@@ -25,6 +25,8 @@
     timer: 0,
     timerInt: null,
     roomId: '',
+    inviteToken: '',      // raw invite token (only stored on host side)
+    isHost: true,         // true = created room, false = joined via invite
     translations: 0,
     myTTL: 'it',
     myName: 'Tu',
@@ -134,17 +136,32 @@
   }
 
   function initRoom(){
-    state.roomId = localStorage.getItem('duo-room-id') || generateRoomId();
-    localStorage.setItem('duo-room-id', state.roomId);
-    // Join mode override
     var params = new URLSearchParams(window.location.search);
+
+    // New invite-based join: ?invite=<TOKEN>
+    var inviteToken = params.get('invite');
+    if (inviteToken && inviteToken.length >= 16) {
+      state.inviteToken = inviteToken;
+      state.isHost = false;
+      state.myName = 'Guest';
+      state.roomId = ''; // Will be set after join-room API call
+      return 'invite'; // Signal: needs to call join-room API
+    }
+
+    // Legacy join mode (backward compat): ?join=1&room=XXX
     if (params.get('join') === '1' && params.get('room')) {
       state.roomId = params.get('room');
       localStorage.setItem('duo-room-id', state.roomId);
+      state.isHost = false;
       state.myName = 'Guest';
-      return true; // is join mode
+      return 'legacy-join';
     }
-    return false; // is host mode
+
+    // Host mode: load or generate room ID (will be replaced by server room)
+    state.roomId = localStorage.getItem('duo-room-id') || generateRoomId();
+    localStorage.setItem('duo-room-id', state.roomId);
+    state.isHost = true;
+    return 'host';
   }
 
   // ── Export ──
