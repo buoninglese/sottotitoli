@@ -216,6 +216,7 @@
 <script src="ws-publisher.js"></script>
 <script src="js/cefr-levels.js"></script>
 <script src="js/traduzione/state.js"></script>
+<script src="js/traduzione/segments.js"></script>
 <script src="js/traduzione/api-client.js"></script>
 
 <script>
@@ -478,47 +479,49 @@
     }
     // A2 mode: delay translation by 3s — show original first
     if (bridge === 'a2') {
-      commitSentence(speaker, orig, '…');
+      var segA2 = commitSentence(speaker, orig, '…');
+      var sidA2 = segA2.clientSegmentId;
       setTimeout(function(){
         translateText(orig, sp.snl, DUO.myTTL).then(function(realTran){
-          if (realTran) patchLastSentence(speaker, realTran);
+          if (realTran) patchSentenceById(sidA2, realTran);
         }).catch(function(){});
       }, 3000);
       return;
     }
     // A1 mode (default): immediate translation
     var placeholder = DUO.myTTL === sp.snl ? orig : '…';
-    commitSentence(speaker, orig, placeholder);
+    var segA1 = commitSentence(speaker, orig, placeholder);
+    var sidA1 = segA1.clientSegmentId;
     translateText(orig, sp.snl, DUO.myTTL).then(function(realTran){
       if (realTran && realTran !== placeholder) {
-        patchLastSentence(speaker, realTran);
+        patchSentenceById(sidA1, realTran);
       }
     }).catch(function(){});
   }
 
   function commitSentence(speaker, orig, tran){
-    DUO.sentences.push({speaker:speaker, orig:orig, tran:tran, ts:new Date()});
-    DUO.translations = DUO.sentences.length;
-    renderSentence(speaker, orig, tran);
+    var seg = S8T_SEGMENTS.create(speaker, orig, tran);
+    DUO.sentences.push(seg);
+    DUO.translations = S8T_SEGMENTS.count();
+    renderSentence(seg);
     renderSpeakers();
-    // Broadcast to room so other users see it
     if (DUO.session && DUO.isHost && speaker === DUO.myName) {
       broadcastSentence(speaker, orig);
     }
     updateComprehension();
+    return seg;
   }
 
   // ── Comprehension meter ──
   function updateComprehension(){
     var meter = document.getElementById('compMeter');
-    if (!DUO.session || DUO.sentences.length === 0) {
+    if (!DUO.session || S8T_SEGMENTS.count() === 0) {
       if (meter) meter.style.display = 'none';
       return;
     }
     if (meter) meter.style.display = 'flex';
-    // Count all words and known (saved) words
     var allWords = [];
-    DUO.sentences.forEach(function(s){
+    S8T_SEGMENTS.getAll().forEach(function(s){
       var words = s.tran.split(/[\s,.;:!?…]+/).filter(function(w){return w.length>0;});
       allWords = allWords.concat(words);
     });
@@ -550,36 +553,28 @@
     }
   }
 
-  function patchLastSentence(speaker, newTran){
-    // Re-render the last sentence with the real translation
-    var last = DUO.sentences[DUO.sentences.length-1];
-    if (!last || last.speaker !== speaker) return;
-    last.tran = newTran;
-    var container = document.getElementById('duoTranscript');
-    // Remove the last row (which has the placeholder)
-    var rows = container.querySelectorAll('.duo-row, .duo-bubble, .d3-row');
-    if (rows.length > 0) {
-      var lastRow = rows[rows.length-1];
-      // Fade-out effect
-      lastRow.style.opacity = '0';
-      lastRow.style.transition = 'opacity .15s';
-      setTimeout(function(){
-        if (lastRow.parentNode) lastRow.parentNode.removeChild(lastRow);
-        // Re-render in place
-        var el = buildSentenceDOM(last.speaker, last.orig, newTran);
-        container.appendChild(el);
-        requestAnimationFrame(function(){ el.style.opacity = '1'; });
-        container.scrollTo({top:container.scrollHeight,behavior:'smooth'});
-      }, 150);
-    }
+  function patchSentenceById(clientSegmentId, newTran){
+    var seg = S8T_SEGMENTS.updateTranslation(clientSegmentId, newTran);
+    if (!seg) return;
+    var row = document.querySelector('[data-segment-id="'+clientSegmentId+'"]');
+    if (!row) return;
+    row.style.opacity = '0';
+    row.style.transition = 'opacity .15s';
+    setTimeout(function(){
+      if (!row.parentNode) return;
+      var newRow = buildSentenceDOM(seg);
+      row.parentNode.replaceChild(newRow, row);
+      requestAnimationFrame(function(){ newRow.style.opacity = '1'; });
+    }, 150);
   }
 
-  function buildSentenceDOM(speaker, orig, tran){
+  function buildSentenceDOM(seg){
+    var speaker = seg.speaker, orig = seg.orig, tran = seg.tran;
     var sp = DUO.speakers[speaker]; var name = speaker;
     var loading = (tran === '…');
-    // Tokenize translation words for Word Lens (only when not loading)
     var tranHTML = loading ? esc(tran) : tokenizeHTML(tran, DUO.myTTL);
     var el = document.createElement('div');
+    el.setAttribute('data-segment-id', seg.clientSegmentId);
     if (DUO.style === 'd1'){
       el.className = 'duo-row';
       el.innerHTML = '<div class="duo-orig">'+tokenizeHTML(orig, sp.snl)+' <span style="font-size:9px;color:var(--t3)">('+LANGS[sp.snl].flag+')</span></div><div class="duo-arrow">→</div><div class="duo-tran'+(loading?' tran-loading':'')+'">'+tranHTML+' <span style="font-size:9px;color:var(--t3)">('+LANGS[DUO.myTTL].flag+')</span></div>';
@@ -593,7 +588,6 @@
     }
     el.style.opacity = '0';
     el.style.transition = 'opacity .25s';
-    // B2 placeholder: make the whole translation area tappable
     if (tran === '[Tocca per tradurre]') {
       el.classList.add('tran-placeholder');
       el.style.cursor = 'pointer';
@@ -602,15 +596,32 @@
     return el;
   }
 
-  // Add a global click handler for B2 "tap to translate" sentences
+  function renderSentence(seg){
+    var container = document.getElementById('duoTranscript');
+    var el = buildSentenceDOM(seg);
+    container.appendChild(el);
+    requestAnimationFrame(function(){ el.style.opacity = '1'; });
+    container.scrollTo({top:container.scrollHeight,behavior:'smooth'});
+  }
+
+  // B2 "tap to translate" — now uses segment ID
   document.addEventListener('click', function(e){
     var row = e.target.closest('.tran-placeholder');
     if (!row) return;
     e.stopPropagation();
-    var idx = Array.from(row.parentNode.children).indexOf(row);
-    if (idx >= 0 && DUO.sentences[idx] && DUO.sentences[idx].tran === '[Tocca per tradurre]') {
-      translateB2Sentence(idx, row);
-    }
+    var sid = row.getAttribute('data-segment-id');
+    if (!sid) return;
+    var seg = S8T_SEGMENTS.getById(sid);
+    if (!seg || seg.tran !== '[Tocca per tradurre]') return;
+    var sp = DUO.speakers[seg.speaker];
+    if (!sp) return;
+    row.style.opacity = '0.5';
+    translateText(seg.orig, sp.snl, DUO.myTTL).then(function(realTran){
+      if (!realTran) return;
+      patchSentenceById(sid, realTran);
+    }).catch(function(){
+      row.style.opacity = '1';
+    });
   });
 
   function translateB2Sentence(idx, row){
@@ -739,7 +750,7 @@
       document.getElementById('duoMsgInput').style.display = 'none';
       document.getElementById('duoSendBtn').style.display = 'none';
       addLogEntry('⏹','Sessione terminata · '+fmtTime(DUO.timer));
-      showToast('✅ Traduzione completata · '+DUO.sentences.length+' frasi');
+      showToast('✅ Traduzione completata · '+S8T_SEGMENTS.count()+' frasi');
     }
   };
 
@@ -771,10 +782,8 @@
   function reRenderAll(){
     var container = document.getElementById('duoTranscript');
     container.innerHTML = '';
-    var sents = DUO.sentences.slice();
-    DUO.sentences = [];
-    sents.forEach(function(s){ renderSentence(s.speaker, s.orig, s.tran); });
-    DUO.sentences = sents;
+    var sents = S8T_SEGMENTS.getAll();
+    sents.forEach(function(seg){ renderSentence(seg); });
   }
 
   // ── Slides 2-4 (unchanged) ──
@@ -799,7 +808,7 @@
 
   function renderMetrics(){
     document.getElementById('mTotalTime').textContent = fmtTime(DUO.timer);
-    document.getElementById('mTotalWords').textContent = DUO.sentences.reduce(function(s,x){return s+x.orig.split(/\s+/).length},0);
+    document.getElementById('mTotalWords').textContent = S8T_SEGMENTS.getAll().reduce(function(s,x){return s+(x.orig||'').split(/\s+/).length},0);
     document.getElementById('mTranslations').textContent = DUO.translations;
     var tbody = document.getElementById('mSpeakerTable');
     var order = DUO.speakerOrder; var totalWords = order.reduce(function(s,n){return s+(DUO.speakers[n].words||0);},0)||1;
