@@ -13,7 +13,7 @@
   function subscribe(roomId, onUpsert) {
     var supabase = window.sottotitoliSupabase;
     if (!supabase || !roomId) {
-      console.warn('[S8T Realtime] Cannot subscribe — missing Supabase or roomId');
+      // Expected in demo/unauthenticated mode — page works locally
       return false;
     }
 
