@@ -81,17 +81,40 @@
   }
 
   /**
+   * Normalize a room_segment_feed row (snake_case) to camelCase segment.
+   */
+  function mapFeedItem(data) {
+    return {
+      id: data.id,
+      roomId: data.room_id,
+      clientSegmentId: data.client_id,
+      sequence: data.sequence,
+
+      speakerMemberId: data.speaker_member_id,
+      speakerName: data.speaker_name,
+      speakerLanguage: data.speaker_language,
+      speakerColor: data.speaker_color,
+
+      sourceText: data.source_text,
+      sourceLanguage: data.source_language,
+
+      translationText: data.translation_text,
+      translationLanguage: data.translation_language,
+      translationStatus: data.translation_status,
+      translationErrorCode: data.translation_error_code,
+
+      isFinal: data.is_final,
+      createdAt: data.created_at
+    };
+  }
+
+  /**
    * Fetch a single segment from the room_segment_feed view.
-   * Returns { segment: { id, roomId, clientSegmentId, sequence, speakerMemberId,
-   *   speakerName, speakerLanguage, speakerColor, sourceText, sourceLanguage,
-   *   translationText, translationLanguage, translationStatus, translationErrorCode,
-   *   isFinal, createdAt } }
    */
   async function getSegmentFeedItem(segmentId) {
     var sb = w.sottotitoliSupabase;
     if (!sb) throw new Error('Supabase not initialized');
 
-    // Use anon key for read — no auth required for feed view (RLS handles it)
     var { data, error } = await sb
       .from('room_segment_feed')
       .select('*')
@@ -99,36 +122,12 @@
       .single();
 
     if (error) throw error;
-
-    return {
-      segment: {
-        id: data.id,
-        roomId: data.room_id,
-        clientSegmentId: data.client_id,
-        sequence: data.sequence,
-
-        speakerMemberId: data.speaker_member_id,
-        speakerName: data.speaker_name,
-        speakerLanguage: data.speaker_language,
-        speakerColor: data.speaker_color,
-
-        sourceText: data.source_text,
-        sourceLanguage: data.source_language,
-
-        translationText: data.translation_text,
-        translationLanguage: data.translation_language,
-        translationStatus: data.translation_status,
-        translationErrorCode: data.translation_error_code,
-
-        isFinal: data.is_final,
-        createdAt: data.created_at
-      }
-    };
+    return { segment: mapFeedItem(data) };
   }
 
   /**
    * Request server-side translation for a segment.
-   * Returns the updated feed projection so all clients stay in sync.
+   * Returns { segment: feedItem } with camelCase fields.
    */
   async function translateSegment(segmentId, targetLanguage) {
     var token = await getSession();
@@ -145,7 +144,8 @@
     });
     var data = await resp.json();
     if (!resp.ok) throw new Error(data.error || 'translate-segment failed: ' + resp.status);
-    return data; // { segment: feedItem }
+    // Normalize the raw feed row to camelCase
+    return { segment: mapFeedItem(data.segment) };
   }
 
   // Export
