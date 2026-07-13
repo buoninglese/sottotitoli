@@ -225,12 +225,12 @@
 <script src="translation-providers.js"></script>
 <script src="ws-publisher.js"></script>
 <script src="js/cefr-levels.js"></script>
-<script src="js/traduzione/state.js?v=6"></script>
-<script src="js/traduzione/segments.js?v=6"></script>
-<script src="js/traduzione/vocabulary.js?v=6"></script>
-<script src="js/traduzione/speech-service.js?v=6"></script>
-<script src="js/traduzione/realtime.js?v=6"></script>
-<script src="js/traduzione/api-client.js?v=6"></script>
+<script src="js/traduzione/state.js?v=7"></script>
+<script src="js/traduzione/segments.js?v=7"></script>
+<script src="js/traduzione/vocabulary.js?v=7"></script>
+<script src="js/traduzione/speech-service.js?v=7"></script>
+<script src="js/traduzione/realtime.js?v=7"></script>
+<script src="js/traduzione/api-client.js?v=7"></script>
 
 <script>
 // ═══ TRADUZIONE ENGINE — inline application logic ═══
@@ -247,6 +247,14 @@
     S8T_VOCAB.init().then(function(){
       if (S8T_SEGMENTS.count() > 0) reRenderAll();
     });
+
+    // Restore preferences BEFORE any room operations — ensures
+    // Realtime subscription and feed fetch use the correct target language
+    var savedTTL = localStorage.getItem('duo-my-ttl');
+    if (savedTTL && LANGS[savedTTL]) DUO.myTTL = savedTTL;
+    document.getElementById('duoMyTTL').value = DUO.myTTL;
+    var savedBridging = localStorage.getItem('duo-bridging');
+    if (savedBridging) { DUO.bridging = savedBridging; document.getElementById('duoBridging').value = savedBridging; }
 
     var isDemo = window.location.search.indexOf('demo') !== -1;
     var roomMode = S8T.initRoom();
@@ -301,13 +309,6 @@
     } else {
       enterLocalMode('Accedi per creare una stanza condivisa.');
     }
-
-    // Load saved preferences
-    var savedTTL = localStorage.getItem('duo-my-ttl');
-    if (savedTTL && LANGS[savedTTL]) DUO.myTTL = savedTTL;
-    document.getElementById('duoMyTTL').value = DUO.myTTL;
-    var savedBridging = localStorage.getItem('duo-bridging');
-    if (savedBridging) { DUO.bridging = savedBridging; document.getElementById('duoBridging').value = savedBridging; }
 
     updateInviteLink();
     renderSpeakerConfigs();
@@ -688,6 +689,12 @@
 
     renderOrPatchSegment(optimistic);
 
+    // Local/demo mode: bridging only, no server persistence
+    if (DUO.mode !== 'collaborative') {
+      applyBridgingToSegment(optimistic.clientSegmentId);
+      return;
+    }
+
     try {
       if (window.sottotitoliSupabase && S8T_API && S8T_API.createFinalSegment) {
         var response = await S8T_API.createFinalSegment({
@@ -1050,12 +1057,14 @@
       if (DUO.mode === 'local' && !DUO.roomId) {
         DUO.roomId = 'local-' + Date.now().toString(36);
       }
-      // Connect WebSocket + Realtime
+      // Connect WebSocket + Realtime (collaborative only)
       initWS();
       wsPublisher.connect();
-      S8T_REALTIME.subscribe(DUO.roomId, DUO.myTTL, function(segment){
-        receiveAuthoritativeSegment(segment);
-      });
+      if (DUO.mode === 'collaborative') {
+        S8T_REALTIME.subscribe(DUO.roomId, DUO.myTTL, function(segment){
+          receiveAuthoritativeSegment(segment);
+        });
+      }
       // Initialize speech recognition
       var spkLang = getSessionSpeechLanguage();
       DUO.sessionState = 'requesting_microphone';
