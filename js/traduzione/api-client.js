@@ -123,9 +123,12 @@
     });
 
     if (error) throw error;
-    if (!data) throw new Error('segment_not_found');
 
-    return { segment: mapFeedItem(data) };
+    // RPC may return array (RETURNS TABLE) or single object (jsonb)
+    var row = Array.isArray(data) ? data[0] : data;
+    if (!row) throw new Error('segment_not_found');
+
+    return { segment: mapFeedItem(row) };
   }
 
   /**

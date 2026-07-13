@@ -587,6 +587,49 @@
     }
   }
 
+  // ── Retry failed segment persistence (same clientSegmentId → idempotent) ──
+  async function retryPersistSegment(clientSegmentId) {
+    if (DUO.mode !== 'collaborative') return;
+    var seg = S8T_SEGMENTS.getByClientId(clientSegmentId);
+    if (!seg) return;
+
+    patchSentenceById(clientSegmentId, '…');
+
+    try {
+      var response = await S8T_API.createFinalSegment({
+        roomId: DUO.roomId,
+        clientSegmentId: seg.clientSegmentId,
+        sourceText: seg.orig,
+        sourceLanguage: seg.sourceLanguage || seg.speakerLanguage || 'en'
+      });
+
+      var row = Array.isArray(response) ? response[0] : response;
+      if (!row) throw new Error('empty_segment_response');
+
+      receiveAuthoritativeSegment({
+        id: row.id,
+        roomId: row.room_id,
+        clientSegmentId: row.client_id,
+        sequence: row.sequence,
+        speakerMemberId: row.speaker_member_id,
+        speakerName: row.speaker_name,
+        speakerLanguage: row.speaker_language,
+        speakerColor: row.speaker_color,
+        sourceText: row.source_text,
+        sourceLanguage: row.source_language,
+        translationText: '…',
+        translationStatus: 'pending',
+        isFinal: row.is_final,
+        createdAt: row.created_at
+      });
+
+      applyBridgingToSegment(clientSegmentId);
+    } catch(error) {
+      console.error('[S8T] Retry persist failed', error);
+      patchSentenceById(clientSegmentId, '⚠️ Invio non riuscito');
+    }
+  }
+
   // ── Delayed translation timeout tracker ──
   var pendingTimeouts = [];
 
@@ -924,10 +967,13 @@
     var tran = seg.tran;
     var loading = (tran === '…');
     var isPlaceholder = (tran === '[Tocca per tradurre]' || tran === '🔄 Riprova');
+    var isSendFailure = (tran === '⚠️ Invio non riuscito');
     var action = tran === '🔄 Riprova' ? 'retry-translation' : 'tap-translate';
     var tranHTML;
     if (loading) {
       tranHTML = esc(tran);
+    } else if (isSendFailure) {
+      tranHTML = '<button type="button" data-action="retry-send" data-client-segment-id="'+esc(seg.clientSegmentId)+'" style="font-family:var(--f);font-size:12px;font-weight:600;padding:6px 14px;border-radius:99px;border:1px solid var(--red);background:transparent;color:var(--red);cursor:pointer">↻ Riprova invio</button>';
     } else if (isPlaceholder) {
       tranHTML = '<button type="button" data-action="'+action+'" data-client-segment-id="'+esc(seg.clientSegmentId)+'" style="font-family:var(--f);font-size:12px;font-weight:600;padding:6px 14px;border-radius:99px;border:1px dashed var(--t3);background:transparent;color:var(--t3);cursor:pointer">'+esc(tran)+'</button>';
     } else {
@@ -960,9 +1006,9 @@
     container.scrollTo({top:container.scrollHeight,behavior:'smooth'});
   }
 
-  // Delegated click handler for tap-translate and retry-translation buttons
+  // Delegated click handler for tap-translate, retry-translation, and retry-send
   document.addEventListener('click', function(e){
-    var btn = e.target.closest('[data-action="tap-translate"], [data-action="retry-translation"]');
+    var btn = e.target.closest('[data-action="tap-translate"], [data-action="retry-translation"], [data-action="retry-send"]');
     if (!btn) return;
     e.preventDefault();
     e.stopPropagation();
@@ -970,6 +1016,13 @@
     if (!sid) return;
     var seg = S8T_SEGMENTS.getByClientId(sid);
     if (!seg) return;
+    var action = btn.getAttribute('data-action');
+
+    if (action === 'retry-send') {
+      retryPersistSegment(sid);
+      return;
+    }
+
     btn.disabled = true;
     btn.textContent = '…';
     requestTranslationForSegment(sid).catch(function(){
@@ -1061,10 +1114,6 @@
         DUO.timer++; var m=Math.floor(DUO.timer/60), s=DUO.timer%60;
         document.getElementById('duoTimer').textContent = (m<10?'0':'')+m+':'+(s<10?'0':'')+s;
       },1000);
-      // Local mode: generate room ID for WebSocket
-      if (DUO.mode === 'local' && !DUO.roomId) {
-        DUO.roomId = 'local-' + Date.now().toString(36);
-      }
       // Connect WebSocket + Realtime (collaborative only)
       if (DUO.mode === 'collaborative') {
         initWS();

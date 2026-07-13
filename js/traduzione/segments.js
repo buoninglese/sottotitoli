@@ -32,6 +32,17 @@
     if (!input || !input.clientSegmentId) {
       throw new Error('Segment requires clientSegmentId.');
     }
+
+    var translationStatus = input.translationStatus || 'pending';
+    var translationText = input.tran !== undefined ? input.tran : input.translationText;
+
+    // Failed translation → show retry, not indefinite loading
+    if ((translationText === null || translationText === undefined || translationText === '') && translationStatus === 'failed') {
+      translationText = '🔄 Riprova';
+    } else if (translationText === null || translationText === undefined || translationText === '') {
+      translationText = '…';
+    }
+
     return {
       id: input.id || input.serverSegmentId || null,
       clientSegmentId: input.clientSegmentId,
@@ -46,9 +57,9 @@
       orig: input.orig || input.sourceText || '',
       sourceLanguage: input.sourceLanguage || input.speakerLanguage || 'en',
 
-      tran: input.tran || input.translationText || '…',
+      tran: translationText,
       translationLanguage: input.translationLanguage || null,
-      translationStatus: input.translationStatus || 'pending',
+      translationStatus: translationStatus,
       translationErrorCode: input.translationErrorCode || null,
 
       isFinal: input.isFinal !== false,

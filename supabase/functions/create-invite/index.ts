@@ -11,6 +11,7 @@ import { crypto } from 'https://deno.land/std@0.208.0/crypto/mod.ts';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+const PUBLIC_APP_URL = Deno.env.get('PUBLIC_APP_URL') || 'https://buoninglese.github.io/sottotitoli/traduzione-s8t.html';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': 'https://buoninglese.github.io',
@@ -33,8 +34,20 @@ Deno.serve(async (req: Request) => {
     );
     if (authError || !user) throw new Error('Unauthorized');
 
-    const { roomId, role, maxUses, expiryHours } = await req.json();
+    const { roomId, role, maxUses, expiryHours, revokePrevious } = await req.json();
     if (!roomId) throw new Error('roomId is required');
+
+    // Validate parameters before any DB write
+    const safeRole = (role === 'viewer' || role === 'speaker') ? role : 'speaker';
+    const safeMaxUses = Number(maxUses) || 10;
+    const safeExpiryHours = Number(expiryHours) || 24;
+
+    if (!Number.isInteger(safeMaxUses) || safeMaxUses < 1 || safeMaxUses > 100) {
+      throw new Error('invalid_max_uses');
+    }
+    if (!Number.isInteger(safeExpiryHours) || safeExpiryHours < 1 || safeExpiryHours > 720) {
+      throw new Error('invalid_expiry_hours');
+    }
 
     // Verify caller is the room owner
     const { data: membership, error: membError } = await supabase
@@ -47,6 +60,15 @@ Deno.serve(async (req: Request) => {
 
     if (membError || !membership) throw new Error('You are not a member of this room');
     if (membership.role !== 'owner') throw new Error('Only the room owner can create invites');
+
+    // Optionally revoke previous active invites
+    if (revokePrevious) {
+      await supabase
+        .from('room_invites')
+        .update({ revoked_at: new Date().toISOString() })
+        .eq('room_id', roomId)
+        .is('revoked_at', null);
+    }
 
     // Generate cryptographically secure token
     const tokenBytes = new Uint8Array(32);
@@ -62,7 +84,7 @@ Deno.serve(async (req: Request) => {
     const tokenHash = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
 
     const expiresAt = new Date(
-      Date.now() + (expiryHours || 24) * 60 * 60 * 1000
+      Date.now() + safeExpiryHours * 60 * 60 * 1000
     ).toISOString();
 
     // Store only the hash
@@ -71,9 +93,9 @@ Deno.serve(async (req: Request) => {
       .insert({
         room_id: roomId,
         token_hash: tokenHash,
-        role: role || 'speaker',
+        role: safeRole,
         created_by: user.id,
-        max_uses: maxUses || 10,
+        max_uses: safeMaxUses,
         expires_at: expiresAt,
       });
 
@@ -82,7 +104,7 @@ Deno.serve(async (req: Request) => {
     return new Response(
       JSON.stringify({
         inviteToken: inviteToken,
-        inviteUrl: `${req.headers.get('origin') || ''}/traduzione-s8t.html?invite=${inviteToken}`,
+        inviteUrl: `${PUBLIC_APP_URL}?invite=${encodeURIComponent(inviteToken)}`,
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
