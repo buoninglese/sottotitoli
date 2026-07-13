@@ -48,131 +48,29 @@ Deno.serve(async (req: Request) => {
     // Hash the provided token
     const tokenHash = await sha256(inviteToken);
 
-    // Find the invite
-    const { data: invite, error: inviteError } = await supabase
-      .from('room_invites')
-      .select('id, room_id, role, max_uses, uses, expires_at, revoked_at')
-      .eq('token_hash', tokenHash)
-      .single();
+    // Use the atomic RPC — eliminates race condition on invite uses
+    const { data: result, error: rpcError } = await supabase.rpc(
+      'join_room_with_invite',
+      {
+        p_token_hash: tokenHash,
+        p_display_name: displayName || null,
+        p_source_language: sourceLanguage || 'en',
+      }
+    );
 
-    if (inviteError || !invite) throw new Error('Invalid or expired invite link');
-
-    // Validate invite
-    if (invite.revoked_at) throw new Error('This invite has been revoked');
-    if (new Date(invite.expires_at) < new Date()) throw new Error('This invite has expired');
-    if (invite.uses >= invite.max_uses) throw new Error('This invite has reached its maximum uses');
-
-    // Check if user is already a member
-    const { data: existing } = await supabase
-      .from('room_members')
-      .select('id, left_at')
-      .eq('room_id', invite.room_id)
-      .eq('user_id', user.id)
-      .maybeSingle();
-
-    if (existing && !existing.left_at) {
-      // Already a member — return full membership
-      const { data: room } = await supabase
-        .from('rooms')
-        .select('id, name, status')
-        .eq('id', invite.room_id)
-        .single();
-
-      const { data: membership } = await supabase
-        .from('room_members')
-        .select('id, room_id, user_id, display_name, source_language, color, role, left_at')
-        .eq('id', existing.id)
-        .single();
-
-      const { data: members } = await supabase
-        .from('room_members')
-        .select('id, room_id, user_id, display_name, source_language, color, role, left_at')
-        .eq('room_id', invite.room_id)
-        .is('left_at', null);
-
-      const { data: segments } = await supabase
-        .from('room_segment_feed')
-        .select('*')
-        .eq('room_id', invite.room_id)
-        .order('sequence', { ascending: true });
-
-      return new Response(
-        JSON.stringify({
-          room: room,
-          membership: membership,
-          members: members || [],
-          segments: segments || [],
-        }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+    if (rpcError) {
+      const msg = rpcError.message || '';
+      if (msg.includes('invalid_invite')) {
+        throw new Error('Invalid or expired invite link');
+      }
+      if (msg.includes('unauthenticated')) {
+        throw new Error('Unauthorized');
+      }
+      throw new Error(msg || 'Join failed');
     }
-
-    // If they left before, re-activate membership
-    if (existing && existing.left_at) {
-      await supabase
-        .from('room_members')
-        .update({ left_at: null, role: invite.role, joined_at: new Date().toISOString() })
-        .eq('id', existing.id);
-    } else {
-      // Add new member
-      const memberColor = ['#3b82f6','#22c55e','#ec4899','#f59e0b','#8b5cf6'][Math.floor(Math.random() * 5)];
-      const { error: memberError } = await supabase
-        .from('room_members')
-        .insert({
-          room_id: invite.room_id,
-          user_id: user.id,
-          role: invite.role,
-          display_name: displayName || user.user_metadata?.full_name || user.email?.split('@')[0] || 'Guest',
-          source_language: sourceLanguage || 'en',
-          color: memberColor,
-        });
-
-      if (memberError) throw new Error(memberError.message);
-    }
-
-    // Increment invite uses
-    await supabase
-      .from('room_invites')
-      .update({ uses: invite.uses + 1 })
-      .eq('id', invite.id);
-
-    // Get room info
-    const { data: room } = await supabase
-      .from('rooms')
-      .select('id, name, status')
-      .eq('id', invite.room_id)
-      .single();
-
-    // Get the membership row
-    const { data: membership } = await supabase
-      .from('room_members')
-      .select('id, room_id, user_id, display_name, source_language, color, role, left_at')
-      .eq('room_id', invite.room_id)
-      .eq('user_id', user.id)
-      .is('left_at', null)
-      .single();
-
-    // Get all active members
-    const { data: members } = await supabase
-      .from('room_members')
-      .select('id, room_id, user_id, display_name, source_language, color, role, left_at')
-      .eq('room_id', invite.room_id)
-      .is('left_at', null);
-
-    // Get existing segments
-    const { data: segments } = await supabase
-      .from('room_segment_feed')
-      .select('*')
-      .eq('room_id', invite.room_id)
-      .order('sequence', { ascending: true });
 
     return new Response(
-      JSON.stringify({
-        room: room,
-        membership: membership,
-        members: members || [],
-        segments: segments || [],
-      }),
+      JSON.stringify(result),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 200,

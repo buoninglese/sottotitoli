@@ -430,6 +430,11 @@
 
   // ── Speaker management ──
   window.duoAddSpeaker = function(name, snl){
+    // In collaborative mode, members come from the server — no local creation
+    if (DUO.mode === 'collaborative') {
+      showToast('ℹ️ I partecipanti sono gestiti dal server.');
+      return;
+    }
     if (DUO.speakerOrder.length >= 5) { showToast('⚠️ Massimo 5 partecipanti'); return; }
     name = name || ('Partecipante '+(DUO.nextSpkId));
     snl = snl || 'en';
@@ -446,6 +451,7 @@
   };
 
   window.duoRemoveSpeaker = function(name){
+    if (DUO.mode === 'collaborative') { showToast('ℹ️ I partecipanti sono gestiti dal server.'); return; }
     delete DUO.speakers[name];
     DUO.speakerOrder = DUO.speakerOrder.filter(function(n){ return n !== name; });
     // Preserve transcript history — just remove from active speakers
@@ -475,6 +481,7 @@
     }
 
     var html = '';
+    var isCollaborative = DUO.mode === 'collaborative';
     members.forEach(function(m){
       var name = m.displayName || 'Partecipante';
       var snl = m.sourceLanguage || 'en';
@@ -484,13 +491,13 @@
       });
       html += '<div class="duo-spk-cfg">'+
         '<span class="spk-dot" style="background:'+(m.color||'#7c3aed')+'"></span>'+
-        '<input value="'+escAttr(name)+'" data-spk-rename="'+escAttr(name)+'" placeholder="Nome">'+
-        '<select data-spk-snl="'+escAttr(name)+'">'+langOpts+'</select>'+
-        '<button data-spk-remove="'+escAttr(name)+'" title="Rimuovi">×</button>'+
+        '<input value="'+escAttr(name)+'" data-spk-rename="'+escAttr(name)+'" placeholder="Nome"'+(isCollaborative?' disabled':'')+'>'+
+        '<select data-spk-snl="'+escAttr(name)+'"'+(isCollaborative?' disabled':'')+'>'+langOpts+'</select>'+
+        (isCollaborative ? '' : '<button data-spk-remove="'+escAttr(name)+'" title="Rimuovi">×</button>')+
       '</div>';
     });
     container.innerHTML = html;
-    if (addBtn) addBtn.style.display = (members.length >= 5) ? 'none' : '';
+    if (addBtn) addBtn.style.display = (isCollaborative || members.length >= 5) ? 'none' : '';
     if (window._rebindSpeakerEvents) window._rebindSpeakerEvents();
   }
 
@@ -744,28 +751,36 @@
     var seg = S8T_SEGMENTS.getByClientId(clientSegmentId);
     if (!seg) return;
 
-    // Prefer server-side translation (shared, durable, one result for all members)
-    if (seg.id && window.sottotitoliSupabase && S8T_API && S8T_API.translateSegment) {
+    // Local/demo mode: browser-side translation only
+    if (DUO.mode !== 'collaborative') {
       try {
-        var result = await S8T_API.translateSegment(seg.id, DUO.myTTL);
-        if (result && result.segment) {
-          receiveAuthoritativeSegment(result.segment);
-          return;
-        }
+        var translated = await translateText(
+          seg.orig,
+          seg.speakerLanguage || 'en',
+          DUO.myTTL
+        );
+        patchSentenceById(clientSegmentId, translated || '🔄 Riprova');
       } catch(e) {
-        console.warn('[S8T] Server translation failed, falling back to browser:', e.message);
+        patchSentenceById(clientSegmentId, '🔄 Riprova');
       }
+      return;
     }
 
-    // Fallback: browser-side translation (works offline/unauthenticated)
+    // Collaborative mode: server-side translation only
+    if (!seg.id) {
+      patchSentenceById(clientSegmentId, '🔄 Riprova');
+      return;
+    }
+
     try {
-      var translated = await translateText(
-        seg.orig,
-        seg.speakerLanguage || 'en',
-        DUO.myTTL
-      );
-      patchSentenceById(clientSegmentId, translated || '🔄 Riprova');
+      var result = await S8T_API.translateSegment(seg.id, DUO.myTTL);
+      if (result && result.segment) {
+        receiveAuthoritativeSegment(result.segment);
+      } else {
+        patchSentenceById(clientSegmentId, '🔄 Riprova');
+      }
     } catch(e) {
+      console.warn('[S8T] Server translation failed:', e.message);
       patchSentenceById(clientSegmentId, '🔄 Riprova');
     }
   }
@@ -924,6 +939,7 @@
   document.addEventListener('click', function(e){
     var btn = e.target.closest('[data-action="tap-translate"], [data-action="retry-translation"]');
     if (!btn) return;
+    e.preventDefault();
     e.stopPropagation();
     var sid = btn.getAttribute('data-client-segment-id');
     if (!sid) return;
@@ -931,13 +947,7 @@
     if (!seg) return;
     btn.disabled = true;
     btn.textContent = '…';
-    translateText(seg.orig, seg.speakerLanguage || 'en', DUO.myTTL).then(function(realTran){
-      if (realTran) {
-        patchSentenceById(sid, realTran);
-      } else {
-        patchSentenceById(sid, '🔄 Riprova');
-      }
-    }).catch(function(){
+    requestTranslationForSegment(sid).catch(function(){
       patchSentenceById(sid, '🔄 Riprova');
     });
   });
