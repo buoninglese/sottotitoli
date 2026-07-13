@@ -246,38 +246,76 @@
   async function init(){
     // Initialize vocabulary (loads local cache, syncs with Supabase)
     S8T_VOCAB.init().then(function(){
-      // Re-tokenize any existing transcript words
       if (S8T_SEGMENTS.count() > 0) reRenderAll();
     });
+
+    var isDemo = window.location.search.indexOf('demo') !== -1;
     var roomMode = S8T.initRoom();
+    var isAuthenticated = !!(window.sottotitoliSupabase && window.sottotitoliSupabase.auth);
+
     if (roomMode === 'invite') {
-      // Guest joining via invite token — must succeed or fail visibly
+      // Guest joining via invite token
       try {
         var result = await S8T_API.joinRoom(DUO.inviteToken, null, DUO.myTTL);
-        DUO.roomId = result.room.id;
-        localStorage.setItem('duo-room-id', DUO.roomId);
-        DUO.myName = result.membership.display_name || 'Guest';
+        // joinRoom returns: { room: {id, name, status}, membership: {role, alreadyMember} }
+        applyRoomBootstrap({
+          room: result.room,
+          currentMember: {
+            id: null,
+            display_name: DUO.myName || 'Guest',
+            source_language: DUO.myTTL,
+            color: '#7c3aed',
+            role: result.membership ? result.membership.role : 'speaker'
+          }
+        });
+        S8T_REALTIME.subscribe(DUO.roomId, receiveAuthoritativeSegment);
         showToast('🔗 Sei entrato nella stanza!');
       } catch(e) {
         console.error('Join room failed:', e);
-        // Fail closed — do NOT create a local room
         showJoinError(e.message || 'Link di invito non valido o scaduto');
-        return; // Stop initialization — page stays on error state
+        return;
       }
+    } else if (isAuthenticated && !isDemo) {
+      // Authenticated host — create a server room
+      try {
+        var hostResult = await S8T_API.createRoom(null);
+        // createRoom returns: { room: {id, name, status, created_at}, inviteToken, inviteUrl }
+        applyRoomBootstrap({
+          room: hostResult.room,
+          inviteToken: hostResult.inviteToken,
+          currentMember: {
+            id: null,
+            display_name: 'Tu',
+            source_language: DUO.myTTL,
+            color: '#7c3aed',
+            role: 'owner'
+          }
+        });
+        S8T_REALTIME.subscribe(DUO.roomId, receiveAuthoritativeSegment);
+        showToast('✨ Stanza pronta!');
+      } catch(e) {
+        console.warn('Auto room creation failed, using local mode:', e.message);
+        DUO.roomId = 'local-' + Date.now().toString(36);
+        document.getElementById('duoRoomCode').textContent = DUO.roomId.substring(0,8);
+      }
+    } else {
+      // Local/demo mode
+      DUO.roomId = DUO.roomId || ('local-' + Date.now().toString(36));
+      document.getElementById('duoRoomCode').textContent = DUO.roomId.substring(0,8);
     }
-    document.getElementById('duoRoomCode').textContent = DUO.roomId.substring(0,8);
-    // Load saved TTL
+
+    // Load saved preferences
     var savedTTL = localStorage.getItem('duo-my-ttl');
     if (savedTTL && LANGS[savedTTL]) DUO.myTTL = savedTTL;
     document.getElementById('duoMyTTL').value = DUO.myTTL;
-    // Load saved bridging mode
     var savedBridging = localStorage.getItem('duo-bridging');
     if (savedBridging) { DUO.bridging = savedBridging; document.getElementById('duoBridging').value = savedBridging; }
+
     updateInviteLink();
     renderSpeakerConfigs();
     document.getElementById('duoTranscript').addEventListener('click', handleWordClick);
     bindEvents();
-    if (window.location.search.indexOf('demo') !== -1) demoPopulate();
+    if (isDemo) demoPopulate();
   }
 
   // ── Event delegation — replaces inline onclick attributes ──
@@ -650,15 +688,33 @@
   function receiveAuthoritativeSegment(serverSegment) {
     if (!serverSegment || !serverSegment.clientSegmentId) return;
 
+    // Register speaker in member model + legacy speaker model
+    if (serverSegment.speakerMemberId) {
+      S8T.upsertMember({
+        id: serverSegment.speakerMemberId,
+        displayName: serverSegment.speakerName || 'Partecipante',
+        sourceLanguage: serverSegment.speakerLanguage || 'en',
+        color: serverSegment.speakerColor || '#7c3aed',
+        active: true
+      });
+    }
+    // Legacy speaker compat for sidebar UI
+    var spkName = serverSegment.speakerName;
+    if (spkName && !DUO.speakers[spkName]) {
+      DUO.speakers[spkName] = {
+        snl: serverSegment.speakerLanguage || 'en',
+        color: serverSegment.speakerColor || '#7c3aed',
+        words: 0, wpm: 0, joined: new Date()
+      };
+      DUO.speakerOrder.push(spkName);
+      renderSpeakers();
+      renderSpeakerConfigs();
+    }
+
     var before = S8T_SEGMENTS.getByClientId(serverSegment.clientSegmentId);
     var merged = S8T_SEGMENTS.upsert(serverSegment);
 
-    if (!before) {
-      renderOrPatchSegment(merged);
-    } else {
-      renderOrPatchSegment(merged);
-    }
-
+    renderOrPatchSegment(merged);
     updateComprehension();
   }
 
@@ -1113,23 +1169,45 @@
 
   // ── Room bootstrap (call after create-room / join-room API success) ──
   function applyRoomBootstrap(payload) {
-    DUO.roomId = payload.room.id;
-    DUO.currentMemberId = payload.currentMember ? payload.currentMember.id : null;
+    if (payload.room) {
+      DUO.roomId = payload.room.id;
+      localStorage.setItem('duo-room-id', DUO.roomId);
+    }
+    if (payload.inviteToken) {
+      DUO.inviteToken = payload.inviteToken;
+    }
 
-    if (payload.members) {
+    // Set current user identity — from membership, auth, or fallback
+    if (payload.currentMember) {
+      DUO.currentMemberId = payload.currentMember.id || null;
+      DUO.myName = payload.currentMember.display_name || payload.currentMember.displayName || 'Tu';
+      // Register self in member models
+      S8T.upsertMember({
+        id: payload.currentMember.id || 'me',
+        displayName: DUO.myName,
+        sourceLanguage: payload.currentMember.source_language || payload.currentMember.sourceLanguage || DUO.myTTL,
+        color: payload.currentMember.color || '#7c3aed',
+        role: payload.currentMember.role || 'owner',
+        active: true
+      });
+    }
+
+    // Register other members
+    if (payload.members && payload.members.length) {
       payload.members.forEach(function(member) {
         S8T.upsertMember({
           id: member.id,
-          displayName: member.display_name,
-          sourceLanguage: member.source_language,
-          color: member.color,
-          role: member.role,
+          displayName: member.display_name || member.displayName,
+          sourceLanguage: member.source_language || member.sourceLanguage || 'en',
+          color: member.color || '#7c3aed',
+          role: member.role || 'speaker',
           active: !member.left_at
         });
       });
     }
 
-    if (payload.segments) {
+    // Load existing segments
+    if (payload.segments && payload.segments.length) {
       payload.segments.forEach(function(segment) {
         receiveAuthoritativeSegment(segment);
       });
@@ -1146,73 +1224,50 @@
   window.duoShareWhatsApp=function(){ window.open('https://wa.me/?text='+encodeURIComponent(document.getElementById('duoInviteLink').textContent),'_blank'); };
   window.duoShareEmail=function(){ window.location.href='mailto:?subject=Unisciti alla mia sessione di traduzione&body='+encodeURIComponent(document.getElementById('duoInviteLink').textContent); };
   window.duoNewRoom = function(){
-    // 1. Snapshot current state BEFORE any teardown
-    var prev = {
-      roomId: DUO.roomId,
-      inviteToken: DUO.inviteToken,
-      speakers: {}, speakerOrder: [], sentences: [],
-      translations: DUO.translations, nextSpkId: DUO.nextSpkId
-    };
-    // Deep-clone speakers and sentences
-    DUO.speakerOrder.forEach(function(n){ prev.speakerOrder.push(n); });
-    Object.keys(DUO.speakers).forEach(function(k){ prev.speakers[k] = DUO.speakers[k]; });
-    DUO.sentences.forEach(function(s){ prev.sentences.push(s); });
+    // Tear down current session and state
+    if (DUO.session) { duoToggleSession(); }
+    if (wsPublisher) { wsPublisher.disconnect(); wsPublisher = null; }
+    S8T_REALTIME.unsubscribe();
+    clearPendingTimeouts();
+    S8T_SEGMENTS.clear();
+    DUO.sentences = [];
+    DUO.translations = 0;
+    DUO.speakers = {};
+    DUO.speakerOrder = [];
+    DUO.nextSpkId = 1;
+    document.getElementById('duoTranscript').innerHTML = '';
 
-    function restorePrev(){
-      DUO.roomId = prev.roomId;
-      DUO.inviteToken = prev.inviteToken;
-      DUO.speakers = prev.speakers;
-      DUO.speakerOrder = prev.speakerOrder;
-      DUO.sentences = prev.sentences;
-      DUO.translations = prev.translations;
-      DUO.nextSpkId = prev.nextSpkId;
-      localStorage.setItem('duo-room-id', DUO.roomId);
-      document.getElementById('duoRoomCode').textContent = DUO.roomId.substring(0,8);
-      updateInviteLink();
-      renderSpeakers();
-      renderSpeakerConfigs();
-      // Re-render transcript from restored sentences
-      var container = document.getElementById('duoTranscript');
-      container.innerHTML = '';
-      if (prev.sentences.length > 0) {
-        prev.sentences.forEach(function(s){ renderSentence(s); });
-      }
-    }
-
-    function applyNew(roomId, inviteToken){
-      // Tear down old session if live
-      if (DUO.session) { duoToggleSession(); }
-      if (wsPublisher) { wsPublisher.disconnect(); wsPublisher = null; }
-      S8T_REALTIME.unsubscribe();
-      clearPendingTimeouts();
-      S8T_SEGMENTS.clear();
-      DUO.sentences = [];
-      DUO.translations = 0;
-      DUO.speakers = {};
-      DUO.speakerOrder = [];
-      DUO.nextSpkId = 1;
-      document.getElementById('duoTranscript').innerHTML = '';
-      // Apply new room
-      DUO.roomId = roomId;
-      DUO.inviteToken = inviteToken || '';
-      localStorage.setItem('duo-room-id', DUO.roomId);
-      document.getElementById('duoRoomCode').textContent = DUO.roomId.substring(0,8);
-      updateInviteLink();
-      renderSpeakers();
-      renderSpeakerConfigs();
-    }
-
-    // 2. Try server room creation first — don't touch old state until it succeeds
     if (window.S8T_API && window.sottotitoliSupabase) {
       S8T_API.createRoom(null).then(function(result){
-        applyNew(result.room.id, result.inviteToken);
+        applyRoomBootstrap({
+          room: result.room,
+          inviteToken: result.inviteToken,
+          currentMember: {
+            id: null,
+            display_name: 'Tu',
+            source_language: DUO.myTTL,
+            color: '#7c3aed',
+            role: 'owner'
+          }
+        });
+        S8T_REALTIME.subscribe(DUO.roomId, receiveAuthoritativeSegment);
         showToast('🔄 Stanza creata · Invita i partecipanti!');
       }).catch(function(err){
         console.error('Room creation failed:', err);
-        showToast('⚠️ Impossibile creare una nuova stanza. Riprova.');
+        DUO.roomId = 'local-' + Date.now().toString(36);
+        document.getElementById('duoRoomCode').textContent = DUO.roomId.substring(0,8);
+        updateInviteLink();
+        renderSpeakers();
+        renderSpeakerConfigs();
+        showToast('⚠️ Modalità locale · Accedi per stanze condivise');
       });
     } else {
-      showToast('⚠️ Accedi per creare stanze condivise.');
+      DUO.roomId = 'local-' + Date.now().toString(36);
+      document.getElementById('duoRoomCode').textContent = DUO.roomId.substring(0,8);
+      updateInviteLink();
+      renderSpeakers();
+      renderSpeakerConfigs();
+      showToast('📋 Stanza locale · Accedi per invitare partecipanti');
     }
   };
 
