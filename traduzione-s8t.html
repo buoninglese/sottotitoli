@@ -148,6 +148,38 @@ body{font-family:var(--f);background:var(--bg);color:var(--text);height:100vh;ov
 .duo-interim{text-align:center;padding:16px 20px;font-size:18px;font-weight:300;color:var(--t2);min-height:60px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
 /* ── Toast ── */
 .duo-toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);z-index:9999;opacity:0;transition:opacity .3s;pointer-events:none;font-family:var(--f);font-weight:700;font-size:13px;padding:10px 24px;border-radius:99px}
+/* ── Word Lens popup ── */
+.tw-word{cursor:pointer;border-bottom:1px dashed transparent;transition:all .15s;padding:1px 2px;border-radius:3px;position:relative}
+.tw-word:hover{background:rgba(124,58,237,.1);border-bottom-color:var(--accent)}
+.tw-word.saved{border-bottom:1px solid var(--green);background:rgba(34,197,94,.06)}
+/* CEFR level tints — subtle backgrounds for word-awareness */
+.tw-word[data-level="A1"]{background:transparent}
+.tw-word[data-level="A2"]{background:rgba(34,197,94,.04)}
+.tw-word[data-level="B1"]{background:rgba(245,158,11,.06)}
+.tw-word[data-level="B2"]{background:rgba(59,130,246,.06)}
+.tw-word[data-level="C1"]{background:rgba(139,92,246,.06)}
+.tw-word[data-level="C2"]{background:rgba(236,72,153,.06)}
+/* Comprehension meter */
+.comp-meter{display:flex;align-items:center;gap:8px;padding:6px 14px;font-size:11px;color:var(--t2);border-bottom:1px solid var(--line);flex-shrink:0;background:var(--card2)}
+.comp-bar{flex:1;height:4px;border-radius:2px;background:var(--line);overflow:hidden}
+.comp-bar-fill{height:100%;border-radius:2px;transition:width .6s ease,background .6s ease}
+.comp-pct{font-weight:700;font-size:12px;min-width:36px;text-align:right}
+.comp-new{font-size:10px;color:var(--accent);font-weight:600;cursor:pointer}
+.comp-new:hover{text-decoration:underline}
+.tw-popup{position:fixed;z-index:9999;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px 18px;min-width:200px;max-width:300px;box-shadow:0 8px 32px rgba(0,0,0,.28);opacity:0;transform:translateY(6px);transition:opacity .2s,transform .2s;pointer-events:none;font-family:var(--f)}
+.tw-popup.show{opacity:1;transform:translateY(0);pointer-events:auto}
+.tw-popup .tw-word-title{font-size:18px;font-weight:700;color:var(--text);margin-bottom:6px;letter-spacing:-.01em}
+.tw-popup .tw-cefr-badge{display:inline-block;font-size:10px;font-weight:700;padding:3px 8px;border-radius:6px;margin-bottom:6px}
+.tw-popup .tw-info{font-size:12px;color:var(--t2);margin-bottom:8px;line-height:1.5}
+.tw-popup .tw-actions{display:flex;gap:8px}
+.tw-popup .tw-btn{font-size:11px;font-weight:700;padding:6px 14px;border-radius:99px;border:none;cursor:pointer;font-family:var(--f);transition:all .15s}
+.tw-popup .tw-btn-save{background:var(--accent);color:#fff}
+.tw-popup .tw-btn-save:hover{filter:brightness(1.1)}
+.tw-popup .tw-btn-saved{background:var(--green);color:#fff}
+.tw-popup .tw-btn-close{background:var(--bg);color:var(--t2);border:1px solid var(--line)}
+/* ── Translation loading animation ── */
+@keyframes tranPulse{0%,100%{opacity:.3}50%{opacity:.7}}
+.tran-loading{animation:tranPulse 1.2s ease-in-out infinite}
 /* Responsive */
 @media(max-width:768px){.duo-speakers{width:180px}.duo-cards{grid-template-columns:1fr}.duo-metrics{grid-template-columns:1fr 1fr}}
 @media(max-width:520px){.duo-speakers{display:none}.duo-bottom{flex-wrap:wrap;gap:8px}.slide-dots{margin-left:0}}
@@ -213,7 +245,7 @@ body{background:radial-gradient(circle at top left,rgba(255,255,255,.35),transpa
     <a href="panoramica.html" style="text-decoration:none;color:var(--text-soft);font-size:13px;font-weight:500;margin-left:4px">← Dashboard</a>
   </div>
   <div style="flex:1;display:flex;justify-content:center;align-items:center;gap:8px">
-    <span style="font-family:var(--mono);font-size:11px;color:var(--muted);display:flex;align-items:center;gap:4px">Room <code style="background:var(--bg);padding:2px 8px;border-radius:4px;font-size:12px" id="duoRoomCode">———</code></span>
+    <span style="font-family:var(--mono);font-size:11px;color:var(--muted);display:flex;align-items:center;gap:4px">Room <code style="background:var(--bg);padding:2px 8px;border-radius:4px;font-size:12px" id="duoRoomCode">———</code><span id="wsIndicator" style="display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--t3);margin-left:2px" title="WebSocket: idle"></span></span>
   </div>
   <div class="topbar-tools">
     <button type="button" class="theme-toggle" id="themeToggle" aria-label="Toggle color theme">
@@ -252,6 +284,7 @@ body{background:radial-gradient(circle at top left,rgba(255,255,255,.35),transpa
       <button class="slide-dot" data-slide="2" onclick="duoGoSlide(2)" style="width:28px;height:28px;border-radius:50%;border:1px solid var(--line);background:transparent;color:var(--t3);cursor:pointer;font-size:11px;font-weight:700">2</button>
       <button class="slide-dot" data-slide="3" onclick="duoGoSlide(3)" style="width:28px;height:28px;border-radius:50%;border:1px solid var(--line);background:transparent;color:var(--t3);cursor:pointer;font-size:11px;font-weight:700">3</button>
       <button class="slide-dot" data-slide="4" onclick="duoGoSlide(4)" style="width:28px;height:28px;border-radius:50%;border:1px solid var(--line);background:transparent;color:var(--t3);cursor:pointer;font-size:11px;font-weight:700">4</button>
+      <button class="slide-dot" data-slide="5" onclick="duoGoSlide(5)" style="width:28px;height:28px;border-radius:50%;border:1px solid var(--line);background:transparent;color:var(--t3);cursor:pointer;font-size:11px;font-weight:700">📖</button>
     </div>
   </div>
 
@@ -281,6 +314,16 @@ body{background:radial-gradient(circle at top left,rgba(255,255,255,.35),transpa
             <option value="es">🇪🇸 Español</option>
           </select>
         </div>
+        <!-- Bridging mode -->
+        <div class="duo-set-row">
+          <label class="duo-set-label">Modalità di aiuto</label>
+          <select id="duoBridging" onchange="duoUpdateBridging()" class="duo-set-select">
+            <option value="a1">🟢 Aiuto completo — Traduzione immediata</option>
+            <option value="a2">🟡 Aiuto graduale — Traduzione dopo 3s</option>
+            <option value="b1">🟠 Solo parole nuove — Traduci solo ciò che non conosci</option>
+            <option value="b2">🔴 Su richiesta — Tocca per tradurre</option>
+          </select>
+        </div>
         <!-- Speaker management -->
         <div class="duo-set-head" style="margin-top:8px">👤 Partecipanti <span style="font-weight:400;font-size:10px;color:var(--t3)">1–5</span></div>
         <div id="duoSpeakerConfigs"></div>
@@ -299,6 +342,13 @@ body{background:radial-gradient(circle at top left,rgba(255,255,255,.35),transpa
     <!-- Right: Content area (80%) -->
     <div style="flex:1;display:flex;flex-direction:column;min-width:0">
       <div class="duo-interim" id="duoInterim" data-placeholder="Parla per vedere le traduzioni in tempo reale…" style="text-align:center;padding:20px 24px;font-size:20px;font-weight:300;color:var(--t2);min-height:70px;display:flex;align-items:center;justify-content:center;flex-shrink:0;border-bottom:1px solid var(--line)"></div>
+      <!-- Comprehension meter -->
+      <div class="comp-meter" id="compMeter" style="display:none">
+        <span>🧠 Comprensione</span>
+        <div class="comp-bar"><div class="comp-bar-fill" id="compBarFill" style="width:0%;background:var(--green)"></div></div>
+        <span class="comp-pct" id="compPct">0%</span>
+        <span class="comp-new" id="compNewWords" style="display:none"></span>
+      </div>
       <div style="flex:1;overflow-y:auto;min-height:0;display:flex;flex-direction:column" id="duoSlideContainer">
         <!-- SLIDE 1: Live Transcript -->
         <div class="duo-panel active" data-panel="1" style="display:flex;flex-direction:column;flex:1;min-height:0">
@@ -343,6 +393,21 @@ body{background:radial-gradient(circle at top left,rgba(255,255,255,.35),transpa
             </div>
           </div>
         </div>
+        <!-- SLIDE 5: Personal Glossary -->
+        <div class="duo-panel" data-panel="5" style="display:none;flex-direction:column;flex:1;min-height:0;overflow-y:auto;padding:16px">
+          <h3 style="margin-bottom:14px;font-size:16px">📖 Il tuo vocabolario</h3>
+          <div style="display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap">
+            <button class="tw-btn" style="font-size:11px;padding:5px 12px;border-radius:99px;border:1px solid var(--line);background:var(--bg);color:var(--t2);cursor:pointer;font-family:var(--f)" onclick="renderGlossary('all')" id="glossFilterAll">Tutte</button>
+            <button class="tw-btn" style="font-size:11px;padding:5px 12px;border-radius:99px;border:1px solid var(--line);background:var(--bg);color:var(--t2);cursor:pointer;font-family:var(--f)" onclick="renderGlossary('A1')">A1</button>
+            <button class="tw-btn" style="font-size:11px;padding:5px 12px;border-radius:99px;border:1px solid var(--line);background:var(--bg);color:var(--t2);cursor:pointer;font-family:var(--f)" onclick="renderGlossary('A2')">A2</button>
+            <button class="tw-btn" style="font-size:11px;padding:5px 12px;border-radius:99px;border:1px solid var(--line);background:var(--bg);color:var(--t2);cursor:pointer;font-family:var(--f)" onclick="renderGlossary('B1')">B1</button>
+            <button class="tw-btn" style="font-size:11px;padding:5px 12px;border-radius:99px;border:1px solid var(--line);background:var(--bg);color:var(--t2);cursor:pointer;font-family:var(--f)" onclick="renderGlossary('B2')">B2</button>
+            <button class="tw-btn" style="font-size:11px;padding:5px 12px;border-radius:99px;border:1px solid var(--line);background:var(--bg);color:var(--t2);cursor:pointer;font-family:var(--f)" onclick="renderGlossary('C1')">C1</button>
+          </div>
+          <div id="glossaryList" style="display:flex;flex-wrap:wrap;gap:8px;align-content:flex-start">
+            <div style="color:var(--t3);font-size:13px;padding:20px">Nessuna parola salvata. Tocca una parola nella trascrizione e premi "💾 Salva".</div>
+          </div>
+        </div>
       </div>
       <!-- Bottom bar inside content flow -->
       <div class="duo-bottom" style="flex-shrink:0;padding:10px 20px;border-top:1px solid var(--line);display:flex;align-items:center;gap:14px;background:var(--card)">
@@ -354,6 +419,8 @@ body{background:radial-gradient(circle at top left,rgba(255,255,255,.35),transpa
         </div>
         <button class="btn-duo btn-start" id="duoStartBtn" onclick="duoToggleSession()" style="font-family:var(--f);font-size:12px;font-weight:700;padding:8px 18px;border-radius:99px;border:none;cursor:pointer;background:var(--green);color:#000">🎤 Avvia</button>
         <button class="btn-duo btn-stop" id="duoStopBtn" onclick="duoToggleSession()" style="display:none;font-family:var(--f);font-size:12px;font-weight:700;padding:8px 18px;border-radius:99px;border:none;cursor:pointer;background:var(--red);color:#fff">⏹ Ferma</button>
+        <input type="text" id="duoMsgInput" placeholder="Scrivi un messaggio…" style="display:none;flex:1;min-width:120px;max-width:320px;font-family:var(--f);font-size:13px;padding:7px 14px;border-radius:99px;border:1px solid var(--line);background:var(--bg);color:var(--text);outline:none" onkeydown="if(event.key==='Enter')duoSendMessage()">
+        <button id="duoSendBtn" onclick="duoSendMessage()" style="display:none;font-family:var(--f);font-size:12px;font-weight:700;padding:7px 14px;border-radius:99px;border:none;cursor:pointer;background:var(--accent);color:#fff">Invia</button>
         <span class="duo-timer" id="duoTimer" style="font-family:var(--mono);font-size:16px;font-weight:600;color:var(--text);min-width:48px">00:00</span>
       </div>
     </div><!-- /content area -->
@@ -365,6 +432,9 @@ body{background:radial-gradient(circle at top left,rgba(255,255,255,.35),transpa
 <script src="config.js"></script>
 <script src="js/auth.js?v=21"></script>
 <script src="js/theme-2.js"></script>
+<script src="translation-providers.js"></script>
+<script src="ws-publisher.js"></script>
+<script src="js/cefr-levels.js"></script>
 
 <script>
 // ═══ DUO S8T ENGINE v2 — TTL/SNL configurable ═══
@@ -385,6 +455,8 @@ body{background:radial-gradient(circle at top left,rgba(255,255,255,.35),transpa
     style:'d1', slide:1, session:false, timer:0, timerInt:null,
     roomId:'', translations:0,
     myTTL:'it',  // viewer's preferred translation language
+    myName:'Tu', // this user's display name in the room
+    bridging:'a1', // bridging mode: a1=immediate, a2=delayed, b1=new-words, b2=on-demand
     speakers:{}, // {name:{snl,color,words,wpm,joined}}
     speakerOrder:[],
     sentences:[],
@@ -400,8 +472,22 @@ body{background:radial-gradient(circle at top left,rgba(255,255,255,.35),transpa
     var savedTTL = localStorage.getItem('duo-my-ttl');
     if (savedTTL && LANGS[savedTTL]) DUO.myTTL = savedTTL;
     document.getElementById('duoMyTTL').value = DUO.myTTL;
+    // Load saved bridging mode
+    var savedBridging = localStorage.getItem('duo-bridging');
+    if (savedBridging) { DUO.bridging = savedBridging; document.getElementById('duoBridging').value = savedBridging; }
+    // Join mode: if ?join=1&room=XXX, use that room and set guest name
+    var params = new URLSearchParams(window.location.search);
+    if (params.get('join') === '1' && params.get('room')) {
+      DUO.roomId = params.get('room');
+      localStorage.setItem('duo-room-id', DUO.roomId);
+      document.getElementById('duoRoomCode').textContent = DUO.roomId.substring(0,8);
+      isHost = false;
+      DUO.myName = 'Guest';
+    }
     updateInviteLink();
     renderSpeakerConfigs();
+    // Word Lens click handler on transcript
+    document.getElementById('duoTranscript').addEventListener('click', handleWordClick);
     if (window.location.search.indexOf('demo') !== -1) demoPopulate();
   }
 
@@ -414,6 +500,15 @@ body{background:radial-gradient(circle at top left,rgba(255,255,255,.35),transpa
     // Re-render existing sentences with new TTL
     if (DUO.sentences.length > 0) reRenderAll();
     showToast('🌐 Traduzioni ora in '+LANGS[DUO.myTTL].name);
+  };
+
+  window.duoUpdateBridging = function(){
+    DUO.bridging = document.getElementById('duoBridging').value;
+    localStorage.setItem('duo-bridging', DUO.bridging);
+    var labels = {a1:'Aiuto completo', a2:'Aiuto graduale', b1:'Solo parole nuove', b2:'Su richiesta'};
+    showToast('🎯 Modalità: '+labels[DUO.bridging]);
+    // Re-render to apply new bridging mode
+    if (DUO.sentences.length > 0) reRenderAll();
   };
 
   // ── Speaker management ──
@@ -497,15 +592,209 @@ body{background:radial-gradient(circle at top left,rgba(255,255,255,.35),transpa
     if (n >= 1) transcript.classList.add('s'+n);
   }
 
-  // ── Generate a translation for demo ──
-  function mockTranslate(orig, snl){
-    var map = {
-      'en':{'it':'Il tempo è bello oggi.','nl':'Het weer is mooi vandaag.','fr':'Il fait beau aujourd\'hui.','de':'Das Wetter ist schön heute.','es':'El tiempo es bueno hoy.'},
-      'it':{'en':'The weather is lovely today.','nl':'Het weer is mooi vandaag.','fr':'Il fait beau aujourd\'hui.','de':'Das Wetter ist schön heute.','es':'El tiempo es bueno hoy.'},
-      'nl':{'en':'The weather is nice today.','it':'Il tempo è bello oggi.','fr':'Il fait beau aujourd\'hui.','de':'Das Wetter ist schön heute.','es':'El tiempo es bueno hoy.'}
-    };
-    var s = map[snl] || map['en'];
-    return s[DUO.myTTL] || s['it'] || orig;
+  // ── Real translation via API (MyMemory + Google fallback) ──
+  async function translateText(text, sourceLang, targetLang){
+    // Normalize: same language → no translation needed
+    var sl = (sourceLang||'').toLowerCase().split('-')[0];
+    var tl = (targetLang||'').toLowerCase().split('-')[0];
+    if (sl === tl) return text;
+    // Small texts or punctuation → skip API call
+    if (text.length < 2 || /^[\s.,!?;:…]+$/.test(text)) return text;
+    var config = window.SottotitoliTranslationProviders.resolveConfig();
+    try {
+      var result = await window.SottotitoliTranslationProviders.translateText(config, text, sl, tl);
+      return result.translatedText;
+    } catch(e) {
+      console.warn('Translation failed for "'+text.substring(0,40)+'…": '+e.message);
+      return null; // Signal failure — caller shows fallback
+    }
+  }
+
+  // ── Progressive sentence rendering (with bridging mode) ──
+  function addSentence(speaker, orig, preTran){
+    var sp = DUO.speakers[speaker]; if (!sp) return;
+    sp.words += orig.split(/\s+/).length;
+    if (preTran) {
+      commitSentence(speaker, orig, preTran);
+      return;
+    }
+    var bridge = DUO.bridging || 'a1';
+    // B2 mode: no auto-translation — show "tap to translate"
+    if (bridge === 'b2') {
+      commitSentence(speaker, orig, '[Tocca per tradurre]');
+      return;
+    }
+    // B1 mode: only translate unknown words
+    if (bridge === 'b1') {
+      var words = orig.split(/\s+/);
+      var knownWords = words.filter(function(w){
+        return savedWords[w.toLowerCase().replace(/[.,!?;:…]$/,'')];
+      });
+      if (knownWords.length >= words.length * 0.7) {
+        // User knows >70% of words — show partial translation with unknown words highlighted
+        var partial = words.map(function(w){
+          var lower = w.toLowerCase().replace(/[.,!?;:…]$/,'');
+          return savedWords[lower] ? w : '___';
+        }).join(' ');
+        commitSentence(speaker, orig, partial + ' ⚡');
+        return;
+      }
+      // Fall through to full translation if too many unknown words
+    }
+    // A2 mode: delay translation by 3s — show original first
+    if (bridge === 'a2') {
+      commitSentence(speaker, orig, '…');
+      setTimeout(function(){
+        translateText(orig, sp.snl, DUO.myTTL).then(function(realTran){
+          if (realTran) patchLastSentence(speaker, realTran);
+        }).catch(function(){});
+      }, 3000);
+      return;
+    }
+    // A1 mode (default): immediate translation
+    var placeholder = DUO.myTTL === sp.snl ? orig : '…';
+    commitSentence(speaker, orig, placeholder);
+    translateText(orig, sp.snl, DUO.myTTL).then(function(realTran){
+      if (realTran && realTran !== placeholder) {
+        patchLastSentence(speaker, realTran);
+      }
+    }).catch(function(){});
+  }
+
+  function commitSentence(speaker, orig, tran){
+    DUO.sentences.push({speaker:speaker, orig:orig, tran:tran, ts:new Date()});
+    DUO.translations = DUO.sentences.length;
+    renderSentence(speaker, orig, tran);
+    renderSpeakers();
+    // Broadcast to room so other users see it
+    if (DUO.session && isHost && speaker === DUO.myName) {
+      broadcastSentence(speaker, orig);
+    }
+    updateComprehension();
+  }
+
+  // ── Comprehension meter ──
+  function updateComprehension(){
+    var meter = document.getElementById('compMeter');
+    if (!DUO.session || DUO.sentences.length === 0) {
+      if (meter) meter.style.display = 'none';
+      return;
+    }
+    if (meter) meter.style.display = 'flex';
+    // Count all words and known (saved) words
+    var allWords = [];
+    DUO.sentences.forEach(function(s){
+      var words = s.tran.split(/[\s,.;:!?…]+/).filter(function(w){return w.length>0;});
+      allWords = allWords.concat(words);
+    });
+    var total = allWords.length;
+    var known = 0;
+    var newWords = [];
+    var seen = {};
+    allWords.forEach(function(w){
+      var lower = w.toLowerCase();
+      if (savedWords[lower]) known++;
+      else if (!seen[lower]) { seen[lower]=true; newWords.push(lower); }
+    });
+    var pct = total > 0 ? Math.round(known/total*100) : 0;
+    var fill = document.getElementById('compBarFill');
+    var pctEl = document.getElementById('compPct');
+    var newEl = document.getElementById('compNewWords');
+    if (fill) {
+      fill.style.width = pct+'%';
+      fill.style.background = pct >= 80 ? 'var(--green)' : pct >= 50 ? 'var(--amber)' : 'var(--red)';
+    }
+    if (pctEl) pctEl.textContent = pct+'%';
+    if (newEl) {
+      if (newWords.length > 0) {
+        newEl.style.display = '';
+        newEl.textContent = '+'+newWords.length+' nuove';
+      } else {
+        newEl.style.display = 'none';
+      }
+    }
+  }
+
+  function patchLastSentence(speaker, newTran){
+    // Re-render the last sentence with the real translation
+    var last = DUO.sentences[DUO.sentences.length-1];
+    if (!last || last.speaker !== speaker) return;
+    last.tran = newTran;
+    var container = document.getElementById('duoTranscript');
+    // Remove the last row (which has the placeholder)
+    var rows = container.querySelectorAll('.duo-row, .duo-bubble, .d3-row');
+    if (rows.length > 0) {
+      var lastRow = rows[rows.length-1];
+      // Fade-out effect
+      lastRow.style.opacity = '0';
+      lastRow.style.transition = 'opacity .15s';
+      setTimeout(function(){
+        if (lastRow.parentNode) lastRow.parentNode.removeChild(lastRow);
+        // Re-render in place
+        var el = buildSentenceDOM(last.speaker, last.orig, newTran);
+        container.appendChild(el);
+        requestAnimationFrame(function(){ el.style.opacity = '1'; });
+        container.scrollTo({top:container.scrollHeight,behavior:'smooth'});
+      }, 150);
+    }
+  }
+
+  function buildSentenceDOM(speaker, orig, tran){
+    var sp = DUO.speakers[speaker]; var name = speaker;
+    var loading = (tran === '…');
+    // Tokenize translation words for Word Lens (only when not loading)
+    var tranHTML = loading ? esc(tran) : tokenizeHTML(tran, DUO.myTTL);
+    var el = document.createElement('div');
+    if (DUO.style === 'd1'){
+      el.className = 'duo-row';
+      el.innerHTML = '<div class="duo-orig">'+tokenizeHTML(orig, sp.snl)+' <span style="font-size:9px;color:var(--t3)">('+LANGS[sp.snl].flag+')</span></div><div class="duo-arrow">→</div><div class="duo-tran'+(loading?' tran-loading':'')+'">'+tranHTML+' <span style="font-size:9px;color:var(--t3)">('+LANGS[DUO.myTTL].flag+')</span></div>';
+    } else if (DUO.style === 'd2'){
+      var side = (DUO.speakerOrder.indexOf(speaker)%2===0)?'a':'b';
+      el.className = 'duo-bubble '+side;
+      el.innerHTML = '<span class="duo-btext'+(loading?' tran-loading':'')+'">'+tranHTML+'<div class="duo-blang"><span style="color:'+sp.color+'">●</span> '+esc(name)+' · '+LANGS[sp.snl].flag+'</div><div class="duo-btran">'+esc(orig)+'</div></span>';
+    } else {
+      el.className = 'd3-row';
+      el.innerHTML = '<div style="flex:1;min-width:0"><div class="d3-ttl'+(loading?' tran-loading':'')+'">'+tranHTML+'</div><div class="d3-src">'+esc(orig)+'<span class="d3-snl" style="background:'+sp.color+'">'+esc(name.substring(0,3).toUpperCase())+'</span></div></div>';
+    }
+    el.style.opacity = '0';
+    el.style.transition = 'opacity .25s';
+    // B2 placeholder: make the whole translation area tappable
+    if (tran === '[Tocca per tradurre]') {
+      el.classList.add('tran-placeholder');
+      el.style.cursor = 'pointer';
+      el.title = 'Tocca per tradurre';
+    }
+    return el;
+  }
+
+  // Add a global click handler for B2 "tap to translate" sentences
+  document.addEventListener('click', function(e){
+    var row = e.target.closest('.tran-placeholder');
+    if (!row) return;
+    e.stopPropagation();
+    var idx = Array.from(row.parentNode.children).indexOf(row);
+    if (idx >= 0 && DUO.sentences[idx] && DUO.sentences[idx].tran === '[Tocca per tradurre]') {
+      translateB2Sentence(idx, row);
+    }
+  });
+
+  function translateB2Sentence(idx, row){
+    var s = DUO.sentences[idx];
+    if (!s) return;
+    var sp = DUO.speakers[s.speaker];
+    // Show loading
+    row.style.opacity = '0.5';
+    translateText(s.orig, sp.snl, DUO.myTTL).then(function(realTran){
+      if (!realTran) return;
+      s.tran = realTran;
+      // Replace the row with the real translation
+      var container = row.parentNode;
+      var newRow = buildSentenceDOM(s.speaker, s.orig, realTran);
+      container.replaceChild(newRow, row);
+      requestAnimationFrame(function(){ newRow.style.opacity = '1'; });
+    }).catch(function(){
+      row.style.opacity = '1';
+    });
   }
 
   // ── Style toggle ──
@@ -536,7 +825,55 @@ body{background:radial-gradient(circle at top left,rgba(255,255,255,.35),transpa
     });
     if (n===2) renderSpeakerCards();
     if (n===3) renderMetrics();
+    if (n===5) renderGlossary('all');
   };
+
+  // ── WebSocket room ──
+  var wsPublisher = null;
+  var isHost = (window.location.search.indexOf('join=1') === -1); // No ?join → host
+
+  function initWS(){
+    if (wsPublisher) return;
+    wsPublisher = window.createWSPublisher({
+      url: (window.SOTTOTITOLI_CONFIG && window.SOTTOTITOLI_CONFIG.websocketUrl) || 'wss://sottotitoli-websocket.onrender.com',
+      room: DUO.roomId,
+      onStateChange: function(state){
+        var dot = document.getElementById('wsIndicator');
+        if (dot) {
+          dot.style.background = state === 'connected' ? 'var(--green)' : state === 'connecting' ? 'var(--amber)' : 'var(--t3)';
+          dot.title = 'WebSocket: '+state;
+        }
+      },
+      onMessage: function(event){
+        try {
+          var data = JSON.parse(event.data);
+          // Handle incoming sentences from other users in the room
+          if (data.final && data.speaker && data.snl) {
+            // Don't re-render our own sentences
+            if (data.speaker !== DUO.myName) {
+              addSentence(data.speaker, data.final, null);
+              addLogEntry('📩', esc(data.speaker)+': '+esc(data.final.substring(0,40)));
+            }
+          }
+        } catch(e) {}
+      },
+      onError: function(err){
+        console.warn('WS error:', err);
+      }
+    });
+  }
+
+  function broadcastSentence(speaker, orig){
+    if (!wsPublisher || !wsPublisher.isOpen()) return;
+    var sp = DUO.speakers[speaker];
+    wsPublisher.publish({
+      msg: true,
+      final: orig,
+      speaker: speaker,
+      snl: sp ? sp.snl : 'en',
+      id: DUO.sentences.length
+    });
+  }
 
   // ── Session ──
   window.duoToggleSession = function(){
@@ -549,13 +886,24 @@ body{background:radial-gradient(circle at top left,rgba(255,255,255,.35),transpa
         DUO.timer++; var m=Math.floor(DUO.timer/60), s=DUO.timer%60;
         document.getElementById('duoTimer').textContent = (m<10?'0':'')+m+':'+(s<10?'0':'')+s;
       },1000);
-      addLogEntry('🎬','Sessione avviata');
+      // Connect WebSocket
+      initWS();
+      wsPublisher.connect();
+      addLogEntry('🎬','Sessione avviata · Room '+DUO.roomId.substring(0,8));
+      // Show message input
+      document.getElementById('duoMsgInput').style.display = '';
+      document.getElementById('duoSendBtn').style.display = '';
       // Auto-add default speaker if none
-      if (DUO.speakerOrder.length === 0) duoAddSpeaker('You','en');
+      if (DUO.speakerOrder.length === 0) duoAddSpeaker(isHost ? 'Tu' : 'Guest','en');
+      if (!isHost) DUO.myName = 'Guest';
       document.getElementById('duoHostSection') && (document.getElementById('duoHostSection').style.display='block');
     } else {
       startBtn.style.display = ''; stopBtn.style.display = 'none';
       clearInterval(DUO.timerInt);
+      if (wsPublisher) wsPublisher.disconnect();
+      // Hide message input
+      document.getElementById('duoMsgInput').style.display = 'none';
+      document.getElementById('duoSendBtn').style.display = 'none';
       addLogEntry('⏹','Sessione terminata · '+fmtTime(DUO.timer));
       showToast('✅ Traduzione completata · '+DUO.sentences.length+' frasi');
     }
@@ -577,33 +925,12 @@ body{background:radial-gradient(circle at top left,rgba(255,255,255,.35),transpa
     list.innerHTML = html || '<div style="text-align:center;font-size:11px;color:var(--t3);padding:20px 8px">Nessun partecipante.<br>Usa le impostazioni qui sotto per aggiungerne.</div>';
   }
 
-  // ── Sentence rendering with TTL ──
-  function addSentence(speaker, orig, tran){
-    var sp = DUO.speakers[speaker]; if (!sp) return;
-    sp.words += orig.split(/\s+/).length;
-    if (!tran) tran = mockTranslate(orig, sp.snl);
-    DUO.sentences.push({speaker:speaker, orig:orig, tran:tran, ts:new Date()});
-    DUO.translations++;
-    renderSentence(speaker, orig, tran);
-    renderSpeakers();
-  }
-
+  // ── DOM rendering ──
   function renderSentence(speaker, orig, tran){
     var container = document.getElementById('duoTranscript');
-    var sp = DUO.speakers[speaker]; var name = speaker;
-    var el = document.createElement('div');
-    if (DUO.style === 'd1'){
-      el.className = 'duo-row';
-      el.innerHTML = '<div class="duo-orig">'+esc(orig)+' <span style="font-size:9px;color:var(--t3)">('+LANGS[sp.snl].flag+')</span></div><div class="duo-arrow">→</div><div class="duo-tran">'+esc(tran)+' <span style="font-size:9px;color:var(--t3)">('+LANGS[DUO.myTTL].flag+')</span></div>';
-    } else if (DUO.style === 'd2'){
-      var side = (DUO.speakerOrder.indexOf(speaker)%2===0)?'a':'b';
-      el.className = 'duo-bubble '+side;
-      el.innerHTML = '<span class="duo-btext">'+esc(tran)+'<div class="duo-blang"><span style="color:'+sp.color+'">●</span> '+esc(name)+' · '+LANGS[sp.snl].flag+'</div><div class="duo-btran">'+esc(orig)+'</div></span>';
-    } else {
-      el.className = 'd3-row';
-      el.innerHTML = '<div style="flex:1;min-width:0"><div class="d3-ttl">'+esc(tran)+'</div><div class="d3-src">'+esc(orig)+'<span class="d3-snl" style="background:'+sp.color+'">'+esc(name.substring(0,3).toUpperCase())+'</span></div></div>';
-    }
+    var el = buildSentenceDOM(speaker, orig, tran);
     container.appendChild(el);
+    requestAnimationFrame(function(){ el.style.opacity = '1'; });
     container.scrollTo({top:container.scrollHeight,behavior:'smooth'});
   }
 
@@ -650,6 +977,49 @@ body{background:radial-gradient(circle at top left,rgba(255,255,255,.35),transpa
     }); tbody.innerHTML = html;
   }
 
+  // ── Personal Glossary ──
+  function renderGlossary(filter){
+    filter = filter || 'all';
+    var container = document.getElementById('glossaryList');
+    if (!container) return;
+    var words = Object.keys(savedWords);
+    if (words.length === 0) {
+      container.innerHTML = '<div style="color:var(--t3);font-size:13px;padding:20px">Nessuna parola salvata. Tocca una parola nella trascrizione e premi "💾 Salva".</div>';
+      return;
+    }
+    // Update filter buttons
+    document.querySelectorAll('#glossFilterAll, [onclick^="renderGlossary"]').forEach(function(b){
+      var f = b.textContent.trim();
+      var active = (f === filter || (filter === 'all' && f === 'Tutte'));
+      b.style.background = active ? 'var(--accent)' : 'var(--bg)';
+      b.style.color = active ? '#fff' : 'var(--t2)';
+    });
+    var filtered = words.filter(function(w){
+      if (filter === 'all') return true;
+      return savedWords[w].level === filter;
+    });
+    if (filtered.length === 0) {
+      container.innerHTML = '<div style="color:var(--t3);font-size:13px;padding:20px">Nessuna parola di livello '+filter+' nel tuo vocabolario.</div>';
+      return;
+    }
+    filtered.sort(function(a,b){ return (savedWords[b].savedAt||'').localeCompare(savedWords[a].savedAt||''); });
+    var html = '';
+    filtered.forEach(function(w){
+      var info = savedWords[w];
+      var level = info.level || '';
+      var cefr = (window.CEFR_COLORS && level) ? window.CEFR_COLORS[level] : null;
+      html += '<div class="gloss-card" style="background:var(--card2);border:1px solid var(--line);border-radius:12px;padding:12px 16px;display:flex;flex-direction:column;gap:6px;min-width:140px;max-width:200px;flex:1;transition:all .2s;cursor:pointer" onclick="showToast(\''+escAttr(w)+' · '+escAttr(level||'?')+'\')" title="'+escAttr(w)+'">'+
+        '<div style="font-size:18px;font-weight:700;color:var(--text);letter-spacing:-.01em">'+esc(w)+'</div>'+
+        '<div style="display:flex;align-items:center;gap:8px">'+
+        (cefr ? '<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:4px;background:'+cefr.bg+';color:'+cefr.text+'">'+level+'</span>' : '')+
+        '<span style="font-size:10px;color:var(--t3)">'+(info.lang||'').toUpperCase()+'</span>'+
+        '</div>'+
+        '<button class="tw-btn" style="font-size:10px;padding:4px 10px;border-radius:99px;border:1px solid var(--red);background:transparent;color:var(--red);cursor:pointer;font-family:var(--f);align-self:flex-start;margin-top:4px" onclick="event.stopPropagation();window._twUnsave(\''+escAttr(w)+'\');renderGlossary(\''+escAttr(filter)+'\')">🗑️ Rimuovi</button>'+
+      '</div>';
+    });
+    container.innerHTML = html;
+  }
+
   // ── Log, Invite, Helpers ──
   function addLogEntry(icon,msg){
     var log=document.getElementById('duoJoinLog'); var ts=new Date().toTimeString().substring(0,5);
@@ -668,6 +1038,111 @@ body{background:radial-gradient(circle at top left,rgba(255,255,255,.35),transpa
   window.duoShareWhatsApp=function(){ window.open('https://wa.me/?text='+encodeURIComponent(document.getElementById('duoInviteLink').textContent),'_blank'); };
   window.duoShareEmail=function(){ window.location.href='mailto:?subject=Unisciti alla mia sessione di traduzione&body='+encodeURIComponent(document.getElementById('duoInviteLink').textContent); };
   window.duoNewRoom=function(){ DUO.roomId=generateRoomId(); localStorage.setItem('duo-room-id',DUO.roomId); document.getElementById('duoRoomCode').textContent=DUO.roomId.substring(0,8); updateInviteLink(); showToast('🔄 Nuova stanza!'); };
+
+  window.duoSendMessage = function(){
+    var input = document.getElementById('duoMsgInput');
+    var text = (input.value || '').trim();
+    if (!text || !DUO.session) return;
+    input.value = '';
+    // Use the first speaker (me) as the sender
+    var me = DUO.speakerOrder[0] || DUO.myName;
+    if (!DUO.speakers[me]) duoAddSpeaker(DUO.myName, DUO.myTTL);
+    addSentence(me, text, null);
+  };
+
+  // ═══ WORD LENS — tap-to-explore ═══
+  var savedWords = {};
+  try { savedWords = JSON.parse(localStorage.getItem('sottotitoli-saved-words') || '{}'); } catch(e) {}
+
+  function tokenizeHTML(text, lang){
+    if (!text || text === '…') return esc(text||'');
+    return text.replace(/([\wÀ-ÿ']+)|([^\wÀ-ÿ']+)/g, function(match, word, punct){
+      if (punct) return esc(punct);
+      var lower = word.toLowerCase().replace(/'s$/,'').replace(/[.,!?;:…]$/,'');
+      var level = window.getCEFRLevel ? window.getCEFRLevel(lower) : '';
+      var isSaved = savedWords[lower] ? ' saved' : '';
+      return '<span class="tw-word'+isSaved+'" data-word="'+escAttr(lower)+'" data-lang="'+escAttr(lang)+'" data-level="'+level+'" title="'+escAttr(word)+(level?' · '+level:'')+'">'+esc(word)+'</span>';
+    });
+  }
+
+  function handleWordClick(e){
+    var target = e.target;
+    if (!target.classList.contains('tw-word')) return;
+    e.stopPropagation();
+    showWordPopup(target);
+  }
+
+  function showWordPopup(el){
+    var word = el.getAttribute('data-word');
+    var lang = el.getAttribute('data-lang') || 'en';
+    var level = el.getAttribute('data-level') || '';
+    var isSaved = savedWords[word];
+    var rect = el.getBoundingClientRect();
+    var popup = document.getElementById('twPopup');
+    if (!popup) {
+      popup = document.createElement('div');
+      popup.id = 'twPopup';
+      popup.className = 'tw-popup';
+      document.body.appendChild(popup);
+      document.addEventListener('click', function(ev){
+        if (!popup.contains(ev.target) && !ev.target.classList.contains('tw-word')) {
+          popup.classList.remove('show');
+        }
+      });
+    }
+    var cefrInfo = (window.CEFR_COLORS && level) ? window.CEFR_COLORS[level] : null;
+    var h = '<div class="tw-word-title">'+esc(word)+'</div>';
+    if (cefrInfo) {
+      h += '<span class="tw-cefr-badge" style="background:'+cefrInfo.bg+';color:'+cefrInfo.text+'">'+cefrInfo.label+'</span>';
+    } else if (level) {
+      h += '<span class="tw-cefr-badge" style="background:var(--bg);color:var(--t2)">'+level+'</span>';
+    }
+    h += '<div class="tw-info">Lingua: '+esc(lang.toUpperCase())+'</div>';
+    h += '<div class="tw-actions">';
+    if (isSaved) {
+      h += '<button class="tw-btn tw-btn-saved" onclick="window._twUnsave(\''+escAttr(word)+'\')">💾 Salvata</button>';
+    } else {
+      h += '<button class="tw-btn tw-btn-save" onclick="window._twSave(\''+escAttr(word)+'\',\''+escAttr(lang)+'\',\''+escAttr(level)+'\')">💾 Salva parola</button>';
+    }
+    h += '<button class="tw-btn tw-btn-close" onclick="document.getElementById(\'twPopup\').classList.remove(\'show\')">✕</button>';
+    h += '</div>';
+    popup.innerHTML = h;
+    // Position near the word
+    var top = rect.top - 180;
+    if (top < 10) top = rect.bottom + 8;
+    var left = Math.max(10, Math.min(rect.left + rect.width/2 - 120, window.innerWidth - 280));
+    popup.style.top = top + 'px';
+    popup.style.left = left + 'px';
+    popup.classList.add('show');
+  }
+
+  window._twSave = function(word, lang, level){
+    savedWords[word] = {lang:lang, level:level, savedAt:new Date().toISOString()};
+    localStorage.setItem('sottotitoli-saved-words', JSON.stringify(savedWords));
+    document.querySelectorAll('.tw-word[data-word="'+escAttr(word)+'"]').forEach(function(el){
+      el.classList.add('saved');
+    });
+    var popup = document.getElementById('twPopup');
+    if (popup) {
+      var btn = popup.querySelector('.tw-btn-save');
+      if (btn) { btn.className = 'tw-btn tw-btn-saved'; btn.textContent = '💾 Salvata'; btn.onclick = function(){ window._twUnsave(''+escAttr(word)+''); }; }
+    }
+    showToast('💾 '+word+' salvata nel tuo vocabolario');
+  };
+
+  window._twUnsave = function(word){
+    delete savedWords[word];
+    localStorage.setItem('sottotitoli-saved-words', JSON.stringify(savedWords));
+    document.querySelectorAll('.tw-word[data-word="'+escAttr(word)+'"]').forEach(function(el){
+      el.classList.remove('saved');
+    });
+    var popup = document.getElementById('twPopup');
+    if (popup) {
+      var btn = popup.querySelector('.tw-btn-saved');
+      if (btn) { btn.className = 'tw-btn tw-btn-save'; btn.textContent = '💾 Salva parola'; btn.onclick = function(){ window._twSave(''+escAttr(word)+'','en',''); }; }
+    }
+    showToast('🗑️ '+word+' rimossa dal vocabolario');
+  };
 
   function esc(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
   function escAttr(s){return s.replace(/'/g,"\\'").replace(/"/g,'&quot;');}
