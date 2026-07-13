@@ -22,6 +22,7 @@
     style: 'd1',
     slide: 1,
     session: false,
+    sessionState: null,   // null, 'requesting_microphone', 'live_speech', 'live_typed'
     timer: 0,
     timerInt: null,
     roomId: '',

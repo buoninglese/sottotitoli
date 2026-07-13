@@ -543,8 +543,9 @@
       var sidA2 = segA2.clientSegmentId;
       var tid = setTimeout(function(){
         translateText(orig, sp.snl, DUO.myTTL).then(function(realTran){
-          if (realTran) patchSentenceById(sidA2, realTran);
-        }).catch(function(){});
+          if (realTran) { patchSentenceById(sidA2, realTran); }
+          else { patchSentenceById(sidA2, '🔄 Riprova'); }
+        }).catch(function(){ patchSentenceById(sidA2, '🔄 Riprova'); });
       }, 3000);
       pendingTimeouts.push(tid);
       return;
@@ -556,8 +557,10 @@
     translateText(orig, sp.snl, DUO.myTTL).then(function(realTran){
       if (realTran && realTran !== placeholder) {
         patchSentenceById(sidA1, realTran);
+      } else if (!realTran) {
+        patchSentenceById(sidA1, '🔄 Riprova');
       }
-    }).catch(function(){});
+    }).catch(function(){ patchSentenceById(sidA1, '🔄 Riprova'); });
   }
 
   function commitSentence(speaker, orig, tran){
@@ -657,10 +660,10 @@
     }
     el.style.opacity = '0';
     el.style.transition = 'opacity .25s';
-    if (tran === '[Tocca per tradurre]') {
+    if (tran === '[Tocca per tradurre]' || tran === '🔄 Riprova') {
       el.classList.add('tran-placeholder');
       el.style.cursor = 'pointer';
-      el.title = 'Tocca per tradurre';
+      el.title = tran === '🔄 Riprova' ? 'Traduzione non disponibile — tocca per riprovare' : 'Tocca per tradurre';
     }
     return el;
   }
@@ -673,7 +676,7 @@
     container.scrollTo({top:container.scrollHeight,behavior:'smooth'});
   }
 
-  // B2 "tap to translate" — now uses segment ID
+  // B2 "tap to translate" + retry handler
   document.addEventListener('click', function(e){
     var row = e.target.closest('.tran-placeholder');
     if (!row) return;
@@ -681,36 +684,21 @@
     var sid = row.getAttribute('data-segment-id');
     if (!sid) return;
     var seg = S8T_SEGMENTS.getById(sid);
-    if (!seg || seg.tran !== '[Tocca per tradurre]') return;
-    var sp = DUO.speakers[seg.speaker];
-    if (!sp) return;
+    if (!seg) return;
+    var isB2 = seg.tran === '[Tocca per tradurre]';
+    var isRetry = seg.tran === '🔄 Riprova';
+    if (!isB2 && !isRetry) return;
     row.style.opacity = '0.5';
-    translateText(seg.orig, sp.snl, DUO.myTTL).then(function(realTran){
-      if (!realTran) return;
-      patchSentenceById(sid, realTran);
+    translateText(seg.orig, seg.speakerLanguage || 'en', DUO.myTTL).then(function(realTran){
+      if (realTran) {
+        patchSentenceById(sid, realTran);
+      } else {
+        patchSentenceById(sid, '🔄 Riprova');
+      }
     }).catch(function(){
-      row.style.opacity = '1';
+      patchSentenceById(sid, '🔄 Riprova');
     });
   });
-
-  function translateB2Sentence(idx, row){
-    var s = DUO.sentences[idx];
-    if (!s) return;
-    var sp = DUO.speakers[s.speaker];
-    // Show loading
-    row.style.opacity = '0.5';
-    translateText(s.orig, sp.snl, DUO.myTTL).then(function(realTran){
-      if (!realTran) return;
-      s.tran = realTran;
-      // Replace the row with the real translation
-      var container = row.parentNode;
-      var newRow = buildSentenceDOM(s.speaker, s.orig, realTran);
-      container.replaceChild(newRow, row);
-      requestAnimationFrame(function(){ newRow.style.opacity = '1'; });
-    }).catch(function(){
-      row.style.opacity = '1';
-    });
-  }
 
   // ── Style toggle ──
   window.duoSetStyle = function(style){
@@ -765,7 +753,13 @@
           if (data.final && data.speaker && data.snl) {
             // Don't re-render our own sentences
             if (data.speaker !== DUO.myName) {
-              addSentence(data.speaker, data.final, null);
+              // Auto-create speaker if they don't exist yet
+              if (!DUO.speakers[data.speaker]) { duoAddSpeaker(data.speaker, data.snl); }
+              // Dedup: skip if we already have this segment
+              var cid = data.clientId || data.id;
+              if (!cid || !S8T_SEGMENTS.getById(cid)) {
+                addSentence(data.speaker, data.final, null);
+              }
               addLogEntry('📩', esc(data.speaker)+': '+esc(data.final.substring(0,40)));
             }
           }
@@ -800,7 +794,7 @@
         DUO.timer++; var m=Math.floor(DUO.timer/60), s=DUO.timer%60;
         document.getElementById('duoTimer').textContent = (m<10?'0':'')+m+':'+(s<10?'0':'')+s;
       },1000);
-      // Connect WebSocket + Realtime + Speech
+      // Connect WebSocket + Realtime
       initWS();
       wsPublisher.connect();
       S8T_REALTIME.subscribe(DUO.roomId, function(seg){
@@ -813,6 +807,7 @@
       // Initialize speech recognition for the first speaker's language
       var firstSpk = DUO.speakerOrder[0];
       var spkLang = firstSpk ? DUO.speakers[firstSpk].snl : 'en';
+      DUO.sessionState = 'requesting_microphone';
       S8T_SPEECH.init(spkLang, {
         onInterim: function(text){
           var interim = document.getElementById('duoInterim');
@@ -832,13 +827,20 @@
         },
         onError: function(code, msg){
           console.warn('Speech error:', code, msg);
-          // Fall back to typed input — already visible
           var interim = document.getElementById('duoInterim');
           if (interim) { interim.textContent = '🎤 ' + (code === 'unsupported' ? 'Riconoscimento vocale non supportato. Usa la tastiera.' : 'Microfono non disponibile. Usa la tastiera.'); interim.style.color = 'var(--t3)'; }
         }
       });
-      // Try to start speech — if it fails, typed input is the fallback
-      S8T_SPEECH.start().catch(function(){});
+      // Try speech — result sets session mode
+      S8T_SPEECH.start().then(function(speechOk){
+        DUO.sessionState = speechOk ? 'live_speech' : 'live_typed';
+        if (!speechOk) {
+          var interim = document.getElementById('duoInterim');
+          if (interim && !interim.textContent) { interim.textContent = '⌨️ Sessione testuale — scrivi un messaggio'; interim.style.color = 'var(--t3)'; }
+        }
+      }).catch(function(){
+        DUO.sessionState = 'live_typed';
+      });
       addLogEntry('🎬','Sessione avviata · Room '+DUO.roomId.substring(0,8));
       // Show message input
       document.getElementById('duoMsgInput').style.display = '';
@@ -974,15 +976,13 @@
   }
 
   function updateInviteLink(){
-    // New format: ?invite=<TOKEN>  (server-authoritative)
-    // Fallback: ?join=1&room=<ID> (legacy, local-only)
-    var link;
-    if (DUO.inviteToken) {
-      link = window.location.origin + window.location.pathname + '?invite=' + DUO.inviteToken;
-    } else {
-      link = window.location.origin + window.location.pathname + '?join=1&room=' + DUO.roomId;
+    var el=document.getElementById('duoInviteLink');
+    if (!DUO.inviteToken) {
+      if(el)el.textContent='Crea una stanza condivisa per generare un link sicuro.';
+      return;
     }
-    var el=document.getElementById('duoInviteLink'); if(el)el.textContent=link;
+    var link = window.location.origin + window.location.pathname + '?invite=' + DUO.inviteToken;
+    if(el)el.textContent=link;
   }
 
   window.duoCopyInvite=function(){ navigator.clipboard.writeText(document.getElementById('duoInviteLink').textContent).then(function(){showToast('📋 Link copiato!')}); };
