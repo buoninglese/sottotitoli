@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html lang="it" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Traduzione · Release Checklist</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,400;14..32,500;14..32,600;14..32,700;14..32,800;14..32,900&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#0f1117;--card:#1a1d26;--line:#2a2d35;--text:#e1e4ea;--t2:#9ca3af;--t3:#6b7280;--accent:#7c3aed;--green:#22c55e;--amber:#f59e0b;--red:#ef4444;--f:'Inter',sans-serif}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--f);background:var(--bg);color:var(--text);line-height:1.6;padding:40px 20px;max-width:900px;margin:0 auto}
+h1{font-size:28px;font-weight:800;margin-bottom:8px}
+h2{font-size:18px;font-weight:700;margin:32px 0 12px;padding-bottom:8px;border-bottom:1px solid var(--line)}
+h3{font-size:15px;font-weight:600;margin:20px 0 8px;color:var(--t2)}
+.subtitle{color:var(--t3);font-size:13px;margin-bottom:24px}
+.commit{font-family:monospace;font-size:12px;background:var(--card);padding:4px 10px;border-radius:6px;color:var(--accent)}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:20px;margin-bottom:16px}
+.card h3{margin-top:0}
+.step{display:flex;gap:10px;align-items:flex-start;padding:8px 0;border-bottom:1px solid var(--line)}
+.step:last-child{border-bottom:none}
+.step-num{width:26px;height:26px;border-radius:50%;background:var(--line);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;flex-shrink:0;color:var(--t2)}
+.step-text{flex:1;font-size:13px}
+.step-text code{font-family:monospace;font-size:11px;background:rgba(124,58,237,.15);padding:1px 5px;border-radius:3px;color:var(--accent)}
+.pass{color:var(--green)}
+.fail{color:var(--red)}
+.checkbox{display:inline-block;width:18px;height:18px;border:2px solid var(--line);border-radius:4px;margin-right:8px;vertical-align:middle;cursor:pointer}
+.manual{background:rgba(245,158,11,.08);border-color:rgba(245,158,11,.2)}
+.manual h3{color:var(--amber)}
+.badge{display:inline-block;font-size:10px;font-weight:700;padding:2px 8px;border-radius:99px;margin-left:6px}
+.badge-me{background:var(--amber);color:#000}
+.badge-agent{background:var(--accent);color:#fff}
+.two-col{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+@media(max-width:640px){.two-col{grid-template-columns:1fr}}
+.progress{height:6px;background:var(--line);border-radius:3px;margin:16px 0;overflow:hidden}
+.progress-fill{height:100%;background:var(--accent);border-radius:3px;transition:width .3s}
+</style>
+</head>
+<body>
+
+<h1>🧪 Traduzione S8T · Release Checklist</h1>
+<p class="subtitle">Commit <span class="commit">59ad015</span> · 15 test di accettazione · 13 luglio 2026</p>
+
+<div class="progress"><div class="progress-fill" style="width:0%" id="progressBar"></div></div>
+
+<!-- ═══ SEZIONE MANUALE (solo tu) ═══ -->
+<div class="card manual">
+<h3>🔧 Azioni manuali — solo tu puoi farle <span class="badge badge-me">TU</span></h3>
+
+<div class="step">
+  <div class="step-num">A1</div>
+  <div class="step-text">
+    <strong>Esegui SQL nel Supabase Editor:</strong><br>
+    <code>get_room_segment_feed_item</code> — incolla lo script qui sotto e premi Run.
+    <br><br>
+    <textarea readonly style="width:100%;height:180px;font-family:monospace;font-size:11px;background:var(--bg);color:var(--text);border:1px solid var(--line);border-radius:8px;padding:10px;resize:vertical">create or replace function public.get_room_segment_feed_item(
+  p_segment_id uuid, p_target_language text
+)
+returns jsonb language plpgsql security invoker as $$
+declare
+  v_room_id uuid; result jsonb;
+begin
+  select room_id into v_room_id from public.transcript_segments where id = p_segment_id;
+  if v_room_id is null then return null; end if;
+  select row_to_json(f) into result
+  from public.get_room_segment_feed(v_room_id, p_target_language) f
+  where f.id = p_segment_id;
+  return result;
+end;
+$$;</textarea>
+  </div>
+</div>
+
+<div class="step">
+  <div class="step-num">A2</div>
+  <div class="step-text">
+    <strong>Esegui SQL per room_id su segment_translations:</strong><br>
+    <textarea readonly style="width:100%;height:120px;font-family:monospace;font-size:11px;background:var(--bg);color:var(--text);border:1px solid var(--line);border-radius:8px;padding:10px;resize:vertical">alter table public.segment_translations add column if not exists room_id uuid;
+update public.segment_translations st set room_id = ts.room_id
+from public.transcript_segments ts where st.segment_id = ts.id and st.room_id is null;
+create index if not exists segment_translations_room_id_idx on public.segment_translations(room_id);</textarea>
+  </div>
+</div>
+
+<div class="step">
+  <div class="step-num">A3</div>
+  <div class="step-text">
+    <strong>Aggiorna il RPC atomic invite join</strong> (versione senza segments nella risposta):<br>
+    <textarea readonly style="width:100%;height:200px;font-family:monospace;font-size:11px;background:var(--bg);color:var(--text);border:1px solid var(--line);border-radius:8px;padding:10px;resize:vertical">create or replace function public.join_room_with_invite(
+  p_token_hash text, p_display_name text, p_source_language text
+)
+returns jsonb language plpgsql security definer set search_path = public as $$
+declare
+  v_user_id uuid := auth.uid(); v_invite public.room_invites;
+  v_member public.room_members; v_room public.rooms; v_members jsonb;
+begin
+  if v_user_id is null then raise exception 'unauthenticated'; end if;
+  select * into v_invite from public.room_invites where token_hash = p_token_hash for update;
+  if v_invite.id is null or v_invite.revoked_at is not null or v_invite.expires_at &lt;= now() or v_invite.uses &gt;= v_invite.max_uses then raise exception 'invalid_invite'; end if;
+  select * into v_room from public.rooms where id = v_invite.room_id for share;
+  select * into v_member from public.room_members where room_id = v_invite.room_id and user_id = v_user_id for update;
+  if v_member.id is null then
+    insert into public.room_members (room_id,user_id,role,display_name,source_language,color) values (v_invite.room_id,v_user_id,v_invite.role,coalesce(nullif(trim(p_display_name),''),'Partecipante'),p_source_language,'#7c3aed') returning * into v_member;
+    update public.room_invites set uses = uses + 1 where id = v_invite.id;
+  elsif v_member.left_at is not null then
+    update public.room_members set left_at=null,joined_at=now(),role=v_invite.role where id=v_member.id returning * into v_member;
+    update public.room_invites set uses = uses + 1 where id = v_invite.id;
+  end if;
+  select coalesce(jsonb_agg(to_jsonb(rm)),'[]'::jsonb) into v_members from public.room_members rm where rm.room_id=v_invite.room_id and rm.left_at is null;
+  return jsonb_build_object('room',to_jsonb(v_room),'membership',to_jsonb(v_member),'members',v_members,'segments','[]'::jsonb);
+end;
+$$;</textarea>
+  </div>
+</div>
+
+<div class="step">
+  <div class="step-num">A4</div>
+  <div class="step-text">
+    <strong>Verifica i segreti Supabase:</strong><br>
+    <code>npx supabase secrets list</code><br>
+    Devono essere presenti: <code>GOOGLE_TRANSLATE_API_KEY</code> e <code>PUBLIC_APP_URL</code>.<br>
+    <em>Non stampare mai i valori.</em>
+  </div>
+</div>
+
+<div class="step">
+  <div class="step-num">A5</div>
+  <div class="step-text">
+    <strong>Verifica il deploy delle Edge Functions:</strong><br>
+    <code>npx supabase functions list</code><br>
+    Devono apparire: <code>create-room</code>, <code>create-invite</code>, <code>join-room</code>, <code>translate-segment</code>.
+  </div>
+</div>
+
+<div class="step">
+  <div class="step-num">A6</div>
+  <div class="step-text">
+    <strong>Abilita Realtime su <code>transcript_segments</code> e <code>segment_translations</code>:</strong><br>
+    Vai su Supabase Dashboard → Database → Replication → abilita per entrambe le tabelle.
+  </div>
+</div>
+</div>
+
+<!-- ═══ TEST AUTOMATIZZABILI ═══ -->
+<div class="card">
+<h3>🤖 Test automatici — l'agente può eseguirli <span class="badge badge-agent">AGENTE</span></h3>
+
+<div class="step">
+  <div class="step-num">B1</div>
+  <div class="step-text"><strong>Caricamento pagina demo:</strong> Apri <code>?demo</code> → 3 partecipanti, nessun errore console, room code "demo" in grigio.</div>
+</div>
+
+<div class="step">
+  <div class="step-num">B2</div>
+  <div class="step-text"><strong>Caricamento anonimo:</strong> Apri senza parametri → room code "—", toast "Accedi per creare una stanza condivisa", inviti disabilitati.</div>
+</div>
+
+<div class="step">
+  <div class="step-num">B3</div>
+  <div class="step-text"><strong>Modalità locale — invio messaggio:</strong> Avvia sessione → scrivi "Ciao" → invia → appare riga con traduzione locale. Nessuna chiamata RPC, nessun canale Realtime.</div>
+</div>
+
+<div class="step">
+  <div class="step-num">B4</div>
+  <div class="step-text"><strong>Cambio lingua target:</strong> In demo, cambia TTL a Francese → appare toast "Traduzioni ora in Français", le righe esistenti si ri-renderizzano.</div>
+</div>
+
+<div class="step">
+  <div class="step-num">B5</div>
+  <div class="step-text"><strong>Bridging mode B2:</strong> Imposta modalità "Su richiesta" → invia messaggio → appare "[Tocca per tradurre]" → click → appare traduzione.</div>
+</div>
+
+<div class="step">
+  <div class="step-num">B6</div>
+  <div class="step-text"><strong>Retry traduzione fallita:</strong> Modalità A1, senza API key → invia → appare "🔄 Riprova" → click → ritenta.</div>
+</div>
+
+<div class="step">
+  <div class="step-num">B7</div>
+  <div class="step-text"><strong>Stato sessione:</strong> Avvia sessione → indicatore mostra "🎤 Richiedo microfono…" → poi "⌨️ Sessione testuale" (senza microfono).</div>
+</div>
+</div>
+
+<!-- ═══ TEST MANUALI (due browser autenticati) ═══ -->
+<div class="card manual">
+<h3>👥 Test collaborativi — due browser autenticati <span class="badge badge-me">TU</span></h3>
+
+<div class="step">
+  <div class="step-num">1</div>
+  <div class="step-text">
+    <strong>URL invito iniziale:</strong> Host crea stanza → clicca "📋 Copia link".<br>
+    ✅ URL è <code>https://buoninglese.github.io/sottotitoli/traduzione-s8t.html?invite=&lt;64-char-hex&gt;</code><br>
+    ✅ Nessun parametro <code>?room=</code><br>
+    ✅ Guest apre link → join riuscito → vede stesso room ID e membri
+    <br><input type="checkbox" class="checkbox" onchange="updateProgress()">
+  </div>
+</div>
+
+<div class="step">
+  <div class="step-num">2</div>
+  <div class="step-text">
+    <strong>"Nuovo invito":</strong> Host clicca "🔄 Nuovo invito" → copia nuovo link.<br>
+    ✅ Nuovo link funziona in terzo browser<br>
+    ✅ Comportamento vecchio invito coerente con UI (ancora valido O revocato)
+    <br><input type="checkbox" class="checkbox" onchange="updateProgress()">
+  </div>
+</div>
+
+<div class="step">
+  <div class="step-num">3</div>
+  <div class="step-text">
+    <strong>Singolo messaggio roundtrip:</strong> Host invia "Test 1".<br>
+    ✅ Una sola riga appare in entrambi i browser<br>
+    ✅ Speaker name = nome membro host<br>
+    ✅ <code>create_final_segment</code> chiamato 1x, Realtime INSERT arriva 1x
+    <br><input type="checkbox" class="checkbox" onchange="updateProgress()">
+  </div>
+</div>
+
+<div class="step">
+  <div class="step-num">4</div>
+  <div class="step-text">
+    <strong>RPC + Realtime dedup:</strong> Rallenta <code>receiveAuthoritativeSegment</code> con breakpoint, invia messaggio, lascia passare entrambi gli eventi.<br>
+    ✅ Una sola riga DOM anche se RPC e Realtime hanno sparato entrambi
+    <br><input type="checkbox" class="checkbox" onchange="updateProgress()">
+  </div>
+</div>
+
+<div class="step">
+  <div class="step-num">5</div>
+  <div class="step-text">
+    <strong>10 messaggi concorrenti:</strong> Host invia 10, Guest invia 10 rapidamente.<br>
+    ✅ 20 righe in ogni browser<br>
+    ✅ Sequence ordinato e senza buchi<br>
+    ✅ Nessun duplicato
+    <br><input type="checkbox" class="checkbox" onchange="updateProgress()">
+  </div>
+</div>
+
+<div class="step">
+  <div class="step-num">6</div>
+  <div class="step-text">
+    <strong>Idempotenza clientSegmentId:</strong> In console, chiama <code>createFinalSegment</code> 2x con stesso clientSegmentId.<br>
+    ✅ Una sola riga in <code>transcript_segments</code> per quel client_id
+    <br><input type="checkbox" class="checkbox" onchange="updateProgress()">
+  </div>
+</div>
+
+<div class="step">
+  <div class="step-num">7</div>
+  <div class="step-text">
+    <strong>Fallimento persistenza + retry:</strong> Rompi temporaneamente <code>create_final_segment</code> → invia.<br>
+    ✅ Appare "⚠️ Invio non riuscito"<br>
+    ✅ Nessuna riga in Supabase<br>
+    Ripristina → clicca "↻ Riprova invio".<br>
+    ✅ Segmento persistito, stesso clientSegmentId, bridging applicato
+    <br><input type="checkbox" class="checkbox" onchange="updateProgress()">
+  </div>
+</div>
+
+<div class="step">
+  <div class="step-num">8</div>
+  <div class="step-text">
+    <strong>Traduzione successo:</strong> Host TTL=Italiano, invia "Hello world", modalità A1.<br>
+    ✅ Traduzione "Ciao mondo" appare in entrambi i browser<br>
+    ✅ <code>segment_translations</code>: target_language='it', status='complete'
+    <br><input type="checkbox" class="checkbox" onchange="updateProgress()">
+  </div>
+</div>
+
+<div class="step">
+  <div class="step-num">9</div>
+  <div class="step-text">
+    <strong>Traduzione fallita:</strong> Invalida API key → invia "Hello world".<br>
+    ✅ <code>segment_translations</code>: status='failed', error_code non vuoto<br>
+    ✅ UI mostra "🔄 Riprova" (non "…" infinito)<br>
+    ✅ Clicca Riprova → se provider ancora down, resta failed; se ripristinato, traduce
+    <br><input type="checkbox" class="checkbox" onchange="updateProgress()">
+  </div>
+</div>
+
+<div class="step">
+  <div class="step-num">10</div>
+  <div class="step-text">
+    <strong>Target-language isolation:</strong> Host TTL=it, Guest TTL=fr.<br>
+    ✅ Host vede italiano, Guest vede francese per lo stesso segmento<br>
+    ✅ <code>segment_translations</code> ha due righe: una 'it', una 'fr'<br>
+    ✅ <code>get_room_segment_feed_item</code> restituisce la traduzione corretta per lingua
+    <br><input type="checkbox" class="checkbox" onchange="updateProgress()">
+  </div>
+</div>
+
+<div class="step">
+  <div class="step-num">11</div>
+  <div class="step-text">
+    <strong>Preferenza TTL salvata:</strong> Imposta TTL=Francese, invia messaggio, chiudi browser, riapri, logga, unisciti.<br>
+    ✅ TTL ripristinato a Francese PRIMA di qualsiasi subscribe/feed<br>
+    ✅ Feed iniziale e Realtime usano Francese<br>
+    Cambia TTL a Italiano → ✅ resubscribe + refetch in italiano
+    <br><input type="checkbox" class="checkbox" onchange="updateProgress()">
+  </div>
+</div>
+
+<div class="step">
+  <div class="step-num">12</div>
+  <div class="step-text">
+    <strong>Concorrenza inviti (maxUses=1):</strong> Crea invito con maxUses=1. Due guest aprono il link quasi simultaneamente.<br>
+    ✅ Esattamente uno si unisce, l'altro riceve errore chiaro<br>
+    ✅ Invito scaduto → join fallisce<br>
+    ✅ Invito revocato → join fallisce
+    <br><input type="checkbox" class="checkbox" onchange="updateProgress()">
+  </div>
+</div>
+
+<div class="step">
+  <div class="step-num">13</div>
+  <div class="step-text">
+    <strong>Protezioni RLS/API:</strong> Chiamate non autenticate a <code>create_final_segment</code>, <code>get_room_segment_feed_item</code>, <code>translate-segment</code>, <code>create-invite</code>, <code>join-room</code>.<br>
+    ✅ Tutte restituiscono 401/403, nessun dato leak<br>
+    Utente autenticato NON membro della room → ✅ accesso negato
+    <br><input type="checkbox" class="checkbox" onchange="updateProgress()">
+  </div>
+</div>
+
+<div class="step">
+  <div class="step-num">14</div>
+  <div class="step-text">
+    <strong>Isolamento local/demo:</strong> Browser anonimo, senza auth, senza ?invite, senza ?demo.<br>
+    ✅ Nessun canale Supabase Realtime creato<br>
+    ✅ Nessun WebSocket connesso a room transport<br>
+    ✅ <code>submitFinalSegment()</code> non chiama mai <code>create_final_segment</code>
+    <br><input type="checkbox" class="checkbox" onchange="updateProgress()">
+  </div>
+</div>
+
+<div class="step">
+  <div class="step-num">15</div>
+  <div class="step-text">
+    <strong>Identità membri:</strong> Due utenti con lo stesso display name nella stessa room.<br>
+    ✅ <code>room_members.id</code> diversi in Supabase<br>
+    ✅ Righe transcript correttamente attribuite via <code>speakerMemberId</code><br>
+    ✅ UI non confonde i due utenti
+    <br><input type="checkbox" class="checkbox" onchange="updateProgress()">
+  </div>
+</div>
+</div>
+
+<!-- ═══ COMANDI RAPIDI ═══ -->
+<div class="card">
+<h3>⚡ Comandi rapidi</h3>
+<div class="step">
+  <div class="step-num">⌘</div>
+  <div class="step-text">
+    <strong>Deploy tutte le funzioni:</strong><br>
+    <code>for fn in create-room create-invite join-room translate-segment; do npx supabase functions deploy $fn --no-verify-jwt; done</code>
+  </div>
+</div>
+<div class="step">
+  <div class="step-num">⌘</div>
+  <div class="step-text">
+    <strong>Verifica segreti:</strong><br>
+    <code>npx supabase secrets list</code>
+  </div>
+</div>
+<div class="step">
+  <div class="step-num">⌘</div>
+  <div class="step-text">
+    <strong>Verifica funzioni deployate:</strong><br>
+    <code>npx supabase functions list</code>
+  </div>
+</div>
+<div class="step">
+  <div class="step-num">⌘</div>
+  <div class="step-text">
+    <strong>Git status:</strong><br>
+    <code>git status --short && git log -1 --oneline</code>
+  </div>
+</div>
+<div class="step">
+  <div class="step-num">⌘</div>
+  <div class="step-text">
+    <strong>Apri pagina demo:</strong><br>
+    <code>open https://buoninglese.github.io/sottotitoli/traduzione-s8t.html?demo</code>
+  </div>
+</div>
+</div>
+
+<script>
+function updateProgress(){
+  var boxes = document.querySelectorAll('.manual input[type="checkbox"]');
+  var checked = document.querySelectorAll('.manual input[type="checkbox"]:checked').length;
+  var pct = Math.round(checked / boxes.length * 100);
+  document.getElementById('progressBar').style.width = pct + '%';
+}
+</script>
+</body>
+</html>
