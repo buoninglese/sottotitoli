@@ -63,12 +63,77 @@
     return callFunction('end-room', { roomId: roomId });
   }
 
+  /**
+   * Create a final segment via server RPC (resolves speaker from auth.uid()).
+   * Returns the full feed-item projection.
+   */
+  async function createFinalSegment(input) {
+    var token = await getSession();
+    var sb = w.sottotitoliSupabase;
+    var { data, error } = await sb.rpc('create_final_segment', {
+      p_room_id: input.roomId,
+      p_client_id: input.clientSegmentId,
+      p_source_text: input.sourceText,
+      p_source_language: input.sourceLanguage
+    });
+    if (error) throw new Error(error.message || 'create_final_segment failed');
+    return data;
+  }
+
+  /**
+   * Fetch a single segment from the room_segment_feed view.
+   * Returns { segment: { id, roomId, clientSegmentId, sequence, speakerMemberId,
+   *   speakerName, speakerLanguage, speakerColor, sourceText, sourceLanguage,
+   *   translationText, translationLanguage, translationStatus, translationErrorCode,
+   *   isFinal, createdAt } }
+   */
+  async function getSegmentFeedItem(segmentId) {
+    var sb = w.sottotitoliSupabase;
+    if (!sb) throw new Error('Supabase not initialized');
+
+    // Use anon key for read — no auth required for feed view (RLS handles it)
+    var { data, error } = await sb
+      .from('room_segment_feed')
+      .select('*')
+      .eq('id', segmentId)
+      .single();
+
+    if (error) throw error;
+
+    return {
+      segment: {
+        id: data.id,
+        roomId: data.room_id,
+        clientSegmentId: data.client_id,
+        sequence: data.sequence,
+
+        speakerMemberId: data.speaker_member_id,
+        speakerName: data.speaker_name,
+        speakerLanguage: data.speaker_language,
+        speakerColor: data.speaker_color,
+
+        sourceText: data.source_text,
+        sourceLanguage: data.source_language,
+
+        translationText: data.translation_text,
+        translationLanguage: data.translation_language,
+        translationStatus: data.translation_status,
+        translationErrorCode: data.translation_error_code,
+
+        isFinal: data.is_final,
+        createdAt: data.created_at
+      }
+    };
+  }
+
   // Export
   w.S8T_API = {
     createRoom: createRoom,
     joinRoom: joinRoom,
     startRoom: startRoom,
     endRoom: endRoom,
+    createFinalSegment: createFinalSegment,
+    getSegmentFeedItem: getSegmentFeedItem,
   };
 
 })(window);
