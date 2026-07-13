@@ -31,10 +31,15 @@
     myTTL: 'it',
     bridging: 'a1',
 
-    // Member UUID model
+    // Member UUID model (new)
     membersById: {},
     memberIds: [],
     currentMemberId: null,
+
+    // Legacy speaker model (bridged — DO NOT use for new code)
+    speakers: {},
+    speakerOrder: [],
+    nextSpkId: 1,
     myName: 'Tu'
   };
 
