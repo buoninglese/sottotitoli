@@ -164,6 +164,19 @@
   }
 
   /**
+   * Create a new invite token for an existing room.
+   * Only the room owner can call this.
+   */
+  async function createInvite(roomId, options) {
+    return callFunction('create-invite', {
+      roomId: roomId,
+      role: (options && options.role) || 'speaker',
+      maxUses: (options && options.maxUses) || 10,
+      expiryHours: (options && options.expiryHours) || 24,
+    });
+  }
+
+  /**
    * Fetch all segments for a room with target-language-aware translations.
    */
   async function getRoomSegmentFeed(roomId, targetLanguage) {
@@ -189,6 +202,7 @@
     getSegmentFeedItem: getSegmentFeedItem,
     translateSegment: translateSegment,
     getRoomSegmentFeed: getRoomSegmentFeed,
+    createInvite: createInvite,
   };
 
 })(window);
