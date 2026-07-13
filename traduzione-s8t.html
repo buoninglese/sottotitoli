@@ -207,6 +207,15 @@
   </div><!-- /appCenter -->
   </div><!-- /appMain -->
 
+<!-- ═══ Mobile bottom sheet (visible <900px) ═══ -->
+<button class="mobile-fab" id="mobileFab" aria-label="Partecipanti e impostazioni" title="Partecipanti">👥</button>
+<div class="mobile-sheet-backdrop" id="mobileBackdrop" onclick="toggleMobileSheet()"></div>
+<div class="mobile-sheet" id="mobileSheet">
+  <div class="mobile-sheet-handle"></div>
+  <button class="mobile-sheet-close" onclick="toggleMobileSheet()" aria-label="Chiudi">✕</button>
+  <div id="mobileSheetContent"></div>
+</div>
+
 <!-- ═══ SCRIPTS ═══ -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="config.js"></script>
@@ -314,6 +323,9 @@
     document.querySelectorAll('[data-gloss-filter]').forEach(function(el){
       el.addEventListener('click', function(){ renderGlossary(el.getAttribute('data-gloss-filter')); });
     });
+    // Mobile FAB
+    var fab = document.getElementById('mobileFab');
+    if (fab) fab.addEventListener('click', toggleMobileSheet);
     // Sign out
     var signOutBtn = document.querySelector('[data-action="sign-out"]');
     if (signOutBtn) signOutBtn.addEventListener('click', function(){
@@ -915,6 +927,28 @@
     var me = DUO.speakerOrder[0] || DUO.myName;
     if (!DUO.speakers[me]) duoAddSpeaker(DUO.myName, DUO.myTTL);
     addSentence(me, text, null);
+  };
+
+  // ── Mobile bottom sheet ──
+  window.toggleMobileSheet = function(){
+    var sheet = document.getElementById('mobileSheet');
+    var backdrop = document.getElementById('mobileBackdrop');
+    var isOpen = sheet.classList.contains('open');
+    if (isOpen) {
+      sheet.classList.remove('open');
+      backdrop.classList.remove('open');
+    } else {
+      // Clone sidebar content into mobile sheet
+      var content = document.getElementById('mobileSheetContent');
+      var sidebar = document.getElementById('duoSpeakerSidebar');
+      if (content && sidebar) {
+        content.innerHTML = sidebar.innerHTML;
+        // Re-bind speaker events for the cloned content
+        if (window._rebindSpeakerEvents) window._rebindSpeakerEvents();
+      }
+      sheet.classList.add('open');
+      backdrop.classList.add('open');
+    }
   };
 
   // ═══ WORD LENS — tap-to-explore ═══
