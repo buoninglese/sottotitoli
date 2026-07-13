@@ -132,14 +132,12 @@
   }
 
   // ── Room ──
-  function generateRoomId(){
-    return 'duo-' + Math.random().toString(36).substring(2, 8);
-  }
+  // Room IDs are server-authoritative. No local generation.
 
   function initRoom(){
     var params = new URLSearchParams(window.location.search);
 
-    // New invite-based join: ?invite=<TOKEN>
+    // Invite-based join: ?invite=<TOKEN>
     var inviteToken = params.get('invite');
     if (inviteToken && inviteToken.length >= 16) {
       state.inviteToken = inviteToken;
@@ -149,18 +147,9 @@
       return 'invite'; // Signal: needs to call join-room API
     }
 
-    // Legacy join mode (backward compat): ?join=1&room=XXX
-    if (params.get('join') === '1' && params.get('room')) {
-      state.roomId = params.get('room');
-      localStorage.setItem('duo-room-id', state.roomId);
-      state.isHost = false;
-      state.myName = 'Guest';
-      return 'legacy-join';
-    }
-
-    // Host mode: load or generate room ID (will be replaced by server room)
-    state.roomId = localStorage.getItem('duo-room-id') || generateRoomId();
-    localStorage.setItem('duo-room-id', state.roomId);
+    // Host mode: roomId set by server create-room API
+    // No local generation — empty until server assigns one
+    state.roomId = localStorage.getItem('duo-room-id') || '';
     state.isHost = true;
     return 'host';
   }
@@ -199,7 +188,6 @@
     getColorClassForCount: getColorClassForCount,
 
     // Room
-    generateRoomId: generateRoomId,
     initRoom: initRoom
   };
 
