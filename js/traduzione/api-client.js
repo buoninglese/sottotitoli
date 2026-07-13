@@ -163,6 +163,22 @@
     return { segment: mapFeedItem(data.segment) };
   }
 
+  /**
+   * Fetch all segments for a room with target-language-aware translations.
+   */
+  async function getRoomSegmentFeed(roomId, targetLanguage) {
+    var sb = w.sottotitoliSupabase;
+    if (!sb) throw new Error('Supabase not initialized');
+
+    var { data, error } = await sb.rpc('get_room_segment_feed', {
+      p_room_id: roomId,
+      p_target_language: targetLanguage || 'en'
+    });
+
+    if (error) throw error;
+    return { segments: (data || []).map(mapFeedItem) };
+  }
+
   // Export
   w.S8T_API = {
     createRoom: createRoom,
@@ -172,6 +188,7 @@
     createFinalSegment: createFinalSegment,
     getSegmentFeedItem: getSegmentFeedItem,
     translateSegment: translateSegment,
+    getRoomSegmentFeed: getRoomSegmentFeed,
   };
 
 })(window);

@@ -35,55 +35,35 @@ async function translateWithGoogleCloud(
   sourceLanguage: string,
   targetLanguage: string
 ): Promise<string> {
-  // Use official API if key is configured, fall back to public endpoint
-  if (GOOGLE_API_KEY) {
-    const resp = await fetch(
-      `https://translation.googleapis.com/language/translate/v2`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          q: text,
-          source: sourceLanguage,
-          target: targetLanguage,
-          format: 'text',
-          key: GOOGLE_API_KEY,
-        }),
-      }
-    );
+  if (!GOOGLE_API_KEY) {
+    throw new Error('translation_provider_not_configured');
+  }
 
-    if (!resp.ok) {
-      const status = resp.status;
-      if (status === 403 || status === 429) throw new Error('translation_rate_limited');
-      throw new Error('translation_provider_unavailable');
+  const resp = await fetch(
+    `https://translation.googleapis.com/language/translate/v2`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        q: text,
+        source: sourceLanguage,
+        target: targetLanguage,
+        format: 'text',
+        key: GOOGLE_API_KEY,
+      }),
     }
+  );
 
-    const body = await resp.json();
-    const translated = body?.data?.translations?.[0]?.translatedText;
-    if (!translated) throw new Error('translation_provider_invalid_response');
-    return translated;
+  if (!resp.ok) {
+    const status = resp.status;
+    if (status === 403 || status === 429) throw new Error('translation_rate_limited');
+    throw new Error('translation_provider_unavailable');
   }
 
-  // Fallback: public endpoint (no key required, limited quota)
-  const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=${
-    encodeURIComponent(sourceLanguage)
-  }&tl=${
-    encodeURIComponent(targetLanguage)
-  }&dt=t&q=${encodeURIComponent(text)}`;
-
-  const resp = await fetch(url);
-  if (!resp.ok) throw new Error('translation_provider_unavailable');
-
-  const data = await resp.json();
-  if (!data || !data[0] || !data[0][0] || !data[0][0][0]) {
-    throw new Error('translation_provider_invalid_response');
-  }
-
-  let result = '';
-  for (const sentence of data[0]) {
-    if (sentence && sentence[0]) result += sentence[0];
-  }
-  return result;
+  const body = await resp.json();
+  const translated = body?.data?.translations?.[0]?.translatedText;
+  if (!translated) throw new Error('translation_provider_invalid_response');
+  return translated;
 }
 
 Deno.serve(async (req: Request) => {
@@ -143,7 +123,8 @@ Deno.serve(async (req: Request) => {
       } catch (e) {
         status = 'failed';
         const msg = (e as Error).message || '';
-        if (msg.includes('timeout')) errorCode = 'translation_timeout';
+        if (msg.includes('not_configured')) errorCode = 'translation_provider_not_configured';
+        else if (msg.includes('timeout')) errorCode = 'translation_timeout';
         else if (msg.includes('rate_limited')) errorCode = 'translation_rate_limited';
         else if (msg.includes('unavailable')) errorCode = 'translation_provider_unavailable';
         else if (msg.includes('invalid_response')) errorCode = 'translation_provider_invalid_response';
@@ -157,11 +138,12 @@ Deno.serve(async (req: Request) => {
       .from('segment_translations')
       .upsert({
         segment_id: segmentId,
+        room_id: segment.room_id,
         target_language: targetLanguage,
         translated_text: translatedText || null,
         status: status,
         error_code: errorCode,
-        provider: GOOGLE_API_KEY ? 'google_cloud' : 'google_public',
+        provider: 'google_cloud',
         updated_at: new Date().toISOString(),
       }, {
         onConflict: 'segment_id, target_language',

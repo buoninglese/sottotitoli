@@ -225,12 +225,12 @@
 <script src="translation-providers.js"></script>
 <script src="ws-publisher.js"></script>
 <script src="js/cefr-levels.js"></script>
-<script src="js/traduzione/state.js?v=5"></script>
-<script src="js/traduzione/segments.js?v=5"></script>
-<script src="js/traduzione/vocabulary.js?v=5"></script>
-<script src="js/traduzione/speech-service.js?v=5"></script>
-<script src="js/traduzione/realtime.js?v=5"></script>
-<script src="js/traduzione/api-client.js?v=5"></script>
+<script src="js/traduzione/state.js?v=6"></script>
+<script src="js/traduzione/segments.js?v=6"></script>
+<script src="js/traduzione/vocabulary.js?v=6"></script>
+<script src="js/traduzione/speech-service.js?v=6"></script>
+<script src="js/traduzione/realtime.js?v=6"></script>
+<script src="js/traduzione/api-client.js?v=6"></script>
 
 <script>
 // ═══ TRADUZIONE ENGINE — inline application logic ═══
@@ -264,9 +264,14 @@
             inviteToken: DUO.inviteToken,
             membership: result.membership,
             members: result.members || [],
-            segments: result.segments || []
+            segments: [] // Load target-aware feed below
           });
           S8T_REALTIME.subscribe(DUO.roomId, DUO.myTTL, receiveAuthoritativeSegment);
+          // Load target-language-specific translations
+          try {
+            var feed = await S8T_API.getRoomSegmentFeed(DUO.roomId, DUO.myTTL);
+            (feed.segments || []).forEach(receiveAuthoritativeSegment);
+          } catch(e) { console.warn('[S8T] Cannot load target feed:', e.message); }
           showToast('🔗 Sei entrato nella stanza!');
         } catch(e) {
           console.error('Join room failed:', e);
@@ -283,7 +288,7 @@
           inviteToken: hostResult.inviteToken,
           membership: hostResult.membership,
           members: hostResult.members || [],
-          segments: hostResult.segments || []
+          segments: [] // New room — no existing segments
         });
         S8T_REALTIME.subscribe(DUO.roomId, DUO.myTTL, receiveAuthoritativeSegment);
         showToast('✨ Stanza pronta!');
@@ -411,12 +416,29 @@
   }
 
   // ── TTL change ──
-  window.duoUpdateTTL = function(){
-    DUO.myTTL = document.getElementById('duoMyTTL').value;
+  window.duoUpdateTTL = async function(){
+    var nextLanguage = document.getElementById('duoMyTTL').value;
+    if (nextLanguage === DUO.myTTL) return;
+    DUO.myTTL = nextLanguage;
     localStorage.setItem('duo-my-ttl', DUO.myTTL);
-    // Re-render existing sentences with new TTL
-    if (DUO.sentences.length > 0) reRenderAll();
-    showToast('🌐 Traduzioni ora in '+LANGS[DUO.myTTL].name);
+
+    // Collaborative mode: resubscribe realtime with new target language
+    if (DUO.mode === 'collaborative' && DUO.roomId) {
+      S8T_REALTIME.unsubscribe();
+      S8T_REALTIME.subscribe(DUO.roomId, DUO.myTTL, receiveAuthoritativeSegment);
+
+      try {
+        var result = await S8T_API.getRoomSegmentFeed(DUO.roomId, DUO.myTTL);
+        (result.segments || []).forEach(receiveAuthoritativeSegment);
+      } catch(error) {
+        console.warn('[S8T] Cannot refresh target-language feed', error);
+        showToast('⚠️ Impossibile aggiornare le traduzioni.');
+        return;
+      }
+    }
+
+    reRenderAll();
+    showToast('🌐 Traduzioni ora in ' + LANGS[DUO.myTTL].name);
   };
 
   window.duoUpdateBridging = function(){

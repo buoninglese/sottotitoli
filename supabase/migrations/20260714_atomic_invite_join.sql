@@ -92,11 +92,8 @@ begin
   where rm.room_id = v_invite.room_id
     and rm.left_at is null;
 
-  -- Gather existing segments with speaker + translation
-  select coalesce(jsonb_agg(to_jsonb(f) order by f.sequence), '[]'::jsonb)
-  into v_segments
-  from public.room_segment_feed f
-  where f.room_id = v_invite.room_id;
+  -- Return empty segments — frontend loads target-aware feed after bootstrap
+  v_segments := '[]'::jsonb;
 
   return jsonb_build_object(
     'room', to_jsonb(v_room),
