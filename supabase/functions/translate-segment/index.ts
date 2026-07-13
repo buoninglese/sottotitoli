@@ -3,13 +3,14 @@
  * POST /translate-segment
  * Body: { segmentId: uuid, targetLanguage: string }
  *
- * Verifies the caller belongs to the segment's room, calls Google Translate,
- * upserts segment_translations, and returns the updated feed projection.
+ * Uses Google Cloud Translation API (official, authenticated).
+ * Set secret: supabase secrets set GOOGLE_TRANSLATE_API_KEY="..."
  */
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+const GOOGLE_API_KEY = Deno.env.get('GOOGLE_TRANSLATE_API_KEY') || '';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -17,23 +18,67 @@ const corsHeaders = {
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 };
 
-async function translateWithGoogle(text: string, sourceLang: string, targetLang: string): Promise<string> {
+async function withTimeout<T>(promise: Promise<T>, ms = 10_000): Promise<T> {
+  let timer: number | undefined;
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new Error('translation_timeout')), ms);
+  });
+  try {
+    return await Promise.race([promise, timeout]);
+  } finally {
+    if (timer !== undefined) clearTimeout(timer);
+  }
+}
+
+async function translateWithGoogleCloud(
+  text: string,
+  sourceLanguage: string,
+  targetLanguage: string
+): Promise<string> {
+  // Use official API if key is configured, fall back to public endpoint
+  if (GOOGLE_API_KEY) {
+    const resp = await fetch(
+      `https://translation.googleapis.com/language/translate/v2`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          q: text,
+          source: sourceLanguage,
+          target: targetLanguage,
+          format: 'text',
+          key: GOOGLE_API_KEY,
+        }),
+      }
+    );
+
+    if (!resp.ok) {
+      const status = resp.status;
+      if (status === 403 || status === 429) throw new Error('translation_rate_limited');
+      throw new Error('translation_provider_unavailable');
+    }
+
+    const body = await resp.json();
+    const translated = body?.data?.translations?.[0]?.translatedText;
+    if (!translated) throw new Error('translation_provider_invalid_response');
+    return translated;
+  }
+
+  // Fallback: public endpoint (no key required, limited quota)
   const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=${
-    encodeURIComponent(sourceLang)
+    encodeURIComponent(sourceLanguage)
   }&tl=${
-    encodeURIComponent(targetLang)
+    encodeURIComponent(targetLanguage)
   }&dt=t&q=${encodeURIComponent(text)}`;
 
   const resp = await fetch(url);
-  if (!resp.ok) throw new Error(`Google Translate HTTP ${resp.status}`);
+  if (!resp.ok) throw new Error('translation_provider_unavailable');
 
   const data = await resp.json();
-  // Format: [[["translated text","original",...]],...]
   if (!data || !data[0] || !data[0][0] || !data[0][0][0]) {
-    throw new Error('Could not parse Google Translate response');
+    throw new Error('translation_provider_invalid_response');
   }
 
-  // Concatenate all sentence translations
   let result = '';
   for (const sentence of data[0]) {
     if (sentence && sentence[0]) result += sentence[0];
@@ -88,20 +133,27 @@ Deno.serve(async (req: Request) => {
       translatedText = segment.source_text;
     } else {
       try {
-        translatedText = await translateWithGoogle(
-          segment.source_text,
-          segment.source_language || 'en',
-          targetLanguage
+        translatedText = await withTimeout(
+          translateWithGoogleCloud(
+            segment.source_text,
+            segment.source_language || 'en',
+            targetLanguage
+          )
         );
       } catch (e) {
         status = 'failed';
-        errorCode = 'translation_api_error';
+        const msg = (e as Error).message || '';
+        if (msg.includes('timeout')) errorCode = 'translation_timeout';
+        else if (msg.includes('rate_limited')) errorCode = 'translation_rate_limited';
+        else if (msg.includes('unavailable')) errorCode = 'translation_provider_unavailable';
+        else if (msg.includes('invalid_response')) errorCode = 'translation_provider_invalid_response';
+        else errorCode = 'translation_api_error';
         translatedText = '';
       }
     }
 
-    // Upsert translation
-    const { data: translation, error: upsertError } = await supabase
+    // Upsert translation (keyed by segment_id + target_language)
+    const { error: upsertError } = await supabase
       .from('segment_translations')
       .upsert({
         segment_id: segmentId,
@@ -109,25 +161,28 @@ Deno.serve(async (req: Request) => {
         translated_text: translatedText || null,
         status: status,
         error_code: errorCode,
-        provider: 'google',
+        provider: GOOGLE_API_KEY ? 'google_cloud' : 'google_public',
         updated_at: new Date().toISOString(),
       }, {
         onConflict: 'segment_id, target_language',
         ignoreDuplicates: false,
-      })
-      .select('*')
-      .single();
+      });
 
     if (upsertError) throw new Error(upsertError.message);
 
-    // Return the updated feed projection
-    const { data: feedItem, error: feedError } = await supabase
-      .from('room_segment_feed')
-      .select('*')
-      .eq('id', segmentId)
-      .single();
+    // Return the updated feed projection using target-language-aware RPC
+    const { data: feedData, error: feedError } = await supabase.rpc(
+      'get_room_segment_feed',
+      {
+        p_room_id: segment.room_id,
+        p_target_language: targetLanguage,
+      }
+    );
 
     if (feedError) throw new Error(feedError.message);
+
+    const feedItem = (feedData || []).find((row: any) => row.id === segmentId);
+    if (!feedItem) throw new Error('segment_not_found');
 
     return new Response(
       JSON.stringify({ segment: feedItem }),

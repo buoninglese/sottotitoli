@@ -225,12 +225,12 @@
 <script src="translation-providers.js"></script>
 <script src="ws-publisher.js"></script>
 <script src="js/cefr-levels.js"></script>
-<script src="js/traduzione/state.js?v=4"></script>
-<script src="js/traduzione/segments.js?v=4"></script>
-<script src="js/traduzione/vocabulary.js?v=4"></script>
-<script src="js/traduzione/speech-service.js?v=4"></script>
-<script src="js/traduzione/realtime.js?v=4"></script>
-<script src="js/traduzione/api-client.js?v=4"></script>
+<script src="js/traduzione/state.js?v=5"></script>
+<script src="js/traduzione/segments.js?v=5"></script>
+<script src="js/traduzione/vocabulary.js?v=5"></script>
+<script src="js/traduzione/speech-service.js?v=5"></script>
+<script src="js/traduzione/realtime.js?v=5"></script>
+<script src="js/traduzione/api-client.js?v=5"></script>
 
 <script>
 // ═══ TRADUZIONE ENGINE — inline application logic ═══
@@ -266,7 +266,7 @@
             members: result.members || [],
             segments: result.segments || []
           });
-          S8T_REALTIME.subscribe(DUO.roomId, receiveAuthoritativeSegment);
+          S8T_REALTIME.subscribe(DUO.roomId, DUO.myTTL, receiveAuthoritativeSegment);
           showToast('🔗 Sei entrato nella stanza!');
         } catch(e) {
           console.error('Join room failed:', e);
@@ -285,7 +285,7 @@
           members: hostResult.members || [],
           segments: hostResult.segments || []
         });
-        S8T_REALTIME.subscribe(DUO.roomId, receiveAuthoritativeSegment);
+        S8T_REALTIME.subscribe(DUO.roomId, DUO.myTTL, receiveAuthoritativeSegment);
         showToast('✨ Stanza pronta!');
       } catch(e) {
         console.error('Room creation failed:', e);
@@ -789,7 +789,7 @@
   function receiveAuthoritativeSegment(serverSegment) {
     if (!serverSegment || !serverSegment.clientSegmentId) return;
 
-    // Register speaker in member model + legacy speaker model
+    // Register speaker in member model (not legacy speakers)
     if (serverSegment.speakerMemberId) {
       S8T.upsertMember({
         id: serverSegment.speakerMemberId,
@@ -798,18 +798,6 @@
         color: serverSegment.speakerColor || '#7c3aed',
         active: true
       });
-    }
-    // Legacy speaker compat for sidebar UI
-    var spkName = serverSegment.speakerName;
-    if (spkName && !DUO.speakers[spkName]) {
-      DUO.speakers[spkName] = {
-        snl: serverSegment.speakerLanguage || 'en',
-        color: serverSegment.speakerColor || '#7c3aed',
-        words: 0, wpm: 0, joined: new Date()
-      };
-      DUO.speakerOrder.push(spkName);
-      renderSpeakers();
-      renderSpeakerConfigs();
     }
 
     var before = S8T_SEGMENTS.getByClientId(serverSegment.clientSegmentId);
@@ -1043,12 +1031,11 @@
       // Connect WebSocket + Realtime
       initWS();
       wsPublisher.connect();
-      S8T_REALTIME.subscribe(DUO.roomId, function(segment){
+      S8T_REALTIME.subscribe(DUO.roomId, DUO.myTTL, function(segment){
         receiveAuthoritativeSegment(segment);
       });
-      // Initialize speech recognition for the first speaker's language
-      var firstSpk = DUO.speakerOrder[0];
-      var spkLang = firstSpk ? DUO.speakers[firstSpk].snl : 'en';
+      // Initialize speech recognition
+      var spkLang = getSessionSpeechLanguage();
       DUO.sessionState = 'requesting_microphone';
       S8T_SPEECH.init(spkLang, {
         onInterim: function(text){
@@ -1323,6 +1310,15 @@
     btns.forEach(function(b){ b.style.opacity = disabled ? '0.3' : '1'; b.style.pointerEvents = disabled ? 'none' : ''; });
   }
 
+  function getSessionSpeechLanguage() {
+    if (DUO.mode === 'collaborative') {
+      var currentMember = S8T.getCurrentMember();
+      return currentMember ? (currentMember.sourceLanguage || 'en') : 'en';
+    }
+    var firstSpeakerName = DUO.speakerOrder[0];
+    return firstSpeakerName ? DUO.speakers[firstSpeakerName].snl : 'en';
+  }
+
   async function getAuthenticatedUser() {
     var sb = window.sottotitoliSupabase;
     if (!sb) return null;
@@ -1352,7 +1348,7 @@
     DUO.myName = membership.display_name || 'Tu';
     localStorage.setItem('duo-room-id', DUO.roomId);
 
-    // Register self
+    // Register self in member model only — no legacy speaker write
     S8T.upsertMember({
       id: membership.id,
       displayName: membership.display_name,
@@ -1362,17 +1358,7 @@
       active: !membership.left_at
     });
 
-    // Also register in legacy speaker model for sidebar UI
-    if (!DUO.speakers[membership.display_name]) {
-      DUO.speakers[membership.display_name] = {
-        snl: membership.source_language || 'en',
-        color: membership.color || '#7c3aed',
-        words: 0, wpm: 0, joined: new Date()
-      };
-      DUO.speakerOrder.push(membership.display_name);
-    }
-
-    // Register other members
+    // Register other members (member model only)
     (payload.members || []).forEach(function(member) {
       S8T.upsertMember({
         id: member.id,
@@ -1382,15 +1368,6 @@
         role: member.role || 'speaker',
         active: !member.left_at
       });
-      // Legacy speaker compat
-      if (!DUO.speakers[member.display_name]) {
-        DUO.speakers[member.display_name] = {
-          snl: member.source_language || 'en',
-          color: member.color || '#7c3aed',
-          words: 0, wpm: 0, joined: new Date()
-        };
-        DUO.speakerOrder.push(member.display_name);
-      }
     });
 
     // Load existing segments
@@ -1430,7 +1407,7 @@
           members: result.members || [],
           segments: result.segments || []
         });
-        S8T_REALTIME.subscribe(DUO.roomId, receiveAuthoritativeSegment);
+        S8T_REALTIME.subscribe(DUO.roomId, DUO.myTTL, receiveAuthoritativeSegment);
         showToast('🔄 Stanza creata · Invita i partecipanti!');
       }).catch(function(err){
         console.error('Room creation failed:', err);

@@ -109,20 +109,35 @@
   }
 
   /**
-   * Fetch a single segment from the room_segment_feed view.
+   * Fetch a single segment with target-language-aware translation.
+   * Uses get_room_segment_feed RPC to filter translations by language.
    */
-  async function getSegmentFeedItem(segmentId) {
+  async function getSegmentFeedItem(segmentId, targetLanguage) {
     var sb = w.sottotitoliSupabase;
     if (!sb) throw new Error('Supabase not initialized');
+    targetLanguage = targetLanguage || 'en';
 
-    var { data, error } = await sb
-      .from('room_segment_feed')
-      .select('*')
+    // Get the room_id for this segment
+    var { data: segData, error: segError } = await sb
+      .from('transcript_segments')
+      .select('room_id')
       .eq('id', segmentId)
       .single();
 
+    if (segError) throw segError;
+
+    // Fetch all segments for the room with target-language translation
+    var { data, error } = await sb.rpc('get_room_segment_feed', {
+      p_room_id: segData.room_id,
+      p_target_language: targetLanguage
+    });
+
     if (error) throw error;
-    return { segment: mapFeedItem(data) };
+
+    var item = (data || []).find(function(row) { return row.id === segmentId; });
+    if (!item) throw new Error('segment_not_found');
+
+    return { segment: mapFeedItem(item) };
   }
 
   /**
