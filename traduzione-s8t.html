@@ -916,7 +916,34 @@
   window.duoCopyRoom=function(){ navigator.clipboard.writeText(DUO.roomId).then(function(){showToast('📋 ID stanza copiato!')}); };
   window.duoShareWhatsApp=function(){ window.open('https://wa.me/?text='+encodeURIComponent(document.getElementById('duoInviteLink').textContent),'_blank'); };
   window.duoShareEmail=function(){ window.location.href='mailto:?subject=Unisciti alla mia sessione di traduzione&body='+encodeURIComponent(document.getElementById('duoInviteLink').textContent); };
-  window.duoNewRoom=function(){ DUO.roomId = S8T.generateRoomId(); localStorage.setItem('duo-room-id',DUO.roomId); document.getElementById('duoRoomCode').textContent=DUO.roomId.substring(0,8); updateInviteLink(); showToast('🔄 Nuova stanza!'); };
+  window.duoNewRoom=function(){
+    // Try server room creation if authenticated
+    if (window.S8T_API && window.sottotitoliSupabase) {
+      S8T_API.createRoom(null).then(function(result){
+        DUO.roomId = result.room.id;
+        DUO.inviteToken = result.inviteToken;
+        localStorage.setItem('duo-room-id', DUO.roomId);
+        document.getElementById('duoRoomCode').textContent = DUO.roomId.substring(0,8);
+        updateInviteLink();
+        showToast('🔄 Stanza creata · Invita i partecipanti!');
+      }).catch(function(){
+        // Fall back to local room
+        DUO.roomId = S8T.generateRoomId();
+        DUO.inviteToken = '';
+        localStorage.setItem('duo-room-id', DUO.roomId);
+        document.getElementById('duoRoomCode').textContent = DUO.roomId.substring(0,8);
+        updateInviteLink();
+        showToast('🔄 Nuova stanza locale!');
+      });
+    } else {
+      DUO.roomId = S8T.generateRoomId();
+      DUO.inviteToken = '';
+      localStorage.setItem('duo-room-id', DUO.roomId);
+      document.getElementById('duoRoomCode').textContent = DUO.roomId.substring(0,8);
+      updateInviteLink();
+      showToast('🔄 Nuova stanza!');
+    }
+  };
 
   window.duoSendMessage = function(){
     var input = document.getElementById('duoMsgInput');
