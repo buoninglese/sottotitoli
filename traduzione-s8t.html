@@ -372,6 +372,9 @@
         case 'close-mobile-sheet':
           toggleMobileSheet();
           break;
+        case 'show-vocab-word':
+          showToast(el.getAttribute('data-word') + ' · ' + (el.getAttribute('data-level')||'?'));
+          break;
       }
     });
   }
@@ -559,6 +562,11 @@
 
   function commitSentence(speaker, orig, tran){
     var seg = S8T_SEGMENTS.create(speaker, orig, tran);
+    // Store immutable speaker snapshot so historic segments survive participant removal
+    var sp = DUO.speakers[speaker];
+    seg.speakerName = speaker;
+    seg.speakerLanguage = sp ? sp.snl : 'en';
+    seg.speakerColor = sp ? sp.color : '#7c3aed';
     DUO.sentences.push(seg);
     DUO.translations = S8T_SEGMENTS.count();
     renderSentence(seg);
@@ -628,21 +636,24 @@
 
   function buildSentenceDOM(seg){
     var speaker = seg.speaker, orig = seg.orig, tran = seg.tran;
-    var sp = DUO.speakers[speaker]; var name = speaker;
+    // Use immutable speaker snapshot from segment (survives participant removal)
+    var name = seg.speakerName || speaker;
+    var spSnl = seg.speakerLanguage || 'en';
+    var spColor = seg.speakerColor || '#7c3aed';
     var loading = (tran === '…');
     var tranHTML = loading ? esc(tran) : tokenizeHTML(tran, DUO.myTTL);
     var el = document.createElement('div');
     el.setAttribute('data-segment-id', seg.clientSegmentId);
     if (DUO.style === 'd1'){
       el.className = 'duo-row';
-      el.innerHTML = '<div class="duo-orig">'+tokenizeHTML(orig, sp.snl)+' <span style="font-size:9px;color:var(--t3)">('+LANGS[sp.snl].flag+')</span></div><div class="duo-arrow">→</div><div class="duo-tran'+(loading?' tran-loading':'')+'">'+tranHTML+' <span style="font-size:9px;color:var(--t3)">('+LANGS[DUO.myTTL].flag+')</span></div>';
+      el.innerHTML = '<div class="duo-orig">'+tokenizeHTML(orig, spSnl)+' <span style="font-size:9px;color:var(--t3)">('+LANGS[spSnl].flag+')</span></div><div class="duo-arrow">→</div><div class="duo-tran'+(loading?' tran-loading':'')+'">'+tranHTML+' <span style="font-size:9px;color:var(--t3)">('+LANGS[DUO.myTTL].flag+')</span></div>';
     } else if (DUO.style === 'd2'){
       var side = (DUO.speakerOrder.indexOf(speaker)%2===0)?'a':'b';
       el.className = 'duo-bubble '+side;
-      el.innerHTML = '<span class="duo-btext'+(loading?' tran-loading':'')+'">'+tranHTML+'<div class="duo-blang"><span style="color:'+sp.color+'">●</span> '+esc(name)+' · '+LANGS[sp.snl].flag+'</div><div class="duo-btran">'+esc(orig)+'</div></span>';
+      el.innerHTML = '<span class="duo-btext'+(loading?' tran-loading':'')+'">'+tranHTML+'<div class="duo-blang"><span style="color:'+spColor+'">●</span> '+esc(name)+' · '+LANGS[spSnl].flag+'</div><div class="duo-btran">'+esc(orig)+'</div></span>';
     } else {
       el.className = 'd3-row';
-      el.innerHTML = '<div style="flex:1;min-width:0"><div class="d3-ttl'+(loading?' tran-loading':'')+'">'+tranHTML+'</div><div class="d3-src">'+esc(orig)+'<span class="d3-snl" style="background:'+sp.color+'">'+esc(name.substring(0,3).toUpperCase())+'</span></div></div>';
+      el.innerHTML = '<div style="flex:1;min-width:0"><div class="d3-ttl'+(loading?' tran-loading':'')+'">'+tranHTML+'</div><div class="d3-src">'+esc(orig)+'<span class="d3-snl" style="background:'+spColor+'">'+esc(name.substring(0,3).toUpperCase())+'</span></div></div>';
     }
     el.style.opacity = '0';
     el.style.transition = 'opacity .25s';
@@ -942,7 +953,7 @@
       var info = S8T_VOCAB.cache[w];
       var level = info.level || '';
       var cefr = (window.CEFR_COLORS && level) ? window.CEFR_COLORS[level] : null;
-      html += '<div class="gloss-card" style="background:var(--card2);border:1px solid var(--line);border-radius:12px;padding:12px 16px;display:flex;flex-direction:column;gap:6px;min-width:140px;max-width:200px;flex:1;transition:all .2s;cursor:pointer" onclick="showToast(\''+escAttr(w)+' · '+escAttr(level||'?')+'\')" title="'+escAttr(w)+'">'+
+      html += '<div class="gloss-card" data-action="show-vocab-word" data-word="'+escAttr(w)+'" data-level="'+escAttr(level)+'" style="background:var(--card2);border:1px solid var(--line);border-radius:12px;padding:12px 16px;display:flex;flex-direction:column;gap:6px;min-width:140px;max-width:200px;flex:1;transition:all .2s;cursor:pointer" title="'+escAttr(w)+'">'+
         '<div style="font-size:18px;font-weight:700;color:var(--text);letter-spacing:-.01em">'+esc(w)+'</div>'+
         '<div style="display:flex;align-items:center;gap:8px">'+
         (cefr ? '<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:4px;background:'+cefr.bg+';color:'+cefr.text+'">'+level+'</span>' : '')+
@@ -979,23 +990,53 @@
   window.duoShareWhatsApp=function(){ window.open('https://wa.me/?text='+encodeURIComponent(document.getElementById('duoInviteLink').textContent),'_blank'); };
   window.duoShareEmail=function(){ window.location.href='mailto:?subject=Unisciti alla mia sessione di traduzione&body='+encodeURIComponent(document.getElementById('duoInviteLink').textContent); };
   window.duoNewRoom = function(){
-    // 1. If live, stop the session first
-    if (DUO.session) {
-      duoToggleSession(); // stops timer, disconnects WS, unsubscribes realtime
+    // 1. Snapshot current state BEFORE any teardown
+    var prev = {
+      roomId: DUO.roomId,
+      inviteToken: DUO.inviteToken,
+      speakers: {}, speakerOrder: [], sentences: [],
+      translations: DUO.translations, nextSpkId: DUO.nextSpkId
+    };
+    // Deep-clone speakers and sentences
+    DUO.speakerOrder.forEach(function(n){ prev.speakerOrder.push(n); });
+    Object.keys(DUO.speakers).forEach(function(k){ prev.speakers[k] = DUO.speakers[k]; });
+    DUO.sentences.forEach(function(s){ prev.sentences.push(s); });
+
+    function restorePrev(){
+      DUO.roomId = prev.roomId;
+      DUO.inviteToken = prev.inviteToken;
+      DUO.speakers = prev.speakers;
+      DUO.speakerOrder = prev.speakerOrder;
+      DUO.sentences = prev.sentences;
+      DUO.translations = prev.translations;
+      DUO.nextSpkId = prev.nextSpkId;
+      localStorage.setItem('duo-room-id', DUO.roomId);
+      document.getElementById('duoRoomCode').textContent = DUO.roomId.substring(0,8);
+      updateInviteLink();
+      renderSpeakers();
+      renderSpeakerConfigs();
+      // Re-render transcript from restored sentences
+      var container = document.getElementById('duoTranscript');
+      container.innerHTML = '';
+      if (prev.sentences.length > 0) {
+        prev.sentences.forEach(function(s){ renderSentence(s); });
+      }
     }
-    // 2. Clear old room state
-    if (wsPublisher) { wsPublisher.disconnect(); wsPublisher = null; }
-    S8T_REALTIME.unsubscribe();
-    S8T_SEGMENTS.clear();
-    DUO.sentences = [];
-    DUO.translations = 0;
-    DUO.speakers = {};
-    DUO.speakerOrder = [];
-    DUO.nextSpkId = 1;
-    document.getElementById('duoTranscript').innerHTML = '';
-    // 3. Create new room — must succeed or restore old state
-    var savedRoom = { id: DUO.roomId, token: DUO.inviteToken, speakers: DUO.speakers, order: DUO.speakerOrder, sentences: DUO.sentences };
-    var applyRoom = function(roomId, inviteToken){
+
+    function applyNew(roomId, inviteToken){
+      // Tear down old session if live
+      if (DUO.session) { duoToggleSession(); }
+      if (wsPublisher) { wsPublisher.disconnect(); wsPublisher = null; }
+      S8T_REALTIME.unsubscribe();
+      clearPendingTimeouts();
+      S8T_SEGMENTS.clear();
+      DUO.sentences = [];
+      DUO.translations = 0;
+      DUO.speakers = {};
+      DUO.speakerOrder = [];
+      DUO.nextSpkId = 1;
+      document.getElementById('duoTranscript').innerHTML = '';
+      // Apply new room
       DUO.roomId = roomId;
       DUO.inviteToken = inviteToken || '';
       localStorage.setItem('duo-room-id', DUO.roomId);
@@ -1003,31 +1044,18 @@
       updateInviteLink();
       renderSpeakers();
       renderSpeakerConfigs();
-    };
+    }
+
+    // 2. Try server room creation first — don't touch old state until it succeeds
     if (window.S8T_API && window.sottotitoliSupabase) {
       S8T_API.createRoom(null).then(function(result){
-        applyRoom(result.room.id, result.inviteToken);
+        applyNew(result.room.id, result.inviteToken);
         showToast('🔄 Stanza creata · Invita i partecipanti!');
       }).catch(function(err){
-        // Fail closed — restore old room
-        DUO.roomId = savedRoom.id;
-        DUO.inviteToken = savedRoom.token;
-        DUO.speakers = savedRoom.speakers;
-        DUO.speakerOrder = savedRoom.order;
-        DUO.sentences = savedRoom.sentences;
-        localStorage.setItem('duo-room-id', DUO.roomId);
-        applyRoom(savedRoom.id, savedRoom.token);
-        showToast('⚠️ Impossibile creare una nuova stanza. Riprova.');
         console.error('Room creation failed:', err);
+        showToast('⚠️ Impossibile creare una nuova stanza. Riprova.');
       });
     } else {
-      // Not authenticated — restore old room
-      DUO.roomId = savedRoom.id;
-      DUO.inviteToken = savedRoom.token;
-      DUO.speakers = savedRoom.speakers;
-      DUO.speakerOrder = savedRoom.order;
-      DUO.sentences = savedRoom.sentences;
-      applyRoom(savedRoom.id, savedRoom.token);
       showToast('⚠️ Accedi per creare stanze condivise.');
     }
   };
