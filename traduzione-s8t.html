@@ -344,6 +344,36 @@
         el.addEventListener('change', function(){ duoUpdateSpeakerSNL(el.getAttribute('data-spk-snl'), el.value); reRenderAll(); });
       });
     };
+
+    // ── Delegated click handler for data-action attributes ──
+    document.addEventListener('click', function(e){
+      var el = e.target.closest('[data-action]');
+      if (!el) return;
+      var action = el.getAttribute('data-action');
+      var word, lang, level;
+      switch(action) {
+        case 'save-word':
+          doSaveWord(el.getAttribute('data-word'), el.getAttribute('data-lang'), el.getAttribute('data-level'));
+          break;
+        case 'unsave-word':
+          doUnsaveWord(el.getAttribute('data-word'));
+          break;
+        case 'close-popup':
+          var popup = document.getElementById('twPopup');
+          if (popup) popup.classList.remove('show');
+          break;
+        case 'sign-out':
+          var sb = window.sottotitoliSupabase;
+          if (sb) { sb.auth.signOut().then(function(){ window.location.href = 'index.html'; }); }
+          break;
+        case 'new-room':
+          duoNewRoom();
+          break;
+        case 'close-mobile-sheet':
+          toggleMobileSheet();
+          break;
+      }
+    });
   }
 
   // ── TTL change ──
@@ -384,8 +414,7 @@
   window.duoRemoveSpeaker = function(name){
     delete DUO.speakers[name];
     DUO.speakerOrder = DUO.speakerOrder.filter(function(n){ return n !== name; });
-    // Remove their sentences
-    DUO.sentences = DUO.sentences.filter(function(s){ return s.speaker !== name; });
+    // Preserve transcript history — just remove from active speakers
     renderSpeakers();
     renderSpeakerConfigs();
     updateStyleForCount();
@@ -465,6 +494,14 @@
     }
   }
 
+  // ── Delayed translation timeout tracker ──
+  var pendingTimeouts = [];
+
+  function clearPendingTimeouts(){
+    pendingTimeouts.forEach(function(t){ clearTimeout(t); });
+    pendingTimeouts = [];
+  }
+
   // ── Progressive sentence rendering (with bridging mode) ──
   function addSentence(speaker, orig, preTran){
     var sp = DUO.speakers[speaker]; if (!sp) return;
@@ -501,11 +538,12 @@
     if (bridge === 'a2') {
       var segA2 = commitSentence(speaker, orig, '…');
       var sidA2 = segA2.clientSegmentId;
-      setTimeout(function(){
+      var tid = setTimeout(function(){
         translateText(orig, sp.snl, DUO.myTTL).then(function(realTran){
           if (realTran) patchSentenceById(sidA2, realTran);
         }).catch(function(){});
       }, 3000);
+      pendingTimeouts.push(tid);
       return;
     }
     // A1 mode (default): immediate translation
@@ -804,6 +842,10 @@
       if (wsPublisher) wsPublisher.disconnect();
       S8T_REALTIME.unsubscribe();
       S8T_SPEECH.stop();
+      clearPendingTimeouts();
+      // Reset mic indicator
+      var micDot = document.getElementById('micIndicator');
+      if (micDot) { micDot.style.background = 'var(--t3)'; micDot.title = 'Microfono: spento'; }
       // Hide message input
       document.getElementById('duoMsgInput').style.display = 'none';
       document.getElementById('duoSendBtn').style.display = 'none';
@@ -906,7 +948,7 @@
         (cefr ? '<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:4px;background:'+cefr.bg+';color:'+cefr.text+'">'+level+'</span>' : '')+
         '<span style="font-size:10px;color:var(--t3)">'+(info.lang||'').toUpperCase()+'</span>'+
         '</div>'+
-        '<button class="tw-btn" style="font-size:10px;padding:4px 10px;border-radius:99px;border:1px solid var(--red);background:transparent;color:var(--red);cursor:pointer;font-family:var(--f);align-self:flex-start;margin-top:4px" onclick="event.stopPropagation();window._twUnsave(\''+escAttr(w)+'\');renderGlossary(\''+escAttr(filter)+'\')">🗑️ Rimuovi</button>'+
+        '<button class="tw-btn" data-action="unsave-word" data-word="'+escAttr(w)+'" style="font-size:10px;padding:4px 10px;border-radius:99px;border:1px solid var(--red);background:transparent;color:var(--red);cursor:pointer;font-family:var(--f);align-self:flex-start;margin-top:4px">🗑️ Rimuovi</button>'+
       '</div>';
     });
     container.innerHTML = html;
@@ -951,8 +993,9 @@
     DUO.speakerOrder = [];
     DUO.nextSpkId = 1;
     document.getElementById('duoTranscript').innerHTML = '';
-    // 3. Create new room
-    var createRoom = function(roomId, inviteToken){
+    // 3. Create new room — must succeed or restore old state
+    var savedRoom = { id: DUO.roomId, token: DUO.inviteToken, speakers: DUO.speakers, order: DUO.speakerOrder, sentences: DUO.sentences };
+    var applyRoom = function(roomId, inviteToken){
       DUO.roomId = roomId;
       DUO.inviteToken = inviteToken || '';
       localStorage.setItem('duo-room-id', DUO.roomId);
@@ -960,21 +1003,32 @@
       updateInviteLink();
       renderSpeakers();
       renderSpeakerConfigs();
-      if (inviteToken) {
-        showToast('🔄 Stanza creata · Invita i partecipanti!');
-      } else {
-        showToast('🔄 Nuova stanza!');
-      }
     };
-    // Try server room, fall back to local
     if (window.S8T_API && window.sottotitoliSupabase) {
       S8T_API.createRoom(null).then(function(result){
-        createRoom(result.room.id, result.inviteToken);
-      }).catch(function(){
-        createRoom(S8T.generateRoomId(), '');
+        applyRoom(result.room.id, result.inviteToken);
+        showToast('🔄 Stanza creata · Invita i partecipanti!');
+      }).catch(function(err){
+        // Fail closed — restore old room
+        DUO.roomId = savedRoom.id;
+        DUO.inviteToken = savedRoom.token;
+        DUO.speakers = savedRoom.speakers;
+        DUO.speakerOrder = savedRoom.order;
+        DUO.sentences = savedRoom.sentences;
+        localStorage.setItem('duo-room-id', DUO.roomId);
+        applyRoom(savedRoom.id, savedRoom.token);
+        showToast('⚠️ Impossibile creare una nuova stanza. Riprova.');
+        console.error('Room creation failed:', err);
       });
     } else {
-      createRoom(S8T.generateRoomId(), '');
+      // Not authenticated — restore old room
+      DUO.roomId = savedRoom.id;
+      DUO.inviteToken = savedRoom.token;
+      DUO.speakers = savedRoom.speakers;
+      DUO.speakerOrder = savedRoom.order;
+      DUO.sentences = savedRoom.sentences;
+      applyRoom(savedRoom.id, savedRoom.token);
+      showToast('⚠️ Accedi per creare stanze condivise.');
     }
   };
 
@@ -991,23 +1045,16 @@
 
   // ── Mobile bottom sheet ──
   window.toggleMobileSheet = function(){
-    var sheet = document.getElementById('mobileSheet');
+    var sidebar = document.getElementById('duoSpeakerSidebar');
     var backdrop = document.getElementById('mobileBackdrop');
-    var isOpen = sheet.classList.contains('open');
+    if (!sidebar) return;
+    var isOpen = sidebar.classList.contains('is-open');
     if (isOpen) {
-      sheet.classList.remove('open');
-      backdrop.classList.remove('open');
+      sidebar.classList.remove('is-open');
+      if (backdrop) backdrop.classList.remove('open');
     } else {
-      // Clone sidebar content into mobile sheet
-      var content = document.getElementById('mobileSheetContent');
-      var sidebar = document.getElementById('duoSpeakerSidebar');
-      if (content && sidebar) {
-        content.innerHTML = sidebar.innerHTML;
-        // Re-bind speaker events for the cloned content
-        if (window._rebindSpeakerEvents) window._rebindSpeakerEvents();
-      }
-      sheet.classList.add('open');
-      backdrop.classList.add('open');
+      sidebar.classList.add('is-open');
+      if (backdrop) backdrop.classList.add('open');
     }
   };
 
@@ -1077,11 +1124,11 @@
     h += '<div class="tw-info">Lingua: '+esc(lang.toUpperCase())+'</div>';
     h += '<div class="tw-actions">';
     if (isSaved) {
-      h += '<button class="tw-btn tw-btn-saved" onclick="window._twUnsave(\''+escAttr(word)+'\')">💾 Salvata</button>';
+      h += '<button class="tw-btn tw-btn-saved" data-action="unsave-word" data-word="'+escAttr(word)+'">💾 Salvata</button>';
     } else {
-      h += '<button class="tw-btn tw-btn-save" onclick="window._twSave(\''+escAttr(word)+'\',\''+escAttr(lang)+'\',\''+escAttr(level)+'\')">💾 Salva parola</button>';
+      h += '<button class="tw-btn tw-btn-save" data-action="save-word" data-word="'+escAttr(word)+'" data-lang="'+escAttr(lang)+'" data-level="'+escAttr(level)+'">💾 Salva parola</button>';
     }
-    h += '<button class="tw-btn tw-btn-close" onclick="document.getElementById(\'twPopup\').classList.remove(\'show\')">✕</button>';
+    h += '<button class="tw-btn tw-btn-close" data-action="close-popup">✕</button>';
     h += '</div>';
     popup.innerHTML = h;
     // Position near the word
@@ -1093,33 +1140,25 @@
     popup.classList.add('show');
   }
 
-  window._twSave = function(word, lang, level){
+  function doSaveWord(word, lang, level){
     S8T_VOCAB.saveWord(word, lang, level).then(function(){
-      document.querySelectorAll('.tw-word[data-word="'+escAttr(word)+'"]').forEach(function(el){
-        el.classList.add('saved');
-      });
+      document.querySelectorAll('.tw-word[data-word="'+escAttr(word)+'"]').forEach(function(el){ el.classList.add('saved'); });
       var popup = document.getElementById('twPopup');
-      if (popup) {
-        var btn = popup.querySelector('.tw-btn-save');
-        if (btn) { btn.className = 'tw-btn tw-btn-saved'; btn.textContent = '💾 Salvata'; btn.onclick = function(){ window._twUnsave(word); }; }
-      }
+      if (popup) { popup.classList.remove('show'); }
       showToast('💾 '+word+' salvata nel tuo vocabolario');
     });
-  };
+  }
 
-  window._twUnsave = function(word){
+  function doUnsaveWord(word){
     S8T_VOCAB.unsaveWord(word).then(function(){
-      document.querySelectorAll('.tw-word[data-word="'+escAttr(word)+'"]').forEach(function(el){
-        el.classList.remove('saved');
-      });
+      document.querySelectorAll('.tw-word[data-word="'+escAttr(word)+'"]').forEach(function(el){ el.classList.remove('saved'); });
       var popup = document.getElementById('twPopup');
-      if (popup) {
-        var btn = popup.querySelector('.tw-btn-saved');
-        if (btn) { btn.className = 'tw-btn tw-btn-save'; btn.textContent = '💾 Salva parola'; btn.onclick = function(){ window._twSave(word,'',''); }; }
-      }
+      if (popup) { popup.classList.remove('show'); }
+      // Refresh glossary if visible
+      if (DUO.slide === 5) renderGlossary('all');
       showToast('🗑️ '+word+' rimossa dal vocabolario');
     });
-  };
+  }
 
   function esc(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
   function escAttr(s){return s.replace(/'/g,"\\'").replace(/"/g,'&quot;');}
