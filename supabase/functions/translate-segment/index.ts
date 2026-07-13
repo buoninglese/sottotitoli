@@ -1,20 +1,13 @@
 /**
- * translate-segment — Server-side translation via Gemini (Vertex AI).
- * Uses the Agent Platform API key bound to the service account.
- * Secret: GOOGLE_TRANSLATE_API_KEY (= Agent Platform API key)
+ * translate-segment — Server-side translation via Google Cloud Translation API.
+ * Requires a Cloud Translation API key.
+ * Secret: GOOGLE_TRANSLATE_API_KEY
  */
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 const API_KEY = Deno.env.get('GOOGLE_TRANSLATE_API_KEY') || '';
-const PROJECT = 'arctic-analyzer-496821-k9';
-const LOCATION = 'us-central1';
-const MODEL = 'gemini-2.0-flash-001';
-
-const LANG_NAMES: Record<string, string> = {
-  en: 'English', it: 'Italian', nl: 'Dutch', fr: 'French', de: 'German', es: 'Spanish'
-};
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -31,35 +24,24 @@ async function withTimeout<T>(promise: Promise<T>, ms = 10_000): Promise<T> {
   finally { if (timer !== undefined) clearTimeout(timer); }
 }
 
-async function translateWithGemini(
+async function translateWithGoogleCloud(
   text: string,
   sourceLanguage: string,
   targetLanguage: string
 ): Promise<string> {
   if (!API_KEY) throw new Error('translation_provider_not_configured');
 
-  const srcName = LANG_NAMES[sourceLanguage] || sourceLanguage;
-  const tgtName = LANG_NAMES[targetLanguage] || targetLanguage;
-
   const resp = await fetch(
-    `https://${LOCATION}-aiplatform.googleapis.com/v1/projects/${PROJECT}/locations/${LOCATION}/publishers/google/models/${MODEL}:generateContent`,
+    `https://translation.googleapis.com/language/translate/v2`,
     {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-goog-api-key': API_KEY,
-      },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        contents: [{
-          role: 'user',
-          parts: [{
-            text: `Translate the following text from ${srcName} to ${tgtName}. Return ONLY the translation, no explanations, no quotes, no extra text:\n\n${text}`
-          }]
-        }],
-        generationConfig: {
-          temperature: 0.1,
-          maxOutputTokens: 1024,
-        }
+        q: text,
+        source: sourceLanguage,
+        target: targetLanguage,
+        format: 'text',
+        key: API_KEY,
       }),
     }
   );
@@ -71,9 +53,9 @@ async function translateWithGemini(
   }
 
   const body = await resp.json();
-  const translated = body?.candidates?.[0]?.content?.parts?.[0]?.text;
+  const translated = body?.data?.translations?.[0]?.translatedText;
   if (!translated) throw new Error('translation_provider_invalid_response');
-  return translated.trim();
+  return translated;
 }
 
 Deno.serve(async (req: Request) => {
@@ -124,7 +106,7 @@ Deno.serve(async (req: Request) => {
     } else {
       try {
         translatedText = await withTimeout(
-          translateWithGemini(
+          translateWithGoogleCloud(
             segment.source_text,
             segment.source_language || 'en',
             targetLanguage
@@ -153,7 +135,7 @@ Deno.serve(async (req: Request) => {
         translated_text: translatedText || null,
         status: status,
         error_code: errorCode,
-        provider: 'gemini',
+        provider: 'google_cloud',
         updated_at: new Date().toISOString(),
       }, {
         onConflict: 'segment_id, target_language',
