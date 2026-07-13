@@ -10,15 +10,21 @@
   var channel = null;
   var activeRoomId = null;
 
-  function subscribe(roomId, onUpsert) {
+  function subscribe(roomId, targetLanguage, onUpsert) {
     var supabase = window.sottotitoliSupabase;
     if (!supabase || !roomId) {
-      // Expected in demo/unauthenticated mode — page works locally
       return false;
+    }
+
+    // Support both old (roomId, onUpsert) and new (roomId, targetLanguage, onUpsert) signatures
+    if (typeof targetLanguage === 'function') {
+      onUpsert = targetLanguage;
+      targetLanguage = 'en';
     }
 
     unsubscribe();
     activeRoomId = roomId;
+    var ttl = targetLanguage || 'en';
 
     channel = supabase
       .channel('room-segments:' + roomId)
@@ -33,9 +39,9 @@
         async function(payload) {
           if (!payload.new || !payload.new.id) return;
           try {
-            var segment = await window.S8T_API.getSegmentFeedItem(payload.new.id);
-            if (segment && segment.segment && segment.segment.roomId === activeRoomId) {
-              onUpsert(segment.segment);
+            var result = await window.S8T_API.getSegmentFeedItem(payload.new.id, ttl);
+            if (result && result.segment && result.segment.roomId === activeRoomId) {
+              onUpsert(result.segment);
             }
           } catch(error) {
             console.error('[S8T Realtime] Cannot fetch incoming segment', error);
@@ -52,9 +58,9 @@
         async function(payload) {
           if (!payload.new || !payload.new.segment_id) return;
           try {
-            var segment = await window.S8T_API.getSegmentFeedItem(payload.new.segment_id);
-            if (segment && segment.segment && segment.segment.roomId === activeRoomId) {
-              onUpsert(segment.segment);
+            var result = await window.S8T_API.getSegmentFeedItem(payload.new.segment_id, ttl);
+            if (result && result.segment && result.segment.roomId === activeRoomId) {
+              onUpsert(result.segment);
             }
           } catch(error) {
             console.error('[S8T Realtime] Cannot fetch translation update', error);
