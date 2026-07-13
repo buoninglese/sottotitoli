@@ -202,6 +202,7 @@
         <input type="text" id="duoMsgInput" placeholder="Scrivi un messaggio…" style="display:none;flex:1;min-width:120px;max-width:320px;font-family:var(--f);font-size:13px;padding:7px 14px;border-radius:99px;border:1px solid var(--line);background:var(--bg);color:var(--text);outline:none">
         <button id="duoSendBtn" style="display:none;font-family:var(--f);font-size:12px;font-weight:700;padding:7px 14px;border-radius:99px;border:none;cursor:pointer;background:var(--accent);color:#fff">Invia</button>
         <span class="duo-timer" id="duoTimer" style="font-family:var(--mono);font-size:16px;font-weight:600;color:var(--text);min-width:48px">00:00</span>
+        <span id="duoSessionStatus" style="font-family:var(--f);font-size:11px;font-weight:600;color:var(--t3);padding:4px 10px;border-radius:99px;background:var(--bg);display:none"></span>
       </div>
     </div><!-- /content area -->
   </div><!-- /appCenter -->
@@ -575,7 +576,7 @@
     renderSentence(seg);
     renderSpeakers();
     if (DUO.session && DUO.isHost && speaker === DUO.myName) {
-      broadcastSentence(speaker, orig);
+      broadcastSentence(seg);
     }
     updateComprehension();
     return seg;
@@ -644,7 +645,16 @@
     var spSnl = seg.speakerLanguage || 'en';
     var spColor = seg.speakerColor || '#7c3aed';
     var loading = (tran === '…');
-    var tranHTML = loading ? esc(tran) : tokenizeHTML(tran, DUO.myTTL);
+    var isPlaceholder = (tran === '[Tocca per tradurre]' || tran === '🔄 Riprova');
+    var action = tran === '🔄 Riprova' ? 'retry-translation' : 'tap-translate';
+    var tranHTML;
+    if (loading) {
+      tranHTML = esc(tran);
+    } else if (isPlaceholder) {
+      tranHTML = '<button type="button" data-action="'+action+'" data-segment-id="'+esc(seg.clientSegmentId)+'" style="font-family:var(--f);font-size:12px;font-weight:600;padding:6px 14px;border-radius:99px;border:1px dashed var(--t3);background:transparent;color:var(--t3);cursor:pointer">'+esc(tran)+'</button>';
+    } else {
+      tranHTML = tokenizeHTML(tran, DUO.myTTL);
+    }
     var el = document.createElement('div');
     el.setAttribute('data-segment-id', seg.clientSegmentId);
     if (DUO.style === 'd1'){
@@ -660,11 +670,6 @@
     }
     el.style.opacity = '0';
     el.style.transition = 'opacity .25s';
-    if (tran === '[Tocca per tradurre]' || tran === '🔄 Riprova') {
-      el.classList.add('tran-placeholder');
-      el.style.cursor = 'pointer';
-      el.title = tran === '🔄 Riprova' ? 'Traduzione non disponibile — tocca per riprovare' : 'Tocca per tradurre';
-    }
     return el;
   }
 
@@ -676,19 +681,17 @@
     container.scrollTo({top:container.scrollHeight,behavior:'smooth'});
   }
 
-  // B2 "tap to translate" + retry handler
+  // Delegated click handler for tap-translate and retry-translation buttons
   document.addEventListener('click', function(e){
-    var row = e.target.closest('.tran-placeholder');
-    if (!row) return;
+    var btn = e.target.closest('[data-action="tap-translate"], [data-action="retry-translation"]');
+    if (!btn) return;
     e.stopPropagation();
-    var sid = row.getAttribute('data-segment-id');
+    var sid = btn.getAttribute('data-segment-id');
     if (!sid) return;
     var seg = S8T_SEGMENTS.getById(sid);
     if (!seg) return;
-    var isB2 = seg.tran === '[Tocca per tradurre]';
-    var isRetry = seg.tran === '🔄 Riprova';
-    if (!isB2 && !isRetry) return;
-    row.style.opacity = '0.5';
+    btn.disabled = true;
+    btn.textContent = '…';
     translateText(seg.orig, seg.speakerLanguage || 'en', DUO.myTTL).then(function(realTran){
       if (realTran) {
         patchSentenceById(sid, realTran);
@@ -749,18 +752,21 @@
       onMessage: function(event){
         try {
           var data = JSON.parse(event.data);
-          // Handle incoming sentences from other users in the room
-          if (data.final && data.speaker && data.snl) {
-            // Don't re-render our own sentences
-            if (data.speaker !== DUO.myName) {
-              // Auto-create speaker if they don't exist yet
-              if (!DUO.speakers[data.speaker]) { duoAddSpeaker(data.speaker, data.snl); }
-              // Dedup: skip if we already have this segment
-              var cid = data.clientId || data.id;
+          // Handle incoming segments from other users in the room
+          // New format: {type, clientSegmentId, speakerName, speakerLanguage, sourceText}
+          // Legacy format: {msg, final, speaker, snl, id} — still supported for compat
+          var cid = data.clientSegmentId || (data.id != null ? String(data.id) : null);
+          var text = data.sourceText || data.final;
+          var speaker = data.speakerName || data.speaker;
+          var snl = data.speakerLanguage || data.snl;
+          if (text && speaker && snl) {
+            if (speaker !== DUO.myName) {
+              if (!DUO.speakers[speaker]) { duoAddSpeaker(speaker, snl); }
+              // Dedup using canonical clientSegmentId
               if (!cid || !S8T_SEGMENTS.getById(cid)) {
-                addSentence(data.speaker, data.final, null);
+                addSentence(speaker, text, null);
               }
-              addLogEntry('📩', esc(data.speaker)+': '+esc(data.final.substring(0,40)));
+              addLogEntry('📩', esc(speaker)+': '+esc(text.substring(0,40)));
             }
           }
         } catch(e) {}
@@ -771,15 +777,14 @@
     });
   }
 
-  function broadcastSentence(speaker, orig){
+  function broadcastSentence(seg){
     if (!wsPublisher || !wsPublisher.isOpen()) return;
-    var sp = DUO.speakers[speaker];
     wsPublisher.publish({
-      msg: true,
-      final: orig,
-      speaker: speaker,
-      snl: sp ? sp.snl : 'en',
-      id: DUO.sentences.length
+      type: 'interim-caption',
+      clientSegmentId: seg.clientSegmentId,
+      speakerName: seg.speakerName,
+      speakerLanguage: seg.speakerLanguage,
+      sourceText: seg.orig
     });
   }
 
@@ -797,12 +802,31 @@
       // Connect WebSocket + Realtime
       initWS();
       wsPublisher.connect();
-      S8T_REALTIME.subscribe(DUO.roomId, function(seg){
-        if (seg.sourceText) {
-          var speaker = 'Guest';
-          if (!DUO.speakers[speaker]) duoAddSpeaker(speaker, seg.sourceLanguage || 'en');
-          addSentence(speaker, seg.sourceText, null);
+      S8T_REALTIME.subscribe(DUO.roomId, function(segment){
+        // Handle persisted segments from other clients via Supabase Realtime
+        // Expected format: {id, clientId, speakerMemberId, speakerName, speakerLanguage, speakerColor, sourceText, translationText}
+        if (!segment || !segment.sourceText) return;
+
+        // ID-based dedup: use clientId as canonical identity
+        var cid = segment.clientId || segment.id;
+        var existing = cid ? S8T_SEGMENTS.getById(cid) : null;
+
+        if (existing) {
+          // Update existing segment with server-authoritative data
+          if (segment.translationText) {
+            S8T_SEGMENTS.updateTranslation(cid, segment.translationText);
+            patchSentenceById(cid, segment.translationText);
+          }
+          return;
         }
+
+        // New segment from server — resolve speaker identity
+        // TODO: use segment.speakerMemberId + room_members lookup when backend sends it
+        var speaker = segment.speakerName || 'Guest';
+        if (!DUO.speakers[speaker]) {
+          duoAddSpeaker(speaker, segment.speakerLanguage || segment.sourceLanguage || 'en');
+        }
+        addSentence(speaker, segment.sourceText, segment.translationText || null);
       });
       // Initialize speech recognition for the first speaker's language
       var firstSpk = DUO.speakerOrder[0];
@@ -832,14 +856,18 @@
         }
       });
       // Try speech — result sets session mode
+      DUO.sessionState = 'requesting_microphone';
+      updateSessionStatus();
       S8T_SPEECH.start().then(function(speechOk){
         DUO.sessionState = speechOk ? 'live_speech' : 'live_typed';
+        updateSessionStatus();
         if (!speechOk) {
           var interim = document.getElementById('duoInterim');
           if (interim && !interim.textContent) { interim.textContent = '⌨️ Sessione testuale — scrivi un messaggio'; interim.style.color = 'var(--t3)'; }
         }
       }).catch(function(){
         DUO.sessionState = 'live_typed';
+        updateSessionStatus();
       });
       addLogEntry('🎬','Sessione avviata · Room '+DUO.roomId.substring(0,8));
       // Show message input
@@ -852,6 +880,8 @@
     } else {
       startBtn.style.display = ''; stopBtn.style.display = 'none';
       clearInterval(DUO.timerInt);
+      DUO.sessionState = null;
+      updateSessionStatus();
       if (wsPublisher) wsPublisher.disconnect();
       S8T_REALTIME.unsubscribe();
       S8T_SPEECH.stop();
@@ -973,6 +1003,22 @@
     var entry=document.createElement('div'); entry.className='duo-log-entry';
     entry.innerHTML='<span class="duo-log-time">'+ts+'</span><span class="duo-log-icon">'+icon+'</span>'+msg;
     if(log.querySelector('div[style]'))log.innerHTML=''; log.appendChild(entry); log.scrollTop=log.scrollHeight;
+  }
+
+  function updateSessionStatus(){
+    var el = document.getElementById('duoSessionStatus');
+    if (!el) return;
+    var s = DUO.sessionState;
+    if (!DUO.session || !s) { el.style.display = 'none'; return; }
+    el.style.display = '';
+    var map = {
+      'requesting_microphone': {icon:'🎤', text:'Richiedo microfono…', color:'var(--amber)'},
+      'live_speech':           {icon:'🎤', text:'Microfono attivo',    color:'var(--green)'},
+      'live_typed':            {icon:'⌨️', text:'Sessione testuale',   color:'var(--t3)'}
+    };
+    var info = map[s] || {icon:'', text:s, color:'var(--t3)'};
+    el.textContent = info.icon + ' ' + info.text;
+    el.style.color = info.color;
   }
 
   function updateInviteLink(){
