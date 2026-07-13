@@ -38,77 +38,32 @@ h3{font-size:15px;font-weight:600;margin:20px 0 8px;color:var(--t2)}
 <body>
 
 <h1>🧪 Traduzione S8T · Release Checklist</h1>
-<p class="subtitle">Commit <span class="commit">59ad015</span> · 15 test di accettazione · 13 luglio 2026</p>
+<p class="subtitle">Commit <span class="commit">f053fae</span> · 15 test di accettazione · 13 luglio 2026 · SQL ✅ eseguite</p>
 
 <div class="progress"><div class="progress-fill" style="width:0%" id="progressBar"></div></div>
 
 <!-- ═══ SEZIONE MANUALE (solo tu) ═══ -->
 <div class="card manual">
-<h3>🔧 Azioni manuali — solo tu puoi farle <span class="badge badge-me">TU</span></h3>
+<h3>🔧 Azioni manuali — SQL eseguite ✅ <span class="badge badge-me">TU</span></h3>
 
 <div class="step">
-  <div class="step-num">A1</div>
+  <div class="step-num">✅</div>
   <div class="step-text">
-    <strong>Esegui SQL nel Supabase Editor:</strong><br>
-    <code>get_room_segment_feed_item</code> — incolla lo script qui sotto e premi Run.
-    <br><br>
-    <textarea readonly style="width:100%;height:180px;font-family:monospace;font-size:11px;background:var(--bg);color:var(--text);border:1px solid var(--line);border-radius:8px;padding:10px;resize:vertical">create or replace function public.get_room_segment_feed_item(
-  p_segment_id uuid, p_target_language text
-)
-returns jsonb language plpgsql security invoker as $$
-declare
-  v_room_id uuid; result jsonb;
-begin
-  select room_id into v_room_id from public.transcript_segments where id = p_segment_id;
-  if v_room_id is null then return null; end if;
-  select row_to_json(f) into result
-  from public.get_room_segment_feed(v_room_id, p_target_language) f
-  where f.id = p_segment_id;
-  return result;
-end;
-$$;</textarea>
+    <strong>A1 — get_room_segment_feed_item</strong> — eseguito<br>
   </div>
 </div>
 
 <div class="step">
-  <div class="step-num">A2</div>
+  <div class="step-num">✅</div>
   <div class="step-text">
-    <strong>Esegui SQL per room_id su segment_translations:</strong><br>
-    <textarea readonly style="width:100%;height:120px;font-family:monospace;font-size:11px;background:var(--bg);color:var(--text);border:1px solid var(--line);border-radius:8px;padding:10px;resize:vertical">alter table public.segment_translations add column if not exists room_id uuid;
-update public.segment_translations st set room_id = ts.room_id
-from public.transcript_segments ts where st.segment_id = ts.id and st.room_id is null;
-create index if not exists segment_translations_room_id_idx on public.segment_translations(room_id);</textarea>
+    <strong>A2 — room_id su segment_translations + indice</strong> — eseguito<br>
   </div>
 </div>
 
 <div class="step">
-  <div class="step-num">A3</div>
+  <div class="step-num">✅</div>
   <div class="step-text">
-    <strong>Aggiorna il RPC atomic invite join</strong> (versione senza segments nella risposta):<br>
-    <textarea readonly style="width:100%;height:200px;font-family:monospace;font-size:11px;background:var(--bg);color:var(--text);border:1px solid var(--line);border-radius:8px;padding:10px;resize:vertical">create or replace function public.join_room_with_invite(
-  p_token_hash text, p_display_name text, p_source_language text
-)
-returns jsonb language plpgsql security definer set search_path = public as $$
-declare
-  v_user_id uuid := auth.uid(); v_invite public.room_invites;
-  v_member public.room_members; v_room public.rooms; v_members jsonb;
-begin
-  if v_user_id is null then raise exception 'unauthenticated'; end if;
-  select * into v_invite from public.room_invites where token_hash = p_token_hash for update;
-  if v_invite.id is null or v_invite.revoked_at is not null or v_invite.expires_at &lt;= now() or v_invite.uses &gt;= v_invite.max_uses then raise exception 'invalid_invite'; end if;
-  select * into v_room from public.rooms where id = v_invite.room_id for share;
-  select * into v_member from public.room_members where room_id = v_invite.room_id and user_id = v_user_id for update;
-  if v_member.id is null then
-    insert into public.room_members (room_id,user_id,role,display_name,source_language,color) values (v_invite.room_id,v_user_id,v_invite.role,coalesce(nullif(trim(p_display_name),''),'Partecipante'),p_source_language,'#7c3aed') returning * into v_member;
-    update public.room_invites set uses = uses + 1 where id = v_invite.id;
-  elsif v_member.left_at is not null then
-    update public.room_members set left_at=null,joined_at=now(),role=v_invite.role where id=v_member.id returning * into v_member;
-    update public.room_invites set uses = uses + 1 where id = v_invite.id;
-  end if;
-  select coalesce(jsonb_agg(to_jsonb(rm)),'[]'::jsonb) into v_members from public.room_members rm where rm.room_id=v_invite.room_id and rm.left_at is null;
-  return jsonb_build_object('room',to_jsonb(v_room),'membership',to_jsonb(v_member),'members',v_members,'segments','[]'::jsonb);
-end;
-$$;</textarea>
+    <strong>A3 — join_room_with_invite (atomic, jsonb)</strong> — eseguito<br>
   </div>
 </div>
 
@@ -142,41 +97,49 @@ $$;</textarea>
 
 <!-- ═══ TEST AUTOMATIZZABILI ═══ -->
 <div class="card">
-<h3>🤖 Test automatici — l'agente può eseguirli <span class="badge badge-agent">AGENTE</span></h3>
+<h3>🤖 Test automatici — eseguiti dall'agente ✅ <span class="badge badge-agent">AGENTE</span></h3>
 
 <div class="step">
-  <div class="step-num">B1</div>
-  <div class="step-text"><strong>Caricamento pagina demo:</strong> Apri <code>?demo</code> → 3 partecipanti, nessun errore console, room code "demo" in grigio.</div>
+  <div class="step-num">✅</div>
+  <div class="step-text"><strong>B1 — Caricamento demo:</strong> 3 partecipanti (Alice, Marco, Sofie), room code "demo", nessun errore console, "Nuovo invito" disabilitato.</div>
 </div>
 
 <div class="step">
-  <div class="step-num">B2</div>
-  <div class="step-text"><strong>Caricamento anonimo:</strong> Apri senza parametri → room code "—", toast "Accedi per creare una stanza condivisa", inviti disabilitati.</div>
+  <div class="step-num">✅</div>
+  <div class="step-text"><strong>B2 — Caricamento anonimo:</strong> Room code "—", toast "Accedi per creare una stanza condivisa", inviti disabilitati, 0 partecipanti.</div>
 </div>
 
 <div class="step">
-  <div class="step-num">B3</div>
-  <div class="step-text"><strong>Modalità locale — invio messaggio:</strong> Avvia sessione → scrivi "Ciao" → invia → appare riga con traduzione locale. Nessuna chiamata RPC, nessun canale Realtime.</div>
+  <div class="step-num">✅</div>
+  <div class="step-text"><strong>B3 — Invio locale:</strong> Messaggio "Ciao, come stai?" inviato → traduzione "Ciao, vieni, stai?" apparsa via MyMemory. Nessuna chiamata RPC/Realtime.</div>
 </div>
 
 <div class="step">
-  <div class="step-num">B4</div>
-  <div class="step-text"><strong>Cambio lingua target:</strong> In demo, cambia TTL a Francese → appare toast "Traduzioni ora in Français", le righe esistenti si ri-renderizzano.</div>
+  <div class="step-num">✅</div>
+  <div class="step-text"><strong>B4 — Cambio TTL:</strong> TTL → Français → toast "🌐 Traduzioni ora in Français", segmento esistente ri-renderizzato con (🇫🇷).</div>
 </div>
 
 <div class="step">
-  <div class="step-num">B5</div>
-  <div class="step-text"><strong>Bridging mode B2:</strong> Imposta modalità "Su richiesta" → invia messaggio → appare "[Tocca per tradurre]" → click → appare traduzione.</div>
+  <div class="step-num">✅</div>
+  <div class="step-text"><strong>B5 — Tap-to-translate:</strong> Modalità B4 → "[Tocca per tradurre]" apparso → click → traduzione "Vorrei imparare l'italiano" (🇫🇷) visualizzata.</div>
 </div>
 
 <div class="step">
-  <div class="step-num">B6</div>
-  <div class="step-text"><strong>Retry traduzione fallita:</strong> Modalità A1, senza API key → invia → appare "🔄 Riprova" → click → ritenta.</div>
+  <div class="step-num">⏭️</div>
+  <div class="step-text"><strong>B6 — Retry traduzione fallita:</strong> Saltato — richiede manipolazione API per forzare un errore di traduzione.</div>
 </div>
 
 <div class="step">
-  <div class="step-num">B7</div>
-  <div class="step-text"><strong>Stato sessione:</strong> Avvia sessione → indicatore mostra "🎤 Richiedo microfono…" → poi "⌨️ Sessione testuale" (senza microfono).</div>
+  <div class="step-num">✅</div>
+  <div class="step-text"><strong>B7 — Indicatore stato sessione:</strong> "🎤 Richiedo microfono…" → "⌨️ Sessione testuale" (mic negato → fallback tastiera).</div>
+</div>
+
+<div class="step" style="background:rgba(239,68,68,.08);border-radius:8px;padding:8px">
+  <div class="step-num" style="background:var(--red);color:#fff">🐛</div>
+  <div class="step-text"><strong>Bug trovati e risolti durante i test:</strong><br>
+    1. <code>DUO.roomId.substring</code> crash in local mode → guard aggiunto<br>
+    2. <code>DUO.sentences</code> undefined in local/demo → init aggiunto in enterLocalMode/enterDemoMode<br>
+    3. Cache busters → v=9</div>
 </div>
 </div>
 
@@ -380,6 +343,80 @@ $$;</textarea>
   <div class="step-text">
     <strong>Apri pagina demo:</strong><br>
     <code>open https://buoninglese.github.io/sottotitoli/traduzione-s8t.html?demo</code>
+  </div>
+</div>
+</div>
+
+<!-- ═══ DEPLOYMENT RUNBOOK ═══ -->
+<div class="card" style="border-color:var(--accent);background:rgba(124,58,237,.06)">
+<h3>🚀 Deployment Runbook — 14 luglio 2026</h3>
+<p style="font-size:13px;color:var(--t2);margin-bottom:12px">Ordine esatto delle operazioni per il go-live collaborativo.</p>
+
+<div class="step">
+  <div class="step-num" style="background:var(--green);color:#fff">✅</div>
+  <div class="step-text">
+    <strong>Fase 1 — SQL (già eseguita):</strong> A1 get_room_segment_feed_item, A2 room_id + indice, A3 join_room_with_invite v2.
+  </div>
+</div>
+
+<div class="step">
+  <div class="step-num">1</div>
+  <div class="step-text">
+    <strong>Fase 2 — Verifica segreti (A4):</strong><br>
+    <code>cd /Users/sebastiankrauwel/sottotitoli && npx supabase secrets list</code><br>
+    Conferma: <code>GOOGLE_TRANSLATE_API_KEY</code> ✅, <code>PUBLIC_APP_URL</code> ✅<br>
+    ⚠️ Non stampare mai i valori. Se manca una variabile: <code>npx supabase secrets set VAR_NAME=value</code>
+  </div>
+</div>
+
+<div class="step">
+  <div class="step-num">2</div>
+  <div class="step-text">
+    <strong>Fase 3 — Verifica Edge Functions (A5):</strong><br>
+    <code>npx supabase functions list</code><br>
+    Devono apparire TUTTE e 4:<br>
+    ✅ <code>create-room</code> · ✅ <code>create-invite</code> · ✅ <code>join-room</code> · ✅ <code>translate-segment</code><br>
+    Se manca una: <code>npx supabase functions deploy &lt;nome&gt; --no-verify-jwt</code>
+  </div>
+</div>
+
+<div class="step">
+  <div class="step-num">3</div>
+  <div class="step-text">
+    <strong>Fase 4 — Realtime Replication (A6):</strong><br>
+    Supabase Dashboard → Database → Replication<br>
+    ✅ <code>transcript_segments</code> — abilitata<br>
+    ✅ <code>segment_translations</code> — abilitata<br>
+    Se non abilitate: attiva i toggle per entrambe le tabelle.
+  </div>
+</div>
+
+<div class="step">
+  <div class="step-num">4</div>
+  <div class="step-text">
+    <strong>Fase 5 — Test collaborativi (1-15):</strong><br>
+    Due browser autenticati (es. Chrome + Safari, o Chrome + incognito).<br>
+    Account: <code>studiobuoninglese@gmail.com</code> + <code>joliechanel84@gmail.com</code><br>
+    Esegui i test 1–15 nella checklist qui sopra, spuntando man mano.<br>
+    <br>
+    <strong>Test critici (non saltare):</strong><br>
+    • #1: Invito URL funziona, guest vede stesso room ID<br>
+    • #4: Messaggio host → guest lo vede in tempo reale<br>
+    • #5: Guest invia → host vede + traduzione<br>
+    • #8: TTL diverso per guest → traduzioni separate per lingua<br>
+    • #10: Disconnessione/riconnessione → feed recuperato<br>
+    • #12: Concorrenza inviti (maxUses=1)<br>
+    • #13: Protezioni RLS (401/403 per non autenticati)
+  </div>
+</div>
+
+<div class="step">
+  <div class="step-num">5</div>
+  <div class="step-text">
+    <strong>Fase 6 — Go/No-Go:</strong><br>
+    ✅ Tutti i 15 test passano → produzione ready<br>
+    ⚠️ 1-2 test falliscono ma non critici → fix + re-test<br>
+    ❌ Test critici falliscono → blocca release, debug
   </div>
 </div>
 </div>
