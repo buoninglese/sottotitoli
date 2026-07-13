@@ -159,21 +159,26 @@ create or replace function public.get_room_segment_feed_item(
   p_segment_id uuid,
   p_target_language text
 )
-returns table (
-  id uuid, room_id uuid, client_id uuid, sequence bigint,
-  source_text text, source_language text, is_final boolean, created_at timestamptz,
-  speaker_member_id bigint, speaker_name text,
-  speaker_language text, speaker_color text,
-  translation_id uuid, translation_language text,
-  translation_text text, translation_status text, translation_error_code text
-)
-language sql
+returns jsonb
+language plpgsql
 security invoker
 as $$
-  select *
-  from public.get_room_segment_feed(
-    (select room_id from public.transcript_segments where id = p_segment_id),
-    p_target_language
-  )
+declare
+  v_room_id uuid;
+  result jsonb;
+begin
+  select room_id into v_room_id
+  from public.transcript_segments
   where id = p_segment_id;
+
+  if v_room_id is null then
+    return null;
+  end if;
+
+  select row_to_json(f) into result
+  from public.get_room_segment_feed(v_room_id, p_target_language) f
+  where f.id = p_segment_id;
+
+  return result;
+end;
 $$;

@@ -123,9 +123,9 @@
     });
 
     if (error) throw error;
-    if (!data || !data[0]) throw new Error('segment_not_found');
+    if (!data) throw new Error('segment_not_found');
 
-    return { segment: mapFeedItem(data[0]) };
+    return { segment: mapFeedItem(data) };
   }
 
   /**
