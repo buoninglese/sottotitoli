@@ -114,6 +114,7 @@
           <button class="duo-invite-btn" onclick="duoShareInvite('copy')">📋 Copia link</button>
           <button class="duo-invite-btn" onclick="duoShareInvite('whatsapp')">📱 WhatsApp</button>
           <button class="duo-invite-btn" onclick="duoShareInvite('email')">📧 Email</button>
+          <button class="duo-invite-btn" onclick="duoNewInvite()">🔄 Nuovo invito</button>
         </div>
         <button data-action="new-room" class="duo-invite-btn" style="margin-top:6px;width:100%">🔄 Nuova stanza</button>
       </div>
@@ -1416,6 +1417,21 @@
   window.duoCopyRoom=function(){ navigator.clipboard.writeText(DUO.roomId).then(function(){showToast('📋 ID stanza copiato!')}); };
   window.duoShareWhatsApp=function(){ window.open('https://wa.me/?text='+encodeURIComponent(document.getElementById('duoInviteLink').textContent),'_blank'); };
   window.duoShareEmail=function(){ window.location.href='mailto:?subject=Unisciti alla mia sessione di traduzione&body='+encodeURIComponent(document.getElementById('duoInviteLink').textContent); };
+  window.duoNewInvite = async function(){
+    if (DUO.mode !== 'collaborative' || !DUO.roomId) {
+      showToast('⚠️ Crea una stanza condivisa prima di generare un invito.');
+      return;
+    }
+    try {
+      var result = await S8T_API.createInvite(DUO.roomId, { role: 'speaker', maxUses: 10, expiryHours: 24 });
+      DUO.inviteToken = result.inviteToken;
+      updateInviteLink();
+      showToast('🔗 Nuovo link di invito generato!');
+    } catch(e) {
+      console.error('Create invite failed:', e);
+      showToast('⚠️ Impossibile creare un nuovo invito.');
+    }
+  };
   window.duoNewRoom = function(){
     if (DUO.session) { duoToggleSession(); }
     if (wsPublisher) { wsPublisher.disconnect(); wsPublisher = null; }
