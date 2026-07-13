@@ -2,7 +2,7 @@
  * join-room — Validates an invite token and adds the user to the room.
  * POST /join-room
  * Body: { inviteToken: string, displayName?: string, sourceLanguage?: string }
- * Returns: { room: { id, name, status }, membership: { role, display_name } }
+ * Returns: { room, membership, members, segments }
  */
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
@@ -71,17 +71,37 @@ Deno.serve(async (req: Request) => {
       .maybeSingle();
 
     if (existing && !existing.left_at) {
-      // Already a member — just return room info
+      // Already a member — return full membership
       const { data: room } = await supabase
         .from('rooms')
         .select('id, name, status')
         .eq('id', invite.room_id)
         .single();
 
+      const { data: membership } = await supabase
+        .from('room_members')
+        .select('id, room_id, user_id, display_name, source_language, color, role, left_at')
+        .eq('id', existing.id)
+        .single();
+
+      const { data: members } = await supabase
+        .from('room_members')
+        .select('id, room_id, user_id, display_name, source_language, color, role, left_at')
+        .eq('room_id', invite.room_id)
+        .is('left_at', null);
+
+      const { data: segments } = await supabase
+        .from('room_segment_feed')
+        .select('*')
+        .eq('room_id', invite.room_id)
+        .order('sequence', { ascending: true });
+
       return new Response(
         JSON.stringify({
           room: room,
-          membership: { role: invite.role, alreadyMember: true },
+          membership: membership,
+          members: members || [],
+          segments: segments || [],
         }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
@@ -95,6 +115,7 @@ Deno.serve(async (req: Request) => {
         .eq('id', existing.id);
     } else {
       // Add new member
+      const memberColor = ['#3b82f6','#22c55e','#ec4899','#f59e0b','#8b5cf6'][Math.floor(Math.random() * 5)];
       const { error: memberError } = await supabase
         .from('room_members')
         .insert({
@@ -103,6 +124,7 @@ Deno.serve(async (req: Request) => {
           role: invite.role,
           display_name: displayName || user.user_metadata?.full_name || user.email?.split('@')[0] || 'Guest',
           source_language: sourceLanguage || 'en',
+          color: memberColor,
         });
 
       if (memberError) throw new Error(memberError.message);
@@ -121,10 +143,35 @@ Deno.serve(async (req: Request) => {
       .eq('id', invite.room_id)
       .single();
 
+    // Get the membership row
+    const { data: membership } = await supabase
+      .from('room_members')
+      .select('id, room_id, user_id, display_name, source_language, color, role, left_at')
+      .eq('room_id', invite.room_id)
+      .eq('user_id', user.id)
+      .is('left_at', null)
+      .single();
+
+    // Get all active members
+    const { data: members } = await supabase
+      .from('room_members')
+      .select('id, room_id, user_id, display_name, source_language, color, role, left_at')
+      .eq('room_id', invite.room_id)
+      .is('left_at', null);
+
+    // Get existing segments
+    const { data: segments } = await supabase
+      .from('room_segment_feed')
+      .select('*')
+      .eq('room_id', invite.room_id)
+      .order('sequence', { ascending: true });
+
     return new Response(
       JSON.stringify({
         room: room,
-        membership: { role: invite.role, alreadyMember: false },
+        membership: membership,
+        members: members || [],
+        segments: segments || [],
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },

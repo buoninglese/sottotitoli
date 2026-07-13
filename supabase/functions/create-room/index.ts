@@ -50,7 +50,8 @@ Deno.serve(async (req: Request) => {
     if (roomError || !room) throw new Error(roomError?.message || 'Failed to create room');
 
     // Add owner as member
-    const { error: memberError } = await supabase
+    const memberColor = ['#3b82f6','#22c55e','#ec4899','#f59e0b','#8b5cf6'][Math.floor(Math.random() * 5)];
+    const { data: member, error: memberError } = await supabase
       .from('room_members')
       .insert({
         room_id: room.id,
@@ -58,9 +59,12 @@ Deno.serve(async (req: Request) => {
         role: 'owner',
         display_name: user.user_metadata?.full_name || user.email?.split('@')[0] || 'Host',
         source_language: 'en',
-      });
+        color: memberColor,
+      })
+      .select('id, room_id, user_id, display_name, source_language, color, role, left_at')
+      .single();
 
-    if (memberError) throw new Error(memberError.message);
+    if (memberError || !member) throw new Error(memberError?.message || 'Failed to add member');
 
     // Generate invite token (cryptographically secure)
     const tokenBytes = new Uint8Array(32);
@@ -94,6 +98,9 @@ Deno.serve(async (req: Request) => {
         room: room,
         inviteToken: inviteToken,
         inviteUrl: `${req.headers.get('origin') || ''}/traduzione-s8t.html?invite=${inviteToken}`,
+        membership: member,
+        members: [member],
+        segments: [],
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },

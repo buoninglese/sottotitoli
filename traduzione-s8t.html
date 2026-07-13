@@ -225,12 +225,12 @@
 <script src="translation-providers.js"></script>
 <script src="ws-publisher.js"></script>
 <script src="js/cefr-levels.js"></script>
-<script src="js/traduzione/state.js?v=2"></script>
-<script src="js/traduzione/segments.js?v=2"></script>
-<script src="js/traduzione/vocabulary.js?v=2"></script>
-<script src="js/traduzione/speech-service.js?v=2"></script>
+<script src="js/traduzione/state.js?v=3"></script>
+<script src="js/traduzione/segments.js?v=3"></script>
+<script src="js/traduzione/vocabulary.js?v=3"></script>
+<script src="js/traduzione/speech-service.js?v=3"></script>
 <script src="js/traduzione/realtime.js?v=3"></script>
-<script src="js/traduzione/api-client.js?v=2"></script>
+<script src="js/traduzione/api-client.js?v=3"></script>
 
 <script>
 // ═══ TRADUZIONE ENGINE — inline application logic ═══
@@ -244,64 +244,57 @@
 
   // ── Init (bootstraps room, TTL, bridging, join mode, demo) ──
   async function init(){
-    // Initialize vocabulary (loads local cache, syncs with Supabase)
     S8T_VOCAB.init().then(function(){
       if (S8T_SEGMENTS.count() > 0) reRenderAll();
     });
 
     var isDemo = window.location.search.indexOf('demo') !== -1;
     var roomMode = S8T.initRoom();
-    var isAuthenticated = !!(window.sottotitoliSupabase && window.sottotitoliSupabase.auth);
+    var user = await getAuthenticatedUser();
 
     if (roomMode === 'invite') {
-      // Guest joining via invite token
-      try {
-        var result = await S8T_API.joinRoom(DUO.inviteToken, null, DUO.myTTL);
-        // joinRoom returns: { room: {id, name, status}, membership: {role, alreadyMember} }
-        applyRoomBootstrap({
-          room: result.room,
-          currentMember: {
-            id: null,
-            display_name: DUO.myName || 'Guest',
-            source_language: DUO.myTTL,
-            color: '#7c3aed',
-            role: result.membership ? result.membership.role : 'speaker'
-          }
-        });
-        S8T_REALTIME.subscribe(DUO.roomId, receiveAuthoritativeSegment);
-        showToast('🔗 Sei entrato nella stanza!');
-      } catch(e) {
-        console.error('Join room failed:', e);
-        showJoinError(e.message || 'Link di invito non valido o scaduto');
-        return;
+      // Invite join — requires auth
+      if (!user) {
+        enterLocalMode('Accedi per unirti a una stanza condivisa.');
+      } else {
+        try {
+          var result = await S8T_API.joinRoom(DUO.inviteToken, null, DUO.myTTL);
+          applyRoomBootstrap({
+            room: result.room,
+            inviteToken: DUO.inviteToken,
+            membership: result.membership,
+            members: result.members || [],
+            segments: result.segments || []
+          });
+          S8T_REALTIME.subscribe(DUO.roomId, receiveAuthoritativeSegment);
+          showToast('🔗 Sei entrato nella stanza!');
+        } catch(e) {
+          console.error('Join room failed:', e);
+          showJoinError(e.message || 'Link di invito non valido o scaduto');
+          return;
+        }
       }
-    } else if (isAuthenticated && !isDemo) {
-      // Authenticated host — create a server room
+    } else if (user && !isDemo) {
+      // Authenticated host — create collaborative room
       try {
         var hostResult = await S8T_API.createRoom(null);
-        // createRoom returns: { room: {id, name, status, created_at}, inviteToken, inviteUrl }
         applyRoomBootstrap({
           room: hostResult.room,
           inviteToken: hostResult.inviteToken,
-          currentMember: {
-            id: null,
-            display_name: 'Tu',
-            source_language: DUO.myTTL,
-            color: '#7c3aed',
-            role: 'owner'
-          }
+          membership: hostResult.membership,
+          members: hostResult.members || [],
+          segments: hostResult.segments || []
         });
         S8T_REALTIME.subscribe(DUO.roomId, receiveAuthoritativeSegment);
         showToast('✨ Stanza pronta!');
       } catch(e) {
-        console.warn('Auto room creation failed, using local mode:', e.message);
-        DUO.roomId = 'local-' + Date.now().toString(36);
-        document.getElementById('duoRoomCode').textContent = DUO.roomId.substring(0,8);
+        console.error('Room creation failed:', e);
+        enterLocalMode('Impossibile creare una stanza. Modalità locale attivata.');
       }
+    } else if (isDemo) {
+      enterDemoMode();
     } else {
-      // Local/demo mode
-      DUO.roomId = DUO.roomId || ('local-' + Date.now().toString(36));
-      document.getElementById('duoRoomCode').textContent = DUO.roomId.substring(0,8);
+      enterLocalMode('Accedi per creare una stanza condivisa.');
     }
 
     // Load saved preferences
@@ -315,7 +308,6 @@
     renderSpeakerConfigs();
     document.getElementById('duoTranscript').addEventListener('click', handleWordClick);
     bindEvents();
-    if (isDemo) demoPopulate();
   }
 
   // ── Event delegation — replaces inline onclick attributes ──
@@ -648,7 +640,6 @@
           sourceText: sourceText,
           sourceLanguage: me.sourceLanguage || me.snl || 'en'
         });
-        // response is an array from RPC; take first row
         var row = Array.isArray(response) ? response[0] : response;
         if (row) {
           receiveAuthoritativeSegment({
@@ -667,20 +658,74 @@
             isFinal: row.is_final,
             createdAt: row.created_at
           });
-          // Trigger bridging translation on the authoritative segment
-          var seg = S8T_SEGMENTS.getByClientId(optimistic.clientSegmentId);
-          if (seg) {
-            addSentence(seg.speakerName, seg.orig, null);
-          }
+          // Apply bridging mode to the existing authoritative segment (no duplicate)
+          applyBridgingToSegment(optimistic.clientSegmentId);
         }
+      } else {
+        // Unauthenticated/local: apply bridging directly on optimistic segment
+        applyBridgingToSegment(optimistic.clientSegmentId);
       }
     } catch(error) {
       console.warn('[S8T] Segment not persisted (offline/demo):', error.message);
-      // Fall back to local-only: trigger client-side translation on the optimistic segment
-      var seg = S8T_SEGMENTS.getByClientId(optimistic.clientSegmentId);
-      if (seg) {
-        addSentence(seg.speakerName, seg.orig, null);
+      applyBridgingToSegment(optimistic.clientSegmentId);
+    }
+  }
+
+  // ── Bridging mode handler — operates on an existing segment ID, never creates duplicates ──
+  function applyBridgingToSegment(clientSegmentId) {
+    var seg = S8T_SEGMENTS.getByClientId(clientSegmentId);
+    if (!seg) return;
+
+    var bridge = DUO.bridging || 'a1';
+
+    if (bridge === 'b2') {
+      patchSentenceById(clientSegmentId, '[Tocca per tradurre]');
+      return;
+    }
+
+    if (bridge === 'a2') {
+      patchSentenceById(clientSegmentId, '…');
+      var timerId = setTimeout(function(){
+        requestTranslationForSegment(clientSegmentId);
+      }, 3000);
+      pendingTimeouts.push(timerId);
+      return;
+    }
+
+    if (bridge === 'b1') {
+      var words = seg.orig.split(/\s+/);
+      var knownWords = words.filter(function(w){
+        var lemma = normalizeLemma(w);
+        return S8T_VOCAB.cache[lemma] || S8T_VOCAB.cache[w.toLowerCase()];
+      });
+      if (knownWords.length >= words.length * 0.7) {
+        var partial = words.map(function(w){
+          var lemma = normalizeLemma(w);
+          return (S8T_VOCAB.cache[lemma] || S8T_VOCAB.cache[w.toLowerCase()]) ? w : '___';
+        }).join(' ');
+        patchSentenceById(clientSegmentId, partial + ' ⚡');
+        return;
       }
+      // Too many unknown words — fall through to full translation
+    }
+
+    // A1 (default): request translation immediately
+    requestTranslationForSegment(clientSegmentId);
+  }
+
+  async function requestTranslationForSegment(clientSegmentId) {
+    var seg = S8T_SEGMENTS.getByClientId(clientSegmentId);
+    if (!seg) return;
+
+    try {
+      var translated = await translateText(
+        seg.orig,
+        seg.speakerLanguage || 'en',
+        DUO.myTTL
+      );
+      patchSentenceById(clientSegmentId, translated || '🔄 Riprova');
+    } catch(e) {
+      patchSentenceById(clientSegmentId, '🔄 Riprova');
     }
   }
 
@@ -940,11 +985,14 @@
         DUO.timer++; var m=Math.floor(DUO.timer/60), s=DUO.timer%60;
         document.getElementById('duoTimer').textContent = (m<10?'0':'')+m+':'+(s<10?'0':'')+s;
       },1000);
+      // Local mode: generate room ID for WebSocket
+      if (DUO.mode === 'local' && !DUO.roomId) {
+        DUO.roomId = 'local-' + Date.now().toString(36);
+      }
       // Connect WebSocket + Realtime
       initWS();
       wsPublisher.connect();
       S8T_REALTIME.subscribe(DUO.roomId, function(segment){
-        // All final segments come through here — upsert by canonical ID, never duplicate
         receiveAuthoritativeSegment(segment);
       });
       // Initialize speech recognition for the first speaker's language
@@ -1167,53 +1215,108 @@
     }, 5000);
   }
 
+  // ── Mode management ──
+  function enterLocalMode(reason) {
+    DUO.mode = 'local';
+    DUO.roomId = null;
+    DUO.currentMemberId = null;
+    document.getElementById('duoRoomCode').textContent = '—';
+    document.getElementById('duoRoomCode').style.opacity = '0.4';
+    disableInviteActions(true);
+    showToast(reason || 'Modalità locale: i messaggi restano su questo dispositivo.');
+  }
+
+  function enterDemoMode() {
+    DUO.mode = 'demo';
+    DUO.roomId = null;
+    DUO.currentMemberId = null;
+    document.getElementById('duoRoomCode').textContent = 'demo';
+    document.getElementById('duoRoomCode').style.opacity = '0.4';
+    disableInviteActions(true);
+    demoPopulate();
+  }
+
+  function disableInviteActions(disabled) {
+    var btns = document.querySelectorAll('#duoInviteLink, [onclick*="duoCopy"], [onclick*="duoShare"]');
+    btns.forEach(function(b){ b.style.opacity = disabled ? '0.3' : '1'; b.style.pointerEvents = disabled ? 'none' : ''; });
+  }
+
+  async function getAuthenticatedUser() {
+    var sb = window.sottotitoliSupabase;
+    if (!sb) return null;
+    try {
+      var result = await sb.auth.getUser();
+      return result.data && result.data.user ? result.data.user : null;
+    } catch(e) {
+      return null;
+    }
+  }
+
   // ── Room bootstrap (call after create-room / join-room API success) ──
   function applyRoomBootstrap(payload) {
-    if (payload.room) {
-      DUO.roomId = payload.room.id;
-      localStorage.setItem('duo-room-id', DUO.roomId);
-    }
-    if (payload.inviteToken) {
-      DUO.inviteToken = payload.inviteToken;
+    var membership = payload.membership;
+
+    if (!payload.room || !membership || !membership.id) {
+      console.error('applyRoomBootstrap: invalid payload — missing room or membership.id', payload);
+      enterLocalMode('Impossibile inizializzare la stanza. Riprova più tardi.');
+      return;
     }
 
-    // Set current user identity — from membership, auth, or fallback
-    if (payload.currentMember) {
-      DUO.currentMemberId = payload.currentMember.id || null;
-      DUO.myName = payload.currentMember.display_name || payload.currentMember.displayName || 'Tu';
-      // Register self in member models
-      S8T.upsertMember({
-        id: payload.currentMember.id || 'me',
-        displayName: DUO.myName,
-        sourceLanguage: payload.currentMember.source_language || payload.currentMember.sourceLanguage || DUO.myTTL,
-        color: payload.currentMember.color || '#7c3aed',
-        role: payload.currentMember.role || 'owner',
-        active: true
-      });
+    DUO.mode = 'collaborative';
+    DUO.roomId = payload.room.id;
+    DUO.currentMemberId = membership.id;
+    DUO.inviteToken = payload.inviteToken || '';
+    DUO.isHost = membership.role === 'owner';
+    DUO.myName = membership.display_name || 'Tu';
+    localStorage.setItem('duo-room-id', DUO.roomId);
+
+    // Register self
+    S8T.upsertMember({
+      id: membership.id,
+      displayName: membership.display_name,
+      sourceLanguage: membership.source_language || DUO.myTTL,
+      color: membership.color || '#7c3aed',
+      role: membership.role,
+      active: !membership.left_at
+    });
+
+    // Also register in legacy speaker model for sidebar UI
+    if (!DUO.speakers[membership.display_name]) {
+      DUO.speakers[membership.display_name] = {
+        snl: membership.source_language || 'en',
+        color: membership.color || '#7c3aed',
+        words: 0, wpm: 0, joined: new Date()
+      };
+      DUO.speakerOrder.push(membership.display_name);
     }
 
     // Register other members
-    if (payload.members && payload.members.length) {
-      payload.members.forEach(function(member) {
-        S8T.upsertMember({
-          id: member.id,
-          displayName: member.display_name || member.displayName,
-          sourceLanguage: member.source_language || member.sourceLanguage || 'en',
-          color: member.color || '#7c3aed',
-          role: member.role || 'speaker',
-          active: !member.left_at
-        });
+    (payload.members || []).forEach(function(member) {
+      S8T.upsertMember({
+        id: member.id,
+        displayName: member.display_name,
+        sourceLanguage: member.source_language || 'en',
+        color: member.color || '#7c3aed',
+        role: member.role || 'speaker',
+        active: !member.left_at
       });
-    }
+      // Legacy speaker compat
+      if (!DUO.speakers[member.display_name]) {
+        DUO.speakers[member.display_name] = {
+          snl: member.source_language || 'en',
+          color: member.color || '#7c3aed',
+          words: 0, wpm: 0, joined: new Date()
+        };
+        DUO.speakerOrder.push(member.display_name);
+      }
+    });
 
     // Load existing segments
-    if (payload.segments && payload.segments.length) {
-      payload.segments.forEach(function(segment) {
-        receiveAuthoritativeSegment(segment);
-      });
-    }
+    (payload.segments || []).forEach(receiveAuthoritativeSegment);
 
     document.getElementById('duoRoomCode').textContent = DUO.roomId.substring(0,8);
+    document.getElementById('duoRoomCode').style.opacity = '1';
+    disableInviteActions(false);
     renderSpeakers();
     renderSpeakerConfigs();
     updateInviteLink();
@@ -1224,7 +1327,6 @@
   window.duoShareWhatsApp=function(){ window.open('https://wa.me/?text='+encodeURIComponent(document.getElementById('duoInviteLink').textContent),'_blank'); };
   window.duoShareEmail=function(){ window.location.href='mailto:?subject=Unisciti alla mia sessione di traduzione&body='+encodeURIComponent(document.getElementById('duoInviteLink').textContent); };
   window.duoNewRoom = function(){
-    // Tear down current session and state
     if (DUO.session) { duoToggleSession(); }
     if (wsPublisher) { wsPublisher.disconnect(); wsPublisher = null; }
     S8T_REALTIME.unsubscribe();
@@ -1242,32 +1344,18 @@
         applyRoomBootstrap({
           room: result.room,
           inviteToken: result.inviteToken,
-          currentMember: {
-            id: null,
-            display_name: 'Tu',
-            source_language: DUO.myTTL,
-            color: '#7c3aed',
-            role: 'owner'
-          }
+          membership: result.membership,
+          members: result.members || [],
+          segments: result.segments || []
         });
         S8T_REALTIME.subscribe(DUO.roomId, receiveAuthoritativeSegment);
         showToast('🔄 Stanza creata · Invita i partecipanti!');
       }).catch(function(err){
         console.error('Room creation failed:', err);
-        DUO.roomId = 'local-' + Date.now().toString(36);
-        document.getElementById('duoRoomCode').textContent = DUO.roomId.substring(0,8);
-        updateInviteLink();
-        renderSpeakers();
-        renderSpeakerConfigs();
-        showToast('⚠️ Modalità locale · Accedi per stanze condivise');
+        enterLocalMode('Impossibile creare una stanza. Modalità locale attivata.');
       });
     } else {
-      DUO.roomId = 'local-' + Date.now().toString(36);
-      document.getElementById('duoRoomCode').textContent = DUO.roomId.substring(0,8);
-      updateInviteLink();
-      renderSpeakers();
-      renderSpeakerConfigs();
-      showToast('📋 Stanza locale · Accedi per invitare partecipanti');
+      enterLocalMode('Accedi per creare una stanza condivisa.');
     }
   };
 
