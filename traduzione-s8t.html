@@ -508,19 +508,23 @@
 
   // ── Progressive sentence rendering (with bridging mode) ──
   function addSentence(speaker, orig, preTran){
-    var sp = DUO.speakers[speaker]; if (!sp) return;
-    sp.words += orig.split(/\s+/).length;
+    var sp = S8T.getSpeaker(speaker); if (!sp) return;
+    sp.words = (sp.words || 0) + orig.split(/\s+/).length;
+
     if (preTran) {
-      commitSentence(speaker, orig, preTran);
+      commitLocalSegment(speaker, orig, preTran);
       return;
     }
+
     var bridge = DUO.bridging || 'a1';
-    // B2 mode: no auto-translation — show "tap to translate"
+
+    // B2: tap to translate
     if (bridge === 'b2') {
-      commitSentence(speaker, orig, '[Tocca per tradurre]');
+      commitLocalSegment(speaker, orig, '[Tocca per tradurre]');
       return;
     }
-    // B1 mode: only translate unknown words
+
+    // B1: partial translation if >70% known words
     if (bridge === 'b1') {
       var words = orig.split(/\s+/);
       var knownWords = words.filter(function(w){
@@ -528,22 +532,21 @@
         return S8T_VOCAB.cache[lemma] || S8T_VOCAB.cache[w.toLowerCase()];
       });
       if (knownWords.length >= words.length * 0.7) {
-        // User knows >70% of words — show partial translation with unknown words highlighted
         var partial = words.map(function(w){
           var lemma = normalizeLemma(w);
           return (S8T_VOCAB.cache[lemma] || S8T_VOCAB.cache[w.toLowerCase()]) ? w : '___';
         }).join(' ');
-        commitSentence(speaker, orig, partial + ' ⚡');
+        commitLocalSegment(speaker, orig, partial + ' ⚡');
         return;
       }
-      // Fall through to full translation if too many unknown words
     }
-    // A2 mode: delay translation by 3s — show original first
+
+    // A2: delayed translation
     if (bridge === 'a2') {
-      var segA2 = commitSentence(speaker, orig, '…');
+      var segA2 = commitLocalSegment(speaker, orig, '…');
       var sidA2 = segA2.clientSegmentId;
       var tid = setTimeout(function(){
-        translateText(orig, sp.snl, DUO.myTTL).then(function(realTran){
+        translateText(orig, sp.snl || sp.sourceLanguage || 'en', DUO.myTTL).then(function(realTran){
           if (realTran) { patchSentenceById(sidA2, realTran); }
           else { patchSentenceById(sidA2, '🔄 Riprova'); }
         }).catch(function(){ patchSentenceById(sidA2, '🔄 Riprova'); });
@@ -551,11 +554,12 @@
       pendingTimeouts.push(tid);
       return;
     }
-    // A1 mode (default): immediate translation
-    var placeholder = DUO.myTTL === sp.snl ? orig : '…';
-    var segA1 = commitSentence(speaker, orig, placeholder);
+
+    // A1 (default): immediate translation
+    var placeholder = DUO.myTTL === (sp.snl || sp.sourceLanguage) ? orig : '…';
+    var segA1 = commitLocalSegment(speaker, orig, placeholder);
     var sidA1 = segA1.clientSegmentId;
-    translateText(orig, sp.snl, DUO.myTTL).then(function(realTran){
+    translateText(orig, sp.snl || sp.sourceLanguage || 'en', DUO.myTTL).then(function(realTran){
       if (realTran && realTran !== placeholder) {
         patchSentenceById(sidA1, realTran);
       } else if (!realTran) {
@@ -564,22 +568,115 @@
     }).catch(function(){ patchSentenceById(sidA1, '🔄 Riprova'); });
   }
 
-  function commitSentence(speaker, orig, tran){
+  function commitLocalSegment(speaker, orig, tran){
     var seg = S8T_SEGMENTS.create(speaker, orig, tran);
-    // Store immutable speaker snapshot so historic segments survive participant removal
-    var sp = DUO.speakers[speaker];
+    var sp = S8T.getSpeaker(speaker);
     seg.speakerName = speaker;
-    seg.speakerLanguage = sp ? sp.snl : 'en';
-    seg.speakerColor = sp ? sp.color : '#7c3aed';
-    DUO.sentences.push(seg);
+    seg.speakerLanguage = sp ? (sp.snl || sp.sourceLanguage || 'en') : 'en';
+    seg.speakerColor = sp ? (sp.color || '#7c3aed') : '#7c3aed';
     DUO.translations = S8T_SEGMENTS.count();
-    renderSentence(seg);
+    renderOrPatchSegment(seg);
     renderSpeakers();
-    if (DUO.session && DUO.isHost && speaker === DUO.myName) {
-      broadcastSentence(seg);
-    }
     updateComprehension();
     return seg;
+  }
+
+  // ── Server-authoritative final segment submission ──
+  async function submitFinalSegment(sourceText) {
+    var me = S8T.getCurrentMember();
+    if (!me) {
+      // Fallback: use legacy speaker identity
+      var firstSpk = DUO.myName || 'Tu';
+      me = S8T.getSpeaker(firstSpk) || { displayName: firstSpk, snl: 'en', sourceLanguage: 'en', color: '#7c3aed' };
+    }
+
+    var optimistic = S8T_SEGMENTS.createOptimistic({
+      roomId: DUO.roomId,
+      speakerMemberId: me.id || null,
+      speakerName: me.displayName || me.speakerName || 'Tu',
+      speakerLanguage: me.sourceLanguage || me.snl || 'en',
+      speakerColor: me.color || '#7c3aed',
+      sourceText: sourceText,
+      sourceLanguage: me.sourceLanguage || me.snl || 'en'
+    });
+
+    renderOrPatchSegment(optimistic);
+
+    try {
+      if (window.sottotitoliSupabase && S8T_API && S8T_API.createFinalSegment) {
+        var response = await S8T_API.createFinalSegment({
+          roomId: DUO.roomId,
+          clientSegmentId: optimistic.clientSegmentId,
+          sourceText: sourceText,
+          sourceLanguage: me.sourceLanguage || me.snl || 'en'
+        });
+        // response is an array from RPC; take first row
+        var row = Array.isArray(response) ? response[0] : response;
+        if (row) {
+          receiveAuthoritativeSegment({
+            id: row.id,
+            roomId: row.room_id,
+            clientSegmentId: row.client_id,
+            sequence: row.sequence,
+            speakerMemberId: row.speaker_member_id,
+            speakerName: row.speaker_name,
+            speakerLanguage: row.speaker_language,
+            speakerColor: row.speaker_color,
+            sourceText: row.source_text,
+            sourceLanguage: row.source_language,
+            translationText: '…',
+            translationStatus: 'pending',
+            isFinal: row.is_final,
+            createdAt: row.created_at
+          });
+          // Trigger bridging translation on the authoritative segment
+          var seg = S8T_SEGMENTS.getByClientId(optimistic.clientSegmentId);
+          if (seg) {
+            addSentence(seg.speakerName, seg.orig, null);
+          }
+        }
+      }
+    } catch(error) {
+      console.error('[S8T] Cannot persist segment', error);
+      S8T_SEGMENTS.setTranslation(optimistic.clientSegmentId, {
+        translationStatus: 'failed',
+        translationErrorCode: 'segment_create_failed',
+        translationText: '⚠️ Invio non riuscito'
+      });
+      patchSentenceById(optimistic.clientSegmentId, '⚠️ Invio non riuscito');
+    }
+  }
+
+  // ── Authoritative segment receiver (upsert, never duplicate) ──
+  function receiveAuthoritativeSegment(serverSegment) {
+    if (!serverSegment || !serverSegment.clientSegmentId) return;
+
+    var before = S8T_SEGMENTS.getByClientId(serverSegment.clientSegmentId);
+    var merged = S8T_SEGMENTS.upsert(serverSegment);
+
+    if (!before) {
+      renderOrPatchSegment(merged);
+    } else {
+      renderOrPatchSegment(merged);
+    }
+
+    updateComprehension();
+  }
+
+  // ── Render or patch a segment in the DOM ──
+  function renderOrPatchSegment(segment) {
+    var selector = '[data-client-segment-id="' + segment.clientSegmentId + '"]';
+    var existing = document.querySelector(selector);
+    var next = buildSentenceDOM(segment);
+
+    if (existing) {
+      existing.replaceWith(next);
+    } else {
+      var transcript = document.getElementById('duoTranscript');
+      if (transcript) transcript.appendChild(next);
+    }
+
+    requestAnimationFrame(function(){ next.style.opacity = '1'; });
   }
 
   // ── Comprehension meter ──
@@ -626,7 +723,7 @@
   function patchSentenceById(clientSegmentId, newTran){
     var seg = S8T_SEGMENTS.updateTranslation(clientSegmentId, newTran);
     if (!seg) return;
-    var row = document.querySelector('[data-segment-id="'+clientSegmentId+'"]');
+    var row = document.querySelector('[data-client-segment-id="'+clientSegmentId+'"]');
     if (!row) return;
     row.style.opacity = '0';
     row.style.transition = 'opacity .15s';
@@ -639,11 +736,11 @@
   }
 
   function buildSentenceDOM(seg){
-    var speaker = seg.speaker, orig = seg.orig, tran = seg.tran;
-    // Use immutable speaker snapshot from segment (survives participant removal)
-    var name = seg.speakerName || speaker;
+    var name = seg.speakerName || 'Partecipante';
     var spSnl = seg.speakerLanguage || 'en';
     var spColor = seg.speakerColor || '#7c3aed';
+    var orig = seg.orig;
+    var tran = seg.tran;
     var loading = (tran === '…');
     var isPlaceholder = (tran === '[Tocca per tradurre]' || tran === '🔄 Riprova');
     var action = tran === '🔄 Riprova' ? 'retry-translation' : 'tap-translate';
@@ -651,17 +748,18 @@
     if (loading) {
       tranHTML = esc(tran);
     } else if (isPlaceholder) {
-      tranHTML = '<button type="button" data-action="'+action+'" data-segment-id="'+esc(seg.clientSegmentId)+'" style="font-family:var(--f);font-size:12px;font-weight:600;padding:6px 14px;border-radius:99px;border:1px dashed var(--t3);background:transparent;color:var(--t3);cursor:pointer">'+esc(tran)+'</button>';
+      tranHTML = '<button type="button" data-action="'+action+'" data-client-segment-id="'+esc(seg.clientSegmentId)+'" style="font-family:var(--f);font-size:12px;font-weight:600;padding:6px 14px;border-radius:99px;border:1px dashed var(--t3);background:transparent;color:var(--t3);cursor:pointer">'+esc(tran)+'</button>';
     } else {
       tranHTML = tokenizeHTML(tran, DUO.myTTL);
     }
     var el = document.createElement('div');
-    el.setAttribute('data-segment-id', seg.clientSegmentId);
+    el.setAttribute('data-client-segment-id', seg.clientSegmentId);
+    if (seg.id) { el.setAttribute('data-server-segment-id', seg.id); }
     if (DUO.style === 'd1'){
       el.className = 'duo-row';
       el.innerHTML = '<div class="duo-orig">'+tokenizeHTML(orig, spSnl)+' <span style="font-size:9px;color:var(--t3)">('+LANGS[spSnl].flag+')</span></div><div class="duo-arrow">→</div><div class="duo-tran'+(loading?' tran-loading':'')+'">'+tranHTML+' <span style="font-size:9px;color:var(--t3)">('+LANGS[DUO.myTTL].flag+')</span></div>';
     } else if (DUO.style === 'd2'){
-      var side = (DUO.speakerOrder.indexOf(speaker)%2===0)?'a':'b';
+      var side = (S8T.getMemberCount() % 2 === 0) ? 'a' : 'b';
       el.className = 'duo-bubble '+side;
       el.innerHTML = '<span class="duo-btext'+(loading?' tran-loading':'')+'">'+tranHTML+'<div class="duo-blang"><span style="color:'+spColor+'">●</span> '+esc(name)+' · '+LANGS[spSnl].flag+'</div><div class="duo-btran">'+esc(orig)+'</div></span>';
     } else {
@@ -686,9 +784,9 @@
     var btn = e.target.closest('[data-action="tap-translate"], [data-action="retry-translation"]');
     if (!btn) return;
     e.stopPropagation();
-    var sid = btn.getAttribute('data-segment-id');
+    var sid = btn.getAttribute('data-client-segment-id');
     if (!sid) return;
-    var seg = S8T_SEGMENTS.getById(sid);
+    var seg = S8T_SEGMENTS.getByClientId(sid);
     if (!seg) return;
     btn.disabled = true;
     btn.textContent = '…';
@@ -752,23 +850,16 @@
       onMessage: function(event){
         try {
           var data = JSON.parse(event.data);
-          // Handle incoming segments from other users in the room
-          // New format: {type, clientSegmentId, speakerName, speakerLanguage, sourceText}
-          // Legacy format: {msg, final, speaker, snl, id} — still supported for compat
-          var cid = data.clientSegmentId || (data.id != null ? String(data.id) : null);
-          var text = data.sourceText || data.final;
-          var speaker = data.speakerName || data.speaker;
-          var snl = data.speakerLanguage || data.snl;
-          if (text && speaker && snl) {
-            if (speaker !== DUO.myName) {
-              if (!DUO.speakers[speaker]) { duoAddSpeaker(speaker, snl); }
-              // Dedup using canonical clientSegmentId
-              if (!cid || !S8T_SEGMENTS.getById(cid)) {
-                addSentence(speaker, text, null);
-              }
-              addLogEntry('📩', esc(speaker)+': '+esc(text.substring(0,40)));
-            }
-          }
+          // Only handle interim captions over WebSocket.
+          // Final segments are server-authoritative via Supabase Realtime.
+          if (data.type !== 'interim-caption') return;
+          // Skip our own interim captions
+          if (data.memberId === DUO.currentMemberId) return;
+          renderRemoteInterimCaption({
+            memberId: data.memberId,
+            speakerName: data.speakerName,
+            text: data.text || ''
+          });
         } catch(e) {}
       },
       onError: function(err){
@@ -778,14 +869,9 @@
   }
 
   function broadcastSentence(seg){
-    if (!wsPublisher || !wsPublisher.isOpen()) return;
-    wsPublisher.publish({
-      type: 'interim-caption',
-      clientSegmentId: seg.clientSegmentId,
-      speakerName: seg.speakerName,
-      speakerLanguage: seg.speakerLanguage,
-      sourceText: seg.orig
-    });
+    // Final transcript segments are NEVER sent over WebSocket.
+    // They are persisted once via create_final_segment RPC and
+    // rendered exclusively through Supabase Realtime.
   }
 
   // ── Session ──
@@ -803,30 +889,8 @@
       initWS();
       wsPublisher.connect();
       S8T_REALTIME.subscribe(DUO.roomId, function(segment){
-        // Handle persisted segments from other clients via Supabase Realtime
-        // Expected format: {id, clientId, speakerMemberId, speakerName, speakerLanguage, speakerColor, sourceText, translationText}
-        if (!segment || !segment.sourceText) return;
-
-        // ID-based dedup: use clientId as canonical identity
-        var cid = segment.clientId || segment.id;
-        var existing = cid ? S8T_SEGMENTS.getById(cid) : null;
-
-        if (existing) {
-          // Update existing segment with server-authoritative data
-          if (segment.translationText) {
-            S8T_SEGMENTS.updateTranslation(cid, segment.translationText);
-            patchSentenceById(cid, segment.translationText);
-          }
-          return;
-        }
-
-        // New segment from server — resolve speaker identity
-        // TODO: use segment.speakerMemberId + room_members lookup when backend sends it
-        var speaker = segment.speakerName || 'Guest';
-        if (!DUO.speakers[speaker]) {
-          duoAddSpeaker(speaker, segment.speakerLanguage || segment.sourceLanguage || 'en');
-        }
-        addSentence(speaker, segment.sourceText, segment.translationText || null);
+        // All final segments come through here — upsert by canonical ID, never duplicate
+        receiveAuthoritativeSegment(segment);
       });
       // Initialize speech recognition for the first speaker's language
       var firstSpk = DUO.speakerOrder[0];
@@ -840,8 +904,9 @@
         onFinal: function(text){
           var interim = document.getElementById('duoInterim');
           if (interim) interim.textContent = '';
-          var me = DUO.speakerOrder[0] || DUO.myName;
-          addSentence(me, text, null);
+          submitFinalSegment(text).catch(function(error){
+            console.error('[S8T] Cannot persist speech segment', error);
+          });
         },
         onState: function(state){
           var micDot = document.getElementById('micIndicator');
@@ -1031,6 +1096,52 @@
     if(el)el.textContent=link;
   }
 
+  // ── Remote interim caption (WebSocket-only, not persisted) ──
+  function renderRemoteInterimCaption(data) {
+    var interim = document.getElementById('duoInterim');
+    if (!interim) return;
+    var speaker = data.speakerName || 'Remoto';
+    interim.textContent = '[' + speaker + '] ' + (data.text || '');
+    interim.style.color = 'var(--t2)';
+    // Auto-clear after 5 seconds if no update
+    clearTimeout(interim._remoteTimer);
+    interim._remoteTimer = setTimeout(function(){
+      if (interim.textContent.indexOf('[' + speaker + ']') === 0) {
+        interim.textContent = '';
+      }
+    }, 5000);
+  }
+
+  // ── Room bootstrap (call after create-room / join-room API success) ──
+  function applyRoomBootstrap(payload) {
+    DUO.roomId = payload.room.id;
+    DUO.currentMemberId = payload.currentMember ? payload.currentMember.id : null;
+
+    if (payload.members) {
+      payload.members.forEach(function(member) {
+        S8T.upsertMember({
+          id: member.id,
+          displayName: member.display_name,
+          sourceLanguage: member.source_language,
+          color: member.color,
+          role: member.role,
+          active: !member.left_at
+        });
+      });
+    }
+
+    if (payload.segments) {
+      payload.segments.forEach(function(segment) {
+        receiveAuthoritativeSegment(segment);
+      });
+    }
+
+    document.getElementById('duoRoomCode').textContent = DUO.roomId.substring(0,8);
+    renderSpeakers();
+    renderSpeakerConfigs();
+    updateInviteLink();
+  }
+
   window.duoCopyInvite=function(){ navigator.clipboard.writeText(document.getElementById('duoInviteLink').textContent).then(function(){showToast('📋 Link copiato!')}); };
   window.duoCopyRoom=function(){ navigator.clipboard.writeText(DUO.roomId).then(function(){showToast('📋 ID stanza copiato!')}); };
   window.duoShareWhatsApp=function(){ window.open('https://wa.me/?text='+encodeURIComponent(document.getElementById('duoInviteLink').textContent),'_blank'); };
@@ -1106,15 +1217,12 @@
     }
   };
 
-  window.duoSendMessage = function(){
+  window.duoSendMessage = async function(){
     var input = document.getElementById('duoMsgInput');
     var text = (input.value || '').trim();
     if (!text || !DUO.session) return;
     input.value = '';
-    // Use the first speaker (me) as the sender
-    var me = DUO.speakerOrder[0] || DUO.myName;
-    if (!DUO.speakers[me]) duoAddSpeaker(DUO.myName, DUO.myTTL);
-    addSentence(me, text, null);
+    await submitFinalSegment(text);
   };
 
   // ── Mobile bottom sheet ──

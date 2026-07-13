@@ -1,11 +1,11 @@
 /**
- * S8T State — Centralized application state for Traduzione
- * All mutable session state lives here. UI reads from this, never writes directly.
+ * S8T State — Centralized application state with immutable member UUIDs.
+ * Members indexed by server-issued id, not display name.
+ * Renames never mutate historical segments; removals never delete them.
  */
 (function(w){
   'use strict';
 
-  // ── Constants ──
   var SPK_COLORS = ['#3b82f6','#22c55e','#ec4899','#f59e0b','#8b5cf6'];
 
   var LANGS = {
@@ -17,178 +17,96 @@
     es:{flag:'🇪🇸',name:'Español'}
   };
 
-  // ── Core state object ──
   var state = {
     style: 'd1',
     slide: 1,
     session: false,
-    sessionState: null,   // null, 'requesting_microphone', 'live_speech', 'live_typed'
+    sessionState: null,
     timer: 0,
     timerInt: null,
     roomId: '',
-    inviteToken: '',      // raw invite token (only stored on host side)
-    isHost: true,         // true = created room, false = joined via invite
+    inviteToken: '',
+    isHost: true,
     translations: 0,
     myTTL: 'it',
-    myName: 'Tu',
     bridging: 'a1',
-    speakers: {},
-    speakerOrder: [],
-    sentences: [],
-    nextSpkId: 1
+
+    // Member UUID model
+    membersById: {},
+    memberIds: [],
+    currentMemberId: null,
+    myName: 'Tu'
   };
 
-  // ── State query helpers ──
-  function getSpeaker(name){ return state.speakers[name] || null; }
-  function getSpeakerCount(){ return state.speakerOrder.length; }
-  function getColorForIndex(idx){ return SPK_COLORS[idx % SPK_COLORS.length]; }
-  function getLang(code){ return LANGS[code] || null; }
-
-  // ── State mutation: speakers ──
-  function addSpeaker(name, snl){
-    if (state.speakerOrder.length >= 5) return null;
-    name = name || ('Partecipante ' + (state.nextSpkId));
-    snl = snl || 'en';
-    if (state.speakers[name]) { name = name + ' ' + (state.nextSpkId); }
-    var color = getColorForIndex(state.speakerOrder.length);
-    state.speakers[name] = {snl: snl, color: color, words: 0, wpm: 0, joined: new Date()};
-    state.speakerOrder.push(name);
-    state.nextSpkId++;
-    return name;
+  // ── Member mutations ──
+  function upsertMember(member) {
+    if (!member || !member.id) throw new Error('Member requires immutable id.');
+    state.membersById[member.id] = Object.assign({}, state.membersById[member.id] || {}, member);
+    if (state.memberIds.indexOf(member.id) === -1) state.memberIds.push(member.id);
+    return state.membersById[member.id];
   }
 
-  function removeSpeaker(name){
-    if (!state.speakers[name]) return false;
-    delete state.speakers[name];
-    state.speakerOrder = state.speakerOrder.filter(function(n){ return n !== name; });
-    state.sentences = state.sentences.filter(function(s){ return s.speaker !== name; });
-    return true;
+  function getMember(memberId) { return state.membersById[memberId] || null; }
+
+  function getCurrentMember() {
+    return state.currentMemberId ? getMember(state.currentMemberId) : null;
   }
 
-  function renameSpeaker(oldName, newName){
-    newName = (newName || '').trim();
-    if (!newName || newName === oldName) return false;
-    if (state.speakers[newName]) return false;
-    state.speakers[newName] = state.speakers[oldName];
-    delete state.speakers[oldName];
-    state.speakerOrder = state.speakerOrder.map(function(n){ return n === oldName ? newName : n; });
-    state.sentences.forEach(function(s){ if (s.speaker === oldName) s.speaker = newName; });
-    return true;
+  function markMemberLeft(memberId) {
+    var m = getMember(memberId); if (m) m.active = false;
   }
 
-  function updateSpeakerSNL(name, snl){
-    if (state.speakers[name]) { state.speakers[name].snl = snl; return true; }
-    return false;
+  function getActiveMembers() {
+    return state.memberIds.map(function(id){ return state.membersById[id]; })
+      .filter(function(m){ return m && m.active !== false; });
   }
 
-  // ── State mutation: session ──
-  function setSession(active){
-    state.session = !!active;
-  }
+  function getMemberCount() { return getActiveMembers().length; }
 
-  function addSentenceToState(speaker, orig, tran){
-    var sp = state.speakers[speaker];
-    if (!sp) return null;
-    sp.words += orig.split(/\s+/).length;
-    var entry = {speaker: speaker, orig: orig, tran: tran, ts: new Date()};
-    state.sentences.push(entry);
-    state.translations = state.sentences.length;
-    return entry;
-  }
+  function getColorForIndex(idx) { return SPK_COLORS[idx % SPK_COLORS.length]; }
 
-  function updateLastTranslation(speaker, newTran){
-    var last = state.sentences[state.sentences.length - 1];
-    if (!last || last.speaker !== speaker) return false;
-    last.tran = newTran;
-    return true;
+  // Legacy compat
+  function getSpeaker(name) {
+    var members = getActiveMembers();
+    for (var i=0; i<members.length; i++) { if (members[i].displayName === name) return members[i]; }
+    return null;
   }
+  function getSpeakerCount() { return getMemberCount(); }
+  function getLang(code) { return LANGS[code] || null; }
 
-  function updateBridging(mode){
-    state.bridging = mode;
-    localStorage.setItem('duo-bridging', mode);
-  }
-
-  function updateTTL(ttl){
+  // Session
+  function setSession(active) { state.session = !!active; }
+  function updateBridging(mode) { state.bridging = mode; localStorage.setItem('duo-bridging', mode); }
+  function updateTTL(ttl) {
     if (!LANGS[ttl]) return false;
-    state.myTTL = ttl;
-    localStorage.setItem('duo-my-ttl', ttl);
-    return true;
+    state.myTTL = ttl; localStorage.setItem('duo-my-ttl', ttl); return true;
   }
 
-  // ── State mutation: style ──
-  function setStyle(style){
-    state.style = style;
+  // Style
+  function setStyle(style) { state.style = style; }
+  function getStyleForCount() {
+    var n = getMemberCount();
+    if (n >= 3) return 'd3'; if (n === 2) return 'd2'; return 'd1';
   }
+  function getColorClassForCount() { return 's' + Math.min(getMemberCount(), 5); }
 
-  function getStyleForCount(){
-    var n = state.speakerOrder.length;
-    if (n >= 3) return 'd3';
-    if (n === 2) return 'd2';
-    return 'd1';
-  }
-
-  function getColorClassForCount(){
-    return 's' + Math.min(state.speakerOrder.length, 5);
-  }
-
-  // ── Room ──
-  // Room IDs are server-authoritative. No local generation.
-
-  function initRoom(){
+  // Room
+  function initRoom() {
     var params = new URLSearchParams(window.location.search);
-
-    // Invite-based join: ?invite=<TOKEN>
     var inviteToken = params.get('invite');
     if (inviteToken && inviteToken.length >= 16) {
-      state.inviteToken = inviteToken;
-      state.isHost = false;
-      state.myName = 'Guest';
-      state.roomId = ''; // Will be set after join-room API call
-      return 'invite'; // Signal: needs to call join-room API
+      state.inviteToken = inviteToken; state.isHost = false; state.roomId = ''; return 'invite';
     }
-
-    // Host mode: roomId set by server create-room API
-    // No local generation — empty until server assigns one
-    state.roomId = localStorage.getItem('duo-room-id') || '';
-    state.isHost = true;
-    return 'host';
+    state.roomId = ''; state.isHost = true; return 'host';
   }
 
-  // ── Export ──
   w.S8T = {
-    // Constants (read-only)
-    LANGS: LANGS,
-    SPK_COLORS: SPK_COLORS,
-
-    // State object (read/write via provided functions)
-    state: state,
-
-    // Query
-    getSpeaker: getSpeaker,
-    getSpeakerCount: getSpeakerCount,
-    getColorForIndex: getColorForIndex,
-    getLang: getLang,
-
-    // Speaker mutations
-    addSpeaker: addSpeaker,
-    removeSpeaker: removeSpeaker,
-    renameSpeaker: renameSpeaker,
-    updateSpeakerSNL: updateSpeakerSNL,
-
-    // Session mutations
-    setSession: setSession,
-    addSentenceToState: addSentenceToState,
-    updateLastTranslation: updateLastTranslation,
-    updateBridging: updateBridging,
-    updateTTL: updateTTL,
-
-    // Style
-    setStyle: setStyle,
-    getStyleForCount: getStyleForCount,
-    getColorClassForCount: getColorClassForCount,
-
-    // Room
+    LANGS: LANGS, SPK_COLORS: SPK_COLORS, state: state,
+    upsertMember: upsertMember, getMember: getMember, getCurrentMember: getCurrentMember,
+    markMemberLeft: markMemberLeft, getActiveMembers: getActiveMembers, getMemberCount: getMemberCount,
+    getSpeaker: getSpeaker, getSpeakerCount: getSpeakerCount, getColorForIndex: getColorForIndex, getLang: getLang,
+    setSession: setSession, updateBridging: updateBridging, updateTTL: updateTTL,
+    setStyle: setStyle, getStyleForCount: getStyleForCount, getColorClassForCount: getColorClassForCount,
     initRoom: initRoom
   };
-
 })(window);
