@@ -1,16 +1,20 @@
 /**
- * translate-segment — Server-side translation for a transcript segment.
- * POST /translate-segment
- * Body: { segmentId: uuid, targetLanguage: string }
- *
- * Uses Google Cloud Translation API (official, authenticated).
- * Set secret: supabase secrets set GOOGLE_TRANSLATE_API_KEY="..."
+ * translate-segment — Server-side translation via Gemini (Vertex AI).
+ * Uses the Agent Platform API key bound to the service account.
+ * Secret: GOOGLE_TRANSLATE_API_KEY (= Agent Platform API key)
  */
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-const GOOGLE_API_KEY = Deno.env.get('GOOGLE_TRANSLATE_API_KEY') || '';
+const API_KEY = Deno.env.get('GOOGLE_TRANSLATE_API_KEY') || '';
+const PROJECT = 'arctic-analyzer-496821-k9';
+const LOCATION = 'us-central1';
+const MODEL = 'gemini-2.0-flash-001';
+
+const LANG_NAMES: Record<string, string> = {
+  en: 'English', it: 'Italian', nl: 'Dutch', fr: 'French', de: 'German', es: 'Spanish'
+};
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -23,33 +27,39 @@ async function withTimeout<T>(promise: Promise<T>, ms = 10_000): Promise<T> {
   const timeout = new Promise<never>((_, reject) => {
     timer = setTimeout(() => reject(new Error('translation_timeout')), ms);
   });
-  try {
-    return await Promise.race([promise, timeout]);
-  } finally {
-    if (timer !== undefined) clearTimeout(timer);
-  }
+  try { return await Promise.race([promise, timeout]); }
+  finally { if (timer !== undefined) clearTimeout(timer); }
 }
 
-async function translateWithGoogleCloud(
+async function translateWithGemini(
   text: string,
   sourceLanguage: string,
   targetLanguage: string
 ): Promise<string> {
-  if (!GOOGLE_API_KEY) {
-    throw new Error('translation_provider_not_configured');
-  }
+  if (!API_KEY) throw new Error('translation_provider_not_configured');
+
+  const srcName = LANG_NAMES[sourceLanguage] || sourceLanguage;
+  const tgtName = LANG_NAMES[targetLanguage] || targetLanguage;
 
   const resp = await fetch(
-    `https://translation.googleapis.com/language/translate/v2`,
+    `https://${LOCATION}-aiplatform.googleapis.com/v1/projects/${PROJECT}/locations/${LOCATION}/publishers/google/models/${MODEL}:generateContent`,
     {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'x-goog-api-key': API_KEY,
+      },
       body: JSON.stringify({
-        q: text,
-        source: sourceLanguage,
-        target: targetLanguage,
-        format: 'text',
-        key: GOOGLE_API_KEY,
+        contents: [{
+          role: 'user',
+          parts: [{
+            text: `Translate the following text from ${srcName} to ${tgtName}. Return ONLY the translation, no explanations, no quotes, no extra text:\n\n${text}`
+          }]
+        }],
+        generationConfig: {
+          temperature: 0.1,
+          maxOutputTokens: 1024,
+        }
       }),
     }
   );
@@ -61,9 +71,9 @@ async function translateWithGoogleCloud(
   }
 
   const body = await resp.json();
-  const translated = body?.data?.translations?.[0]?.translatedText;
+  const translated = body?.candidates?.[0]?.content?.parts?.[0]?.text;
   if (!translated) throw new Error('translation_provider_invalid_response');
-  return translated;
+  return translated.trim();
 }
 
 Deno.serve(async (req: Request) => {
@@ -114,7 +124,7 @@ Deno.serve(async (req: Request) => {
     } else {
       try {
         translatedText = await withTimeout(
-          translateWithGoogleCloud(
+          translateWithGemini(
             segment.source_text,
             segment.source_language || 'en',
             targetLanguage
@@ -143,7 +153,7 @@ Deno.serve(async (req: Request) => {
         translated_text: translatedText || null,
         status: status,
         error_code: errorCode,
-        provider: 'google_cloud',
+        provider: 'gemini',
         updated_at: new Date().toISOString(),
       }, {
         onConflict: 'segment_id, target_language',
