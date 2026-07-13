@@ -111,10 +111,10 @@
         <!-- Invite section -->
         <div class="duo-set-head" style="margin-top:8px">📨 Invita</div>
         <div class="duo-invite-btns">
-          <button class="duo-invite-btn" onclick="duoShareInvite('copy')">📋 Copia link</button>
-          <button class="duo-invite-btn" onclick="duoShareInvite('whatsapp')">📱 WhatsApp</button>
-          <button class="duo-invite-btn" onclick="duoShareInvite('email')">📧 Email</button>
-          <button class="duo-invite-btn" onclick="duoNewInvite()">🔄 Nuovo invito</button>
+          <button class="duo-invite-btn" data-invite="copy">📋 Copia link</button>
+          <button class="duo-invite-btn" data-invite="whatsapp">📱 WhatsApp</button>
+          <button class="duo-invite-btn" data-invite="email">📧 Email</button>
+          <button class="duo-invite-btn" data-invite="new" id="duoNewInviteBtn" disabled>🔄 Nuovo invito</button>
         </div>
         <button data-action="new-room" class="duo-invite-btn" style="margin-top:6px;width:100%">🔄 Nuova stanza</button>
       </div>
@@ -226,12 +226,12 @@
 <script src="translation-providers.js"></script>
 <script src="ws-publisher.js"></script>
 <script src="js/cefr-levels.js"></script>
-<script src="js/traduzione/state.js?v=7"></script>
-<script src="js/traduzione/segments.js?v=7"></script>
-<script src="js/traduzione/vocabulary.js?v=7"></script>
-<script src="js/traduzione/speech-service.js?v=7"></script>
-<script src="js/traduzione/realtime.js?v=7"></script>
-<script src="js/traduzione/api-client.js?v=7"></script>
+<script src="js/traduzione/state.js?v=8"></script>
+<script src="js/traduzione/segments.js?v=8"></script>
+<script src="js/traduzione/vocabulary.js?v=8"></script>
+<script src="js/traduzione/speech-service.js?v=8"></script>
+<script src="js/traduzione/realtime.js?v=8"></script>
+<script src="js/traduzione/api-client.js?v=8"></script>
 
 <script>
 // ═══ TRADUZIONE ENGINE — inline application logic ═══
@@ -355,6 +355,7 @@
         if (action === 'copy') duoCopyInvite();
         else if (action === 'whatsapp') duoShareWhatsApp();
         else if (action === 'email') duoShareEmail();
+        else if (action === 'new') duoNewInvite();
       });
     });
     // Glossary filter buttons
@@ -730,8 +731,14 @@
         applyBridgingToSegment(optimistic.clientSegmentId);
       }
     } catch(error) {
-      console.warn('[S8T] Segment not persisted (offline/demo):', error.message);
-      applyBridgingToSegment(optimistic.clientSegmentId);
+      console.error('[S8T] Segment persistence failed', error);
+      S8T_SEGMENTS.setTranslation(optimistic.clientSegmentId, {
+        translationStatus: 'failed',
+        translationErrorCode: 'segment_persistence_failed',
+        translationText: '⚠️ Invio non riuscito'
+      });
+      patchSentenceById(optimistic.clientSegmentId, '⚠️ Invio non riuscito');
+      showToast('⚠️ Messaggio non inviato. Controlla la connessione e riprova.');
     }
   }
 
@@ -1059,9 +1066,9 @@
         DUO.roomId = 'local-' + Date.now().toString(36);
       }
       // Connect WebSocket + Realtime (collaborative only)
-      initWS();
-      wsPublisher.connect();
       if (DUO.mode === 'collaborative') {
+        initWS();
+        wsPublisher.connect();
         S8T_REALTIME.subscribe(DUO.roomId, DUO.myTTL, function(segment){
           receiveAuthoritativeSegment(segment);
         });
@@ -1120,8 +1127,10 @@
       clearInterval(DUO.timerInt);
       DUO.sessionState = null;
       updateSessionStatus();
-      if (wsPublisher) wsPublisher.disconnect();
-      S8T_REALTIME.unsubscribe();
+      if (DUO.mode === 'collaborative') {
+        if (wsPublisher) wsPublisher.disconnect();
+        S8T_REALTIME.unsubscribe();
+      }
       S8T_SPEECH.stop();
       clearPendingTimeouts();
       // Reset mic indicator
@@ -1161,7 +1170,10 @@
         '<div class="duo-spk-info"><div class="duo-spk-name">'+esc(name)+'</div><div class="duo-spk-lang">'+LANGS[snl].flag+' '+snl.toUpperCase()+' · '+words+'w</div></div>'+
         '<div class="duo-spk-status online"></div></div>';
     });
-    list.innerHTML = html || '<div style="text-align:center;font-size:11px;color:var(--t3);padding:20px 8px">Nessun partecipante.<br>Usa le impostazioni qui sotto per aggiungerne.</div>';
+    var emptyMsg = DUO.mode === 'collaborative'
+      ? 'Nessun partecipante collegato alla stanza.'
+      : 'Nessun partecipante. Usa le impostazioni qui sotto per aggiungerne.';
+    list.innerHTML = html || '<div style="text-align:center;font-size:11px;color:var(--t3);padding:20px 8px">'+esc(emptyMsg)+'</div>';
   }
 
   function reRenderAll(){
@@ -1291,13 +1303,18 @@
   }
 
   function updateInviteLink(){
-    var el=document.getElementById('duoInviteLink');
+    var el = document.getElementById('duoInviteLink');
+    var newInviteBtn = document.getElementById('duoNewInviteBtn');
+    var collaborativeHost = DUO.mode === 'collaborative' && !!DUO.roomId;
+
+    if (newInviteBtn) { newInviteBtn.disabled = !collaborativeHost; }
+
     if (!DUO.inviteToken) {
-      if(el)el.textContent='Crea una stanza condivisa per generare un link sicuro.';
+      if (el) el.textContent = 'Crea una stanza condivisa per generare un link sicuro.';
       return;
     }
     var link = window.location.origin + window.location.pathname + '?invite=' + DUO.inviteToken;
-    if(el)el.textContent=link;
+    if (el) el.textContent = link;
   }
 
   // ── Remote interim caption (WebSocket-only, not persisted) ──
@@ -1419,17 +1436,22 @@
   window.duoShareEmail=function(){ window.location.href='mailto:?subject=Unisciti alla mia sessione di traduzione&body='+encodeURIComponent(document.getElementById('duoInviteLink').textContent); };
   window.duoNewInvite = async function(){
     if (DUO.mode !== 'collaborative' || !DUO.roomId) {
-      showToast('⚠️ Crea una stanza condivisa prima di generare un invito.');
+      showToast('ℹ️ Accedi e crea una stanza condivisa per generare un invito.');
       return;
     }
+    var button = document.getElementById('duoNewInviteBtn');
     try {
+      if (button) { button.disabled = true; button.textContent = 'Creo invito…'; }
       var result = await S8T_API.createInvite(DUO.roomId, { role: 'speaker', maxUses: 10, expiryHours: 24 });
+      if (!result || !result.inviteToken || !result.inviteUrl) throw new Error('invalid_invite_response');
       DUO.inviteToken = result.inviteToken;
       updateInviteLink();
-      showToast('🔗 Nuovo link di invito generato!');
+      showToast('🔄 Nuovo link di invito creato.');
     } catch(e) {
-      console.error('Create invite failed:', e);
+      console.error('[S8T] Cannot create invite', e);
       showToast('⚠️ Impossibile creare un nuovo invito.');
+    } finally {
+      if (button) { button.disabled = false; button.textContent = '🔄 Nuovo invito'; }
     }
   };
   window.duoNewRoom = function(){
