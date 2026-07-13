@@ -126,6 +126,28 @@
     };
   }
 
+  /**
+   * Request server-side translation for a segment.
+   * Returns the updated feed projection so all clients stay in sync.
+   */
+  async function translateSegment(segmentId, targetLanguage) {
+    var token = await getSession();
+    var resp = await fetch(FUNCTIONS_BASE + '/translate-segment', {
+      method: 'POST',
+      headers: {
+        'Authorization': 'Bearer ' + token,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        segmentId: segmentId,
+        targetLanguage: targetLanguage,
+      }),
+    });
+    var data = await resp.json();
+    if (!resp.ok) throw new Error(data.error || 'translate-segment failed: ' + resp.status);
+    return data; // { segment: feedItem }
+  }
+
   // Export
   w.S8T_API = {
     createRoom: createRoom,
@@ -134,6 +156,7 @@
     endRoom: endRoom,
     createFinalSegment: createFinalSegment,
     getSegmentFeedItem: getSegmentFeedItem,
+    translateSegment: translateSegment,
   };
 
 })(window);

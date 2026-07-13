@@ -225,12 +225,12 @@
 <script src="translation-providers.js"></script>
 <script src="ws-publisher.js"></script>
 <script src="js/cefr-levels.js"></script>
-<script src="js/traduzione/state.js?v=3"></script>
-<script src="js/traduzione/segments.js?v=3"></script>
-<script src="js/traduzione/vocabulary.js?v=3"></script>
-<script src="js/traduzione/speech-service.js?v=3"></script>
-<script src="js/traduzione/realtime.js?v=3"></script>
-<script src="js/traduzione/api-client.js?v=3"></script>
+<script src="js/traduzione/state.js?v=4"></script>
+<script src="js/traduzione/segments.js?v=4"></script>
+<script src="js/traduzione/vocabulary.js?v=4"></script>
+<script src="js/traduzione/speech-service.js?v=4"></script>
+<script src="js/traduzione/realtime.js?v=4"></script>
+<script src="js/traduzione/api-client.js?v=4"></script>
 
 <script>
 // ═══ TRADUZIONE ENGINE — inline application logic ═══
@@ -463,41 +463,68 @@
     var container = document.getElementById('duoSpeakerConfigs');
     var addBtn = document.getElementById('duoAddSpkBtn');
     if (!container) return;
+
+    // Prefer member model, fall back to legacy speakers
+    var members = S8T.getActiveMembers();
+    if (members.length === 0 && DUO.speakerOrder.length > 0) {
+      // Legacy fallback
+      members = DUO.speakerOrder.map(function(name){
+        var sp = DUO.speakers[name];
+        return { displayName: name, sourceLanguage: sp.snl, color: sp.color, id: name };
+      });
+    }
+
     var html = '';
-    DUO.speakerOrder.forEach(function(name){
-      var sp = DUO.speakers[name];
+    members.forEach(function(m){
+      var name = m.displayName || 'Partecipante';
+      var snl = m.sourceLanguage || 'en';
       var langOpts = '';
       Object.keys(LANGS).forEach(function(code){
-        langOpts += '<option value="'+code+'"'+(sp.snl===code?' selected':'')+'>'+LANGS[code].flag+' '+code.toUpperCase()+'</option>';
+        langOpts += '<option value="'+code+'"'+(snl===code?' selected':'')+'>'+LANGS[code].flag+' '+code.toUpperCase()+'</option>';
       });
       html += '<div class="duo-spk-cfg">'+
-        '<span class="spk-dot" style="background:'+sp.color+'"></span>'+
+        '<span class="spk-dot" style="background:'+(m.color||'#7c3aed')+'"></span>'+
         '<input value="'+escAttr(name)+'" data-spk-rename="'+escAttr(name)+'" placeholder="Nome">'+
         '<select data-spk-snl="'+escAttr(name)+'">'+langOpts+'</select>'+
         '<button data-spk-remove="'+escAttr(name)+'" title="Rimuovi">×</button>'+
       '</div>';
     });
     container.innerHTML = html;
-    if (addBtn) addBtn.style.display = DUO.speakerOrder.length >= 5 ? 'none' : '';
-    // Rebind events on dynamically created elements
+    if (addBtn) addBtn.style.display = (members.length >= 5) ? 'none' : '';
     if (window._rebindSpeakerEvents) window._rebindSpeakerEvents();
   }
 
   window.duoRenameSpeaker = function(oldName, newName){
     newName = newName.trim();
     if (!newName || newName === oldName) return;
+
+    // Try member model first
+    var member = S8T.getSpeaker(oldName);
+    if (member && member.id) {
+      S8T.upsertMember({ id: member.id, displayName: newName });
+      // Update legacy for UI compat
+      if (DUO.speakers[oldName]) {
+        DUO.speakers[newName] = DUO.speakers[oldName];
+        delete DUO.speakers[oldName];
+        DUO.speakerOrder = DUO.speakerOrder.map(function(n){ return n===oldName ? newName : n; });
+      }
+      renderSpeakers();
+      renderSpeakerConfigs();
+      return;
+    }
+
+    // Legacy fallback
     if (DUO.speakers[newName]) { showToast('⚠️ Nome già esistente'); return; }
     DUO.speakers[newName] = DUO.speakers[oldName];
     delete DUO.speakers[oldName];
     DUO.speakerOrder = DUO.speakerOrder.map(function(n){ return n===oldName ? newName : n; });
-    DUO.sentences.forEach(function(s){ if (s.speaker===oldName) s.speaker=newName; });
+    // DO NOT mutate historical sentences — they carry immutable speaker snapshots
     renderSpeakers();
     renderSpeakerConfigs();
-    reRenderAll();
   };
 
   function updateStyleForCount(){
-    var n = DUO.speakerOrder.length;
+    var n = S8T.getMemberCount() || DUO.speakerOrder.length;
     if (n >= 3) duoSetStyle('d3');
     else if (n === 2) duoSetStyle('d2');
     else duoSetStyle('d1');
@@ -717,6 +744,20 @@
     var seg = S8T_SEGMENTS.getByClientId(clientSegmentId);
     if (!seg) return;
 
+    // Prefer server-side translation (shared, durable, one result for all members)
+    if (seg.id && window.sottotitoliSupabase && S8T_API && S8T_API.translateSegment) {
+      try {
+        var result = await S8T_API.translateSegment(seg.id, DUO.myTTL);
+        if (result && result.segment) {
+          receiveAuthoritativeSegment(result.segment);
+          return;
+        }
+      } catch(e) {
+        console.warn('[S8T] Server translation failed, falling back to browser:', e.message);
+      }
+    }
+
+    // Fallback: browser-side translation (works offline/unauthenticated)
     try {
       var translated = await translateText(
         seg.orig,
@@ -1069,13 +1110,26 @@
   function renderSpeakers(){
     var list = document.getElementById('duoSpeakerList');
     var count = document.getElementById('duoSpkCount');
-    count.textContent = DUO.speakerOrder.length;
+
+    // Prefer member model, fall back to legacy
+    var members = S8T.getActiveMembers();
+    if (members.length === 0 && DUO.speakerOrder.length > 0) {
+      members = DUO.speakerOrder.map(function(name){
+        var sp = DUO.speakers[name];
+        return { displayName: name, sourceLanguage: sp.snl, color: sp.color, words: sp.words || 0, id: name };
+      });
+    }
+
+    count.textContent = members.length;
     var html = '';
-    DUO.speakerOrder.forEach(function(name){
-      var sp = DUO.speakers[name];
+    members.forEach(function(m){
+      var name = m.displayName || 'Partecipante';
+      var snl = m.sourceLanguage || 'en';
+      var color = m.color || '#7c3aed';
+      var words = m.words || 0;
       html += '<div class="duo-spk">'+
-        '<div class="duo-spk-avatar" style="background:'+sp.color+';color:#fff">'+name.charAt(0).toUpperCase()+'</div>'+
-        '<div class="duo-spk-info"><div class="duo-spk-name">'+esc(name)+'</div><div class="duo-spk-lang">'+LANGS[sp.snl].flag+' '+sp.snl.toUpperCase()+' · '+sp.words+'w</div></div>'+
+        '<div class="duo-spk-avatar" style="background:'+color+';color:#fff">'+name.charAt(0).toUpperCase()+'</div>'+
+        '<div class="duo-spk-info"><div class="duo-spk-name">'+esc(name)+'</div><div class="duo-spk-lang">'+LANGS[snl].flag+' '+snl.toUpperCase()+' · '+words+'w</div></div>'+
         '<div class="duo-spk-status online"></div></div>';
     });
     list.innerHTML = html || '<div style="text-align:center;font-size:11px;color:var(--t3);padding:20px 8px">Nessun partecipante.<br>Usa le impostazioni qui sotto per aggiungerne.</div>';
@@ -1091,20 +1145,30 @@
   // ── Slides 2-4 (unchanged) ──
   function renderSpeakerCards(){
     var container = document.getElementById('duoSpeakerCards');
-    var order = DUO.speakerOrder;
-    if (!order.length){ container.innerHTML='<div style="text-align:center;padding:40px;color:var(--t3);grid-column:1/-1">Avvia una sessione per vedere le statistiche.</div>'; return; }
-    var totalWords = order.reduce(function(s,n){return s+(DUO.speakers[n].words||0);},0)||1;
+    var members = S8T.getActiveMembers();
+    if (members.length === 0 && DUO.speakerOrder.length > 0) {
+      members = DUO.speakerOrder.map(function(name){
+        var sp = DUO.speakers[name];
+        return { displayName: name, sourceLanguage: sp.snl, color: sp.color, words: sp.words||0, wpm: sp.wpm||0, id: name };
+      });
+    }
+    if (!members.length){ container.innerHTML='<div style="text-align:center;padding:40px;color:var(--t3);grid-column:1/-1">Avvia una sessione per vedere le statistiche.</div>'; return; }
+    var totalWords = members.reduce(function(s,m){return s+(m.words||0);},0)||1;
     var html = '';
-    order.forEach(function(name,i){
-      var sp=DUO.speakers[name]; var pct=Math.round((sp.words||0)/totalWords*100);
-      var rating=Math.min(99,Math.round((sp.words||0)*0.5+pct+(sp.wpm||0)*0.3));
+    members.forEach(function(m){
+      var name = m.displayName || 'Partecipante';
+      var color = m.color || '#7c3aed';
+      var snl = m.sourceLanguage || 'en';
+      var words = m.words || 0;
+      var pct = Math.round(words/totalWords*100);
+      var rating = Math.min(99, Math.round(words*0.5+pct+(m.wpm||0)*0.3));
       html+='<div class="duo-card"><div class="duo-card-rating">'+rating+'</div>'+
-        '<div class="duo-card-header"><div class="duo-card-avatar" style="background:'+sp.color+';color:#fff">'+name.charAt(0).toUpperCase()+'</div>'+
-        '<div><div class="duo-card-name">'+esc(name)+'</div><div class="duo-card-lang">'+LANGS[sp.snl].flag+' '+sp.snl.toUpperCase()+'</div></div></div>'+
-        '<div class="duo-stat-row"><span class="duo-stat-label">Parole</span><span class="duo-stat-val">'+(sp.words||0)+'</span></div>'+
-        '<div class="duo-stat-row"><span class="duo-stat-label">WPM</span><span class="duo-stat-val">'+(sp.wpm||'—')+'</span></div>'+
+        '<div class="duo-card-header"><div class="duo-card-avatar" style="background:'+color+';color:#fff">'+name.charAt(0).toUpperCase()+'</div>'+
+        '<div><div class="duo-card-name">'+esc(name)+'</div><div class="duo-card-lang">'+LANGS[snl].flag+' '+snl.toUpperCase()+'</div></div></div>'+
+        '<div class="duo-stat-row"><span class="duo-stat-label">Parole</span><span class="duo-stat-val">'+words+'</span></div>'+
+        '<div class="duo-stat-row"><span class="duo-stat-label">WPM</span><span class="duo-stat-val">'+(m.wpm||'—')+'</span></div>'+
         '<div class="duo-stat-row"><span class="duo-stat-label">Parlato %</span><span class="duo-stat-val">'+pct+'%</span></div>'+
-        '<div class="duo-stat-bar"><div class="duo-stat-fill" style="width:'+pct+'%;background:'+sp.color+'"></div></div></div>';
+        '<div class="duo-stat-bar"><div class="duo-stat-fill" style="width:'+pct+'%;background:'+color+'"></div></div></div>';
     }); container.innerHTML = html;
   }
 
@@ -1113,12 +1177,20 @@
     document.getElementById('mTotalWords').textContent = S8T_SEGMENTS.getAll().reduce(function(s,x){return s+(x.orig||'').split(/\s+/).length},0);
     document.getElementById('mTranslations').textContent = DUO.translations;
     var tbody = document.getElementById('mSpeakerTable');
-    var order = DUO.speakerOrder; var totalWords = order.reduce(function(s,n){return s+(DUO.speakers[n].words||0);},0)||1;
-    if (!order.length){ tbody.innerHTML='<tr><td colspan="6" style="color:var(--t3)">Nessun dato</td></tr>'; return; }
+    var members = S8T.getActiveMembers();
+    if (members.length === 0 && DUO.speakerOrder.length > 0) {
+      members = DUO.speakerOrder.map(function(name){
+        var sp = DUO.speakers[name];
+        return { displayName: name, sourceLanguage: sp.snl, words: sp.words||0, wpm: sp.wpm||0, id: name };
+      });
+    }
+    var totalWords = members.reduce(function(s,m){return s+(m.words||0);},0)||1;
+    if (!members.length){ tbody.innerHTML='<tr><td colspan="6" style="color:var(--t3)">Nessun dato</td></tr>'; return; }
     var html = '';
-    order.forEach(function(name){
-      var sp=DUO.speakers[name];
-      html+='<tr><td style="font-weight:600">'+esc(name)+'</td><td>'+(sp.words||0)+'</td><td>'+Math.round((sp.words||0)/totalWords*100)+'%</td><td>'+(sp.wpm||'—')+'</td><td>'+sp.snl.toUpperCase()+'</td><td>'+DUO.myTTL.toUpperCase()+'</td></tr>';
+    members.forEach(function(m){
+      var name = m.displayName || 'Partecipante';
+      var snl = m.sourceLanguage || 'en';
+      html+='<tr><td style="font-weight:600">'+esc(name)+'</td><td>'+(m.words||0)+'</td><td>'+Math.round((m.words||0)/totalWords*100)+'%</td><td>'+(m.wpm||'—')+'</td><td>'+snl.toUpperCase()+'</td><td>'+DUO.myTTL.toUpperCase()+'</td></tr>';
     }); tbody.innerHTML = html;
   }
 
