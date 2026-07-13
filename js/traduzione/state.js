@@ -22,6 +22,7 @@
     slide: 1,
     session: false,
     sessionState: null,
+    mode: 'uninitialized',  // 'demo' | 'local' | 'collaborative'
     timer: 0,
     timerInt: null,
     roomId: '',
