@@ -265,11 +265,18 @@
       font_pref: prefs.font_pref || 'sans'
     };
 
-    // Fallback: merge with localStorage for any missing fields
+    // ── Full localStorage fallback for ALL fields ──
+    // If Supabase returned empty/default values, use localStorage instead.
+    // This handles missing columns, RLS issues, and first-time users.
     var local = loadLocalSettings();
     if (local) {
       if (!result.display_name && local.display_name) result.display_name = local.display_name;
       if (!result.native_lang && local.native_lang) result.native_lang = local.native_lang;
+      if (local.ui_language && (result.ui_language === 'it' || !result.ui_language)) result.ui_language = local.ui_language;
+      if (local.theme && (result.theme === 'auto' || !result.theme)) result.theme = local.theme;
+      if (local.font_pref && (result.font_pref === 'sans' || !result.font_pref)) result.font_pref = local.font_pref;
+      if (local.save_sessions !== undefined) result.save_sessions = local.save_sessions;
+      if (local.anonymous_sharing !== undefined) result.anonymous_sharing = local.anonymous_sharing;
     }
 
     console.log('loadSettings:', JSON.stringify(result));
