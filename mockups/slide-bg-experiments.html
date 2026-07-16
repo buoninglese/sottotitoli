@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="it" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Cinematic Loop — Crossfade Blend · Sottotitoli</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,400;14..32,500;14..32,600;14..32,700;14..32,800;14..32,900&family=Manrope:wght@500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{background:#0a0c10;color:#fff;font-family:Inter,sans-serif;min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:32px;user-select:none;-webkit-user-select:none}
+h1{font-family:Manrope,sans-serif;font-size:clamp(30px,5vw,48px);font-weight:800;text-align:center;margin-bottom:4px;letter-spacing:-.025em;z-index:10}
+h1 span{background:linear-gradient(135deg,#06b6d4,#e8944a,#c06040);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.sub{text-align:center;color:rgba(255,255,255,.35);font-size:13px;margin-bottom:12px;z-index:10}
+
+/* ── Shadow toggle bar ── */
+.shadow-bar{display:flex;align-items:center;justify-content:center;gap:10px;margin-bottom:24px;flex-wrap:wrap;position:relative;z-index:100}
+.shadow-bar span.label{font-size:11px;color:rgba(255,255,255,.3);text-transform:uppercase;letter-spacing:.05em;font-weight:600}
+.shadow-bar button{font-family:Inter,sans-serif;font-size:12px;font-weight:600;padding:8px 16px;border-radius:100px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.04);color:rgba(255,255,255,.6);cursor:pointer;transition:all .25s}
+.shadow-bar button:hover{background:rgba(255,255,255,.08);border-color:rgba(255,255,255,.2);color:#fff}
+.shadow-bar .counter{font-size:10px;color:rgba(255,255,255,.2);font-family:'JetBrains Mono',monospace;min-width:28px;text-align:center}
+
+.card-wrap{position:relative;width:min(900px,90vw);z-index:1}
+.card{position:relative;border-radius:20px;overflow:hidden;aspect-ratio:16/9;border:1px solid rgba(255,255,255,.08);cursor:pointer;transition:transform .5s cubic-bezier(.16,1,.3,1),box-shadow .5s ease;will-change:transform;background:url('../img/bg-home.png') center/cover no-repeat}
+.card:hover{transform:translateY(-4px) scale(1.005);box-shadow:0 24px 64px rgba(0,0,0,.6),0 0 0 1px rgba(6,182,212,.2)}
+
+.card::before{content:'';position:absolute;inset:0;z-index:0;background:rgba(0,0,0,.3);border-radius:20px}
+.card::after{content:'';position:absolute;inset:0;z-index:3;pointer-events:none;background:radial-gradient(ellipse at center,transparent 50%,rgba(0,0,0,.5) 100%);border-radius:20px}
+
+/* ── Crossfade Blend — three layers crossfading via opacity ── */
+.xf-a{position:absolute;inset:0;z-index:1;pointer-events:none;background:transparent;animation:xfA 40s ease-in-out infinite}
+.xf-b{position:absolute;inset:0;z-index:1;pointer-events:none;background:linear-gradient(180deg,rgba(15,30,60,.22),rgba(10,25,50,.14),rgba(5,15,30,.1));animation:xfB 40s ease-in-out infinite}
+@keyframes xfA{0%,35%{opacity:1}60%,100%{opacity:1}}
+@keyframes xfB{0%,30%{opacity:0}45%,55%{opacity:1}70%,100%{opacity:0}}
+
+/* ── Light sweep ── */
+.card-sweep{position:absolute;inset:0;z-index:1;pointer-events:none;animation:sweepShift 3s ease-in-out infinite}
+.card-sweep::before{content:'';position:absolute;inset:0;background:linear-gradient(150deg,rgba(255,200,100,.06) 0%,rgba(200,140,60,.03) 25%,transparent 55%);filter:blur(40px)}
+.card-sweep::after{content:'';position:absolute;inset:0;background:linear-gradient(210deg,transparent 45%,rgba(6,182,212,.05) 70%,rgba(6,160,200,.04) 100%);filter:blur(35px)}
+@keyframes sweepShift{0%,100%{opacity:.25;transform:translateX(-2%)}50%{opacity:.6;transform:translateX(2%)}}
+
+/* ── Cyan accent streak ── */
+.card-cyan{position:absolute;z-index:1;pointer-events:none;background:linear-gradient(90deg,transparent,rgba(6,182,212,.2),transparent);animation:cyanPulse 5.5s ease-in-out infinite;will-change:transform,opacity}
+@keyframes cyanPulse{0%,100%{transform:translateX(-4%);opacity:.12}50%{transform:translateX(4%);opacity:.5}}
+
+/* ── Grain ── */
+.card-grain{position:absolute;inset:0;z-index:4;pointer-events:none;opacity:.025;background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");background-size:150px;animation:grainShift .25s steps(3) infinite}
+@keyframes grainShift{0%{transform:translate(0,0)}33%{transform:translate(-1px,1px)}66%{transform:translate(1px,-1px)}}
+
+/* ── Click flash ── */
+.card-flash{position:absolute;inset:0;z-index:5;pointer-events:none;opacity:0;transition:opacity .15s ease}
+.card-flash.fire{opacity:1;transition:opacity 0s}
+
+/* ── Content ── */
+.card-content{position:relative;z-index:2;display:flex;flex-direction:column;justify-content:center;align-items:center;height:100%;padding:32px;text-align:center}
+.card-content h3{font-family:Manrope,sans-serif;font-size:clamp(24px,3.5vw,36px);font-weight:800;line-height:1.2;margin-bottom:6px;text-shadow:0 2px 8px rgba(0,0,0,.85),0 4px 20px rgba(0,0,0,.6),0 1px 2px rgba(0,0,0,.95);transition:text-shadow .4s ease,transform .4s ease}
+.card-content h3:hover{text-shadow:0 2px 12px rgba(0,0,0,.95),0 6px 28px rgba(0,0,0,.75),0 0 40px rgba(6,182,212,.15);transform:translateY(-1px)}
+.card-content h3 em{font-style:normal;color:#06b6d4}
+.card-content p{font-size:13px;color:rgba(255,255,255,.55);line-height:1.5;text-shadow:0 1px 4px rgba(0,0,0,.8);font-weight:500}
+
+/* ── Phase tag (bottom-left) ── */
+.phase-tag{position:absolute;bottom:16px;left:20px;z-index:6;font-size:10px;font-weight:600;color:rgba(255,255,255,.35);font-family:'JetBrains Mono',monospace;text-transform:uppercase;letter-spacing:.04em;pointer-events:none}
+
+/* ── Click ripple ── */
+.ripple-effect{position:absolute;z-index:10;pointer-events:none;border-radius:50%;background:radial-gradient(circle,rgba(6,200,220,.28),transparent 60%);animation:rippleOut .9s ease-out forwards}
+@keyframes rippleOut{0%{width:0;height:0;opacity:1;transform:translate(-50%,-50%)}100%{width:600px;height:600px;opacity:0;transform:translate(-50%,-50%)}}
+</style>
+</head>
+<body>
+
+<h1>Crossfade <span>Blend</span></h1>
+<p class="sub">40s loop · due layer in crossfade · zero jump</p>
+
+<div class="shadow-bar">
+  <span class="label">Shadow</span>
+  <button id="shadowPrev">←</button>
+  <span class="counter" id="shadowCounter">01/10</span>
+  <button id="shadowNext">→</button>
+  <span id="shadowName" style="font-size:11px;color:rgba(255,255,255,.45);min-width:130px;text-align:left">Deep Drop</span>
+</div>
+
+<div class="card-wrap">
+  <div class="card" id="mainCard">
+    <div class="xf-a"></div>
+    <div class="xf-b"></div>
+    <div class="card-sweep"></div>
+    <div class="card-cyan" style="width:60%;height:1.5px;top:38%;left:20%;filter:blur(2px)"></div>
+    <div class="card-grain"></div>
+    <div class="card-flash"></div>
+    <div class="card-content">
+      <h3>Tutto chiaro.<br><em>Sempre. Subito.</em></h3>
+      <p id="phaseName">Originale — com'è su index.html</p>
+    </div>
+    <div class="phase-tag" id="phaseTag">ORIGINALE</div>
+  </div>
+</div>
+
+<script>
+const card = document.getElementById('mainCard');
+
+// ── Shadow toggle ──
+const shadowStyles = [
+  {name:'Deep Drop', css:'0 2px 8px rgba(0,0,0,.85),0 4px 20px rgba(0,0,0,.6),0 1px 2px rgba(0,0,0,.95)'},
+  {name:'Subtle Soft', css:'0 1px 6px rgba(0,0,0,.5),0 2px 12px rgba(0,0,0,.3)'},
+  {name:'Movie Poster', css:'0 0 2px rgba(0,0,0,1),0 1px 0 rgba(0,0,0,.9),0 2px 0 rgba(0,0,0,.6),0 3px 8px rgba(0,0,0,.7)'},
+  {name:'Glow Halo', css:'0 0 10px rgba(0,0,0,.6),0 0 30px rgba(0,0,0,.5),0 0 60px rgba(0,0,0,.4),0 2px 4px rgba(0,0,0,.8)'},
+  {name:'Broadcast TV', css:'0 1px 0 rgba(0,0,0,1),0 -1px 0 rgba(0,0,0,.8),1px 0 0 rgba(0,0,0,.8),-1px 0 0 rgba(0,0,0,.8),0 2px 4px rgba(0,0,0,.6)'},
+  {name:'Long Drop', css:'0 6px 12px rgba(0,0,0,.5),0 2px 4px rgba(0,0,0,.3),0 8px 24px rgba(0,0,0,.35)'},
+  {name:'Duotone Outline', css:'-1px -1px 0 rgba(6,182,212,.4),1px 1px 0 rgba(0,0,0,.8),0 3px 10px rgba(0,0,0,.6)'},
+  {name:'Diffuse Dreamy', css:'0 2px 16px rgba(0,0,0,.4),0 4px 32px rgba(0,0,0,.35),0 8px 48px rgba(0,0,0,.25)'},
+  {name:'Minimal', css:'0 1px 3px rgba(0,0,0,.4)'},
+  {name:'Experimental RGB', css:'2px 2px 0 rgba(6,182,212,.5),-1px -1px 0 rgba(0,0,0,.9),0 4px 16px rgba(0,0,0,.55)'},
+];
+let shadowIdx = 5; // start with Long Drop
+
+function applyShadow() {
+  const s = shadowStyles[shadowIdx];
+  const h3 = card.querySelector('.card-content h3');
+  if (h3) h3.style.textShadow = s.css;
+  document.getElementById('shadowCounter').textContent = String(shadowIdx+1).padStart(2,'0')+'/10';
+  document.getElementById('shadowName').textContent = s.name;
+}
+document.getElementById('shadowPrev').onclick = function(){ shadowIdx = (shadowIdx - 1 + 10) % 10; applyShadow(); };
+document.getElementById('shadowNext').onclick = function(){ shadowIdx = (shadowIdx + 1) % 10; applyShadow(); };
+applyShadow();
+
+// Hover: deepen shadow
+card.addEventListener('mouseenter', function() {
+  const h3 = card.querySelector('.card-content h3');
+  if (h3) {
+    const s = shadowStyles[shadowIdx];
+    h3.style.textShadow = s.css + ',0 0 30px rgba(6,182,212,.15)';
+    h3.style.transform = 'translateY(-1px)';
+  }
+});
+card.addEventListener('mouseleave', function() {
+  const h3 = card.querySelector('.card-content h3');
+  if (h3) {
+    h3.style.transform = '';
+    applyShadow();
+  }
+});
+
+// ── Phase updater ──
+const phaseName = document.getElementById('phaseName');
+const phaseTag = document.getElementById('phaseTag');
+
+function updatePhase() {
+  const elapsed = (Date.now() / 1000) % 40;
+  const pct = (elapsed / 40) * 100;
+  let name, tag;
+  if (pct < 40) { name = 'Originale — com\'è su index.html'; tag = 'ORIGINALE'; }
+  else if (pct < 65) { name = 'Deep Night — notte profonda'; tag = 'DEEP NIGHT'; }
+  else { name = 'Originale — com\'è su index.html'; tag = 'ORIGINALE'; }
+  phaseName.textContent = name;
+  phaseTag.textContent = tag;
+  requestAnimationFrame(() => setTimeout(updatePhase, 300));
+}
+updatePhase();
+
+card.addEventListener('click', function(e) {
+  // Switch to Broadcast TV on click
+  if (shadowIdx !== 4) { shadowIdx = 4; applyShadow(); }
+
+  const rect = card.getBoundingClientRect();
+  const x = e.clientX - rect.left;
+  const y = e.clientY - rect.top;
+
+  const flash = card.querySelector('.card-flash');
+  if (flash) {
+    flash.style.background = 'radial-gradient(circle at '+x+'px '+y+'px,rgba(6,200,220,.35),transparent 70%)';
+    flash.classList.add('fire');
+    setTimeout(function(){ flash.classList.remove('fire'); }, 150);
+  }
+
+  const ripple = document.createElement('div');
+  ripple.className = 'ripple-effect';
+  ripple.style.left = x + 'px';
+  ripple.style.top = y + 'px';
+  card.appendChild(ripple);
+  setTimeout(function(){ ripple.remove(); }, 900);
+});
+</script>
+
+</body>
+</html>
