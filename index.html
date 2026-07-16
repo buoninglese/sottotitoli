@@ -10,7 +10,8 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,400;14..32,500;14..32,600;14..32,700;14..32,800;14..32,900&family=Manrope:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="css/theme-2.css">
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" media="print" onload="this.media='all'">
+<link rel="preload" as="image" href="img/bg-home.png">
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{--cyan:#06b6d4}
@@ -139,6 +140,9 @@ body::before{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;bac
 @keyframes orbit{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
 @keyframes softGlow{0%,100%{box-shadow:0 0 6px rgba(6,182,212,.15)}50%{box-shadow:0 0 18px rgba(6,182,212,.4)}}
 .sat-spin{animation:orbit 8s linear infinite;transform-origin:center center}
+/* Phone entrance: decelerating rise from below */
+@keyframes phoneRise{0%{opacity:0;transform:scale(1.55) translateY(120px)}100%{opacity:1;transform:scale(1.55) translateY(0)}}
+#phoneZoom.phone-enter{animation:phoneRise 2s cubic-bezier(.25,.1,.1,1) both}
 
 /* ── Slide 1 · Phone mockup ── */
 .s1-phone-wrap{
@@ -249,6 +253,24 @@ body::before{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;bac
 </style>
 </head>
 <body>
+<div id="pageloader" style="position:fixed;inset:0;z-index:9999;background:#0a0c13;display:flex;align-items:center;justify-content:center;transition:opacity .6s ease;pointer-events:all">
+  <span style="font-family:'Inter',sans-serif;font-size:31px;font-weight:800;color:#fff;letter-spacing:-.5px"><span id="loaderBrand">sottotitoli</span><span style="color:var(--cyan,#06b6d4)">.ai</span></span>
+</div>
+<script>
+// Hide loader once background image is ready (or after timeout)
+(function(){
+  var ld=document.getElementById('pageloader');
+  if(!ld)return;
+  var hidden=false;
+  function hide(){if(!hidden){hidden=true;ld.style.opacity='0';setTimeout(function(){ld.style.display='none';},700);}}
+  // Track background image
+  var img=new Image();
+  img.onload=img.onerror=function(){setTimeout(hide,400);};
+  img.src='img/bg-home.png';
+  // Fallback: hide after 5s max
+  setTimeout(hide,5000);
+})();
+</script>
 <div class="bg-xf-a"></div>
 <div class="bg-xf-b"></div>
 <div class="page-border"></div>
@@ -374,11 +396,11 @@ body::before{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;bac
             </div>
             <div class="s2-caption s2-caption-2" style="opacity:0;background:rgba(0,0,0,.35);border:1px solid rgba(255,255,255,.06);border-radius:12px;padding:clamp(10px,1.5vh,14px) clamp(12px,2vw,16px);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);display:flex;align-items:flex-start;gap:10px">
               <span class="s2-caption-time" style="font-size:clamp(13px,1.3vw,16px);color:rgba(255,255,255,.5);font-family:'JetBrains Mono',monospace;min-width:42px;text-align:right;font-weight:500;padding-top:2px">00:00</span>
-              <p class="s2-caption-text" style="flex:1;font-size:clamp(15px,1.5vw,18px);color:rgba(255,255,255,.85);line-height:1.5;font-weight:400;margin:0">And now every word has its moment.</p>
+              <p class="s2-caption-text" style="flex:1;font-size:clamp(15px,1.5vw,18px);color:rgba(255,255,255,.85);line-height:1.5;font-weight:400;margin:0">Just one moment...</p>
             </div>
             <div class="s2-caption s2-caption-3" style="opacity:0;background:rgba(0,0,0,.35);border:1px solid rgba(255,255,255,.06);border-radius:12px;padding:clamp(10px,1.5vh,14px) clamp(12px,2vw,16px);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);display:flex;align-items:flex-start;gap:10px">
               <span class="s2-caption-time" style="font-size:clamp(13px,1.3vw,16px);color:rgba(255,255,255,.5);font-family:'JetBrains Mono',monospace;min-width:42px;text-align:right;font-weight:500;padding-top:2px">00:00</span>
-              <p class="s2-caption-text" style="flex:1;font-size:clamp(15px,1.5vw,18px);color:rgba(255,255,255,.85);line-height:1.5;font-weight:400;margin:0">We can make every moment together <span class="s2-word s2-word-c2" data-word="indelible">indelible</span>.</p>
+              <p class="s2-caption-text" style="flex:1;font-size:clamp(15px,1.5vw,18px);color:rgba(255,255,255,.85);line-height:1.5;font-weight:400;margin:0">We can make all moments <span class="s2-word s2-word-c2" data-word="indelible">indelible</span>.</p>
             </div>
           </div>
         </div>
@@ -579,9 +601,14 @@ body::before{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;bac
       copy=document.getElementById('s2Copy');
       cont=document.getElementById('s1Continua');
       convo.innerHTML='';cardWrap.classList.remove('show');built=true;
-      // Smooth fade-in of the zoomed phone
+      // Smooth rise entrance of the zoomed phone
       var zoomEl=document.getElementById('phoneZoom');
-      if(zoomEl)zoomEl.style.opacity='1';
+      if(zoomEl){zoomEl.classList.add('phone-enter');}
+      safeTimeout(1,token,function(){
+        if(!isLive(token))return;
+        zoomEl.classList.remove('phone-enter');
+        zoomEl.style.opacity='1';zoomEl.style.transform='scale(1.55)';
+      },2100);
       phoneBubbles.forEach(function(b,i){
         var delay=i===0?400:i===1?2400:5000;
         safeTimeout(2,token,function(){
@@ -665,7 +692,7 @@ body::before{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;bac
     return {
       reset:function(){
         built=false;
-        var z=document.getElementById('phoneZoom');if(z){z.style.opacity='0';z.style.transform='scale(1.55)';}
+        var z=document.getElementById('phoneZoom');if(z){z.style.opacity='0';z.style.transform='scale(1.55)';z.classList.remove('phone-enter');}
         var h=document.getElementById('s2Hand');if(h)h.style.opacity='0';
         copy=document.getElementById('s2Copy');if(copy)copy.style.opacity='0';
         cont=document.getElementById('s1Continua');if(cont)cont.classList.remove('show');
@@ -697,8 +724,8 @@ body::before{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;bac
     var c2Box=document.getElementById('s2C2Box'),defBox=document.getElementById('s2WordDef');
     var captionLines=[
       {it:"Each moment is a skyline of words."},
-      {it:"And now every word has its moment."},
-      {it:"We can make every moment together indelible."}
+      {it:"Just one moment..."},
+      {it:"We can make all moments indelible."}
     ];
     var c1Words=['skyline'],c2Words=['indelible'];
     var cefrColors={A1:'#22c55e',A2:'#a3e635',B1:'#facc15',B2:'#fb923c',C1:'#c084fc',C2:'#06b6d4'};
@@ -748,7 +775,7 @@ body::before{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;bac
     return {
       reset:function(){
         tL.style.opacity='0';tL.classList.remove('kubrick-slow');
-        tR.style.opacity='0';tR.classList.remove('kubrick-track');
+        tR.style.opacity='0';tR.classList.remove('kubrick-slow');
         capWrap.style.opacity='0';capWrap.classList.remove('kubrick-track');
         liveText.innerHTML='';
         liveText.style.opacity='1';
@@ -779,7 +806,7 @@ body::before{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;bac
         // Phase 1 — Left title (Kubrick slow reveal)
         safeTimeout(2,token,function(){tL.classList.add('kubrick-slow');},200);
         // Phase 2 — Right title
-        safeTimeout(2,token,function(){tR.classList.add('kubrick-track');},1400);
+        safeTimeout(2,token,function(){tR.classList.add('kubrick-slow');},1400);
         // Phase 3 — Captions type out
         var base=2400;
         safeTimeout(2,token,function(){capWrap.classList.add('kubrick-track');},base);
@@ -971,10 +998,11 @@ body::before{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;bac
   // Force phone logo text (prevent i18n override)
   var pl=document.getElementById('phoneLogo');if(pl)pl.textContent='sottotitoli';
 })();
-// Force footer link to always say "Termini" and brand to stay "sottotitoli" (runs after i18n)
+// Force footer, brand, and loader to always stay Italian (runs after i18n)
 window.addEventListener('load',function(){
   var tl=document.querySelector('.bottom-nav-row a[href="termini.html"]');if(tl)tl.textContent='Termini';
   var br=document.querySelector('.topbar-brand');if(br)br.textContent='sottotitoli';
+  var ls=document.getElementById('loaderBrand');if(ls)ls.textContent='sottotitoli';
 });
 </script>
 
