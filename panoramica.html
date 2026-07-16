@@ -62,6 +62,12 @@
       border-color:rgba(255,107,53,.1) !important;
     }
     [data-theme="dark"] #pnl-insights .alt-card:hover { border-color:rgba(255,107,53,.22) !important; }
+
+    /* Sparkline bar hover + tooltip */
+    .sparkline { position:relative; }
+    .sparkline .bar { transition:background .2s,transform .2s; cursor:pointer; }
+    .sparkline .bar:hover { background:var(--cyan) !important; transform:scaleY(1.15); transform-origin:bottom; }
+    .sparkline .bar:hover::after { content:attr(data-tip); position:absolute; bottom:calc(100% + 6px); left:50%; transform:translateX(-50%); background:rgba(0,0,0,.85); color:#fff; font-size:10px; padding:3px 7px; border-radius:5px; white-space:nowrap; pointer-events:none; z-index:10; }
   </style>
   <script src="https://unpkg.com/compromise"></script>
 </head>
@@ -256,18 +262,28 @@
             </article>
           </section>
           <!-- Estimated CEFR Level -->
-          <article class="alt-card" style="border:2px solid var(--line-strong);border-radius:34px;box-shadow:0 4px 32px rgba(0,0,0,.04);margin-top:16px" id="dashboardLevelCard">
-            <h3>Livello stimato</h3>
-            <div style="display:flex;align-items:center;gap:20px">
-              <div style="font-size:56px;font-weight:900;color:var(--teal);line-height:1" id="dashboardLevelValue">—</div>
+          <article class="alt-card" style="border:2px solid var(--line-strong);border-radius:24px;box-shadow:0 4px 32px rgba(0,0,0,.04);margin-top:16px;overflow:hidden" id="dashboardLevelCard">
+            <div style="background:linear-gradient(135deg,rgba(6,182,212,.12),rgba(8,145,178,.04));padding:24px 24px 20px">
+            <h3 style="margin:0 0 16px">Livello stimato</h3>
+            <div style="display:flex;align-items:center;gap:24px">
+              <div style="position:relative;width:100px;height:100px;flex-shrink:0">
+                <svg viewBox="0 0 100 100" style="transform:rotate(-90deg);width:100%;height:100%">
+                  <circle cx="50" cy="50" r="42" fill="none" stroke="var(--line)" stroke-width="8"/>
+                  <circle cx="50" cy="50" r="42" fill="none" stroke="var(--teal)" stroke-width="8" stroke-linecap="round" stroke-dasharray="264" stroke-dashoffset="132" id="dashboardLevelRing" style="transition:stroke-dashoffset 1.2s cubic-bezier(.34,1.56,.64,1)"/>
+                </svg>
+                <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:28px;font-weight:900;color:var(--teal);font-family:'Manrope',sans-serif" id="dashboardLevelValue">—</div>
+              </div>
               <div style="flex:1">
-                <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--text-faint);margin-bottom:4px" id="dashboardLevelLabels">
+                <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--text-faint);margin-bottom:6px;letter-spacing:.04em" id="dashboardLevelLabels">
                   <span>A1</span><span>A2</span><span>B1</span><span>B2</span><span>C1</span><span>C2</span>
                 </div>
-                <div style="height:6px;background:var(--line);border-radius:3px;overflow:hidden" id="dashboardLevelBarWrap"><div style="height:100%;width:0%;background:var(--teal);border-radius:3px;transition:width .6s ease" id="dashboardLevelBarFill"></div></div>
+                <div style="height:8px;background:var(--line);border-radius:4px;overflow:hidden;position:relative" id="dashboardLevelBarWrap">
+                  <div style="height:100%;width:0%;background:linear-gradient(90deg,var(--teal),var(--cyan));border-radius:4px;transition:width 1s cubic-bezier(.34,1.56,.64,1);box-shadow:0 0 12px rgba(6,182,212,.3)" id="dashboardLevelBarFill"></div>
+                </div>
               </div>
             </div>
-            <p style="margin-top:10px;font-size:13px;color:var(--text-soft);font-family:var(--font-ui)" id="dashboardLevelSub">Caricamento…</p>
+            <p style="margin-top:12px;font-size:13px;color:var(--text-soft);font-family:var(--font-ui)" id="dashboardLevelSub">Caricamento…</p>
+            </div>
           </article>
         </div>
                 <!-- Profilo panel with sub-tabs -->
@@ -819,6 +835,15 @@
       var rm = m % 60;
       return rm > 0 ? h + 'h ' + rm + 'm' : h + 'h';
     }
+    // Add tooltip labels to sparkline bars (last 7 days context)
+    document.querySelectorAll('.sparkline').forEach(function(sl){
+      var card=sl.closest('.metric-card');
+      var metric=card?card.getAttribute('data-metric'):'';
+      var labels={'totalSessions':'sessioni','totalMinutes':'minuti','totalWords':'parole','avgWpm':'WPM','avgLexDiv':'diversità'};
+      var label=labels[metric]||'valore';
+      var days=['6g fa','5g fa','4g fa','3g fa','2g fa','ieri','oggi'];
+      sl.querySelectorAll('.bar').forEach(function(b,i){b.setAttribute('data-tip',days[i]||label);});
+    });
     function fmtDate(iso) {
       if (!iso) return '—';
       return new Date(iso).toLocaleDateString('it-IT', { day: 'numeric', month: 'short' });
@@ -1189,7 +1214,7 @@
           var days = [];
           for (var d = 13; d >= 0; d--) {
             var date = new Date(now.getTime() - d * 86400000);
-            days.push({ date: date, label: date.toLocaleDateString('it-IT', { weekday: 'short' }).substring(0, 3), iso: date.toISOString().substring(0, 10), minutes: 0 });
+            days.push({ date: date, label: date.toLocaleDateString('it-IT', { day: '2-digit', month: '2-digit' }), iso: date.toISOString().substring(0, 10), minutes: 0 });
           }
           var startDate = days[0].iso;
           var endDate = new Date(now.getTime() + 86400000).toISOString().substring(0, 10);
@@ -1210,7 +1235,7 @@
           days.forEach(function(day) {
             var h = Math.max(4, Math.round((day.minutes / maxMin) * 100));
             var color = day.minutes > 0 ? 'var(--accent)' : 'var(--line)';
-            barHtml += '<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:3px"><span style="font-size:9px;color:var(--text-faint)">' + (day.minutes || '') + '</span><div style="width:100%;height:' + h + '%;min-height:' + (day.minutes > 0 ? '4px' : '2px') + ';background:' + color + ';border-radius:3px 3px 0 0;transition:height .4s ease" title="' + day.iso + ': ' + day.minutes + ' min"></div></div>';
+            barHtml += '<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;cursor:pointer" title="' + day.iso + ': ' + day.minutes + ' min"><span style="font-size:9px;color:var(--text-faint)">' + (day.minutes || '') + '</span><div style="width:100%;height:' + h + '%;min-height:' + (day.minutes > 0 ? '4px' : '2px') + ';background:' + color + ';border-radius:3px 3px 0 0;transition:height .4s ease,background .2s" onmouseenter="this.style.background='var(--cyan)'" onmouseleave="this.style.background='' + color + '"></div></div>';
             labelHtml += '<span style="flex:1;text-align:center">' + day.label + '</span>';
           });
           container.innerHTML = barHtml;
