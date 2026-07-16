@@ -809,6 +809,9 @@
       var textNodes = [];
       while(walker.nextNode()) textNodes.push(walker.currentNode);
       textNodes.forEach(function(tn){
+        // Skip brand elements and anything marked no-i18n
+        var parent = tn.parentElement;
+        if (parent && (parent.closest('.topbar-brand') || parent.closest('[data-i18n-ignore]') || parent.closest('.no-i18n'))) return;
         var text = tn.textContent.trim();
         if (!text || text.length < 2) return;
         // Check if this matches any Italian key (reverse lookup)
