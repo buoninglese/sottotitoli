@@ -5,7 +5,7 @@
   var DICT = {
     it: {
       // ── Topbar ──
-      "start_session": "Start Session",
+      "start_session": "Avvia sessione",
       "start": "Start",
       "dark": "Dark",
       "light": "Light",
@@ -24,8 +24,8 @@
 
       // ── Sidebar ──
       "study_language": "Lingua studio",
-      "insights": "Insights",
-      "word_banks": "Word banks",
+      "insights": "Approfondimenti",
+      "word_banks": "Banche parole",
       "vocabolario": "Vocabolario",
       "grammatica": "Grammatica",
       "trascrizioni": "Trascrizioni",
