@@ -203,6 +203,12 @@
     /* ── Box layout (Brutalist Poster) ── */
     .wbx-box{background:#fff;border:3px solid #0f1c24;border-radius:0;padding:0;box-shadow:10px 10px 0 rgba(0,0,0,.2);gap:0;min-height:0;font-family:var(--font-ui);display:grid;grid-template-columns:1fr 56px;grid-template-rows:1fr;grid-template-areas:"main bar";align-items:stretch;transition:transform .25s,box-shadow .25s}
     .wbx-box:hover{transform:translate(-3px,-3px);box-shadow:14px 14px 0 rgba(0,0,0,.28)}
+    /* ── Expanded box (from synonym chip click) ── */
+    .wbx-box.expanded{animation:wbxExpandIn .35s cubic-bezier(.2,.8,.2,1) both;box-shadow:inset 0 0 0 2px rgba(6,182,212,.35),14px 14px 0 rgba(0,0,0,.28)!important;border-color:rgba(6,182,212,.4)!important}
+    @keyframes wbxExpandIn{from{opacity:0;transform:translateY(-8px) scale(.97)}to{opacity:1;transform:translateY(0) scale(1)}}
+    .wbx-close-exp{position:absolute;top:6px;right:6px;width:22px;height:22px;border-radius:50%;border:1px solid rgba(255,255,255,.15);background:rgba(0,0,0,.35);color:rgba(255,255,255,.55);cursor:pointer;font-size:12px;display:none;align-items:center;justify-content:center;z-index:2;font-family:var(--font-ui);transition:all .15s}
+    .wbx-close-exp:hover{background:rgba(248,113,113,.3);border-color:rgba(248,113,113,.45);color:#f87171}
+    .wbx-box.expanded .wbx-close-exp{display:flex}
     .wbx-main-col{grid-area:main;display:flex;flex-direction:column;min-width:0;overflow:hidden}
     .wbx-word-zone{display:block;grid-area:auto;background:var(--sz-dark);padding:18px 20px 10px;overflow:hidden;min-width:0}
     .wbx-meta-zone{display:flex;flex-direction:column;grid-area:auto;padding:16px 24px 20px;gap:6px;flex:auto;min-width:0}
@@ -3151,21 +3157,107 @@
         if (box) { box.style.opacity = '0'; box.style.transform = 'scale(.95)'; box.style.transition = 'all .2s'; setTimeout(function(){ box.remove(); }, 200); }
       });
 
-      // ── Event delegation: synonym chip click → search that word ──
+      // ── Event delegation: synonym chip click → expand box inline ──
       document.addEventListener('click', function(e) {
         var chip = e.target.closest('.wbx-syns span[data-word]');
         if (!chip) return;
         e.stopPropagation();
         var word = chip.getAttribute('data-word');
-        var inp = document.getElementById('wbExpandSearch');
-        if (inp && word) {
-          inp.value = word;
-          inp.dispatchEvent(new Event('input', {bubbles: true}));
-          // Scroll to results
-          var results = document.getElementById('wbExpandResults');
-          if (results) results.scrollIntoView({behavior: 'smooth', block: 'start'});
+        var box = chip.closest('.wbx-box');
+        if (!box || !word) return;
+
+        // Prevent duplicates — check if this word already expanded after this box
+        var dup = false;
+        var sib = box.nextElementSibling;
+        while (sib) {
+          if (sib.classList.contains('expanded') && sib.getAttribute('data-word') === word) { dup = true; break; }
+          sib = sib.nextElementSibling;
         }
+        if (dup) return;
+
+        expandWordBox(word, box);
       });
+
+      // ── Event delegation: close expanded box ──
+      document.addEventListener('click', function(e) {
+        var btn = e.target.closest('.wbx-close-exp');
+        if (!btn) return;
+        e.stopPropagation();
+        var box = btn.closest('.wbx-box.expanded');
+        if (box) { box.style.opacity = '0'; box.style.transform = 'scale(.95)'; box.style.transition = 'all .2s'; setTimeout(function(){ box.remove(); }, 200); }
+      });
+
+      // ── Expand a word into a new box inserted right after sourceBox ──
+      async function expandWordBox(word, sourceBox) {
+        // Build loading placeholder
+        var loadingHtml = '<article class="wbx-box expanded" data-word="' + word + '" style="opacity:0.65">' +
+          '<button class="wbx-close-exp" title="Chiudi">×</button>' +
+          '<div class="wbx-main-col">' +
+          '<div class="wbx-word-zone"><div class="wbx-head"><span class="wbx-w">' + word + '</span><span class="wbx-cefr">…</span><span class="wbx-pos">…</span></div><div class="wbx-ipa">—</div></div>' +
+          '<div class="wbx-meta-zone"><div class="wbx-def">Caricamento…</div><div class="wbx-trans" style="opacity:0">—</div><div class="wbx-syns"></div></div>' +
+          '</div>' +
+          '<div class="wbx-save-col"><button class="wbx-save-btn" data-word="' + word + '">+</button><button class="wbx-bookmark-btn" data-word="' + word + '"><i class="fa-regular fa-bookmark"></i></button><button class="wbx-close-btn">×</button></div>' +
+          '</article>';
+        var temp = document.createElement('div');
+        temp.innerHTML = loadingHtml;
+        var newBox = temp.firstChild;
+        sourceBox.insertAdjacentElement('afterend', newBox);
+        newBox.scrollIntoView({behavior: 'smooth', block: 'nearest'});
+
+        // Fetch real data
+        try {
+          var results = await Promise.allSettled([fetchDictionary(word), fetchTranslationIT(word), fetchSynonymsEN(word)]);
+          var dict = results[0].status === 'fulfilled' ? results[0].value : null;
+          var trans = results[1].status === 'fulfilled' ? results[1].value : null;
+          var syns = results[2].status === 'fulfilled' ? results[2].value : null;
+
+          var level = (window.CEFR_LEVELS && window.CEFR_LEVELS[word]) ? window.CEFR_LEVELS[word] : estimateCEFR(word);
+          var rawPos = (window.LEMMA_POS_MAP && window.LEMMA_POS_MAP[word]) ? window.LEMMA_POS_MAP[word] : '—';
+          var posLabel = mapPos(rawPos);
+
+          // Update header
+          var cefrEl = newBox.querySelector('.wbx-cefr'); if (cefrEl) cefrEl.textContent = level;
+          var posEl = newBox.querySelector('.wbx-pos'); if (posEl) posEl.textContent = posLabel;
+          newBox.setAttribute('data-pos', posLabel);
+          newBox.setAttribute('data-cefr', level);
+          // Update save/bookmark data attributes
+          var svBtn = newBox.querySelector('.wbx-save-btn'); if (svBtn) { svBtn.setAttribute('data-level', level); svBtn.setAttribute('data-pos', posLabel); }
+          var bmBtn = newBox.querySelector('.wbx-bookmark-btn'); if (bmBtn) { bmBtn.setAttribute('data-level', level); bmBtn.setAttribute('data-pos', posLabel); }
+
+          // Definition
+          if (dict && dict.definition) {
+            var defEl = newBox.querySelector('.wbx-def'); if (defEl) defEl.textContent = dict.definition;
+          } else {
+            var defEl = newBox.querySelector('.wbx-def'); if (defEl) defEl.textContent = 'Parola correlata';
+          }
+          // IPA
+          if (dict && dict.ipa) {
+            var ipaEl = newBox.querySelector('.wbx-ipa'); if (ipaEl) { ipaEl.textContent = dict.ipa; ipaEl.style.color = ''; }
+          }
+          // Translations
+          if (trans && trans.length) {
+            var transEl = newBox.querySelector('.wbx-trans');
+            if (transEl) {
+              var chips = trans.slice(0, 4).map(function(t){ return '<span class="pc-trans-chip">' + t + '</span>'; }).join(' <span style="color:rgba(255,255,255,.15);font-weight:400">·</span> ');
+              transEl.innerHTML = '→ ' + chips;
+              transEl.style.opacity = '1';
+            }
+          } else {
+            var transEl = newBox.querySelector('.wbx-trans'); if (transEl) transEl.style.display = 'none';
+          }
+          // Synonyms
+          if (syns && syns.length) {
+            var synsEl = newBox.querySelector('.wbx-syns');
+            if (synsEl) synsEl.innerHTML = syns.slice(0, 6).map(function(s){ return '<span data-word="' + s + '">' + s + '</span>'; }).join('');
+          }
+
+          newBox.style.opacity = '1';
+          if (typeof autoSizeExpandWords === 'function') autoSizeExpandWords();
+        } catch(e) {
+          var defEl = newBox.querySelector('.wbx-def'); if (defEl) defEl.textContent = 'Dettagli non disponibili.';
+          newBox.style.opacity = '1';
+        }
+      }
 
       // ── Bookmark: save to "Saved for later" pinned bank ──
       async function bookmarkExpandWord(word, level, pos) {
