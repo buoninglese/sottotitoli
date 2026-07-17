@@ -243,9 +243,12 @@
     var userId = await getUserId();
     if (!userId) { console.warn('loadSettings: no user id'); return loadLocalSettings(); }
 
+    // Use select('*') — resilient to missing columns.
+    // Explicit column selection causes the ENTIRE query to fail if any column
+    // doesn't exist (e.g. display_name, theme, font_pref may not be migrated yet).
     var _a = await Promise.all([
-      sb().from('profiles').select('full_name,display_name,native_lang').eq('id', userId).maybeSingle(),
-      sb().from('user_preferences').select('ui_language,save_sessions,anonymous_sharing,theme,font_pref').eq('user_id', userId).maybeSingle()
+      sb().from('profiles').select('*').eq('id', userId).maybeSingle(),
+      sb().from('user_preferences').select('*').eq('user_id', userId).maybeSingle()
     ]);
 
     var profileR = _a[0], prefsR = _a[1];
@@ -255,13 +258,16 @@
     if (profileR.error) console.warn('loadSettings profiles:', profileR.error.message);
     if (prefsR.error) console.warn('loadSettings prefs:', prefsR.error.message);
 
+    // Normalize: display_name may come from display_name or full_name column
+    var displayName = profile.display_name || profile.full_name || '';
+
     var result = {
-      display_name: profile.display_name || profile.full_name || '',
-      native_lang: profile.native_lang || '',
+      display_name: displayName,
+      native_lang: profile.native_lang || prefs.native_lang || '',
       ui_language: prefs.ui_language || 'it',
       save_sessions: prefs.save_sessions !== undefined ? prefs.save_sessions : true,
       anonymous_sharing: prefs.anonymous_sharing !== undefined ? prefs.anonymous_sharing : false,
-      theme: prefs.theme || 'auto',
+      theme: prefs.theme || prefs.dark_mode ? 'dark' : 'auto', // dark_mode is legacy column
       font_pref: prefs.font_pref || 'sans'
     };
 
