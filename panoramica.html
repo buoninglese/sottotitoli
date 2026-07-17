@@ -3112,10 +3112,11 @@
           var cardsHtml = '';
           suggestions.forEach(function(s) {
             var posLabel = mapPos(s.pos);
+            var displayWord = posLabel === 'VERB' ? 'to ' + s.word : s.word;
             cardsHtml += '<article class="wbx-box" data-pos="' + posLabel + '" data-cefr="' + s.level + '" data-word="' + s.word + '">' +
               '<div class="wbx-main-col">' +
               '<div class="wbx-word-zone">' +
-              '<div class="wbx-head"><span class="wbx-w">' + s.word + '</span><span class="wbx-cefr">' + s.level + '</span><span class="wbx-pos">' + posLabel + '</span></div>' +
+              '<div class="wbx-head"><span class="wbx-w">' + displayWord + '</span><span class="wbx-cefr">' + s.level + '</span><span class="wbx-pos">' + posLabel + '</span></div>' +
               '<div class="wbx-ipa">—</div>' +
               '</div>' +
               '<div class="wbx-meta-zone">' +
@@ -3199,6 +3200,9 @@
       async function enrichOneCard(box, queryWord) {
         var word = box.getAttribute('data-word');
         if (!word || word.length < 2) return;
+        var posLabel = box.getAttribute('data-pos') || '';
+        // Prefix "to " for verbs to help dictionary APIs disambiguate
+        var apiWord = posLabel === 'VERB' ? 'to ' + word : word;
         try {
           var defEl = box.querySelector('.wbx-def');
           var transEl = box.querySelector('.wbx-trans');
@@ -3207,8 +3211,8 @@
 
           // Fetch all 3 data sources in parallel
           var results = await Promise.allSettled([
-            fetchDictionary(word),
-            fetchTranslationIT(word),
+            fetchDictionary(apiWord),
+            fetchTranslationIT(apiWord),
             fetchSynonymsEN(word)
           ]);
           var dict = results[0].status === 'fulfilled' ? results[0].value : null;
@@ -3473,31 +3477,34 @@
         sourceBox.insertAdjacentElement('afterend', newBox);
         newBox.scrollIntoView({behavior: 'smooth', block: 'nearest'});
 
-        // Fetch real data
+        // Fetch real data — use "to " prefix for verbs to disambiguate
+        var rawPos = (window.LEMMA_POS_MAP && window.LEMMA_POS_MAP[word]) ? window.LEMMA_POS_MAP[word] : '—';
+        // compromise.js fallback
+        if (rawPos === '—' && typeof nlp !== 'undefined') {
+          try {
+            var doc = nlp(word); var terms = doc.terms().json();
+            if (terms && terms.length) {
+              var tgs = terms[0].tags || [];
+              if (tgs.indexOf('Noun') >= 0) rawPos = 'n';
+              else if (tgs.indexOf('Verb') >= 0) rawPos = 'v';
+              else if (tgs.indexOf('Adjective') >= 0) rawPos = 'adj';
+              else if (tgs.indexOf('Adverb') >= 0) rawPos = 'adv';
+            }
+          } catch(e) {}
+        }
+        var posLabel = mapPos(rawPos);
+        var apiWord = posLabel === 'VERB' ? 'to ' + word : word;
+        var displayWord = posLabel === 'VERB' ? 'to ' + word : word;
         try {
-          var results = await Promise.allSettled([fetchDictionary(word), fetchTranslationIT(word), fetchSynonymsEN(word)]);
+          var results = await Promise.allSettled([fetchDictionary(apiWord), fetchTranslationIT(apiWord), fetchSynonymsEN(word)]);
           var dict = results[0].status === 'fulfilled' ? results[0].value : null;
           var trans = results[1].status === 'fulfilled' ? results[1].value : null;
           var syns = results[2].status === 'fulfilled' ? results[2].value : null;
 
           var level = (window.CEFR_LEVELS && window.CEFR_LEVELS[word]) ? window.CEFR_LEVELS[word] : estimateCEFR(word);
-          var rawPos = (window.LEMMA_POS_MAP && window.LEMMA_POS_MAP[word]) ? window.LEMMA_POS_MAP[word] : '—';
-          // compromise.js fallback
-          if (rawPos === '—' && typeof nlp !== 'undefined') {
-            try {
-              var doc = nlp(word); var terms = doc.terms().json();
-              if (terms && terms.length) {
-                var tgs = terms[0].tags || [];
-                if (tgs.indexOf('Noun') >= 0) rawPos = 'n';
-                else if (tgs.indexOf('Verb') >= 0) rawPos = 'v';
-                else if (tgs.indexOf('Adjective') >= 0) rawPos = 'adj';
-                else if (tgs.indexOf('Adverb') >= 0) rawPos = 'adv';
-              }
-            } catch(e) {}
-          }
-          var posLabel = mapPos(rawPos);
 
           // Update header
+          var wEl = newBox.querySelector('.wbx-w'); if (wEl) wEl.textContent = displayWord;
           var cefrEl = newBox.querySelector('.wbx-cefr'); if (cefrEl) cefrEl.textContent = level;
           var posEl = newBox.querySelector('.wbx-pos'); if (posEl) posEl.textContent = posLabel;
           newBox.setAttribute('data-pos', posLabel);
