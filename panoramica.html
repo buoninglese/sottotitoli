@@ -2850,9 +2850,13 @@
             var w = (item.word || '').toLowerCase().replace(/[^a-z]/g, '');
             if (!w || w === query.toLowerCase() || seen[w]) return;
             seen[w] = true;
-            // Determine CEFR level for each suggestion
+            // Determine CEFR level + POS for each suggestion
             var sl = window.CEFR_LEVELS && window.CEFR_LEVELS[w] ? window.CEFR_LEVELS[w] : estimateCEFR(w);
-            var pos = item.tags && item.tags.length ? item.tags[0] : (window.LEMMA_POS_MAP && window.LEMMA_POS_MAP[w] ? window.LEMMA_POS_MAP[w] : '—');
+            // Extract POS from tags — skip relation-type tags like "syn"
+            var pos = extractPosFromTags(item.tags);
+            if (pos === '—' && window.LEMMA_POS_MAP && window.LEMMA_POS_MAP[w]) {
+              pos = window.LEMMA_POS_MAP[w];
+            }
             // For 'next-level', keep only words at or above estimated level
             if (rel === 'next-level') {
               var levels = ['A1','A2','B1','B2','C1','C2'];
@@ -2917,6 +2921,18 @@
         if (!tag) return '—';
         var t = tag.toLowerCase().trim();
         return m[t] || (t.length <= 3 ? t.toUpperCase() : t);
+      }
+
+      // Extract actual POS from Datamuse tags array (e.g. ["syn","v"] → "v")
+      function extractPosFromTags(tags) {
+        if (!tags || !tags.length) return '—';
+        var posTags = ['n','v','adj','adv','u'];
+        for (var i=0;i<tags.length;i++) {
+          var t = (tags[i]||'').toLowerCase().trim();
+          if (posTags.indexOf(t) >= 0) return t;
+        }
+        // Fallback: use LEMMA_POS_MAP
+        return '—';
       }
 
       // ── Enrich cards with real dictionary + translation + synonym data ──
