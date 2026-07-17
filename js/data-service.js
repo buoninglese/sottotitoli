@@ -429,6 +429,96 @@
   }
 
   /* ═══════════════════════════════════════════
+     WORD BANK STATS — aggregated counts
+     ═══════════════════════════════════════════ */
+  async function getWordbankStats(lang) {
+    lang = lang || getStudyLang();
+    var userId = await getUserId();
+    if (!userId) return { totalWords: 0, dueToday: 0, newThisWeek: 0, known: 0, learning: 0 };
+
+    var _a = await Promise.all([
+      sb().from('user_wordbank_words').select('id', { count: 'exact', head: true })
+        .eq('user_id', userId).eq('lang', lang),
+      sb().from('user_wordbank_words').select('id', { count: 'exact', head: true })
+        .eq('user_id', userId).eq('lang', lang).eq('status', 'due'),
+      sb().from('user_wordbank_words').select('id', { count: 'exact', head: true })
+        .eq('user_id', userId).eq('lang', lang).gte('added_at', new Date(Date.now() - 7*86400000).toISOString())
+    ]);
+
+    // Fallback: count from wordbank_words if status columns don't exist yet
+    var allWords = await sb().from('user_wordbank_words')
+      .select('id, status, added_at').eq('user_id', userId);
+    var words = allWords.data || [];
+    var total = words.length;
+    var due = words.filter(function(w) { return w.status === 'due'; }).length;
+    var weekAgo = new Date(Date.now() - 7*86400000).toISOString();
+    var newThisWeek = words.filter(function(w) { return w.added_at && w.added_at >= weekAgo; }).length;
+    var known = words.filter(function(w) { return w.status === 'known' || w.status === 'mastered'; }).length;
+    var learning = words.filter(function(w) { return w.status === 'learning' || w.status === 'new'; }).length;
+
+    return { totalWords: total, dueToday: due, newThisWeek: newThisWeek, known: known, learning: learning, mastered: words.filter(function(w) { return w.status === 'mastered'; }).length };
+  }
+
+  /* ═══════════════════════════════════════════
+     WORD STATUS — update learning status (never CEFR)
+     ═══════════════════════════════════════════ */
+  async function updateWordStatus(lexemeId, status) {
+    var userId = await getUserId();
+    if (!userId) return false;
+    var r = await sb().from('user_wordbank_words').update({ status: status, updated_at: new Date().toISOString() }).eq('id', lexemeId).eq('user_id', userId);
+    if (r.error) { console.warn('updateWordStatus:', r.error.message); return false; }
+    return true;
+  }
+
+  /* ═══════════════════════════════════════════
+     WORD BANK — remove word from bank
+     ═══════════════════════════════════════════ */
+  async function removeWordFromBank(wordbankId, wordId) {
+    var r = await sb().from('user_wordbank_words').delete().eq('wordbank_id', wordbankId).eq('id', wordId);
+    if (r.error) { console.warn('removeWordFromBank:', r.error.message); return false; }
+    cacheClear();
+    return true;
+  }
+
+  /* ═══════════════════════════════════════════
+     WORD BANK — bulk add words to bank
+     ═══════════════════════════════════════════ */
+  async function bulkAddToBank(wordbankId, wordIds, sourceType) {
+    sourceType = sourceType || 'manual';
+    var userId = await getUserId();
+    if (!userId) return { added: 0, duplicates: 0 };
+    var rows = wordIds.map(function(wid) {
+      return { wordbank_id: wordbankId, word_id: wid, user_id: userId, source_type: sourceType, added_at: new Date().toISOString() };
+    });
+    // Insert ignoring conflicts (word already in bank)
+    var r = await sb().from('user_wordbank_words').upsert(rows, { onConflict: 'wordbank_id,word_id', ignoreDuplicates: true });
+    if (r.error) { console.warn('bulkAddToBank:', r.error.message); return { added: 0, duplicates: 0 }; }
+    cacheClear();
+    return { added: wordIds.length, duplicates: 0 };
+  }
+
+  /* ═══════════════════════════════════════════
+     WORD BANK — bulk remove words
+     ═══════════════════════════════════════════ */
+  async function bulkRemoveFromBank(wordbankId, wordIds) {
+    var r = await sb().from('user_wordbank_words').delete().eq('wordbank_id', wordbankId).in('id', wordIds);
+    if (r.error) { console.warn('bulkRemoveFromBank:', r.error.message); return false; }
+    cacheClear();
+    return true;
+  }
+
+  /* ═══════════════════════════════════════════
+     WORD — get detail for drawer
+     ═══════════════════════════════════════════ */
+  async function getWordDetail(lexemeId) {
+    var userId = await getUserId();
+    if (!userId) return null;
+    var r = await sb().from('user_wordbank_words').select('*').eq('id', lexemeId).eq('user_id', userId).single();
+    if (r.error) return null;
+    return r.data;
+  }
+
+  /* ═══════════════════════════════════════════
      VOCABULARY
      ═══════════════════════════════════════════ */
   async function getVocabulary(lang, limit) {
@@ -709,6 +799,12 @@
     getWordbankWords: getWordbankWords,
     addWordbank: addWordbank,
     addWordToBank: addWordToBank,
+    getWordbankStats: getWordbankStats,
+    updateWordStatus: updateWordStatus,
+    removeWordFromBank: removeWordFromBank,
+    bulkAddToBank: bulkAddToBank,
+    bulkRemoveFromBank: bulkRemoveFromBank,
+    getWordDetail: getWordDetail,
     getVocabulary: getVocabulary,
     getVocabularyStats: getVocabularyStats,
     getAnalyticsSnapshot: getAnalyticsSnapshot,
