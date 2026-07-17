@@ -223,7 +223,12 @@
     }
     function closeSSSpinner(key){
       var s=key==='cap'?document.getElementById('ssCapSpinner'):document.getElementById('ssTrSpinner');
-      if(s)s.classList.remove('show');
+      if(s){
+        s.classList.remove('show');
+        // Force parent to re-evaluate :hover state after overlay is gone
+        var half=s.closest('.start-half');
+        if(half){half.style.pointerEvents='none';void half.offsetHeight;half.style.pointerEvents='';}
+      }
     }
     function updSSFlags(){
       var cf=ssFlags.find(function(f){return f.code===ssCapCode}),sf=ssFlags.find(function(f){return f.code===ssSrcCode}),tf=ssFlags.find(function(f){return f.code===ssTgtCode});
