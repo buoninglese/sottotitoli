@@ -434,7 +434,7 @@
   async function getWordbankStats(lang) {
     lang = lang || getStudyLang();
     var userId = await getUserId();
-    if (!userId) return { totalWords: 0, dueToday: 0, newThisWeek: 0, known: 0, learning: 0 };
+    if (!userId) return { totalWords: 0, dueToday: 0, overdue: 0, reviewedToday: 0, newThisWeek: 0, known: 0, learning: 0 };
 
     var _a = await Promise.all([
       sb().from('user_wordbank_words').select('id', { count: 'exact', head: true })
@@ -447,16 +447,26 @@
 
     // Fallback: count from wordbank_words if status columns don't exist yet
     var allWords = await sb().from('user_wordbank_words')
-      .select('id, status, added_at').eq('user_id', userId);
+      .select('id, status, added_at, last_reviewed_at, srs_interval').eq('user_id', userId);
     var words = allWords.data || [];
     var total = words.length;
+    var now = new Date();
+    var todayISO = now.toISOString().substring(0, 10);
     var due = words.filter(function(w) { return w.status === 'due'; }).length;
+    // Overdue: status=due AND last_reviewed_at + srs_interval days < now
+    var overdue = words.filter(function(w) {
+      return w.status === 'due' && w.last_reviewed_at && w.srs_interval &&
+        (now - new Date(w.last_reviewed_at)) > (w.srs_interval * 86400000);
+    }).length;
+    var reviewedToday = words.filter(function(w) {
+      return w.last_reviewed_at && w.last_reviewed_at.substring(0,10) === todayISO;
+    }).length;
     var weekAgo = new Date(Date.now() - 7*86400000).toISOString();
     var newThisWeek = words.filter(function(w) { return w.added_at && w.added_at >= weekAgo; }).length;
     var known = words.filter(function(w) { return w.status === 'known' || w.status === 'mastered'; }).length;
     var learning = words.filter(function(w) { return w.status === 'learning' || w.status === 'new'; }).length;
 
-    return { totalWords: total, dueToday: due, newThisWeek: newThisWeek, known: known, learning: learning, mastered: words.filter(function(w) { return w.status === 'mastered'; }).length };
+    return { totalWords: total, dueToday: due, overdue: overdue, reviewedToday: reviewedToday, newThisWeek: newThisWeek, known: known, learning: learning, mastered: words.filter(function(w) { return w.status === 'mastered'; }).length };
   }
 
   /* ═══════════════════════════════════════════
