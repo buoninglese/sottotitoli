@@ -220,14 +220,19 @@
       grid.innerHTML='';
       ssFlags.forEach(function(f){var c=document.createElement('button');c.className='ssc'+(f.code===cur?' selected':'');c.textContent=f.flag+' '+f.name;c.onclick=function(){if(key==='cap')ssCapCode=f.code;else if(key==='src')ssSrcCode=f.code;else ssTgtCode=f.code;grid.querySelectorAll('.ssc').forEach(function(x){x.classList.remove('selected')});c.classList.add('selected');updSSFlags()};grid.appendChild(c)});
       spinner.classList.add('show');
+      // Force parent hover state so the dim highlight stays visible behind overlay
+      half.classList.add('spinner-open');
     }
     function closeSSSpinner(key){
       var s=key==='cap'?document.getElementById('ssCapSpinner'):document.getElementById('ssTrSpinner');
       if(s){
         s.classList.remove('show');
-        // Force parent to re-evaluate :hover state after overlay is gone
         var half=s.closest('.start-half');
-        if(half){half.style.pointerEvents='none';void half.offsetHeight;half.style.pointerEvents='';}
+        if(half){
+          half.classList.remove('spinner-open');
+          // Force parent to re-evaluate :hover state after overlay is gone
+          half.style.pointerEvents='none';void half.offsetHeight;half.style.pointerEvents='';
+        }
       }
     }
     function updSSFlags(){
