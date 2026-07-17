@@ -1046,6 +1046,11 @@
               </select>
               <span style="font-size:11px;color:var(--text-faint)" id="wbExpandLevelInfo"></span>
             </div>
+            <!-- POS disambiguation bar (hidden until multi-POS word detected) -->
+            <div id="wbExpandDisambig" style="display:none;align-items:center;gap:10px;margin-bottom:14px;padding:10px 18px;background:var(--panel-2);border-radius:12px;border:1px solid var(--line);font-family:var(--font-ui)">
+              <span style="font-size:13px;font-weight:700;color:var(--text-soft);white-space:nowrap">Intendevi…</span>
+              <span id="wbDisambigChips" style="display:flex;gap:6px;flex-wrap:wrap"></span>
+            </div>
             <div id="wbExpandResults">
               <div style="text-align:center;padding:40px 20px;color:var(--text-faint)">
                 <div style="font-size:48px;margin-bottom:12px;color:var(--text-faint)"><i class="fa-solid fa-brain"></i></div>
@@ -3026,10 +3031,19 @@
 
         var query = inp.value.trim();
         if (!query || query.length < 2) {
+          // Hide disambiguation bar on empty query
+          var disambig = document.getElementById('wbExpandDisambig');
+          if (disambig) disambig.style.display = 'none';
+          window._wbxSelectedPos = null;
           results.innerHTML = '<div style="text-align:center;padding:40px 20px;color:var(--text-faint)"><div style="font-size:48px;margin-bottom:12px;color:var(--text-faint)"><i class="fa-solid fa-brain"></i></div><h3 style="color:var(--text-soft);margin-bottom:6px">Costruisci da ciò che sai</h3><p style="font-size:14px;max-width:440px;margin:0 auto;line-height:1.5">Scrivi una parola che conosci e Sottotitoli ti mostrerà sinonimi, contrari, collocazioni e parole correlate al tuo livello.</p></div>';
           if (info) info.textContent = '';
           return;
         }
+
+        // Reset disambiguation on new search
+        window._wbxSelectedPos = null;
+        var disambigBar = document.getElementById('wbExpandDisambig');
+        if (disambigBar) disambigBar.style.display = 'none';
 
         var rel = relation ? relation.value : 'synonyms';
         results.innerHTML = '<div style="text-align:center;padding:30px 20px;color:var(--text-faint)"><i class="fa-solid fa-spinner fa-spin"></i> Cercando suggerimenti…</div>';
@@ -3184,7 +3198,7 @@
           var cardsHtml = '';
           suggestions.forEach(function(s) {
             var posLabel = mapPos(s.pos);
-            var displayWord = posLabel === 'VERB' ? 'to ' + s.word : s.word;
+            var displayWord = s.word;
             cardsHtml += '<article class="wbx-box" data-pos="' + posLabel + '" data-cefr="' + s.level + '" data-word="' + s.word + '">' +
               '<div class="wbx-main-col">' +
               '<div class="wbx-word-zone">' +
@@ -3209,6 +3223,8 @@
           setTimeout(window.autoSizeExpandWords, 100);
           // Enrich cards with real definitions, translations, synonyms
           enrichExpandCards(query);
+          // Background: check if query word has multiple POS (noun/verb/adjective)
+          checkPosAmbiguity(query);
 
         } catch(e) {
           results.innerHTML = '<section class=\"alt-card-grid\"><article class=\"alt-card\"><h3>⚠️ Errore</h3><p style=\"font-size:14px;color:var(--text-soft)\">Impossibile raggiungere il servizio di suggerimenti. Riprova tra qualche secondo.</p></article></section>';
@@ -3280,17 +3296,18 @@
         var word = box.getAttribute('data-word');
         if (!word || word.length < 2) return;
         var posLabel = box.getAttribute('data-pos') || '';
-        // Prefix "to " for verbs to help dictionary APIs disambiguate
-        var apiWord = posLabel === 'VERB' ? 'to ' + word : word;
+        // Use bare word — POS label already disambiguates verb vs noun
+        var apiWord = word;
         try {
           var defEl = box.querySelector('.wbx-def');
           var transEl = box.querySelector('.wbx-trans');
           var synsEl = box.querySelector('.wbx-syns');
           var ipaEl = box.querySelector('.wbx-ipa');
 
-          // Fetch all 3 data sources in parallel
+          // Fetch all 3 data sources in parallel — pass POS for dictionary disambiguation
+          var preferredPos = extractPosCode(posLabel);
           var results = await Promise.allSettled([
-            fetchDictionary(apiWord),
+            fetchDictionary(apiWord, preferredPos),
             fetchTranslationIT(apiWord),
             fetchSynonymsEN(word)
           ]);
@@ -3334,6 +3351,87 @@
         }
       }
 
+      // ── POS disambiguation: detect multi-POS words via Free Dictionary ──
+      // Returns array of {code:'n', label:'NOUN'} or null
+      async function fetchPosOptions(word) {
+        try {
+          var resp = await fetch('https://api.dictionaryapi.dev/api/v2/entries/en/' + encodeURIComponent(word));
+          if (!resp.ok) return null;
+          var data = await resp.json();
+          if (!data || !data.length) return null;
+          var posSet = {};
+          var posMap = { noun:'n', verb:'v', adjective:'adj', adverb:'adv', interjection:'—', pronoun:'—', preposition:'—', conjunction:'—', determiner:'—', numeral:'—' };
+          var labelMap = { n:'NOUN', v:'VERB', adj:'ADJ', adv:'ADV' };
+          for (var i = 0; i < data.length; i++) {
+            var meanings = data[i].meanings || [];
+            for (var j = 0; j < meanings.length; j++) {
+              var pos = (meanings[j].partOfSpeech || '').toLowerCase().trim();
+              var code = posMap[pos];
+              if (code && code !== '—' && !posSet[code]) {
+                posSet[code] = { code: code, label: labelMap[code] || pos.toUpperCase() };
+              }
+            }
+          }
+          var options = Object.values(posSet);
+          return options.length >= 2 ? options : null; // Only return if truly ambiguous
+        } catch(e) { return null; }
+      }
+
+      // ── Show did-you-mean bar with clickable POS chips ──
+      function showPosDisambig(options, queryWord, currentPos) {
+        var bar = document.getElementById('wbExpandDisambig');
+        var chips = document.getElementById('wbDisambigChips');
+        if (!bar || !chips) return;
+        bar.style.display = 'flex';
+        chips.innerHTML = options.map(function(opt, idx) {
+          var isActive = (currentPos && opt.code === currentPos) || (!currentPos && idx === 0);
+          return '<button class="fchip' + (isActive ? ' active' : '') + '" data-pos-code="' + opt.code + '" data-pos-label="' + opt.label + '" onclick="window.wbxSelectPos(this,\'' + queryWord + '\')" style="font-size:13px;padding:7px 14px;font-family:var(--font-ui)">' + opt.label + '</button>';
+        }).join('');
+      }
+
+      // ── User clicked a POS chip — update exact box & re-enrich ──
+      window.wbxSelectPos = function(chip, queryWord) {
+        // Update chip active state
+        var bar = document.getElementById('wbExpandDisambig');
+        bar.querySelectorAll('.fchip').forEach(function(c){ c.classList.remove('active'); });
+        chip.classList.add('active');
+        var newCode = chip.getAttribute('data-pos-code');
+        var newLabel = chip.getAttribute('data-pos-label');
+        window._wbxSelectedPos = newCode;
+
+        // Update the exact-match box
+        var exactBox = document.querySelector('#wbExpandResults .wbx-box.wbx-exact');
+        if (exactBox) {
+          exactBox.setAttribute('data-pos', newLabel);
+          var posEl = exactBox.querySelector('.wbx-pos');
+          if (posEl) posEl.textContent = newLabel;
+          // Also update save/bookmark buttons
+          exactBox.querySelectorAll('.wbx-save-btn, .wbx-bookmark-btn').forEach(function(btn){
+            btn.setAttribute('data-pos', newLabel);
+          });
+        }
+
+        // Re-enrich the exact box with new POS context
+        if (exactBox) {
+          enrichOneCard(exactBox, queryWord);
+        }
+      };
+
+      // ── Background check for POS ambiguity after results load ──
+      async function checkPosAmbiguity(queryWord) {
+        var options = await fetchPosOptions(queryWord);
+        if (!options || options.length < 2) return;
+        // Determine current POS from the exact box
+        var exactBox = document.querySelector('#wbExpandResults .wbx-box.wbx-exact');
+        var currentPos = exactBox ? extractPosCode(exactBox.getAttribute('data-pos') || '') : null;
+        showPosDisambig(options, queryWord, currentPos);
+      }
+
+      function extractPosCode(label) {
+        var m = { NOUN:'n', VERB:'v', ADJ:'adj', ADV:'adv' };
+        return m[label] || null;
+      }
+
       // ── Wordnik definition (primary, via Supabase Edge Function proxy) ──
       async function fetchWordnik(word) {
         try {
@@ -3353,8 +3451,8 @@
         } catch(e) { return null; }
       }
 
-      // ── Free Dictionary API (fallback) ──
-      async function fetchFreeDict(word) {
+      // ── Free Dictionary API (with optional POS preference) ──
+      async function fetchFreeDict(word, preferredPos) {
         try {
           var resp = await fetch('https://api.dictionaryapi.dev/api/v2/entries/en/' + encodeURIComponent(word));
           if (!resp.ok) return null;
@@ -3363,10 +3461,25 @@
           var entry = data[0];
           var def = '';
           var ipa = '';
+          // POS code → FreeDict partOfSpeech mapping
+          var posToFD = { n:'noun', v:'verb', adj:'adjective', adv:'adverb' };
+          var preferredFD = preferredPos ? posToFD[preferredPos] : null;
           if (entry.meanings && entry.meanings.length) {
-            for (var i = 0; i < entry.meanings.length; i++) {
-              var m = entry.meanings[i];
-              if (m.definitions && m.definitions.length) { def = m.definitions[0].definition; break; }
+            // First pass: try to match preferred POS
+            if (preferredFD) {
+              for (var i = 0; i < entry.meanings.length; i++) {
+                var m = entry.meanings[i];
+                if ((m.partOfSpeech || '').toLowerCase() === preferredFD && m.definitions && m.definitions.length) {
+                  def = m.definitions[0].definition; break;
+                }
+              }
+            }
+            // Second pass: take first available if no POS match
+            if (!def) {
+              for (var i = 0; i < entry.meanings.length; i++) {
+                var m = entry.meanings[i];
+                if (m.definitions && m.definitions.length) { def = m.definitions[0].definition; break; }
+              }
             }
           }
           if (entry.phonetics && entry.phonetics.length) {
@@ -3379,9 +3492,9 @@
       }
 
       // ── Combined: Free Dictionary → Wordnik fallback ──
-      async function fetchDictionary(word) {
-        // Try Free Dictionary first (has IPA + definitions)
-        var fd = await fetchFreeDict(word);
+      async function fetchDictionary(word, preferredPos) {
+        // Try Free Dictionary first (has IPA + definitions, POS-aware)
+        var fd = await fetchFreeDict(word, preferredPos);
         if (fd && fd.definition) return fd;
         // Fall back to Wordnik
         var w = await fetchWordnik(word);
