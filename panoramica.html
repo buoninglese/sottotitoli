@@ -2738,6 +2738,30 @@
       window.renderReviewDue = renderReviewDue;
 
       // ═══ RENDER: Build From What You Know — level-gated word exploration ═══
+      async function renderExpandStats() {
+        var lang = window.SOTTOTITOLI_STUDY_LANG || 'en';
+        var statsEl = document.getElementById('wbExpandStats');
+        if (!statsEl) return;
+        // Try to get real stats, fall back to zeros for offline
+        var s = { totalWords: 0, dueToday: 0, newThisWeek: 0, known: 0, learning: 0 };
+        try {
+          if (typeof SottotitoliData !== 'undefined' && SottotitoliData.getWordbankStats) {
+            var live = await SottotitoliData.getWordbankStats(lang);
+            if (live) s = live;
+          }
+        } catch(e) {}
+        var cards = [
+          { v: s.totalWords, l: 'Total words', b: '' },
+          { v: s.dueToday, l: 'Due today', b: s.dueToday > 0 ? s.dueToday + ' da ripassare' : 'Tutto in ordine' },
+          { v: s.newThisWeek, l: 'New this week', b: s.newThisWeek > 0 ? '+' + s.newThisWeek + ' questa settimana' : '' },
+          { v: s.known, l: 'Known', b: '' },
+          { v: s.learning, l: 'Learning', b: '' }
+        ];
+        statsEl.innerHTML = '<div class="stats-row" style="grid-template-columns:repeat(5,1fr);margin-bottom:0">' +
+          cards.map(function(c){ return '<div class="metric-card" style="min-height:80px;padding:14px 16px"><div class="metric-label" style="margin-bottom:2px">'+c.l+'</div><div class="metric-value" style="font-size:26px">'+c.v+'</div>'+(c.b?'<div class="metric-badge">'+c.b+'</div>':'')+'</div>'; }).join('') +
+          '</div>';
+      }
+
       async function renderExpandQuickChips() {
         var lang = window.SOTTOTITOLI_STUDY_LANG || 'en';
         var sb = window.sottotitoliSupabase;
@@ -3352,6 +3376,7 @@
       window.selectExpandWord = selectExpandWord;
       window.renderExpandSuggestions = renderExpandSuggestions;
       window.renderExpandQuickChips = renderExpandQuickChips;
+      window.renderExpandStats = renderExpandStats;
       window.saveExpandWord = saveExpandWord;
       window.openExpandWordDetail = openExpandWordDetail;
 
@@ -3757,9 +3782,10 @@
       var wbReviewTab = document.querySelector('[data-subtab="wb-review"]');
       if (wbReviewTab) { wbReviewTab.addEventListener('click', function () { setTimeout(renderReviewDue, 100); }); }
       var wbExpandTab = document.querySelector('[data-subtab="wb-expand"]');
-      if (wbExpandTab) { wbExpandTab.addEventListener('click', function () { setTimeout(function(){ renderExpandQuickChips(); }, 150); }); }
+      if (wbExpandTab) { wbExpandTab.addEventListener('click', function () { setTimeout(function(){ renderExpandStats(); renderExpandQuickChips(); }, 150); }); }
       // Initial render for Review Due (Build From expands on demand)
       setTimeout(renderReviewDue, 500);
+      setTimeout(function(){ renderExpandStats(); }, 600);
       var vocNav = document.querySelector('[data-panel="vocabolario"]');
       if (vocNav) { vocNav.addEventListener('click', function () { setTimeout(renderVocabolario, 100); }); }
       var insNav = document.querySelector('[data-panel="insights"]');
