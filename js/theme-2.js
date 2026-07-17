@@ -107,6 +107,7 @@
         e.preventDefault();
         var t=(html.getAttribute('data-theme')||document.body.getAttribute('data-theme')||'light')==='dark'?'light':'dark';
         html.setAttribute('data-theme',t);
+        document.body.setAttribute('data-theme',t);
         localStorage.setItem('sottotitoli-theme',t);
         themeText.textContent=t==='dark'?'Light':'Dark';
       });
