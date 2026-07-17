@@ -184,7 +184,7 @@
       <div style="display:flex;align-items:center;gap:0">
         <a href="index.html" class="topbar-brand" style="font-size:31px;color:var(--text)">sottotitoli</a>
         <span class="trial-pill" style="background:transparent;font-family:var(--font-ui);font-size:31px;font-weight:800;padding:0;color:var(--cyan);letter-spacing:-.5px;border-radius:0;line-height:1">.ai</span>
-        <span style="font-size:10px;font-weight:500;color:rgba(255,255,255,.2);margin-left:6px;font-family:'Inter',sans-serif">v1.36</span>
+        <span style="font-size:10px;font-weight:500;color:rgba(255,255,255,.2);margin-left:6px;font-family:'Inter',sans-serif">v1.38</span>
       </div>
       <div style="display:flex;align-items:center;gap:12px">
         <button class="btn-start-session" id="btnStartSession" onclick="toggleStartSession()" style="font-size:16px;height:38px;padding:0 18px;border-radius:10px;background:linear-gradient(135deg,#0895b0,var(--cyan));color:#fff;border:none;font-weight:600;font-family:Inter,sans-serif;display:inline-flex;align-items:center;gap:8px;box-shadow:0 2px 10px rgba(6,182,212,.25);cursor:pointer">
@@ -2510,86 +2510,116 @@
         }
 
         var rel = relation ? relation.value : 'synonyms';
-        var lang = window.SOTTOTITOLI_STUDY_LANG || 'en';
-        var sb = window.sottotitoliSupabase;
+        results.innerHTML = '<div style="text-align:center;padding:30px 20px;color:var(--text-faint)"><i class="fa-solid fa-spinner fa-spin"></i> Cercando suggerimenti…</div>';
 
-        // 1. Determine the CEFR level of the query word
+        // Determine CEFR level of query word (for display)
         var wordLevel = null;
         if (window.CEFR_LEVELS && window.CEFR_LEVELS[query.toLowerCase()]) {
           wordLevel = window.CEFR_LEVELS[query.toLowerCase()];
         }
-        // Also check user's own wordbank
-        if (!wordLevel && sb) {
-          var r = await sb.auth.getSession();
-          if (r.data?.session) {
-            var res = await sb.from('user_wordbank_words')
-              .select('cefr_level,pos')
-              .eq('word', query.toLowerCase())
-              .eq('user_id', r.data.session.user.id)
-              .limit(1);
-            if (res.data && res.data.length > 0) {
-              wordLevel = res.data[0].cefr_level || wordLevel;
-            }
+        if (!wordLevel) wordLevel = estimateCEFR(query);
+        if (info) info.textContent = wordLevel ? 'CEFR: ~' + wordLevel : '';
+
+        // ── Build Datamuse API URL based on relation ──
+        var apiUrl = '';
+        var enc = encodeURIComponent(query);
+        switch (rel) {
+          case 'synonyms':
+            apiUrl = 'https://api.datamuse.com/words?ml=' + enc + '&max=20';
+            break;
+          case 'antonyms':
+            apiUrl = 'https://api.datamuse.com/words?rel_ant=' + enc + '&max=20';
+            break;
+          case 'word-family':
+            // Words starting with same prefix + means-like for related forms
+            apiUrl = 'https://api.datamuse.com/words?sp=' + enc.substring(0, Math.min(4, enc.length)) + '*&md=p&max=30';
+            break;
+          case 'collocations':
+            // Adjectives that modify this noun + words that frequently follow
+            apiUrl = 'https://api.datamuse.com/words?rel_jjb=' + enc + '&max=10';
+            break;
+          case 'next-level':
+            // Semantically related words — we'll filter by length as a proxy for complexity
+            apiUrl = 'https://api.datamuse.com/words?ml=' + enc + '&max=30';
+            break;
+          default:
+            apiUrl = 'https://api.datamuse.com/words?ml=' + enc + '&max=20';
+        }
+
+        try {
+          var resp = await fetch(apiUrl);
+          if (!resp.ok) throw new Error('API error ' + resp.status);
+          var data = await resp.json();
+
+          // For collocations, also fetch words that follow the query
+          var collocationExtra = [];
+          if (rel === 'collocations') {
+            try {
+              var resp2 = await fetch('https://api.datamuse.com/words?lc=' + enc + '&max=10');
+              if (resp2.ok) collocationExtra = await resp2.json();
+            } catch(e) {}
           }
-        }
-        // Estimate from word length as fallback
-        var fallbackLevel = wordLevel || estimateCEFR(query);
-        if (info) info.textContent = wordLevel ? 'CEFR: ' + wordLevel : 'Stima: ~' + fallbackLevel;
 
-        // 2. Determine target CEFR level based on relation
-        var targetLevel = fallbackLevel;
-        if (rel === 'next-level') {
-          var levels = ['A1', 'A2', 'B1', 'B2', 'C1', 'C2'];
-          var idx = levels.indexOf(fallbackLevel);
-          targetLevel = idx >= 0 && idx < 5 ? levels[idx + 1] : fallbackLevel;
-        }
+          // Merge results
+          var allItems = data.concat(collocationExtra || []);
 
-        // 3. Generate suggestions from CEFR dictionary filtered by target level and POS
-        var suggestions = [];
-        var cefrMap = window.CEFR_LEVELS || {};
-        var posMap = window.LEMMA_POS_MAP || {};
-
-        // Get POS of the query word
-        var queryPos = posMap[query.toLowerCase()] || null;
-
-        // Scan for words at target level with similar POS
-        Object.keys(cefrMap).forEach(function(w) {
-          if (w === query.toLowerCase()) return;
-          if (cefrMap[w] === targetLevel) {
-            var wPos = posMap[w] || null;
-            // For synonyms/antonyms, prefer same POS; for word-family, allow any
-            if (rel === 'synonyms' || rel === 'antonyms') {
-              if (queryPos && wPos !== queryPos) return;
-            }
-            suggestions.push({ word: w, level: cefrMap[w], pos: wPos || '—' });
+          // For word-family, filter to words that start similarly
+          if (rel === 'word-family' && allItems.length > 20) {
+            var prefix = query.toLowerCase().substring(0, 3);
+            allItems = allItems.filter(function(item) {
+              return item.word && item.word.toLowerCase().indexOf(prefix) === 0 && item.word.toLowerCase() !== query.toLowerCase();
+            });
           }
-        });
 
-        // Limit to 20, prioritize known words
-        suggestions = suggestions.slice(0, 20);
+          // Remove duplicates and the query word itself
+          var seen = {};
+          var suggestions = [];
+          allItems.forEach(function(item) {
+            var w = (item.word || '').toLowerCase().replace(/[^a-z]/g, '');
+            if (!w || w === query.toLowerCase() || seen[w]) return;
+            seen[w] = true;
+            // Determine CEFR level for each suggestion
+            var sl = window.CEFR_LEVELS && window.CEFR_LEVELS[w] ? window.CEFR_LEVELS[w] : estimateCEFR(w);
+            var pos = item.tags && item.tags.length ? item.tags[0] : (window.LEMMA_POS_MAP && window.LEMMA_POS_MAP[w] ? window.LEMMA_POS_MAP[w] : '—');
+            // For 'next-level', keep only words at or above estimated level
+            if (rel === 'next-level') {
+              var levels = ['A1','A2','B1','B2','C1','C2'];
+              if (levels.indexOf(sl) < levels.indexOf(wordLevel || 'A2')) return;
+            }
+            suggestions.push({ word: w, level: sl, pos: pos, score: item.score || 0 });
+          });
 
-        // 4. Render results
-        if (suggestions.length === 0) {
-          results.innerHTML = '<section class=\"alt-card-grid\"><article class=\"alt-card\"><h3>Nessun suggerimento</h3><p style=\"font-size:14px;color:var(--text-soft)\">Nessuna parola trovata al livello ' + targetLevel + ' con relazione \"' + relLabels(rel) + '\". Prova con un\'altra parola o un\'altra relazione.</p></article></section>';
-          return;
+          // Limit and sort by score
+          suggestions.sort(function(a,b){ return b.score - a.score; });
+          suggestions = suggestions.slice(0, 20);
+
+          // Render
+          if (suggestions.length === 0) {
+            results.innerHTML = '<section class=\"alt-card-grid\"><article class=\"alt-card\"><h3>Nessun suggerimento</h3><p style=\"font-size:14px;color:var(--text-soft)\">Nessuna parola trovata per \"' + query + '\" con relazione \"' + relLabels(rel) + '\". Prova con un\'altra parola o un\'altra relazione.</p></article></section>';
+            return;
+          }
+
+          var relLabel = relLabels(rel);
+          var cardsHtml = '';
+          suggestions.forEach(function(s) {
+            var levelColor = levelToColor(s.level);
+            cardsHtml += '<article class=\"alt-card\" style=\"cursor:pointer;padding:14px 16px\" onclick=\"openExpandWordDetail(\'' + s.word + '\',\'' + s.level + '\')\">' +
+              '<div style=\"display:flex;align-items:center;justify-content:space-between;gap:8px\">' +
+              '<div><h4 style=\"font-size:15px;font-weight:700;margin:0 0 2px;color:var(--text)\">' + s.word + '</h4><span style=\"font-size:11px;color:var(--text-soft)\">' + s.pos + '</span></div>' +
+              '<span style=\"font-size:9px;font-weight:700;padding:3px 8px;border-radius:100px;background:' + levelColor + '20;color:' + levelColor + '\">' + s.level + '</span>' +
+              '</div>' +
+              '<div style=\"margin-top:6px;display:flex;gap:4px\">' +
+              '<button class=\"btn btn-ghost btn-sm\" onclick=\"event.stopPropagation();saveExpandWord(\'' + s.word + '\',\'' + s.level + '\',\'' + s.pos + '\')\" style=\"font-size:10px;font-family:var(--font-ui)\"><i class=\"fa-solid fa-bookmark\"></i> Salva</button>' +
+              '</div>' +
+              '</article>';
+          });
+          results.innerHTML = '<section class=\"panel-head\" style=\"margin-top:0\"><h3 style=\"font-size:16px\">' + relLabel + ' — ' + suggestions.length + ' suggerimenti per \"' + query + '\"</h3></section>' +
+            '<section class=\"alt-card-grid\" style=\"grid-template-columns:repeat(auto-fill,minmax(200px,1fr))\">' + cardsHtml + '</section>';
+
+        } catch(e) {
+          results.innerHTML = '<section class=\"alt-card-grid\"><article class=\"alt-card\"><h3>⚠️ Errore</h3><p style=\"font-size:14px;color:var(--text-soft)\">Impossibile raggiungere il servizio di suggerimenti. Riprova tra qualche secondo.</p></article></section>';
+          console.warn('Datamuse API error:', e);
         }
-
-        var relLabel = relLabels(rel);
-        var cardsHtml = '';
-        suggestions.forEach(function(s) {
-          var levelColor = levelToColor(s.level);
-          cardsHtml += '<article class=\"alt-card\" style=\"cursor:pointer;padding:14px 16px\" onclick=\"openExpandWordDetail(\'' + s.word + '\',\'' + s.level + '\')\">' +
-            '<div style=\"display:flex;align-items:center;justify-content:space-between;gap:8px\">' +
-            '<div><h4 style=\"font-size:15px;font-weight:700;margin:0 0 2px;color:var(--text)\">' + s.word + '</h4><span style=\"font-size:11px;color:var(--text-soft)\">' + s.pos + '</span></div>' +
-            '<span style=\"font-size:9px;font-weight:700;padding:3px 8px;border-radius:100px;background:' + levelColor + '20;color:' + levelColor + '\">' + s.level + '</span>' +
-            '</div>' +
-            '<div style=\"margin-top:6px;display:flex;gap:4px\">' +
-            '<button class=\"btn btn-ghost btn-sm\" onclick=\"event.stopPropagation();saveExpandWord(\'' + s.word + '\',\'' + s.level + '\',\'' + s.pos + '\')\" style=\"font-size:10px;font-family:var(--font-ui)\"><i class=\"fa-solid fa-bookmark\"></i> Salva</button>' +
-            '</div>' +
-            '</article>';
-        });
-        results.innerHTML = '<section class=\"panel-head\" style=\"margin-top:0\"><h3 style=\"font-size:16px\">' + relLabel + ' a livello ' + targetLevel + ' — ' + suggestions.length + ' suggerimenti</h3></section>' +
-          '<section class=\"alt-card-grid\" style=\"grid-template-columns:repeat(auto-fill,minmax(200px,1fr))\">' + cardsHtml + '</section>';
       }
 
       function relLabels(rel) {
