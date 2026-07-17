@@ -403,7 +403,14 @@
   async function getWordbankWords(wordbankId) {
     var r = await sb().from('user_wordbank_words').select('*').eq('wordbank_id', wordbankId).order('usage_count', { ascending: false });
     if (r.error) return [];
-    return r.data || [];
+    // Deduplicate by word (case-insensitive), keeping the entry with highest usage_count
+    var seen = {};
+    var deduped = [];
+    (r.data || []).forEach(function(w) {
+      var key = w.word.toLowerCase();
+      if (!seen[key]) { seen[key] = true; deduped.push(w); }
+    });
+    return deduped;
   }
 
   async function addWordbank(name, lang) {
