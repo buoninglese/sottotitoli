@@ -116,6 +116,11 @@
     .wb-table tbody tr:hover{background:var(--teal-4)}
     .wb-table tbody tr.selected{background:rgba(6,182,212,.1)}
     .wb-table .cb{width:28px;text-align:center}
+    .wb-table th.sortable{cursor:pointer;user-select:none;transition:color .2s}
+    .wb-table th.sortable:hover{color:var(--text-soft)}
+    .wb-table th .sort-arrow{font-size:8px;margin-left:3px;opacity:.35;display:inline-block;transition:opacity .2s,transform .2s}
+    .wb-table th.sort-asc .sort-arrow{opacity:1;color:var(--cyan)}
+    .wb-table th.sort-desc .sort-arrow{opacity:1;color:var(--cyan);transform:scaleY(-1)}
     .wb-word{font-weight:700;color:var(--text);cursor:pointer}
     .wb-word:hover{color:var(--cyan)}
     .badge-pos{background:var(--teal-4);color:var(--teal)}
@@ -625,7 +630,7 @@
               </div>
             </div>
             <div class="bulk-bar" id="wbReviewBulkBar"><span id="wbReviewBulkCount">0 selezionate</span><button onclick="wbReviewBulkDone()">✓ Fatto</button><button class="bulk-close" onclick="wbReviewClearSelection()">&times;</button></div>
-            <div class="wb-table-wrap"><table class="wb-table"><thead><tr><th class="cb"><input type="checkbox" onchange="wbReviewToggleAll(this)" style="accent-color:var(--cyan)"></th><th>Parola</th><th>CEFR</th><th>POS</th><th>Ultimo ripasso</th><th>Intervallo SRS</th><th>Stato</th><th></th></tr></thead><tbody id="wbReviewBody"></tbody></table></div>
+            <div class="wb-table-wrap"><table class="wb-table"><thead><tr><th class="cb"><input type="checkbox" onchange="wbReviewToggleAll(this)" style="accent-color:var(--cyan)"></th><th class="sortable" data-sort="word">Parola <span class="sort-arrow">▲</span></th><th class="sortable" data-sort="cefr">CEFR <span class="sort-arrow">▲</span></th><th class="sortable" data-sort="pos">POS <span class="sort-arrow">▲</span></th><th class="sortable" data-sort="lastReview">Ultimo ripasso <span class="sort-arrow">▲</span></th><th class="sortable" data-sort="interval">Intervallo SRS <span class="sort-arrow">▲</span></th><th class="sortable" data-sort="status">Stato <span class="sort-arrow">▲</span></th><th></th></tr></thead><tbody id="wbReviewBody"></tbody></table></div>
             <div id="wbReviewEmpty" style="display:none;text-align:center;padding:40px 20px;color:var(--text-faint)">
               <div style="font-size:48px;margin-bottom:12px">🎉</div>
               <h3 style="color:var(--text-soft);margin-bottom:6px">Tutto in ordine!</h3>
@@ -2106,7 +2111,7 @@
             '</div>'+
           '</div>'+
           '<div class="bulk-bar" id="wbBulkBar"><span id="wbBulkCount">0 selected</span><button onclick="wbBulkMarkKnown()">Mark known</button><button onclick="wbBulkRemove()">Remove</button><button class="bulk-close" onclick="wbClearSelection()">&times;</button></div>'+
-          '<div class="wb-table-wrap"><table class="wb-table"><thead><tr><th class="cb"><input type="checkbox" onchange="wbToggleAll(this)" style="accent-color:var(--cyan)"></th><th>Word</th><th>POS</th><th>CEFR</th><th>Source</th><th>Status</th><th>Uses</th><th></th></tr></thead><tbody id="wbTableBody"></tbody></table></div>';
+          '<div class="wb-table-wrap"><table class="wb-table"><thead><tr><th class="cb"><input type="checkbox" onchange="wbToggleAll(this)" style="accent-color:var(--cyan)"></th><th class="sortable" data-sort="word">Word <span class="sort-arrow">▲</span></th><th class="sortable" data-sort="pos">POS <span class="sort-arrow">▲</span></th><th class="sortable" data-sort="cefr">CEFR <span class="sort-arrow">▲</span></th><th class="sortable" data-sort="source">Source <span class="sort-arrow">▲</span></th><th class="sortable" data-sort="status">Status <span class="sort-arrow">▲</span></th><th class="sortable" data-sort="uses">Uses <span class="sort-arrow">▲</span></th><th></th></tr></thead><tbody id="wbTableBody"></tbody></table></div>';
         renderWbTable(words);
       }
 
@@ -2213,6 +2218,108 @@
         openWordbankView(_wbState.currentBank);
       }
 
+      // ═══ TABLE SORTING ═══
+      var _sortState = {};   // { tbodyId: { col: key, dir: 0|1|2 } }  0=orig 1=desc(high→low) 2=asc(low→high)
+      var _origRows = {};    // { tbodyId: [rowElement, ...] }
+
+      function wbSortTable(tbodyId, colKey, thEl) {
+        var tbody = document.getElementById(tbodyId);
+        if (!tbody) return;
+
+        // Init state
+        if (!_sortState[tbodyId]) _sortState[tbodyId] = { col: null, dir: 0 };
+        var st = _sortState[tbodyId];
+
+        // Advance: same col → cycle 0→1→2→0; different col → start at 1 (desc)
+        if (st.col === colKey) { st.dir = (st.dir + 1) % 3; }
+        else { st.col = colKey; st.dir = 1; }
+
+        // Save original order once
+        if (!_origRows[tbodyId]) {
+          _origRows[tbodyId] = Array.from(tbody.querySelectorAll('tr'));
+        }
+
+        var rows = Array.from(tbody.querySelectorAll('tr'));
+
+        // Clear all header indicators
+        var table = tbody.closest('table');
+        if (table) {
+          table.querySelectorAll('th.sortable').forEach(function(th){ th.classList.remove('sort-asc','sort-desc'); });
+        }
+
+        // State 0 = restore original
+        if (st.dir === 0) {
+          if (_origRows[tbodyId]) {
+            _origRows[tbodyId].forEach(function(r){ tbody.appendChild(r); });
+          }
+          return;
+        }
+
+        // Set indicator
+        if (thEl) { thEl.classList.add(st.dir === 1 ? 'sort-desc' : 'sort-asc'); }
+
+        // Sort
+        rows.sort(function(a, b){
+          var va = _wbSortVal(a, colKey, tbodyId);
+          var vb = _wbSortVal(b, colKey, tbodyId);
+          var cmp = _wbCompare(va, vb);
+          return st.dir === 1 ? -cmp : cmp; // 1=desc
+        });
+        rows.forEach(function(r){ tbody.appendChild(r); });
+      }
+
+      function _wbSortVal(row, colKey, tbodyId) {
+        var cells = row.cells;
+        switch(colKey) {
+          case 'word':  return (row.querySelector('.wb-word')?.textContent || cells[1]?.textContent || '').trim().toLowerCase();
+          case 'cefr':  { var ci = tbodyId === 'wbReviewBody' ? 2 : 3; return _cefrRank(row.querySelector('.badge-cefr')?.textContent || cells[ci]?.textContent || ''); }
+          case 'pos':   { var pi = tbodyId === 'wbReviewBody' ? 3 : 2; return (row.querySelector('.badge-pos')?.textContent || cells[pi]?.textContent || '').trim().toLowerCase(); }
+          case 'source': return (row.querySelector('.badge-source')?.textContent || cells[4]?.textContent || '').trim().toLowerCase();
+          case 'status': { var si = tbodyId === 'wbReviewBody' ? 6 : 5; return (cells[si]?.textContent || '').trim(); }
+          case 'uses':  return parseInt(cells[6]?.textContent) || 0;
+          case 'lastReview': return _parseReviewDate(cells[4]?.textContent || '');
+          case 'interval': return parseInt(cells[5]?.textContent) || 0;
+          default: return '';
+        }
+      }
+
+      function _cefrRank(lvl) {
+        var r = {'A1':1,'A2':2,'B1':3,'B2':4,'C1':5,'C2':6};
+        return r[(lvl||'').trim()] || 0;
+      }
+
+      function _parseReviewDate(txt) {
+        if (!txt || txt === 'Mai' || txt === '—') return 0;
+        var d = new Date(txt);
+        return isNaN(d.getTime()) ? 0 : d.getTime();
+      }
+
+      function _wbCompare(a, b) {
+        if (typeof a === 'number' && typeof b === 'number') return a - b;
+        a = String(a); b = String(b);
+        if (a < b) return -1;
+        if (a > b) return 1;
+        return 0;
+      }
+
+      // Event delegation for sortable headers
+      document.addEventListener('click', function(e){
+        var th = e.target.closest('th.sortable');
+        if (!th) return;
+        var tbody = th.closest('table')?.querySelector('tbody');
+        if (!tbody) return;
+        var colKey = th.getAttribute('data-sort');
+        wbSortTable(tbody.id, colKey, th);
+      });
+
+      // Reset sort state when tables are repopulated
+      var _origRenderWbTable = renderWbTable;
+      renderWbTable = function(words) {
+        _sortState['wbTableBody'] = null;
+        _origRows['wbTableBody'] = null;
+        return _origRenderWbTable(words);
+      };
+
       // ── Word detail drawer ──
       async function openWbDrawer(wordId) {
         var w = _wbState.currentWords.find(function(x){return x.id === wordId;});
@@ -2309,6 +2416,10 @@
       var _wbReviewState = { selectedRows: new Set() };
 
       async function renderReviewDue() {
+        // Reset sort state on refresh
+        _sortState['wbReviewBody'] = null;
+        _origRows['wbReviewBody'] = null;
+
         var lang = window.SOTTOTITOLI_STUDY_LANG || 'en';
         var sb = window.sottotitoliSupabase;
         if (!sb) return;
