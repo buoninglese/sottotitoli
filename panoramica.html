@@ -3154,17 +3154,16 @@
         } catch(e) { return null; }
       }
 
-      // ── Combined: Wordnik → Free Dictionary → nothing ──
+      // ── Combined: Free Dictionary → Wordnik fallback ──
       async function fetchDictionary(word) {
+        // Try Free Dictionary first (has IPA + definitions)
+        var fd = await fetchFreeDict(word);
+        if (fd && fd.definition) return fd;
+        // Fall back to Wordnik
         var w = await fetchWordnik(word);
-        if (w && w.definition) {
-          // Wordnik got definition, try FreeDict for IPA only
-          var fd = await fetchFreeDict(word);
-          if (fd && fd.ipa) w.ipa = fd.ipa;
-          return w;
-        }
-        // Fall back to Free Dictionary for everything
-        return await fetchFreeDict(word);
+        if (w && w.definition) return w;
+        // Neither worked
+        return null;
       }
 
       // ── MyMemory Translation (EN → IT) ──
