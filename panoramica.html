@@ -2864,6 +2864,20 @@
             if (pos === '—' && window.LEMMA_POS_MAP && window.LEMMA_POS_MAP[w]) {
               pos = window.LEMMA_POS_MAP[w];
             }
+            // Tertiary fallback: compromise.js NLP tagger
+            if (pos === '—' && typeof nlp !== 'undefined') {
+              try {
+                var doc = nlp(w);
+                var terms = doc.terms().json();
+                if (terms && terms.length) {
+                  var tags = terms[0].tags || [];
+                  if (tags.indexOf('Noun') >= 0) pos = 'n';
+                  else if (tags.indexOf('Verb') >= 0) pos = 'v';
+                  else if (tags.indexOf('Adjective') >= 0) pos = 'adj';
+                  else if (tags.indexOf('Adverb') >= 0) pos = 'adv';
+                }
+              } catch(e) { /* compromise failed, leave as '—' */ }
+            }
             // For 'next-level', keep only words at or above estimated level
             if (rel === 'next-level') {
               var levels = ['A1','A2','B1','B2','C1','C2'];
@@ -3007,8 +3021,27 @@
         }
       }
 
-      // ── Free Dictionary API ──
-      async function fetchDictionary(word) {
+      // ── Wordnik definition (primary, via Supabase Edge Function proxy) ──
+      async function fetchWordnik(word) {
+        try {
+          var proxyUrl = (window.SOTTOTITOLI_CONFIG && window.SOTTOTITOLI_CONFIG.wordnikProxyUrl) || '';
+          if (!proxyUrl) return null;
+          var resp = await fetch(proxyUrl + '?word=' + encodeURIComponent(word));
+          if (!resp.ok) return null;
+          var data = await resp.json();
+          if (!data || !data.length) return null;
+          // Wordnik returns array of definitions; pick the first with text
+          var def = '';
+          var pos = '';
+          for (var i = 0; i < data.length; i++) {
+            if (data[i].text) { def = data[i].text; pos = data[i].partOfSpeech || ''; break; }
+          }
+          return { definition: def, ipa: null }; // Wordnik doesn't reliably give IPA
+        } catch(e) { return null; }
+      }
+
+      // ── Free Dictionary API (fallback) ──
+      async function fetchFreeDict(word) {
         try {
           var resp = await fetch('https://api.dictionaryapi.dev/api/v2/entries/en/' + encodeURIComponent(word));
           if (!resp.ok) return null;
@@ -3017,17 +3050,12 @@
           var entry = data[0];
           var def = '';
           var ipa = '';
-          // Extract first definition
           if (entry.meanings && entry.meanings.length) {
             for (var i = 0; i < entry.meanings.length; i++) {
               var m = entry.meanings[i];
-              if (m.definitions && m.definitions.length) {
-                def = m.definitions[0].definition;
-                break;
-              }
+              if (m.definitions && m.definitions.length) { def = m.definitions[0].definition; break; }
             }
           }
-          // Extract IPA from phonetics
           if (entry.phonetics && entry.phonetics.length) {
             for (var j = 0; j < entry.phonetics.length; j++) {
               if (entry.phonetics[j].text) { ipa = entry.phonetics[j].text; break; }
@@ -3035,6 +3063,19 @@
           }
           return { definition: def, ipa: ipa };
         } catch(e) { return null; }
+      }
+
+      // ── Combined: Wordnik → Free Dictionary → nothing ──
+      async function fetchDictionary(word) {
+        var w = await fetchWordnik(word);
+        if (w && w.definition) {
+          // Wordnik got definition, try FreeDict for IPA only
+          var fd = await fetchFreeDict(word);
+          if (fd && fd.ipa) w.ipa = fd.ipa;
+          return w;
+        }
+        // Fall back to Free Dictionary for everything
+        return await fetchFreeDict(word);
       }
 
       // ── MyMemory Translation (EN → IT) ──
@@ -3212,6 +3253,19 @@
 
           var level = (window.CEFR_LEVELS && window.CEFR_LEVELS[word]) ? window.CEFR_LEVELS[word] : estimateCEFR(word);
           var rawPos = (window.LEMMA_POS_MAP && window.LEMMA_POS_MAP[word]) ? window.LEMMA_POS_MAP[word] : '—';
+          // compromise.js fallback
+          if (rawPos === '—' && typeof nlp !== 'undefined') {
+            try {
+              var doc = nlp(word); var terms = doc.terms().json();
+              if (terms && terms.length) {
+                var tgs = terms[0].tags || [];
+                if (tgs.indexOf('Noun') >= 0) rawPos = 'n';
+                else if (tgs.indexOf('Verb') >= 0) rawPos = 'v';
+                else if (tgs.indexOf('Adjective') >= 0) rawPos = 'adj';
+                else if (tgs.indexOf('Adverb') >= 0) rawPos = 'adv';
+              }
+            } catch(e) {}
+          }
           var posLabel = mapPos(rawPos);
 
           // Update header
