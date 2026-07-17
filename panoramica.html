@@ -735,7 +735,7 @@
           <div role="tabpanel" class="subtab-pane" id="sub-wb-expand">
             <div class="wb-stats" id="wbExpandStats"></div>
             <!-- ── Box style controls ── -->
-            <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px;flex-wrap:wrap;padding:8px 14px;background:var(--panel-2);border-radius:12px;border:1px solid var(--line)">
+            <div class="wbx-toggle-bar" style="display:flex;align-items:center;gap:8px;margin-bottom:14px;flex-wrap:wrap;padding:8px 14px;background:var(--panel-2);border-radius:12px;border:1px solid var(--line)">
               <span style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--text-faint);flex-shrink:0">Stile</span>
               <button class="fchip" id="wbxAccentBtn" title="Clicca per cambiare schema colore" style="font-size:11px">🎨 Colore</button>
               <span style="width:1px;height:18px;background:var(--line);flex-shrink:0;margin:0 2px"></span>
@@ -784,7 +784,7 @@
                 };
 
                 // Wire up toggle bar clicks
-                var bar = document.querySelector('#sub-wb-expand > div:first-of-type');
+                var bar = document.querySelector('#sub-wb-expand .wbx-toggle-bar');
                 if (bar) {
                   bar.addEventListener('click', function(e){
                     var chip = e.target.closest('[data-wbx-mode]');
@@ -2875,7 +2875,6 @@
           var cardsHtml = '';
           suggestions.forEach(function(s) {
             var posLabel = mapPos(s.pos);
-            var scorePct = s.score ? Math.min(99, Math.round(s.score / 1000)) : 0;
             cardsHtml += '<article class="wbx-box" data-pos="' + posLabel + '" data-cefr="' + s.level + '" data-word="' + s.word + '">' +
               '<div class="wbx-main-col">' +
               '<div class="wbx-word-zone">' +
@@ -2883,8 +2882,9 @@
               '<div class="wbx-ipa">—</div>' +
               '</div>' +
               '<div class="wbx-meta-zone">' +
-              '<div class="wbx-def">' + (relLabel || 'Correlato') + ' a <strong>' + query + '</strong>' + (scorePct > 0 ? ' · rilevanza ' + scorePct + '%' : '') + '</div>' +
-              '<div class="wbx-trans">→ Aggiungi alla tua raccolta</div>' +
+              '<div class="wbx-def">Caricamento…</div>' +
+              '<div class="wbx-trans" style="opacity:0">—</div>' +
+              '<div class="wbx-syns"></div>' +
               '</div>' +
               '</div>' +
               '<div class="wbx-save-col">' +
@@ -2897,7 +2897,9 @@
           results.innerHTML = '<section class="panel-head" style="margin-top:0"><h3 style="font-size:16px">' + relLabel + ' — ' + suggestions.length + ' suggerimenti per "' + query + '"</h3></section>' +
             '<div class="wbx-grid">' + cardsHtml + '</div>';
           // Auto-size long words
-          setTimeout(autoSizeExpandWords, 100);
+          setTimeout(window.autoSizeExpandWords, 100);
+          // Enrich cards with real definitions, translations, synonyms
+          enrichExpandCards(query);
 
         } catch(e) {
           results.innerHTML = '<section class=\"alt-card-grid\"><article class=\"alt-card\"><h3>⚠️ Errore</h3><p style=\"font-size:14px;color:var(--text-soft)\">Impossibile raggiungere il servizio di suggerimenti. Riprova tra qualche secondo.</p></article></section>';
@@ -2915,6 +2917,127 @@
         if (!tag) return '—';
         var t = tag.toLowerCase().trim();
         return m[t] || (t.length <= 3 ? t.toUpperCase() : t);
+      }
+
+      // ── Enrich cards with real dictionary + translation + synonym data ──
+      async function enrichExpandCards(queryWord) {
+        var boxes = document.querySelectorAll('#wbExpandResults .wbx-box');
+        // Process 3 words at a time to avoid flooding APIs
+        for (var i = 0; i < boxes.length; i += 3) {
+          var batch = Array.from(boxes).slice(i, i + 3);
+          await Promise.all(batch.map(function(box) { return enrichOneCard(box, queryWord); }));
+        }
+      }
+
+      async function enrichOneCard(box, queryWord) {
+        var word = box.getAttribute('data-word');
+        if (!word || word.length < 2) return;
+        try {
+          var defEl = box.querySelector('.wbx-def');
+          var transEl = box.querySelector('.wbx-trans');
+          var synsEl = box.querySelector('.wbx-syns');
+          var ipaEl = box.querySelector('.wbx-ipa');
+
+          // Fetch all 3 data sources in parallel
+          var results = await Promise.allSettled([
+            fetchDictionary(word),
+            fetchTranslationIT(word),
+            fetchSynonymsEN(word)
+          ]);
+          var dict = results[0].status === 'fulfilled' ? results[0].value : null;
+          var trans = results[1].status === 'fulfilled' ? results[1].value : null;
+          var syns = results[2].status === 'fulfilled' ? results[2].value : null;
+
+          // Update definition
+          if (dict && dict.definition && defEl) {
+            defEl.textContent = dict.definition;
+          } else if (defEl) {
+            defEl.textContent = 'Parola suggerita' + (queryWord ? ' a partire da ' + queryWord : '');
+            defEl.style.color = 'var(--text-soft)';
+          }
+
+          // Update IPA
+          if (dict && dict.ipa && ipaEl) {
+            ipaEl.textContent = dict.ipa;
+            ipaEl.style.color = '';
+          }
+
+          // Update translations
+          if (trans && transEl) {
+            var chips = trans.slice(0, 4).map(function(t){
+              return '<span class="pc-trans-chip">' + t + '</span>';
+            }).join(' <span style="color:rgba(255,255,255,.15);font-weight:400">·</span> ');
+            transEl.innerHTML = '→ ' + chips;
+            transEl.style.opacity = '1';
+          } else if (transEl) {
+            transEl.style.display = 'none';
+          }
+
+          // Update synonym chips
+          if (syns && syns.length && synsEl) {
+            synsEl.innerHTML = syns.slice(0, 6).map(function(s){
+              return '<span data-word="' + s + '" title="Clicca per esplorare">' + s + '</span>';
+            }).join('');
+          }
+        } catch(e) {
+          // Silently fail — card stays with "Caricamento…" which is acceptable
+        }
+      }
+
+      // ── Free Dictionary API ──
+      async function fetchDictionary(word) {
+        try {
+          var resp = await fetch('https://api.dictionaryapi.dev/api/v2/entries/en/' + encodeURIComponent(word));
+          if (!resp.ok) return null;
+          var data = await resp.json();
+          if (!data || !data.length) return null;
+          var entry = data[0];
+          var def = '';
+          var ipa = '';
+          // Extract first definition
+          if (entry.meanings && entry.meanings.length) {
+            for (var i = 0; i < entry.meanings.length; i++) {
+              var m = entry.meanings[i];
+              if (m.definitions && m.definitions.length) {
+                def = m.definitions[0].definition;
+                break;
+              }
+            }
+          }
+          // Extract IPA from phonetics
+          if (entry.phonetics && entry.phonetics.length) {
+            for (var j = 0; j < entry.phonetics.length; j++) {
+              if (entry.phonetics[j].text) { ipa = entry.phonetics[j].text; break; }
+            }
+          }
+          return { definition: def, ipa: ipa };
+        } catch(e) { return null; }
+      }
+
+      // ── MyMemory Translation (EN → IT) ──
+      async function fetchTranslationIT(word) {
+        try {
+          var resp = await fetch('https://api.mymemory.translated.net/get?q=' + encodeURIComponent(word) + '&langpair=en|it');
+          if (!resp.ok) return null;
+          var data = await resp.json();
+          if (data.responseData && data.responseData.translatedText) {
+            var txt = data.responseData.translatedText;
+            // MyMemory returns comma-separated or single translation
+            return txt.split(/[,;]/).map(function(t){ return t.trim(); }).filter(function(t){ return t && t.toLowerCase() !== word.toLowerCase(); });
+          }
+          return null;
+        } catch(e) { return null; }
+      }
+
+      // ── Datamuse synonyms (means-like) ──
+      async function fetchSynonymsEN(word) {
+        try {
+          var resp = await fetch('https://api.datamuse.com/words?ml=' + encodeURIComponent(word) + '&max=8');
+          if (!resp.ok) return null;
+          var data = await resp.json();
+          if (!data || !data.length) return null;
+          return data.map(function(item){ return item.word; }).filter(function(w){ return w && w.toLowerCase() !== word.toLowerCase(); });
+        } catch(e) { return null; }
       }
 
       function levelToColor(level) {
@@ -3009,6 +3132,22 @@
         e.stopPropagation();
         var box = btn.closest('.wbx-box');
         if (box) { box.style.opacity = '0'; box.style.transform = 'scale(.95)'; box.style.transition = 'all .2s'; setTimeout(function(){ box.remove(); }, 200); }
+      });
+
+      // ── Event delegation: synonym chip click → search that word ──
+      document.addEventListener('click', function(e) {
+        var chip = e.target.closest('.wbx-syns span[data-word]');
+        if (!chip) return;
+        e.stopPropagation();
+        var word = chip.getAttribute('data-word');
+        var inp = document.getElementById('wbExpandSearch');
+        if (inp && word) {
+          inp.value = word;
+          inp.dispatchEvent(new Event('input', {bubbles: true}));
+          // Scroll to results
+          var results = document.getElementById('wbExpandResults');
+          if (results) results.scrollIntoView({behavior: 'smooth', block: 'start'});
+        }
       });
 
       // ── Bookmark: save to "Saved for later" pinned bank ──
