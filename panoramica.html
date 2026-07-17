@@ -264,9 +264,9 @@
     /* ── Box layout (Brutalist Poster) ── */
     .wbx-box{background:#fff;border:3px solid #0f1c24;border-radius:0;padding:0;box-shadow:10px 10px 0 rgba(0,0,0,.2);gap:0;min-height:0;font-family:var(--font-ui);display:grid;grid-template-columns:1fr 56px;grid-template-rows:1fr;grid-template-areas:"main bar";align-items:stretch;transition:transform .25s,box-shadow .25s}
     .wbx-box:hover{transform:translate(-3px,-3px);box-shadow:14px 14px 0 rgba(0,0,0,.28)}
-    /* ── First result = exact query word, dotted outline, no hover ── */
-    .wbx-box.wbx-exact{border-style:dotted!important;border-color:var(--cyan)!important}
-    .wbx-box.wbx-exact:hover{transform:none!important;box-shadow:10px 10px 0 rgba(0,0,0,.2)!important}
+    /* ── First result = exact query word, golden glow, no hover lift ── */
+    .wbx-box.wbx-exact{border-color:#0f1c24!important;box-shadow:0 0 0 3px #f59e0b,0 0 20px rgba(245,158,11,.45),10px 10px 0 rgba(0,0,0,.2)!important}
+    .wbx-box.wbx-exact:hover{transform:none!important;box-shadow:0 0 0 3px #f59e0b,0 0 28px rgba(245,158,11,.6),10px 10px 0 rgba(0,0,0,.2)!important}
     /* ── Expanded box (from synonym chip click) ── */
     .wbx-box.expanded{animation:wbxExpandIn .35s cubic-bezier(.2,.8,.2,1) backwards;box-shadow:inset 0 0 0 2px rgba(6,182,212,.35),10px 10px 0 rgba(0,0,0,.2)!important;border-color:rgba(6,182,212,.4)!important}
     .wbx-box.expanded:hover{transform:translate(-3px,-3px);box-shadow:inset 0 0 0 2px rgba(6,182,212,.5),14px 14px 0 rgba(0,0,0,.28)!important}
@@ -274,6 +274,8 @@
     .wbx-close-exp{position:absolute;top:6px;right:6px;width:22px;height:22px;border-radius:50%;border:1px solid rgba(255,255,255,.15);background:rgba(0,0,0,.35);color:rgba(255,255,255,.55);cursor:pointer;font-size:12px;display:none;align-items:center;justify-content:center;z-index:2;font-family:var(--font-ui);transition:all .15s}
     .wbx-close-exp:hover{background:rgba(248,113,113,.3);border-color:rgba(248,113,113,.45);color:#f87171}
     .wbx-box.expanded .wbx-close-exp{display:flex}
+    /* ── Hidden initially for mostra-di-più ── */
+    .wbx-box.wbx-hidden-initially{display:none!important}
     .wbx-main-col{grid-area:main;display:flex;flex-direction:column;min-width:0;overflow:hidden}
     .wbx-word-zone{display:block;grid-area:auto;background:var(--sz-dark);padding:18px 20px 10px;overflow:hidden;min-width:0}
     .wbx-meta-zone{display:flex;flex-direction:column;grid-area:auto;padding:16px 24px 20px;gap:6px;flex:auto;min-width:0}
@@ -984,6 +986,24 @@
                       wel.style.fontSize = Math.max(12, (cur * ratio) * 0.95) + 'px';
                     }
                   });
+                };
+
+                // ── Show-more pagination (5 at a time, up to 20) ──
+                window.wbxShowMore = function(btn){
+                  var hidden = document.querySelectorAll('#wbExpandResults .wbx-box.wbx-hidden-initially');
+                  var toShow = Math.min(5, hidden.length);
+                  for (var i = 0; i < toShow; i++) {
+                    hidden[i].classList.remove('wbx-hidden-initially');
+                    hidden[i].style.display = '';
+                  }
+                  // Update or remove button
+                  var remaining = document.querySelectorAll('#wbExpandResults .wbx-box.wbx-hidden-initially');
+                  if (remaining.length === 0) {
+                    btn.parentElement.remove();
+                  } else {
+                    btn.innerHTML = '<i class="fa-solid fa-chevron-down"></i> Mostra di più (' + remaining.length + ')';
+                  }
+                  window.autoSizeExpandWords();
                 };
 
                 // Wire up toggle bar clicks
@@ -3012,7 +3032,8 @@
           wordLevel = window.CEFR_LEVELS[query.toLowerCase()];
         }
         if (!wordLevel) wordLevel = estimateCEFR(query);
-        if (info) info.textContent = wordLevel ? 'CEFR: ~' + wordLevel : '';
+        // (CEFR info now shown inside the exact word box, not as separate label)
+        if (info) info.textContent = '';
 
         // ── Build Datamuse API URL based on relation ──
         var apiUrl = '';
@@ -3116,10 +3137,28 @@
           // Build exact-match card for the query word itself (dotted outline, first position)
           var exactLevel = wordLevel || estimateCEFR(query);
           var exactPos = '—';
-          var exactCardHtml = '<article class="wbx-box wbx-exact" data-pos="' + exactPos + '" data-cefr="' + exactLevel + '" data-word="' + query + '">' +
+          // Determine POS for the exact query word
+          if (window.LEMMA_POS_MAP && window.LEMMA_POS_MAP[query.toLowerCase()]) {
+            exactPos = window.LEMMA_POS_MAP[query.toLowerCase()];
+          }
+          if (exactPos === '—' && typeof nlp !== 'undefined') {
+            try {
+              var exactDoc = nlp(query.toLowerCase());
+              var exactTerms = exactDoc.terms().json();
+              if (exactTerms && exactTerms.length) {
+                var exactTags = exactTerms[0].tags || [];
+                if (exactTags.indexOf('Noun') >= 0) exactPos = 'n';
+                else if (exactTags.indexOf('Verb') >= 0) exactPos = 'v';
+                else if (exactTags.indexOf('Adjective') >= 0) exactPos = 'adj';
+                else if (exactTags.indexOf('Adverb') >= 0) exactPos = 'adv';
+              }
+            } catch(e) {}
+          }
+          var exactPosLabel = mapPos(exactPos);
+          var exactCardHtml = '<article class="wbx-box wbx-exact" data-pos="' + exactPosLabel + '" data-cefr="' + exactLevel + '" data-word="' + query + '">' +
             '<div class="wbx-main-col">' +
             '<div class="wbx-word-zone">' +
-            '<div class="wbx-head"><span class="wbx-w">' + query + '</span><span class="wbx-cefr">' + exactLevel + '</span><span class="wbx-pos">' + exactPos + '</span></div>' +
+            '<div class="wbx-head"><span class="wbx-w">' + query + '</span><span class="wbx-cefr">' + exactLevel + '</span><span class="wbx-pos">' + exactPosLabel + '</span></div>' +
             '<div class="wbx-ipa">—</div>' +
             '</div>' +
             '<div class="wbx-meta-zone">' +
@@ -3129,9 +3168,8 @@
             '</div>' +
             '</div>' +
             '<div class="wbx-save-col">' +
-            '<button class="wbx-save-btn" data-word="' + query + '" data-level="' + exactLevel + '" data-pos="' + exactPos + '" title="Aggiungi a Build From Known">+</button>' +
-            '<button class="wbx-bookmark-btn" data-word="' + query + '" data-level="' + exactLevel + '" data-pos="' + exactPos + '" title="Salva per dopo"><i class="fa-regular fa-bookmark"></i></button>' +
-            '<button class="wbx-close-btn" title="Nascondi">×</button>' +
+            '<button class="wbx-save-btn" data-word="' + query + '" data-level="' + exactLevel + '" data-pos="' + exactPosLabel + '" title="Aggiungi a Build From Known">+</button>' +
+            '<button class="wbx-bookmark-btn" data-word="' + query + '" data-level="' + exactLevel + '" data-pos="' + exactPosLabel + '" title="Salva per dopo"><i class="fa-regular fa-bookmark"></i></button>' +
             '</div>' +
             '</article>';
 
@@ -3154,12 +3192,11 @@
               '<div class="wbx-save-col">' +
               '<button class="wbx-save-btn" data-word="' + s.word + '" data-level="' + s.level + '" data-pos="' + posLabel + '" title="Aggiungi a Build From Known">+</button>' +
               '<button class="wbx-bookmark-btn" data-word="' + s.word + '" data-level="' + s.level + '" data-pos="' + posLabel + '" title="Salva per dopo"><i class="fa-regular fa-bookmark"></i></button>' +
-              '<button class="wbx-close-btn" title="Nascondi">×</button>' +
               '</div>' +
               '</article>';
           });
-          results.innerHTML = '<section class="panel-head" style="margin-top:0"><h3 style="font-size:16px">' + relLabel + ' — 1 + ' + suggestions.length + ' suggerimenti per "' + query + '"</h3></section>' +
-            '<div class="wbx-grid">' + exactCardHtml + cardsHtml + '</div>';
+          results.innerHTML = '<div class="wbx-grid">' + exactCardHtml + cardsHtml + '</div>' +
+            (suggestions.length > 5 ? '<div style="text-align:center;margin-top:16px"><button class="fchip" onclick="window.wbxShowMore(this)" style="font-size:14px;padding:10px 22px;font-family:var(--font-ui)"><i class="fa-solid fa-chevron-down"></i> Mostra di più (' + (suggestions.length - 5) + ')</button></div>' : '');
           // Auto-size long words
           setTimeout(window.autoSizeExpandWords, 100);
           // Enrich cards with real definitions, translations, synonyms
@@ -3205,6 +3242,11 @@
         }
         // Sort: boxes with real definitions first, fallbacks last
         sortExpandBoxes();
+        // Hide boxes beyond first 6 (1 exact + 5 suggestions) for mostra-di-più
+        var allBoxes = document.querySelectorAll('#wbExpandResults .wbx-box');
+        for (var j = 6; j < allBoxes.length; j++) {
+          allBoxes[j].classList.add('wbx-hidden-initially');
+        }
       }
 
       function sortExpandBoxes() {
@@ -3212,6 +3254,9 @@
         if (!grid) return;
         var boxes = Array.from(grid.querySelectorAll('.wbx-box'));
         boxes.sort(function(a, b) {
+          // Exact-match card always stays first
+          if (a.classList.contains('wbx-exact')) return -1;
+          if (b.classList.contains('wbx-exact')) return 1;
           var defA = (a.querySelector('.wbx-def')?.textContent || '').trim();
           var defB = (b.querySelector('.wbx-def')?.textContent || '').trim();
           var aIsFallback = defA === 'Caricamento…' || defA.indexOf('Parola suggerita') === 0;
