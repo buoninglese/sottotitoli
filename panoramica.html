@@ -2972,6 +2972,7 @@
       // Expose wordbank helpers globally (needed by onclick handlers)
       window.closeWordbankView = closeWordbankView;
       window.openWordbankView = openWordbankView;
+      window.renameSession = renameSession;
       window.sortWbWords = sortWbWords;
       window.filterWbWords = filterWbWords;
       window.addWordToCurrentBank = addWordToCurrentBank;
@@ -3429,11 +3430,11 @@
             '</div>';
         }
 
-        // Fetch words with status 'due' or 'new' (reviewable)
-        var q = sb.from('user_wordbank_words')
-          .select('id,word,pos,cefr_level,status,usage_count,last_reviewed_at,srs_interval,added_at')
+        // Fetch reviewable words from review_words (not user_wordbank_words — those columns don't exist)
+        var q = sb.from('review_words')
+          .select('id,lemma,pos,cefr,mastery_score,review_state,next_review_at,last_reviewed_at,lapses,personal_frequency')
           .eq('user_id', userId)
-          .in('status', ['due', 'new'])
+          .or('is_new.eq.true,next_review_at.lte.' + new Date().toISOString())
           .order('last_reviewed_at', { ascending: true, nullsFirst: true })
           .limit(100);
         var res = await q;
@@ -3453,18 +3454,20 @@
         var now = new Date();
         var html = '';
         words.forEach(function(w) {
-          var cefrBadge = w.cefr_level ? '<span class="badge badge-cefr">' + w.cefr_level + '</span>' : '<span style="font-size:10px;color:var(--text-faint)">—</span>';
+          var cefrVal = w.cefr || '';
+          var cefrBadge = cefrVal ? '<span class="badge badge-cefr cefr-'+cefrVal+'">' + cefrVal + '</span>' : '<span style="font-size:10px;color:var(--text-faint)">—</span>';
           var posBadge = w.pos ? '<span class="badge badge-pos">' + w.pos + '</span>' : '<span style="font-size:10px;color:var(--text-faint)">—</span>';
           var lastReview = w.last_reviewed_at ? fmtDate(w.last_reviewed_at) : 'Mai';
-          var interval = w.srs_interval ? w.srs_interval + 'g' : '—';
-          var statusClass = 'badge-' + (w.status || 'new');
-          var statusLabel = w.status === 'due' ? 'Da ripassare' : 'Nuova';
-          var isOverdue = w.status === 'due' && w.last_reviewed_at && (now - new Date(w.last_reviewed_at)) > (w.srs_interval || 1) * 86400000;
+          var interval = w.interval_days ? w.interval_days + 'g' : '—';
+          var isNew = w.is_new || w.review_state === 'new';
+          var isOverdue = w.next_review_at && new Date(w.next_review_at) < now;
+          var statusLabel = isNew ? 'Nuova' : isOverdue ? 'In ritardo' : 'In programma';
+          var statusClass = isNew ? 'badge-new' : isOverdue ? 'badge-learning' : 'badge-known';
           var rowStyle = isOverdue ? 'style="background:rgba(217,119,6,.06)"' : '';
 
           html += '<tr data-wid="' + w.id + '" ' + rowStyle + ' onclick="wbReviewToggleRow(this)">' +
             '<td class="cb"><input type="checkbox" onclick="event.stopPropagation()" onchange="wbReviewUpdateBulkBar()" style="accent-color:var(--cyan)"></td>' +
-            '<td><span class="wb-word" onclick="event.stopPropagation();openWbDrawer(\'' + w.id + '\')">' + w.word + '</span></td>' +
+            '<td><span class="wb-word">' + (w.lemma || '—') + '</span></td>' +
             '<td>' + cefrBadge + '</td>' +
             '<td>' + posBadge + '</td>' +
             '<td style="font-size:11px;color:var(--text-faint)">' + lastReview + '</td>' +
@@ -3584,12 +3587,11 @@
         if (!r.data?.session) return;
         var userId = r.data.session.user.id;
 
-        // Fetch user's known words (top 8 by usage)
-        var res = await sb.from('user_wordbank_words')
-          .select('word,pos,cefr_level,usage_count')
+        // Fetch user's known words from review_words (top 8 by frequency)
+        var res = await sb.from('review_words')
+          .select('lemma,pos,cefr,personal_frequency')
           .eq('user_id', userId)
-          .in('status', ['known', 'mastered'])
-          .order('usage_count', { ascending: false })
+          .order('personal_frequency', { ascending: false })
           .limit(8);
         var known = res.data || [];
 
@@ -3601,8 +3603,8 @@
         }
         var html = '';
         known.forEach(function(w) {
-          var level = w.cefr_level || '';
-          html += '<button type=\"button\" class=\"q-chip\" onclick=\"selectExpandWord(\'' + w.word + '\',\'' + (w.cefr_level||'') + '\')\" style=\"font-size:12px\">' + w.word + (level ? ' <span style=\"font-size:9px;opacity:.6\">' + level + '</span>' : '') + '</button>';
+          var level = w.cefr || '';
+          html += '<button type=\"button\" class=\"q-chip\" onclick=\"selectExpandWord(\'' + (w.lemma||'') + '\',\'' + (w.cefr||'') + '\')\" style=\"font-size:12px\">' + (w.lemma||'') + (level ? ' <span style=\"font-size:9px;opacity:.6\">' + level + '</span>' : '') + '</button>';
         });
         container.innerHTML = html;
       }
