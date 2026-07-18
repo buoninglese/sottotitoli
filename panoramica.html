@@ -2475,7 +2475,6 @@
 
         // ── Smart banks (4 recommendation banks — live counts from DB or 0) ──
         var smartHtml = '';
-        var cefrBreakdownData = cefrBreakdown || {};
         // Try to get real counts from the review bank system
         var smartCounts = { goal_next_step: 0, build_from_known: 0, activate_recognized: 0, upcoming_useful_vocab: 0 };
         try {
@@ -2490,7 +2489,7 @@
         if (!smartCounts.build_from_known && stats.totalWords > 0) smartCounts.build_from_known = Math.round(stats.totalWords * 0.2);
         var smartBanks = [
           { id: 'goal_next_step', name: 'Next Step For Your Goal', desc: 'Goal-aligned vocabulary for your profile', count: smartCounts.goal_next_step, signal: smartCounts.goal_next_step > 0 ? smartCounts.goal_next_step + ' suggestions' : 'Complete your profile', preview: [], subtitle: 'Suggested for your current goal' },
-          { id: 'build_from_known', name: 'Build From What You Know', desc: 'Lexical progression from words you already know', count: smartCounts.build_from_known || Math.round(stats.totalWords * 0.2) || 0, signal: 'From your vocabulary', preview: [], subtitle: 'Follow-on words from known vocabulary' },
+          { id: 'build_from_known', name: 'Build From What You Know', desc: 'Lexical progression from words you already know', count: smartCounts.build_from_known, signal: smartCounts.build_from_known > 0 ? smartCounts.build_from_known + ' suggestions' : 'From your vocabulary', preview: [], subtitle: 'Follow-on words from known vocabulary' },
           { id: 'activate_recognized', name: 'Activate What You Recognize', desc: 'Words you understand but rarely use actively', count: smartCounts.activate_recognized, signal: smartCounts.activate_recognized > 0 ? smartCounts.activate_recognized + ' ready' : 'No gap detected', preview: [], subtitle: 'Turn recognition into active use' },
           { id: 'upcoming_useful_vocab', name: 'Upcoming Useful Vocabulary', desc: 'Words likely useful for your next stage', count: smartCounts.upcoming_useful_vocab, signal: smartCounts.upcoming_useful_vocab > 0 ? smartCounts.upcoming_useful_vocab + ' queued' : 'Set your goals first', preview: [], subtitle: 'Suggested for what comes next' }
         ];
@@ -2622,10 +2621,24 @@
 
         var words = [];
         if (bank) {
+          // Custom bank: fetch from user_wordbank_words
           words = await SottotitoliData.getWordbankWords(bank.id);
-        } else {
-          var vocab = await SottotitoliData.getVocabulary(lang, 50);
-          words = vocab || [];
+        } else if (type !== 'custom') {
+          // Pinned/smart bank: try to fetch real membership from review_bank_words
+          try {
+            var sbClient = window.sottotitoliSupabase;
+            if (sbClient) {
+              var { data: bwData } = await sbClient
+                .from('review_bank_words')
+                .select('word_id, review_words(*)')
+                .eq('bank_key', bankId)
+                .eq('status', 'active')
+                .limit(100);
+              if (bwData && bwData.length) {
+                words = bwData.map(function(r) { return r.review_words; }).filter(Boolean);
+              }
+            }
+          } catch(e) { /* leave empty */ }
         }
         _wbState.currentWords = words;
 
