@@ -469,6 +469,22 @@
     return { totalWords: total, dueToday: due, overdue: overdue, reviewedToday: reviewedToday, newThisWeek: newThisWeek, known: known, learning: learning, mastered: words.filter(function(w) { return w.status === 'mastered'; }).length };
   }
 
+  // ── Bank catalog summaries (live counts from review_bank_words) ──
+  async function getBankSummaries() {
+    var userId = await getUserId();
+    if (!userId) return null;
+    try {
+      var { data, error } = await sb().from('review_bank_words').select('bank_key').eq('user_id', userId).eq('status', 'active');
+      if (error || !data) return null;
+      var summary = {};
+      data.forEach(function(r) {
+        if (!summary[r.bank_key]) summary[r.bank_key] = { total: 0 };
+        summary[r.bank_key].total++;
+      });
+      return summary;
+    } catch(e) { return null; }
+  }
+
   /* ═══════════════════════════════════════════
      WORD STATUS — update learning status (never CEFR)
      ═══════════════════════════════════════════ */
@@ -810,6 +826,7 @@
     addWordbank: addWordbank,
     addWordToBank: addWordToBank,
     getWordbankStats: getWordbankStats,
+    getBankSummaries: getBankSummaries,
     updateWordStatus: updateWordStatus,
     removeWordFromBank: removeWordFromBank,
     bulkAddToBank: bulkAddToBank,
