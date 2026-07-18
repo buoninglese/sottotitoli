@@ -147,20 +147,24 @@
     .badge-learning{background:var(--amber-soft);color:var(--amber)}
     .badge-known{background:var(--green-soft);color:var(--green)}
     .badge-source{background:var(--line);color:var(--text-soft)}
-    .drawer-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:100;backdrop-filter:blur(2px)}
+    .drawer-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:1000;backdrop-filter:blur(3px)}
     .drawer-overlay.active{display:block}
-    .drawer{position:fixed;right:0;top:0;bottom:0;width:440px;max-width:100vw;background:var(--panel);border-left:1px solid var(--line);z-index:101;overflow-y:auto;padding:24px;transform:translateX(100%);transition:transform .3s cubic-bezier(.4,0,.2,1);box-shadow:var(--shadow-lg)}
+    .drawer{position:fixed;right:0;top:0;bottom:0;width:440px;max-width:100vw;background:var(--card);border-left:1px solid var(--line);z-index:1001;overflow-y:auto;padding:28px 24px;transform:translateX(100%);transition:transform .3s cubic-bezier(.4,0,.2,1);box-shadow:-8px 0 40px rgba(0,0,0,.15)}
     .drawer.active{transform:translateX(0)}
-    .drawer-close{position:absolute;top:14px;right:14px;width:30px;height:30px;border-radius:50%;border:1px solid var(--line);background:var(--card);display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:14px;color:var(--text-soft);transition:all var(--transition)}
+    .drawer-close{position:absolute;top:14px;right:14px;width:32px;height:32px;border-radius:50%;border:1px solid var(--line);background:var(--card);display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:14px;color:var(--text-soft);transition:all var(--transition)}
     .drawer-close:hover{background:var(--line);color:var(--text)}
-    .drawer h3{font-size:22px;font-weight:800;margin:0 0 4px;letter-spacing:-.02em}
+    .drawer h3{font-size:26px;font-weight:900;margin:0 0 0;letter-spacing:-.02em;padding-right:32px}
+    .drawer-ipa{font-size:15px;color:var(--text-soft);font-family:'Gentium Plus','Charis SIL','Times New Roman',serif;margin:2px 0 4px}
     .drawer-meta{display:flex;gap:6px;align-items:center;margin-bottom:14px;flex-wrap:wrap}
     .drawer-meta .badge{font-size:10px;padding:2px 8px;border-radius:100px;font-weight:700;letter-spacing:.03em}
     .drawer-section{margin-bottom:16px}
     .drawer-section h4{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--text-faint);margin-bottom:6px}
     .drawer-section p{font-size:13px;color:var(--text-soft);line-height:1.5}
     .membership-list{display:flex;flex-wrap:wrap;gap:5px}
-    .membership-chip{font-size:10px;padding:3px 9px;border-radius:100px;background:var(--teal-4);color:var(--teal);font-weight:500}
+    .membership-chip{font-size:10px;padding:3px 9px;border-radius:100px;background:var(--teal-4);color:var(--teal);font-weight:500;cursor:pointer;border:1px solid transparent;transition:all .15s}
+    .membership-chip:hover{background:var(--teal-4);border-color:var(--teal);opacity:.8}
+    .membership-chip.add-chip{background:rgba(6,182,212,.06);color:var(--cyan);border:1px dashed rgba(6,182,212,.25)}
+    .membership-chip.add-chip:hover{background:rgba(6,182,212,.15);border-style:solid}
     .drawer-signals{display:grid;grid-template-columns:1fr 1fr;gap:6px}
     .drawer-signal{font-size:11px;color:var(--text-soft)}
     .drawer-signal strong{color:var(--text)}
@@ -922,12 +926,14 @@
           </div>
           <!-- Word detail drawer overlay -->
           <div class="drawer-overlay" id="wbDrawerOverlay" onclick="closeWbDrawer()"></div>
-          <div class="drawer" id="wbDrawer">
+          <div class="drawer" id="wbDrawer" onclick="event.stopPropagation()">
             <button class="drawer-close" onclick="closeWbDrawer()"><i class="fa-solid fa-xmark"></i></button>
             <h3 id="wbDrawerWord">—</h3>
+            <div class="drawer-ipa" id="wbDrawerIPA"></div>
             <div class="drawer-meta" id="wbDrawerMeta"></div>
             <div class="drawer-section"><h4>Meaning</h4><p id="wbDrawerMeaning">—</p></div>
             <div class="drawer-section"><h4>Bank membership</h4><div class="membership-list" id="wbDrawerBanks"></div></div>
+            <div class="drawer-section"><h4>Add to bank</h4><div class="membership-list" id="wbDrawerAddBanks" style="margin-top:4px"></div></div>
             <div class="drawer-section"><h4>Signals</h4><div class="drawer-signals" id="wbDrawerSignals"></div></div>
           </div>
         </div>
@@ -2823,6 +2829,14 @@
             }
           } catch(e) { /* leave empty */ }
         }
+        // ── Enrich all words with CEFR from local lookup ──
+        words.forEach(function(w) {
+          var wordKey = (w.word || w.lemma || '').toLowerCase();
+          if (wordKey && window.CEFR_LEVELS && window.CEFR_LEVELS[wordKey] && !w.cefr && !w.cefr_level) {
+            w.cefr = window.CEFR_LEVELS[wordKey];
+            w.cefr_level = window.CEFR_LEVELS[wordKey];
+          }
+        });
         _wbState.currentWords = words;
 
         insideEl.innerHTML =
@@ -3109,35 +3123,45 @@
         document.getElementById('wbDrawer').classList.add('active');
         var wordText = w.word || w.lemma || w.normalized || '—';
         document.getElementById('wbDrawerWord').textContent = wordText;
+        document.getElementById('wbDrawerIPA').textContent = '';
+
+        // ── Meta: POS + CEFR ──
         var metaHtml = '';
+        var posVal = w.pos || w.part_of_speech || '';
         var cefrVal = w.cefr || w.cefr_level || w.level || '';
         if (cefrVal) metaHtml += '<span class="badge badge-cefr">'+cefrVal+'</span>';
-        var posVal = w.pos || w.part_of_speech || '';
         if (posVal) metaHtml += '<span class="badge badge-pos">'+posVal+'</span>';
         document.getElementById('wbDrawerMeta').innerHTML = metaHtml || '<span style="font-size:11px;color:var(--text-faint)">—</span>';
 
-        // Try to fetch definition from Free Dictionary API
+        // ── Definition + IPA from Free Dictionary API ──
         var definition = w.definition || w.translation_primary || '';
         var meaningEl = document.getElementById('wbDrawerMeaning');
-        if (!definition && wordText !== '—') {
-          meaningEl.textContent = 'Caricamento…';
+        var ipaEl = document.getElementById('wbDrawerIPA');
+        if (wordText !== '—') {
+          meaningEl.textContent = definition || 'Caricamento…';
           try {
             var resp = await fetch('https://api.dictionaryapi.dev/api/v2/entries/en/' + encodeURIComponent(wordText.toLowerCase()));
             if (resp.ok) {
               var defData = await resp.json();
-              if (defData && defData[0] && defData[0].meanings && defData[0].meanings[0]) {
-                var m = defData[0].meanings[0];
-                definition = (m.definitions && m.definitions[0] ? m.definitions[0].definition : '') || '';
-                // Also populate POS and IPA if missing
-                if (!posVal && m.partOfSpeech) {
-                  posVal = m.partOfSpeech.toUpperCase();
-                  metaHtml += '<span class="badge badge-pos">'+posVal+'</span>';
-                  document.getElementById('wbDrawerMeta').innerHTML = metaHtml;
-                }
+              if (defData && defData[0]) {
+                // IPA
                 if (defData[0].phonetic) {
                   var ipa = typeof defData[0].phonetic === 'string' ? defData[0].phonetic : (defData[0].phonetic.text || '');
-                  if (ipa) {
-                    document.getElementById('wbDrawerWord').textContent = wordText + '  ' + ipa;
+                  if (ipa) ipaEl.textContent = '/' + ipa + '/';
+                } else if (defData[0].phonetics && defData[0].phonetics.length) {
+                  var ph = defData[0].phonetics.find(function(p){ return p.text; });
+                  if (ph) ipaEl.textContent = '/' + ph.text + '/';
+                }
+                // Definition + POS backfill
+                if (defData[0].meanings && defData[0].meanings[0]) {
+                  var m = defData[0].meanings[0];
+                  if (!definition && m.definitions && m.definitions[0]) {
+                    definition = m.definitions[0].definition || '';
+                  }
+                  if (!posVal && m.partOfSpeech) {
+                    posVal = m.partOfSpeech.toUpperCase();
+                    metaHtml += '<span class="badge badge-pos">'+posVal+'</span>';
+                    document.getElementById('wbDrawerMeta').innerHTML = metaHtml;
                   }
                 }
               }
@@ -3145,21 +3169,69 @@
           } catch(e) { /* API unavailable */ }
         }
         meaningEl.textContent = definition || (I18n && I18n.t ? I18n.t('word_definition_unavailable') : 'Definizione non ancora disponibile.');
-        // Bank membership
-        var banks = await SottotitoliData.getWordbanks(window.SOTTOTITOLI_STUDY_LANG||'en');
+
+        // ── Bank membership (current banks) ──
+        var lang = window.SOTTOTITOLI_STUDY_LANG || 'en';
+        var banks = await SottotitoliData.getWordbanks(lang);
         var membershipHTML = '';
+        var currentBankIds = [];
         if (banks && banks.length) {
-          for (var i=0;i<Math.min(banks.length,3);i++) {
-            membershipHTML += '<span class="membership-chip">'+banks[i].name+'</span>';
+          for (var i = 0; i < banks.length; i++) {
+            // Check if word is in this bank by looking at current bank context
+            if (_wbState.currentBankUUID === banks[i].id || _wbState.currentBank === banks[i].id) {
+              currentBankIds.push(banks[i].id);
+            }
+          }
+          if (currentBankIds.length > 0) {
+            banks.forEach(function(b) {
+              if (currentBankIds.indexOf(b.id) !== -1) {
+                membershipHTML += '<span class="membership-chip">'+b.name+'</span>';
+              }
+            });
+          } else {
+            membershipHTML = '<span class="membership-chip">Current bank</span>';
           }
         }
-        document.getElementById('wbDrawerBanks').innerHTML = membershipHTML || '<span style="font-size:12px;color:var(--text-faint)">' + (I18n && I18n.t ? I18n.t('word_not_in_any_bank') : 'Non presente in nessuna word bank.') + '</span>';
-        // Signals
+        document.getElementById('wbDrawerBanks').innerHTML = membershipHTML || '<span style="font-size:12px;color:var(--text-faint)">Non presente in nessuna word bank.</span>';
+
+        // ── Add to other banks ──
+        var addBankHTML = '';
+        if (banks && banks.length) {
+          for (var j = 0; j < banks.length; j++) {
+            var b = banks[j];
+            if (currentBankIds.indexOf(b.id) !== -1) continue; // skip current bank
+            addBankHTML += '<span class="membership-chip add-chip" onclick="event.stopPropagation();wbAddWordToBank(\''+wordId+'\',\''+b.id+'\',\''+b.name.replace(/'/g,"\\'")+'\',this)" title="Add to '+b.name+'">+ '+b.name+'</span>';
+          }
+        }
+        if (!addBankHTML) addBankHTML = '<span style="font-size:11px;color:var(--text-faint)">Create another bank first</span>';
+        document.getElementById('wbDrawerAddBanks').innerHTML = addBankHTML;
+
+        // ── Signals ──
         var uses = w.usage_count || w.frequency || w.reps || 0;
         document.getElementById('wbDrawerSignals').innerHTML =
           '<div class="drawer-signal">Uses <strong>'+(uses > 0 ? uses+'×' : '—')+'</strong></div>'+
           '<div class="drawer-signal">CEFR <strong>'+(cefrVal || '—')+'</strong></div>';
       }
+
+      // ── Add word to another bank from drawer ──
+      window.wbAddWordToBank = async function(wordId, bankId, bankName, chipEl) {
+        var w = _wbState.currentWords.find(function(x){return x.id === wordId;});
+        if (!w) return;
+        var word = w.word || w.lemma || '';
+        var pos = w.pos || w.part_of_speech || null;
+        try {
+          await SottotitoliData.addWordToBank(bankId, word, pos);
+          SottotitoliData.cacheClear();
+          if (chipEl) {
+            chipEl.textContent = '✓ ' + bankName;
+            chipEl.classList.remove('add-chip');
+            chipEl.style.background = 'var(--teal-4)';
+            chipEl.style.color = 'var(--teal)';
+            chipEl.style.border = '1px solid var(--teal)';
+            chipEl.onclick = null;
+          }
+        } catch(e) { console.warn('add to bank:', e); }
+      };
 
       function closeWbDrawer() {
         document.getElementById('wbDrawerOverlay').classList.remove('active');
