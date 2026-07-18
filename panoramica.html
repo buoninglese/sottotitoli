@@ -2459,16 +2459,36 @@
             '</div>';
         }
 
-        // ── Pinned banks (4 operational banks — new catalog) ──
-        var pinnedHtml = '';
+        // ── Pinned counts: try review_words first, fall back to wordbank stats ──
+        var pinnedCounts = { review_due_now: 0, new_from_sessions: 0, saved_from_sessions: 0, fragile_words: 0 };
+        try {
+          var sbClient = window.sottotitoliSupabase;
+          if (sbClient) {
+            var nowISO = new Date().toISOString();
+            // Review Due Now: next_review_at <= now
+            var { count: dueCount } = await sbClient.from('review_words').select('*', { count: 'exact', head: true }).lte('next_review_at', nowISO);
+            if (dueCount !== null) pinnedCounts.review_due_now = dueCount;
+            // New From Recent Sessions: is_new = true, first_seen_at within 7 days
+            var weekAgo = new Date(Date.now() - 7*86400000).toISOString();
+            var { count: newCount } = await sbClient.from('review_words').select('*', { count: 'exact', head: true }).eq('is_new', true).gte('first_seen_at', weekAgo);
+            if (newCount !== null) pinnedCounts.new_from_sessions = newCount;
+            // Fragile Words: mastery < 40 OR lapses >= 2
+            var { count: fragCount } = await sbClient.from('review_words').select('*', { count: 'exact', head: true }).or('mastery_score.lt.40,lapses.gte.2');
+            if (fragCount !== null) pinnedCounts.fragile_words = fragCount;
+          }
+        } catch(e) { /* review_words table may not exist yet — fall back to wordbank stats */ }
+        // Saved From Sessions: count from the actual user bank
+        if (stats.totalWords > 0) pinnedCounts.saved_from_sessions = stats.totalWords;
+
         var pinnedBanks = [
-          { id: 'review_due_now', name: 'Review Due Now', desc: 'Words due now or overdue for review', icon: '⏰', count: stats.dueToday || 0, signal: stats.dueToday > 0 ? stats.dueToday + ' due' : 'All caught up!', preview: [], subtitle: 'Words ready for review right now' },
-          { id: 'new_from_sessions', name: 'New From Recent Sessions', desc: 'Recently captured words not yet stabilized', icon: '✨', count: stats.newThisWeek || 0, signal: stats.newThisWeek > 0 ? '+' + stats.newThisWeek + ' this week' : 'None', preview: [], subtitle: 'New words from your recent sessions' },
-          { id: 'saved_from_sessions', name: 'Saved From Sessions', desc: 'Words you saved during live sessions', icon: '💾', count: stats.totalWords || 0, signal: (stats.dueToday || 0) + ' due today', preview: [], subtitle: 'Saved words from live use' },
-          { id: 'fragile_words', name: 'Fragile Words', desc: 'Weak words at risk of being forgotten', icon: '⚠️', count: stats.learning || 0, signal: stats.learning > 0 ? stats.learning + ' need reinforcement' : 'None at risk', preview: [], subtitle: 'Words that need reinforcement' }
+          { id: 'review_due_now', name: 'Review Due Now', desc: 'Words due now or overdue for review', count: pinnedCounts.review_due_now, signal: pinnedCounts.review_due_now > 0 ? pinnedCounts.review_due_now + ' due' : 'All caught up!', subtitle: 'Words ready for review right now' },
+          { id: 'new_from_sessions', name: 'New From Recent Sessions', desc: 'Recently captured words not yet stabilized', count: pinnedCounts.new_from_sessions, signal: pinnedCounts.new_from_sessions > 0 ? '+' + pinnedCounts.new_from_sessions + ' this week' : 'None yet', subtitle: 'New words from your recent sessions' },
+          { id: 'saved_from_sessions', name: 'Saved From Sessions', desc: 'Words you saved during live sessions', count: pinnedCounts.saved_from_sessions, signal: pinnedCounts.saved_from_sessions > 0 ? pinnedCounts.saved_from_sessions + ' words' : 'Save words during sessions', subtitle: 'Saved words from live use' },
+          { id: 'fragile_words', name: 'Fragile Words', desc: 'Weak words at risk of being forgotten', count: pinnedCounts.fragile_words, signal: pinnedCounts.fragile_words > 0 ? pinnedCounts.fragile_words + ' need reinforcement' : 'None at risk', subtitle: 'Words that need reinforcement' }
         ];
+        var pinnedHtml = '';
         pinnedBanks.forEach(function(b) {
-          pinnedHtml += wbCardHTML(b.id, b.name, 'pinned', b.desc, b.count, b.signal, b.preview, b.subtitle);
+          pinnedHtml += wbCardHTML(b.id, b.name, 'pinned', b.desc, b.count, b.signal, [], b.subtitle);
         });
         var pinnedGrid = document.getElementById('wbPinnedGrid');
         if (pinnedGrid) pinnedGrid.innerHTML = pinnedHtml;
@@ -2499,12 +2519,14 @@
         var smartGrid = document.getElementById('wbSmartGrid');
         if (smartGrid) smartGrid.innerHTML = smartHtml;
 
-        // ── Custom banks from Supabase ──
+        // ── Custom banks from Supabase (exclude system banks already shown in Pinned/Smart) ──
         var banks = await SottotitoliData.getWordbanks(lang);
+        var systemBankNames = ['Saved from sessions', 'Build From Known', 'New Words', 'Saved For Later'];
         var customHtml = '';
         if (banks && banks.length) {
           for (var i = 0; i < banks.length; i++) {
             var b = banks[i];
+            if (systemBankNames.indexOf(b.name) !== -1) continue; // skip system-managed banks
             var words = await SottotitoliData.getWordbankWords(b.id);
             var preview = (words||[]).slice(0,3).map(function(w){return w.word;});
             customHtml += wbCardHTML(b.id, b.name, 'custom', b.description || '', (words||[]).length, (words||[]).length+' words', preview);
@@ -2623,8 +2645,12 @@
         if (bank) {
           // Custom bank: fetch from user_wordbank_words
           words = await SottotitoliData.getWordbankWords(bank.id);
+        } else if (bankId === 'saved_from_sessions') {
+          // Pinned "Saved From Sessions" — fetch from the actual user bank created by caption sync
+          var sfBank = banks.find(function(b){ return b.name === 'Saved from sessions'; });
+          if (sfBank) words = await SottotitoliData.getWordbankWords(sfBank.id);
         } else if (type !== 'custom') {
-          // Pinned/smart bank: try to fetch real membership from review_bank_words
+          // Other pinned/smart bank: try to fetch real membership from review_bank_words
           try {
             var sbClient = window.sottotitoliSupabase;
             if (sbClient) {
