@@ -4325,10 +4325,20 @@
         tasks.forEach(function(t) {
           var sc = statusColors[t.status] || 'var(--teal)';
           if (t.status === 'done') {
-            doneHtml += '<div style="display:flex;justify-content:space-between;align-items:center"><span>' + t.title + '</span><span style="color:var(--text-faint);font-size:11px">' + fmtDate(t.created_at) + '</span></div>';
+            var timeSpent = '';
+            if (t.completed_at && t.created_at) {
+              var ms = new Date(t.completed_at) - new Date(t.created_at);
+              var mins = Math.round(ms / 60000);
+              var hrs = Math.floor(mins / 60);
+              var days = Math.floor(hrs / 24);
+              if (days > 0) timeSpent = days + 'gg';
+              else if (hrs > 0) timeSpent = hrs + 'h ' + (mins % 60) + 'm';
+              else timeSpent = mins + 'm';
+            }
+            doneHtml += '<div style="display:flex;justify-content:space-between;align-items:center"><span>' + t.title + '</span><span style="color:var(--text-faint);font-size:11px">' + fmtDate(t.created_at) + (timeSpent ? ' · ' + timeSpent : '') + '</span></div>';
           } else {
             activeHtml += '<tr class="task-row"><td style="padding:8px 10px"><span>' + t.title + '</span></td>' +
-              '<td style="padding:8px 10px"><select style="padding:4px 8px;border-radius:8px;border:1px solid var(--line);background:var(--bg);font-size:11px;font-family:var(--font-ui);font-weight:600;color:' + sc + ';cursor:pointer" onchange="var v=this.value;var m={doing:\'var(--amber)\',todo:\'var(--teal)\',done:\'var(--green)\'};this.style.color=m[v];SottotitoliData.updateTask(\'' + t.id + '\',{status:v}).then(function(){renderVTTasks()})">' +
+              '<td style="padding:8px 10px"><select style="padding:4px 8px;border-radius:8px;border:1px solid var(--line);background:var(--bg);font-size:11px;font-family:var(--font-ui);font-weight:600;color:' + sc + ';cursor:pointer" onchange="var v=this.value;var m={doing:\'var(--amber)\',todo:\'var(--teal)\',done:\'var(--green)\'};this.style.color=m[v];var upd={status:v};if(v===\'done\')upd.completed_at=new Date().toISOString();else upd.completed_at=null;SottotitoliData.updateTask(\'' + t.id + '\',upd).then(function(){renderVTTasks()})">' +
               '<option value="doing" style="color:var(--amber)"' + (t.status === 'doing' ? ' selected' : '') + '>In corso</option>' +
               '<option value="todo" style="color:var(--teal)"' + (t.status === 'todo' ? ' selected' : '') + '>Da fare</option>' +
               '<option value="done" style="color:var(--green)"' + (t.status === 'done' ? ' selected' : '') + '>Completato</option></select></td>' +
