@@ -2642,7 +2642,7 @@
           (words.length === 0 ?
             '<div style="text-align:center;padding:40px 20px;color:var(--text-faint)"><div style="font-size:48px;margin-bottom:12px">📭</div><p style="font-size:14px">'+emptyMsg+'</p></div>'
             :
-            '<div class="wb-table-wrap"><table class="wb-table"><thead><tr><th class="cb"><input type="checkbox" onchange="wbToggleAll(this)" style="accent-color:var(--cyan)"></th><th class="sortable" data-sort="word">Word <span class="sort-arrow">▲</span></th><th class="sortable" data-sort="pos">POS <span class="sort-arrow">▲</span></th><th class="sortable" data-sort="cefr">CEFR <span class="sort-arrow">▲</span></th><th class="sortable" data-sort="source">Source <span class="sort-arrow">▲</span></th><th class="sortable" data-sort="uses">Uses <span class="sort-arrow">▲</span></th><th></th></tr></thead><tbody id="wbTableBody"></tbody></table></div>');
+            '<div class="wb-table-wrap"><table class="wb-table"><thead><tr><th class="cb"><input type="checkbox" onchange="wbToggleAll(this)" style="accent-color:var(--cyan)"></th><th class="sortable" data-sort="word">Word <span class="sort-arrow">▲</span></th><th class="sortable" data-sort="pos">POS <span class="sort-arrow">▲</span></th><th class="sortable" data-sort="cefr">CEFR <span class="sort-arrow">▲</span></th><th class="sortable" data-sort="uses">Uses <span class="sort-arrow">▲</span></th><th></th></tr></thead><tbody id="wbTableBody"></tbody></table></div>');
         renderWbTable(words);
       }
 
@@ -2698,19 +2698,23 @@
         if (!tbody) return;
         var html = '';
         words.forEach(function(w) {
-          var posBadge = w.pos ? '<span class="badge badge-pos">'+w.pos+'</span>' : '<span style="font-size:10px;color:var(--text-faint)">—</span>';
-          var cefrBadge = w.cefr_level ? '<span class="badge badge-cefr">'+w.cefr_level+'</span>' : '<span style="font-size:10px;color:var(--text-faint)">—</span>';
-          var sourceLabel = w.source_type || 'manual';
-          var statusClass = 'badge-' + (w.status || 'new');
+          // POS: try pos field, fallback to part_of_speech
+          var posVal = w.pos || w.part_of_speech || '';
+          var posBadge = posVal ? '<span class="badge badge-pos">'+posVal+'</span>' : '<span style="font-size:10px;color:var(--text-faint)">—</span>';
+          // CEFR: try cefr, cefr_level, or level fields
+          var cefrVal = w.cefr || w.cefr_level || w.level || '';
+          var cefrBadge = cefrVal ? '<span class="badge badge-cefr">'+cefrVal+'</span>' : '<span style="font-size:10px;color:var(--text-faint)">—</span>';
+          // Word: try word, lemma, or normalized
+          var wordText = w.word || w.lemma || w.normalized || '—';
+          // Uses: try usage_count, frequency, reps
+          var uses = w.usage_count || w.frequency || w.reps || 0;
           html += '<tr data-wid="'+w.id+'" onclick="wbToggleRow(this)"><td class="cb"><input type="checkbox" onclick="event.stopPropagation()" onchange="wbUpdateBulkBar()" style="accent-color:var(--cyan)"></td>'+
-            '<td><span class="wb-word" onclick="event.stopPropagation();openWbDrawer(\''+w.id+'\')">'+w.word+'</span></td>'+
+            '<td><span class="wb-word" onclick="event.stopPropagation();openWbDrawer(\''+w.id+'\')">'+wordText+'</span></td>'+
             '<td>'+posBadge+'</td><td>'+cefrBadge+'</td>'+
-            '<td><span class="badge badge-source">'+sourceLabel+'</span></td>'+
-            '<td><span class="badge '+statusClass+'">'+(w.status||'new')+'</span></td>'+
-            '<td style="font-size:11px;color:var(--text-faint)">'+(w.usage_count||0)+'</td>'+
+            '<td style="font-size:13px;font-weight:600;color:var(--text-soft)">'+(uses > 0 ? uses+'×' : '—')+'</td>'+
             '<td><button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();openWbDrawer(\''+w.id+'\')" style="font-size:10px;padding:2px 6px"><i class="fa-solid fa-circle-info"></i></button></td></tr>';
         });
-        tbody.innerHTML = html || '<tr><td colspan="8" style="padding:30px;text-align:center;color:var(--text-faint)">' + (I18n && I18n.t ? I18n.t('wordbank_no_words') : 'Nessuna parola ancora. Inizia una sessione o aggiungi parole.') + '</td></tr>';
+        tbody.innerHTML = html || '<tr><td colspan="6" style="padding:30px;text-align:center;color:var(--text-faint)">' + (I18n && I18n.t ? I18n.t('wordbank_no_words') : 'Nessuna parola ancora. Inizia una sessione o aggiungi parole.') + '</td></tr>';
       }
 
       // ── Table row selection ──
@@ -2878,13 +2882,15 @@
         if (!w) return;
         document.getElementById('wbDrawerOverlay').classList.add('active');
         document.getElementById('wbDrawer').classList.add('active');
-        document.getElementById('wbDrawerWord').textContent = w.word;
+        var wordText = w.word || w.lemma || w.normalized || '—';
+        document.getElementById('wbDrawerWord').textContent = wordText;
         var metaHtml = '';
-        if (w.cefr_level) metaHtml += '<span class="badge badge-cefr">'+w.cefr_level+'</span>';
-        if (w.pos) metaHtml += '<span class="badge badge-pos">'+w.pos+'</span>';
-        metaHtml += '<span class="badge badge-'+(w.status||'new')+'">'+(w.status||'new')+'</span>';
-        document.getElementById('wbDrawerMeta').innerHTML = metaHtml;
-        document.getElementById('wbDrawerMeaning').textContent = w.definition || (I18n && I18n.t ? I18n.t('word_definition_unavailable') : 'Definizione non ancora disponibile.');
+        var cefrVal = w.cefr || w.cefr_level || w.level || '';
+        if (cefrVal) metaHtml += '<span class="badge badge-cefr">'+cefrVal+'</span>';
+        var posVal = w.pos || w.part_of_speech || '';
+        if (posVal) metaHtml += '<span class="badge badge-pos">'+posVal+'</span>';
+        document.getElementById('wbDrawerMeta').innerHTML = metaHtml || '<span style="font-size:11px;color:var(--text-faint)">—</span>';
+        document.getElementById('wbDrawerMeaning').textContent = w.definition || w.translation_primary || (I18n && I18n.t ? I18n.t('word_definition_unavailable') : 'Definizione non ancora disponibile.');
         // Bank membership
         var banks = await SottotitoliData.getWordbanks(window.SOTTOTITOLI_STUDY_LANG||'en');
         var membershipHTML = '';
@@ -2895,9 +2901,10 @@
         }
         document.getElementById('wbDrawerBanks').innerHTML = membershipHTML || '<span style="font-size:12px;color:var(--text-faint)">' + (I18n && I18n.t ? I18n.t('word_not_in_any_bank') : 'Non presente in nessuna word bank.') + '</span>';
         // Signals
+        var uses = w.usage_count || w.frequency || w.reps || 0;
         document.getElementById('wbDrawerSignals').innerHTML =
-          '<div class="drawer-signal">Uses <strong>'+(w.usage_count||0)+'</strong></div>'+
-          '<div class="drawer-signal">Status <strong>'+(w.status||'new')+'</strong></div>';
+          '<div class="drawer-signal">Uses <strong>'+(uses > 0 ? uses+'×' : '—')+'</strong></div>'+
+          '<div class="drawer-signal">CEFR <strong>'+(cefrVal || '—')+'</strong></div>';
       }
 
       function closeWbDrawer() {
