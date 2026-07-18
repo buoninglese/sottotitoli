@@ -1570,6 +1570,23 @@
             if (r.data?.session) {
               var uid = r.data.session.user.id;
               await sb.from('profiles').upsert({ id: uid, ...profile }, { onConflict: 'id' });
+              // ═══ Also sync to review_user_learning_profile (feeds Smart banks) ═══
+              try {
+                await sb.from('review_user_learning_profile').upsert({
+                  user_id: uid,
+                  target_language: window.SOTTOTITOLI_STUDY_LANG || 'en',
+                  long_term_goal: profile.goal_primary || null,
+                  target_role: profile.target_purpose || null,
+                  target_domain: profile.target_sector || null,
+                  target_contexts: profile.target_situations || [],
+                  preferences: profile,
+                  updated_at: new Date().toISOString()
+                }, { onConflict: 'user_id' });
+              } catch(lpErr) { console.warn('learning profile sync:', lpErr.message); }
+              // ═══ Populate Smart bank suggestions based on profile ═══
+              try {
+                await generateSmartSuggestions(uid, profile);
+              } catch(gsErr) { console.warn('smart suggestions:', gsErr.message); }
             }
           }
           // Update local cache
@@ -1597,6 +1614,92 @@
       }
       // Expose globally since onclick calls it
       window.saveProfiloLinguistico = saveProfiloLinguistico;
+
+      // ═══ Smart suggestion engine — populates review_bank_words from profile ═══
+      async function generateSmartSuggestions(userId, profile) {
+        var sb = window.sottotitoliSupabase;
+        if (!sb) return;
+        // Domain-specific starter vocabulary
+        var sectorWords = {
+          tech: [
+            { word: 'implement', pos: 'VERB', reason: 'Useful for technical discussions and documentation' },
+            { word: 'deploy', pos: 'VERB', reason: 'Common in software engineering contexts' },
+            { word: 'architecture', pos: 'NOUN', reason: 'Key term for system design conversations' },
+            { word: 'scalable', pos: 'ADJ', reason: 'Important for describing system requirements' },
+            { word: 'debug', pos: 'VERB', reason: 'Essential for troubleshooting discussions' }
+          ],
+          business: [
+            { word: 'revenue', pos: 'NOUN', reason: 'Core business metric in meetings and reports' },
+            { word: 'stakeholder', pos: 'NOUN', reason: 'Key term for project and business discussions' },
+            { word: 'negotiate', pos: 'VERB', reason: 'Important for business communication' },
+            { word: 'strategy', pos: 'NOUN', reason: 'Essential for planning and decision-making' },
+            { word: 'efficient', pos: 'ADJ', reason: 'Valuable for describing processes and workflows' }
+          ],
+          academic: [
+            { word: 'hypothesis', pos: 'NOUN', reason: 'Core academic term for research and papers' },
+            { word: 'methodology', pos: 'NOUN', reason: 'Important for describing research approaches' },
+            { word: 'analyze', pos: 'VERB', reason: 'Essential for academic writing and discussion' },
+            { word: 'significant', pos: 'ADJ', reason: 'Key term for presenting findings' },
+            { word: 'framework', pos: 'NOUN', reason: 'Useful for structuring arguments and research' }
+          ],
+          medical: [
+            { word: 'diagnosis', pos: 'NOUN', reason: 'Core medical term for patient discussions' },
+            { word: 'treatment', pos: 'NOUN', reason: 'Essential for medical communication' },
+            { word: 'symptom', pos: 'NOUN', reason: 'Key term for describing patient conditions' },
+            { word: 'prescribe', pos: 'VERB', reason: 'Important for medical practice contexts' },
+            { word: 'chronic', pos: 'ADJ', reason: 'Valuable for describing long-term conditions' }
+          ],
+          legal: [
+            { word: 'compliance', pos: 'NOUN', reason: 'Essential for regulatory and legal discussions' },
+            { word: 'liability', pos: 'NOUN', reason: 'Key legal term for contracts and risk' },
+            { word: 'jurisdiction', pos: 'NOUN', reason: 'Important for understanding legal scope' },
+            { word: 'binding', pos: 'ADJ', reason: 'Useful for contract and agreement contexts' },
+            { word: 'clause', pos: 'NOUN', reason: 'Core legal document terminology' }
+          ]
+        };
+        var sector = (profile.target_sector || '').toLowerCase();
+        var words = null;
+        if (sector.indexOf('tech') !== -1 || sector.indexOf('it') !== -1 || sector.indexOf('software') !== -1) words = sectorWords.tech;
+        else if (sector.indexOf('business') !== -1 || sector.indexOf('finance') !== -1 || sector.indexOf('marketing') !== -1) words = sectorWords.business;
+        else if (sector.indexOf('academic') !== -1 || sector.indexOf('education') !== -1 || sector.indexOf('research') !== -1) words = sectorWords.academic;
+        else if (sector.indexOf('medical') !== -1 || sector.indexOf('health') !== -1) words = sectorWords.medical;
+        else if (sector.indexOf('legal') !== -1 || sector.indexOf('law') !== -1) words = sectorWords.legal;
+        else words = sectorWords.business; // default
+
+        if (!words) return;
+        // Upsert words to review_words and review_bank_words
+        for (var i = 0; i < words.length; i++) {
+          var w = words[i];
+          var clean = w.word.toLowerCase().trim();
+          // Upsert to review_words
+          var { data: rwData } = await sb.from('review_words').select('id').eq('user_id', userId).eq('lemma', w.word).maybeSingle();
+          var wordId;
+          if (rwData) {
+            wordId = rwData.id;
+            await sb.from('review_words').update({ goal_relevance_score: 5, pos: w.pos }).eq('id', wordId);
+          } else {
+            var { data: insData } = await sb.from('review_words').insert({
+              user_id: userId, lemma: w.word, normalized: clean,
+              pos: w.pos, is_new: true, first_seen_at: new Date().toISOString(),
+              source_type: 'smart', review_state: 'new',
+              goal_relevance_score: 5, relevance_score: 5
+            }).select('id').single();
+            if (insData) wordId = insData.id;
+          }
+          // Upsert to review_bank_words for goal_next_step
+          if (wordId) {
+            try {
+              await sb.from('review_bank_words').upsert({
+                user_id: userId, bank_key: 'goal_next_step', word_id: wordId,
+                source_type: 'smart', rank_score: 5 - i,
+                reason_code: 'goal_relevant', reason_text: w.reason,
+                status: 'active'
+              }, { onConflict: 'user_id,bank_key,word_id' });
+            } catch(dupErr) { /* already exists — skip */ }
+          }
+        }
+        SottotitoliData.cacheClear();
+      }
       } // end else (auth block)
 
       // ── Pick current language stats ──
