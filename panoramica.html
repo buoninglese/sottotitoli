@@ -894,8 +894,10 @@
           <div class="wb-toolbar" style="margin-bottom:10px">
             <div class="wb-filter-chips" id="trFilterChips">
               <button class="fchip active" onclick="trFilter(this,'all')">Tutte</button>
+              <button class="fchip" onclick="trFilter(this,'favorites')">Preferiti</button>
               <button class="fchip" onclick="trFilter(this,'7days')">Ultimi 7 giorni</button>
               <button class="fchip" onclick="trFilter(this,'en')">Solo inglese</button>
+              <button class="fchip" onclick="trFilter(this,'it')">Solo italiano</button>
               <button class="fchip" onclick="trFilter(this,'translated')">Con traduzione</button>
             </div>
             <div style="display:flex;gap:6px;align-items:center">
@@ -903,6 +905,12 @@
               <button class="fchip active" data-tr-view="table" onclick="trSetView(this,'table')">Tabella</button>
               <button class="fchip" data-tr-view="drawer" onclick="trSetView(this,'drawer')">Drawer</button>
             </div>
+          </div>
+          <!-- Bulk actions bar -->
+          <div class="bulk-bar" id="trBulkBar" style="margin-bottom:10px">
+            <span id="trBulkCount">0 selezionate</span>
+            <button onclick="trBulkDelete()"><i class="fa-solid fa-trash"></i> Elimina selezionate</button>
+            <button class="bulk-close" onclick="trClearSelection()">&times;</button>
           </div>
           <!-- Policy badge -->
           <div style="margin-bottom:12px;display:flex;gap:6px;flex-wrap:wrap">
@@ -912,7 +920,7 @@
           <div id="trTableView">
             <div class="wb-table-wrap"><table class="wb-table" style="min-width:600px">
               <thead><tr>
-                <th style="width:32px"></th>
+                <th style="width:32px"><input type="checkbox" id="trSelectAll" onchange="trToggleSelectAll(this)" style="accent-color:var(--cyan)"></th>
                 <th class="sortable" data-sort="name">Sessione <span class="sort-arrow">▲</span></th>
                 <th class="sortable" data-sort="date" style="width:100px">Data <span class="sort-arrow">▲</span></th>
                 <th style="width:70px">Durata</th>
@@ -3473,9 +3481,13 @@
           var weekAgo = new Date(now - 7*86400000);
           filtered = filtered.filter(function(s){ return new Date(s.started_at) >= weekAgo; });
         } else if (_trFilter === 'en') {
-          filtered = filtered.filter(function(s){ return (s.language_pair||'').indexOf('en') === 0; });
+          filtered = filtered.filter(function(s){ return (s.language_pair||'').indexOf('en') === 0 && (s.language_pair||'').indexOf('→') < 0; });
+        } else if (_trFilter === 'it') {
+          filtered = filtered.filter(function(s){ return (s.language_pair||'').indexOf('it') === 0 || (s.language_pair||'').indexOf('→it') > 0; });
         } else if (_trFilter === 'translated') {
           filtered = filtered.filter(function(s){ return (s.language_pair||'').indexOf('→') > 0 || s.has_translation; });
+        } else if (_trFilter === 'favorites') {
+          filtered = filtered.filter(function(s){ return s.favorite; });
         }
 
         // Metrics
@@ -3512,7 +3524,8 @@
             remaining <= 7 ? '<span class="badge badge-source">'+remaining+' giorni rimanenti</span>' : '';
           var starIcon = s.favorite ? '★' : '☆';
           var starColor = s.favorite ? 'color:#e8b84b' : 'color:var(--text-faint)';
-          html += '<tr>'+
+          html += '<tr data-sid="'+(s.id||'')+'">'+
+            '<td><input type="checkbox" class="tr-session-cb" data-sid="'+(s.id||'')+'" onclick="event.stopPropagation()" onchange="trUpdateBulkBar()" style="accent-color:var(--cyan)"></td>'+
             '<td><span style="cursor:pointer;font-size:14px;'+starColor+'" onclick="event.stopPropagation();toggleFavorite(this,\''+(s.id||'')+'\');renderTrascrizioni()">'+starIcon+'</span></td>'+
             '<td><span class="wb-word" onclick="trOpenSession(\''+(s.id||'')+'\',\''+name.replace(/'/g,"\\'")+'\')">'+name+'</span></td>'+
             '<td style="font-size:11px;color:var(--text-faint)">'+dateStr+'</td>'+
@@ -3520,6 +3533,7 @@
             '<td style="font-size:11px">'+langLabel+'</td>'+
             '<td>'+(policyBadge || '<span style="font-size:10px;color:var(--text-faint)">—</span>')+'</td>'+
             '<td style="white-space:nowrap;text-align:right">'+
+              '<button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();trRenameSession(\''+(s.id||'')+'\',this)" style="font-size:10px;padding:2px 6px;margin-right:2px" title="Rinomina"><i class="fa-solid fa-pen"></i></button>'+
               '<button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();trOpenSession(\''+(s.id||'')+'\',\''+name.replace(/'/g,"\\'")+'\')" style="font-size:10px;padding:2px 8px;margin-right:4px" title="Apri"><i class="fa-solid fa-arrow-right"></i></button>'+
               '<button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();trDeleteSession(\''+(s.id||'')+'\',this)" style="font-size:10px;padding:2px 6px;color:var(--red)" title="Elimina" onmouseover="this.style.color=\'#fff\';this.style.background=\'#dc2626\'" onmouseout="this.style.color=\'var(--red)\';this.style.background=\'\'"><i class="fa-solid fa-trash"></i></button>'+
             '</td></tr>';
@@ -3564,6 +3578,15 @@
           positionDrawer();
           overlay.classList.add('active');
           drawer.classList.add('active');
+          // Hide unused section headers for session view
+          drawer.querySelectorAll('.drawer-section').forEach(function(sec, i) {
+            var h4 = sec.querySelector('h4');
+            if (h4) {
+              if (h4.textContent === 'Meaning') sec.style.display = '';
+              else if (h4.textContent === 'Signals') sec.style.display = '';
+              else sec.style.display = 'none';
+            }
+          });
           // Populate
           var mins = Math.round((session.duration_seconds||0)/60);
           var durStr = mins >= 60 ? Math.floor(mins/60)+'h '+(mins%60)+'m' : mins+'m';
@@ -3573,18 +3596,26 @@
           var lexDiv = session.lexical_diversity ? session.lexical_diversity.toFixed(2) : '—';
           document.getElementById('wbDrawerWord').textContent = session.name || ('Sessione ' + (sid||'').substring(0,8));
           document.getElementById('wbDrawerIPA').textContent = dateStr;
+          document.getElementById('wbDrawerIPA').style.fontFamily = 'var(--font-ui)';
+          document.getElementById('wbDrawerIPA').style.fontSize = '13px';
+          document.getElementById('wbDrawerIPA').style.color = 'var(--text-soft)';
           document.getElementById('wbDrawerMeta').innerHTML =
-            '<span class="badge badge-pos">'+durStr+'</span>'+
-            '<span class="badge badge-cefr">'+words+' parole</span>'+
-            '<span class="badge badge-source">'+(session.language_pair||'en')+'</span>';
+            '<span class="badge" style="background:rgba(6,182,212,.15);color:var(--cyan);font-weight:600">'+durStr+'</span>'+
+            '<span class="badge" style="background:rgba(6,182,212,.15);color:var(--cyan);font-weight:600">'+words+' parole</span>'+
+            '<span class="badge" style="background:rgba(6,182,212,.15);color:var(--cyan);font-weight:600">'+(session.language_pair||'en')+'</span>';
           document.getElementById('wbDrawerMeaning').innerHTML =
             '<strong>WPM:</strong> '+wpm+' &middot; <strong>Lexical Diversity:</strong> '+lexDiv+'<br>'+
-            (session.transcript_text ? '<em style="font-size:12px">'+session.transcript_text.substring(0,300)+(session.transcript_text.length>300?'…':'')+'</em>' : '<span style="color:var(--text-faint)">Nessuna trascrizione disponibile.</span>');
+            (session.transcript_text ? '<em style="font-size:12px;color:var(--text-soft)">'+session.transcript_text.substring(0,300)+(session.transcript_text.length>300?'…':'')+'</em>' : '<span style="color:var(--text-faint)">Nessuna trascrizione disponibile.</span>');
+          // Clean up unused sections
           document.getElementById('wbDrawerBanks').innerHTML = '';
           document.getElementById('wbDrawerAddBanks').innerHTML = '';
+          // Signals → download + AI Reports
           document.getElementById('wbDrawerSignals').innerHTML =
-            '<div class="drawer-signal">Qualità <strong>'+(session.quality_score ? Math.round(session.quality_score*100)+'%' : '—')+'</strong></div>'+
-            '<div class="drawer-signal">Apertura <strong><a href="studio-sotto-mockup.html?session='+sid+'" style="color:var(--cyan)">Vai alla sessione →</a></strong></div>';
+            '<div style="display:flex;flex-direction:column;gap:8px">'+
+            '<button class="btn-action smart-action" onclick="event.stopPropagation();trDownloadCSV(\''+sid+'\')" style="width:100%;justify-content:center"><i class="fa-solid fa-file-csv"></i> Scarica CSV</button>'+
+            '<button class="btn-action custom-action" onclick="event.stopPropagation();trDownloadPDF(\''+sid+'\')" style="width:100%;justify-content:center"><i class="fa-solid fa-file-pdf"></i> Scarica PDF</button>'+
+            '<button class="btn-action pinned-action" onclick="event.stopPropagation();document.querySelector(\'[data-panel=report-ai]\').dispatchEvent(new MouseEvent(\'click\',{bubbles:true}));closeWbDrawer()" style="width:100%;justify-content:center"><i class="fa-solid fa-robot"></i> AI Reports</button>'+
+            '</div>';
         } catch(e) { console.warn('trOpenSession:', e); }
       };
 
@@ -3599,6 +3630,86 @@
           if (row) { row.style.opacity='0'; row.style.transform='translateX(20px)'; row.style.transition='all .2s'; setTimeout(function(){ row.remove(); renderTrascrizioni(); }, 250); }
         } catch(e) { alert('Errore: ' + e.message); }
       };
+
+      // ── Select all / bulk delete ──
+      window.trToggleSelectAll = function(masterCb) {
+        document.querySelectorAll('#trSessionsBody .tr-session-cb').forEach(function(cb){ cb.checked = masterCb.checked; });
+        trUpdateBulkBar();
+      };
+      window.trUpdateBulkBar = function() {
+        var bar = document.getElementById('trBulkBar');
+        var count = document.getElementById('trBulkCount');
+        var checked = document.querySelectorAll('#trSessionsBody .tr-session-cb:checked');
+        if (bar && count) {
+          if (checked.length > 0) { bar.classList.add('active'); count.textContent = checked.length + ' selezionate'; }
+          else { bar.classList.remove('active'); }
+        }
+      };
+      window.trClearSelection = function() {
+        document.querySelectorAll('#trSessionsBody .tr-session-cb').forEach(function(cb){ cb.checked = false; });
+        var master = document.getElementById('trSelectAll'); if (master) master.checked = false;
+        trUpdateBulkBar();
+      };
+      window.trBulkDelete = async function() {
+        var checked = document.querySelectorAll('#trSessionsBody .tr-session-cb:checked');
+        if (!checked.length) return;
+        if (!confirm('Eliminare ' + checked.length + ' sessione/i selezionata/e?')) return;
+        var sb = window.sottotitoliSupabase;
+        if (!sb) return;
+        for (var i = 0; i < checked.length; i++) {
+          var sid = checked[i].getAttribute('data-sid');
+          try { await sb.from('sessions').delete().eq('id', sid); } catch(e) {}
+        }
+        renderTrascrizioni();
+      };
+
+      // ── Rename session ──
+      window.trRenameSession = function(sid, btn) {
+        var row = btn.closest('tr');
+        var nameCell = row ? row.querySelector('.wb-word') : null;
+        if (!nameCell) return;
+        var oldName = nameCell.textContent.trim();
+        var input = document.createElement('input');
+        input.value = oldName;
+        input.style.cssText = 'width:100%;border:none;outline:none;background:transparent;font:inherit;color:var(--text);padding:2px 4px;border-bottom:2px solid var(--cyan)';
+        nameCell.textContent = '';
+        nameCell.appendChild(input);
+        input.focus(); input.select();
+        var save = async function() {
+          var newName = input.value.trim() || oldName;
+          nameCell.textContent = newName;
+          try {
+            var sb = window.sottotitoliSupabase;
+            if (sb) await sb.from('sessions').update({ name: newName }).eq('id', sid);
+          } catch(e) {}
+        };
+        input.addEventListener('blur', save);
+        input.addEventListener('keydown', function(e){ if (e.key === 'Enter') { input.blur(); } });
+      };
+
+      // ── Download helpers ──
+      window.trDownloadCSV = async function(sid) {
+        var sb = window.sottotitoliSupabase;
+        if (!sb) return;
+        var { data: session } = await sb.from('sessions').select('*').eq('id', sid).single();
+        if (!session) return;
+        var rows = [['Field','Value']];
+        rows.push(['Name',session.name||'']);
+        rows.push(['Date',session.started_at||'']);
+        rows.push(['Duration (min)',Math.round((session.duration_seconds||0)/60)]);
+        rows.push(['Words',session.words_count||0]);
+        rows.push(['WPM',session.wpm||'']);
+        rows.push(['Lexical Diversity',session.lexical_diversity||'']);
+        rows.push(['Language',session.language_pair||'']);
+        rows.push(['Transcript',(session.transcript_text||'').substring(0,1000)]);
+        var csv = rows.map(function(r){ return r.map(function(c){ return '"'+(c+'').replace(/"/g,'""')+'"'; }).join(','); }).join('\n');
+        var blob = new Blob([csv],{type:'text/csv;charset=utf-8'});
+        var a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'session-'+(sid||'').substring(0,8)+'.csv'; a.click();
+      };
+      window.trDownloadPDF = function(sid) {
+        alert('PDF export coming soon.');
+      };
+
       window.sortWbWords = sortWbWords;
       window.filterWbWords = filterWbWords;
       window.addWordToCurrentBank = addWordToCurrentBank;
