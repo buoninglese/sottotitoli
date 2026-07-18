@@ -2459,30 +2459,31 @@
             '</div>';
         }
 
-        // ── Pinned banks ──
+        // ── Pinned banks (4 operational banks — new catalog) ──
         var pinnedHtml = '';
         var pinnedBanks = [
-          { id: 'new', name: 'New', desc: 'Recently captured words', icon: '✨', count: stats.newThisWeek || 0, signal: stats.dueToday+' unreviewed', preview: [] },
-          { id: 'saved-sessions', name: 'Saved From Sessions', desc: 'Words saved directly from sessions', icon: '💾', count: stats.totalWords || 0, signal: (stats.dueToday||0)+' due today', preview: [] },
-          { id: 'review-due', name: 'Review Due Today', desc: 'Review queue', icon: '⏰', count: stats.dueToday || 0, signal: stats.dueToday > 0 ? stats.dueToday+' due today' : 'All caught up!', preview: [] }
+          { id: 'review_due_now', name: 'Review Due Now', desc: 'Words due now or overdue for review', icon: '⏰', count: stats.dueToday || 0, signal: stats.dueToday > 0 ? stats.dueToday + ' due' : 'All caught up!', preview: [], subtitle: 'Words ready for review right now' },
+          { id: 'new_from_sessions', name: 'New From Recent Sessions', desc: 'Recently captured words not yet stabilized', icon: '✨', count: stats.newThisWeek || 0, signal: stats.newThisWeek > 0 ? '+' + stats.newThisWeek + ' this week' : 'None', preview: [], subtitle: 'New words from your recent sessions' },
+          { id: 'saved_from_sessions', name: 'Saved From Sessions', desc: 'Words you saved during live sessions', icon: '💾', count: stats.totalWords || 0, signal: (stats.dueToday || 0) + ' due today', preview: [], subtitle: 'Saved words from live use' },
+          { id: 'fragile_words', name: 'Fragile Words', desc: 'Weak words at risk of being forgotten', icon: '⚠️', count: stats.learning || 0, signal: stats.learning > 0 ? stats.learning + ' need reinforcement' : 'None at risk', preview: [], subtitle: 'Words that need reinforcement' }
         ];
         pinnedBanks.forEach(function(b) {
-          pinnedHtml += wbCardHTML(b.id, b.name, 'pinned', b.desc, b.count, b.signal, b.preview);
+          pinnedHtml += wbCardHTML(b.id, b.name, 'pinned', b.desc, b.count, b.signal, b.preview, b.subtitle);
         });
         var pinnedGrid = document.getElementById('wbPinnedGrid');
         if (pinnedGrid) pinnedGrid.innerHTML = pinnedHtml;
 
-        // ── Smart banks ──
+        // ── Smart banks (4 recommendation banks — new catalog) ──
         var smartHtml = '';
         var cefrBreakdownData = cefrBreakdown || {};
         var smartBanks = [
-          { id: 'by-level', name: 'By Level', desc: 'Auto-grouped by CEFR', count: (cefrBreakdownData.total||0)||stats.totalWords, signal: '6 CEFR levels', preview: ['A1','A2','B1','B2','C1','C2'].map(function(l){return l+': '+(cefrBreakdownData[l]||0)}) },
-          { id: 'by-word-type', name: 'By Word Type', desc: 'Nouns, verbs, adjectives…', count: stats.totalWords, signal: 'Grouped by POS', preview: ['Verbs', 'Nouns', 'Adjectives'] },
-          { id: 'build-from-known', name: 'Build From What You Know', desc: 'Related words filtered to your level', count: Math.round(stats.totalWords * 0.3) || 12, signal: 'Level-gated suggestions', preview: ['enhance → improve', 'progress → advance'] },
-          { id: 'frequently-seen', name: 'Frequently Seen', desc: 'High recurrence in sessions', count: Math.round(stats.totalWords * 0.4) || 20, signal: 'Most common in your speech', preview: [] }
+          { id: 'goal_next_step', name: 'Next Step For Your Goal', desc: 'Goal-aligned vocabulary for your profile', count: 5, signal: 'Based on your objectives', preview: [], subtitle: 'Suggested for your current goal' },
+          { id: 'build_from_known', name: 'Build From What You Know', desc: 'Lexical progression from words you already know', count: Math.round(stats.totalWords * 0.3) || 12, signal: 'From your vocabulary', preview: ['enhance → improve', 'progress → advance'], subtitle: 'Follow-on words from known vocabulary' },
+          { id: 'activate_recognized', name: 'Activate What You Recognize', desc: 'Words you understand but rarely use actively', count: Math.round(stats.learning * 0.6) || 8, signal: 'Recognition > production gap', preview: [], subtitle: 'Turn recognition into active use' },
+          { id: 'upcoming_useful_vocab', name: 'Upcoming Useful Vocabulary', desc: 'Words likely useful for your next stage', count: 6, signal: 'For your roadmap', preview: [], subtitle: 'Suggested for what comes next' }
         ];
         smartBanks.forEach(function(b) {
-          smartHtml += wbCardHTML(b.id, b.name, 'smart', b.desc, b.count, b.signal, b.preview);
+          smartHtml += wbCardHTML(b.id, b.name, 'smart', b.desc, b.count, b.signal, b.preview, b.subtitle);
         });
         var smartGrid = document.getElementById('wbSmartGrid');
         if (smartGrid) smartGrid.innerHTML = smartHtml;
@@ -2509,12 +2510,16 @@
         });
       }
 
-      function wbCardHTML(id, name, type, desc, count, signal, preview) {
+      function wbCardHTML(id, name, type, desc, count, signal, preview, subtitle) {
         var badgeClass = type === 'pinned' ? 'badge-pinned' : type === 'smart' ? 'badge-smart' : 'badge-custom';
-        var typeLabel = type === 'pinned' ? 'Pinned' : type === 'smart' ? 'Smart' : 'Yours';
+        var typeLabel = type === 'pinned' ? 'PINNED' : type === 'smart' ? 'SMART' : 'YOURS';
         var previewHTML = '';
         if (preview && preview.length) {
           previewHTML = '<div class="wb-card-preview">'+preview.map(function(p){return '<span class="preview-chip" style="font-size:10px;padding:2px 8px;border-radius:100px;background:var(--teal-4);color:var(--teal);font-weight:500">'+p+'</span>'}).join('')+'</div>';
+        }
+        var subtitleHTML = '';
+        if (subtitle) {
+          subtitleHTML = '<div class="wb-card-subtitle" style="font-size:11px;color:var(--text-muted);margin-top:2px">'+subtitle+'</div>';
         }
         // Three-dot menu for custom banks only
         var menuHTML = '';
@@ -2529,13 +2534,19 @@
             '</div>' +
             '</div>';
         }
+        // Action label by type
+        var actionLabel = 'Open';
+        if (type === 'pinned') actionLabel = 'Start review';
+        else if (type === 'smart') actionLabel = 'See suggestions';
+        else actionLabel = 'Manage';
         return '<article class="alt-card wb-card" data-bank-id="'+id+'" style="cursor:pointer;padding:16px 18px;position:relative">'+
           menuHTML+
-          '<div class="wb-card-head"><h4 style="font-size:14px;font-weight:700;margin:0">'+name+'</h4><span class="section-badge '+badgeClass+'">'+typeLabel+'</span></div>'+
-          '<div class="wb-card-count">'+count+'</div>'+
-          '<div class="wb-card-signal">'+signal+'</div>'+
+          '<div class="wb-card-head"><h4 style="font-size:14px;font-weight:700;margin:0">'+name+'</h4><span class="section-badge '+badgeClass+'" style="font-size:9px;letter-spacing:0.08em">'+typeLabel+'</span></div>'+
+          subtitleHTML+
+          '<div class="wb-card-count" style="font-size:28px;font-weight:900;margin:8px 0 2px">'+count+'</div>'+
+          '<div class="wb-card-signal" style="font-size:12px">'+signal+'</div>'+
           previewHTML+
-          '<div class="wb-card-actions"><button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();openWordbankView(\''+id+'\')">Open</button></div>'+
+          '<div class="wb-card-actions" style="margin-top:10px"><button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();openWordbankView(\''+id+'\')">'+actionLabel+'</button></div>'+
           '</article>';
       }
 
@@ -2554,18 +2565,45 @@
         var bank = banks.find(function(b){return b.id === bankId;});
 
         var bankNames = {
-          'new':'New','saved-sessions':'Saved From Sessions','review-due':'Review Due Today',
-          'by-level':'By Level','by-word-type':'By Word Type','build-from-known':'Build From What You Know','frequently-seen':'Frequently Seen'
+          'review_due_now':'Review Due Now','new_from_sessions':'New From Recent Sessions',
+          'saved_from_sessions':'Saved From Sessions','fragile_words':'Fragile Words',
+          'goal_next_step':'Next Step For Your Goal','build_from_known':'Build From What You Know',
+          'activate_recognized':'Activate What You Recognize','upcoming_useful_vocab':'Upcoming Useful Vocabulary'
         };
         var bankTypes = {
-          'new':'pinned','saved-sessions':'pinned','review-due':'pinned',
-          'by-level':'smart','by-word-type':'smart','build-from-known':'smart','frequently-seen':'smart'
+          'review_due_now':'pinned','new_from_sessions':'pinned',
+          'saved_from_sessions':'pinned','fragile_words':'pinned',
+          'goal_next_step':'smart','build_from_known':'smart',
+          'activate_recognized':'smart','upcoming_useful_vocab':'smart'
+        };
+        var bankSubtitles = {
+          'review_due_now':'Words ready for review right now',
+          'new_from_sessions':'New words from your recent sessions',
+          'saved_from_sessions':'Saved words from live use',
+          'fragile_words':'Words that need reinforcement',
+          'goal_next_step':'Suggested for your current goal',
+          'build_from_known':'Follow-on words from your existing vocabulary',
+          'activate_recognized':'Turn recognition into active use',
+          'upcoming_useful_vocab':'Suggested for what comes next'
+        };
+        var bankEmptyStates = {
+          'review_due_now':'All caught up for now.',
+          'new_from_sessions':'No new captured words right now.',
+          'saved_from_sessions':'You haven\'t saved any session words yet.',
+          'fragile_words':'No fragile words at the moment.',
+          'goal_next_step':'No goal-based suggestions yet.',
+          'build_from_known':'No follow-on vocabulary yet.',
+          'activate_recognized':'No recognition-to-usage candidates right now.',
+          'upcoming_useful_vocab':'No upcoming vocabulary queued yet.'
         };
 
         var name = bank ? bank.name : (bankNames[bankId] || bankId);
         var type = bank ? 'custom' : (bankTypes[bankId] || 'pinned');
+        var subtitle = bank ? (bank.description || '') : (bankSubtitles[bankId] || '');
+        var emptyMsg = bankEmptyStates[bankId] || 'No words yet.';
         var badgeClass = type === 'pinned' ? 'badge-pinned' : type === 'smart' ? 'badge-smart' : 'badge-custom';
-        var typeLabel = type === 'pinned' ? 'Pinned' : type === 'smart' ? 'Smart' : 'Yours';
+        var typeLabel = type === 'pinned' ? 'PINNED' : type === 'smart' ? 'SMART' : 'YOURS';
+        var primaryAction = type === 'pinned' ? 'Start review' : type === 'smart' ? 'Move selected to Yours' : 'Manage collection';
 
         var words = [];
         if (bank) {
@@ -2580,13 +2618,15 @@
           '<div class="wb-toolbar">'+
             '<button class="back-btn" onclick="closeWordbankView()"><i class="fa-solid fa-arrow-left"></i> Back to overview</button>'+
             '<div style="display:flex;gap:8px;align-items:center">'+
-              '<select class="btn btn-ghost btn-sm" onchange="sortWbWords(this.value)" style="font-family:var(--font-ui)"><option value="recent">Recent</option><option value="alphabetical">Alphabetical</option><option value="usage">Most used</option></select>'+
+              (type !== 'custom' ? '<button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();toggleWhyThisBank()" style="font-family:var(--font-ui);font-size:11px" title="Why these words?"><i class="fa-solid fa-circle-info"></i> Why these words?</button>' : '')+
               '<button class="btn btn-primary btn-sm" onclick="addWordToCurrentBank()"><i class="fa-solid fa-plus"></i> Add words</button>'+
             '</div>'+
           '</div>'+
           '<div style="margin-bottom:14px">'+
-            '<div style="display:flex;align-items:center;gap:10px;margin-bottom:4px"><h3 style="margin:0;font-size:20px;font-weight:700">'+name+'</h3><span class="section-badge '+badgeClass+'">'+typeLabel+'</span></div>'+
+            '<div style="display:flex;align-items:center;gap:10px;margin-bottom:4px"><h3 style="margin:0;font-size:20px;font-weight:700">'+name+'</h3><span class="section-badge '+badgeClass+'" style="font-size:9px;letter-spacing:0.08em">'+typeLabel+'</span></div>'+
+            (subtitle ? '<p style="margin:0 0 8px;font-size:12px;color:var(--text-soft);max-width:500px">'+subtitle+'</p>' : '')+
             '<div style="font-size:12px;color:var(--text-soft);display:flex;gap:14px"><span>'+words.length+' words</span></div>'+
+            '<div id="wbWhySection" style="display:none;margin-top:10px;padding:12px 16px;background:var(--panel-2);border-radius:10px;border:1px solid var(--line);font-size:12px;color:var(--text-soft);line-height:1.5"></div>'+
             '<div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap">'+
               '<button class="fchip active" onclick="filterWbWords(this,\'all\')">All</button>'+
               '<button class="fchip" onclick="filterWbWords(this,\'new\')">New</button>'+
@@ -2595,7 +2635,10 @@
             '</div>'+
           '</div>'+
           '<div class="bulk-bar" id="wbBulkBar"><span id="wbBulkCount">0 selected</span><button onclick="wbBulkMarkKnown()">Mark known</button><button onclick="wbBulkRemove()">Remove</button><button class="bulk-close" onclick="wbClearSelection()">&times;</button></div>'+
-          '<div class="wb-table-wrap"><table class="wb-table"><thead><tr><th class="cb"><input type="checkbox" onchange="wbToggleAll(this)" style="accent-color:var(--cyan)"></th><th class="sortable" data-sort="word">Word <span class="sort-arrow">▲</span></th><th class="sortable" data-sort="pos">POS <span class="sort-arrow">▲</span></th><th class="sortable" data-sort="cefr">CEFR <span class="sort-arrow">▲</span></th><th class="sortable" data-sort="source">Source <span class="sort-arrow">▲</span></th><th class="sortable" data-sort="status">Status <span class="sort-arrow">▲</span></th><th class="sortable" data-sort="uses">Uses <span class="sort-arrow">▲</span></th><th></th></tr></thead><tbody id="wbTableBody"></tbody></table></div>';
+          (words.length === 0 ?
+            '<div style="text-align:center;padding:40px 20px;color:var(--text-faint)"><div style="font-size:48px;margin-bottom:12px">📭</div><p style="font-size:14px">'+emptyMsg+'</p></div>'
+            :
+            '<div class="wb-table-wrap"><table class="wb-table"><thead><tr><th class="cb"><input type="checkbox" onchange="wbToggleAll(this)" style="accent-color:var(--cyan)"></th><th class="sortable" data-sort="word">Word <span class="sort-arrow">▲</span></th><th class="sortable" data-sort="pos">POS <span class="sort-arrow">▲</span></th><th class="sortable" data-sort="cefr">CEFR <span class="sort-arrow">▲</span></th><th class="sortable" data-sort="reason">Why here <span class="sort-arrow">▲</span></th><th class="sortable" data-sort="status">Status <span class="sort-arrow">▲</span></th><th class="sortable" data-sort="uses">Uses <span class="sort-arrow">▲</span></th><th></th></tr></thead><tbody id="wbTableBody"></tbody></table></div>');
         renderWbTable(words);
       }
 
@@ -2606,6 +2649,27 @@
         _wbState.currentBank = null;
         _wbState.selectedRows = new Set();
       }
+
+      // ── "Why these words?" toggle ──
+      window.toggleWhyThisBank = function() {
+        var section = document.getElementById('wbWhySection');
+        if (!section) return;
+        if (section.style.display === 'block') { section.style.display = 'none'; return; }
+        var bankId = _wbState.currentBank;
+        var whyTexts = {
+          'review_due_now': '<strong>Collection rule:</strong> All words with <code>next_review_at ≤ now</code>. Sorted by overdue first, then lowest mastery. This is your core spaced-repetition queue — the most urgent words to review.',
+          'new_from_sessions': '<strong>Collection rule:</strong> Words first seen in the last 7 days, not yet stabilized (<code>is_new = true</code>, reps &lt; 2). These bridge the gap from capture to learning.',
+          'saved_from_sessions': '<strong>Collection rule:</strong> Words you explicitly saved during live sessions (<code>saved_origin = session</code>). Manual save is a strong intent signal. Grouped into due now vs. not due yet.',
+          'fragile_words': '<strong>Collection rule:</strong> Words with low mastery (&lt;40), repeated lapses (≥2), or recent "again"/"hard" outcomes. These need targeted reinforcement before they\'re forgotten.',
+          'goal_next_step': '<strong>Recommendation logic:</strong> Words matched to your profile (role, domain, objectives). Each gets a <code>goal_relevance_score</code>. Only a small batch (5–12) is shown at a time. Every word says why it\'s relevant.',
+          'build_from_known': '<strong>Recommendation logic:</strong> Lexical progression from words you already know — synonyms, register upgrades, collocations, derivations. Built from the <code>review_word_relations</code> graph.',
+          'activate_recognized': '<strong>Recommendation logic:</strong> Words where recognition ≥ 50 but production/speech/typing &lt; 45. You understand them — now it\'s time to start using them actively.',
+          'upcoming_useful_vocab': '<strong>Recommendation logic:</strong> Words tied to your roadmap stage. If your goal says "work remotely for a Dutch company," the system stages interviews, meetings, and async-communication vocabulary gradually.'
+        };
+        section.innerHTML = (whyTexts[bankId] || '<strong>Collection rule:</strong> This bank uses custom criteria defined by you.') +
+          '<div style="margin-top:6px;font-size:10px;color:var(--text-faint)">These rules determine which words appear here and in what order.</div>';
+        section.style.display = 'block';
+      };
 
       // Expose wordbank helpers globally (needed by onclick handlers)
       window.closeWordbankView = closeWordbankView;
@@ -4625,6 +4689,49 @@
           setTimeout(function() { renderReviewDue(); }, 300);
         }
       });
+    });
+  }
+</script>
+
+<!-- Bank catalog system -->
+<script type="module">
+  import { hydrateBankDefinitions, subscribe } from './js/bank-store.js';
+  import { fetchBankDefinitions, fetchBankWords, fetchLearningProfile } from './js/bank-api.js';
+  import { buildBankCardView, buildBankDetailView, buildGroupCardViews } from './js/bank-ui-bridge.js';
+
+  // Expose for the main script to call
+  window.initBankCatalog = async function() {
+    try {
+      var defs = await fetchBankDefinitions();
+      if (defs && defs.length) {
+        hydrateBankDefinitions(defs);
+        // Also try to load learning profile
+        var profile = await fetchLearningProfile();
+        if (profile) {
+          const { hydrateLearningProfile } = await import('./js/bank-store.js');
+          hydrateLearningProfile(profile);
+        }
+        console.log('Bank catalog loaded: ' + defs.length + ' definitions');
+        return true;
+      }
+    } catch(e) {
+      console.warn('Bank catalog not available (run SQL migrations?):', e.message);
+    }
+    return false;
+  };
+
+  // Auto-init when Word Banks tab is clicked
+  var wbTab = document.querySelector('[data-panel="wordbanks"]');
+  var bankInitDone = false;
+  if (wbTab) {
+    wbTab.addEventListener('click', async function() {
+      if (bankInitDone) return;
+      bankInitDone = true;
+      var ok = await window.initBankCatalog();
+      if (ok) {
+        // Re-render bank cards with live data
+        if (typeof renderWordbanks === 'function') setTimeout(renderWordbanks, 200);
+      }
     });
   }
 </script>
