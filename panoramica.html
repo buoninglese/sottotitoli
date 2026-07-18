@@ -3078,27 +3078,39 @@
       // ── Single word delete (instant, no confirm) ──
       window.wbDeleteWord = async function(wordId, wordText) {
         var bankUUID = _wbState.currentBankUUID || _wbState.currentBank;
-        if (!bankUUID || !wordId) { console.warn('Delete: missing bankUUID or wordId', {bankUUID, wordId}); return; }
+        var bankKey = _wbState.currentBank;
+        if (!wordId) return;
         var row = document.querySelector('#wbTableBody tr[data-wid="' + wordId + '"]');
         if (row) { row.style.opacity = '0'; row.style.transform = 'translateX(20px)'; row.style.transition = 'all .2s'; }
-        // Try both direct delete and via SottotitoliData
+
         var result = false;
-        try {
-          result = await SottotitoliData.bulkRemoveFromBank(bankUUID, [wordId]);
-        } catch(e) { console.warn('Delete error:', e); }
-        // Fallback: try direct Supabase delete
-        if (!result && window.sottotitoliSupabase) {
+        // Pinned banks 1,2,4 query review_words — dismiss by updating review_words
+        if (bankKey === 'review_due_now' || bankKey === 'new_from_sessions' || bankKey === 'fragile_words') {
           try {
-            var { error } = await window.sottotitoliSupabase.from('user_wordbank_words').delete().eq('wordbank_id', bankUUID).eq('id', wordId);
-            if (!error) result = true;
-          } catch(e2) {}
+            var sb = window.sottotitoliSupabase;
+            if (sb) {
+              await sb.from('review_words').update({ is_new: false, dismissed_at: new Date().toISOString() }).eq('id', wordId);
+              result = true;
+            }
+          } catch(e) { console.warn('review_words dismiss:', e); }
+        } else if (bankUUID && bankUUID !== bankKey) {
+          // Custom banks and Saved From Sessions — delete from user_wordbank_words
+          try {
+            result = await SottotitoliData.bulkRemoveFromBank(bankUUID, [wordId]);
+          } catch(e) { console.warn('Delete error:', e); }
+          if (!result && window.sottotitoliSupabase) {
+            try {
+              var { error } = await window.sottotitoliSupabase.from('user_wordbank_words').delete().eq('wordbank_id', bankUUID).eq('id', wordId);
+              if (!error) result = true;
+            } catch(e2) {}
+          }
         }
         if (result) {
           SottotitoliData.cacheClear();
           if (row) setTimeout(function(){ row.remove(); }, 200);
         } else {
           if (row) { row.style.opacity = '1'; row.style.transform = ''; }
-          console.warn('Delete failed for wordId:', wordId, 'bankUUID:', bankUUID);
+          console.warn('Delete failed for wordId:', wordId, 'bankKey:', bankKey, 'bankUUID:', bankUUID);
         }
       };
 
