@@ -2473,14 +2473,26 @@
         var pinnedGrid = document.getElementById('wbPinnedGrid');
         if (pinnedGrid) pinnedGrid.innerHTML = pinnedHtml;
 
-        // ── Smart banks (4 recommendation banks — new catalog) ──
+        // ── Smart banks (4 recommendation banks — live counts from DB or 0) ──
         var smartHtml = '';
         var cefrBreakdownData = cefrBreakdown || {};
+        // Try to get real counts from the review bank system
+        var smartCounts = { goal_next_step: 0, build_from_known: 0, activate_recognized: 0, upcoming_useful_vocab: 0 };
+        try {
+          var bankSummaries = await SottotitoliData.getBankSummaries ? await SottotitoliData.getBankSummaries() : null;
+          if (bankSummaries) {
+            Object.keys(smartCounts).forEach(function(k) {
+              if (bankSummaries[k]) smartCounts[k] = bankSummaries[k].total || 0;
+            });
+          }
+        } catch(e) { /* fall through to hardcoded counts */ }
+        // Fallback: use estimates from available data
+        if (!smartCounts.build_from_known && stats.totalWords > 0) smartCounts.build_from_known = Math.round(stats.totalWords * 0.2);
         var smartBanks = [
-          { id: 'goal_next_step', name: 'Next Step For Your Goal', desc: 'Goal-aligned vocabulary for your profile', count: 5, signal: 'Based on your objectives', preview: [], subtitle: 'Suggested for your current goal' },
-          { id: 'build_from_known', name: 'Build From What You Know', desc: 'Lexical progression from words you already know', count: Math.round(stats.totalWords * 0.3) || 12, signal: 'From your vocabulary', preview: ['enhance → improve', 'progress → advance'], subtitle: 'Follow-on words from known vocabulary' },
-          { id: 'activate_recognized', name: 'Activate What You Recognize', desc: 'Words you understand but rarely use actively', count: Math.round(stats.learning * 0.6) || 8, signal: 'Recognition > production gap', preview: [], subtitle: 'Turn recognition into active use' },
-          { id: 'upcoming_useful_vocab', name: 'Upcoming Useful Vocabulary', desc: 'Words likely useful for your next stage', count: 6, signal: 'For your roadmap', preview: [], subtitle: 'Suggested for what comes next' }
+          { id: 'goal_next_step', name: 'Next Step For Your Goal', desc: 'Goal-aligned vocabulary for your profile', count: smartCounts.goal_next_step, signal: smartCounts.goal_next_step > 0 ? smartCounts.goal_next_step + ' suggestions' : 'Complete your profile', preview: [], subtitle: 'Suggested for your current goal' },
+          { id: 'build_from_known', name: 'Build From What You Know', desc: 'Lexical progression from words you already know', count: smartCounts.build_from_known || Math.round(stats.totalWords * 0.2) || 0, signal: 'From your vocabulary', preview: [], subtitle: 'Follow-on words from known vocabulary' },
+          { id: 'activate_recognized', name: 'Activate What You Recognize', desc: 'Words you understand but rarely use actively', count: smartCounts.activate_recognized, signal: smartCounts.activate_recognized > 0 ? smartCounts.activate_recognized + ' ready' : 'No gap detected', preview: [], subtitle: 'Turn recognition into active use' },
+          { id: 'upcoming_useful_vocab', name: 'Upcoming Useful Vocabulary', desc: 'Words likely useful for your next stage', count: smartCounts.upcoming_useful_vocab, signal: smartCounts.upcoming_useful_vocab > 0 ? smartCounts.upcoming_useful_vocab + ' queued' : 'Set your goals first', preview: [], subtitle: 'Suggested for what comes next' }
         ];
         smartBanks.forEach(function(b) {
           smartHtml += wbCardHTML(b.id, b.name, 'smart', b.desc, b.count, b.signal, b.preview, b.subtitle);
@@ -2615,30 +2627,22 @@
         _wbState.currentWords = words;
 
         insideEl.innerHTML =
-          '<div class="wb-toolbar">'+
-            '<button class="back-btn" onclick="closeWordbankView()"><i class="fa-solid fa-arrow-left"></i> Back to overview</button>'+
+          '<div class="wb-toolbar" style="margin-bottom:16px">'+
+            '<button class="back-btn" onclick="closeWordbankView()" style="display:inline-flex;align-items:center;gap:8px;padding:10px 20px;border-radius:100px;border:1.5px solid var(--line);background:var(--card);color:var(--text);font-family:var(--font-ui);font-size:13px;font-weight:600;cursor:pointer;transition:all .2s" onmouseover="this.style.borderColor=\'var(--cyan)\';this.style.color=\'var(--cyan)\'" onmouseout="this.style.borderColor=\'var(--line)\';this.style.color=\'var(--text)\'"><i class="fa-solid fa-arrow-left"></i> Back to overview</button>'+
             '<div style="display:flex;gap:8px;align-items:center">'+
               (type !== 'custom' ? '<button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();toggleWhyThisBank()" style="font-family:var(--font-ui);font-size:11px" title="Why these words?"><i class="fa-solid fa-circle-info"></i> Why these words?</button>' : '')+
-              '<button class="btn btn-primary btn-sm" onclick="addWordToCurrentBank()"><i class="fa-solid fa-plus"></i> Add words</button>'+
             '</div>'+
           '</div>'+
           '<div style="margin-bottom:14px">'+
             '<div style="display:flex;align-items:center;gap:10px;margin-bottom:4px"><h3 style="margin:0;font-size:20px;font-weight:700">'+name+'</h3><span class="section-badge '+badgeClass+'" style="font-size:9px;letter-spacing:0.08em">'+typeLabel+'</span></div>'+
             (subtitle ? '<p style="margin:0 0 8px;font-size:12px;color:var(--text-soft);max-width:500px">'+subtitle+'</p>' : '')+
-            '<div style="font-size:12px;color:var(--text-soft);display:flex;gap:14px"><span>'+words.length+' words</span></div>'+
+            '<div style="font-size:12px;color:var(--text-soft);display:flex;gap:14px;margin-bottom:8px"><span>'+words.length+' words</span></div>'+
             '<div id="wbWhySection" style="display:none;margin-top:10px;padding:12px 16px;background:var(--panel-2);border-radius:10px;border:1px solid var(--line);font-size:12px;color:var(--text-soft);line-height:1.5"></div>'+
-            '<div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap">'+
-              '<button class="fchip active" onclick="filterWbWords(this,\'all\')">All</button>'+
-              '<button class="fchip" onclick="filterWbWords(this,\'new\')">New</button>'+
-              '<button class="fchip" onclick="filterWbWords(this,\'learning\')">Learning</button>'+
-              '<button class="fchip" onclick="filterWbWords(this,\'known\')">Known</button>'+
-            '</div>'+
           '</div>'+
-          '<div class="bulk-bar" id="wbBulkBar"><span id="wbBulkCount">0 selected</span><button onclick="wbBulkMarkKnown()">Mark known</button><button onclick="wbBulkRemove()">Remove</button><button class="bulk-close" onclick="wbClearSelection()">&times;</button></div>'+
           (words.length === 0 ?
             '<div style="text-align:center;padding:40px 20px;color:var(--text-faint)"><div style="font-size:48px;margin-bottom:12px">📭</div><p style="font-size:14px">'+emptyMsg+'</p></div>'
             :
-            '<div class="wb-table-wrap"><table class="wb-table"><thead><tr><th class="cb"><input type="checkbox" onchange="wbToggleAll(this)" style="accent-color:var(--cyan)"></th><th class="sortable" data-sort="word">Word <span class="sort-arrow">▲</span></th><th class="sortable" data-sort="pos">POS <span class="sort-arrow">▲</span></th><th class="sortable" data-sort="cefr">CEFR <span class="sort-arrow">▲</span></th><th class="sortable" data-sort="reason">Why here <span class="sort-arrow">▲</span></th><th class="sortable" data-sort="status">Status <span class="sort-arrow">▲</span></th><th class="sortable" data-sort="uses">Uses <span class="sort-arrow">▲</span></th><th></th></tr></thead><tbody id="wbTableBody"></tbody></table></div>');
+            '<div class="wb-table-wrap"><table class="wb-table"><thead><tr><th class="cb"><input type="checkbox" onchange="wbToggleAll(this)" style="accent-color:var(--cyan)"></th><th class="sortable" data-sort="word">Word <span class="sort-arrow">▲</span></th><th class="sortable" data-sort="pos">POS <span class="sort-arrow">▲</span></th><th class="sortable" data-sort="cefr">CEFR <span class="sort-arrow">▲</span></th><th class="sortable" data-sort="source">Source <span class="sort-arrow">▲</span></th><th class="sortable" data-sort="uses">Uses <span class="sort-arrow">▲</span></th><th></th></tr></thead><tbody id="wbTableBody"></tbody></table></div>');
         renderWbTable(words);
       }
 
