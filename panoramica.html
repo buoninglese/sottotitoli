@@ -246,7 +246,7 @@
     #sub-wb-expand{--sz-dark:#0f1c24;--sz-dark-border:#0f1c24;--sz-darktext:#fff;--sz-darktext2:rgba(255,255,255,.5);--sz-accent:#06b6d4;--sz-trans-border:#0f1c24}
     [data-theme="dark"] #sub-wb-expand{--sz-dark:#d8eaf4;--sz-dark-border:#d8eaf4;--sz-darktext:#0b151c;--sz-darktext2:rgba(11,21,28,.5);--sz-accent:#0e7490;--sz-trans-border:#d8eaf4}
     /* Scheme cycling */
-    #sub-wb-expand[data-wb-scheme="1"]{--sz-dark:#000;--sz-dark-border:#000;--sz-darktext:#fff;--sz-darktext2:rgba(255,255,255,.45);--sz-accent:#fff;--sz-trans-border:#333}
+    #sub-wb-expand[data-wb-scheme="1"]{--sz-dark:#000;--sz-dark-border:#000;--sz-darktext:#fff;--sz-darktext2:rgba(255,255,255,.45);--sz-accent:#06b6d4;--sz-trans-border:#333}
     [data-theme="dark"] #sub-wb-expand[data-wb-scheme="1"]{--sz-dark:#111;--sz-dark-border:#333;--sz-darktext:#fff;--sz-darktext2:rgba(255,255,255,.45);--sz-accent:#fff;--sz-trans-border:#444}
     #sub-wb-expand[data-wb-scheme="2"]{--sz-dark:#0f1c24;--sz-dark-border:#0f1c24;--sz-darktext:#fff;--sz-darktext2:rgba(255,255,255,.5);--sz-accent:#06b6d4;--sz-trans-border:#0f1c24}
     [data-theme="dark"] #sub-wb-expand[data-wb-scheme="2"]{--sz-dark:#d8eaf4;--sz-dark-border:#d8eaf4;--sz-darktext:#0b151c;--sz-darktext2:rgba(11,21,28,.5);--sz-accent:#0e7490;--sz-trans-border:#d8eaf4}
@@ -341,14 +341,14 @@
     .wbx-syns span{font-size:12px;padding:3px 8px;border-radius:0;border:3px solid var(--sz-accent);font-weight:700;background:transparent;color:var(--sz-accent);cursor:pointer}
     .wbx-syns span:hover{background:var(--sz-accent);color:var(--sz-light,#fff)}
     /* ── Dark mode overrides ── */
-    [data-theme="dark"] .wbx-box{background:#1a2630;border-color:var(--sz-dark-border,#d8eaf4)}
+    [data-theme="dark"] .wbx-box{background:var(--sz-dark,#1a2630);border-color:var(--sz-dark-border,#d8eaf4)}
     [data-theme="dark"] .wbx-word-zone{background:var(--sz-dark)}
     [data-theme="dark"] .wbx-w{color:var(--sz-darktext)}
     [data-theme="dark"] .wbx-cefr{color:var(--sz-darktext);border-color:var(--sz-darktext)}
     [data-theme="dark"] .wbx-pos{color:var(--sz-darktext2)}
-    [data-theme="dark"] .wbx-def{color:var(--sz-darktext2,#a0c0d4)}
+    [data-theme="dark"] .wbx-def{color:var(--sz-darktext2,var(--text-soft))}
     [data-theme="dark"] .wbx-trans{border-top-color:var(--sz-dark-border,#d8eaf4)}
-    [data-theme="dark"] .wbx-meta-zone{background:#1a2630}
+    [data-theme="dark"] .wbx-meta-zone{background:var(--sz-dark)}
     [data-theme="dark"] .wbx-save-col{background:var(--sz-dark);border-color:var(--sz-dark-border)}
     [data-theme="dark"] .wbx-save-btn,[data-theme="dark"] .wbx-bookmark-btn,[data-theme="dark"] .wbx-close-btn{border-color:var(--sz-darktext2);background:transparent;color:var(--sz-darktext2)}
     [data-theme="dark"] .wbx-syns span{color:var(--sz-accent);border-color:var(--sz-accent)}
@@ -3825,6 +3825,7 @@
               '<div class="wbx-save-col">' +
               '<button class="wbx-save-btn" data-word="' + s.word + '" data-level="' + s.level + '" data-pos="' + posLabel + '" title="Aggiungi a Build From Known">+</button>' +
               '<button class="wbx-bookmark-btn" data-word="' + s.word + '" data-level="' + s.level + '" data-pos="' + posLabel + '" title="Salva per dopo"><i class="fa-regular fa-bookmark"></i></button>' +
+              '<button class="wbx-close-btn" title="Rimuovi" onclick="event.stopPropagation();wbxDismissBox(this)">×</button>' +
               '</div>' +
               '</article>';
           });
@@ -4000,6 +4001,17 @@
         }).join('');
       }
 
+      // ── Dismiss a suggestion box with animation ──
+      window.wbxDismissBox = function(btn) {
+        var box = btn.closest('.wbx-box');
+        if (!box || box.classList.contains('wbx-exact')) return;
+        box.style.opacity = '0';
+        box.style.transform = 'scale(.9)';
+        box.style.transition = 'all .25s ease-in';
+        box.style.pointerEvents = 'none';
+        setTimeout(function(){ box.remove(); }, 260);
+      };
+
       // ── User clicked a POS chip — update exact box & re-enrich ──
       window.wbxSelectPos = function(chip, queryWord) {
         // Update chip active state
@@ -4020,6 +4032,13 @@
           exactBox.querySelectorAll('.wbx-save-btn, .wbx-bookmark-btn').forEach(function(btn){
             btn.setAttribute('data-pos', newLabel);
           });
+          // Show loading state immediately
+          var defEl = exactBox.querySelector('.wbx-def');
+          if (defEl) defEl.textContent = 'Caricamento…';
+          var transEl = exactBox.querySelector('.wbx-trans');
+          if (transEl) { transEl.style.opacity = '0'; transEl.textContent = '—'; }
+          var synsEl = exactBox.querySelector('.wbx-syns');
+          if (synsEl) synsEl.innerHTML = '';
         }
 
         // Re-enrich the exact box with new POS context
@@ -4259,8 +4278,7 @@
         var btn = e.target.closest('.wbx-close-btn');
         if (!btn) return;
         e.stopPropagation();
-        var box = btn.closest('.wbx-box');
-        if (box) { box.style.opacity = '0'; box.style.transform = 'scale(.95)'; box.style.transition = 'all .2s'; setTimeout(function(){ box.remove(); }, 200); }
+        wbxDismissBox(btn);
       });
 
       // ── Event delegation: synonym chip click → expand box inline ──
