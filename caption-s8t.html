@@ -3577,6 +3577,26 @@ async function _doWbSync() {
       } else {
         await sb.from('user_wordbank_words').insert({ wordbank_id: wbId, word: w, pos: pos || null, usage_count: 1 });
       }
+      // ═══ Also upsert to review_words (feeds pinned banks) ═══
+      try {
+        var clean = w.replace(/[^a-zA-Z0-9 '-]/g, '').trim();
+        if (clean && clean.length >= 2) {
+          var norm = clean.toLowerCase();
+          var rwRes = await sb.from('review_words').select('id,personal_frequency,is_new').eq('user_id', userId).eq('lemma', clean).maybeSingle();
+          if (rwRes.data) {
+            var rwUpdate = { personal_frequency: (rwRes.data.personal_frequency || 0) + 1 };
+            if (pos) rwUpdate.pos = pos;
+            await sb.from('review_words').update(rwUpdate).eq('id', rwRes.data.id);
+          } else {
+            await sb.from('review_words').insert({
+              user_id: userId, lemma: clean, normalized: norm,
+              pos: pos || null, is_new: true, first_seen_at: new Date().toISOString(),
+              source_type: 'session', review_state: 'new',
+              personal_frequency: 1
+            });
+          }
+        }
+      } catch(rwErr) { /* review_words table might not exist yet */ }
     }
   } catch(e) { /* silent */ }
 }
