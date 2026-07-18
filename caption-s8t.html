@@ -3562,19 +3562,44 @@ async function _doWbSync() {
       if (createRes.error) { console.warn('wb create:', createRes.error.message); return; }
       wbId = createRes.data.id;
     }
-    // 2. Upsert all current words
+    // 2. Upsert all current words with POS detection (uses existing tagWord)
     for (var i = 0; i < wordBank.length; i++) {
       var w = wordBank[i];
+      var pos = typeof tagWord === 'function' ? tagWord(w) : null;
+      if (pos === 'OTHER' || pos === 'FUNC' || pos === 'WORD') pos = null;
       // Check if word already exists in this bank
       var exRes = await sb.from('user_wordbank_words').select('id,usage_count').eq('wordbank_id', wbId).eq('word', w).maybeSingle();
       if (exRes.data) {
-        // Increment usage
-        await sb.from('user_wordbank_words').update({ usage_count: (exRes.data.usage_count || 0) + 1 }).eq('id', exRes.data.id);
+        // Increment usage, update POS if we have one and DB doesn't
+        var update = { usage_count: (exRes.data.usage_count || 0) + 1 };
+        if (pos) update.pos = pos;
+        await sb.from('user_wordbank_words').update(update).eq('id', exRes.data.id);
       } else {
-        await sb.from('user_wordbank_words').insert({ wordbank_id: wbId, word: w, usage_count: 1 });
+        await sb.from('user_wordbank_words').insert({ wordbank_id: wbId, word: w, pos: pos || null, usage_count: 1 });
       }
     }
   } catch(e) { /* silent */ }
+}
+
+// ── POS detection using Compromise.js ── (kept for reference, tagWord is primary)
+function _detectPOS(word) {
+  try {
+    if (typeof nlp === 'undefined') return null;
+    var clean = word.replace(/[^a-zA-Z0-9 '-]/g, '').trim();
+    if (!clean) return null;
+    var t = nlp(clean).json();
+    if (t[0] && t[0].terms && t[0].terms[0]) {
+      var tags = t[0].terms[0].tags || [];
+      if (tags.indexOf('Noun') !== -1) return 'NOUN';
+      if (tags.indexOf('Verb') !== -1) return 'VERB';
+      if (tags.indexOf('Adjective') !== -1) return 'ADJ';
+      if (tags.indexOf('Adverb') !== -1) return 'ADV';
+      if (tags.indexOf('Preposition') !== -1) return 'PREP';
+      if (tags.indexOf('Conjunction') !== -1) return 'CONJ';
+      if (tags.indexOf('Pronoun') !== -1) return 'PRON';
+    }
+  } catch(e) {}
+  return null;
 }
 
 function renderWordBank() {
