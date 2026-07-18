@@ -534,6 +534,10 @@
      WORD BANK — bulk remove words
      ═══════════════════════════════════════════ */
   async function bulkRemoveFromBank(wordbankId, wordIds) {
+    if (!wordIds || !wordIds.length) return false;
+    // Safety: filter out any invalid IDs
+    wordIds = wordIds.filter(function(id) { return id && id !== 'undefined' && id !== 'null' && id.length > 10; });
+    if (!wordIds.length) return false;
     var r = await sb().from('user_wordbank_words').delete().eq('wordbank_id', wordbankId).in('id', wordIds);
     if (r.error) { console.warn('bulkRemoveFromBank:', r.error.message); return false; }
     cacheClear();
