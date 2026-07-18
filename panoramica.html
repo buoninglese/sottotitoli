@@ -3515,9 +3515,43 @@
       }
       window.renderTrascrizioni = renderTrascrizioni;
 
-      window.trOpenSession = function(sid, name) {
-        // Open session — navigate to caption page or show detail
-        window.location.href = 'studio-sotto-mockup.html?session=' + sid;
+      window.trOpenSession = async function(sid, name) {
+        // Open session detail in the word drawer
+        var sb = window.sottotitoliSupabase;
+        if (!sb) return;
+        try {
+          var { data: session } = await sb.from('sessions').select('*').eq('id', sid).single();
+          if (!session) return;
+          // Show drawer
+          var drawer = document.getElementById('wbDrawer');
+          var overlay = document.getElementById('wbDrawerOverlay');
+          if (!drawer || !overlay) return;
+          // Position to main-panel
+          positionDrawer();
+          overlay.classList.add('active');
+          drawer.classList.add('active');
+          // Populate
+          var mins = Math.round((session.duration_seconds||0)/60);
+          var durStr = mins >= 60 ? Math.floor(mins/60)+'h '+(mins%60)+'m' : mins+'m';
+          var dateStr = new Date(session.started_at).toLocaleDateString('it-IT', {day:'2-digit',month:'long',year:'numeric',hour:'2-digit',minute:'2-digit'});
+          var words = session.words_count || 0;
+          var wpm = session.wpm ? Math.round(session.wpm) : '—';
+          var lexDiv = session.lexical_diversity ? session.lexical_diversity.toFixed(2) : '—';
+          document.getElementById('wbDrawerWord').textContent = session.name || ('Sessione ' + (sid||'').substring(0,8));
+          document.getElementById('wbDrawerIPA').textContent = dateStr;
+          document.getElementById('wbDrawerMeta').innerHTML =
+            '<span class="badge badge-pos">'+durStr+'</span>'+
+            '<span class="badge badge-cefr">'+words+' parole</span>'+
+            '<span class="badge badge-source">'+(session.language_pair||'en')+'</span>';
+          document.getElementById('wbDrawerMeaning').innerHTML =
+            '<strong>WPM:</strong> '+wpm+' &middot; <strong>Lexical Diversity:</strong> '+lexDiv+'<br>'+
+            (session.transcript_text ? '<em style="font-size:12px">'+session.transcript_text.substring(0,300)+(session.transcript_text.length>300?'…':'')+'</em>' : '<span style="color:var(--text-faint)">Nessuna trascrizione disponibile.</span>');
+          document.getElementById('wbDrawerBanks').innerHTML = '';
+          document.getElementById('wbDrawerAddBanks').innerHTML = '';
+          document.getElementById('wbDrawerSignals').innerHTML =
+            '<div class="drawer-signal">Qualità <strong>'+(session.quality_score ? Math.round(session.quality_score*100)+'%' : '—')+'</strong></div>'+
+            '<div class="drawer-signal">Apertura <strong><a href="studio-sotto-mockup.html?session='+sid+'" style="color:var(--cyan)">Vai alla sessione →</a></strong></div>';
+        } catch(e) { console.warn('trOpenSession:', e); }
       };
 
       window.trDeleteSession = async function(sid, el) {
