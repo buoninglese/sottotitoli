@@ -2864,13 +2864,9 @@
         var cells = row.cells;
         switch(colKey) {
           case 'word':  return (row.querySelector('.wb-word')?.textContent || cells[1]?.textContent || '').trim().toLowerCase();
-          case 'cefr':  { var ci = tbodyId === 'wbReviewBody' ? 2 : 3; return _cefrRank(row.querySelector('.badge-cefr')?.textContent || cells[ci]?.textContent || ''); }
-          case 'pos':   { var pi = tbodyId === 'wbReviewBody' ? 3 : 2; return (row.querySelector('.badge-pos')?.textContent || cells[pi]?.textContent || '').trim().toLowerCase(); }
-          case 'source': return (row.querySelector('.badge-source')?.textContent || cells[4]?.textContent || '').trim().toLowerCase();
-          case 'status': { var si = tbodyId === 'wbReviewBody' ? 6 : 5; return (cells[si]?.textContent || '').trim(); }
-          case 'uses':  return parseInt(cells[6]?.textContent) || 0;
-          case 'lastReview': return _parseReviewDate(cells[4]?.textContent || '');
-          case 'interval': return parseInt(cells[5]?.textContent) || 0;
+          case 'cefr':  return _cefrRank(row.querySelector('.badge-cefr')?.textContent || cells[3]?.textContent || '');
+          case 'pos':   return (row.querySelector('.badge-pos')?.textContent || cells[2]?.textContent || '').trim().toLowerCase();
+          case 'uses':  return parseInt(cells[4]?.textContent) || 0;
           default: return '';
         }
       }
@@ -2926,7 +2922,36 @@
         var posVal = w.pos || w.part_of_speech || '';
         if (posVal) metaHtml += '<span class="badge badge-pos">'+posVal+'</span>';
         document.getElementById('wbDrawerMeta').innerHTML = metaHtml || '<span style="font-size:11px;color:var(--text-faint)">—</span>';
-        document.getElementById('wbDrawerMeaning').textContent = w.definition || w.translation_primary || (I18n && I18n.t ? I18n.t('word_definition_unavailable') : 'Definizione non ancora disponibile.');
+
+        // Try to fetch definition from Free Dictionary API
+        var definition = w.definition || w.translation_primary || '';
+        var meaningEl = document.getElementById('wbDrawerMeaning');
+        if (!definition && wordText !== '—') {
+          meaningEl.textContent = 'Caricamento…';
+          try {
+            var resp = await fetch('https://api.dictionaryapi.dev/api/v2/entries/en/' + encodeURIComponent(wordText.toLowerCase()));
+            if (resp.ok) {
+              var defData = await resp.json();
+              if (defData && defData[0] && defData[0].meanings && defData[0].meanings[0]) {
+                var m = defData[0].meanings[0];
+                definition = (m.definitions && m.definitions[0] ? m.definitions[0].definition : '') || '';
+                // Also populate POS and IPA if missing
+                if (!posVal && m.partOfSpeech) {
+                  posVal = m.partOfSpeech.toUpperCase();
+                  metaHtml += '<span class="badge badge-pos">'+posVal+'</span>';
+                  document.getElementById('wbDrawerMeta').innerHTML = metaHtml;
+                }
+                if (defData[0].phonetic) {
+                  var ipa = typeof defData[0].phonetic === 'string' ? defData[0].phonetic : (defData[0].phonetic.text || '');
+                  if (ipa) {
+                    document.getElementById('wbDrawerWord').textContent = wordText + '  ' + ipa;
+                  }
+                }
+              }
+            }
+          } catch(e) { /* API unavailable */ }
+        }
+        meaningEl.textContent = definition || (I18n && I18n.t ? I18n.t('word_definition_unavailable') : 'Definizione non ancora disponibile.');
         // Bank membership
         var banks = await SottotitoliData.getWordbanks(window.SOTTOTITOLI_STUDY_LANG||'en');
         var membershipHTML = '';
