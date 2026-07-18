@@ -2504,9 +2504,7 @@
               if (bankSummaries[k]) smartCounts[k] = bankSummaries[k].total || 0;
             });
           }
-        } catch(e) { /* fall through to hardcoded counts */ }
-        // Fallback: use estimates from available data
-        if (!smartCounts.build_from_known && stats.totalWords > 0) smartCounts.build_from_known = Math.round(stats.totalWords * 0.2);
+        } catch(e) { /* fall through — all zero */ }
         var smartBanks = [
           { id: 'goal_next_step', name: 'Next Step For Your Goal', desc: 'Goal-aligned vocabulary for your profile', count: smartCounts.goal_next_step, signal: smartCounts.goal_next_step > 0 ? smartCounts.goal_next_step + ' suggestions' : 'Complete your profile', preview: [], subtitle: 'Suggested for your current goal' },
           { id: 'build_from_known', name: 'Build From What You Know', desc: 'Lexical progression from words you already know', count: smartCounts.build_from_known, signal: smartCounts.build_from_known > 0 ? smartCounts.build_from_known + ' suggestions' : 'From your vocabulary', preview: [], subtitle: 'Follow-on words from known vocabulary' },
@@ -2537,9 +2535,22 @@
         var customGrid = document.getElementById('wbCustomGrid');
         if (customGrid) customGrid.innerHTML = customHtml;
 
-        // Attach click handlers
+        // Attach click handlers — special case for Build From What You Know
         document.querySelectorAll('#wordbanksOverview .wb-card[data-bank-id]').forEach(function(card) {
-          card.addEventListener('click', function() { openWordbankView(this.getAttribute('data-bank-id')); });
+          var bankId = card.getAttribute('data-bank-id');
+          if (bankId === 'build_from_known') {
+            card.addEventListener('click', function() {
+              // Navigate to Vocabolario → Build From What You Know tab
+              var vocNav = document.querySelector('[data-panel="vocabolario"]');
+              if (vocNav) vocNav.click();
+              setTimeout(function() {
+                var wbTab = document.querySelector('[data-subtab="wb-expand"]');
+                if (wbTab) wbTab.click();
+              }, 150);
+            });
+          } else {
+            card.addEventListener('click', function() { openWordbankView(bankId); });
+          }
         });
       }
 
