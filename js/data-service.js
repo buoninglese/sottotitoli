@@ -436,37 +436,44 @@
     var userId = await getUserId();
     if (!userId) return { totalWords: 0, dueToday: 0, overdue: 0, reviewedToday: 0, newThisWeek: 0, known: 0, learning: 0 };
 
-    var _a = await Promise.all([
-      sb().from('user_wordbank_words').select('id', { count: 'exact', head: true })
-        .eq('user_id', userId).eq('lang', lang),
-      sb().from('user_wordbank_words').select('id', { count: 'exact', head: true })
-        .eq('user_id', userId).eq('lang', lang).eq('status', 'due'),
-      sb().from('user_wordbank_words').select('id', { count: 'exact', head: true })
-        .eq('user_id', userId).eq('lang', lang).gte('added_at', new Date(Date.now() - 7*86400000).toISOString())
-    ]);
+    try {
+      // Query through user_wordbanks to get user-scoped data, then join to words
+      // user_wordbank_words only has: id, wordbank_id, word, pos, usage_count, last_used, created_at
+      var { data: banks, error: bankErr } = await sb().from('user_wordbanks')
+        .select('id').eq('user_id', userId).eq('lang', lang);
+      if (bankErr || !banks || !banks.length) {
+        return { totalWords: 0, dueToday: 0, overdue: 0, reviewedToday: 0, newThisWeek: 0, known: 0, learning: 0 };
+      }
+      var bankIds = banks.map(function(b) { return b.id; });
 
-    // Fallback: count from wordbank_words if status columns don't exist yet
-    var allWords = await sb().from('user_wordbank_words')
-      .select('id, status, added_at, last_reviewed_at, srs_interval').eq('user_id', userId);
-    var words = allWords.data || [];
-    var total = words.length;
-    var now = new Date();
-    var todayISO = now.toISOString().substring(0, 10);
-    var due = words.filter(function(w) { return w.status === 'due'; }).length;
-    // Overdue: status=due AND last_reviewed_at + srs_interval days < now
-    var overdue = words.filter(function(w) {
-      return w.status === 'due' && w.last_reviewed_at && w.srs_interval &&
-        (now - new Date(w.last_reviewed_at)) > (w.srs_interval * 86400000);
-    }).length;
-    var reviewedToday = words.filter(function(w) {
-      return w.last_reviewed_at && w.last_reviewed_at.substring(0,10) === todayISO;
-    }).length;
-    var weekAgo = new Date(Date.now() - 7*86400000).toISOString();
-    var newThisWeek = words.filter(function(w) { return w.added_at && w.added_at >= weekAgo; }).length;
-    var known = words.filter(function(w) { return w.status === 'known' || w.status === 'mastered'; }).length;
-    var learning = words.filter(function(w) { return w.status === 'learning' || w.status === 'new'; }).length;
+      var { data: words, error: wordErr } = await sb().from('user_wordbank_words')
+        .select('id, word, pos, usage_count, last_used, created_at')
+        .in('wordbank_id', bankIds)
+        .order('usage_count', { ascending: false });
+      if (wordErr) { console.warn('wordbank stats:', wordErr.message); return { totalWords: 0, dueToday: 0, overdue: 0, reviewedToday: 0, newThisWeek: 0, known: 0, learning: 0 }; }
 
-    return { totalWords: total, dueToday: due, overdue: overdue, reviewedToday: reviewedToday, newThisWeek: newThisWeek, known: known, learning: learning, mastered: words.filter(function(w) { return w.status === 'mastered'; }).length };
+      words = words || [];
+      var total = words.length;
+      var now = new Date();
+      var weekAgo = new Date(Date.now() - 7 * 86400000);
+      var newThisWeek = words.filter(function(w) {
+        return w.created_at && new Date(w.created_at) >= weekAgo;
+      }).length;
+
+      return {
+        totalWords: total,
+        dueToday: 0,       // no SRS columns yet — will be wired when review_words integration happens
+        overdue: 0,
+        reviewedToday: 0,
+        newThisWeek: newThisWeek,
+        known: 0,
+        learning: total,   // all words are "learning" until SRS is wired
+        mastered: 0
+      };
+    } catch(e) {
+      console.warn('getWordbankStats error:', e.message);
+      return { totalWords: 0, dueToday: 0, overdue: 0, reviewedToday: 0, newThisWeek: 0, known: 0, learning: 0 };
+    }
   }
 
   // ── Bank catalog summaries (live counts from review_bank_words) ──
