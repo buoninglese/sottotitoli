@@ -3583,8 +3583,14 @@
         if (!w) return;
         var word = w.word || w.lemma || '';
         var pos = w.pos || w.part_of_speech || null;
+        if (!word || !bankId) return;
         try {
-          await SottotitoliData.addWordToBank(bankId, word, pos);
+          var result = await SottotitoliData.addWordToBank(bankId, word, pos);
+          if (!result) {
+            console.warn('addWordToBank returned null for word:', word, 'bank:', bankId);
+            if (chipEl) { chipEl.textContent = '⚠ Riprova'; chipEl.style.color = 'var(--amber)'; }
+            return;
+          }
           SottotitoliData.cacheClear();
           if (chipEl) {
             chipEl.textContent = '✓ ' + bankName;
@@ -3594,7 +3600,7 @@
             chipEl.style.border = '1px solid var(--teal)';
             chipEl.onclick = null;
           }
-        } catch(e) { console.warn('add to bank:', e); }
+        } catch(e) { console.warn('add to bank:', e); if (chipEl) { chipEl.textContent = '⚠ Errore'; } }
       };
 
       function closeWbDrawer() {
