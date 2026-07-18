@@ -82,18 +82,39 @@ export function renderReviewQueueCards(queues) {
       '</div>';
   }
 
-  return '<div class="review-queue-grid alt-card-grid" style="margin-top:16px">' +
+  // Color scheme per queue type (matches #05 Gradient Banner style)
+  var schemes = {
+    due_all:      { grad: 'rgba(6,182,212,.15),rgba(8,145,178,.08),rgba(6,182,212,.04)', border: 'rgba(6,182,212,.2)', accent: '#06b6d4', icon: 'fa-solid fa-layer-group' },
+    due_verbs:    { grad: 'rgba(192,132,252,.15),rgba(99,102,241,.08),rgba(192,132,252,.04)', border: 'rgba(192,132,252,.2)', accent: '#c084fc', icon: 'fa-solid fa-bolt' },
+    due_adjectives:{ grad: 'rgba(59,130,246,.15),rgba(37,99,235,.08),rgba(59,130,246,.04)', border: 'rgba(59,130,246,.2)', accent: '#3b82f6', icon: 'fa-solid fa-paint-brush' },
+    due_nouns:    { grad: 'rgba(20,184,166,.15),rgba(13,148,136,.08),rgba(20,184,166,.04)', border: 'rgba(20,184,166,.2)', accent: '#14b8a6', icon: 'fa-solid fa-cube' },
+    due_saved:    { grad: 'rgba(245,158,11,.15),rgba(217,119,6,.08),rgba(245,158,11,.04)', border: 'rgba(245,158,11,.2)', accent: '#f59e0b', icon: 'fa-solid fa-bookmark' },
+    due_new:      { grad: 'rgba(16,185,129,.15),rgba(5,150,105,.08),rgba(16,185,129,.04)', border: 'rgba(16,185,129,.2)', accent: '#10b981', icon: 'fa-solid fa-seedling' },
+    default:      { grad: 'rgba(192,132,252,.15),rgba(99,102,241,.08),rgba(192,132,252,.04)', border: 'rgba(192,132,252,.2)', accent: '#c084fc', icon: 'fa-solid fa-crown' }
+  };
+  var aiScheme = { grad: 'rgba(244,114,182,.15),rgba(225,29,72,.08),rgba(244,114,182,.04)', border: 'rgba(244,114,182,.2)', accent: '#f472b6', icon: 'fa-solid fa-robot' };
+
+  return '<div class="rv-queue-grid">' +
     queues.map(function (queue) {
-      return '<article class="alt-card review-queue-card" data-urgency="' + queue.urgency + '" style="padding:18px 20px">' +
-        '<h3 style="margin:0 0 6px;font-size:15px">' + queue.title + '</h3>' +
-        '<p style="margin:0 0 10px;font-size:12px;color:var(--text-soft)">' + queue.rationale + '</p>' +
-        '<div style="display:flex;gap:12px;font-size:12px;color:var(--text-faint);margin-bottom:12px">' +
-        '<span>' + queue.item_count + ' parole</span>' +
-        '<span>~' + queue.estimated_minutes + ' min</span>' +
+      var s = queue.type === 'ai' ? aiScheme : (schemes[queue.id] || schemes['default']);
+      var urgencyColor = queue.urgency === 'high' ? '#f59e0b' : queue.urgency === 'medium' ? '#06b6d4' : 'rgba(255,255,255,.25)';
+      return '<article class="rv-banner" style="background:linear-gradient(135deg,' + s.grad + ');border-color:' + s.border + '">' +
+        // Row 1: icon + title
+        '<div class="rv-row1"><i class="' + s.icon + '" style="color:' + s.accent + ';opacity:.85"></i><span>' + queue.title + '</span></div>' +
+        // Row 2: big count + detail
+        '<div class="rv-huge-wrap"><span class="rv-huge" style="color:' + s.accent + '">' + queue.item_count + '</span><span class="rv-of">parole</span></div>' +
+        // Row 3: meta chips
+        '<div class="rv-bottom">' +
+          '<span class="rv-chip" style="color:' + urgencyColor + ';background:' + urgencyColor.replace(')',',.12)').replace('rgb','rgba') + ';border-color:' + urgencyColor.replace(')',',.2)').replace('rgb','rgba') + '">' +
+            (queue.urgency === 'high' ? '⚠ Urgente' : queue.urgency === 'medium' ? 'In scadenza' : 'In programma') +
+          '</span>' +
+          '<span class="rv-dl"><i class="fa-regular fa-clock"></i> ~' + queue.estimated_minutes + ' min</span>' +
+          '<span class="rv-dl" style="margin-left:auto;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + queue.rationale + '</span>' +
         '</div>' +
-        '<div style="display:flex;gap:8px">' +
-        '<button type="button" class="fchip" data-open-queue="' + queue.id + '" data-mode="review" style="font-size:12px;padding:6px 14px;font-family:var(--font-ui)">Ripassa</button>' +
-        '<button type="button" class="fchip" data-open-queue="' + queue.id + '" data-mode="test_typing" style="font-size:12px;padding:6px 14px;font-family:var(--font-ui)">Testa</button>' +
+        // Row 4: CTA buttons
+        '<div class="rv-actions">' +
+          '<button type="button" class="rv-btn rv-btn-primary" data-open-queue="' + queue.id + '" data-mode="review" style="background:' + s.accent + ';border-color:' + s.accent + '">Ripassa</button>' +
+          '<button type="button" class="rv-btn" data-open-queue="' + queue.id + '" data-mode="test_typing" style="border-color:' + s.accent + ';color:' + s.accent + '">Testa</button>' +
         '</div>' +
         '</article>';
     }).join('') +
