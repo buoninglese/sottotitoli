@@ -90,7 +90,7 @@ create table if not exists public.review_user_learning_profile (
   target_language text,
   native_language text,
   long_term_goal text,
-  current_role text,
+  learner_current_role text,
   target_role text,
   target_domain text,
   target_contexts text[] not null default '{}',
