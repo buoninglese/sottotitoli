@@ -3782,17 +3782,17 @@
         var userId = r.data.session.user.id;
         var lang = window.SOTTOTITOLI_STUDY_LANG || 'en';
 
-        // Add to a default "Build From What You Know" bank, or to a general collection
+        // Save to "Saved from sessions" bank (same as caption word bank chips)
         var banks = await SottotitoliData.getWordbanks(lang);
-        var targetBank = banks.find(function(b) { return b.name === 'Build From Known'; });
+        var targetBank = banks.find(function(b) { return b.name === 'Saved from sessions'; });
         if (!targetBank) {
-          var createRes = await sb.from('user_wordbanks').insert({ user_id: userId, name: 'Build From Known', lang: lang }).select().single();
+          var createRes = await sb.from('user_wordbanks').insert({ user_id: userId, name: 'Saved from sessions', lang: lang }).select().single();
           if (createRes.error) { console.warn('create bank:', createRes.error.message); return; }
           targetBank = createRes.data;
         }
+        // Only insert columns that exist in user_wordbank_words: wordbank_id, word, pos, usage_count
         var insertRes = await sb.from('user_wordbank_words').insert({
-          wordbank_id: targetBank.id, word: word, pos: pos, cefr_level: level,
-          user_id: userId, status: 'new', added_at: new Date().toISOString()
+          wordbank_id: targetBank.id, word: word, pos: pos || null, usage_count: 1
         });
         if (insertRes.error) { console.warn('save word:', insertRes.error.message); return; }
         SottotitoliData.cacheClear();
