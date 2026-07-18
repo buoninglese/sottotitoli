@@ -2973,18 +2973,22 @@
         openWordbankView(_wbState.currentBank);
       }
 
-      // ── Single word delete ──
+      // ── Single word delete (instant, no confirm) ──
       window.wbDeleteWord = async function(wordId, wordText) {
         var bankUUID = _wbState.currentBankUUID || _wbState.currentBank;
-        if (!bankUUID) return;
-        if (!confirm('Remove "' + (wordText || 'this word') + '" from this bank?')) return;
+        if (!bankUUID || !wordId) return;
         // Remove row instantly for immediate feedback
         var row = document.querySelector('#wbTableBody tr[data-wid="' + wordId + '"]');
-        if (row) { row.style.opacity = '0'; row.style.transform = 'translateX(20px)'; row.style.transition = 'all .2s'; setTimeout(function(){ row.remove(); }, 200); }
-        await SottotitoliData.bulkRemoveFromBank(bankUUID, [wordId]);
-        SottotitoliData.cacheClear();
-        // Refresh in background to update counts
-        setTimeout(function() { openWordbankView(_wbState.currentBank); }, 300);
+        if (row) { row.style.opacity = '0'; row.style.transform = 'translateX(20px)'; row.style.transition = 'all .2s'; }
+        var result = await SottotitoliData.bulkRemoveFromBank(bankUUID, [wordId]);
+        if (result) {
+          SottotitoliData.cacheClear();
+          if (row) setTimeout(function(){ row.remove(); }, 200);
+        } else {
+          // Delete failed — put row back
+          if (row) { row.style.opacity = '1'; row.style.transform = ''; }
+          console.warn('Delete failed for word:', wordId);
+        }
       };
 
       async function wbBulkRemove() {
