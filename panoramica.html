@@ -1207,28 +1207,23 @@
             <button role="tab" aria-selected="false" class="tab-link" data-subtab="vt-milestones">Milestones</button>
             <button role="tab" aria-selected="false" class="tab-link" data-subtab="vt-tasks">Compiti</button>
           </div></section>
-          <!-- Subtab: Review Due -->
+          <!-- Subtab: Review Due — word cards with fatto/più tardi -->
           <div role="tabpanel" class="subtab-pane active" id="sub-vt-review">
-            <section id="vtReviewDashboardMount">
-              <div id="vtReviewClassicFallback">
-                <div class="wb-stats" id="vtReviewStats"></div>
-                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:10px">
-                  <h3 style="margin:0;font-size:18px;font-weight:700">⏰ Parole da ripassare</h3>
-                  <div style="display:flex;gap:8px;flex-wrap:wrap">
-                    <button class="btn btn-ghost btn-sm" onclick="renderVTReviewDue()" style="font-family:var(--font-ui)"><i class="fa-solid fa-rotate"></i> Refresh</button>
-                    <button class="btn btn-primary btn-sm" id="btnVTReviewAllDue" onclick="reviewAllDue()" style="font-family:var(--font-ui)"><i class="fa-solid fa-check"></i> Segna tutte come ripassate</button>
-                  </div>
-                </div>
-                <div class="bulk-bar" id="vtReviewBulkBar"><span id="vtReviewBulkCount">0 selezionate</span><button onclick="vtReviewBulkDone()">✓ Fatto</button><button class="bulk-close" onclick="vtReviewClearSelection()">&times;</button></div>
-                <div class="wb-table-wrap"><table class="wb-table"><thead><tr><th class="cb"><input type="checkbox" onchange="vtReviewToggleAll(this)" style="accent-color:var(--cyan)"></th><th class="sortable" data-sort="word">Parola <span class="sort-arrow">▲</span></th><th class="sortable" data-sort="cefr">CEFR <span class="sort-arrow">▲</span></th><th class="sortable" data-sort="pos">POS <span class="sort-arrow">▲</span></th><th class="sortable" data-sort="lastReview">Ultimo ripasso <span class="sort-arrow">▲</span></th><th class="sortable" data-sort="interval">Intervallo SRS <span class="sort-arrow">▲</span></th><th class="sortable" data-sort="status">Stato <span class="sort-arrow">▲</span></th><th></th></tr></thead><tbody id="vtReviewBody"></tbody></table></div>
-                <div id="vtReviewEmpty" style="display:none;text-align:center;padding:40px 20px;color:var(--text-faint)">
-                  <div style="font-size:48px;margin-bottom:12px">🎉</div>
-                  <h3 style="color:var(--text-soft);margin-bottom:6px">Tutto in ordine!</h3>
-                  <p style="font-size:14px;max-width:400px;margin:0 auto;line-height:1.5">Nessuna parola da ripassare oggi.</p>
-                </div>
+            <div class="wb-stats" id="vtReviewStats"></div>
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;flex-wrap:wrap;gap:10px">
+              <h3 style="margin:0;font-size:20px;font-weight:800;letter-spacing:-.02em">Parole da ripassare</h3>
+              <div style="display:flex;gap:6px;flex-wrap:wrap" id="vtReviewOrderToggles">
+                <button class="fchip active" onclick="vtSetOrder(this,'priority')">Priorità</button>
+                <button class="fchip" onclick="vtSetOrder(this,'cefr')">CEFR</button>
+                <button class="fchip" onclick="vtSetOrder(this,'pos')">POS</button>
               </div>
-            </section>
-            <div id="vtReviewSessionMount"></div>
+            </div>
+            <div id="vtReviewCards" class="wbx-grid" style="margin-top:0"></div>
+            <div id="vtReviewEmpty" style="display:none;text-align:center;padding:50px 20px;color:var(--text-faint)">
+              <div style="font-size:48px;margin-bottom:12px">🎉</div>
+              <h3 style="color:var(--text-soft);margin-bottom:6px">Tutto in ordine!</h3>
+              <p style="font-size:14px;max-width:400px;margin:0 auto;line-height:1.5">Nessuna parola da ripassare oggi. Torna domani o inizia una nuova sessione.</p>
+            </div>
           </div>
           <!-- Subtab: Milestones -->
           <div role="tabpanel" class="subtab-pane" id="sub-vt-milestones">
@@ -3907,43 +3902,161 @@
       window.renderReviewDue = renderReviewDue;
 
       // ═══ RENDER: Vocabulary Trainer panel ═══
-      // Review Due — delegates to the main renderReviewDue then mirrors content
+      var _vtOrder = 'priority'; // priority | cefr | pos
+
+      window.vtSetOrder = function(btn, order) {
+        _vtOrder = order;
+        var bar = document.getElementById('vtReviewOrderToggles');
+        if (bar) bar.querySelectorAll('.fchip').forEach(function(c){ c.classList.remove('active'); });
+        btn.classList.add('active');
+        renderVTReviewDue();
+      };
+
+      // Review Due — renders words as wbx-box cards with fatto/più tardi
       async function renderVTReviewDue() {
-        await renderReviewDue();
-        setTimeout(function() {
-          var map = [
-            ['wbReviewStats','vtReviewStats'],
-            ['wbReviewBody','vtReviewBody'],
-            ['wbReviewEmpty','vtReviewEmpty'],
-            ['wbReviewBulkBar','vtReviewBulkBar'],
-            ['wbReviewBulkCount','vtReviewBulkCount']
-          ];
-          map.forEach(function(pair) {
-            var src = document.getElementById(pair[0]);
-            var dst = document.getElementById(pair[1]);
-            if (src && dst) dst.innerHTML = src.innerHTML;
+        var sb = window.sottotitoliSupabase;
+        if (!sb) return;
+        var r = await sb.auth.getSession();
+        if (!r.data || !r.data.session) return;
+        var userId = r.data.session.user.id;
+
+        // Stats bar
+        var statsEl = document.getElementById('vtReviewStats');
+        var cardsEl = document.getElementById('vtReviewCards');
+        var emptyEl = document.getElementById('vtReviewEmpty');
+        if (!cardsEl) return;
+
+        // Fetch reviewable words
+        var nowISO = new Date().toISOString();
+        var todayISO = new Date().toISOString().substring(0, 10);
+        var q = sb.from('review_words')
+          .select('id,lemma,pos,cefr,mastery_score,review_state,next_review_at,last_reviewed_at,personal_frequency')
+          .eq('user_id', userId)
+          .or('is_new.eq.true,next_review_at.lte.' + nowISO)
+          .order('last_reviewed_at', { ascending: true, nullsFirst: true })
+          .limit(40);
+        var res = await q;
+        var words = res.data || [];
+
+        // Count mastered today (reviewed today)
+        var masteredToday = 0;
+        if (words.length) {
+          words.forEach(function(w) {
+            if (w.last_reviewed_at && w.last_reviewed_at.substring(0,10) === todayISO && w.review_state !== 'new') {
+              masteredToday++;
+            }
           });
-          // Mirror empty state visibility
-          var srcEmpty = document.getElementById('wbReviewEmpty');
-          var dstEmpty = document.getElementById('vtReviewEmpty');
-          if (srcEmpty && dstEmpty) dstEmpty.style.display = srcEmpty.style.display;
-          var srcBar = document.getElementById('wbReviewBulkBar');
-          var dstBar = document.getElementById('vtReviewBulkBar');
-          if (srcBar && dstBar) { dstBar.className = srcBar.className; dstBar.style.display = srcBar.style.display; }
-        }, 300);
+        }
+
+        // Stats
+        if (statsEl) {
+          statsEl.innerHTML =
+            '<div class="wb-stat"><div class="stat-value">'+words.length+'</div><div class="stat-label">In programma oggi</div></div>'+
+            '<div class="wb-stat"><div class="stat-value">'+masteredToday+'</div><div class="stat-label">Ripassate oggi</div></div>'+
+            '<div class="wb-stat"><div class="stat-value">'+(words.length - masteredToday)+'</div><div class="stat-label">Da fare</div></div>';
+        }
+
+        // Empty state
+        if (!words.length) {
+          cardsEl.innerHTML = '';
+          if (emptyEl) emptyEl.style.display = 'block';
+          return;
+        }
+        if (emptyEl) emptyEl.style.display = 'none';
+
+        // Sort
+        if (_vtOrder === 'cefr') {
+          var lvlRank = {A1:1,A2:2,B1:3,B2:4,C1:5,C2:6};
+          words.sort(function(a,b){ return (lvlRank[a.cefr]||0) - (lvlRank[b.cefr]||0); });
+        } else if (_vtOrder === 'pos') {
+          words.sort(function(a,b){ return (a.pos||'').localeCompare(b.pos||''); });
+        }
+        // Default priority: new first, then by mastery asc
+
+        // Render cards
+        var html = '';
+        words.forEach(function(w) {
+          var word = w.lemma || '—';
+          var cefr = w.cefr || '';
+          var pos = w.pos || '';
+          var posLabel = mapPos(pos);
+          var isNew = w.review_state === 'new' || w.is_new;
+          var isOverdue = w.next_review_at && new Date(w.next_review_at) < new Date();
+          var ringColor = isNew ? 'var(--cyan)' : isOverdue ? 'var(--amber)' : 'var(--green)';
+
+          html += '<article class="wbx-box" data-word="'+word+'" data-wid="'+w.id+'" style="border-left:3px solid '+ringColor+'">'+
+            '<div class="wbx-main-col">'+
+            '<div class="wbx-word-zone">'+
+            '<div class="wbx-head"><span class="wbx-w">'+word+'</span>'+(cefr?'<span class="wbx-cefr">'+cefr+'</span>':'')+(posLabel!=='—'?'<span class="wbx-pos">'+posLabel+'</span>':'')+'</div>'+
+            '<div class="wbx-ipa">'+(w.mastery_score ? 'Mastery: '+w.mastery_score+'%' : '')+'</div>'+
+            '</div>'+
+            '<div class="wbx-meta-zone">'+
+            '<div class="wbx-def">'+ (isNew ? 'Nuova — mai ripassata' : isOverdue ? 'In ritardo — ripassa ora' : 'In programma') +'</div>'+
+            '<div class="wbx-trans" style="opacity:1;border-top-color:transparent;font-size:11px;color:var(--text-faint)">'+
+              (w.personal_frequency ? 'Usata '+w.personal_frequency+'×' : '') +
+              (w.last_reviewed_at ? ' · Ultimo ripasso: '+fmtDate(w.last_reviewed_at) : '') +
+            '</div>'+
+            '<div class="wbx-syns"></div>'+
+            '</div>'+
+            '</div>'+
+            '<div class="wbx-save-col">'+
+            '<button class="wbx-save-btn vt-fatto-btn" data-wid="'+w.id+'" data-word="'+word+'" title="Fatto — la conosco" onclick="event.stopPropagation();vtMarkFatto(this)" style="font-size:20px">✓</button>'+
+            '<button class="wbx-bookmark-btn vt-piutardi-btn" data-wid="'+w.id+'" data-word="'+word+'" title="Più tardi — saltala per ora" onclick="event.stopPropagation();vtMarkPiuTardi(this)" style="font-size:18px">⏭</button>'+
+            '</div>'+
+            '</article>';
+        });
+        cardsEl.innerHTML = html;
+
+        // Enrich with definitions (lightweight, batch)
+        setTimeout(function() {
+          var boxes = document.querySelectorAll('#vtReviewCards .wbx-box');
+          for (var i = 0; i < Math.min(boxes.length, 6); i++) {
+            enrichOneCard(boxes[i], boxes[i].getAttribute('data-word'));
+          }
+        }, 100);
       }
       window.renderVTReviewDue = renderVTReviewDue;
 
-      // VT Review Due bulk bar stubs (delegate to original handlers)
-      window.vtReviewBulkDone = function() { wbReviewBulkDone(); setTimeout(renderVTReviewDue, 400); };
-      window.vtReviewClearSelection = function() { wbReviewClearSelection(); renderVTReviewDue(); };
-      window.vtReviewToggleAll = function(cb) { wbReviewToggleAll(cb); setTimeout(renderVTReviewDue, 200); };
-      window.vtReviewToggleRow = function(tr) { wbReviewToggleRow(tr); wbReviewUpdateBulkBar(); };
-      window.vtReviewUpdateBulkBar = function() { wbReviewUpdateBulkBar(); setTimeout(function() {
-        var src = document.getElementById('wbReviewBulkBar');
-        var dst = document.getElementById('vtReviewBulkBar');
-        if (src && dst) { dst.className = src.className; dst.style.display = src.style.display; }
-      }, 50); };
+      // ── Fatto: mark word as reviewed (update review_words) ──
+      window.vtMarkFatto = async function(btn) {
+        var wid = btn.getAttribute('data-wid');
+        var box = btn.closest('.wbx-box');
+        if (!wid) return;
+        if (box) { box.style.opacity='0'; box.style.transform='scale(.9)'; box.style.transition='all .3s'; }
+        try {
+          var sb = window.sottotitoliSupabase;
+          if (sb) {
+            await sb.from('review_words').update({
+              review_state: 'known',
+              last_reviewed_at: new Date().toISOString(),
+              is_new: false
+            }).eq('id', wid);
+          }
+        } catch(e) { console.warn('vtMarkFatto:', e); }
+        if (box) setTimeout(function(){ box.remove(); }, 300);
+        setTimeout(function() { renderVTReviewDue(); }, 500);
+      };
+
+      // ── Più tardi: reschedule for later ──
+      window.vtMarkPiuTardi = async function(btn) {
+        var wid = btn.getAttribute('data-wid');
+        var box = btn.closest('.wbx-box');
+        if (!wid) return;
+        if (box) { box.style.opacity='0'; box.style.transform='scale(.9)'; box.style.transition='all .3s'; }
+        try {
+          var sb = window.sottotitoliSupabase;
+          if (sb) {
+            // Push next_review_at to later today or tomorrow
+            var later = new Date(Date.now() + 4*3600000).toISOString();
+            await sb.from('review_words').update({
+              next_review_at: later,
+              is_new: false
+            }).eq('id', wid);
+          }
+        } catch(e) { console.warn('vtMarkPiuTardi:', e); }
+        if (box) setTimeout(function(){ box.remove(); }, 300);
+        setTimeout(function() { renderVTReviewDue(); }, 400);
+      };
 
       // Milestones — uses same data as Insights Traguardi
       function renderVTMilestones() {
