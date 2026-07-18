@@ -3832,6 +3832,26 @@
           wordbank_id: targetBank.id, word: word, pos: pos || null, usage_count: 1
         });
         if (insertRes.error) { console.warn('save word:', insertRes.error.message); return; }
+        // ═══ Also upsert to review_words (feeds pinned banks) ═══
+        try {
+          var clean = word.replace(/[^a-zA-Z0-9 '-]/g, '').trim();
+          if (clean && clean.length >= 2) {
+            var norm = clean.toLowerCase();
+            var rwRes = await sb.from('review_words').select('id,personal_frequency').eq('user_id', userId).eq('lemma', clean).maybeSingle();
+            if (rwRes.data) {
+              var rwUpdate = { personal_frequency: (rwRes.data.personal_frequency || 0) + 1 };
+              if (pos) rwUpdate.pos = pos;
+              await sb.from('review_words').update(rwUpdate).eq('id', rwRes.data.id);
+            } else {
+              await sb.from('review_words').insert({
+                user_id: userId, lemma: clean, normalized: norm,
+                pos: pos || null, is_new: true, first_seen_at: new Date().toISOString(),
+                source_type: 'expand', review_state: 'new',
+                personal_frequency: 1
+              });
+            }
+          }
+        } catch(rwErr) { /* review_words table might not exist */ }
         SottotitoliData.cacheClear();
         // Toast
         var t = document.createElement('div');
