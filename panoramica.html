@@ -2768,7 +2768,44 @@
         } else if (bankId === 'saved_from_sessions') {
           // Pinned "Saved From Sessions" — fetch from the actual user bank created by caption sync
           var sfBank = banks.find(function(b){ return b.name === 'Saved from sessions'; });
-          if (sfBank) words = await SottotitoliData.getWordbankWords(sfBank.id);
+          if (sfBank) {
+            words = await SottotitoliData.getWordbankWords(sfBank.id);
+            // Enrich with CEFR from local lookup
+            words.forEach(function(w) {
+              if (!w.cefr && !w.cefr_level && window.CEFR_LEVELS) {
+                var cefr = window.CEFR_LEVELS[w.word.toLowerCase()];
+                if (cefr) { w.cefr = cefr; w.cefr_level = cefr; }
+              }
+            });
+          }
+        } else if (bankId === 'review_due_now' || bankId === 'new_from_sessions' || bankId === 'fragile_words') {
+          // Pinned banks 1,2,4 — query review_words directly (words from Pipeline 1)
+          try {
+            var sbClient = window.sottotitoliSupabase;
+            if (sbClient) {
+              var query = sbClient.from('review_words').select('*').limit(100);
+              var nowISO = new Date().toISOString();
+              var weekAgo = new Date(Date.now() - 7*86400000).toISOString();
+              if (bankId === 'review_due_now') {
+                query = query.or('next_review_at.lte.' + nowISO + ',is_new.eq.true');
+              } else if (bankId === 'new_from_sessions') {
+                query = query.eq('is_new', true).gte('first_seen_at', weekAgo);
+              } else if (bankId === 'fragile_words') {
+                query = query.or('mastery_score.lt.40,lapses.gte.2');
+              }
+              var { data: rwData } = await query;
+              if (rwData && rwData.length) {
+                // Map review_words fields to what renderWbTable expects
+                words = rwData.map(function(r) { return {
+                  id: r.id, word: r.lemma, lemma: r.lemma, pos: r.pos,
+                  cefr: r.cefr, cefr_level: r.cefr, level: r.cefr,
+                  usage_count: r.personal_frequency, frequency: r.personal_frequency, reps: r.reps,
+                  status: r.review_state, source_type: r.source_type,
+                  definition: r.translation_primary
+                }; });
+              }
+            }
+          } catch(e) { /* leave empty */ }
         } else if (type !== 'custom') {
           // Other pinned/smart bank: try to fetch real membership from review_bank_words
           try {
