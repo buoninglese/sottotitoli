@@ -2713,6 +2713,12 @@
         var lang = window.SOTTOTITOLI_STUDY_LANG || 'en';
         var banks = await SottotitoliData.getWordbanks(lang);
         var bank = banks.find(function(b){return b.id === bankId;});
+        // For pinned/smart banks, resolve the actual bank UUID for delete operations
+        _wbState.currentBankUUID = bank ? bank.id : null;
+        if (!_wbState.currentBankUUID && bankId === 'saved_from_sessions') {
+          var sfBank = banks.find(function(b){ return b.name === 'Saved from sessions'; });
+          if (sfBank) _wbState.currentBankUUID = sfBank.id;
+        }
 
         var bankNames = {
           'review_due_now':'Review Due Now','new_from_sessions':'New From Recent Sessions',
@@ -2932,19 +2938,25 @@
 
       // ── Single word delete ──
       window.wbDeleteWord = async function(wordId, wordText) {
-        if (!_wbState.currentBank) return;
+        var bankUUID = _wbState.currentBankUUID || _wbState.currentBank;
+        if (!bankUUID) return;
         if (!confirm('Remove "' + (wordText || 'this word') + '" from this bank?')) return;
-        await SottotitoliData.bulkRemoveFromBank(_wbState.currentBank, [wordId]);
+        // Remove row instantly for immediate feedback
+        var row = document.querySelector('#wbTableBody tr[data-wid="' + wordId + '"]');
+        if (row) { row.style.opacity = '0'; row.style.transform = 'translateX(20px)'; row.style.transition = 'all .2s'; setTimeout(function(){ row.remove(); }, 200); }
+        await SottotitoliData.bulkRemoveFromBank(bankUUID, [wordId]);
         SottotitoliData.cacheClear();
-        openWordbankView(_wbState.currentBank);
+        // Refresh in background to update counts
+        setTimeout(function() { openWordbankView(_wbState.currentBank); }, 300);
       };
 
       async function wbBulkRemove() {
-        if (!_wbState.currentBank) return;
+        var bankUUID = _wbState.currentBankUUID || _wbState.currentBank;
+        if (!bankUUID) return;
         var ids = Array.from(_wbState.selectedRows);
         if (!ids.length) return;
         if (!confirm('Remove ' + ids.length + ' selected word' + (ids.length > 1 ? 's' : '') + ' from this bank?')) return;
-        await SottotitoliData.bulkRemoveFromBank(_wbState.currentBank, ids);
+        await SottotitoliData.bulkRemoveFromBank(bankUUID, ids);
         SottotitoliData.cacheClear();
         wbClearSelection();
         openWordbankView(_wbState.currentBank);
