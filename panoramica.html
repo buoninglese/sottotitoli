@@ -107,6 +107,11 @@
     .wb-card-signal .due{color:var(--amber);font-weight:600}
     .wb-card-preview{display:flex;gap:4px;flex-wrap:wrap}
     .wb-card-actions{display:flex;gap:5px;margin-top:2px}
+    .wb-menu-item{display:block;width:100%;text-align:left;padding:7px 12px;border:none;background:none;font-size:12px;font-family:var(--font-ui);color:var(--text);cursor:pointer;border-radius:6px;transition:background .15s}
+    .wb-menu-item:hover{background:var(--teal-4)}
+    .wb-menu-item.danger{color:#dc2626}
+    .wb-menu-item.danger:hover{background:rgba(220,38,38,.08)}
+    .wb-menu-trigger:hover{background:var(--line);color:var(--text)}
     .section-badge{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;padding:3px 10px;border-radius:100px;flex-shrink:0;white-space:nowrap}
     .badge-pinned{background:rgba(124,58,237,.18);color:#7c3aed}
     .badge-smart{background:rgba(6,182,212,.18);color:#0895b0}
@@ -370,7 +375,7 @@
       <div style="display:flex;align-items:center;gap:0">
         <a href="index.html" class="topbar-brand" style="font-size:31px;color:var(--text)">sottotitoli</a>
         <span class="trial-pill" style="background:transparent;font-family:var(--font-ui);font-size:31px;font-weight:800;padding:0;color:var(--cyan);letter-spacing:-.5px;border-radius:0;line-height:1">.ai</span>
-        <span style="font-size:10px;font-weight:500;color:rgba(255,255,255,.2);margin-left:6px;font-family:'Inter',sans-serif">v1.48</span>
+        <span style="font-size:10px;font-weight:500;color:rgba(255,255,255,.2);margin-left:6px;font-family:'Inter',sans-serif">v1.49</span>
       </div>
       <div style="display:flex;align-items:center;gap:12px">
         <button class="btn-start-session" id="btnStartSession" onclick="toggleStartSession()" style="font-size:16px;height:38px;padding:0 18px;border-radius:10px;background:linear-gradient(135deg,#0895b0,var(--cyan));color:#fff;border:none;font-weight:600;font-family:Inter,sans-serif;display:inline-flex;align-items:center;gap:8px;box-shadow:0 2px 10px rgba(6,182,212,.25);cursor:pointer">
@@ -2461,7 +2466,21 @@
         if (preview && preview.length) {
           previewHTML = '<div class="wb-card-preview">'+preview.map(function(p){return '<span class="preview-chip" style="font-size:10px;padding:2px 8px;border-radius:100px;background:var(--teal-4);color:var(--teal);font-weight:500">'+p+'</span>'}).join('')+'</div>';
         }
-        return '<article class="alt-card wb-card" data-bank-id="'+id+'" style="cursor:pointer;padding:16px 18px">'+
+        // Three-dot menu for custom banks only
+        var menuHTML = '';
+        if (type === 'custom') {
+          menuHTML = '<div class="wb-card-menu" style="position:absolute;top:10px;right:12px;z-index:2">' +
+            '<button class="wb-menu-trigger" onclick="event.stopPropagation();wbToggleMenu(this)" title="Opzioni" style="border:none;background:none;font-size:16px;cursor:pointer;color:var(--text-faint);padding:2px 6px;border-radius:6px;letter-spacing:2px;font-weight:700">•••</button>' +
+            '<div class="wb-menu-dropdown" style="display:none;position:absolute;right:0;top:100%;min-width:130px;background:var(--card);border:1px solid var(--line);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.12);padding:4px;z-index:10">' +
+              '<button class="wb-menu-item" onclick="event.stopPropagation();openWordbankView(\''+id+'\')">Apri</button>' +
+              '<button class="wb-menu-item" onclick="event.stopPropagation();wbRenameBank(\''+id+'\',\''+name.replace(/'/g,"\\'")+'\')">Rinomina</button>' +
+              '<button class="wb-menu-item" onclick="event.stopPropagation();wbDuplicateBank(\''+id+'\')">Duplica</button>' +
+              '<button class="wb-menu-item danger" onclick="event.stopPropagation();wbDeleteBank(\''+id+'\',\''+name.replace(/'/g,"\\'")+'\')">Elimina</button>' +
+            '</div>' +
+            '</div>';
+        }
+        return '<article class="alt-card wb-card" data-bank-id="'+id+'" style="cursor:pointer;padding:16px 18px;position:relative">'+
+          menuHTML+
           '<div class="wb-card-head"><h4 style="font-size:14px;font-weight:700;margin:0">'+name+'</h4><span class="section-badge '+badgeClass+'">'+typeLabel+'</span></div>'+
           '<div class="wb-card-count">'+count+'</div>'+
           '<div class="wb-card-signal">'+signal+'</div>'+
@@ -4006,6 +4025,79 @@
           renderWordbanks();
         } catch(e) { alert('Errore nella creazione: ' + e.message); }
       };
+
+      // ── Three-dot menu toggle ──
+      window.wbToggleMenu = function(btn) {
+        var dd = btn.nextElementSibling;
+        if (!dd) return;
+        // Close all other menus first
+        document.querySelectorAll('.wb-menu-dropdown').forEach(function(m){ if (m !== dd) m.style.display = 'none'; });
+        dd.style.display = dd.style.display === 'block' ? 'none' : 'block';
+      };
+
+      // ── Rename bank ──
+      window.wbRenameBank = async function(bankId, currentName) {
+        var newName = prompt('Nuovo nome:', currentName);
+        if (!newName || !newName.trim()) return;
+        newName = newName.trim();
+        try {
+          var sb = window.sottotitoliSupabase;
+          if (!sb) return;
+          var { error } = await sb.from('user_wordbanks').update({ name: newName }).eq('id', bankId);
+          if (error) { alert('Errore: ' + error.message); return; }
+          SottotitoliData.cacheClear();
+          renderWordbanks();
+        } catch(e) { alert('Errore: ' + e.message); }
+      };
+
+      // ── Duplicate bank ──
+      window.wbDuplicateBank = async function(bankId) {
+        try {
+          var sb = window.sottotitoliSupabase;
+          if (!sb) return;
+          var lang = window.SOTTOTITOLI_STUDY_LANG || 'en';
+          // Fetch the original bank
+          var { data: bank, error: fErr } = await sb.from('user_wordbanks').select('*').eq('id', bankId).single();
+          if (fErr || !bank) { alert('Banca non trovata.'); return; }
+          // Create copy
+          var { data: copy, error: cErr } = await sb.from('user_wordbanks').insert({
+            user_id: bank.user_id, name: (bank.name || 'Copy') + ' (copia)', lang: lang,
+            description: bank.description
+          }).select().single();
+          if (cErr) { alert('Errore: ' + cErr.message); return; }
+          // Copy words
+          var { data: words } = await sb.from('user_wordbank_words').select('*').eq('wordbank_id', bankId);
+          if (words && words.length) {
+            var inserts = words.map(function(w){ return { wordbank_id: copy.id, word: w.word, pos: w.pos, cefr_level: w.cefr_level, user_id: bank.user_id, status: w.status, usage_count: w.usage_count }; });
+            await sb.from('user_wordbank_words').insert(inserts);
+          }
+          alert('Banca "' + bank.name + '" duplicata!');
+          SottotitoliData.cacheClear();
+          renderWordbanks();
+        } catch(e) { alert('Errore: ' + e.message); }
+      };
+
+      // ── Delete bank ──
+      window.wbDeleteBank = async function(bankId, name) {
+        if (!confirm('Eliminare la banca "' + name + '" e tutte le sue parole?')) return;
+        try {
+          var sb = window.sottotitoliSupabase;
+          if (!sb) return;
+          // Delete words first, then the bank
+          await sb.from('user_wordbank_words').delete().eq('wordbank_id', bankId);
+          var { error } = await sb.from('user_wordbanks').delete().eq('id', bankId);
+          if (error) { alert('Errore: ' + error.message); return; }
+          SottotitoliData.cacheClear();
+          renderWordbanks();
+        } catch(e) { alert('Errore: ' + e.message); }
+      };
+
+      // ── Close dropdowns when clicking elsewhere ──
+      document.addEventListener('click', function(e) {
+        if (!e.target.closest('.wb-card-menu')) {
+          document.querySelectorAll('.wb-menu-dropdown').forEach(function(m){ m.style.display = 'none'; });
+        }
+      });
 
 
       // ═══ RENDER: Grammatica from compromise.js NLP ═══
