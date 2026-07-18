@@ -978,7 +978,14 @@
           <section class="panel-tabs"><div class="tabs" role="tablist"><button role="tab" aria-selected="true" class="tab-link active" data-subtab="voc-panoramica">Panoramica</button><button role="tab" aria-selected="false" class="tab-link" data-subtab="wb-expand" style="color:var(--cyan)">Build From What You Know</button></div></section>
           <div role="tabpanel" class="subtab-pane active" id="sub-voc-panoramica">
             <div class="wb-stats" id="wbStats"></div>
-            <div id="vocCefrChart"></div>
+            <!-- CEFR 4-box grid: Distribution + Absolute Count, All Words + Known Words -->
+            <section class="alt-card-grid" style="grid-template-columns:repeat(2,1fr);margin-bottom:14px" id="cefrQuadGrid">
+              <article class="alt-card" style="min-height:auto;padding:18px 20px"><h3 style="font-size:14px;margin:0 0 10px">CEFR Distribution <span style="font-weight:400;font-size:11px;color:var(--text-faint)">· tutte le parole</span></h3><div id="cefrDistAll" style="display:flex;flex-direction:column;gap:5px"></div></article>
+              <article class="alt-card" style="min-height:auto;padding:18px 20px"><h3 style="font-size:14px;margin:0 0 10px">CEFR Absolute Count <span style="font-weight:400;font-size:11px;color:var(--text-faint)">· tutte le parole</span></h3><div id="cefrCountAll" style="display:flex;flex-direction:column;gap:5px"></div></article>
+              <article class="alt-card" style="min-height:auto;padding:18px 20px"><h3 style="font-size:14px;margin:0 0 10px">CEFR Distribution <span style="font-weight:400;font-size:11px;color:var(--text-faint)">· parole confermate</span></h3><div id="cefrDistKnown" style="display:flex;flex-direction:column;gap:5px"></div></article>
+              <article class="alt-card" style="min-height:auto;padding:18px 20px"><h3 style="font-size:14px;margin:0 0 10px">CEFR Absolute Count <span style="font-weight:400;font-size:11px;color:var(--text-faint)">· parole confermate</span></h3><div id="cefrCountKnown" style="display:flex;flex-direction:column;gap:5px"></div></article>
+            </section>
+            <div id="vocCefrChart" style="display:none"></div>
           <article class="alt-card" style="border:2px solid var(--line-strong);border-radius:24px;box-shadow:0 4px 32px rgba(0,0,0,.04);margin-top:16px;padding:24px 24px 20px" id="dashboardLevelCard">
             <h3 style="margin:0 0 16px" data-i18n="estimated_vocab_level">Livello vocabolario stimato</h3>
             <div style="display:flex;align-items:center;gap:24px">
@@ -1844,6 +1851,82 @@
         html += '</div>';
         container.innerHTML = html;
       }
+
+      // ═══ RENDER: CEFR 4-box quad (Distribution + Count, All + Known) ═══
+      async function renderCEFRQuad() {
+        var levels = [
+          {k:'C2',c:'#8b5cf6'},{k:'C1',c:'var(--amber)'},{k:'B2',c:'var(--green)'},
+          {k:'B1',c:'var(--teal-2)'},{k:'A2',c:'var(--teal)'},{k:'A1',c:'var(--blue)'}
+        ];
+        var levelColors = {C2:'#8b5cf6',C1:'var(--amber)',B2:'var(--green)',B1:'var(--teal-2)',A2:'var(--teal)',A1:'var(--blue)'};
+
+        // ── All words (from cefrBreakdown) ──
+        var allData = cefrBreakdown || {};
+        var allTotal = allData.total || 0;
+        var allCounts = { A1: allData.A1||0, A2: allData.A2||0, B1: allData.B1||0, B2: allData.B2||0, C1: allData.C1||0, C2: allData.C2||0 };
+        var allMax = Math.max.apply(null, Object.values(allCounts)) || 1;
+
+        // ── Known words (from review_words with review_state = 'known') ──
+        var knownCounts = { A1:0, A2:0, B1:0, B2:0, C1:0, C2:0 };
+        var knownTotal = 0;
+        try {
+          var sb = window.sottotitoliSupabase;
+          if (sb) {
+            var r = await sb.auth.getSession();
+            if (r.data && r.data.session) {
+              var { data: known } = await sb.from('review_words')
+                .select('cefr').eq('user_id', r.data.session.user.id)
+                .eq('review_state', 'known');
+              if (known) {
+                known.forEach(function(w) {
+                  var lvl = w.cefr;
+                  if (lvl && knownCounts.hasOwnProperty(lvl)) { knownCounts[lvl]++; knownTotal++; }
+                });
+              }
+            }
+          }
+        } catch(e) { /* known data unavailable */ }
+        var knownMax = Math.max.apply(null, Object.values(knownCounts)) || 1;
+
+        // ── Render helpers ──
+        function renderBars(counts, maxVal, total) {
+          var html = '';
+          levels.forEach(function(l) {
+            var v = counts[l.k] || 0;
+            var pct = maxVal > 0 ? Math.round(v / maxVal * 100) : 0;
+            html += '<div style="display:flex;align-items:center;gap:8px">'+
+              '<span style="width:22px;font-size:11px;font-weight:700;color:'+l.c+'">'+l.k+'</span>'+
+              '<div style="flex:1;height:6px;border-radius:3px;background:var(--line);overflow:hidden">'+
+              '<div style="height:100%;width:'+pct+'%;background:'+l.c+';border-radius:3px;min-width:2px"></div></div>'+
+              '<span style="font-size:11px;font-weight:600;color:var(--text-soft);min-width:32px;text-align:right">'+v+'</span></div>';
+          });
+          if (total > 0) html += '<div style="font-size:10px;color:var(--text-faint);margin-top:2px">Totale: <strong>'+total+' parole</strong></div>';
+          return html;
+        }
+
+        function renderCounts(counts, total) {
+          var html = '<div style="display:flex;flex-wrap:wrap;gap:8px">';
+          levels.forEach(function(l) {
+            html += '<div style="flex:1;min-width:60px;text-align:center;padding:8px 6px;background:var(--bg);border-radius:10px;border:1px solid var(--line)">'+
+              '<div style="font-size:20px;font-weight:900;color:'+l.c+';line-height:1">'+(counts[l.k]||0)+'</div>'+
+              '<div style="font-size:9px;color:var(--text-faint);text-transform:uppercase;letter-spacing:.04em">'+l.k+'</div></div>';
+          });
+          html += '</div>';
+          if (total > 0) html += '<div style="font-size:10px;color:var(--text-faint);margin-top:4px">Totale: <strong>'+total+' parole</strong></div>';
+          return html;
+        }
+
+        var distAllEl = document.getElementById('cefrDistAll');
+        var countAllEl = document.getElementById('cefrCountAll');
+        var distKnownEl = document.getElementById('cefrDistKnown');
+        var countKnownEl = document.getElementById('cefrCountKnown');
+
+        if (distAllEl) distAllEl.innerHTML = allTotal > 0 ? renderBars(allCounts, allMax, allTotal) : '<span style="font-size:12px;color:var(--text-faint)">Nessun dato — completa alcune sessioni.</span>';
+        if (countAllEl) countAllEl.innerHTML = allTotal > 0 ? renderCounts(allCounts, allTotal) : '<span style="font-size:12px;color:var(--text-faint)">—</span>';
+        if (distKnownEl) distKnownEl.innerHTML = knownTotal > 0 ? renderBars(knownCounts, knownMax, knownTotal) : '<span style="font-size:12px;color:var(--text-faint)">Nessuna parola confermata. Usa il Trainer per consolidare le parole.</span>';
+        if (countKnownEl) countKnownEl.innerHTML = knownTotal > 0 ? renderCounts(knownCounts, knownTotal) : '<span style="font-size:12px;color:var(--text-faint)">—</span>';
+      }
+      window.renderCEFRQuad = renderCEFRQuad;
 
       // ═══ RENDER: Panoramica hero ───
 
@@ -5513,6 +5596,7 @@
       renderInsightsTraguardi();
       renderInsightsOverview();
       renderPanoramicaCEFR();
+      renderCEFRQuad();
       renderProfile();
       renderSessions();
       renderWordbanks();
@@ -5546,7 +5630,7 @@
       // Initial render for Review Due (Build From expands on demand)
       setTimeout(renderReviewDue, 500);
       var vocNav = document.querySelector('[data-panel="vocabulary-builder"]');
-      if (vocNav) { vocNav.addEventListener('click', function () { setTimeout(renderVocabolario, 100); }); }
+      if (vocNav) { vocNav.addEventListener('click', function () { setTimeout(renderVocabolario, 100); setTimeout(renderCEFRQuad, 150); }); }
       var vtNav = document.querySelector('[data-panel="vocabulary-trainer"]');
       if (vtNav) { vtNav.addEventListener('click', function () { setTimeout(renderVTReviewDue, 150); setTimeout(renderVTMilestones, 200); setTimeout(renderVTTasks, 250); }); }
       var insNav = document.querySelector('[data-panel="insights"]');
@@ -5591,6 +5675,7 @@
           renderInsightsTraguardi();
           renderInsightsOverview();
           renderPanoramicaCEFR();
+          renderCEFRQuad();
           renderSessions();
           renderWordbanks();
           renderVocabolario();
