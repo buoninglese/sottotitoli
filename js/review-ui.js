@@ -74,12 +74,16 @@ export function renderReviewMetrics(metrics) {
 }
 
 export function renderReviewQueueCards(queues) {
+  // Always show cards — if no queues, render placeholders so the UI is visible
   if (!queues || !queues.length) {
-    return '<div class="review-empty-state" style="text-align:center;padding:40px 20px;color:var(--text-faint)">' +
-      '<div style="font-size:48px;margin-bottom:12px">🎉</div>' +
-      '<h3 style="color:var(--text-soft)">Tutto in ordine</h3>' +
-      '<p style="font-size:14px">Nessuna parola da ripassare ora.</p>' +
-      '</div>';
+    queues = [
+      { id: 'due_verbs', type: 'standard', title: 'Ripassa verbi', rationale: 'Verbi in scadenza', urgency: 'low', item_count: 0, estimated_minutes: 0, word_ids: [] },
+      { id: 'due_nouns', type: 'standard', title: 'Ripassa sostantivi', rationale: 'Sostantivi in scadenza', urgency: 'low', item_count: 0, estimated_minutes: 0, word_ids: [] },
+      { id: 'due_adjectives', type: 'standard', title: 'Ripassa aggettivi', rationale: 'Aggettivi in scadenza', urgency: 'low', item_count: 0, estimated_minutes: 0, word_ids: [] },
+      { id: 'due_saved', type: 'standard', title: 'Ripassa salvate', rationale: 'Parole salvate da consolidare', urgency: 'low', item_count: 0, estimated_minutes: 0, word_ids: [] },
+      { id: 'due_new', type: 'standard', title: 'Ripassa nuove', rationale: 'Parole nuove da stabilizzare', urgency: 'low', item_count: 0, estimated_minutes: 0, word_ids: [] },
+      { id: 'due_all', type: 'standard', title: 'Ripassa tutto', rationale: 'Tutte le parole in scadenza', urgency: 'low', item_count: 0, estimated_minutes: 0, word_ids: [] }
+    ];
   }
 
   // Colour schemes — one per queue type
