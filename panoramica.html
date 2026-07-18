@@ -9,6 +9,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Cormorant+Garamond:wght@500;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
   <link rel="stylesheet" href="css/theme-2.css">
+  <link rel="stylesheet" href="css/review.css">
   <style>
     /* ── Gradient card backgrounds (matching index.html SFIDA style) ── */
     /* Cyan — all metric cards */
@@ -920,23 +921,10 @@
             <!-- Inside-bank view (replaces overview when bank opened) -->
             <div id="wbInsideView" style="display:none"></div>
           </div>
-          <!-- Subtab: Review Due -->
+          <!-- Subtab: Review Due — driven by review subsystem -->
           <div role="tabpanel" class="subtab-pane" id="sub-wb-review">
-            <div class="wb-stats" id="wbReviewStats"></div>
-            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:10px">
-              <h3 style="margin:0;font-size:18px;font-weight:700">⏰ Parole da ripassare</h3>
-              <div style="display:flex;gap:8px;flex-wrap:wrap">
-                <button class="btn btn-ghost btn-sm" onclick="renderReviewDue()" style="font-family:var(--font-ui)"><i class="fa-solid fa-rotate"></i> Refresh</button>
-                <button class="btn btn-primary btn-sm" id="btnReviewAllDue" onclick="reviewAllDue()" style="font-family:var(--font-ui)"><i class="fa-solid fa-check"></i> Segna tutte come ripassate</button>
-              </div>
-            </div>
-            <div class="bulk-bar" id="wbReviewBulkBar"><span id="wbReviewBulkCount">0 selezionate</span><button onclick="wbReviewBulkDone()">✓ Fatto</button><button class="bulk-close" onclick="wbReviewClearSelection()">&times;</button></div>
-            <div class="wb-table-wrap"><table class="wb-table"><thead><tr><th class="cb"><input type="checkbox" onchange="wbReviewToggleAll(this)" style="accent-color:var(--cyan)"></th><th class="sortable" data-sort="word">Parola <span class="sort-arrow">▲</span></th><th class="sortable" data-sort="cefr">CEFR <span class="sort-arrow">▲</span></th><th class="sortable" data-sort="pos">POS <span class="sort-arrow">▲</span></th><th class="sortable" data-sort="lastReview">Ultimo ripasso <span class="sort-arrow">▲</span></th><th class="sortable" data-sort="interval">Intervallo SRS <span class="sort-arrow">▲</span></th><th class="sortable" data-sort="status">Stato <span class="sort-arrow">▲</span></th><th></th></tr></thead><tbody id="wbReviewBody"></tbody></table></div>
-            <div id="wbReviewEmpty" style="display:none;text-align:center;padding:40px 20px;color:var(--text-faint)">
-              <div style="font-size:48px;margin-bottom:12px">🎉</div>
-              <h3 style="color:var(--text-soft);margin-bottom:6px">Tutto in ordine!</h3>
-              <p style="font-size:14px;max-width:400px;margin:0 auto;line-height:1.5">Nessuna parola da ripassare oggi. Torna domani o inizia una nuova sessione per aggiungere parole.</p>
-            </div>
+            <section id="reviewDashboardMount"></section>
+            <div id="reviewSessionMount"></div>
           </div>
           <!-- Subtab: Build From What You Know -->
           <div role="tabpanel" class="subtab-pane" id="sub-wb-expand">
@@ -4455,6 +4443,21 @@
     if (panel) setTimeout(loadTradInsights, 300);
   });
 })();
+</script>
+
+<!-- Review subsystem — modular SRS review engine with fullscreen test flow -->
+<script type="module">
+  import { initReviewDashboard } from './js/review-bootstrap.js';
+  // Defer until user is authenticated and clicks Review Due tab
+  var reviewTab = document.querySelector('[data-subtab="wb-review"]');
+  if (reviewTab) {
+    reviewTab.addEventListener('click', function reviewInit() {
+      initReviewDashboard().catch(function(e) {
+        console.warn('Review init:', e.message);
+      });
+      reviewTab.removeEventListener('click', reviewInit);
+    });
+  }
 </script>
 
 </body>
