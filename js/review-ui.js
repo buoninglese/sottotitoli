@@ -18,6 +18,10 @@ export function mountReviewDashboard(rootEl) {
   rootRef = rootEl;
   if (!rootRef) return;
 
+  // Hide classic fallback now that review subsystem is active
+  var fallback = document.getElementById('wbReviewClassicFallback');
+  if (fallback) fallback.style.display = 'none';
+
   if (unsubscribe) unsubscribe();
   unsubscribe = subscribeReviewState(function () {
     renderReviewDashboard();

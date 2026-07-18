@@ -921,9 +921,28 @@
             <!-- Inside-bank view (replaces overview when bank opened) -->
             <div id="wbInsideView" style="display:none"></div>
           </div>
-          <!-- Subtab: Review Due — driven by review subsystem -->
+          <!-- Subtab: Review Due — driven by review subsystem, with classic fallback -->
           <div role="tabpanel" class="subtab-pane" id="sub-wb-review">
-            <section id="reviewDashboardMount"></section>
+            <section id="reviewDashboardMount">
+              <!-- Classic fallback (hidden once review subsystem mounts) -->
+              <div id="wbReviewClassicFallback">
+                <div class="wb-stats" id="wbReviewStats"></div>
+                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:10px">
+                  <h3 style="margin:0;font-size:18px;font-weight:700">⏰ Parole da ripassare</h3>
+                  <div style="display:flex;gap:8px;flex-wrap:wrap">
+                    <button class="btn btn-ghost btn-sm" onclick="renderReviewDue()" style="font-family:var(--font-ui)"><i class="fa-solid fa-rotate"></i> Refresh</button>
+                    <button class="btn btn-primary btn-sm" id="btnReviewAllDue" onclick="reviewAllDue()" style="font-family:var(--font-ui)"><i class="fa-solid fa-check"></i> Segna tutte come ripassate</button>
+                  </div>
+                </div>
+                <div class="bulk-bar" id="wbReviewBulkBar"><span id="wbReviewBulkCount">0 selezionate</span><button onclick="wbReviewBulkDone()">✓ Fatto</button><button class="bulk-close" onclick="wbReviewClearSelection()">&times;</button></div>
+                <div class="wb-table-wrap"><table class="wb-table"><thead><tr><th class="cb"><input type="checkbox" onchange="wbReviewToggleAll(this)" style="accent-color:var(--cyan)"></th><th class="sortable" data-sort="word">Parola <span class="sort-arrow">▲</span></th><th class="sortable" data-sort="cefr">CEFR <span class="sort-arrow">▲</span></th><th class="sortable" data-sort="pos">POS <span class="sort-arrow">▲</span></th><th class="sortable" data-sort="lastReview">Ultimo ripasso <span class="sort-arrow">▲</span></th><th class="sortable" data-sort="interval">Intervallo SRS <span class="sort-arrow">▲</span></th><th class="sortable" data-sort="status">Stato <span class="sort-arrow">▲</span></th><th></th></tr></thead><tbody id="wbReviewBody"></tbody></table></div>
+                <div id="wbReviewEmpty" style="display:none;text-align:center;padding:40px 20px;color:var(--text-faint)">
+                  <div style="font-size:48px;margin-bottom:12px">🎉</div>
+                  <h3 style="color:var(--text-soft);margin-bottom:6px">Tutto in ordine!</h3>
+                  <p style="font-size:14px;max-width:400px;margin:0 auto;line-height:1.5">Nessuna parola da ripassare oggi. Torna domani o inizia una nuova sessione per aggiungere parole.</p>
+                </div>
+              </div>
+            </section>
             <div id="reviewSessionMount"></div>
           </div>
           <!-- Subtab: Build From What You Know -->
@@ -4453,10 +4472,21 @@
   if (reviewTab) {
     reviewTab.addEventListener('click', function reviewInit() {
       initReviewDashboard().catch(function(e) {
-        console.warn('Review init:', e.message);
+        console.warn('Review init failed, falling back to classic:', e.message);
+        // Fall back to old review renderer if available
+        var mount = document.getElementById('reviewDashboardMount');
+        if (mount && typeof renderReviewDue === 'function') {
+          // Show loading briefly then render classic
+          mount.innerHTML = '<div style="text-align:center;padding:20px;color:var(--text-faint)"><i class="fa-solid fa-spinner fa-spin"></i> Caricamento classico…</div>';
+          setTimeout(function() { renderReviewDue(); }, 200);
+        }
       });
       reviewTab.removeEventListener('click', reviewInit);
     });
+    // If Review Due is already active (e.g., from URL hash), init immediately
+    if (reviewTab.classList.contains('active') || reviewTab.getAttribute('aria-selected') === 'true') {
+      setTimeout(function() { reviewTab.click(); }, 600);
+    }
   }
 </script>
 
