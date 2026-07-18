@@ -3909,24 +3909,77 @@ var WORD_DEFS = {
   vita:'life'
 };
 
+// ═══ Word definition popup — stays open, Add to Bank changes state ═══
+var _wordDefPopupWord = '';
 function showWordDefinition(word) {
-  var defPanel = document.getElementById('wordbankDefinition');
-  var defWord = document.getElementById('wordbankDefWord');
-  var defText = document.getElementById('wordbankDefText');
-  if (!defPanel || !defWord || !defText) return;
+  _wordDefPopupWord = word;
+  var popup = document.getElementById('wordDefPopup');
+  var wEl = document.getElementById('wordDefPopupWord');
+  var pEl = document.getElementById('wordDefPopupPOS');
+  var tEl = document.getElementById('wordDefPopupText');
+  var btn = document.getElementById('wordDefPopupAddBtn');
+  if (!popup || !wEl || !tEl) return;
+  
+  wEl.textContent = word;
+  // POS detection
+  var pos = typeof tagWord === 'function' ? tagWord(word) : '';
+  if (pos === 'OTHER' || pos === 'FUNC' || pos === 'WORD') pos = '';
+  pEl.textContent = pos || '';
+  
+  // Definition lookup
   var def = WORD_DEFS[word] || WORD_DEFS[word.toLowerCase()];
-  if (def) { defWord.textContent = word + ': '; defText.textContent = def; }
-  else {
-    defWord.textContent = word + ': ';
-    // Try a language-aware fallback
-    var langHint = detectWordLanguage(word);
-    defText.innerHTML = '<em style="opacity:.7">Definition not yet in dictionary</em><br><small style="color:var(--accent);cursor:pointer" onclick="event.stopPropagation();lookupOnline(\''+word.replace(/'/g,"\\'")+'\')">🔍 Look up online &rarr;</small>';
+  if (def) {
+    tEl.textContent = def;
+  } else {
+    tEl.innerHTML = '<em style="opacity:.6">Definition not in dictionary</em>';
+    // Try Free Dictionary API
+    try {
+      fetch('https://api.dictionaryapi.dev/api/v2/entries/en/' + encodeURIComponent(word.toLowerCase()))
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+          if (data && data[0] && data[0].meanings && data[0].meanings[0]) {
+            var d = data[0].meanings[0].definitions[0];
+            if (d) tEl.textContent = d.definition;
+            if (!pos && data[0].meanings[0].partOfSpeech) {
+              pEl.textContent = data[0].meanings[0].partOfSpeech.toUpperCase();
+            }
+          }
+        }).catch(function(){});
+    } catch(e) {}
   }
-  defPanel.style.display = 'block';
-  var chips = document.querySelectorAll('.wordbank-chip');
-  chips.forEach(function(c) { c.style.background = ''; c.style.borderColor = ''; });
-  chips.forEach(function(c) { if (c.textContent === word) { c.style.background = 'rgba(167,139,250,.22)'; c.style.borderColor = 'rgba(167,139,250,.4)'; } });
+  
+  // Update Add button state
+  var inBank = wordBank.indexOf(word) >= 0;
+  if (inBank) {
+    btn.innerHTML = '<i class="fa-solid fa-check"></i> Added';
+    btn.classList.add('added');
+  } else {
+    btn.innerHTML = '<i class="fa-solid fa-plus"></i> Add to Bank';
+    btn.classList.remove('added');
+  }
+  
+  popup.style.display = 'block';
 }
+
+window.addWordFromDefPopup = function() {
+  var word = _wordDefPopupWord;
+  if (!word) return;
+  if (wordBank.indexOf(word) >= 0) return; // already in bank
+  addToWordBank(word);
+  // Update button to "Added" state — popup stays open
+  var btn = document.getElementById('wordDefPopupAddBtn');
+  if (btn) {
+    btn.innerHTML = '<i class="fa-solid fa-check"></i> Added';
+    btn.classList.add('added');
+  }
+  // Show toast
+  var t = document.createElement('div');
+  t.style.cssText = 'position:fixed;bottom:120px;left:50%;transform:translateX(-50%);background:var(--teal);color:#fff;font-size:13px;font-weight:700;padding:8px 20px;border-radius:99px;z-index:99999;opacity:0;transition:opacity .3s;pointer-events:none;font-family:var(--font-body)';
+  t.innerHTML = '<i class="fa-solid fa-check"></i> ' + word + ' added to bank';
+  document.body.appendChild(t);
+  requestAnimationFrame(function(){ t.style.opacity = '1'; });
+  setTimeout(function(){ t.style.opacity = '0'; setTimeout(function(){ t.remove(); }, 300); }, 2000);
+};
 
 // Simple language detection for Word Bank lookups
 function detectWordLanguage(word) {
@@ -6555,7 +6608,30 @@ window.fixExtrasPanelColors = function(){
 @keyframes scaleIn{from{transform:scale(.9);opacity:0}to{transform:scale(1);opacity:1}}
 #postSessionOverlay{animation:fadeIn .25s ease}
 #postSessionOverlay > div{animation:scaleIn .3s cubic-bezier(.34,1.56,.64,1)}
+
+/* Word definition popup */
+.word-def-popup{position:fixed;bottom:100px;left:50%;transform:translateX(-50%);background:var(--card);border:2px solid rgba(6,182,212,.25);border-radius:16px;padding:20px 24px;z-index:5000;max-width:420px;width:calc(100% - 32px);box-shadow:0 16px 48px rgba(0,0,0,.3);display:none;font-family:var(--font-body)}
+.word-def-popup .def-word{font-size:20px;font-weight:800;margin-bottom:2px}
+.word-def-popup .def-pos{font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--cyan);margin-bottom:10px}
+.word-def-popup .def-text{font-size:13px;color:var(--text-soft);line-height:1.5;margin-bottom:14px}
+.word-def-popup .def-actions{display:flex;gap:8px}
+.word-def-popup .def-btn-add{padding:8px 18px;border-radius:100px;border:1px solid var(--cyan);background:rgba(6,182,212,.1);color:var(--cyan);font-size:12px;font-weight:700;cursor:pointer;transition:all .2s;font-family:var(--font-body);display:inline-flex;align-items:center;gap:6px}
+.word-def-popup .def-btn-add:hover{background:rgba(6,182,212,.2)}
+.word-def-popup .def-btn-add.added{background:var(--teal);color:#fff;border-color:var(--teal)}
+.word-def-popup .def-btn-close{position:absolute;top:12px;right:14px;width:28px;height:28px;border-radius:50%;border:none;background:rgba(255,255,255,.05);color:var(--text-faint);cursor:pointer;font-size:14px;display:flex;align-items:center;justify-content:center}
 </style>
+
+<!-- Word definition popup -->
+<div class="word-def-popup" id="wordDefPopup">
+  <button class="def-btn-close" onclick="document.getElementById('wordDefPopup').style.display='none'"><i class="fa-solid fa-xmark"></i></button>
+  <div class="def-word" id="wordDefPopupWord"></div>
+  <div class="def-pos" id="wordDefPopupPOS"></div>
+  <div class="def-text" id="wordDefPopupText"></div>
+  <div class="def-actions">
+    <button class="def-btn-add" id="wordDefPopupAddBtn" onclick="addWordFromDefPopup()"><i class="fa-solid fa-plus"></i> Add to Bank</button>
+    <button style="padding:8px 14px;border-radius:100px;border:1px solid var(--line);background:transparent;color:var(--text-soft);font-size:12px;cursor:pointer;font-family:var(--font-body)" onclick="document.getElementById('wordDefPopup').style.display='none'">Close</button>
+  </div>
+</div>
 
 </body>
 </html>
