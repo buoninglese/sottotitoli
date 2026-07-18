@@ -530,6 +530,17 @@
             </div>
             <div style="display:flex;justify-content:space-between;margin-top:6px;font-size:9px;color:var(--text-faint);padding:0 2px" id="dailyChartLabels"></div>
           </article>
+          <!-- 14-day practice minutes chart -->
+          <article class="alt-card" style="border:2px solid var(--line-strong);border-radius:24px;box-shadow:0 4px 32px rgba(0,0,0,.04);margin-top:16px;padding:24px 24px 20px" id="practiceChartCard">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+              <h3 style="margin:0">Minuti fare pratica — ultimi 14 giorni</h3>
+              <span style="font-size:11px;color:var(--text-faint)" id="practiceChartTotal">—</span>
+            </div>
+            <div id="practiceChart" style="display:flex;align-items:flex-end;gap:4px;height:90px;padding:0 2px">
+              <span style="font-size:12px;color:var(--text-faint);align-self:center;width:100%;text-align:center">Caricamento…</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;margin-top:6px;font-size:9px;color:var(--text-faint);padding:0 2px" id="practiceChartLabels"></div>
+          </article>
         </div>
                 <!-- Profilo panel with sub-tabs -->
         <div class="content-panel" id="pnl-profilo">
@@ -1898,6 +1909,7 @@
         renderSparklines();
         // ── Render 14-day chart ──
         renderDailyChart();
+        renderPracticeChart();
       }
 
       // ═══ RENDER: Sparklines — 7-day real data bars ═══
@@ -2028,6 +2040,75 @@
           labelsEl.innerHTML = labelHtml;
         } catch(e) { container.innerHTML = '<span style="font-size:12px;color:var(--text-faint);align-self:center;width:100%;text-align:center">Errore nel caricamento</span>'; }
       }
+
+      // ═══ RENDER: Practice time chart (site engagement, not session) ═══
+      function renderPracticeChart() {
+        var container = document.getElementById('practiceChart');
+        var labelsEl = document.getElementById('practiceChartLabels');
+        var totalEl = document.getElementById('practiceChartTotal');
+        if (!container || !labelsEl) return;
+        try {
+          var now = new Date();
+          var days = [];
+          for (var d = 13; d >= 0; d--) {
+            var date = new Date(now.getTime() - d * 86400000);
+            days.push({ date: date, label: date.toLocaleDateString('it-IT', { day: '2-digit', month: '2-digit' }), iso: date.toISOString().substring(0, 10), minutes: 0 });
+          }
+          // Read practice time from localStorage
+          var stored = localStorage.getItem('sottotitoli-practice-minutes');
+          var allData = stored ? JSON.parse(stored) : {};
+          days.forEach(function(day) {
+            day.minutes = Math.round((allData[day.iso] || 0) / 60);
+          });
+          var maxMin = Math.max.apply(null, days.map(function(d) { return d.minutes; })) || 1;
+          var totalMin = days.reduce(function(s, d) { return s + d.minutes; }, 0);
+          if (totalEl) totalEl.textContent = totalMin + ' min totali';
+          var chartH = 90;
+          var barHtml = '';
+          var labelHtml = '';
+          days.forEach(function(day) {
+            var h = Math.max(2, Math.round((day.minutes / maxMin) * chartH));
+            var color = day.minutes > 0 ? 'var(--teal)' : 'var(--line)';
+            barHtml += '<div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:3px;cursor:pointer;height:100%" title="' + day.iso + ': ' + day.minutes + ' min"><span style="font-size:9px;color:var(--text-faint);flex-shrink:0">' + (day.minutes || '') + '</span><div style="width:100%;height:' + h + 'px;min-height:2px;background:' + color + ';border-radius:3px 3px 0 0;transition:height .4s ease;flex-shrink:0" onmouseenter="this.style.boxShadow=&#39;0 0 10px rgba(5,150,105,.6)&#39;" onmouseleave="this.style.boxShadow=&#39;none&#39;"></div></div>';
+            labelHtml += '<span style="flex:1;text-align:center">' + day.label + '</span>';
+          });
+          container.innerHTML = barHtml || '<span style="font-size:12px;color:var(--text-faint);align-self:center;width:100%;text-align:center">Nessun dato</span>';
+          labelsEl.innerHTML = labelHtml;
+        } catch(e) { container.innerHTML = '<span style="font-size:12px;color:var(--text-faint);align-self:center;width:100%;text-align:center">Errore</span>'; }
+      }
+
+      // ═══ Practice time tracker: counts seconds on page when visible ═══
+      (function() {
+        var trackKey = 'sottotitoli-practice-minutes';
+        var tickInterval = null;
+        var lastTick = Date.now();
+        function startTracking() {
+          if (tickInterval) return;
+          lastTick = Date.now();
+          tickInterval = setInterval(function() {
+            var now = Date.now();
+            var elapsed = Math.round((now - lastTick) / 1000);
+            lastTick = now;
+            if (elapsed <= 0 || elapsed > 10) return; // ignore huge gaps (tab was hidden)
+            var today = new Date().toISOString().substring(0, 10);
+            var stored = localStorage.getItem(trackKey);
+            var data = stored ? JSON.parse(stored) : {};
+            data[today] = (data[today] || 0) + elapsed;
+            // Keep only last 30 days
+            var keys = Object.keys(data).sort();
+            while (keys.length > 30) { delete data[keys.shift()]; }
+            localStorage.setItem(trackKey, JSON.stringify(data));
+          }, 1000);
+        }
+        function stopTracking() {
+          if (tickInterval) { clearInterval(tickInterval); tickInterval = null; }
+        }
+        document.addEventListener('visibilitychange', function() {
+          if (document.hidden) stopTracking();
+          else startTracking();
+        });
+        if (!document.hidden) startTracking();
+      })();
 
       // ═══ RENDER: Insights metrics ───
       function renderInsightsMetrics() {
