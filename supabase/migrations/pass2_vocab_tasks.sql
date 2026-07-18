@@ -39,7 +39,9 @@ CREATE INDEX IF NOT EXISTS idx_uwb_user ON user_wordbanks(user_id, lang);
 
 ALTER TABLE user_wordbanks ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Users manage own wordbanks" ON user_wordbanks;
-CREATE POLICY "Users manage own wordbanks" ON user_wordbanks FOR ALL USING (auth.uid() = user_id);
+CREATE POLICY "Users manage own wordbanks" ON user_wordbanks FOR ALL
+  USING (auth.uid() = user_id)
+  WITH CHECK (auth.uid() = user_id);
 
 -- 3. WORD BANK ENTRIES — words inside each collection
 -- ============================================================================
@@ -58,7 +60,8 @@ CREATE INDEX IF NOT EXISTS idx_uwbw_bank ON user_wordbank_words(wordbank_id);
 ALTER TABLE user_wordbank_words ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Users manage own wordbank words" ON user_wordbank_words;
 CREATE POLICY "Users manage own wordbank words" ON user_wordbank_words FOR ALL
-  USING (EXISTS (SELECT 1 FROM user_wordbanks wb WHERE wb.id = wordbank_id AND wb.user_id = auth.uid()));
+  USING (EXISTS (SELECT 1 FROM user_wordbanks wb WHERE wb.id = wordbank_id AND wb.user_id = auth.uid()))
+  WITH CHECK (EXISTS (SELECT 1 FROM user_wordbanks wb WHERE wb.id = wordbank_id AND wb.user_id = auth.uid()));
 
 -- 4. USER TASKS — for Insights → Compiti panel
 -- ============================================================================
