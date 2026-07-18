@@ -1225,15 +1225,10 @@
                 <button class="fchip" onclick="vtSetOrder(this,'pos')">POS</button>
               </div>
             </div>
-            <!-- Style toggles (mirrors Build From What You Know) -->
+            <!-- Style toggle (color schemes only, mirrors Build From What You Know) -->
             <div class="wbx-toggle-bar" style="display:flex;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:wrap;padding:12px 16px;background:var(--panel-2);border-radius:12px;border:1px solid var(--line);min-height:auto;font-family:var(--font-ui)">
               <span style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--text-soft);flex-shrink:0"><i class="fa-solid fa-palette"></i> Stile</span>
               <button class="fchip" id="vtAccentBtn" onclick="window.vtCycleAccent()" style="font-size:12px;padding:6px 12px"><i class="fa-solid fa-palette"></i> Colore</button>
-              <span style="width:1px;height:24px;background:var(--line);flex-shrink:0;margin:0 4px"></span>
-              <span style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--text-soft);flex-shrink:0"><i class="fa-solid fa-droplet"></i> Modo</span>
-              <button class="fchip active" data-vt-mode="none" onclick="window.vtSetMode('none')" style="font-size:12px;padding:6px 12px">Default</button>
-              <button class="fchip" data-vt-mode="pos" onclick="window.vtSetMode('pos')" style="font-size:12px;padding:6px 12px">POS Accent</button>
-              <button class="fchip" data-vt-mode="cefr" onclick="window.vtSetMode('cefr')" style="font-size:12px;padding:6px 12px">CEFR Accent</button>
             </div>
             <!-- Intro guide -->
             <div style="margin-bottom:14px;padding:10px 16px;background:var(--teal-4);border:1px solid rgba(14,116,144,.12);border-radius:10px;font-size:12px;color:var(--text-soft);line-height:1.5;font-family:var(--font-ui);display:flex;align-items:flex-start;gap:8px" id="vtReviewGuide">
@@ -1254,9 +1249,24 @@
           </div>
           <!-- Subtab: Compiti -->
           <div role="tabpanel" class="subtab-pane" id="sub-vt-tasks">
+            <!-- Automated tasks hub -->
+            <section class="alt-card" style="margin-bottom:16px;padding:18px 22px;border:2px solid var(--line-strong);border-radius:16px">
+              <h3 style="margin:0 0 4px">Automated tasks</h3>
+              <p style="font-size:12px;color:var(--text-soft);margin:0 0 12px">Generati automaticamente in base alla ripetizione delle parole e alle tue word bank da ripassare.</p>
+              <div id="vtAutoTasks" style="display:flex;flex-direction:column;gap:6px">
+                <span style="font-size:13px;color:var(--text-faint)">Nessun task automatico. Le parole da ripassare nel Trainer genereranno task qui automaticamente.</span>
+              </div>
+              <div style="margin-top:12px;padding-top:10px;border-top:1px solid var(--line)">
+                <h4 style="font-size:12px;font-weight:700;margin:0 0 6px;color:var(--text-soft)">Completati</h4>
+                <div id="vtAutoTasksDone" style="display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--text-faint)">
+                  <span>—</span>
+                </div>
+              </div>
+            </section>
+            <!-- Manual tasks -->
             <section class="alt-card-grid"><article class="alt-card" style="padding:14px 18px 16px">
               <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
-                <h3 style="margin:0">Compiti attivi</h3>
+                <h3 style="margin:0">Active tasks</h3>
                 <button style="padding:6px 14px;border-radius:10px;border:1px solid var(--line);background:var(--bg);font-size:11px;font-weight:600;color:var(--teal);cursor:pointer;font-family:var(--font-ui)" onclick="this.closest('article').querySelector('.vtAddRow').style.display='flex';this.style.display='none'"><svg class="icon" style="width:13px;height:13px"><use href="#i-plus"></use></svg>&nbsp;Aggiungi</button>
               </div>
               <div style="overflow-x:auto">
@@ -4227,34 +4237,52 @@
       }
       window.renderVTTasks = renderVTTasks;
 
-      // ── VT Style toggles (mirrors Build From What You Know) ──
+      // ── VT Style toggle (color schemes 1-7) ──
       var _vtAccentIdx = (function(){ var s = localStorage.getItem('vt-accent-scheme')||'1'; var schemes=['1','2','3','4','5','6','7']; var i=schemes.indexOf(s); return i>=0?i:0; })();
-      var _vtAccentMode = localStorage.getItem('vt-accent-mode') || 'none';
-      (function(){
-        var el = document.getElementById('sub-vt-review');
-        if (el) { el.setAttribute('data-wb-scheme', ['1','2','3','4','5','6','7'][_vtAccentIdx]); el.setAttribute('data-wb-accent', _vtAccentMode); }
-      })();
+      
+      // Scheme palettes matching Build From What You Know
+      var _vtSchemes = [
+        { dark:'#000', border:'#000', text:'#fff', text2:'rgba(255,255,255,.45)', accent:'#06b6d4', trans:'#333' },
+        { dark:'#0f1c24', border:'#0f1c24', text:'#fff', text2:'rgba(255,255,255,.5)', accent:'#06b6d4', trans:'#0f1c24' },
+        { dark:'#0c4a6e', border:'#0c4a6e', text:'#fff', text2:'rgba(255,255,255,.5)', accent:'#22d3ee', trans:'#0c4a6e' },
+        { dark:'#0f2a1a', border:'#0f2a1a', text:'#fff', text2:'rgba(255,255,255,.5)', accent:'#10b981', trans:'#0f2a1a' },
+        { dark:'#1a0f2e', border:'#1a0f2e', text:'#fff', text2:'rgba(255,255,255,.5)', accent:'#a78bfa', trans:'#1a0f2e' },
+        { dark:'#2e2410', border:'#2e2410', text:'#fff', text2:'rgba(255,255,255,.5)', accent:'#d97706', trans:'#2e2410' },
+        { dark:'#2a0f24', border:'#2a0f24', text:'#fff', text2:'rgba(255,255,255,.5)', accent:'#e879a4', trans:'#2a0f24' }
+      ];
+      var _vtSchemesDark = [
+        { dark:'#111', border:'#333', text:'#fff', text2:'rgba(255,255,255,.45)', accent:'#fff', trans:'#444' },
+        { dark:'#d8eaf4', border:'#d8eaf4', text:'#0b151c', text2:'rgba(11,21,28,.5)', accent:'#0e7490', trans:'#d8eaf4' },
+        { dark:'#d8eaf4', border:'#d8eaf4', text:'#0b151c', text2:'rgba(11,21,28,.5)', accent:'#22d3ee', trans:'#d8eaf4' },
+        { dark:'#a7f3d0', border:'#a7f3d0', text:'#0f2a1a', text2:'rgba(15,42,26,.5)', accent:'#34d399', trans:'#a7f3d0' },
+        { dark:'#ddd6fe', border:'#ddd6fe', text:'#1a0f2e', text2:'rgba(26,15,46,.5)', accent:'#c4b5fd', trans:'#ddd6fe' },
+        { dark:'#fde68a', border:'#fde68a', text:'#2e2410', text2:'rgba(46,36,16,.5)', accent:'#f59e0b', trans:'#fde68a' },
+        { dark:'#fbcfe8', border:'#fbcfe8', text:'#2a0f24', text2:'rgba(42,15,36,.5)', accent:'#f472b6', trans:'#fbcfe8' }
+      ];
+
+      function vtApplyScheme() {
+        var isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+        var s = isDark ? _vtSchemesDark[_vtAccentIdx] : _vtSchemes[_vtAccentIdx];
+        var container = document.getElementById('vtReviewCards');
+        if (!container) return;
+        container.style.setProperty('--sz-dark', s.dark);
+        container.style.setProperty('--sz-dark-border', s.border);
+        container.style.setProperty('--sz-darktext', s.text);
+        container.style.setProperty('--sz-darktext2', s.text2);
+        container.style.setProperty('--sz-accent', s.accent);
+        container.style.setProperty('--sz-trans-border', s.trans);
+      }
 
       window.vtCycleAccent = function() {
-        var schemes = ['1','2','3','4','5','6','7'];
-        _vtAccentIdx = (_vtAccentIdx + 1) % schemes.length;
-        var s = schemes[_vtAccentIdx];
-        var el = document.getElementById('sub-vt-review');
-        if (el) el.setAttribute('data-wb-scheme', s);
+        _vtAccentIdx = (_vtAccentIdx + 1) % 7;
+        vtApplyScheme();
         var btn = document.getElementById('vtAccentBtn');
-        if (btn) btn.innerHTML = '<i class="fa-solid fa-palette"></i> ' + s;
-        localStorage.setItem('vt-accent-scheme', s);
+        if (btn) btn.innerHTML = '<i class="fa-solid fa-palette"></i> ' + (_vtAccentIdx + 1);
+        localStorage.setItem('vt-accent-scheme', String(_vtAccentIdx + 1));
       };
 
-      window.vtSetMode = function(mode) {
-        _vtAccentMode = mode;
-        var el = document.getElementById('sub-vt-review');
-        if (el) el.setAttribute('data-wb-accent', mode);
-        document.querySelectorAll('#sub-vt-review [data-vt-mode]').forEach(function(c){ c.classList.remove('active'); });
-        var chip = document.querySelector('#sub-vt-review [data-vt-mode="' + mode + '"]');
-        if (chip) chip.classList.add('active');
-        localStorage.setItem('vt-accent-mode', mode);
-      };
+      // Apply scheme on load
+      vtApplyScheme();
       async function renderExpandStats() {
         var lang = window.SOTTOTITOLI_STUDY_LANG || 'en';
         var statsEl = document.getElementById('wbExpandStats');
