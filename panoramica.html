@@ -23,6 +23,18 @@
     }
     [data-theme="dark"] .metric-card:hover { border-color:rgba(6,182,212,.22) !important; }
 
+    /* Amber — review / due / urgency cards */
+    .metric-card.amber {
+      background:linear-gradient(135deg,rgba(217,119,6,.25),rgba(180,83,9,.14),rgba(217,119,6,.06)) !important;
+      border-color:rgba(217,119,6,.22) !important;
+    }
+    .metric-card.amber:hover { border-color:rgba(217,119,6,.35) !important; }
+    [data-theme="dark"] .metric-card.amber {
+      background:linear-gradient(135deg,rgba(245,158,11,.12),rgba(217,119,6,.06),rgba(245,158,11,.02)) !important;
+      border-color:rgba(245,158,11,.1) !important;
+    }
+    [data-theme="dark"] .metric-card.amber:hover { border-color:rgba(245,158,11,.22) !important; }
+
     /* Purple — personal / admin cards */
     .alt-card {
       background:linear-gradient(135deg,rgba(192,132,252,.2),rgba(99,102,241,.12),rgba(192,132,252,.05)) !important;
@@ -2824,11 +2836,18 @@
         var statsEl = document.getElementById('wbReviewStats');
         if (statsEl) {
           var overdue = stats.overdue || 0;
-          statsEl.innerHTML =
-            '<div class="wb-stat"><div class="stat-value">' + stats.dueToday + '</div><div class="stat-label">' + (I18n && I18n.t ? I18n.t('review_due_due_today') : 'Due today') + '</div></div>' +
-            '<div class="wb-stat" style="' + (overdue > 0 ? 'border-color:var(--amber)' : '') + '"><div class="stat-value" style="' + (overdue > 0 ? 'color:var(--amber)' : '') + '">' + overdue + '</div><div class="stat-label">' + (I18n && I18n.t ? I18n.t('review_due_overdue') : 'Overdue') + '</div></div>' +
-            '<div class="wb-stat"><div class="stat-value">' + (stats.reviewedToday || 0) + '</div><div class="stat-label">' + (I18n && I18n.t ? I18n.t('review_due_reviewed_today') : 'Reviewed today') + '</div></div>' +
-            '<div class="wb-stat"><div class="stat-value">' + (stats.known || 0) + '</div><div class="stat-label">' + (I18n && I18n.t ? I18n.t('review_due_mastered') : 'Mastered') + '</div></div>';
+          var cards = [
+            { v: stats.dueToday, l: 'In programma oggi', b: stats.dueToday > 0 ? stats.dueToday + ' da ripassare' : 'Tutto in ordine' },
+            { v: overdue, l: 'Scadute', b: overdue > 0 ? overdue + ' in arretrato' : '' },
+            { v: (stats.reviewedToday || 0), l: 'Ripassate oggi', b: '' },
+            { v: (stats.known || 0), l: 'Padroneggiate', b: '' }
+          ];
+          statsEl.innerHTML = '<div class="stats-row" style="grid-template-columns:repeat(4,1fr);margin-bottom:0">' +
+            cards.map(function(c, i){
+              var isOverdue = (i === 1 && overdue > 0);
+              return '<div class="metric-card amber" style="min-height:80px;padding:14px 16px"><div class="metric-label" style="margin-bottom:2px">' + c.l + '</div><div class="metric-value" style="font-size:26px;' + (isOverdue ? 'color:var(--amber)' : '') + '">' + c.v + '</div>' + (c.b ? '<div class="metric-badge">' + c.b + '</div>' : '') + '</div>';
+            }).join('') +
+            '</div>';
         }
 
         // Fetch words with status 'due' or 'new' (reviewable)
