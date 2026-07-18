@@ -504,7 +504,7 @@
           <article class="hero-banner" id="heroBanner">
             <button class="hero-close" id="heroClose" aria-label="Close banner"><svg class="icon"><use href="#i-close"></use></svg></button>
             <div class="hero-art" aria-hidden="true"><span class="blob blob-a"></span><span class="blob blob-b"></span><span class="blob blob-c"></span><span class="glow glow-a"></span><span class="glow glow-b"></span></div>
-            <div class="hero-content"><h2><span data-i18n="welcome_back">Ben tornato,</span> <em id="heroName">...</em></h2><p id="heroText" data-i18n="login_to_see_stats">Accedi per vedere le tue statistiche.</p><div class="hero-chips"><button class="hero-chip strong" onclick="toggleStartSession()" data-i18n="start_session_btn">Inizia sessione</button></div></div>
+            <div class="hero-content"><h2><span data-i18n="welcome_back">Ben tornato,</span> <em id="heroName">...</em></h2><p id="heroText" data-i18n="login_to_see_stats">Accedi per vedere le tue statistiche.</p><div class="hero-chips" id="heroChips"><button class="hero-chip strong" onclick="toggleStartSession()" data-i18n="start_session_btn">Inizia sessione</button></div></div>
           </article>
           <!-- Contextual message banner removed -->
           <section class="stats-row">
@@ -676,8 +676,16 @@
               <div class="hero-chips" style="margin-top:12px"><button class="hero-chip strong" onclick="document.querySelector('#pnl-insights [data-subtab=profilo-ling-insights]').click()">Vai a Profilo Linguistico</button></div>
             </div>
           </article>
-          <section class="panel-tabs"><div class="tabs" role="tablist"><button role="tab" aria-selected="true" class="tab-link active" data-subtab="obiettivi">Obiettivi</button><button role="tab" aria-selected="false" class="tab-link" data-subtab="compiti">Compiti</button><button role="tab" aria-selected="false" class="tab-link" data-subtab="traguardi">Traguardi</button><button role="tab" aria-selected="false" class="tab-link" data-subtab="profilo-ling-insights">Profilo Linguistico</button><button role="tab" aria-selected="false" class="tab-link" data-subtab="percorso" style="color:var(--purple)">Percorso</button></div></section>
-          <div role="tabpanel" class="subtab-pane active" id="sub-obiettivi">
+          <section class="panel-tabs"><div class="tabs" role="tablist"><button role="tab" aria-selected="true" class="tab-link active" data-subtab="overview">Overview</button><button role="tab" aria-selected="false" class="tab-link" data-subtab="obiettivi">Obiettivi</button><button role="tab" aria-selected="false" class="tab-link" data-subtab="compiti">Compiti</button><button role="tab" aria-selected="false" class="tab-link" data-subtab="traguardi">Traguardi</button><button role="tab" aria-selected="false" class="tab-link" data-subtab="profilo-ling-insights">Profilo Linguistico</button><button role="tab" aria-selected="false" class="tab-link" data-subtab="percorso" style="color:var(--purple)">Percorso</button></div></section>
+          <div role="tabpanel" class="subtab-pane active" id="sub-overview">
+            <section class="alt-card-grid" id="insightsOverviewGrid">
+              <article class="alt-card"><h3>Panoramica</h3><p id="insightsOverviewSummary" style="font-size:14px;color:var(--text-soft);line-height:1.6">Caricamento…</p></article>
+              <article class="alt-card"><h3>Affidabilità</h3><p id="insightsOverviewConfidence" style="font-size:14px;color:var(--text-soft);line-height:1.6">Caricamento…</p><p id="insightsOverviewConfidenceNote" style="font-size:11px;color:var(--text-faint);margin-top:6px">Sono indicazioni direzionali, non valutazioni definitive.</p></article>
+              <article class="alt-card"><h3>Segnali</h3><div id="insightsOverviewPatterns" class="habit-chips" style="margin-top:10px"></div></article>
+              <article class="alt-card"><h3>Prossimo passo</h3><p id="insightsOverviewNext" style="font-size:14px;color:var(--text-soft);line-height:1.6">Caricamento…</p></article>
+            </section>
+          </div>
+          <div role="tabpanel" class="subtab-pane" id="sub-obiettivi">
           <section class="alt-card-grid">
             <article class="alt-card" style="border:2px solid var(--line-strong);border-radius:34px;box-shadow:0 4px 32px rgba(0,0,0,.04)">
               <h3>Obiettivo a breve termine</h3>
@@ -1778,29 +1786,161 @@
       }
 
       // ═══ RENDER: Panoramica hero ───
+
+      // ── Confidence state builder ──
+      function getInsightState() {
+        var s = currentStats() || {};
+        var totalSessions = s.totalSessions || 0;
+        var totalMinutes = s.totalMinutes || 0;
+        if (totalSessions === 0) return { key: 'no_data', confidence: 'Bassa' };
+        if (totalSessions < 5 || totalMinutes < 30) return { key: 'early_data', confidence: 'Bassa' };
+        if (totalSessions < 20 || totalMinutes < 180) return { key: 'growing_data', confidence: 'Media' };
+        return { key: 'solid_data', confidence: 'Alta' };
+      }
+
+      // ── Fetch 60-day session history for habit + growth computation ──
+      async function fetchRecentSessionsForHero() {
+        var sb = window.sottotitoliSupabase;
+        if (!sb) return [];
+        var r = await sb.auth.getSession();
+        if (!r.data || !r.data.session) return [];
+        var userId = r.data.session.user.id;
+        var lang = window.SOTTOTITOLI_STUDY_LANG || 'en';
+        var start = new Date();
+        start.setDate(start.getDate() - 60);
+        var { data, error } = await sb
+          .from('sessions')
+          .select('duration_seconds,words_count,wpm,lexical_diversity,started_at')
+          .eq('user_id', userId)
+          .like('language_pair', lang + '%')
+          .gte('started_at', start.toISOString())
+          .order('started_at', { ascending: false });
+        if (error) return [];
+        return data || [];
+      }
+
+      // ── Compute practice habits from raw sessions ──
+      function computePracticeHabit(sessions) {
+        if (!sessions || !sessions.length) {
+          return { activeDays: 0, dailyAverageMinutes: 0, preferredTimeBucket: null, topDays: [], sessionsPerWeek: 0 };
+        }
+        var dayMap = new Map();
+        var weekdayCount = [0,0,0,0,0,0,0];
+        var timeBuckets = { mattina: 0, pomeriggio: 0, sera: 0, notte: 0 };
+        sessions.forEach(function(s) {
+          var dt = new Date(s.started_at);
+          var isoDay = dt.toISOString().slice(0, 10);
+          var mins = Math.max(1, Math.round((s.duration_seconds || 0) / 60));
+          dayMap.set(isoDay, (dayMap.get(isoDay) || 0) + mins);
+          weekdayCount[dt.getDay()] += 1;
+          var h = dt.getHours();
+          if (h >= 6 && h < 12) timeBuckets.mattina += 1;
+          else if (h >= 12 && h < 18) timeBuckets.pomeriggio += 1;
+          else if (h >= 18 && h < 24) timeBuckets.sera += 1;
+          else timeBuckets.notte += 1;
+        });
+        var activeDays = dayMap.size;
+        var totalMinutes = 0;
+        dayMap.forEach(function(v) { totalMinutes += v; });
+        var dailyAverageMinutes = activeDays ? Math.round(totalMinutes / activeDays) : 0;
+        var dayNames = ['Dom','Lun','Mar','Mer','Gio','Ven','Sab'];
+        var sortedDays = weekdayCount.map(function(count, idx) { return { day: dayNames[idx], count: count }; })
+          .sort(function(a, b) { return b.count - a.count; })
+          .filter(function(x) { return x.count > 0; });
+        var prefEntries = Object.entries(timeBuckets).sort(function(a, b) { return b[1] - a[1]; });
+        var preferredTimeBucket = prefEntries.length ? prefEntries[0][0] : null;
+        var timeLabels = { mattina: 'la mattina', pomeriggio: 'il pomeriggio', sera: 'la sera', notte: 'la notte' };
+        var sessionsPerWeek = Math.max(1, Math.round((sessions.length / Math.max(activeDays, 7)) * 7));
+        return {
+          activeDays: activeDays,
+          dailyAverageMinutes: dailyAverageMinutes,
+          preferredTimeBucket: preferredTimeBucket,
+          preferredTimeLabel: timeLabels[preferredTimeBucket] || '',
+          topDays: sortedDays.slice(0, 2).map(function(d) { return d.day; }),
+          sessionsPerWeek: sessionsPerWeek
+        };
+      }
+
+      // ── Compute month-over-month growth ──
+      function computeMonthlyGrowth(sessions) {
+        var now = new Date();
+        var last30 = [];
+        var prev30 = [];
+        sessions.forEach(function(s) {
+          var dt = new Date(s.started_at);
+          var diffDays = (now - dt) / 86400000;
+          if (diffDays <= 30) last30.push(s);
+          else if (diffDays <= 60) prev30.push(s);
+        });
+        function avg(arr) {
+          if (!arr.length) return { wpm: 0, minutes: 0 };
+          var wpmVals = arr.map(function(x) { return Number(x.wpm || 0); }).filter(Boolean);
+          var minsVals = arr.map(function(x) { return Math.max(1, Math.round((x.duration_seconds || 0) / 60)); });
+          return {
+            wpm: wpmVals.length ? wpmVals.reduce(function(a,b){return a+b;},0) / wpmVals.length : 0,
+            minutes: minsVals.length ? minsVals.reduce(function(a,b){return a+b;},0) / minsVals.length : 0
+          };
+        }
+        var a = avg(last30);
+        var b = avg(prev30);
+        function pct(curr, prev) {
+          if (!prev && !curr) return 0;
+          if (!prev) return 100;
+          return ((curr - prev) / prev) * 100;
+        }
+        return {
+          monthlyWpmGrowthPct: Math.round(pct(a.wpm, b.wpm)),
+          monthlyMinutesGrowthPct: Math.round(pct(a.minutes, b.minutes))
+        };
+      }
+
+      // ── Navigate to Insights Overview ──
+      function openInsightsOverview() {
+        var nav = document.querySelector('[data-panel="insights"]');
+        if (nav) nav.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        setTimeout(function() {
+          var tab = document.querySelector('[data-subtab="overview"]');
+          if (tab) tab.click();
+        }, 80);
+      }
+      window.openInsightsOverview = openInsightsOverview;
+
       function renderHero(displayName) {
-        // Always update hero name from saved settings
         var hn = document.getElementById('heroName');
         if (hn && displayName) hn.textContent = displayName;
 
-        var s = currentStats();
-        var sessions = s ? s.totalSessions : 0;
-        var mins = s ? (s.totalMinutes || 0) : 0;
-        var hours = mins >= 60 ? Math.round(mins / 60) : (mins > 0 ? '<1' : '0');
-        var words = s ? (s.totalWords || 0).toLocaleString() : '0';
+        var s = currentStats() || {};
+        var state = getInsightState();
+
+        // ── Build copy based on confidence state ──
         var heroP = document.getElementById('heroText');
-        var mattrText = '';
-        if (cefrBreakdown && cefrBreakdown.mattr > 0) {
-          mattrText = ' · MATTR: <strong>' + cefrBreakdown.mattr.toFixed(3) + '</strong>';
+        var heroChips = document.getElementById('heroChips');
+        var text = '';
+        var ctaLabel = 'Inizia sessione';
+
+        if (state.key === 'no_data') {
+          text = 'Completa alcune sessioni per trasformare il tuo modo di parlare in feedback utile su fluidità, vocabolario e progressi.';
+          ctaLabel = 'Inizia sessione';
+        } else if (state.key === 'early_data') {
+          text = 'Iniziamo a vedere i primi pattern, ma con un po\' più di tempo di parola il tuo feedback diventerà molto più preciso e personale.';
+          ctaLabel = 'Continua a parlare';
+        } else if (state.key === 'growing_data') {
+          text = 'I tuoi dati rivelano già tendenze utili. Apri Insights per vedere cosa sta migliorando e cosa merita più attenzione.';
+          ctaLabel = 'Apri Insights';
+        } else {
+          text = 'Abbiamo identificato pattern significativi tra le tue sessioni. Apri Insights per un\'analisi più approfondita su punti di forza, abitudini e prossimi passi.';
+          ctaLabel = 'Apri Insights';
         }
-        if (heroP && sessions > 0) {
-          var lang = (typeof I18n !== 'undefined' && I18n.getLang ? I18n.getLang() : (window._settingsData && window._settingsData.ui_language) || 'it');
-          if (lang === 'en') {
-            heroP.innerHTML = 'You dictated <strong>' + sessions + ' sessions</strong> totaling <strong>' + hours + ' hours</strong>. Your active vocabulary has <strong>' + words + ' unique words</strong>.' + mattrText;
-          } else {
-            heroP.innerHTML = 'Hai dettato <strong>' + sessions + ' sessioni</strong> per un totale di <strong>' + hours + ' ore</strong>. Il tuo vocabolario attivo conta <strong>' + words + ' parole</strong> uniche.' + mattrText;
-          }
+
+        if (heroP) {
+          heroP.textContent = text;
           heroP.removeAttribute('data-i18n');
+        }
+
+        if (heroChips) {
+          heroChips.innerHTML =
+            '<button class=\"hero-chip strong\" onclick=\"toggleStartSession()\">' + ctaLabel + '</button>' +
+            '<button class=\"hero-chip\" onclick=\"openInsightsOverview()\">Scopri di più</button>';
         }
       }
       window.renderHero = renderHero;
@@ -4473,6 +4613,75 @@
       window.saveExpandWord = saveExpandWord;
       window.openExpandWordDetail = openExpandWordDetail;
 
+      // ═══ RENDER: Insights Overview ───
+      async function renderInsightsOverview() {
+        var s = currentStats() || {};
+        var state = getInsightState();
+        var totalSessions = s.totalSessions || 0;
+        var totalMinutes = s.totalMinutes || 0;
+        var avgWpm = Math.round(s.avgWpm || 0);
+        var avgLexDiv = s.avgLexDiv || 0;
+
+        // Compute habits from real session data
+        var habit = { activeDays: 0, dailyAverageMinutes: 0, preferredTimeLabel: '', topDays: [], sessionsPerWeek: 0 };
+        var growth = { monthlyWpmGrowthPct: 0, monthlyMinutesGrowthPct: 0 };
+        try {
+          var sessions = await fetchRecentSessionsForHero();
+          if (sessions && sessions.length) {
+            habit = computePracticeHabit(sessions);
+            growth = computeMonthlyGrowth(sessions);
+          }
+        } catch(e) { /* use defaults */ }
+
+        var summary = '', confidence = '', next = '';
+
+        if (state.key === 'no_data') {
+          summary = 'Non ci sono ancora abbastanza dati per tracciare un profilo significativo.';
+          confidence = 'Affidabilità bassa — nessuna sessione completata.';
+          next = 'Inizia con qualche sessione breve in giorni diversi per permettere al sistema di rilevare i primi pattern.';
+        } else if (state.key === 'early_data') {
+          summary = 'Stiamo iniziando a riconoscere le prime tendenze nel tuo modo di parlare, ma il quadro è ancora in formazione.';
+          confidence = 'Affidabilità bassa — segnale iniziale basato su dati ancora limitati.';
+          next = 'Aggiungi altre sessioni distribuite su più giorni per rendere il feedback più preciso.';
+        } else if (state.key === 'growing_data') {
+          summary = 'La tua attività recente è sufficiente per mostrare tendenze utili su ritmo, ampiezza del vocabolario e costanza.';
+          confidence = 'Affidabilità media — abbastanza stabile per essere utile, ancora in evoluzione.';
+          next = 'Concentrati sulla costanza e rivedi l\'area più debole prima che diventi un\'abitudine.';
+        } else {
+          summary = 'La tua cronologia è ora abbastanza ricca da supportare un\'interpretazione più stabile dei tuoi punti di forza, abitudini e aree di sviluppo.';
+          confidence = 'Affidabilità alta — più sessioni permettono un profilo più affidabile.';
+          next = 'Usa i segnali qui sotto per lavorare su un\'area debole mantenendo il tuo pattern più forte.';
+        }
+
+        // ── Populate DOM ──
+        var summaryEl = document.getElementById('insightsOverviewSummary');
+        var confidenceEl = document.getElementById('insightsOverviewConfidence');
+        var nextEl = document.getElementById('insightsOverviewNext');
+        var patternsEl = document.getElementById('insightsOverviewPatterns');
+
+        if (summaryEl) summaryEl.textContent = summary;
+        if (confidenceEl) confidenceEl.textContent = confidence;
+        if (nextEl) nextEl.textContent = next;
+
+        if (patternsEl) {
+          var growthSign = growth.monthlyWpmGrowthPct > 0 ? '+' : '';
+          var patterns = [
+            { value: totalSessions || '—', label: 'Sessioni' },
+            { value: totalMinutes ? (totalMinutes >= 60 ? Math.round(totalMinutes / 60) + 'h' : totalMinutes + 'm') : '—', label: 'Tempo parlato' },
+            { value: avgWpm || '—', label: 'WPM medio' },
+            { value: avgLexDiv ? avgLexDiv.toFixed(2) : '—', label: 'Diversità lessicale' },
+            { value: growth.monthlyWpmGrowthPct !== 0 ? growthSign + growth.monthlyWpmGrowthPct + '%' : '—', label: 'Crescita WPM mensile' },
+            { value: habit.dailyAverageMinutes > 0 ? '~' + habit.dailyAverageMinutes + ' min/giorno' : '—', label: 'Media giornaliera' },
+            { value: habit.preferredTimeLabel || '—', label: 'Fascia preferita' },
+            { value: habit.topDays.length ? habit.topDays.join(', ') : '—', label: 'Giorni più attivi' }
+          ];
+          patternsEl.innerHTML = patterns.map(function(p) {
+            return '<div class="habit-chip"><span class="hv">' + p.value + '</span><span class="hl">' + p.label + '</span></div>';
+          }).join('');
+        }
+      }
+      window.renderInsightsOverview = renderInsightsOverview;
+
       // ═══ RENDER: Vocabolario Traguardi ───
       function renderVocabTraguardi() {
         var container = document.querySelector('#sub-voc-traguardi');
@@ -4921,6 +5130,7 @@
       renderMetrics();
       renderInsightsMetrics();
       renderInsightsTraguardi();
+      renderInsightsOverview();
       renderPanoramicaCEFR();
       renderProfile();
       renderSessions();
@@ -4954,7 +5164,7 @@
       var vocNav = document.querySelector('[data-panel="vocabolario"]');
       if (vocNav) { vocNav.addEventListener('click', function () { setTimeout(renderVocabolario, 100); }); }
       var insNav = document.querySelector('[data-panel="insights"]');
-      if (insNav) { insNav.addEventListener('click', function () { setTimeout(renderTasks, 100); }); }
+      if (insNav) { insNav.addEventListener('click', function () { setTimeout(renderTasks, 100); setTimeout(renderInsightsOverview, 150); }); }
       var impNav = document.querySelector('[data-panel="impostazioni"]');
       if (impNav) { impNav.addEventListener('click', async function () {
         var sd = null;
@@ -4993,6 +5203,7 @@
           renderMetrics();
           renderInsightsMetrics();
           renderInsightsTraguardi();
+          renderInsightsOverview();
           renderPanoramicaCEFR();
           renderSessions();
           renderWordbanks();
