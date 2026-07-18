@@ -925,6 +925,13 @@
               <p style="font-size:14px">Nessuna sessione trovata. Inizia una sessione di caption o traduzione.</p>
             </div>
           </div>
+          <!-- Drawer list view -->
+          <div id="trDrawerList" style="display:none">
+            <div id="trDrawerSessionList" style="display:flex;flex-direction:column;gap:4px"></div>
+            <div id="trDrawerEmpty" style="display:none;text-align:center;padding:40px 20px;color:var(--text-faint)">
+              <p style="font-size:14px">Nessuna sessione trovata. Inizia una sessione.</p>
+            </div>
+          </div>
         </div>
         <!-- ═══ WORD BANKS — three-layer vocabulary workspace ═══ -->
         <div class="content-panel" id="pnl-wordbanks">
@@ -3443,7 +3450,13 @@
         document.querySelectorAll('#pnl-trascrizioni [data-tr-view]').forEach(function(c){ c.classList.remove('active'); });
         btn.classList.add('active');
         var tableEl = document.getElementById('trTableView');
+        var drawerListEl = document.getElementById('trDrawerList');
         if (tableEl) tableEl.style.display = view === 'table' ? '' : 'none';
+        if (drawerListEl) drawerListEl.style.display = view === 'drawer' ? '' : 'none';
+        if (view === 'table') {
+          // Close any open drawer
+          if (typeof closeWbDrawer === 'function') closeWbDrawer();
+        }
       };
 
       async function renderTrascrizioni() {
@@ -3512,6 +3525,27 @@
             '</td></tr>';
         });
         tbody.innerHTML = html;
+
+        // Populate drawer list view too
+        var drawerList = document.getElementById('trDrawerSessionList');
+        var drawerEmpty = document.getElementById('trDrawerEmpty');
+        if (drawerList) {
+          var drawerHtml = '';
+          filtered.forEach(function(s) {
+            var name = s.name || 'Sessione ' + (s.id ? s.id.substring(0,8) : '—');
+            var dateStr = fmtDate(s.started_at);
+            var mins = Math.round((s.duration_seconds||0)/60);
+            var durStr = mins >= 60 ? Math.floor(mins/60)+'h '+(mins%60)+'m' : mins+'m';
+            drawerHtml += '<div class="term-row" style="cursor:pointer;padding:10px 14px" onclick="trOpenSession(\''+(s.id||'')+'\',\''+name.replace(/'/g,"\\'")+'\')">'+
+              '<span style="flex:2;font-weight:600">'+name+'</span>'+
+              '<span style="color:var(--text-faint);font-size:12px;margin-right:12px">'+dateStr+'</span>'+
+              '<span style="font-size:12px;font-weight:600">'+durStr+'</span>'+
+              '<span style="margin-left:12px;color:var(--cyan)"><i class="fa-solid fa-arrow-right"></i></span>'+
+              '</div>';
+          });
+          drawerList.innerHTML = drawerHtml || '<span style="color:var(--text-faint);padding:20px">Nessuna sessione.</span>';
+        }
+        if (drawerEmpty) drawerEmpty.style.display = filtered.length ? 'none' : 'block';
       }
       window.renderTrascrizioni = renderTrascrizioni;
 
