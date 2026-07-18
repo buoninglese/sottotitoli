@@ -15,10 +15,10 @@ export async function initReviewDashboard() {
   try {
     // Quick auth check first — is Supabase even available?
     var sb = window.sottotitoliSupabase;
-    if (!sb || !sb.client) {
+    if (!sb || typeof sb.auth === 'undefined') {
       throw new Error('AUTH_MISSING');
     }
-    var sessionResp = await sb.client.auth.getSession();
+    var sessionResp = await sb.auth.getSession();
     if (!sessionResp.data || !sessionResp.data.session) {
       throw new Error('AUTH_MISSING');
     }

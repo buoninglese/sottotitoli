@@ -4,10 +4,11 @@
  */
 
 function getSupabaseClient() {
-  if (!window.sottotitoliSupabase || !window.sottotitoliSupabase.client) {
+  var sb = window.sottotitoliSupabase;
+  if (!sb || typeof sb.from !== 'function') {
     throw new Error('Supabase client non disponibile');
   }
-  return window.sottotitoliSupabase.client;
+  return sb;
 }
 
 export async function fetchReviewDashboard() {
