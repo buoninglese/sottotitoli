@@ -4468,16 +4468,22 @@
 <script type="module">
   import { initReviewDashboard } from './js/review-bootstrap.js';
   var reviewTab = document.querySelector('[data-subtab="wb-review"]');
+  var reviewStarted = false;
   if (reviewTab) {
     reviewTab.addEventListener('click', function reviewInit() {
-      initReviewDashboard().catch(function(e) {
+      if (reviewStarted) return;
+      reviewStarted = true;
+      initReviewDashboard().then(function() {
+        // Success — no need to retry
+      }).catch(function(e) {
         console.warn('Review init failed, using classic fallback:', e.message);
-        // Classic fallback is already in the DOM — just re-render it
+        // Allow retry on next click
+        reviewStarted = false;
+        // Classic fallback is already in the DOM — re-render it
         if (typeof renderReviewDue === 'function') {
           setTimeout(function() { renderReviewDue(); }, 300);
         }
       });
-      reviewTab.removeEventListener('click', reviewInit);
     });
   }
 </script>
