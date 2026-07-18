@@ -3006,6 +3006,7 @@
 
         var name = bank ? bank.name : (bankNames[bankId] || bankId);
         var type = bank ? 'custom' : (bankTypes[bankId] || 'pinned');
+        _wbState.currentBankType = type;  // store type for delete routing
         var subtitle = bank ? (bank.description || '') : (bankSubtitles[bankId] || '');
         var emptyMsg = bankEmptyStates[bankId] || 'No words yet.';
         var badgeClass = type === 'pinned' ? 'badge-pinned' : type === 'smart' ? 'badge-smart' : 'badge-custom';
@@ -3250,50 +3251,107 @@
 
       // ── Single word delete (instant, no confirm) ──
       window.wbDeleteWord = async function(wordId, wordText) {
-        var bankUUID = _wbState.currentBankUUID || _wbState.currentBank;
         var bankKey = _wbState.currentBank;
+        var bankUUID = _wbState.currentBankUUID;
+        var bankType = _wbState.currentBankType || '';
         if (!wordId) return;
         var row = document.querySelector('#wbTableBody tr[data-wid="' + wordId + '"]');
         if (row) { row.style.opacity = '0'; row.style.transform = 'translateX(20px)'; row.style.transition = 'all .2s'; }
 
         var result = false;
-        // Pinned banks 1,2,4 query review_words — dismiss by updating review_words
-        if (bankKey === 'review_due_now' || bankKey === 'new_from_sessions' || bankKey === 'fragile_words') {
+        var sb = window.sottotitoliSupabase;
+
+        if (bankType === 'pinned' && (bankKey === 'review_due_now' || bankKey === 'new_from_sessions' || bankKey === 'fragile_words')) {
+          // These query review_words directly — dismiss by marking not new + dismissed
           try {
-            var sb = window.sottotitoliSupabase;
             if (sb) {
               await sb.from('review_words').update({ is_new: false, dismissed_at: new Date().toISOString() }).eq('id', wordId);
               result = true;
             }
           } catch(e) { console.warn('review_words dismiss:', e); }
-        } else if (bankUUID && bankUUID !== bankKey) {
-          // Custom banks and Saved From Sessions — delete from user_wordbank_words
-          try {
-            result = await SottotitoliData.bulkRemoveFromBank(bankUUID, [wordId]);
-          } catch(e) { console.warn('Delete error:', e); }
-          if (!result && window.sottotitoliSupabase) {
+        } else if (bankType === 'pinned' && bankKey === 'saved_from_sessions') {
+          // Saved from sessions — delete from user_wordbank_words by UUID
+          if (bankUUID) {
             try {
-              var { error } = await window.sottotitoliSupabase.from('user_wordbank_words').delete().eq('wordbank_id', bankUUID).eq('id', wordId);
-              if (!error) result = true;
-            } catch(e2) {}
+              result = await SottotitoliData.bulkRemoveFromBank(bankUUID, [wordId]);
+            } catch(e) { console.warn('bulkRemoveFromBank:', e); }
+            if (!result && sb) {
+              try {
+                var { error } = await sb.from('user_wordbank_words').delete().eq('wordbank_id', bankUUID).eq('id', wordId);
+                if (!error) result = true;
+              } catch(e2) {}
+            }
+          }
+        } else if (bankType === 'smart') {
+          // Smart banks — mark the word inactive in review_bank_words
+          try {
+            if (sb) {
+              await sb.from('review_bank_words').update({ status: 'dismissed' }).eq('bank_key', bankKey).eq('word_id', wordId);
+              result = true;
+            }
+          } catch(e) { console.warn('smart bank dismiss:', e); }
+        } else if (bankType === 'custom') {
+          // Custom banks — delete from user_wordbank_words by UUID (same as bankKey for custom banks)
+          var deleteUUID = bankUUID || bankKey;
+          if (deleteUUID) {
+            try {
+              result = await SottotitoliData.bulkRemoveFromBank(deleteUUID, [wordId]);
+            } catch(e) { console.warn('bulkRemoveFromBank:', e); }
+            if (!result && sb) {
+              try {
+                var { error } = await sb.from('user_wordbank_words').delete().eq('wordbank_id', deleteUUID).eq('id', wordId);
+                if (!error) result = true;
+              } catch(e2) {}
+            }
           }
         }
+
         if (result) {
           SottotitoliData.cacheClear();
           if (row) setTimeout(function(){ row.remove(); }, 200);
         } else {
           if (row) { row.style.opacity = '1'; row.style.transform = ''; }
-          console.warn('Delete failed for wordId:', wordId, 'bankKey:', bankKey, 'bankUUID:', bankUUID);
+          console.warn('Delete failed for wordId:', wordId, 'bankKey:', bankKey, 'type:', bankType, 'UUID:', bankUUID);
         }
       };
 
       async function wbBulkRemove() {
-        var bankUUID = _wbState.currentBankUUID || _wbState.currentBank;
-        if (!bankUUID) return;
+        var bankKey = _wbState.currentBank;
+        var bankUUID = _wbState.currentBankUUID;
+        var bankType = _wbState.currentBankType || '';
         var ids = Array.from(_wbState.selectedRows).filter(function(id) { return id && id !== 'undefined' && id !== 'null'; });
         if (!ids.length) return;
         if (!confirm('Remove ' + ids.length + ' selected word' + (ids.length > 1 ? 's' : '') + ' from this bank? This cannot be undone.')) return;
-        await SottotitoliData.bulkRemoveFromBank(bankUUID, ids);
+
+        var sb = window.sottotitoliSupabase;
+
+        if (bankType === 'pinned' && (bankKey === 'review_due_now' || bankKey === 'new_from_sessions' || bankKey === 'fragile_words')) {
+          // Dismiss from review_words
+          if (sb) {
+            try {
+              await sb.from('review_words').update({ is_new: false, dismissed_at: new Date().toISOString() }).in('id', ids);
+            } catch(e) { console.warn('bulk dismiss review_words:', e); }
+          }
+        } else if (bankType === 'pinned' && bankKey === 'saved_from_sessions') {
+          // Delete from user_wordbank_words by UUID
+          if (bankUUID) {
+            await SottotitoliData.bulkRemoveFromBank(bankUUID, ids);
+          }
+        } else if (bankType === 'smart') {
+          // Mark dismissed in review_bank_words
+          if (sb) {
+            try {
+              await sb.from('review_bank_words').update({ status: 'dismissed' }).eq('bank_key', bankKey).in('word_id', ids);
+            } catch(e) { console.warn('bulk dismiss smart bank:', e); }
+          }
+        } else if (bankType === 'custom') {
+          // Delete from user_wordbank_words by UUID
+          var deleteUUID = bankUUID || bankKey;
+          if (deleteUUID) {
+            await SottotitoliData.bulkRemoveFromBank(deleteUUID, ids);
+          }
+        }
+
         SottotitoliData.cacheClear();
         wbClearSelection();
         openWordbankView(_wbState.currentBank);
