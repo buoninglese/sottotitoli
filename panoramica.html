@@ -578,7 +578,7 @@
                 <!-- Profilo panel with sub-tabs -->
         <div class="content-panel" id="pnl-profilo">
           <section class="panel-head"><h2>Profilo</h2></section>
-          <section class="panel-tabs"><div class="tabs" role="tablist"><button role="tab" aria-selected="true" class="tab-link active" data-subtab="generale">Generale</button><button role="tab" aria-selected="false" class="tab-link" data-subtab="profilo-ling">Profilo Linguistico</button></div></section>
+          <section class="panel-tabs"><div class="tabs" role="tablist"><button role="tab" aria-selected="true" class="tab-link active" data-subtab="generale">Generale</button></div></section>
           <!-- Sub-tab: Generale -->
           <div role="tabpanel" class="subtab-pane active" id="sub-generale">
             <section class="alt-card-grid">
@@ -861,7 +861,7 @@
                 <div style="font-size:48px;margin-bottom:12px">🧬</div>
                 <h3 style="margin-bottom:8px">Profilo Linguistico</h3>
                 <p style="font-size:14px;color:var(--text-soft);max-width:500px;margin:0 auto 16px;line-height:1.5">Più Sottotitoli ti conosce, meglio ti può guidare. Raccontaci da dove parti e dove vuoi arrivare — i Report AI, il lessico e i consigli di studio si adatteranno a te, non a un modello standard.</p>
-                <button class="btn btn-primary" onclick="document.querySelector('#pnl-profilo [data-subtab=profilo-ling]').click();document.querySelector('[data-panel=profilo]').click()" style="font-family:var(--font-ui)">Apri Profilo Linguistico completo →</button>
+                <button class="btn btn-primary" onclick="openProfileLingModal()" style="font-family:var(--font-ui)">Apri Profilo Linguistico completo →</button>
               </article>
               <article class="alt-card" style="padding:24px 28px">
                 <h3 style="margin-bottom:10px;font-size:18px">Perché compilarlo?</h3>
@@ -2072,6 +2072,110 @@
         }, 80);
       }
       window.openInsightsOverview = openInsightsOverview;
+
+      // ── Profilo Linguistico modal ──
+      var _profileLingModalInit = false;
+      function initProfileLingModal() {
+        if (_profileLingModalInit) return;
+        _profileLingModalInit = true;
+        var src = document.getElementById('sub-profilo-ling');
+        var dst = document.getElementById('modalProfileLingContent');
+        if (src && dst) {
+          // Clone the plang panes (skip the subtabs which are already in modal)
+          var nativePane = document.getElementById('plang-native');
+          var targetPane = document.getElementById('plang-target');
+          var saveRow = src.querySelector('.save-row');
+          var html = '';
+          if (nativePane) html += '<div class="plang-pane active" id="modal-plang-native">' + nativePane.innerHTML + '</div>';
+          if (targetPane) html += '<div class="plang-pane" id="modal-plang-target" style="display:none">' + targetPane.innerHTML + '</div>';
+          if (saveRow) html += '<div class="save-row" style="margin-top:18px">' + saveRow.innerHTML + '</div>';
+          dst.innerHTML = html;
+          // Re-bind save button
+          var saveBtn = dst.querySelector('#saveProfileLingBtn');
+          if (saveBtn) saveBtn.onclick = function() { saveProfiloLinguistico(); };
+        }
+      }
+      window.openProfileLingModal = function() {
+        initProfileLingModal();
+        var modal = document.getElementById('profileLingModal');
+        if (modal) modal.classList.add('active');
+        // Render saved selections
+        if (typeof renderProfiloLinguistico === 'function') {
+          // Sync selections from main profile to modal clones
+          setTimeout(function() {
+            syncModalProfileSelections();
+          }, 100);
+        }
+      };
+      window.closeProfileLingModal = function(e) {
+        if (e && e.target !== document.getElementById('profileLingModal')) return;
+        var modal = document.getElementById('profileLingModal');
+        if (modal) modal.classList.remove('active');
+      };
+      window.switchModalPlang = function(btn, plang) {
+        btn.parentElement.querySelectorAll('.tab-link').forEach(function(t){ t.classList.remove('active'); t.setAttribute('aria-selected','false'); });
+        btn.classList.add('active'); btn.setAttribute('aria-selected','true');
+        var panes = document.querySelectorAll('#modalProfileLingContent .plang-pane');
+        panes.forEach(function(p){ p.style.display = 'none'; });
+        var target = document.getElementById('modal-plang-' + plang);
+        if (target) target.style.display = 'block';
+      };
+      function syncModalProfileSelections() {
+        // Copy selected states from original elements to modal clones
+        ['nativeProficiency','nativeContexts','nativeImprove','targetPurpose','targetSituations','targetSector','targetLevel'].forEach(function(id) {
+          var orig = document.getElementById(id);
+          var modal = document.querySelector('#modalProfileLingContent #' + id);
+          if (!orig || !modal) return;
+          var origActives = orig.querySelectorAll('.q-chip.active, .q-chip[aria-pressed="true"]');
+          modal.querySelectorAll('.q-chip').forEach(function(chip) {
+            chip.classList.remove('active'); chip.setAttribute('aria-pressed','false');
+          });
+          origActives.forEach(function(ac) {
+            var val = ac.getAttribute('data-val');
+            var match = modal.querySelector('.q-chip[data-val="' + val + '"]');
+            if (match) { match.classList.add('active'); match.setAttribute('aria-pressed','true'); }
+          });
+        });
+        ['nativeGoalsInput','targetGoalInput'].forEach(function(id) {
+          var orig = document.getElementById(id);
+          var modal = document.querySelector('#modalProfileLingContent #' + id);
+          if (orig && modal) modal.value = orig.value;
+        });
+      }
+
+      // ── Modal chip click: toggle in modal AND sync to original ──
+      document.addEventListener('click', function(e) {
+        var chip = e.target.closest('#modalProfileLingContent .q-chip');
+        if (!chip) return;
+        e.preventDefault();
+        var container = chip.closest('[id]');
+        if (!container) return;
+        var isMulti = container.classList.contains('q-multi');
+        if (!isMulti) {
+          container.querySelectorAll('.q-chip').forEach(function(c){ c.classList.remove('active'); c.setAttribute('aria-pressed','false'); });
+        }
+        chip.classList.toggle('active');
+        chip.setAttribute('aria-pressed', chip.classList.contains('active') ? 'true' : 'false');
+        // Sync to original
+        var origContainer = document.getElementById(container.id);
+        if (origContainer) {
+          if (!isMulti) origContainer.querySelectorAll('.q-chip').forEach(function(c){ c.classList.remove('active'); c.setAttribute('aria-pressed','false'); });
+          var val = chip.getAttribute('data-val');
+          var origChip = origContainer.querySelector('.q-chip[data-val="' + val + '"]');
+          if (origChip) {
+            origChip.classList.toggle('active');
+            origChip.setAttribute('aria-pressed', chip.classList.contains('active') ? 'true' : 'false');
+          }
+        }
+      });
+
+      // ── Modal input sync on blur ──
+      document.addEventListener('blur', function(e) {
+        var inp = e.target.closest('#modalProfileLingContent input');
+        if (!inp) return;
+        var orig = document.getElementById(inp.id);
+        if (orig) orig.value = inp.value;
+      }, true);
 
       function renderHero(displayName) {
         var hn = document.getElementById('heroName');
@@ -5985,6 +6089,29 @@
     });
   }
 </script>
+
+<!-- Profilo Linguistico modal -->
+<div class="modal-overlay" id="profileLingModal" onclick="closeProfileLingModal(event)">
+  <div class="modal-panel" onclick="event.stopPropagation()">
+    <button class="modal-close" onclick="closeProfileLingModal()">&times;</button>
+    <h2 style="margin:0 0 20px;font-size:22px;font-weight:800">Profilo Linguistico</h2>
+    <div class="tabs" role="tablist" style="margin-bottom:18px">
+      <button role="tab" aria-selected="true" class="tab-link active" data-plang="native" onclick="switchModalPlang(this,'native')">🏠 Lingua madre</button>
+      <button role="tab" aria-selected="false" class="tab-link" data-plang="target" onclick="switchModalPlang(this,'target')">🎯 Lingua obiettivo</button>
+    </div>
+    <div id="modalProfileLingContent"></div>
+  </div>
+</div>
+
+<style>
+  .modal-overlay{display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.6);backdrop-filter:blur(6px);align-items:center;justify-content:center}
+  .modal-overlay.active{display:flex}
+  .modal-panel{background:var(--card);border:2px solid var(--line-strong);border-radius:24px;padding:32px 36px;max-width:700px;width:calc(100vw - 48px);max-height:85vh;overflow-y:auto;box-shadow:0 24px 64px rgba(0,0,0,.3);position:relative}
+  [data-theme="dark"] .modal-panel{box-shadow:0 24px 64px rgba(0,0,0,.6)}
+  .modal-close{position:absolute;top:14px;right:18px;width:36px;height:36px;border-radius:50%;border:1.5px solid var(--line);background:var(--card);color:var(--text-soft);font-size:20px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .15s;font-family:var(--font-ui)}
+  .modal-close:hover{background:var(--line);color:var(--text)}
+  @media(max-width:600px){.modal-panel{padding:24px 20px}}
+</style>
 
 </body>
 </html>
