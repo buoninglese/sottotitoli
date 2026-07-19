@@ -31,32 +31,32 @@ async function translateWithNllb(
 ): Promise<string> {
   if (!HF_API_TOKEN) throw new Error('translation_provider_not_configured');
 
-  const langMap: Record<string, string> = {
-    en: 'eng_Latn',
-    it: 'ita_Latn',
+  // Use Helsinki-NLP Opus-MT models (work on free HF inference)
+  const modelMap: Record<string, string> = {
+    'en-it': 'Helsinki-NLP/opus-mt-en-it',
+    'it-en': 'Helsinki-NLP/opus-mt-it-en',
   };
-  const src = langMap[sourceLanguage];
-  const tgt = langMap[targetLanguage];
-  if (!src || !tgt) throw new Error('translation_unsupported_language_pair');
+  const pair = `${sourceLanguage}-${targetLanguage}`;
+  const model = modelMap[pair];
+  if (!model) throw new Error('translation_unsupported_language_pair');
 
   const resp = await fetch(
-    'https://api-inference.huggingface.co/models/facebook/nllb-200-distilled-600M',
+    `https://router.huggingface.co/hf-inference/models/${model}`,
     {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${HF_API_TOKEN}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
-        inputs: text,
-        parameters: { src_lang: src, tgt_lang: tgt },
-      }),
+      body: JSON.stringify({ inputs: text }),
     }
   );
 
   if (!resp.ok) throw new Error('translation_provider_unavailable');
   const data = await resp.json();
-  return data?.[0]?.translation_text || '';
+  // Opus-MT returns [{ translation_text: "..." }]
+  if (Array.isArray(data)) return data[0]?.translation_text || '';
+  return (data as any)?.translation_text || '';
 }
 
 async function translateWithGoogleCloud(

@@ -1,14 +1,13 @@
 /**
- * grammar-segment — Server-side grammar correction via Hugging Face CoEdIT / mEdIT.
- * English: grammarly/coedit-large (now)
- * Italian: grammarly/medit-xl (later)
- * Secret: HF_API_TOKEN
+ * grammar-segment — Server-side grammar correction via LanguageTool.
+ * Free tier: 500 req/day. No API key needed.
+ * Returns: corrected text + error explanations + rule categories.
+ * English only for now (Italian later via LanguageTool it-IT).
  */
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-const HF_API_TOKEN = Deno.env.get('HF_API_TOKEN') || '';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': 'https://buoninglese.github.io',
@@ -23,145 +22,121 @@ function json(data: unknown, status = 200) {
   });
 }
 
-async function hfGenerate(model: string, prompt: string): Promise<string> {
-  if (!HF_API_TOKEN) throw new Error('hf_token_missing');
+interface LTMatch {
+  message: string; shortMessage: string;
+  replacements: { value: string }[];
+  offset: number; length: number;
+  rule: { id: string; description: string; category: { id: string; name: string } };
+}
 
-  const resp = await fetch(`https://api-inference.huggingface.co/models/${model}`, {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${HF_API_TOKEN}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ inputs: prompt }),
-  });
-
-  if (!resp.ok) throw new Error(`hf_error_${resp.status}`);
-
-  const data = await resp.json();
-  // HF returns array or single object
-  if (Array.isArray(data)) {
-    return data[0]?.generated_text ?? '';
+function applyCorrections(text: string, matches: LTMatch[]): string {
+  const sorted = [...matches]
+    .filter(m => m.replacements && m.replacements.length > 0)
+    .sort((a, b) => b.offset - a.offset);
+  let result = text;
+  for (const m of sorted) {
+    result = result.substring(0, m.offset) + m.replacements[0].value + result.substring(m.offset + m.length);
   }
-  return (data as any)?.generated_text ?? '';
+  return result;
 }
 
 Deno.serve(async (req: Request) => {
-  if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders });
-  }
+  if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
 
   try {
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) throw new Error('Missing Authorization header');
 
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
-    const { data: { user }, error: authError } = await supabase.auth.getUser(
-      authHeader.replace('Bearer ', '')
-    );
+    const { data: { user }, error: authError } = await supabase.auth.getUser(authHeader.replace('Bearer ', ''));
     if (authError || !user) throw new Error('Unauthorized');
 
-    const { segmentId, mode = 'fix_grammar', provider } = await req.json();
-    if (!segmentId) throw new Error('segmentId required');
+    const { segmentId, text: directText, mode = 'fix_grammar' } = await req.json();
+    if (!segmentId && !directText) throw new Error('segmentId or text required');
 
-    // Fetch segment
-    const { data: seg, error: segError } = await supabase
-      .from('transcript_segments')
-      .select('id, room_id, source_text, source_language')
-      .eq('id', segmentId)
-      .single();
+    const provider = 'languagetool';
+    let sourceText: string;
+    let segId: string;
+    let roomId: string;
+    let sourceLanguage = 'en';
 
-    if (segError || !seg) throw new Error('Segment not found');
+    if (segmentId) {
+      // DB-backed mode: fetch segment, verify room membership
+      const { data: seg, error: segError } = await supabase
+        .from('transcript_segments')
+        .select('id, room_id, source_text, source_language')
+        .eq('id', segmentId).single();
+      if (segError || !seg) throw new Error('Segment not found');
 
-    // Verify room membership
-    const { data: membership } = await supabase
-      .from('room_members')
-      .select('id')
-      .eq('room_id', seg.room_id)
-      .eq('user_id', user.id)
-      .is('left_at', null)
-      .maybeSingle();
+      const { data: membership } = await supabase
+        .from('room_members').select('id')
+        .eq('room_id', seg.room_id).eq('user_id', user.id).is('left_at', null).maybeSingle();
+      if (!membership) throw new Error('You are not a member of this room');
 
-    if (!membership) throw new Error('You are not a member of this room');
+      if (seg.source_language !== 'en') throw new Error('Grammar correction currently supports English only');
+      sourceText = seg.source_text;
+      segId = seg.id;
+      roomId = seg.room_id;
+      sourceLanguage = seg.source_language;
+    } else {
+      // Direct text mode: no DB segment needed, use text hash as cache key
+      sourceText = directText;
+      const hashBuf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(sourceText));
+      const hashHex = Array.from(new Uint8Array(hashBuf)).map(b => b.toString(16).padStart(2,'0')).join('');
+      segId = hashHex.substring(0, 32);
+      roomId = '00000000-0000-0000-0000-000000000000';
+    }
 
-    // Determine provider and model
-    const resolvedProvider = provider || (seg.source_language === 'it' ? 'medit' : 'coedit');
-    const model =
-      resolvedProvider === 'medit'
-        ? (Deno.env.get('HF_MEDIT_MODEL') || 'grammarly/medit-xl')
-        : (Deno.env.get('HF_COEDIT_MODEL') || 'grammarly/coedit-large');
-
-    // Check cache: existing completed grammar entry
+    // Check cache
     const { data: existing } = await supabase
-      .from('segment_grammar')
-      .select('*')
-      .eq('segment_id', seg.id)
-      .eq('language', seg.source_language)
-      .eq('provider', resolvedProvider)
-      .eq('mode', mode)
-      .maybeSingle();
-
+      .from('segment_grammar').select('*')
+      .eq('segment_id', segId).eq('language', sourceLanguage)
+      .eq('provider', provider).eq('mode', mode).maybeSingle();
     if (existing && existing.status === 'complete') {
       return json({ grammar: existing });
     }
 
-    // Insert pending row
+    // Insert pending
     await supabase.from('segment_grammar').upsert({
-      segment_id: seg.id,
-      room_id: seg.room_id,
-      language: seg.source_language,
-      provider: resolvedProvider,
-      mode,
-      original_text: seg.source_text,
-      status: 'pending',
+      segment_id: segId, room_id: roomId, language: sourceLanguage,
+      provider, mode, original_text: sourceText, status: 'pending',
       updated_at: new Date().toISOString(),
-    }, {
-      onConflict: 'segment_id, language, provider, mode',
-    });
-
-    // Build prompt
-    const prompt =
-      mode === 'improve_clarity'
-        ? `Improve clarity and fluency: ${seg.source_text}`
-        : `Fix grammatical errors in this sentence: ${seg.source_text}`;
+    }, { onConflict: 'segment_id, language, provider, mode' });
 
     try {
-      const correctedText = await hfGenerate(model, prompt);
+      const ltResp = await fetch('https://api.languagetool.org/v2/check', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({ text: sourceText, language: 'en-US' }),
+      });
+      if (!ltResp.ok) throw new Error(`lt_error_${ltResp.status}`);
+
+      const ltData = await ltResp.json();
+      const matches: LTMatch[] = ltData.matches || [];
+
+      let correctedText = sourceText;
+      let explanation: string | null = null;
+      let errorCategories: string[] = [];
+
+      if (matches.length > 0) {
+        correctedText = applyCorrections(sourceText, matches);
+        explanation = matches.map(m => `• ${m.message}${m.replacements?.length ? ' → "' + m.replacements[0].value + '"' : ''} (${m.rule.category.name})`).join('\n');
+        errorCategories = [...new Set(matches.map(m => m.rule.category.name))];
+      }
 
       const { data: updated } = await supabase
         .from('segment_grammar')
-        .update({
-          corrected_text: correctedText,
-          status: 'complete',
-          error_code: null,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('segment_id', seg.id)
-        .eq('language', seg.source_language)
-        .eq('provider', resolvedProvider)
-        .eq('mode', mode)
-        .select('*')
-        .single();
+        .update({ corrected_text: correctedText, status: 'complete', error_code: null, updated_at: new Date().toISOString() })
+        .eq('segment_id', segId).eq('language', sourceLanguage).eq('provider', provider).eq('mode', mode)
+        .select('*').single();
 
-      return json({ grammar: updated });
+      return json({ grammar: updated, explanation, errorCategories, matchCount: matches.length });
     } catch (error) {
       const msg = (error as Error).message || '';
-
-      // Mark as failed
-      const { data: failed } = await supabase
-        .from('segment_grammar')
-        .update({
-          status: 'failed',
-          error_code: msg,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('segment_id', seg.id)
-        .eq('language', seg.source_language)
-        .eq('provider', resolvedProvider)
-        .eq('mode', mode)
-        .select('*')
-        .single();
-
-      return json({ grammar: failed }, 200);
+      await supabase.from('segment_grammar')
+        .update({ status: 'failed', error_code: msg, updated_at: new Date().toISOString() })
+        .eq('segment_id', segId).eq('language', sourceLanguage).eq('provider', provider).eq('mode', mode);
+      return json({ grammar: null, error: msg }, 200);
     }
   } catch (error) {
     return json({ error: (error as Error).message || 'unknown_error' }, 500);
