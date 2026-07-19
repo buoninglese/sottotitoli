@@ -1,13 +1,13 @@
 /**
- * translate-segment — Server-side translation via Google Cloud Translation API.
- * Requires a Cloud Translation API key.
- * Secret: GOOGLE_TRANSLATE_API_KEY
+ * translate-segment — Server-side translation via Google Cloud Translation API + optional NLLB.
+ * Secrets: GOOGLE_TRANSLATE_API_KEY, HF_API_TOKEN (for NLLB)
  */
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 const API_KEY = Deno.env.get('GOOGLE_TRANSLATE_API_KEY') || '';
+const HF_API_TOKEN = Deno.env.get('HF_API_TOKEN') || '';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': 'https://buoninglese.github.io',
@@ -22,6 +22,41 @@ async function withTimeout<T>(promise: Promise<T>, ms = 10_000): Promise<T> {
   });
   try { return await Promise.race([promise, timeout]); }
   finally { if (timer !== undefined) clearTimeout(timer); }
+}
+
+async function translateWithNllb(
+  text: string,
+  sourceLanguage: string,
+  targetLanguage: string
+): Promise<string> {
+  if (!HF_API_TOKEN) throw new Error('translation_provider_not_configured');
+
+  const langMap: Record<string, string> = {
+    en: 'eng_Latn',
+    it: 'ita_Latn',
+  };
+  const src = langMap[sourceLanguage];
+  const tgt = langMap[targetLanguage];
+  if (!src || !tgt) throw new Error('translation_unsupported_language_pair');
+
+  const resp = await fetch(
+    'https://api-inference.huggingface.co/models/facebook/nllb-200-distilled-600M',
+    {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${HF_API_TOKEN}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        inputs: text,
+        parameters: { src_lang: src, tgt_lang: tgt },
+      }),
+    }
+  );
+
+  if (!resp.ok) throw new Error('translation_provider_unavailable');
+  const data = await resp.json();
+  return data?.[0]?.translation_text || '';
 }
 
 async function translateWithGoogleCloud(
@@ -73,8 +108,9 @@ Deno.serve(async (req: Request) => {
     );
     if (authError || !user) throw new Error('Unauthorized');
 
-    const { segmentId, targetLanguage } = await req.json();
+    const { segmentId, targetLanguage, provider: requestedProvider } = await req.json();
     if (!segmentId || !targetLanguage) throw new Error('segmentId and targetLanguage required');
+    const provider = requestedProvider || 'google';
 
     // Fetch the segment with room info
     const { data: segment, error: segError } = await supabase
@@ -100,18 +136,29 @@ Deno.serve(async (req: Request) => {
     let translatedText: string;
     let status = 'complete';
     let errorCode: string | null = null;
+    let providerTag = provider;
 
     if (segment.source_language === targetLanguage) {
       translatedText = segment.source_text;
     } else {
       try {
-        translatedText = await withTimeout(
-          translateWithGoogleCloud(
-            segment.source_text,
-            segment.source_language || 'en',
-            targetLanguage
-          )
-        );
+        if (provider === 'nllb') {
+          translatedText = await withTimeout(
+            translateWithNllb(
+              segment.source_text,
+              segment.source_language || 'en',
+              targetLanguage
+            )
+          );
+        } else {
+          translatedText = await withTimeout(
+            translateWithGoogleCloud(
+              segment.source_text,
+              segment.source_language || 'en',
+              targetLanguage
+            )
+          );
+        }
       } catch (e) {
         status = 'failed';
         const msg = (e as Error).message || '';
@@ -135,7 +182,7 @@ Deno.serve(async (req: Request) => {
         translated_text: translatedText || null,
         status: status,
         error_code: errorCode,
-        provider: 'google_cloud',
+        provider: providerTag,
         updated_at: new Date().toISOString(),
       }, {
         onConflict: 'segment_id, target_language',
