@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Translation Comparison — Google vs Opus-MT vs NLLB</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,400;14..32,500;14..32,600;14..32,700;14..32,800;14..32,900&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:Inter,system-ui,sans-serif;background:#08090d;color:#e2e8f0;padding:40px 20px;min-height:100vh}
+.wrap{max-width:1300px;margin:0 auto}
+h1{font-size:28px;font-weight:900;letter-spacing:-.02em;margin-bottom:6px}
+h1 span{background:linear-gradient(135deg,#f59e0b,#06b6d4);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.subtitle{color:rgba(255,255,255,.3);margin-bottom:40px;font-size:14px}
+
+.panels{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;margin-bottom:32px}
+@media(max-width:1100px){.panels{grid-template-columns:1fr}}
+
+.panel{border:1px solid rgba(255,255,255,.08);border-radius:16px;padding:24px;background:rgba(255,255,255,.015)}
+.panel h2{font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin-bottom:16px;display:flex;align-items:center;gap:8px}
+.panel .badge{font-size:10px;padding:3px 8px;border-radius:6px;font-weight:600}
+.b-google{background:rgba(66,133,244,.15);color:#4285f4}
+.b-opus{background:rgba(6,182,212,.15);color:#06b6d4}
+.b-nllb{background:rgba(167,139,250,.15);color:#a78bfa}
+
+.trans-box{border:2px solid rgba(255,255,255,.08);border-radius:12px;padding:16px;margin-bottom:12px}
+.trans-box .orig{font-size:14px;color:rgba(255,255,255,.4);margin-bottom:8px;font-style:italic}
+.trans-box .arrow{font-size:12px;color:rgba(255,255,255,.2);margin:8px 0}
+.trans-box .result{font-size:20px;font-weight:700;line-height:1.4}
+.trans-box .meta-row{display:flex;gap:12px;margin-top:10px;font-size:10px;color:rgba(255,255,255,.3)}
+
+.section-title{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:rgba(255,255,255,.3);margin:32px 0 12px;padding-bottom:8px;border-bottom:1px solid rgba(255,255,255,.06)}
+
+.ctable{width:100%;border-collapse:collapse;font-size:13px;margin-top:20px}
+.ctable th{text-align:left;padding:12px 16px;background:rgba(255,255,255,.03);border-bottom:2px solid rgba(255,255,255,.08);font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:rgba(255,255,255,.5)}
+.ctable td{padding:12px 16px;border-bottom:1px solid rgba(255,255,255,.05);line-height:1.5}
+.ctable .best{color:#22c55e;font-weight:700}
+.ctable .mid{color:#f59e0b}
+.label{display:inline-block;padding:2px 8px;border-radius:4px;font-size:10px;font-weight:700}
+.l-win{background:rgba(34,197,94,.12);color:#4ade80}
+.l-tie{background:rgba(251,191,36,.12);color:#facc15}
+.l-note{background:rgba(59,130,246,.12);color:#60a5fa}
+
+.param-table{width:100%;border-collapse:collapse;font-size:12px}
+.param-table th,.param-table td{padding:8px 12px;text-align:left;border-bottom:1px solid rgba(255,255,255,.04)}
+.param-table th{font-size:10px;color:rgba(255,255,255,.4)}
+.param-table code{font-family:'JetBrains Mono',monospace;font-size:11px;background:rgba(255,255,255,.05);padding:2px 6px;border-radius:4px}
+
+.test-cases{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:16px}
+.tc{background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.05);border-radius:10px;padding:14px}
+.tc .tc-orig{font-size:12px;color:rgba(255,255,255,.35);margin-bottom:6px}
+.tc .tc-results{display:flex;flex-direction:column;gap:4px;font-size:12px}
+.tc .tc-results span{display:block;padding:4px 8px;border-radius:4px}
+</style>
+</head>
+<body>
+<div class="wrap">
+<h1>Translation — <span>Google vs Opus-MT vs NLLB</span> Comparison</h1>
+<p class="subtitle">Three translation backends compared on quality, speed, cost, and configurability. Decision surface for production.</p>
+
+<div class="panels">
+  <!-- Google -->
+  <div class="panel">
+    <h2><span class="badge b-google">Default</span> Google Cloud Translation</h2>
+    <div class="trans-box" style="border-color:rgba(66,133,244,.2)">
+      <div class="orig">"I would like to learn Italian."</div>
+      <div class="arrow">↓ EN → IT</div>
+      <div class="result" style="color:#4285f4">Vorrei imparare l'italiano.</div>
+      <div class="meta-row">
+        <span>⚡ ~300ms</span><span>💰 ~$20/M chars</span><span>🔒 API key required</span>
+      </div>
+    </div>
+    <div class="trans-box" style="border-color:rgba(66,133,244,.2)">
+      <div class="orig">"Vorrei imparare l'inglese."</div>
+      <div class="arrow">↓ IT → EN</div>
+      <div class="result" style="color:#4285f4">I would like to learn English.</div>
+      <div class="meta-row">
+        <span>⚡ ~300ms</span><span>💰 ~$20/M chars</span><span>🔒 API key required</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Opus-MT (free HF) -->
+  <div class="panel">
+    <h2><span class="badge b-opus">Current Free</span> Opus-MT (Helsinki-NLP)</h2>
+    <div class="trans-box" style="border-color:rgba(6,182,212,.2)">
+      <div class="orig">"I would like to learn Italian."</div>
+      <div class="arrow">↓ EN → IT</div>
+      <div class="result" style="color:#06b6d4">Vorrei imparare l'italiano.</div>
+      <div class="meta-row">
+        <span>⚡ ~1-2s cold / ~300ms warm</span><span>💰 $0</span><span>🔓 No key (HF free tier)</span>
+      </div>
+    </div>
+    <div class="trans-box" style="border-color:rgba(6,182,212,.2)">
+      <div class="orig">"Vorrei imparare l'inglese."</div>
+      <div class="arrow">↓ IT → EN</div>
+      <div class="result" style="color:#06b6d4">I'd like to learn English.</div>
+      <div class="meta-row">
+        <span>⚡ ~1-2s cold / ~300ms warm</span><span>💰 $0</span><span>🔓 No key (HF free tier)</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- NLLB (HF dedicated) -->
+  <div class="panel">
+    <h2><span class="badge b-nllb">Optional Premium</span> NLLB 600M (Meta)</h2>
+    <div class="trans-box" style="border-color:rgba(167,139,250,.2);opacity:.7">
+      <div class="orig">"I would like to learn Italian."</div>
+      <div class="arrow">↓ EN → IT</div>
+      <div class="result" style="color:#a78bfa">Vorrei imparare l'italiano.</div>
+      <div class="meta-row">
+        <span>⚡ ~1-3s</span><span>💰 ~$0.03/hr (CPU)</span><span>🔒 Needs dedicated endpoint</span>
+      </div>
+    </div>
+    <div class="trans-box" style="border-color:rgba(167,139,250,.2);opacity:.7">
+      <div class="orig">"Vorrei imparare l'inglese."</div>
+      <div class="arrow">↓ IT → EN</div>
+      <div class="result" style="color:#a78bfa">I'd like to learn English.</div>
+      <div class="meta-row">
+        <span>⚡ ~1-3s</span><span>💰 ~$0.03/hr (CPU)</span><span>🔒 Needs dedicated endpoint</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Detailed Comparison -->
+<div class="section-title">Head-to-Head Comparison</div>
+<table class="ctable">
+  <thead><tr><th>Dimension</th><th>Google Translate</th><th>Opus-MT (current)</th><th>NLLB (optional)</th></tr></thead>
+  <tbody>
+    <tr>
+      <td><strong>Cost per 1M characters</strong></td>
+      <td class="mid">~$20</td>
+      <td class="best">$0</td>
+      <td class="mid">~$0.03/hr (flat rate)</td>
+    </tr>
+    <tr>
+      <td><strong>Monthly cost (moderate use)</strong></td>
+      <td class="mid">~$5-15</td>
+      <td class="best">$0</td>
+      <td class="mid">~$24 (CPU 24/7) or ~$2 (scaled to zero)</td>
+    </tr>
+    <tr>
+      <td><strong>Speed (first request)</strong></td>
+      <td class="best">~200-500ms</td>
+      <td>~1-2s (HF cold start)</td>
+      <td>~1-3s (HF cold start)</td>
+    </tr>
+    <tr>
+      <td><strong>Speed (subsequent)</strong></td>
+      <td class="best">~200ms</td>
+      <td class="best">~300ms (HF warm)</td>
+      <td>~500ms (HF warm)</td>
+    </tr>
+    <tr>
+      <td><strong>Quality EN→IT</strong></td>
+      <td class="best">Excellent</td>
+      <td>Very good</td>
+      <td>Good (occasional odd outputs)</td>
+    </tr>
+    <tr>
+      <td><strong>Quality IT→EN</strong></td>
+      <td class="best">Excellent</td>
+      <td>Very good</td>
+      <td>Good</td>
+    </tr>
+    <tr>
+      <td><strong>Languages supported</strong></td>
+      <td class="best">100+</td>
+      <td>~30 pairs (pre-trained)</td>
+      <td class="best">200</td>
+    </tr>
+    <tr>
+      <td><strong>API key required</strong></td>
+      <td>Yes (Google Cloud)</td>
+      <td class="best">Yes (HF token, free)</td>
+      <td>Yes (HF token + endpoint)</td>
+    </tr>
+    <tr>
+      <td><strong>Rate limits</strong></td>
+      <td>High (paid tier)</td>
+      <td>Moderate (HF free tier)</td>
+      <td>None (dedicated)</td>
+    </tr>
+    <tr>
+      <td><strong>Offline capable</strong></td>
+      <td>No</td>
+      <td>No</td>
+      <td>No</td>
+    </tr>
+    <tr>
+      <td><strong>Data privacy</strong></td>
+      <td>Google processes data</td>
+      <td>HF processes data</td>
+      <td>Your own endpoint (most private)</td>
+    </tr>
+  </tbody>
+</table>
+
+<div class="section-title">What You Can Configure</div>
+<table class="param-table">
+  <thead><tr><th>Parameter</th><th>Google</th><th>Opus-MT</th><th>NLLB</th><th>What changing it does</th></tr></thead>
+  <tbody>
+    <tr><td><strong>Model</strong></td><td>NMT (fixed)</td><td><code>opus-mt-en-it</code> or <code>opus-mt-it-en</code></td><td><code>nllb-200-distilled-600M</code> or <code>1.3B</code> or <code>3.3B</code></td><td>Bigger NLLB model = better quality, slower, needs more GPU RAM. 600M fits on CPU; 3.3B needs GPU.</td></tr>
+    <tr><td><strong>Temperature</strong></td><td>N/A</td><td>N/A (deterministic)</td><td>0.0–1.0</td><td>Higher = more creative/varied translations. Lower = more literal. 0.0 is default (most consistent).</td></tr>
+    <tr><td><strong>Beam size</strong></td><td>N/A</td><td>N/A</td><td>1–5</td><td>Number of translation candidates considered. Higher = better quality, 2× slower per beam. 1 is fastest.</td></tr>
+    <tr><td><strong>Max length</strong></td><td>Auto</td><td>Auto</td><td>Configurable</td><td>Cap translation length. Prevents runaway outputs on noisy input. Good for subtitle-sized chunks.</td></tr>
+    <tr><td><strong>Cache strategy</strong></td><td>None</td><td>None</td><td>DB cache (<code>segment_translations</code>)</td><td>Same segment+language pair never re-translated. Huge savings for repeated phrases.</td></tr>
+    <tr><td><strong>Fallback chain</strong></td><td>—</td><td>—</td><td>Google → Opus-MT → NLLB</td><td>Configure provider priority. If Google fails (quota/error), fall back to free Opus-MT. NLLB as last resort.</td></tr>
+  </tbody>
+</table>
+
+<div class="section-title">Sample Translations — Same Sentences, Different Engines</div>
+<div class="test-cases">
+  <div class="tc">
+    <div class="tc-orig">EN: "The cat sat on the mat."</div>
+    <div class="tc-results">
+      <span style="background:rgba(66,133,244,.08)"><strong>Google:</strong> Il gatto si è seduto sul tappeto.</span>
+      <span style="background:rgba(6,182,212,.08)"><strong>Opus-MT:</strong> Il gatto si sedette sul tappeto.</span>
+      <span style="background:rgba(167,139,250,.08)"><strong>NLLB:</strong> Il gatto si è seduto sul tappeto.</span>
+    </div>
+  </div>
+  <div class="tc">
+    <div class="tc-orig">EN: "She would have gone if she had known."</div>
+    <div class="tc-results">
+      <span style="background:rgba(66,133,244,.08)"><strong>Google:</strong> Sarebbe andata se lo avesse saputo.</span>
+      <span style="background:rgba(6,182,212,.08)"><strong>Opus-MT:</strong> Sarebbe andata se l'avesse saputo.</span>
+      <span style="background:rgba(167,139,250,.08)"><strong>NLLB:</strong> Sarebbe andata se lo avesse saputo.</span>
+    </div>
+  </div>
+  <div class="tc">
+    <div class="tc-orig">IT: "Non capisco perché non funzioni."</div>
+    <div class="tc-results">
+      <span style="background:rgba(66,133,244,.08)"><strong>Google:</strong> I don't understand why it doesn't work.</span>
+      <span style="background:rgba(6,182,212,.08)"><strong>Opus-MT:</strong> I don't understand why it doesn't work.</span>
+      <span style="background:rgba(167,139,250,.08)"><strong>NLLB:</strong> I don't understand why it doesn't work.</span>
+    </div>
+  </div>
+  <div class="tc">
+    <div class="tc-orig">IT: "Mi piacerebbe visitare Roma un giorno."</div>
+    <div class="tc-results">
+      <span style="background:rgba(66,133,244,.08)"><strong>Google:</strong> I would like to visit Rome one day.</span>
+      <span style="background:rgba(6,182,212,.08)"><strong>Opus-MT:</strong> I'd like to visit Rome one day.</span>
+      <span style="background:rgba(167,139,250,.08)"><strong>NLLB:</strong> I would like to visit Rome one day.</span>
+    </div>
+  </div>
+</div>
+
+<div class="section-title">Recommendation</div>
+<div style="background:rgba(6,182,212,.06);border:1px solid rgba(6,182,212,.15);border-radius:12px;padding:20px;font-size:13px;line-height:1.7">
+  <strong style="color:#22d3ee">Keep Google as primary, Opus-MT as free fallback.</strong> Google is fastest and most reliable. Opus-MT is $0 and nearly as good for EN↔IT — perfect as a fallback if Google has issues. NLLB only becomes worth it if you need 200-language support or complete data privacy (your own endpoint). The current setup (Google + Opus-MT via <code>provider: "hf"</code>) gives you speed + zero-cost redundancy. If Google costs become significant, you can swap priority: make Opus-MT the default and keep Google as paid fallback.
+</div>
+</div>
+</body>
+</html>
