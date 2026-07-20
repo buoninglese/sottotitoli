@@ -79,29 +79,31 @@ Deno.serve(async (req: Request) => {
       roomId = seg.room_id;
       sourceLanguage = seg.source_language;
     } else {
-      // Direct text mode: no DB segment needed, use text hash as cache key
+      // Direct text mode: no DB segment needed — call LanguageTool directly, skip DB cache
       sourceText = directText;
-      const hashBuf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(sourceText));
-      const hashHex = Array.from(new Uint8Array(hashBuf)).map(b => b.toString(16).padStart(2,'0')).join('');
-      segId = hashHex.substring(0, 32);
-      roomId = '00000000-0000-0000-0000-000000000000';
+      segId = ''; // signal: no DB persistence
+      roomId = '';
+      sourceLanguage = 'en';
     }
 
-    // Check cache
-    const { data: existing } = await supabase
-      .from('segment_grammar').select('*')
-      .eq('segment_id', segId).eq('language', sourceLanguage)
-      .eq('provider', provider).eq('mode', mode).maybeSingle();
-    if (existing && existing.status === 'complete') {
-      return json({ grammar: existing });
-    }
+    // Only use DB cache for real segments (not direct text)
+    if (segId && segId.length === 36) {
+      // Check cache
+      const { data: existing } = await supabase
+        .from('segment_grammar').select('*')
+        .eq('segment_id', segId).eq('language', sourceLanguage)
+        .eq('provider', provider).eq('mode', mode).maybeSingle();
+      if (existing && existing.status === 'complete') {
+        return json({ grammar: existing });
+      }
 
-    // Insert pending
-    await supabase.from('segment_grammar').upsert({
-      segment_id: segId, room_id: roomId, language: sourceLanguage,
-      provider, mode, original_text: sourceText, status: 'pending',
-      updated_at: new Date().toISOString(),
-    }, { onConflict: 'segment_id, language, provider, mode' });
+      // Insert pending
+      await supabase.from('segment_grammar').upsert({
+        segment_id: segId, room_id: roomId, language: sourceLanguage,
+        provider, mode, original_text: sourceText, status: 'pending',
+        updated_at: new Date().toISOString(),
+      }, { onConflict: 'segment_id, language, provider, mode' });
+    }
 
     try {
       const ltResp = await fetch('https://api.languagetool.org/v2/check', {
@@ -124,18 +126,28 @@ Deno.serve(async (req: Request) => {
         errorCategories = [...new Set(matches.map(m => m.rule.category.name))];
       }
 
-      const { data: updated } = await supabase
-        .from('segment_grammar')
-        .update({ corrected_text: correctedText, status: 'complete', error_code: null, updated_at: new Date().toISOString() })
-        .eq('segment_id', segId).eq('language', sourceLanguage).eq('provider', provider).eq('mode', mode)
-        .select('*').single();
+      // Only persist to DB for real segments
+      if (segId && segId.length === 36) {
+        const { data: updated } = await supabase
+          .from('segment_grammar')
+          .update({ corrected_text: correctedText, status: 'complete', error_code: null, updated_at: new Date().toISOString() })
+          .eq('segment_id', segId).eq('language', sourceLanguage).eq('provider', provider).eq('mode', mode)
+          .select('*').single();
+        return json({ grammar: updated, explanation, errorCategories, matchCount: matches.length });
+      }
 
-      return json({ grammar: updated, explanation, errorCategories, matchCount: matches.length });
+      // Direct text mode: return result without persisting
+      return json({
+        grammar: { original_text: sourceText, corrected_text: correctedText, status: 'complete', provider, mode },
+        explanation, errorCategories, matchCount: matches.length
+      });
     } catch (error) {
       const msg = (error as Error).message || '';
-      await supabase.from('segment_grammar')
-        .update({ status: 'failed', error_code: msg, updated_at: new Date().toISOString() })
-        .eq('segment_id', segId).eq('language', sourceLanguage).eq('provider', provider).eq('mode', mode);
+      if (segId && segId.length === 36) {
+        await supabase.from('segment_grammar')
+          .update({ status: 'failed', error_code: msg, updated_at: new Date().toISOString() })
+          .eq('segment_id', segId).eq('language', sourceLanguage).eq('provider', provider).eq('mode', mode);
+      }
       return json({ grammar: null, error: msg }, 200);
     }
   } catch (error) {
