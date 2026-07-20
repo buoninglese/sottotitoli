@@ -2829,15 +2829,7 @@ function downloadCEFRPDF(){
 // ── Vocab POS Stack ──
 function _updateVocabPosStack() {
   var stack = document.getElementById('vocabPosStack'); if (!stack) return;
-  // Non-English guard — POS/CEFR only works for English
-  var capEl = document.getElementById('captionTranscript');
-  var firstLine = capEl ? capEl.querySelector('.line') : null;
-  if (firstLine && firstLine.getAttribute('data-lang') !== 'en' && firstLine.getAttribute('data-lang')) {
-    stack.innerHTML = '<div style="text-align:center;padding:30px;color:var(--muted2);font-size:13px">📋 POS tagging only available for English.<br><span style="font-size:11px">Use slide 3 (Word Meaning) for vocabulary.</span></div>';
-    var cefrBars = document.getElementById('cefrBars');
-    if (cefrBars) cefrBars.innerHTML = '<div style="text-align:center;padding:30px;color:var(--muted2);font-size:13px">📊 CEFR levels only available for English.</div>';
-    return;
-  }
+  // Note: slides 2 and 4 are hidden via slide navigation for non-English
   var lines = document.querySelectorAll('#captionTranscript .line');
   var posMap = {}; var posOrder = ['NOUN','VERB','ADJ','ADV','PREP','CONJ','PRON','AUX'];
   var posNames = {NOUN:'Nouns',VERB:'Verbs',ADJ:'Adjectives',ADV:'Adverbs',PREP:'Prepositions',CONJ:'Conjunctions',PRON:'Pronouns',AUX:'Auxiliaries'};
@@ -3054,20 +3046,22 @@ setCaptionMode(saved);
 
   // Apply language-specific visibility
   S8T_LANG.resolve(S8T_LANG.readRoomConfig()).then(function(ls){
-    if (ls.content_language !== 'en') {
-      // Hide slides 2 (Vocabulary) and 4 (Live Analysis) — only English
+    if (ls.content_language && ls.content_language !== 'en') {
+      // Non-English: hide slides 2 (Vocabulary) and 4 (Live Analysis)
       visibleIndices = [0,2,4]; // Captions, Word Meaning, Grammar Fix
-      // Re-number dots: show 1,2,3 instead of 1,3,5
-      document.querySelectorAll('.slide-dot').forEach(function(d){
-        var realI = parseInt(d.getAttribute('data-slide'));
-        if (!visibleIndices.includes(realI)) d.style.display = 'none';
-        else {
-          // Renumber: 1st visible = 1, 2nd = 2, 3rd = 3
-          var newNum = visibleIndices.indexOf(realI) + 1;
-          d.textContent = newNum;
-        }
-      });
     }
+    // English: keep all 5 (visibleIndices already [0,1,2,3,4])
+    document.querySelectorAll('.slide-dot').forEach(function(d){
+      var realI = parseInt(d.getAttribute('data-slide'));
+      d.style.display = visibleIndices.includes(realI) ? '' : 'none';
+      if (visibleIndices.includes(realI)) {
+        d.textContent = visibleIndices.indexOf(realI) + 1;
+      }
+    });
+    updateDots();
+    goTo(0);
+  }).catch(function(){
+    // Fallback: show all 5 slides
     updateDots();
     goTo(0);
   });
