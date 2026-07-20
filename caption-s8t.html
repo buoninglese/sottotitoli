@@ -311,6 +311,10 @@ body {
 .transcript-line-box .tline { padding: clamp(4px,.6vw,7px) clamp(6px,1vw,10px); border-radius: 5px; cursor: pointer; font-size: var(--grammar-fs, clamp(10px,1.1vw,14px)); color: var(--muted); border-bottom: 1px solid var(--line); transition: all .15s; display: flex; gap: 8px; align-items: baseline; }
 .transcript-line-box .tline:hover { background: rgba(56,189,248,.05); }
 .transcript-line-box .tline .ts { color: var(--blue); font-size: clamp(9px,.85vw,11px); flex-shrink: 0; min-width: 48px; text-align: right; }
+.tline-grammar { opacity: 0; font-size: 10px; cursor: pointer; margin-left: 6px; flex-shrink: 0; transition: opacity .15s; }
+.tline:hover .tline-grammar { opacity: .4; }
+.tline-grammar:hover { opacity: 1 !important; transform: scale(1.2); }
+.tline-grammar.checked { opacity: .7; color: var(--accent); }
 
 /* ═══ APP MAIN — fills remaining space below topbar ═══ */
 .app-main { flex: 1; min-height: 0; position: relative; background: var(--bg); }
@@ -2135,7 +2139,7 @@ function _updateGrammarLines() {
       div.className = 'tline';
       div.setAttribute('onclick', '_slideLineClick(this)');
       div.setAttribute('data-text', text.replace(/"/g, '&quot;'));
-      div.innerHTML = '<span class="ts">' + tsText + '</span>' + text;
+      div.innerHTML = '<span class="ts">' + tsText + '</span><span class="tline-grammar" onclick="event.stopPropagation();_checkGrammarInline(this)" title="Check grammar">✍️</span>' + text;
       box.appendChild(div);
     }
     // Trim excess from top
@@ -2163,7 +2167,7 @@ function _updateGrammarLines() {
       div.className = 'tline';
       div.setAttribute('onclick', '_s4LineClick(this)');
       div.setAttribute('data-text', txt.replace(/"/g, '&quot;'));
-      div.innerHTML = '<span class="ts">' + tsText + '</span>' + txt;
+      div.innerHTML = '<span class="ts">' + tsText + '</span><span class="tline-grammar" onclick="event.stopPropagation();_checkGrammarInline(this)" title="Check grammar">✍️</span>' + txt;
       box4.appendChild(div);
     }
     var tlines4 = box4.querySelectorAll('.tline');
@@ -2187,7 +2191,7 @@ function _updateGrammarLines() {
       div5.className = 'tline';
       div5.setAttribute('onclick', '_s5LineClick(this)');
       div5.setAttribute('data-text', txt2.replace(/\"/g, '&quot;'));
-      div5.innerHTML = '<span class=\"ts\">' + tsText2 + '</span>' + txt2;
+      div5.innerHTML = '<span class=\"ts\">' + tsText2 + '</span><span class="tline-grammar" onclick="event.stopPropagation();_checkGrammarInline(this)" title="Check grammar">✍️</span>' + txt2;
       box5.appendChild(div5);
     }
     var tlines5 = box5.querySelectorAll('.tline');
@@ -2485,6 +2489,97 @@ function _s5LineClick(el) {
     if (explEl) explEl.textContent = 'Could not reach grammar service.';
   });
 }
+
+// ── Save grammar error to error bank ──
+window.saveGrammarError = async function() {
+  var btn = document.getElementById('grammarSaveBtn');
+  if (!btn || btn.disabled) return;
+  var original = btn.getAttribute('data-original') || '';
+  var corrected = btn.getAttribute('data-corrected') || '';
+  var explanation = btn.getAttribute('data-explanation') || '';
+  if (!original || !corrected) return;
+
+  var sb = window.sottotitoliSupabase;
+  if (!sb) { alert('Sign in to save errors.'); return; }
+
+  var r = await sb.auth.getSession();
+  if (!r.data || !r.data.session) { alert('Sign in to save errors.'); return; }
+
+  btn.disabled = true;
+  btn.textContent = 'Saving…';
+
+  var { error } = await sb.from('grammar_errors').insert({
+    user_id: r.data.session.user.id,
+    language: 'en',
+    original_text: original,
+    corrected_text: corrected,
+    explanation: explanation || null
+  });
+
+  if (error) {
+    btn.textContent = '⚠️ Failed';
+    btn.disabled = false;
+    console.error('saveGrammarError:', error);
+  } else {
+    btn.textContent = '✓ Saved';
+    btn.style.background = 'rgba(34,197,94,.15)';
+    btn.style.color = '#22c55e';
+    btn.style.borderColor = 'rgba(34,197,94,.3)';
+    setTimeout(function() {
+      btn.textContent = '💾 Save to Error Bank';
+      btn.style.background = '';
+      btn.style.color = '';
+      btn.style.borderColor = '';
+      btn.disabled = true;
+    }, 2000);
+  }
+};
+
+// ── Inline grammar check from any transcript line (Mode 4) ──
+window._checkGrammarInline = async function(icon) {
+  var line = icon.closest('.tline');
+  if (!line) return;
+  var text = line.getAttribute('data-text') || '';
+  if (!text) return;
+
+  // Visual feedback
+  icon.textContent = '⏳';
+  icon.style.opacity = '1';
+
+  var sb = window.sottotitoliSupabase;
+  if (!sb) { icon.textContent = '✍️'; return; }
+
+  try {
+    var res = await sb.functions.invoke('grammar-segment', {
+      body: { text: text, mode: 'fix_grammar' }
+    });
+    if (res.error) throw new Error(res.error.message || res.error);
+    var data = res.data;
+    var grammar = data.grammar;
+    if (!grammar || grammar.status === 'failed') { icon.textContent = '⚠️'; return; }
+
+    // Remove any existing correction annotation
+    var existing = line.querySelector('.tline-correction');
+    if (existing) existing.remove();
+
+    if (grammar.corrected_text && grammar.corrected_text !== text) {
+      // Show corrected version below the line
+      var corr = document.createElement('div');
+      corr.className = 'tline-correction';
+      corr.style.cssText = 'font-size:11px;color:var(--accent);padding:2px 0 2px 56px;line-height:1.4;border-bottom:1px solid var(--line);background:rgba(6,182,212,.04)';
+      corr.textContent = '→ ' + grammar.corrected_text;
+      line.after(corr);
+      icon.classList.add('checked');
+      icon.textContent = '✓';
+    } else {
+      icon.textContent = '✓';
+      icon.classList.add('checked');
+    }
+  } catch(err) {
+    icon.textContent = '⚠️';
+    console.error('_checkGrammarInline:', err);
+  }
+};
 
 function _s4LineClick(el) {
   // Highlight selected line in slide 4
