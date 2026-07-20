@@ -1,7 +1,8 @@
 /**
  * grammar-segment — Server-side grammar correction.
- * Uses Llama 3.1/3.3/4 via HF Inference Providers for 7 languages.
- * Fallback: LanguageTool for English only.
+ * Uses Llama via HF Inference Providers. Language-agnostic:
+ * content_language = language of text to analyze
+ * explanation_language = language to write explanations in
  */
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
@@ -17,37 +18,40 @@ const corsHeaders = {
 };
 
 function json(data: unknown, status = 200) {
-  return new Response(JSON.stringify(data), {
-    status, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-  });
+  return new Response(JSON.stringify(data), { status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
 }
 
-// ── LLM grammar — 7 languages ──
-const PROMPTS: Record<string, string> = {
-  en: 'Fix this English sentence. Rules:\n- Fix punctuation, capitalization, and missing apostrophes SILENTLY — do NOT list these as errors.\n- Only explain REAL grammar mistakes (verb tense, word order, prepositions, articles, subject-verb agreement, etc).\n- If there are multiple grammar errors, list ALL of them.\n- Return JSON: {"corrected":"...","explanations":["error 1","error 2"]}. If only silent fixes, return empty explanations array.\n\nSentence: ',
-  it: 'Correggi questa frase italiana. Regole:\n- Correggi punteggiatura, maiuscole e apostrofi in SILENZIO — non elencarli.\n- Spiega solo VERI errori grammaticali (coniugazioni, preposizioni, articoli, concordanza, etc).\n- Più errori = elencali TUTTI.\n- Restituisci JSON: {"corrected":"...","explanations":["errore 1","errore 2"]}.\n\nFrase: ',
-  fr: 'Corrige cette phrase française. Règles:\n- Corrige ponctuation, majuscules et apostrophes en SILENCE — ne les liste PAS.\n- Explique uniquement les VRAIES erreurs (conjugaison, accords, prépositions, articles).\n- Erreurs multiples = liste-les TOUTES.\n- Retourne JSON: {"corrected":"...","explanations":["erreur 1","erreur 2"]}.\n\nPhrase: ',
-  de: 'Korrigiere diesen deutschen Satz. Regeln:\n- Korrigiere Zeichensetzung, Großschreibung und Apostrophe STILLSCHWEIGEND.\n- Erkläre nur ECHTE Grammatikfehler (Konjugation, Wortstellung, Präpositionen, Artikel, Kasus).\n- Mehrere Fehler = ALLE auflisten.\n- JSON: {"corrected":"...","explanations":["Fehler 1","Fehler 2"]}.\n\nSatz: ',
-  es: 'Corrige esta frase en español. Reglas:\n- Corrige puntuación, mayúsculas y apóstrofes en SILENCIO.\n- Explica solo ERRORES reales (conjugación, concordancia, preposiciones, artículos).\n- Múltiples errores = enuméralos TODOS.\n- JSON: {"corrected":"...","explanations":["error 1","error 2"]}.\n\nFrase: ',
-  nl: 'Corrigeer deze Nederlandse zin. Regels:\n- Corrigeer interpunctie, hoofdletters en apostrofs STILZWIJGEND.\n- Leg alleen ECHTE grammaticafouten uit (vervoeging, woordvolgorde, voorzetsels, lidwoorden).\n- Meerdere fouten = ALLEMAAL vermelden.\n- JSON: {"corrected":"...","explanations":["fout 1","fout 2"]}.\n\nZin: ',
-  pl: 'Popraw tę polską frazę. Zasady:\n- Popraw interpunkcję, wielkie litery i apostrofy PO CICHU.\n- Wyjaśniaj tylko PRAWDZIWE błędy (koniugacja, przypadki, przyimki, rodzaj).\n- Wiele błędów = wymień WSZYSTKIE.\n- JSON: {"corrected":"...","explanations":["błąd 1","błąd 2"]}.\n\nFraza: ',
-};
+// ── Dynamic prompt builder — no hardcoded languages ──
+function buildPrompt(text: string, contentLang: string, explanationLang: string): string {
+  const LANG_NAMES: Record<string, string> = {
+    en:'English',it:'Italian',fr:'French',de:'German',es:'Spanish',nl:'Dutch',pl:'Polish'
+  };
+  const contentName = LANG_NAMES[contentLang] || contentLang;
+  const explName = LANG_NAMES[explanationLang] || explanationLang;
 
-async function grammarWithLLM(text: string, language: string, modelId?: string): Promise<{
+  return `Analyze this ${contentName} sentence for grammar errors. Rules:
+- Fix punctuation, capitalization, and missing apostrophes SILENTLY — do NOT list these as errors.
+- Only explain REAL grammar mistakes (verb tense, conjugation, word order, prepositions, articles, agreement, gender, case, etc).
+- If there are multiple grammar errors, list ALL of them.
+- Write ALL explanations in ${explName}.
+- Return a JSON object with:
+  "corrected": the fully fixed sentence (including silent punctuation/capitalization fixes)
+  "explanations": an array of strings in ${explName}, each describing one grammar error in one short sentence. If there are only silent fixes, return an empty array.
+
+Sentence: ${text}`;
+}
+
+// ── LLM call ──
+async function grammarWithLLM(text: string, contentLang: string, explanationLang: string, modelId?: string): Promise<{
   corrected: string; explanations: string[];
 }> {
-  const prefix = PROMPTS[language] || PROMPTS['en'];
+  const prompt = buildPrompt(text, contentLang, explanationLang);
   const model = modelId || DEFAULT_MODEL;
 
   const resp = await fetch('https://router.huggingface.co/v1/chat/completions', {
     method: 'POST',
     headers: { 'Authorization': `Bearer ${HF_API_TOKEN}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      model,
-      messages: [{ role: 'user', content: prefix + text }],
-      max_tokens: 200, temperature: 0,
-      response_format: { type: 'json_object' },
-    }),
+    body: JSON.stringify({ model, messages: [{ role: 'user', content: prompt }], max_tokens: 200, temperature: 0, response_format: { type: 'json_object' } }),
   });
   if (!resp.ok) throw new Error(`llm_error_${resp.status}`);
 
@@ -63,15 +67,8 @@ async function grammarWithLLM(text: string, language: string, modelId?: string):
 }
 
 // ── LanguageTool fallback (English only) ──
-interface LTMatch {
-  message: string; replacements: { value: string }[];
-  offset: number; length: number;
-  rule: { category: { name: string } };
-}
-
-async function grammarWithLanguageTool(text: string): Promise<{
-  corrected: string; explanation: string | null; categories: string[];
-}> {
+interface LTMatch { message: string; replacements: { value: string }[]; offset: number; length: number; rule: { category: { name: string } }; }
+async function grammarWithLanguageTool(text: string): Promise<{ corrected: string; explanation: string | null; }> {
   const resp = await fetch('https://api.languagetool.org/v2/check', {
     method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: new URLSearchParams({ text, language: 'en-US' }),
@@ -84,10 +81,8 @@ async function grammarWithLanguageTool(text: string): Promise<{
     const sorted = [...matches].filter(m => m.replacements?.length).sort((a, b) => b.offset - a.offset);
     for (const m of sorted) corrected = corrected.substring(0, m.offset) + m.replacements[0].value + corrected.substring(m.offset + m.length);
   }
-  const explanation = matches.length > 0
-    ? matches.map(m => `• ${m.message}${m.replacements?.length ? ' → "' + m.replacements[0].value + '"' : ''} (${m.rule.category.name})`).join('\n')
-    : null;
-  return { corrected, explanation, categories: [...new Set(matches.map(m => m.rule.category.name))] };
+  const explanation = matches.length > 0 ? matches.map(m => `• ${m.message}${m.replacements?.length ? ' → "' + m.replacements[0].value + '"' : ''} (${m.rule.category.name})`).join('\n') : null;
+  return { corrected, explanation };
 }
 
 // ── Main ──
@@ -96,39 +91,41 @@ Deno.serve(async (req: Request) => {
   try {
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) throw new Error('Missing Authorization header');
-
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
     const { data: { user }, error: authError } = await supabase.auth.getUser(authHeader.replace('Bearer ', ''));
     if (authError || !user) throw new Error('Unauthorized');
 
-    const { segmentId, text: directText, language = 'en', mode = 'fix_grammar', provider: reqProvider, llama_model } = await req.json();
+    const { segmentId, text: directText, content_language, explanation_language, mode = 'fix_grammar', provider: reqProvider, model: reqModel } = await req.json();
     if (!segmentId && !directText) throw new Error('segmentId or text required');
 
-    const sourceText: string = segmentId
+    const sourceText = segmentId
       ? (await supabase.from('transcript_segments').select('source_text,source_language').eq('id', segmentId).single()).data?.source_text || ''
       : directText;
     if (!sourceText) throw new Error('No text to check');
 
-    const lang = segmentId
-      ? (await supabase.from('transcript_segments').select('source_language').eq('id', segmentId).single()).data?.source_language || 'en'
-      : language;
+    // Resolve content language: segment's language → explicit param → default
+    const contentLang = segmentId
+      ? (await supabase.from('transcript_segments').select('source_language').eq('id', segmentId).single()).data?.source_language || content_language || 'en'
+      : content_language || 'en';
+    const explLang = explanation_language || 'en';
+    const model = reqModel || DEFAULT_MODEL;
+    const provider = reqProvider || 'llama31';
 
-    const modelId = llama_model || DEFAULT_MODEL;
     let result: { corrected: string; explanations: string[] };
     let usedProvider: string;
 
-    if (reqProvider === 'languagetool' && lang === 'en') {
+    if (provider === 'languagetool' && contentLang === 'en') {
       const lt = await grammarWithLanguageTool(sourceText);
       result = { corrected: lt.corrected, explanations: lt.explanation ? [lt.explanation] : [] };
       usedProvider = 'languagetool';
     } else {
       try {
-        const llm = await grammarWithLLM(sourceText, lang, modelId);
+        const llm = await grammarWithLLM(sourceText, contentLang, explLang, model);
         result = llm;
-        usedProvider = modelId.includes('3.3') ? 'llama33' : modelId.includes('4-') ? 'llama4' : 'llama31';
+        usedProvider = model.includes('3.3') ? 'llama33' : model.includes('4-') ? 'llama4' : 'llama31';
       } catch (llmErr) {
         console.warn('LLM failed, fallback:', llmErr);
-        if (lang === 'en') {
+        if (contentLang === 'en') {
           try {
             const lt = await grammarWithLanguageTool(sourceText);
             result = { corrected: lt.corrected, explanations: lt.explanation ? [lt.explanation] : [] };
@@ -144,9 +141,7 @@ Deno.serve(async (req: Request) => {
 
     return json({
       grammar: { original_text: sourceText, corrected_text: result.corrected, status: 'complete', provider: usedProvider, mode },
-      explanation: explanationText,
-      errorCategories: [],
-      matchCount: result.corrected !== sourceText ? 1 : 0,
+      explanation: explanationText, errorCategories: [], matchCount: result.corrected !== sourceText ? 1 : 0,
     });
   } catch (error) {
     return json({ error: (error as Error).message || 'unknown_error' }, 500);
