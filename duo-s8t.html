@@ -388,6 +388,29 @@ body{background:radial-gradient(circle at top left,rgba(255,255,255,.35),transpa
   function init(){
     // Parse URL params
     parseURLParams();
+
+    // Guests must log in before joining a room
+    if (!DUO.isHost) {
+      var sb = window.sottotitoliSupabase;
+      if (sb) {
+        sb.auth.getSession().then(function(r){
+          if (!r.data?.session) {
+            // Save invite URL and redirect to login
+            localStorage.setItem('sottotitoli_return_page', window.location.pathname + window.location.search);
+            window.location.replace('index.html?auth=required');
+            return;
+          }
+          // Logged in — continue init
+          initAfterAuth();
+        });
+        return; // Wait for async auth check
+      }
+    }
+
+    initAfterAuth();
+  }
+
+  function initAfterAuth(){
     // Room ID
     DUO.roomId = localStorage.getItem('duo-room-id') || ('duo-'+Math.random().toString(36).substring(2,8));
     localStorage.setItem('duo-room-id', DUO.roomId);
