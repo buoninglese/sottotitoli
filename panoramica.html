@@ -6445,7 +6445,80 @@
   .modal-close{position:absolute;top:14px;right:18px;width:36px;height:36px;border-radius:50%;border:1.5px solid var(--line);background:var(--card);color:var(--text-soft);font-size:20px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .15s;font-family:var(--font-ui)}
   .modal-close:hover{background:var(--line);color:var(--text)}
   @media(max-width:600px){.modal-panel{padding:24px 20px}}
+  .model-select-row{display:flex;align-items:center;gap:8px;margin-top:10px;padding-top:10px;border-top:1px solid var(--line);font-size:11px;color:var(--muted2)}
+  .model-select-row select{padding:4px 8px;border-radius:6px;border:1px solid var(--line);background:var(--card);color:var(--text);font-size:11px;font-family:Inter,sans-serif;cursor:pointer}
 </style>
+
+<script>
+// ═══ Override Start Session: 7 languages + Llama model selector ═══
+(function(){
+  var LANGUAGES = [
+    {code:'en',flag:'🇬🇧',name:'English'},
+    {code:'it',flag:'🇮🇹',name:'Italiano'},
+    {code:'fr',flag:'🇫🇷',name:'Français'},
+    {code:'de',flag:'🇩🇪',name:'Deutsch'},
+    {code:'es',flag:'🇪🇸',name:'Español'},
+    {code:'nl',flag:'🇳🇱',name:'Nederlands'},
+    {code:'pl',flag:'🇵🇱',name:'Polski'}
+  ];
+
+  var LLAMA_MODELS = [
+    {id:'meta-llama/Llama-3.1-8B-Instruct',label:'Llama 3.1 8B (fast, cheap)'},
+    {id:'meta-llama/Llama-3.3-70B-Instruct',label:'Llama 3.3 70B (better quality)'},
+    {id:'meta-llama/Llama-4-Scout-17B-16E-Instruct',label:'Llama 4 Scout 17B (latest)'}
+  ];
+
+  // Override the shared ssFlags
+  window._ssFlagsOverride = LANGUAGES;
+
+  // Replace spinner grids with our languages
+  setTimeout(function(){
+    // Override the theme-2.js spinner by redefining ssFlags
+    if (typeof ssFlags !== 'undefined') {
+      ssFlags.length = 0;
+      LANGUAGES.forEach(function(l){ ssFlags.push(l); });
+      // Update any displayed flags
+      updSSFlags();
+    }
+
+    // Add Llama model selector to both start halves
+    var modelHTML = '<div class="model-select-row">🧠 Model: <select id="llamaModelSelect" onchange="localStorage.setItem(\'sottotitoli-llama-model\',this.value)">' +
+      LLAMA_MODELS.map(function(m,i){ return '<option value="'+m.id+'"'+(i===0?' selected':'')+'>'+m.label+'</option>'; }).join('') +
+      '</select></div>';
+
+    var capHalf = document.querySelector('.start-half.caption');
+    var trHalf = document.querySelector('.start-half.translate');
+    if (capHalf) { var btn = capHalf.querySelector('.start-btn'); if (btn) btn.insertAdjacentHTML('beforebegin', modelHTML); }
+    // Restore saved model preference
+    var saved = localStorage.getItem('sottotitoli-llama-model');
+    if (saved) { var sel = document.getElementById('llamaModelSelect'); if (sel) sel.value = saved; }
+    // Also set on any duplicate (translate side)
+    if (trHalf) { var trBtn = trHalf.querySelector('.start-btn'); if (trBtn) trBtn.insertAdjacentHTML('beforebegin', modelHTML); }
+
+    // Fix routing: Caption → caption-s8t.html, Translation → duo-s8t.html
+    var capBtn = document.querySelector('.start-half.caption .start-btn');
+    var trBtn2 = document.querySelector('.start-half.translate .start-btn');
+    if (capBtn) {
+      capBtn.onclick = function(){
+        var lang = (ssCapCode || 'en');
+        localStorage.setItem('sottotitoli-caption-lang', lang);
+        localStorage.setItem('sottotitoli-room-lang', lang);
+        window.location.href = 'caption-s8t.html?lang=' + lang;
+      };
+    }
+    if (trBtn2) {
+      trBtn2.onclick = function(){
+        var src = (ssSrcCode || 'en');
+        var tgt = (ssTgtCode || 'it');
+        localStorage.setItem('sottotitoli-caption-lang', src);
+        localStorage.setItem('sottotitoli-room-lang', src);
+        localStorage.setItem('duo-bridging','a1');
+        window.location.href = 'duo-s8t.html?src=' + src + '&tgt=' + tgt;
+      };
+    }
+  }, 300);
+})();
+</script>
 
 </body>
 </html>
