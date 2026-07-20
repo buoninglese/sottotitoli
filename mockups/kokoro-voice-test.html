@@ -56,8 +56,9 @@ audio{display:none}
 </head>
 <body>
 <div class="wrap">
-<h1>Kokoro-82M <span>Voice Test</span> <span style="font-size:14px;color:var(--t3);font-weight:500;margin-left:12px;vertical-align:middle">v2</span></h1>
-<p class="sub">All {{VOICE_COUNT}} voices across {{LANG_COUNT}} languages · Click a voice to generate TTS with your text</p>
+<h1>Kokoro-82M <span>Voice Test</span> <span style="font-size:14px;color:var(--t3);font-weight:500;margin-left:12px;vertical-align:middle">v3</span></h1>
+<p class="sub">⚠️ Kokoro-82M requires a <a href="https://fal.ai" style="color:var(--accent)">fal.ai</a> API key — not available via free HF Inference.
+<br>This page now uses your browser's built-in Web Speech API (free, instant). <span id="voiceCount"></span></p>
 
 <div class="status-bar">
   <span class="status-dot" id="statusDot"></span>
@@ -80,142 +81,49 @@ audio{display:none}
 <div id="voiceSections"></div>
 </div>
 
-<script src="../config.js"></script>
 <script>
-// ═══ KOKORO VOICE TEST ═══
-var HF_TOKEN = (window.SOTTOTITOLI_CONFIG && window.SOTTOTITOLI_CONFIG.kokoroToken) || prompt('Enter HF token:');
-var API_URL = 'https://api-inference.huggingface.co/models/hexgrad/Kokoro-82M';
+// ═══ VOICE TEST v3 — Browser Web Speech API ═══
+// Note: Kokoro-82M requires fal.ai key. This uses browser's built-in speechSynthesis.
 
-// All voices from VOICES.md
-var VOICES = {
-  'American English': {
-    lang_code: 'a', flag: '🇺🇸',
-    voices: [
-      {id:'af_heart',   gender:'female', grade:'A',   desc:'❤️ Best overall'},
-      {id:'af_alloy',   gender:'female', grade:'B',   desc:''},
-      {id:'af_aoede',   gender:'female', grade:'C+',  desc:''},
-      {id:'af_bella',   gender:'female', grade:'A-',  desc:'🔥 Popular'},
-      {id:'af_jessica', gender:'female', grade:'D',   desc:''},
-      {id:'af_kore',    gender:'female', grade:'C+',  desc:''},
-      {id:'af_nicole',  gender:'female', grade:'B-',  desc:'🎧'},
-      {id:'af_nova',    gender:'female', grade:'C',   desc:''},
-      {id:'af_river',   gender:'female', grade:'D',   desc:''},
-      {id:'af_sarah',   gender:'female', grade:'C+',  desc:''},
-      {id:'af_sky',     gender:'female', grade:'C-',  desc:''},
-      {id:'am_adam',    gender:'male',   grade:'F+',  desc:''},
-      {id:'am_echo',    gender:'male',   grade:'D',   desc:''},
-      {id:'am_eric',    gender:'male',   grade:'D',   desc:''},
-      {id:'am_fenrir',  gender:'male',   grade:'C+',  desc:''},
-      {id:'am_liam',    gender:'male',   grade:'D',   desc:''},
-      {id:'am_michael', gender:'male',   grade:'C+',  desc:''},
-      {id:'am_onyx',    gender:'male',   grade:'D',   desc:''},
-      {id:'am_puck',    gender:'male',   grade:'C+',  desc:''},
-      {id:'am_santa',   gender:'male',   grade:'D-',  desc:''},
-    ]
-  },
-  'British English': {
-    lang_code: 'b', flag: '🇬🇧',
-    voices: [
-      {id:'bf_alice',    gender:'female', grade:'D', desc:''},
-      {id:'bf_emma',     gender:'female', grade:'B-', desc:''},
-      {id:'bf_isabella', gender:'female', grade:'C', desc:''},
-      {id:'bf_lily',     gender:'female', grade:'D', desc:''},
-      {id:'bm_daniel',   gender:'male',   grade:'D', desc:''},
-      {id:'bm_fable',    gender:'male',   grade:'C', desc:''},
-      {id:'bm_george',   gender:'male',   grade:'C', desc:''},
-      {id:'bm_lewis',    gender:'male',   grade:'D+', desc:''},
-    ]
-  },
-  'Italian': {
-    lang_code: 'i', flag: '🇮🇹',
-    voices: [
-      {id:'if_sara',  gender:'female', grade:'C', desc:''},
-      {id:'im_nicola',gender:'male',   grade:'C', desc:''},
-    ]
-  },
-  'Spanish': {
-    lang_code: 'e', flag: '🇪🇸',
-    voices: [
-      {id:'ef_dora',  gender:'female', grade:'', desc:''},
-      {id:'em_alex',  gender:'male',   grade:'', desc:''},
-      {id:'em_santa', gender:'male',   grade:'', desc:''},
-    ]
-  },
-  'French': {
-    lang_code: 'f', flag: '🇫🇷',
-    voices: [
-      {id:'ff_siwis', gender:'female', grade:'B-', desc:''},
-    ]
-  },
-  'Japanese': {
-    lang_code: 'j', flag: '🇯🇵',
-    voices: [
-      {id:'jf_alpha',      gender:'female', grade:'C+', desc:''},
-      {id:'jf_gongitsune', gender:'female', grade:'C', desc:'gongitsune'},
-      {id:'jf_nezumi',     gender:'female', grade:'C-', desc:'nezuminoyomeiri'},
-      {id:'jf_tebukuro',   gender:'female', grade:'C', desc:'tebukurowokaini'},
-      {id:'jm_kumo',       gender:'male',   grade:'C-', desc:'kumonoito'},
-    ]
-  },
-  'Mandarin Chinese': {
-    lang_code: 'z', flag: '🇨🇳',
-    voices: [
-      {id:'zf_xiaobei',  gender:'female', grade:'D', desc:''},
-      {id:'zf_xiaoni',   gender:'female', grade:'D', desc:''},
-      {id:'zf_xiaoxiao', gender:'female', grade:'D', desc:''},
-      {id:'zf_xiaoyi',   gender:'female', grade:'D', desc:''},
-      {id:'zm_yunjian',  gender:'male',   grade:'D', desc:''},
-      {id:'zm_yunxi',    gender:'male',   grade:'D', desc:''},
-      {id:'zm_yunxia',   gender:'male',   grade:'D', desc:''},
-      {id:'zm_yunyang',  gender:'male',   grade:'D', desc:''},
-    ]
-  },
-  'Hindi': {
-    lang_code: 'h', flag: '🇮🇳',
-    voices: [
-      {id:'hf_alpha', gender:'female', grade:'C', desc:''},
-      {id:'hf_beta',  gender:'female', grade:'C', desc:''},
-      {id:'hm_omega', gender:'male',   grade:'C', desc:''},
-      {id:'hm_psi',   gender:'male',   grade:'C', desc:''},
-    ]
-  },
-  'Brazilian Portuguese': {
-    lang_code: 'p', flag: '🇧🇷',
-    voices: [
-      {id:'pf_dora',  gender:'female', grade:'', desc:''},
-      {id:'pm_alex',  gender:'male',   grade:'', desc:''},
-      {id:'pm_santa', gender:'male',   grade:'', desc:''},
-    ]
-  }
-};
+var VOICES_BY_LANG = {};
+var currentUtterance = null;
 
-var totalVoices = 0;
-var totalLangs = Object.keys(VOICES).length;
-Object.values(VOICES).forEach(function(l){ totalVoices += l.voices.length; });
-document.querySelector('.sub').textContent = totalVoices+' voices across '+totalLangs+' languages · Click a ▶ button to generate TTS';
-
-var currentAudio = null;
+function loadVoices(){
+  var all = speechSynthesis.getVoices();
+  if (!all.length) { speechSynthesis.onvoiceschanged = loadVoices; return; }
+  VOICES_BY_LANG = {};
+  all.forEach(function(v){
+    var lang = v.lang.split('-')[0];
+    var langName = {en:'English',it:'Italiano',fr:'Français',de:'Deutsch',es:'Español',ja:'日本語',zh:'中文',pt:'Português',nl:'Nederlands',pl:'Polski',hi:'Hindi'}[lang] || v.lang;
+    if (!VOICES_BY_LANG[langName]) VOICES_BY_LANG[langName] = [];
+    VOICES_BY_LANG[langName].push({id:v.name, label:v.name+' ('+v.lang+')', gender:v.name.toLowerCase().indexOf('female')!==-1?'female':'male', voice:v});
+  });
+  renderAll();
+}
 
 function renderAll(){
   var html = '';
-  Object.keys(VOICES).forEach(function(langName){
-    var lang = VOICES[langName];
+  var totalVoices = 0;
+  var langs = Object.keys(VOICES_BY_LANG).sort();
+  langs.forEach(function(langName){
+    var voices = VOICES_BY_LANG[langName];
+    totalVoices += voices.length;
     html += '<div class="lang-section">';
-    html += '<div class="lang-head"><span class="flag">'+lang.flag+'</span> '+langName+' <span class="count">('+lang.voices.length+' voices, lang_code='+lang.lang_code+')</span></div>';
+    html += '<div class="lang-head"><span class="flag">🗣️</span> '+langName+' <span class="count">('+voices.length+' voices)</span></div>';
     html += '<div class="voice-grid">';
-    lang.voices.forEach(function(v){
+    voices.forEach(function(v){
       var dotClass = v.gender === 'female' ? 'female' : 'male';
-      var gradeInfo = v.grade ? 'Grade: '+v.grade : '';
-      var descInfo = v.desc ? ' '+v.desc : '';
       html += '<div class="voice-card">';
       html += '<span class="v-dot '+dotClass+'"></span>';
-      html += '<div class="v-info"><div class="v-name">'+v.id.replace(/_/g,' ')+'</div><div class="v-id">'+v.id+'</div><div class="v-grade">'+gradeInfo+descInfo+'</div></div>';
-      html += '<button class="v-play" data-voice="'+v.id+'" data-lang="'+lang.lang_code+'" onclick="playVoice(this,\''+v.id+'\',\''+lang.lang_code+'\')" title="Play">▶</button>';
+      html += '<div class="v-info"><div class="v-name">'+v.label+'</div><div class="v-id">'+v.id+'</div></div>';
+      html += '<button class="v-play" data-voice="'+v.id.replace(/"/g,'&quot;')+'" data-lang="'+v.voice.lang+'" onclick="playVoice(this)" title="Play">▶</button>';
       html += '</div>';
     });
     html += '</div></div>';
   });
   document.getElementById('voiceSections').innerHTML = html;
+  document.getElementById('voiceCount').textContent = totalVoices+' browser voices found';
+  updateStatus('ok', 'Ready — '+totalVoices+' voices');
 }
 
 function updateStatus(state, msg){
@@ -226,107 +134,48 @@ function updateStatus(state, msg){
 }
 
 function stopAllAudio(){
-  if (currentAudio) { currentAudio.pause(); currentAudio.remove(); currentAudio = null; }
+  if (currentUtterance) { speechSynthesis.cancel(); currentUtterance = null; }
   document.querySelectorAll('.v-play').forEach(function(b){ b.className = 'v-play'; b.textContent = '▶'; });
   updateStatus('ok', 'Stopped');
 }
 
-async function playVoice(btn, voiceId, langCode){
+function playVoice(btn){
   stopAllAudio();
-  btn.className = 'v-play loading';
-  btn.textContent = '⏳';
-  updateStatus('wait', 'Generating '+voiceId+'... (model may need to warm up)');
-
+  var voiceName = btn.getAttribute('data-voice');
+  var lang = btn.getAttribute('data-lang');
   var text = document.getElementById('ttsText').value.trim();
-  if (!text) { updateStatus('err', 'Enter text first'); btn.className = 'v-play'; btn.textContent = '▶'; return; }
+  if (!text) { updateStatus('err', 'Enter text first'); return; }
 
-  var speed = parseFloat(document.getElementById('speed').value) || 1.0;
+  // Find the voice object
+  var allVoices = speechSynthesis.getVoices();
+  var voice = allVoices.find(function(v){ return v.name === voiceName; });
+  if (!voice) { updateStatus('err', 'Voice not found: '+voiceName); return; }
 
-  try {
-    // Kokoro-82M HF Inference API — try with parameters first
-    var response = await fetch(API_URL, {
-      method: 'POST',
-      headers: {
-        'Authorization': 'Bearer ' + HF_TOKEN,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        inputs: text,
-        parameters: { voice: voiceId, speed: speed }
-      })
-    });
+  btn.className = 'v-play done';
+  btn.textContent = '🔊';
+  updateStatus('wait', 'Speaking: '+voiceName+'...');
 
-    // If model is loading (cold start), wait and retry
-    if (response.status === 503) {
-      var retryAfter = 15;
-      updateStatus('wait', 'Model loading (cold start), retrying in '+retryAfter+'s...');
-      btn.textContent = '⏳';
-      await new Promise(function(r){ setTimeout(r, retryAfter*1000); });
-      response = await fetch(API_URL, {
-        method: 'POST',
-        headers: {
-          'Authorization': 'Bearer ' + HF_TOKEN,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          inputs: text,
-          parameters: { voice: voiceId, speed: speed }
-        })
-      });
-    }
+  var utterance = new SpeechSynthesisUtterance(text);
+  utterance.voice = voice;
+  utterance.lang = lang;
+  utterance.rate = parseFloat(document.getElementById('speed').value) || 1.0;
+  utterance.pitch = 1.0;
+  utterance.volume = 1.0;
 
-    if (!response.ok) {
-      var errText = await response.text();
-      // Try fallback: just inputs without parameters
-      if (response.status === 400 || response.status === 422) {
-        updateStatus('wait', 'Retrying without parameters...');
-        response = await fetch(API_URL, {
-          method: 'POST',
-          headers: {
-            'Authorization': 'Bearer ' + HF_TOKEN,
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({ inputs: text })
-        });
-        if (!response.ok) {
-          throw new Error('HTTP '+response.status+': '+ (await response.text()).substring(0,200));
-        }
-      } else {
-        throw new Error('HTTP '+response.status+': '+errText.substring(0,200));
-      }
-    }
+  utterance.onstart = function(){ updateStatus('ok', 'Playing: '+voiceName); };
+  utterance.onend = function(){
+    btn.className = 'v-play'; btn.textContent = '▶';
+    currentUtterance = null;
+    updateStatus('ok', 'Done');
+  };
+  utterance.onerror = function(e){
+    btn.className = 'v-play'; btn.textContent = '⚠';
+    currentUtterance = null;
+    updateStatus('err', 'Error: '+(e.error||'unknown'));
+  };
 
-    var blob = await response.blob();
-    var url = URL.createObjectURL(blob);
-    var audio = new Audio(url);
-    currentAudio = audio;
-
-    btn.className = 'v-play done';
-    btn.textContent = '🔊';
-
-    audio.onended = function(){
-      btn.className = 'v-play';
-      btn.textContent = '▶';
-      currentAudio = null;
-      URL.revokeObjectURL(url);
-    };
-
-    audio.onerror = function(){
-      btn.className = 'v-play';
-      btn.textContent = '▶';
-      currentAudio = null;
-      updateStatus('err', 'Playback error');
-    };
-
-    await audio.play();
-    updateStatus('ok', 'Playing: '+voiceId+' ('+langCode+')');
-
-  } catch(e) {
-    console.error('Kokoro TTS error:', e);
-    btn.className = 'v-play';
-    btn.textContent = '⚠';
-    updateStatus('err', 'Error: '+e.message);
-  }
+  currentUtterance = utterance;
+  speechSynthesis.speak(utterance);
 }
 
 // Speed slider
@@ -334,8 +183,8 @@ document.getElementById('speed').addEventListener('input', function(){
   document.getElementById('speedVal').textContent = parseFloat(this.value).toFixed(1)+'x';
 });
 
-renderAll();
-updateStatus('ok', 'Ready — '+totalVoices+' voices loaded');
+loadVoices();
+updateStatus('ok', 'Loading browser voices…');
 </script>
 </body>
 </html>
