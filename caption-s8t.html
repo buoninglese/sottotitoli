@@ -1864,6 +1864,48 @@ function _fetchWordData(word, cardId) {
   var relEl = card.querySelector('.syn-rel');
   var posEl = card.querySelector('.syn-pos-tag');
 
+  // Route non-English through vocab-lookup edge function
+  S8T_LANG.resolve(S8T_LANG.readRoomConfig()).then(function(ls) {
+    if (ls.content_language !== 'en') {
+      _fetchWordViaLLM(word, cardId, ls);
+      return;
+    }
+    _fetchWordEnglish(word, cardId, defEl, relEl, posEl);
+  });
+}
+
+// ── Non-English: vocab-lookup edge function ──
+function _fetchWordViaLLM(word, cardId, langSettings) {
+  var card = document.getElementById(cardId);
+  if (!card) return;
+  var defEl = card.querySelector('.syn-def');
+  var relEl = card.querySelector('.syn-rel');
+  var posEl = card.querySelector('.syn-pos-tag');
+  var sb = window.sottotitoliSupabase;
+  if (!sb) { if (defEl) defEl.textContent = 'Sign in required.'; return; }
+
+  sb.functions.invoke('vocab-lookup', {
+    body: { language: langSettings.content_language, explanation_language: langSettings.explanation_language, text: word, model: langSettings.model }
+  }).then(function(res) {
+    if (res.error || !res.data || !res.data.entry) {
+      if (defEl) defEl.textContent = 'Definition unavailable.';
+      return;
+    }
+    var entry = res.data.entry;
+    if (defEl) defEl.textContent = entry.definition || 'No definition found.';
+    if (posEl) posEl.textContent = entry.pos || '—';
+    if (relEl && entry.synonyms && entry.synonyms.length) {
+      relEl.innerHTML = entry.synonyms.map(function(s) {
+        return '<span onclick="lookupSynonym(this)" data-word="' + s + '" data-context="' + word + '" style="cursor:pointer;font-size:11px;font-weight:600;padding:3px 8px;border-radius:100px;border:1px solid rgba(52,211,153,.2);color:#34d399;background:rgba(52,211,153,.06);margin:2px">' + s + '</span>';
+      }).join('');
+    }
+  }).catch(function(err) {
+    if (defEl) defEl.textContent = 'Error: ' + (err.message || 'unknown');
+  });
+}
+
+// ── English: existing Datamuse + Free Dictionary path ──
+function _fetchWordEnglish(word, cardId, defEl, relEl, posEl) {
   // 1. Try Datamuse (definitions — fast, free, no auth)
   var dmUrl = 'https://api.datamuse.com/words?sp=' + encodeURIComponent(word) + '&md=d&max=1';
   try {
@@ -2787,6 +2829,15 @@ function downloadCEFRPDF(){
 // ── Vocab POS Stack ──
 function _updateVocabPosStack() {
   var stack = document.getElementById('vocabPosStack'); if (!stack) return;
+  // Non-English guard — POS/CEFR only works for English
+  var capEl = document.getElementById('captionTranscript');
+  var firstLine = capEl ? capEl.querySelector('.line') : null;
+  if (firstLine && firstLine.getAttribute('data-lang') !== 'en' && firstLine.getAttribute('data-lang')) {
+    stack.innerHTML = '<div style="text-align:center;padding:30px;color:var(--muted2);font-size:13px">📋 POS tagging only available for English.<br><span style="font-size:11px">Use slide 3 (Word Meaning) for vocabulary.</span></div>';
+    var cefrBars = document.getElementById('cefrBars');
+    if (cefrBars) cefrBars.innerHTML = '<div style="text-align:center;padding:30px;color:var(--muted2);font-size:13px">📊 CEFR levels only available for English.</div>';
+    return;
+  }
   var lines = document.querySelectorAll('#captionTranscript .line');
   var posMap = {}; var posOrder = ['NOUN','VERB','ADJ','ADV','PREP','CONJ','PRON','AUX'];
   var posNames = {NOUN:'Nouns',VERB:'Verbs',ADJ:'Adjectives',ADV:'Adverbs',PREP:'Prepositions',CONJ:'Conjunctions',PRON:'Pronouns',AUX:'Auxiliaries'};
