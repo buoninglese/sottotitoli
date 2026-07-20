@@ -1,57 +1,33 @@
-// js/kokoro-tts.js — Kokoro-82M TTS via HuggingFace Inference API
-// Shared module for all pages that need text-to-speech
+// js/kokoro-tts.js — Text-to-speech via browser Web Speech API
+// Note: Kokoro-82M via HuggingFace API is not available (requires fal.ai key).
+// This module uses the browser's built-in speechSynthesis for instant, free TTS.
 (function(global){
   'use strict';
 
-  var HF_TOKEN = (window.SOTTOTITOLI_CONFIG && window.SOTTOTITOLI_CONFIG.kokoroToken) || '';
-  var API_URL = 'https://api-inference.huggingface.co/models/hexgrad/Kokoro-82M';
-
-  // Default voice per language (overridable via settings)
+  // Default voice preferences per language (stored in localStorage)
   var DEFAULTS = {
-    en: { voice: 'af_heart', lang_code: 'a' },  // American English female
-    it: { voice: 'if_sara',  lang_code: 'i' },  // Italian female
+    en: 'Samantha',
+    it: 'Alice',
   };
 
-  // All available voices grouped by language
-  var VOICE_MAP = {
-    'en-US': [
-      {id:'af_heart',label:'❤️ Heart (F)'},{id:'af_bella',label:'🔥 Bella (F)'},
-      {id:'af_alloy',label:'Alloy (F)'},{id:'af_aoede',label:'Aoede (F)'},
-      {id:'af_jessica',label:'Jessica (F)'},{id:'af_kore',label:'Kore (F)'},
-      {id:'af_nicole',label:'🎧 Nicole (F)'},{id:'af_nova',label:'Nova (F)'},
-      {id:'af_river',label:'River (F)'},{id:'af_sarah',label:'Sarah (F)'},
-      {id:'af_sky',label:'Sky (F)'},
-      {id:'am_adam',label:'Adam (M)'},{id:'am_echo',label:'Echo (M)'},
-      {id:'am_eric',label:'Eric (M)'},{id:'am_fenrir',label:'Fenrir (M)'},
-      {id:'am_liam',label:'Liam (M)'},{id:'am_michael',label:'Michael (M)'},
-      {id:'am_onyx',label:'Onyx (M)'},{id:'am_puck',label:'Puck (M)'},
-      {id:'am_santa',label:'Santa (M)'},
-    ],
-    'en-GB': [
-      {id:'bf_alice',label:'Alice (F)'},{id:'bf_emma',label:'Emma (F)'},
-      {id:'bf_isabella',label:'Isabella (F)'},{id:'bf_lily',label:'Lily (F)'},
-      {id:'bm_daniel',label:'Daniel (M)'},{id:'bm_fable',label:'Fable (M)'},
-      {id:'bm_george',label:'George (M)'},{id:'bm_lewis',label:'Lewis (M)'},
-    ],
-    'it': [
-      {id:'if_sara',label:'Sara (F)'},{id:'im_nicola',label:'Nicola (M)'},
-    ]
-  };
+  // Available browser voices by language (discovered at runtime)
+  var _browserVoices = [];
 
-  var currentAudio = null;
+  function _loadVoices(){
+    var voices = speechSynthesis.getVoices();
+    if (voices.length) { _browserVoices = voices; return; }
+    // Chrome loads voices async
+    speechSynthesis.onvoiceschanged = function(){
+      _browserVoices = speechSynthesis.getVoices();
+    };
+  }
+  _loadVoices();
 
   function getVoiceForLang(lang) {
     var key = 'kokoro-voice-' + (lang || 'en');
     var saved = localStorage.getItem(key);
     if (saved) return saved;
-    var def = DEFAULTS[lang] || DEFAULTS['en'];
-    return def.voice;
-  }
-
-  function getLangCodeForVoice(voiceId) {
-    var prefix = voiceId.substring(0, 2);
-    var map = {af:'a', am:'a', bf:'b', bm:'b', if:'i', im:'i', ef:'e', em:'e', ff:'f', jf:'j', jm:'j', zf:'z', zm:'z', hf:'h', hm:'h', pf:'p', pm:'p'};
-    return map[prefix] || 'a';
+    return DEFAULTS[lang] || DEFAULTS['en'];
   }
 
   function setVoiceForLang(lang, voiceId) {
@@ -60,79 +36,70 @@
   }
 
   function getVoiceList(lang) {
-    // Normalize: en-US → en, it-IT → it
     var base = (lang || 'en').split('-')[0].toLowerCase();
-    if (base === 'en') {
-      return (VOICE_MAP['en-US'] || []).concat(VOICE_MAP['en-GB'] || []);
-    }
-    return VOICE_MAP[base] || VOICE_MAP['en-US'] || [];
+    var allVoices = speechSynthesis.getVoices();
+    if (!allVoices.length) allVoices = _browserVoices;
+    // Filter voices matching the language
+    var matches = allVoices.filter(function(v){
+      return v.lang.toLowerCase().indexOf(base) === 0;
+    });
+    if (!matches.length) matches = allVoices;
+    return matches.map(function(v){
+      return { id: v.name, label: v.name + ' (' + v.lang + ')', voice: v };
+    });
   }
 
-  async function speak(text, options) {
+  function _findVoice(lang, preferredName){
+    var allVoices = speechSynthesis.getVoices();
+    if (!allVoices.length) allVoices = _browserVoices;
+    var base = (lang || 'en').split('-')[0].toLowerCase();
+    // Try preferred voice first
+    if (preferredName) {
+      var match = allVoices.find(function(v){ return v.name === preferredName; });
+      if (match) return match;
+    }
+    // Fall back to any voice in this language
+    var langMatch = allVoices.find(function(v){ return v.lang.toLowerCase().indexOf(base) === 0; });
+    if (langMatch) return langMatch;
+    // Fall back to first available voice
+    return allVoices[0] || null;
+  }
+
+  function speak(text, options) {
     var opts = options || {};
     var lang = opts.lang || 'en';
-    var voice = opts.voice || getVoiceForLang(lang);
-    var speed = opts.speed || 1.0;
+    var preferredVoice = opts.voice || getVoiceForLang(lang);
+    var rate = opts.speed || 1.0;
     var onStart = opts.onStart || null;
     var onEnd = opts.onEnd || null;
     var onError = opts.onError || null;
 
     if (!text) return;
-
-    // Stop any current playback
-    stop();
-
-    try {
-      var response = await fetch(API_URL, {
-        method: 'POST',
-        headers: {
-          'Authorization': 'Bearer ' + HF_TOKEN,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          inputs: text,
-          parameters: { voice: voice, speed: speed }
-        })
-      });
-
-      if (!response.ok) {
-        var errText = await response.text();
-        throw new Error('HTTP ' + response.status + ': ' + errText.substring(0, 200));
-      }
-
-      var blob = await response.blob();
-      var url = URL.createObjectURL(blob);
-      var audio = new Audio(url);
-      currentAudio = audio;
-
-      if (onStart) onStart();
-
-      audio.onended = function(){
-        currentAudio = null;
-        URL.revokeObjectURL(url);
-        if (onEnd) onEnd();
-      };
-
-      audio.onerror = function(){
-        currentAudio = null;
-        URL.revokeObjectURL(url);
-        if (onError) onError(new Error('Playback failed'));
-      };
-
-      await audio.play();
-
-    } catch(e) {
-      console.warn('Kokoro TTS error:', e.message);
-      if (onError) onError(e);
+    if (!window.speechSynthesis) {
+      if (onError) onError(new Error('Speech synthesis not supported'));
+      return;
     }
+
+    // Cancel any current speech
+    speechSynthesis.cancel();
+
+    var utterance = new SpeechSynthesisUtterance(text);
+    var voice = _findVoice(lang, preferredVoice);
+    if (voice) utterance.voice = voice;
+    utterance.lang = lang;
+    utterance.rate = rate;
+    utterance.pitch = 1.0;
+    utterance.volume = 1.0;
+
+    if (onStart) utterance.onstart = onStart;
+    if (onEnd) utterance.onend = onEnd;
+    if (onError) utterance.onerror = function(e){ onError(new Error(e.error || 'Speech error')); };
+
+    speechSynthesis.speak(utterance);
   }
 
   function stop(){
-    if (currentAudio) {
-      currentAudio.pause();
-      currentAudio.remove();
-      currentAudio = null;
-    }
+    if (window.speechSynthesis) speechSynthesis.cancel();
   }
 
   // Build a speaker button element
@@ -169,7 +136,6 @@
     getVoiceForLang: getVoiceForLang,
     setVoiceForLang: setVoiceForLang,
     getVoiceList: getVoiceList,
-    getLangCodeForVoice: getLangCodeForVoice,
     createSpeakerButton: createSpeakerButton,
     DEFAULTS: DEFAULTS
   };
