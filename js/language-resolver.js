@@ -57,8 +57,8 @@ var S8T_LANG = (function() {
     var profile = await loadProfile();
     var rc = roomConfig || {};
 
-    // Content language: room config → profile native → default
-    var contentLang = rc.caption_lang || profile.native_lang || DEFAULT_LANG;
+    // Content language: room config → URL param → default English
+    var contentLang = rc.caption_lang || DEFAULT_LANG;
 
     // Explanation language: profile preference → profile native → default
     var explanationLang = profile.explanation_language || profile.native_lang || DEFAULT_LANG;
