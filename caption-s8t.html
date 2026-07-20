@@ -3021,31 +3021,71 @@ setCaptionMode(saved);
   var panels=document.querySelectorAll('.h-panel');
   var scrollEl=document.getElementById('modeScroll');
   var total=panels.length,idx=0;
+  var visibleIndices = [0,1,2,3,4]; // panel indices that are visible (adjusted per language)
 
   function goTo(i){
-    if(i<0||i>=total)return;
+    if(i<0||i>=visibleIndices.length)return;
+    var realIdx = visibleIndices[i];
     panels.forEach(function(p){p.style.opacity='0';p.style.transition='opacity .12s'});
     setTimeout(function(){
-      idx=i;scrollEl.scrollLeft=i*scrollEl.clientWidth;updateDots();
+      idx=i;scrollEl.scrollLeft=realIdx*scrollEl.clientWidth;updateDots();
       setTimeout(function(){panels.forEach(function(p){p.style.opacity='1'})},30);
     },130);
   }
 
   function updateDots(){
-    document.querySelectorAll('.slide-dot').forEach(function(d,i){d.classList.toggle('active',i===idx)});
-    var titles=['Captions','Vocabulary','Word Meaning','Live Analysis','Grammar Fix'];
-    var el=document.getElementById('slideTitleOverlay');if(el)el.textContent=titles[idx]||'';
+    var allDots = document.querySelectorAll('.slide-dot');
+    var titles = ['Captions','Vocabulary','Word Meaning','Live Analysis','Grammar Fix'];
+
+    allDots.forEach(function(d,i){
+      var realI = parseInt(d.getAttribute('data-slide'));
+      d.style.display = visibleIndices.includes(realI) ? '' : 'none';
+    });
+
+    // Update active state on visible dots only
+    var visibleDots = document.querySelectorAll('.slide-dot:not([style*=\"display: none\"])');
+    visibleDots.forEach(function(d,i){d.classList.toggle('active',i===idx)});
+
+    // Show correct title
+    var realIdx = visibleIndices[idx] !== undefined ? visibleIndices[idx] : 0;
+    var el=document.getElementById('slideTitleOverlay');
+    if(el)el.textContent=titles[realIdx]||'';
   }
 
+  // Apply language-specific visibility
+  S8T_LANG.resolve(S8T_LANG.readRoomConfig()).then(function(ls){
+    if (ls.content_language !== 'en') {
+      // Hide slides 2 (Vocabulary) and 4 (Live Analysis) — only English
+      visibleIndices = [0,2,4]; // Captions, Word Meaning, Grammar Fix
+      // Re-number dots: show 1,2,3 instead of 1,3,5
+      document.querySelectorAll('.slide-dot').forEach(function(d){
+        var realI = parseInt(d.getAttribute('data-slide'));
+        if (!visibleIndices.includes(realI)) d.style.display = 'none';
+        else {
+          // Renumber: 1st visible = 1, 2nd = 2, 3rd = 3
+          var newNum = visibleIndices.indexOf(realI) + 1;
+          d.textContent = newNum;
+        }
+      });
+    }
+    updateDots();
+    goTo(0);
+  });
+
   document.querySelectorAll('.slide-dot').forEach(function(dot){
-    dot.addEventListener('click',function(){goTo(parseInt(this.getAttribute('data-slide')))});
+    dot.addEventListener('click',function(){
+      var realSlide = parseInt(this.getAttribute('data-slide'));
+      var visIdx = visibleIndices.indexOf(realSlide);
+      if (visIdx >= 0) goTo(visIdx);
+    });
   });
 
   var scrollTicking=false;
   scrollEl.addEventListener('scroll',function(){
     if(!scrollTicking){requestAnimationFrame(function(){
-      var newIdx=Math.round(scrollEl.scrollLeft/scrollEl.clientWidth);
-      if(newIdx!==idx&&newIdx>=0&&newIdx<total){idx=newIdx;updateDots();}
+      var rawIdx = Math.round(scrollEl.scrollLeft/scrollEl.clientWidth);
+      var visIdx = visibleIndices.indexOf(rawIdx);
+      if(visIdx!==idx&&visIdx>=0){idx=visIdx;updateDots();}
       scrollTicking=false;
     });scrollTicking=true;}
   },{passive:true});
@@ -3057,11 +3097,11 @@ setCaptionMode(saved);
 
   panels.forEach(function(p){p.style.transition='opacity .12s'});
   scrollEl.style.scrollBehavior='auto';
-  goTo(0);
 
-  // Fix: restore scroll position on resize (narrow→wide breaks snap)
+  // Fix: restore scroll position on resize
   window.addEventListener('resize',function(){
-    scrollEl.scrollLeft=idx*scrollEl.clientWidth;
+    var realIdx = visibleIndices[idx] !== undefined ? visibleIndices[idx] : 0;
+    scrollEl.scrollLeft=realIdx*scrollEl.clientWidth;
   });
 })();
 
