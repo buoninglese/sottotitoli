@@ -14,6 +14,34 @@ var S8T_LANG = (function() {
   var DEFAULT_PROVIDER = 'llama31';
   var DEFAULT_LANG = 'en';
 
+  // ── Model selection per language ──
+  // NL and PL use Llama 3.3 70B (better quality for those languages)
+  // EN uses Llama 3.1 + LanguageTool fallback
+  // All others use Llama 3.1
+  var MODEL_PER_LANG = {
+    nl: 'meta-llama/Llama-3.3-70B-Instruct',
+    pl: 'meta-llama/Llama-3.3-70B-Instruct',
+  };
+  var PROVIDER_PER_LANG = {
+    nl: 'llama33',
+    pl: 'llama33',
+  };
+  var MODEL_LABELS = {
+    'meta-llama/Llama-3.1-8B-Instruct': 'Llama 3.1',
+    'meta-llama/Llama-3.3-70B-Instruct': 'Llama 3.3',
+    'meta-llama/Llama-4-Scout-17B-16E-Instruct': 'Llama 4',
+  };
+
+  function getModelForLanguage(lang) {
+    return MODEL_PER_LANG[lang] || DEFAULT_MODEL;
+  }
+  function getProviderForLanguage(lang) {
+    return PROVIDER_PER_LANG[lang] || DEFAULT_PROVIDER;
+  }
+  function getModelLabel(modelId) {
+    return MODEL_LABELS[modelId] || modelId.split('/').pop();
+  }
+
   // ── Cached profile data ──
   var _profile = null;       // { native_lang, explanation_language, ai_model, ai_provider }
   var _profileLoaded = false;
@@ -35,8 +63,8 @@ var S8T_LANG = (function() {
     // Explanation language: profile preference → profile native → default
     var explanationLang = profile.explanation_language || profile.native_lang || DEFAULT_LANG;
 
-    var model = profile.ai_model || DEFAULT_MODEL;
-    var provider = profile.ai_provider || DEFAULT_PROVIDER;
+    var model = profile.ai_model || getModelForLanguage(contentLang);
+    var provider = profile.ai_provider || getProviderForLanguage(contentLang);
 
     return {
       content_language: contentLang,
@@ -163,6 +191,9 @@ var S8T_LANG = (function() {
     readRoomConfig: readRoomConfig,
     saveRoomConfig: saveRoomConfig,
     savePreference: savePreference,
+    getModelForLanguage: getModelForLanguage,
+    getProviderForLanguage: getProviderForLanguage,
+    getModelLabel: getModelLabel,
     DEFAULT_MODEL: DEFAULT_MODEL,
     DEFAULT_PROVIDER: DEFAULT_PROVIDER,
     DEFAULT_LANG: DEFAULT_LANG,
