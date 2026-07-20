@@ -4571,18 +4571,20 @@
           var wordLen = word.length;
           var wordFontSize = wordLen <= 6 ? '28px' : wordLen <= 8 ? '22px' : wordLen <= 11 ? '17px' : '14px';
 
-          html += '<article class="wbx-box" data-word="'+word+'" data-wid="'+w.id+'" style="border-left:3px solid '+ringColor+'">'+
+          var statusLine = (isNew ? '🆕 Nuova' : isOverdue ? '⚠️ In ritardo' : '📅 In programma');
+          var freqLine = (w.personal_frequency ? 'Usata '+w.personal_frequency+'×' : '') +
+              (w.last_reviewed_at ? ' · Ultimo ripasso: '+fmtDate(w.last_reviewed_at) : '') +
+              (w.mastery_score ? ' · Mastery '+w.mastery_score+'%' : '');
+
+          html += '<article class="wbx-box" data-word="'+word+'" data-wid="'+w.id+'" data-pos="'+posLabel+'" style="border-left:3px solid '+ringColor+'">'+
             '<div class="wbx-main-col">'+
             '<div class="wbx-word-zone">'+
             '<div class="wbx-head"><span class="wbx-w" style="font-size:'+wordFontSize+'">'+word+'</span>'+(cefr?'<span class="wbx-cefr">'+cefr+'</span>':'')+(posLabel!=='—'?'<span class="wbx-pos">'+posLabel+'</span>':'')+'</div>'+
-            '<div class="wbx-ipa">'+(w.mastery_score ? 'Mastery: '+w.mastery_score+'%' : '')+'</div>'+
+            '<div class="wbx-ipa"><span class="wbx-status-tag" style="font-size:10px;color:'+(isOverdue?'var(--amber)':'var(--text-faint)')+'">'+statusLine+'</span> · <span style="font-size:10px;color:var(--text-faint)">'+freqLine+'</span></div>'+
             '</div>'+
             '<div class="wbx-meta-zone">'+
-            '<div class="wbx-def">'+ (isNew ? 'Nuova — mai ripassata' : isOverdue ? 'In ritardo — ripassa ora' : 'In programma') +'</div>'+
-            '<div class="wbx-trans" style="opacity:1;border-top-color:transparent;font-size:11px;color:var(--text-faint)">'+
-              (w.personal_frequency ? 'Usata '+w.personal_frequency+'×' : '') +
-              (w.last_reviewed_at ? ' · Ultimo ripasso: '+fmtDate(w.last_reviewed_at) : '') +
-            '</div>'+
+            '<div class="wbx-def" style="font-size:13px;color:var(--text-soft);line-height:1.5;min-height:20px">Caricamento…</div>'+
+            '<div class="wbx-trans" style="font-size:12px;color:var(--text-faint);min-height:18px"></div>'+
             '<div class="wbx-syns"></div>'+
             '</div>'+
             '</div>'+
@@ -4594,13 +4596,13 @@
         });
         cardsEl.innerHTML = html;
 
-        // Enrich with definitions (lightweight, batch)
-        setTimeout(function() {
-          var boxes = document.querySelectorAll('#vtReviewCards .wbx-box');
-          for (var i = 0; i < Math.min(boxes.length, 6); i++) {
-            enrichOneCard(boxes[i], boxes[i].getAttribute('data-word'));
-          }
-        }, 100);
+        // Enrich ALL cards with definitions (batch with stagger to avoid rate limits)
+        var boxes = document.querySelectorAll('#vtReviewCards .wbx-box');
+        boxes.forEach(function(box, i) {
+          setTimeout(function() {
+            enrichOneCard(box, box.getAttribute('data-word'));
+          }, i * 150); // 150ms stagger between cards
+        });
       }
       window.renderVTReviewDue = renderVTReviewDue;
 
