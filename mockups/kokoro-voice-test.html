@@ -80,6 +80,7 @@ audio{display:none}
 <div id="voiceSections"></div>
 </div>
 
+<script src="../config.js"></script>
 <script>
 // ═══ KOKORO VOICE TEST ═══
 var HF_TOKEN = (window.SOTTOTITOLI_CONFIG && window.SOTTOTITOLI_CONFIG.kokoroToken) || prompt('Enter HF token:');
@@ -234,7 +235,7 @@ async function playVoice(btn, voiceId, langCode){
   stopAllAudio();
   btn.className = 'v-play loading';
   btn.textContent = '⏳';
-  updateStatus('wait', 'Generating '+voiceId+'...');
+  updateStatus('wait', 'Generating '+voiceId+'... (model may need to warm up)');
 
   var text = document.getElementById('ttsText').value.trim();
   if (!text) { updateStatus('err', 'Enter text first'); btn.className = 'v-play'; btn.textContent = '▶'; return; }
@@ -242,7 +243,7 @@ async function playVoice(btn, voiceId, langCode){
   var speed = parseFloat(document.getElementById('speed').value) || 1.0;
 
   try {
-    // Kokoro-82M HF Inference API
+    // Kokoro-82M HF Inference API — try with parameters first
     var response = await fetch(API_URL, {
       method: 'POST',
       headers: {
@@ -251,16 +252,48 @@ async function playVoice(btn, voiceId, langCode){
       },
       body: JSON.stringify({
         inputs: text,
-        parameters: {
-          voice: voiceId,
-          speed: speed
-        }
+        parameters: { voice: voiceId, speed: speed }
       })
     });
 
+    // If model is loading (cold start), wait and retry
+    if (response.status === 503) {
+      var retryAfter = 15;
+      updateStatus('wait', 'Model loading (cold start), retrying in '+retryAfter+'s...');
+      btn.textContent = '⏳';
+      await new Promise(function(r){ setTimeout(r, retryAfter*1000); });
+      response = await fetch(API_URL, {
+        method: 'POST',
+        headers: {
+          'Authorization': 'Bearer ' + HF_TOKEN,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          inputs: text,
+          parameters: { voice: voiceId, speed: speed }
+        })
+      });
+    }
+
     if (!response.ok) {
       var errText = await response.text();
-      throw new Error('HTTP '+response.status+': '+errText.substring(0,200));
+      // Try fallback: just inputs without parameters
+      if (response.status === 400 || response.status === 422) {
+        updateStatus('wait', 'Retrying without parameters...');
+        response = await fetch(API_URL, {
+          method: 'POST',
+          headers: {
+            'Authorization': 'Bearer ' + HF_TOKEN,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ inputs: text })
+        });
+        if (!response.ok) {
+          throw new Error('HTTP '+response.status+': '+ (await response.text()).substring(0,200));
+        }
+      } else {
+        throw new Error('HTTP '+response.status+': '+errText.substring(0,200));
+      }
     }
 
     var blob = await response.blob();
