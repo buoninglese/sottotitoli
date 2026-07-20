@@ -23,11 +23,27 @@ function json(data: unknown, status = 200) {
 
 // ── LLM grammar for any language ──
 async function grammarWithLLM(text: string, language: string): Promise<{
-  corrected: string; explanation: string | null;
+  corrected: string; explanations: string[];
 }> {
   const prompts: Record<string, string> = {
-    en: `Fix the grammar in this English sentence. Return a JSON object with "corrected" (fixed sentence) and "explanation" (what was wrong in one short sentence).\n\nSentence: ${text}`,
-    it: `Correggi la grammatica di questa frase italiana. Restituisci un JSON con "corrected" (frase corretta) e "explanation" (spiegazione in inglese di cosa era sbagliato).\n\nFrase: ${text}`,
+    en: `Fix this English sentence. Rules:
+- Fix punctuation, capitalization, and missing apostrophes SILENTLY — do NOT list these as errors.
+- Only explain REAL grammar mistakes (verb tense, word order, prepositions, articles, subject-verb agreement, etc).
+- If there are multiple grammar errors, list ALL of them.
+- Return a JSON object with:
+  "corrected": the fully fixed sentence (including silent punctuation/capitalization fixes)
+  "explanations": an array of strings, each describing one grammar error in one short sentence. If there are only silent fixes (punctuation etc), return an empty array.
+
+Sentence: ${text}`,
+    it: `Correggi questa frase italiana. Regole:
+- Correggi punteggiatura, maiuscole e apostrofi in SILENZIO — non elencarli come errori.
+- Spiega solo i VERI errori grammaticali (coniugazioni, preposizioni, articoli, concordanza, etc).
+- Se ci sono più errori grammaticali, elencali TUTTI.
+- Restituisci un JSON con:
+  "corrected": la frase completamente corretta (inclusi i fix silenziosi)
+  "explanations": array di stringhe, ognuna descrive un errore in una breve frase in inglese. Se ci sono solo fix silenziosi, array vuoto.
+
+Frase: ${text}`,
   };
   const prompt = prompts[language] || prompts['en'];
 
@@ -47,9 +63,12 @@ async function grammarWithLLM(text: string, language: string): Promise<{
   const content = data?.choices?.[0]?.message?.content || '';
   try {
     const parsed = JSON.parse(content);
-    return { corrected: parsed.corrected || text, explanation: parsed.explanation || null };
+    return {
+      corrected: parsed.corrected || text,
+      explanations: Array.isArray(parsed.explanations) ? parsed.explanations : (parsed.explanation ? [parsed.explanation] : []),
+    };
   } catch {
-    return { corrected: text, explanation: content.substring(0, 200) };
+    return { corrected: text, explanations: [] };
   }
 }
 
@@ -105,28 +124,29 @@ Deno.serve(async (req: Request) => {
       ? (await supabase.from('transcript_segments').select('source_language').eq('id', segmentId).single()).data?.source_language || 'en'
       : language;
 
-    let result: { corrected: string; explanation: string | null; categories?: string[] };
+    let result: { corrected: string; explanations: string[] };
     let usedProvider: string;
 
     if (reqProvider === 'languagetool' && lang === 'en') {
       const lt = await grammarWithLanguageTool(sourceText);
-      result = lt; usedProvider = 'languagetool';
+      result = { corrected: lt.corrected, explanations: lt.explanation ? [lt.explanation] : [] };
+      usedProvider = 'languagetool';
     } else if (reqProvider === 'languagetool' && lang !== 'en') {
-      // LanguageTool only supports English — fall back to LLM
       const llm = await grammarWithLLM(sourceText, lang);
-      result = { corrected: llm.corrected, explanation: llm.explanation };
+      result = llm;
       usedProvider = 'llama31_fallback';
     } else {
       try {
         const llm = await grammarWithLLM(sourceText, lang);
-        result = { corrected: llm.corrected, explanation: llm.explanation };
+        result = llm;
         usedProvider = 'llama31';
       } catch (llmErr) {
         console.warn('LLM failed, fallback:', llmErr);
         if (lang === 'en') {
           try {
             const lt = await grammarWithLanguageTool(sourceText);
-            result = lt; usedProvider = 'languagetool_fallback';
+            result = { corrected: lt.corrected, explanations: lt.explanation ? [lt.explanation] : [] };
+            usedProvider = 'languagetool_fallback';
           } catch (ltErr) { throw new Error(`All providers failed`); }
         } else {
           throw llmErr;
@@ -134,9 +154,14 @@ Deno.serve(async (req: Request) => {
       }
     }
 
+    // Format explanations as bullet points for the frontend
+    const explanationText = result.explanations.length > 0
+      ? result.explanations.map((e, i) => `${i + 1}. ${e}`).join('\n')
+      : null;
+
     return json({
       grammar: { original_text: sourceText, corrected_text: result.corrected, status: 'complete', provider: usedProvider, mode },
-      explanation: result.explanation,
+      explanation: explanationText,
       errorCategories: result.categories || [],
       matchCount: result.corrected !== sourceText ? 1 : 0,
     });
