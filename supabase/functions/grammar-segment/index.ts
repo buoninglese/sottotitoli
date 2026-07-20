@@ -1,13 +1,14 @@
 /**
- * grammar-segment — Server-side grammar correction via LanguageTool.
- * Free tier: 500 req/day. No API key needed.
- * Returns: corrected text + error explanations + rule categories.
- * English only for now (Italian later via LanguageTool it-IT).
+ * grammar-segment — Server-side grammar correction.
+ * Primary: Llama 3.1 8B via HF Inference Providers (Groq) — $0.0000017/check
+ * Fallback: LanguageTool — free, rule-based
+ * English only for now.
  */
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+const HF_API_TOKEN = Deno.env.get('HF_API_TOKEN') || '';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': 'https://buoninglese.github.io',
@@ -22,24 +23,92 @@ function json(data: unknown, status = 200) {
   });
 }
 
+// ── Primary: LLM grammar via Inference Providers ──
+async function grammarWithLLM(text: string): Promise<{
+  corrected: string; explanation: string | null;
+}> {
+  const resp = await fetch('https://router.huggingface.co/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${HF_API_TOKEN}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      model: 'meta-llama/Llama-3.1-8B-Instruct',
+      messages: [{
+        role: 'user',
+        content: `Fix the grammar in this sentence. Return a JSON object with two fields: "corrected" (the fixed sentence) and "explanation" (what was wrong, in one short sentence).\n\nSentence: ${text}`,
+      }],
+      max_tokens: 120,
+      temperature: 0,
+      response_format: { type: 'json_object' },
+    }),
+  });
+
+  if (!resp.ok) throw new Error(`llm_error_${resp.status}`);
+
+  const data = await resp.json();
+  const content = data?.choices?.[0]?.message?.content || '';
+  
+  // Parse JSON response
+  try {
+    const parsed = JSON.parse(content);
+    return {
+      corrected: parsed.corrected || text,
+      explanation: parsed.explanation || null,
+    };
+  } catch {
+    // If JSON parse fails, try to extract from raw text
+    const correctedMatch = content.match(/corrected[:\s]*"?([^"\n]+)"?/i);
+    return {
+      corrected: correctedMatch ? correctedMatch[1].trim() : text,
+      explanation: content.substring(0, 200),
+    };
+  }
+}
+
+// ── Fallback: LanguageTool ──
 interface LTMatch {
-  message: string; shortMessage: string;
+  message: string;
   replacements: { value: string }[];
   offset: number; length: number;
-  rule: { id: string; description: string; category: { id: string; name: string } };
+  rule: { category: { name: string } };
 }
 
-function applyCorrections(text: string, matches: LTMatch[]): string {
-  const sorted = [...matches]
-    .filter(m => m.replacements && m.replacements.length > 0)
-    .sort((a, b) => b.offset - a.offset);
-  let result = text;
-  for (const m of sorted) {
-    result = result.substring(0, m.offset) + m.replacements[0].value + result.substring(m.offset + m.length);
+async function grammarWithLanguageTool(text: string): Promise<{
+  corrected: string; explanation: string | null; categories: string[];
+}> {
+  const resp = await fetch('https://api.languagetool.org/v2/check', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({ text, language: 'en-US' }),
+  });
+  if (!resp.ok) throw new Error(`lt_error_${resp.status}`);
+
+  const data = await resp.json();
+  const matches: LTMatch[] = data.matches || [];
+
+  let corrected = text;
+  let explanation: string | null = null;
+  const categories: string[] = [];
+
+  if (matches.length > 0) {
+    const sorted = [...matches]
+      .filter(m => m.replacements?.length)
+      .sort((a, b) => b.offset - a.offset);
+    for (const m of sorted) {
+      corrected = corrected.substring(0, m.offset) + m.replacements[0].value + corrected.substring(m.offset + m.length);
+    }
+    explanation = matches.map(m =>
+      `• ${m.message}${m.replacements?.length ? ' → "' + m.replacements[0].value + '"' : ''} (${m.rule.category.name})`
+    ).join('\n');
+    categories.push(...new Set(matches.map(m => m.rule.category.name)));
   }
-  return result;
+
+  return { corrected, explanation, categories };
 }
 
+// ── Main handler ──
 Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
 
@@ -51,105 +120,70 @@ Deno.serve(async (req: Request) => {
     const { data: { user }, error: authError } = await supabase.auth.getUser(authHeader.replace('Bearer ', ''));
     if (authError || !user) throw new Error('Unauthorized');
 
-    const { segmentId, text: directText, mode = 'fix_grammar' } = await req.json();
+    const { segmentId, text: directText, mode = 'fix_grammar', provider: reqProvider } = await req.json();
     if (!segmentId && !directText) throw new Error('segmentId or text required');
 
-    const provider = 'languagetool';
-    let sourceText: string;
-    let segId: string;
-    let roomId: string;
-    let sourceLanguage = 'en';
+    const sourceText: string = segmentId
+      ? (await supabase.from('transcript_segments').select('source_text').eq('id', segmentId).single()).data?.source_text || ''
+      : directText;
 
-    if (segmentId) {
-      // DB-backed mode: fetch segment, verify room membership
-      const { data: seg, error: segError } = await supabase
-        .from('transcript_segments')
-        .select('id, room_id, source_text, source_language')
-        .eq('id', segmentId).single();
-      if (segError || !seg) throw new Error('Segment not found');
+    if (!sourceText) throw new Error('No text to check');
 
-      const { data: membership } = await supabase
-        .from('room_members').select('id')
-        .eq('room_id', seg.room_id).eq('user_id', user.id).is('left_at', null).maybeSingle();
-      if (!membership) throw new Error('You are not a member of this room');
+    let result: { corrected: string; explanation: string | null; categories?: string[] };
+    let usedProvider: string;
 
-      if (seg.source_language !== 'en') throw new Error('Grammar correction currently supports English only');
-      sourceText = seg.source_text;
-      segId = seg.id;
-      roomId = seg.room_id;
-      sourceLanguage = seg.source_language;
+    // Try LLM first (PRO required), fall back to LanguageTool
+    if (reqProvider === 'languagetool') {
+      // Explicit fallback requested
+      const lt = await grammarWithLanguageTool(sourceText);
+      result = lt;
+      usedProvider = 'languagetool';
     } else {
-      // Direct text mode: no DB segment needed — call LanguageTool directly, skip DB cache
-      sourceText = directText;
-      segId = ''; // signal: no DB persistence
-      roomId = '';
-      sourceLanguage = 'en';
+      try {
+        const llm = await grammarWithLLM(sourceText);
+        result = { corrected: llm.corrected, explanation: llm.explanation };
+        usedProvider = 'llama31';
+      } catch (llmErr) {
+        console.warn('LLM grammar failed, falling back to LanguageTool:', llmErr);
+        try {
+          const lt = await grammarWithLanguageTool(sourceText);
+          result = lt;
+          usedProvider = 'languagetool_fallback';
+        } catch (ltErr) {
+          throw new Error(`All grammar providers failed: ${ltErr}`);
+        }
+      }
     }
 
-    // Only use DB cache for real segments (not direct text)
-    if (segId && segId.length === 36) {
-      // Check cache
-      const { data: existing } = await supabase
-        .from('segment_grammar').select('*')
-        .eq('segment_id', segId).eq('language', sourceLanguage)
-        .eq('provider', provider).eq('mode', mode).maybeSingle();
-      if (existing && existing.status === 'complete') {
-        return json({ grammar: existing });
-      }
+    // Persist to DB if we have a real segment
+    if (segmentId) {
+      const { data: seg } = await supabase.from('transcript_segments').select('room_id,source_language').eq('id', segmentId).single();
+      if (seg) {
+        await supabase.from('segment_grammar').upsert({
+          segment_id: segmentId, room_id: seg.room_id, language: seg.source_language,
+          provider: usedProvider, mode, original_text: sourceText, status: 'pending',
+          updated_at: new Date().toISOString(),
+        }, { onConflict: 'segment_id, language, provider, mode' });
 
-      // Insert pending
-      await supabase.from('segment_grammar').upsert({
-        segment_id: segId, room_id: roomId, language: sourceLanguage,
-        provider, mode, original_text: sourceText, status: 'pending',
-        updated_at: new Date().toISOString(),
-      }, { onConflict: 'segment_id, language, provider, mode' });
+        await supabase.from('segment_grammar').update({
+          corrected_text: result.corrected, status: 'complete',
+          updated_at: new Date().toISOString(),
+        }).eq('segment_id', segmentId).eq('language', seg.source_language).eq('provider', usedProvider).eq('mode', mode);
+      }
     }
 
-    try {
-      const ltResp = await fetch('https://api.languagetool.org/v2/check', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: new URLSearchParams({ text: sourceText, language: 'en-US' }),
-      });
-      if (!ltResp.ok) throw new Error(`lt_error_${ltResp.status}`);
-
-      const ltData = await ltResp.json();
-      const matches: LTMatch[] = ltData.matches || [];
-
-      let correctedText = sourceText;
-      let explanation: string | null = null;
-      let errorCategories: string[] = [];
-
-      if (matches.length > 0) {
-        correctedText = applyCorrections(sourceText, matches);
-        explanation = matches.map(m => `• ${m.message}${m.replacements?.length ? ' → "' + m.replacements[0].value + '"' : ''} (${m.rule.category.name})`).join('\n');
-        errorCategories = [...new Set(matches.map(m => m.rule.category.name))];
-      }
-
-      // Only persist to DB for real segments
-      if (segId && segId.length === 36) {
-        const { data: updated } = await supabase
-          .from('segment_grammar')
-          .update({ corrected_text: correctedText, status: 'complete', error_code: null, updated_at: new Date().toISOString() })
-          .eq('segment_id', segId).eq('language', sourceLanguage).eq('provider', provider).eq('mode', mode)
-          .select('*').single();
-        return json({ grammar: updated, explanation, errorCategories, matchCount: matches.length });
-      }
-
-      // Direct text mode: return result without persisting
-      return json({
-        grammar: { original_text: sourceText, corrected_text: correctedText, status: 'complete', provider, mode },
-        explanation, errorCategories, matchCount: matches.length
-      });
-    } catch (error) {
-      const msg = (error as Error).message || '';
-      if (segId && segId.length === 36) {
-        await supabase.from('segment_grammar')
-          .update({ status: 'failed', error_code: msg, updated_at: new Date().toISOString() })
-          .eq('segment_id', segId).eq('language', sourceLanguage).eq('provider', provider).eq('mode', mode);
-      }
-      return json({ grammar: null, error: msg }, 200);
-    }
+    return json({
+      grammar: {
+        original_text: sourceText,
+        corrected_text: result.corrected,
+        status: 'complete',
+        provider: usedProvider,
+        mode,
+      },
+      explanation: result.explanation,
+      errorCategories: result.categories || [],
+      matchCount: result.corrected !== sourceText ? 1 : 0,
+    });
   } catch (error) {
     return json({ error: (error as Error).message || 'unknown_error' }, 500);
   }
