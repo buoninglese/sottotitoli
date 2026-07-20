@@ -22,6 +22,10 @@ window.SOTTOTITOLI_CONFIG = {
       Set secret: supabase secrets set WORDNIK_API_KEY=your_key */
   wordnikProxyUrl: "https://qzqmuegbpmvqrjrlfbgk.supabase.co/functions/v1/wordnik-proxy",
 
+  /** HuggingFace API token for Kokoro-82M TTS (text-to-speech).
+      Get your free token at https://huggingface.co/settings/tokens */
+  kokoroToken: "hf_your_token_here",
+
   /** Translation provider settings */
   translation: {
     /** Translation provider: "auto" = Google first with MyMemory fallback.

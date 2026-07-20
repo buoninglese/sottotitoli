@@ -1308,6 +1308,7 @@ button[onclick*="addToWordBank"]:hover{background:rgba(52,211,153,.15)!important
 <script src="js/language-resolver.js?v=1"></script>
 <script src="js/real-mic.js?v=13"></script>
 <script src="js/grammar-viz.js?v=2"></script>
+<script src="js/kokoro-tts.js"></script>
 <!-- Apply saved theme (from panoramica settings or localStorage) -->
 <script>
 (function(){
@@ -1903,16 +1904,30 @@ function _fetchWordViaLLM(word, cardId, langSettings) {
       return;
     }
     var entry = res.data.entry;
-    if (defEl) defEl.textContent = entry.definition || 'No definition found.';
+    if (defEl) { defEl.textContent = entry.definition || 'No definition found.'; _addTTSButton(defEl, entry.definition, langSettings.content_language); }
     if (posEl) posEl.textContent = entry.pos || '—';
     if (relEl && entry.synonyms && entry.synonyms.length) {
       relEl.innerHTML = entry.synonyms.map(function(s) {
         return '<span onclick="lookupSynonym(this)" data-word="' + s + '" data-context="' + word + '" style="cursor:pointer;font-size:11px;font-weight:600;padding:3px 8px;border-radius:100px;border:1px solid rgba(52,211,153,.2);color:#34d399;background:rgba(52,211,153,.06);margin:2px">' + s + '</span>';
       }).join('');
     }
+    // Add speaker icon to word
+    _addTTSButton(card.querySelector('.syn-base-word'), word, langSettings.content_language);
   }).catch(function(err) {
     if (defEl) defEl.textContent = 'Error: ' + (err.message || 'unknown');
   });
+}
+
+// ── TTS speaker button helper ──
+function _addTTSButton(el, text, lang) {
+  if (!el || !text || !window.KokoroTTS) return;
+  // Only for English and Italian
+  var base = (lang || 'en').split('-')[0].toLowerCase();
+  if (base !== 'en' && base !== 'it') return;
+  // Don't double-add
+  if (el.querySelector('.kokoro-spk-btn')) return;
+  var btn = window.KokoroTTS.createSpeakerButton(text, lang);
+  el.appendChild(btn);
 }
 
 // ── English: existing Datamuse + Free Dictionary path ──
@@ -1931,11 +1946,15 @@ function _fetchWordEnglish(word, cardId, defEl, relEl, posEl) {
             var parts = data[0].defs[0].split('\t');
             // defs format: "pos\ndefinition"
             if (defEl) defEl.textContent = parts[1] || data[0].defs[0];
+            _addTTSButton(defEl, parts[1] || data[0].defs[0], 'en');
             if (posEl && data[0].tags && data[0].tags[0]) {
               posEl.textContent = data[0].tags[0];
             }
             // Now fetch Datamuse "means like" (≈ synonyms)
             _fetchDatamuseMeansLike(word, cardId, defEl, relEl, posEl);
+            // Speaker icon for word
+            var card = document.getElementById(cardId);
+            if (card) { var wordEl = card.querySelector('.syn-base-word'); _addTTSButton(wordEl, word, 'en'); }
             return;
           }
         } catch(e) { console.warn('Datamuse parse error:', e); }
@@ -1999,8 +2018,11 @@ function _fetchWordnikFallback(word, cardId) {
           var defs = JSON.parse(xhr.responseText);
           if (defs && defs.length > 0) {
             if (defEl) defEl.textContent = defs[0].text || '';
+            _addTTSButton(defEl, defs[0].text || '', 'en');
             if (posEl && defs[0].partOfSpeech) posEl.textContent = defs[0].partOfSpeech;
             _fetchWordnikSynonyms(word, cardId);
+            // Speaker icon for word
+            var wordEl = card.querySelector('.syn-base-word'); _addTTSButton(wordEl, word, 'en');
             return;
           }
         } catch(e) {}

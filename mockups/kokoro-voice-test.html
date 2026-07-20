@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Kokoro-82M Voice Test</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,400;14..32,500;14..32,600;14..32,700;14..32,800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#08090d;--card:#111318;--card2:#181b22;--line:#1e2230;--text:#e2e4e9;--t2:#8b8fa6;--t3:#555a6e;--accent:#7c3aed;--green:#22c55e;--amber:#f59e0b;--red:#ef4444;--pink:#ec4899;--r:14px}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);padding:32px;min-height:100vh}
+.wrap{max-width:1400px;margin:0 auto}
+h1{font-size:28px;font-weight:900;letter-spacing:-.02em;margin-bottom:4px}
+h1 span{background:linear-gradient(135deg,#a78bfa,#06b6d4);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.sub{color:var(--t3);font-size:13px;margin-bottom:28px}
+.controls{display:flex;flex-wrap:wrap;gap:16px;align-items:flex-end;margin-bottom:28px;padding:20px;background:var(--card);border:1px solid var(--line);border-radius:16px}
+.ctrl-group{display:flex;flex-direction:column;gap:4px}
+.ctrl-group label{font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--t3);font-weight:700}
+.ctrl-group input,.ctrl-group select,.ctrl-group textarea{background:var(--card2);border:1px solid var(--line);border-radius:8px;padding:8px 12px;color:var(--text);font-family:var(--f,'Inter',sans-serif);font-size:13px;outline:none;transition:border .15s}
+.ctrl-group input:focus,.ctrl-group select:focus,.ctrl-group textarea:focus{border-color:var(--accent)}
+.ctrl-group textarea{width:400px;height:60px;resize:vertical}
+.btn{font-family:'Inter',sans-serif;font-size:12px;font-weight:700;padding:10px 20px;border-radius:99px;border:none;cursor:pointer;transition:all .15s}
+.btn-play{background:var(--accent);color:#fff}
+.btn-play:hover{filter:brightness(1.15)}
+.btn-play:disabled{opacity:.4;cursor:not-allowed}
+.btn-play.playing{background:var(--green)}
+.lang-section{margin-bottom:32px}
+.lang-head{font-size:13px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--t2);margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:8px}
+.lang-head .flag{font-size:20px}
+.lang-head .count{font-size:11px;color:var(--t3);font-weight:500}
+.voice-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:10px}
+.voice-card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px;display:flex;align-items:center;gap:12px;transition:all .15s;position:relative}
+.voice-card:hover{border-color:var(--accent);background:var(--card2)}
+.voice-card .v-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+.voice-card .v-dot.female{background:var(--pink)}
+.voice-card .v-dot.male{background:#3b82f6}
+.voice-card .v-info{flex:1;min-width:0}
+.voice-card .v-name{font-size:13px;font-weight:600;color:var(--text)}
+.voice-card .v-id{font-size:10px;color:var(--t3);font-family:'JetBrains Mono',monospace}
+.voice-card .v-grade{font-size:9px;color:var(--t3);margin-top:2px}
+.voice-card .v-play{width:32px;height:32px;border-radius:50%;border:1px solid var(--line);background:transparent;color:var(--t3);cursor:pointer;font-size:12px;display:flex;align-items:center;justify-content:center;transition:all .15s;flex-shrink:0}
+.voice-card .v-play:hover{border-color:var(--accent);color:var(--accent)}
+.voice-card .v-play.loading{border-color:var(--amber);color:var(--amber);animation:pulse 1s infinite}
+.voice-card .v-play.done{border-color:var(--green);color:var(--green)}
+@keyframes pulse{50%{opacity:.5}}
+audio{display:none}
+.status-bar{display:flex;align-items:center;gap:12px;padding:8px 16px;background:var(--card);border:1px solid var(--line);border-radius:99px;margin-bottom:20px;font-size:12px}
+.status-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.status-dot.ok{background:var(--green)}
+.status-dot.err{background:var(--red)}
+.status-dot.wait{background:var(--amber)}
+.param-row{display:flex;gap:16px;align-items:center}
+.param-row label{font-size:10px;color:var(--t3);display:flex;align-items:center;gap:4px}
+.param-row input[type=range]{width:100px}
+</style>
+</head>
+<body>
+<div class="wrap">
+<h1>Kokoro-82M <span>Voice Test</span></h1>
+<p class="sub">All {{VOICE_COUNT}} voices across {{LANG_COUNT}} languages · Click a voice to generate TTS with your text</p>
+
+<div class="status-bar">
+  <span class="status-dot" id="statusDot"></span>
+  <span id="statusText">Ready</span>
+</div>
+
+<div class="controls">
+  <div class="ctrl-group">
+    <label>Text to speak</label>
+    <textarea id="ttsText" placeholder="Enter text to synthesize...">Ciao! Questo è un test della voce italiana Kokoro. La qualità è davvero impressionante per un modello così piccolo.</textarea>
+  </div>
+  <div class="ctrl-group">
+    <label>Speed</label>
+    <input type="range" id="speed" min="0.5" max="2.0" step="0.1" value="1.0" style="width:120px">
+    <span style="font-size:11px;color:var(--t3)" id="speedVal">1.0x</span>
+  </div>
+  <button class="btn btn-play" id="stopAll" onclick="stopAllAudio()">⏹ Stop All</button>
+</div>
+
+<div id="voiceSections"></div>
+</div>
+
+<script>
+// ═══ KOKORO VOICE TEST ═══
+var HF_TOKEN = (window.SOTTOTITOLI_CONFIG && window.SOTTOTITOLI_CONFIG.kokoroToken) || prompt('Enter HF token:');
+var API_URL = 'https://api-inference.huggingface.co/models/hexgrad/Kokoro-82M';
+
+// All voices from VOICES.md
+var VOICES = {
+  'American English': {
+    lang_code: 'a', flag: '🇺🇸',
+    voices: [
+      {id:'af_heart',   gender:'female', grade:'A',   desc:'❤️ Best overall'},
+      {id:'af_alloy',   gender:'female', grade:'B',   desc:''},
+      {id:'af_aoede',   gender:'female', grade:'C+',  desc:''},
+      {id:'af_bella',   gender:'female', grade:'A-',  desc:'🔥 Popular'},
+      {id:'af_jessica', gender:'female', grade:'D',   desc:''},
+      {id:'af_kore',    gender:'female', grade:'C+',  desc:''},
+      {id:'af_nicole',  gender:'female', grade:'B-',  desc:'🎧'},
+      {id:'af_nova',    gender:'female', grade:'C',   desc:''},
+      {id:'af_river',   gender:'female', grade:'D',   desc:''},
+      {id:'af_sarah',   gender:'female', grade:'C+',  desc:''},
+      {id:'af_sky',     gender:'female', grade:'C-',  desc:''},
+      {id:'am_adam',    gender:'male',   grade:'F+',  desc:''},
+      {id:'am_echo',    gender:'male',   grade:'D',   desc:''},
+      {id:'am_eric',    gender:'male',   grade:'D',   desc:''},
+      {id:'am_fenrir',  gender:'male',   grade:'C+',  desc:''},
+      {id:'am_liam',    gender:'male',   grade:'D',   desc:''},
+      {id:'am_michael', gender:'male',   grade:'C+',  desc:''},
+      {id:'am_onyx',    gender:'male',   grade:'D',   desc:''},
+      {id:'am_puck',    gender:'male',   grade:'C+',  desc:''},
+      {id:'am_santa',   gender:'male',   grade:'D-',  desc:''},
+    ]
+  },
+  'British English': {
+    lang_code: 'b', flag: '🇬🇧',
+    voices: [
+      {id:'bf_alice',    gender:'female', grade:'D', desc:''},
+      {id:'bf_emma',     gender:'female', grade:'B-', desc:''},
+      {id:'bf_isabella', gender:'female', grade:'C', desc:''},
+      {id:'bf_lily',     gender:'female', grade:'D', desc:''},
+      {id:'bm_daniel',   gender:'male',   grade:'D', desc:''},
+      {id:'bm_fable',    gender:'male',   grade:'C', desc:''},
+      {id:'bm_george',   gender:'male',   grade:'C', desc:''},
+      {id:'bm_lewis',    gender:'male',   grade:'D+', desc:''},
+    ]
+  },
+  'Italian': {
+    lang_code: 'i', flag: '🇮🇹',
+    voices: [
+      {id:'if_sara',  gender:'female', grade:'C', desc:''},
+      {id:'im_nicola',gender:'male',   grade:'C', desc:''},
+    ]
+  },
+  'Spanish': {
+    lang_code: 'e', flag: '🇪🇸',
+    voices: [
+      {id:'ef_dora',  gender:'female', grade:'', desc:''},
+      {id:'em_alex',  gender:'male',   grade:'', desc:''},
+      {id:'em_santa', gender:'male',   grade:'', desc:''},
+    ]
+  },
+  'French': {
+    lang_code: 'f', flag: '🇫🇷',
+    voices: [
+      {id:'ff_siwis', gender:'female', grade:'B-', desc:''},
+    ]
+  },
+  'Japanese': {
+    lang_code: 'j', flag: '🇯🇵',
+    voices: [
+      {id:'jf_alpha',      gender:'female', grade:'C+', desc:''},
+      {id:'jf_gongitsune', gender:'female', grade:'C', desc:'gongitsune'},
+      {id:'jf_nezumi',     gender:'female', grade:'C-', desc:'nezuminoyomeiri'},
+      {id:'jf_tebukuro',   gender:'female', grade:'C', desc:'tebukurowokaini'},
+      {id:'jm_kumo',       gender:'male',   grade:'C-', desc:'kumonoito'},
+    ]
+  },
+  'Mandarin Chinese': {
+    lang_code: 'z', flag: '🇨🇳',
+    voices: [
+      {id:'zf_xiaobei',  gender:'female', grade:'D', desc:''},
+      {id:'zf_xiaoni',   gender:'female', grade:'D', desc:''},
+      {id:'zf_xiaoxiao', gender:'female', grade:'D', desc:''},
+      {id:'zf_xiaoyi',   gender:'female', grade:'D', desc:''},
+      {id:'zm_yunjian',  gender:'male',   grade:'D', desc:''},
+      {id:'zm_yunxi',    gender:'male',   grade:'D', desc:''},
+      {id:'zm_yunxia',   gender:'male',   grade:'D', desc:''},
+      {id:'zm_yunyang',  gender:'male',   grade:'D', desc:''},
+    ]
+  },
+  'Hindi': {
+    lang_code: 'h', flag: '🇮🇳',
+    voices: [
+      {id:'hf_alpha', gender:'female', grade:'C', desc:''},
+      {id:'hf_beta',  gender:'female', grade:'C', desc:''},
+      {id:'hm_omega', gender:'male',   grade:'C', desc:''},
+      {id:'hm_psi',   gender:'male',   grade:'C', desc:''},
+    ]
+  },
+  'Brazilian Portuguese': {
+    lang_code: 'p', flag: '🇧🇷',
+    voices: [
+      {id:'pf_dora',  gender:'female', grade:'', desc:''},
+      {id:'pm_alex',  gender:'male',   grade:'', desc:''},
+      {id:'pm_santa', gender:'male',   grade:'', desc:''},
+    ]
+  }
+};
+
+var totalVoices = 0;
+var totalLangs = Object.keys(VOICES).length;
+Object.values(VOICES).forEach(function(l){ totalVoices += l.voices.length; });
+document.querySelector('.sub').textContent = totalVoices+' voices across '+totalLangs+' languages · Click a ▶ button to generate TTS';
+
+var currentAudio = null;
+
+function renderAll(){
+  var html = '';
+  Object.keys(VOICES).forEach(function(langName){
+    var lang = VOICES[langName];
+    html += '<div class="lang-section">';
+    html += '<div class="lang-head"><span class="flag">'+lang.flag+'</span> '+langName+' <span class="count">('+lang.voices.length+' voices, lang_code='+lang.lang_code+')</span></div>';
+    html += '<div class="voice-grid">';
+    lang.voices.forEach(function(v){
+      var dotClass = v.gender === 'female' ? 'female' : 'male';
+      var gradeInfo = v.grade ? 'Grade: '+v.grade : '';
+      var descInfo = v.desc ? ' '+v.desc : '';
+      html += '<div class="voice-card">';
+      html += '<span class="v-dot '+dotClass+'"></span>';
+      html += '<div class="v-info"><div class="v-name">'+v.id.replace(/_/g,' ')+'</div><div class="v-id">'+v.id+'</div><div class="v-grade">'+gradeInfo+descInfo+'</div></div>';
+      html += '<button class="v-play" data-voice="'+v.id+'" data-lang="'+lang.lang_code+'" onclick="playVoice(this,\''+v.id+'\',\''+lang.lang_code+'\')" title="Play">▶</button>';
+      html += '</div>';
+    });
+    html += '</div></div>';
+  });
+  document.getElementById('voiceSections').innerHTML = html;
+}
+
+function updateStatus(state, msg){
+  var dot = document.getElementById('statusDot');
+  var text = document.getElementById('statusText');
+  dot.className = 'status-dot ' + state;
+  text.textContent = msg;
+}
+
+function stopAllAudio(){
+  if (currentAudio) { currentAudio.pause(); currentAudio.remove(); currentAudio = null; }
+  document.querySelectorAll('.v-play').forEach(function(b){ b.className = 'v-play'; b.textContent = '▶'; });
+  updateStatus('ok', 'Stopped');
+}
+
+async function playVoice(btn, voiceId, langCode){
+  stopAllAudio();
+  btn.className = 'v-play loading';
+  btn.textContent = '⏳';
+  updateStatus('wait', 'Generating '+voiceId+'...');
+
+  var text = document.getElementById('ttsText').value.trim();
+  if (!text) { updateStatus('err', 'Enter text first'); btn.className = 'v-play'; btn.textContent = '▶'; return; }
+
+  var speed = parseFloat(document.getElementById('speed').value) || 1.0;
+
+  try {
+    // Kokoro-82M HF Inference API
+    var response = await fetch(API_URL, {
+      method: 'POST',
+      headers: {
+        'Authorization': 'Bearer ' + HF_TOKEN,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        inputs: text,
+        parameters: {
+          voice: voiceId,
+          speed: speed
+        }
+      })
+    });
+
+    if (!response.ok) {
+      var errText = await response.text();
+      throw new Error('HTTP '+response.status+': '+errText.substring(0,200));
+    }
+
+    var blob = await response.blob();
+    var url = URL.createObjectURL(blob);
+    var audio = new Audio(url);
+    currentAudio = audio;
+
+    btn.className = 'v-play done';
+    btn.textContent = '🔊';
+
+    audio.onended = function(){
+      btn.className = 'v-play';
+      btn.textContent = '▶';
+      currentAudio = null;
+      URL.revokeObjectURL(url);
+    };
+
+    audio.onerror = function(){
+      btn.className = 'v-play';
+      btn.textContent = '▶';
+      currentAudio = null;
+      updateStatus('err', 'Playback error');
+    };
+
+    await audio.play();
+    updateStatus('ok', 'Playing: '+voiceId+' ('+langCode+')');
+
+  } catch(e) {
+    console.error('Kokoro TTS error:', e);
+    btn.className = 'v-play';
+    btn.textContent = '⚠';
+    updateStatus('err', 'Error: '+e.message);
+  }
+}
+
+// Speed slider
+document.getElementById('speed').addEventListener('input', function(){
+  document.getElementById('speedVal').textContent = parseFloat(this.value).toFixed(1)+'x';
+});
+
+renderAll();
+updateStatus('ok', 'Ready — '+totalVoices+' voices loaded');
+</script>
+</body>
+</html>
