@@ -1171,6 +1171,13 @@ button[onclick*="addToWordBank"]:hover{background:rgba(52,211,153,.15)!important
               <!-- A: Explanation -->
               <div id="grammarExplainBox" style="flex:35;background:var(--panel-bg);border:1px solid var(--line);border-radius:var(--mode-radius);padding:clamp(14px,2vw,20px);overflow-y:auto;min-height:0">
                 <div class="slide-box-title">What Changed</div>
+                <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+                  <span style="font-size:9px;color:var(--muted2)">Engine:</span>
+                  <select id="grammarProvider" onchange="switchGrammarProvider(this.value)" style="font-size:10px;padding:3px 8px;border-radius:6px;border:1px solid var(--line);background:var(--card);color:var(--text);cursor:pointer;font-family:Inter,sans-serif">
+                    <option value="llama31">🧠 Llama 3.1 (AI)</option>
+                    <option value="languagetool">📋 LanguageTool (rules)</option>
+                  </select>
+                </div>
                 <div id="grammarExplanation" style="font-size:13px;color:var(--muted);line-height:1.6">
                   Select a sentence → to see grammar corrections and explanations.
                 </div>
@@ -2460,7 +2467,7 @@ function _s5LineClick(el) {
   if (!sb) { if (corrEl) corrEl.textContent = '⚠️ Not signed in'; return; }
 
   sb.functions.invoke('grammar-segment', {
-    body: { text: text, mode: 'fix_grammar' }
+    body: { text: text, mode: 'fix_grammar', provider: _grammarProvider }
   }).then(function(res) {
     if (res.error) throw new Error(res.error.message || res.error);
     var data = res.data;
@@ -2558,7 +2565,7 @@ window._checkGrammarInline = async function(icon) {
 
   try {
     var res = await sb.functions.invoke('grammar-segment', {
-      body: { text: text, mode: 'fix_grammar' }
+      body: { text: text, mode: 'fix_grammar', provider: _grammarProvider }
     });
     if (res.error) throw new Error(res.error.message || res.error);
     var data = res.data;
@@ -3010,6 +3017,17 @@ function adjustGrammarFont(delta){
   var label3=document.getElementById('grammarFontSize3');
   if(label3)label3.textContent=_grammarFontSize+'px';
 }
+
+// ═══ Grammar provider selector ═══
+var _grammarProvider = 'llama31';
+window.switchGrammarProvider = function(val) {
+  _grammarProvider = val;
+  localStorage.setItem('sottotitoli-grammar-provider', val);
+};
+(function() {
+  var saved = localStorage.getItem('sottotitoli-grammar-provider');
+  if (saved) { _grammarProvider = saved; var sel = document.getElementById('grammarProvider'); if (sel) sel.value = saved; }
+})();
 
 // ═══ Mode 5: Corrected-feed view ═══
 var _correctedFeedMode = false;
