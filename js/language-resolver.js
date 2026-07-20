@@ -134,10 +134,15 @@ var S8T_LANG = (function() {
     var params = new URLSearchParams(window.location.search);
     var config = {};
 
+    function normalizeLang(code) {
+      if (!code) return null;
+      return code.split('-')[0].toLowerCase(); // 'en-US' → 'en'
+    }
+
     // From URL params (set by panoramica.html Start Session)
-    if (params.get('lang')) config.caption_lang = params.get('lang');
-    if (params.get('src')) config.translate_src = params.get('src');
-    if (params.get('tgt')) config.translate_tgt = params.get('tgt');
+    if (params.get('lang')) config.caption_lang = normalizeLang(params.get('lang'));
+    if (params.get('src')) config.translate_src = normalizeLang(params.get('src'));
+    if (params.get('tgt')) config.translate_tgt = normalizeLang(params.get('tgt'));
 
     // From localStorage cache (set on room entry, survives refresh)
     var cached = localStorage.getItem('s8t-room-config');
