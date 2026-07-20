@@ -379,7 +379,9 @@ body{background:radial-gradient(circle at top left,rgba(255,255,255,.35),transpa
     sentences:[],
     nextSpkId:1,
     connected:false,
-    connecting:false
+    connecting:false,
+    isHost:true,      // room creator = host; ?join=1 = guest
+    hostSpeaker:null  // name of the host speaker (cannot be deleted)
   };
 
   // ── Init ──
@@ -390,6 +392,14 @@ body{background:radial-gradient(circle at top left,rgba(255,255,255,.35),transpa
     DUO.roomId = localStorage.getItem('duo-room-id') || ('duo-'+Math.random().toString(36).substring(2,8));
     localStorage.setItem('duo-room-id', DUO.roomId);
     document.getElementById('duoRoomCode').textContent = DUO.roomId.substring(0,8);
+
+    // Update badge for host/guest
+    var badge = document.querySelector('.trial-pill');
+    if (badge) {
+      badge.textContent = DUO.isHost ? 'Host' : 'Guest';
+      badge.style.background = DUO.isHost ? 'rgba(124,58,237,.15)' : 'rgba(245,158,11,.15)';
+      badge.style.color = DUO.isHost ? 'var(--accent)' : 'var(--amber)';
+    }
 
     // Load saved preferences
     var savedTTL = localStorage.getItem('duo-my-ttl');
@@ -404,6 +414,18 @@ body{background:radial-gradient(circle at top left,rgba(255,255,255,.35),transpa
     renderSpeakerConfigs();
     updateStatus('idle');
 
+    // Guest: disable settings, show note
+    if (!DUO.isHost) {
+      var settingsEl = document.getElementById('duoSettings');
+      if (settingsEl) {
+        settingsEl.innerHTML = '<div class="duo-set-head">🔒 Guest Mode</div>'+
+          '<div style="font-size:11px;color:var(--t3);padding:4px 0">Only the host can manage speakers.<br>Host: '+(DUO.hostSpeaker||'Unknown')+'</div>';
+      }
+      // Hide "New Room" button area
+      var newRoomBtn = document.querySelector('.duo-invite-btn[onclick*="duoNewRoom"]');
+      if (newRoomBtn) newRoomBtn.style.display = 'none';
+    }
+
     // If demo mode
     if (window.location.search.indexOf('demo') !== -1) { demoPopulate(); return; }
 
@@ -414,6 +436,10 @@ body{background:radial-gradient(circle at top left,rgba(255,255,255,.35),transpa
   // ── URL param parsing ──
   function parseURLParams(){
     var params = new URLSearchParams(window.location.search);
+
+    // Host vs guest: ?join=1 means guest, otherwise host
+    DUO.isHost = !params.get('join');
+    if (params.get('host')) DUO.hostSpeaker = decodeURIComponent(params.get('host'));
 
     // Source language (caption language)
     if (params.get('src')) DUO.srcLang = params.get('src').split('-')[0].toLowerCase();
@@ -606,6 +632,7 @@ body{background:radial-gradient(circle at top left,rgba(255,255,255,.35),transpa
 
   // ── Speaker management ──
   window.duoAddSpeaker = function(name, snl){
+    if (!DUO.isHost) { showToast('🔒 Only the host can add speakers'); return; }
     if (DUO.speakerOrder.length >= 5) { showToast('⚠️ Max 5 speakers'); return; }
     name = name || ('Speaker '+(DUO.nextSpkId));
     snl = snl || DUO.srcLang || 'en';
@@ -614,12 +641,16 @@ body{background:radial-gradient(circle at top left,rgba(255,255,255,.35),transpa
     DUO.speakers[name] = {snl:snl, color:color, words:0, wpm:0, joined:new Date()};
     DUO.speakerOrder.push(name);
     DUO.nextSpkId++;
+    // First speaker added = host
+    if (!DUO.hostSpeaker) DUO.hostSpeaker = name;
     renderSpeakers();
     renderSpeakerConfigs();
     updateStyleForCount();
   };
 
   window.duoRemoveSpeaker = function(name){
+    if (!DUO.isHost) { showToast('🔒 Only the host can remove speakers'); return; }
+    if (name === DUO.hostSpeaker) { showToast('🔒 The host cannot be removed'); return; }
     delete DUO.speakers[name];
     DUO.speakerOrder = DUO.speakerOrder.filter(function(n){ return n !== name; });
     // Remove their sentences
@@ -641,19 +672,20 @@ body{background:radial-gradient(circle at top left,rgba(255,255,255,.35),transpa
     var html = '';
     DUO.speakerOrder.forEach(function(name){
       var sp = DUO.speakers[name];
+      var isHostSpeaker = (name === DUO.hostSpeaker);
       var langOpts = '';
       Object.keys(LANGS).forEach(function(code){
         langOpts += '<option value="'+code+'"'+(sp.snl===code?' selected':'')+'>'+LANGS[code].flag+' '+code.toUpperCase()+'</option>';
       });
       html += '<div class="duo-spk-cfg">'+
         '<span class="spk-dot" style="background:'+sp.color+'"></span>'+
-        '<input value="'+escAttr(name)+'" onchange="duoRenameSpeaker(\''+escAttr(name)+'\',this.value)" placeholder="Name">'+
-        '<select onchange="duoUpdateSpeakerSNL(\''+escAttr(name)+'\',this.value);reRenderAll();renderSpeakers()">'+langOpts+'</select>'+
-        '<button onclick="duoRemoveSpeaker(\''+escAttr(name)+'\')" title="Remove">×</button>'+
+        '<input value="'+escAttr(name)+'" onchange="duoRenameSpeaker(\''+escAttr(name)+'\',this.value)" placeholder="Name"'+(DUO.isHost?'':' disabled')+'>'+
+        '<select onchange="duoUpdateSpeakerSNL(\''+escAttr(name)+'\',this.value);reRenderAll();renderSpeakers()"'+langOpts+(DUO.isHost?'':' disabled')+'</select>'+
+        (DUO.isHost && !isHostSpeaker ? '<button onclick="duoRemoveSpeaker(\''+escAttr(name)+'\')" title="Remove">×</button>' : '')+
       '</div>';
     });
     container.innerHTML = html;
-    if (addBtn) addBtn.style.display = DUO.speakerOrder.length >= 5 ? 'none' : '';
+    if (addBtn) addBtn.style.display = (DUO.isHost && DUO.speakerOrder.length < 5) ? '' : 'none';
   }
 
   window.duoRenameSpeaker = function(oldName, newName){
@@ -734,9 +766,10 @@ body{background:radial-gradient(circle at top left,rgba(255,255,255,.35),transpa
     var html = '';
     DUO.speakerOrder.forEach(function(name){
       var sp = DUO.speakers[name];
+      var isHost = (name === DUO.hostSpeaker);
       html += '<div class="duo-spk">'+
         '<div class="duo-spk-avatar" style="background:'+sp.color+';color:#fff">'+name.charAt(0).toUpperCase()+'</div>'+
-        '<div class="duo-spk-info"><div class="duo-spk-name">'+esc(name)+'</div><div class="duo-spk-lang">'+(LANGS[sp.snl]?LANGS[sp.snl].flag:'')+' '+sp.snl.toUpperCase()+' · '+sp.words+'w</div></div>'+
+        '<div class="duo-spk-info"><div class="duo-spk-name">'+esc(name)+(isHost?' <span style="font-size:9px;background:var(--accent);color:#fff;padding:1px 5px;border-radius:4px;font-weight:700">HOST</span>':'')+'</div><div class="duo-spk-lang">'+(LANGS[sp.snl]?LANGS[sp.snl].flag:'')+' '+sp.snl.toUpperCase()+' · '+sp.words+'w</div></div>'+
         '<div class="duo-spk-status online"></div></div>';
     });
     list.innerHTML = html || '<div style="text-align:center;font-size:11px;color:var(--t3);padding:20px 8px">No speakers yet.<br>They will appear when captions arrive.</div>';
@@ -832,6 +865,9 @@ body{background:radial-gradient(circle at top left,rgba(255,255,255,.35),transpa
 
   function updateInviteLink(){
     var link=window.location.origin+window.location.pathname+'?join=1&room='+DUO.roomId;
+    if (DUO.hostSpeaker) link += '&host=' + encodeURIComponent(DUO.hostSpeaker);
+    if (DUO.srcLang) link += '&src=' + DUO.srcLang;
+    if (DUO.myTTL) link += '&tgt=' + DUO.myTTL;
     var el=document.getElementById('duoInviteLink'); if(el)el.textContent=link;
   }
 
