@@ -1452,6 +1452,20 @@
         </div>
       </div>
     </article>
+    <article class="alt-card">
+      <h3>🎙️ AI Voice Speaker</h3>
+      <div style="display:flex;flex-direction:column;gap:10px;margin-top:10px">
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:6px 0">
+          <span style="font-size:14px">🇬🇧 English</span>
+          <select id="settingsVoiceEN" class="sott-select" style="text-align:right;max-width:180px"></select>
+        </div>
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:6px 0">
+          <span style="font-size:14px">🇮🇹 Italiano</span>
+          <select id="settingsVoiceIT" class="sott-select" style="text-align:right;max-width:180px"></select>
+        </div>
+        <div style="font-size:10px;color:var(--text-faint);margin-top:4px">Kokoro-82M · Speaker icons in word definitions</div>
+      </div>
+    </article>
   </section>
   <div class="save-row">
     <button class="primary-btn" id="saveSettingsBtn" data-i18n="save_settings">Salva impostazioni</button>
@@ -1577,6 +1591,7 @@
   <script src="js/theme-2.js?v=4"></script>
   <script src="js/data-service.js"></script>
   <script src="js/i18n.js"></script>
+  <script src="js/kokoro-tts.js"></script>
 
   <!-- Page-specific: Supabase data fetching -->
   <script>
@@ -3082,6 +3097,12 @@
         // Aspetto — Font
         var fontEl = document.getElementById('settingsFont');
         if (fontEl) fontEl.value = s.font_pref || 'sans';
+
+        // AI Voice — English & Italian (Kokoro-82M)
+        var voiceEN = document.getElementById('settingsVoiceEN');
+        if (voiceEN && s.voice_en) voiceEN.value = s.voice_en;
+        var voiceIT = document.getElementById('settingsVoiceIT');
+        if (voiceIT && s.voice_it) voiceIT.value = s.voice_it;
       }
 
       // ── Apply theme immediately (called from settings + on page load) ──
@@ -6242,6 +6263,10 @@
     if (themeEl) settings.theme = themeEl.value;
     var fontEl = document.getElementById('settingsFont');
     if (fontEl) settings.font_pref = fontEl.value;
+    var voiceEN = document.getElementById('settingsVoiceEN');
+    if (voiceEN) settings.voice_en = voiceEN.value;
+    var voiceIT = document.getElementById('settingsVoiceIT');
+    if (voiceIT) settings.voice_it = voiceIT.value;
 
     // Green flash
     var origBg = btn.style.background;
@@ -6306,6 +6331,46 @@
   });
 
   console.log('🎯 Settings save handler attached');
+})();
+</script>
+
+<!-- ═══ AI Voice dropdowns — populate from KokoroTTS ═══ -->
+<script>
+(function(){
+  'use strict';
+  function populateVoiceDropdowns(){
+    if (!window.KokoroTTS || !window.KokoroTTS.getVoiceList) { setTimeout(populateVoiceDropdowns, 300); return; }
+    var enVoices = window.KokoroTTS.getVoiceList('en');
+    var itVoices = window.KokoroTTS.getVoiceList('it');
+
+    function fillSelect(el, voices, savedKey) {
+      if (!el) return;
+      var saved = localStorage.getItem(savedKey);
+      el.innerHTML = '';
+      voices.forEach(function(v){
+        var opt = document.createElement('option');
+        opt.value = v.id;
+        opt.textContent = v.label;
+        if (saved === v.id) opt.selected = true;
+        el.appendChild(opt);
+      });
+      // Also load from settings data
+      if (window._settingsData) {
+        if (savedKey === 'kokoro-voice-en' && window._settingsData.voice_en) el.value = window._settingsData.voice_en;
+        if (savedKey === 'kokoro-voice-it' && window._settingsData.voice_it) el.value = window._settingsData.voice_it;
+      }
+    }
+
+    fillSelect(document.getElementById('settingsVoiceEN'), enVoices, 'kokoro-voice-en');
+    fillSelect(document.getElementById('settingsVoiceIT'), itVoices, 'kokoro-voice-it');
+
+    // Save to localStorage on change
+    var enEl = document.getElementById('settingsVoiceEN');
+    var itEl = document.getElementById('settingsVoiceIT');
+    if (enEl) enEl.addEventListener('change', function(){ localStorage.setItem('kokoro-voice-en', this.value); });
+    if (itEl) itEl.addEventListener('change', function(){ localStorage.setItem('kokoro-voice-it', this.value); });
+  }
+  populateVoiceDropdowns();
 })();
 </script>
 
