@@ -4523,20 +4523,37 @@ function showWordDefinition(word) {
     tEl.textContent = def;
   } else {
     tEl.innerHTML = '<em style="opacity:.6">Definition not in dictionary</em>';
-    // Try Free Dictionary API
+    // Try Free Dictionary API — skip proper noun entries
     try {
       fetch('https://api.dictionaryapi.dev/api/v2/entries/en/' + encodeURIComponent(word.toLowerCase()))
         .then(function(r) { return r.json(); })
         .then(function(data) {
-          if (data && data[0] && data[0].meanings && data[0].meanings[0]) {
-            var d = data[0].meanings[0].definitions[0];
-            if (d) tEl.textContent = d.definition;
-            if (!pos && data[0].meanings[0].partOfSpeech) {
-              pEl.textContent = data[0].meanings[0].partOfSpeech.toUpperCase();
+          if (data && data[0] && data[0].meanings) {
+            var meanings = data[0].meanings;
+            var bestDef = null, bestPos = '';
+            // Find first non-proper-noun definition
+            for (var mi = 0; mi < meanings.length && !bestDef; mi++) {
+              var m = meanings[mi];
+              var isProper = m.partOfSpeech === 'proper noun' || m.partOfSpeech === 'proper-noun';
+              if (!isProper && m.definitions) {
+                for (var di = 0; di < m.definitions.length && !bestDef; di++) {
+                  var txt = m.definitions[di].definition || '';
+                  // Skip obvious proper noun definitions
+                  if (/^(A|The)\s/.test(txt) && /(song|album|film|movie|record|band|artist|actor|actress|novel|book|poem|city|town|country|company|brand|product|software|app|game|website|platform|character)/i.test(txt)) continue;
+                  bestDef = txt;
+                  bestPos = m.partOfSpeech;
+                }
+              }
             }
+            // Fallback: accept first definition if all were proper nouns
+            if (!bestDef && data[0].meanings[0] && data[0].meanings[0].definitions && data[0].meanings[0].definitions[0]) {
+              bestDef = data[0].meanings[0].definitions[0].definition;
+              bestPos = data[0].meanings[0].partOfSpeech;
+            }
+            if (bestDef) tEl.textContent = bestDef;
+            if (!pos && bestPos) pEl.textContent = bestPos.toUpperCase();
           }
         }).catch(function(){});
-    } catch(e) {}
   }
   
   // Update Add button state
