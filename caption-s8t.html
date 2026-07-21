@@ -833,6 +833,10 @@ button[onclick*="addToWordBank"]:hover{background:rgba(52,211,153,.15)!important
 .v20q-cap5 .v20q-line:hover .v20q-text{border-color:rgba(56,189,248,.15)}
 .v20q-cap5 .v20q-meta{display:flex;flex-direction:column;align-items:flex-end;gap:4px;flex-shrink:0;min-width:80px}
 .v20q-cap5 .v20q-meta .v20q-act{position:static;opacity:1;margin:0;gap:4px}
+
+/* ═══ Translation mode — side-by-side boxes ═══ */
+.v20q-tran-box { flex: 1; min-width: 0; padding: 4px 8px; font-size: 13px; color: var(--cyan); font-weight: 500; line-height: 1.5; text-align: right; border-left: 2px solid var(--cyan); opacity: .9; }
+[data-theme="light"] .v20q-tran-box { color: #0e7490; border-left-color: #0e7490; }
 .v20q-cap5 .v20q-num-row{display:flex;align-items:center;gap:6px}
 .v20q-cap5 .v20q-num{font-size:15px;font-weight:800;color:var(--accent);text-transform:uppercase;letter-spacing:.05em;font-family:var(--font-body)}
 .v20q-cap5 .v20q-time{font-size:22px;font-weight:800;color:var(--text);font-family:var(--font-mono);letter-spacing:-.03em;line-height:1}
@@ -1169,6 +1173,9 @@ button[onclick*="addToWordBank"]:hover{background:rgba(52,211,153,.15)!important
       <select id="varSelect" onchange="switchCaptionVar(this.value)" style="font-family:Inter,sans-serif;font-size:10px;font-weight:600;padding:4px 6px;border-radius:6px;border:1px solid var(--line);background:var(--panel,var(--card));color:var(--text);cursor:pointer;outline:none" title="Caption background">
         <option value="0">🎨 BG</option>
         <option value="1">VAR 1</option>
+        <option value="2">VAR 2</option>
+        <option value="10">VAR 3</option>
+        <option value="3">VAR 4</option>
       </select>
       <div style="position:relative">
         <button type="button" id="captionSettingsBtn" onclick="togglePopup('captionSettingsPopup',this)" title="Caption settings" style="font-size:14px;padding:4px 6px;border-radius:6px;border:1px solid var(--line);background:var(--card);color:var(--muted);cursor:pointer"><i class="fas fa-sliders"></i></button>
@@ -3902,9 +3909,36 @@ function addToWordBank(optionalWord) {
   wordBank.push(word);
   saveWordBank();
   renderWordBank();
+
+  // If translation mode is on, also save translation pair
+  if (v20q.translateOn) {
+    var tgtLang = localStorage.getItem('sottotitoli-translate-target') || 'it';
+    var srcLang = (window._currentCaptionLang || 'en-US').split('-')[0];
+    if (srcLang !== tgtLang) {
+      var T = window.SottotitoliTranslationProviders;
+      if (T) {
+        T.translateText({ provider: 'auto' }, word, srcLang, tgtLang).then(function(r){
+          _saveTranslationWord(word, r.translatedText, srcLang, tgtLang);
+        }).catch(function(){});
+      }
+    }
+  }
+
   if (!optionalWord) {
     var input = document.getElementById('wordbankInput');
     if (input) input.focus();
+  }
+}
+
+// ── Translation word bank ──
+var TR_WORD_KEY = 'sottotitoli_translation_words';
+function _saveTranslationWord(source, target, srcLang, tgtLang) {
+  var words = [];
+  try { words = JSON.parse(localStorage.getItem(TR_WORD_KEY) || '[]'); } catch(e) {}
+  // Avoid duplicates
+  if (!words.some(function(w){ return w.source === source && w.tgtLang === tgtLang; })) {
+    words.push({ source: source, target: target, srcLang: srcLang, tgtLang: tgtLang, savedAt: new Date().toISOString() });
+    localStorage.setItem(TR_WORD_KEY, JSON.stringify(words));
   }
 }
 
@@ -6867,22 +6901,36 @@ window.fixExtrasPanelColors = function(){
     if (!container) return;
     var lines = container.querySelectorAll('.v20q-line, .line');
     lines.forEach(function(line){
-      if (line.querySelector('.v20q-tran-box')) return; // already has translation
+      if (line.querySelector('.v20q-tran-box')) return;
       var text = (line.textContent || '').replace(/^\d{2}:\d{2}:\d{2}\s*/,'').trim();
       if (!text || text.length < 3) return;
+      // Side-by-side layout: original left, translation right
+      line.style.display = 'flex';
+      line.style.gap = '12px';
+      line.style.alignItems = 'flex-start';
+      var origWrap = document.createElement('span');
+      origWrap.style.flex = '1';
+      origWrap.style.minWidth = '0';
+      while (line.firstChild && line.firstChild !== origWrap) {
+        if (line.firstChild.nodeType === 3) {
+          origWrap.appendChild(line.firstChild);
+        } else if (line.firstChild.classList && line.firstChild.classList.contains('v20q-tran-box')) {
+          break;
+        } else {
+          origWrap.appendChild(line.firstChild);
+        }
+      }
+      line.insertBefore(origWrap, line.firstChild);
       var box = document.createElement('div');
       box.className = 'v20q-tran-box';
-      box.style.cssText = 'margin-top:4px;padding:6px 10px;background:rgba(124,58,237,.06);border-left:3px solid var(--accent);border-radius:4px;font-size:13px;color:var(--text-soft);font-style:italic';
-      box.textContent = '⏳ Translating…';
+      box.style.cssText = 'flex:1;min-width:0;padding:4px 8px;font-size:13px;color:var(--cyan);font-weight:500;line-height:1.5;text-align:right;border-left:2px solid var(--cyan);opacity:.9';
+      box.textContent = '⏳…';
       line.appendChild(box);
-      // Queue translation
       var T = window.SottotitoliTranslationProviders;
       if (T && srcLang !== target) {
         T.translateText({ provider: 'auto' }, text, srcLang, target).then(function(r){
           box.textContent = r.translatedText;
-        }).catch(function(){
-          box.textContent = text + ' ⚠';
-        });
+        }).catch(function(){ box.textContent = text + ' ⚠'; });
       } else {
         box.textContent = text;
       }
