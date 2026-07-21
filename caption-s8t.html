@@ -1411,12 +1411,30 @@ button[onclick*="addToWordBank"]:hover{background:rgba(52,211,153,.15)!important
     var names = {'en-US':'English','it-IT':'Italiano','fr-FR':'Français','de-DE':'Deutsch','es-ES':'Español','pt-PT':'Português','nl-NL':'Nederlands'};
     setTimeout(function() { setCaptionLanguage(code, names[code] || 'English', true); }, 200);
   }
-  if (modeParam) {
+  // Translate mode: don't pass to setCaptionMode (it's not a caption style)
+  if (modeParam === 'translate') {
+    setTimeout(function(){ applyTranslateModeUI(); }, 250);
+  } else if (modeParam) {
     setTimeout(function() { setCaptionMode(modeParam); }, 300);
   }
   // Ensure extras bar reflects language capabilities on load
   setTimeout(function() { refreshExtrasBarForLanguage(); }, 400);
 })();
+
+// ── Apply translate mode UI (shared between URL init and v20q init) ──
+function applyTranslateModeUI(){
+  if (typeof v20q !== 'undefined') v20q.translateOn = true;
+  var capBtn = document.getElementById('topCapBtn');
+  var trBtn = document.getElementById('topTrBtn');
+  var trFlag = document.getElementById('topTrFlag');
+  var rightExp = document.getElementById('rightExpander');
+  if (capBtn) capBtn.classList.remove('active');
+  if (trBtn) trBtn.classList.add('active');
+  if (trFlag) trFlag.style.display = '';
+  if (rightExp) { rightExp.style.opacity = '1'; rightExp.style.pointerEvents = 'auto'; }
+  if (typeof v20q_renderTranslations === 'function') v20q_renderTranslations();
+  if (typeof refreshFlagRows === 'function') refreshFlagRows();
+}
 
 // ═══ Caption Language Dropdown ═══
 var currentCaptionLang = 'en-US';
@@ -7072,22 +7090,9 @@ window.fixExtrasPanelColors = function(){
     btns.forEach(function(b){ b.classList.toggle('active', b.getAttribute('data-mode') === mode); });
   };
   // ── Init: auto-enable translate mode if ?mode=translate in URL ──
+  // (fallback — the URL params handler at the top of the script also handles this)
   if (window.location.search.indexOf('mode=translate') !== -1) {
-    // Apply translate UI state directly — do NOT redirect (we're already here)
-    v20q.translateOn = true;
-    setTimeout(function(){
-      var capBtn = document.getElementById('topCapBtn');
-      var trBtn = document.getElementById('topTrBtn');
-      var trFlag = document.getElementById('topTrFlag');
-      var rightExp = document.getElementById('rightExpander');
-      if (capBtn) capBtn.classList.remove('active');
-      if (trBtn) trBtn.classList.add('active');
-      if (trFlag) trFlag.style.display = '';
-      if (rightExp) { rightExp.style.opacity = '1'; rightExp.style.pointerEvents = 'auto'; }
-      // Re-render translations if content exists
-      if (typeof v20q_renderTranslations === 'function') v20q_renderTranslations();
-      if (typeof refreshFlagRows === 'function') refreshFlagRows();
-    }, 200);
+    setTimeout(function(){ applyTranslateModeUI(); }, 350);
   } else {
     // Caption mode: dim right expander
     setTimeout(function(){
