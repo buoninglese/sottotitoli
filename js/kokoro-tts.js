@@ -7,7 +7,10 @@
   // Default voice preferences per language
   // For English: dual voices (US + UK Male) with two speaker icons separated by |
   var DEFAULTS = {
-    en:  ['Google US English', 'Google UK English Male'],  // dual voice
+    en:  [
+      { name: 'Google US English', flag: '🇺🇸', label: 'US English' },
+      { name: 'Google UK English Male', altNames: ['Google UK English', 'Google UK English Female', 'Daniel'], flag: '🇬🇧', label: 'UK English' }
+    ],
     it:  'Google italiano',
     de:  'Google Deutsch',
     fr:  'Google français',
@@ -36,7 +39,10 @@
     var key = 'kokoro-voice-' + (lang || 'en');
     var saved = localStorage.getItem(key);
     if (saved) return saved;
-    return DEFAULTS[lang] || DEFAULTS['en'];
+    var def = DEFAULTS[lang] || DEFAULTS['en'];
+    // For dual-lang like en, return just the name array
+    if (Array.isArray(def)) return def.map(function(v){ return typeof v === 'string' ? v : v.name; });
+    return def;
   }
 
   function setVoiceForLang(lang, voiceId) {
@@ -67,9 +73,30 @@
       var match = allVoices.find(function(v){ return v.name === preferredName; });
       if (match) return match;
     }
-    // Fall back to any voice in this language
-    var langMatch = allVoices.find(function(v){ return v.lang.toLowerCase().indexOf(base) === 0; });
-    if (langMatch) return langMatch;
+    // For English dual voices, try alternative names (e.g. "Google UK English Male" → "Daniel")
+    if (base === 'en' && preferredName) {
+      var enDefs = DEFAULTS['en'];
+      if (Array.isArray(enDefs)) {
+        for (var i = 0; i < enDefs.length; i++) {
+          var def = enDefs[i];
+          if (typeof def === 'object' && def.name === preferredName && def.altNames) {
+            for (var j = 0; j < def.altNames.length; j++) {
+              var altMatch = allVoices.find(function(v){ return v.name === def.altNames[j]; });
+              if (altMatch) return altMatch;
+            }
+          }
+        }
+      }
+    }
+    // Fall back to any voice in this language (but not the same as the first match)
+    var langMatches = allVoices.filter(function(v){ return v.lang.toLowerCase().indexOf(base) === 0; });
+    if (langMatches.length > 1 && preferredName) {
+      // Try to find a different voice than the first match
+      for (var k = 0; k < langMatches.length; k++) {
+        if (langMatches[k].name !== preferredName) return langMatches[k];
+      }
+    }
+    if (langMatches.length) return langMatches[0];
     // Fall back to first available voice
     return allVoices[0] || null;
   }
@@ -153,6 +180,9 @@
     if (DUAL_LANGS[base]) {
       var voices = getVoiceForLang(base);
       if (!Array.isArray(voices)) voices = [voices];
+      // Get the rich voice objects for labels
+      var defs = DEFAULTS[base];
+      if (!Array.isArray(defs)) defs = [{name: defs, flag: '', label: defs}];
       voices.forEach(function(v, i){
         if (i > 0) {
           var sep = document.createElement('span');
@@ -160,7 +190,8 @@
           sep.style.cssText = 'font-size:10px;color:var(--t3);margin:0 2px;user-select:none';
           wrapper.appendChild(sep);
         }
-        wrapper.appendChild(_makeOneButton(text, lang, v, v));
+        var label = (defs[i] && defs[i].flag ? defs[i].flag + ' ' : '') + (defs[i] ? (defs[i].label || v) : v);
+        wrapper.appendChild(_makeOneButton(text, lang, v, label));
       });
     } else {
       wrapper.appendChild(_makeOneButton(text, lang, null, null));
