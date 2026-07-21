@@ -2079,10 +2079,14 @@ function _fetchDatamusePills(word, cardId, pos) {
   var relEl = card.querySelector('.syn-rel');
   if (!relEl) return;
 
-  // Determine POS if not provided
+  // Determine POS and context
   pos = pos || (typeof tagWord === 'function' ? tagWord(word) : 'OTHER');
-  // Normalize: tagWord returns NOUN/VERB/ADJ/ADV/etc, Compromise returns noun/verb/adj/adv
   pos = pos.toUpperCase();
+  var lc = card.getAttribute('data-lc') || '';
+  var rc = card.getAttribute('data-rc') || '';
+  var ctx = '';
+  if (lc) ctx += '&lc=' + encodeURIComponent(lc);
+  if (rc) ctx += '&rc=' + encodeURIComponent(rc);
 
   var baseUrl = 'https://api.datamuse.com/words?';
   var queries = [];
@@ -2109,7 +2113,7 @@ function _fetchDatamusePills(word, cardId, pos) {
   relEl.innerHTML = '<span style="color:var(--muted2);font-size:10px">…</span>';
 
   var promises = queries.map(function(q) {
-    return fetch(baseUrl + q.q + '&max=' + q.max + '&md=p')
+    return fetch(baseUrl + q.q + '&max=' + q.max + '&md=p' + ctx)
       .then(function(r) { return r.json(); })
       .then(function(data) {
         return { label: q.label, words: (data || []).map(function(d) { return d.word; }) };
@@ -2622,7 +2626,9 @@ function _slideLineClick(el) {
     var ts = Date.now();
     words.forEach(function(w, i){
       var cardId = 'gsyn-' + ts + '-' + i;
-      html += '<div class="syn-card" id="' + cardId + '" data-word="' + w + '" style="background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px;position:relative">';
+      var lc = i > 0 ? words[i-1].replace(/[^a-zA-Z]/g,'') : '';
+      var rc = i < words.length-1 ? words[i+1].replace(/[^a-zA-Z]/g,'') : '';
+      html += '<div class="syn-card" id="' + cardId + '" data-word="' + w + '" data-lc="' + lc + '" data-rc="' + rc + '" style="background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px;position:relative">';
       html += '<div style="position:absolute;top:8px;right:8px;display:flex;gap:4px;z-index:2">';
       html += '<button onclick="var w=this.closest(\'.syn-card\').getAttribute(\'data-word\');this.classList.toggle(\'saved\');if(this.classList.contains(\'saved\')){this.textContent=\'✓\';if(typeof addToWordBank===\'function\')addToWordBank(w)}else{this.textContent=\'+\';if(typeof removeFromWordBank===\'function\')removeFromWordBank(w)}" style="width:24px;height:24px;border-radius:50%;border:1px solid var(--line);background:var(--card2);color:var(--muted2);cursor:pointer;font-size:20px;display:flex;align-items:center;justify-content:center;line-height:1" title="Add to word bank">+</button>';
       html += '<button onclick="var c=document.getElementById(\''+cardId+'\');c.style.opacity=\'0\';c.style.transform=\'scale(.95)\';c.style.transition=\'all .2s\';setTimeout(function(){c.remove()},200)" style="width:24px;height:24px;border-radius:50%;border:1px solid var(--line);background:var(--card2);color:var(--muted2);cursor:pointer;font-size:20px;display:flex;align-items:center;justify-content:center;line-height:1" title="Dismiss">×</button>';
