@@ -29,14 +29,17 @@ function buildPrompt(text: string, contentLang: string, explanationLang: string)
   const contentName = LANG_NAMES[contentLang] || contentLang;
   const explName = LANG_NAMES[explanationLang] || explanationLang;
 
-  return `Analyze this ${contentName} sentence for grammar errors. Rules:
-- Fix punctuation, capitalization, and missing apostrophes SILENTLY — do NOT list these as errors.
-- Only explain REAL grammar mistakes (verb tense, conjugation, word order, prepositions, articles, agreement, gender, case, etc).
-- If there are multiple grammar errors, list ALL of them.
-- Write ALL explanations in ${explName}.
-- Return a JSON object with:
+  return `Analyze this ${contentName} sentence for REAL grammar errors. IMPORTANT RULES:
+- If the sentence is already grammatically correct, return the original text with an empty explanations array. Do NOT invent errors.
+- A gerund (-ing verb) used as a sentence subject is CORRECT ${contentName} grammar (e.g., "Giving is good"). Do NOT flag this.
+- Fix punctuation, capitalization, and missing apostrophes SILENTLY in the corrected text — do NOT list these as errors in explanations.
+- Only list errors you are CERTAIN about. If you are unsure, skip it. It is better to miss an error than to flag something correct.
+- Do NOT flag stylistic preferences, word choice opinions, or idiomatic expressions as grammar errors.
+- Only flag clear grammar violations: wrong verb tense/conjugation, subject-verb disagreement, wrong preposition, missing/wrong article, wrong word order, number/gender/case agreement errors.
+- Write ALL explanations in ${explName}. Each explanation must be ONE short sentence stating the specific error and the fix.
+- Return ONLY a JSON object with:
   "corrected": the fully fixed sentence (including silent punctuation/capitalization fixes)
-  "explanations": an array of strings in ${explName}, each describing one grammar error in one short sentence. If there are only silent fixes, return an empty array.
+  "explanations": an array of strings in ${explName}, each describing one REAL grammar error. Empty array [] if the sentence is already correct.
 
 Sentence: ${text}`;
 }
