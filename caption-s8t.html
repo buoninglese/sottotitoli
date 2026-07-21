@@ -4624,8 +4624,9 @@ function lookupOnline(word) {
         window.sottotitoliSupabase.from('user_preferences')
           .select('native_lang,updated_at').eq('user_id', r.data.session.user.id).maybeSingle()
           .then(function(res) {
-            // Future: if we add a wordbank column, restore here
-            // For now, just confirm the user_preferences row exists
+            if (res.data && res.data.native_lang) {
+              localStorage.setItem('sottotitoli-native-lang', res.data.native_lang);
+            }
           }).catch(function(){});
       }
     }).catch(function(){});
@@ -7031,7 +7032,15 @@ window.fixExtrasPanelColors = function(){
       return;
     }
     if (topMode === 'translate') {
-      var src2 = localStorage.getItem('sottotitoli-caption-lang') || 'en-US';
+      // Prefer user's native language as source, fall back to caption language
+      var nativeCode = localStorage.getItem('sottotitoli-native-lang');
+      var captionLang = localStorage.getItem('sottotitoli-caption-lang') || 'en-US';
+      var src2 = captionLang;
+      if (nativeCode) {
+        // Map short codes to full locale codes
+        var codeMap = { en:'en-US', it:'it-IT', nl:'nl-NL', fr:'fr-FR', de:'de-DE', es:'es-ES', pl:'pl-PL', pt:'pt-PT' };
+        src2 = codeMap[nativeCode] || captionLang;
+      }
       var tgt = localStorage.getItem('sottotitoli-translate-target') || 'it';
       window.location.href = window.location.pathname + '?lang=' + src2 + '&mode=translate&tgt=' + tgt;
       return;
