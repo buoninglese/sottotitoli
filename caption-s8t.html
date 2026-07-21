@@ -1189,7 +1189,7 @@ button[onclick*="addToWordBank"]:hover{background:rgba(52,211,153,.15)!important
   <!-- Transport controls — simplified -->
   <div class="action-bar" id="actionBar" style="margin-top:10px;display:flex;align-items:center;justify-content:center;gap:16px;flex-wrap:wrap">
     <button type="button" class="btn-grad btn-start" id="startBtn" onclick="toggleSession()" style="font-size:15px;padding:8px 22px;border-radius:100px">🎤 Start</button>
-    <button type="button" class="btn-grad btn-pause" id="pauseBtn" style="display:none;font-size:15px;padding:8px 22px;border-radius:100px" onclick="togglePause()">▶ Paused</button>
+    <button type="button" class="btn-grad btn-pause" id="pauseBtn" style="display:none;font-size:15px;padding:8px 22px;border-radius:100px" onclick="togglePause()">⏸</button>
     <span id="recTimer" style="font-family:Inter,sans-serif;font-size:16px;font-weight:600;color:var(--text);min-width:48px;text-align:center">00:00</span>
     <span class="topbar-pill" style="border:none;background:transparent;padding:0">
       <span class="tp-dot" id="micDot"></span>
@@ -3527,7 +3527,7 @@ function _applySessionLiveUI(startBtn, stopBtn) {
     if (_realMic.state === 'live' && !paused && timerInterval !== null) {
       startBtn.style.display = 'none';
       stopBtn.style.display = '';
-      if (pauseBtn) { pauseBtn.style.display = ''; pauseBtn.classList.remove('paused'); }
+      if (pauseBtn) { pauseBtn.style.display = ''; pauseBtn.textContent = '⏸'; pauseBtn.classList.remove('paused'); }
       updateRecDash('live');
       document.body.classList.add('session-active');
       return;
@@ -3535,7 +3535,7 @@ function _applySessionLiveUI(startBtn, stopBtn) {
     // Fresh start — mic just started, set up everything
     startBtn.style.display = 'none';
     stopBtn.style.display = '';
-    if (pauseBtn) { pauseBtn.style.display = ''; pauseBtn.classList.remove('paused'); }
+    if (pauseBtn) { pauseBtn.style.display = ''; pauseBtn.textContent = '⏸'; pauseBtn.classList.remove('paused'); }
     sessionSeconds = 0;
     wordBank = [];
     saveWordBank();
@@ -6818,7 +6818,7 @@ window.fixExtrasPanelColors = function(){
 <script>
 (function(){
   // ── State ──
-  var v20q = { mode:'view', style:'cap1', words:[], sentences:[], timestamps:[], sIdx:0, bookmarks:[] };
+  var v20q = { mode:'view', style:'cap1', words:[], sentences:[], timestamps:[], sIdx:0, bookmarks:[], translateOn:false };
 
   // ── Helpers ──
   function v20q_fmtTime(sec){ var m=Math.floor(sec/60); var s=sec%60; return (m<10?'0':'')+m+':'+(s<10?'0':'')+s; }
@@ -6827,19 +6827,35 @@ window.fixExtrasPanelColors = function(){
 
   // ── Toggle: Mode ──
   window.v20q_setMode = function(mode){
-    v20q.mode = mode;
-    var c = document.getElementById('captionTranscript'); if(c) c.setAttribute('data-mode', mode);
-    // Update left bar buttons
-    var btns = document.querySelectorAll('#leftModeBar .mode-icon-btn');
-    btns.forEach(function(b){ b.classList.toggle('active', b.getAttribute('data-mode') === mode); });
-    // Show/hide translation cycle button
-    var tlBtn = document.getElementById('translateCycleBtn');
-    if (tlBtn) tlBtn.style.display = (mode === 'translate') ? 'flex' : 'none';
-    // If switching to translate mode, re-render with translations
+    // Translation is a toggle — combinable with view/edit/collect
     if (mode === 'translate') {
+      v20q.translateOn = !v20q.translateOn;
+    } else {
+      // View / Edit / Collect are mutually exclusive
+      v20q.mode = mode;
+      v20q.translateOn = false; // switching mode turns off translation
+    }
+    var c = document.getElementById('captionTranscript'); if(c) c.setAttribute('data-mode', v20q.mode);
+
+    // Update left bar buttons: view/edit/collect mutually exclusive, translate independent
+    var btns = document.querySelectorAll('#leftModeBar .mode-icon-btn');
+    btns.forEach(function(b){
+      var dm = b.getAttribute('data-mode');
+      if (dm === 'translate') {
+        b.classList.toggle('active', v20q.translateOn);
+      } else {
+        b.classList.toggle('active', dm === v20q.mode);
+      }
+    });
+
+    // Show/hide translation flag button
+    var tlBtn = document.getElementById('translateCycleBtn');
+    if (tlBtn) tlBtn.style.display = v20q.translateOn ? 'flex' : 'none';
+
+    // Render or remove translations
+    if (v20q.translateOn) {
       v20q_renderTranslations();
     } else {
-      // Remove translation boxes
       document.querySelectorAll('.v20q-tran-box').forEach(function(b){ b.remove(); });
     }
   };
