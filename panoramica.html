@@ -6548,5 +6548,54 @@
 })();
 </script>
 
+<!-- ═══ Translation Word Banks — render from localStorage ═══ -->
+<script>
+(function(){
+  'use strict';
+  var FLAGS = { en:'🇬🇧', it:'🇮🇹', nl:'🇳🇱', fr:'🇫🇷', de:'🇩🇪', es:'🇪🇸', pl:'🇵🇱' };
+  var NAMES = { en:'English', it:'Italiano', nl:'Nederlands', fr:'Français', de:'Deutsch', es:'Español', pl:'Polski' };
+
+  function renderTranslationBanks(){
+    var grid = document.getElementById('wbTranslationGrid');
+    if (!grid) return;
+    var words = [];
+    try { words = JSON.parse(localStorage.getItem('sottotitoli_translation_words') || '[]'); } catch(e) {}
+    if (!words.length) {
+      grid.innerHTML = '<div style="text-align:center;padding:40px;color:var(--text-faint);grid-column:1/-1">No translation words saved yet. Use Translation mode in a caption session to start collecting.</div>';
+      return;
+    }
+    // Group by target language
+    var byLang = {};
+    words.forEach(function(w){
+      var key = w.tgtLang || 'it';
+      if (!byLang[key]) byLang[key] = [];
+      byLang[key].push(w);
+    });
+    var html = '';
+    Object.keys(byLang).sort().forEach(function(lang){
+      var items = byLang[lang];
+      html += '<div class="alt-card" style="padding:16px">';
+      html += '<h3 style="font-size:14px;margin-bottom:10px">'+(FLAGS[lang]||'')+' '+(NAMES[lang]||lang)+' <span style="font-size:10px;color:var(--text-faint)">('+items.length+' words)</span></h3>';
+      html += '<div style="font-size:10px;color:var(--text-faint);text-transform:uppercase;letter-spacing:.04em;margin-bottom:8px">📥 Saved from session</div>';
+      html += '<div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:12px">';
+      items.slice(-20).reverse().forEach(function(w){
+        html += '<span style="font-size:11px;padding:3px 8px;border-radius:99px;background:var(--card2);border:1px solid var(--line);color:var(--text)" title="'+w.target+'">'+w.source+' → '+w.target+'</span>';
+      });
+      html += '</div>';
+      html += '<div style="font-size:10px;color:var(--text-faint);text-transform:uppercase;letter-spacing:.04em;margin-bottom:8px">✏️ Create your own</div>';
+      html += '<div style="display:flex;gap:6px"><input placeholder="Source word" style="flex:1;padding:6px 8px;border-radius:6px;border:1px solid var(--line);background:var(--bg);color:var(--text);font-size:12px"><input placeholder="Translation" style="flex:1;padding:6px 8px;border-radius:6px;border:1px solid var(--line);background:var(--bg);color:var(--text);font-size:12px"><button style="padding:6px 12px;border-radius:6px;border:1px solid var(--accent);background:var(--accent);color:#fff;cursor:pointer;font-size:11px;font-weight:600">+</button></div>';
+      html += '</div>';
+    });
+    grid.innerHTML = html;
+  }
+
+  // Render when Translation tab is clicked
+  var tab = document.querySelector('[data-subtab="wb-translation"]');
+  if (tab) tab.addEventListener('click', function(){ setTimeout(renderTranslationBanks, 100); });
+  // Also render on page load in case it's the active tab
+  setTimeout(renderTranslationBanks, 500);
+})();
+</script>
+
 </body>
 </html>
