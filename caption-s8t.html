@@ -1452,7 +1452,7 @@ button[onclick*="addToWordBank"]:hover{background:rgba(52,211,153,.15)!important
   // Translate mode: don't pass to setCaptionMode (it's not a caption style)
   if (modeParam === 'translate') {
     setTimeout(function(){ applyTranslateModeUI(); }, 250);
-  } else if (modeParam) {
+  } else if (modeParam && modeParam !== 'undefined' && modeParam !== 'null') {
     setTimeout(function() { setCaptionMode(modeParam); }, 300);
   }
   // Ensure extras bar reflects language capabilities on load
@@ -1651,7 +1651,8 @@ function setCaptionLanguage(code, name, skipConfirm) {
   }
   localStorage.setItem('sottotitoli-caption-lang', code);
   // Update URL — preserve join params if present
-  var newUrl = window.location.pathname + '?lang=' + code + '&mode=' + currentCaptionMode;
+  var modeParam = currentCaptionMode || 'j7b';
+  var newUrl = window.location.pathname + '?lang=' + code + '&mode=' + modeParam;
   var params = new URLSearchParams(window.location.search);
   if (params.get('join')) newUrl += '&join=' + params.get('join') + '&room=' + (params.get('room')||'') + '&host=' + encodeURIComponent(params.get('host')||'');
   window.history.replaceState({}, '', newUrl);
@@ -1712,7 +1713,7 @@ function _createCaptionRoom(langCode) {
         if (el) el.textContent = roomId.substring(0, 16) + '…';
         var linkEl = document.getElementById('capRoomLink');
         if (linkEl) {
-          var shareUrl = window.location.origin + window.location.pathname + '?lang=' + langCode + '&mode=' + currentCaptionMode + '&room=' + roomId;
+          var shareUrl = window.location.origin + window.location.pathname + '?lang=' + langCode + '&mode=' + (currentCaptionMode || 'j7b') + '&room=' + roomId;
           linkEl.innerHTML = '<a href="' + shareUrl + '" style="color:var(--accent);font-size:10px" onclick="navigator.clipboard.writeText(this.href);return false">📋 copy</a>';
         }
       }
@@ -3120,9 +3121,10 @@ function setSpeakerMode(mode) {
   setTimeout(function() { setSpeakerMode(sm); }, 100);
 })();
 
-// Restore saved mode — sanitize: 'translate' is not a valid caption style
+// Restore saved mode — sanitize: only allow known caption styles
 var saved = localStorage.getItem('sottotitoli-caption-mode') || 'j7b';
-if (saved === 'translate') { saved = 'j7b'; localStorage.removeItem('sottotitoli-caption-mode'); }
+var VALID_MODES = ['j7b','i1'];
+if (VALID_MODES.indexOf(saved) === -1) { saved = 'j7b'; localStorage.removeItem('sottotitoli-caption-mode'); }
 setCaptionMode(saved);
 
 // ═══ Theme handled by theme-2.js ═══
