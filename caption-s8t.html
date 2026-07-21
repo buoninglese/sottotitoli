@@ -2090,59 +2090,75 @@ function _fetchDatamusePills(word, cardId, pos) {
 
   var baseUrl = 'https://api.datamuse.com/words?';
   var queries = [];
-  var maxTotal = 5;
 
   if (pos === 'NOUN') {
     queries = [
-      { label: '', q: 'rel_syn=' + encodeURIComponent(word), max: 3 },
-      { label: '', q: 'rel_spc=' + encodeURIComponent(word), max: 1 },
-      { label: '', q: 'rel_jjb=' + encodeURIComponent(word), max: 1 }
+      { q: 'rel_syn=' + encodeURIComponent(word), max: 3 },
+      { q: 'rel_spc=' + encodeURIComponent(word), max: 1 },
+      { q: 'rel_jjb=' + encodeURIComponent(word), max: 1 }
     ];
   } else if (pos === 'ADJ') {
     queries = [
-      { label: '', q: 'rel_syn=' + encodeURIComponent(word), max: 3 },
-      { label: '', q: 'rel_ant=' + encodeURIComponent(word), max: 2 }
+      { q: 'rel_syn=' + encodeURIComponent(word), max: 3 },
+      { q: 'rel_ant=' + encodeURIComponent(word), max: 2 }
     ];
   } else {
-    // VERB, ADV, or undefined — just synonyms
     queries = [
-      { label: '', q: 'rel_syn=' + encodeURIComponent(word), max: 5 }
+      { q: 'rel_syn=' + encodeURIComponent(word), max: 5 }
     ];
   }
 
   relEl.innerHTML = '<span style="color:var(--muted2);font-size:10px">…</span>';
 
-  var promises = queries.map(function(q) {
-    return fetch(baseUrl + q.q + '&max=' + q.max + '&md=p' + ctx)
-      .then(function(r) { return r.json(); })
-      .then(function(data) {
-        return { label: q.label, words: (data || []).map(function(d) { return d.word; }) };
-      })
-      .catch(function() { return { label: q.label, words: [] }; });
-  });
-
-  Promise.all(promises).then(function(results) {
+  // Primary: POS-specific endpoints
+  _dmFetch(queries, ctx).then(function(allWords) {
+    // Fallback: if too few results, try broader "means like"
+    if (allWords.length < 2) {
+      return _dmFetch([{ q: 'ml=' + encodeURIComponent(word), max: 8 }], ctx);
+    }
+    return allWords;
+  }).then(function(allWords) {
+    // Last resort: word triggers
+    if (allWords.length < 2) {
+      return _dmFetch([{ q: 'rel_trg=' + encodeURIComponent(word), max: 8 }], ctx);
+    }
+    return allWords;
+  }).then(function(allWords) {
     var seen = {};
     seen[word.toLowerCase()] = true;
-    var allWords = [];
-    results.forEach(function(group) {
-      group.words.forEach(function(w) {
-        var lw = w.toLowerCase();
-        if (!seen[lw] && allWords.length < 8) {
-          seen[lw] = true;
-          allWords.push(w);
-        }
-      });
+    var filtered = [];
+    allWords.forEach(function(w) {
+      var lw = w.toLowerCase();
+      if (!seen[lw] && filtered.length < 8) {
+        seen[lw] = true;
+        filtered.push(w);
+      }
     });
     var html = '';
-    if (allWords.length === 0) {
+    if (filtered.length === 0) {
       html = '<span style="color:var(--muted2);font-size:10px">No related words</span>';
     } else {
-      allWords.forEach(function(w) {
+      filtered.forEach(function(w) {
         html += '<span onclick="lookupSynonym(this)" data-word="' + w + '" data-context="' + word + '" style="cursor:pointer;font-size:11px;font-weight:600;padding:3px 8px;border-radius:100px;border:1px solid rgba(52,211,153,.2);color:#34d399;background:rgba(52,211,153,.06);margin:2px;display:inline-block">' + w + '</span>';
       });
     }
     if (relEl) relEl.innerHTML = html;
+  });
+}
+
+// Helper: fetch multiple Datamuse queries in parallel, return deduped word list
+function _dmFetch(queries, ctx) {
+  var baseUrl = 'https://api.datamuse.com/words?';
+  var promises = queries.map(function(q) {
+    return fetch(baseUrl + q.q + '&max=' + q.max + '&md=p' + (ctx||''))
+      .then(function(r) { return r.json(); })
+      .then(function(data) { return (data || []).map(function(d) { return d.word; }); })
+      .catch(function() { return []; });
+  });
+  return Promise.all(promises).then(function(results) {
+    var all = [];
+    results.forEach(function(words) { all = all.concat(words); });
+    return all;
   });
 }
 function _fetchWordnikFallback(word, cardId) {
