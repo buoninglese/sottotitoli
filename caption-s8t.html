@@ -722,6 +722,27 @@ button[onclick*="addToWordBank"]:hover{background:rgba(52,211,153,.15)!important
 [data-theme="light"] .rec-toggle:hover { border-color: #7c3aed; color: #7c3aed; }
 [data-theme="light"] .rec-toggle.open { background: rgba(124,58,237,.06); border-color: #7c3aed; color: #7c3aed; }
 
+/* ═══ LEFT MODE BAR ═══ */
+.left-mode-bar {
+  position: absolute; top: 12px; left: 12px; z-index: 10;
+  display: flex; flex-direction: column; align-items: center; gap: 4px;
+}
+.mode-icon-btn {
+  width: 44px; height: 44px; border-radius: 12px;
+  border: 1px solid var(--line); background: var(--card); color: var(--t3);
+  cursor: pointer; font-size: 11px; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: 1px;
+  transition: all .15s; font-family: 'Inter',sans-serif;
+}
+.mode-icon-btn i { font-size: 14px; }
+.mode-icon-btn span { font-size: 6px; line-height: 1.1; text-align: center; font-weight: 500; }
+.mode-icon-btn:hover { border-color: var(--accent); color: var(--text); }
+.mode-icon-btn.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+.mode-icon-btn.active span { color: rgba(255,255,255,.8); }
+/* Translation lang dropdown */
+#translateLangRow select { font-size: 10px; font-weight: 500; }
+#translateLangRow select:focus { outline: none; border-color: var(--accent); }
+
 /* ═══ RIGHT PANEL (Metrics / SYN) ═══ */
 .right-panel {
   position: absolute; top: 0; right: 0; bottom: 0; z-index: 500;
@@ -949,7 +970,25 @@ button[onclick*="addToWordBank"]:hover{background:rgba(52,211,153,.15)!important
         <div class="metric-row" style="border-color:var(--line)"><span class="m-label" title="Riempitivi al minuto.">Riemp./min</span><span class="m-value" id="popLiveFillersPerMin">—</span></div>
       </div>
     </div>
-    <button type="button" class="icon-btn" id="speakersToggleBtn" onclick="togglePanel('speakers')" aria-label="Speakers" title="Speakers" style="font-size:15px;opacity:.4;color:var(--text)"><i class="fas fa-user-friends"></i></button>
+    <!-- Magic Fix -->
+    <div style="position:relative">
+      <button type="button" class="icon-btn" id="magicFixBtn" aria-label="Magic Fix" title="Magic Fix" onclick="togglePopup('magicFixPopup',this)" style="font-size:15px;color:var(--text)"><i class="fas fa-wand-magic-sparkles"></i></button>
+      <div id="magicFixPopup" style="display:none;position:absolute;top:0;right:36px;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px 16px;box-shadow:0 8px 32px rgba(0,0,0,.12);z-index:20;min-width:200px;font-size:12px">
+        <div style="font-size:9px;color:var(--muted2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">🪄 Magic Fix</div>
+        <p style="font-size:11px;color:var(--muted);line-height:1.5;margin-bottom:10px">Automatically corrects grammar in your sentences as they appear. Turn on to see corrected text alongside the original.</p>
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px;font-weight:600">
+          <input type="checkbox" id="magicFixToggle" onchange="toggleMagicFix(this.checked)" style="accent-color:var(--accent)">
+          <span id="magicFixStatus">Off — tap to enable</span>
+        </label>
+      </div>
+    </div>
+    <!-- Bookmarks -->
+    <span style="position:relative">
+      <button type="button" class="icon-btn" id="bookmarksBtn" onclick="v20q_showBookmarks()" aria-label="Bookmarks" title="Bookmarked sentences" style="font-size:15px;color:var(--warn)"><i class="fas fa-bookmark"></i></button>
+      <div class="v20q-bookmark-panel" id="v20qBookmarkPanel"></div>
+    </span>
+    <!-- Word Bank -->
+    <button type="button" class="icon-btn" id="wordBankBtn" onclick="toggleWordBankPanel()" aria-label="Word Bank" title="Word Bank" style="font-size:15px;color:var(--text)"><i class="fas fa-book-open"></i></button>
     <div id="slideDots" style="display:flex;flex-direction:column;align-items:center;gap:3px;margin-top:8px;padding-top:8px;border-top:1px solid var(--line)">
       <button class="slide-dot active" data-slide="0" title="Captions">1</button>
       <button class="slide-dot" data-slide="1" title="Vocabolario">2</button>
@@ -959,7 +998,24 @@ button[onclick*="addToWordBank"]:hover{background:rgba(52,211,153,.15)!important
     </div>
   </div>
 
-  <!-- ── Left: Speaker Panel (removed — use duo-s8t.html for multi-speaker) ── -->
+  <!-- ── Left: Mode Bar ── -->
+  <div class="left-mode-bar" id="leftModeBar">
+    <button class="mode-icon-btn active" data-mode="view" onclick="v20q_setMode('view')" title="Clear View"><i class="fas fa-eye"></i><span>Clear<br>View</span></button>
+    <button class="mode-icon-btn" data-mode="edit" onclick="v20q_setMode('edit')" title="Edit Mode"><i class="fas fa-pen-to-square"></i><span>Edit<br>Mode</span></button>
+    <button class="mode-icon-btn" data-mode="collect" onclick="v20q_setMode('collect')" title="Word Saver"><i class="fas fa-book"></i><span>Word<br>Saver</span></button>
+    <button class="mode-icon-btn" data-mode="translate" onclick="v20q_setMode('translate')" title="Translation"><i class="fas fa-language"></i><span>Trans<br>lation</span></button>
+    <div id="translateLangRow" style="display:none;margin-top:8px;padding-top:8px;border-top:1px solid var(--line)">
+      <select id="translateTargetLang" onchange="setTranslateTarget(this.value)" style="width:100%;font-size:10px;padding:4px;border-radius:6px;border:1px solid var(--line);background:var(--card);color:var(--text);cursor:pointer">
+        <option value="it">🇮🇹 Italiano</option>
+        <option value="en">🇬🇧 English</option>
+        <option value="nl">🇳🇱 Nederlands</option>
+        <option value="fr">🇫🇷 Français</option>
+        <option value="de">🇩🇪 Deutsch</option>
+        <option value="es">🇪🇸 Español</option>
+        <option value="pl">🇵🇱 Polski</option>
+      </select>
+    </div>
+  </div>
     </div>
     <!-- Invitee info section -->
     <div id="duoInviteeSection" style="display:none;padding:12px;border-top:1px solid rgba(255,255,255,.06)">
@@ -1134,45 +1190,16 @@ button[onclick*="addToWordBank"]:hover{background:rgba(52,211,153,.15)!important
   <div id="captionPanel" style="background:var(--panel,var(--card));border:2px solid var(--line-strong,var(--line));border-radius:34px;padding:14px 24px;box-shadow:0 4px 32px rgba(0,0,0,.06)">
     <div class="caption-interim" id="captionInterim" data-placeholder="Speak to see subtitles…" style="text-align:center;min-height:150px;display:flex;align-items:center;justify-content:center"></div>
   </div>
-  <!-- Transport controls — on the background, not in a box -->
+  <!-- Transport controls — simplified -->
   <div class="action-bar" id="actionBar" style="margin-top:10px;display:flex;align-items:center;justify-content:center;gap:16px;flex-wrap:wrap">
-    <!-- V20quint Mode toggle -->
-    <span class="v20q-toggle" id="v20qModeToggle" title="Transcript mode: what clicking words does">
-      <span class="v20q-label">Mode</span>
-      <button class="v20q-tbtn active" data-val="view" onclick="v20q_setMode('view')">👁</button>
-      <button class="v20q-tbtn" data-val="edit" onclick="v20q_setMode('edit')">✎</button>
-      <button class="v20q-tbtn" data-val="collect" onclick="v20q_setMode('collect')">🟢</button>
-      <span class="v20q-badge" id="v20qBadge"></span>
-    </span>
-    <!-- V20quint Style toggle -->
-    <span class="v20q-toggle" id="v20qStyleToggle" title="Transcript style">
-      <span class="v20q-label">Style</span>
-      <button class="v20q-tbtn active" data-val="cap1" onclick="v20q_setStyle('cap1')" title="Minimal">1</button>
-      <button class="v20q-tbtn" data-val="cap2" onclick="v20q_setStyle('cap2')" title="Newspaper">2</button>
-      <button class="v20q-tbtn" data-val="cap3" onclick="v20q_setStyle('cap3')" title="Stacked">3</button>
-      <button class="v20q-tbtn" data-val="cap5" onclick="v20q_setStyle('cap5')" title="Dashboard">5</button>
-    </span>
-    <!-- Bookmarks -->
-    <span style="position:relative">
-      <button class="v20q-tbtn" onclick="v20q_showBookmarks()" title="Bookmarked sentences" style="color:var(--warn);border-color:rgba(245,158,11,.3)">☆</button>
-      <div class="v20q-bookmark-panel" id="v20qBookmarkPanel"></div>
-    </span>
     <button type="button" class="btn-grad btn-start" id="startBtn" onclick="toggleSession()" style="font-size:15px;padding:8px 22px;border-radius:100px">🎤 Start</button>
     <button type="button" class="btn-grad btn-pause" id="pauseBtn" style="display:none;font-size:15px;padding:8px 22px;border-radius:100px" onclick="togglePause()">▶ Paused</button>
     <span id="recTimer" style="font-family:Inter,sans-serif;font-size:16px;font-weight:600;color:var(--text);min-width:48px;text-align:center">00:00</span>
-    <!-- Mode 5: Corrected feed toggle -->
-    <button type="button" id="correctedFeedBtn" onclick="toggleCorrectedFeed()" title="Mode 5: Show corrected transcript (Ctrl+Shift+G)" style="font-size:11px;padding:5px 10px;border-radius:100px;border:1px solid var(--line);background:var(--card);color:var(--muted);cursor:pointer;font-family:Inter,sans-serif;transition:all .2s">👁 Corrected</button>
+    <!-- Font size: 3-preset cycle -->
+    <button type="button" id="fontSizeBtn" onclick="cycleFontSize()" title="Font size: click to cycle 45 → 55 → 65" style="font-size:13px;padding:5px 10px;border-radius:100px;border:1px solid var(--line);background:var(--card);color:var(--muted);cursor:pointer;font-family:Inter,sans-serif;transition:all .2s">A<span id="fontSizeLabel" style="font-weight:700;color:var(--text)">55</span></button>
     <span class="topbar-pill" style="border:none;background:transparent;padding:0">
       <span class="tp-dot" id="micDot"></span>
       <span id="micStatus" style="font-size:13px;font-weight:600;color:var(--muted)">Mic Off</span>
-    </span>
-    <span style="display:inline-flex;align-items:center;gap:4px" title="Font size">
-      <span style="font-size:10px;color:var(--muted)">A⁻</span>
-      <input type="range" id="fontSizeSlider" min="10" max="80" value="0" step="1"
-        style="width:60px;height:4px;accent-color:var(--accent);cursor:pointer;appearance:none;background:var(--line);border-radius:2px;outline:none"
-        oninput="updateFontSize(this.value)">
-      <span style="font-size:14px;color:var(--muted)">A⁺</span>
-      <span id="fontSizeLabel" style="font-size:10px;font-weight:600;color:var(--text2);min-width:24px;text-align:center;cursor:pointer" onclick="resetFontSize()" title="Click to reset">auto</span>
     </span>
     <select id="varSelect" onchange="switchCaptionVar(this.value)" style="font-family:Inter,sans-serif;font-size:12px;font-weight:600;padding:6px 10px;border-radius:8px;border:1px solid var(--line);background:var(--panel,var(--card));color:var(--text);cursor:pointer;outline:none" title="Caption background variation">
       <option value="0">🎨 BG</option>
@@ -3082,8 +3109,9 @@ window.retryGrammarCheck = function(modelId) {
 
 // ═══ Mode 5: Corrected-feed view ═══
 var _correctedFeedMode = false;
-window.toggleCorrectedFeed = function() {
-  _correctedFeedMode = !_correctedFeedMode;
+window.toggleCorrectedFeed = function(force) {
+  if (typeof force === 'boolean') _correctedFeedMode = force;
+  else _correctedFeedMode = !_correctedFeedMode;
   var btn = document.getElementById('correctedFeedBtn');
   if (btn) {
     btn.textContent = _correctedFeedMode ? '👁 Raw' : '👁 Corrected';
@@ -3714,34 +3742,70 @@ function updateFontToggleUI(mode) {
 })();
 
 // ═══ Font size slider ═══
-function updateFontSize(val) {
-  var html = document.documentElement;
+// ── Font size: 3-preset cycle (45, 55, 65) ──
+var _fontSizes = [45, 55, 65];
+var _fontIdx = 1; // default 55
+function cycleFontSize() {
+  _fontIdx = (_fontIdx + 1) % _fontSizes.length;
+  var px = _fontSizes[_fontIdx];
+  document.documentElement.style.setProperty('--font-size-override', px + 'px');
   var label = document.getElementById('fontSizeLabel');
-  var slider = document.getElementById('fontSizeSlider');
-  if (val === '0' || val === 0 || val === '') {
-    html.style.removeProperty('--font-size-override');
-    if (label) label.textContent = 'auto';
-    if (slider) slider.value = 0;
-    localStorage.removeItem('sottotitoli-font-size');
-  } else {
-    var px = val + 'px';
-    html.style.setProperty('--font-size-override', px);
-    if (label) label.textContent = val + 'px';
-    localStorage.setItem('sottotitoli-font-size', val);
-  }
-}
-function resetFontSize() {
-  updateFontSize(0);
+  if (label) label.textContent = px;
+  localStorage.setItem('sottotitoli-font-size', px);
 }
 // Restore saved font size
 (function(){
   var saved = localStorage.getItem('sottotitoli-font-size');
-  if (saved && saved !== '0') {
-    var slider = document.getElementById('fontSizeSlider');
-    if (slider) slider.value = saved;
-    updateFontSize(saved);
+  if (saved) {
+    var px = parseInt(saved);
+    var idx = _fontSizes.indexOf(px);
+    if (idx >= 0) { _fontIdx = idx; document.documentElement.style.setProperty('--font-size-override', px + 'px'); }
+    var label = document.getElementById('fontSizeLabel');
+    if (label) label.textContent = px;
   }
 })();
+
+// ── Magic Fix toggle ──
+function toggleMagicFix(on) {
+  var status = document.getElementById('magicFixStatus');
+  if (on) {
+    if (status) status.textContent = 'On — correcting grammar';
+    toggleCorrectedFeed(true);
+  } else {
+    if (status) status.textContent = 'Off — tap to enable';
+    toggleCorrectedFeed(false);
+  }
+  localStorage.setItem('sottotitoli-magic-fix', on ? '1' : '0');
+}
+(function(){
+  if (localStorage.getItem('sottotitoli-magic-fix') === '1') {
+    var cb = document.getElementById('magicFixToggle');
+    if (cb) cb.checked = true;
+    toggleMagicFix(true);
+  }
+})();
+
+// ── Translation target language ──
+function setTranslateTarget(lang) {
+  localStorage.setItem('sottotitoli-translate-target', lang);
+}
+(function(){
+  var saved = localStorage.getItem('sottotitoli-translate-target');
+  if (saved) {
+    var sel = document.getElementById('translateTargetLang');
+    if (sel) sel.value = saved;
+  }
+})();
+
+// ── Word bank panel toggle ──
+function toggleWordBankPanel() {
+  var panel = document.getElementById('wordBankPanel');
+  if (!panel) return;
+  panel.style.display = panel.style.display === 'block' ? 'none' : 'block';
+}
+
+function updateFontSize(val) { /* kept for compatibility, unused */ }
+function resetFontSize() { /* kept for compatibility, unused */ }
 function switchCaptionVar(val) {
   var html = document.documentElement;
   // Remove all existing VAR classes
@@ -6733,9 +6797,47 @@ window.fixExtrasPanelColors = function(){
   window.v20q_setMode = function(mode){
     v20q.mode = mode;
     var c = document.getElementById('captionTranscript'); if(c) c.setAttribute('data-mode', mode);
-    var btns = document.querySelectorAll('#v20qModeToggle .v20q-tbtn');
-    btns.forEach(function(b){ b.classList.toggle('active', b.dataset.val === mode); });
+    // Update left bar buttons
+    var btns = document.querySelectorAll('#leftModeBar .mode-icon-btn');
+    btns.forEach(function(b){ b.classList.toggle('active', b.getAttribute('data-mode') === mode); });
+    // Show/hide translation language dropdown
+    var tlRow = document.getElementById('translateLangRow');
+    if (tlRow) tlRow.style.display = (mode === 'translate') ? 'block' : 'none';
+    // If switching to translate mode, re-render with translations
+    if (mode === 'translate') {
+      v20q_renderTranslations();
+    } else {
+      // Remove translation boxes
+      document.querySelectorAll('.v20q-tran-box').forEach(function(b){ b.remove(); });
+    }
   };
+  // ── Render translations for all lines ──
+  function v20q_renderTranslations(){
+    var target = localStorage.getItem('sottotitoli-translate-target') || 'it';
+    var srcLang = (window._currentCaptionLang || 'en-US').split('-')[0];
+    var lines = document.querySelectorAll('#captionTranscript .line');
+    lines.forEach(function(line){
+      if (line.querySelector('.v20q-tran-box')) return; // already has translation
+      var text = (line.textContent || '').replace(/^\d{2}:\d{2}:\d{2}\s*/,'').trim();
+      if (!text || text.length < 3) return;
+      var box = document.createElement('div');
+      box.className = 'v20q-tran-box';
+      box.style.cssText = 'margin-top:4px;padding:6px 10px;background:rgba(124,58,237,.06);border-left:3px solid var(--accent);border-radius:4px;font-size:13px;color:var(--text-soft);font-style:italic';
+      box.textContent = '⏳ Translating…';
+      line.appendChild(box);
+      // Queue translation
+      var T = window.SottotitoliTranslationProviders;
+      if (T && srcLang !== target) {
+        T.translateText({ provider: 'auto' }, text, srcLang, target).then(function(r){
+          box.textContent = r.translatedText;
+        }).catch(function(){
+          box.textContent = text + ' ⚠';
+        });
+      } else {
+        box.textContent = text;
+      }
+    });
+  }
   // ── Toggle: Style ──
   window.v20q_setStyle = function(style){
     v20q.style = style;
