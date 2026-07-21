@@ -9,7 +9,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 const HF_API_TOKEN = Deno.env.get('HF_API_TOKEN') || '';
-const DEFAULT_MODEL = 'meta-llama/Llama-3.1-8B-Instruct';
+const DEFAULT_MODEL = 'meta-llama/Llama-3.3-70B-Instruct';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': 'https://buoninglese.github.io',
@@ -29,17 +29,29 @@ function buildPrompt(text: string, contentLang: string, explanationLang: string)
   const contentName = LANG_NAMES[contentLang] || contentLang;
   const explName = LANG_NAMES[explanationLang] || explanationLang;
 
-  return `Analyze this ${contentName} sentence for REAL grammar errors. IMPORTANT RULES:
-- If the sentence is already grammatically correct, return the original text with an empty explanations array. Do NOT invent errors.
-- A gerund (-ing verb) used as a sentence subject is CORRECT ${contentName} grammar (e.g., "Giving is good"). Do NOT flag this.
-- Fix punctuation, capitalization, and missing apostrophes SILENTLY in the corrected text — do NOT list these as errors in explanations.
-- Only list errors you are CERTAIN about. If you are unsure, skip it. It is better to miss an error than to flag something correct.
-- Do NOT flag stylistic preferences, word choice opinions, or idiomatic expressions as grammar errors.
-- Only flag clear grammar violations: wrong verb tense/conjugation, subject-verb disagreement, wrong preposition, missing/wrong article, wrong word order, number/gender/case agreement errors.
-- Write ALL explanations in ${explName}. Each explanation must be ONE short sentence stating the specific error and the fix.
-- Return ONLY a JSON object with:
-  "corrected": the fully fixed sentence (including silent punctuation/capitalization fixes)
-  "explanations": an array of strings in ${explName}, each describing one REAL grammar error. Empty array [] if the sentence is already correct.
+  return `You are a strict but fair ${contentName} grammar checker. Your ONLY job is to find REAL grammar errors — nothing else.
+
+CRITICAL: Most sentences are already correct. If the sentence has no grammar errors, your corrected text MUST be identical to the original and explanations MUST be empty. This is the most common case.
+
+EXAMPLES of CORRECT sentences (return empty explanations):
+- "Let's start to see if this works." → corrected: "Let's start to see if this works." explanations: []
+- "The company announced a major breakthrough." → corrected: "The company announced a major breakthrough." explanations: []
+- "She went to the store yesterday." → corrected: "She went to the store yesterday." explanations: []
+
+EXAMPLES of REAL errors:
+- "He go to school." → corrected: "He goes to school." explanations: ["Subject-verb agreement: 'go' should be 'goes' for third-person singular."]
+- "I have seen her yesterday." → corrected: "I saw her yesterday." explanations: ["Verb tense: use simple past 'saw' instead of present perfect with 'yesterday'."]
+
+RULES:
+- A gerund (-ing verb) as a sentence subject is CORRECT grammar. Do NOT flag it.
+- Fix punctuation, capitalization, and apostrophes SILENTLY in corrected text — do NOT list these in explanations.
+- Only list errors you are 100% CERTAIN about. If unsure, skip it.
+- Do NOT flag: stylistic choices, word preferences, idiomatic expressions, "could be clearer" suggestions.
+- Only flag: wrong verb tense/conjugation, subject-verb disagreement, wrong preposition, missing/wrong article, wrong word order, number/gender/case errors.
+- Write ALL explanations in ${explName}. ONE short sentence per error.
+
+Return ONLY a JSON object:
+{"corrected": "the fixed sentence", "explanations": ["error 1", "error 2"]}
 
 Sentence: ${text}`;
 }
@@ -62,10 +74,16 @@ async function grammarWithLLM(text: string, contentLang: string, explanationLang
   const content = data?.choices?.[0]?.message?.content || '';
   try {
     const parsed = JSON.parse(content);
-    return {
-      corrected: parsed.corrected || text,
-      explanations: Array.isArray(parsed.explanations) ? parsed.explanations : (parsed.explanation ? [parsed.explanation] : []),
-    };
+    const corrected = parsed.corrected || text;
+    const explanations = Array.isArray(parsed.explanations) ? parsed.explanations : (parsed.explanation ? [parsed.explanation] : []);
+    // Post-processing: if corrected text is identical to original (ignoring case/punctuation),
+    // the LLM hallucinated errors — clear them
+    const normalized = (s: string) => s.replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
+    if (normalized(corrected) === normalized(text) && explanations.length > 0) {
+      console.log('Post-process: corrected text unchanged, clearing', explanations.length, 'hallucinated explanations');
+      return { corrected: text, explanations: [] };
+    }
+    return { corrected, explanations };
   } catch { return { corrected: text, explanations: [] }; }
 }
 
