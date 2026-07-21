@@ -725,23 +725,22 @@ button[onclick*="addToWordBank"]:hover{background:rgba(52,211,153,.15)!important
 /* ═══ LEFT MODE BAR ═══ */
 .left-mode-bar {
   position: absolute; top: 12px; left: 12px; z-index: 10;
-  display: flex; flex-direction: column; align-items: center; gap: 4px;
+  display: flex; flex-direction: column; align-items: center; gap: 6px;
+  width: 64px;
 }
 .mode-icon-btn {
-  width: 44px; height: 44px; border-radius: 12px;
+  width: 56px; height: 56px; border-radius: 14px;
   border: 1px solid var(--line); background: var(--card); color: var(--t3);
-  cursor: pointer; font-size: 11px; display: flex; flex-direction: column;
-  align-items: center; justify-content: center; gap: 1px;
+  cursor: pointer; font-size: 13px; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: 2px;
   transition: all .15s; font-family: 'Inter',sans-serif;
 }
-.mode-icon-btn i { font-size: 14px; }
-.mode-icon-btn span { font-size: 6px; line-height: 1.1; text-align: center; font-weight: 500; }
+.mode-icon-btn i { font-size: 18px; }
+.mode-icon-btn span { font-size: 7px; line-height: 1.1; text-align: center; font-weight: 500; }
 .mode-icon-btn:hover { border-color: var(--accent); color: var(--text); }
 .mode-icon-btn.active { background: var(--accent); border-color: var(--accent); color: #fff; }
 .mode-icon-btn.active span { color: rgba(255,255,255,.8); }
-/* Translation lang dropdown */
-#translateLangRow select { font-size: 10px; font-weight: 500; }
-#translateLangRow select:focus { outline: none; border-color: var(--accent); }
+#translateCycleBtn span { font-size: 24px; }
 
 /* ═══ RIGHT PANEL (Metrics / SYN) ═══ */
 .right-panel {
@@ -1004,17 +1003,7 @@ button[onclick*="addToWordBank"]:hover{background:rgba(52,211,153,.15)!important
     <button class="mode-icon-btn" data-mode="edit" onclick="v20q_setMode('edit')" title="Edit Mode"><i class="fas fa-pen-to-square"></i><span>Edit<br>Mode</span></button>
     <button class="mode-icon-btn" data-mode="collect" onclick="v20q_setMode('collect')" title="Word Saver"><i class="fas fa-book"></i><span>Word<br>Saver</span></button>
     <button class="mode-icon-btn" data-mode="translate" onclick="v20q_setMode('translate')" title="Translation"><i class="fas fa-language"></i><span>Trans<br>lation</span></button>
-    <div id="translateLangRow" style="display:none;margin-top:8px;padding-top:8px;border-top:1px solid var(--line)">
-      <select id="translateTargetLang" onchange="setTranslateTarget(this.value)" style="width:100%;font-size:10px;padding:4px;border-radius:6px;border:1px solid var(--line);background:var(--card);color:var(--text);cursor:pointer">
-        <option value="it">🇮🇹 Italiano</option>
-        <option value="en">🇬🇧 English</option>
-        <option value="nl">🇳🇱 Nederlands</option>
-        <option value="fr">🇫🇷 Français</option>
-        <option value="de">🇩🇪 Deutsch</option>
-        <option value="es">🇪🇸 Español</option>
-        <option value="pl">🇵🇱 Polski</option>
-      </select>
-    </div>
+    <button class="mode-icon-btn" id="translateCycleBtn" onclick="cycleTranslateTarget()" title="Cycle target language" style="display:none"><span id="translateCycleFlag" style="font-size:20px">🇮🇹</span></button>
   </div>
 
   <!-- ── Center: Scroll Area ── -->
@@ -3780,15 +3769,43 @@ function toggleMagicFix(on) {
 })();
 
 // ── Translation target language ──
+var _trLangs = [
+  { code:'it', flag:'🇮🇹' },
+  { code:'en', flag:'🇬🇧' },
+  { code:'nl', flag:'🇳🇱' },
+  { code:'fr', flag:'🇫🇷' },
+  { code:'de', flag:'🇩🇪' },
+  { code:'es', flag:'🇪🇸' },
+  { code:'pl', flag:'🇵🇱' }
+];
+var _trIdx = 0;
+function cycleTranslateTarget() {
+  _trIdx = (_trIdx + 1) % _trLangs.length;
+  var lang = _trLangs[_trIdx];
+  localStorage.setItem('sottotitoli-translate-target', lang.code);
+  var flagEl = document.getElementById('translateCycleFlag');
+  if (flagEl) flagEl.textContent = lang.flag;
+  // Re-render translations if in translate mode
+  if (v20q.mode === 'translate') {
+    document.querySelectorAll('.v20q-tran-box').forEach(function(b){ b.remove(); });
+    v20q_renderTranslations();
+  }
+}
 function setTranslateTarget(lang) {
+  for (var i = 0; i < _trLangs.length; i++) {
+    if (_trLangs[i].code === lang) { _trIdx = i; break; }
+  }
   localStorage.setItem('sottotitoli-translate-target', lang);
+  var flagEl = document.getElementById('translateCycleFlag');
+  if (flagEl) flagEl.textContent = _trLangs[_trIdx].flag;
 }
 (function(){
-  var saved = localStorage.getItem('sottotitoli-translate-target');
-  if (saved) {
-    var sel = document.getElementById('translateTargetLang');
-    if (sel) sel.value = saved;
+  var saved = localStorage.getItem('sottotitoli-translate-target') || 'it';
+  for (var i = 0; i < _trLangs.length; i++) {
+    if (_trLangs[i].code === saved) { _trIdx = i; break; }
   }
+  var flagEl = document.getElementById('translateCycleFlag');
+  if (flagEl) flagEl.textContent = _trLangs[_trIdx].flag;
 })();
 
 // ── Word bank panel toggle ──
@@ -6794,9 +6811,9 @@ window.fixExtrasPanelColors = function(){
     // Update left bar buttons
     var btns = document.querySelectorAll('#leftModeBar .mode-icon-btn');
     btns.forEach(function(b){ b.classList.toggle('active', b.getAttribute('data-mode') === mode); });
-    // Show/hide translation language dropdown
-    var tlRow = document.getElementById('translateLangRow');
-    if (tlRow) tlRow.style.display = (mode === 'translate') ? 'block' : 'none';
+    // Show/hide translation cycle button
+    var tlBtn = document.getElementById('translateCycleBtn');
+    if (tlBtn) tlBtn.style.display = (mode === 'translate') ? 'flex' : 'none';
     // If switching to translate mode, re-render with translations
     if (mode === 'translate') {
       v20q_renderTranslations();
