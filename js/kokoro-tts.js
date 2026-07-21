@@ -4,11 +4,20 @@
 (function(global){
   'use strict';
 
-  // Default voice preferences per language (stored in localStorage)
+  // Default voice preferences per language
+  // For English: dual voices (US + UK Male) with two speaker icons separated by |
   var DEFAULTS = {
-    en: 'Samantha',
-    it: 'Alice',
+    en:  ['Google US English', 'Google UK English Male'],  // dual voice
+    it:  'Google italiano',
+    de:  'Google Deutsch',
+    fr:  'Google français',
+    es:  'Google español',
+    nl:  'Google Nederlands',
+    pl:  'Google polski',
   };
+
+  // Languages that have dual voice support (two icons)
+  var DUAL_LANGS = { en: true };
 
   // Available browser voices by language (discovered at runtime)
   var _browserVoices = [];
@@ -69,6 +78,8 @@
     var opts = options || {};
     var lang = opts.lang || 'en';
     var preferredVoice = opts.voice || getVoiceForLang(lang);
+    // If dual-lang, use the first voice by default unless a specific one is passed
+    if (Array.isArray(preferredVoice)) preferredVoice = preferredVoice[0];
     var rate = opts.speed || 1.0;
     var onStart = opts.onStart || null;
     var onEnd = opts.onEnd || null;
@@ -102,14 +113,14 @@
     if (window.speechSynthesis) speechSynthesis.cancel();
   }
 
-  // Build a speaker button element
-  function createSpeakerButton(text, lang, className) {
+  function _makeOneButton(text, lang, voiceName, label) {
     var btn = document.createElement('button');
-    btn.className = (className || '') + ' kokoro-spk-btn';
+    btn.className = 'kokoro-spk-btn';
     btn.innerHTML = '🔊';
-    btn.title = 'Listen';
+    btn.title = label || voiceName || 'Listen';
     btn.setAttribute('data-tts-text', text);
     btn.setAttribute('data-tts-lang', lang);
+    btn.setAttribute('data-tts-voice', voiceName || '');
     btn.style.cssText = 'width:22px;height:22px;border-radius:50%;border:1px solid rgba(255,255,255,.1);background:transparent;cursor:pointer;font-size:11px;display:inline-flex;align-items:center;justify-content:center;margin-left:4px;transition:all .15s;flex-shrink:0;vertical-align:middle';
     btn.onmouseenter = function(){ this.style.borderColor = 'var(--accent)'; };
     btn.onmouseleave = function(){ if (!this.classList.contains('playing')) this.style.borderColor = 'rgba(255,255,255,.1)'; };
@@ -122,11 +133,39 @@
       var self = this;
       speak(this.getAttribute('data-tts-text'), {
         lang: this.getAttribute('data-tts-lang'),
+        voice: this.getAttribute('data-tts-voice'),
         onEnd: function(){ self.classList.remove('playing'); self.style.borderColor = 'rgba(255,255,255,.1)'; },
         onError: function(){ self.classList.remove('playing'); self.style.borderColor = 'rgba(255,255,255,.1)'; }
       });
     };
     return btn;
+  }
+
+  // Build a speaker button element (for English: two buttons separated by |)
+  function createSpeakerButton(text, lang, className) {
+    var base = (lang || 'en').split('-')[0].toLowerCase();
+    var wrapper = document.createElement('span');
+    wrapper.className = (className || '') + ' kokoro-spk-wrap';
+    wrapper.style.display = 'inline-flex';
+    wrapper.style.alignItems = 'center';
+    wrapper.style.verticalAlign = 'middle';
+
+    if (DUAL_LANGS[base]) {
+      var voices = getVoiceForLang(base);
+      if (!Array.isArray(voices)) voices = [voices];
+      voices.forEach(function(v, i){
+        if (i > 0) {
+          var sep = document.createElement('span');
+          sep.textContent = '|';
+          sep.style.cssText = 'font-size:10px;color:var(--t3);margin:0 2px;user-select:none';
+          wrapper.appendChild(sep);
+        }
+        wrapper.appendChild(_makeOneButton(text, lang, v, v));
+      });
+    } else {
+      wrapper.appendChild(_makeOneButton(text, lang, null, null));
+    }
+    return wrapper;
   }
 
   // Exports
