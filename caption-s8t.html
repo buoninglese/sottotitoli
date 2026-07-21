@@ -1180,9 +1180,7 @@ button[onclick*="addToWordBank"]:hover{background:rgba(52,211,153,.15)!important
           <div style="font-size:9px;color:var(--muted2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">Style</div>
           <div style="display:flex;gap:3px">
             <button class="v20q-tbtn active" data-val="cap1" onclick="v20q_setStyle('cap1')" style="font-size:10px;padding:3px 8px;border-radius:6px;border:1px solid var(--line);background:transparent;color:var(--muted);cursor:pointer" title="Minimal">1</button>
-            <button class="v20q-tbtn" data-val="cap2" onclick="v20q_setStyle('cap2')" style="font-size:10px;padding:3px 8px;border-radius:6px;border:1px solid var(--line);background:transparent;color:var(--muted);cursor:pointer" title="Newspaper">2</button>
-            <button class="v20q-tbtn" data-val="cap3" onclick="v20q_setStyle('cap3')" style="font-size:10px;padding:3px 8px;border-radius:6px;border:1px solid var(--line);background:transparent;color:var(--muted);cursor:pointer" title="Stacked">3</button>
-            <button class="v20q-tbtn" data-val="cap5" onclick="v20q_setStyle('cap5')" style="font-size:10px;padding:3px 8px;border-radius:6px;border:1px solid var(--line);background:transparent;color:var(--muted);cursor:pointer" title="Dashboard">5</button>
+            <button class="v20q-tbtn" data-val="cap5" onclick="v20q_setStyle('cap5')" style="font-size:10px;padding:3px 8px;border-radius:6px;border:1px solid var(--line);background:transparent;color:var(--muted);cursor:pointer" title="Dashboard">2</button>
           </div>
         </div>
       </div>
@@ -3764,10 +3762,20 @@ function toggleMagicFix(on) {
     if (status) status.textContent = 'On — correcting grammar';
     if (btn) { btn.style.color = 'var(--accent)'; btn.style.borderColor = 'var(--accent)'; }
     toggleCorrectedFeed(true);
+    // Retroactively fix existing transcript lines
+    setTimeout(function(){ _updateGrammarLines(); }, 300);
   } else {
     if (status) status.textContent = 'Off — tap to enable';
     if (btn) { btn.style.color = ''; btn.style.borderColor = ''; }
     toggleCorrectedFeed(false);
+    // Remove corrections from existing lines
+    var lines = document.querySelectorAll('#captionTranscript .line');
+    lines.forEach(function(l){
+      var corr = l.querySelector('.grammar-corrected');
+      if (corr) corr.remove();
+      var orig = l.querySelector('.grammar-original-hidden');
+      if (orig) { orig.classList.remove('grammar-original-hidden'); orig.style.display = ''; }
+    });
   }
   localStorage.setItem('sottotitoli-magic-fix', on ? '1' : '0');
 }
@@ -3821,9 +3829,11 @@ function setTranslateTarget(lang) {
 
 // ── Word bank panel toggle ──
 function toggleWordBankPanel() {
-  var panel = document.getElementById('wordBankPanel');
-  if (!panel) return;
-  panel.style.display = panel.style.display === 'block' ? 'none' : 'block';
+  // Open the word bank slide (slide 3 - Word Meaning)
+  window.duoGoSlide ? window.duoGoSlide(3) : (function(){
+    var dots = document.querySelectorAll('#slideDots .slide-dot');
+    if (dots[2]) dots[2].click();
+  })();
 }
 
 function updateFontSize(val) { /* kept for compatibility, unused */ }
@@ -6837,7 +6847,9 @@ window.fixExtrasPanelColors = function(){
   function v20q_renderTranslations(){
     var target = localStorage.getItem('sottotitoli-translate-target') || 'it';
     var srcLang = (window._currentCaptionLang || 'en-US').split('-')[0];
-    var lines = document.querySelectorAll('#captionTranscript .line');
+    var container = document.getElementById('v20qContent') || document.getElementById('captionTranscript');
+    if (!container) return;
+    var lines = container.querySelectorAll('.v20q-line, .line');
     lines.forEach(function(line){
       if (line.querySelector('.v20q-tran-box')) return; // already has translation
       var text = (line.textContent || '').replace(/^\d{2}:\d{2}:\d{2}\s*/,'').trim();
