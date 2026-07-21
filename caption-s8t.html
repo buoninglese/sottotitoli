@@ -974,8 +974,8 @@ button[onclick*="addToWordBank"]:hover{background:rgba(52,211,153,.15)!important
       <button id="topCapBtn" class="top-mode-btn active" onclick="v20q_setTopMode('caption')" title="Caption mode"><i class="fas fa-closed-captioning"></i> Caption</button>
       <button id="topTrBtn" class="top-mode-btn" onclick="v20q_setTopMode('translate')" title="Translation mode"><i class="fas fa-language"></i> Translate</button>
     </div>
-    <!-- RIGHT: target language flag expander -->
-    <div class="flag-expander" id="rightExpander">
+    <!-- RIGHT: target language flag expander (hidden in caption mode) -->
+    <div class="flag-expander" id="rightExpander" style="display:none">
       <div class="flag-row right" id="rightFlagRow">
         <button class="top-mode-flag" data-trg-lang="it" data-trg-flag="🇮🇹" title="Italiano">🇮🇹</button>
         <button class="top-mode-flag" data-trg-lang="en" data-trg-flag="🇬🇧" title="English">🇬🇧</button>
@@ -1427,12 +1427,32 @@ function applyTranslateModeUI(){
   var capBtn = document.getElementById('topCapBtn');
   var trBtn = document.getElementById('topTrBtn');
   var trFlag = document.getElementById('topTrFlag');
+  var leftExp = document.getElementById('leftExpander');
   var rightExp = document.getElementById('rightExpander');
   if (capBtn) capBtn.classList.remove('active');
   if (trBtn) trBtn.classList.add('active');
+  // Only show right flag, hide left
+  if (leftExp) leftExp.style.display = 'none';
+  if (rightExp) { rightExp.style.display = ''; rightExp.style.opacity = '1'; rightExp.style.pointerEvents = 'auto'; }
   if (trFlag) trFlag.style.display = '';
-  if (rightExp) { rightExp.style.opacity = '1'; rightExp.style.pointerEvents = 'auto'; }
   if (typeof v20q_renderTranslations === 'function') v20q_renderTranslations();
+  if (typeof refreshFlagRows === 'function') refreshFlagRows();
+}
+
+// ── Apply caption mode UI ──
+function applyCaptionModeUI(){
+  if (typeof v20q !== 'undefined') v20q.translateOn = false;
+  var capBtn = document.getElementById('topCapBtn');
+  var trBtn = document.getElementById('topTrBtn');
+  var trFlag = document.getElementById('topTrFlag');
+  var leftExp = document.getElementById('leftExpander');
+  var rightExp = document.getElementById('rightExpander');
+  if (capBtn) capBtn.classList.add('active');
+  if (trBtn) trBtn.classList.remove('active');
+  // Only show left flag, hide right
+  if (leftExp) leftExp.style.display = '';
+  if (rightExp) rightExp.style.display = 'none';
+  if (trFlag) trFlag.style.display = 'none';
   if (typeof refreshFlagRows === 'function') refreshFlagRows();
 }
 
@@ -7094,12 +7114,7 @@ window.fixExtrasPanelColors = function(){
   if (window.location.search.indexOf('mode=translate') !== -1) {
     setTimeout(function(){ applyTranslateModeUI(); }, 350);
   } else {
-    // Caption mode: dim right expander
-    setTimeout(function(){
-      var rightExp = document.getElementById('rightExpander');
-      if (rightExp) { rightExp.style.opacity = '0.3'; rightExp.style.pointerEvents = 'none'; }
-      if (typeof refreshFlagRows === 'function') refreshFlagRows();
-    }, 200);
+    setTimeout(function(){ applyCaptionModeUI(); }, 200);
   }
 
   // ── Render translations for all lines ──
