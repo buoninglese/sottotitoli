@@ -6935,13 +6935,15 @@ window.fixExtrasPanelColors = function(){
   function v20q_makeWordHtml(words){ return words.map(function(w){return '<span class="v20q-w">'+w+'</span>'}).join(' '); }
 
   // ── Top bar: Caption vs Translation mode ──
-  window.v20q_setTopMode = function(topMode){
-    var lang = localStorage.getItem('sottotitoli-lang') || 'en';
-    var modeName = topMode === 'caption' ? (lang==='it'?'Sottotitoli':'Caption') : (lang==='it'?'Traduzione':'Translation');
-    var msg = lang === 'it'
-      ? 'Passare a modalità '+modeName+'?\n\nLascerai questa stanza. La trascrizione non salvata andrà persa.'
-      : 'Switch to '+modeName+' mode?\n\nYou will leave this room. Unsaved transcript will be lost.';
-    if (!confirm(msg)) return;
+  window.v20q_setTopMode = function(topMode, skipConfirm){
+    if (!skipConfirm) {
+      var lang = localStorage.getItem('sottotitoli-lang') || 'en';
+      var modeName = topMode === 'caption' ? (lang==='it'?'Sottotitoli':'Caption') : (lang==='it'?'Traduzione':'Translation');
+      var msg = lang === 'it'
+        ? 'Passare a modalità '+modeName+'?\n\nLascerai questa stanza. La trascrizione non salvata andrà persa.'
+        : 'Switch to '+modeName+' mode?\n\nYou will leave this room. Unsaved transcript will be lost.';
+      if (!confirm(msg)) return;
+    }
     if (topMode === 'caption') {
       var src = localStorage.getItem('sottotitoli-caption-lang') || 'en-US';
       window.location.href = window.location.pathname + '?lang=' + src;
@@ -6964,7 +6966,18 @@ window.fixExtrasPanelColors = function(){
   };
   // ── Init: auto-enable translate mode if ?mode=translate in URL ──
   if (window.location.search.indexOf('mode=translate') !== -1) {
-    setTimeout(function(){ v20q_setTopMode('translate'); }, 200);
+    // Apply translate UI state directly — do NOT redirect (we're already here)
+    v20q.translateOn = true;
+    setTimeout(function(){
+      var capBtn = document.getElementById('topCapBtn');
+      var trBtn = document.getElementById('topTrBtn');
+      var trFlag = document.getElementById('topTrFlag');
+      if (capBtn) capBtn.classList.remove('active');
+      if (trBtn) trBtn.classList.add('active');
+      if (trFlag) trFlag.style.display = '';
+      // Re-render translations if content exists
+      if (typeof v20q_renderTranslations === 'function') v20q_renderTranslations();
+    }, 200);
   }
 
   // ── Render translations for all lines ──
