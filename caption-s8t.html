@@ -923,7 +923,7 @@ button[onclick*="addToWordBank"]:hover{background:rgba(52,211,153,.15)!important
   <div style="display:flex;align-items:center;gap:8px">
     <a href="panoramica.html" class="topbar-brand">sotto<span>titoli</span></a>
     <span class="trial-pill">Pro</span>
-    <span style="font-size:9px;color:var(--muted2);font-family:monospace;opacity:.5;margin-left:2px" title="V20quint version">v47</span>
+    <span style="font-size:9px;color:var(--muted2);font-family:monospace;opacity:.5;margin-left:2px" title="V20quint version">v48</span>
     <a href="panoramica.html" style="text-decoration:none;color:var(--text-soft);font-size:13px;font-weight:500;margin-left:4px">← Dashboard</a>
   </div>
   <div style="flex:1;display:flex;justify-content:center;align-items:center;gap:0">
@@ -1534,8 +1534,6 @@ function setCaptionLanguage(code, name, skipConfirm) {
       _realMic.recognition.lang = code;
     }
   }
-  // Create room in Supabase
-  _createCaptionRoom(code);
   localStorage.setItem('sottotitoli-caption-lang', code);
   // Update URL — preserve join params if present
   var newUrl = window.location.pathname + '?lang=' + code + '&mode=' + currentCaptionMode;
@@ -3504,6 +3502,8 @@ async function toggleSession() {
   
   if (sessionActive) {
     paused = false;
+    // Create Supabase room ONLY when user presses Start (not on page load)
+    _createCaptionRoom(currentCaptionLang || 'en-US');
     // ── Start mic (await getUserMedia warm-up + rec.start — both during gesture) ──
     var micOk = await startRealMic();
     if (!micOk) {
@@ -3869,24 +3869,19 @@ document.addEventListener('click', function(e){
   }
 });
 
-// ── Select caption language → reload with new room ──
+// ── Select caption language → confirm then reload ──
 window.selectCaptionLang = function(code, flag) {
+  if (!confirm('Change caption language to '+flag+'?\n\nYou will leave this room. Unsaved transcript will be lost.')) return;
   localStorage.setItem('sottotitoli-caption-lang', code);
-  var flagEl = document.getElementById('topCapFlagEmoji');
-  if (flagEl) flagEl.textContent = flag;
-  document.querySelectorAll('.flag-dropdown').forEach(function(d){ d.classList.remove('show'); });
-  // Keep current mode if translate is in URL
   var isTr = window.location.search.indexOf('mode=translate') !== -1;
   var mode = isTr ? '&mode=translate&tgt='+(localStorage.getItem('sottotitoli-translate-target')||'it') : '';
   window.location.href = window.location.pathname + '?lang=' + code + mode;
 };
 
-// ── Select target language → reload with new room ──
+// ── Select target language → confirm then reload ──
 window.selectTargetLang = function(code, flag) {
+  if (!confirm('Change translation language to '+flag+'?\n\nYou will leave this room. Unsaved transcript will be lost.')) return;
   localStorage.setItem('sottotitoli-translate-target', code);
-  var flagEl = document.getElementById('topTrFlagEmoji');
-  if (flagEl) flagEl.textContent = flag;
-  document.querySelectorAll('.flag-dropdown').forEach(function(d){ d.classList.remove('show'); });
   var src = localStorage.getItem('sottotitoli-caption-lang') || 'en-US';
   window.location.href = window.location.pathname + '?lang=' + src + '&mode=translate&tgt=' + code;
 };
@@ -6933,6 +6928,7 @@ window.fixExtrasPanelColors = function(){
 
   // ── Top bar: Caption vs Translation mode ──
   window.v20q_setTopMode = function(topMode){
+    if (!confirm('Switch to '+(topMode==='caption'?'Caption':'Translation')+' mode?\n\nYou will leave this room. Unsaved transcript will be lost.')) return;
     if (topMode === 'caption') {
       var src = localStorage.getItem('sottotitoli-caption-lang') || 'en-US';
       window.location.href = window.location.pathname + '?lang=' + src;
