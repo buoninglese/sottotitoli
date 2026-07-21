@@ -728,6 +728,19 @@ button[onclick*="addToWordBank"]:hover{background:rgba(52,211,153,.15)!important
   display: flex; flex-direction: column; align-items: center; gap: 6px;
   width: 64px;
 }
+
+/* ═══ TOP BAR MODE TOGGLE ═══ */
+.top-mode-btn {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 6px 14px; border-radius: 99px; border: 1px solid var(--line);
+  background: var(--card); color: var(--t3); cursor: pointer;
+  font-size: 12px; font-weight: 600; font-family: 'Inter',sans-serif;
+  transition: all .15s;
+}
+.top-mode-btn i { font-size: 13px; }
+.top-mode-btn:hover { border-color: var(--accent); color: var(--text); }
+.top-mode-btn.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+#topTrFlag { font-size: 18px; }
 .mode-icon-btn {
   width: 56px; height: 56px; border-radius: 14px;
   border: 1px solid var(--line); background: var(--card); color: var(--t3);
@@ -894,7 +907,11 @@ button[onclick*="addToWordBank"]:hover{background:rgba(52,211,153,.15)!important
     <span style="font-size:9px;color:var(--muted2);font-family:monospace;opacity:.5;margin-left:2px" title="V20quint version">v44</span>
     <a href="panoramica.html" style="text-decoration:none;color:var(--text-soft);font-size:13px;font-weight:500;margin-left:4px">← Dashboard</a>
   </div>
-  <div style="flex:1;display:flex;justify-content:center;align-items:center;gap:8px">
+  <div style="flex:1;display:flex;justify-content:center;align-items:center;gap:6px">
+    <!-- Caption / Translation mode toggle -->
+    <button id="topCapBtn" class="top-mode-btn active" onclick="v20q_setTopMode('caption')" title="Caption mode"><i class="fas fa-closed-captioning"></i> Caption</button>
+    <button id="topTrBtn" class="top-mode-btn" onclick="v20q_setTopMode('translate')" title="Translation mode"><i class="fas fa-language"></i> Translate</button>
+    <button id="topTrFlag" class="top-mode-btn" onclick="cycleTranslateTarget()" title="Cycle target language" style="display:none"><span id="topTrFlagEmoji">🇮🇹</span></button>
   </div>
   <div class="topbar-tools">
     <button type="button" class="theme-toggle" id="themeToggle" aria-label="Toggle color theme">
@@ -994,11 +1011,8 @@ button[onclick*="addToWordBank"]:hover{background:rgba(52,211,153,.15)!important
 
   <!-- ── Left: Mode Bar ── -->
   <div class="left-mode-bar" id="leftModeBar">
-    <button class="mode-icon-btn active" data-mode="view" onclick="v20q_setMode('view')" title="Clear View"><i class="fas fa-eye"></i><span>Clear<br>View</span></button>
-    <button class="mode-icon-btn" data-mode="edit" onclick="v20q_setMode('edit')" title="Edit Mode"><i class="fas fa-pen-to-square"></i><span>Edit<br>Mode</span></button>
-    <button class="mode-icon-btn" data-mode="collect" onclick="v20q_setMode('collect')" title="Word Saver"><i class="fas fa-book"></i><span>Word<br>Saver</span></button>
-    <button class="mode-icon-btn" data-mode="translate" onclick="v20q_setMode('translate')" title="Translation"><i class="fas fa-language"></i><span>Trans<br>lation</span></button>
-    <button class="mode-icon-btn" id="translateCycleBtn" onclick="cycleTranslateTarget()" title="Cycle target language" style="display:none"><span id="translateCycleFlag" style="font-size:20px">🇮🇹</span></button>
+    <button class="mode-icon-btn active" data-mode="edit" onclick="v20q_setMode('edit')" title="Edit Mode"><i class="fas fa-pen-to-square"></i><span>Edit</span></button>
+    <button class="mode-icon-btn" data-mode="collect" onclick="v20q_setMode('collect')" title="Word Saver"><i class="fas fa-book"></i><span>Save</span></button>
   </div>
 
   <!-- ── Center: Scroll Area ── -->
@@ -3807,10 +3821,9 @@ function cycleTranslateTarget() {
   _trIdx = (_trIdx + 1) % _trLangs.length;
   var lang = _trLangs[_trIdx];
   localStorage.setItem('sottotitoli-translate-target', lang.code);
-  var flagEl = document.getElementById('translateCycleFlag');
+  var flagEl = document.getElementById('topTrFlagEmoji');
   if (flagEl) flagEl.textContent = lang.flag;
-  // Re-render translations if in translate mode
-  if (v20q.mode === 'translate') {
+  if (v20q.translateOn) {
     document.querySelectorAll('.v20q-tran-box').forEach(function(b){ b.remove(); });
     v20q_renderTranslations();
   }
@@ -3820,7 +3833,7 @@ function setTranslateTarget(lang) {
     if (_trLangs[i].code === lang) { _trIdx = i; break; }
   }
   localStorage.setItem('sottotitoli-translate-target', lang);
-  var flagEl = document.getElementById('translateCycleFlag');
+  var flagEl = document.getElementById('topTrFlagEmoji');
   if (flagEl) flagEl.textContent = _trLangs[_trIdx].flag;
 }
 (function(){
@@ -3828,7 +3841,7 @@ function setTranslateTarget(lang) {
   for (var i = 0; i < _trLangs.length; i++) {
     if (_trLangs[i].code === saved) { _trIdx = i; break; }
   }
-  var flagEl = document.getElementById('translateCycleFlag');
+  var flagEl = document.getElementById('topTrFlagEmoji');
   if (flagEl) flagEl.textContent = _trLangs[_trIdx].flag;
 })();
 
@@ -6857,39 +6870,29 @@ window.fixExtrasPanelColors = function(){
   function v20q_extractWords(s){ var w=s.match(/<span[^>]*>.*?<\/span>|\S+/g)||[]; return w.map(function(x){return x.replace(/<[^>]*>/g,'')}); }
   function v20q_makeWordHtml(words){ return words.map(function(w){return '<span class="v20q-w">'+w+'</span>'}).join(' '); }
 
-  // ── Toggle: Mode ──
-  window.v20q_setMode = function(mode){
-    // Translation is a toggle — combinable with view/edit/collect
-    if (mode === 'translate') {
-      v20q.translateOn = !v20q.translateOn;
-    } else {
-      // View / Edit / Collect are mutually exclusive
-      v20q.mode = mode;
-      v20q.translateOn = false; // switching mode turns off translation
-    }
-    var c = document.getElementById('captionTranscript'); if(c) c.setAttribute('data-mode', v20q.mode);
-
-    // Update left bar buttons: view/edit/collect mutually exclusive, translate independent
-    var btns = document.querySelectorAll('#leftModeBar .mode-icon-btn');
-    btns.forEach(function(b){
-      var dm = b.getAttribute('data-mode');
-      if (dm === 'translate') {
-        b.classList.toggle('active', v20q.translateOn);
-      } else {
-        b.classList.toggle('active', dm === v20q.mode);
-      }
-    });
-
-    // Show/hide translation flag button
-    var tlBtn = document.getElementById('translateCycleBtn');
-    if (tlBtn) tlBtn.style.display = v20q.translateOn ? 'flex' : 'none';
-
-    // Render or remove translations
+  // ── Top bar: Caption vs Translation mode ──
+  window.v20q_setTopMode = function(topMode){
+    v20q.translateOn = (topMode === 'translate');
+    var capBtn = document.getElementById('topCapBtn');
+    var trBtn = document.getElementById('topTrBtn');
+    var flagBtn = document.getElementById('topTrFlag');
+    if (capBtn) capBtn.classList.toggle('active', !v20q.translateOn);
+    if (trBtn) trBtn.classList.toggle('active', v20q.translateOn);
+    if (flagBtn) flagBtn.style.display = v20q.translateOn ? 'inline-flex' : 'none';
     if (v20q.translateOn) {
       v20q_renderTranslations();
     } else {
       document.querySelectorAll('.v20q-tran-box').forEach(function(b){ b.remove(); });
+      document.querySelectorAll('.v20q-line').forEach(function(l){ l.style.display = ''; l.style.gap = ''; });
     }
+  };
+
+  // ── Left bar: Edit / Word Save (mutually exclusive) ──
+  window.v20q_setMode = function(mode){
+    v20q.mode = mode;
+    var c = document.getElementById('captionTranscript'); if(c) c.setAttribute('data-mode', mode);
+    var btns = document.querySelectorAll('#leftModeBar .mode-icon-btn');
+    btns.forEach(function(b){ b.classList.toggle('active', b.getAttribute('data-mode') === mode); });
   };
   // ── Render translations for all lines ──
   function v20q_renderTranslations(){
