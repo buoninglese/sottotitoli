@@ -603,22 +603,22 @@
   <!-- Credits Bar -->
   <div class="credits-bar" id="creditsBar">
     <div class="credits-info">
-      <span class="credits-label">Voice Credits</span>
+      <span class="credits-label">Crediti disponibili</span>
       <span class="credits-value" id="vcValue">—</span>
-      <span class="credits-unit">VC</span>
+      <span class="credits-unit">crediti</span>
     </div>
     <div class="credits-actions">
-      <span class="credits-rate">~50 VC / ora</span>
-      <button class="btn-buy" onclick="window.location.href='purchase.html'">Acquista VC</button>
+      <span class="credits-rate">~50 crediti / ora</span>
+      <button class="btn-buy" onclick="window.location.href='purchase.html'">Acquista crediti</button>
     </div>
   </div>
 
   <!-- Locked State -->
   <div class="locked" id="lockedState">
     <div class="locked-icon">🔒</div>
-    <h2>Voice Credits esauriti</h2>
-    <p>Acquista altri Voice Credits per usare AI Voice. Ogni ora di conversazione consuma circa 50 VC.</p>
-    <button class="btn-buy" onclick="window.location.href='purchase.html'" style="font-size:15px;padding:14px 32px">Acquista VC →</button>
+    <h2>Crediti esauriti</h2>
+    <p>Acquista altri crediti per usare AI Voice. Ogni ora di conversazione consuma circa 50 crediti.</p>
+    <button class="btn-buy" onclick="window.location.href='purchase.html'" style="font-size:15px;padding:14px 32px">Acquista crediti →</button>
   </div>
 
   <!-- Scenarios -->
@@ -772,9 +772,30 @@
 
   // ── VC Balance ──
   function loadVC() {
-    var stored = localStorage.getItem('sottotitoli-vc-balance');
-    state.vcBalance = stored !== null ? parseInt(stored, 10) || 0 : 0;
-    updateVCUI();
+    // Try to read real credits via SottotitoliData (shared pool with AI Reports)
+    if (window.SottotitoliData && window.SottotitoliData.getAITokens) {
+      window.SottotitoliData.getAITokens().then(function(tokens) {
+        if (typeof tokens === 'number') {
+          state.vcBalance = tokens;
+          localStorage.setItem('sottotitoli-ai-balance', String(tokens));
+          updateVCUI();
+        }
+      }).catch(function() { loadLocal(); });
+    } else {
+      loadLocal();
+    }
+
+    function loadLocal() {
+      var stored = localStorage.getItem('sottotitoli-ai-balance');
+      var localBalance = (stored !== null) ? (parseInt(stored, 10) || 0) : null;
+      var isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+      if (isLocalhost && (localBalance === null || localBalance <= 0)) {
+        localBalance = 500;
+        localStorage.setItem('sottotitoli-ai-balance', '500');
+      }
+      state.vcBalance = (localBalance !== null) ? localBalance : 0;
+      updateVCUI();
+    }
   }
 
   function updateVCUI() {
@@ -798,7 +819,7 @@
   function deductVC(minutes) {
     var cost = Math.max(1, Math.ceil((minutes / 60) * VC_PER_HOUR));
     state.vcBalance = Math.max(0, state.vcBalance - cost);
-    localStorage.setItem('sottotitoli-vc-balance', state.vcBalance);
+    localStorage.setItem('sottotitoli-ai-balance', state.vcBalance);
     updateVCUI();
     return cost;
   }
@@ -852,7 +873,7 @@
     var timerEl = $('timer');
     if (timerEl) timerEl.textContent = String(mins).padStart(2,'0') + ':' + String(secs).padStart(2,'0');
     var costEl = $('cost');
-    if (costEl) costEl.textContent = Math.ceil((elapsed / 3600) * VC_PER_HOUR) + ' VC';
+    if (costEl) costEl.textContent = Math.ceil((elapsed / 3600) * VC_PER_HOUR) + ' cr';
   }
 
   // ── Transcript ──
@@ -1084,7 +1105,7 @@
     var elapsed = state.startTime ? Math.floor((Date.now() - state.startTime) / 60000) : 0;
     if (elapsed > 0) {
       var cost = deductVC(elapsed);
-      addMsg('system', '⏱️ Sessione terminata. Durata: ' + elapsed + ' min. VC usati: ' + cost + '. Saldo: ' + state.vcBalance + ' VC.');
+      addMsg('system', '⏱️ Sessione terminata. Durata: ' + elapsed + ' min. Crediti usati: ' + cost + '. Saldo: ' + state.vcBalance + ' crediti.');
     }
 
     // Reset UI
