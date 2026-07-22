@@ -11,7 +11,7 @@ import { crypto } from 'https://deno.land/std@0.208.0/crypto/mod.ts';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-const PUBLIC_APP_URL = Deno.env.get('PUBLIC_APP_URL') || 'https://buoninglese.github.io/sottotitoli/traduzione-s8t.html';
+const PUBLIC_APP_URL = Deno.env.get('PUBLIC_APP_URL') || 'https://buoninglese.github.io/sottotitoli/caption-s8t.html';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': 'https://buoninglese.github.io',
