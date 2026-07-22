@@ -59,8 +59,8 @@
     // For localhost dev: default to 500 demo credits if nothing stored AND not logged in
     var isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
     if (isLocalhost && (localBalance === null || localBalance <= 0)) {
-      localBalance = 500;
-      localStorage.setItem('sottotitoli-ai-balance', '500');
+      localBalance = 1000;
+      localStorage.setItem('sottotitoli-ai-balance', '1000');
     }
 
     state.vcBalance = (localBalance !== null) ? localBalance : 0;
