@@ -7320,7 +7320,44 @@ window.fixExtrasPanelColors = function(){
       inp.value = orig;
       inp.style.cssText = 'width:'+(orig.length+2)+'ch;background:var(--card);border:1px solid var(--accent);border-radius:3px;color:var(--text);font:inherit;font-size:13px;padding:1px 3px;outline:none';
       span.textContent = ''; span.appendChild(inp); inp.focus(); inp.select();
-      inp.onblur = function(){ span.textContent = inp.value || orig; inp.remove(); if (inp.value !== orig) span.classList.add('edited'); };
+      inp.onblur = function(){
+        span.textContent = inp.value || orig;
+        inp.remove();
+        var changed = (inp.value !== orig);
+        if (changed) {
+          span.classList.add('edited');
+          // ── Propagate edit to original .line div and refresh all transcript boxes ──
+          var v20Line = span.closest('.v20q-line');
+          if (v20Line) {
+            var allV20 = v20Line.parentNode.querySelectorAll('.v20q-line');
+            var idx = Array.prototype.indexOf.call(allV20, v20Line);
+            var origLines = document.querySelectorAll('#captionTranscript .line');
+            if (idx >= 0 && idx < origLines.length) {
+              var origLine = origLines[idx];
+              var textEl = v20Line.querySelector('.v20q-text');
+              if (textEl) {
+                var fullText = textEl.textContent.trim();
+                // Preserve timestamp span, replace text nodes after it
+                var tsSpan = origLine.querySelector('span');
+                if (tsSpan) {
+                  // Remove all nodes after the timestamp span
+                  while (origLine.lastChild && origLine.lastChild !== tsSpan) {
+                    origLine.removeChild(origLine.lastChild);
+                  }
+                  origLine.appendChild(document.createTextNode(fullText));
+                } else {
+                  origLine.textContent = fullText;
+                }
+                origLine.setAttribute('data-raw', fullText);
+              }
+            }
+          }
+          // Refresh all transcript boxes on other slides
+          if (typeof _updateGrammarLines === 'function') {
+            try { _updateGrammarLines(); } catch(e) {}
+          }
+        }
+      };
       inp.onkeydown = function(ev){ if (ev.key === 'Enter') inp.blur(); if (ev.key === 'Escape'){ inp.value = orig; inp.blur(); } };
     } else if (v20q.mode === 'collect') {
       span.classList.toggle('collected');
