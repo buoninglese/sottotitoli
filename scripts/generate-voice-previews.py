@@ -6,10 +6,14 @@ import numpy as np
 PREVIEW_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'tmp', 'voice-previews')
 os.makedirs(PREVIEW_DIR, exist_ok=True)
 
-PHRASES = [
-    "Hello, this is my voice. I hope you like it.",
-    "The quick brown fox jumps over the lazy dog."
-]
+PHRASES = {
+    "i": ["Ciao, questa è la mia voce. Spero ti piaccia.", "Nel mezzo del cammin di nostra vita mi ritrovai per una selva oscura."],
+    "a": ["Hello, this is my voice. I hope you like it.", "The quick brown fox jumps over the lazy dog."],
+    "b": ["Hello, this is my voice. I hope you like it.", "The quick brown fox jumps over the lazy dog."],
+    "f": ["Bonjour, voici ma voix. J'espère qu'elle vous plaît.", "Portez ce vieux whisky au juge blond qui fume."],
+    "e": ["Hola, esta es mi voz. Espero que te guste.", "El veloz murciélago hindú comía feliz cardillo y kiwi."],
+    "p": ["Olá, esta é a minha voz. Espero que goste.", "O rápido jabuti marrom pula sobre o cachorro preguiçoso."],
+}
 
 VOICES = [
     {"id":"if_sara", "lang":"i"}, {"id":"im_nicola", "lang":"i"},
@@ -44,7 +48,8 @@ def main():
     total = len(VOICES); success = 0
     for idx, v in enumerate(VOICES):
         vid, lang = v["id"], v["lang"]
-        for pi, phrase in enumerate(PHRASES):
+        lang_phrases = PHRASES.get(lang, PHRASES["a"])
+        for pi, phrase in enumerate(lang_phrases):
             out_path = os.path.join(PREVIEW_DIR, f"{vid}_{pi}.wav")
             if os.path.exists(out_path):
                 success += 1; continue
@@ -61,7 +66,8 @@ def main():
                 success += 1
             except Exception as e:
                 print(f"  [{idx+1}/{total}] {vid} #{pi} — ERR: {e}")
-    print(f"\nDone: {success}/{total*len(PHRASES)} clips → {PREVIEW_DIR}/")
+    expected = sum(len(PHRASES.get(v["lang"], PHRASES["a"])) for v in VOICES)
+    print(f"\nDone: {success}/{expected} clips → {PREVIEW_DIR}/")
     manifest = {}
     for v in VOICES:
         if os.path.exists(os.path.join(PREVIEW_DIR, f"{v['id']}_0.wav")): manifest[v["id"]] = True
