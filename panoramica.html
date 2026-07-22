@@ -4908,19 +4908,9 @@
             if (pos === '—' && window.LEMMA_POS_MAP && window.LEMMA_POS_MAP[w]) {
               pos = window.LEMMA_POS_MAP[w];
             }
-            // Tertiary fallback: compromise.js NLP tagger
+            // Tertiary fallback: enhanced Penn Treebank tagger
             if (pos === '—' && typeof nlp !== 'undefined') {
-              try {
-                var doc = nlp(w);
-                var terms = doc.terms().json();
-                if (terms && terms.length) {
-                  var tags = terms[0].tags || [];
-                  if (tags.indexOf('Noun') >= 0) pos = 'n';
-                  else if (tags.indexOf('Verb') >= 0) pos = 'v';
-                  else if (tags.indexOf('Adjective') >= 0) pos = 'adj';
-                  else if (tags.indexOf('Adverb') >= 0) pos = 'adv';
-                }
-              } catch(e) { /* compromise failed, leave as '—' */ }
+              pos = tagWordPenn(w) || pos;
             }
             // For 'next-level', keep only words at or above estimated level
             if (rel === 'next-level') {
@@ -4949,18 +4939,9 @@
           if (window.LEMMA_POS_MAP && window.LEMMA_POS_MAP[query.toLowerCase()]) {
             exactPos = window.LEMMA_POS_MAP[query.toLowerCase()];
           }
+          // Enhanced Penn Treebank fallback
           if (exactPos === '—' && typeof nlp !== 'undefined') {
-            try {
-              var exactDoc = nlp(query.toLowerCase());
-              var exactTerms = exactDoc.terms().json();
-              if (exactTerms && exactTerms.length) {
-                var exactTags = exactTerms[0].tags || [];
-                if (exactTags.indexOf('Noun') >= 0) exactPos = 'n';
-                else if (exactTags.indexOf('Verb') >= 0) exactPos = 'v';
-                else if (exactTags.indexOf('Adjective') >= 0) exactPos = 'adj';
-                else if (exactTags.indexOf('Adverb') >= 0) exactPos = 'adv';
-              }
-            } catch(e) {}
+            exactPos = tagWordPenn(query.toLowerCase()) || exactPos;
           }
           var exactPosLabel = mapPos(exactPos);
           var exactCardHtml = '<article class="wbx-box wbx-exact" data-pos="' + exactPosLabel + '" data-cefr="' + exactLevel + '" data-word="' + query + '">' +
@@ -5029,6 +5010,26 @@
         if (!tag) return '—';
         var t = tag.toLowerCase().trim();
         return m[t] || (t.length <= 3 ? t.toUpperCase() : t);
+      }
+
+      // ── Enhanced POS via Penn Treebank (nlp().compute('penn')) ──
+      function tagWordPenn(w) {
+        if (!w || typeof nlp === 'undefined') return null;
+        try {
+          var doc = nlp(w).compute('penn');
+          var json = doc.json();
+          if (json[0] && json[0].terms && json[0].terms[0] && json[0].terms[0].penn) {
+            var penn = json[0].terms[0].penn;
+            var pennMap = { NN:'n', NNS:'n', NNP:'n', NNPS:'n', VB:'v', VBD:'v', VBG:'v', VBN:'v', VBP:'v', VBZ:'v', MD:'v', JJ:'adj', JJR:'adj', JJS:'adj', RB:'adv', RBR:'adv', RBS:'adv' };
+            return pennMap[penn] || null;
+          }
+          // Fallback: basic Compromise methods
+          if (doc.nouns().found) return 'n';
+          if (doc.verbs().found) return 'v';
+          if (doc.adjectives().found) return 'adj';
+          if (doc.adverbs().found) return 'adv';
+        } catch(e) {}
+        return null;
       }
 
       // Extract actual POS from Datamuse tags array (e.g. ["syn","v"] → "v")
@@ -5505,18 +5506,9 @@
 
         // Fetch real data — use "to " prefix for verbs to disambiguate
         var rawPos = (window.LEMMA_POS_MAP && window.LEMMA_POS_MAP[word]) ? window.LEMMA_POS_MAP[word] : '—';
-        // compromise.js fallback
+        // Enhanced Penn Treebank fallback
         if (rawPos === '—' && typeof nlp !== 'undefined') {
-          try {
-            var doc = nlp(word); var terms = doc.terms().json();
-            if (terms && terms.length) {
-              var tgs = terms[0].tags || [];
-              if (tgs.indexOf('Noun') >= 0) rawPos = 'n';
-              else if (tgs.indexOf('Verb') >= 0) rawPos = 'v';
-              else if (tgs.indexOf('Adjective') >= 0) rawPos = 'adj';
-              else if (tgs.indexOf('Adverb') >= 0) rawPos = 'adv';
-            }
-          } catch(e) {}
+          rawPos = tagWordPenn(word) || rawPos;
         }
         var posLabel = mapPos(rawPos);
         var apiWord = posLabel === 'VERB' ? 'to ' + word : word;
