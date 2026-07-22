@@ -209,7 +209,7 @@
       if(!ss.classList.contains('active')){document.getElementById('pnl-panoramica').classList.add('active');document.getElementById('pnl-panoramica').style.display=''}
     }
 
-    var ssFlags=[{code:'en',flag:'🇬🇧',name:'English'},{code:'it',flag:'🇮🇹',name:'Italiano'}];
+    var ssFlags=[{code:'en',flag:'🇬🇧',name:'English'},{code:'it',flag:'🇮🇹',name:'Italiano'},{code:'nl',flag:'🇳🇱',name:'Nederlands'},{code:'fr',flag:'🇫🇷',name:'Français'},{code:'de',flag:'🇩🇪',name:'Deutsch'},{code:'es',flag:'🇪🇸',name:'Español'},{code:'pl',flag:'🇵🇱',name:'Polski'},{code:'pt',flag:'🇵🇹',name:'Português'}];
     var ssCapCode='en',ssSrcCode='en',ssTgtCode='it';
 
     function openSSSpinner(el,key){
@@ -252,7 +252,7 @@
       }
       if(trBtn){
         trBtn.addEventListener('click',function(){
-          window.location.href='caption-s8t.html?src='+ssSrcCode+'&tgt='+ssTgtCode;
+          window.location.href='caption-s8t.html?lang='+ssSrcCode+'&mode=translate&tgt='+ssTgtCode+'&src='+ssSrcCode;
         });
       }
     })();
