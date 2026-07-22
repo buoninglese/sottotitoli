@@ -82,6 +82,23 @@ window.SOTTOTITOLI_CONFIG = {
   },
 
   /** Stripe payment integration */
+  /** AI Voice — Voice Conversation Partner (Premium feature) */
+  aiVoice: {
+    /** WebSocket URL of the speech-to-speech server.
+        Deploy from: https://github.com/huggingface/speech-to-speech
+        Options:
+        - HF Space (free CPU): duplicate the space, get URL from settings
+        - Render: deploy as Docker web service
+        - Local: 'ws://localhost:8080/v1/realtime' */
+    serverUrl: null,
+
+    /** Voice Credits consumed per hour of conversation */
+    vcPerHour: 50,
+
+    /** Minimum VC balance required to start a session */
+    minBalance: 10
+  },
+
   stripe: {
     /** Your Stripe publishable key (pk_test_... for testing, pk_live_... for production) */
     publishableKey: "pk_test_YOUR_STRIPE_PUBLISHABLE_KEY",

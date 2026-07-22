@@ -77,6 +77,16 @@ window.SOTTOTITOLI_CONFIG = {
     }
   },
 
+  /** AI Voice — Voice Conversation Partner (Premium) */
+  aiVoice: {
+    /** WebSocket URL for the speech-to-speech server */
+    serverUrl: "ws://localhost:8765/v1/realtime",
+    /** Voice Credits per hour */
+    vcPerHour: 50,
+    /** Minimum balance to start */
+    minBalance: 10
+  },
+
   /** Stripe payment integration */
   stripe: {
     /** Your Stripe publishable key (pk_test_... for testing, pk_live_... for production) */
