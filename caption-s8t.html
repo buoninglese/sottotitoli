@@ -4638,6 +4638,7 @@ function lookupOnline(word) {
 
 // Restore word bank from Supabase on load (silent fail — falls back to localStorage)
 (function() {
+  // Try to cache native language from Supabase profile
   if (window.sottotitoliSupabase) {
     window.sottotitoliSupabase.auth.getSession().then(function(r) {
       if (r.data?.session) {
@@ -4650,6 +4651,32 @@ function lookupOnline(word) {
           }).catch(function(){});
       }
     }).catch(function(){});
+  }
+  // Also try profiles table as fallback (some users have it there)
+  if (window.sottotitoliSupabase) {
+    window.sottotitoliSupabase.auth.getSession().then(function(r) {
+      if (r.data?.session) {
+        window.sottotitoliSupabase.from('profiles')
+          .select('native_lang').eq('id', r.data.session.user.id).maybeSingle()
+          .then(function(res) {
+            if (res.data && res.data.native_lang && !localStorage.getItem('sottotitoli-native-lang')) {
+              localStorage.setItem('sottotitoli-native-lang', res.data.native_lang);
+            }
+          }).catch(function(){});
+      }
+    }).catch(function(){});
+  }
+  // If no native lang cached yet, try reading from panoramica settings
+  if (!localStorage.getItem('sottotitoli-native-lang')) {
+    var settingsStr = localStorage.getItem('sottotitoli-settings');
+    if (settingsStr) {
+      try {
+        var settings = JSON.parse(settingsStr);
+        if (settings.native_lang) {
+          localStorage.setItem('sottotitoli-native-lang', settings.native_lang);
+        }
+      } catch(e) {}
+    }
   }
   renderWordBank();
 })();
