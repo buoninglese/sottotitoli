@@ -3084,9 +3084,7 @@ function downloadCEFRPDF(){
     (clone.textContent||'').trim().split(/\s+/).forEach(function(w){
       var clean=w.replace(/[^a-zA-Z]/g,'').toLowerCase();if(clean.length<2||seen.has(clean))return;
       seen.add(clean);
-      var pos='OTHER';
-      if (typeof tagWord === 'function') { pos = tagWord(clean); }
-      else { try { if (typeof nlp !== 'undefined') { var t = nlp(clean).json(); if (t[0] && t[0].terms && t[0].terms[0]) { var tags = t[0].terms[0].tags || []; if (tags.indexOf('Noun') !== -1) pos = 'NOUN'; else if (tags.indexOf('Verb') !== -1) pos = 'VERB'; else if (tags.indexOf('Adjective') !== -1) pos = 'ADJ'; else if (tags.indexOf('Adverb') !== -1) pos = 'ADV'; } } } catch(e) {} }
+      var pos = (typeof tagWord === 'function') ? tagWord(clean) : 'WORD';
       if(posWords[pos])posWords[pos].push(clean);
     });
   });
@@ -4553,24 +4551,12 @@ async function _doWbSync() {
   } catch(e) { /* silent */ }
 }
 
-// ── POS detection using Compromise.js ── (kept for reference, tagWord is primary)
+// ── POS detection using enhanced tagWord (Penn Treebank) ──
 function _detectPOS(word) {
-  try {
-    if (typeof nlp === 'undefined') return null;
-    var clean = word.replace(/[^a-zA-Z0-9 '-]/g, '').trim();
-    if (!clean) return null;
-    var t = nlp(clean).json();
-    if (t[0] && t[0].terms && t[0].terms[0]) {
-      var tags = t[0].terms[0].tags || [];
-      if (tags.indexOf('Noun') !== -1) return 'NOUN';
-      if (tags.indexOf('Verb') !== -1) return 'VERB';
-      if (tags.indexOf('Adjective') !== -1) return 'ADJ';
-      if (tags.indexOf('Adverb') !== -1) return 'ADV';
-      if (tags.indexOf('Preposition') !== -1) return 'PREP';
-      if (tags.indexOf('Conjunction') !== -1) return 'CONJ';
-      if (tags.indexOf('Pronoun') !== -1) return 'PRON';
-    }
-  } catch(e) {}
+  if (typeof tagWord === 'function') {
+    var pos = tagWord(word);
+    return (pos === 'OTHER' || pos === 'FUNC' || pos === 'WORD') ? null : pos;
+  }
   return null;
 }
 
