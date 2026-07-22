@@ -36,36 +36,34 @@
   // ── DOM refs (lazy) ──
   function $(id) { return document.getElementById(id); }
 
-  // ── Voice Credits ──
+  // ── Credit Balance (shared pool with AI Reports) ──
   async function fetchVCBalance() {
-    // Try Supabase first if authenticated
+    // Try Supabase first (real balance — authoritative when logged in)
     try {
-      if (window.sottotitoliSupabase) {
-        var session = await window.sottotitoliSupabase.auth.getSession();
-        if (session && session.data && session.data.session) {
-          var userId = session.data.session.user.id;
-          var resp = await window.sottotitoliSupabase
-            .from('user_credits')
-            .select('balance')
-            .eq('user_id', userId)
-            .single();
-          if (resp.data && typeof resp.data.balance === 'number') {
-            state.vcBalance = resp.data.balance;
-            return state.vcBalance;
-          }
+      if (window.SottotitoliData && window.SottotitoliData.getAITokens) {
+        var tokens = await window.SottotitoliData.getAITokens();
+        if (typeof tokens === 'number') {
+          state.vcBalance = tokens;
+          localStorage.setItem('sottotitoli-ai-balance', String(tokens));
+          return state.vcBalance;
         }
       }
     } catch(e) {
-      console.warn('AI Voice: could not fetch VC from Supabase, using localStorage fallback:', e.message);
+      console.warn('AI Voice: could not fetch credits from Supabase:', e.message);
     }
 
     // Fallback: localStorage
-    var stored = localStorage.getItem('sottotitoli-vc-balance');
-    if (stored !== null) {
-      state.vcBalance = parseInt(stored, 10) || 0;
-    } else {
-      state.vcBalance = 0;
+    var stored = localStorage.getItem('sottotitoli-ai-balance');
+    var localBalance = (stored !== null) ? (parseInt(stored, 10) || 0) : null;
+
+    // For localhost dev: default to 500 demo credits if nothing stored AND not logged in
+    var isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+    if (isLocalhost && (localBalance === null || localBalance <= 0)) {
+      localBalance = 500;
+      localStorage.setItem('sottotitoli-ai-balance', '500');
     }
+
+    state.vcBalance = (localBalance !== null) ? localBalance : 0;
     return state.vcBalance;
   }
 
@@ -95,10 +93,10 @@
     var cost = Math.ceil(hours * CONFIG.vcPerHour);
     state.vcBalance = Math.max(0, state.vcBalance - cost);
 
-    // Persist
-    localStorage.setItem('sottotitoli-vc-balance', state.vcBalance);
+    // Persist to localStorage
+    localStorage.setItem('sottotitoli-ai-balance', state.vcBalance);
 
-    // Update Supabase if authenticated
+    // Sync to Supabase if authenticated (via the same token system)
     try {
       if (window.sottotitoliSupabase) {
         window.sottotitoliSupabase.auth.getSession().then(function(session) {
@@ -106,7 +104,7 @@
             var userId = session.data.session.user.id;
             window.sottotitoliSupabase
               .from('user_credits')
-              .update({ balance: state.vcBalance })
+              .update({ balance_tokens: state.vcBalance })
               .eq('user_id', userId)
               .then(function() { /* silent */ });
           }
@@ -183,7 +181,7 @@
     var hours = elapsed / 3600;
     var estCost = Math.ceil(hours * CONFIG.vcPerHour);
     var costEl = $('aiVoiceCost');
-    if (costEl) costEl.textContent = estCost + ' VC';
+    if (costEl) costEl.textContent = estCost + ' cr';
   }
 
   function getElapsedMinutes() {
@@ -543,7 +541,7 @@
     var minutes = getElapsedMinutes();
     if (minutes > 0) {
       var cost = deductVC(minutes);
-      addMessage('assistant', '⏱️ Sessione terminata. Durata: ' + minutes + ' min. Voice Credits consumati: ' + cost + ' VC. Credito rimanente: ' + state.vcBalance + ' VC.');
+      addMessage('assistant', '⏱️ Sessione terminata. Durata: ' + minutes + ' min. Crediti usati: ' + cost + '. Saldo: ' + state.vcBalance + ' crediti.');
     }
 
     // Reset UI
