@@ -48,12 +48,25 @@
       border: 1.5px solid var(--line); background: var(--card);
       cursor: pointer; font-family: inherit; font-size: 12px; font-weight: 500;
       color: var(--text); transition: all .15s; text-align: left;
+      user-select: none;
     }
     .voice-chip:hover { border-color: var(--green); background: var(--green-bg); }
     .voice-chip.active { border-color: var(--green); background: var(--green-bg); box-shadow: 0 0 0 2px rgba(16,185,129,.15); }
     .voice-chip-gender { font-size: 14px; flex-shrink: 0; }
     .voice-chip-name { font-weight: 600; }
     .voice-chip-lang { font-size: 10px; color: var(--text-dim); }
+    .voice-chip-play {
+      margin-left: auto; flex-shrink: 0;
+      width: 28px; height: 28px; border-radius: 50%;
+      border: 1.5px solid var(--line); background: transparent;
+      color: var(--text-dim); font-size: 11px; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      transition: all .15s; padding: 0;
+    }
+    .voice-chip-play:hover { border-color: var(--green); color: var(--green); background: var(--green-bg); }
+    .voice-chip-play.playing { border-color: var(--green); color: var(--green); background: var(--green-bg); animation: spin-play 0.8s linear infinite; }
+    @keyframes spin-play { to { transform: rotate(360deg); } }
+    .voice-preview-status { text-align: center; font-size: 11px; color: var(--text-dim); padding: 4px; min-height: 20px; }
 
     .footer { text-align: center; margin-top: 16px; font-size: 12px; color: var(--text-dim); opacity: 0.6; max-width: 1100px; margin-left: auto; margin-right: auto; }
     .footer a { color: inherit; }
@@ -72,7 +85,7 @@
 </head>
 <body>
   <div class="topbar">
-    <a class="brand" href="index.html"><span class="brand-dot"></span>sottotitoli.ai — AI Voice<span class="badge">KOKORO · 53 voci</span></a>
+    <a class="brand" href="index.html"><span class="brand-dot"></span>sottotitoli.ai — AI Voice<span class="badge">KOKORO · 37 voci</span></a>
     <div style="display:flex;align-items:center;gap:12px">
       <span style="font-size:12px;color:var(--text-dim)">Voce: <span class="selected-voice" id="currentVoiceLabel">af_heart</span></span>
       <button class="theme-toggle" id="themeToggle" onclick="toggleTheme()">☀️</button>
@@ -82,6 +95,7 @@
   <div class="main-layout">
     <!-- Voice grid sidebar -->
     <aside class="voice-sidebar" id="voiceSidebar"></aside>
+    <audio id="previewAudio" style="display:none" preload="none"></audio>
 
     <!-- Main card with iframe -->
     <div class="voice-card">
@@ -134,30 +148,10 @@
       {id:"ef_dora", name:"Dora", lang:"🇪🇸 ES", gender:"♀"},
       {id:"em_alex", name:"Alex", lang:"🇪🇸 ES", gender:"♂"},
       {id:"em_santa", name:"Santa", lang:"🇪🇸 ES", gender:"♂"},
-      // Japanese 🇯🇵
-      {id:"jf_alpha", name:"Alpha", lang:"🇯🇵 JP", gender:"♀"},
-      {id:"jf_gongitsune", name:"Gongitsune", lang:"🇯🇵 JP", gender:"♀"},
-      {id:"jf_nezumi", name:"Nezumi", lang:"🇯🇵 JP", gender:"♀"},
-      {id:"jf_tebukuro", name:"Tebukuro", lang:"🇯🇵 JP", gender:"♀"},
-      {id:"jm_kumo", name:"Kumo", lang:"🇯🇵 JP", gender:"♂"},
       // Portuguese 🇵🇹
       {id:"pf_dora", name:"Dora", lang:"🇵🇹 PT", gender:"♀"},
       {id:"pm_alex", name:"Alex", lang:"🇵🇹 PT", gender:"♂"},
-      {id:"pm_santa", name:"Santa", lang:"🇵🇹 PT", gender:"♂"},
-      // Chinese 🇨🇳
-      {id:"zf_xiaobei", name:"Xiaobei", lang:"🇨🇳 ZH", gender:"♀"},
-      {id:"zf_xiaoni", name:"Xiaoni", lang:"🇨🇳 ZH", gender:"♀"},
-      {id:"zf_xiaoxiao", name:"Xiaoxiao", lang:"🇨🇳 ZH", gender:"♀"},
-      {id:"zf_xiaoyi", name:"Xiaoyi", lang:"🇨🇳 ZH", gender:"♀"},
-      {id:"zm_yunjian", name:"Yunjian", lang:"🇨🇳 ZH", gender:"♂"},
-      {id:"zm_yunxi", name:"Yunxi", lang:"🇨🇳 ZH", gender:"♂"},
-      {id:"zm_yunxia", name:"Yunxia", lang:"🇨🇳 ZH", gender:"♂"},
-      {id:"zm_yunyang", name:"Yunyang", lang:"🇨🇳 ZH", gender:"♂"},
-      // Hindi 🇮🇳
-      {id:"hf_alpha", name:"Alpha", lang:"🇮🇳 HI", gender:"♀"},
-      {id:"hf_beta", name:"Beta", lang:"🇮🇳 HI", gender:"♀"},
-      {id:"hm_omega", name:"Omega", lang:"🇮🇳 HI", gender:"♂"},
-      {id:"hm_psi", name:"Psi", lang:"🇮🇳 HI", gender:"♂"}
+      {id:"pm_santa", name:"Santa", lang:"🇵🇹 PT", gender:"♂"}
     ];
 
     var currentVoice = "af_heart";
@@ -186,22 +180,71 @@
         groups[lang].push(v);
       });
 
-      var order = ["🇮🇹","🇺🇸","🇬🇧","🇫🇷","🇪🇸","🇯🇵","🇵🇹","🇨🇳","🇮🇳"];
-      var langNames = {"🇮🇹":"Italian","🇺🇸":"American English","🇬🇧":"British English","🇫🇷":"French","🇪🇸":"Spanish","🇯🇵":"Japanese","🇵🇹":"Portuguese","🇨🇳":"Chinese","🇮🇳":"Hindi"};
+      var order = ["🇮🇹","🇺🇸","🇬🇧","🇫🇷","🇪🇸","🇵🇹"];
+      var langNames = {"🇮🇹":"Italian","🇺🇸":"American English","🇬🇧":"British English","🇫🇷":"French","🇪🇸":"Spanish","🇵🇹":"Portuguese"};
 
       var html = "";
       order.forEach(function(lang) {
         if (!groups[lang]) return;
         html += '<div class="voice-section"><div class="voice-section-title">' + lang + ' ' + langNames[lang] + '</div><div class="voice-grid">';
         groups[lang].forEach(function(v) {
-          html += '<button class="voice-chip' + (v.id === currentVoice ? ' active' : '') + '" data-voice="' + v.id + '" onclick="setVoice(\'' + v.id + '\')">';
+          html += '<div class="voice-chip' + (v.id === currentVoice ? ' active' : '') + '" data-voice="' + v.id + '" onclick="setVoice(\'' + v.id + '\')">';
           html += '<span class="voice-chip-gender">' + v.gender + '</span>';
           html += '<span class="voice-chip-name">' + v.name + '</span>';
-          html += '</button>';
+          html += '<button class="voice-chip-play" data-voice="' + v.id + '" onclick="event.stopPropagation();playPreview(\'' + v.id + '\',this)" title="Anteprima voce">▶</button>';
+          html += '</div>';
         });
         html += '</div></div>';
       });
       sidebar.innerHTML = html;
+    }
+
+    var previewQueue = [];
+    var previewPlaying = false;
+
+    function playPreview(voiceId, btn) {
+      // If already playing this voice, stop
+      if (previewPlaying && previewQueue.length && previewQueue[0].voiceId === voiceId) {
+        stopPreview();
+        return;
+      }
+      // Stop any current preview
+      stopPreview();
+      // Build queue: two phrases
+      previewQueue = [
+        {voiceId: voiceId, url: 'tmp/voice-previews/' + voiceId + '_0.wav'},
+        {voiceId: voiceId, url: 'tmp/voice-previews/' + voiceId + '_1.wav'}
+      ];
+      // Highlight all play buttons for this voice
+      document.querySelectorAll('.voice-chip-play').forEach(function(b){ b.classList.remove('playing'); });
+      document.querySelectorAll('.voice-chip-play[data-voice="' + voiceId + '"]').forEach(function(b){ b.classList.add('playing'); });
+      playNextInQueue();
+    }
+
+    function playNextInQueue() {
+      if (!previewQueue.length) {
+        previewPlaying = false;
+        document.querySelectorAll('.voice-chip-play').forEach(function(b){ b.classList.remove('playing'); });
+        return;
+      }
+      previewPlaying = true;
+      var item = previewQueue.shift();
+      var audio = document.getElementById('previewAudio');
+      audio.src = item.url;
+      audio.onended = playNextInQueue;
+      audio.onerror = function() {
+        // File doesn't exist yet — show message and skip
+        playNextInQueue();
+      };
+      audio.play().catch(function(){ playNextInQueue(); });
+    }
+
+    function stopPreview() {
+      var audio = document.getElementById('previewAudio');
+      audio.pause(); audio.onended = null; audio.onerror = null;
+      previewQueue = [];
+      previewPlaying = false;
+      document.querySelectorAll('.voice-chip-play').forEach(function(b){ b.classList.remove('playing'); });
     }
 
     buildVoiceGrid();
