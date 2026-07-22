@@ -388,6 +388,7 @@
       animation: msgIn .35s ease;
     }
     @keyframes msgIn { from { opacity: 0; transform: translateY(12px) } to { opacity: 1; transform: translateY(0) } }
+    @keyframes toastIn { from { opacity: 0; transform: translateX(-50%) translateY(16px) } to { opacity: 1; transform: translateX(-50%) translateY(0) } }
     .msg-avatar {
       width: 38px; height: 38px; min-width: 38px; border-radius: 50%;
       display: flex; align-items: center; justify-content: center;
@@ -854,6 +855,22 @@
     return prompts[state.scenario] || prompts['free-talk'];
   }
 
+  // ── Toast notification ──
+  function showToast(msg) {
+    var existing = document.querySelector('.ai-voice-toast');
+    if (existing) existing.remove();
+    var t = document.createElement('div');
+    t.className = 'ai-voice-toast';
+    t.textContent = msg;
+    t.style.cssText = 'position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--card);color:var(--text);border:1.5px solid var(--line);border-radius:14px;padding:14px 24px;font-size:14px;font-weight:600;z-index:9999;box-shadow:0 8px 32px rgba(0,0,0,.15);max-width:90vw;text-align:center;line-height:1.5;animation:toastIn .3s ease';
+    document.body.appendChild(t);
+    setTimeout(function(){
+      t.style.opacity = '0';
+      t.style.transition = 'opacity .3s ease';
+      setTimeout(function(){ t.remove(); }, 300);
+    }, 5000);
+  }
+
   // ── Timer ──
   function startTimer() {
     state.startTime = Date.now();
@@ -995,7 +1012,7 @@
       _wsConnectTimeout = setTimeout(function() {
         if (!connectionEstablished) {
           try { ws.close(); } catch(e) {}
-          addMsg('system', '⚠️ Impossibile connettersi al server AI Voice. Il server non è ancora pronto — i modelli sono in download. Riprova tra qualche minuto.');
+          showToast('⚠️ Il server AI Voice non è ancora pronto. I modelli sono in download — riprova quando vedi "Uvicorn running" nel terminale.');
           if (state.active) stop(true);
         }
       }, 3000);
@@ -1054,7 +1071,7 @@
       ws.onclose = function() {
         if (_wsConnectTimeout) { clearTimeout(_wsConnectTimeout); _wsConnectTimeout = null; }
         if (!connectionEstablished) {
-          addMsg('system', '⚠️ Il server AI Voice non è ancora pronto. I modelli sono in download — riprova quando vedi "Uvicorn running" nel terminale.');
+          showToast('⚠️ Il server AI Voice non è ancora pronto. I modelli sono in download — riprova quando vedi "Uvicorn running" nel terminale.');
           if (state.active) stop(true);
         } else {
           setStatus('Disconnesso');
@@ -1086,37 +1103,37 @@
     // Reset
     state.active = true;
     state.startTime = null;
-    var transcriptEl = $('transcript');
-    if (transcriptEl) transcriptEl.innerHTML = '<div class="empty-state"><div class="icon">🔌</div><p>Connessione al server in corso…</p></div>';
 
-    // UI: show live area immediately so user sees feedback
-    var btnStart = $('btnStart');
-    var btnLabel = $('btnStartLabel');
-    var live = $('live');
-    var startArea = $('startArea');
-    if (btnStart) { btnStart.classList.add('running'); btnStart.disabled = true; }
-    if (btnLabel) btnLabel.textContent = 'Connessione…';
-    if (live) live.classList.add('show');
-    if (startArea) startArea.style.display = 'none';
-
-    // Connect
+    // Connect first — don't open live area until we know the server is up
     state.socket = connect();
 
-    // Wait for connection, then start mic
+    // Wait for connection, then proceed
     setTimeout(async function(){
       if (!state.active) return; // stop() was already called (connection failed)
       if (!state.socket || state.socket.readyState !== WebSocket.OPEN) {
-        addMsg('system', '⚠️ Il server AI Voice non è ancora pronto. I modelli sono in download — riprova quando vedi "Uvicorn running" nel terminale.');
+        showToast('⚠️ Il server AI Voice non è ancora pronto. I modelli sono in download — riprova quando vedi "Uvicorn running" nel terminale.');
         stop(true);
         return;
       }
+
+      // Server is up — now open live area and start mic
+      var transcriptEl = $('transcript');
+      if (transcriptEl) transcriptEl.innerHTML = '<div class="empty-state"><div class="icon">🎙️</div><p>In attesa… inizia a parlare!</p></div>';
+
+      var btnStart = $('btnStart');
+      var btnLabel = $('btnStartLabel');
+      var live = $('live');
+      var startArea = $('startArea');
+      if (btnStart) { btnStart.classList.add('running'); btnStart.disabled = false; }
+      if (btnLabel) btnLabel.textContent = 'In conversazione…';
+      if (live) live.classList.add('show');
+      if (startArea) startArea.style.display = 'none';
+
       var ok = await startMic();
       if (!ok) { stop(); return; }
       startTimer();
       setStatus('In ascolto…');
-      if (btnStart) btnStart.disabled = false;
-      if (btnLabel) btnLabel.textContent = 'In conversazione…';
-    }, 1500);
+    }, 2000);
   }
 
   function stop(silent) {
