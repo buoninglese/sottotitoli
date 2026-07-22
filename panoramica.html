@@ -1761,6 +1761,21 @@
               document.querySelectorAll('#sub-rai-crea .rai-toggle').forEach(function(btn){
                 btn.addEventListener('click', function(e){ e.stopPropagation(); this.classList.toggle('active'); });
               });
+              // Populate session selects
+              if(window.SottotitoliData && window.SottotitoliData.getSessions){
+                window.SottotitoliData.getSessions().then(function(sessions){
+                  var ids = ['snapshotSessionSelect','grammarSessionSelect','vocabSessionSelect','fluencySessionSelect','gramSessionSelect'];
+                  ids.forEach(function(id){
+                    var sel = document.getElementById(id);
+                    if(!sel) return;
+                    sel.innerHTML = '<option value="">Seleziona sessione…</option>';
+                    (sessions||[]).forEach(function(s){
+                      var name = s.name || ('Sessione '+new Date(s.started_at).toLocaleDateString('it-IT'));
+                      sel.innerHTML += '<option value="'+s.id+'">'+name+'</option>';
+                    });
+                  });
+                }).catch(function(){});
+              }
               // Credits
               if(window.SottotitoliData && window.SottotitoliData.getAITokens){
                 window.SottotitoliData.getAITokens().then(function(t){
@@ -1768,6 +1783,78 @@
                   if(el) el.textContent = (t||0);
                 }).catch(function(){});
               }
+
+              // ── Report generation ──
+              window.generateReport = function(type) {
+                var sb = window.sottotitoliSupabase;
+                if (!sb) { alert('Accedi per generare report.'); return; }
+
+                // Find the button and show loading state
+                var productEl = document.querySelector('.rai-product[data-product="'+type+'"]');
+                if (!productEl) return;
+                var btn = productEl.querySelector('.rai-generate-btn');
+                var btnLabel = btn ? btn.querySelector('.rai-btn-icon') : null;
+                var btnLoading = btn ? btn.querySelector('.rai-btn-loading') : null;
+                if (btn) { btn.disabled = true; btn.classList.add('loading'); }
+                if (btnLabel) btnLabel.style.display = 'none';
+                if (btnLoading) btnLoading.style.display = 'inline-flex';
+
+                sb.auth.getSession().then(async function(r) {
+                  if (!r.data?.session) { resetBtn(); alert('Sessione scaduta. Rieffettua il login.'); return; }
+                  var token = r.data.session.access_token;
+                  var sessionSelectId = type === 'snapshot' ? 'snapshotSessionSelect'
+                    : type === 'grammar-full' ? 'gramSessionSelect'
+                    : type === 'grammar' ? 'grammarSessionSelect'
+                    : type+'SessionSelect';
+                  var sessionEl = document.getElementById(sessionSelectId);
+                  var sessionId = sessionEl ? sessionEl.value : '';
+                  if (!sessionId) { resetBtn(); alert('Seleziona una sessione.'); return; }
+
+                  try {
+                    var funcUrl, body;
+                    if (type === 'grammar' || type === 'grammar-full') {
+                      funcUrl = 'https://qzqmuegbpmvqrjrlfbgk.supabase.co/functions/v1/generate-grammar-report';
+                      body = JSON.stringify({ sessionId: sessionId, contentLanguage: 'en', explanationLanguage: 'it' });
+                    } else {
+                      // Snapshot, vocabulary, fluency — use process-ai-reports
+                      funcUrl = 'https://qzqmuegbpmvqrjrlfbgk.supabase.co/functions/v1/process-ai-reports';
+                      body = JSON.stringify({ sessionId: sessionId, type: type });
+                    }
+
+                    var resp = await fetch(funcUrl, {
+                      method: 'POST',
+                      headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+                      body: body
+                    });
+                    var result = await resp.json();
+
+                    if (resp.ok && !result.error) {
+                      showToastMsg('✅ Report generato! Controlla "I miei Report".');
+                      // Refresh credits
+                      if(window.SottotitoliData && window.SottotitoliData.getAITokens){
+                        window.SottotitoliData.getAITokens().then(function(t){
+                          var el = document.getElementById('raiCreditsAvailable');
+                          if(el) el.textContent = (t||0);
+                        }).catch(function(){});
+                      }
+                    } else {
+                      showToastMsg('❌ ' + (result.error || 'Errore nella generazione.'));
+                    }
+                  } catch(e) {
+                    showToastMsg('❌ Errore di rete: ' + e.message);
+                  }
+                  resetBtn();
+                }).catch(function(e) {
+                  resetBtn();
+                  showToastMsg('❌ ' + e.message);
+                });
+
+                function resetBtn() {
+                  if (btn) { btn.disabled = false; btn.classList.remove('loading'); }
+                  if (btnLabel) btnLabel.style.display = '';
+                  if (btnLoading) btnLoading.style.display = 'none';
+                }
+              };
             </script>
           </div>
           <div role="tabpanel" class="subtab-pane" id="sub-rai-miei">
