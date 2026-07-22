@@ -2347,8 +2347,15 @@ function _addWordBankBtn(word, relEl) {
   relEl.appendChild(wb);
 }
 
-// ── Get POS tag from Compromise.js (used for placeholder only) ──
+// ── Get POS tag (enhanced — uses Penn Treebank via tagWord) ──
 function _getPOS(word) {
+  var posMap = { NOUN:'noun', VERB:'verb', ADJ:'adj', ADV:'adv', PREP:'prep', CONJ:'conj', PRON:'pron', FUNC:'func', WORD:'word', OTHER:'other' };
+  // Primary: use enhanced tagWord (Penn Treebank + Compromise + suffix patterns)
+  if (typeof tagWord === 'function') {
+    var t = tagWord(word);
+    if (posMap[t]) return posMap[t];
+  }
+  // Fallback: direct Compromise
   try {
     if (typeof nlp !== 'undefined') {
       var doc = nlp(word);
@@ -2362,12 +2369,6 @@ function _getPOS(word) {
       }
     }
   } catch(e) {}
-  // Fallback to tagWord (Compromise + suffix patterns for EN/NL/IT)
-  if (typeof tagWord === 'function') {
-    var t = tagWord(word);
-    var map = { NOUN:'noun', VERB:'verb', ADJ:'adj', ADV:'adv', PREP:'prep', CONJ:'conj', PRON:'pron', FUNC:'func' };
-    return map[t] || t.toLowerCase();
-  }
   return '—';
 }
 
@@ -2548,24 +2549,28 @@ function _updateGrammarLines() {
         if (seen[clean]) return; // skip duplicates within same line
         seen[clean] = true;
         var pos = 'OTHER';
-        // nlp first, then suffix fallback
-        try {
-          if (typeof nlp !== 'undefined') {
-            var d = nlp(clean); var t = d.json();
-            if (t[0] && t[0].terms && t[0].terms[0]) {
-              var tags = t[0].terms[0].tags || [];
-              if (tags.indexOf('Noun') !== -1) pos = 'NOUN';
-              else if (tags.indexOf('Verb') !== -1) pos = 'VERB';
-              else if (tags.indexOf('Adjective') !== -1) pos = 'ADJ';
-              else if (tags.indexOf('Adverb') !== -1) pos = 'ADV';
-              else if (tags.indexOf('Preposition') !== -1) pos = 'PREP';
-              else if (tags.indexOf('Conjunction') !== -1) pos = 'CONJ';
-              else if (tags.indexOf('Pronoun') !== -1) pos = 'PRON';
-              else if (tags.indexOf('Determiner') !== -1) pos = 'DET';
-              else if (tags.indexOf('Modal') !== -1 || tags.indexOf('Auxiliary') !== -1) pos = 'AUX';
+        // Use enhanced tagWord (Penn Treebank) for English, with suffix fallback
+        if (typeof tagWord === 'function') {
+          pos = tagWord(clean);
+        } else {
+          try {
+            if (typeof nlp !== 'undefined') {
+              var d = nlp(clean); var t = d.json();
+              if (t[0] && t[0].terms && t[0].terms[0]) {
+                var tags = t[0].terms[0].tags || [];
+                if (tags.indexOf('Noun') !== -1) pos = 'NOUN';
+                else if (tags.indexOf('Verb') !== -1) pos = 'VERB';
+                else if (tags.indexOf('Adjective') !== -1) pos = 'ADJ';
+                else if (tags.indexOf('Adverb') !== -1) pos = 'ADV';
+                else if (tags.indexOf('Preposition') !== -1) pos = 'PREP';
+                else if (tags.indexOf('Conjunction') !== -1) pos = 'CONJ';
+                else if (tags.indexOf('Pronoun') !== -1) pos = 'PRON';
+                else if (tags.indexOf('Determiner') !== -1) pos = 'DET';
+                else if (tags.indexOf('Modal') !== -1 || tags.indexOf('Auxiliary') !== -1) pos = 'AUX';
+              }
             }
-          }
-        } catch(e) {}
+          } catch(e) {}
+        }
         if (pos === 'OTHER' && typeof _gvHeuristicPOS === 'function') pos = _gvHeuristicPOS(clean);
         var colorMap = {NOUN:'#60a5fa',VERB:'#34d399',ADJ:'#f472b6',ADV:'#c084fc',PREP:'#fbbf24',CONJ:'#fb923c',PRON:'#38bdf8',AUX:'#a78bfa',DET:'#6b7280',PART:'#6b7280',OTHER:'#6b7280'};
         var color = colorMap[pos] || '#6b7280';
@@ -2618,23 +2623,12 @@ function _switchMetricsMode(mode, btn) {
   if (mode === 'waffle') { if (waffle) waffle.style.display = ''; if (pos) pos.style.display = 'none'; }
   else { if (waffle) waffle.style.display = 'none'; if (pos) pos.style.display = ''; }
 }
-// ── Helper: POS tag using NLP (same as Vocabolario slide) ──
+// ── Helper: POS tag (uses enhanced tagWord with Penn Treebank) ──
 function _nlpPOS(w) {
-  try {
-    if (typeof nlp !== 'undefined') {
-      var d = nlp(w); var t = d.json();
-      if (t[0] && t[0].terms && t[0].terms[0]) {
-        var tags = t[0].terms[0].tags || [];
-        if (tags.indexOf('Noun') !== -1) return 'NOUN';
-        if (tags.indexOf('Verb') !== -1) return 'VERB';
-        if (tags.indexOf('Adjective') !== -1) return 'ADJ';
-        if (tags.indexOf('Adverb') !== -1) return 'ADV';
-        if (tags.indexOf('Preposition') !== -1) return 'PREP';
-        if (tags.indexOf('Conjunction') !== -1) return 'CONJ';
-        if (tags.indexOf('Pronoun') !== -1) return 'PRON';
-      }
-    }
-  } catch(e) {}
+  if (typeof tagWord === 'function') {
+    var t = tagWord(w);
+    if (t && t !== 'WORD' && t !== 'OTHER') return t;
+  }
   return 'OTHER';
 }
 // ═══ Refresh metrics panel data ═══
@@ -2944,23 +2938,28 @@ function _s4LineClick(el) {
     if (seen[clean]) return;
     seen[clean] = true;
     var pos = 'OTHER';
-    try {
-      if (typeof nlp !== 'undefined') {
-        var d = nlp(clean); var t = d.json();
-        if (t[0] && t[0].terms && t[0].terms[0]) {
-          var tags = t[0].terms[0].tags || [];
-          if (tags.indexOf('Noun') !== -1) pos = 'NOUN';
-          else if (tags.indexOf('Verb') !== -1) pos = 'VERB';
-          else if (tags.indexOf('Adjective') !== -1) pos = 'ADJ';
-          else if (tags.indexOf('Adverb') !== -1) pos = 'ADV';
-          else if (tags.indexOf('Preposition') !== -1) pos = 'PREP';
-          else if (tags.indexOf('Conjunction') !== -1) pos = 'CONJ';
-          else if (tags.indexOf('Pronoun') !== -1) pos = 'PRON';
-          else if (tags.indexOf('Determiner') !== -1) pos = 'DET';
-          else if (tags.indexOf('Modal') !== -1 || tags.indexOf('Auxiliary') !== -1) pos = 'AUX';
+    // Use enhanced tagWord (Penn Treebank) with nlp fallback
+    if (typeof tagWord === 'function') {
+      pos = tagWord(clean);
+    } else {
+      try {
+        if (typeof nlp !== 'undefined') {
+          var d = nlp(clean); var t = d.json();
+          if (t[0] && t[0].terms && t[0].terms[0]) {
+            var tags = t[0].terms[0].tags || [];
+            if (tags.indexOf('Noun') !== -1) pos = 'NOUN';
+            else if (tags.indexOf('Verb') !== -1) pos = 'VERB';
+            else if (tags.indexOf('Adjective') !== -1) pos = 'ADJ';
+            else if (tags.indexOf('Adverb') !== -1) pos = 'ADV';
+            else if (tags.indexOf('Preposition') !== -1) pos = 'PREP';
+            else if (tags.indexOf('Conjunction') !== -1) pos = 'CONJ';
+            else if (tags.indexOf('Pronoun') !== -1) pos = 'PRON';
+            else if (tags.indexOf('Determiner') !== -1) pos = 'DET';
+            else if (tags.indexOf('Modal') !== -1 || tags.indexOf('Auxiliary') !== -1) pos = 'AUX';
+          }
         }
-      }
-    } catch(e) {}
+      } catch(e) {}
+    }
     if (pos === 'OTHER' && typeof _gvHeuristicPOS === 'function') pos = _gvHeuristicPOS(clean);
     var colorMap = {NOUN:'#60a5fa',VERB:'#34d399',ADJ:'#f472b6',ADV:'#c084fc',PREP:'#fbbf24',CONJ:'#fb923c',PRON:'#38bdf8',AUX:'#a78bfa',DET:'#6b7280',OTHER:'#6b7280'};
     var color = colorMap[pos] || '#6b7280';
@@ -3085,7 +3084,9 @@ function downloadCEFRPDF(){
     (clone.textContent||'').trim().split(/\s+/).forEach(function(w){
       var clean=w.replace(/[^a-zA-Z]/g,'').toLowerCase();if(clean.length<2||seen.has(clean))return;
       seen.add(clean);
-      var pos='OTHER';try{if(typeof nlp!=='undefined'){var t=nlp(clean).json();if(t[0]&&t[0].terms&&t[0].terms[0]){var tags=t[0].terms[0].tags||[];if(tags.indexOf('Noun')!==-1)pos='NOUN';else if(tags.indexOf('Verb')!==-1)pos='VERB';else if(tags.indexOf('Adjective')!==-1)pos='ADJ';else if(tags.indexOf('Adverb')!==-1)pos='ADV'}}}catch(e){}
+      var pos='OTHER';
+      if (typeof tagWord === 'function') { pos = tagWord(clean); }
+      else { try { if (typeof nlp !== 'undefined') { var t = nlp(clean).json(); if (t[0] && t[0].terms && t[0].terms[0]) { var tags = t[0].terms[0].tags || []; if (tags.indexOf('Noun') !== -1) pos = 'NOUN'; else if (tags.indexOf('Verb') !== -1) pos = 'VERB'; else if (tags.indexOf('Adjective') !== -1) pos = 'ADJ'; else if (tags.indexOf('Adverb') !== -1) pos = 'ADV'; } } } catch(e) {} }
       if(posWords[pos])posWords[pos].push(clean);
     });
   });
