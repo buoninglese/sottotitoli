@@ -1070,6 +1070,7 @@ button[onclick*="addToWordBank"]:hover{background:rgba(52,211,153,.15)!important
 .v20q-act .v20q-del:hover{border-color:var(--danger);color:var(--danger);background:rgba(239,68,68,.08)}
 .v20q-act .v20q-bm:hover{border-color:var(--warn);color:var(--warn);background:rgba(245,158,11,.08)}
 .v20q-act .v20q-bm-on,.v20q-act .v20q-bm-on:hover{color:#f59e0b;border-color:rgba(245,158,11,.4)}
+.v20q-act .v20q-copy:hover{border-color:var(--accent);color:var(--accent);background:rgba(6,182,212,.08)}
 /* Bookmarked line */
 .v20q-bookmarked{border-left:3px solid rgba(245,158,11,.5) !important}
 /* Bookmark panel */
@@ -7393,7 +7394,7 @@ window.fixExtrasPanelColors = function(){
     var time = v20q.timestamps[idx] || v20q_fmtTime(idx * 6);
     var isBm = v20q.bookmarks.indexOf(idx) !== -1;
     var bmCls = isBm ? ' v20q-bm-on' : '';
-    var actIcons = '<span class="v20q-act"><button class="v20q-bm'+bmCls+'" title="'+(isBm?'Unbookmark':'Bookmark')+'" onclick="event.stopPropagation();v20q_toggleBookmark('+idx+')"><i class="fa-solid fa-star"></i></button><button class="v20q-del" title="Delete" onclick="event.stopPropagation();v20q_deleteSentence('+idx+')"><i class="fa-solid fa-trash"></i></button></span>';
+    var actIcons = '<span class="v20q-act"><button class="v20q-copy" title="Copy" onclick="event.stopPropagation();v20q_copySentence('+idx+')"><i class="fa-regular fa-copy"></i></button><button class="v20q-bm'+bmCls+'" title="'+(isBm?'Unbookmark':'Bookmark')+'" onclick="event.stopPropagation();v20q_toggleBookmark('+idx+')"><i class="fa-solid fa-star"></i></button><button class="v20q-del" title="Delete" onclick="event.stopPropagation();v20q_deleteSentence('+idx+')"><i class="fa-solid fa-trash"></i></button></span>';
     var el = document.createElement('div');
     el.className = 'v20q-line' + (isBm ? ' v20q-bookmarked' : '');
     var style = v20q.style; // cap1..cap5
@@ -7432,6 +7433,30 @@ window.fixExtrasPanelColors = function(){
     if (pos === -1) { v20q.bookmarks.push(idx); }
     else { v20q.bookmarks.splice(pos, 1); }
     v20q_rerender();
+  };
+  // ── Copy sentence to clipboard ──
+  window.v20q_copySentence = function(idx){
+    var text = v20q.sentences[idx];
+    if (!text) return;
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(function(){
+        v20q_toast('📋 Copied');
+      }).catch(function(){
+        // Fallback
+        _fallbackCopy(text);
+      });
+    } else {
+      _fallbackCopy(text);
+    }
+    function _fallbackCopy(t){
+      var ta = document.createElement('textarea');
+      ta.value = t;
+      ta.style.cssText = 'position:fixed;left:-9999px';
+      document.body.appendChild(ta);
+      ta.select();
+      try { document.execCommand('copy'); v20q_toast('📋 Copied'); } catch(e) {}
+      document.body.removeChild(ta);
+    }
   };
   // ── Delete sentence ──
   window.v20q_deleteSentence = function(idx){
