@@ -3106,7 +3106,6 @@ function downloadCEFRPDF(){
 // ── Vocab POS Stack ──
 function _updateVocabPosStack() {
   var stack = document.getElementById('vocabPosStack'); if (!stack) return;
-  // Note: slides 2 and 4 are hidden via slide navigation for non-English
   var lines = document.querySelectorAll('#captionTranscript .line');
   var posMap = {}; var posOrder = ['NOUN','VERB','ADJ','ADV','PREP','CONJ','PRON','AUX'];
   var posNames = {NOUN:'Nouns',VERB:'Verbs',ADJ:'Adjectives',ADV:'Adverbs',PREP:'Prepositions',CONJ:'Conjunctions',PRON:'Pronouns',AUX:'Auxiliaries'};
@@ -3114,9 +3113,12 @@ function _updateVocabPosStack() {
   lines.forEach(function(l){
     var clone=l.cloneNode(true);var spans=clone.querySelectorAll('span');spans.forEach(function(s){s.remove()});
     var spks=clone.querySelectorAll('.spk-tag');spks.forEach(function(s){s.remove()});
-    (clone.textContent||'').trim().split(/\s+/).forEach(function(w){
-      var clean=w.replace(/[^a-zA-Z]/g,'').toLowerCase();if(clean.length<2)return;
-      var pos='OTHER';try{if(typeof nlp!=='undefined'){var d=nlp(clean);var t=d.json();if(t[0]&&t[0].terms&&t[0].terms[0]){var tags=t[0].terms[0].tags||[];if(tags.indexOf('Noun')!==-1)pos='NOUN';else if(tags.indexOf('Verb')!==-1)pos='VERB';else if(tags.indexOf('Adjective')!==-1)pos='ADJ';else if(tags.indexOf('Adverb')!==-1)pos='ADV';else if(tags.indexOf('Preposition')!==-1)pos='PREP';else if(tags.indexOf('Conjunction')!==-1)pos='CONJ';else if(tags.indexOf('Pronoun')!==-1)pos='PRON'}}}catch(e){}
+    var lineText = (clone.textContent||'').trim();
+    lineText.split(/\s+/).forEach(function(w){
+      var clean=w.replace(/[^a-zA-Z'-]/g,'').toLowerCase();if(clean.length<2)return;
+      // Use enhanced tagWord with full sentence context for Penn Treebank accuracy
+      var pos = (typeof tagWord === 'function') ? tagWord(clean, lineText) : 'WORD';
+      if (pos === 'FUNC' || pos === 'WORD' || pos === 'OTHER') pos = (typeof tagWord === 'function') ? tagWord(clean) : 'WORD';
       if(!posMap[pos])posMap[pos]=[];if(posMap[pos].indexOf(clean)<0)posMap[pos].push(clean);
     });
   });
@@ -4586,10 +4588,12 @@ function renderWordBank() {
   } else {
     if (empty) empty.classList.remove('show');
     chips.innerHTML = wordBank.map(function(w) {
-      var pos=tagWord(w);
+      var d = (typeof window.tagWordDetail === 'function') ? window.tagWordDetail(w) : { pos: tagWord(w), detail: tagWord(w), penn: null };
+      var pos = d.pos;
+      var detail = (d.detail && d.detail !== pos) ? d.detail : pos;
       var c=posColors[pos]||'#c4b5fd';
       var bg=posBg[pos]||'rgba(167,139,250,.1)';
-      return '<span class="wordbank-chip" style="background:'+bg+';color:'+c+';border-color:'+c+'30" onclick="showWordDefinition(\'' + w.replace(/'/g, "\\'") + '\')" title="Click: definition · POS: '+pos+'">' + w + '<span style="font-size:7px;opacity:.4;margin:0 2px">'+pos+'</span><span class="wb-chip-x" onclick="event.stopPropagation();removeFromWordBank(\'' + w.replace(/'/g, "\\'") + '\')" title="Remove from Word Bank">×</span></span>';
+      return '<span class="wordbank-chip" style="background:'+bg+';color:'+c+';border-color:'+c+'30" onclick="showWordDefinition(\'' + w.replace(/'/g, "\\'") + '\')" title="'+detail+'">' + w + '<span style="font-size:7px;opacity:.5;margin:0 2px">'+detail+'</span><span class="wb-chip-x" onclick="event.stopPropagation();removeFromWordBank(\'' + w.replace(/'/g, "\\'") + '\')" title="Remove from Word Bank">×</span></span>';
     }).join('');
   }
 }
@@ -4975,12 +4979,96 @@ function downloadGrammarPDF() {
     cosa:'NOUN',tempo:'NOUN',anno:'NOUN',giorno:'NOUN',uomo:'NOUN',donna:'NOUN',vita:'NOUN',mondo:'NOUN'
   };
 
-  function tagWord(w){
-    w = w.toLowerCase().replace(/[^a-z0-9-]/g,'');
-    if (!w || w.length<2) return 'OTHER';
-    // ── Use Compromise.js for English when available ──
+  // ── Penn Treebank tag → { broad category, readable detail } ──
+  var PENN_MAP = {
+    // Nouns
+    NN:  { pos:'NOUN', detail:'Noun (singular)' },
+    NNS: { pos:'NOUN', detail:'Noun (plural)' },
+    NNP: { pos:'NOUN', detail:'Proper noun (singular)' },
+    NNPS:{ pos:'NOUN', detail:'Proper noun (plural)' },
+    // Verbs
+    VB:  { pos:'VERB', detail:'Verb (base)' },
+    VBD: { pos:'VERB', detail:'Past tense' },
+    VBG: { pos:'VERB', detail:'Gerund / present participle' },
+    VBN: { pos:'VERB', detail:'Past participle' },
+    VBP: { pos:'VERB', detail:'Present tense (non-3sg)' },
+    VBZ: { pos:'VERB', detail:'Present tense (3sg)' },
+    MD:  { pos:'VERB', detail:'Modal verb' },
+    // Adjectives
+    JJ:  { pos:'ADJ',  detail:'Adjective' },
+    JJR: { pos:'ADJ',  detail:'Comparative adjective' },
+    JJS: { pos:'ADJ',  detail:'Superlative adjective' },
+    // Adverbs
+    RB:  { pos:'ADV',  detail:'Adverb' },
+    RBR: { pos:'ADV',  detail:'Comparative adverb' },
+    RBS: { pos:'ADV',  detail:'Superlative adverb' },
+    // Prepositions & particles
+    IN:  { pos:'PREP', detail:'Preposition / subordinating conjunction' },
+    RP:  { pos:'PREP', detail:'Phrasal verb particle' },
+    TO:  { pos:'PREP', detail:'to' },
+    // Determiners
+    DT:  { pos:'FUNC', detail:'Determiner' },
+    PDT: { pos:'FUNC', detail:'Predeterminer' },
+    // Pronouns
+    PRP: { pos:'PRON', detail:'Personal pronoun' },
+    PRP$:{ pos:'PRON', detail:'Possessive pronoun' },
+    WP:  { pos:'PRON', detail:'Wh-pronoun' },
+    WP$: { pos:'PRON', detail:'Possessive wh-pronoun' },
+    // Conjunctions
+    CC:  { pos:'CONJ', detail:'Coordinating conjunction' },
+    // Existential there
+    EX:  { pos:'FUNC', detail:'Existential there' },
+    // Cardinal numbers
+    CD:  { pos:'WORD', detail:'Cardinal number' },
+    // Foreign words
+    FW:  { pos:'WORD', detail:'Foreign word' },
+    // Possessive
+    POS: { pos:'FUNC', detail:'Possessive ending' },
+    // Symbols / interjections
+    SYM: { pos:'WORD', detail:'Symbol' },
+    UH:  { pos:'WORD', detail:'Interjection' },
+    // Wh-words
+    WDT: { pos:'FUNC', detail:'Wh-determiner' },
+    WRB: { pos:'ADV',  detail:'Wh-adverb' }
+  };
+
+  // ── Enhanced POS tagging using Compromise Penn Treebank ──
+  function _getPennTag(word, sentenceContext) {
+    if (typeof nlp === 'undefined') return null;
+    try {
+      // Use sentence context when available for better accuracy
+      var text = sentenceContext || word;
+      var doc = nlp(text).compute('penn');
+      var json = doc.json();
+      if (json[0] && json[0].terms) {
+        // Find the matching term
+        var cleanWord = word.toLowerCase().replace(/[^a-z0-9'-]/g, '');
+        for (var i = 0; i < json[0].terms.length; i++) {
+          var term = json[0].terms[i];
+          var termClean = (term.text || '').toLowerCase().replace(/[^a-z0-9'-]/g, '');
+          if (termClean === cleanWord || term.text.toLowerCase() === word.toLowerCase()) {
+            if (term.penn) return term.penn;
+          }
+        }
+        // If no exact match, try the first term (for single-word lookups)
+        if (json[0].terms[0] && json[0].terms[0].penn) {
+          return json[0].terms[0].penn;
+        }
+      }
+    } catch(e) {}
+    return null;
+  }
+
+  function tagWord(w, sentenceContext){
+    w = (w || '').toLowerCase().replace(/[^a-z0-9'-]/g, '');
+    if (!w || w.length < 2) return 'OTHER';
+
+    // ── Try Penn Treebank tags first (Compromise with context) ──
     if (typeof nlp !== 'undefined') {
       try {
+        var penn = _getPennTag(w, sentenceContext);
+        if (penn && PENN_MAP[penn]) return PENN_MAP[penn].pos;
+        // Fallback to basic Compromise methods
         var doc = nlp(w);
         if (doc.adjectives().found) return 'ADJ';
         if (doc.verbs().found) return 'VERB';
@@ -4992,30 +5080,37 @@ function downloadGrammarPDF() {
       } catch(e) {}
     }
     // ── Fallback suffix patterns (English + Dutch + Italian) ──
-    // Verb patterns
     if (w.endsWith('ing')) return 'VERB';
     if (w.endsWith('ed') && w.length>4) return 'VERB';
     if (w.endsWith('en') && w.length>4 && !w.endsWith('een') && !w.endsWith('ien')) return 'VERB';
-    // Noun patterns
     if (w.endsWith('tion')||w.endsWith('sion')||w.endsWith('ment')||w.endsWith('ness')||w.endsWith('ity')||w.endsWith('ance')||w.endsWith('ence')) return 'NOUN';
     if (w.endsWith('heid')||w.endsWith('tà')||w.endsWith('tù')) return 'NOUN';
-    // Adverb pattern
     if (w.endsWith('ly')||w.endsWith('mente')||w.endsWith('lijk')) return 'ADV';
-    // Adjective patterns (broader coverage)
     if (w.endsWith('ous')||w.endsWith('ful')||w.endsWith('less')||w.endsWith('able')||w.endsWith('ible')||w.endsWith('ive')||w.endsWith('al')||w.endsWith('ic')||w.endsWith('ish')) return 'ADJ';
     if (w.endsWith('er')||w.endsWith('est')) return 'ADJ';
     if (w.endsWith('y') && w.length>3 && !w.endsWith('ly')) return 'ADJ';
     if (w.endsWith('oso')||w.endsWith('ale')||w.endsWith('ico')||w.endsWith('isch')||w.endsWith('baar')) return 'ADJ';
-    // Diminutives → NOUN
     if (w.endsWith('je')||w.endsWith('tje')) return 'NOUN';
-    // Function words
     if (/^(the|a|an|de|het|een|il|la|lo|gli|le|un|una|in|on|at|op|aan|to|for|of|di|da|con|su|per|tra|fra|with|met|by|door|from|van|into|about|over|under|tussen|between|through|during|before|after|above|below|up|down|out|off|or|and|but|en|e|o|so|if|als|where|how|why|who|this|that|these|those|my|your|his|her|its|our|their|i|we|you|he|she|it|they|me|us|him|them|not|non|no|yes|very|just|only|also|even|still|yet|more|most|some|any|all|each|every|both|few|many|much|such|than|too|as|like|here|there|now|then|well)$/.test(w)) return 'FUNC';
-    // Final noun check for -s plurals
     if (w.endsWith('s') && w.length>4) return 'NOUN';
     return 'WORD';
   }
-  // Export to global scope for callers outside this IIFE
+  // Export to global scope
   window.tagWord = tagWord;
+  // ── Detailed tag info (returns {pos, detail, penn} or null) ──
+  window.tagWordDetail = function(w, sentenceContext) {
+    var pos = tagWord(w, sentenceContext);
+    w = (w || '').toLowerCase().replace(/[^a-z0-9'-]/g, '');
+    if (typeof nlp !== 'undefined') {
+      try {
+        var penn = _getPennTag(w, sentenceContext);
+        if (penn && PENN_MAP[penn]) {
+          return { pos: PENN_MAP[penn].pos, detail: PENN_MAP[penn].detail, penn: penn };
+        }
+      } catch(e) {}
+    }
+    return { pos: pos, detail: pos, penn: null };
+  };
 
   // ── Extract words from TRANSCRIPT ONLY (no interim — only finalized sentences) ──
   function getTranscriptWords(){
