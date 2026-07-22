@@ -1,6 +1,7 @@
-// js/kokoro-tts.js — Text-to-speech via browser Web Speech API
-// Note: Kokoro-82M via HuggingFace API is not available (requires fal.ai key).
-// This module uses the browser's built-in speechSynthesis for instant, free TTS.
+// js/speech-icons.js — Text-to-speech speaker icons via browser Web Speech API
+// Uses the browser's built-in speechSynthesis for instant, free TTS.
+// Formerly known as kokoro-tts.js (that name was misleading — Kokoro-82M was
+// never hooked up; it required a fal.ai key that wasn't available).
 (function(global){
   'use strict';
 
@@ -36,7 +37,7 @@
   _loadVoices();
 
   function getVoiceForLang(lang) {
-    var key = 'kokoro-voice-' + (lang || 'en');
+    var key = 'speech-icons-voice-' + (lang || 'en');
     var saved = localStorage.getItem(key);
     if (saved) return saved;
     var def = DEFAULTS[lang] || DEFAULTS['en'];
@@ -46,7 +47,7 @@
   }
 
   function setVoiceForLang(lang, voiceId) {
-    var key = 'kokoro-voice-' + (lang || 'en');
+    var key = 'speech-icons-voice-' + (lang || 'en');
     localStorage.setItem(key, voiceId);
   }
 
@@ -142,7 +143,7 @@
 
   function _makeOneButton(text, lang, voiceName, label) {
     var btn = document.createElement('button');
-    btn.className = 'kokoro-spk-btn';
+    btn.className = 'speech-icon-btn';
     btn.innerHTML = '🔊';
     btn.title = label || voiceName || 'Listen';
     btn.setAttribute('data-tts-text', text);
@@ -172,7 +173,7 @@
   function createSpeakerButton(text, lang, className) {
     var base = (lang || 'en').split('-')[0].toLowerCase();
     var wrapper = document.createElement('span');
-    wrapper.className = (className || '') + ' kokoro-spk-wrap';
+    wrapper.className = (className || '') + ' speech-icon-wrap';
     wrapper.style.display = 'inline-flex';
     wrapper.style.alignItems = 'center';
     wrapper.style.verticalAlign = 'middle';
@@ -200,7 +201,7 @@
   }
 
   // Exports
-  global.KokoroTTS = {
+  global.SpeechIcons = {
     speak: speak,
     stop: stop,
     getVoiceForLang: getVoiceForLang,
