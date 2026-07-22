@@ -307,14 +307,85 @@ function _refreshCreditDisplays(newMinutesBalance) {
   }
 }
 
-// ═══ Page-unload cleanup — stop mic when user leaves ═══
-// beforeunload: fires on tab close / navigation (sync only — stop mic immediately)
+// ═══ Page-unload cleanup — stop mic + save session when user leaves ═══
+// beforeunload: fires on tab close / navigation
+// IMPORTANT: sync operations only — we dump state to localStorage.
+// Recovery happens on next page load via _recoverPendingSession().
 window.addEventListener('beforeunload', function() {
+  // Stop mic
   if (_realMic.recognition) {
     try { _realMic.recognition.stop(); } catch(e) {}
     _realMic.recognition = null;
   }
+  // Save pending session data so it's not lost if user closes during recording
+  try {
+    var lines = window._sessionLines;
+    var activeSessionId = localStorage.getItem('sottotitoli-active-session')
+      || localStorage.getItem('sottotitoli-caption-session')
+      || localStorage.getItem('sottotitoli-translate-session');
+    if (lines && lines.length > 0 && activeSessionId) {
+      var payload = {
+        sessionId: activeSessionId,
+        lines: lines,
+        durationSeconds: (typeof sessionSeconds !== 'undefined') ? sessionSeconds : 0,
+        lang: (typeof currentCaptionLang !== 'undefined') ? currentCaptionLang : 'en-US',
+        savedAt: Date.now()
+      };
+      localStorage.setItem('sottotitoli-pending-session', JSON.stringify(payload));
+    }
+  } catch(e) { /* silent — best effort */ }
 });
+
+// ═══ Recover pending session on page load ═══
+// Called by caption-s8t.html and other session pages on init.
+function _recoverPendingSession(supabaseClient) {
+  try {
+    var raw = localStorage.getItem('sottotitoli-pending-session');
+    if (!raw) return;
+    var payload = JSON.parse(raw);
+    localStorage.removeItem('sottotitoli-pending-session');
+    if (!payload || !payload.sessionId || !payload.lines || !payload.lines.length) return;
+
+    // Restore session ID
+    localStorage.setItem('sottotitoli-caption-session', payload.sessionId);
+
+    // Reconstruct and save
+    var fullText = payload.lines.map(function(l) { return l.en || l.text || l || ''; }).filter(Boolean).join('\n');
+    var allWords = fullText.toLowerCase().match(/[a-zàèéìòù]{2,}/g) || [];
+
+    var updateObj = {
+      ended_at: new Date().toISOString(),
+      transcript_text: fullText,
+      words_count: allWords.length,
+      duration_seconds: payload.durationSeconds || 0
+    };
+    if (payload.durationSeconds > 0) {
+      updateObj.wpm = Math.round((allWords.length / payload.durationSeconds) * 60);
+    }
+    if (allWords.length > 0) {
+      var unique = {};
+      allWords.forEach(function(w) { unique[w.toLowerCase()] = true; });
+      updateObj.unique_words_count = Object.keys(unique).length;
+      updateObj.lexical_diversity = Object.keys(unique).length / allWords.length;
+    }
+    updateObj.metrics_version = 2;
+
+    // Save via sendBeacon for reliability, or fetch fallback
+    if (supabaseClient && typeof supabaseClient === 'object') {
+      supabaseClient
+        .from('sessions')
+        .update(updateObj)
+        .eq('id', payload.sessionId)
+        .then(function() {
+          console.log('🔄 Recovered session:', payload.sessionId);
+        }).catch(function(e) {
+          console.warn('Failed to recover session:', e.message);
+        });
+    }
+  } catch(e) {
+    console.warn('Session recovery failed:', e.message);
+  }
+}
 
 // ═══ Force-finalize timer — restarts recognition after silence to flush results ═══
 function _startForceFinalizeTimer() {
