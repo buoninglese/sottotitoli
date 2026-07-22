@@ -985,10 +985,24 @@
   }
 
   // ── WebSocket ──
+  var _wsConnectTimeout = null;
   function connect() {
     try {
       var ws = new WebSocket(SERVER_URL);
+      var connectionEstablished = false;
+
+      // Timeout: if no connection within 3 seconds, treat as failure
+      _wsConnectTimeout = setTimeout(function() {
+        if (!connectionEstablished) {
+          try { ws.close(); } catch(e) {}
+          addMsg('system', '⚠️ Impossibile connettersi al server AI Voice. Il server non è ancora pronto — i modelli sono in download. Riprova tra qualche minuto.');
+          if (state.active) stop(true);
+        }
+      }, 3000);
+
       ws.onopen = function() {
+        connectionEstablished = true;
+        if (_wsConnectTimeout) { clearTimeout(_wsConnectTimeout); _wsConnectTimeout = null; }
         setStatus('Connesso');
         updateServerDot(true);
         ws.send(JSON.stringify({
@@ -1035,11 +1049,18 @@
         }
       };
 
-      ws.onerror = function() { setStatus('Errore connessione'); updateServerDot(false); };
+      ws.onerror = function() { /* handled by onclose or timeout */ };
+
       ws.onclose = function() {
-        setStatus('Disconnesso');
-        updateServerDot(false);
-        if (state.active) { addMsg('system', '🔌 Connessione terminata.'); stop(); }
+        if (_wsConnectTimeout) { clearTimeout(_wsConnectTimeout); _wsConnectTimeout = null; }
+        if (!connectionEstablished) {
+          addMsg('system', '⚠️ Il server AI Voice non è ancora pronto. I modelli sono in download — riprova quando vedi "Uvicorn running" nel terminale.');
+          if (state.active) stop(true);
+        } else {
+          setStatus('Disconnesso');
+          updateServerDot(false);
+          if (state.active) { addMsg('system', '🔌 Connessione terminata.'); stop(true); }
+        }
       };
 
       return ws;
@@ -1066,39 +1087,43 @@
     state.active = true;
     state.startTime = null;
     var transcriptEl = $('transcript');
-    if (transcriptEl) transcriptEl.innerHTML = '<div class="empty-state"><div class="icon">🎙️</div><p>Connessione in corso…</p></div>';
+    if (transcriptEl) transcriptEl.innerHTML = '<div class="empty-state"><div class="icon">🔌</div><p>Connessione al server in corso…</p></div>';
 
-    // UI
+    // UI: show live area immediately so user sees feedback
     var btnStart = $('btnStart');
     var btnLabel = $('btnStartLabel');
     var live = $('live');
     var startArea = $('startArea');
-    if (btnStart) btnStart.classList.add('running');
-    if (btnStart) btnStart.disabled = true;
+    if (btnStart) { btnStart.classList.add('running'); btnStart.disabled = true; }
     if (btnLabel) btnLabel.textContent = 'Connessione…';
     if (live) live.classList.add('show');
     if (startArea) startArea.style.display = 'none';
 
     // Connect
     state.socket = connect();
-    if (!state.socket) { stop(); return; }
 
-    // Wait a moment for connection, then start mic
+    // Wait for connection, then start mic
     setTimeout(async function(){
-      if (!state.active) return;
+      if (!state.active) return; // stop() was already called (connection failed)
+      if (!state.socket || state.socket.readyState !== WebSocket.OPEN) {
+        addMsg('system', '⚠️ Il server AI Voice non è ancora pronto. I modelli sono in download — riprova quando vedi "Uvicorn running" nel terminale.');
+        stop(true);
+        return;
+      }
       var ok = await startMic();
       if (!ok) { stop(); return; }
       startTimer();
       setStatus('In ascolto…');
       if (btnStart) btnStart.disabled = false;
       if (btnLabel) btnLabel.textContent = 'In conversazione…';
-    }, 1000);
+    }, 1500);
   }
 
-  function stop() {
+  function stop(silent) {
     var wasActive = state.active;
     state.active = false;
     stopTimer();
+    if (_wsConnectTimeout) { clearTimeout(_wsConnectTimeout); _wsConnectTimeout = null; }
     if (state.socket) { try { state.socket.close(); } catch(e) {} state.socket = null; }
     stopMic();
 
@@ -1106,7 +1131,7 @@
     var elapsed = state.startTime ? Math.floor((Date.now() - state.startTime) / 60000) : 0;
     if (elapsed > 0) {
       var cost = deductVC(elapsed);
-      addMsg('system', '⏱️ Sessione terminata. Durata: ' + elapsed + ' min. Crediti usati: ' + cost + '. Saldo: ' + state.vcBalance + ' crediti.');
+      if (!silent) addMsg('system', '⏱️ Sessione terminata. Durata: ' + elapsed + ' min. Crediti usati: ' + cost + '. Saldo: ' + state.vcBalance + ' crediti.');
     }
 
     // Reset UI
@@ -1122,7 +1147,7 @@
     updateServerDot(false);
 
     // Only save session if there was actual conversation time (>10 seconds)
-    if (elapsed > 0.15) {
+    if (!silent && elapsed > 0.15) {
       saveSession(elapsed);
     }
   }
