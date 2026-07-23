@@ -602,6 +602,20 @@
           <h2 class="slide-title">Il tuo Cruscotto Personalizzato</h2>
           <p class="slide-subtitle">Basato sulle tue risposte, ecco il tuo punto di partenza.</p>
 
+          <!-- Starter Report (button always visible; report hidden until generated) -->
+          <div id="starterReportSection" style="margin-bottom:20px;">
+            <div class="insight-card full" style="border-color:var(--accent-purple);background:linear-gradient(135deg,var(--pill-active-bg),var(--pill-bg));">
+              <h4>📄 Il tuo Starter Report <span style="font-weight:400;font-size:10px;color:var(--text-muted);">— generato dall'AI</span></h4>
+              <div id="starterReportContent" style="display:none;font-size:13px;line-height:1.7;color:var(--text);"></div>
+              <div id="starterReportLoading" style="display:none;text-align:center;padding:20px;color:var(--text-muted);">
+                <span>🤖 L'AI sta analizzando il tuo profilo…</span>
+              </div>
+              <button id="mockGenerateBtn" class="btn btn-next" style="margin-top:12px;font-size:12px;padding:8px 18px;" onclick="mockGenerateReport()">
+                <i class="fa-solid fa-wand-magic-sparkles"></i> Genera Starter Report (mock)
+              </button>
+            </div>
+          </div>
+
           <!-- Row 1: Dashboard, Affidabilità, Prossimo passo -->
           <div class="insights-grid">
             <div class="insight-card full">
@@ -684,6 +698,9 @@
 
     // ── Onboarding state (stored in localStorage for testing) ──
     var onboardData = JSON.parse(localStorage.getItem('sottotitoli_onboarding') || '{}');
+
+    // AI-generated insights (populated by mockGenerateReport in test, by /starter-report in production)
+    var aiInsights = null;
 
     function persist() {
       localStorage.setItem('sottotitoli_onboarding', JSON.stringify(onboardData));
@@ -932,28 +949,50 @@
 
     // ── Build dashboard (slide 11) ──
     function buildDashboard() {
-      // Short term objective
+      // ── Use AI insights if available ──
+      if (aiInsights) {
+        var stEl2 = document.getElementById('dashShortTerm');
+        if (aiInsights.objectives && aiInsights.objectives.short_term) {
+          stEl2.textContent = aiInsights.objectives.short_term;
+          stEl2.classList.remove('empty');
+        }
+        var ltEl2 = document.getElementById('dashLongTerm');
+        if (aiInsights.objectives && aiInsights.objectives.long_term) {
+          ltEl2.textContent = aiInsights.objectives.long_term;
+          ltEl2.classList.remove('empty');
+        }
+        var relEl = document.getElementById('dashReliability');
+        if (aiInsights.reliability) { relEl.textContent = aiInsights.reliability; }
+        var nsEl = document.getElementById('dashNextStep');
+        if (aiInsights.next_step) { nsEl.textContent = aiInsights.next_step; }
+
+        var focusList2 = document.getElementById('dashFocusList');
+        var focusAreas = aiInsights.focus_areas || [];
+        var focusHtml2 = '';
+        if (focusAreas.length > 0) {
+          focusAreas.forEach(function(fa) {
+            focusHtml2 += '<div class="focus-item"><span class="focus-priority">' + (fa.priority || '•') + '</span><span><strong>' + escapeHtml(fa.title || '') + '</strong> — ' + escapeHtml(fa.description || '') + '</span></div>';
+          });
+        } else {
+          focusHtml2 = '<div class="focus-item"><span class="focus-priority">1</span><span>Fai la tua prima sessione di pratica in Sottotitoli Studio</span></div>';
+        }
+        focusList2.innerHTML = focusHtml2;
+        document.getElementById('dashSummary').innerHTML = 'Onboarding completato al <strong style="color:var(--accent-green);">100%</strong> · Starter Report generato dall\'AI ✨';
+        return;
+      }
+
+      // ── Fallback: static data ──
       var stEl = document.getElementById('dashShortTerm');
       var stVal = onboardData['short_term_goal'];
-      if (stVal) {
-        stEl.textContent = stVal;
-        stEl.classList.remove('empty');
-      }
+      if (stVal) { stEl.textContent = stVal; stEl.classList.remove('empty'); }
 
-      // Long term objective
       var ltEl = document.getElementById('dashLongTerm');
       var ltVal = onboardData['long_term_goal'];
-      if (ltVal) {
-        ltEl.textContent = ltVal;
-        ltEl.classList.remove('empty');
-      }
+      if (ltVal) { ltEl.textContent = ltVal; ltEl.classList.remove('empty'); }
 
-      // Focus areas — derive from difficulties and objectives
       var diffs = onboardData['difficulties'] || [];
       var focusList = document.getElementById('dashFocusList');
       var focusItems = [];
-
-      // Map difficulties to focus areas
       var diffFocusMap = {
         'speaking_fluently': 'Pratica conversazione libera 10 min/giorno con Voice Assistant',
         'listening_native': 'Ascolto attivo: guarda 1 video in inglese al giorno con sottotitoli',
@@ -969,12 +1008,9 @@
       };
 
       diffs.forEach(function(d, i) {
-        if (diffFocusMap[d] && i < 6) {
-          focusItems.push(diffFocusMap[d]);
-        }
+        if (diffFocusMap[d] && i < 6) focusItems.push(diffFocusMap[d]);
       });
 
-      // If no difficulties selected, show defaults
       if (focusItems.length === 0) {
         focusItems = [
           'Completa la conversazione di intake con l\'AI',
@@ -989,21 +1025,104 @@
       });
       focusList.innerHTML = focusHtml;
 
-      // Update dashboard summary
       var completionPct = Math.round((Object.keys(onboardData).filter(function(k) {
         return onboardData[k] && (!Array.isArray(onboardData[k]) || onboardData[k].length > 0);
       }).length / 10) * 100);
       document.getElementById('dashSummary').innerHTML = 'Completamento onboarding: <strong style="color:var(--accent-green);">' + completionPct + '%</strong> · ' + (completionPct >= 80 ? 'Profilo ricco — AI pronta a personalizzare' : 'Continua a compilare per un profilo più preciso');
     }
 
+    // ── Mock AI report generator (for testing in mockup) ──
+    function mockGenerateReport() {
+      var reportLoading = document.getElementById('starterReportLoading');
+      var reportContent = document.getElementById('starterReportContent');
+      var mockBtn = document.getElementById('mockGenerateBtn');
+
+      if (reportLoading) reportLoading.style.display = 'block';
+      if (reportContent) reportContent.style.display = 'none';
+      if (mockBtn) { mockBtn.disabled = true; mockBtn.textContent = '⏳ Generando…'; }
+
+      // Simulate AI delay
+      setTimeout(function() {
+        // Build a mock AI response based on actual onboarding data
+        var nativeLang = onboardData['native_lang'] || 'en';
+        var profession = onboardData['profession'] || 'student';
+        var diffs = (onboardData['difficulties'] || []).join(', ') || 'general improvement';
+        var whyEng = (onboardData['why_english'] || []).join(', ') || 'communication';
+        var stGoal = onboardData['short_term_goal'] || 'improve English fluency';
+        var ltGoal = onboardData['long_term_goal'] || 'achieve professional proficiency';
+
+        aiInsights = {
+          report_md: "### 🎉 Benvenuto nel tuo percorso personalizzato!\n\nCiao! Ho analizzato il tuo profilo e sono entusiasta di iniziare questo viaggio con te. " +
+            "Dal tuo profilo vedo che usi l'inglese principalmente per **" + whyEng + "** e che trovi difficile **" + diffs + "**.\n\n" +
+            "### 🔍 Analisi del profilo\n\n" +
+            "Il tuo background in **" + profession + "** ti dà un vantaggio: conosci già il vocabolario tecnico del tuo settore. " +
+            "Ora dobbiamo lavorare sulla fluidità e sulla sicurezza nell'uso quotidiano.\n\n" +
+            "### 💪 Punti di forza\n\n" +
+            "- Hai una motivazione chiara per imparare l'inglese\n" +
+            "- Il tuo contesto professionale ti espone regolarmente alla lingua\n" +
+            "- Hai già identificato le aree su cui vuoi lavorare\n\n" +
+            "### 🎯 Piano d'azione\n\n" +
+            "In base al tuo profilo, ho preparato un piano personalizzato con obiettivi SMART e focus pratici. " +
+            "Ogni settimana riceverai un Weekly Update con i tuoi progressi e nuovi obiettivi.\n\n" +
+            "**Sei pronto? Iniziamo! 🚀**",
+          objectives: {
+            short_term: "Entro 3 mesi: migliorare la fluidità nel " + (diffs.indexOf('speaking') >= 0 ? 'parlato' : 'parlato e ascolto') + " con pratica giornaliera di 10 minuti, misurata tramite le sessioni in Sottotitoli Studio.",
+            long_term: "Entro 12 mesi: raggiungere un livello B2 solido, dimostrato dalla capacità di sostenere riunioni di lavoro complesse e scrivere email professionali senza assistenza."
+          },
+          focus_areas: [
+            { priority: 1, title: "Conversazione quotidiana", description: "10 minuti al giorno di pratica orale con il Voice Assistant su argomenti di lavoro." },
+            { priority: 2, title: "Ascolto attivo", description: "Guarda 1 video in inglese al giorno (TED, YouTube) e riassumi oralmente il contenuto." },
+            { priority: 3, title: "Vocabolario professionale", description: "Impara 5 nuove parole del tuo settore ogni giorno con flashcard contestuali." },
+            { priority: 4, title: "Grammatica mirata", description: "Completa 3 esercizi di grammatica a settimana focalizzati sugli errori più comuni." },
+            { priority: 5, title: "Scrittura pratica", description: "Scrivi 2 email brevi in inglese a settimana e ricevi feedback dall'AI." }
+          ],
+          reliability: "Livello stimato: A2-B1 (pre-intermedio). Basato sul tuo profilo, hai buone basi ma necessiti di pratica costante per consolidare. La valutazione precisa arriverà dopo le prime sessioni.",
+          next_step: "Fai subito la tua prima sessione di pratica in Sottotitoli Studio — bastano 10 minuti per iniziare a vedere i progressi!"
+        };
+
+        // Display the report
+        if (reportContent) { reportContent.innerHTML = markedToHtml(aiInsights.report_md || ''); reportContent.style.display = 'block'; }
+        if (reportLoading) reportLoading.style.display = 'none';
+        if (mockBtn) { mockBtn.textContent = '🔄 Rigenera Report'; mockBtn.disabled = false; }
+
+        // Refresh the dashboard with AI data
+        buildDashboard();
+
+        // Save mock report to localStorage
+        onboardData['_ai_report'] = aiInsights;
+        persist();
+      }, 1500);
+    }
+
+    // ── Simple markdown → HTML ──
+    function markedToHtml(md) {
+      if (!md) return '';
+      var html = md
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+        .replace(/^### (.+)$/gm, '<h4 style="font-size:14px;font-weight:700;margin:16px 0 6px;color:var(--text);">$1</h4>')
+        .replace(/^## (.+)$/gm, '<h3 style="font-size:16px;font-weight:800;margin:20px 0 8px;color:var(--accent-purple);">$1</h3>')
+        .replace(/^# (.+)$/gm, '<h2 style="font-size:18px;font-weight:800;margin:20px 0 8px;color:var(--accent-purple);">$1</h2>')
+        .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+        .replace(/\*(.+?)\*/g, '<em>$1</em>')
+        .replace(/^- (.+)$/gm, '<li style="margin-left:16px;">$1</li>')
+        .replace(/(\n<li[^>]*>.*<\/li>)+/g, '<ul style="margin:8px 0;">$&</ul>')
+        .replace(/\n\n/g, '</p><p style="margin:8px 0;">')
+        .replace(/\n/g, '<br>');
+      return '<p style="margin:8px 0;">' + html + '</p>';
+    }
+
     // ── Finish onboarding ──
     function finishOnboarding() {
-      // In production: save all onboardData to Supabase profiles table
       onboardData['onboarding_completed'] = true;
       onboardData['onboarding_completed_at'] = new Date().toISOString();
       persist();
-      alert('✅ Onboarding completato!\n\nIn produzione, questi dati verranno salvati su Supabase nella tabella profiles e onboarding_responses.\n\nVerrai reindirizzato alla Panoramica.');
-      // window.location.href = 'panoramica.html';
+
+      // Trigger mock AI report if not yet generated
+      if (!aiInsights) {
+        mockGenerateReport();
+      }
+
+      alert('✅ Onboarding completato!\n\nIn produzione: i dati vengono salvati su Supabase, lo Starter Report viene generato dall\'AI, e vieni reindirizzato alla Panoramica.\n\nMockup: usa il pulsante "Genera Starter Report" sopra per vedere il report.');
     }
 
     // ── Skip ──
@@ -1173,7 +1292,32 @@
         - No session → shows "Accesso richiesto" + sign-in button
         - Session but onboarding done → shows "Già completato" + redo option
         - Session + not done → shows overlay with slides
-     4. On finish → saves to Supabase → redirects to panoramica.html
+     4. On finish → saves to Supabase → calls AI Starter Report → redirects to panoramica.html
+
+     ── AI STARTER REPORT FLOW ─────────────────────────────────────────
+     On finishOnboarding():
+     1. Save all onboarding data to Supabase (onboarding_responses + profiles)
+     2. POST onboarding_data to STARTER_REPORT_URL (/starter-report endpoint)
+        - Local dev: http://localhost:8771/starter-report (report-ai-space)
+        - Production: set via config.js → window.SOTTOTITOLI_CONFIG.starterReportUrl
+     3. AI returns JSON: { report_md, objectives: {short_term, long_term},
+        focus_areas: [{priority, title, description}], reliability, next_step }
+     4. Report displayed in #starterReportSection on slide 11
+     5. Insights dashboard (#dashShortTerm, #dashLongTerm, etc.) populated from AI data
+     6. AI results saved to Supabase (onboarding_responses + profiles)
+
+     Mockup testing:
+     - Click "Genera Starter Report (mock)" button on slide 11
+     - mockGenerateReport() creates realistic mock data from onboardData
+     - No server needed — works fully offline
+     - aiInsights variable holds the AI response (same shape as production)
+
+     /starter-report endpoint:
+     - Defined in tmp/report-ai-space/app.py
+     - Uses same LLM client as the self-plan system (zai-org/GLM-5.1 via HF router)
+     - Prompt template: STARTER_PROMPT in app.py
+     - Returns clean JSON (no markdown fences)
+     - Restart server after changes: lsof -ti:8771 | xargs kill; cd tmp/report-ai-space && python3 -m uvicorn app:app --host 0.0.0.0 --port 8771 &
 
      ── ADDING/CHANGING A SLIDE ────────────────────────────────────────
      1. Add/edit the slide HTML in onboarding-mockup.html (this file)

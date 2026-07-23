@@ -619,6 +619,18 @@
           <h2 class="slide-title">Il tuo Cruscotto Personalizzato</h2>
           <p class="slide-subtitle">Basato sulle tue risposte, ecco il tuo punto di partenza.</p>
 
+          <!-- Starter Report (hidden until AI generates it) -->
+          <div id="starterReportSection" style="display:none;margin-bottom:20px;">
+            <div class="insight-card full" style="border-color:var(--accent-purple);background:linear-gradient(135deg,var(--pill-active-bg),var(--pill-bg));">
+              <h4>📄 Il tuo Starter Report <span style="font-weight:400;font-size:10px;color:var(--text-muted);">— generato dall'AI</span></h4>
+              <div id="starterReportContent" style="font-size:13px;line-height:1.7;color:var(--text);"></div>
+              <div id="starterReportLoading" style="display:none;text-align:center;padding:20px;color:var(--text-muted);">
+                <div class="loader" style="margin:0 auto 12px;"></div>
+                <span>L'AI sta analizzando il tuo profilo…</span>
+              </div>
+            </div>
+          </div>
+
           <div class="insights-grid">
             <div class="insight-card full">
               <h4>📊 Dashboard</h4>
@@ -707,6 +719,13 @@
     var TOTAL_SLIDES = 12;
     var currentSlide = 0;
     var currentUserId = null;
+
+    // AI Starter Report endpoint (local dev: http://localhost:8771/starter-report)
+    // In production, set via config.js: window.SOTTOTITOLI_CONFIG.starterReportUrl
+    var STARTER_REPORT_URL = (window.SOTTOTITOLI_CONFIG && window.SOTTOTITOLI_CONFIG.starterReportUrl) || 'http://localhost:8771/starter-report';
+
+    // AI-generated insights (populated after starter report)
+    var aiInsights = null;
 
     // Onboarding state (backed by localStorage + Supabase)
     var onboardData = JSON.parse(localStorage.getItem('sottotitoli_onboarding') || '{}');
@@ -935,6 +954,39 @@
 
     // ── Build dashboard (slide 11) ──
     function buildDashboard() {
+      // ── Use AI insights if available, otherwise fall back to static data ──
+      if (aiInsights) {
+        var stEl2 = document.getElementById('dashShortTerm');
+        if (aiInsights.objectives && aiInsights.objectives.short_term) {
+          stEl2.textContent = aiInsights.objectives.short_term;
+          stEl2.classList.remove('empty');
+        }
+        var ltEl2 = document.getElementById('dashLongTerm');
+        if (aiInsights.objectives && aiInsights.objectives.long_term) {
+          ltEl2.textContent = aiInsights.objectives.long_term;
+          ltEl2.classList.remove('empty');
+        }
+        var relEl = document.getElementById('dashReliability');
+        if (aiInsights.reliability) { relEl.textContent = aiInsights.reliability; }
+        var nsEl = document.getElementById('dashNextStep');
+        if (aiInsights.next_step) { nsEl.textContent = aiInsights.next_step; }
+
+        var focusList2 = document.getElementById('dashFocusList');
+        var focusAreas = aiInsights.focus_areas || [];
+        var focusHtml2 = '';
+        if (focusAreas.length > 0) {
+          focusAreas.forEach(function(fa) {
+            focusHtml2 += '<div class="focus-item"><span class="focus-priority">' + (fa.priority || '•') + '</span><span><strong>' + escapeHtml(fa.title || '') + '</strong> — ' + escapeHtml(fa.description || '') + '</span></div>';
+          });
+        } else {
+          focusHtml2 = '<div class="focus-item"><span class="focus-priority">1</span><span>Fai la tua prima sessione di pratica in Sottotitoli Studio</span></div>';
+        }
+        focusList2.innerHTML = focusHtml2;
+        document.getElementById('dashSummary').innerHTML = 'Onboarding completato al <strong style="color:var(--accent-green);">100%</strong> · Starter Report generato dall\'AI ✨';
+        return;
+      }
+
+      // ── Fallback: static data ──
       var stEl = document.getElementById('dashShortTerm');
       var stVal = onboardData['short_term_goal'];
       if (stVal) { stEl.textContent = stVal; stEl.classList.remove('empty'); }
@@ -1095,16 +1147,136 @@
 
       var ok = await saveToSupabase(true);
 
-      if (ok) {
-        // Small delay so user sees the success state
-        setTimeout(function() {
-          window.location.href = 'panoramica.html';
-        }, 800);
-      } else {
+      if (!ok) {
         btnFinish.disabled = false;
         btnFinish.innerHTML = '<i class="fa-solid fa-check"></i> Completa Onboarding';
         alert('⚠️ Si è verificato un errore durante il salvataggio. Riprova o contatta il supporto.');
+        return;
       }
+
+      // Step 2: Generate AI Starter Report
+      btnFinish.innerHTML = '<span class="spin" style="width:16px;height:16px;border:2px solid rgba(0,0,0,.3);border-top-color:#000;border-radius:50%;animation:spin .7s linear infinite;"></span> AI analizza il tuo profilo…';
+
+      var aiResult = await generateStarterReport();
+
+      if (aiResult) {
+        // Populate insights with AI data
+        aiInsights = aiResult;
+        buildDashboard(); // refresh with AI data
+
+        // Show the Starter Report
+        var reportSection = document.getElementById('starterReportSection');
+        var reportContent = document.getElementById('starterReportContent');
+        if (reportSection && reportContent) {
+          reportContent.innerHTML = markedToHtml(aiResult.report_md || '');
+          reportSection.style.display = 'block';
+          // Scroll to the report
+          slidesContainer.scrollTop = 0;
+        }
+
+        // Save AI results to Supabase
+        await saveAiInsightsToSupabase(aiResult);
+      }
+
+      // Step 3: Update button to "Vai alla Panoramica"
+      btnFinish.disabled = false;
+      btnFinish.innerHTML = 'Vai alla Panoramica <i class="fa-solid fa-arrow-right"></i>';
+      btnFinish.onclick = function() {
+        window.location.href = 'panoramica.html';
+      };
+    }
+
+    // ── Generate Starter Report via AI ──
+    async function generateStarterReport() {
+      var reportSection = document.getElementById('starterReportSection');
+      var reportLoading = document.getElementById('starterReportLoading');
+      var reportContent = document.getElementById('starterReportContent');
+
+      if (reportSection) reportSection.style.display = 'block';
+      if (reportLoading) reportLoading.style.display = 'block';
+      if (reportContent) reportContent.innerHTML = '';
+
+      try {
+        var resp = await fetch(STARTER_REPORT_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ onboarding_data: onboardData })
+        });
+
+        if (!resp.ok) throw new Error('HTTP ' + resp.status);
+
+        var result = await resp.json();
+
+        if (result.error) {
+          console.warn('AI report error:', result.error);
+          return null;
+        }
+
+        // Cache locally
+        onboardData['_ai_report'] = result;
+        persist();
+        return result;
+
+      } catch(e) {
+        console.warn('Starter report generation failed (endpoint may be offline):', e.message);
+        // Fall back to cached if available
+        if (onboardData['_ai_report']) return onboardData['_ai_report'];
+        return null;
+      } finally {
+        if (reportLoading) reportLoading.style.display = 'none';
+      }
+    }
+
+    // ── Save AI insights to Supabase ──
+    async function saveAiInsightsToSupabase(aiResult) {
+      if (!currentUserId || !aiResult) return;
+      try {
+        var sb = window.sottotitoliSupabase;
+        if (!sb) return;
+
+        var obj = aiResult.objectives || {};
+        var focusAreas = aiResult.focus_areas || [];
+
+        // Update onboarding_responses with AI output
+        await sb.from('onboarding_responses').upsert({
+          user_id: currentUserId,
+          short_term_goal: obj.short_term || null,
+          long_term_goal: obj.long_term || null,
+          updated_at: new Date().toISOString()
+        }, { onConflict: 'user_id' });
+
+        // Update profiles with AI-derived fields
+        var profileUpdate = {
+          id: currentUserId,
+          goal_primary: (obj.short_term || '') + (obj.long_term ? ' | LT: ' + obj.long_term : ''),
+          learning_profile: focusAreas.length > 0 ? JSON.stringify(focusAreas) : undefined,
+          updated_at: new Date().toISOString()
+        };
+        Object.keys(profileUpdate).forEach(function(k) {
+          if (profileUpdate[k] === undefined) delete profileUpdate[k];
+        });
+        await sb.from('profiles').upsert(profileUpdate, { onConflict: 'id' });
+
+      } catch(e) {
+        console.warn('saveAiInsights error:', e.message);
+      }
+    }
+
+    // ── Simple markdown → HTML (for the report) ──
+    function markedToHtml(md) {
+      if (!md) return '';
+      var html = md
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+        .replace(/^### (.+)$/gm, '<h4 style="font-size:14px;font-weight:700;margin:16px 0 6px;color:var(--text);">$1</h4>')
+        .replace(/^## (.+)$/gm, '<h3 style="font-size:16px;font-weight:800;margin:20px 0 8px;color:var(--accent-purple);">$1</h3>')
+        .replace(/^# (.+)$/gm, '<h2 style="font-size:18px;font-weight:800;margin:20px 0 8px;color:var(--accent-purple);">$1</h2>')
+        .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+        .replace(/\*(.+?)\*/g, '<em>$1</em>')
+        .replace(/^- (.+)$/gm, '<li style="margin-left:16px;">$1</li>')
+        .replace(/(\n<li[^>]*>.*<\/li>)+/g, '<ul style="margin:8px 0;">$&</ul>')
+        .replace(/\n\n/g, '</p><p style="margin:8px 0;">')
+        .replace(/\n/g, '<br>');
+      return '<p style="margin:8px 0;">' + html + '</p>';
     }
 
     // ── Skip ──
