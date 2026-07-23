@@ -188,6 +188,12 @@
     .onboard-input:focus { border-color: var(--accent-purple); }
     .onboard-input::placeholder { color: var(--text-muted); }
 
+    /* ── Transcript validation ── */
+    .transcript-status { font-size: 12px; color: var(--text-dim); }
+    .transcript-status.valid { color: var(--accent-green); }
+    .transcript-status .fa-circle-check { color: var(--accent-green); }
+    .transcript-status .fa-circle-xmark { color: #ef4444; }
+
     /* ── Language select ── */
     .lang-select {
       width: 100%; padding: 12px 16px; border-radius: 12px;
@@ -543,44 +549,57 @@
           </div>
         </div>
 
-        <!-- ═══ Slide 8: Tell me about yourself (5 min) ═══ -->
+        <!-- ═══ Slide 8: Intake conversation (voice + transcript validation) ═══ -->
         <div class="onboard-slide" data-slide="8">
           <i class="fa-solid fa-headset slide-icon"></i>
           <h2 class="slide-title">Parlami di te</h2>
           <p class="slide-subtitle">
-            Hai <strong>5 minuti</strong> per raccontarci di te in inglese. Puoi parlare del tuo lavoro, dei tuoi hobby, dei tuoi obiettivi… Quello che vuoi!
+            Avvia la conversazione qui sotto e raccontaci di te in inglese — lavoro, hobby, obiettivi. L'AI ti farà domande per guidarti.
           </p>
-          <p class="slide-subtitle" style="font-size:12px;color:var(--text-muted);">
-            💡 <strong>Questo è importante:</strong> la trascrizione di questa conversazione verrà salvata come <em>"intake conversation"</em> e analizzata dall'AI per creare il tuo profilo di apprendimento personalizzato.
-          </p>
-          <div class="voice-embed" id="intakeVoiceEmbed">
+          <div class="voice-embed" style="height:200px;" id="intakeVoiceEmbed">
             <div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--text-muted);font-size:13px;">
               <span>🎙️ Voice assistant — carica da <code>hugging-voice-kokoro</code></span>
             </div>
           </div>
-          <div class="voice-label">Premi il pulsante centrale e inizia a parlare — l'AI ti farà domande per guidarti</div>
+          <p style="font-size:11px;color:var(--text-muted);margin-top:4px;">
+            La trascrizione appare qui sotto. <strong>Minimo 100 parole</strong> per proseguire.
+          </p>
+          <textarea class="onboard-input" id="intakeTranscript" rows="4" placeholder="La trascrizione della tua conversazione… Puoi anche scrivere direttamente in inglese." oninput="onTranscriptInput('intake', this.value)"></textarea>
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-top:6px;">
+            <span class="transcript-status" id="intakeStatus"><span id="intakeWordCount">0</span>/100 parole — <i class="fa-solid fa-circle-xmark"></i> Minimo 100 parole richieste</span>
+            <button class="btn btn-back" style="font-size:11px;padding:6px 14px;" onclick="validateTranscript('intake')"><i class="fa-solid fa-check-double"></i> Verifica</button>
+          </div>
+          <div id="intakeRetryInfo" style="display:none;font-size:11px;color:var(--amber);margin-top:4px;"></div>
         </div>
 
-        <!-- ═══ Slide 9: AI Conversation — Objectives ═══ -->
+        <!-- ═══ Slide 9: AI objectives conversation (voice + transcript validation) ═══ -->
         <div class="onboard-slide" data-slide="9">
           <i class="fa-solid fa-robot slide-icon"></i>
           <h2 class="slide-title">Conversazione con l'AI</h2>
           <p class="slide-subtitle">
-            L'AI analizzerà la tua conversazione e ti farà alcune domande per capire i tuoi <strong>obiettivi a breve e lungo termine</strong> con l'inglese.
+            L'AI ti farà domande per capire i tuoi <strong>obiettivi a breve e lungo termine</strong> con l'inglese. Rispondi a voce — la trascrizione appare qui sotto.
           </p>
-          <div class="voice-embed" id="objectivesVoiceEmbed">
+          <div class="voice-embed" style="height:200px;" id="objectivesVoiceEmbed">
             <div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--text-muted);font-size:13px;">
               <span>🤖 AI Objectives Conversation — carica da <code>hugging-voice-kokoro</code></span>
             </div>
           </div>
-          <div class="voice-label">L'AI ti guiderà per definire obiettivi SMART (Specific, Measurable, Achievable, Relevant, Time-bound)</div>
+          <p style="font-size:11px;color:var(--text-muted);margin-top:4px;">
+            <strong>Minimo 100 parole</strong> nella trascrizione per proseguire.
+          </p>
+          <textarea class="onboard-input" id="objectivesTranscript" rows="4" placeholder="La trascrizione della conversazione sugli obiettivi… Puoi anche scrivere direttamente in inglese." oninput="onTranscriptInput('objectives', this.value)"></textarea>
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-top:6px;">
+            <span class="transcript-status" id="objectivesStatus"><span id="objectivesWordCount">0</span>/100 parole — <i class="fa-solid fa-circle-xmark"></i> Minimo 100 parole richieste</span>
+            <button class="btn btn-back" style="font-size:11px;padding:6px 14px;" onclick="validateTranscript('objectives')"><i class="fa-solid fa-check-double"></i> Verifica</button>
+          </div>
+          <div id="objectivesRetryInfo" style="display:none;font-size:11px;color:var(--amber);margin-top:4px;"></div>
 
-          <!-- Manual fallback for testing -->
+          <!-- Manual objectives (secondary) -->
           <details style="margin-top:12px;font-size:12px;color:var(--text-muted);">
-            <summary style="cursor:pointer;font-weight:600;">📝 Oppure scrivi i tuoi obiettivi manualmente (per testing)</summary>
+            <summary style="cursor:pointer;font-weight:600;">📝 Obiettivi manuali (opzionale — aiuta l'AI)</summary>
             <div style="margin-top:8px;">
               <label style="font-size:12px;font-weight:600;color:var(--text-dim);">Obiettivo a breve termine (1-3 mesi):</label>
-              <textarea class="onboard-input" id="shortTermGoalInput" rows="2" style="margin-bottom:8px;" placeholder="Es: Riuscire a sostenere una riunione di lavoro in inglese senza preparazione..." oninput="saveText('short_term_goal', this.value)"></textarea>
+              <textarea class="onboard-input" id="shortTermGoalInput" rows="2" style="margin-bottom:8px;" placeholder="Es: Sostenere una riunione in inglese senza preparazione..." oninput="saveText('short_term_goal', this.value)"></textarea>
               <label style="font-size:12px;font-weight:600;color:var(--text-dim);">Obiettivo a lungo termine (6-12 mesi):</label>
               <textarea class="onboard-input" id="longTermGoalInput" rows="2" placeholder="Es: Ottenere una certificazione C1 entro fine anno..." oninput="saveText('long_term_goal', this.value)"></textarea>
             </div>
@@ -762,26 +781,153 @@
     }
 
     function updateUI() {
-      // Progress bar
       var pct = Math.round(((currentSlide + 1) / TOTAL_SLIDES) * 100);
       progressFill.style.width = pct + '%';
 
-      // Buttons
       btnBack.style.visibility = currentSlide === 0 ? 'hidden' : 'visible';
       if (currentSlide === TOTAL_SLIDES - 1) {
         btnNext.style.display = 'none';
         btnFinish.style.display = 'flex';
+        var comp = getCompletionPercent();
+        if (comp < 100) {
+          btnFinish.disabled = true; btnFinish.style.opacity = '0.5';
+          btnFinish.title = getMissingFields().join(' · ');
+          btnFinish.innerHTML = '<i class="fa-solid fa-lock"></i> Completa le domande (' + comp + '%)';
+        } else {
+          btnFinish.disabled = false; btnFinish.style.opacity = '1';
+          btnFinish.title = '';
+          btnFinish.innerHTML = '<i class="fa-solid fa-check"></i> Completa Onboarding';
+        }
       } else {
         btnNext.style.display = 'flex';
         btnFinish.style.display = 'none';
       }
-
-      // Dots
       buildDots();
-
-      // Special slide actions
       if (currentSlide === 10) buildSummary();
       if (currentSlide === 11) buildDashboard();
+    }
+
+    // ── Completion tracking (6 required fields) ──
+    function getWordCount(text) {
+      if (!text || !text.trim()) return 0;
+      return text.trim().split(/\s+/).filter(function(w) { return w.length > 0; }).length;
+    }
+
+    function getCompletionPercent() {
+      var required = ['native_lang', 'difficulties', 'why_english', 'mic_tested', 'intake_transcript', 'objectives_transcript'];
+      var filled = 0;
+      required.forEach(function(k) {
+        if (k === 'intake_transcript' || k === 'objectives_transcript') {
+          if (getWordCount(onboardData[k]) >= 100) filled++;
+        } else {
+          var v = onboardData[k];
+          if (v && (!Array.isArray(v) || v.length > 0)) filled++;
+        }
+      });
+      return Math.round((filled / required.length) * 100);
+    }
+
+    function getMissingFields() {
+      var labels = {
+        'native_lang': 'Lingua madre (slide 3)',
+        'difficulties': 'Difficoltà in inglese (slide 6)',
+        'why_english': 'Perché parli inglese (slide 4)',
+        'mic_tested': 'Test microfono (slide 7)',
+        'intake_transcript': 'Trascrizione Parlami di te ≥100 parole (slide 8)',
+        'objectives_transcript': 'Trascrizione Conversazione AI ≥100 parole (slide 9)'
+      };
+      var missing = [];
+      Object.keys(labels).forEach(function(k) {
+        if (k === 'intake_transcript' || k === 'objectives_transcript') {
+          if (getWordCount(onboardData[k]) < 100) missing.push(labels[k]);
+        } else {
+          var v = onboardData[k];
+          if (!v || (Array.isArray(v) && v.length === 0)) missing.push(labels[k]);
+        }
+      });
+      return missing.length > 0 ? ['Manca: '].concat(missing) : [];
+    }
+
+    // ── Retry tracking ──
+    var retryData = JSON.parse(localStorage.getItem('sottotitoli_onboarding_retries') || '{}');
+
+    function getRetryInfo(type) {
+      var rd = retryData[type] || { count: 0, lastAttempt: null };
+      var MAX_RETRIES = 3; var TIMEOUT_MS = 60 * 60 * 1000;
+      var blocked = false; var remaining = MAX_RETRIES - rd.count; var retryUntil = null;
+      if (rd.count >= MAX_RETRIES && rd.lastAttempt) {
+        var elapsed = Date.now() - rd.lastAttempt;
+        if (elapsed < TIMEOUT_MS) { blocked = true; retryUntil = rd.lastAttempt + TIMEOUT_MS; }
+        else { retryData[type] = { count: 0, lastAttempt: null }; localStorage.setItem('sottotitoli_onboarding_retries', JSON.stringify(retryData)); remaining = MAX_RETRIES; }
+      }
+      return { blocked: blocked, remaining: remaining, retryCount: rd.count, retryUntil: retryUntil };
+    }
+
+    function recordRetryAttempt(type) {
+      if (!retryData[type]) retryData[type] = { count: 0, lastAttempt: null };
+      retryData[type].count++; retryData[type].lastAttempt = Date.now();
+      localStorage.setItem('sottotitoli_onboarding_retries', JSON.stringify(retryData));
+    }
+
+    function onTranscriptInput(type, text) {
+      onboardData[type + '_transcript'] = text; persist();
+      var wc = getWordCount(text);
+      var wcEl = document.getElementById(type + 'WordCount');
+      var statusEl = document.getElementById(type + 'Status');
+      if (wcEl) wcEl.textContent = wc;
+      if (statusEl) {
+        if (wc >= 100) {
+          statusEl.innerHTML = wc + '/100 parole — <i class="fa-solid fa-circle-check"></i> Trascrizione valida';
+          statusEl.className = 'transcript-status valid';
+        } else {
+          statusEl.innerHTML = wc + '/100 parole — <i class="fa-solid fa-circle-xmark"></i> Minimo 100 parole richieste';
+          statusEl.className = 'transcript-status';
+        }
+      }
+      if (currentSlide === 11) { buildDashboard(); updateUI(); }
+    }
+
+    function validateTranscript(type) {
+      var ri = getRetryInfo(type);
+      var retryEl = document.getElementById(type + 'RetryInfo');
+      var statusEl = document.getElementById(type + 'Status');
+      if (ri.blocked) {
+        var mins = Math.ceil((ri.retryUntil - Date.now()) / 60000);
+        var msg = '⏳ Troppi tentativi. Riprova tra ' + mins + ' minuti.';
+        if (statusEl) { statusEl.innerHTML = msg; statusEl.className = 'transcript-status'; }
+        if (retryEl) { retryEl.style.display = 'block'; retryEl.textContent = msg; }
+        return;
+      }
+      var text = onboardData[type + '_transcript'] || ''; var wc = getWordCount(text);
+      if (wc >= 100) {
+        if (statusEl) { statusEl.innerHTML = wc + '/100 parole — <i class="fa-solid fa-circle-check"></i> Trascrizione valida ✅'; statusEl.className = 'transcript-status valid'; }
+        if (retryEl) { retryEl.style.display = 'none'; } persist();
+        if (currentSlide === 11) { buildDashboard(); updateUI(); }
+      } else {
+        recordRetryAttempt(type); ri = getRetryInfo(type);
+        if (ri.blocked) {
+          var mins2 = Math.ceil((ri.retryUntil - Date.now()) / 60000);
+          var msg2 = '⏳ 3 tentativi falliti. Riprova tra ' + mins2 + ' minuti.';
+          if (statusEl) { statusEl.innerHTML = msg2; statusEl.className = 'transcript-status'; }
+          if (retryEl) { retryEl.style.display = 'block'; retryEl.textContent = msg2; }
+        } else {
+          var msg3 = '⚠️ Solo ' + wc + ' parole — ne servono almeno 100. Tentativo ' + ri.retryCount + ' di 3.';
+          if (statusEl) { statusEl.innerHTML = msg3; statusEl.className = 'transcript-status'; }
+          if (retryEl) { retryEl.style.display = 'block'; retryEl.textContent = 'Tentativi rimasti: ' + ri.remaining + '. Dopo 3 tentativi falliti, dovrai aspettare 1 ora.'; }
+        }
+      }
+    }
+
+    function updateRetryDisplay(type) {
+      var ri = getRetryInfo(type);
+      var retryEl = document.getElementById(type + 'RetryInfo');
+      if (!retryEl) return;
+      if (ri.blocked) {
+        var mins = Math.ceil((ri.retryUntil - Date.now()) / 60000);
+        retryEl.style.display = 'block'; retryEl.textContent = '⏳ In timeout — riprova tra ' + mins + ' minuti.';
+      } else if (ri.retryCount > 0) {
+        retryEl.style.display = 'block'; retryEl.textContent = 'Tentativi usati: ' + ri.retryCount + ' di 3.';
+      }
     }
 
     // ── Pill selection (single / multi) ──
@@ -1231,6 +1377,10 @@
       if (onboardData['difficulties_other']) { document.getElementById('diffOtherInput').style.display = 'block'; document.getElementById('diffOtherInput').value = onboardData['difficulties_other']; }
       if (onboardData['short_term_goal']) document.getElementById('shortTermGoalInput').value = onboardData['short_term_goal'];
       if (onboardData['long_term_goal']) document.getElementById('longTermGoalInput').value = onboardData['long_term_goal'];
+      // Restore transcripts
+      if (onboardData['intake_transcript']) { var itEl = document.getElementById('intakeTranscript'); if (itEl) { itEl.value = onboardData['intake_transcript']; onTranscriptInput('intake', onboardData['intake_transcript']); } }
+      if (onboardData['objectives_transcript']) { var otEl = document.getElementById('objectivesTranscript'); if (otEl) { otEl.value = onboardData['objectives_transcript']; onTranscriptInput('objectives', onboardData['objectives_transcript']); } }
+      ['intake','objectives'].forEach(function(t) { updateRetryDisplay(t); });
     }
 
     init();
