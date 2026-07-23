@@ -81,6 +81,15 @@ window.SOTTOTITOLI_CONFIG = {
     }
   },
 
+  /** AI Voice TTS URLs — used by hugging-voice-* iframes.
+   *  Local dev: "http://localhost:8765" (Custom), ":8766" (Base), ":8767" (Kokoro)
+   *  Production: HF Spaces (start them if sleeping) */
+  aiVoice: {
+    customVoiceUrl: "wss://s8t-sottotitoli-voice.hf.space/v1/realtime",
+    baseVoiceUrl:   "http://localhost:8766",
+    kokoroVoiceUrl: "wss://s8t-sottotitoli-voice.hf.space/v1/realtime"
+  },
+
   /** AI Voice — Voice Conversation Partner (Premium) */
   voicePartner: {
     /** WebSocket URL for the speech-to-speech server */
