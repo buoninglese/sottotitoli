@@ -48,6 +48,20 @@
       return Date.now();
     }
 
+    function stripRoomFromUrl() {
+      if (!room || !window.history || !window.sessionStorage) return;
+      try {
+        var url = new URL(window.location.href);
+        if (url.searchParams.has('room')) {
+          // Persist room in session so a refresh doesn't lose it
+          sessionStorage.setItem('s8t_activeRoom', room);
+          // Strip from the visible URL (history, referrer, screenshots)
+          url.searchParams.delete('room');
+          history.replaceState({ room: room }, '', url.toString());
+        }
+      } catch (_) { /* non-critical; room stays in URL */ }
+    }
+
     function getRetryDelay() {
       if (retryCount === 0) return 0;
       return Math.min(baseDelayMs * Math.pow(2, retryCount - 1), maxDelayMs);
@@ -162,6 +176,8 @@
             emitError(err);
           }
         }
+        // Strip room from URL so it doesn't leak via history / referrer / screenshots
+        stripRoomFromUrl();
         flushQueue();
       };
 

@@ -5,9 +5,9 @@
   'use strict';
 
   // ── Configuration ──
-  // Reads from window.SOTTOTITOLI_CONFIG.aiVoice (set in config.js)
+  // Reads from window.SOTTOTITOLI_CONFIG.voicePartner (set in config.js)
   // Falls back to defaults below if not configured.
-  var globalCfg = (window.SOTTOTITOLI_CONFIG && window.SOTTOTITOLI_CONFIG.aiVoice) || {};
+  var globalCfg = (window.SOTTOTITOLI_CONFIG && window.SOTTOTITOLI_CONFIG.voicePartner) || {};
   var CONFIG = {
     // WebSocket endpoint for the speech-to-speech server
     serverUrl: globalCfg.serverUrl || null,

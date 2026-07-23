@@ -28,9 +28,13 @@ window.SOTTOTITOLI_CONFIG = {
 
   /** Translation provider settings */
   translation: {
-    /** Translation provider: "auto" = Google first with MyMemory fallback.
+    /** Translation provider: "proxy" = server-side with caching + fallback.
+        "auto" = Google first with MyMemory fallback (client-side).
         Also accepts "google" or "mymemory" for single-provider mode. */
-    provider: "auto", // "mymemory" | "google" | "none"
+    provider: "proxy",
+    /** Supabase Edge Function URL for the translation proxy.
+        Deploy with: supabase functions deploy translate --no-verify-jwt */
+    proxyUrl: "https://qzqmuegbpmvqrjrlfbgk.supabase.co/functions/v1/translate",
     myMemoryBase: "https://api.mymemory.translated.net/get"
   },
 
@@ -103,7 +107,7 @@ window.SOTTOTITOLI_CONFIG = {
 
   /** Stripe payment integration */
   /** AI Voice — Voice Conversation Partner (Premium feature) */
-  aiVoice: {
+  voicePartner: {
     /** WebSocket URL of the speech-to-speech server.
         Deploy from: https://github.com/huggingface/speech-to-speech
         Options:

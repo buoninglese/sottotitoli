@@ -122,12 +122,45 @@
 
     return {
       provider: translation.provider || 'google',  // default to Google
+      proxyUrl: translation.proxyUrl || 'https://qzqmuegbpmvqrjrlfbgk.supabase.co/functions/v1/translate',
       myMemoryBase: translation.myMemoryBase || 'https://api.mymemory.translated.net/get'
+    };
+  }
+
+  async function translateWithProxy(text, sourceLang, targetLang, config) {
+    const proxyUrl = (config && config.proxyUrl) || 'https://qzqmuegbpmvqrjrlfbgk.supabase.co/functions/v1/translate';
+
+    const response = await fetch(proxyUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text: text, sourceLang: sourceLang, targetLang: targetLang })
+    });
+
+    if (!response.ok) {
+      throw new Error(`Translation proxy HTTP ${response.status}`);
+    }
+
+    const data = await response.json();
+    const translated = data && data.translatedText;
+    if (!translated) {
+      throw new Error('Invalid translation proxy response.');
+    }
+
+    return {
+      provider: data.provider || 'proxy',
+      translatedText: translated,
+      detectedLang: data.detectedLang || null,
+      raw: data
     };
   }
 
   async function translateText(config, text, sourceLang, targetLang) {
     const provider = (config && config.provider) || 'google';
+
+    if (provider === 'proxy') {
+      // Server-side proxy with caching + Google → MyMemory → passthrough fallback
+      return translateWithProxy(text, sourceLang, targetLang, config);
+    }
 
     if (provider === 'google') {
       return translateWithGoogle(text, sourceLang, targetLang);
@@ -152,6 +185,7 @@
     translateText,
     translateWithFallback,
     translateWithGoogle,
-    translateWithMyMemory
+    translateWithMyMemory,
+    translateWithProxy
   };
 })(window);

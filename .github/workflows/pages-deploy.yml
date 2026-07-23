@@ -17,12 +17,45 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Validate panoramica build script
+        run: |
+          python build_panoramica.py
+          test -s panoramica.html || { echo "❌ panoramica.html is empty or missing"; exit 1; }
+
+      - name: Check voice backends are synced
+        run: python sync_voice.py --check
+
+      - name: Stage deployable files
+        run: |
+          mkdir _deploy
+          # Top-level files needed by the site
+          cp *.html _deploy/
+          cp .nojekyll _deploy/ 2>/dev/null || true
+          cp sitemap.xml _deploy/ 2>/dev/null || true
+          cp robots.txt _deploy/ 2>/dev/null || true
+          cp LICENSE _deploy/ 2>/dev/null || true
+          cp CNAME _deploy/ 2>/dev/null || true
+          # Directories needed by the frontend
+          cp -r css _deploy/
+          cp -r js _deploy/
+          cp -r img _deploy/
+          cp -r fonts _deploy/
+          cp -r webfonts _deploy/ 2>/dev/null || true
+          # Explicitly EXCLUDED (never deployed):
+          #   dev/ docs/ extra-help/ backups/ supabase/ voice-core/
+          #   hugging-voice*/ hf-image-studio/ mockups/ test/ tmp/ scripts/ tools/
+          #   .github/ build_panoramica.py sync_voice.py AGENTS.md CLAUDE.md config.example.js
+          echo "✅ Staged $(ls _deploy/*.html 2>/dev/null | wc -l) HTML files"
+
       - name: Setup Pages
         uses: actions/configure-pages@v4
+
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: '.'
+          path: '_deploy'
+
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4

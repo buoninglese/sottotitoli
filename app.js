@@ -31,6 +31,10 @@
   }
 
   let room = params.get("room");
+  // Fallback: room may have been stripped from URL after WebSocket connect
+  if (!room && sessionStorage) {
+    room = sessionStorage.getItem("s8t_activeRoom");
+  }
   if (!room && w.SottotitoliSessionUtils) {
     room = w.SottotitoliSessionUtils.randomRoom();
   }
