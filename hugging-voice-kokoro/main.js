@@ -1584,8 +1584,15 @@ void fetchConfig();
 void autoStartCamera();
 void watchCameraPermission();
 
-// Reconcile a live session if the tab is closed/hidden mid-call (no teardown).
-window.addEventListener("pagehide", () => { endTrackedSession(); endQueueTicket(); });
+// Clean up WebSocket when tab closes to free the session slot.
+window.addEventListener("pagehide", () => {
+  endTrackedSession();
+  endQueueTicket();
+  if (client) { try { client.close(); } catch(e) {} }
+});
+window.addEventListener("beforeunload", () => {
+  if (client) { try { client.close(); } catch(e) {} }
+});
 
 requestAnimationFrame(() => {
   document.body.classList.remove("booting");
