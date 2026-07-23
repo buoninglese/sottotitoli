@@ -1598,17 +1598,34 @@ requestAnimationFrame(() => {
   document.body.classList.remove("booting");
 });
 
-// ── Voice grid integration: listen for voice changes from parent page ──────
+// ── Voice grid integration: listen for voice/mood/speed changes from parent ──
 window.addEventListener("message", function(e) {
-  if (e.data && e.data.type === "set-voice" && e.data.voice) {
+  if (!e.data || !e.data.type) return;
+  
+  if (e.data.type === "set-voice" && e.data.voice) {
     settings.voice = e.data.voice;
     saveSettings(settings);
     if (client && LIVE_STATES.has(currentState)) {
       client.updateSession({ voice: e.data.voice });
     }
-    // Also update the settings dropdown
     var voiceSelect = document.getElementById("voice");
     if (voiceSelect) voiceSelect.value = e.data.voice;
     console.log("[kokoro] Voice set to:", e.data.voice);
+  }
+  
+  if (e.data.type === "set-instructions" && e.data.instructions) {
+    settings.instructions = e.data.instructions;
+    saveSettings(settings);
+    if (client && LIVE_STATES.has(currentState)) {
+      client.updateSession({ instructions: e.data.instructions });
+    }
+    console.log("[kokoro] Instructions updated");
+  }
+  
+  if (e.data.type === "set-speed" && typeof e.data.speed === "number") {
+    // Speed is a server-side Kokoro parameter — stored for reference.
+    // The Space must be restarted with --kokoro_speed <value> to take effect.
+    localStorage.setItem("s2s.ws.speed", String(e.data.speed));
+    console.log("[kokoro] Speed set to:", e.data.speed, "(requires Space restart)");
   }
 });

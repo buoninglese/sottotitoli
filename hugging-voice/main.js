@@ -311,7 +311,7 @@ let allowDirect = true;
 // Deploy-pinned s2s URL (SPEECH_TO_SPEECH_URL). Non-empty -> locked direct
 // mode: the field displays it read-only and the saved user URL is untouched.
 // STANDALONE LOCAL MODE: hardcoded to local speech-to-speech server.
-let pinnedUrl = "http://localhost:8765";
+let pinnedUrl = "wss://s8t-sottotitoli-voice.hf.space/v1/realtime";
 // Whether the deploy offers the WebRTC transport (/api/config `rtc`; true
 // exactly when the URL is env-pinned, since /api/calls only forwards there).
 let rtcAvailable = false;
@@ -898,7 +898,7 @@ async function fetchConfig() {
   serverSearchKey = false;
   lbMode = false;
   allowDirect = true;
-  pinnedUrl = (cfg && cfg.customVoiceUrl) || "http://localhost:8765";
+  pinnedUrl = (cfg && cfg.customVoiceUrl) || "wss://s8t-sottotitoli-voice.hf.space/v1/realtime";
   rtcAvailable = false;
   iceServers = [];
   limiterOn = false;

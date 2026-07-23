@@ -87,6 +87,36 @@
       .voice-card { border-radius: 16px; }
       .voice-frame { height: 70vh; max-height: none; min-height: 400px; }
     }
+
+    /* Mood presets */
+    .mood-grid { display: flex; flex-direction: column; gap: 5px; }
+    .mood-chip {
+      display: flex; align-items: center; gap: 8px;
+      padding: 8px 12px; border-radius: 10px;
+      border: 1.5px solid var(--line); background: var(--card);
+      cursor: pointer; font-family: inherit; font-size: 11px; font-weight: 500;
+      color: var(--text); transition: all .15s; text-align: left;
+    }
+    .mood-chip:hover { border-color: var(--cyan); background: rgba(6,182,212,.05); }
+    .mood-chip.active { border-color: var(--cyan); background: rgba(6,182,212,.1); box-shadow: 0 0 0 2px rgba(6,182,212,.12); }
+    .mood-chip-emoji { font-size: 16px; flex-shrink: 0; width: 22px; text-align: center; }
+    .mood-chip-name { font-weight: 600; }
+    .mood-chip-desc { font-size: 10px; color: var(--text-dim); }
+
+    /* Voice parameters */
+    .param-group { padding: 4px 0; }
+    .param-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
+    .param-label { font-size: 11px; color: var(--text-dim); font-weight: 500; }
+    .param-val { font-size: 11px; color: var(--cyan); font-weight: 700; font-variant-numeric: tabular-nums; }
+    .param-slider {
+      -webkit-appearance: none; width: 100%; height: 5px;
+      border-radius: 99px; background: var(--line); outline: none;
+    }
+    .param-slider::-webkit-slider-thumb {
+      -webkit-appearance: none; width: 16px; height: 16px;
+      border-radius: 50%; background: var(--cyan); cursor: pointer;
+      border: 2px solid var(--card); box-shadow: 0 0 6px rgba(6,182,212,.3);
+    }
   </style>
 </head>
 <body>
@@ -101,7 +131,25 @@
 
   <div class="main-layout">
     <!-- Voice grid sidebar -->
-    <aside class="voice-sidebar" id="voiceSidebar"></aside>
+    <aside class="voice-sidebar" id="voiceSidebar">
+      <div class="voice-section" id="voiceGridContainer"></div>
+      <!-- Mood presets -->
+      <div class="voice-section">
+        <div class="voice-section-title">🎭 Mood · Stile</div>
+        <div class="mood-grid" id="moodGrid"></div>
+      </div>
+      <!-- Voice parameters -->
+      <div class="voice-section">
+        <div class="voice-section-title">🎚️ Parametri Voce</div>
+        <div class="param-group">
+          <div class="param-row">
+            <span class="param-label">Velocità</span>
+            <span class="param-val" id="speedVal">1.0x</span>
+          </div>
+          <input type="range" class="param-slider" id="speedSlider" min="0.5" max="2.0" step="0.1" value="1.0" oninput="updateSpeed(this.value)">
+        </div>
+      </div>
+    </aside>
     <audio id="previewAudio" style="display:none" preload="none"></audio>
 
     <!-- Main card with iframe -->
@@ -190,8 +238,52 @@
         });
         html += '</div></div>';
       });
-      sidebar.innerHTML = html;
+      document.getElementById('voiceGridContainer').innerHTML = html;
     }
+
+    // ── Mood presets ─────────────────────────────────────
+    var MOODS = [
+      {id:"default", emoji:"🤖", name:"Neutro", desc:"Assistente bilanciato", instructions:"You are a friendly voice assistant. Keep replies short, warm, and spoken."},
+      {id:"cheerful", emoji:"☀️", name:"Solare", desc:"Energico e positivo", instructions:"You are an extremely cheerful and energetic assistant. Use exclamation marks, smile through your voice, be uplifting and bright. Keep it brief."},
+      {id:"calm", emoji:"🧘", name:"Calmo", desc:"Rilassato e pacato", instructions:"You are a calm, meditative assistant. Speak slowly and softly, like a guided meditation. Use gentle, soothing language. Keep it brief."},
+      {id:"professor", emoji:"🎓", name:"Professore", desc:"Dettagliato e preciso", instructions:"You are a knowledgeable professor. Be precise, thorough, and slightly formal. Explain concepts clearly but concisely. Keep it brief."},
+      {id:"poetic", emoji:"🎭", name:"Poetico", desc:"Creativo ed espressivo", instructions:"You are a poetic, artistic assistant. Use vivid imagery and beautiful language. Be creative in your expressions. Keep it brief."},
+      {id:"witty", emoji:"😏", name:"Brillante", desc:"Spiritoso e arguto", instructions:"You are a witty, sharp assistant with a dry sense of humor. Be clever and quick. Use wordplay and irony. Keep it brief."}
+    ];
+    var currentMood = "default";
+
+    function buildMoodGrid() {
+      var html = '';
+      MOODS.forEach(function(m) {
+        html += '<div class="mood-chip' + (m.id === currentMood ? ' active' : '') + '" data-mood="' + m.id + '" onclick="setMood(\'' + m.id + '\')">';
+        html += '<span class="mood-chip-emoji">' + m.emoji + '</span>';
+        html += '<span class="mood-chip-name">' + m.name + '</span>';
+        html += '<span class="mood-chip-desc">' + m.desc + '</span>';
+        html += '</div>';
+      });
+      document.getElementById('moodGrid').innerHTML = html;
+    }
+
+    function setMood(moodId) {
+      currentMood = moodId;
+      document.querySelectorAll('.mood-chip').forEach(function(c) {
+        c.classList.toggle('active', c.dataset.mood === moodId);
+      });
+      var mood = MOODS.find(function(m){ return m.id === moodId; });
+      if (mood && frame && frame.contentWindow) {
+        frame.contentWindow.postMessage({ type: "set-instructions", instructions: mood.instructions }, "*");
+      }
+    }
+
+    // ── Speed control ────────────────────────────────────
+    function updateSpeed(val) {
+      document.getElementById('speedVal').textContent = parseFloat(val).toFixed(1) + 'x';
+      if (frame && frame.contentWindow) {
+        frame.contentWindow.postMessage({ type: "set-speed", speed: parseFloat(val) }, "*");
+      }
+    }
+
+    buildMoodGrid();
 
     var previewQueue = [];
     var previewPlaying = false;
