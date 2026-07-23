@@ -1331,10 +1331,31 @@ async function doStart(audioContext = null) {
   c.addEventListener("status", (e) => {
     const detail = /** @type {CustomEvent<{ status: string }>} */ (e).detail;
     onClientStatus(detail.status);
+    // ── Forward status to parent wrapper when embedded ──
+    if (window.__EMBED_MODE__ && window.parent !== window) {
+      try {
+        window.parent.postMessage({
+          type: "status",
+          text: detail.status || "",
+          level: "ok"
+        }, "*");
+      } catch(_) {}
+    }
   });
   c.addEventListener("transcript", (e) => {
     const d = /** @type {CustomEvent<{ role: "user" | "assistant"; text: string; partial: boolean; itemId?: string; responseId?: string }>} */ (e).detail;
     chat.onTranscript(d);
+    // ── Forward to parent wrapper when embedded (ai-s8t.html) ──
+    if (window.__EMBED_MODE__ && window.parent !== window) {
+      try {
+        window.parent.postMessage({
+          type: d.partial ? "live-transcript" : "transcript-final",
+          role: d.role === "user" ? "user" : "ai",
+          text: d.text || "",
+          partial: !!d.partial
+        }, "*");
+      } catch(_) {}
+    }
   });
 
   c.addEventListener("response-finished", (e) => {

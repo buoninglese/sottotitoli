@@ -196,7 +196,7 @@
             clearInterval(wakeInterval);
             wakeSub.textContent = 'Pronto!';
             wakeOverlay.classList.add('hidden');
-            voiceFrame.src = 'hugging-voice-kokoro/index.html';
+            voiceFrame.src = 'hugging-voice/index.html?embed=1';
             voiceFrame.style.display = 'block';
             statusDot.className = 'status-dot live';
             statusText.textContent = 'Connesso — parla con l\'AI';
@@ -332,13 +332,20 @@
     window.addEventListener('message', function(e) {
       var msg = e.data;
       if (!msg || !msg.type) return;
+      // Only accept messages from our iframe
+      if (e.source !== voiceFrame.contentWindow) return;
 
       if (msg.type === 'live-transcript') {
         addLine(msg.role, msg.text, msg.partial);
       }
 
+      if (msg.type === 'transcript-final') {
+        // Final transcript line — un-mark partial and enable save
+        finalizePartial(msg.role);
+      }
+
       if (msg.type === 'transcript') {
-        // Final transcript from a completed conversation
+        // Full transcript from completed conversation (kokoro variant)
         fullTranscriptText = msg.text || '';
         saveBtn.disabled = !fullTranscriptText;
         saveBtn2.disabled = !fullTranscriptText;
