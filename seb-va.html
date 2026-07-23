@@ -55,6 +55,9 @@
     }
     .voice-chip:hover { border-color: var(--green); background: var(--green-bg); }
     .voice-chip.active { border-color: var(--green); background: var(--green-bg); box-shadow: 0 0 0 2px rgba(16,185,129,.15); }
+    .voice-chip.featured { border-color: rgba(245,158,11,.4); background: linear-gradient(135deg, rgba(245,158,11,.08), rgba(245,158,11,.02)); }
+    .voice-chip.featured:hover { border-color: #f59e0b; background: linear-gradient(135deg, rgba(245,158,11,.15), rgba(245,158,11,.04)); }
+    .voice-chip.featured.active { border-color: #f59e0b; box-shadow: 0 0 0 2px rgba(245,158,11,.2); }
     .voice-chip-gender { font-size: 14px; flex-shrink: 0; }
     .voice-chip-name { font-weight: 600; }
     .voice-chip-lang { font-size: 10px; color: var(--text-dim); }
@@ -88,7 +91,7 @@
 </head>
 <body>
   <div class="topbar">
-    <a class="brand" href="#"><span class="brand-dot"></span>Sebastian's VA<span class="badge">KOKORO · 25 voci</span></a>
+    <a class="brand" href="#"><span class="brand-dot"></span>Sebastian's VA<span class="badge">KOKORO · 12 voci</span></a>
     <div style="display:flex;align-items:center;gap:12px">
       <span id="userChip" style="font-size:12px;color:var(--text-dim);cursor:pointer" onclick="handleAuth()" title="Accedi">🔐 Accedi</span>
       <span style="font-size:12px;color:var(--text-dim)">Voce: <span class="selected-voice" id="currentVoiceLabel">af_heart</span></span>
@@ -120,35 +123,24 @@
   <script>
     // ── All Kokoro voices ────────────────────────────────
     var VOICES = [
+      // ⭐ Featured — gold box
+      {id:"af_jessica", name:"Jessica", lang:"⭐ Featured", gender:"♀", featured:true},
+      {id:"af_nicole", name:"Nicole", lang:"⭐ Featured", gender:"♀", featured:true},
       // Italian 🇮🇹
       {id:"if_sara", name:"Sara", lang:"🇮🇹 IT", gender:"♀"},
       {id:"im_nicola", name:"Nicola", lang:"🇮🇹 IT", gender:"♂"},
       // American English 🇺🇸
-      {id:"af_heart", name:"Heart", lang:"🇺🇸 EN", gender:"♀"},
-      {id:"af_bella", name:"Bella", lang:"🇺🇸 EN", gender:"♀"},
-      {id:"af_nicole", name:"Nicole", lang:"🇺🇸 EN", gender:"♀"},
-      {id:"af_aoede", name:"Aoede", lang:"🇺🇸 EN", gender:"♀"},
-      {id:"af_jessica", name:"Jessica", lang:"🇺🇸 EN", gender:"♀"},
       {id:"af_kore", name:"Kore", lang:"🇺🇸 EN", gender:"♀"},
-      {id:"af_nova", name:"Nova", lang:"🇺🇸 EN", gender:"♀"},
+      {id:"am_liam", name:"Liam", lang:"🇺🇸 EN", gender:"♂"},
       {id:"am_adam", name:"Adam", lang:"🇺🇸 EN", gender:"♂"},
-      {id:"am_michael", name:"Michael", lang:"🇺🇸 EN", gender:"♂"},
-      {id:"am_echo", name:"Echo", lang:"🇺🇸 EN", gender:"♂"},
-      {id:"am_fenrir", name:"Fenrir", lang:"🇺🇸 EN", gender:"♂"},
       {id:"am_onyx", name:"Onyx", lang:"🇺🇸 EN", gender:"♂"},
-      {id:"am_puck", name:"Puck", lang:"🇺🇸 EN", gender:"♂"},
-      {id:"am_santa", name:"Santa", lang:"🇺🇸 EN", gender:"♂"},
       // British English 🇬🇧
       {id:"bf_emma", name:"Emma", lang:"🇬🇧 EN", gender:"♀"},
-      {id:"bf_lily", name:"Lily", lang:"🇬🇧 EN", gender:"♀"},
-      {id:"bf_alice", name:"Alice", lang:"🇬🇧 EN", gender:"♀"},
-      {id:"bf_isabella", name:"Isabella", lang:"🇬🇧 EN", gender:"♀"},
-      {id:"bm_fable", name:"Fable", lang:"🇬🇧 EN", gender:"♂"},
-      {id:"bm_george", name:"George", lang:"🇬🇧 EN", gender:"♂"},
-      {id:"bm_lewis", name:"Lewis", lang:"🇬🇧 EN", gender:"♂"},
       {id:"bm_daniel", name:"Daniel", lang:"🇬🇧 EN", gender:"♂"},
       // French 🇫🇷
-      {id:"ff_siwis", name:"Siwis", lang:"🇫🇷 FR", gender:"♀"}
+      {id:"ff_siwis", name:"Siwis", lang:"🇫🇷 FR", gender:"♀"},
+      // General
+      {id:"am_santa", name:"Santa", lang:"🌍 General", gender:"♂"}
     ];
 
     var currentVoice = "af_heart";
@@ -177,15 +169,16 @@
         groups[lang].push(v);
       });
 
-      var order = ["🇮🇹","🇺🇸","🇬🇧","🇫🇷"];
-      var langNames = {"🇮🇹":"Italian","🇺🇸":"American English","🇬🇧":"British English","🇫🇷":"French"};
+      var order = ["⭐ Featured","🇮🇹","🇺🇸","🇬🇧","🇫🇷","🌍"];
+      var langNames = {"⭐ Featured":"Featured","🇮🇹":"Italian","🇺🇸":"American English","🇬🇧":"British English","🇫🇷":"French","🌍":"General"};
 
       var html = "";
       order.forEach(function(lang) {
         if (!groups[lang]) return;
         html += '<div class="voice-section"><div class="voice-section-title">' + lang + ' ' + langNames[lang] + '</div><div class="voice-grid">';
         groups[lang].forEach(function(v) {
-          html += '<div class="voice-chip' + (v.id === currentVoice ? ' active' : '') + '" data-voice="' + v.id + '" onclick="setVoice(\'' + v.id + '\')">';
+          var isFeatured = v.featured;
+          html += '<div class="voice-chip' + (v.id === currentVoice ? ' active' : '') + (isFeatured ? ' featured' : '') + '" data-voice="' + v.id + '" onclick="setVoice(\'' + v.id + '\')">';
           html += '<span class="voice-chip-gender">' + v.gender + '</span>';
           html += '<span class="voice-chip-name">' + v.name + '</span>';
           html += '<button class="voice-chip-play" data-voice="' + v.id + '" onclick="event.stopPropagation();playPreview(\'' + v.id + '\',this)" title="Anteprima voce">▶</button>';
