@@ -94,8 +94,14 @@ window.SOTTOTITOLI_CONFIG = {
   /** Hugging Face token for Inference Providers (Cerebras via Router).
    *  Used by AI Voice browser mode for direct LLM calls.
    *  Create at https://huggingface.co/settings/tokens
-   *  Needs "Make calls to Inference Providers" permission. */
+   *  Needs "Make calls to Inference Providers" permission.
+   *  Real token lives in config.secrets.js (gitignored).
+   *  For production, the hf-proxy Edge Function injects it server-side. */
   hfToken: "hf_...",  // real value in config.secrets.js (gitignored)
+  /** HF Proxy URL — server-side Edge Function that injects the HF token.
+      Deploy with: supabase functions deploy hf-proxy --no-verify-jwt
+      Set secret: supabase secrets set HF_TOKEN=hf_... */
+  hfProxyUrl: "https://qzqmuegbpmvqrjrlfbgk.supabase.co/functions/v1/hf-proxy",
 
   /** Stripe payment integration */
   stripe: {
