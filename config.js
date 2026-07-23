@@ -24,9 +24,13 @@ window.SOTTOTITOLI_CONFIG = {
 
   /** Translation provider settings */
   translation: {
-    /** Translation provider: "auto" = Google first with MyMemory fallback.
+    /** Translation provider: "proxy" = server-side with caching + fallback.
+        "auto" = Google first with MyMemory fallback (client-side).
         Also accepts "google" or "mymemory" for single-provider mode. */
-    provider: "auto", // "mymemory" | "google" | "none"
+    provider: "proxy",
+    /** Supabase Edge Function URL for the translation proxy.
+        Deploy with: supabase functions deploy translate --no-verify-jwt */
+    proxyUrl: "https://qzqmuegbpmvqrjrlfbgk.supabase.co/functions/v1/translate",
     myMemoryBase: "https://api.mymemory.translated.net/get"
   },
 
@@ -78,7 +82,7 @@ window.SOTTOTITOLI_CONFIG = {
   },
 
   /** AI Voice — Voice Conversation Partner (Premium) */
-  aiVoice: {
+  voicePartner: {
     /** WebSocket URL for the speech-to-speech server */
     serverUrl: "wss://s8t-sottotitoli-voice.hf.space/v1/realtime",
     /** Voice Credits per hour */
@@ -86,6 +90,12 @@ window.SOTTOTITOLI_CONFIG = {
     /** Minimum balance to start */
     minBalance: 10
   },
+
+  /** Hugging Face token for Inference Providers (Cerebras via Router).
+   *  Used by AI Voice browser mode for direct LLM calls.
+   *  Create at https://huggingface.co/settings/tokens
+   *  Needs "Make calls to Inference Providers" permission. */
+  hfToken: "hf_...",
 
   /** Stripe payment integration */
   stripe: {
