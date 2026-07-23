@@ -421,6 +421,13 @@ function setState(next) {
   }
 
   updateRestartAvailability();
+
+  // Notify parent frame of state changes (for status dashboard)
+  try {
+    const labels = { idle:'In attesa', connecting:'In collegamento al server…', queued:'In coda…', 'your-turn':'È il tuo turno!', listening:'In ascolto…', 'user-speaking':'Parlando…', processing:'Elaborando…', 'ai-speaking':'Rispondendo…', error:'Errore' };
+    const levels = { idle:'ok', listening:'ok', 'user-speaking':'ok', 'ai-speaking':'ok', connecting:'warn', queued:'warn', 'your-turn':'warn', processing:'warn', error:'error' };
+    window.parent.postMessage({ type:'status', text: labels[next] || next, detail: view.caption || '', level: levels[next] || 'ok' }, '*');
+  } catch(e) {}
 }
 
 function updateRestartAvailability() {
@@ -927,6 +934,11 @@ async function fetchConfig() {
   void account.refresh();
   syncToolsUi();
   syncConnectionUi();
+
+  // Notify parent that we're ready
+  try {
+    window.parent.postMessage({ type:'status', text:'Pronto', detail:'Server: ' + (pinnedUrl || 'non configurato'), level:'ok' }, '*');
+  } catch(e) {}
 }
 
 /**
