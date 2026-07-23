@@ -1983,16 +1983,34 @@
         </div>
         <!-- ═══ AI VOICE — Voice Conversation Partner (Premium) ═══ -->
         <div class="content-panel" id="pnl-ai-voice">
-          <section class="panel-head"><h2>🎙️ AI Voice</h2><span class="premium-pill">PREMIUM</span></section>
-          <p style="font-size:15px;color:var(--text-soft);margin:0 0 16px;max-width:680px;line-height:1.6">Il tuo partner di conversazione intelligente. Parla liberamente e ricevi risposte vocali naturali dall'AI.</p>
+          <section class="panel-head" style="display:flex;align-items:center;gap:16px;flex-wrap:wrap">
+            <h2>🎙️ AI Voice</h2><span class="premium-pill">PREMIUM</span>
+            <div class="mode-toggle-voice" style="display:flex;gap:3px;background:var(--card2, #1a1f2e);border-radius:99px;padding:3px;border:1px solid var(--line);margin-left:4px">
+              <button class="mode-btn-voice active" data-mode="browser" onclick="setVoiceMode('browser')" style="padding:5px 13px;border-radius:99px;border:none;background:transparent;color:var(--text-dim);font-family:var(--font-ui);font-size:11px;font-weight:600;cursor:pointer;transition:all .15s">⚡ Browser</button>
+              <button class="mode-btn-voice" data-mode="kokoro" onclick="setVoiceMode('kokoro')" style="padding:5px 13px;border-radius:99px;border:none;background:transparent;color:var(--text-dim);font-family:var(--font-ui);font-size:11px;font-weight:600;cursor:pointer;transition:all .15s">🎙️ Kokoro</button>
+            </div>
+          </section>
+          <p style="font-size:15px;color:var(--text-soft);margin:0 0 16px;max-width:680px;line-height:1.6" id="voiceModeDesc">Browser mode: parla nel browser — speech-to-text e text-to-speech sono istantanei. L'AI risponde via Cerebras.</p>
 
-          <div style="background:var(--card);border:1px solid var(--line);border-radius:18px;overflow:hidden;box-shadow:var(--shadow-lg);">
+          <!-- Browser mode: inline voice UI -->
+          <div id="voiceBrowserMode" style="background:var(--card);border:1px solid var(--line);border-radius:18px;overflow:hidden;box-shadow:var(--shadow-lg);min-height:500px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:20px;padding:40px 20px">
+            <div id="voiceConvBox" style="width:100%;max-width:520px;max-height:150px;overflow-y:auto;display:flex;flex-direction:column;gap:8px;font-size:13px;padding:0 8px"></div>
+            <div id="voiceOrb" onclick="toggleVoiceMic()" title="Clicca per parlare" style="width:110px;height:110px;border-radius:50%;border:3px solid var(--line);display:flex;align-items:center;justify-content:center;cursor:pointer;transition:all .3s;background:var(--card);position:relative;user-select:none;flex-shrink:0">
+              <span id="voiceOrbIcon" style="font-size:32px">🎙️</span>
+              <span id="voiceOrbState" style="position:absolute;bottom:-24px;font-size:11px;color:var(--text-dim);white-space:nowrap">Clicca per parlare</span>
+            </div>
+            <div style="font-size:11px;color:var(--text-faint);text-align:center;line-height:1.6"><strong>Click</strong> l'orbe per parlare · <strong>Click</strong> di nuovo per fermare<br>Browser STT/TTS · AI: <strong>Gemma 4 31B</strong> @ Cerebras</div>
+          </div>
+
+          <!-- Kokoro mode: iframe -->
+          <div id="voiceKokoroMode" style="display:none;background:var(--card);border:1px solid var(--line);border-radius:18px;overflow:hidden;box-shadow:var(--shadow-lg);">
             <iframe
               src="hugging-voice/index.html"
               style="display:block;width:100%;height:700px;border:none;"
               title="AI Voice Conversation"
               allow="microphone; camera; autoplay"
               loading="lazy"
+              id="voiceKokoroFrame"
             ></iframe>
           </div>
 
@@ -7098,6 +7116,152 @@
   if (tab) tab.addEventListener('click', function(){ setTimeout(renderTranslationBanks, 100); });
   // Also render on page load in case it's the active tab
   setTimeout(renderTranslationBanks, 500);
+
+  // ── AI Voice mode toggle (Browser ↔ Kokoro) ──────────────
+  window.setVoiceMode = function(mode) {
+    localStorage.setItem('panoramica-voice-mode', mode);
+    document.querySelectorAll('.mode-btn-voice').forEach(function(b){ b.classList.toggle('active', b.dataset.mode === mode); });
+    var browserEl = document.getElementById('voiceBrowserMode');
+    var kokoroEl = document.getElementById('voiceKokoroMode');
+    var descEl = document.getElementById('voiceModeDesc');
+    if (mode === 'browser') {
+      if (browserEl) browserEl.style.display = 'flex';
+      if (kokoroEl) kokoroEl.style.display = 'none';
+      if (descEl) descEl.textContent = 'Browser mode: parla nel browser — speech-to-text e text-to-speech sono istantanei. L\'AI risponde via Cerebras.';
+      // Stop any Kokoro iframe from using mic
+      var f = document.getElementById('voiceKokoroFrame'); if (f) f.src = f.src;
+    } else {
+      if (browserEl) browserEl.style.display = 'none';
+      if (kokoroEl) kokoroEl.style.display = '';
+      if (descEl) descEl.textContent = 'Kokoro mode: voce AI completa con whisper + Kokoro TTS. Più naturale, leggermente più lento.';
+    }
+    // Update active button styles
+    document.querySelectorAll('.mode-btn-voice').forEach(function(b){
+      b.style.background = b.classList.contains('active') ? 'var(--green, #10b981)' : 'transparent';
+      b.style.color = b.classList.contains('active') ? '#fff' : '';
+    });
+  };
+
+  // ── Inline browser voice (AI Voice tab) ───────────────────
+  (function(){
+    var voiceListening = false;
+    var voiceRecognition = null;
+    var voiceSynth = window.speechSynthesis;
+    var voiceConv = [];
+    var currentVoiceMode = localStorage.getItem('panoramica-voice-mode') || 'browser';
+
+    // Init mode
+    setTimeout(function(){ setVoiceMode(currentVoiceMode); }, 100);
+
+    // Orb click
+    window.toggleVoiceMic = function() {
+      if (voiceListening) { stopVoiceListening(); }
+      else { startVoiceListening(); }
+    };
+
+    function startVoiceListening() {
+      if (!('webkitSpeechRecognition' in window || 'SpeechRecognition' in window)) return;
+      if (!voiceRecognition) {
+        var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+        voiceRecognition = new SR();
+        voiceRecognition.continuous = true;
+        voiceRecognition.interimResults = true;
+        voiceRecognition.lang = 'it-IT';
+        voiceRecognition.onresult = function(e) {
+          for (var i = e.resultIndex; i < e.results.length; i++) {
+            if (e.results[i].isFinal) {
+              var text = e.results[i][0].transcript.trim();
+              if (text) onVoiceSpeech(text);
+            }
+          }
+        };
+        voiceRecognition.onerror = function(e) {
+          if (e.error !== 'no-speech' && e.error !== 'aborted') voiceAddMsg('error', '🎤 ' + e.error);
+          stopVoiceListening();
+        };
+        voiceRecognition.onend = function() {
+          if (voiceListening) { try { voiceRecognition.start(); } catch(e) { stopVoiceListening(); } }
+          else { stopVoiceListening(); }
+        };
+      }
+      voiceListening = true;
+      try { voiceRecognition.start(); } catch(e) {}
+      var orb = document.getElementById('voiceOrb');
+      if (orb) { orb.style.borderColor = 'var(--green)'; orb.style.boxShadow = '0 0 40px rgba(16,185,129,.3)'; }
+      var icon = document.getElementById('voiceOrbIcon'); if (icon) icon.textContent = '🔴';
+      var state = document.getElementById('voiceOrbState'); if (state) state.textContent = 'Ascoltando…';
+    }
+
+    function stopVoiceListening() {
+      voiceListening = false;
+      try { if (voiceRecognition) voiceRecognition.stop(); } catch(e) {}
+      var orb = document.getElementById('voiceOrb');
+      if (orb) { orb.style.borderColor = 'var(--line)'; orb.style.boxShadow = ''; }
+      var icon = document.getElementById('voiceOrbIcon'); if (icon) icon.textContent = '🎙️';
+      var state = document.getElementById('voiceOrbState'); if (state) state.textContent = 'Clicca per parlare';
+    }
+
+    function onVoiceSpeech(text) {
+      voiceAddMsg('user', text);
+      voiceConv.push({role: 'user', content: text});
+      stopVoiceListening();
+      var orb = document.getElementById('voiceOrb');
+      if (orb) orb.style.borderColor = 'var(--amber)';
+      var icon = document.getElementById('voiceOrbIcon'); if (icon) icon.textContent = '⏳';
+      var state = document.getElementById('voiceOrbState'); if (state) state.textContent = 'Pensando…';
+
+      var hfToken = (window.SOTTOTITOLI_CONFIG && window.SOTTOTITOLI_CONFIG.hfToken) || '';
+      fetch('https://router.huggingface.co/v1/chat/completions', {
+        method: 'POST',
+        headers: { 'Authorization': 'Bearer ' + hfToken, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ model: 'google/gemma-4-31B-it:cerebras', messages: [{role:'system',content:'You are a friendly voice assistant. Keep it brief.'}].concat(voiceConv.slice(-15)), max_tokens: 512 })
+      })
+      .then(function(r){ return r.json(); })
+      .then(function(d) {
+        if (orb) { orb.style.borderColor = 'var(--line)'; orb.style.boxShadow = ''; }
+        if (d.error) { voiceAddMsg('error', '❌ ' + (d.error.message || d.error)); return; }
+        var reply = d.choices && d.choices[0] ? d.choices[0].message.content : '(no reply)';
+        voiceAddMsg('ai', reply);
+        voiceConv.push({role: 'assistant', content: reply});
+        speakVoiceReply(reply);
+      })
+      .catch(function(e) {
+        if (orb) { orb.style.borderColor = 'var(--line)'; }
+        voiceAddMsg('error', '❌ ' + e.message);
+      });
+    }
+
+    function speakVoiceReply(text) {
+      if (!voiceSynth) return;
+      voiceSynth.cancel();
+      var orb = document.getElementById('voiceOrb');
+      if (orb) orb.style.borderColor = 'var(--cyan)';
+      var icon = document.getElementById('voiceOrbIcon'); if (icon) icon.textContent = '🔊';
+      var state = document.getElementById('voiceOrbState'); if (state) state.textContent = 'Parlando…';
+      var u = new SpeechSynthesisUtterance(text);
+      u.lang = 'it-IT'; u.rate = 1.0;
+      u.onend = function() {
+        if (orb) { orb.style.borderColor = 'var(--line)'; orb.style.boxShadow = ''; }
+        if (icon) icon.textContent = '🎙️';
+        if (state) state.textContent = 'Clicca per parlare';
+      };
+      voiceSynth.speak(u);
+    }
+
+    function voiceAddMsg(role, text) {
+      var box = document.getElementById('voiceConvBox');
+      if (!box) return;
+      var div = document.createElement('div');
+      div.style.cssText = 'padding:8px 12px;border-radius:12px;font-size:13px;line-height:1.4;max-width:85%';
+      if (role === 'user') { div.style.alignSelf = 'flex-end'; div.style.background = 'var(--green-bg)'; div.style.color = 'var(--green)'; div.style.border = '1px solid rgba(16,185,129,.2)'; }
+      else if (role === 'ai') { div.style.alignSelf = 'flex-start'; div.style.background = 'var(--card2)'; div.style.color = 'var(--text)'; div.style.border = '1px solid var(--line)'; }
+      else { div.style.alignSelf = 'flex-start'; div.style.background = 'rgba(239,68,68,.08)'; div.style.color = 'var(--red)'; div.style.fontSize = '11px'; }
+      div.textContent = text;
+      box.appendChild(div);
+      box.scrollTop = box.scrollHeight;
+      while (box.children.length > 30) box.removeChild(box.firstChild);
+    }
+  })();
 })();
 </script>
 

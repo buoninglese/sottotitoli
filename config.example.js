@@ -49,6 +49,11 @@ window.SOTTOTITOLI_CONFIG = {
     kokoroVoiceUrl: "http://localhost:8767"
   },
 
+  /** Hugging Face token for Inference Providers (Cerebras, etc.).
+   *  Create at https://huggingface.co/settings/tokens
+   *  Needs "Make calls to Inference Providers" permission. */
+  hfToken: "hf_...",
+
   /** Onboarding Starter Report AI endpoint.
    *  Local dev: "http://localhost:8771/starter-report" (report-ai-space)
    *  Production: deploy as Supabase Edge Function or HF Space */
