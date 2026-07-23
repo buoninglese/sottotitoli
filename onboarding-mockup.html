@@ -604,8 +604,8 @@
           <div style="font-size:11px;color:var(--text-muted);margin-bottom:4px;padding:6px 10px;border-radius:8px;background:var(--pill-bg);border:1px solid var(--line);">
             <i class="fa-solid fa-robot"></i> <strong>AI prompt:</strong> You are an English language coach doing an intake interview.
           </div>
-          <div class="voice-embed" style="height:200px;" id="intakeVoiceEmbed">
-            <iframe src="hugging-voice-kokoro/index.html" title="AI Voice Intake" allow="microphone; camera" loading="lazy" id="intakeVoiceFrame"></iframe>
+          <div class="voice-embed" style="height:300px;" id="intakeVoiceEmbed">
+            <iframe src="hugging-voice-kokoro/index.html" title="AI Voice Intake" allow="microphone" loading="lazy" id="intakeVoiceFrame"></iframe>
           </div>
           <p style="font-size:11px;color:var(--text-muted);margin-top:4px;">
             La trascrizione appare qui sotto. <strong>Minimo 100 parole</strong> per proseguire.
@@ -628,8 +628,8 @@
           <div style="font-size:11px;color:var(--text-muted);margin-bottom:4px;padding:6px 10px;border-radius:8px;background:var(--pill-bg);border:1px solid var(--line);">
             <i class="fa-solid fa-robot"></i> <strong>AI prompt:</strong> You are an English learning advisor. Ask about short-term and long-term objectives.
           </div>
-          <div class="voice-embed" style="height:200px;" id="objectivesVoiceEmbed">
-            <iframe src="hugging-voice-kokoro/index.html" title="AI Objectives Voice" allow="microphone; camera" loading="lazy" id="objectivesVoiceFrame"></iframe>
+          <div class="voice-embed" style="height:300px;" id="objectivesVoiceEmbed">
+            <iframe src="hugging-voice-kokoro/index.html" title="AI Objectives Voice" allow="microphone" loading="lazy" id="objectivesVoiceFrame"></iframe>
           </div>
           <p style="font-size:11px;color:var(--text-muted);margin-top:4px;">
             <strong>Minimo 100 parole</strong> nella trascrizione per proseguire.
@@ -816,12 +816,18 @@
     // ── Voice iframe prompts ──
     var VOICE_PROMPTS = {
       intake: "You are an English language coach doing an intake interview. " +
-        "Ask the user about their work, hobbies, daily life, and why they want to improve their English. " +
-        "Be warm and encouraging. Ask follow-up questions. Keep replies under 3 sentences. Speak in English.",
+        "Start by introducing yourself briefly: 'Hi! I'm your English coach. Let's get to know each other.' " +
+        "Then ask about the user's work, hobbies, daily life, and why they want to improve their English. " +
+        "Be warm and encouraging. Ask follow-up questions. Keep replies under 3 sentences. Speak in English only.",
       objectives: "You are an English learning advisor helping the user define their goals. " +
-        "Ask about their short-term objectives (1-3 months) and long-term objectives (6-12 months) for learning English. " +
-        "Help them make goals SMART: Specific, Measurable, Achievable, Relevant, Time-bound. Speak in English."
+        "Start by introducing yourself: 'Hello! I'm your learning advisor. Let's figure out your English goals together.' " +
+        "Then ask about their short-term objectives (1-3 months) and long-term objectives (6-12 months). " +
+        "Help them make goals SMART: Specific, Measurable, Achievable, Relevant, Time-bound. Speak in English only."
     };
+
+    var VOICE_TIMERS = {};
+    var VOICE_SESSION_DONE = {};
+    var VOICE_SESSION_MINUTES = 5;
 
     function sendToVoiceIframe(source, msg) {
       var frameId = source === 'intake' ? 'intakeVoiceFrame' : 'objectivesVoiceFrame';
@@ -832,17 +838,25 @@
     }
 
     function stopVoiceSession(source) {
+      if (VOICE_TIMERS[source]) { clearTimeout(VOICE_TIMERS[source]); VOICE_TIMERS[source] = null; }
       sendToVoiceIframe(source, { type: 'stop-conversation' });
     }
 
     function startVoiceSession(source) {
+      if (VOICE_SESSION_DONE[source]) return;
       var frame = document.getElementById(source === 'intake' ? 'intakeVoiceFrame' : 'objectivesVoiceFrame');
       if (!frame || !frame.contentWindow) return;
       sendToVoiceIframe(source, { type: 'set-source', source: source });
+      sendToVoiceIframe(source, { type: 'set-title', title: source === 'intake' ? 'Parlami di te' : 'Conversazione con l\'AI' });
+      sendToVoiceIframe(source, { type: 'set-compact' });
       sendToVoiceIframe(source, { type: 'set-instructions', instructions: VOICE_PROMPTS[source] });
       setTimeout(function() {
         sendToVoiceIframe(source, { type: 'start-conversation' });
-      }, 600);
+        VOICE_TIMERS[source] = setTimeout(function() {
+          stopVoiceSession(source);
+          VOICE_SESSION_DONE[source] = true;
+        }, VOICE_SESSION_MINUTES * 60 * 1000);
+      }, 800);
     }
 
     function goToSlide(idx) {

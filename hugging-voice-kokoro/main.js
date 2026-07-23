@@ -1673,4 +1673,24 @@ window.addEventListener("message", function(e) {
       teardown().catch(function(err) { console.warn("[kokoro] stop-conversation failed:", err.message); });
     }
   }
+
+  // ── Compact / onboarding mode ──
+  if (e.data.type === "set-title" && e.data.title) {
+    var titleEl = document.querySelector(".ident-title");
+    if (titleEl) titleEl.textContent = e.data.title;
+  }
+
+  if (e.data.type === "set-compact") {
+    // Hide unnecessary UI for embedded/onboarding use
+    ["about-btn", "about-btn-m", "tools-btn", "chat-btn", "settings-btn"].forEach(function(id) {
+      var el = document.getElementById(id);
+      if (el) el.style.display = "none";
+    });
+    // Hide the hero blurb too
+    var blurb = document.getElementById("heroBlurb");
+    if (blurb) blurb.style.display = "none";
+    // Hide ident-meta (clock/weather)
+    var meta = document.querySelector(".ident-meta");
+    if (meta) meta.style.display = "none";
+  }
 });
