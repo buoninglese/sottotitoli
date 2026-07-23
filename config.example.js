@@ -39,6 +39,16 @@ window.SOTTOTITOLI_CONFIG = {
     speakerEndpoint: "https://sottotitoli-websocket.onrender.com/analyze-speakers"
   },
 
+  /** AI Voice conversation partner (speech-to-speech).
+   *  Local dev: "http://localhost:8765" (CustomVoice), ":8766" (Base/cloning), ":8767" (Kokoro/53 voices)
+   *  Production: deploy a speech-to-speech HF Space and use its URL, e.g.
+   *  "https://buoninglese-sottotitoli-voice.hf.space" */
+  aiVoice: {
+    customVoiceUrl: "http://localhost:8765",
+    baseVoiceUrl:   "http://localhost:8766",
+    kokoroVoiceUrl: "http://localhost:8767"
+  },
+
   /** Language and translation mode definitions */
   modes: {
     // Caption-only modes

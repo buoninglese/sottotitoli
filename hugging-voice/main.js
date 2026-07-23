@@ -890,17 +890,19 @@ async function execWebSearch(query) {
   return lines.length > 1 ? lines.join("\n") : `${lines[0]}\nNo results found.`;
 }
 
-/** Standalone local mode — no /api/config needed. Hardcoded to localhost:8765. */
+/** Reads pinnedUrl from window.SOTTOTITOLI_CONFIG.aiVoice (checks parent too for iframe). */
 async function fetchConfig() {
-  // Local standalone: always direct mode, pinned to localhost.
+  const parentCfg = (function(){ try { return window.parent.SOTTOTITOLI_CONFIG; } catch(e) { return null; } })();
+  const cfg = (window.SOTTOTITOLI_CONFIG && window.SOTTOTITOLI_CONFIG.aiVoice)
+           || (parentCfg && parentCfg.aiVoice);
   serverSearchKey = false;
   lbMode = false;
   allowDirect = true;
-  pinnedUrl = "http://localhost:8765";
+  pinnedUrl = (cfg && cfg.customVoiceUrl) || "http://localhost:8765";
   rtcAvailable = false;
   iceServers = [];
   limiterOn = false;
-  if (DEBUG) console.debug(`[ui] config: standalone local mode — pinnedUrl=${pinnedUrl}`);
+  if (DEBUG) console.debug(`[ui] config: pinnedUrl=${pinnedUrl}`);
   // Login chip + remaining-budget (no-op / hidden when the limiter is off).
   void account.refresh();
   syncToolsUi();

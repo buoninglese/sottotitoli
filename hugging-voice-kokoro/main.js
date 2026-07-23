@@ -892,15 +892,16 @@ async function execWebSearch(query) {
 
 /** Standalone local mode — no /api/config needed. Hardcoded to localhost:8765. */
 async function fetchConfig() {
-  // Local standalone: always direct mode, pinned to localhost.
+  const cfg = window.SOTTOTITOLI_CONFIG && window.SOTTOTITOLI_CONFIG.aiVoice;
+  // Local standalone: always direct mode, pinned from config or localhost.
   serverSearchKey = false;
   lbMode = false;
   allowDirect = true;
-  pinnedUrl = "http://localhost:8767";
+  pinnedUrl = (cfg && cfg.kokoroVoiceUrl) || "http://localhost:8767";
   rtcAvailable = false;
   iceServers = [];
   limiterOn = false;
-  if (DEBUG) console.debug(`[ui] config: standalone local mode — pinnedUrl=${pinnedUrl}`);
+  if (DEBUG) console.debug(`[ui] config: pinnedUrl=${pinnedUrl}`);
   // Login chip + remaining-budget (no-op / hidden when the limiter is off).
   void account.refresh();
   syncToolsUi();
