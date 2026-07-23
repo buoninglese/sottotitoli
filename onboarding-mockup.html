@@ -194,6 +194,20 @@
     .transcript-status .fa-circle-check { color: var(--accent-green); }
     .transcript-status .fa-circle-xmark { color: #ef4444; }
 
+    /* ── Live caption teleprompter ── */
+    .live-caption {
+      height: 80px; overflow-y: auto;
+      border: 1.5px solid var(--line); border-radius: 10px;
+      padding: 8px 12px; margin-top: 8px;
+      font-size: 12px; line-height: 1.6; color: var(--text-dim);
+      background: var(--input-bg);
+      font-style: italic;
+      scroll-behavior: smooth;
+    }
+    .live-caption:empty::after { content: 'In attesa della conversazione…'; color: var(--text-muted); }
+    .live-caption .user-line { color: var(--accent-blue); }
+    .live-caption .ai-line { color: var(--accent-green); }
+
     /* ── Starter Report card ── */
     .report-card {
       background: linear-gradient(160deg, var(--pill-active-bg), var(--card));
@@ -624,6 +638,7 @@
           <div id="intakeHint" style="display:none;text-align:center;padding:8px;font-size:13px;font-weight:700;color:var(--accent-purple);background:var(--pill-active-bg);border-radius:10px;margin-top:6px;">
             <i class="fa-solid fa-hand-point-up"></i> Di' <em>"hi"</em> per iniziare — l'AI risponderà presentandosi
           </div>
+          <div class="live-caption" id="intakeLive" style="display:none;"></div>
           <textarea class="onboard-input" id="intakeTranscript" rows="4" placeholder="La trascrizione della tua conversazione… Puoi anche scrivere direttamente in inglese." oninput="onTranscriptInput('intake', this.value)"></textarea>
           <div style="display:flex;align-items:center;justify-content:space-between;margin-top:6px;">
             <span class="transcript-status" id="intakeStatus"><span id="intakeWordCount">0</span>/100 parole — <i class="fa-solid fa-circle-xmark"></i> Minimo 100 parole richieste</span>
@@ -662,6 +677,7 @@
           <div id="objectivesHint" style="display:none;text-align:center;padding:8px;font-size:13px;font-weight:700;color:var(--accent-purple);background:var(--pill-active-bg);border-radius:10px;margin-top:6px;">
             <i class="fa-solid fa-hand-point-up"></i> Di' <em>"hi"</em> per iniziare — l'AI risponderà presentandosi
           </div>
+          <div class="live-caption" id="objectivesLive" style="display:none;"></div>
           <textarea class="onboard-input" id="objectivesTranscript" rows="4" placeholder="La trascrizione della conversazione sugli obiettivi… Puoi anche scrivere direttamente in inglese." oninput="onTranscriptInput('objectives', this.value)"></textarea>
           <div style="display:flex;align-items:center;justify-content:space-between;margin-top:6px;">
             <span class="transcript-status" id="objectivesStatus"><span id="objectivesWordCount">0</span>/100 parole — <i class="fa-solid fa-circle-xmark"></i> Minimo 100 parole richieste</span>
@@ -1107,12 +1123,30 @@
         var text = (e.data.text || '').replace(/^(You|AI):\s*/gm, '').trim();
         var textarea = document.getElementById(src + 'Transcript');
         if (textarea) { textarea.value = text; onTranscriptInput(src, text); }
+        var liveEl2 = document.getElementById(src + 'Live');
+        if (liveEl2) liveEl2.style.display = 'none';
         return;
       }
 
       if (e.data.type === 'status') {
         var src2 = currentSlide === 8 ? 'intake' : currentSlide === 9 ? 'objectives' : null;
         if (!src2) return;
+        var liveEl = document.getElementById(src2 + 'Live');
+        if (liveEl && e.data.detail && e.data.detail.trim()) {
+          liveEl.style.display = 'block';
+          var isUser = e.data.text === 'Parlando…' || e.data.text === 'In ascolto…';
+          var isAI = e.data.text === 'Rispondendo…' || e.data.text === 'Elaborando…';
+          var cls = isUser ? 'user-line' : isAI ? 'ai-line' : '';
+          var currentText = liveEl.textContent.trim();
+          var newText = e.data.detail.trim();
+          if (newText && newText !== currentText) {
+            liveEl.innerHTML = (liveEl.innerHTML ? liveEl.innerHTML + '<br>' : '') + '<span class="' + cls + '">' + newText.replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</span>';
+            liveEl.scrollTop = liveEl.scrollHeight;
+          }
+        }
+        if (e.data.text === 'In attesa' || e.data.text === 'Pronto') {
+          if (liveEl) liveEl.style.display = 'none';
+        }
         if (e.data.text === 'Pronto' || e.data.text === 'In attesa' || e.data.level === 'ok') {
           var loadingEl = document.getElementById(src2 + 'Loading');
           var hintEl = document.getElementById(src2 + 'Hint');
