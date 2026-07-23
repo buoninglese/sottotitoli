@@ -29,23 +29,18 @@ jobs:
       - name: Stage deployable files
         run: |
           mkdir _deploy
-          # Top-level files needed by the site
-          cp *.html _deploy/
+          # Copy everything, then remove what shouldn't be public
+          cp -r ./* _deploy/ 2>/dev/null || true
           cp .nojekyll _deploy/ 2>/dev/null || true
-          cp sitemap.xml _deploy/ 2>/dev/null || true
-          cp robots.txt _deploy/ 2>/dev/null || true
-          cp LICENSE _deploy/ 2>/dev/null || true
-          cp CNAME _deploy/ 2>/dev/null || true
-          # Directories needed by the frontend
-          cp -r css _deploy/
-          cp -r js _deploy/
-          cp -r img _deploy/
-          cp -r fonts _deploy/
-          cp -r webfonts _deploy/ 2>/dev/null || true
-          # Explicitly EXCLUDED (never deployed):
-          #   dev/ docs/ extra-help/ backups/ supabase/ voice-core/
-          #   hugging-voice*/ hf-image-studio/ mockups/ test/ tmp/ scripts/ tools/
-          #   .github/ build_panoramica.py sync_voice.py AGENTS.md CLAUDE.md config.example.js
+          # Remove internal / sensitive directories
+          rm -rf _deploy/dev _deploy/docs _deploy/extra-help _deploy/backups
+          rm -rf _deploy/supabase _deploy/voice-core
+          rm -rf _deploy/hf-image-studio _deploy/mockups _deploy/test _deploy/tmp _deploy/scripts _deploy/tools
+          rm -rf _deploy/.github _deploy/.git
+          # Remove internal / sensitive files
+          rm -f _deploy/build_panoramica.py _deploy/sync_voice.py
+          rm -f _deploy/config.example.js _deploy/AGENTS.md _deploy/CLAUDE.md
+          rm -f _deploy/*.backup-*
           echo "✅ Staged $(ls _deploy/*.html 2>/dev/null | wc -l) HTML files"
 
       - name: Setup Pages
