@@ -28,6 +28,10 @@ const DEFAULT_INSTRUCTIONS =
   "You are a friendly voice assistant. " +
   "Keep replies short, warm, and spoken. Avoid long monologues.";
 
+// Transcript accumulator for parent-frame forwarding (onboarding integration)
+let conversationTranscript = "";
+let conversationSource = "voice"; // "intake" or "objectives" — set via postMessage
+
 // Appended to the user's instructions whenever at least one tool is enabled.
 // Stops the model from announcing capabilities ("Yes, I can search") and then
 // idling for the next turn — it should act immediately in the same response.
@@ -387,7 +391,24 @@ let micMuted = false;
 
 /** @param {AppState} next */
 function setState(next) {
+  const prev = currentState;
   currentState = next;
+
+  // On entering a live state from idle/error: clear transcript
+  if (LIVE_STATES.has(next) && !LIVE_STATES.has(prev)) {
+    conversationTranscript = "";
+  }
+  // On returning to idle from a live state: send transcript to parent
+  if (next === "idle" && LIVE_STATES.has(prev) && conversationTranscript) {
+    try {
+      window.parent.postMessage({
+        type: "transcript",
+        source: conversationSource,
+        text: conversationTranscript
+      }, "*");
+    } catch(e) {}
+  }
+
   const view = STATE_VIEWS[next];
   circleBtn.disabled = view.disabled;
   circleBtn.className = `circle ${STATE_CLASS[next]}`;
@@ -1369,6 +1390,10 @@ async function doStart(audioContext = null) {
   c.addEventListener("transcript", (e) => {
     const d = /** @type {CustomEvent<{ role: "user" | "assistant"; text: string; partial: boolean; itemId?: string; responseId?: string }>} */ (e).detail;
     chat.onTranscript(d);
+    // Accumulate non-partial transcripts for parent forwarding
+    if (!d.partial && d.text) {
+      conversationTranscript += (conversationTranscript ? "\n" : "") + (d.role === "user" ? "You: " : "AI: ") + d.text;
+    }
   });
 
   c.addEventListener("response-finished", (e) => {
@@ -1625,9 +1650,27 @@ window.addEventListener("message", function(e) {
   }
   
   if (e.data.type === "set-speed" && typeof e.data.speed === "number") {
-    // Speed is a server-side Kokoro parameter — stored for reference.
-    // The Space must be restarted with --kokoro_speed <value> to take effect.
     localStorage.setItem("s2s.ws.speed", String(e.data.speed));
     console.log("[kokoro] Speed set to:", e.data.speed, "(requires Space restart)");
+  }
+
+  // ── Onboarding integration: mic control + transcript source ──
+  if (e.data.type === "set-source" && e.data.source) {
+    conversationSource = e.data.source; // "intake" or "objectives"
+    console.log("[kokoro] Transcript source set to:", conversationSource);
+  }
+
+  if (e.data.type === "start-conversation") {
+    if (!LIVE_STATES.has(currentState)) {
+      console.log("[kokoro] Parent requested start");
+      doStart().catch(function(err) { console.warn("[kokoro] start-conversation failed:", err.message); });
+    }
+  }
+
+  if (e.data.type === "stop-conversation") {
+    if (LIVE_STATES.has(currentState)) {
+      console.log("[kokoro] Parent requested stop");
+      teardown().catch(function(err) { console.warn("[kokoro] stop-conversation failed:", err.message); });
+    }
   }
 });

@@ -622,6 +622,9 @@
           <p class="slide-subtitle">
             Avvia la conversazione qui sotto e raccontaci di te in inglese — lavoro, hobby, obiettivi. L'AI ti farà domande per guidarti.
           </p>
+          <div style="font-size:11px;color:var(--text-muted);margin-bottom:4px;padding:6px 10px;border-radius:8px;background:var(--pill-bg);border:1px solid var(--line);">
+            <i class="fa-solid fa-robot"></i> <strong>AI prompt:</strong> You are an English language coach doing an intake interview. Ask about work, hobbies, and English goals.
+          </div>
           <div class="voice-embed" style="height:200px;" id="intakeVoiceEmbed">
             <iframe src="hugging-voice-kokoro/index.html" title="AI Voice Intake" allow="microphone; camera" loading="lazy" id="intakeVoiceFrame"></iframe>
           </div>
@@ -643,6 +646,9 @@
           <p class="slide-subtitle">
             L'AI ti farà domande per capire i tuoi <strong>obiettivi a breve e lungo termine</strong> con l'inglese. Rispondi a voce — la trascrizione appare qui sotto.
           </p>
+          <div style="font-size:11px;color:var(--text-muted);margin-bottom:4px;padding:6px 10px;border-radius:8px;background:var(--pill-bg);border:1px solid var(--line);">
+            <i class="fa-solid fa-robot"></i> <strong>AI prompt:</strong> You are an English learning advisor. Ask about short-term and long-term objectives. Help make them SMART.
+          </div>
           <div class="voice-embed" style="height:200px;" id="objectivesVoiceEmbed">
             <iframe src="hugging-voice-kokoro/index.html" title="AI Objectives Voice" allow="microphone; camera" loading="lazy" id="objectivesVoiceFrame"></iframe>
           </div>
@@ -844,13 +850,54 @@
       navDots.innerHTML = html;
     }
 
+    // ── Voice iframe prompts ──
+    var VOICE_PROMPTS = {
+      intake: "You are an English language coach doing an intake interview. " +
+        "Ask the user about their work, hobbies, daily life, and why they want to improve their English. " +
+        "Be warm and encouraging. Ask follow-up questions. Keep replies under 3 sentences. Speak in English.",
+      objectives: "You are an English learning advisor helping the user define their goals. " +
+        "Ask about their short-term objectives (1-3 months) and long-term objectives (6-12 months) for learning English. " +
+        "Help them make goals SMART: Specific, Measurable, Achievable, Relevant, Time-bound. Speak in English."
+    };
+
+    function sendToVoiceIframe(source, msg) {
+      var frameId = source === 'intake' ? 'intakeVoiceFrame' : 'objectivesVoiceFrame';
+      var frame = document.getElementById(frameId);
+      if (frame && frame.contentWindow) {
+        try { frame.contentWindow.postMessage(msg, '*'); } catch(e) {}
+      }
+    }
+
+    function stopVoiceSession(source) {
+      sendToVoiceIframe(source, { type: 'stop-conversation' });
+    }
+
+    function startVoiceSession(source) {
+      var frame = document.getElementById(source === 'intake' ? 'intakeVoiceFrame' : 'objectivesVoiceFrame');
+      if (!frame || !frame.contentWindow) return;
+      // Set source identifier + instructions
+      sendToVoiceIframe(source, { type: 'set-source', source: source });
+      sendToVoiceIframe(source, { type: 'set-instructions', instructions: VOICE_PROMPTS[source] });
+      // Wait a beat then start the conversation
+      setTimeout(function() {
+        sendToVoiceIframe(source, { type: 'start-conversation' });
+      }, 600);
+    }
+
     function goToSlide(idx) {
       if (idx < 0 || idx >= TOTAL_SLIDES) return;
+      var prev = currentSlide;
+      // Stop voice if leaving slide 8 or 9
+      if (prev === 8) stopVoiceSession('intake');
+      if (prev === 9) stopVoiceSession('objectives');
       document.querySelectorAll('.onboard-slide').forEach(function(s) { s.classList.remove('active'); });
       document.querySelectorAll('.onboard-slide')[idx].classList.add('active');
       currentSlide = idx;
       updateUI();
       slidesContainer.scrollTop = 0;
+      // Start voice if entering slide 8 or 9
+      if (idx === 8) startVoiceSession('intake');
+      if (idx === 9) startVoiceSession('objectives');
     }
 
     function nextSlide() {
@@ -1035,16 +1082,17 @@
 
     // ── Listen for transcript postMessage from voice iframes ──
     window.addEventListener('message', function(e) {
-      // Expected format: { type: 'transcript', source: 'intake'|'objectives', text: '...' }
       if (!e.data || !e.data.type || e.data.type !== 'transcript') return;
       var src = e.data.source;
       if (src !== 'intake' && src !== 'objectives') return;
-      var text = e.data.text || '';
+      var text = (e.data.text || '')
+        // Strip role prefixes added by the voice iframe
+        .replace(/^(You|AI):\s*/gm, '')
+        .trim();
       var textarea = document.getElementById(src + 'Transcript');
       if (textarea) {
         textarea.value = text;
         onTranscriptInput(src, text);
-        validateTranscript(src);
       }
     });
 
