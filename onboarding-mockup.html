@@ -440,11 +440,10 @@
           <i class="fa-solid fa-language slide-icon"></i>
           <h2 class="slide-title">Qual è la tua lingua madre?</h2>
           <p class="slide-subtitle">
-            La useremo come <strong>lingua di spiegazione predefinita</strong> — quando tradurremo o spiegheremo qualcosa, lo faremo nella tua lingua madre.
+            Sottotitoli è ottimizzato per <strong>madrelingua italiani</strong> che imparano l'inglese. Se parli un'altra lingua madre, selezionala qui sotto — la useremo come lingua di spiegazione predefinita.
           </p>
           <select class="lang-select" id="nativeLangSelect" onchange="saveSelect('native_lang', this.value)">
-            <option value="">-- Seleziona la tua lingua --</option>
-            <option value="it">🇮🇹 Italiano</option>
+            <option value="it" selected>🇮🇹 Italiano</option>
             <option value="nl">🇳🇱 Nederlands (Olandese)</option>
             <option value="en">🇬🇧 English</option>
             <option value="es">🇪🇸 Español</option>
@@ -702,6 +701,8 @@
 
     // ── Onboarding state (stored in localStorage for testing) ──
     var onboardData = JSON.parse(localStorage.getItem('sottotitoli_onboarding') || '{}');
+    // Default native language to Italian (90% of users)
+    if (!onboardData['native_lang']) { onboardData['native_lang'] = 'it'; persist(); }
 
     // AI-generated insights (populated by mockGenerateReport in test, by /starter-report in production)
     var aiInsights = null;
@@ -1116,6 +1117,12 @@
 
     // ── Finish onboarding ──
     function finishOnboarding() {
+      // Guard: refuse if not 100% complete
+      if (getCompletionPercent() < 100) {
+        alert('Completa tutte le domande richieste prima di finire.\n\nCampi mancanti:\n' + getMissingFields().join('\n'));
+        return;
+      }
+
       onboardData['onboarding_completed'] = true;
       onboardData['onboarding_completed_at'] = new Date().toISOString();
       persist();

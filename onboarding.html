@@ -461,11 +461,10 @@
           <i class="fa-solid fa-language slide-icon"></i>
           <h2 class="slide-title">Qual è la tua lingua madre?</h2>
           <p class="slide-subtitle">
-            La useremo come <strong>lingua di spiegazione predefinita</strong> — quando tradurremo o spieghereremo qualcosa, lo faremo nella tua lingua madre.
+            Sottotitoli è ottimizzato per <strong>madrelingua italiani</strong> che imparano l'inglese. Se parli un'altra lingua madre, selezionala qui sotto — la useremo come lingua di spiegazione predefinita.
           </p>
           <select class="lang-select" id="nativeLangSelect" onchange="saveSelect('native_lang', this.value)">
-            <option value="">-- Seleziona la tua lingua --</option>
-            <option value="it">🇮🇹 Italiano</option>
+            <option value="it" selected>🇮🇹 Italiano</option>
             <option value="nl">🇳🇱 Nederlands (Olandese)</option>
             <option value="en">🇬🇧 English</option>
             <option value="es">🇪🇸 Español</option>
@@ -733,6 +732,8 @@
 
     // Onboarding state (backed by localStorage + Supabase)
     var onboardData = JSON.parse(localStorage.getItem('sottotitoli_onboarding') || '{}');
+    // Default native language to Italian (90% of users)
+    if (!onboardData['native_lang']) { onboardData['native_lang'] = 'it'; persist(); }
 
     function persist() {
       localStorage.setItem('sottotitoli_onboarding', JSON.stringify(onboardData));
@@ -798,6 +799,19 @@
       if (currentSlide === TOTAL_SLIDES - 1) {
         btnNext.style.display = 'none';
         btnFinish.style.display = 'flex';
+        // Validate completion — disable finish if not 100%
+        var comp = getCompletionPercent();
+        if (comp < 100) {
+          btnFinish.disabled = true;
+          btnFinish.style.opacity = '0.5';
+          btnFinish.title = getMissingFields().join(' · ');
+          btnFinish.innerHTML = '<i class="fa-solid fa-lock"></i> Completa le domande (' + comp + '%)';
+        } else {
+          btnFinish.disabled = false;
+          btnFinish.style.opacity = '1';
+          btnFinish.title = '';
+          btnFinish.innerHTML = '<i class="fa-solid fa-check"></i> Completa Onboarding';
+        }
       } else {
         btnNext.style.display = 'flex';
         btnFinish.style.display = 'none';
@@ -807,6 +821,34 @@
 
       if (currentSlide === 10) buildSummary();
       if (currentSlide === 11) buildDashboard();
+    }
+
+    // ── Completion tracking ──
+    function getCompletionPercent() {
+      var required = ['native_lang', 'difficulties', 'why_english', 'mic_tested'];
+      var filled = 0;
+      required.forEach(function(k) {
+        var v = onboardData[k];
+        if (v && (!Array.isArray(v) || v.length > 0)) filled++;
+      });
+      return Math.round((filled / required.length) * 100);
+    }
+
+    function getMissingFields() {
+      var labels = {
+        'native_lang': 'Lingua madre (slide 3)',
+        'difficulties': 'Difficoltà in inglese (slide 6)',
+        'why_english': 'Perché parli inglese (slide 4)',
+        'mic_tested': 'Test microfono (slide 7)'
+      };
+      var missing = [];
+      Object.keys(labels).forEach(function(k) {
+        var v = onboardData[k];
+        if (!v || (Array.isArray(v) && v.length === 0)) {
+          missing.push(labels[k]);
+        }
+      });
+      return missing.length > 0 ? ['Manca: '].concat(missing) : [];
     }
 
     // ── Pill selection ──
@@ -1141,6 +1183,12 @@
 
     // ── Finish onboarding ──
     async function finishOnboarding() {
+      // Guard: refuse if not 100% complete
+      if (getCompletionPercent() < 100) {
+        alert('Completa tutte le domande richieste prima di finire.\n\nCampi mancanti:\n' + getMissingFields().join('\n'));
+        return;
+      }
+
       btnFinish.disabled = true;
       btnFinish.innerHTML = '<span class="spin" style="width:16px;height:16px;border:2px solid rgba(0,0,0,.3);border-top-color:#000;border-radius:50%;animation:spin .7s linear infinite;"></span> Salvando…';
 
