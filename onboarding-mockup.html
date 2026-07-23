@@ -840,10 +840,12 @@
     function stopVoiceSession(source) {
       if (VOICE_TIMERS[source]) { clearTimeout(VOICE_TIMERS[source]); VOICE_TIMERS[source] = null; }
       sendToVoiceIframe(source, { type: 'stop-conversation' });
+      _voiceConfigSent[source] = false;
     }
 
     function startVoiceSession(source) {
       if (VOICE_SESSION_DONE[source]) return;
+      _voiceConfigSent[source] = false;
       var frame = document.getElementById(source === 'intake' ? 'intakeVoiceFrame' : 'objectivesVoiceFrame');
       if (!frame || !frame.contentWindow) return;
       sendToVoiceIframe(source, { type: 'set-source', source: source });
@@ -851,12 +853,17 @@
       sendToVoiceIframe(source, { type: 'set-compact' });
       sendToVoiceIframe(source, { type: 'set-instructions', instructions: VOICE_PROMPTS[source] });
       setTimeout(function() {
+        sendToVoiceIframe(source, { type: 'set-title', title: source === 'intake' ? 'Parlami di te' : 'Conversazione con l\'AI' });
+        sendToVoiceIframe(source, { type: 'set-compact' });
+        sendToVoiceIframe(source, { type: 'set-instructions', instructions: VOICE_PROMPTS[source] });
+      }, 1500);
+      setTimeout(function() {
         sendToVoiceIframe(source, { type: 'start-conversation' });
         VOICE_TIMERS[source] = setTimeout(function() {
           stopVoiceSession(source);
           VOICE_SESSION_DONE[source] = true;
         }, VOICE_SESSION_MINUTES * 60 * 1000);
-      }, 800);
+      }, 2000);
     }
 
     function goToSlide(idx) {
@@ -1032,13 +1039,31 @@
       }
     }
 
+    // ── Listen for messages from voice iframes ──
+    var _voiceConfigSent = {};
+
     window.addEventListener('message', function(e) {
-      if (!e.data || !e.data.type || e.data.type !== 'transcript') return;
-      var src = e.data.source;
-      if (src !== 'intake' && src !== 'objectives') return;
-      var text = (e.data.text || '').replace(/^(You|AI):\s*/gm, '').trim();
-      var textarea = document.getElementById(src + 'Transcript');
-      if (textarea) { textarea.value = text; onTranscriptInput(src, text); }
+      if (!e.data || !e.data.type) return;
+
+      if (e.data.type === 'transcript') {
+        var src = e.data.source;
+        if (src !== 'intake' && src !== 'objectives') return;
+        var text = (e.data.text || '').replace(/^(You|AI):\s*/gm, '').trim();
+        var textarea = document.getElementById(src + 'Transcript');
+        if (textarea) { textarea.value = text; onTranscriptInput(src, text); }
+        return;
+      }
+
+      if (e.data.type === 'status') {
+        var src2 = currentSlide === 8 ? 'intake' : currentSlide === 9 ? 'objectives' : null;
+        if (src2 && !_voiceConfigSent[src2]) {
+          sendToVoiceIframe(src2, { type: 'set-title', title: src2 === 'intake' ? 'Parlami di te' : 'Conversazione con l\'AI' });
+          sendToVoiceIframe(src2, { type: 'set-compact' });
+          sendToVoiceIframe(src2, { type: 'set-instructions', instructions: VOICE_PROMPTS[src2] });
+          _voiceConfigSent[src2] = true;
+        }
+        return;
+      }
     });
 
     // ── Pill selection (single / multi) ──
