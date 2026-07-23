@@ -35,6 +35,9 @@
     .voice-frame { display: block; width: 100%; height: calc(100vh - 90px); min-height: 550px; border: none; }
     .status-bar { display: flex; align-items: center; justify-content: center; gap: 8px; padding: 10px 20px; font-size: 12px; color: var(--text-dim); background: rgba(255,255,255,.02); border-top: 1px solid var(--line); }
     .status-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--green); flex-shrink: 0; }
+    .status-dot.ok { background: var(--green); box-shadow: 0 0 6px rgba(16,185,129,.5); }
+    .status-dot.warn { background: #f59e0b; box-shadow: 0 0 6px rgba(245,158,11,.5); animation: pulse-dot 1.5s infinite; }
+    .status-dot.error { background: #ef4444; box-shadow: 0 0 6px rgba(239,68,68,.5); }
     .selected-voice { font-weight: 600; color: var(--green); }
 
     /* Voice grid sidebar */
@@ -101,7 +104,11 @@
     <!-- Main card with iframe -->
     <div class="voice-card">
       <iframe class="voice-frame" src="hugging-voice-kokoro/index.html" title="AI Voice Kokoro" allow="microphone; camera" loading="eager" id="kokoroFrame"></iframe>
-      <div class="status-bar"><span class="status-dot"></span><span id="statusText">Server: s8t-sottotitoli-voice.hf.space</span></div>
+      <div class="status-bar" id="statusBar">
+        <span class="status-dot" id="statusDot"></span>
+        <span id="statusText">In attesa…</span>
+        <span style="margin-left:auto;font-size:10px;opacity:0.6" id="statusDetail"></span>
+      </div>
     </div>
   </div>
 
@@ -386,9 +393,26 @@
       } catch(e){}
     };
 
-    // Listen for messages from iframe (conversation events)
+    // Listen for messages from iframe (conversation events + status)
     window.addEventListener('message', function(e){
       if(!e.data || !e.data.type) return;
+
+      // Status updates from the voice assistant
+      if(e.data.type === 'status'){
+        var dot = document.getElementById('statusDot');
+        var txt = document.getElementById('statusText');
+        var detail = document.getElementById('statusDetail');
+        if(txt) txt.textContent = e.data.text || '';
+        if(detail) detail.textContent = e.data.detail || '';
+        if(dot){
+          dot.className = 'status-dot';
+          if(e.data.level === 'ok') dot.classList.add('ok');
+          if(e.data.level === 'warn') dot.classList.add('warn');
+          if(e.data.level === 'error') dot.classList.add('error');
+        }
+      }
+
+      // Conversation ended
       if(e.data.type === 'conversation-ended' && e.data.summary){
         window.saveConversation(e.data.summary, e.data.duration, e.data.voice);
       }
