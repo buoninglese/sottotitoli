@@ -599,8 +599,15 @@
           <i class="fa-solid fa-headset slide-icon"></i>
           <h2 class="slide-title">Parlami di te</h2>
           <p class="slide-subtitle">
-            Avvia la conversazione qui sotto e raccontaci di te in inglese — lavoro, hobby, obiettivi. L'AI ti farà domande per guidarti.
+            Puoi parlare in <strong>italiano</strong> o provare in <strong>inglese</strong>, come preferisci. L'AI si adatterà alla lingua che scegli.
           </p>
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
+            <span style="font-size:12px;font-weight:600;color:var(--text-dim);">Lingua intervista:</span>
+            <div class="pill-grid" data-key="intake_lang" style="margin:0;">
+              <button class="pill selected" data-val="it" id="intakeLangToggle" data-lang="it" onclick="setVoiceLang('intake','it',this)"><i class="fa-solid fa-globe"></i> Italiano</button>
+              <button class="pill" data-val="en" data-lang="en" onclick="setVoiceLang('intake','en',this)"><i class="fa-solid fa-globe"></i> English</button>
+            </div>
+          </div>
           <div style="font-size:11px;color:var(--text-muted);margin-bottom:4px;padding:6px 10px;border-radius:8px;background:var(--pill-bg);border:1px solid var(--line);">
             <i class="fa-solid fa-robot"></i> <strong>AI prompt:</strong> You are an English language coach doing an intake interview.
           </div>
@@ -630,8 +637,15 @@
           <i class="fa-solid fa-robot slide-icon"></i>
           <h2 class="slide-title">Conversazione con l'AI</h2>
           <p class="slide-subtitle">
-            L'AI ti farà domande per capire i tuoi <strong>obiettivi a breve e lungo termine</strong> con l'inglese. Rispondi a voce — la trascrizione appare qui sotto.
+            Puoi parlare in <strong>italiano</strong> o provare in <strong>inglese</strong>, come preferisci. L'AI ti farà domande per capire i tuoi obiettivi.
           </p>
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
+            <span style="font-size:12px;font-weight:600;color:var(--text-dim);">Lingua intervista:</span>
+            <div class="pill-grid" data-key="objectives_lang" style="margin:0;">
+              <button class="pill selected" data-val="it" id="objectivesLangToggle" data-lang="it" onclick="setVoiceLang('objectives','it',this)"><i class="fa-solid fa-globe"></i> Italiano</button>
+              <button class="pill" data-val="en" data-lang="en" onclick="setVoiceLang('objectives','en',this)"><i class="fa-solid fa-globe"></i> English</button>
+            </div>
+          </div>
           <div style="font-size:11px;color:var(--text-muted);margin-bottom:4px;padding:6px 10px;border-radius:8px;background:var(--pill-bg);border:1px solid var(--line);">
             <i class="fa-solid fa-robot"></i> <strong>AI prompt:</strong> You are an English learning advisor. Ask about short-term and long-term objectives.
           </div>
@@ -827,17 +841,34 @@
     }
 
     // ── Slide navigation ──
-    // ── Voice iframe prompts ──
+    // ── Voice iframe prompts (bilingual) ──
     var VOICE_PROMPTS = {
-      intake: "You are an English language coach doing an intake interview. " +
-        "Start by introducing yourself briefly: 'Hi! I'm your English coach. Let's get to know each other.' " +
-        "Then ask about the user's work, hobbies, daily life, and why they want to improve their English. " +
-        "Be warm and encouraging. Ask follow-up questions. Keep replies under 3 sentences. Speak in English only.",
-      objectives: "You are an English learning advisor helping the user define their goals. " +
-        "Start by introducing yourself: 'Hello! I'm your learning advisor. Let's figure out your English goals together.' " +
-        "Then ask about their short-term objectives (1-3 months) and long-term objectives (6-12 months). " +
-        "Help them make goals SMART: Specific, Measurable, Achievable, Relevant, Time-bound. Speak in English only."
+      intake: {
+        it: "Sei un coach di inglese che fa un'intervista di intake. " +
+          "Presentati brevemente: 'Ciao! Sono il tuo coach di inglese. Parliamo un po' di te.' " +
+          "Poi chiedi del lavoro, hobby, vita quotidiana, e perché vuole migliorare l'inglese. " +
+          "Sii caloroso e incoraggiante. Fai domande di follow-up. Risposte brevi, massimo 3 frasi. Parla solo in italiano.",
+        en: "You are an English language coach doing an intake interview. " +
+          "Start by introducing yourself briefly: 'Hi! I'm your English coach. Let's get to know each other.' " +
+          "Then ask about the user's work, hobbies, daily life, and why they want to improve their English. " +
+          "Be warm and encouraging. Ask follow-up questions. Keep replies under 3 sentences. Speak in English only."
+      },
+      objectives: {
+        it: "Sei un consulente di apprendimento dell'inglese che aiuta a definire gli obiettivi. " +
+          "Presentati: 'Ciao! Ti aiuto a definire i tuoi obiettivi di inglese.' " +
+          "Poi chiedi degli obiettivi a breve termine (1-3 mesi) e a lungo termine (6-12 mesi). " +
+          "Aiuta a renderli SMART: Specifici, Misurabili, Raggiungibili, Rilevanti, Temporalizzati. Parla solo in italiano.",
+        en: "You are an English learning advisor helping the user define their goals. " +
+          "Start by introducing yourself: 'Hello! I'm your learning advisor. Let's figure out your English goals together.' " +
+          "Then ask about their short-term objectives (1-3 months) and long-term objectives (6-12 months). " +
+          "Help them make goals SMART: Specific, Measurable, Achievable, Relevant, Time-bound. Speak in English only."
+      }
     };
+
+    function getVoiceLang(source) {
+      var toggle = document.getElementById(source + 'LangToggle');
+      return toggle ? (toggle.dataset.lang || 'it') : 'it';
+    }
 
     var VOICE_TIMERS = {};
     var VOICE_SESSION_DONE = {};
@@ -862,14 +893,16 @@
       _voiceConfigSent[source] = false;
       var frame = document.getElementById(source === 'intake' ? 'intakeVoiceFrame' : 'objectivesVoiceFrame');
       if (!frame || !frame.contentWindow) return;
+      var prompt = VOICE_PROMPTS[source][getVoiceLang(source)];
       sendToVoiceIframe(source, { type: 'set-source', source: source });
       sendToVoiceIframe(source, { type: 'set-title', title: source === 'intake' ? 'Parlami di te' : 'Conversazione con l\'AI' });
       sendToVoiceIframe(source, { type: 'set-compact' });
-      sendToVoiceIframe(source, { type: 'set-instructions', instructions: VOICE_PROMPTS[source] });
+      sendToVoiceIframe(source, { type: 'set-instructions', instructions: prompt });
       setTimeout(function() {
+        var prompt2 = VOICE_PROMPTS[source][getVoiceLang(source)];
         sendToVoiceIframe(source, { type: 'set-title', title: source === 'intake' ? 'Parlami di te' : 'Conversazione con l\'AI' });
         sendToVoiceIframe(source, { type: 'set-compact' });
-        sendToVoiceIframe(source, { type: 'set-instructions', instructions: VOICE_PROMPTS[source] });
+        sendToVoiceIframe(source, { type: 'set-instructions', instructions: prompt2 });
       }, 1500);
       setTimeout(function() {
         sendToVoiceIframe(source, { type: 'start-conversation' });
@@ -878,6 +911,15 @@
           VOICE_SESSION_DONE[source] = true;
         }, VOICE_SESSION_MINUTES * 60 * 1000);
       }, 2000);
+    }
+
+    function setVoiceLang(source, lang, btn) {
+      var grid = btn.parentElement;
+      grid.querySelectorAll('.pill').forEach(function(p) { p.classList.remove('selected'); });
+      btn.classList.add('selected');
+      if (VOICE_TIMERS[source]) {
+        sendToVoiceIframe(source, { type: 'set-instructions', instructions: VOICE_PROMPTS[source][lang] });
+      }
     }
 
     function goToSlide(idx) {
@@ -1075,12 +1117,18 @@
           var loadingEl = document.getElementById(src2 + 'Loading');
           var hintEl = document.getElementById(src2 + 'Hint');
           if (loadingEl) loadingEl.style.display = 'none';
-          if (hintEl) hintEl.style.display = 'block';
+          if (hintEl) {
+        var lang = getVoiceLang(src2);
+        hintEl.innerHTML = lang === 'it'
+          ? '<i class=\"fa-solid fa-hand-point-up\"></i> Di\\' <em>\"ciao\"</em> per iniziare — l\\'AI risponderà presentandosi'
+          : '<i class=\"fa-solid fa-hand-point-up\"></i> Say <em>\"hi\"</em> to start — the AI will introduce itself';
+        hintEl.style.display = 'block';
+      }
         }
         if (!_voiceConfigSent[src2]) {
           sendToVoiceIframe(src2, { type: 'set-title', title: src2 === 'intake' ? 'Parlami di te' : 'Conversazione con l\'AI' });
           sendToVoiceIframe(src2, { type: 'set-compact' });
-          sendToVoiceIframe(src2, { type: 'set-instructions', instructions: VOICE_PROMPTS[src2] });
+          sendToVoiceIframe(src2, { type: 'set-instructions', instructions: VOICE_PROMPTS[src2][getVoiceLang(src2)] });
           _voiceConfigSent[src2] = true;
         }
         return;
