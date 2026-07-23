@@ -95,7 +95,7 @@ window.SOTTOTITOLI_CONFIG = {
    *  Used by AI Voice browser mode for direct LLM calls.
    *  Create at https://huggingface.co/settings/tokens
    *  Needs "Make calls to Inference Providers" permission. */
-  hfToken: "hf_...",
+  hfToken: "hf_...",  // real value in config.secrets.js (gitignored)
 
   /** Stripe payment integration */
   stripe: {
