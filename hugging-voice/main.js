@@ -158,11 +158,11 @@ function loadTools() {
     // on a user gesture (conversation start), so a default-on flag doesn't
     // silently resume the webcam; an explicit saved `false` is respected.
     return {
-      web_search: raw.web_search ?? true,
+      web_search: raw.web_search ?? false,
       camera_snapshot: raw.camera_snapshot ?? true,
     };
   } catch {
-    return { web_search: true, camera_snapshot: true };
+    return { web_search: false, camera_snapshot: true };
   }
 }
 
