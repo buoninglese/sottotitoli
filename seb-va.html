@@ -87,6 +87,7 @@
   <div class="topbar">
     <a class="brand" href="#"><span class="brand-dot"></span>Sebastian's VA<span class="badge">KOKORO · 25 voci</span></a>
     <div style="display:flex;align-items:center;gap:12px">
+      <span id="userChip" style="font-size:12px;color:var(--text-dim);cursor:pointer" onclick="handleAuth()" title="Accedi">🔐 Accedi</span>
       <span style="font-size:12px;color:var(--text-dim)">Voce: <span class="selected-voice" id="currentVoiceLabel">af_heart</span></span>
       <button class="theme-toggle" id="themeToggle" onclick="toggleTheme()">☀️</button>
     </div>
@@ -108,6 +109,7 @@
     <span id="footerDate"></span> · <span id="footerClock"></span> · <span id="footerWeather">Bari: —</span>
   </footer>
 
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script>
     // ── All Kokoro voices ────────────────────────────────
     var VOICES = [
@@ -292,43 +294,148 @@
       setInterval(updateDate, 3600000); // every hour
     })();
 
-    // ── Daily overview message ──────────────────────────────
+    // ── Supabase client ──────────────────────────────────────
+    var SEBVA_SUPABASE_URL = 'https://tngmcavybhvqaizuizyt.supabase.co';
+    var SEBVA_SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRuZ21jYXZ5Ymh2cWFpenVpenl0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ4MDczODksImV4cCI6MjEwMDM4MzM4OX0.g0ECf4iLqLBe8QlFzArCOBLcF7lYPVfrgwXs-rHyagg';
+    var sebVaSb = null;
+    var sebVaUser = null;
+
+    function initSupabase(){
+      if(window.supabase && window.supabase.createClient){
+        sebVaSb = window.supabase.createClient(SEBVA_SUPABASE_URL, SEBVA_SUPABASE_KEY);
+        // Check for existing session
+        sebVaSb.auth.getSession().then(function(r){
+          if(r.data && r.data.session){
+            sebVaUser = r.data.session.user;
+            updateUserUI();
+            sendDailyOverview();
+          }
+        });
+        // Listen for auth changes
+        sebVaSb.auth.onAuthStateChange(function(event, session){
+          sebVaUser = session ? session.user : null;
+          updateUserUI();
+          if(sebVaUser) sendDailyOverview();
+        });
+      }
+    }
+
+    function updateUserUI(){
+      var chip = document.getElementById('userChip');
+      if(sebVaUser){
+        var name = sebVaUser.user_metadata && sebVaUser.user_metadata.full_name
+          || sebVaUser.email.split('@')[0];
+        chip.textContent = '👤 ' + name;
+        chip.title = 'Profilo';
+      } else {
+        chip.textContent = '🔐 Accedi';
+        chip.title = 'Accedi';
+      }
+    }
+
+    async function handleAuth(){
+      if(!sebVaSb){ alert('Supabase non ancora caricato. Ricarica la pagina.'); return; }
+      if(sebVaUser){
+        // Show sign out
+        if(confirm('Vuoi uscire?')){ await sebVaSb.auth.signOut(); sebVaUser = null; updateUserUI(); }
+        return;
+      }
+      // Sign in with Google
+      var redirectTo = window.location.origin + window.location.pathname;
+      await sebVaSb.auth.signInWithOAuth({provider:'google',options:{redirectTo:redirectTo}});
+    }
+
+    // ── Daily overview from Supabase ───────────────────────
+    async function sendDailyOverview(){
+      var frame = document.getElementById('kokoroFrame');
+      if(!frame || !sebVaSb || !sebVaUser) return;
+      try {
+        var {data,error} = await sebVaSb.rpc('get_daily_overview',{uid:sebVaUser.id});
+        var msg = (data && !error) ? data : 'Pronto per una sessione di pratica. Di cosa vuoi parlare oggi?';
+        try {
+          frame.contentWindow.postMessage({type:'daily-overview', text:msg}, '*');
+        } catch(e){}
+      } catch(e){}
+    }
+
+    // ── Save conversation to Supabase ──────────────────────
+    window.saveConversation = async function(summary, durationSeconds, voiceId){
+      if(!sebVaSb || !sebVaUser) return;
+      try {
+        var {data,error} = await sebVaSb.from('conversations').insert({
+          user_id: sebVaUser.id,
+          duration_seconds: durationSeconds||0,
+          voice_id: voiceId||currentVoice,
+          summary: summary||'',
+          language: 'it'
+        }).select('id').single();
+        return data ? data.id : null;
+      } catch(e){ return null; }
+    };
+
+    // ── Add daily goal from conversation ───────────────────
+    window.addDailyGoal = async function(title, minutes){
+      if(!sebVaSb || !sebVaUser) return;
+      try {
+        await sebVaSb.from('daily_goals').insert({
+          user_id: sebVaUser.id,
+          title: title,
+          estimated_minutes: minutes||30,
+          ai_suggested: true
+        });
+      } catch(e){}
+    };
+
+    // Listen for messages from iframe (conversation events)
+    window.addEventListener('message', function(e){
+      if(!e.data || !e.data.type) return;
+      if(e.data.type === 'conversation-ended' && e.data.summary){
+        window.saveConversation(e.data.summary, e.data.duration, e.data.voice);
+      }
+      if(e.data.type === 'suggest-goal' && e.data.title){
+        window.addDailyGoal(e.data.title, e.data.minutes);
+      }
+    });
+
+    // Try to send overview whenever iframe loads
+    var kokoroFrame = document.getElementById('kokoroFrame');
+    if(kokoroFrame){
+      kokoroFrame.addEventListener('load', function(){
+        setTimeout(function(){
+          if(sebVaUser){ sendDailyOverview(); }
+          else {
+            // Fallback to localStorage-based overview
+            var msg = window._localOverview ? window._localOverview() : 'Pronto per una sessione di pratica. Di cosa vuoi parlare oggi?';
+            try { kokoroFrame.contentWindow.postMessage({type:'daily-overview', text:msg}, '*'); } catch(e){}
+          }
+        }, 2000);
+      });
+    }
+
+    // localStorage fallback (used when not signed in)
     (function(){
       var GOALS_KEY = 'sebva-daily-goals';
       function getToday(){ return new Date().toISOString().substring(0,10); }
-
-      // Store a simple daily goal
       window.setDailyGoal = function(text, minutes){
         var data = {};
         try { data = JSON.parse(localStorage.getItem(GOALS_KEY)||'{}'); } catch(e){}
         data[getToday()] = {text:text, minutes:minutes||30, set:new Date().toISOString()};
         localStorage.setItem(GOALS_KEY, JSON.stringify(data));
       };
-
-      // Get today's overview
-      window.getDailyOverview = function(){
+      window._localOverview = function(){
         var data = {};
         try { data = JSON.parse(localStorage.getItem(GOALS_KEY)||'{}'); } catch(e){}
         var today = data[getToday()];
-        if(today){
-          return 'Oggi: ' + today.text + ' (~' + today.minutes + ' min)';
-        }
-        return 'Pronto per una sessione di pratica. Di cosa vuoi parlare oggi?';
+        return today ? 'Oggi: ' + today.text + ' (~' + today.minutes + ' min)' : 'Pronto per una sessione di pratica. Di cosa vuoi parlare oggi?';
       };
-
-      // Send overview to iframe once loaded
-      var frame = document.getElementById('kokoroFrame');
-      if(frame){
-        frame.addEventListener('load', function(){
-          setTimeout(function(){
-            var msg = window.getDailyOverview();
-            try {
-              frame.contentWindow.postMessage({type:'daily-overview', text:msg}, '*');
-            } catch(e){}
-          }, 2000);
-        });
-      }
     })();
+
+    // ── Initialize Supabase when SDK loads ──────────────────
+    if(window.supabase && window.supabase.createClient){
+      initSupabase();
+    } else {
+      window.addEventListener('load', function(){ setTimeout(initSupabase, 500); });
+    }
   </script>
 </body>
 </html>
