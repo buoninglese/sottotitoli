@@ -112,6 +112,10 @@
         <span id="statusText">In attesa…</span>
         <span style="margin-left:auto;font-size:10px;opacity:0.6" id="statusDetail"></span>
       </div>
+      <div class="status-bar" style="border-top:none;padding-top:0;font-size:10px;gap:16px" id="pipelineBar">
+        <span>🔧 Pipeline: <strong id="plInUse">—</strong>/<span id="plSize">—</span></span>
+        <span id="plState" style="color:var(--text-dim)">—</span>
+      </div>
     </div>
   </div>
 
@@ -453,6 +457,28 @@
     } else {
       window.addEventListener('load', function(){ setTimeout(initSupabase, 500); });
     }
+
+    // ── Pipeline monitor — polls the Space every 5s ──────────
+    (function(){
+      var POOL_URL = 'https://s8t-sottotitoli-voice.hf.space/v1/pool';
+      function updatePipeline(){
+        fetch(POOL_URL).then(function(r){ return r.json(); }).then(function(d){
+          document.getElementById('plInUse').textContent = d.in_use;
+          document.getElementById('plSize').textContent = d.size;
+          var states = (d.units||[]).map(function(u){ return u.state; }).join(', ');
+          var el = document.getElementById('plState');
+          if(el){ el.textContent = states; el.style.color = d.in_use===0 ? 'var(--green)' : 'var(--cyan)'; }
+          // If all pipelines busy, warn
+          var dot = document.getElementById('statusDot');
+          if(d.in_use >= d.size && dot){ dot.className = 'status-dot error'; }
+        }).catch(function(e){
+          var el = document.getElementById('plState');
+          if(el){ el.textContent = 'Space offline'; el.style.color = '#ef4444'; }
+        });
+      }
+      updatePipeline();
+      setInterval(updatePipeline, 5000);
+    })();
   </script>
 </body>
 </html>
