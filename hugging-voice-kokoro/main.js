@@ -862,9 +862,33 @@ async function runTool(name, argsJson, callId) {
 /** @param {string} query @returns {Promise<string>} */
 async function execWebSearch(query) {
   if (!query) return "No query provided.";
+  const today = new Date().toISOString().slice(0, 10);
+
+  // Local mode with user key: call Serper API directly (no CORS issues).
+  if (!serverSearchKey && userSearchKey) {
+    const res = await fetch("https://google.serper.dev/search", {
+      method: "POST",
+      headers: { "X-API-KEY": userSearchKey, "Content-Type": "application/json" },
+      body: JSON.stringify({ q: query }),
+    });
+    if (!res.ok) {
+      let detail = String(res.status);
+      try { const j = await res.json(); if (j.message) detail = j.message; } catch {}
+      throw new Error(`search error (${detail})`);
+    }
+    const json = await res.json();
+    /** @type {string[]} */
+    const lines = [`Google search result from ${today}:`];
+    if (json.answerBox) lines.push(`Answer: ${json.answerBox.title || json.answerBox.snippet || ''} ${json.answerBox.snippet || ''}`);
+    for (const r of (json.organic || []).slice(0, 5)) {
+      lines.push(`- ${r.title}: ${r.snippet} (${r.link})`);
+    }
+    return lines.length > 1 ? lines.join("\n") : `${lines[0]}\nNo results found.`;
+  }
+
+  // Server mode: proxy through the same-origin /api/search endpoint.
   /** @type {Record<string, string>} */
   const body = { query };
-  // Only send a user key when there's no server key (server prefers its own).
   if (!serverSearchKey && userSearchKey) body.key = userSearchKey;
 
   const res = await fetch("api/search", {
@@ -878,9 +902,6 @@ async function execWebSearch(query) {
     throw new Error(`search error (${detail})`);
   }
   const json = await res.json();
-  // Date-stamp the header so the model treats these as fresh realtime facts
-  // rather than its (older) training knowledge.
-  const today = new Date().toISOString().slice(0, 10);
   /** @type {string[]} */
   const lines = [`Google search result from ${today}:`];
   if (json.answer) lines.push(`Answer: ${json.answer}`);
