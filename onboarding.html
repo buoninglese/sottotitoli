@@ -186,6 +186,44 @@
     .transcript-status .fa-circle-check { color: var(--accent-green); }
     .transcript-status .fa-circle-xmark { color: #ef4444; }
 
+    /* ── Starter Report card ── */
+    .report-card {
+      background: linear-gradient(160deg, var(--pill-active-bg), var(--card));
+      border: 1.5px solid var(--accent-purple);
+      border-radius: 18px; padding: 24px 28px;
+      margin-bottom: 20px;
+    }
+    .report-card h3 { font-family: 'Manrope', sans-serif; font-size: 20px; font-weight: 800; letter-spacing: -.6px; margin: 24px 0 10px; color: var(--accent-purple); }
+    .report-card h3:first-child { margin-top: 0; }
+    .report-card h4 { font-family: 'Manrope', sans-serif; font-size: 15px; font-weight: 700; margin: 18px 0 6px; color: var(--text); }
+    .report-card p { font-size: 13.5px; line-height: 1.75; color: var(--text); margin: 8px 0; }
+    .report-card strong { color: var(--accent-purple); font-weight: 700; }
+    .report-card ul { margin: 8px 0; padding-left: 20px; }
+    .report-card li { font-size: 13.5px; line-height: 1.7; margin-bottom: 4px; color: var(--text); }
+    .report-card em { font-style: italic; color: var(--text-dim); }
+    .report-card .report-header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding-bottom: 16px; border-bottom: 1px solid var(--line); margin-bottom: 16px;
+    }
+    .report-card .report-header h2 {
+      font-family: 'Manrope', sans-serif; font-size: 18px; font-weight: 800;
+      letter-spacing: -.4px; color: var(--accent-purple); margin: 0;
+    }
+    .report-card .report-badge {
+      font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em;
+      padding: 4px 10px; border-radius: 99px; background: var(--pill-active-bg);
+      color: var(--accent-purple); white-space: nowrap;
+    }
+    .report-download-btn {
+      display: inline-flex; align-items: center; gap: 6px;
+      font-family: inherit; font-size: 11px; font-weight: 600;
+      padding: 7px 14px; border-radius: 99px; cursor: pointer;
+      border: 1.5px solid var(--accent-purple); background: transparent;
+      color: var(--accent-purple); transition: all .15s;
+      margin-top: 14px;
+    }
+    .report-download-btn:hover { background: var(--accent-purple); color: #fff; }
+
     /* ── Language select ── */
     .lang-select {
       width: 100%; padding: 12px 16px; border-radius: 12px;
@@ -650,14 +688,20 @@
           <p class="slide-subtitle">Basato sulle tue risposte, ecco il tuo punto di partenza.</p>
 
           <!-- Starter Report (hidden until AI generates it) -->
-          <div id="starterReportSection" style="display:none;margin-bottom:20px;">
-            <div class="insight-card full" style="border-color:var(--accent-purple);background:linear-gradient(135deg,var(--pill-active-bg),var(--pill-bg));">
-              <h4>📄 Il tuo Starter Report <span style="font-weight:400;font-size:10px;color:var(--text-muted);">— generato dall'AI</span></h4>
-              <div id="starterReportContent" style="font-size:13px;line-height:1.7;color:var(--text);"></div>
-              <div id="starterReportLoading" style="display:none;text-align:center;padding:20px;color:var(--text-muted);">
-                <div class="loader" style="margin:0 auto 12px;"></div>
+          <div id="starterReportSection" style="display:none;">
+            <div class="report-card">
+              <div class="report-header">
+                <h2><i class="fa-solid fa-file-lines"></i> Starter Report</h2>
+                <span class="report-badge">AI · Personalizzato</span>
+              </div>
+              <div id="starterReportContent"></div>
+              <div id="starterReportLoading" style="display:none;text-align:center;padding:24px;color:var(--text-muted);">
+                <div class="loader" style="margin:0 auto 14px;"></div>
                 <span>L'AI sta analizzando il tuo profilo…</span>
               </div>
+              <button class="report-download-btn" id="reportDownloadBtn" style="display:none;" onclick="downloadReportPDF()">
+                <i class="fa-solid fa-download"></i> Scarica PDF
+              </button>
             </div>
           </div>
 
@@ -1413,7 +1457,8 @@
         if (reportSection && reportContent) {
           reportContent.innerHTML = markedToHtml(aiResult.report_md || '');
           reportSection.style.display = 'block';
-          // Scroll to the report
+          var dlBtn = document.getElementById('reportDownloadBtn');
+          if (dlBtn) dlBtn.style.display = 'inline-flex';
           slidesContainer.scrollTop = 0;
         }
 
@@ -1510,16 +1555,44 @@
       if (!md) return '';
       var html = md
         .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-        .replace(/^### (.+)$/gm, '<h4 style="font-size:14px;font-weight:700;margin:16px 0 6px;color:var(--text);">$1</h4>')
-        .replace(/^## (.+)$/gm, '<h3 style="font-size:16px;font-weight:800;margin:20px 0 8px;color:var(--accent-purple);">$1</h3>')
-        .replace(/^# (.+)$/gm, '<h2 style="font-size:18px;font-weight:800;margin:20px 0 8px;color:var(--accent-purple);">$1</h2>')
+        .replace(/^### (.+)$/gm, '<h4>$1</h4>')
+        .replace(/^## (.+)$/gm, '<h3>$1</h3>')
+        .replace(/^# (.+)$/gm, '<h3>$1</h3>')
         .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
         .replace(/\*(.+?)\*/g, '<em>$1</em>')
-        .replace(/^- (.+)$/gm, '<li style="margin-left:16px;">$1</li>')
-        .replace(/(\n<li[^>]*>.*<\/li>)+/g, '<ul style="margin:8px 0;">$&</ul>')
-        .replace(/\n\n/g, '</p><p style="margin:8px 0;">')
+        .replace(/^- (.+)$/gm, '<li>$1</li>')
+        .replace(/(\n<li>.*<\/li>)+/g, '<ul>$&</ul>')
+        .replace(/\n\n/g, '</p><p>')
         .replace(/\n/g, '<br>');
-      return '<p style="margin:8px 0;">' + html + '</p>';
+      return '<p>' + html + '</p>';
+    }
+
+    function downloadReportPDF() {
+      var content = document.getElementById('starterReportContent');
+      if (!content) return;
+      var reportHTML = content.innerHTML;
+      var title = 'Sottotitoli Starter Report';
+      // Open a clean print window
+      var w = window.open('', '_blank', 'width=800,height=600');
+      w.document.write('<!DOCTYPE html><html><head><meta charset="UTF-8"><title>' + title + '</title>');
+      w.document.write('<link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,400;14..32,500;14..32,600;14..32,700;14..32,800&family=Manrope:wght@700;800&display=swap" rel="stylesheet">');
+      w.document.write('<style>');
+      w.document.write('*{box-sizing:border-box;margin:0;padding:0}');
+      w.document.write('body{font-family:Inter,system-ui,sans-serif;color:#111827;padding:40px 48px;max-width:700px;margin:0 auto;line-height:1.7;font-size:14px}');
+      w.document.write('h3{font-family:Manrope,sans-serif;font-size:20px;font-weight:800;letter-spacing:-.4px;color:#7c3aed;margin:28px 0 10px}');
+      w.document.write('h3:first-child{margin-top:0}');
+      w.document.write('h4{font-family:Manrope,sans-serif;font-size:15px;font-weight:700;margin:18px 0 6px;color:#111827}');
+      w.document.write('p{margin:8px 0} strong{color:#7c3aed;font-weight:700}');
+      w.document.write('ul{margin:8px 0;padding-left:20px} li{margin-bottom:4px}');
+      w.document.write('em{font-style:italic;color:#6b7280}');
+      w.document.write('.report-header{display:flex;align-items:center;justify-content:space-between;padding-bottom:14px;border-bottom:2px solid #7c3aed;margin-bottom:20px}');
+      w.document.write('.report-header h2{font-family:Manrope,sans-serif;font-size:22px;font-weight:800;color:#7c3aed}');
+      w.document.write('</style></head><body>');
+      w.document.write('<div class="report-header"><h2>Starter Report</h2><span style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#7c3aed">Sottotitoli · AI Personalizzato</span></div>');
+      w.document.write(reportHTML);
+      w.document.write('</body></html>');
+      w.document.close();
+      setTimeout(function(){ w.print(); }, 500);
     }
 
     // ── Finish onboarding ──
