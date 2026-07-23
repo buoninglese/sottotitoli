@@ -95,6 +95,20 @@
     .status-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--line); flex-shrink: 0; }
     .status-dot.live { background: var(--green); animation: pulse 1.5s infinite; }
     .status-dot.warn { background: #f59e0b; }
+    .wake-overlay {
+      position: absolute; inset: 0; display: flex; flex-direction: column;
+      align-items: center; justify-content: center; gap: 16px;
+      background: var(--bg); z-index: 2; transition: opacity .3s;
+    }
+    .wake-overlay.hidden { opacity: 0; pointer-events: none; }
+    .wake-spinner {
+      width: 48px; height: 48px; border: 3px solid var(--line);
+      border-top-color: var(--purple); border-radius: 50%;
+      animation: spin .8s linear infinite;
+    }
+    .wake-text { font-size: 15px; color: var(--text-dim); text-align: center; line-height: 1.6; }
+    .wake-sub { font-size: 12px; color: var(--text-faint); }
+    @keyframes spin { to { transform: rotate(360deg); } }
     @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
     @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: .4; } }
     @media (max-width: 768px) {
@@ -117,7 +131,11 @@
 
   <div class="main-layout">
     <div class="orb-panel" id="orbPanel">
-      <iframe src="hugging-voice-kokoro/index.html" title="AI Voice" allow="microphone; camera; autoplay" id="voiceFrame"></iframe>
+      <div class="wake-overlay" id="wakeOverlay">
+        <div class="wake-spinner"></div>
+        <div class="wake-text">Risveglio AI Voice…<br><span class="wake-sub" id="wakeSub">Il server si sta avviando — circa 30 secondi</span></div>
+      </div>
+      <iframe src="about:blank" title="AI Voice" allow="microphone; camera; autoplay" id="voiceFrame" style="display:none"></iframe>
     </div>
     <div class="transcript-panel" id="transcriptPanel">
       <div class="transcript-head">
@@ -156,6 +174,64 @@
       localStorage.setItem('sottotitoli-theme', next);
       document.getElementById('themeBtn').textContent = next === 'dark' ? '☀️' : '🌙';
     }
+
+    // ── HF Space Wake-Up ──
+    var SPACE_ID = 's8t/Sottotitoli-voice';
+    var SPACE_URL = 'https://huggingface.co/api/spaces/' + SPACE_ID;
+    var WAKE_POLL_MS = 3000;
+    var WAKE_TIMEOUT_MS = 90000; // 90s max wait
+    var wakeStart = Date.now();
+    var wakeOverlay = document.getElementById('wakeOverlay');
+    var wakeSub = document.getElementById('wakeSub');
+    var voiceFrame = document.getElementById('voiceFrame');
+    var wakeInterval = null;
+
+    function wakeSpace() {
+      fetch(SPACE_URL)
+        .then(function(r) { return r.json(); })
+        .then(function(d) {
+          var elapsed = Math.round((Date.now() - wakeStart) / 1000);
+          if (d.stage === 'RUNNING') {
+            // Space is up — load the iframe
+            clearInterval(wakeInterval);
+            wakeSub.textContent = 'Pronto!';
+            wakeOverlay.classList.add('hidden');
+            voiceFrame.src = 'hugging-voice-kokoro/index.html';
+            voiceFrame.style.display = 'block';
+            statusDot.className = 'status-dot live';
+            statusText.textContent = 'Connesso — parla con l\'AI';
+          } else if (d.stage === 'BUILDING' || d.stage === 'STARTING') {
+            wakeSub.textContent = 'Server in avvio… (' + elapsed + 's)';
+            statusDot.className = 'status-dot warn';
+            statusText.textContent = 'Risveglio server AI Voice…';
+          } else if (elapsed > 90) {
+            clearInterval(wakeInterval);
+            wakeSub.textContent = 'Il server impiega troppo tempo. Riprova tra qualche minuto.';
+            statusDot.className = 'status-dot';
+            statusText.textContent = 'Timeout — server non raggiungibile';
+          } else {
+            // Sleeping or unknown — first ping wakes it
+            wakeSub.textContent = 'Server in fase di avvio… (' + elapsed + 's)';
+            statusDot.className = 'status-dot warn';
+            statusText.textContent = 'Risveglio server AI Voice…';
+            // Also ping the Space root to trigger wake-up
+            fetch('https://s8t-sottotitoli-voice.hf.space/', { mode: 'no-cors' }).catch(function(){});
+          }
+        })
+        .catch(function() {
+          var elapsed = Math.round((Date.now() - wakeStart) / 1000);
+          if (elapsed > 90) {
+            clearInterval(wakeInterval);
+            wakeSub.textContent = 'Impossibile contattare il server. Riprova più tardi.';
+            statusDot.className = 'status-dot';
+            statusText.textContent = 'Errore di connessione';
+          }
+        });
+    }
+
+    // Start polling
+    wakeSpace();
+    wakeInterval = setInterval(wakeSpace, WAKE_POLL_MS);
 
     // ── Transcript state ──
     var transcriptLines = []; // { role, text, partial }
