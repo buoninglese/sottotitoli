@@ -948,22 +948,18 @@
       var frame = document.getElementById(source === 'intake' ? 'intakeVoiceFrame' : 'objectivesVoiceFrame');
       if (!frame || !frame.contentWindow) return;
       var prompt = VOICE_PROMPTS[source][getVoiceLang(source)];
+      // Configure the iframe (instructions, compact mode, title) — do NOT auto-start
+      // User must click the orb to begin (browser autoplay policy requires user gesture)
       sendToVoiceIframe(source, { type: 'set-source', source: source });
       sendToVoiceIframe(source, { type: 'set-title', title: source === 'intake' ? 'Parlami di te' : 'Conversazione con l\'AI' });
       sendToVoiceIframe(source, { type: 'set-compact' });
       sendToVoiceIframe(source, { type: 'set-instructions', instructions: prompt });
+      // Retry after iframe fully loads
       setTimeout(function() {
         var prompt2 = VOICE_PROMPTS[source][getVoiceLang(source)];
         sendToVoiceIframe(source, { type: 'set-title', title: source === 'intake' ? 'Parlami di te' : 'Conversazione con l\'AI' });
         sendToVoiceIframe(source, { type: 'set-compact' });
         sendToVoiceIframe(source, { type: 'set-instructions', instructions: prompt2 });
-      }, 1500);
-      setTimeout(function() {
-        sendToVoiceIframe(source, { type: 'start-conversation' });
-        VOICE_TIMERS[source] = setTimeout(function() {
-          stopVoiceSession(source);
-          VOICE_SESSION_DONE[source] = true;
-        }, VOICE_SESSION_MINUTES * 60 * 1000);
       }, 2000);
     }
 
@@ -1210,6 +1206,14 @@
             liveEl.scrollTop = liveEl.scrollHeight;
           }
         }
+        // Start 5-min timer when conversation goes live
+        var LIVE_STATES_LIST = ['connecting','queued','your-turn','listening','user-speaking','processing','ai-speaking'];
+        if (LIVE_STATES_LIST.indexOf(e.data.text) !== -1 && !VOICE_TIMERS[src2]) {
+          VOICE_TIMERS[src2] = setTimeout(function() {
+            stopVoiceSession(src2);
+            VOICE_SESSION_DONE[src2] = true;
+          }, VOICE_SESSION_MINUTES * 60 * 1000);
+        }
         // If back to idle, hide live caption
         if (e.data.text === 'In attesa' || e.data.text === 'Pronto') {
           if (liveEl) liveEl.style.display = 'none';
@@ -1222,8 +1226,8 @@
           if (hintEl) {
         var lang = getVoiceLang(src2);
         hintEl.innerHTML = lang === 'it'
-          ? '<i class="fa-solid fa-hand-point-up"></i> Di\' <em>"ciao"</em> per iniziare — l\'AI risponderà presentandosi'
-          : '<i class="fa-solid fa-hand-point-up"></i> Say <em>"hi"</em> to start — the AI will introduce itself';
+          ? '<i class=\"fa-solid fa-hand-point-up\"></i> Clicca il pulsante centrale e di\\' <em>\"ciao\"</em> — l\\'AI risponderà'
+          : '<i class=\"fa-solid fa-hand-point-up\"></i> Click the orb and say <em>\"hi\"</em> — the AI will respond';
         hintEl.style.display = 'block';
       }
         }
