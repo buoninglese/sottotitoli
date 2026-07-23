@@ -1112,10 +1112,30 @@
     window.addEventListener('message', function(e) {
       if (!e.data || !e.data.type) return;
 
+      if (e.data.type === 'live-transcript') {
+        var src3 = e.data.source;
+        if (src3 !== 'intake' && src3 !== 'objectives') return;
+        var liveEl3 = document.getElementById(src3 + 'Live');
+        if (!liveEl3 || !e.data.text) return;
+        liveEl3.style.display = 'block';
+        var cls3 = e.data.role === 'user' ? 'user-line' : 'ai-line';
+        var prefix = e.data.role === 'user' ? 'You: ' : 'AI: ';
+        var line = prefix + e.data.text.trim();
+        var lines = liveEl3.innerHTML.split('<br>');
+        if (e.data.partial && lines.length > 0 && lines[0] !== '') {
+          lines[lines.length - 1] = '<span class=\"' + cls3 + '\">' + line.replace(/</g, '&lt;') + '</span>';
+          liveEl3.innerHTML = lines.join('<br>');
+        } else {
+          liveEl3.innerHTML = (liveEl3.innerHTML && liveEl3.innerHTML !== '' ? liveEl3.innerHTML + '<br>' : '') + '<span class=\"' + cls3 + '\">' + line.replace(/</g, '&lt;') + '</span>';
+        }
+        liveEl3.scrollTop = liveEl3.scrollHeight;
+        return;
+      }
+
       if (e.data.type === 'transcript') {
         var src = e.data.source;
         if (src !== 'intake' && src !== 'objectives') return;
-        var text = (e.data.text || '').replace(/^(You|AI):\s*/gm, '').trim();
+        var text = (e.data.text || '').replace(/^(You|AI):\\s*/gm, '').trim();
         var textarea = document.getElementById(src + 'Transcript');
         if (textarea) { textarea.value = text; onTranscriptInput(src, text); }
         var liveEl2 = document.getElementById(src + 'Live');

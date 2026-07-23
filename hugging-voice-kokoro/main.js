@@ -1390,10 +1390,20 @@ async function doStart(audioContext = null) {
   c.addEventListener("transcript", (e) => {
     const d = /** @type {CustomEvent<{ role: "user" | "assistant"; text: string; partial: boolean; itemId?: string; responseId?: string }>} */ (e).detail;
     chat.onTranscript(d);
-    // Accumulate non-partial transcripts for parent forwarding
+    // Accumulate non-partial transcripts for final forwarding
     if (!d.partial && d.text) {
       conversationTranscript += (conversationTranscript ? "\n" : "") + (d.role === "user" ? "You: " : "AI: ") + d.text;
     }
+    // Post live transcript to parent for teleprompter (every transcript, partial or final)
+    try {
+      window.parent.postMessage({
+        type: "live-transcript",
+        source: conversationSource,
+        role: d.role,
+        text: d.text,
+        partial: d.partial
+      }, "*");
+    } catch(e) {}
   });
 
   c.addEventListener("response-finished", (e) => {
