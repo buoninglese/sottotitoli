@@ -29,7 +29,7 @@ window.sottotitoliSupabase = window.supabase.createClient(
 (function(){
   var path = window.location.pathname.replace(/\/$/,'').split('/').pop() || 'index.html';
   // Pages that are publicly accessible (no auth required)
-  if(path==='index.html'||path===''||path==='404.html'||path==='duo-s8t.html'||path==='traduzione-s8t.html'||path==='panoramica.html'||path.indexOf('overlay')===0||path.indexOf('mockup')>=0)return;
+  if(path==='index.html'||path===''||path==='404.html'||path==='duo-s8t.html'||path==='traduzione-s8t.html'||path==='panoramica.html'||path==='onboarding.html'||path.indexOf('overlay')===0||path.indexOf('mockup')>=0)return;
   // Multispeaker speaker-join mode doesn't require auth (guests join via invite link)
   if(path==='multispeaker.html' && window.location.search.indexOf('speaker=1')!==-1)return;
   // Wait for session, redirect if missing
@@ -53,8 +53,30 @@ window.sottotitoliSupabase = window.supabase.createClient(
         // Initialize credits for new users (15 min free + 3 tokens)
         initUserCredits(r.data.session.user.id);
         initUserTokens(r.data.session.user.id);
-        // Skip profiles table query — columns not yet created in Supabase
-        // TODO: add columns (avatar_url, full_name, native_lang, location, learning_profile) to profiles table
+
+        // ── Onboarding gate ──
+        // If user hasn't completed onboarding, redirect to onboarding page
+        // (unless they are already on it, or on a public page like index/panoramica)
+        if (path !== 'onboarding.html' && path !== 'index.html' && path !== 'panoramica.html') {
+          var onboardingDone = localStorage.getItem('sottotitoli_onboarding_done');
+          if (onboardingDone !== 'true') {
+            // Check Supabase for onboarding status
+            sb.from('onboarding_responses')
+              .select('onboarding_completed')
+              .eq('user_id', user.id)
+              .maybeSingle()
+              .then(function(_r) {
+                if (!_r.data?.onboarding_completed && !_r.error) {
+                  // Onboarding not completed — redirect
+                  window.location.replace('onboarding.html');
+                } else if (_r.data?.onboarding_completed) {
+                  // Mark locally so we don't re-check on every page
+                  localStorage.setItem('sottotitoli_onboarding_done', 'true');
+                }
+                // If table doesn't exist yet (_r.error), silently skip
+              });
+          }
+        }
       }
     });
   }
@@ -369,4 +391,42 @@ function initUserTokens(userId) {
       });
     }
   });
+
+// ═══════════════════════════════════════════════════════════
+// Global onboarding gate — runs on ALL pages after session is ready
+// Redirects to onboarding.html if user hasn't completed onboarding yet.
+// ═══════════════════════════════════════════════════════════
+(function(){
+  var path = (window.location.pathname.replace(/\/$/,'').split('/').pop() || 'index.html');
+  // Never redirect FROM these pages
+  if (path === 'onboarding.html' || path === 'index.html' || path === '' || path === '404.html' || path.indexOf('overlay') === 0 || path.indexOf('mockup') >= 0) return;
+
+  function checkOnboarding(){
+    var sb = window.sottotitoliSupabase;
+    if (!sb) { setTimeout(checkOnboarding, 300); return; }
+    sb.auth.getSession().then(function(r){
+      if (!r.data?.session) return; // Not signed in — let the auth guard handle it
+      var user = r.data.session.user;
+      // Check local cache first
+      if (localStorage.getItem('sottotitoli_onboarding_done') === 'true') return;
+      // Check Supabase
+      sb.from('onboarding_responses')
+        .select('onboarding_completed')
+        .eq('user_id', user.id)
+        .maybeSingle()
+        .then(function(_r){
+          if (_r.error) return; // Table might not exist yet — skip silently
+          if (!_r.data?.onboarding_completed) {
+            console.log('🆕 Onboarding not completed — redirecting');
+            window.location.replace('onboarding.html');
+          } else {
+            localStorage.setItem('sottotitoli_onboarding_done', 'true');
+          }
+        });
+    });
+  }
+
+  // Run after a short delay so Supabase has time to process OAuth hash
+  setTimeout(checkOnboarding, 1500);
+})();
 }
