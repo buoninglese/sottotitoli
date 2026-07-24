@@ -1296,6 +1296,24 @@ async function doStart(audioContext = null) {
       });
   client = c;
 
+  // ── Embed bridge: forward ALL events to parent for discovery ──
+  if (window.__EMBED_MODE__ && window.parent !== window) {
+    const _nativeAE = c.addEventListener.bind(c);
+    c.addEventListener = function(type, handler, opts) {
+      _nativeAE(type, function(event) {
+        try {
+          window.parent.postMessage({
+            type: 'hf-event',
+            eventType: type,
+            detail: event.detail || null,
+            time: Date.now()
+          }, '*');
+        } catch(_) {}
+        return handler.apply(this, arguments);
+      }, opts);
+    };
+  }
+
   c.addEventListener("queue", (e) => {
     const { position, queueId } = /** @type {CustomEvent<{ position: number; queueId: string }>} */ (e).detail;
     if (queueId) queuedTicketId = queueId;

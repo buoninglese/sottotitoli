@@ -285,27 +285,40 @@
       // Only accept messages from our iframe
       if (e.source !== voiceFrame.contentWindow) return;
 
+      // Debug: log every message (remove after verified)
+      console.log('[ai-s8t] iframe msg:', msg.type, msg);
+
       if (msg.type === 'live-transcript') {
         addLine(msg.role, msg.text, msg.partial);
+        return;
       }
-
       if (msg.type === 'transcript-final') {
-        // Final transcript line — un-mark partial and enable save
         finalizePartial(msg.role);
+        return;
       }
-
       if (msg.type === 'transcript') {
-        // Full transcript from completed conversation (kokoro variant)
         fullTranscriptText = msg.text || '';
         saveBtn.disabled = !fullTranscriptText;
         saveBtn2.disabled = !fullTranscriptText;
         copyBtn.disabled = !fullTranscriptText;
         copyBtn2.disabled = !fullTranscriptText;
+        return;
       }
-
       if (msg.type === 'status') {
         statusText.textContent = msg.text + (msg.detail ? ' — ' + msg.detail : '');
         statusDot.className = 'status-dot ' + (msg.level === 'ok' ? 'live' : msg.level === 'warn' ? 'warn' : '');
+        return;
+      }
+      // hf-event: raw events from the monkey-patched client (for discovery)
+      if (msg.type === 'hf-event') {
+        console.log('[ai-s8t] hf-event type=' + msg.eventType, msg.detail);
+        // Best-effort: try to map known event shapes to addLine
+        var d = msg.detail || {};
+        if (d.role && d.text) {
+          addLine(d.role === 'user' ? 'user' : 'ai', d.text, !!d.partial);
+          if (!d.partial) finalizePartial(d.role === 'user' ? 'user' : 'ai');
+        }
+        return;
       }
     });
   </script>
