@@ -1,0 +1,462 @@
+<!DOCTYPE html>
+<html lang="it" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>AI Voice · Sottotitoli</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,400;14..32,500;14..32,600;14..32,700;14..32,800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --font-ui: 'Inter', system-ui, -apple-system, sans-serif;
+      --panel: #fff;
+      --bg: #f0f2f5;
+      --card: #ffffff;
+      --line: rgba(0,0,0,.08);
+      --line-strong: rgba(0,0,0,.12);
+      --text: #111827;
+      --text-dim: #6b7280;
+      --text-faint: #9ca3af;
+      --purple: #7c3aed;
+      --purple-soft: rgba(124,58,237,.08);
+      --purple-line: rgba(124,58,237,.15);
+      --cyan: #06b6d4;
+      --green: #10b981;
+      --black-btn: #111827;
+      --shadow-card: 0 4px 14px rgba(0,0,0,.06);
+      --radius-sm: 10px;
+      --transition: 0.2s ease;
+    }
+
+    [data-theme="dark"] {
+      --panel: #111827;
+      --bg: #0a0f1e;
+      --card: #1a1d26;
+      --line: rgba(255,255,255,.07);
+      --line-strong: rgba(255,255,255,.1);
+      --text: #f1f5f9;
+      --text-dim: #94a3b8;
+      --text-faint: #64748b;
+      --purple: #8b7dff;
+      --purple-soft: rgba(139,125,255,.08);
+      --purple-line: rgba(139,125,255,.15);
+      --cyan: #22d3ee;
+      --black-btn: #1f2937;
+      --shadow-card: 0 4px 24px rgba(0,0,0,.3);
+    }
+
+    body {
+      font-family: var(--font-ui);
+      background: var(--bg);
+      color: var(--text);
+      overflow: hidden;
+      transition: background var(--transition), color var(--transition);
+    }
+
+    /* ── App shell ──────────────────────────────────── */
+    .app-shell {
+      height: 100vh;
+      display: grid;
+      grid-template-rows: 62px 1fr;
+      grid-template-columns: 260px 1fr;
+      gap: 0;
+    }
+
+    /* ── Header ──────────────────────────────────────── */
+    .header {
+      grid-column: 1 / -1;
+      display: flex; align-items: center; gap: 16px;
+      padding: 0 20px;
+      background: var(--card);
+      border-bottom: 1px solid var(--line);
+      z-index: 20;
+    }
+    .brand-row {
+      display: flex; align-items: center; gap: 10px;
+      font-size: 18px; font-weight: 800; color: var(--text);
+      text-decoration: none; flex-shrink: 0;
+    }
+    .brand-row span { color: var(--purple); }
+    .brand-dot {
+      width: 8px; height: 8px; border-radius: 50%;
+      background: var(--green);
+      box-shadow: 0 0 8px rgba(16,185,129,.5);
+      animation: pulse 2s infinite;
+    }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.3} }
+
+    .panel-tabs {
+      display: flex; align-items: center; gap: 4px;
+      margin-left: 20px; overflow-x: auto;
+      scrollbar-width: none; -ms-overflow-style: none;
+    }
+    .panel-tabs::-webkit-scrollbar { display: none; }
+    .tab-btn {
+      padding: 7px 16px; border-radius: 99px;
+      font-size: 13px; font-weight: 600; color: var(--text-dim);
+      cursor: pointer; transition: all var(--transition);
+      border: 1.5px solid transparent;
+      background: transparent;
+      font-family: var(--font-ui);
+      white-space: nowrap;
+      display: flex; align-items: center; gap: 6px;
+    }
+    .tab-btn:hover { color: var(--text); }
+    [data-theme="dark"] .tab-btn:hover { background: rgba(255,255,255,.04); }
+    .tab-btn:hover { background: rgba(0,0,0,.04); }
+    .tab-btn.active {
+      color: var(--purple);
+      background: var(--purple-soft);
+      border-color: var(--purple-line);
+    }
+    .tab-btn i { font-size: 13px; opacity: .7; }
+    .tab-btn.active i { opacity: 1; }
+
+    .header-right {
+      margin-left: auto;
+      display: flex; align-items: center; gap: 10px;
+    }
+    .theme-btn {
+      height: 36px; border-radius: 999px; padding: 0 14px;
+      display: inline-flex; align-items: center; gap: 6px;
+      background: transparent; border: 1px solid var(--line);
+      color: var(--text-dim); font-size: 13px; font-family: var(--font-ui);
+      cursor: pointer; transition: all var(--transition);
+    }
+    .theme-btn:hover { color: var(--text); border-color: var(--line-strong); }
+
+    /* ── Sidebar ─────────────────────────────────────── */
+    .sidebar {
+      height: 100%; overflow-y: auto; overflow-x: hidden;
+      padding: 14px 14px 14px;
+      display: flex; flex-direction: column;
+      justify-content: space-between;
+      scrollbar-width: none; -ms-overflow-style: none;
+    }
+    .sidebar::-webkit-scrollbar { display: none; }
+
+    .side-nav {
+      display: flex; flex-direction: column; gap: 2px;
+      flex-shrink: 1; min-height: 0;
+    }
+    .nav-item {
+      display: flex; align-items: center; gap: 10px;
+      min-height: 0; height: auto; flex-shrink: 1;
+      border-radius: 10px; padding: 8px 10px;
+      font-size: 15px; color: var(--text);
+      transition: background var(--transition), color var(--transition), transform var(--transition);
+      cursor: pointer; text-decoration: none;
+      border: none; background: none; font-family: var(--font-ui);
+      width: 100%; text-align: left;
+    }
+    .nav-item:hover:not(.active) { background: rgba(0,0,0,.035); transform: translateX(2px); }
+    [data-theme="dark"] .nav-item:hover:not(.active) { background: rgba(255,255,255,.04); }
+    .nav-item.active { background: var(--purple); color: #fff; }
+    .nav-item.active:hover { background: var(--purple); transform: none; }
+    .nav-item i { width: 20px; text-align: center; font-size: 15px; opacity: .8; }
+    .nav-item.active i { opacity: 1; }
+
+    .nav-badge {
+      margin-left: auto; font-size: 9px; font-weight: 700;
+      padding: 2px 7px; border-radius: 99px;
+      background: rgba(124,58,237,.15); color: var(--purple);
+    }
+    [data-theme="dark"] .nav-badge { background: rgba(139,125,255,.15); }
+
+    .sidebar-bottom {
+      display: flex; flex-direction: column; gap: 12px;
+    }
+    .trial-card {
+      background: var(--purple-soft);
+      border: 1px solid var(--purple-line);
+      border-radius: 16px; padding: 10px 12px 8px;
+      transition: all var(--transition);
+    }
+    .trial-card h3 { font-size: 14px; font-weight: 700; margin-bottom: 4px; }
+    .trial-card p { font-size: 11px; color: var(--text-dim); line-height: 1.4; margin-bottom: 8px; }
+    .trial-btn {
+      background: var(--black-btn); color: var(--panel);
+      padding: 10px 16px; border-radius: 12px; font-weight: 600;
+      font-size: 12px; font-family: var(--font-ui); border: none; cursor: pointer;
+      width: 100%; transition: all var(--transition);
+    }
+    .trial-btn:hover { opacity: .85; }
+    .side-nav.lower { margin-top: auto; padding-top: .5rem; border-top: 1px solid var(--line); }
+
+    /* ── Workspace + rounded box ─────────────────────── */
+    .workspace {
+      position: relative; padding: 14px 18px 14px 0;
+      height: 100%; overflow: hidden;
+    }
+    .main-panel {
+      height: 100%; overflow-y: auto; overflow-x: hidden;
+      background: var(--panel);
+      border: 2px solid var(--line-strong);
+      border-radius: 34px;
+      box-shadow: 0 4px 32px rgba(0,0,0,.06), 0 0 0 1px rgba(0,0,0,.02);
+      position: relative;
+      transition: background var(--transition), border-color var(--transition), box-shadow var(--transition);
+    }
+    [data-theme="dark"] .main-panel {
+      box-shadow: 0 1px 4px rgba(0,0,0,.15), 0 0 0 1px rgba(255,255,255,.03);
+    }
+
+    .content-panel { display: none; height: 100%; }
+    .content-panel.active { display: flex; flex-direction: column; height: 100%; }
+
+    .voice-frame {
+      flex: 1; width: 100%; border: none; display: block;
+      border-radius: 0 0 32px 32px;
+    }
+    .voice-status {
+      display: flex; align-items: center; gap: 8px;
+      padding: 10px 28px; font-size: 11px; color: var(--text-faint);
+      border-top: 1px solid var(--line);
+      background: transparent;
+      border-radius: 0 0 32px 32px;
+    }
+    .voice-status .dot {
+      width: 7px; height: 7px; border-radius: 50%; background: var(--green);
+      box-shadow: 0 0 6px rgba(16,185,129,.4);
+    }
+    .voice-status .dot.live { animation: pulse 1.5s infinite; }
+
+    .placeholder {
+      flex: 1; display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      gap: 16px; padding: 40px; color: var(--text-dim);
+    }
+    .placeholder i { font-size: 40px; opacity: .25; }
+    .placeholder h2 { font-size: 18px; font-weight: 700; color: var(--text); }
+    .placeholder p { font-size: 13px; max-width: 380px; text-align: center; line-height: 1.6; color: var(--text-dim); }
+
+    .transcript-overlay {
+      position: absolute; right: 20px; top: 50%;
+      transform: translateY(-50%);
+      width: 340px; max-height: 70%;
+      background: var(--card);
+      border: 1.5px solid var(--line);
+      border-radius: 18px;
+      box-shadow: var(--shadow-card);
+      display: none; flex-direction: column;
+      z-index: 10; overflow: hidden;
+    }
+    .transcript-overlay.open { display: flex; }
+    .transcript-head {
+      padding: 14px 18px; border-bottom: 1px solid var(--line);
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .transcript-head h3 { font-size: 14px; font-weight: 700; }
+    .transcript-close {
+      background: none; border: none; color: var(--text-dim);
+      font-size: 16px; cursor: pointer; padding: 2px 8px;
+      border-radius: 6px;
+    }
+
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } }
+
+    @media(max-width: 860px) {
+      .app-shell { grid-template-columns: 48px 1fr; }
+      .sidebar { width: 48px; padding: 10px 6px; }
+      .nav-item { padding: 6px; }
+      .nav-item span, .nav-item .nav-badge { display: none; }
+      .trial-card { display: none; }
+      .brand-row span { display: none; }
+      .panel-tabs { margin-left: 8px; }
+      .tab-btn span { display: none; }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="app-shell">
+
+    <header class="header">
+      <a href="panoramica.html" class="brand-row">
+        <span class="brand-dot"></span>sottotitoli<span>.ai</span>
+      </a>
+      <div class="panel-tabs" id="panelTabs">
+        <button class="tab-btn active" data-tab="voice" onclick="switchTab('voice')">
+          <i class="fa-solid fa-microphone"></i> <span>AI Voice</span>
+        </button>
+        <button class="tab-btn" data-tab="transcripts" onclick="switchTab('transcripts')">
+          <i class="fa-solid fa-file-lines"></i> <span>Transcripts</span>
+        </button>
+        <button class="tab-btn" data-tab="vocab" onclick="switchTab('vocab')">
+          <i class="fa-solid fa-book"></i> <span>Vocabolario</span>
+        </button>
+        <button class="tab-btn" data-tab="grammar" onclick="switchTab('grammar')">
+          <i class="fa-solid fa-pen-to-square"></i> <span>Grammatica</span>
+        </button>
+      </div>
+      <div class="header-right">
+        <button class="theme-btn" onclick="toggleTheme()">
+          <i class="fa-solid" id="themeIcon">☀️</i> Tema
+        </button>
+      </div>
+    </header>
+
+    <aside class="sidebar">
+      <div>
+        <nav class="side-nav">
+          <button class="nav-item active" data-panel="voice" onclick="switchTab('voice')">
+            <i class="fa-solid fa-microphone"></i> <span>AI Voice</span>
+            <span class="nav-badge">LIVE</span>
+          </button>
+          <button class="nav-item" data-panel="transcripts" onclick="switchTab('transcripts')">
+            <i class="fa-solid fa-file-lines"></i> <span>Transcripts</span>
+          </button>
+          <button class="nav-item" data-panel="vocab" onclick="switchTab('vocab')">
+            <i class="fa-solid fa-book"></i> <span>Vocabolario</span>
+          </button>
+          <button class="nav-item" data-panel="grammar" onclick="switchTab('grammar')">
+            <i class="fa-solid fa-pen-to-square"></i> <span>Grammatica</span>
+          </button>
+          <button class="nav-item" data-panel="reports" onclick="switchTab('reports')">
+            <i class="fa-solid fa-chart-line"></i> <span>Report AI</span>
+          </button>
+        </nav>
+      </div>
+      <div class="sidebar-bottom">
+        <div class="trial-card">
+          <h3>Acquista minuti</h3>
+          <p>Ricarica il tuo credito voce in pochi click.</p>
+          <button class="trial-btn">Acquista minuti</button>
+        </div>
+        <nav class="side-nav lower">
+          <button class="nav-item" onclick="toggleTheme()">
+            <i class="fa-solid fa-circle-half-stroke"></i> <span>Tema</span>
+          </button>
+          <button class="nav-item">
+            <i class="fa-solid fa-gear"></i> <span>Impostazioni</span>
+          </button>
+        </nav>
+      </div>
+    </aside>
+
+    <div class="workspace">
+      <main class="main-panel" id="mainContent">
+
+        <div class="content-panel active" id="pnl-voice">
+          <iframe class="voice-frame"
+                  src="hugging-voice/index.html?v=2"
+                  title="AI Voice"
+                  allow="microphone; camera; autoplay"
+                  id="voiceFrame">
+          </iframe>
+          <div class="voice-status">
+            <span class="dot live"></span>
+            <span id="voiceStatus">Connesso — clicca l'orb e parla</span>
+            <span style="margin-left:auto;cursor:pointer;font-size:11px;color:var(--text-dim)" onclick="toggleTranscript()">
+              <i class="fa-solid fa-file-lines"></i> Live Transcript
+            </span>
+          </div>
+        </div>
+
+        <div class="content-panel" id="pnl-transcripts">
+          <div class="placeholder">
+            <i class="fa-solid fa-file-lines"></i>
+            <h2>Transcripts</h2>
+            <p>Storico di tutte le conversazioni con l'AI Voice.</p>
+          </div>
+        </div>
+
+        <div class="content-panel" id="pnl-vocab">
+          <div class="placeholder">
+            <i class="fa-solid fa-book"></i>
+            <h2>Vocabolario</h2>
+            <p>Parole raccolte durante le conversazioni.</p>
+          </div>
+        </div>
+
+        <div class="content-panel" id="pnl-grammar">
+          <div class="placeholder">
+            <i class="fa-solid fa-pen-to-square"></i>
+            <h2>Grammatica</h2>
+            <p>Regole, esercizi e correzioni.</p>
+          </div>
+        </div>
+
+        <div class="content-panel" id="pnl-reports">
+          <div class="placeholder">
+            <i class="fa-solid fa-chart-line"></i>
+            <h2>Report AI</h2>
+            <p>Analisi delle tue sessioni e progressi.</p>
+          </div>
+        </div>
+
+      </main>
+
+      <div class="transcript-overlay" id="transcriptOverlay">
+        <div class="transcript-head">
+          <h3>📝 Live Transcript</h3>
+          <button class="transcript-close" onclick="toggleTranscript()">✕</button>
+        </div>
+        <div class="transcript-body" id="transcriptBody" style="flex:1;overflow-y:auto;padding:12px 18px;display:flex;flex-direction:column;gap:6px;max-height:300px">
+          <div class="transcript-empty" style="flex:1;display:flex;align-items:center;justify-content:center;color:var(--text-faint);font-size:12px">Parla con l'AI — le frasi appariranno qui.</div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    function switchTab(name) {
+      document.querySelectorAll('.sidebar .nav-item').forEach(function(el) {
+        el.classList.toggle('active', el.dataset.panel === name);
+      });
+      document.querySelectorAll('.tab-btn').forEach(function(el) {
+        el.classList.toggle('active', el.dataset.tab === name);
+      });
+      document.querySelectorAll('.content-panel').forEach(function(el) {
+        el.classList.toggle('active', el.id === 'pnl-' + name);
+      });
+      localStorage.setItem('aivoice-tab', name);
+    }
+
+    function toggleTheme() {
+      var html = document.documentElement;
+      var next = html.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+      html.setAttribute('data-theme', next);
+      localStorage.setItem('sottotitoli-theme', next);
+      document.getElementById('themeIcon').className = 'fa-solid ' + (next === 'dark' ? '☀️' : '🌙');
+    }
+
+    function toggleTranscript() {
+      document.getElementById('transcriptOverlay').classList.toggle('open');
+    }
+
+    window.addEventListener('message', function(e) {
+      if (!e.data || !e.data.type) return;
+      if (e.data.type === 'transcript-final' || e.data.type === 'live-transcript') {
+        var body = document.getElementById('transcriptBody');
+        var empty = body.querySelector('.transcript-empty');
+        if (empty) empty.remove();
+        var line = document.createElement('div');
+        line.className = 'transcript-line';
+        line.style.cssText = 'font-size:12px;line-height:1.5;padding:7px 10px;border-radius:10px;max-width:100%;animation:fadeIn .2s ease;';
+        if (e.data.role === 'user') {
+          line.style.background = 'rgba(34,211,238,.1)'; line.style.color = 'var(--cyan)'; line.style.alignSelf = 'flex-end';
+        } else {
+          line.style.background = 'rgba(139,125,255,.1)'; line.style.color = 'var(--purple)'; line.style.alignSelf = 'flex-start';
+        }
+        line.textContent = (e.data.role === 'user' ? '🎤 ' : '🤖 ') + e.data.text;
+        body.appendChild(line);
+        body.scrollTop = body.scrollHeight;
+      }
+    });
+
+    var saved = localStorage.getItem('aivoice-tab');
+    if (saved) switchTab(saved);
+
+    var theme = localStorage.getItem('sottotitoli-theme') || 'dark';
+    document.documentElement.setAttribute('data-theme', theme);
+    document.getElementById('themeIcon').className = 'fa-solid ' + (theme === 'dark' ? '☀️' : '🌙');
+  </script>
+
+</body>
+</html>
