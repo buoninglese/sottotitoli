@@ -174,10 +174,11 @@
     @keyframes colFadeIn{0%{opacity:0}100%{opacity:1}}
     .col-accent{opacity:0;transition:opacity 2s cubic-bezier(.25,.1,.25,1)}
     .col-accent.in{opacity:1}
+    .col-accent-4.in{transition:opacity 3s cubic-bezier(.25,.1,.25,1)}  /* Premium — slower reveal */
     .col-accent-1{background:rgba(34,211,238,.08);border-left:1px solid rgba(34,211,238,.12)}  /* Gratis — cyan */
     .col-accent-2{background:rgba(168,85,247,.08);border-left:1px solid rgba(168,85,247,.12)}  /* Starter — purple */
     .col-accent-3{background:rgba(59,130,246,.08);border-left:1px solid rgba(59,130,246,.12)}  /* Standard — blue */
-    .col-accent-4{background:rgba(250,204,21,.08);border-left:1px solid rgba(250,204,21,.12)}  /* Premium — gold */
+    .col-accent-4{background:rgba(250,204,21,.12);border-left:1px solid rgba(250,204,21,.18)}  /* Premium — gold */
     .s4-table .dash{color:rgba(255,255,255,.08);font-size:10px}
     .s4-toggle{display:none;text-align:center}
     @media(max-width:599px){.s4-toggle{display:block}}
@@ -552,16 +553,19 @@
           var p = document.getElementById('s4Pricing'); if(p){p.style.opacity='1';p.style.transform='translateY(0)';}
           var allRows = document.querySelectorAll('.s4-table .row');
           var dataRows = document.querySelectorAll('.s4-table .row:not(.head)');
-          var colGap = 2000;
+          var colGap = 2800;
           for (var col = 2; col <= 5; col++) {
             (function(colIdx){
+              var isLastCol = colIdx === 5;
               setTimeout(function(){
                 if(!isLive(token)) return;
-                // Fade in permanent column accent
-                allRows.forEach(function(row){
-                  var cell = row.querySelector('.cell:nth-child('+colIdx+')');
-                  if(cell){ cell.classList.add('col-accent','col-accent-'+(colIdx-1),'in'); }
-                });
+                // Fade in column accent (Premium delayed until after number)
+                if (!isLastCol) {
+                  allRows.forEach(function(row){
+                    var cell = row.querySelector('.cell:nth-child('+colIdx+')');
+                    if(cell){ cell.classList.add('col-accent','col-accent-'+(colIdx-1),'in'); }
+                  });
+                }
                 // Pop checks in this column top→bottom
                 var checkCount = 0;
                 dataRows.forEach(function(row, ri){
@@ -572,10 +576,11 @@
                     setTimeout(function(){
                       if(!isLive(token)) return;
                       check.classList.add('anim-in');
-                    }, ri * 250);
+                    }, ri * 300);
                   }
                 });
                 // After checks, pop the Report AI number for this column
+                var numDelay = (checkCount + 1) * 300;
                 setTimeout(function(){
                   if(!isLive(token)) return;
                   var reportRow = document.querySelector('.s4-table .row:last-child');
@@ -583,11 +588,21 @@
                     var numCell = reportRow.querySelector('.cell:nth-child('+colIdx+') .num.anim-num');
                     if(numCell) numCell.classList.add('anim-in');
                   }
-                }, (checkCount + 1) * 250);
+                  // For Premium, fade accent in slowly AFTER the number
+                  if (isLastCol) {
+                    setTimeout(function(){
+                      if(!isLive(token)) return;
+                      allRows.forEach(function(row){
+                        var cell = row.querySelector('.cell:nth-child(5)');
+                        if(cell){ cell.classList.add('col-accent','col-accent-4','in'); }
+                      });
+                    }, 600);
+                  }
+                }, numDelay);
               }, (col - 2) * colGap);
             })(col);
           }
-          var ctaDelay = (4 * colGap) + 2000;
+          var ctaDelay = (4 * colGap) + 2800;
           setTimeout(function(){
             if(!isLive(token)) return;
             var cta = document.getElementById('pricingCta');
