@@ -1035,6 +1035,101 @@
       localStorage.setItem('sottotitoli_onboarding_retries', JSON.stringify(retryData));
     }
 
+    // ── Browser speech-to-text record button ──
+    var _speechRecognition = null;
+    var _speechRecType = null;
+
+    function toggleSpeechRecord(type) {
+      if (_speechRecognition && _speechRecType === type) {
+        stopSpeechRecord();
+        return;
+      }
+      if (_speechRecognition) stopSpeechRecord();
+      startSpeechRecord(type);
+    }
+
+    function startSpeechRecord(type) {
+      var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+      if (!SR) {
+        alert('Riconoscimento vocale non supportato. Usa Chrome o Edge.');
+        return;
+      }
+      _speechRecognition = new SR();
+      _speechRecognition.continuous = true;
+      _speechRecognition.interimResults = true;
+      _speechRecognition.lang = 'en-US';
+
+      var btn = document.getElementById(type + 'MicBtn');
+      var status = document.getElementById(type + 'RecordStatus');
+      var textarea = document.getElementById(type + 'Transcript');
+
+      _speechRecognition.onresult = function(event) {
+        var interim = '';
+        var finalText = '';
+        for (var i = event.resultIndex; i < event.results.length; i++) {
+          if (event.results[i].isFinal) {
+            finalText += event.results[i][0].transcript;
+          } else {
+            interim += event.results[i][0].transcript;
+          }
+        }
+        if (finalText) {
+          textarea.value = (textarea.value + ' ' + finalText).trim();
+        }
+        textarea.value = textarea.value.replace(/ \[.*?\]$/, '');
+        if (interim) {
+          textarea.value = textarea.value + ' [' + interim.trim() + ']';
+        }
+        textarea.dispatchEvent(new Event('input', { bubbles: true }));
+        textarea.scrollTop = textarea.scrollHeight;
+      };
+
+      _speechRecognition.onerror = function(event) {
+        console.warn('Speech recognition error:', event.error);
+        if (event.error === 'no-speech' || event.error === 'aborted') return;
+        stopSpeechRecord();
+      };
+
+      _speechRecognition.onend = function() {
+        if (_speechRecognition && _speechRecType === type) {
+          try { _speechRecognition.start(); } catch(e) {}
+        }
+      };
+
+      _speechRecognition.start();
+      _speechRecType = type;
+
+      if (btn) {
+        btn.innerHTML = '<i class="fa-solid fa-stop"></i> Ferma';
+        btn.classList.add('recording');
+      }
+      if (status) status.style.display = 'inline';
+    }
+
+    function stopSpeechRecord() {
+      if (_speechRecognition) {
+        var rec = _speechRecognition;
+        _speechRecognition = null;
+        try { rec.stop(); } catch(e) {}
+      }
+      var type = _speechRecType;
+      _speechRecType = null;
+      if (type) {
+        var btn = document.getElementById(type + 'MicBtn');
+        var status = document.getElementById(type + 'RecordStatus');
+        var textarea = document.getElementById(type + 'Transcript');
+        if (textarea) {
+          textarea.value = textarea.value.replace(/ \[.*?\]$/, '').trim();
+          textarea.dispatchEvent(new Event('input', { bubbles: true }));
+        }
+        if (btn) {
+          btn.innerHTML = '<i class="fa-solid fa-microphone"></i> Registra';
+          btn.classList.remove('recording');
+        }
+        if (status) status.style.display = 'none';
+      }
+    }
+
     function onTranscriptInput(type, text) {
       onboardData[type + '_transcript'] = text; persist();
       var wc = getWordCount(text);
