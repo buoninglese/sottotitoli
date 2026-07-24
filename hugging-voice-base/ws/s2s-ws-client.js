@@ -894,13 +894,6 @@ export class S2sWsRealtimeClient extends EventTarget {
       type: "realtime",
       instructions: this.options.instructions,
       audio: {
-        input: {
-          turn_detection: {
-            type: "server_vad",
-            threshold: parseFloat(localStorage.getItem('s2s-vad-threshold')) || 0.4,
-            silence_duration_ms: parseInt(localStorage.getItem('s2s-vad-silence')) || 800,
-          },
-        },
         output: { voice: this.options.voice },
       },
     };
