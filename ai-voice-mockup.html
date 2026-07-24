@@ -295,6 +295,20 @@
       color: var(--purple);
       border: 1px solid rgba(139,125,255,.2);
     }
+    /* Thinking state: dimmer, subtle pulse before audio starts */
+    .caption-bubble.ai.thinking {
+      opacity: .6;
+      animation: captionEnter .5s cubic-bezier(.2,.8,.2,1) forwards, thinkPulse 2s ease-in-out infinite;
+    }
+    .caption-bubble.ai.ai-final {
+      opacity: 1;
+      border-color: rgba(139,125,255,.45);
+      box-shadow: 0 0 24px rgba(139,125,255,.08);
+    }
+    @keyframes thinkPulse {
+      0%, 100% { opacity: .5; }
+      50%      { opacity: .75; }
+    }
 
     @keyframes captionEnter {
       0%   { opacity: 0; transform: translateX(-50%) translateY(20px) scale(.95); }
@@ -330,7 +344,7 @@
     <header class="header">
       <a href="panoramica.html" class="brand-row">
         <span class="brand-dot"></span>sottotitoli<span>.ai</span>
-        <span style="font-size:10px;color:var(--text-faint);font-weight:400;margin-left:4px">v1.5</span>
+        <span style="font-size:10px;color:var(--text-faint);font-weight:400;margin-left:4px">v1.6 · text-audio sync · 2s VAD</span>
       </a>
       <div class="panel-tabs" id="panelTabs">
         <button class="tab-btn active" data-tab="voice" onclick="switchTab('voice')">
@@ -504,6 +518,12 @@
     var captionIndex = 0;
     var lastUserText = '';
 
+    // Buffered AI text: held until audio playback starts (status "ai-speaking")
+    var pendingAiText = '';
+    var pendingAiBubble = null;    // the partial bubble being updated
+    var aiSpeakingActive = false;   // true while AI audio is playing
+    var aiKeepAliveTimer = 0;      // timeout to keep AI bubble visible after speech ends
+
     function pushCaption(role, text, isPartial) {
       var stage = document.getElementById('captionStage');
       var empty = document.getElementById('captionEmpty');
@@ -517,23 +537,121 @@
         }
       }
 
+      // ── AI text: hold until audio starts ──
+      if (role === 'ai' && !aiSpeakingActive) {
+        if (isPartial) {
+          // Show a dim "thinking" bubble that updates live
+          pendingAiText = text;
+          if (!pendingAiBubble) {
+            var el = document.createElement('div');
+            el.className = 'caption-bubble ai thinking';
+            el.textContent = '🤖 ' + text;
+            stage.appendChild(el);
+            pendingAiBubble = { el: el, role: 'ai', partial: true, id: ++captionIndex, isAi: true };
+            captionBubbles.push(pendingAiBubble);
+            animateStack();
+          } else {
+            pendingAiBubble.el.textContent = '🤖 ' + text;
+          }
+        } else {
+          // Final text arrived but audio hasn't started — buffer it
+          pendingAiText = text;
+          if (pendingAiBubble) {
+            pendingAiBubble.el.textContent = '🤖 ' + text;
+          }
+        }
+        return;
+      }
+
+      // ── AI text while speaking or after: update existing or create new ──
+      if (role === 'ai' && aiSpeakingActive) {
+        if (isPartial && pendingAiBubble) {
+          pendingAiBubble.el.textContent = '🤖 ' + text;
+          pendingAiBubble.el.classList.remove('thinking');
+          pendingAiBubble.partial = true;
+          pendingAiText = text;
+          return;
+        }
+        if (!isPartial && pendingAiBubble && pendingAiBubble.partial) {
+          // Final text arrived, replace the thinking bubble
+          pendingAiBubble.el.textContent = '🤖 ' + text;
+          pendingAiBubble.el.classList.remove('thinking');
+          pendingAiBubble.partial = false;
+          pendingAiText = text;
+          // Convert to permanent bubble — it will stay longer
+          pendingAiBubble = null;
+          resetAiKeepAlive();
+          return;
+        }
+      }
+
       if (!isPartial && role === 'user' && text === lastUserText) return;
       if (!isPartial && role === 'user') lastUserText = text;
 
       var el = document.createElement('div');
       el.className = 'caption-bubble ' + role;
+      if (role === 'ai') { el.classList.add('ai-final'); }
       el.textContent = (role === 'user' ? '🎤 ' : '🤖 ') + text;
       stage.appendChild(el);
 
-      var bubble = { el: el, role: role, partial: !!isPartial, id: ++captionIndex };
+      var bubble = { el: el, role: role, partial: !!isPartial, id: ++captionIndex, isAi: role === 'ai' };
       captionBubbles.push(bubble);
       animateStack();
+
+      if (role === 'ai' && !isPartial) {
+        resetAiKeepAlive();
+      }
+    }
+
+    /** Flush buffered AI text when audio playback starts. */
+    function flushAiText() {
+      if (!pendingAiText && !pendingAiBubble) return;
+      aiSpeakingActive = true;
+
+      if (pendingAiBubble) {
+        // Convert the thinking bubble to a proper AI bubble
+        pendingAiBubble.el.classList.remove('thinking');
+        pendingAiBubble.el.classList.add('ai-final');
+        pendingAiBubble.partial = false;
+        pendingAiBubble.el.textContent = '🤖 ' + (pendingAiText || pendingAiBubble.el.textContent.replace('🤖 ', ''));
+        var b = pendingAiBubble;
+        b.isAi = true;
+        pendingAiBubble = null;
+        pendingAiText = '';
+        resetAiKeepAlive();
+      }
+    }
+
+    /** Reset the keep-alive timer for AI bubbles. They stay fully visible for KEEP_ALIVE_S
+        after the AI finishes speaking, then fade normally. */
+    var AI_KEEP_ALIVE_S = 12;
+    function resetAiKeepAlive() {
+      if (aiKeepAliveTimer) clearTimeout(aiKeepAliveTimer);
+      // Mark all AI bubbles as "fresh" so animateStack won't fade them
+      var now = Date.now();
+      for (var i = 0; i < captionBubbles.length; i++) {
+        if (captionBubbles[i].isAi) {
+          captionBubbles[i]._freshUntil = now + AI_KEEP_ALIVE_S * 1000;
+        }
+      }
+      aiKeepAliveTimer = setTimeout(function() {
+        aiKeepAliveTimer = 0;
+        animateStack();
+      }, AI_KEEP_ALIVE_S * 1000 + 500);
+    }
+
+    function onAiStoppedSpeaking() {
+      aiSpeakingActive = false;
+      pendingAiText = '';
+      pendingAiBubble = null;
+      resetAiKeepAlive();
     }
 
     function animateStack() {
       var stage = document.getElementById('captionStage');
       var stageH = stage.offsetHeight;
       var centerY = stageH * 0.45;
+      var now = Date.now();
 
       var newest = captionBubbles[captionBubbles.length - 1];
       if (newest) {
@@ -548,19 +666,39 @@
         var bubble = captionBubbles[i];
         bubble.el.style.bottom = (centerY + offset) + 'px';
         var age = captionBubbles.length - 1 - i;
-        if (age >= 5) {
-          bubble.el.style.opacity = '0';
-          bubble.el.style.transition = 'all .8s ease';
-        } else if (age >= 3) {
-          bubble.el.style.opacity = '.35';
-          bubble.el.style.transition = 'all .6s ease';
-        } else {
-          bubble.el.style.opacity = '.7';
+
+        // AI bubbles: stay fully visible while fresh, then fade slowly
+        if (bubble.isAi && bubble._freshUntil && now < bubble._freshUntil) {
+          bubble.el.style.opacity = '1';
           bubble.el.style.transition = 'all .4s ease';
+        } else if (bubble.isAi) {
+          // AI bubble past keep-alive: fade very slowly
+          if (age >= 8) {
+            bubble.el.style.opacity = '0';
+            bubble.el.style.transition = 'all 2s ease';
+          } else if (age >= 5) {
+            bubble.el.style.opacity = '.5';
+            bubble.el.style.transition = 'all 1.5s ease';
+          } else {
+            bubble.el.style.opacity = '.8';
+            bubble.el.style.transition = 'all 1s ease';
+          }
+        } else {
+          // User bubbles: fade as before
+          if (age >= 5) {
+            bubble.el.style.opacity = '0';
+            bubble.el.style.transition = 'all .8s ease';
+          } else if (age >= 3) {
+            bubble.el.style.opacity = '.35';
+            bubble.el.style.transition = 'all .6s ease';
+          } else {
+            bubble.el.style.opacity = '.7';
+            bubble.el.style.transition = 'all .4s ease';
+          }
         }
       }
 
-      while (captionBubbles.length > 8) {
+      while (captionBubbles.length > 10) {
         var old = captionBubbles.shift();
         if (old && old.el.parentNode) {
           old.el.style.transition = 'opacity .5s ease';
@@ -572,10 +710,20 @@
 
     window.addEventListener('message', function(e) {
       if (!e.data || !e.data.type) return;
+
       if (e.data.type === 'transcript-final') {
         pushCaption(e.data.role, e.data.text, false);
       } else if (e.data.type === 'live-transcript') {
         pushCaption(e.data.role, e.data.text, true);
+      } else if (e.data.type === 'status') {
+        // Track AI speaking state for text-audio sync
+        var st = e.data.text || '';
+        if (st === 'ai-speaking') {
+          flushAiText();
+          aiSpeakingActive = true;
+        } else if (aiSpeakingActive && st !== 'ai-speaking') {
+          onAiStoppedSpeaking();
+        }
       }
     });
 
