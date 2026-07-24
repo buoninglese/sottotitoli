@@ -916,6 +916,7 @@
       sendToVoiceIframe(source, { type: 'set-instructions', instructions: prompt });
       setTimeout(function() {
         var prompt2 = VOICE_PROMPTS[source][getVoiceLang(source)];
+        sendToVoiceIframe(source, { type: 'set-source', source: source });
         sendToVoiceIframe(source, { type: 'set-title', title: source === 'intake' ? 'Parlami di te' : 'Conversazione con l\'AI' });
         sendToVoiceIframe(source, { type: 'set-compact' });
         sendToVoiceIframe(source, { type: 'set-instructions', instructions: prompt2 });
@@ -1061,11 +1062,14 @@
         }
       }
       if (currentSlide === 11) { buildDashboard(); updateUI(); }
-      var liveEl = document.getElementById(type + 'Live');
-      if (liveEl && text.trim()) {
-        liveEl.style.display = 'block';
-        liveEl.innerHTML = text.replace(/</g, '&lt;').replace(/\n/g, '<br>');
-        liveEl.scrollTop = liveEl.scrollHeight;
+      // Only mirror manual text when voice is not active
+      if (!VOICE_TIMERS[type]) {
+        var liveEl = document.getElementById(type + 'Live');
+        if (liveEl && text.trim()) {
+          liveEl.style.display = 'block';
+          liveEl.innerHTML = text.replace(/</g, '&lt;').replace(/\n/g, '<br>');
+          liveEl.scrollTop = liveEl.scrollHeight;
+        }
       }
     }
 
@@ -1141,7 +1145,7 @@
       if (e.data.type === 'transcript') {
         var src = e.data.source;
         if (src !== 'intake' && src !== 'objectives') return;
-        var text = (e.data.text || '').replace(/^(You|AI):\\s*/gm, '').trim();
+        var text = (e.data.text || '').replace(/^(You|AI):\s*/gm, '').trim();
         var textarea = document.getElementById(src + 'Transcript');
         if (textarea) { textarea.value = text; onTranscriptInput(src, text); }
         var liveEl2 = document.getElementById(src + 'Live');
@@ -1150,7 +1154,9 @@
       }
 
       if (e.data.type === 'status') {
-        var src2 = currentSlide === 8 ? 'intake' : currentSlide === 9 ? 'objectives' : null;
+        // Prefer source from event data, fall back to current slide
+        var src2 = (e.data.source === 'intake' || e.data.source === 'objectives') ? e.data.source
+          : (currentSlide === 8 ? 'intake' : currentSlide === 9 ? 'objectives' : null);
         if (!src2) return;
         var liveEl = document.getElementById(src2 + 'Live');
         if (liveEl && e.data.detail && e.data.detail.trim()) {
@@ -1181,6 +1187,7 @@
       }
         }
         if (!_voiceConfigSent[src2]) {
+          sendToVoiceIframe(src2, { type: 'set-source', source: src2 });
           sendToVoiceIframe(src2, { type: 'set-title', title: src2 === 'intake' ? 'Parlami di te' : 'Conversazione con l\'AI' });
           sendToVoiceIframe(src2, { type: 'set-compact' });
           sendToVoiceIframe(src2, { type: 'set-instructions', instructions: VOICE_PROMPTS[src2][getVoiceLang(src2)] });

@@ -957,6 +957,7 @@
       // Retry after iframe fully loads
       setTimeout(function() {
         var prompt2 = VOICE_PROMPTS[source][getVoiceLang(source)];
+        sendToVoiceIframe(source, { type: 'set-source', source: source });
         sendToVoiceIframe(source, { type: 'set-title', title: source === 'intake' ? 'Parlami di te' : 'Conversazione con l\'AI' });
         sendToVoiceIframe(source, { type: 'set-compact' });
         sendToVoiceIframe(source, { type: 'set-instructions', instructions: prompt2 });
@@ -1122,12 +1123,15 @@
       }
       // Update completion on dashboard if visible
       if (currentSlide === 11) { buildDashboard(); updateUI(); }
-      // Echo manual text to live caption (works even without voice backend)
-      var liveEl = document.getElementById(type + 'Live');
-      if (liveEl && text.trim()) {
-        liveEl.style.display = 'block';
-        liveEl.innerHTML = text.replace(/</g, '&lt;').replace(/\n/g, '<br>');
-        liveEl.scrollTop = liveEl.scrollHeight;
+      // Echo manual text to live caption only when voice is not active
+      // (voice session manages live caption via live-transcript postMessage)
+      if (!VOICE_TIMERS[type]) {
+        var liveEl = document.getElementById(type + 'Live');
+        if (liveEl && text.trim()) {
+          liveEl.style.display = 'block';
+          liveEl.innerHTML = text.replace(/</g, '&lt;').replace(/\n/g, '<br>');
+          liveEl.scrollTop = liveEl.scrollHeight;
+        }
       }
     }
 
@@ -1217,7 +1221,9 @@
 
       // Status from voice iframe — update live caption + re-apply config
       if (e.data.type === 'status') {
-        var src2 = currentSlide === 8 ? 'intake' : currentSlide === 9 ? 'objectives' : null;
+        // Prefer source from event data, fall back to current slide
+        var src2 = (e.data.source === 'intake' || e.data.source === 'objectives') ? e.data.source
+          : (currentSlide === 8 ? 'intake' : currentSlide === 9 ? 'objectives' : null);
         if (!src2) return;
         // Feed live caption (teleprompter)
         var liveEl = document.getElementById(src2 + 'Live');
@@ -1254,12 +1260,13 @@
           if (hintEl) {
         var lang = getVoiceLang(src2);
         hintEl.innerHTML = lang === 'it'
-          ? '<i class=\"fa-solid fa-hand-point-up\"></i> Clicca il pulsante centrale e di\\' <em>\"ciao\"</em> — l\\'AI risponderà'
+          ? '<i class=\"fa-solid fa-hand-point-up\"></i> Clicca il pulsante centrale e di\' <em>\"ciao\"</em> — l\'AI risponder&agrave;'
           : '<i class=\"fa-solid fa-hand-point-up\"></i> Click the orb and say <em>\"hi\"</em> — the AI will respond';
         hintEl.style.display = 'block';
       }
         }
         if (!_voiceConfigSent[src2]) {
+          sendToVoiceIframe(src2, { type: 'set-source', source: src2 });
           sendToVoiceIframe(src2, { type: 'set-title', title: src2 === 'intake' ? 'Parlami di te' : 'Conversazione con l\'AI' });
           sendToVoiceIframe(src2, { type: 'set-compact' });
           sendToVoiceIframe(src2, { type: 'set-instructions', instructions: VOICE_PROMPTS[src2][getVoiceLang(src2)] });
