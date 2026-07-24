@@ -29,7 +29,7 @@ window.sottotitoliSupabase = window.supabase.createClient(
 (function(){
   var path = window.location.pathname.replace(/\/$/,'').split('/').pop() || 'index.html';
   // Pages that are publicly accessible (no auth required)
-  if(path==='index.html'||path===''||path==='404.html'||path==='duo-s8t.html'||path==='traduzione-s8t.html'||path==='panoramica.html'||path==='onboarding.html'||path==='index-wow.html'||path.indexOf('overlay')===0||path.indexOf('mockup')>=0)return;
+  if(path==='index.html'||path===''||path==='404.html'||path==='duo-s8t.html'||path==='traduzione-s8t.html'||path==='panoramica.html'||path==='onboarding.html'||path.indexOf('overlay')===0||path.indexOf('mockup')>=0)return;
   // Multispeaker speaker-join mode doesn't require auth (guests join via invite link)
   if(path==='multispeaker.html' && window.location.search.indexOf('speaker=1')!==-1)return;
   // Wait for session, redirect if missing
