@@ -360,7 +360,7 @@
     <header class="header">
       <a href="panoramica.html" class="brand-row">
         <span class="brand-dot"></span>sottotitoli<span>.ai</span>
-        <span style="font-size:10px;color:var(--text-faint);font-weight:400;margin-left:4px">v2.0 · parakeet · production VAD · 600ms</span>
+        <span style="font-size:10px;color:var(--text-faint);font-weight:400;margin-left:4px">v2.1 · instant-swap · text-after-audio</span>
       </a>
       <div class="panel-tabs" id="panelTabs">
         <button class="tab-btn active" data-tab="voice" onclick="switchTab('voice')">
@@ -518,131 +518,112 @@
     }
 
     // ── Live Caption Stage ──────────────────────────────
-    var currentUserBubble = null;   // single user bubble — replaced each turn
-    var currentAiBubble = null;     // single AI bubble — replaced each response
-    var aiShowTimer = 0;            // delay before showing AI text (sync with audio)
+    var currentUserBubble = null;   // single user bubble — instant swap on new turn
+    var currentAiBubble = null;     // single AI bubble — thinking → final, instant swap
+    var aiShowTimer = 0;            // delay before showing AI final bubble
     var aiPendingText = '';         // text waiting to be shown
-    var AI_SHOW_DELAY_MS = 600;     // wait ~0.6s for audio to start after text (matches original)
-    var AI_MIN_VISIBLE_MS = 4000;   // AI bubble stays at least 4s before replacement
-    var USER_MIN_VISIBLE_MS = 2000; // user bubble stays at least 2s before replacement
+    var AI_SHOW_DELAY_MS = 1000;    // CPU needs more time: text→TTS→audio gap ≈ 500-1500ms
+                                     // Bubble appears ~200ms into audio playback
 
-    /** Show a caption bubble. One per role — new replaces old, with min visibility. */
+    /** Show a caption bubble. One per role — instant swap, no fade. */
     function pushCaption(role, text, isPartial) {
       var stage = document.getElementById('captionStage');
       var empty = document.getElementById('captionEmpty');
       if (empty) empty.style.display = 'none';
-
       var prefix = role === 'user' ? '🎤 ' : '🤖 ';
-      var now = Date.now();
 
-      // ── User: update partial live, replace on final (with min visibility) ──
+      // ── User: partial updates live, final replaces instantly ──
       if (role === 'user') {
         if (isPartial && currentUserBubble) {
           currentUserBubble.el.textContent = prefix + text;
           return;
         }
         if (!isPartial) {
-          // Don't replace if the existing bubble is too fresh
-          if (currentUserBubble && currentUserBubble._createdAt && (now - currentUserBubble._createdAt) < USER_MIN_VISIBLE_MS) {
-            return; // skip — let it breathe
-          }
-          // Replace previous user bubble
-          if (currentUserBubble && currentUserBubble.el.parentNode) {
-            currentUserBubble.el.style.opacity = '0';
-            currentUserBubble.el.style.transition = 'opacity .5s ease';
-            var oldEl = currentUserBubble.el;
-            setTimeout(function(el) { if (el.parentNode) el.remove(); }, 500, oldEl);
-          }
+          removeBubble(currentUserBubble);
           var el = document.createElement('div');
           el.className = 'caption-bubble user';
           el.textContent = prefix + text;
           stage.appendChild(el);
-          currentUserBubble = { el: el, role: 'user', _createdAt: now };
+          currentUserBubble = { el: el, role: 'user' };
           positionBubble(el, 'user');
           return;
         }
-        // Partial user without existing bubble: create one
+        // Partial user without existing bubble
         if (isPartial && !currentUserBubble) {
           var el2 = document.createElement('div');
           el2.className = 'caption-bubble user';
           el2.textContent = prefix + text;
           stage.appendChild(el2);
-          currentUserBubble = { el: el2, role: 'user', _createdAt: now };
+          currentUserBubble = { el: el2, role: 'user' };
           positionBubble(el2, 'user');
-          return;
         }
         return;
       }
 
-      // ── AI: delay final text to sync with audio, replace old bubble ──
+      // ── AI: partial → "thinking" bubble now; final → delayed reveal ──
       if (role === 'ai') {
         if (isPartial) {
-          // Show a dim "thinking" preview immediately
           aiPendingText = text;
-          if (!currentAiBubble) {
-            var ael = document.createElement('div');
-            ael.className = 'caption-bubble ai thinking';
-            ael.textContent = prefix + text;
-            stage.appendChild(ael);
-            currentAiBubble = { el: ael, role: 'ai' };
-            positionBubble(ael, 'ai');
-          } else {
-            currentAiBubble.el.textContent = prefix + text;
-          }
+          showThinkingBubble(text);
           return;
         }
 
-        // Final AI text — delay then show
+        // Final text — update thinking bubble, then delay for audio sync
         aiPendingText = text;
-        // Update the thinking bubble if it exists
         if (currentAiBubble) {
           currentAiBubble.el.textContent = prefix + text;
+        } else {
+          showThinkingBubble(text);
         }
 
-        // Cancel any pending timer, start new delay
         if (aiShowTimer) clearTimeout(aiShowTimer);
         aiShowTimer = setTimeout(function() {
           aiShowTimer = 0;
           showFinalAiBubble(aiPendingText);
         }, AI_SHOW_DELAY_MS);
-        return;
       }
     }
 
-    /** Reveal the final AI bubble — replaces the thinking one. */
+    function showThinkingBubble(text) {
+      var stage = document.getElementById('captionStage');
+      var prefix = '🤖 ';
+      if (!currentAiBubble || currentAiBubble.el.classList.contains('ai-final')) {
+        removeBubble(currentAiBubble);
+        var el = document.createElement('div');
+        el.className = 'caption-bubble ai thinking';
+        el.textContent = prefix + (text || '...');
+        stage.appendChild(el);
+        currentAiBubble = { el: el, role: 'ai' };
+        positionBubble(el, 'ai');
+      } else {
+        currentAiBubble.el.textContent = prefix + (text || '...');
+      }
+    }
+
+    /** Reveal the final AI bubble — instant swap, no fade. */
     function showFinalAiBubble(text) {
       var stage = document.getElementById('captionStage');
       var prefix = '🤖 ';
       var displayText = text || aiPendingText || '';
-      var now = Date.now();
 
-      // Don't replace if the existing AI bubble is too fresh (min visibility)
-      if (currentAiBubble && !currentAiBubble.el.classList.contains('thinking') &&
-          currentAiBubble._createdAt && (now - currentAiBubble._createdAt) < AI_MIN_VISIBLE_MS) {
-        // Still fresh — skip replacement, but store the text for later
-        return;
-      }
+      removeBubble(currentAiBubble);
 
-      // Remove old AI bubble (thinking or previous final)
-      if (currentAiBubble && currentAiBubble.el.parentNode) {
-        currentAiBubble.el.style.opacity = '0';
-        currentAiBubble.el.style.transition = 'opacity .5s ease';
-        var old = currentAiBubble.el;
-        setTimeout(function(el) { if (el.parentNode) el.remove(); }, 500, old);
-      }
-
-      // Create new final AI bubble
       var el = document.createElement('div');
       el.className = 'caption-bubble ai ai-final';
       el.textContent = prefix + displayText;
       stage.appendChild(el);
-      currentAiBubble = { el: el, role: 'ai', _createdAt: now };
+      currentAiBubble = { el: el, role: 'ai' };
       positionBubble(el, 'ai');
 
-      // Also add to transcript overlay (stacked, continuous)
       appendTranscript('ai', displayText);
-
       aiPendingText = '';
+    }
+
+    /** Remove a bubble instantly — no fade, no timer. */
+    function removeBubble(bubble) {
+      if (bubble && bubble.el && bubble.el.parentNode) {
+        bubble.el.remove();
+      }
     }
 
     /** Position a bubble centered in the stage. */
@@ -656,7 +637,7 @@
       el.style.bottom = 'auto';
       el.style.top = y + 'px';
       el.style.animation = 'none';
-      el.offsetHeight; // force reflow
+      el.offsetHeight;
       el.style.animation = 'captionEnter .5s cubic-bezier(.2,.8,.2,1) forwards';
     }
 
