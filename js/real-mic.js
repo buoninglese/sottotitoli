@@ -228,6 +228,9 @@ function _endSupabaseSession(data) {
     if (data.ngslCoverage != null) updateObj.ngsl_coverage = data.ngslCoverage;
   }
   
+  // Store session ID for post-session rewards
+  window._lastSessionId = sessionId;
+  
   window.sottotitoliSupabase.from('sessions').update(updateObj)
     .eq('id', sessionId).then(function() {
       // Clear all session keys

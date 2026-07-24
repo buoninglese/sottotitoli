@@ -53,21 +53,25 @@ ALTER PUBLICATION supabase_realtime ADD TABLE notifications;
 CREATE OR REPLACE FUNCTION notify_session_saved()
 RETURNS TRIGGER AS $$
 BEGIN
-  INSERT INTO notifications (user_id, type, title, message, data)
-  VALUES (
-    NEW.user_id,
-    'system',
-    'Sessione salvata',
-    'La tua sessione di ' || COALESCE(NEW.duration_minutes, 0) || ' minuti è stata archiviata.',
-    jsonb_build_object('session_id', NEW.id, 'duration', NEW.duration_minutes)
-  );
+  -- Only notify on completion: INSERT of a completed session OR UPDATE setting ended_at
+  IF (TG_OP = 'INSERT' AND NEW.ended_at IS NOT NULL) OR
+     (TG_OP = 'UPDATE' AND NEW.ended_at IS NOT NULL AND OLD.ended_at IS NULL) THEN
+    INSERT INTO notifications (user_id, type, title, message, data)
+    VALUES (
+      NEW.user_id,
+      'system',
+      'Sessione salvata',
+      'La tua sessione di ' || COALESCE(NEW.duration_seconds/60, 0) || ' minuti è stata archiviata.',
+      jsonb_build_object('session_id', NEW.id, 'duration', NEW.duration_seconds)
+    );
+  END IF;
   RETURN NEW;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 DROP TRIGGER IF EXISTS session_saved_auto_notify ON sessions;
 CREATE TRIGGER session_saved_auto_notify
-  AFTER INSERT ON sessions
+  AFTER INSERT OR UPDATE ON sessions
   FOR EACH ROW EXECUTE FUNCTION notify_session_saved();
 
 
