@@ -109,7 +109,10 @@ async function startRealMic() {
         newRec.onend = _realMic._onend;
         newRec.start();
         _realMic.recognition = newRec;
-      } catch(e) {}
+      } catch(e) {
+        console.error('Speech auto-restart failed:', e);
+        updateMicUI('error');
+      }
     }
   };
   _realMic._onend = rec.onend;
@@ -130,7 +133,9 @@ async function startRealMic() {
 function stopRealMic() {
   _stopForceFinalizeTimer();
   if (_realMic.recognition) {
-    try { _realMic.recognition.stop(); } catch(e) {}
+    try { _realMic.recognition.stop(); } catch(e) {
+      console.warn('Speech stop error (may be normal):', e.message);
+    }
     _realMic.recognition = null;
   }
   if (_realMic.stream) {
@@ -240,6 +245,9 @@ function _endSupabaseSession(data) {
       
       // ── Deduct minutes from user_credits ──
       _deductSessionMinutes(data.durationSeconds || 0);
+    }).catch(function(err) {
+      console.error('Failed to save session to Supabase:', err);
+      // Keep session keys so retry is possible on next session start
     });
 }
 
