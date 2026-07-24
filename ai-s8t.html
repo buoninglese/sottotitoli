@@ -175,64 +175,14 @@
       document.getElementById('themeBtn').textContent = next === 'dark' ? '☀️' : '🌙';
     }
 
-    // ── HF Space Wake-Up ──
-    var SPACE_ID = 's8t/Sottotitoli-voice';
-    var SPACE_URL = 'https://qzqmuegbpmvqrjrlfbgk.supabase.co/functions/v1/space-status';
-    var WAKE_POLL_MS = 3000;
-    var WAKE_TIMEOUT_MS = 90000; // 90s max wait
-    var wakeStart = Date.now();
-    var wakeOverlay = document.getElementById('wakeOverlay');
-    var wakeSub = document.getElementById('wakeSub');
+    // ── Load voice iframe immediately (handles its own connection) ──
     var voiceFrame = document.getElementById('voiceFrame');
-    var wakeInterval = null;
-
-    function wakeSpace() {
-      fetch(SPACE_URL)
-        .then(function(r) { return r.json(); })
-        .then(function(d) {
-          var elapsed = Math.round((Date.now() - wakeStart) / 1000);
-          var rt = d.runtime || {};
-          if (rt.stage === 'RUNNING') {
-            // Space is up — load the iframe
-            clearInterval(wakeInterval);
-            wakeSub.textContent = 'Pronto!';
-            wakeOverlay.classList.add('hidden');
-            voiceFrame.src = 'hugging-voice/index.html?embed=1';
-            voiceFrame.style.display = 'block';
-            statusDot.className = 'status-dot live';
-            statusText.textContent = 'Connesso — parla con l\'AI';
-          } else if (rt.stage === 'BUILDING' || rt.stage === 'STARTING') {
-            wakeSub.textContent = 'Server in avvio… (' + elapsed + 's)';
-            statusDot.className = 'status-dot warn';
-            statusText.textContent = 'Risveglio server AI Voice…';
-          } else if (elapsed > 90) {
-            clearInterval(wakeInterval);
-            wakeSub.textContent = 'Il server impiega troppo tempo. Riprova tra qualche minuto.';
-            statusDot.className = 'status-dot';
-            statusText.textContent = 'Timeout — server non raggiungibile';
-          } else {
-            // Sleeping or unknown — first ping wakes it
-            wakeSub.textContent = 'Server in fase di avvio… (' + elapsed + 's)';
-            statusDot.className = 'status-dot warn';
-            statusText.textContent = 'Risveglio server AI Voice…';
-            // Also ping the Space root to trigger wake-up
-            fetch('https://s8t-sottotitoli-voice.hf.space/', { mode: 'no-cors' }).catch(function(){});
-          }
-        })
-        .catch(function() {
-          var elapsed = Math.round((Date.now() - wakeStart) / 1000);
-          if (elapsed > 90) {
-            clearInterval(wakeInterval);
-            wakeSub.textContent = 'Impossibile contattare il server. Riprova più tardi.';
-            statusDot.className = 'status-dot';
-            statusText.textContent = 'Errore di connessione';
-          }
-        });
-    }
-
-    // Start polling
-    wakeSpace();
-    wakeInterval = setInterval(wakeSpace, WAKE_POLL_MS);
+    var wakeOverlay = document.getElementById('wakeOverlay');
+    wakeOverlay.classList.add('hidden');
+    voiceFrame.src = 'hugging-voice/index.html?embed=1';
+    voiceFrame.style.display = 'block';
+    statusDot.className = 'status-dot live';
+    statusText.textContent = 'Connesso — parla con l\'AI';
 
     // ── Transcript state ──
     var transcriptLines = []; // { role, text, partial }
