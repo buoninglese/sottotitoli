@@ -24,6 +24,9 @@
       "language": "Lingua",
 
       // ── Sidebar ──
+      "mode_view": "Vista",
+      "mode_edit": "Modifica",
+      "mode_save": "Salva",
       "study_language": "Lingua studio",
       "insights": "Approfondimenti",
       "word_banks": "Banche parole",
@@ -458,6 +461,9 @@
       "language": "Language",
 
       // ── Sidebar ──
+      "mode_view": "View",
+      "mode_edit": "Edit",
+      "mode_save": "Save",
       "study_language": "Study language",
       "insights": "Insights",
       "word_banks": "Word banks",
