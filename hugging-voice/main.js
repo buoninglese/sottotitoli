@@ -630,22 +630,22 @@ if (_toolCamSwitch) {
         await enableCamera();
       } catch (err) {
         _toolCamSwitch.checked = false;
-      const denied = err instanceof Error && (err.name === "NotAllowedError" || err.name === "SecurityError");
-      toolCamHint.textContent = denied
-        ? "Camera blocked. Allow it from the camera icon in your browser's address bar — it switches on automatically."
-        : `Camera unavailable${err instanceof Error ? `: ${err.message}` : ""}`;
-      return;
+        const denied = err instanceof Error && (err.name === "NotAllowedError" || err.name === "SecurityError");
+        toolCamHint.textContent = denied
+          ? "Camera blocked. Allow it from the camera icon in your browser's address bar — it switches on automatically."
+          : `Camera unavailable${err instanceof Error ? `: ${err.message}` : ""}`;
+        return;
+      }
+      toolsEnabled.camera_snapshot = true;
+      toolCamHint.textContent = "Camera on. The assistant can take a snapshot when it needs to see.";
+    } else {
+      disableCamera();
+      toolsEnabled.camera_snapshot = false;
+      toolCamHint.textContent = "Let the assistant see through your webcam.";
     }
-    toolsEnabled.camera_snapshot = true;
-    toolCamHint.textContent = "Camera on. The assistant can take a snapshot when it needs to see.";
-  } else {
-    disableCamera();
-    toolsEnabled.camera_snapshot = false;
-    toolCamHint.textContent = "Let the assistant see through your webcam.";
-  }
-  saveTools();
-  pushToolsToSession();
-});
+    saveTools();
+    pushToolsToSession();
+  });
 }
 
 searchKeyInput.addEventListener("input", () => {
