@@ -168,6 +168,8 @@
     .s4-table .check.anim{opacity:0;transform:scale(.6)}
     .s4-table .check.anim-in{animation:checkPop .5s cubic-bezier(.34,1.56,.64,1) forwards}
     @keyframes checkPop{0%{opacity:0;transform:scale(.6)}60%{opacity:1;transform:scale(1.2)}100%{opacity:1;transform:scale(1)}}
+    @keyframes colGlow{0%{background:rgba(34,211,238,.1);box-shadow:inset 0 0 20px rgba(34,211,238,.06)}100%{background:transparent;box-shadow:none}}
+    .col-flash{animation:colGlow .7s ease-out}
     .s4-table .dash{color:rgba(255,255,255,.08);font-size:10px}
     .s4-toggle{display:none;text-align:center}
     @media(max-width:599px){.s4-toggle{display:block}}
@@ -535,26 +537,52 @@
         enter: function(token){
           if(!isLive(token)) return;
           var p = document.getElementById('s4Pricing'); if(p){p.style.opacity='1';p.style.transform='translateY(0)';}
-          // Animate check marks in sequence
-          var checks = document.querySelectorAll('.s4-table .check.anim');
-          checks.forEach(function(ch, i){
-            setTimeout(function(){
-              if(!isLive(token)) return;
-              ch.classList.add('anim-in');
-            }, 200 + (i * 60));
-          });
-          // Show CTA after checks animate + pricing table resolves
+          // Column-by-column reveal: highlight column → checks pop in
+          var allRows = document.querySelectorAll('.s4-table .row');
+          var dataRows = document.querySelectorAll('.s4-table .row:not(.head)');
+          var colGap = 750; // ms between columns
+          for (var col = 2; col <= 5; col++) {
+            (function(colIdx){
+              setTimeout(function(){
+                if(!isLive(token)) return;
+                // Flash entire column
+                allRows.forEach(function(row){
+                  var cell = row.querySelector('.cell:nth-child('+colIdx+')');
+                  if(cell){ cell.classList.add('col-flash'); }
+                });
+                // After flash starts, pop checks in this column top→bottom
+                setTimeout(function(){
+                  if(!isLive(token)) return;
+                  dataRows.forEach(function(row, ri){
+                    var cell = row.querySelector('.cell:nth-child('+colIdx+')');
+                    var check = cell ? cell.querySelector('.check.anim') : null;
+                    if(check){
+                      setTimeout(function(){
+                        if(!isLive(token)) return;
+                        check.classList.add('anim-in');
+                      }, ri * 110);
+                    }
+                  });
+                }, 200);
+              }, (col - 2) * colGap);
+            })(col);
+          }
+          // Show CTA after all columns resolve
+          var ctaDelay = (4 * colGap) + 800;
           setTimeout(function(){
             if(!isLive(token)) return;
             var cta = document.getElementById('pricingCta');
             if(cta) cta.classList.add('is-visible');
-          }, 1800);
+          }, ctaDelay);
         },
         leave: function(token){
           var p = document.getElementById('s4Pricing'); if(p){p.style.opacity='0';p.style.transform='translateY(16px)';}
           var cta = document.getElementById('pricingCta'); if(cta) cta.classList.remove('is-visible');
+          // Reset check animations and column flashes
           var checks = document.querySelectorAll('.s4-table .check.anim-in');
           checks.forEach(function(ch){ ch.classList.remove('anim-in'); });
+          var flashes = document.querySelectorAll('.s4-table .col-flash');
+          flashes.forEach(function(cell){ cell.classList.remove('col-flash'); });
         }
       }
     ];
