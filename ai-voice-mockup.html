@@ -259,6 +259,58 @@
 
     @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } }
 
+    /* ── Live Caption Stage ─────────────────────────── */
+    .caption-stage {
+      flex: 1; display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      overflow: hidden; position: relative;
+      padding: 40px 20px;
+    }
+    .caption-empty {
+      display: flex; flex-direction: column;
+      align-items: center; gap: 12px;
+      color: var(--text-faint); font-size: 14px;
+      text-align: center; line-height: 1.6;
+    }
+    .caption-empty i { font-size: 36px; opacity: .2; }
+
+    .caption-bubble {
+      position: absolute;
+      left: 50%; transform: translateX(-50%);
+      max-width: 80%; padding: 16px 24px;
+      border-radius: 18px;
+      font-size: 16px; font-weight: 500; line-height: 1.5;
+      text-align: center;
+      animation: captionEnter .5s cubic-bezier(.2,.8,.2,1) forwards;
+      pointer-events: none;
+      word-break: break-word;
+    }
+    .caption-bubble.user {
+      background: rgba(34,211,238,.12);
+      color: var(--cyan);
+      border: 1px solid rgba(34,211,238,.2);
+    }
+    .caption-bubble.ai {
+      background: rgba(139,125,255,.12);
+      color: var(--purple);
+      border: 1px solid rgba(139,125,255,.2);
+    }
+
+    @keyframes captionEnter {
+      0%   { opacity: 0; transform: translateX(-50%) translateY(20px) scale(.95); }
+      100% { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); }
+    }
+
+    @keyframes captionFloat {
+      0%   { opacity: .9; transform: translateX(-50%) translateY(0); }
+      100% { opacity: 0; transform: translateX(-50%) translateY(-60px); }
+    }
+
+    @keyframes captionFloatFar {
+      0%   { opacity: .5; transform: translateX(-50%) translateY(-60px); }
+      100% { opacity: 0; transform: translateX(-50%) translateY(-140px); }
+    }
+
     @media(max-width: 860px) {
       .app-shell { grid-template-columns: 48px 1fr; }
       .sidebar { width: 48px; padding: 10px 6px; }
@@ -358,10 +410,14 @@
         </div>
 
         <div class="content-panel" id="pnl-transcripts">
-          <div class="placeholder">
-            <i class="fa-solid fa-file-lines"></i>
-            <h2>Transcripts</h2>
-            <p>Storico di tutte le conversazioni con l'AI Voice.</p>
+          <div style="text-align:center;padding:12px;font-size:11px;color:var(--text-faint);border-bottom:1px solid var(--line)">
+            🎬 Live Captions — parla con l'AI Voice nell'altra tab
+          </div>
+          <div class="caption-stage" id="captionStage">
+            <div class="caption-empty" id="captionEmpty">
+              <i class="fa-solid fa-closed-captioning"></i>
+              <p>I sottotitoli appariranno qui<br>quando parli con l'AI Voice.</p>
+            </div>
           </div>
         </div>
 
@@ -430,23 +486,83 @@
       document.getElementById('transcriptOverlay').classList.toggle('open');
     }
 
+    // ── Live Caption Stage ──────────────────────────────
+    var captionBubbles = [];
+    var captionIndex = 0;
+    var lastUserText = '';
+
+    function pushCaption(role, text, isPartial) {
+      var stage = document.getElementById('captionStage');
+      var empty = document.getElementById('captionEmpty');
+      if (empty) empty.style.display = 'none';
+
+      if (isPartial && role === 'user') {
+        var last = captionBubbles[captionBubbles.length - 1];
+        if (last && last.role === 'user' && last.partial) {
+          last.el.textContent = '🎤 ' + text;
+          return;
+        }
+      }
+
+      if (!isPartial && role === 'user' && text === lastUserText) return;
+      if (!isPartial && role === 'user') lastUserText = text;
+
+      var el = document.createElement('div');
+      el.className = 'caption-bubble ' + role;
+      el.textContent = (role === 'user' ? '🎤 ' : '🤖 ') + text;
+      stage.appendChild(el);
+
+      var bubble = { el: el, role: role, partial: !!isPartial, id: ++captionIndex };
+      captionBubbles.push(bubble);
+      animateStack();
+    }
+
+    function animateStack() {
+      var stage = document.getElementById('captionStage');
+      var stageH = stage.offsetHeight;
+      var centerY = stageH * 0.45;
+
+      var newest = captionBubbles[captionBubbles.length - 1];
+      if (newest) {
+        newest.el.style.bottom = centerY + 'px';
+        newest.el.style.animation = 'none';
+        newest.el.offsetHeight;
+        newest.el.style.animation = 'captionEnter .5s cubic-bezier(.2,.8,.2,1) forwards';
+      }
+
+      for (var i = captionBubbles.length - 2; i >= 0; i--) {
+        var offset = (captionBubbles.length - 1 - i) * 90;
+        var bubble = captionBubbles[i];
+        bubble.el.style.bottom = (centerY + offset) + 'px';
+        var age = captionBubbles.length - 1 - i;
+        if (age >= 5) {
+          bubble.el.style.opacity = '0';
+          bubble.el.style.transition = 'all .8s ease';
+        } else if (age >= 3) {
+          bubble.el.style.opacity = '.35';
+          bubble.el.style.transition = 'all .6s ease';
+        } else {
+          bubble.el.style.opacity = '.7';
+          bubble.el.style.transition = 'all .4s ease';
+        }
+      }
+
+      while (captionBubbles.length > 8) {
+        var old = captionBubbles.shift();
+        if (old && old.el.parentNode) {
+          old.el.style.transition = 'opacity .5s ease';
+          old.el.style.opacity = '0';
+          setTimeout(function(el){ if(el.parentNode) el.remove(); }, 500, old.el);
+        }
+      }
+    }
+
     window.addEventListener('message', function(e) {
       if (!e.data || !e.data.type) return;
-      if (e.data.type === 'transcript-final' || e.data.type === 'live-transcript') {
-        var body = document.getElementById('transcriptBody');
-        var empty = body.querySelector('.transcript-empty');
-        if (empty) empty.remove();
-        var line = document.createElement('div');
-        line.className = 'transcript-line';
-        line.style.cssText = 'font-size:12px;line-height:1.5;padding:7px 10px;border-radius:10px;max-width:100%;animation:fadeIn .2s ease;';
-        if (e.data.role === 'user') {
-          line.style.background = 'rgba(34,211,238,.1)'; line.style.color = 'var(--cyan)'; line.style.alignSelf = 'flex-end';
-        } else {
-          line.style.background = 'rgba(139,125,255,.1)'; line.style.color = 'var(--purple)'; line.style.alignSelf = 'flex-start';
-        }
-        line.textContent = (e.data.role === 'user' ? '🎤 ' : '🤖 ') + e.data.text;
-        body.appendChild(line);
-        body.scrollTop = body.scrollHeight;
+      if (e.data.type === 'transcript-final') {
+        pushCaption(e.data.role, e.data.text, false);
+      } else if (e.data.type === 'live-transcript') {
+        pushCaption(e.data.role, e.data.text, true);
       }
     });
 
