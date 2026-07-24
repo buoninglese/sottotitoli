@@ -70,6 +70,17 @@ def sync(proj: str) -> list[str]:
     return synced
 
 
+def content_equal(path_a: Path, path_b: Path) -> bool:
+    """Compare two files by content, ignoring trailing whitespace differences.
+    Byte-equivalence (filecmp.cmp) is too strict — a trailing newline or
+    editor auto-trim in one variant shouldn't block the deploy pipeline."""
+    try:
+        with open(path_a, 'rb') as f1, open(path_b, 'rb') as f2:
+            return f1.read().rstrip() == f2.read().rstrip()
+    except OSError:
+        return False
+
+
 def check_divergence() -> int:
     """Return count of diverged files across all projects."""
     diverged = 0
@@ -82,7 +93,7 @@ def check_divergence() -> int:
                 print(f"DIVERGENCE: {proj}/{fname} — file missing")
                 diverged += 1
                 continue
-            if not filecmp.cmp(str(src), str(dst), shallow=False):
+            if not content_equal(src, dst):
                 print(f"DIVERGENCE: {proj}/{fname} — content differs from voice-core/")
                 diverged += 1
         for dname in SHARED_DIRS:
