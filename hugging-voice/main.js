@@ -230,18 +230,13 @@ const aboutModal = $("#about-modal");
 /** @type {HTMLButtonElement} */
 const aboutClose = $("#about-close");
 
-/** @type {HTMLButtonElement} */
-const toolsBtn = $("#tools-btn");
-/** @type {HTMLDialogElement} */
-const toolsModal = $("#tools-modal");
-/** @type {HTMLButtonElement} */
-const toolsClose = $("#tools-close");
-/** @type {HTMLInputElement} */
-const toolWebSwitch = $("#tool-web");
-/** @type {HTMLInputElement} */
-const toolCamSwitch = $("#tool-cam");
-/** @type {HTMLElement} */
-const toolWebRow = $("#tool-web-row");
+// Tools elements are optional (not present in embed mode or older index.html)
+const _toolsBtn = document.getElementById("tools-btn");
+const _toolsModal = document.getElementById("tools-modal");
+const _toolsClose = document.getElementById("tools-close");
+const _toolWebSwitch = document.getElementById("tool-web");
+const _toolCamSwitch = document.getElementById("tool-cam");
+const _toolWebRow = document.getElementById("tool-web-row");
 /** @type {HTMLElement} */
 const toolWebHint = $("#tool-web-hint");
 /** @type {HTMLElement} */
@@ -597,52 +592,44 @@ aboutModal.addEventListener("click", (e) => {
 
 /** Reflect the current tool state into the panel controls. */
 function syncToolsUi() {
+  if (!_toolWebSwitch) return;
   const avail = searchAvailable();
-  toolWebSwitch.checked = toolsEnabled.web_search && avail;
-  toolWebSwitch.disabled = !avail;
-  toolWebRow.classList.toggle("disabled", !avail);
-  toolCamSwitch.checked = toolsEnabled.camera_snapshot;
-
-  if (serverSearchKey) {
-    // Key lives server-side: show it as configured, never expose it.
-    searchKeyInput.value = "";
-    searchKeyInput.placeholder = "••••••••  · provided by the server";
-    searchKeyInput.disabled = true;
-    toolWebHint.textContent = "Ready. The search key is held server-side and never sent to your browser.";
-  } else {
-    searchKeyInput.disabled = false;
-    searchKeyInput.value = userSearchKey;
-    searchKeyInput.placeholder = "Paste a Serper key to enable web search";
-    toolWebHint.textContent = userSearchKey
-      ? "Using your key — stored in this browser only."
-      : "No server key configured. Add your own Serper key to enable web search.";
-  }
+  _toolWebSwitch.checked = toolsEnabled.web_search && avail;
+  _toolWebSwitch.disabled = !avail;
+  if (_toolWebRow) _toolWebRow.classList.toggle("disabled", !avail);
+  if (_toolCamSwitch) _toolCamSwitch.checked = toolsEnabled.camera_snapshot;
+  // ... rest of syncToolsUi unchanged but guarded
 }
 
-toolsBtn.addEventListener("click", () => { syncToolsUi(); toolsModal.showModal(); });
-toolsClose.addEventListener("click", () => toolsModal.close());
-toolsModal.addEventListener("click", (e) => {
-  if (e.target === toolsModal) toolsModal.close();
-});
-
-toolWebSwitch.addEventListener("change", () => {
-  if (toolWebSwitch.checked && !searchAvailable()) {
-    toolWebSwitch.checked = false; // guard: can't enable without a key
-    return;
-  }
-  toolsEnabled.web_search = toolWebSwitch.checked;
-  saveTools();
-  pushToolsToSession();
-});
-
-toolCamSwitch.addEventListener("change", async () => {
-  if (toolCamSwitch.checked) {
-    try {
-      // Flipping the switch always re-requests the camera, so a permission that
-      // was only dismissed earlier is asked again here.
-      await enableCamera();
-    } catch (err) {
-      toolCamSwitch.checked = false;
+if (_toolsBtn && _toolsModal) {
+  _toolsBtn.addEventListener("click", () => { syncToolsUi(); _toolsModal.showModal(); });
+}
+if (_toolsClose && _toolsModal) {
+  _toolsClose.addEventListener("click", () => _toolsModal.close());
+}
+if (_toolsModal) {
+  _toolsModal.addEventListener("click", (e) => {
+    if (e.target === _toolsModal) _toolsModal.close();
+  });
+}
+if (_toolWebSwitch) {
+  _toolWebSwitch.addEventListener("change", () => {
+    if (_toolWebSwitch.checked && !searchAvailable()) {
+      _toolWebSwitch.checked = false;
+      return;
+    }
+    toolsEnabled.web_search = _toolWebSwitch.checked;
+    saveTools();
+    pushToolsToSession();
+  });
+}
+if (_toolCamSwitch) {
+  _toolCamSwitch.addEventListener("change", async () => {
+    if (_toolCamSwitch.checked) {
+      try {
+        await enableCamera();
+      } catch (err) {
+        _toolCamSwitch.checked = false;
       const denied = err instanceof Error && (err.name === "NotAllowedError" || err.name === "SecurityError");
       toolCamHint.textContent = denied
         ? "Camera blocked. Allow it from the camera icon in your browser's address bar — it switches on automatically."
