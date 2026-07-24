@@ -412,16 +412,16 @@
     }
     .btn-back {
       background: var(--pill-bg); color: var(--text-dim);
-      border: 1.5px solid var(--line);
+      border: 1.5px solid var(--line); backdrop-filter: blur(6px);
     }
     .btn-back:hover { color: var(--text); border-color: var(--text-dim); }
     .btn-next {
-      background: var(--accent-purple); color: #fff;
+      background: var(--accent-purple); color: #fff; backdrop-filter: blur(6px);
     }
     .btn-next:hover { filter: brightness(1.15); }
     .btn-finish {
       background: linear-gradient(135deg, var(--accent-green), #10b981);
-      color: #000;
+      color: #000; backdrop-filter: blur(6px);
     }
     .btn-finish:disabled { opacity: .5; pointer-events: none; }
     .btn-skip {
@@ -507,6 +507,13 @@
               <div style="font-size:13px;font-weight:700;color:var(--text);">I tuoi dati sono al sicuro</div>
               <div style="font-size:12px;color:var(--text-dim);">Servono esclusivamente a personalizzare il tuo percorso. Non vengono condivisi con terze parti.</div>
             </div>
+          </div>
+          <div style="margin-top:16px;padding:14px 18px;border-radius:14px;background:var(--pill-bg);border:1.5px solid var(--accent-purple);">
+            <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;font-size:13px;color:var(--text);line-height:1.5;">
+              <input type="checkbox" id="consentCheck" style="margin-top:2px;accent-color:var(--accent-purple);" onchange="onConsentChange()">
+              <span>Ho letto e accetto i <a href="termini.html" target="_blank" style="color:var(--accent-purple);font-weight:600;">Termini e Condizioni</a> e la <a href="privacy.html" target="_blank" style="color:var(--accent-purple);font-weight:600;">Privacy Policy</a>. Acconsento al trattamento dei miei dati per personalizzare la mia esperienza.</span>
+            </label>
+            <p id="consentError" style="display:none;font-size:11px;color:#ef4444;margin-top:8px;"><i class="fa-solid fa-triangle-exclamation"></i> Devi accettare i termini per continuare.</p>
           </div>
         </div>
 
@@ -816,9 +823,18 @@
               </div>
             </div>
             <p style="font-size:11px;color:var(--text-muted);margin-top:8px;">
-              💡 Dopo il benvenuto, riceverai un <strong>Weekly Update</strong> con focus prioritari basati sui tuoi obiettivi.
+              💡 <i class="fa-solid fa-envelope"></i> Dopo il benvenuto, riceverai un <strong>Weekly Update</strong> con focus prioritari basati sui tuoi obiettivi.
             </p>
           </div>
+          <hr style="border:none;border-top:1px solid var(--line);margin:20px 0 16px;">
+          <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;font-size:13px;color:var(--text);margin-bottom:10px;">
+            <input type="checkbox" id="marketingConsent" style="margin-top:2px;accent-color:var(--accent-purple);" onchange="onMarketingConsentChange()">
+            <span><i class="fa-solid fa-envelope"></i> Vorrei ricevere il <strong>Weekly Update</strong> via email con consigli personalizzati.</span>
+          </label>
+          <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;font-size:12px;color:var(--text-dim);">
+            <input type="checkbox" id="finalTermsCheck" style="margin-top:2px;accent-color:var(--accent-purple);">
+            <span>Confermo di aver letto e accettato i <a href="termini.html" target="_blank" style="color:var(--accent-purple);">Termini e Condizioni</a> e la <a href="privacy.html" target="_blank" style="color:var(--accent-purple);">Privacy Policy</a>.</span>
+          </label>
         </div>
 
       </div><!-- /slides -->
@@ -875,6 +891,26 @@
 
     function persist() {
       localStorage.setItem('sottotitoli_onboarding', JSON.stringify(onboardData));
+    }
+
+    // ── Consent management ──
+    function hasConsented() {
+      return document.getElementById('consentCheck')?.checked || false;
+    }
+
+    function onConsentChange() {
+      var err = document.getElementById('consentError');
+      if (err) err.style.display = hasConsented() ? 'none' : 'none';
+      if (hasConsented()) {
+        onboardData['terms_consent'] = true;
+        onboardData['terms_consent_at'] = new Date().toISOString();
+        persist();
+      }
+    }
+
+    function onMarketingConsentChange() {
+      onboardData['marketing_consent'] = document.getElementById('marketingConsent')?.checked || false;
+      persist();
     }
 
     // ── UI references ──
@@ -993,6 +1029,11 @@
     }
 
     function goToSlide(idx) {
+      if (idx > 0 && !hasConsented()) {
+        var err = document.getElementById('consentError');
+        if (err) err.style.display = 'block';
+        return;
+      }
       if (idx < 0 || idx >= TOTAL_SLIDES) return;
       document.querySelectorAll('.onboard-slide').forEach(function(s) { s.classList.remove('active'); });
       document.querySelectorAll('.onboard-slide')[idx].classList.add('active');
