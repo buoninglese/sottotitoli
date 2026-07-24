@@ -896,6 +896,12 @@ export class S2sWsRealtimeClient extends EventTarget {
       audio: {
         output: { voice: this.options.voice },
       },
+      // VAD: prevent cutting off mid-sentence. Default is 300ms — too aggressive.
+      turn_detection: {
+        type: "server_vad",
+        threshold: 0.4,
+        silence_duration_ms: 800,
+      },
     };
     // Tools are declared here; the backend already accepts them in
     // session.update and emits response.function_call_arguments.done when the
