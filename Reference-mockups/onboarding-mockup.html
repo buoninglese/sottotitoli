@@ -1,0 +1,1995 @@
+<!DOCTYPE html>
+<html lang="it" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>Onboarding · Sottotitoli</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,400;14..32,500;14..32,600;14..32,700;14..32,800;14..32,900&family=Manrope:wght@700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+  <style>
+    /* ═══════════════════════════════════════════════════════
+       Onboarding · Theme & Layout
+       ═══════════════════════════════════════════════════════ */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #f0f2f5;
+      --card: rgba(255,255,255,0.92);
+      --line: rgba(0,0,0,.08);
+      --text: #111827;
+      --text-dim: #6b7280;
+      --text-muted: #9ca3af;
+      --accent: #7c3aed;
+      --accent-purple: #7c3aed;
+      --accent-green: #059669;
+      --accent-blue: #2563eb;
+      --amber: #d97706;
+      --overlay-bg: rgba(0,0,0,.65);
+      --pill-bg: rgba(0,0,0,.04);
+      --pill-active-bg: rgba(124,58,237,.1);
+      --pill-active-border: rgba(124,58,237,.35);
+      --input-bg: #fff;
+      --input-border: #d1d5db;
+      --shadow: 0 8px 40px rgba(0,0,0,.12);
+    }
+    [data-theme="dark"] {
+      --bg: #0f1117;
+      --card: rgba(26,29,38,0.92);
+      --line: rgba(255,255,255,.07);
+      --text: #e8eaed;
+      --text-dim: #9ca3af;
+      --text-muted: #6b7280;
+      --accent: #7c3aed;
+      --accent-purple: #a78bfa;
+      --accent-green: #34d399;
+      --accent-blue: #60a5fa;
+      --amber: #fbbf24;
+      --overlay-bg: rgba(0,0,0,.78);
+      --pill-bg: rgba(255,255,255,.04);
+      --pill-active-bg: rgba(124,58,237,.15);
+      --pill-active-border: rgba(124,58,237,.4);
+      --input-bg: #11131a;
+      --input-border: rgba(255,255,255,.1);
+      --shadow: 0 8px 40px rgba(0,0,0,.5);
+    }
+
+    body {
+      font-family: 'Inter', system-ui, -apple-system, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background .3s;
+      padding: 20px;
+    }
+
+    /* ── Demo toolbar (top-right, outside overlay) ── */
+    .demo-toolbar {
+      position: fixed; top: 16px; right: 16px; z-index: 10000;
+      display: flex; gap: 8px; align-items: center;
+    }
+    .demo-toolbar button, .demo-toolbar .demo-label {
+      font-family: inherit; font-size: 12px; font-weight: 600;
+      padding: 8px 14px; border-radius: 99px;
+      border: 1.5px solid var(--line); background: var(--card);
+      color: var(--text-dim); cursor: pointer;
+      transition: all .15s;
+    }
+    .demo-toolbar button:hover { color: var(--text); border-color: var(--accent-purple); }
+    .demo-toolbar .demo-label {
+      background: transparent; border-color: var(--amber);
+      color: var(--amber); cursor: default;
+      font-size: 11px; letter-spacing: .04em;
+    }
+
+    /* ── Overlay ── */
+    .overlay {
+      position: fixed; inset: 0; z-index: 9000;
+      background: var(--overlay-bg);
+      backdrop-filter: blur(12px);
+      display: flex; align-items: center; justify-content: center;
+      opacity: 0; pointer-events: none;
+      transition: opacity .4s ease;
+      padding: 24px;
+      overflow-y: auto;
+    }
+    .overlay.active { opacity: 1; pointer-events: auto; }
+
+    /* ── Onboarding card ── */
+    .onboard-card {
+      width: 100%; max-width: 600px;
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 24px;
+      box-shadow: var(--shadow);
+      overflow: hidden;
+      display: flex; flex-direction: column;
+      max-height: calc(100vh - 48px);
+      min-height: 480px;
+    }
+
+    /* ── Progress bar ── */
+    .onboard-progress {
+      height: 3px; background: var(--line);
+      flex-shrink: 0;
+    }
+    .onboard-progress-fill {
+      height: 100%; background: linear-gradient(90deg, var(--accent-purple), var(--accent-blue));
+      transition: width .4s cubic-bezier(.4,0,.2,1);
+      width: 0%;
+    }
+
+    /* ── Slide area ── */
+    .onboard-slides {
+      flex: 1; overflow-y: auto; overflow-x: hidden;
+      padding: 32px 36px 16px;
+      position: relative;
+      min-height: 0;
+    }
+    .onboard-slide {
+      display: none;
+      animation: fadeSlideIn .35s ease;
+    }
+    .onboard-slide.active { display: block; }
+    @keyframes fadeSlideIn {
+      from { opacity: 0; transform: translateY(12px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* ── Slide typography ── */
+    .slide-icon { font-size: 36px; color: var(--accent-purple); margin-bottom: 12px; display: block; }
+    .slide-title {
+      font-family: 'Manrope', sans-serif;
+      font-size: clamp(26px, 4vw, 34px);
+      font-weight: 800;
+      line-height: 1.15;
+      letter-spacing: -1.2px;
+      margin-bottom: 10px; color: var(--text);
+    }
+    .slide-subtitle {
+      font-size: 14px; color: var(--text-dim); margin-bottom: 24px;
+      line-height: 1.5;
+    }
+    .slide-subtitle strong { color: var(--accent-purple); font-weight: 700; }
+
+    /* ── Pill / chip selectors ── */
+    .pill-grid {
+      display: flex; flex-wrap: wrap; gap: 10px;
+      margin-bottom: 16px;
+    }
+    .pill {
+      padding: 10px 18px; border-radius: 99px;
+      border: 1.5px solid var(--line); background: var(--pill-bg);
+      font-family: inherit; font-size: 13px; font-weight: 600;
+      color: var(--text-dim); cursor: pointer;
+      transition: all .18s; user-select: none;
+      white-space: nowrap;
+    }
+    .pill:hover { border-color: var(--accent-purple); color: var(--text); }
+    .pill i { margin-right: 6px; font-size: 13px; }
+    .pill.selected {
+      background: var(--pill-active-bg); border-color: var(--pill-active-border);
+      color: var(--accent-purple);
+    }
+    .pill.multi { border-radius: 14px; }
+
+    /* ── Text input ── */
+    .onboard-input {
+      width: 100%; padding: 12px 16px; border-radius: 12px;
+      border: 1.5px solid var(--input-border); background: var(--input-bg);
+      font-family: inherit; font-size: 14px; color: var(--text);
+      outline: none; transition: border-color .2s;
+      resize: vertical; min-height: 44px;
+    }
+    .onboard-input:focus { border-color: var(--accent-purple); }
+    .onboard-input::placeholder { color: var(--text-muted); }
+
+    /* ── Transcript validation ── */
+    .transcript-status { font-size: 12px; color: var(--text-dim); }
+    .transcript-status.valid { color: var(--accent-green); }
+    .transcript-status .fa-circle-check { color: var(--accent-green); }
+
+    /* ── Record button (speech-to-text) ── */
+    .mic-record-btn {
+      display:inline-flex;align-items:center;gap:6px;
+      padding:8px 16px;border-radius:100px;
+      border:1.5px solid var(--line);
+      background:var(--card);color:var(--text);
+      font-size:13px;font-weight:600;cursor:pointer;
+      transition:all .2s;
+    }
+    .mic-record-btn:hover { border-color:var(--accent-purple);color:var(--accent-purple); }
+    .mic-record-btn.recording {
+      background:var(--accent-purple);color:#fff;border-color:var(--accent-purple);
+      animation:pulse-record 1.5s ease-in-out infinite;
+    }
+    @keyframes pulse-record {
+      0%,100%{box-shadow:0 0 0 0 rgba(124,58,237,.4)}
+      50%{box-shadow:0 0 0 8px rgba(124,58,237,0)}
+    }
+    .record-dot {
+      display:inline-block;width:8px;height:8px;border-radius:50%;
+      background:var(--accent-purple);margin-right:4px;
+      animation:blink-dot .8s step-end infinite;
+    }
+    @keyframes blink-dot { 50%{opacity:0} }
+    .record-status { font-weight:600; }
+    .lang-pills { display:inline-flex;gap:0;border-radius:100px;border:1.5px solid var(--line);overflow:hidden; }
+    .lang-pill { padding:6px 11px;font-size:11px;font-weight:700;border:none;background:transparent;color:var(--text-dim);cursor:pointer;transition:all .15s; }
+    .lang-pill:hover { color:var(--accent-purple); }
+    .lang-pill.active { background:var(--accent-purple);color:#fff; }
+    .lang-pill + .lang-pill { border-left:1.5px solid var(--line); }
+    .lang-pills.disabled { pointer-events:none;opacity:0.45; }
+
+    /* ── Live caption teleprompter ── */
+    .live-caption {
+      height: 80px; overflow-y: auto;
+      border: 1.5px solid var(--line); border-radius: 10px;
+      padding: 8px 12px; margin-top: 8px;
+      font-size: 12px; line-height: 1.6; color: var(--text-dim);
+      background: var(--input-bg);
+      font-style: italic;
+      scroll-behavior: smooth;
+    }
+    .live-caption:empty::after { content: 'In attesa della conversazione…'; color: var(--text-muted); }
+    .live-caption .user-line { color: var(--accent-blue); }
+    .live-caption .ai-line { color: var(--accent-green); }
+
+    /* ── Starter Report card ── */
+    .report-card {
+      background: linear-gradient(160deg, var(--pill-active-bg), var(--card));
+      border: 1.5px solid var(--accent-purple);
+      border-radius: 18px; padding: 24px 28px;
+      margin-bottom: 20px;
+    }
+    .report-card h3 { font-family: 'Manrope', sans-serif; font-size: 20px; font-weight: 800; letter-spacing: -.6px; margin: 24px 0 10px; color: var(--accent-purple); }
+    .report-card h3:first-child { margin-top: 0; }
+    .report-card h4 { font-family: 'Manrope', sans-serif; font-size: 15px; font-weight: 700; margin: 18px 0 6px; color: var(--text); }
+    .report-card p { font-size: 13.5px; line-height: 1.75; color: var(--text); margin: 8px 0; }
+    .report-card strong { color: var(--accent-purple); font-weight: 700; }
+    .report-card ul { margin: 8px 0; padding-left: 20px; }
+    .report-card li { font-size: 13.5px; line-height: 1.7; margin-bottom: 4px; color: var(--text); }
+    .report-card em { font-style: italic; color: var(--text-dim); }
+    .report-card .report-header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding-bottom: 16px; border-bottom: 1px solid var(--line); margin-bottom: 16px;
+    }
+    .report-card .report-header h2 {
+      font-family: 'Manrope', sans-serif; font-size: 18px; font-weight: 800;
+      letter-spacing: -.4px; color: var(--accent-purple); margin: 0;
+    }
+    .report-card .report-badge {
+      font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em;
+      padding: 4px 10px; border-radius: 99px; background: var(--pill-active-bg);
+      color: var(--accent-purple); white-space: nowrap;
+    }
+    .report-download-btn {
+      display: inline-flex; align-items: center; gap: 6px;
+      font-family: inherit; font-size: 11px; font-weight: 600;
+      padding: 7px 14px; border-radius: 99px; cursor: pointer;
+      border: 1.5px solid var(--accent-purple); background: transparent;
+      color: var(--accent-purple); transition: all .15s;
+      margin-top: 14px;
+    }
+    .report-download-btn:hover { background: var(--accent-purple); color: #fff; }
+
+    /* ── Language select ── */
+    .lang-select {
+      width: 100%; padding: 12px 16px; border-radius: 12px;
+      border: 1.5px solid var(--input-border); background: var(--input-bg);
+      font-family: inherit; font-size: 14px; color: var(--text);
+      outline: none; cursor: pointer; appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%239ca3af' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+      background-repeat: no-repeat; background-position: right 16px center;
+    }
+    .lang-select:focus { border-color: var(--accent-purple); }
+
+    /* ── Mic test ── */
+    .mic-test-area {
+      display: flex; flex-direction: column; align-items: center;
+      gap: 16px; padding: 20px 0;
+    }
+    .mic-btn {
+      width: 80px; height: 80px; border-radius: 50%;
+      border: 2px solid var(--line); background: var(--card);
+      color: var(--text-dim); font-size: 28px; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      transition: all .2s;
+    }
+    .mic-btn:hover { border-color: var(--accent-purple); color: var(--accent-purple); }
+    .mic-btn.recording {
+      border-color: #ef4444; color: #ef4444;
+      animation: micPulse 1.5s ease-in-out infinite;
+      box-shadow: 0 0 0 0 rgba(239,68,68,.4);
+    }
+    @keyframes micPulse {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(239,68,68,.4); }
+      50% { box-shadow: 0 0 0 16px rgba(239,68,68,0); }
+    }
+    .mic-level {
+      width: 200px; height: 4px; border-radius: 2px;
+      background: var(--line); overflow: hidden;
+    }
+    .mic-level-fill {
+      height: 100%; background: var(--accent-green);
+      width: 0%; transition: width .1s linear;
+    }
+
+    /* ── Voice iframe card ── */
+    .voice-embed {
+      width: 100%; height: 280px; border-radius: 16px;
+      border: 1.5px solid var(--line); overflow: hidden;
+      background: var(--input-bg);
+    }
+    .voice-embed iframe {
+      width: 100%; height: 100%; border: none;
+    }
+    .voice-label {
+      font-size: 12px; color: var(--text-muted); text-align: center;
+      margin-top: 8px;
+    }
+
+    /* ── AI conversation transcript ── */
+    .transcript-box {
+      width: 100%; min-height: 120px; max-height: 200px;
+      border: 1.5px solid var(--line); border-radius: 14px;
+      padding: 14px 16px; background: var(--input-bg);
+      font-size: 13px; color: var(--text-dim); line-height: 1.6;
+      overflow-y: auto; margin-top: 12px;
+    }
+    .transcript-box .msg { margin-bottom: 8px; }
+    .transcript-box .msg i { margin-right: 6px; width: 16px; text-align: center; }
+    .transcript-box .msg.user { color: var(--accent-blue); }
+    .transcript-box .msg.ai { color: var(--accent-green); }
+
+    /* ── Insights dashboard (slide 11) ── */
+    .insights-grid {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 12px;
+      margin-bottom: 16px;
+    }
+    .insight-card {
+      background: rgba(128,128,128,0.06); border: 1px solid var(--line);
+      border-radius: 16px; padding: 18px; backdrop-filter: blur(4px);
+    }
+    [data-theme="dark"] .insight-card { background: rgba(255,255,255,0.03); }
+    .insight-card.full { grid-column: 1 / -1; }
+    .insight-card h4 {
+      font-size: 11px; font-weight: 700; text-transform: uppercase;
+      letter-spacing: .06em; color: var(--text-muted); margin-bottom: 8px;
+    }
+    .insight-card p, .insight-card .val {
+      font-size: 14px; font-weight: 600; color: var(--text); line-height: 1.5;
+    }
+    .insight-card .val.empty { color: var(--text-muted); font-style: italic; }
+    .insight-card .focus-item {
+      display: flex; align-items: center; gap: 8px;
+      padding: 8px 0; border-bottom: 1px solid var(--line);
+      font-size: 13px; font-weight: 500;
+    }
+    .insight-card .focus-item:last-child { border-bottom: none; }
+    .focus-priority {
+      width: 22px; height: 22px; border-radius: 50%;
+      background: var(--accent-purple); color: #fff;
+      font-size: 11px; font-weight: 700; display: flex;
+      align-items: center; justify-content: center; flex-shrink: 0;
+    }
+
+    /* ── Footer nav ── */
+    .onboard-footer {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 16px 36px 20px; flex-shrink: 0;
+      border-top: 1px solid var(--line);
+      flex-wrap: wrap; gap: 10px;
+    }
+    .onboard-dots {
+      display: flex; gap: 8px; align-items: center;
+    }
+    .onboard-dot {
+      width: 8px; height: 8px; border-radius: 50%;
+      background: var(--line); transition: all .25s;
+      cursor: pointer; border: none;
+    }
+    .onboard-dot.active { background: var(--accent-purple); width: 24px; border-radius: 99px; }
+    .onboard-dot.done { background: var(--accent-green); }
+
+    .onboard-btns { display: flex; gap: 10px; }
+    .btn {
+      padding: 11px 24px; border-radius: 99px;
+      font-family: inherit; font-size: 14px; font-weight: 700;
+      border: none; cursor: pointer; transition: all .2s;
+      display: flex; align-items: center; gap: 8px;
+    }
+    .btn-back {
+      background: var(--pill-bg); color: var(--text-dim);
+      border: 1.5px solid var(--line); backdrop-filter: blur(6px);
+    }
+    .btn-back:hover { color: var(--text); border-color: var(--text-dim); }
+    .btn-next {
+      background: var(--accent-purple); color: #fff; backdrop-filter: blur(6px);
+    }
+    .btn-next:hover { filter: brightness(1.15); }
+    .btn-finish {
+      background: linear-gradient(135deg, var(--accent-green), #10b981);
+      color: #000; backdrop-filter: blur(6px);
+    }
+    .btn-skip {
+      background: transparent; color: var(--text-muted);
+      font-size: 12px; font-weight: 500; padding: 8px 12px;
+      text-decoration: underline; text-underline-offset: 3px;
+    }
+    .btn-skip:hover { color: var(--text-dim); }
+
+    /* ── Responsive ── */
+    @media (max-width: 640px) {
+      .onboard-card { max-width: 100%; border-radius: 20px; max-height: 95vh; }
+      .onboard-slides { padding: 28px 24px 18px; }
+      .onboard-footer { padding: 16px 24px 22px; flex-wrap: wrap; gap: 12px; }
+      .slide-title { font-size: 20px; }
+      .pill { font-size: 12px; padding: 8px 14px; }
+      .insights-grid { grid-template-columns: 1fr; }
+      .voice-embed { height: 200px; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ═══════════════════════ Demo Toolbar ═══════════════════════ -->
+  <div class="demo-toolbar">
+    <span class="demo-label">🎬 MOCKUP</span>
+    <button onclick="toggleTheme()" id="themeBtn" title="Toggle day/night">☀️</button>
+    <button onclick="resetOnboarding()" title="Restart onboarding">🔄 Reset</button>
+    <button onclick="toggleOverlay()" title="Show/hide overlay">👁 Toggle</button>
+  </div>
+
+  <!-- ═══════════════════════ Background Page Content ═══════════════════════ -->
+  <div style="text-align:center;color:var(--text-dim);max-width:500px;">
+    <div style="font-size:48px;margin-bottom:16px;">🎬</div>
+    <h1 style="font-size:28px;font-weight:800;color:var(--text);margin-bottom:8px;">Onboarding · Sottotitoli</h1>
+    <p style="font-size:14px;line-height:1.6;">
+      Questa è una pagina mockup per testare il flusso di onboarding.<br>
+      Clicca <strong style="color:var(--accent-purple);">👁 Toggle</strong> in alto a destra per aprire l'overlay.
+    </p>
+    <p style="font-size:12px;color:var(--text-muted);margin-top:12px;">
+      I dati vengono salvati in <code>localStorage</code> per testing.<br>
+      In produzione, verranno scritti su <strong>Supabase</strong> (profiles + onboarding_responses).
+    </p>
+  </div>
+
+  <!-- ═══════════════════════ Onboarding Overlay ═══════════════════════ -->
+  <div class="overlay active" id="onboardOverlay">
+    <div class="onboard-card">
+
+      <!-- Progress bar -->
+      <div class="onboard-progress">
+        <div class="onboard-progress-fill" id="progressFill"></div>
+      </div>
+
+      <!-- Slides container -->
+      <div class="onboard-slides" id="slidesContainer">
+
+        <!-- ═══ Slide 0: Welcome ═══ -->
+        <div class="onboard-slide active" data-slide="0">
+          <i class="fa-solid fa-hand-sparkles slide-icon"></i>
+          <h2 class="slide-title">Welcome to Sottotitoli</h2>
+          <p class="slide-subtitle">
+            Per configurare la tua piattaforma di sviluppo personale, alcune risposte forniranno tutto ciò che serve per iniziare con il piede giusto. Le risposte che darai creano il punto di partenza per un percorso calibrato sulle tue esigenze specifiche.
+          </p>
+          <p class="slide-subtitle" style="font-size:13px;color:var(--text-muted);">
+            L'onboarding richiede <strong>tra 5 e 10 minuti</strong>. Puoi interrompere in qualsiasi momento e riprendere da dove hai lasciato.
+          </p>
+          <div style="display:flex;align-items:center;gap:12px;margin-top:20px;padding:14px 18px;border-radius:14px;background:var(--pill-bg);border:1px solid var(--line);">
+            <i class="fa-solid fa-shield-halved" style="font-size:22px;color:var(--accent-purple);"></i>
+            <div>
+              <div style="font-size:13px;font-weight:700;color:var(--text);">I tuoi dati sono al sicuro</div>
+              <div style="font-size:12px;color:var(--text-dim);">Servono esclusivamente a personalizzare il tuo percorso. Non vengono condivisi con terze parti.</div>
+            </div>
+          </div>
+          <div style="margin-top:16px;padding:14px 18px;border-radius:14px;background:var(--pill-bg);border:1.5px solid var(--accent-purple);">
+            <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;font-size:13px;color:var(--text);line-height:1.5;">
+              <input type="checkbox" id="consentCheck" style="margin-top:2px;accent-color:var(--accent-purple);" onchange="onConsentChange()">
+              <span>Ho letto e accetto i <a href="termini.html" target="_blank" style="color:var(--accent-purple);font-weight:600;">Termini e Condizioni</a> e la <a href="privacy.html" target="_blank" style="color:var(--accent-purple);font-weight:600;">Privacy Policy</a>. Acconsento al trattamento dei miei dati per personalizzare la mia esperienza.</span>
+            </label>
+            <p id="consentError" style="display:none;font-size:11px;color:#ef4444;margin-top:8px;"><i class="fa-solid fa-triangle-exclamation"></i> Devi accettare i termini per continuare.</p>
+          </div>
+        </div>
+
+        <!-- ═══ Slide 1: Where did you hear about us ═══ -->
+        <div class="onboard-slide" data-slide="1">
+          <i class="fa-solid fa-bullhorn slide-icon"></i>
+          <h2 class="slide-title">Come ci hai conosciuti?</h2>
+          <p class="slide-subtitle">Aiutaci a capire quale canale funziona meglio.</p>
+          <div class="pill-grid" data-key="heard_from">
+            <button class="pill" data-val="friends" onclick="selectPill(this,'single')"><i class="fa-solid fa-user-group"></i> Amici</button>
+            <button class="pill" data-val="colleagues" onclick="selectPill(this,'single')"><i class="fa-solid fa-users"></i> Colleghi</button>
+            <button class="pill" data-val="school" onclick="selectPill(this,'single')"><i class="fa-solid fa-school"></i> Scuola / università</button>
+            <button class="pill" data-val="search" onclick="selectPill(this,'single')"><i class="fa-solid fa-magnifying-glass"></i> Motore di ricerca</button>
+            <button class="pill" data-val="social" onclick="selectPill(this,'single')"><i class="fa-solid fa-share-nodes"></i> Social media</button>
+            <button class="pill" data-val="ad" onclick="selectPill(this,'single')"><i class="fa-solid fa-newspaper"></i> Pubblicità</button>
+            <button class="pill" data-val="other_heard" onclick="selectPill(this,'single')"><i class="fa-solid fa-ellipsis"></i> Altro</button>
+          </div>
+          <input class="onboard-input" id="heardOtherInput" placeholder="Specifica..." style="display:none;margin-top:8px;" oninput="saveOtherText('heard_from_other', this.value)">
+        </div>
+
+        <!-- ═══ Slide 2: What do you do for work ═══ -->
+        <div class="onboard-slide" data-slide="2">
+          <i class="fa-solid fa-briefcase slide-icon"></i>
+          <h2 class="slide-title">Cosa fai nella vita?</h2>
+          <p class="slide-subtitle">Ci aiuta a capire meglio le tue esigenze in base al tuo ambito professionale.</p>
+          <div class="pill-grid" data-key="profession">
+            <button class="pill" data-val="student" onclick="selectPill(this,'single')"><i class="fa-solid fa-graduation-cap"></i> Studente</button>
+            <button class="pill" data-val="teacher" onclick="selectPill(this,'single')"><i class="fa-solid fa-chalkboard-user"></i> Insegnante</button>
+            <button class="pill" data-val="hr" onclick="selectPill(this,'single')"><i class="fa-solid fa-users"></i> HR / Risorse umane</button>
+            <button class="pill" data-val="legal" onclick="selectPill(this,'single')"><i class="fa-solid fa-scale-balanced"></i> Legale</button>
+            <button class="pill" data-val="logistics" onclick="selectPill(this,'single')"><i class="fa-solid fa-truck"></i> Logistica</button>
+            <button class="pill" data-val="healthcare" onclick="selectPill(this,'single')"><i class="fa-solid fa-hospital"></i> Sanità</button>
+            <button class="pill" data-val="tech" onclick="selectPill(this,'single')"><i class="fa-solid fa-laptop-code"></i> Tecnologia / IT</button>
+            <button class="pill" data-val="finance" onclick="selectPill(this,'single')"><i class="fa-solid fa-chart-line"></i> Finanza</button>
+            <button class="pill" data-val="hospitality" onclick="selectPill(this,'single')"><i class="fa-solid fa-hotel"></i> Ospitalità / Turismo</button>
+            <button class="pill" data-val="other_job" onclick="selectPill(this,'single')"><i class="fa-solid fa-ellipsis"></i> Altro</button>
+          </div>
+          <input class="onboard-input" id="jobOtherInput" placeholder="Specifica la tua professione..." style="display:none;margin-top:8px;" oninput="saveOtherText('profession_other', this.value)">
+        </div>
+
+        <!-- ═══ Slide 3: Native language + website language ═══ -->
+        <div class="onboard-slide" data-slide="3">
+          <i class="fa-solid fa-language slide-icon"></i>
+          <h2 class="slide-title">Qual è la tua lingua madre?</h2>
+          <p class="slide-subtitle">
+            Sottotitoli è ottimizzato per <strong>madrelingua italiani</strong> che imparano l'inglese. Se parli un'altra lingua madre, selezionala qui sotto.
+          </p>
+          <select class="lang-select" id="nativeLangSelect" onchange="saveSelect('native_lang', this.value)">
+            <option value="it" selected>🇮🇹 Italiano</option>
+            <option value="en">🇬🇧 English</option>
+            <option value="fr">🇫🇷 Français</option>
+            <option value="es">🇪🇸 Español</option>
+            <option value="de">🇩🇪 Deutsch</option>
+            <option value="nl">🇳🇱 Nederlands</option>
+            <option value="pl">🇵🇱 Polski</option>
+            <option value="other_lang">🌍 Altra lingua</option>
+          </select>
+          <input class="onboard-input" id="nativeLangOther" placeholder="Specifica la tua lingua madre..." style="display:none;margin-top:12px;" oninput="saveOtherText('native_lang_other', this.value)">
+
+          <h2 class="slide-title" style="margin-top:28px;">Lingua del sito</h2>
+          <p class="slide-subtitle">In quale lingua preferisci navigare Sottotitoli?</p>
+          <div class="pill-grid" data-key="ui_language">
+            <button class="pill selected" data-val="it" onclick="selectPill(this,'single')"><i class="fa-solid fa-globe"></i> Italiano</button>
+            <button class="pill" data-val="en" onclick="selectPill(this,'single')"><i class="fa-solid fa-globe"></i> English</button>
+          </div>
+        </div>
+
+        <!-- ═══ Slide 4: Why do you speak English ═══ -->
+        <div class="onboard-slide" data-slide="4">
+          <i class="fa-solid fa-flag-usa slide-icon"></i>
+          <h2 class="slide-title">Perché parli inglese?</h2>
+          <p class="slide-subtitle">Raccontaci cosa ti spinge a usare l'inglese nella tua vita quotidiana.</p>
+          <div class="pill-grid" data-key="why_english">
+            <button class="pill multi" data-val="work" onclick="selectPill(this,'multi')"><i class="fa-solid fa-briefcase"></i> Lavoro</button>
+            <button class="pill multi" data-val="study" onclick="selectPill(this,'multi')"><i class="fa-solid fa-book"></i> Studio</button>
+            <button class="pill multi" data-val="travel" onclick="selectPill(this,'multi')"><i class="fa-solid fa-plane"></i> Viaggi</button>
+            <button class="pill multi" data-val="family" onclick="selectPill(this,'multi')"><i class="fa-solid fa-people-roof"></i> Famiglia / Partner</button>
+            <button class="pill multi" data-val="media" onclick="selectPill(this,'multi')"><i class="fa-solid fa-film"></i> Film / Serie / Media</button>
+            <button class="pill multi" data-val="social_friends" onclick="selectPill(this,'multi')"><i class="fa-solid fa-comment-dots"></i> Amicizie / Social</button>
+            <button class="pill multi" data-val="relocation" onclick="selectPill(this,'multi')"><i class="fa-solid fa-house-chimney"></i> Trasferimento</button>
+            <button class="pill multi" data-val="certification" onclick="selectPill(this,'multi')"><i class="fa-solid fa-certificate"></i> Certificazione</button>
+            <button class="pill multi" data-val="other_why" onclick="selectPill(this,'multi')"><i class="fa-solid fa-ellipsis"></i> Altro</button>
+          </div>
+          <input class="onboard-input" id="whyEngOtherInput" placeholder="Specifica..." style="display:none;margin-top:8px;" oninput="saveOtherText('why_english_other', this.value)">
+        </div>
+
+        <!-- ═══ Slide 5: Languages you speak + want to improve ═══ -->
+        <div class="onboard-slide" data-slide="5">
+          <i class="fa-solid fa-globe slide-icon"></i>
+          <h2 class="slide-title" style="margin-top:28px;">Quali altre lingue parli?</h2>
+          <p class="slide-subtitle">Oltre alla tua lingua madre, quali lingue conosci già?</p>
+          <div class="pill-grid" data-key="spoken_languages" data-max="2">
+            <button class="pill multi" data-val="en" onclick="selectPill(this,'multi',4)"><i class="fa-solid fa-globe"></i> Inglese</button>
+            <button class="pill multi" data-val="fr" onclick="selectPill(this,'multi',4)"><i class="fa-solid fa-globe"></i> Francese</button>
+            <button class="pill multi" data-val="es" onclick="selectPill(this,'multi',4)"><i class="fa-solid fa-globe"></i> Spagnolo</button>
+            <button class="pill multi" data-val="de" onclick="selectPill(this,'multi',4)"><i class="fa-solid fa-globe"></i> Tedesco</button>
+            <button class="pill multi" data-val="nl" onclick="selectPill(this,'multi',4)"><i class="fa-solid fa-globe"></i> Olandese</button>
+            <button class="pill multi" data-val="pl" onclick="selectPill(this,'multi',4)"><i class="fa-solid fa-globe"></i> Polacco</button>
+            <button class="pill multi" data-val="other_spoken" onclick="selectPill(this,'multi',4)"><i class="fa-solid fa-ellipsis"></i> Altra</button>
+          </div>
+          <input class="onboard-input" id="spokenOtherInput" placeholder="Quale altra lingua parli?" style="display:none;margin-top:8px;" oninput="saveOtherText('spoken_languages_other', this.value)">
+
+          <h2 class="slide-title" style="margin-top:28px;">Quali lingue vorresti migliorare?</h2>
+          <p class="slide-subtitle">Quali lingue ti piacerebbe praticare o migliorare?</p>
+          <div class="pill-grid" data-key="improve_languages" data-max="2">
+            <button class="pill multi" data-val="en" onclick="selectPill(this,'multi',4)"><i class="fa-solid fa-globe"></i> Inglese</button>
+            <button class="pill multi" data-val="fr" onclick="selectPill(this,'multi',4)"><i class="fa-solid fa-globe"></i> Francese</button>
+            <button class="pill multi" data-val="es" onclick="selectPill(this,'multi',4)"><i class="fa-solid fa-globe"></i> Spagnolo</button>
+            <button class="pill multi" data-val="de" onclick="selectPill(this,'multi',4)"><i class="fa-solid fa-globe"></i> Tedesco</button>
+            <button class="pill multi" data-val="nl" onclick="selectPill(this,'multi',4)"><i class="fa-solid fa-globe"></i> Olandese</button>
+            <button class="pill multi" data-val="pl" onclick="selectPill(this,'multi',4)"><i class="fa-solid fa-globe"></i> Polacco</button>
+            <button class="pill multi" data-val="other_improve" onclick="selectPill(this,'multi',4)"><i class="fa-solid fa-ellipsis"></i> Altra</button>
+          </div>
+          <input class="onboard-input" id="improveOtherInput" placeholder="Quale altra lingua vuoi migliorare?" style="display:none;margin-top:8px;" oninput="saveOtherText('improve_languages_other', this.value)">
+        </div>
+
+        <!-- ═══ Slide 6: What do you find difficult in English ═══ -->
+        <div class="onboard-slide" data-slide="6">
+          <i class="fa-solid fa-bullseye slide-icon"></i>
+          <h2 class="slide-title">Cosa trovi difficile in inglese?</h2>
+          <p class="slide-subtitle">Scegli le aree dove senti di avere più difficoltà.</p>
+          <div class="pill-grid" data-key="difficulties">
+            <button class="pill multi" data-val="reading_docs" onclick="selectPill(this,'multi')"><i class="fa-solid fa-file-lines"></i> Leggere documenti</button>
+            <button class="pill multi" data-val="writing_messages" onclick="selectPill(this,'multi')"><i class="fa-solid fa-pen-to-square"></i> Scrivere messaggi / email</button>
+            <button class="pill multi" data-val="taking_notes" onclick="selectPill(this,'multi')"><i class="fa-solid fa-note-sticky"></i> Prendere appunti</button>
+            <button class="pill multi" data-val="understanding_questions" onclick="selectPill(this,'multi')"><i class="fa-solid fa-circle-question"></i> Capire le domande</button>
+            <button class="pill multi" data-val="speaking_fluently" onclick="selectPill(this,'multi')"><i class="fa-solid fa-comments"></i> Parlare fluentemente</button>
+            <button class="pill multi" data-val="listening_native" onclick="selectPill(this,'multi')"><i class="fa-solid fa-ear-listen"></i> Capire madrelingua veloci</button>
+            <button class="pill multi" data-val="grammar" onclick="selectPill(this,'multi')"><i class="fa-solid fa-spell-check"></i> Grammatica</button>
+            <button class="pill multi" data-val="pronunciation" onclick="selectPill(this,'multi')"><i class="fa-solid fa-volume-high"></i> Pronuncia</button>
+            <button class="pill multi" data-val="vocabulary" onclick="selectPill(this,'multi')"><i class="fa-solid fa-book-open"></i> Vocabolario</button>
+            <button class="pill multi" data-val="meetings" onclick="selectPill(this,'multi')"><i class="fa-solid fa-user-tie"></i> Riunioni / Conference call</button>
+            <button class="pill multi" data-val="presentations" onclick="selectPill(this,'multi')"><i class="fa-solid fa-person-chalkboard"></i> Presentazioni</button>
+            <button class="pill multi" data-val="other_diff" onclick="selectPill(this,'multi')"><i class="fa-solid fa-ellipsis"></i> Altro</button>
+          </div>
+          <input class="onboard-input" id="diffOtherInput" placeholder="Specifica..." style="display:none;margin-top:8px;" oninput="saveOtherText('difficulties_other', this.value)">
+        </div>
+
+        <!-- ═══ Slide 7: Test Mic ═══ -->
+        <div class="onboard-slide" data-slide="7">
+          <i class="fa-solid fa-microphone slide-icon"></i>
+          <h2 class="slide-title">Proviamo il microfono</h2>
+          <p class="slide-subtitle">Assicuriamoci che tutto funzioni. Clicca il microfono e di' qualcosa — vedrai la barra muoversi.</p>
+          <div class="mic-test-area">
+            <button class="mic-btn" id="micTestBtn" onclick="toggleMicTest()" title="Clicca per testare il microfono">
+              <i class="fa-solid fa-microphone"></i>
+            </button>
+            <div class="mic-level">
+              <div class="mic-level-fill" id="micLevelFill"></div>
+            </div>
+            <div style="font-size:13px;color:var(--text-dim);" id="micStatus">Clicca il microfono per iniziare il test</div>
+          </div>
+        </div>
+
+        <!-- ═══ Slide 8: Parlami di te (free text) ═══ -->
+        <div class="onboard-slide" data-slide="8">
+          <i class="fa-solid fa-pen-to-square slide-icon"></i>
+          <h2 class="slide-title">Parlami di te</h2>
+          <p class="slide-subtitle">
+            Raccontaci di te in <strong>italiano</strong> (o inglese): chi sei, cosa fai, perché vuoi migliorare il tuo inglese. Puoi <strong>registrare la tua voce</strong> (nessun audio salvato) o scrivere tutto. Più dettagli darai, più la tua piattaforma sarà personalizzata.
+          </p>
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
+            <button class="mic-record-btn" id="intakeMicBtn" onclick="toggleSpeechRecord('intake')" title="Registra la tua voce e trascrivi">
+              <i class="fa-solid fa-microphone"></i> Registra
+            </button>
+            <div class="lang-pills">
+              <button class="lang-pill active" data-lang="it-IT" onclick="setSpeechLang('intake','it-IT',this)">IT</button>
+              <button class="lang-pill" data-lang="en-US" onclick="setSpeechLang('intake','en-US',this)">EN</button>
+            </div>
+            <span class="record-status" id="intakeRecordStatus" style="display:none;">
+              <span class="record-dot"></span> In ascolto…
+            </span>
+          </div>
+          <textarea class="onboard-input" id="intakeTranscript" rows="6" placeholder="Scrivi qui in italiano (o inglese) — raccontaci di te, il tuo lavoro, i tuoi hobby, e cosa ti motiva…" oninput="onTranscriptInput('intake', this.value)"></textarea>
+          <div style="display:flex;align-items:center;margin-top:6px;">
+            <span class="transcript-status" id="intakeStatus"><span id="intakeWordCount">0</span>/200 parole — Minimo 200 parole richieste</span>
+          </div>
+        </div>
+
+        <!-- ═══ Slide 9: Obiettivo a lungo termine ═══ -->
+        <div class="onboard-slide" data-slide="9">
+          <i class="fa-solid fa-mountain-sun slide-icon"></i>
+          <h2 class="slide-title">Obiettivo a lungo termine</h2>
+          <p class="slide-subtitle">
+            Qual è il tuo <strong>obiettivo principale</strong> con l'inglese nei prossimi 6-12 mesi? Puoi registrare la tua voce o scrivere.
+          </p>
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
+            <button class="mic-record-btn" id="longtermMicBtn" onclick="toggleSpeechRecord('longterm')" title="Registra la tua voce e trascrivi">
+              <i class="fa-solid fa-microphone"></i> Registra
+            </button>
+            <div class="lang-pills">
+              <button class="lang-pill active" data-lang="it-IT" onclick="setSpeechLang('longterm','it-IT',this)">IT</button>
+              <button class="lang-pill" data-lang="en-US" onclick="setSpeechLang('longterm','en-US',this)">EN</button>
+            </div>
+            <span class="record-status" id="longtermRecordStatus" style="display:none;">
+              <span class="record-dot"></span> In ascolto…
+            </span>
+          </div>
+          <textarea class="onboard-input" id="longtermTranscript" rows="4" placeholder="Es: Ottenere una certificazione C1 entro fine anno, oppure tenere una presentazione di 30 minuti in inglese senza preparazione…" oninput="onTranscriptInput('longterm', this.value); saveText('long_term_goal', this.value)"></textarea>
+          <div style="display:flex;align-items:center;margin-top:6px;">
+            <span class="transcript-status" id="longtermStatus"><span id="longtermWordCount">0</span>/100 parole — Minimo 100 parole</span>
+          </div>
+        </div>
+
+        <!-- ═══ Slide 10: Traguardi a breve termine ═══ -->
+        <div class="onboard-slide" data-slide="10">
+          <i class="fa-solid fa-list-check slide-icon"></i>
+          <h2 class="slide-title">Traguardi a breve termine</h2>
+          <p class="slide-subtitle">
+            Quali <strong>traguardi concreti</strong> vorresti raggiungere nei prossimi 1-3 mesi? Elenca tutto quello che ti piacerebbe ottenere. Puoi registrare la tua voce o scrivere.
+          </p>
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
+            <button class="mic-record-btn" id="shorttermMicBtn" onclick="toggleSpeechRecord('shortterm')" title="Registra la tua voce e trascrivi">
+              <i class="fa-solid fa-microphone"></i> Registra
+            </button>
+            <div class="lang-pills">
+              <button class="lang-pill active" data-lang="it-IT" onclick="setSpeechLang('shortterm','it-IT',this)">IT</button>
+              <button class="lang-pill" data-lang="en-US" onclick="setSpeechLang('shortterm','en-US',this)">EN</button>
+            </div>
+            <span class="record-status" id="shorttermRecordStatus" style="display:none;">
+              <span class="record-dot"></span> In ascolto…
+            </span>
+          </div>
+          <textarea class="onboard-input" id="shorttermTranscript" rows="4" placeholder="Es: Sostenere una riunione in inglese senza preparazione, guardare un film in lingua originale senza sottotitoli, imparare 200 nuovi vocaboli…" oninput="onTranscriptInput('shortterm', this.value); saveText('short_term_goal', this.value)"></textarea>
+          <div style="display:flex;align-items:center;margin-top:6px;">
+            <span class="transcript-status" id="shorttermStatus"><span id="shorttermWordCount">0</span>/100 parole — Minimo 100 parole</span>
+          </div>
+        </div>
+
+        <!-- ═══ Slide 11: Riepilogo ═══ -->
+        <div class="onboard-slide" data-slide="11">
+          <i class="fa-solid fa-chart-bar slide-icon"></i>
+          <h2 class="slide-title">Riepilogo Benvenuto</h2>
+          <p class="slide-subtitle">Ecco un riepilogo di ciò che abbiamo raccolto. Puoi tornare indietro per modificare qualsiasi risposta.</p>
+          <div id="summaryBox" class="transcript-box" style="max-height:300px;font-size:12px;">
+            <span style="color:var(--text-muted);">Caricamento riepilogo…</span>
+          </div>
+          <p style="font-size:12px;color:var(--text-muted);margin-top:8px;">
+            <i class="fa-solid fa-shield-halved"></i> Tutti i dati verranno salvati nel tuo profilo. Non verranno mai condivisi con terze parti.
+          </p>
+        </div>
+
+        <!-- ═══ Slide 12: Insights Dashboard ═══ -->
+        <div class="onboard-slide" data-slide="12">
+          <i class="fa-solid fa-rocket slide-icon"></i>
+          <h2 class="slide-title">Il tuo Cruscotto Personalizzato</h2>
+          <p class="slide-subtitle">Basato sulle tue risposte, ecco il tuo punto di partenza.</p>
+
+          <!-- Starter Report -->
+          <div id="starterReportSection">
+            <div class="report-card">
+              <div class="report-header">
+                <h2><i class="fa-solid fa-file-lines"></i> Starter Report</h2>
+                <span class="report-badge">AI · Personalizzato</span>
+              </div>
+              <div id="starterReportContent"></div>
+              <div id="starterReportLoading" style="display:none;text-align:center;padding:24px;color:var(--text-muted);">
+                <span>🤖 L'AI sta analizzando il tuo profilo…</span>
+              </div>
+              <button class="report-download-btn" id="reportDownloadBtn" style="display:none;" onclick="downloadReportPDF()">
+                <i class="fa-solid fa-download"></i> Scarica PDF
+              </button>
+              <button id="mockGenerateBtn" class="btn btn-next" style="margin-top:14px;font-size:12px;padding:8px 18px;" onclick="mockGenerateReport()">
+                <i class="fa-solid fa-wand-magic-sparkles"></i> Genera Starter Report
+              </button>
+            </div>
+          </div>
+
+          <!-- Row 1: Dashboard, Affidabilità, Prossimo passo -->
+          <div class="insights-grid">
+            <div class="insight-card full">
+              <h4><i class="fa-solid fa-chart-pie"></i> Dashboard</h4>
+              <p id="dashSummary">Completamento benvenuto: <strong style="color:var(--accent-green);" id="dashCompletionPct">0%</strong></p>
+            </div>
+            <div class="insight-card">
+              <h4><i class="fa-solid fa-shield-halved"></i> Affidabilità</h4>
+              <p id="dashReliability">—</p>
+            </div>
+            <div class="insight-card">
+              <h4><i class="fa-solid fa-location-dot"></i> Prossimo passo</h4>
+              <p id="dashNextStep">—</p>
+            </div>
+          </div>
+
+          <!-- Row 2: Short-term + Long-term objectives -->
+          <div class="insights-grid">
+            <div class="insight-card">
+              <h4><i class="fa-solid fa-bullseye"></i> Obiettivo a breve termine</h4>
+              <span class="val" id="dashShortTerm">—</span>
+            </div>
+            <div class="insight-card">
+              <h4><i class="fa-solid fa-mountain-sun"></i> Obiettivo a lungo termine</h4>
+              <span class="val" id="dashLongTerm">—</span>
+            </div>
+          </div>
+
+          <!-- Row 3: Short-term Focus areas -->
+          <div class="insight-card full" style="margin-top:0;">
+            <h4><i class="fa-solid fa-list-check"></i> Short-term Focus</h4>
+            <div id="dashFocusList">
+              <div class="focus-item">
+                <span class="focus-priority">1</span>
+                <span>—</span>
+              </div>
+              <div class="focus-item">
+                <span class="focus-priority">2</span>
+                <span>—</span>
+              </div>
+              <div class="focus-item">
+                <span class="focus-priority">3</span>
+                <span>—</span>
+              </div>
+            </div>
+            <p style="font-size:11px;color:var(--text-muted);margin-top:8px;">
+              <i class="fa-solid fa-envelope"></i> Dopo il benvenuto, riceverai un <strong>Weekly Update</strong> con focus prioritari basati sui tuoi obiettivi.
+            </p>
+          </div>
+          <hr style="border:none;border-top:1px solid var(--line);margin:20px 0 14px;">
+          <p style="font-size:14px;font-weight:700;color:var(--text);margin-bottom:4px;"><i class="fa-solid fa-lightbulb"></i> Vuoi pi&ugrave; insight?</p>
+          <p style="font-size:12px;color:var(--text-dim);margin-bottom:14px;line-height:1.6;">
+            Non solo sulla piattaforma, ma anche consigli personalizzati e nuove promozioni direttamente via email.
+          </p>
+          <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;font-size:13px;color:var(--text);">
+            <input type="checkbox" id="marketingConsent" style="margin-top:2px;accent-color:var(--accent-purple);" onchange="onMarketingConsentChange()">
+            <span><i class="fa-solid fa-envelope"></i> Vorrei ricevere il <strong>Weekly Update</strong> via email.</span>
+          </label>
+          <hr style="border:none;border-top:1px solid var(--line);margin:20px 0 14px;">
+          <div id="readySection" style="display:none;">
+          <p style="font-size:14px;font-weight:700;color:var(--text);margin-bottom:4px;"><i class="fa-solid fa-circle-check" style="color:var(--accent-green);"></i> Sei a posto!</p>
+          <p style="font-size:12px;color:var(--text-dim);line-height:1.6;">
+            Puoi cliccare <strong>Completa</strong> ora e verrai portato alla tua piattaforma di apprendimento <strong style="color:#06b6d4;">Panoramica</strong>.
+          </p>
+          </div>
+        </div>
+
+      </div><!-- /slides -->
+
+      <!-- ═══ Footer Navigation ═══ -->
+      <div class="onboard-footer">
+        <div class="onboard-dots" id="navDots"></div>
+        <div class="onboard-btns">
+          <button class="btn btn-back" id="btnBack" onclick="prevSlide()">
+            <i class="fa-solid fa-arrow-left"></i> Indietro
+          </button>
+          <button class="btn btn-next" id="btnNext" onclick="nextSlide()">
+            Avanti <i class="fa-solid fa-arrow-right"></i>
+          </button>
+          <button class="btn btn-finish" id="btnFinish" style="display:none;" onclick="finishOnboarding()">
+            <i class="fa-solid fa-check"></i> Completa
+          </button>
+        </div>
+      </div>
+
+    </div><!-- /onboard-card -->
+  </div><!-- /overlay -->
+
+  <!-- ═══════════════════════ Scripts ═══════════════════════ -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script>
+    // ── Config ────────────────────────────────────────────
+    var TOTAL_SLIDES = 13; // 0-12
+    var currentSlide = 0;
+
+    // ── Onboarding state (stored in localStorage for testing) ──
+    var onboardData = JSON.parse(localStorage.getItem('sottotitoli_onboarding') || '{}');
+    // Default native language to Italian (90% of users)
+    if (!onboardData['native_lang']) { onboardData['native_lang'] = 'it'; persist(); }
+
+    // AI-generated insights (populated by mockGenerateReport in test, by /starter-report in production)
+    var aiInsights = null;
+
+    function persist() {
+      localStorage.setItem('sottotitoli_onboarding', JSON.stringify(onboardData));
+    }
+
+    // ── Consent management ──
+    function hasConsented() {
+      return document.getElementById('consentCheck')?.checked || false;
+    }
+
+    function onConsentChange() {
+      var err = document.getElementById('consentError');
+      if (err) err.style.display = hasConsented() ? 'none' : 'none';
+      if (hasConsented()) {
+        onboardData['terms_consent'] = true;
+        onboardData['terms_consent_at'] = new Date().toISOString();
+        persist();
+      }
+    }
+
+    function onMarketingConsentChange() {
+      onboardData['marketing_consent'] = document.getElementById('marketingConsent')?.checked || false;
+      persist();
+    }
+
+    // ── Demo: Simulate a logged-in user ──
+    var DEMO_USER = {
+      id: 'demo-user-' + Date.now(),
+      email: 'demo@sottotitoli.it',
+      name: 'Demo User'
+    };
+
+    // ── UI References ──
+    var overlay = document.getElementById('onboardOverlay');
+    var slidesContainer = document.getElementById('slidesContainer');
+    var progressFill = document.getElementById('progressFill');
+    var btnBack = document.getElementById('btnBack');
+    var btnNext = document.getElementById('btnNext');
+    var btnFinish = document.getElementById('btnFinish');
+    var btnSkip = document.getElementById('btnSkip');
+    var navDots = document.getElementById('navDots');
+
+    // ── Build nav dots ──
+    function buildDots() {
+      var html = '';
+      for (var i = 0; i < TOTAL_SLIDES; i++) {
+        var cls = 'onboard-dot';
+        if (i === currentSlide) cls += ' active';
+        if (i < currentSlide) cls += ' done';
+        html += '<button class="' + cls + '" onclick="goToSlide(' + i + ')" title="Vai alla slide ' + (i+1) + '"></button>';
+      }
+      navDots.innerHTML = html;
+    }
+
+    // ── Slide navigation ──
+    // ── Voice iframe prompts (bilingual) ──
+    var VOICE_PROMPTS = {
+      intake: {
+        it: "Sei un coach di inglese che fa un'intervista di intake. " +
+          "Presentati brevemente: 'Ciao! Sono il tuo coach di inglese. Parliamo un po' di te.' " +
+          "Poi chiedi del lavoro, hobby, vita quotidiana, e perché vuole migliorare l'inglese. " +
+          "Sii caloroso e incoraggiante. Fai domande di follow-up. Risposte brevi, massimo 3 frasi. Parla solo in italiano.",
+        en: "You are an English language coach doing an intake interview. " +
+          "Start by introducing yourself briefly: 'Hi! I'm your English coach. Let's get to know each other.' " +
+          "Then ask about the user's work, hobbies, daily life, and why they want to improve their English. " +
+          "Be warm and encouraging. Ask follow-up questions. Keep replies under 3 sentences. Speak in English only."
+      },
+      objectives: {
+        it: "Sei un consulente di apprendimento dell'inglese che aiuta a definire gli obiettivi. " +
+          "Presentati: 'Ciao! Ti aiuto a definire i tuoi obiettivi di inglese.' " +
+          "Poi chiedi degli obiettivi a breve termine (1-3 mesi) e a lungo termine (6-12 mesi). " +
+          "Aiuta a renderli SMART: Specifici, Misurabili, Raggiungibili, Rilevanti, Temporalizzati. Parla solo in italiano.",
+        en: "You are an English learning advisor helping the user define their goals. " +
+          "Start by introducing yourself: 'Hello! I'm your learning advisor. Let's figure out your English goals together.' " +
+          "Then ask about their short-term objectives (1-3 months) and long-term objectives (6-12 months). " +
+          "Help them make goals SMART: Specific, Measurable, Achievable, Relevant, Time-bound. Speak in English only."
+      }
+    };
+
+    function getVoiceLang(source) {
+      var toggle = document.getElementById(source + 'LangToggle');
+      return toggle ? (toggle.dataset.lang || 'it') : 'it';
+    }
+
+    var VOICE_TIMERS = {};
+    var VOICE_SESSION_DONE = {};
+    var VOICE_SESSION_MINUTES = 5;
+
+    function sendToVoiceIframe(source, msg) {
+      var frameId = source === 'intake' ? 'intakeVoiceFrame' : 'objectivesVoiceFrame';
+      var frame = document.getElementById(frameId);
+      if (frame && frame.contentWindow) {
+        try { frame.contentWindow.postMessage(msg, '*'); } catch(e) {}
+      }
+    }
+
+    function stopVoiceSession(source) {
+      if (VOICE_TIMERS[source]) { clearTimeout(VOICE_TIMERS[source]); VOICE_TIMERS[source] = null; }
+      sendToVoiceIframe(source, { type: 'stop-conversation' });
+      _voiceConfigSent[source] = false;
+    }
+
+    function startVoiceSession(source) {
+      if (VOICE_SESSION_DONE[source]) return;
+      _voiceConfigSent[source] = false;
+      var frame = document.getElementById(source === 'intake' ? 'intakeVoiceFrame' : 'objectivesVoiceFrame');
+      if (!frame || !frame.contentWindow) return;
+      var prompt = VOICE_PROMPTS[source][getVoiceLang(source)];
+      sendToVoiceIframe(source, { type: 'set-source', source: source });
+      sendToVoiceIframe(source, { type: 'set-title', title: source === 'intake' ? 'Parlami di te' : 'Conversazione con l\'AI' });
+      sendToVoiceIframe(source, { type: 'set-compact' });
+      sendToVoiceIframe(source, { type: 'set-instructions', instructions: prompt });
+      setTimeout(function() {
+        var prompt2 = VOICE_PROMPTS[source][getVoiceLang(source)];
+        sendToVoiceIframe(source, { type: 'set-source', source: source });
+        sendToVoiceIframe(source, { type: 'set-title', title: source === 'intake' ? 'Parlami di te' : 'Conversazione con l\'AI' });
+        sendToVoiceIframe(source, { type: 'set-compact' });
+        sendToVoiceIframe(source, { type: 'set-instructions', instructions: prompt2 });
+      }, 2000);
+    }
+
+    function setVoiceLang(source, lang, btn) {
+      var grid = btn.parentElement;
+      grid.querySelectorAll('.pill').forEach(function(p) { p.classList.remove('selected'); });
+      btn.classList.add('selected');
+      onboardData[source + '_lang'] = lang;
+      persist();
+      if (VOICE_TIMERS[source]) {
+        sendToVoiceIframe(source, { type: 'set-instructions', instructions: VOICE_PROMPTS[source][lang] });
+      }
+    }
+
+    function goToSlide(idx) {
+      if (idx > 0 && !hasConsented()) {
+        var err = document.getElementById('consentError');
+        if (err) err.style.display = 'block';
+        return;
+      }
+      if (idx < 0 || idx >= TOTAL_SLIDES) return;
+      var slides = document.querySelectorAll('.onboard-slide');
+      slides.forEach(function(s) { s.classList.remove('active'); });
+      slides[idx].classList.add('active');
+      currentSlide = idx;
+      updateUI();
+      slidesContainer.scrollTop = 0;
+    }
+
+    function nextSlide() {
+      if (currentSlide < TOTAL_SLIDES - 1) goToSlide(currentSlide + 1);
+    }
+
+    function prevSlide() {
+      if (currentSlide > 0) goToSlide(currentSlide - 1);
+    }
+
+    function updateUI() {
+      var pct = Math.round(((currentSlide + 1) / TOTAL_SLIDES) * 100);
+      progressFill.style.width = pct + '%';
+
+      btnBack.style.visibility = currentSlide === 0 ? 'hidden' : 'visible';
+      if (currentSlide === TOTAL_SLIDES - 1) {
+        btnNext.style.display = 'none';
+        btnFinish.style.display = 'flex';
+        var comp = getCompletionPercent();
+        if (comp < 100) {
+          btnFinish.disabled = true; btnFinish.style.opacity = '0.5';
+          btnFinish.title = getMissingFields().join(' · ');
+          btnFinish.innerHTML = '<i class="fa-solid fa-lock"></i> Completa le domande (' + comp + '%)';
+        } else {
+          btnFinish.disabled = false; btnFinish.style.opacity = '1';
+          btnFinish.title = '';
+          btnFinish.innerHTML = '<i class="fa-solid fa-check"></i> Completa';
+        }
+      } else {
+        btnNext.style.display = 'flex';
+        btnFinish.style.display = 'none';
+      }
+      buildDots();
+      if (currentSlide === 10) buildSummary();
+      if (currentSlide === 12) buildDashboard();
+    }
+
+    // ── Completion tracking (6 required fields) ──
+    function getWordCount(text) {
+      if (!text || !text.trim()) return 0;
+      return text.trim().split(/\s+/).filter(function(w) { return w.length > 0; }).length;
+    }
+
+    function getCompletionPercent() {
+      var required = ['native_lang', 'difficulties', 'why_english', 'intake_transcript', 'longterm_transcript', 'shortterm_transcript'];
+      var filled = 0;
+      required.forEach(function(k) {
+        if (k === 'intake_transcript' || k === 'longterm_transcript' || k === 'shortterm_transcript') {
+          if (getWordCount(onboardData[k]) >= 200) filled++;
+        } else {
+          var v = onboardData[k];
+          if (v && (!Array.isArray(v) || v.length > 0)) filled++;
+        }
+      });
+      return Math.round((filled / required.length) * 100);
+    }
+
+    function getMissingFields() {
+      var labels = {
+        'native_lang': 'Lingua madre (slide 3)',
+        'difficulties': 'Difficoltà in inglese (slide 6)',
+        'why_english': 'Perché parli inglese (slide 4)',
+        'intake_transcript': 'Trascrizione Parlami di te ≥200 parole (slide 8)',
+        'longterm_transcript': 'Obiettivo a lungo termine ≥100 parole (slide 9)',
+        'shortterm_transcript': 'Traguardi a breve termine ≥100 parole (slide 10)'
+      };
+      var missing = [];
+      Object.keys(labels).forEach(function(k) {
+        if (k === 'intake_transcript' || k === 'longterm_transcript' || k === 'shortterm_transcript') {
+          if (getWordCount(onboardData[k]) < 100) missing.push(labels[k]);
+        } else {
+          var v = onboardData[k];
+          if (!v || (Array.isArray(v) && v.length === 0)) missing.push(labels[k]);
+        }
+      });
+      return missing.length > 0 ? ['Manca: '].concat(missing) : [];
+    }
+
+    // ── Retry tracking ──
+    var retryData = JSON.parse(localStorage.getItem('sottotitoli_onboarding_retries') || '{}');
+
+    function getRetryInfo(type) {
+      var rd = retryData[type] || { count: 0, lastAttempt: null };
+      var MAX_RETRIES = 3; var TIMEOUT_MS = 60 * 60 * 1000;
+      var blocked = false; var remaining = MAX_RETRIES - rd.count; var retryUntil = null;
+      if (rd.count >= MAX_RETRIES && rd.lastAttempt) {
+        var elapsed = Date.now() - rd.lastAttempt;
+        if (elapsed < TIMEOUT_MS) { blocked = true; retryUntil = rd.lastAttempt + TIMEOUT_MS; }
+        else { retryData[type] = { count: 0, lastAttempt: null }; localStorage.setItem('sottotitoli_onboarding_retries', JSON.stringify(retryData)); remaining = MAX_RETRIES; }
+      }
+      return { blocked: blocked, remaining: remaining, retryCount: rd.count, retryUntil: retryUntil };
+    }
+
+    function recordRetryAttempt(type) {
+      if (!retryData[type]) retryData[type] = { count: 0, lastAttempt: null };
+      retryData[type].count++; retryData[type].lastAttempt = Date.now();
+      localStorage.setItem('sottotitoli_onboarding_retries', JSON.stringify(retryData));
+    }
+
+    // ── Browser speech-to-text record button ──
+    var _speechRecognition = null;
+    var _speechRecType = null;
+    var _speechLang = { intake: 'it-IT', longterm: 'it-IT', shortterm: 'it-IT' };
+
+    function setSpeechLang(type, lang, btn) {
+      _speechLang[type] = lang;
+      btn.parentElement.querySelectorAll('.lang-pill').forEach(function(p) { p.classList.remove('active'); });
+      btn.classList.add('active');
+      if (_speechRecognition && _speechRecType === type) {
+        _speechRecognition.lang = lang;
+      }
+    }
+
+    function toggleSpeechRecord(type) {
+      if (_speechRecognition && _speechRecType === type) {
+        stopSpeechRecord();
+        return;
+      }
+      if (_speechRecognition) stopSpeechRecord();
+      startSpeechRecord(type);
+    }
+
+    function startSpeechRecord(type) {
+      var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+      if (!SR) {
+        alert('Riconoscimento vocale non supportato. Usa Chrome o Edge.');
+        return;
+      }
+      _speechRecognition = new SR();
+      _speechRecognition.continuous = true;
+      _speechRecognition.interimResults = true;
+      _speechRecognition.lang = _speechLang[type];
+
+      var btn = document.getElementById(type + 'MicBtn');
+      var status = document.getElementById(type + 'RecordStatus');
+      var textarea = document.getElementById(type + 'Transcript');
+
+      _speechRecognition.onresult = function(event) {
+        var transcript = '';
+        for (var i = 0; i < event.results.length; i++) {
+          var t = event.results[i][0].transcript.trim();
+          if (!t) continue;
+          if (event.results[i].isFinal) {
+            transcript += '• ' + t.charAt(0).toUpperCase() + t.slice(1) + '\n';
+          } else {
+            transcript += t;
+          }
+        }
+        textarea.value = transcript.trim();
+        textarea.dispatchEvent(new Event('input', { bubbles: true }));
+        textarea.scrollTop = textarea.scrollHeight;
+      };
+
+      _speechRecognition.onerror = function(event) {
+        console.warn('Speech error:', event.error);
+        if (event.error === 'no-speech') return;
+        stopSpeechRecord();
+      };
+
+      _speechRecognition.onend = function() {
+        // Only auto-restart if we haven't been stopped and have had results
+        if (_speechRecognition && _speechRecType === type) {
+          try { _speechRecognition.start(); } catch(e) {
+            // If restart fails, just stop
+            stopSpeechRecord();
+          }
+        }
+      };
+
+      _speechRecognition.start();
+      _speechRecType = type;
+
+      // Disable language toggle while recording
+      var langContainer = btn && btn.parentElement ? btn.parentElement.querySelector('.lang-pills') : null;
+      if (langContainer) langContainer.classList.add('disabled');
+
+      if (btn) {
+        btn.innerHTML = '<i class="fa-solid fa-stop"></i> Ferma';
+        btn.classList.add('recording');
+      }
+      if (status) status.style.display = 'inline';
+    }
+
+    function stopSpeechRecord() {
+      if (_speechRecognition) {
+        var rec = _speechRecognition;
+        _speechRecognition = null;
+        try { rec.stop(); } catch(e) {}
+      }
+      var type = _speechRecType;
+      _speechRecType = null;
+      if (type) {
+        // Re-enable language toggle
+        var langContainer = document.getElementById(type + 'MicBtn');
+        if (langContainer && langContainer.parentElement) {
+          var pills = langContainer.parentElement.querySelector('.lang-pills');
+          if (pills) pills.classList.remove('disabled');
+        }
+        var btn = document.getElementById(type + 'MicBtn');
+        var status = document.getElementById(type + 'RecordStatus');
+        var textarea = document.getElementById(type + 'Transcript');
+        if (textarea) {
+          textarea.value = textarea.value.replace(/ \[.*?\]$/, '').trim();
+          textarea.dispatchEvent(new Event('input', { bubbles: true }));
+        }
+        if (btn) {
+          btn.innerHTML = '<i class="fa-solid fa-microphone"></i> Registra';
+          btn.classList.remove('recording');
+        }
+        if (status) status.style.display = 'none';
+      }
+    }
+
+    function onTranscriptInput(type, text) {
+      onboardData[type + '_transcript'] = text; persist();
+      var wc = getWordCount(text);
+      var wcEl = document.getElementById(type + 'WordCount');
+      var statusEl = document.getElementById(type + 'Status');
+      if (wcEl) wcEl.textContent = wc;
+      if (statusEl) {
+        if (wc >= 200) {
+          statusEl.innerHTML = wc + '/200 parole — <i class="fa-solid fa-circle-check"></i> Trascrizione valida';
+          statusEl.className = 'transcript-status valid';
+        } else {
+          statusEl.innerHTML = wc + '/200 parole — Minimo 200 parole richieste';
+          statusEl.className = 'transcript-status';
+        }
+      }
+      if (currentSlide === 12) { buildDashboard(); updateUI(); }
+      // Only mirror manual text when voice is not active
+      if (!VOICE_TIMERS[type]) {
+        var liveEl = document.getElementById(type + 'Live');
+        if (liveEl && text.trim()) {
+          liveEl.style.display = 'block';
+          liveEl.innerHTML = text.replace(/</g, '&lt;').replace(/\n/g, '<br>');
+          liveEl.scrollTop = liveEl.scrollHeight;
+        }
+      }
+    }
+
+    function validateTranscript(type) {
+      var ri = getRetryInfo(type);
+      var retryEl = document.getElementById(type + 'RetryInfo');
+      var statusEl = document.getElementById(type + 'Status');
+      if (ri.blocked) {
+        var mins = Math.ceil((ri.retryUntil - Date.now()) / 60000);
+        var msg = '⏳ Troppi tentativi. Riprova tra ' + mins + ' minuti.';
+        if (statusEl) { statusEl.innerHTML = msg; statusEl.className = 'transcript-status'; }
+        if (retryEl) { retryEl.style.display = 'block'; retryEl.textContent = msg; }
+        return;
+      }
+      var text = onboardData[type + '_transcript'] || ''; var wc = getWordCount(text);
+      if (wc >= 200) {
+        if (statusEl) { statusEl.innerHTML = wc + '/200 parole — <i class="fa-solid fa-circle-check"></i> Trascrizione valida ✅'; statusEl.className = 'transcript-status valid'; }
+        if (retryEl) { retryEl.style.display = 'none'; } persist();
+        if (currentSlide === 12) { buildDashboard(); updateUI(); }
+      } else {
+        recordRetryAttempt(type); ri = getRetryInfo(type);
+        if (ri.blocked) {
+          var mins2 = Math.ceil((ri.retryUntil - Date.now()) / 60000);
+          var msg2 = '⏳ 3 tentativi falliti. Riprova tra ' + mins2 + ' minuti.';
+          if (statusEl) { statusEl.innerHTML = msg2; statusEl.className = 'transcript-status'; }
+          if (retryEl) { retryEl.style.display = 'block'; retryEl.textContent = msg2; }
+        } else {
+          var msg3 = '⚠️ Solo ' + wc + ' parole — ne servono almeno 100. Tentativo ' + ri.retryCount + ' di 3.';
+          if (statusEl) { statusEl.innerHTML = msg3; statusEl.className = 'transcript-status'; }
+          if (retryEl) { retryEl.style.display = 'block'; retryEl.textContent = 'Tentativi rimasti: ' + ri.remaining + '. Dopo 3 tentativi falliti, dovrai aspettare 1 ora.'; }
+        }
+      }
+    }
+
+    function updateRetryDisplay(type) {
+      var ri = getRetryInfo(type);
+      var retryEl = document.getElementById(type + 'RetryInfo');
+      if (!retryEl) return;
+      if (ri.blocked) {
+        var mins = Math.ceil((ri.retryUntil - Date.now()) / 60000);
+        retryEl.style.display = 'block'; retryEl.textContent = '⏳ In timeout — riprova tra ' + mins + ' minuti.';
+      } else if (ri.retryCount > 0) {
+        retryEl.style.display = 'block'; retryEl.textContent = 'Tentativi usati: ' + ri.retryCount + ' di 3.';
+      }
+    }
+
+    // ── Listen for messages from voice iframes ──
+    var _voiceConfigSent = {};
+
+    window.addEventListener('message', function(e) {
+      if (!e.data || !e.data.type) return;
+
+      if (e.data.type === 'live-transcript') {
+        var src3 = e.data.source;
+        if (src3 !== 'intake' && src3 !== 'objectives') return;
+        var liveEl3 = document.getElementById(src3 + 'Live');
+        if (!liveEl3 || !e.data.text) return;
+        liveEl3.style.display = 'block';
+        var cls3 = e.data.role === 'user' ? 'user-line' : 'ai-line';
+        var prefix = e.data.role === 'user' ? 'You: ' : 'AI: ';
+        var line = prefix + e.data.text.trim();
+        var lines = liveEl3.innerHTML.split('<br>');
+        if (e.data.partial && lines.length > 0 && lines[0] !== '') {
+          lines[lines.length - 1] = '<span class=\"' + cls3 + '\">' + line.replace(/</g, '&lt;') + '</span>';
+          liveEl3.innerHTML = lines.join('<br>');
+        } else {
+          liveEl3.innerHTML = (liveEl3.innerHTML && liveEl3.innerHTML !== '' ? liveEl3.innerHTML + '<br>' : '') + '<span class=\"' + cls3 + '\">' + line.replace(/</g, '&lt;') + '</span>';
+        }
+        liveEl3.scrollTop = liveEl3.scrollHeight;
+        return;
+      }
+
+      if (e.data.type === 'transcript') {
+        var src = e.data.source;
+        if (src !== 'intake' && src !== 'objectives') return;
+        var text = (e.data.text || '').replace(/^(You|AI):\s*/gm, '').trim();
+        var textarea = document.getElementById(src + 'Transcript');
+        if (textarea) { textarea.value = text; onTranscriptInput(src, text); }
+        var liveEl2 = document.getElementById(src + 'Live');
+        if (liveEl2) liveEl2.style.display = 'none';
+        return;
+      }
+
+      if (e.data.type === 'status') {
+        // Prefer source from event data, fall back to current slide
+        var src2 = (e.data.source === 'intake' || e.data.source === 'objectives') ? e.data.source
+          : (currentSlide === 8 ? 'intake' : currentSlide === 9 ? 'objectives' : null);
+        if (!src2) return;
+        var liveEl = document.getElementById(src2 + 'Live');
+        if (liveEl && e.data.detail && e.data.detail.trim()) {
+          liveEl.style.display = 'block';
+          var isUser = e.data.text === 'Parlando…' || e.data.text === 'In ascolto…';
+          var isAI = e.data.text === 'Rispondendo…' || e.data.text === 'Elaborando…';
+          var cls = isUser ? 'user-line' : isAI ? 'ai-line' : '';
+          var currentText = liveEl.textContent.trim();
+          var newText = e.data.detail.trim();
+          if (newText && newText !== currentText) {
+            liveEl.innerHTML = (liveEl.innerHTML ? liveEl.innerHTML + '<br>' : '') + '<span class="' + cls + '">' + newText.replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</span>';
+            liveEl.scrollTop = liveEl.scrollHeight;
+          }
+        }
+        if (e.data.text === 'In attesa' || e.data.text === 'Pronto') {
+          if (liveEl) liveEl.style.display = 'none';
+        }
+        if (e.data.text === 'Pronto' || e.data.text === 'In attesa' || e.data.level === 'ok') {
+          var loadingEl = document.getElementById(src2 + 'Loading');
+          var hintEl = document.getElementById(src2 + 'Hint');
+          if (loadingEl) loadingEl.style.display = 'none';
+          if (hintEl) {
+        var lang = getVoiceLang(src2);
+        hintEl.innerHTML = lang === 'it'
+          ? '<i class="fa-solid fa-hand-point-up"></i> Clicca il pulsante centrale e di\' <em>"ciao"</em> — l\'AI risponderà'
+          : '<i class="fa-solid fa-hand-point-up"></i> Click the orb and say <em>"hi"</em> — the AI will respond';
+        hintEl.style.display = 'block';
+      }
+        }
+        if (!_voiceConfigSent[src2]) {
+          sendToVoiceIframe(src2, { type: 'set-source', source: src2 });
+          sendToVoiceIframe(src2, { type: 'set-title', title: src2 === 'intake' ? 'Parlami di te' : 'Conversazione con l\'AI' });
+          sendToVoiceIframe(src2, { type: 'set-compact' });
+          sendToVoiceIframe(src2, { type: 'set-instructions', instructions: VOICE_PROMPTS[src2][getVoiceLang(src2)] });
+          _voiceConfigSent[src2] = true;
+        }
+        return;
+      }
+    });
+
+    // ── Pill selection (single / multi) ──
+    function isOtherVal(v) {
+      return v === 'other_heard' || v === 'other_job' || v === 'other_lang' ||
+             v === 'other_why' || v === 'other_diff' || v === 'other_lang_int' ||
+             v === 'other_spoken' || v === 'other_improve';
+    }
+
+    // Find the "Altro" text input that belongs to this pill grid.
+    // Walks forward siblings — handles slides with multiple grids.
+    function findOtherInput(grid) {
+      var el = grid.nextElementSibling;
+      while (el && !el.classList.contains('onboard-input')) {
+        el = el.nextElementSibling;
+      }
+      return el;
+    }
+
+    function selectPill(el, mode, maxSelect) {
+      var grid = el.parentElement;
+      var key = grid.dataset.key;
+      maxSelect = maxSelect || parseInt(grid.dataset.max) || 999;
+
+      if (mode === 'single') {
+        grid.querySelectorAll('.pill').forEach(function(p) { p.classList.remove('selected'); });
+        el.classList.add('selected');
+        onboardData[key] = el.dataset.val;
+        var otherInput = findOtherInput(grid);
+        if (otherInput && isOtherVal(el.dataset.val)) {
+          otherInput.style.display = 'block'; otherInput.focus();
+        } else {
+          if (otherInput) otherInput.style.display = 'none';
+          var otherKey = key + '_other';
+          if (onboardData[otherKey]) { delete onboardData[otherKey]; }
+        }
+      } else if (mode === 'multi') {
+        var selected = [];
+        grid.querySelectorAll('.pill.selected').forEach(function(p) { selected.push(p.dataset.val); });
+        var alreadySelected = selected.indexOf(el.dataset.val) !== -1;
+        if (alreadySelected) {
+          el.classList.remove('selected');
+        } else {
+          if (selected.length >= maxSelect) {
+            alert('Massimo ' + maxSelect + ' selezioni possibili.');
+            return;
+          }
+          el.classList.add('selected');
+        }
+        selected = [];
+        grid.querySelectorAll('.pill.selected').forEach(function(p) { selected.push(p.dataset.val); });
+        onboardData[key] = selected;
+        var otherInput = findOtherInput(grid);
+        if (otherInput) {
+          var hasOther = selected.some(function(v) { return isOtherVal(v); });
+          otherInput.style.display = hasOther ? 'block' : 'none';
+          if (hasOther) otherInput.focus();
+          if (!hasOther) {
+            var otherKey = key + '_other';
+            if (onboardData[otherKey]) { delete onboardData[otherKey]; }
+          }
+        }
+      }
+      persist();
+    }
+
+    // ── Other text inputs ──
+    function saveOtherText(key, val) {
+      onboardData[key] = val;
+      persist();
+    }
+
+    // ── Select ──
+    function saveSelect(key, val) {
+      onboardData[key] = val;
+      persist();
+      if (key === 'native_lang') {
+        var otherInput = document.getElementById('nativeLangOther');
+        otherInput.style.display = val === 'other_lang' ? 'block' : 'none';
+        if (val !== 'other_lang') { delete onboardData['native_lang_other']; persist(); }
+        filterLanguagePills();
+      }
+    }
+
+    function filterLanguagePills() {
+      var native = onboardData['native_lang'];
+      if (!native || native === 'other_lang') return;
+      ['spoken_languages', 'improve_languages'].forEach(function(section) {
+        var grid = document.querySelector('.pill-grid[data-key="' + section + '"]');
+        if (!grid) return;
+        grid.querySelectorAll('.pill').forEach(function(p) {
+          if (p.dataset.val === native) {
+            p.style.display = 'none';
+            if (p.classList.contains('selected')) {
+              p.classList.remove('selected');
+              onboardData[section] = (onboardData[section] || []).filter(function(v) { return v !== native; });
+              persist();
+            }
+          } else {
+            p.style.display = '';
+          }
+        });
+      });
+    }
+
+    // ── Textarea ──
+    function saveText(key, val) {
+      onboardData[key] = val;
+      persist();
+    }
+
+    // ── Mic test ──
+    var micStream = null;
+    var micInterval = null;
+
+    function toggleMicTest() {
+      var btn = document.getElementById('micTestBtn');
+      var status = document.getElementById('micStatus');
+      var levelFill = document.getElementById('micLevelFill');
+
+      if (micStream) {
+        // Stop
+        micStream.getTracks().forEach(function(t) { t.stop(); });
+        micStream = null;
+        clearInterval(micInterval);
+        btn.classList.remove('recording');
+        btn.innerHTML = '<i class="fa-solid fa-microphone"></i>';
+        levelFill.style.width = '0%';
+        status.textContent = 'Clicca il microfono per iniziare il test';
+        onboardData['mic_tested'] = true;
+        persist();
+        return;
+      }
+
+      // Start
+      navigator.mediaDevices.getUserMedia({ audio: true }).then(function(stream) {
+        micStream = stream;
+        btn.classList.add('recording');
+        btn.innerHTML = '<i class="fa-solid fa-stop"></i>';
+        status.textContent = 'Microfono attivo — parla per testare!';
+        onboardData['mic_tested'] = true;
+        persist();
+
+        // Simulate audio level (real AudioContext would be used in production)
+        var ctx = new (window.AudioContext || window.webkitAudioContext)();
+        var source = ctx.createMediaStreamSource(stream);
+        var analyser = ctx.createAnalyser();
+        analyser.fftSize = 256;
+        source.connect(analyser);
+        var dataArray = new Uint8Array(analyser.frequencyBinCount);
+
+        micInterval = setInterval(function() {
+          analyser.getByteFrequencyData(dataArray);
+          var avg = dataArray.reduce(function(a,b) { return a+b; }, 0) / dataArray.length;
+          var pct = Math.min(100, Math.round((avg / 128) * 100));
+          levelFill.style.width = pct + '%';
+        }, 50);
+      }).catch(function(err) {
+        status.textContent = '⚠️ Microfono non disponibile: ' + err.message;
+        status.style.color = '#ef4444';
+      });
+    }
+
+    // ── Build summary (slide 10) ──
+    function buildSummary() {
+      var box = document.getElementById('summaryBox');
+      var lines = [];
+      var labels = {
+        'heard_from': '<i class="fa-solid fa-bullhorn"></i> Come ci hai conosciuti',
+        'heard_from_other': '  ↳ Altro (specifica)',
+        'profession': '<i class="fa-solid fa-briefcase"></i> Professione',
+        'profession_other': '  ↳ Altro (specifica)',
+        'native_lang': '<i class="fa-solid fa-comment-dots"></i> Lingua madre',
+        'native_lang_other': '  ↳ Altra lingua',
+        'why_english': '<i class="fa-solid fa-flag-usa"></i> Perché parli inglese',
+        'why_english_other': '  ↳ Altro (specifica)',
+        'spoken_languages': '<i class="fa-solid fa-language"></i> Lingue parlate',
+        'spoken_languages_other': '  ↳ Altra lingua parlata',
+        'improve_languages': '<i class="fa-solid fa-arrow-trend-up"></i> Lingue da migliorare',
+        'improve_languages_other': '  ↳ Altra lingua da migliorare',
+        'difficulties': '<i class="fa-solid fa-bullseye"></i> Difficoltà in inglese',
+        'difficulties_other': '  ↳ Altro (specifica)',
+        'mic_tested': '<i class="fa-solid fa-microphone"></i> Test microfono',
+        'short_term_goal': '<i class="fa-solid fa-list-check"></i> Obiettivo a breve termine',
+        'long_term_goal': '<i class="fa-solid fa-mountain-sun"></i> Obiettivo a lungo termine'
+      };
+
+      Object.keys(labels).forEach(function(key) {
+        var val = onboardData[key];
+        if (!val || (Array.isArray(val) && val.length === 0)) return;
+        var display;
+        if (val === true) {
+          display = '<i class="fa-solid fa-circle-check"></i> Completato';
+        } else if (Array.isArray(val)) {
+          display = escapeHtml(val.join(', '));
+        } else {
+          display = escapeHtml(val);
+        }
+        lines.push('<div class="msg"><strong>' + labels[key] + ':</strong> ' + display + '</div>');
+      });
+
+      if (lines.length === 0) {
+        box.innerHTML = '<span style="color:var(--text-muted);">Nessun dato raccolto. Torna indietro e compila qualche risposta.</span>';
+      } else {
+        box.innerHTML = lines.join('');
+      }
+    }
+
+    // ── Build dashboard (slide 11) ──
+    function buildDashboard() {
+      // ── Use AI insights if available ──
+      if (aiInsights) {
+        var stEl2 = document.getElementById('dashShortTerm');
+        if (aiInsights.objectives && aiInsights.objectives.short_term) {
+          stEl2.textContent = aiInsights.objectives.short_term;
+          stEl2.classList.remove('empty');
+        }
+        var ltEl2 = document.getElementById('dashLongTerm');
+        if (aiInsights.objectives && aiInsights.objectives.long_term) {
+          ltEl2.textContent = aiInsights.objectives.long_term;
+          ltEl2.classList.remove('empty');
+        }
+        var relEl = document.getElementById('dashReliability');
+        if (aiInsights.reliability) { relEl.textContent = aiInsights.reliability; }
+        var nsEl = document.getElementById('dashNextStep');
+        if (aiInsights.next_step) { nsEl.textContent = aiInsights.next_step; }
+
+        var focusList2 = document.getElementById('dashFocusList');
+        var focusAreas = aiInsights.focus_areas || [];
+        var focusHtml2 = '';
+        if (focusAreas.length > 0) {
+          focusAreas.forEach(function(fa) {
+            focusHtml2 += '<div class="focus-item"><span class="focus-priority">' + (fa.priority || '•') + '</span><span><strong>' + escapeHtml(fa.title || '') + '</strong> — ' + escapeHtml(fa.description || '') + '</span></div>';
+          });
+        } else {
+          focusHtml2 = '<div class="focus-item"><span class="focus-priority">1</span><span>Fai la tua prima sessione di pratica in Sottotitoli Studio</span></div>';
+        }
+        focusList2.innerHTML = focusHtml2;
+        document.getElementById('dashSummary').innerHTML = 'Benvenuto completato al <strong style="color:var(--accent-green);">100%</strong> · Starter Report generato dall\'AI ✨';
+        var readyEl = document.getElementById('readySection');
+        if (readyEl) readyEl.style.display = 'block';
+        return;
+      }
+
+      // ── Fallback: static data (keeps dashboard empty until AI fills it) ──
+      var stEl = document.getElementById('dashShortTerm');
+      var stVal = onboardData['short_term_goal'];
+      if (stVal) { stEl.textContent = stVal; stEl.classList.remove('empty'); }
+
+      var ltEl = document.getElementById('dashLongTerm');
+      var ltVal = onboardData['long_term_goal'];
+      if (ltVal) { ltEl.textContent = ltVal; ltEl.classList.remove('empty'); }
+
+      // Focus list stays — (empty); filled by AI report or left blank
+
+      var completionPct = getCompletionPercent();
+      document.getElementById('dashSummary').innerHTML = 'Completamento benvenuto: <strong style="color:var(--accent-green);">' + completionPct + '%</strong>';
+
+      // Show 'Sei a posto!' when 100%
+      var readyEl = document.getElementById('readySection');
+      if (readyEl) readyEl.style.display = completionPct >= 100 ? 'block' : 'none';
+    }
+
+    // ── Mock AI report generator (for testing in mockup) ──
+    function mockGenerateReport() {
+      if (getCompletionPercent() < 100) {
+        alert('Completa il benvenuto al 100% prima di generare il report.\n\nCampi mancanti:\n' + getMissingFields().join('\n'));
+        return;
+      }
+      var reportLoading = document.getElementById('starterReportLoading');
+      var reportContent = document.getElementById('starterReportContent');
+      var mockBtn = document.getElementById('mockGenerateBtn');
+
+      if (reportLoading) reportLoading.style.display = 'block';
+      if (reportContent) reportContent.style.display = 'none';
+      if (mockBtn) { mockBtn.disabled = true; mockBtn.textContent = '⏳ Generando…'; }
+
+      // Simulate AI delay
+      setTimeout(function() {
+        // Build a mock AI response based on actual onboarding data
+        var nativeLang = onboardData['native_lang'] || 'en';
+        var profession = onboardData['profession'] || 'student';
+        var diffs = (onboardData['difficulties'] || []).join(', ') || 'general improvement';
+        var whyEng = (onboardData['why_english'] || []).join(', ') || 'communication';
+        var stGoal = onboardData['short_term_goal'] || 'improve English fluency';
+        var ltGoal = onboardData['long_term_goal'] || 'achieve professional proficiency';
+
+        aiInsights = {
+          report_md: "### 🎉 Benvenuto nel tuo percorso personalizzato!\n\nCiao! Ho analizzato il tuo profilo e sono entusiasta di iniziare questo viaggio con te. " +
+            "Dal tuo profilo vedo che usi l'inglese principalmente per **" + whyEng + "** e che trovi difficile **" + diffs + "**.\n\n" +
+            "### 🔍 Analisi del profilo\n\n" +
+            "Il tuo background in **" + profession + "** ti dà un vantaggio: conosci già il vocabolario tecnico del tuo settore. " +
+            "Ora dobbiamo lavorare sulla fluidità e sulla sicurezza nell'uso quotidiano.\n\n" +
+            "### 💪 Punti di forza\n\n" +
+            "- Hai una motivazione chiara per imparare l'inglese\n" +
+            "- Il tuo contesto professionale ti espone regolarmente alla lingua\n" +
+            "- Hai già identificato le aree su cui vuoi lavorare\n\n" +
+            "### 🎯 Piano d'azione\n\n" +
+            "In base al tuo profilo, ho preparato un piano personalizzato con obiettivi SMART e focus pratici. " +
+            "Ogni settimana riceverai un Weekly Update con i tuoi progressi e nuovi obiettivi.\n\n" +
+            "**Sei pronto? Iniziamo! 🚀**",
+          objectives: {
+            short_term: "Entro 3 mesi: migliorare la fluidità nel " + (diffs.indexOf('speaking') >= 0 ? 'parlato' : 'parlato e ascolto') + " con pratica giornaliera di 10 minuti, misurata tramite le sessioni in Sottotitoli Studio.",
+            long_term: "Entro 12 mesi: raggiungere un livello B2 solido, dimostrato dalla capacità di sostenere riunioni di lavoro complesse e scrivere email professionali senza assistenza."
+          },
+          focus_areas: [
+            { priority: 1, title: "Conversazione quotidiana", description: "10 minuti al giorno di pratica orale con il Voice Assistant su argomenti di lavoro." },
+            { priority: 2, title: "Ascolto attivo", description: "Guarda 1 video in inglese al giorno (TED, YouTube) e riassumi oralmente il contenuto." },
+            { priority: 3, title: "Vocabolario professionale", description: "Impara 5 nuove parole del tuo settore ogni giorno con flashcard contestuali." },
+            { priority: 4, title: "Grammatica mirata", description: "Completa 3 esercizi di grammatica a settimana focalizzati sugli errori più comuni." },
+            { priority: 5, title: "Scrittura pratica", description: "Scrivi 2 email brevi in inglese a settimana e ricevi feedback dall'AI." }
+          ],
+          reliability: "Livello stimato: A2-B1 (pre-intermedio). Basato sul tuo profilo, hai buone basi ma necessiti di pratica costante per consolidare. La valutazione precisa arriverà dopo le prime sessioni.",
+          next_step: "Fai subito la tua prima sessione di pratica in Sottotitoli Studio — bastano 10 minuti per iniziare a vedere i progressi!"
+        };
+
+        // Display the report
+        if (reportContent) { reportContent.innerHTML = markedToHtml(aiInsights.report_md || ''); reportContent.style.display = 'block'; }
+        if (reportLoading) reportLoading.style.display = 'none';
+        var dlBtn = document.getElementById('reportDownloadBtn');
+        if (dlBtn) dlBtn.style.display = 'inline-flex';
+        if (mockBtn) { mockBtn.textContent = '🔄 Rigenera Report'; mockBtn.disabled = false; }
+
+        // Refresh the dashboard with AI data
+        buildDashboard();
+
+        // Save mock report to localStorage
+        onboardData['_ai_report'] = aiInsights;
+        persist();
+      }, 1500);
+    }
+
+    // ── Simple markdown → HTML ──
+    function markedToHtml(md) {
+      if (!md) return '';
+      var html = md
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+        .replace(/^### (.+)$/gm, '<h4>$1</h4>')
+        .replace(/^## (.+)$/gm, '<h3>$1</h3>')
+        .replace(/^# (.+)$/gm, '<h3>$1</h3>')
+        .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+        .replace(/\*(.+?)\*/g, '<em>$1</em>')
+        .replace(/^- (.+)$/gm, '<li>$1</li>')
+        .replace(/(\n<li>.*<\/li>)+/g, '<ul>$&</ul>')
+        .replace(/\n\n/g, '</p><p>')
+        .replace(/\n/g, '<br>');
+      return '<p>' + html + '</p>';
+    }
+
+    function downloadReportPDF() {
+      var content = document.getElementById('starterReportContent');
+      if (!content) return;
+      var w = window.open('', '_blank', 'width=800,height=600');
+      w.document.write('<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Sottotitoli Starter Report</title>');
+      w.document.write('<link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,400;14..32,500;14..32,600;14..32,700;14..32,800&family=Manrope:wght@700;800&display=swap" rel="stylesheet">');
+      w.document.write('<style>');
+      w.document.write('*{box-sizing:border-box;margin:0;padding:0}');
+      w.document.write('body{font-family:Inter,system-ui,sans-serif;color:#111827;padding:40px 48px;max-width:700px;margin:0 auto;line-height:1.7;font-size:14px}');
+      w.document.write('h3{font-family:Manrope,sans-serif;font-size:20px;font-weight:800;letter-spacing:-.4px;color:#7c3aed;margin:28px 0 10px}');
+      w.document.write('h3:first-child{margin-top:0}');
+      w.document.write('h4{font-family:Manrope,sans-serif;font-size:15px;font-weight:700;margin:18px 0 6px;color:#111827}');
+      w.document.write('p{margin:8px 0} strong{color:#7c3aed;font-weight:700}');
+      w.document.write('ul{margin:8px 0;padding-left:20px} li{margin-bottom:4px}');
+      w.document.write('em{font-style:italic;color:#6b7280}');
+      w.document.write('.report-header{display:flex;align-items:center;justify-content:space-between;padding-bottom:14px;border-bottom:2px solid #7c3aed;margin-bottom:20px}');
+      w.document.write('.report-header h2{font-family:Manrope,sans-serif;font-size:22px;font-weight:800;color:#7c3aed}');
+      w.document.write('</style></head><body>');
+      w.document.write('<div class="report-header"><h2>Starter Report</h2><span style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#7c3aed">Sottotitoli · AI Personalizzato</span></div>');
+      w.document.write(content.innerHTML);
+      w.document.write('</body></html>');
+      w.document.close();
+      setTimeout(function(){ w.print(); }, 500);
+    }
+
+    // ── Finish onboarding ──
+    function finishOnboarding() {
+      // Guard: refuse if not 100% complete
+      if (getCompletionPercent() < 100) {
+        alert('Completa tutte le domande richieste prima di finire.\n\nCampi mancanti:\n' + getMissingFields().join('\n'));
+        return;
+      }
+
+      onboardData['onboarding_completed'] = true;
+      onboardData['onboarding_completed_at'] = new Date().toISOString();
+      persist();
+
+      // Trigger mock AI report if not yet generated
+      if (!aiInsights) {
+        mockGenerateReport();
+      }
+
+      alert('✅ Onboarding completato!\n\nIn produzione: i dati vengono salvati su Supabase, lo Starter Report viene generato dall\'AI, e vieni reindirizzato alla Panoramica.\n\nMockup: usa il pulsante "Genera Starter Report" sopra per vedere il report.');
+    }
+
+    // ── Finish onboarding ──
+    function resetOnboarding() {
+      if (confirm('Resettare tutti i dati di onboarding?')) {
+        localStorage.removeItem('sottotitoli_onboarding');
+        onboardData = {};
+        VOICE_SESSION_DONE = {};
+        VOICE_TIMERS = {};
+        _voiceConfigSent = {};
+        goToSlide(0);
+      }
+    }
+
+    // ── Overlay toggle ──
+    function toggleOverlay() {
+      overlay.classList.toggle('active');
+    }
+
+    // ── Theme toggle ──
+    function toggleTheme() {
+      var html = document.documentElement;
+      var current = html.getAttribute('data-theme');
+      var next = current === 'dark' ? 'light' : 'dark';
+      html.setAttribute('data-theme', next);
+      document.getElementById('themeBtn').textContent = next === 'dark' ? '☀️' : '🌙';
+      localStorage.setItem('sottotitoli-onboarding-theme', next);
+    }
+
+    // ── Helpers ──
+    function escapeHtml(str) {
+      var div = document.createElement('div');
+      div.textContent = str;
+      return div.innerHTML;
+    }
+
+    // ── Keyboard navigation ──
+    document.addEventListener('keydown', function(e) {
+      if (!overlay.classList.contains('active')) return;
+      if (e.key === 'ArrowRight' || e.key === 'ArrowDown') { e.preventDefault(); nextSlide(); }
+      if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') { e.preventDefault(); prevSlide(); }
+      if (e.key === 'Escape') { toggleOverlay(); }
+    });
+
+    // ── Init ──
+    function init() {
+      // Restore theme
+      var savedTheme = localStorage.getItem('sottotitoli-onboarding-theme') || 'dark';
+      document.documentElement.setAttribute('data-theme', savedTheme);
+      document.getElementById('themeBtn').textContent = savedTheme === 'dark' ? '☀️' : '🌙';
+
+      // Restore saved selections in pills
+      restoreSelections();
+      filterLanguagePills();
+
+      // Build initial UI
+      goToSlide(0);
+    }
+
+    function restoreSelections() {
+      var singleKeys = ['heard_from', 'profession', 'ui_language'];
+      singleKeys.forEach(function(key) {
+        var val = onboardData[key];
+        if (!val) return;
+        var grid = document.querySelector('.pill-grid[data-key="' + key + '"]');
+        if (!grid) return;
+        grid.querySelectorAll('.pill').forEach(function(p) {
+          if (p.dataset.val === val) p.classList.add('selected');
+        });
+      });
+
+      var multiKeys = ['why_english', 'spoken_languages', 'improve_languages', 'difficulties'];
+      multiKeys.forEach(function(key) {
+        var vals = onboardData[key];
+        if (!vals || !Array.isArray(vals)) return;
+        var grid = document.querySelector('.pill-grid[data-key="' + key + '"]');
+        if (!grid) return;
+        grid.querySelectorAll('.pill').forEach(function(p) {
+          if (vals.indexOf(p.dataset.val) !== -1) p.classList.add('selected');
+        });
+      });
+
+      // Restore selects
+      if (onboardData['native_lang']) {
+        var sel = document.getElementById('nativeLangSelect');
+        if (sel) sel.value = onboardData['native_lang'];
+        if (onboardData['native_lang'] === 'other_lang') {
+          document.getElementById('nativeLangOther').style.display = 'block';
+        }
+      }
+
+      // Restore text inputs
+      if (onboardData['native_lang_other']) document.getElementById('nativeLangOther').value = onboardData['native_lang_other'];
+      if (onboardData['heard_from_other']) { document.getElementById('heardOtherInput').style.display = 'block'; document.getElementById('heardOtherInput').value = onboardData['heard_from_other']; }
+      if (onboardData['profession_other']) { document.getElementById('jobOtherInput').style.display = 'block'; document.getElementById('jobOtherInput').value = onboardData['profession_other']; }
+      if (onboardData['why_english_other']) { document.getElementById('whyEngOtherInput').style.display = 'block'; document.getElementById('whyEngOtherInput').value = onboardData['why_english_other']; }
+      if (onboardData['spoken_languages_other']) { document.getElementById('spokenOtherInput').style.display = 'block'; document.getElementById('spokenOtherInput').value = onboardData['spoken_languages_other']; }
+      if (onboardData['improve_languages_other']) { document.getElementById('improveOtherInput').style.display = 'block'; document.getElementById('improveOtherInput').value = onboardData['improve_languages_other']; }
+      if (onboardData['difficulties_other']) { document.getElementById('diffOtherInput').style.display = 'block'; document.getElementById('diffOtherInput').value = onboardData['difficulties_other']; }
+      if (onboardData['short_term_goal']) { var stEl = document.getElementById('shorttermTranscript'); if (stEl) { stEl.value = onboardData['short_term_goal']; onTranscriptInput('shortterm', onboardData['short_term_goal']); } }
+      if (onboardData['long_term_goal']) { var ltEl = document.getElementById('longtermTranscript'); if (ltEl) { ltEl.value = onboardData['long_term_goal']; onTranscriptInput('longterm', onboardData['long_term_goal']); } }
+      // Restore transcripts
+      if (onboardData['intake_transcript']) { var itEl = document.getElementById('intakeTranscript'); if (itEl) { itEl.value = onboardData['intake_transcript']; onTranscriptInput('intake', onboardData['intake_transcript']); } }
+      if (onboardData['longterm_transcript']) { var ltEl2 = document.getElementById('longtermTranscript'); if (ltEl2) { ltEl2.value = onboardData['longterm_transcript']; onTranscriptInput('longterm', onboardData['longterm_transcript']); } }
+      if (onboardData['shortterm_transcript']) { var stEl2 = document.getElementById('shorttermTranscript'); if (stEl2) { stEl2.value = onboardData['shortterm_transcript']; onTranscriptInput('shortterm', onboardData['shortterm_transcript']); } }
+      ['intake','longterm','shortterm'].forEach(function(t) { updateRetryDisplay(t); });
+    }
+
+    init();
+  </script>
+
+  <!-- ═══════════════════════════════════════════════════════════════════════
+     ONBOARDING PIPELINE MANUAL — consult before changing anything
+     ═══════════════════════════════════════════════════════════════════════
+
+     This mockup (onboarding-mockup.html) is the DESIGN SOURCE for the
+     production onboarding page (onboarding.html). If you change slides,
+     questions, pill options, or logic here, you MUST apply the same
+     changes to onboarding.html.
+
+     ── FILES IN PLAY ──────────────────────────────────────────────────
+     onboarding-mockup.html   ← You are here. Design/test mockup.
+     onboarding.html          ← Production version (Supabase save, auth).
+     js/auth.js               ← Global auth guard + onboarding gate.
+     supabase/migrations/20260723_add_onboarding_responses.sql ← DB schema.
+     config.js (gitignored)   ← Config loaded by onboarding.html.
+     hugging-voice-kokoro/    ← AI voice iframe (slides 8 & 9).
+
+     ── SLIDE INDEX (0-based, 12 total) ────────────────────────────────
+      0  Welcome
+      1  Come ci hai conosciuti?      (single-select pills, key: heard_from)
+      2  Cosa fai nella vita?         (single-select pills, key: profession)
+      3  Lingua madre                 (select dropdown, key: native_lang)
+      4  Perché parli inglese?        (multi-select pills, key: why_english)
+      5  Ti interessano altre lingue? (multi-select pills, key: interested_languages)
+      6  Cosa trovi difficile?        (multi-select pills, key: difficulties)
+      7  Test microfono               (mic button + AudioContext)
+      8  Parlami di te (5 min)        (voice iframe: hugging-voice-kokoro)
+      9  Conversazione AI - Obiettivi (voice iframe + manual fallback)
+     10  Riepilogo                    (summary of all collected data)
+     11  Cruscotto Personalizzato     (Dashboard, Affidabilità, Obiettivi, Focus)
+
+     ── DATA STORAGE ───────────────────────────────────────────────────
+     Mockup:   localStorage key = "sottotitoli_onboarding" (JSON)
+     Production: localStorage + Supabase (auto-save debounced 2s)
+
+     Supabase tables written by onboarding.html:
+     1. onboarding_responses (raw answers — see SQL migration for columns)
+        - Upserted on every pill/select change (debounced)
+        - onboarding_completed = true on finish
+     2. profiles (derived fields — upsert)
+        - native_lang → profiles.native_lang
+        - profession → profiles.domain
+        - why_english → profiles.use_cases (TEXT[])
+        - difficulties → profiles.learning_profile (JSONB) + focus_preferences (TEXT[])
+        - short_term_goal + long_term_goal → profiles.goal_primary (TEXT)
+        - onboarding_completed_at → profiles.onboarding_completed_at
+
+     ── AUTH FLOW ──────────────────────────────────────────────────────
+     1. User signs in via Google OAuth → redirected to panoramica.html
+     2. js/auth.js global gate (after 1.5s delay for OAuth hash processing):
+        - Checks onboarding_responses.onboarding_completed for this user
+        - If false → redirects to onboarding.html
+        - Caches result in localStorage "sottotitoli_onboarding_done"
+     3. onboarding.html loads:
+        - No session → shows "Accesso richiesto" + sign-in button
+        - Session but onboarding done → shows "Già completato" + redo option
+        - Session + not done → shows overlay with slides
+     4. On finish → saves to Supabase → calls AI Starter Report → redirects to panoramica.html
+
+     ── AI STARTER REPORT FLOW ─────────────────────────────────────────
+     On finishOnboarding():
+     1. Save all onboarding data to Supabase (onboarding_responses + profiles)
+     2. POST onboarding_data to STARTER_REPORT_URL (/starter-report endpoint)
+        - Local dev: http://localhost:8771/starter-report (report-ai-space)
+        - Production: set via config.js → window.SOTTOTITOLI_CONFIG.starterReportUrl
+     3. AI returns JSON: { report_md, objectives: {short_term, long_term},
+        focus_areas: [{priority, title, description}], reliability, next_step }
+     4. Report displayed in #starterReportSection on slide 11
+     5. Insights dashboard (#dashShortTerm, #dashLongTerm, etc.) populated from AI data
+     6. AI results saved to Supabase (onboarding_responses + profiles)
+
+     Mockup testing:
+     - Click "Genera Starter Report (mock)" button on slide 11
+     - mockGenerateReport() creates realistic mock data from onboardData
+     - No server needed — works fully offline
+     - aiInsights variable holds the AI response (same shape as production)
+
+     /starter-report endpoint:
+     - Defined in tmp/report-ai-space/app.py
+     - Uses same LLM client as the self-plan system (zai-org/GLM-5.1 via HF router)
+     - Prompt template: STARTER_PROMPT in app.py
+     - Returns clean JSON (no markdown fences)
+     - Restart server after changes: lsof -ti:8771 | xargs kill; cd tmp/report-ai-space && python3 -m uvicorn app:app --host 0.0.0.0 --port 8771 &
+
+     ── ADDING/CHANGING A SLIDE ────────────────────────────────────────
+     1. Add/edit the slide HTML in onboarding-mockup.html (this file)
+     2. Test visually with the mockup (localhost:8000/onboarding-mockup.html)
+     3. Copy the slide HTML to onboarding.html at the same position
+     4. If new data-key → update the restoreSelections() function in BOTH files
+     5. If new data-key → update buildSummary() labels in BOTH files
+     6. If new data-key → add column to onboarding_responses table (SQL migration)
+     7. If new data-key → update the Supabase upsert payload in onboarding.html
+        (both onboarding_responses row AND profiles update)
+     8. Update TOTAL_SLIDES in BOTH files
+     9. Update this manual's slide index above
+
+     ── "OTHER" PILL PATTERN ───────────────────────────────────────────
+     Every pill grid that has an "✨ Altro" option needs:
+     1. The pill with data-val="other_xxx" (e.g. other_heard, other_job)
+     2. An <input class="onboard-input"> right after the pill-grid (initially hidden)
+     3. The "other" value registered in isOtherVal() function
+     4. The input's oninput calling saveOtherText('key_other', this.value)
+     5. In restoreSelections(): show + populate the input if data exists
+     6. In buildSummary(): a label for the 'key_other' field
+
+     ── isOtherVal() — must match all "other" values ────────────────────
+     Current list: other_heard, other_job, other_lang, other_why, other_diff, other_lang_int
+     Location in both files: inside selectPill() function
+
+     ── SUPABASE SETUP (one-time) ──────────────────────────────────────
+     Run this in Supabase SQL Editor (https://qzqmuegbpmvqrjrlfbgk.supabase.co):
+       supabase/migrations/20260723_add_onboarding_responses.sql
+     This creates:
+     - onboarding_responses table + RLS policies + indexes
+     - profiles.onboarding_completed_at column (if missing)
+
+     ═══════════════════════════════════════════════════════════════════════ -->
+</body>
+</html>
