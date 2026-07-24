@@ -646,6 +646,7 @@ if (_toolCamSwitch) {
   saveTools();
   pushToolsToSession();
 });
+}
 
 searchKeyInput.addEventListener("input", () => {
   if (serverSearchKey) return;
