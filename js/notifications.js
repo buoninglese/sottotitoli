@@ -36,6 +36,9 @@
       if (!user) return;
       this._userId = user.id;
 
+      // Send welcome notification on first visit (once per user)
+      this._maybeSendWelcome();
+
       // Cache DOM refs
       this.bellEl = document.querySelector('.topbar-bell');
       this.badgeEl = document.querySelector('.topbar-bell .badge');
@@ -220,6 +223,22 @@
       const hr = Math.floor(min / 60);
       if (hr < 24) return hr + 'h fa';
       return Math.floor(hr / 24) + 'g fa';
+    }
+
+    async _maybeSendWelcome() {
+      var key = 's8t-welcome-sent-' + this._userId;
+      if (localStorage.getItem(key)) return;
+      try {
+        var res = await this.supabase.auth.getSession();
+        var token = res?.data?.session?.access_token;
+        if (!token) return;
+        await fetch('https://qzqmuegbpmvqrjrlfbgk.supabase.co/functions/v1/welcome-notification', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+          body: JSON.stringify({ user_id: this._userId })
+        });
+        localStorage.setItem(key, '1');
+      } catch (_) { /* silent */ }
     }
   }
 
