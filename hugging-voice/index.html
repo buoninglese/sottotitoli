@@ -57,11 +57,6 @@
             </div>
             <div class="ident-meta" style="gap:4px">
               <span class="ident-row" id="timerRow" style="font-size:12px;color:var(--text-dim)">⏱ 00:00</span>
-              <span class="ident-row" id="questionsRow" style="font-size:11px;color:var(--text-dim);flex-wrap:wrap;gap:3px">
-                <span class="q-pill" data-q="vocab" style="font-size:9px;padding:2px 8px;border-radius:99px;border:1px solid var(--line);opacity:.5">Vocabolario</span>
-                <span class="q-pill" data-q="goals" style="font-size:9px;padding:2px 8px;border-radius:99px;border:1px solid var(--line);opacity:.5">Obiettivi</span>
-                <span class="q-pill" data-q="level" style="font-size:9px;padding:2px 8px;border-radius:99px;border:1px solid var(--line);opacity:.5">Livello</span>
-              </span>
             </div>
           </div>
         </div>
@@ -275,15 +270,14 @@
               <label class="field">
                 <span>Voice</span>
                 <select id="voice">
-                  <option value="Aiden" selected>Aiden</option>
-                  <option value="Ryan">Ryan</option>
-                  <option value="Dylan">Dylan</option>
-                  <option value="Eric">Eric</option>
-                  <option value="Ono_Anna">Ono_Anna</option>
-                  <option value="Serena">Serena</option>
-                  <option value="Sohee">Sohee</option>
-                  <option value="Uncle_Fu">Uncle_Fu</option>
-                  <option value="Vivian">Vivian</option>
+                  <option value="if_sara">🇮🇹 Sara</option>
+                  <option value="im_nicola">🇮🇹 Nicola</option>
+                  <option value="af_kore">🇺🇸 Kore</option>
+                  <option value="am_liam">🇺🇸 Liam</option>
+                  <option value="bf_emma">🇬🇧 Emma</option>
+                  <option value="bm_daniel">🇬🇧 Daniel</option>
+                  <option value="ff_siwis">🇫🇷 Siwis</option>
+                  <option value="am_santa" selected>🌍 Santa</option>
                 </select>
               </label>
             </div>
@@ -416,17 +410,32 @@ document.addEventListener('click', function(e){
   // Send to parent for status update
   try { window.parent.postMessage({type:'status', text:'Voce: '+voice, detail:chip.textContent.trim(), level:'ok'}, '*'); } catch(e){}
 });
-// Timer
+// Timer — only counts during active conversation (not idle time)
 (function(){
-  var startTime = Date.now();
+  var accumulatedMs = 0;
+  var activeSince = null;
   var el = document.getElementById('timerRow');
-  function update(){ if(el){ var s=Math.floor((Date.now()-startTime)/1000); var m=Math.floor(s/60); var sec=s%60; el.textContent='⏱ '+String(m).padStart(2,'0')+':'+String(sec).padStart(2,'0'); } }
-  setInterval(update, 1000);
-  // Mark question pills green when confirmed
-  window.markQuestionDone = function(q){
-    var pill = document.querySelector('.q-pill[data-q="'+q+'"]');
-    if(pill){ pill.style.opacity='1'; pill.style.borderColor='var(--green)'; pill.style.color='var(--green)'; pill.style.background='rgba(16,185,129,.1)'; }
+  function format(ms){ var s=Math.floor(ms/1000); var m=Math.floor(s/60); var sec=s%60; return '⏱ '+String(m).padStart(2,'0')+':'+String(sec).padStart(2,'0'); }
+  function update(){ if(el){ el.textContent = activeSince ? format(accumulatedMs + (Date.now() - activeSince)) : format(accumulatedMs); } }
+  setInterval(update, 250);
+  // Watch the orb's state class — active when NOT idle
+  var observer = new MutationObserver(function(){
+    var circle = document.getElementById('main-circle');
+    if (!circle) return;
+    var isActive = !circle.classList.contains('state-idle');
+    if (isActive && !activeSince) {
+      activeSince = Date.now(); // start counting
+    } else if (!isActive && activeSince) {
+      accumulatedMs += Date.now() - activeSince;
+      activeSince = null;
+    }
+  });
+  var check = function(){
+    var circle = document.getElementById('main-circle');
+    if (circle) { observer.observe(circle, {attributes:true, attributeFilter:['class']}); }
+    else { setTimeout(check, 500); }
   };
+  check();
 })();
 </script>
 </body>
