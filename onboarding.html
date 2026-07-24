@@ -211,6 +211,11 @@
     }
     @keyframes blink-dot { 50%{opacity:0} }
     .record-status { font-weight:600; }
+    .lang-pills { display:inline-flex;gap:0;border-radius:100px;border:1.5px solid var(--line);overflow:hidden; }
+    .lang-pill { padding:6px 11px;font-size:11px;font-weight:700;border:none;background:transparent;color:var(--text-dim);cursor:pointer;transition:all .15s; }
+    .lang-pill:hover { color:var(--accent-purple); }
+    .lang-pill.active { background:var(--accent-purple);color:#fff; }
+    .lang-pill + .lang-pill { border-left:1.5px solid var(--line); }
 
     /* ── Live caption teleprompter ── */
     .live-caption {
@@ -666,6 +671,10 @@
             <button class="mic-record-btn" id="intakeMicBtn" onclick="toggleSpeechRecord('intake')" title="Registra la tua voce e trascrivi">
               <i class="fa-solid fa-microphone"></i> Registra
             </button>
+            <div class="lang-pills">
+              <button class="lang-pill active" data-lang="en-US" onclick="setSpeechLang('intake','en-US',this)">EN</button>
+              <button class="lang-pill" data-lang="it-IT" onclick="setSpeechLang('intake','it-IT',this)">IT</button>
+            </div>
             <span class="record-status" id="intakeRecordStatus" style="display:none;">
               <span class="record-dot"></span> In ascolto…
             </span>
@@ -689,6 +698,10 @@
             <button class="mic-record-btn" id="objectivesMicBtn" onclick="toggleSpeechRecord('objectives')" title="Registra la tua voce e trascrivi">
               <i class="fa-solid fa-microphone"></i> Registra
             </button>
+            <div class="lang-pills">
+              <button class="lang-pill active" data-lang="en-US" onclick="setSpeechLang('objectives','en-US',this)">EN</button>
+              <button class="lang-pill" data-lang="it-IT" onclick="setSpeechLang('objectives','it-IT',this)">IT</button>
+            </div>
             <span class="record-status" id="objectivesRecordStatus" style="display:none;">
               <span class="record-dot"></span> In ascolto…
             </span>
@@ -1094,6 +1107,16 @@
     // ── Browser speech-to-text record button ──
     var _speechRecognition = null;
     var _speechRecType = null;
+    var _speechLang = { intake: 'en-US', objectives: 'en-US' };
+
+    function setSpeechLang(type, lang, btn) {
+      _speechLang[type] = lang;
+      btn.parentElement.querySelectorAll('.lang-pill').forEach(function(p) { p.classList.remove('active'); });
+      btn.classList.add('active');
+      if (_speechRecognition && _speechRecType === type) {
+        _speechRecognition.lang = lang;
+      }
+    }
 
     function toggleSpeechRecord(type) {
       if (_speechRecognition && _speechRecType === type) {
@@ -1113,7 +1136,7 @@
       _speechRecognition = new SR();
       _speechRecognition.continuous = true;
       _speechRecognition.interimResults = true;
-      _speechRecognition.lang = 'en-US';
+      _speechRecognition.lang = _speechLang[type];
 
       var btn = document.getElementById(type + 'MicBtn');
       var status = document.getElementById(type + 'RecordStatus');
