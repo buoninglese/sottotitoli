@@ -168,8 +168,13 @@
     .s4-table .check.anim{opacity:0;transform:scale(.6)}
     .s4-table .check.anim-in{animation:checkPop .5s cubic-bezier(.34,1.56,.64,1) forwards}
     @keyframes checkPop{0%{opacity:0;transform:scale(.6)}60%{opacity:1;transform:scale(1.2)}100%{opacity:1;transform:scale(1)}}
-    @keyframes colGlow{0%{background:rgba(34,211,238,.12);box-shadow:inset 0 0 24px rgba(34,211,238,.08)}100%{background:transparent;box-shadow:none}}
-    .col-flash{animation:colGlow 1.8s ease-out}
+    @keyframes colFadeIn{0%{opacity:0}100%{opacity:1}}
+    .col-accent{opacity:0;transition:opacity 2s cubic-bezier(.25,.1,.25,1)}
+    .col-accent.in{opacity:1}
+    .col-accent-1{background:rgba(34,211,238,.04)}  /* Gratis — cyan */
+    .col-accent-2{background:rgba(168,85,247,.04)}  /* Starter — purple */
+    .col-accent-3{background:rgba(59,130,246,.04)}  /* Standard — blue */
+    .col-accent-4{background:rgba(250,204,21,.04)}  /* Premium — gold */
     .s4-table .dash{color:rgba(255,255,255,.08);font-size:10px}
     .s4-toggle{display:none;text-align:center}
     @media(max-width:599px){.s4-toggle{display:block}}
@@ -542,7 +547,6 @@
         enter: function(token){
           if(!isLive(token)) return;
           var p = document.getElementById('s4Pricing'); if(p){p.style.opacity='1';p.style.transform='translateY(0)';}
-          // Column-by-column reveal: highlight column → checks pop in
           var allRows = document.querySelectorAll('.s4-table .row');
           var dataRows = document.querySelectorAll('.s4-table .row:not(.head)');
           var colGap = 2000;
@@ -550,29 +554,26 @@
             (function(colIdx){
               setTimeout(function(){
                 if(!isLive(token)) return;
-                // Flash entire column
+                // Fade in permanent column accent
                 allRows.forEach(function(row){
                   var cell = row.querySelector('.cell:nth-child('+colIdx+')');
-                  if(cell){ cell.classList.add('col-flash'); }
+                  if(cell){ cell.classList.add('col-accent','col-accent-'+(colIdx-1),'in'); }
                 });
-                // After flash starts, pop checks in this column top→bottom
-                setTimeout(function(){
-                  if(!isLive(token)) return;
-                  dataRows.forEach(function(row, ri){
-                    var cell = row.querySelector('.cell:nth-child('+colIdx+')');
-                    var check = cell ? cell.querySelector('.check.anim') : null;
-                    if(check){
-                      setTimeout(function(){
-                        if(!isLive(token)) return;
-                        check.classList.add('anim-in');
-                      }, ri * 250);
-                    }
-                  });
-                }, 400);
+                // Pop checks in this column top→bottom
+                dataRows.forEach(function(row, ri){
+                  var cell = row.querySelector('.cell:nth-child('+colIdx+')');
+                  var check = cell ? cell.querySelector('.check.anim') : null;
+                  if(check){
+                    setTimeout(function(){
+                      if(!isLive(token)) return;
+                      check.classList.add('anim-in');
+                    }, ri * 250);
+                  }
+                });
               }, (col - 2) * colGap);
             })(col);
           }
-          var ctaDelay = (4 * colGap) + 1600;
+          var ctaDelay = (4 * colGap) + 2000;
           setTimeout(function(){
             if(!isLive(token)) return;
             var cta = document.getElementById('pricingCta');
@@ -584,8 +585,8 @@
           var cta = document.getElementById('pricingCta'); if(cta) cta.classList.remove('is-visible');
           var checks = document.querySelectorAll('.s4-table .check.anim-in');
           checks.forEach(function(ch){ ch.classList.remove('anim-in'); });
-          var flashes = document.querySelectorAll('.s4-table .col-flash');
-          flashes.forEach(function(cell){ cell.classList.remove('col-flash'); });
+          var accents = document.querySelectorAll('.s4-table .col-accent.in');
+          accents.forEach(function(cell){ cell.classList.remove('in'); });
         }
       }
     ];
