@@ -38,7 +38,7 @@
 
       // Outside click to close
       document.addEventListener('click', (e) => {
-        if (this.panelEl && this.panelEl.classList.contains('open') &&
+        if (this.panelEl && this.panelEl.style.opacity === '1' &&
             this.bellEl && !this.bellEl.contains(e.target) &&
             !this.panelEl.contains(e.target)) {
           this.closePanel();
@@ -146,10 +146,13 @@
 
     togglePanel() {
       if (!this.panelEl) return;
-      const isOpen = this.panelEl.classList.contains('open');
+      const isOpen = this.panelEl.style.opacity === '1';
       if (isOpen) {
         this.closePanel();
       } else {
+        this.panelEl.style.opacity = '1';
+        this.panelEl.style.pointerEvents = 'auto';
+        this.panelEl.style.transform = 'translateY(0)';
         this.panelEl.classList.add('open');
         this.markAllRead();
       }
@@ -157,6 +160,9 @@
 
     closePanel() {
       if (!this.panelEl) return;
+      this.panelEl.style.opacity = '0';
+      this.panelEl.style.pointerEvents = 'none';
+      this.panelEl.style.transform = 'translateY(-8px)';
       this.panelEl.classList.remove('open');
     }
 
