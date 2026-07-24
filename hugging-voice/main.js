@@ -1296,21 +1296,41 @@ async function doStart(audioContext = null) {
       });
   client = c;
 
-  // ── Embed bridge: forward ALL events to parent for discovery ──
+  // ── Embed bridge: forward events to parent for discovery ──
   if (window.__EMBED_MODE__ && window.parent !== window) {
-    const _nativeAE = c.addEventListener.bind(c);
+    const nativeAdd = c.addEventListener.bind(c);
+    const nativeRemove = c.removeEventListener.bind(c);
+    const wrappers = new Map();
+
     c.addEventListener = function(type, handler, opts) {
-      _nativeAE(type, function(event) {
-        try {
-          window.parent.postMessage({
-            type: 'hf-event',
-            eventType: type,
-            detail: event.detail || null,
-            time: Date.now()
-          }, '*');
-        } catch(_) {}
-        return handler.apply(this, arguments);
-      }, opts);
+      if (!wrappers.has(handler)) {
+        wrappers.set(handler, function(event) {
+          // Skip high-frequency audio binary events (performance)
+          var skip = false;
+          if (type === 'message' && event.detail) {
+            var d = event.detail;
+            if (d.type === 'response.audio.delta') skip = true;
+            if (d.type === 'input_audio_buffer.delta') skip = true;
+          }
+          if (!skip) {
+            try {
+              window.parent.postMessage({
+                type: 'hf-event',
+                eventType: type,
+                detail: event.detail === undefined ? null : event.detail,
+                time: Date.now()
+              }, '*');
+            } catch(_) {}
+          }
+          return handler.apply(this, arguments);
+        });
+      }
+      nativeAdd(type, wrappers.get(handler), opts);
+    };
+
+    c.removeEventListener = function(type, handler, opts) {
+      nativeRemove(type, wrappers.get(handler) || handler, opts);
+      wrappers.delete(handler);
     };
   }
 
