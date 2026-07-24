@@ -153,23 +153,21 @@
     .active .s4-pricing{opacity:1;transform:translateY(0)}
     .s4-table{display:none}
     @media(min-width:600px){.s4-table{display:block}}
-    .s4-table-inner{overflow:hidden;border-radius:16px;border:1px solid rgba(255,255,255,.06);background:rgba(255,255,255,.012)}
-    .s4-table .row{display:flex;border-bottom:1px solid rgba(255,255,255,.04);transition:background var(--t-micro)}
+    .s4-table-inner{overflow:hidden;border-radius:16px;border:1px solid rgba(255,255,255,.1);background:rgba(255,255,255,.04)}
+    .s4-table .row{display:flex;border-bottom:1px solid rgba(255,255,255,.06);transition:background var(--t-micro)}
     .s4-table .row:last-child{border-bottom:none}
     .s4-table .row:hover{background:rgba(255,255,255,.015)}
-    .s4-table .cell{flex:1;padding:clamp(10px,1.6vh,14px) clamp(10px,1.5vw,16px);text-align:center;font-size:clamp(11px,1vw,13px);display:flex;align-items:center;justify-content:center;min-width:0}
-    .s4-table .cell:first-child{text-align:left;justify-content:flex-start;color:rgba(255,255,255,.35);font-weight:500;flex:1.2}
-    .s4-table .head .cell{font-weight:700;font-size:clamp(10px,.9vw,11px);text-transform:uppercase;letter-spacing:.08em;color:rgba(255,255,255,.35);padding:clamp(14px,2vh,18px) clamp(10px,1.5vw,16px) clamp(12px,1.6vh,14px)}
-    .s4-table .head{background:rgba(255,255,255,.015)}
-    .s4-table .price{font-family:'Manrope',sans-serif;font-weight:800;font-size:clamp(18px,2.2vw,22px);color:#fff;line-height:1}
+    .s4-table .cell{flex:1;padding:clamp(10px,1.6vh,14px) clamp(10px,1.5vw,16px);text-align:center;font-size:clamp(11px,1vw,13px);color:rgba(255,255,255,.55);display:flex;align-items:center;justify-content:center;min-width:0}
+    .s4-table .cell:first-child{text-align:left;justify-content:flex-start;color:rgba(255,255,255,.28);font-weight:500;flex:1.2}
+    .s4-table .head .cell{font-family:'Manrope',sans-serif;font-weight:800;font-size:clamp(13px,1.4vw,16px);text-transform:uppercase;letter-spacing:.04em;color:rgba(255,255,255,.6);padding:clamp(14px,2vh,18px) clamp(10px,1.5vw,16px) clamp(12px,1.6vh,14px)}
+    .s4-table .head{background:rgba(255,255,255,.04)}
+    .s4-table .price{font-family:'Manrope',sans-serif;font-weight:800;font-size:clamp(18px,2.2vw,22px);color:rgba(255,255,255,.9);line-height:1}
     .s4-table .price small{font-size:.42em;color:#fff;font-weight:500}
     .s4-table .feat-col{border-left:1px solid rgba(192,132,252,.1);background:rgba(192,132,252,.02)}
     .s4-table .check{color:#10b981;font-size:12px}
     .s4-table .check.anim{opacity:0;transform:scale(.6)}
     .s4-table .check.anim-in{animation:checkPop .5s cubic-bezier(.34,1.56,.64,1) forwards}
     @keyframes checkPop{0%{opacity:0;transform:scale(.6)}60%{opacity:1;transform:scale(1.2)}100%{opacity:1;transform:scale(1)}}
-    @keyframes colGlow{0%{background:rgba(34,211,238,.1);box-shadow:inset 0 0 20px rgba(34,211,238,.06)}100%{background:transparent;box-shadow:none}}
-    .col-flash{animation:colGlow .7s ease-out}
     .s4-table .dash{color:rgba(255,255,255,.08);font-size:10px}
     .s4-toggle{display:none;text-align:center}
     @media(max-width:599px){.s4-toggle{display:block}}
@@ -537,52 +535,26 @@
         enter: function(token){
           if(!isLive(token)) return;
           var p = document.getElementById('s4Pricing'); if(p){p.style.opacity='1';p.style.transform='translateY(0)';}
-          // Column-by-column reveal: highlight column → checks pop in
-          var allRows = document.querySelectorAll('.s4-table .row');
-          var dataRows = document.querySelectorAll('.s4-table .row:not(.head)');
-          var colGap = 750; // ms between columns
-          for (var col = 2; col <= 5; col++) {
-            (function(colIdx){
-              setTimeout(function(){
-                if(!isLive(token)) return;
-                // Flash entire column
-                allRows.forEach(function(row){
-                  var cell = row.querySelector('.cell:nth-child('+colIdx+')');
-                  if(cell){ cell.classList.add('col-flash'); }
-                });
-                // After flash starts, pop checks in this column top→bottom
-                setTimeout(function(){
-                  if(!isLive(token)) return;
-                  dataRows.forEach(function(row, ri){
-                    var cell = row.querySelector('.cell:nth-child('+colIdx+')');
-                    var check = cell ? cell.querySelector('.check.anim') : null;
-                    if(check){
-                      setTimeout(function(){
-                        if(!isLive(token)) return;
-                        check.classList.add('anim-in');
-                      }, ri * 110);
-                    }
-                  });
-                }, 200);
-              }, (col - 2) * colGap);
-            })(col);
-          }
-          // Show CTA after all columns resolve
-          var ctaDelay = (4 * colGap) + 800;
+          // Animate check marks in sequence
+          var checks = document.querySelectorAll('.s4-table .check.anim');
+          checks.forEach(function(ch, i){
+            setTimeout(function(){
+              if(!isLive(token)) return;
+              ch.classList.add('anim-in');
+            }, 200 + (i * 60));
+          });
+          // Show CTA after checks animate + pricing table resolves
           setTimeout(function(){
             if(!isLive(token)) return;
             var cta = document.getElementById('pricingCta');
             if(cta) cta.classList.add('is-visible');
-          }, ctaDelay);
+          }, 1800);
         },
         leave: function(token){
           var p = document.getElementById('s4Pricing'); if(p){p.style.opacity='0';p.style.transform='translateY(16px)';}
           var cta = document.getElementById('pricingCta'); if(cta) cta.classList.remove('is-visible');
-          // Reset check animations and column flashes
           var checks = document.querySelectorAll('.s4-table .check.anim-in');
           checks.forEach(function(ch){ ch.classList.remove('anim-in'); });
-          var flashes = document.querySelectorAll('.s4-table .col-flash');
-          flashes.forEach(function(cell){ cell.classList.remove('col-flash'); });
         }
       }
     ];
