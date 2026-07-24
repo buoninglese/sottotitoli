@@ -1,1200 +1,739 @@
 <!DOCTYPE html>
 <html lang="it" dir="ltr" data-theme="dark">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<title>Sottotitoli — Sottotitoli e traduzione in tempo reale</title>
-<meta name="description" content="Sottotitoli e traduzione in tempo reale. Uno strumento che unisce comprensione e apprendimento in un'unica esperienza.">
-<meta name="theme-color" content="#0f172a">
-<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎧</text></svg>">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,400;14..32,500;14..32,600;14..32,700;14..32,800;14..32,900&family=Manrope:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/theme-2.css">
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" media="print" onload="this.media='all'">
-<link rel="preload" as="image" href="img/bg-home.png">
-<style>
-*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-:root{
-  --t-micro: 220ms cubic-bezier(.2,.8,.2,1);
-  --t-lift: 300ms cubic-bezier(.2,.8,.2,1);
-  --t-surface: 450ms cubic-bezier(.2,.8,.2,1);
-}
-:focus-visible{
-  outline: 2px solid rgba(255,255,255,.45);
-  outline-offset: 3px;
-  border-radius: inherit;
-}
-:root{--cyan:#06b6d4}
-[data-theme="light"]{--cyan:#0e7490}
-body{font-family:'Inter',ui-sans-serif,system-ui,sans-serif;overflow:hidden;height:100dvh;background:url('img/bg-home.png') center/cover no-repeat;color:#fff}
-body::before{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;background:rgba(0,0,0,.3)}
-/* Crossfade blend layers */
-.bg-xf-a{position:fixed;inset:0;z-index:1;pointer-events:none;background:transparent;animation:bgXfA 40s ease-in-out infinite}
-.bg-xf-b{position:fixed;inset:0;z-index:1;pointer-events:none;background:linear-gradient(180deg,rgba(15,30,60,.22),rgba(10,25,50,.14),rgba(5,15,30,.1));animation:bgXfB 40s ease-in-out infinite}
-@keyframes bgXfA{0%,35%{opacity:1}60%,100%{opacity:1}}
-@keyframes bgXfB{0%,30%{opacity:0}45%,55%{opacity:1}70%,100%{opacity:0}}
-/* Page border */
-.page-border{position:fixed;inset:0;z-index:200;pointer-events:none;border-radius:20px;box-shadow:inset 0 0 80px rgba(0,0,0,.65),inset 0 0 0 1.5px rgba(255,255,255,.08),0 0 30px rgba(0,0,0,.4);margin:10px}
-.topbar{position:fixed;top:20px;left:20px;right:20px;z-index:100;display:flex;align-items:center;justify-content:space-between;padding:0 22px;height:72px;background:transparent}
-.topbar-right{display:flex;align-items:center;gap:10px}
-.topbar-login{display:inline-flex;align-items:center;gap:6px;height:34px;padding:0 14px;border-radius:10px;background:rgba(0,0,0,.25);color:#fff;font-size:13px;font-weight:600;border:1px solid rgba(255,255,255,.25);cursor:pointer;font-family:'Inter',sans-serif;text-decoration:none;text-shadow:0 1px 4px rgba(0,0,0,.3);transition:border-color var(--t-micro),background var(--t-micro),transform var(--t-lift)}
-.topbar-login:hover{border-color:rgba(255,255,255,.5);background:rgba(0,0,0,.4);transform:translateY(-1px)}
-.topbar-login:active{transform:translateY(0) scale(.98)}
-.slider{position:fixed;inset:0}
-.slide{position:absolute;inset:0;display:grid;grid-template-columns:66.667fr 33.333fr;pointer-events:none;z-index:0;clip-path:polygon(0 0,100% 0,100% 100%,0 100%);overflow:visible;background:transparent;visibility:hidden}
-@media(max-width:768px){.slide{grid-template-columns:1fr}}
-.slide.active{z-index:2;pointer-events:auto;visibility:visible}
-.text-side{display:flex;align-items:center;padding-left:clamp(40px,8vw,10%);position:relative;z-index:2}
-@media(max-width:768px){.text-side{padding:40px 28px;justify-content:center;text-align:center}}
-.text-inner{max-width:560px;width:100%}
-.slide-tag{font-family:'Inter',sans-serif;font-size:13px;font-weight:500;color:rgba(255,255,255,.45);margin-bottom:12px;letter-spacing:.04em;text-transform:uppercase;opacity:0;transform:translateY(16px);transition:opacity .55s ease .05s,transform .55s ease .05s}
-.slide-h2{font-family:'Manrope',sans-serif;font-size:clamp(44px,6vw,64px);font-weight:800;line-height:1.12;letter-spacing:-2.5px;color:#fff;margin-bottom:24px;opacity:0;transform:translateY(16px);transition:opacity .55s ease .15s,transform .55s ease .15s;text-shadow:-1px -1px 0 rgba(6,182,212,.4),1px 1px 0 rgba(0,0,0,.8),0 3px 10px rgba(0,0,0,.6)}
-.slide-h2 .hl{color:var(--cyan)}
-.slide-p{font-family:'Inter',sans-serif;font-size:16px;line-height:1.6;color:rgba(255,255,255,.55);margin-bottom:28px;max-width:440px;opacity:0;transform:translateY(16px);transition:opacity .55s ease .2s,transform .55s ease .2s}
-.slide-cta{display:inline-flex;align-items:center;gap:8px;font-family:'Inter',sans-serif;font-size:14px;font-weight:600;color:#fff;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15);padding:10px 20px;border-radius:100px;cursor:pointer;text-decoration:none;opacity:0;transform:translateY(16px);transition:opacity .55s ease .25s,transform .55s ease .25s,background var(--t-micro),border-color var(--t-micro)}
-.slide-cta:hover{background:rgba(255,255,255,.14);border-color:rgba(255,255,255,.3)}
-.slide-cta .icon{width:12px;height:12px;stroke:#fff;stroke-width:2.5;fill:none}
-.active .slide-tag,.active .slide-h2,.active .slide-p,.active .slide-cta{opacity:1;transform:translateY(0)}
-.active .slide-cta{transition:opacity .55s ease .25s,transform .55s ease .25s,background var(--t-micro),border-color var(--t-micro)}
-/* Slide 4 — Pricing: table (desktop) + toggle card (mobile) — always stacked vertically */
-.s4-pricing{opacity:0;transform:translateY(16px);transition:opacity .55s ease .3s,transform .55s ease .3s;max-width:640px;width:100%}
-.active .s4-pricing{opacity:1;transform:translateY(0)}
-/* Table (desktop) */
-.s4-table{display:none}
-@media(min-width:600px){.s4-table{display:block}}
-.s4-table-inner{overflow:hidden;border-radius:16px;border:1px solid rgba(255,255,255,.06);background:rgba(255,255,255,.012)}
-.s4-table .row{display:flex;border-bottom:1px solid rgba(255,255,255,.04);transition:background var(--t-micro)}
-.s4-table .row:last-child{border-bottom:none}
-.s4-table .row:hover{background:rgba(255,255,255,.015)}
-.s4-table .cell{flex:1;padding:clamp(10px,1.6vh,14px) clamp(10px,1.5vw,16px);text-align:center;font-size:clamp(11px,1vw,13px);display:flex;align-items:center;justify-content:center;min-width:0}
-.s4-table .cell:first-child{text-align:left;justify-content:flex-start;color:rgba(255,255,255,.35);font-weight:500;flex:1.2}
-.s4-table .head .cell{font-weight:700;font-size:clamp(10px,.9vw,11px);text-transform:uppercase;letter-spacing:.08em;color:rgba(255,255,255,.35);padding:clamp(14px,2vh,18px) clamp(10px,1.5vw,16px) clamp(12px,1.6vh,14px)}
-.s4-table .head{background:rgba(255,255,255,.015)}
-.s4-table .price{font-family:'Manrope',sans-serif;font-weight:800;font-size:clamp(18px,2.2vw,22px);color:#fff;line-height:1}
-.s4-table .price small{font-size:.42em;color:#fff;font-weight:500}
-.s4-table .feat-col{border-left:1px solid rgba(192,132,252,.1);background:rgba(192,132,252,.02)}
-.s4-table .check{color:#10b981;font-size:12px}
-.s4-table .dash{color:rgba(255,255,255,.08);font-size:10px}
-/* Toggle card (mobile) */
-.s4-toggle{display:none;text-align:center}
-@media(max-width:599px){.s4-toggle{display:block}}
-.s4-toggle .toggle-row{display:inline-flex;flex-wrap:wrap;justify-content:center;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.06);border-radius:100px;padding:3px;margin-bottom:16px}
-.s4-toggle .toggle-btn{padding:7px 14px;border-radius:100px;font-size:11px;font-weight:600;cursor:pointer;color:rgba(255,255,255,.4);transition:color var(--t-micro),background var(--t-micro);border:none;background:none;font-family:'Inter',sans-serif;white-space:nowrap}
-.s4-toggle .toggle-btn.active{background:rgba(192,132,252,.2);color:#c084fc}
-.s4-toggle .main-card{background:linear-gradient(180deg,rgba(192,132,252,.08),rgba(192,132,252,.01));border:1px solid rgba(192,132,252,.15);border-radius:20px;padding:28px 24px;max-width:360px;margin:0 auto}
-.s4-toggle .main-tier{font-weight:800;font-size:14px;text-transform:uppercase;letter-spacing:.06em;color:#c084fc;margin-bottom:6px}
-.s4-toggle .main-price{font-family:'Manrope',sans-serif;font-weight:900;font-size:clamp(42px,7vw,52px);color:#fff;line-height:1;margin:2px 0}
-.s4-toggle .main-price small{font-size:.32em;color:#fff;font-weight:600}
-.s4-toggle .main-detail{color:rgba(255,255,255,.35);font-size:13px;line-height:1.5}
-.s4-toggle .dots{display:flex;justify-content:center;gap:7px;margin-top:14px}
-.s4-toggle .dot{width:7px;height:7px;border-radius:50%;background:rgba(255,255,255,.1);cursor:pointer;transition:background var(--t-micro),transform var(--t-lift)}
-.s4-toggle .dot.active{background:var(--cyan);transform:scale(1.3)}
-#s4UlLine.draw{animation:drawUnderline .9s ease-out forwards}
-.slide-right{display:flex;align-items:center;justify-content:center;padding:20px}
-@media(max-width:768px){.slide-right{padding:0 28px 40px}}
-@keyframes fadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
-@keyframes popIn{from{opacity:0;transform:scale(.88)}to{opacity:1;transform:scale(1)}}
-/* Kubrick — slow symmetrical reveals */
-@keyframes kubrickSlow{0%{opacity:0;transform:scale(.95)}60%{opacity:.4}100%{opacity:1;transform:scale(1)}}
-@keyframes kubrickTrack{0%{opacity:0;transform:translateY(40px)}100%{opacity:1;transform:translateY(0)}}
-.kubrick-slow{animation:kubrickSlow 2s ease-out both}
-.kubrick-track{animation:kubrickTrack 1.6s cubic-bezier(.25,.1,.1,1) both}
-/* CEFR bars */
-.cefr-row{display:flex;align-items:center;gap:10px}
-.cefr-lbl{font-size:12px;font-weight:700;font-family:'JetBrains Mono',monospace;width:26px}
-.cefr-trk{flex:1;height:clamp(9px,1.1vh,12px);background:rgba(255,255,255,.04);border-radius:5px;overflow:hidden}
-.cefr-fill{height:100%;border-radius:5px;width:0%}
-.cefr-fill.animate-grow{transition:width .7s cubic-bezier(.34,1.56,.64,1)}
-/* Word recognition glow */
-.s2-word{border-radius:.4em;transition:all .4s cubic-bezier(.175,.885,.32,1.275);cursor:default}
-.s2-word[data-word]:hover{background:rgba(255,255,255,.06)}
-.s2-word.is-found-c1{color:#fff;background:rgba(168,85,247,.22);box-shadow:0 0 0 2px rgba(168,85,247,.4),0 0 28px rgba(168,85,247,.3);transform:scale(1.07)}
-.s2-word.is-found-c2{color:#fff;background:rgba(6,182,212,.22);box-shadow:0 0 0 3px rgba(6,182,212,.5),0 0 40px rgba(6,182,212,.4);transform:scale(1.1);animation:s2C2Force .55s cubic-bezier(.175,.885,.32,1.275)}
-@keyframes s2C2Force{0%{transform:scale(1)}55%{transform:scale(1.14)}100%{transform:scale(1.1)}}
-/* C2 card reveal */
-#s2C2Box.is-visible{visibility:visible!important;opacity:1!important;transform:scale(1)!important;transition:opacity .35s ease-out,transform .6s cubic-bezier(.175,.885,.32,1.275)}
-#s2C2Box.is-visible i{animation:s2GemGlow .9s ease-out}
-@keyframes s2GemGlow{0%{filter:drop-shadow(0 0 30px rgba(6,182,212,.9)) brightness(2)}60%{filter:drop-shadow(0 0 12px rgba(6,182,212,.5))}100%{filter:drop-shadow(0 0 4px rgba(6,182,212,.25))}}
-/* Word-level recognition glow */
-.word-glow-c1{box-shadow:0 0 0 1px rgba(140,100,255,.18),0 0 18px rgba(140,100,255,.18);background:rgba(124,92,255,.12);color:rgba(245,245,255,.98);border-radius:.4em;transition:all 320ms ease-out}
-.word-glow-c2{box-shadow:0 0 0 1px rgba(70,220,255,.28),0 0 24px rgba(70,220,255,.24);background:rgba(70,220,255,.13);color:rgba(245,255,255,.99);border-radius:.4em;transform:scale(1.03);transition:all 360ms ease-out}
-.trans-pair-row{animation:fadeIn .4s ease-out both}
-.trans-en{font-size:13px;color:#fff;font-weight:600;margin-bottom:2px;min-height:20px}
-.trans-it{font-size:12px;color:var(--cyan);font-style:italic;min-height:18px;opacity:0}
-.trans-it em{font-style:italic;position:relative;white-space:nowrap}
-.trans-it em::after{content:'';position:absolute;bottom:-2px;left:0;width:0;height:2px;background:var(--cyan);border-radius:1px}
-.trans-it em.underline-on::after{animation:drawUnderline .9s ease-out forwards}
-@keyframes drawUnderline{from{width:0}to{width:100%}}
-.bottom-nav{position:fixed;bottom:20px;left:20px;right:20px;z-index:60;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;padding:20px 20px 14px}
-.bottom-nav-row{display:flex;align-items:center;justify-content:center;gap:44px}
-.bottom-nav a{font-size:11px;font-weight:500;color:rgba(255,255,255,.3);text-decoration:none;transition:color var(--t-micro);font-family:'Inter',sans-serif}
-.bottom-nav a:hover{color:rgba(255,255,255,.7)}
-.bottom-copy{font-size:11px;font-weight:500;color:rgba(255,255,255,.3);font-family:'Inter',sans-serif;letter-spacing:.02em}
-.nav-dots{display:flex;gap:8px;align-items:center}
-.nav-dot{width:6px;height:6px;border-radius:50%;background:rgba(255,255,255,.2);cursor:pointer;position:relative;transition:background var(--t-micro),transform var(--t-lift)}
-.nav-dot.active{background:var(--cyan);transform:scale(1.4)}
-.nav-dot::after{content:'';position:absolute;inset:-10px}
-.nav-dot:hover{background:rgba(255,255,255,.35);box-shadow:0 0 0 2px rgba(255,255,255,.15)}
-@media(max-width:768px){.bottom-nav{gap:24px;padding:20px 12px}}
-.s1,.s2,.s3{grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr}
-.s1 .text-side,.s2 .text-side,.s3 .text-side{padding-left:0;padding-right:0}
-.s1 .slide-right,.s2 .slide-right{padding:0 0 0 clamp(4px,1vw,16px)}
-.continua-btn{position:absolute;bottom:clamp(70px,12vh,90px);left:50%;transform:translateX(-50%);display:inline-flex;align-items:center;gap:8px;z-index:70;font-family:'Inter',sans-serif;font-size:14px;font-weight:600;color:#fff;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15);padding:10px 22px;border-radius:100px;cursor:pointer;text-decoration:none;opacity:0;transition:opacity var(--t-surface),background var(--t-micro),border-color var(--t-micro),transform var(--t-lift);pointer-events:none}
-.continua-btn.show{opacity:1;pointer-events:auto}
-.continua-btn:hover{background:rgba(255,255,255,.14);border-color:rgba(255,255,255,.3);transform:translateY(-1px)}
-.continua-btn:active{transform:translateY(0) scale(.97)}
-.continua-btn .icon{width:12px;height:12px;stroke:#fff;stroke-width:2.5;fill:none}
-.slide-exit{animation:slideExit .55s cubic-bezier(.55,0,.12,1) forwards}
-@keyframes slideExit{from{opacity:1;transform:translateY(0)}to{opacity:0;transform:translateY(-60px)}}
-.slide.mask-out{animation:maskOut .62s cubic-bezier(.55,0,.12,1) forwards;z-index:3;visibility:visible}
-.slide.mask-in{animation:maskIn .62s cubic-bezier(.55,0,.12,1) forwards;z-index:4;visibility:visible}
-@keyframes maskOut{from{clip-path:polygon(0 0,100% 0,100% 100%,0 100%)}to{clip-path:polygon(0 100%,100% 100%,100% 100%,0 100%)}}
-@keyframes maskIn{from{clip-path:polygon(0 0,100% 0,100% 0,0 0)}to{clip-path:polygon(0 0,100% 0,100% 100%,0 100%)}}
-.viz-word-family{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none;z-index:0;opacity:0;transition:opacity .8s ease}
-@keyframes orbit{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
-@keyframes softGlow{0%,100%{box-shadow:0 0 6px rgba(6,182,212,.15)}50%{box-shadow:0 0 18px rgba(6,182,212,.4)}}
-.sat-spin{animation:orbit 8s linear infinite;transform-origin:center center}
-/* Phone entrance: decelerating rise from below */
-@keyframes phoneRise{0%{opacity:0;transform:scale(1.55) translateY(120px)}100%{opacity:1;transform:scale(1.55) translateY(0)}}
-#phoneZoom.phone-enter{animation:phoneRise 2s cubic-bezier(.25,.1,.1,1) both}
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="description" content="Sottotitoli e traduzione in tempo reale. Uno strumento che unisce comprensione e apprendimento in un'unica esperienza.">
+  <meta name="theme-color" content="#050810">
+  <meta property="og:title" content="Sottotitoli — Traduzione e comprensione in tempo reale">
+  <meta property="og:description" content="Ascolta in italiano. Leggi in inglese. Capisci tutto, subito.">
+  <meta property="og:type" content="website">
+  <title>Sottotitoli — Traduzione e comprensione in tempo reale</title>
 
-/* ── Slide 1 · Phone mockup ── */
-.s1-phone-wrap{
-  display:flex;align-items:center;justify-content:center;
-  height:100%;width:100%;
-}
-.s1-phone-frame{
-  position:relative;display:flex;flex-direction:column;
-  aspect-ratio:9/19;
-  height:min(82vh,100%);
-  background:#000;border:3px solid #2a2a30;
-  border-radius:clamp(24px,3.5vw,34px);overflow:hidden;
-  box-shadow:0 20px 50px rgba(0,0,0,.6),0 0 0 2px #1a1a20,0 0 0 5px #0a0a0e,0 0 0 7px #1c1c24;
-}
-.s1-phone-notch-wrap{
-  position:relative;z-index:3;display:flex;justify-content:center;
-  background:#000;padding-top:clamp(6px,1vh,8px);
-}
-.s1-phone-notch{
-  width:clamp(56px,30%,80px);height:clamp(16px,2.6vh,22px);background:#000;
-  border-radius:0 0 16px 16px;
-}
-.s1-phone-screen{
-  flex:1;min-height:0;
-  background:linear-gradient(180deg,#0f1922 0%,#0b1018 100%);
-  display:flex;flex-direction:column;overflow:hidden;
-}
-.s1-phone-status-bar{
-  display:flex;justify-content:space-between;align-items:center;
-  padding:clamp(4px,1vh,6px) clamp(10px,3vw,16px) clamp(2px,.5vh,4px);
-  font-size:clamp(8px,1.1vw,10px);font-weight:600;
-  color:rgba(255,255,255,.5);flex-shrink:0;
-}
-.s1-phone-status-bar .time{font-size:clamp(9px,1.2vw,11px);font-weight:700;color:#fff}
-.s1-phone-body{
-  flex:1;min-height:0;overflow-y:auto;
-  padding:clamp(3px,.6vh,6px) clamp(8px,2.5vw,12px) 0;
-  display:flex;flex-direction:column;
-}
-.s1-phone-nav-bottom{
-  display:flex;align-items:center;justify-content:space-around;
-  padding:clamp(5px,1vh,8px) clamp(4px,1vw,6px) clamp(12px,2.2vh,16px);
-  border-top:1px solid rgba(255,255,255,.06);
-  background:rgba(0,0,0,.5);flex-shrink:0;
-}
-.s1-phone-nav-bottom .stab{
-  display:flex;flex-direction:column;align-items:center;gap:2px;
-  font-size:clamp(5px,.7vw,7px);color:rgba(255,255,255,.25);cursor:default;
-  transition:color .2s;
-}
-.s1-phone-nav-bottom .stab.active{color:var(--cyan)}
-.s1-phone-nav-bottom .stab i{font-size:clamp(9px,1.4vw,13px)}
-.s1-phone-app-title{
-  font-size:clamp(7px,.9vw,9px);font-weight:700;
-  color:rgba(255,255,255,.22);text-transform:uppercase;
-  letter-spacing:.05em;margin-bottom:clamp(3px,.6vh,6px);flex-shrink:0;
-}
-/* trans-pair rows inside phone — smaller font scale */
-#slide1Trans{display:flex;flex-direction:column;gap:clamp(3px,.8vh,8px);flex:1}
-#slide1Trans .trans-en{font-size:clamp(9px,1.2vw,12px);color:#fff;font-weight:600;margin-bottom:1px;min-height:auto}
-#slide1Trans .trans-it{font-size:clamp(8px,1.05vw,11px);color:var(--cyan);font-style:italic;min-height:auto}
-#slide1Trans .trans-it em{font-style:italic;position:relative;white-space:nowrap}
-#slide1Trans .trans-it em::after{content:'';position:absolute;bottom:-1px;left:0;width:0;height:1.5px;background:var(--cyan);border-radius:1px}
-#slide1Trans .trans-it em.underline-on::after{animation:drawUnderline .9s ease-out forwards}
-.trans-pair-row{animation:fadeIn .4s ease-out both}
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Manrope:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/theme-2.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" media="print" onload="this.media='all'">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎧</text></svg>">
 
-/* ── Phone conversation + card (slide 2) ── */
-.phone-wrap{display:flex;align-items:center;justify-content:center}
-.phone-frame{position:relative;display:flex;flex-direction:column;aspect-ratio:9/19.3;height:min(88vh,680px);background:#000;border:2px solid #1a1a22;border-radius:clamp(28px,3.5vw,40px);overflow:hidden;box-shadow:0 20px 50px rgba(0,0,0,.7),0 0 0 1px #0a0a0e,0 0 0 4px #0f0f15,0 0 0 5.5px #1a1a22}
-.phone-dynamic-island{position:relative;z-index:3;display:flex;justify-content:center;background:#000;padding-top:clamp(7px,1vh,10px)}
-.phone-island-pill{width:clamp(68px,32%,96px);height:clamp(16px,2.5vh,22px);background:#000;border-radius:20px;border:1px solid rgba(255,255,255,.05)}
-.phone-screen{flex:1;min-height:0;background:linear-gradient(180deg,#0f1922 0%,#0a1018 100%);display:flex;flex-direction:column;overflow:hidden}
-.phone-status-bar{display:flex;justify-content:space-between;align-items:center;padding:clamp(4px,1vh,6px) clamp(10px,3vw,16px) clamp(2px,.5vh,4px);font-size:clamp(9px,1.2vw,11px);font-weight:600;color:rgba(255,255,255,.45);flex-shrink:0}
-.phone-status-bar .time{font-size:clamp(10px,1.4vw,12px);font-weight:700;color:#fff}
-.phone-body{flex:1;min-height:0;overflow-y:auto;padding:clamp(6px,1.5vh,12px) clamp(8px,2.5vw,12px) 0;display:flex;flex-direction:column}
-.phone-nav-bottom{display:flex;align-items:center;justify-content:space-around;padding:clamp(5px,1vh,8px) clamp(5px,1vw,6px) clamp(12px,2.5vh,16px);border-top:1px solid rgba(255,255,255,.05);background:rgba(0,0,0,.5);flex-shrink:0}
-.phone-nav-bottom .stab{display:flex;flex-direction:column;align-items:center;gap:1px;font-size:clamp(6px,.8vw,8px);color:rgba(255,255,255,.2);cursor:default}
-.phone-nav-bottom .stab.active{color:var(--cyan)}
-.phone-nav-bottom .stab i{font-size:clamp(10px,1.6vw,14px)}
-.phone-logo::before{content:'sottotitoli'}
-.phone-app-title{font-size:clamp(8px,1vw,10px);font-weight:700;color:rgba(255,255,255,.18);text-transform:uppercase;letter-spacing:.04em;margin-bottom:clamp(4px,.8vh,8px);flex-shrink:0}
-.phone-convo{display:flex;flex-direction:column;gap:5px;flex:1;overflow-y:auto;padding-bottom:2px}
-.phone-bub{padding:8px 11px;border-radius:14px;line-height:1.5;font-size:clamp(11px,1.4vw,13px);max-width:84%;animation:bubIn .45s ease-out both;position:relative}
-.phone-bub.other{background:linear-gradient(135deg,rgba(59,130,246,.12),rgba(59,130,246,.03));border:1px solid rgba(59,130,246,.08);align-self:flex-end;border-bottom-right-radius:3px;border-bottom-left-radius:14px;color:#b8d4fe;text-align:right}
-.phone-bub.self{background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.05);align-self:flex-start;border-bottom-left-radius:3px;border-bottom-right-radius:14px;max-width:68%}
-.phone-bub .w{display:inline-block;cursor:pointer;border-radius:2px;padding:0 2px;margin:0 1px;transition:background .12s}
-.phone-bub .w:hover{background:rgba(8,145,178,.22)}
-.phone-bub .w.active{background:rgba(8,145,178,.35);color:#fff}
-.phone-bub-foot{font-size:10px;color:rgba(255,255,255,.45);margin-top:2px;display:flex;align-items:center;gap:3px;font-weight:600}
-.phone-bub.other .phone-bub-foot{justify-content:flex-end}
-@keyframes bubIn{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
-.phone-card-wrap{width:100%;opacity:0;transform:translateY(6px);transition:opacity .3s,transform .4s}
-.phone-card-wrap.show{opacity:1;transform:translateY(0)}
-.phone-card{background:#111b24;border:1px solid #1f2e3a;border-radius:9px;padding:9px 11px;box-shadow:0 4px 16px rgba(0,0,0,.5);text-align:left}
-.phone-card .pc-head{display:flex;align-items:baseline;gap:4px;margin-bottom:2px}
-.phone-card .pc-w{font-size:16px;font-weight:800;color:#fff;font-family:'Manrope',sans-serif}
-.phone-card .pc-cefr{font-size:11px;padding:2px 5px;border-radius:100px;font-weight:700}
-.phone-card .pc-pos{font-size:11px;color:rgba(255,255,255,.3)}
-.phone-card .pc-ipa{font-size:11px;color:var(--cyan);margin-bottom:4px}
-.phone-card .pc-def{font-size:12px;color:rgba(255,255,255,.4);line-height:1.45;margin-bottom:2px}
-.phone-card .pc-trans{font-size:12px;color:var(--cyan);font-weight:600;margin-bottom:4px}
-.phone-card .pc-syns{display:flex;gap:3px;flex-wrap:wrap}
-.phone-card .pc-syns span{font-size:11px;padding:2px 6px;border-radius:100px;font-weight:600;background:rgba(8,145,178,.08);color:var(--cyan);border:1px solid rgba(8,145,178,.1)}
-@media(max-width:768px){
-  #s2Screen{display:none!important}
-  #s2TitleL{left:20px!important;font-size:clamp(24px,6vw,38px)!important}
-}
-@media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
-    scroll-behavior: auto !important;
-  }
-  .page-border { box-shadow: inset 0 0 0 1px rgba(255,255,255,.08); }
-  .bg-xf-a, .bg-xf-b { animation: none !important; opacity: 1 !important; }
-}
-/* ── Subtitle Stream Slide ── */
-.flow-slide .flow-eyebrow{font-family:'Inter',sans-serif;font-size:12px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:rgba(255,255,255,.55);margin-bottom:16px;opacity:0;transform:translateY(16px);transition:opacity .55s ease .05s,transform .55s ease .05s}
-.flow-slide .flow-headline{font-family:'Manrope',sans-serif;font-size:clamp(36px,5vw,48px);font-weight:800;color:#fff;letter-spacing:-1.5px;margin-bottom:18px;line-height:1.12;opacity:0;transform:translateY(16px);transition:opacity .55s ease .15s,transform .55s ease .15s;text-shadow:-1px -1px 0 rgba(6,182,212,.4),1px 1px 0 rgba(0,0,0,.8),0 3px 10px rgba(0,0,0,.6)}
-.flow-slide .flow-body{font-family:'Inter',sans-serif;font-size:16px;line-height:1.6;color:rgba(255,255,255,.55);margin-bottom:28px;max-width:440px;opacity:0;transform:translateY(16px);transition:opacity .55s ease .2s,transform .55s ease .2s}
-.flow-slide .flow-cta{position:static;transform:translateY(16px);opacity:0;transition:opacity .55s ease .25s,transform .55s ease .25s,background var(--t-micro),border-color var(--t-micro)}
-.flow-slide.active .flow-eyebrow,.flow-slide.active .flow-headline,.flow-slide.active .flow-body,.flow-slide.active .flow-cta{opacity:1;transform:translateY(0)}
-.flow-slide.active .flow-cta{transition:opacity .55s ease .25s,transform .55s ease .25s,background var(--t-micro),border-color var(--t-micro)}
-.subtitle-stream-frame{position:relative;width:100%;max-width:520px;padding:36px 32px;border-radius:22px;background:rgba(255,255,255,.025);border:1px solid rgba(255,255,255,.08);box-shadow:0 32px 64px rgba(0,0,0,.35),inset 0 1px 0 rgba(255,255,255,.06);display:flex;flex-direction:column;gap:28px}
-.subtitle-line{display:flex;align-items:flex-start;gap:16px;opacity:0;transform:translateY(14px) scale(.98);filter:blur(6px);transition:opacity 750ms cubic-bezier(.2,.8,.2,1),transform 750ms cubic-bezier(.2,.8,.2,1),filter 750ms cubic-bezier(.2,.8,.2,1)}
-.subtitle-line.is-visible{opacity:1;transform:translateY(0) scale(1);filter:blur(0)}
-.accent-bar{width:3px;flex-shrink:0;border-radius:3px;align-self:stretch;background:linear-gradient(to bottom,var(--cyan),rgba(6,182,212,.1));opacity:0;transform:scaleY(0);transform-origin:top;transition:opacity 400ms var(--t-lift),transform 400ms var(--t-lift);min-height:48px}
-.subtitle-line.is-visible .accent-bar{opacity:1;transform:scaleY(1)}
-.line-content{display:flex;flex-direction:column;gap:6px;padding-top:2px}
-.lang-it{font-family:'Manrope',sans-serif;font-size:19px;font-weight:600;color:#fff;line-height:1.35}
-.lang-en{font-family:'Inter',sans-serif;font-size:13px;font-weight:400;color:rgba(255,255,255,.48);line-height:1.4;letter-spacing:.01em}
-.stream-indicator{display:flex;gap:6px;justify-content:center;align-items:center;margin-top:4px}
-.stream-indicator span{display:block;width:5px;height:5px;border-radius:50%;background:rgba(255,255,255,.25);animation:streamPulse 1.6s cubic-bezier(.2,.8,.2,1) infinite both}
-.stream-indicator span:nth-child(1){animation-delay:0s}
-.stream-indicator span:nth-child(2){animation-delay:.25s}
-.stream-indicator span:nth-child(3){animation-delay:.5s}
-@keyframes streamPulse{0%,100%{opacity:.25;transform:scale(1)}50%{opacity:1;transform:scale(1.5)}}
-@media(max-width:900px){.subtitle-stream-frame{max-width:100%;padding:24px 20px;gap:20px}.lang-it{font-size:17px}.flow-slide .flow-headline{font-size:clamp(28px,5vw,36px)}}
-html{
-  scrollbar-width: thin;
-  scrollbar-color: rgba(255,255,255,.12) transparent;
-}
-</style>
+  <style>
+    :root{
+      --bg:#050810;
+      --surface:rgba(255,255,255,.03);
+      --text:#f8fafc;
+      --text-secondary:rgba(226,232,240,.70);
+      --accent:#22d3ee;
+      --accent-glow:rgba(34,211,238,.35);
+      --radius:14px;
+      --radius-pill:999px;
+      --t-micro:180ms cubic-bezier(.2,.8,.2,1);
+      --t-lift:280ms cubic-bezier(.34,1.56,.64,1);
+      --t-surface:500ms cubic-bezier(.2,.8,.2,1);
+    }
+    *,*::before,*::after{box-sizing:border-box}
+    ::selection{background:rgba(34,211,238,.22);color:#fff}
+    html{scrollbar-width:thin;scrollbar-color:rgba(34,211,238,.15) transparent}
+    ::-webkit-scrollbar{width:6px}
+    ::-webkit-scrollbar-track{background:transparent}
+    ::-webkit-scrollbar-thumb{background:rgba(34,211,238,.15);border-radius:3px}
+    ::-webkit-scrollbar-thumb:hover{background:rgba(34,211,238,.28)}
+    body{
+      margin:0;background:var(--bg);color:var(--text);
+      font-family:'Inter',system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;
+      min-height:100vh;overflow-x:hidden;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;
+    }
+    .bg-xf-a,.bg-xf-b{position:fixed;inset:0;z-index:-2;background-size:cover;background-position:center}
+    .bg-xf-a{background-image:linear-gradient(to bottom,rgba(5,8,16,.75) 0%,rgba(5,8,16,.20) 50%,rgba(5,8,16,.92) 100%),url('img/bg-home.png');animation:bgFade14s linear infinite;animation-delay:0s}
+    .bg-xf-b{background-image:linear-gradient(to bottom,rgba(5,8,16,.50) 0%,rgba(5,8,16,.10) 50%,rgba(5,8,16,.88) 100%),url('img/bg-home.png');animation:bgFade14s linear infinite;animation-delay:-7s;opacity:0}
+    @keyframes bgFade14s{0%,45%,100%{opacity:1}50%,95%{opacity:0}}
+    .bg-overlay{position:fixed;inset:0;z-index:-1;pointer-events:none;background:linear-gradient(to bottom,var(--bg) 0%,transparent 35%,transparent 65%,var(--bg) 100%)}
+    .page-border{position:fixed;inset:0;z-index:9000;pointer-events:none;border-radius:22px;margin:11px;box-shadow:inset 0 0 0 1px rgba(255,255,255,.07),inset 0 0 100px rgba(0,0,0,.35);transition:box-shadow var(--t-surface)}
+    .noise-overlay{position:fixed;inset:0;z-index:9996;pointer-events:none;opacity:.028;background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.78' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='1'/%3E%3C/svg%3E");background-repeat:repeat;background-size:150px}
+    :focus-visible{outline:2px solid var(--accent);outline-offset:3px;border-radius:inherit}
+    .topbar{position:fixed;top:20px;left:20px;right:20px;z-index:100;display:flex;align-items:center;justify-content:space-between;padding:0 22px;height:72px;background:transparent}
+    .topbar-right{display:flex;align-items:center;gap:10px}
+    .topbar-brand{display:flex;align-items:center;gap:10px;font-family:'Manrope',sans-serif;font-weight:700;font-size:17px;color:#fff;text-decoration:none;letter-spacing:-0.02em}
+    .topbar-login{display:inline-flex;align-items:center;gap:6px;height:34px;padding:0 14px;border-radius:10px;background:rgba(0,0,0,.25);color:#fff;font-size:13px;font-weight:600;border:1px solid rgba(255,255,255,.25);cursor:pointer;font-family:'Inter',sans-serif;text-decoration:none;text-shadow:0 1px 4px rgba(0,0,0,.3);transition:border-color var(--t-micro),background var(--t-micro),transform var(--t-lift)}
+    .topbar-login:hover{border-color:rgba(255,255,255,.5);background:rgba(0,0,0,.4);transform:translateY(-1px)}
+    .topbar-login:active{transform:translateY(0) scale(.98)}
+    .stage-root{position:relative;z-index:2;width:100%;height:100vh;min-height:100vh;overflow:hidden}
+    .stage-track{position:relative;width:100%;height:100vh}
+    .slide{position:absolute;top:0;left:0;width:100%;height:100vh;display:flex;align-items:center;padding:100px 40px 80px;opacity:0;pointer-events:none;z-index:1;transform:scale(1.015);transition:opacity 1100ms cubic-bezier(.25,.1,.25,1),transform 1200ms cubic-bezier(.25,.1,.25,1)}
+    .slide.active{opacity:1;pointer-events:auto;z-index:2;transform:scale(1)}
+    .slide .text-side{transform:translateY(24px);opacity:0;transition:transform 900ms cubic-bezier(.25,.1,.25,1) 150ms,opacity 800ms cubic-bezier(.25,.1,.25,1) 150ms}
+    .slide.active .text-side{transform:translateY(0);opacity:1}
+    .slide .media-side{transform:translateY(-14px) scale(.98);opacity:0;transition:transform 1000ms cubic-bezier(.25,.1,.25,1) 200ms,opacity 900ms cubic-bezier(.25,.1,.25,1) 200ms}
+    .slide.active .media-side{transform:translateY(0) scale(1);opacity:1}
+    .slide-hero .container{justify-content:center}
+    .slide-hero .text-side{max-width:640px;text-align:center}
+    .container{display:flex;align-items:center;justify-content:space-between;width:100%;max-width:1160px;margin:0 auto;gap:56px}
+    .text-side{flex:1.15;max-width:520px}
+    .media-side{flex:1;display:flex;justify-content:center;align-items:center}
+    .eyebrow{display:inline-block;font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:rgba(226,232,240,.55);margin-bottom:14px}
+    .headline{font-family:'Manrope',sans-serif;font-weight:800;color:#fff;letter-spacing:-0.02em;line-height:1.02;margin:0 0 16px;padding-bottom:0.08em;overflow:visible;background:linear-gradient(180deg,#ffffff 0%,#cbd5e1 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+    h1.headline{font-size:clamp(38px,5.5vw + 12px,68px)}
+    h2.headline{font-size:clamp(28px,3.8vw + 10px,48px)}
+    .body-text{font-family:'Inter',sans-serif;font-size:16px;font-weight:400;color:rgba(255,255,255,.78);line-height:1.65;letter-spacing:.01em;max-width:520px;margin-left:auto;margin-right:auto;text-wrap:balance;margin-bottom:30px}
+    .continua-btn{position:relative;overflow:hidden;display:inline-flex;align-items:center;gap:10px;height:48px;padding:0 24px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.10);border-radius:var(--radius-pill);color:#fff;font-family:'Inter',sans-serif;font-size:14px;font-weight:500;text-decoration:none;cursor:pointer;transition:background var(--t-micro),border-color var(--t-micro),transform var(--t-lift),box-shadow var(--t-micro)}
+    .continua-btn:hover{background:rgba(255,255,255,.10);border-color:rgba(34,211,238,.20);transform:translateY(-1px);box-shadow:0 0 24px rgba(34,211,238,.08),0 8px 24px rgba(0,0,0,.20)}
+    .continua-btn:active{transform:translateY(0) scale(.96);box-shadow:inset 0 2px 8px rgba(0,0,0,.25)}
+    .slide-cta-btn{position:absolute;bottom:90px;left:50%;transform:translateX(-50%);z-index:50;display:inline-flex;align-items:center;gap:10px;height:48px;padding:0 24px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15);border-radius:var(--radius-pill);color:#fff;font-family:'Inter',sans-serif;font-size:14px;font-weight:600;text-decoration:none;cursor:pointer;opacity:0;pointer-events:none;transition:opacity 800ms cubic-bezier(.25,.1,.25,1),background var(--t-micro),border-color var(--t-micro),transform var(--t-lift),box-shadow var(--t-micro)}
+    .slide-cta-btn.is-visible{opacity:1;pointer-events:auto}
+    .slide-cta-btn:hover{background:rgba(255,255,255,.14);border-color:rgba(34,211,238,.25);transform:translateX(-50%) translateY(-1px);box-shadow:0 0 24px rgba(34,211,238,.08),0 8px 24px rgba(0,0,0,.20)}
+    .slide-cta-btn:active{transform:translateX(-50%) translateY(0) scale(.96)}
+    .pill-arrow{display:inline-block;transition:transform var(--t-lift)}
+    .continua-btn:hover .pill-arrow{transform:translateX(4px)}
+    .phone-base{position:relative;width:250px;height:520px;background:rgba(6,9,18,.92);border-radius:24px;border:1px solid rgba(255,255,255,.10);box-shadow:0 30px 70px rgba(0,0,0,.50),0 0 0 1px rgba(34,211,238,.03),inset 0 1px 0 rgba(255,255,255,.05);overflow:hidden;animation:phoneRise 1600ms cubic-bezier(.2,.8,.2,1) forwards;opacity:0;transform:translateY(36px)}
+    .phone-notch{position:absolute;top:0;left:50%;transform:translateX(-50%);width:110px;height:26px;background:#000;border-radius:0 0 12px 12px;z-index:10}
+    .phone-screen{position:absolute;inset:8px;border-radius:20px;background:rgba(0,0,0,.40);overflow:hidden;display:flex;flex-direction:column;box-shadow:inset 0 0 30px rgba(0,0,0,.20)}
+    .phone-time{position:absolute;top:10px;left:0;right:0;text-align:center;font-family:'Inter',sans-serif;font-size:10px;font-weight:600;color:rgba(255,255,255,.50);letter-spacing:.06em;z-index:5}
+    .phone-screen-content{flex:1;display:flex;flex-direction:column;justify-content:center;align-items:center;padding:20px;text-align:center}
+    .caption-sublabel{font-family:'JetBrains Mono',monospace;font-size:7px;font-weight:700;color:var(--accent);letter-spacing:.18em;margin-bottom:6px}
+    .caption-line{font-family:'Inter',sans-serif;font-size:14px;font-weight:500;color:rgba(255,255,255,.90);line-height:1.45;opacity:0;transform:translateY(6px)}
+    .caption-line.is-visible{opacity:.90;transform:translateY(0)}
+    .phone-footer{position:absolute;bottom:0;left:0;right:0;display:flex;align-items:center;justify-content:center;gap:6px;padding:12px;background:rgba(0,0,0,.40);border-top:1px solid rgba(255,255,255,.05)}
+    .phone-brand{font-family:'Manrope',sans-serif;font-size:12px;font-weight:700;color:rgba(255,255,255,.75)}
+    @keyframes phoneRise{to{opacity:1;transform:translateY(0)}}
+    .controls{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);display:flex;align-items:center;gap:10px;z-index:100}
+    .arrow-btn{width:44px;height:44px;display:flex;align-items:center;justify-content:center;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.08);border-radius:var(--radius-pill);color:rgba(255,255,255,.60);cursor:pointer;transition:background var(--t-micro),border-color var(--t-micro),transform var(--t-lift),color var(--t-micro),box-shadow var(--t-micro)}
+    .arrow-btn:hover{background:rgba(255,255,255,.10);border-color:rgba(34,211,238,.20);transform:translateY(-1px);color:#fff;box-shadow:0 0 0 3px rgba(34,211,238,.08),0 8px 24px rgba(0,0,0,.20)}
+    .arrow-btn:active{transform:translateY(0) scale(.95)}
+    .control-dots{display:flex;align-items:center;gap:8px;padding:5px 11px;background:rgba(255,255,255,.035);border:1px solid rgba(255,255,255,.07);border-radius:var(--radius-pill)}
+    .control-dots .dot{width:10px;height:10px;border-radius:50%;background:rgba(255,255,255,.18);cursor:pointer;position:relative;transition:background var(--t-micro),box-shadow var(--t-micro),transform var(--t-lift);border:none;padding:0}
+    .control-dots .dot::after{content:"";position:absolute;inset:-10px}
+    .control-dots .dot:hover{background:rgba(255,255,255,.32);box-shadow:0 0 0 2px rgba(255,255,255,.12);transform:translateY(-1px)}
+    .control-dots .dot.active{background:var(--accent);box-shadow:0 0 0 2px var(--accent),0 0 12px var(--accent-glow);animation:dotPulse 2s ease-in-out infinite}
+    @keyframes dotPulse{0%,100%{box-shadow:0 0 0 2px var(--accent),0 0 8px rgba(34,211,238,.25)}50%{box-shadow:0 0 0 3px var(--accent),0 0 16px rgba(34,211,238,.45)}}
+    .subtitle-stream-frame{position:relative;width:100%;max-width:480px;padding:32px;border-radius:18px;background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.06);border-top:1px solid rgba(34,211,238,.06);box-shadow:0 24px 60px rgba(0,0,0,.30),inset 0 1px 0 rgba(255,255,255,.04);display:flex;flex-direction:column;gap:24px;backdrop-filter:blur(16px) saturate(1.1);-webkit-backdrop-filter:blur(16px) saturate(1.1);opacity:0;transition:opacity 800ms cubic-bezier(.25,.1,.25,1)}
+    .subtitle-line{display:flex;align-items:flex-start;gap:14px;opacity:0;transform:translateY(12px) scale(.98);filter:blur(3px);transition:opacity 600ms cubic-bezier(.25,.1,.25,1),transform 650ms cubic-bezier(.34,1.56,.64,1);will-change:transform,opacity}
+    .subtitle-line.is-visible{opacity:1;transform:translateY(0) scale(1);filter:blur(0)}
+    .accent-bar{width:2px;flex-shrink:0;border-radius:2px;align-self:stretch;background:linear-gradient(to bottom,var(--accent),rgba(34,211,238,0));box-shadow:0 0 8px rgba(34,211,238,.12);opacity:0;transform:scaleY(0);transform-origin:top;transition:opacity 600ms cubic-bezier(.25,.1,.25,1) 120ms,transform 700ms cubic-bezier(.34,1.56,.64,1) 120ms;min-height:44px}
+    .subtitle-line.is-visible .accent-bar{opacity:1;transform:scaleY(1)}
+    .line-content{display:flex;flex-direction:column;gap:5px;padding-top:2px}
+    .lang-it{font-family:'Manrope',sans-serif;font-size:18px;font-weight:500;color:rgba(255,255,255,.88);line-height:1.55;letter-spacing:0;max-width:440px;text-wrap:balance}
+    .lang-en{font-family:'Inter',sans-serif;font-size:13px;font-weight:400;color:rgba(255,255,255,.42);line-height:1.4;letter-spacing:.01em}
+    .stream-indicator{display:flex;gap:5px;justify-content:center;align-items:center;margin-top:2px}
+    .stream-indicator span{display:block;width:4px;height:4px;border-radius:50%;background:rgba(34,211,238,.25);animation:streamPulse 1.6s cubic-bezier(.2,.8,.2,1) infinite both}
+    .stream-indicator span:nth-child(1){animation-delay:0s}
+    .stream-indicator span:nth-child(2){animation-delay:.25s}
+    .stream-indicator span:nth-child(3){animation-delay:.5s}
+    @keyframes streamPulse{0%,100%{opacity:.25;transform:scale(1)}50%{opacity:1;transform:scale(1.4)}}
+    .feature-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;width:100%;max-width:420px}
+    .feature-chip{position:relative;display:flex;flex-direction:column;gap:10px;padding:28px 16px 16px 16px;background:rgba(255,255,255,.025);border:1px solid rgba(255,255,255,.07);border-radius:var(--radius);overflow:hidden;box-shadow:0 8px 24px rgba(0,0,0,.20),inset 0 1px 0 rgba(255,255,255,.03);opacity:0;transform:translateY(10px);transition:opacity 700ms cubic-bezier(.25,.1,.25,1),transform 700ms cubic-bezier(.25,.1,.25,1),background var(--t-micro),border-color var(--t-micro),box-shadow var(--t-micro);transform-style:preserve-3d}
+    .feature-chip.is-visible{opacity:1;transform:translateY(0)}
+    .feature-chip:hover{background:rgba(255,255,255,.04);border-color:rgba(34,211,238,.10);transform:perspective(900px) rotateX(1deg) rotateY(-1deg) translateY(-3px);box-shadow:0 20px 40px rgba(0,0,0,.25),0 0 0 1px rgba(255,255,255,.05),0 0 30px rgba(34,211,238,.04)}
+    .feature-chip:active{transform:perspective(900px) rotateX(0.5deg) rotateY(-0.5deg) translateY(-2px) scale(.98)}
+    .feature-chip::before{content:"";position:absolute;top:0;left:0;right:0;height:24px;background:rgba(255,255,255,.025);border-bottom:1px solid rgba(255,255,255,.05)}
+    .feature-chip-dots{position:absolute;top:8px;left:12px;display:flex;gap:5px;z-index:2}
+    .wc-dot{width:6px;height:6px;border-radius:50%}
+    .wc-dot.r{background:rgba(255,85,85,.75)}
+    .wc-dot.y{background:rgba(255,185,50,.8)}
+    .wc-dot.g{background:rgba(45,200,95,.8)}
+    .feature-icon{margin-top:4px;width:30px;height:30px;display:flex;align-items:center;justify-content:center;border-radius:8px;background:rgba(255,255,255,.06);color:var(--accent);transition:box-shadow var(--t-micro),transform var(--t-lift)}
+    .feature-chip:hover .feature-icon{transform:translateY(-2px);box-shadow:0 0 12px rgba(34,211,238,.12)}
+    .feature-chip h3{font-family:'Manrope',sans-serif;font-size:14px;font-weight:600;color:#fff;margin:0}
+    .feature-chip p{font-family:'Inter',sans-serif;font-size:12px;color:rgba(255,255,255,.48);margin:0;line-height:1.45}
+    .pricing-card{width:100%;max-width:360px;padding:24px;background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.06);border-top:1px solid rgba(34,211,238,.06);border-radius:18px;margin-bottom:24px;position:relative}
+    .pricing-card::before{content:"";position:absolute;top:0;left:15%;right:15%;height:1px;background:linear-gradient(90deg,transparent,rgba(34,211,238,.10),transparent)}
+    .pricing-card h3{margin:0 0 6px;font-family:'Manrope',sans-serif;font-size:20px;font-weight:700;color:#fff}
+    .plan-desc{font-family:'Inter',sans-serif;font-size:13px;color:rgba(255,255,255,.48);margin:0 0 18px;line-height:1.5}
+    .pricing-card ul{list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:8px}
+    .pricing-card li{font-family:'Inter',sans-serif;font-size:13px;color:rgba(255,255,255,.65);display:flex;align-items:center;gap:8px}
+    .pricing-card li::before{content:"—";color:var(--accent);font-weight:700;font-size:14px}
+    .pricing-toggle{position:relative;display:inline-flex;align-items:center;padding:3px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:var(--radius-pill);margin-bottom:18px;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);box-shadow:inset 0 1px 1px rgba(255,255,255,.04),0 4px 12px rgba(0,0,0,.12)}
+    .toggle-pill{position:absolute;top:3px;left:3px;width:calc(50% - 3px);height:calc(100% - 6px);background:linear-gradient(135deg,rgba(34,211,238,.15),rgba(6,182,212,.10));border-radius:var(--radius-pill);transition:transform var(--t-lift);box-shadow:0 1px 4px rgba(0,0,0,.12),inset 0 1px 0 rgba(255,255,255,.08),0 0 12px rgba(34,211,238,.06);z-index:1}
+    .pricing-toggle button{position:relative;z-index:2;background:transparent;border:none;padding:7px 18px;border-radius:var(--radius-pill);font-family:'Inter',sans-serif;font-size:13px;font-weight:500;color:rgba(255,255,255,.55);cursor:pointer;transition:color var(--t-micro)}
+    .pricing-toggle button.active{color:#fff}
+    .pricing-toggle button:hover{color:#fff}
+    .auth-toast{position:fixed;top:16px;left:50%;transform:translateX(-50%) translateY(-5px);z-index:10001;padding:9px 18px;background:rgba(5,8,16,.96);border:1px solid rgba(34,211,238,.12);border-radius:10px;color:rgba(255,255,255,.85);font-family:'Inter',sans-serif;font-size:12px;font-weight:500;opacity:0;pointer-events:none;transition:opacity var(--t-micro),transform var(--t-micro),border-color var(--t-micro),box-shadow var(--t-micro);box-shadow:0 12px 40px rgba(0,0,0,.25)}
+    .auth-toast.show{opacity:1;transform:translateX(-50%) translateY(0);pointer-events:auto;border-color:rgba(34,211,238,.20);box-shadow:0 12px 40px rgba(0,0,0,.25),0 0 24px rgba(34,211,238,.06)}
+    /* ── Pricing Table (from original index.html) ── */
+    .s4-pricing{opacity:0;transform:translateY(16px);transition:opacity 800ms cubic-bezier(.25,.1,.25,1) 300ms,transform 800ms cubic-bezier(.25,.1,.25,1) 300ms;max-width:640px;width:100%}
+    .active .s4-pricing{opacity:1;transform:translateY(0)}
+    .s4-table{display:none}
+    @media(min-width:600px){.s4-table{display:block}}
+    .s4-table-inner{overflow:hidden;border-radius:16px;border:1px solid rgba(255,255,255,.08);background:rgba(0,0,0,.35)}
+    .s4-table .row{display:flex;border-bottom:1px solid rgba(255,255,255,.06);transition:background var(--t-micro)}
+    .s4-table .row:last-child{border-bottom:none}
+    .s4-table .row:hover{background:rgba(255,255,255,.015)}
+    .s4-table .cell{flex:1;padding:clamp(10px,1.6vh,14px) clamp(10px,1.5vw,16px);text-align:center;font-size:clamp(11px,1vw,13px);color:rgba(255,255,255,.7);display:flex;align-items:center;justify-content:center;min-width:0}
+    .s4-table .cell:first-child{text-align:left;justify-content:flex-start;color:rgba(255,255,255,.45);font-weight:500;flex:1.2}
+    .s4-table .head .cell{font-family:'Manrope',sans-serif;font-weight:800;font-size:clamp(13px,1.4vw,16px);text-transform:uppercase;letter-spacing:.04em;color:rgba(255,255,255,.75);padding:clamp(14px,2vh,18px) clamp(10px,1.5vw,16px) clamp(12px,1.6vh,14px)}
+    .s4-table .head{background:rgba(0,0,0,.2)}
+    .s4-table .price{font-family:'Manrope',sans-serif;font-weight:800;font-size:clamp(18px,2.2vw,22px);color:rgba(255,255,255,.9);line-height:1}
+    .s4-table .price small{font-size:.42em;color:#fff;font-weight:500}
+    .s4-table .feat-col{border-left:1px solid rgba(192,132,252,.1);background:rgba(192,132,252,.02)}
+    .s4-table .check{color:#10b981;font-size:12px}
+    .s4-table .check.anim{opacity:0;transform:scale(.6)}
+    .s4-table .check.anim-in{animation:checkPop .5s cubic-bezier(.34,1.56,.64,1) forwards}
+    .s4-table .num.anim-num{opacity:0;transform:translateY(6px)}
+    .s4-table .num.anim-in{animation:numUp .6s cubic-bezier(.25,.1,.25,1) forwards}
+    @keyframes checkPop{0%{opacity:0;transform:scale(.6)}60%{opacity:1;transform:scale(1.2)}100%{opacity:1;transform:scale(1)}}
+    @keyframes numUp{0%{opacity:0;transform:translateY(6px)}100%{opacity:1;transform:translateY(0)}}
+    @keyframes colFadeIn{0%{opacity:0}100%{opacity:1}}
+    .col-accent{opacity:0;transition:opacity 2.5s cubic-bezier(.25,.1,.25,1)}
+    .col-accent.in{opacity:1}
+    .col-accent-1{background:rgba(34,211,238,.08);border-left:1px solid rgba(34,211,238,.12)}
+    .col-accent-2{background:rgba(168,85,247,.08);border-left:1px solid rgba(168,85,247,.12)}
+    .col-accent-3{background:rgba(59,130,246,.08);border-left:1px solid rgba(59,130,246,.12)}
+    .col-accent-4{background:rgba(250,204,21,.08);border-left:1px solid rgba(250,204,21,.12)}
+    .s4-table .dash{color:rgba(255,255,255,.08);font-size:10px}
+    .s4-toggle{display:none;text-align:center}
+    @media(max-width:599px){.s4-toggle{display:block}}
+    .s4-toggle .toggle-row{display:inline-flex;flex-wrap:wrap;justify-content:center;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.06);border-radius:100px;padding:3px;margin-bottom:16px}
+    .s4-toggle .toggle-btn{padding:7px 14px;border-radius:100px;font-size:11px;font-weight:600;cursor:pointer;color:rgba(255,255,255,.4);transition:color var(--t-micro),background var(--t-micro);border:none;background:none;font-family:'Inter',sans-serif;white-space:nowrap}
+    .s4-toggle .toggle-btn.active{background:rgba(192,132,252,.2);color:#c084fc}
+    .s4-toggle .main-card{background:linear-gradient(180deg,rgba(192,132,252,.08),rgba(192,132,252,.01));border:1px solid rgba(192,132,252,.15);border-radius:20px;padding:28px 24px;max-width:360px;margin:0 auto}
+    .s4-toggle .main-tier{font-weight:800;font-size:14px;text-transform:uppercase;letter-spacing:.06em;color:#c084fc;margin-bottom:6px}
+    .s4-toggle .main-price{font-family:'Manrope',sans-serif;font-weight:900;font-size:clamp(42px,7vw,52px);color:#fff;line-height:1;margin:2px 0}
+    .s4-toggle .main-price small{font-size:.32em;color:#fff;font-weight:600}
+    .s4-toggle .main-detail{color:rgba(255,255,255,.35);font-size:13px;line-height:1.5}
+    .s4-toggle .dots{display:flex;justify-content:center;gap:7px;margin-top:14px}
+    .s4-toggle .dot{width:7px;height:7px;border-radius:50%;background:rgba(255,255,255,.1);cursor:pointer;transition:background var(--t-micro),transform var(--t-lift)}
+    .s4-toggle .dot.active{background:var(--accent);transform:scale(1.3)}
+    .bottom-nav{position:absolute;bottom:0;left:0;right:0;z-index:50;display:flex;align-items:center;justify-content:space-between;padding:18px 36px;pointer-events:none}
+    .bottom-nav-row{display:flex;align-items:center;gap:18px;pointer-events:auto}
+    .bottom-nav-row a{font-family:'Inter',sans-serif;font-size:12px;color:rgba(255,255,255,.45);text-decoration:none;transition:color var(--t-micro),text-shadow var(--t-micro)}
+    .bottom-nav-row a:hover{color:var(--accent);text-shadow:0 0 12px rgba(34,211,238,.25)}
+    .bottom-copy{font-family:'Inter',sans-serif;font-size:12px;color:rgba(255,255,255,.30)}
+    @media(max-width:980px){
+      .container{flex-direction:column-reverse;gap:28px}
+      .slide{padding:90px 28px 72px;height:auto;min-height:100vh}
+      .phone-base{width:210px;height:440px}
+      .subtitle-stream-frame,.pricing-card,.feature-grid{max-width:100%}
+    }
+    @media(max-width:640px){
+      .topbar{top:10px;left:10px;right:10px;height:50px;padding:0 12px 0 14px;border-radius:12px}
+      .slide{padding:80px 18px 72px}
+      .controls{bottom:14px}
+      .bottom-nav{padding:14px 18px}
+      .feature-grid{grid-template-columns:1fr 1fr}
+      .bottom-nav-row a,.bottom-copy{font-size:11px}
+    }
+    @media(prefers-reduced-motion:reduce){
+      *,*::before,*::after{animation-duration:0.01ms !important;animation-iteration-count:1 !important;transition-duration:0.01ms !important;scroll-behavior:auto !important}
+      .noise-overlay,.stream-indicator,.bg-xf-a,.bg-xf-b{display:none !important}
+      .phone-base{opacity:1 !important;transform:none !important;animation:none !important}
+      .slide{transition:none !important;transform:none !important}
+      .slide:not(.active){opacity:0 !important}
+      .slide.active{opacity:1 !important;transform:none !important}
+      .slide .text-side,.slide .media-side{transition:none !important;transform:none !important;opacity:1 !important}
+      .feature-chip{opacity:1 !important;transform:none !important}
+      .subtitle-line{opacity:1 !important;transform:none !important;filter:none !important}
+      .accent-bar{opacity:1 !important;transform:none !important}
+      .control-dots .dot.active{animation:none !important}
+    }
+  </style>
 </head>
 <body>
-<div id="pageloader" style="position:fixed;inset:0;z-index:9999;background:#0a0c13;display:flex;align-items:center;justify-content:center;transition:opacity .6s ease;pointer-events:all">
-  <span style="font-family:'Inter',sans-serif;font-size:31px;font-weight:800;color:#fff;letter-spacing:-.5px"><span id="loaderBrand">sottotitoli</span><span style="color:var(--cyan,#06b6d4)">.ai</span></span>
-</div>
-<script>
-// Hide loader once background image is ready (or after timeout)
-(function(){
-  var ld=document.getElementById('pageloader');
-  if(!ld)return;
-  var hidden=false;
-  function hide(){if(!hidden){hidden=true;ld.style.opacity='0';setTimeout(function(){ld.style.display='none';},700);}}
-  // Track background image
-  var img=new Image();
-  img.onload=img.onerror=function(){setTimeout(hide,400);};
-  img.src='img/bg-home.png';
-  // Fallback: hide after 5s max
-  setTimeout(hide,5000);
-})();
-</script>
-<div class="bg-xf-a"></div>
-<div class="bg-xf-b"></div>
-<div class="page-border"></div>
-<header class="topbar">
-  <div style="display:flex;align-items:center;gap:0">
-    <a href="index.html" class="topbar-brand" style="font-size:31px;color:#fff">sottotitoli</a>
-    <span class="trial-pill" style="background:transparent;font-family:var(--font-ui);font-size:31px;font-weight:800;padding:0;color:var(--cyan);letter-spacing:-.5px;border-radius:0;line-height:1">.ai</span>
-    <span style="font-size:10px;font-weight:500;color:rgba(255,255,255,.2);margin-left:6px;font-family:'Inter',sans-serif">v1.8</span>
-  </div>
-  <div class="topbar-right">
-    <a href="#" class="topbar-login" onclick="event.preventDefault();signInWithGoogle()" style="font-size:16px;height:38px;padding:0 16px">
-      <i class="fa-brands fa-google" style="font-size:14px"></i>
-      Accedi
-    </a>
-  </div>
-</header>
-<svg xmlns="http://www.w3.org/2000/svg" style="display:none">
-  <symbol id="i-arrow-right" viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7"/></symbol>
-  <symbol id="i-arrow-down" viewBox="0 0 24 24"><path d="M12 5v14M5 12l7 7 7-7"/></symbol>
-  <symbol id="i-chevron-up" viewBox="0 0 24 24"><path d="M18 15l-6-6-6 6"/></symbol>
-  <symbol id="i-chevron-down" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></symbol>
-</svg>
-<div class="slider" id="slider">
-  <div class="slide s0 active" data-idx="0">
-    <div class="text-side" id="s0HeroWrap" style="grid-column:1/-1;justify-content:center;padding-left:0;text-align:center">
-      <div class="text-inner" style="max-width:680px">
-        <h1 class="slide-h2">Tutto chiaro<span style="color:var(--cyan)">.</span><br>Sempre<span style="color:var(--cyan)">.</span> Subito<span style="color:var(--cyan)">.</span></h1>
-        <p class="slide-p" style="max-width:580px;margin-left:auto;margin-right:auto">Uno strumento che unisce comprensione e apprendimento in un'unica esperienza. Progettato per capire l'inglese al volo, in tempo reale.</p>
-        <a href="#" class="slide-cta" id="s0Discover">Scopri di più <svg class="icon"><use href="#i-arrow-down"/></svg></a>
-      </div>
-    </div>
-  </div>
 
-  <div class="slide flow-slide" data-caption-mode="editorial" role="group" aria-roledescription="slide" aria-label="Slide 2 di 5" aria-hidden="true">
-    <div class="text-side">
-      <div class="text-inner">
-        <div class="flow-eyebrow">Traduzione in tempo reale</div>
-        <h2 class="flow-headline">Le parole non hanno confini</h2>
-        <p class="flow-body">Ascolta in italiano. Leggi in inglese.<br>Capisci tutto, subito.</p>
-        <a href="caption-s8t.html" class="continua-btn flow-cta">Prova ora <svg class="icon"><use href="#i-arrow-right"/></svg></a>
-      </div>
-    </div>
-    <div class="slide-right" style="display:flex;align-items:center;justify-content:center">
-      <div class="subtitle-stream-frame">
-        <div class="subtitle-line" data-delay="0">
-          <div class="accent-bar"></div>
-          <div class="line-content">
-            <span class="lang-it">Non è mai troppo tardi per imparare.</span>
-            <span class="lang-en">It is never too late to learn.</span>
-          </div>
-        </div>
-        <div class="subtitle-line" data-delay="1">
-          <div class="accent-bar"></div>
-          <div class="line-content">
-            <span class="lang-it">Ogni conversazione è un'opportunità.</span>
-            <span class="lang-en">Every conversation is an opportunity.</span>
-          </div>
-        </div>
-        <div class="subtitle-line" data-delay="2">
-          <div class="accent-bar"></div>
-          <div class="line-content">
-            <span class="lang-it">La comprensione è la vera libertà.</span>
-            <span class="lang-en">Understanding is true freedom.</span>
-          </div>
-        </div>
-        <div class="stream-indicator">
-          <span></span><span></span><span></span>
-        </div>
-      </div>
-    </div>
-  </div>
+  <div class="bg-xf-a"></div>
+  <div class="bg-xf-b"></div>
+  <div class="bg-overlay"></div>
+  <div class="page-border"></div>
+  <div class="noise-overlay"></div>
 
-  <div class="slide s1" data-idx="1">
-    <div style="grid-column:1/-1;display:flex;align-items:flex-start;justify-content:center;gap:clamp(16px,3vw,40px);padding:216px 16px 40px;align-self:start">
-      <div style="flex:0 0 auto;max-width:400px;display:flex;flex-direction:column;align-items:center;min-width:0;position:relative">
-        <!-- Phone zoom container -->
-        <div id="phoneZoom" style="transform:scale(1.55);transform-origin:top center;transition:opacity .8s ease,transform 1.2s cubic-bezier(.25,.1,.1,1);margin-bottom:8px;opacity:0">
-        <div class="phone-wrap" style="transform:rotate(0deg) translateX(0)">
-          <div class="phone-frame">
-            <div class="phone-dynamic-island"><div class="phone-island-pill"></div></div>
-            <div class="phone-screen">
-              <div class="phone-status-bar"><span class="time" id="phoneTime">9:41</span><span><i class="fa-solid fa-signal"></i> <i class="fa-solid fa-wifi"></i> <i class="fa-solid fa-battery-full"></i></span></div>
-              <div class="phone-body">
-                <div class="phone-app-title" style="display:flex;align-items:center;gap:8px">
-                  <span class="phone-logo" style="font-size:clamp(7px,.9vw,9px);font-weight:700;color:rgba(255,255,255,.2);font-family:Manrope,sans-serif;letter-spacing:-.3px"></span>
-                  <span style="display:inline-flex;align-items:center;gap:3px;background:rgba(239,68,68,.12);border:1px solid rgba(239,68,68,.18);border-radius:5px;padding:2px 6px;font-size:clamp(6px,.7vw,8px);font-weight:600;color:#ef4444;text-transform:uppercase;letter-spacing:.03em"><span style="width:4px;height:4px;border-radius:50%;background:#ef4444"></span>LIVE</span>
-                  <span style="font-size:clamp(9px,1.1vw,11px);color:rgba(255,255,255,.15);cursor:default">⏸</span>
+  <div id="authToast" class="auth-toast">🔐 Accedi per continuare</div>
+
+  <header class="topbar" role="banner">
+    <div style="display:flex;align-items:center;gap:0">
+      <a href="index.html" class="topbar-brand" style="font-size:31px;color:#fff;font-family:'Manrope',sans-serif;font-weight:700;text-decoration:none;letter-spacing:-0.02em">sottotitoli</a>
+      <span style="font-family:'Manrope',sans-serif;font-size:31px;font-weight:800;color:var(--accent);letter-spacing:-.5px;line-height:1">.ai</span>
+      <span style="font-size:10px;font-weight:500;color:rgba(255,255,255,.2);margin-left:6px;font-family:'Inter',sans-serif">v1.8</span>
+    </div>
+    <div class="topbar-right">
+      <a href="#" class="topbar-login" onclick="event.preventDefault();if(typeof signInWithGoogle==='function')signInWithGoogle()" style="font-size:16px;height:38px;padding:0 16px">
+        <i class="fa-brands fa-google" style="font-size:14px"></i>
+        Accedi
+      </a>
+    </div>
+  </header>
+
+  <main class="stage-root" role="main" aria-roledescription="carousel" aria-label="Presentazione Sottotitoli">
+    <div class="stage-track" id="stageTrack">
+
+      <section class="slide slide-hero active" data-caption-mode="editorial" role="group" aria-roledescription="slide" aria-label="Slide 1 di 4" aria-hidden="false">
+        <div class="container">
+          <div class="text-side">
+            <span class="eyebrow">Uno strumento che unisce comprensione e apprendimento</span>
+            <h1 class="headline">Tutto chiaro.<br>Davvero subito.</h1>
+            <p class="body-text">Progettato per capire l'inglese al volo, in tempo reale.<br>Uno strumento che unisce comprensione e apprendimento in un'unica esperienza.</p>
+            <a href="#" class="continua-btn" id="s0Discover" onclick="event.preventDefault();if(window._advance)window._advance()">Scopri di più<span class="pill-arrow">→</span></a>
+          </div>
+        </div>
+      </section>
+
+      <section class="slide flow-slide" data-caption-mode="editorial" role="group" aria-roledescription="slide" aria-label="Slide 2 di 4" aria-hidden="true">
+        <div class="container">
+          <div class="text-side">
+            <span class="eyebrow">Traduzione in tempo reale</span>
+            <h2 class="headline">Ogni momento,<br>le sue parole.</h2>
+            <p class="body-text">Ogni parola, il suo momento. Un clic mostra definizione, livello, pronuncia e sinonimi senza mai uscire dal flusso della conversazione. Puoi anche esplorare il tuo profilo linguistico più in dettaglio, dopo.</p>
+          </div>
+          <div class="media-side">
+            <div class="subtitle-stream-frame">
+              <div class="subtitle-line" data-delay="0">
+                <div class="accent-bar"></div>
+                <div class="line-content">
+                  <span class="lang-it">Non è mai troppo tardi per imparare.</span>
+                  <span class="lang-en">It is never too late to learn.</span>
                 </div>
-                <div class="phone-convo" id="phoneConvo"></div>
-                <div class="phone-card-wrap" id="phoneCardWrap"><div class="phone-card" id="phoneCard"></div></div>
               </div>
-              <div class="phone-nav-bottom">
-                <div class="stab"><i class="fa-solid fa-closed-captioning"></i><span>Caption</span></div>
-                <div class="stab active"><i class="fa-solid fa-language"></i><span>Traduci</span></div>
-                <div class="stab"><i class="fa-solid fa-chart-simple"></i><span>Report</span></div>
-                <div class="stab"><i class="fa-solid fa-circle-user"></i><span>Tu</span></div>
+              <div class="subtitle-line" data-delay="1">
+                <div class="accent-bar"></div>
+                <div class="line-content">
+                  <span class="lang-it">Ogni conversazione è un'opportunità.</span>
+                  <span class="lang-en">Every conversation is an opportunity.</span>
+                </div>
+              </div>
+              <div class="subtitle-line" data-delay="2">
+                <div class="accent-bar"></div>
+                <div class="line-content">
+                  <span class="lang-it">La comprensione è la vera libertà.</span>
+                  <span class="lang-en">Understanding is true freedom.</span>
+                </div>
+              </div>
+              <div class="stream-indicator"><span></span><span></span><span></span></div>
+            </div>
+          </div>
+        </div>
+        <a href="#" class="slide-cta-btn" id="s1Cta" onclick="event.preventDefault();if(window._advance)window._advance()">Scopri di più<span class="pill-arrow">→</span></a>
+        </div>
+      </section>
+
+      <section class="slide features-slide" data-caption-mode="editorial" role="group" aria-roledescription="slide" aria-label="Slide 3 di 4" aria-hidden="true">
+        <div class="container">
+          <div class="text-side">
+            <span class="eyebrow">Tutto quello che ti serve</span>
+            <h2 class="headline">Il concetto è semplice.</h2>
+            <p class="body-text">Usalo come e quando vuoi. Condividi i tuoi sottotitoli con amici, colleghi e studenti, e segui i loro in tempo reale. O usalo semplicemente da solo. Le barriere linguistiche appartengono al passato.</p>
+          </div>
+          <div class="media-side">
+            <div class="feature-grid">
+              <div class="feature-chip">
+                <div class="feature-chip-dots"><span class="wc-dot r"></span><span class="wc-dot y"></span><span class="wc-dot g"></span></div>
+                <div class="feature-icon">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M6 9h12M6 13h8"/></svg>
+                </div>
+                <h3>Sottotitoli in diretta</h3>
+                <p>Trascrizione in tempo reale per ogni contenuto audio.</p>
+              </div>
+              <div class="feature-chip">
+                <div class="feature-chip-dots"><span class="wc-dot r"></span><span class="wc-dot y"></span><span class="wc-dot g"></span></div>
+                <div class="feature-icon">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/><line x1="10" y1="10" x2="16" y2="10"/><line x1="10" y1="14" x2="14" y2="14"/></svg>
+                </div>
+                <h3>Vocabolario personale</h3>
+                <p>Le parole che incontri diventano lezioni su misura.</p>
+              </div>
+              <div class="feature-chip">
+                <div class="feature-chip-dots"><span class="wc-dot r"></span><span class="wc-dot y"></span><span class="wc-dot g"></span></div>
+                <div class="feature-icon">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                </div>
+                <h3>Duo & AI Voice</h3>
+                <p>Studia in coppia o lascia che l'AI guidi la conversazione.</p>
+              </div>
+              <div class="feature-chip">
+                <div class="feature-chip-dots"><span class="wc-dot r"></span><span class="wc-dot y"></span><span class="wc-dot g"></span></div>
+                <div class="feature-icon">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="20" x2="12" y2="10"/><line x1="18" y1="20" x2="18" y2="4"/><line x1="6" y1="20" x2="6" y2="16"/></svg>
+                </div>
+                <h3>Analisi e insight</h3>
+                <p>Metriche chiare sulla tua crescita linguistica.</p>
               </div>
             </div>
           </div>
         </div>
-        </div><!-- /phoneZoom -->
-        <div id="s2Hand" style="font-size:26px;opacity:0;pointer-events:none;position:absolute;z-index:10;filter:drop-shadow(0 2px 6px rgba(0,0,0,.5));transition:left .6s cubic-bezier(.15,.8,.2,1),top .6s cubic-bezier(.15,.8,.2,1),opacity .3s">☝️</div>
-        <div style="font-size:10px;color:rgba(255,255,255,.55);margin-top:8px;text-align:center">prova anche tu — tocca una parola</div>
-      </div>
-      <div style="flex:1;max-width:440px;opacity:0;transition:opacity .8s ease" id="s2Copy">
-        <h2 class="slide-h2" style="font-size:clamp(36px,5vw,52px)">Tutto a portata<br>di <span class="hl">un solo clic.</span></h2>
-        <p class="slide-p">Un clic mostra definizione, livello linguistico, parte del discorso, pronuncia e sinonimi — senza mai uscire dal flusso della conversazione.</p>
-        <p class="slide-p">Condividi i tuoi sottotitoli con amici, colleghi e studenti, e segui i loro in tempo reale. Le barriere linguistiche appartengono al passato.</p>
-      </div>
-    </div>
-    <div style="grid-column:1/-1;text-align:center;padding:12px 16px 0;opacity:0;transition:opacity .8s ease .6s" id="s1AiP">
-      <p class="slide-p" style="max-width:640px;margin:0 auto;font-size:15px">Segui una conversazione, usa i sottotitoli per accompagnare una presentazione, aiuta i tuoi studenti a seguire senza perdersi. Scopri quali strumenti extra possono fare la differenza in ogni scenario.</p>
-    </div>
-    <div></div>
-    <div class="text-side" style="align-items:flex-start;justify-content:flex-start;text-align:left;padding-left:clamp(4px,1vw,16px);padding-top:clamp(6px,2vh,20px)" id="s2Subito">
-      <div style="font-family:'Manrope',sans-serif;font-size:clamp(80px,14vw,140px);font-weight:800;line-height:1;letter-spacing:-5px;color:#fff">Subito<span style="color:var(--cyan)">.</span></div>
-    </div>
-    <button class="continua-btn" id="s1Continua">Continua <svg class="icon"><use href="#i-arrow-down"/></svg></button>
-  </div>
+        <a href="#" class="slide-cta-btn" id="s2Cta" onclick="event.preventDefault();if(window._advance)window._advance()">Continua<span class="pill-arrow">→</span></a>
+      </section>
 
-  <!-- Slide 2 · Magazine Spread — huge left title, right column with everything -->
-  <div class="slide s2" data-idx="2" style="display:flex;align-items:flex-start;justify-content:center;padding:clamp(100px,16vh,140px) clamp(28px,5vw,80px) clamp(80px,12vh,100px)">
-    <div style="display:flex;align-items:flex-start;gap:clamp(32px,6vw,80px);max-width:1100px;width:100%">
-      <!-- Left: huge title + LIVE bar + CEFR -->
-      <div id="s2TitleL" style="flex:1;opacity:0;transition:opacity .8s ease .2s;display:flex;flex-direction:column;gap:clamp(4px,1vh,10px)">
-        <h2 class="slide-h2" style="font-size:clamp(38px,6vw,60px);margin:0">Ogni momento,<br><span class="hl">le sue parole.</span></h2>
-        <div id="s2LiveText" style="font-family:'Manrope',sans-serif;font-size:clamp(48px,6.6vw,72px);font-weight:900;color:#fff;line-height:1.05;min-height:0;letter-spacing:-2px;transition:opacity .5s ease"></div>
-        <div id="s2CefrBars" style="opacity:0;display:flex;flex-direction:column;gap:8px;background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.05);border-radius:14px;padding:18px 20px">
-          <div class="cefr-row"><span class="cefr-lbl" style="color:#22c55e">A1</span><div class="cefr-trk"><div class="cefr-fill s2-bar-a1 pre-filled" style="background:#22c55e"></div></div></div>
-          <div class="cefr-row"><span class="cefr-lbl" style="color:#a3e635">A2</span><div class="cefr-trk"><div class="cefr-fill s2-bar-a2 pre-filled" style="background:#a3e635"></div></div></div>
-          <div class="cefr-row"><span class="cefr-lbl" style="color:#facc15">B1</span><div class="cefr-trk"><div class="cefr-fill s2-bar-b1 pre-filled" style="background:#facc15"></div></div></div>
-          <div class="cefr-row"><span class="cefr-lbl" style="color:#fb923c">B2</span><div class="cefr-trk"><div class="cefr-fill s2-bar-b2 pre-filled" style="background:#fb923c"></div></div></div>
-          <div class="cefr-row"><span class="cefr-lbl" style="color:#c084fc">C1</span><div class="cefr-trk"><div class="cefr-fill s2-bar-c1 animate-grow" style="background:#c084fc"></div></div></div>
-          <div class="cefr-row"><span class="cefr-lbl" style="color:#06b6d4">C2</span><div class="cefr-trk"><div class="cefr-fill s2-bar-c2 animate-grow" style="background:#06b6d4"></div></div></div>
-        </div>
-        <!-- Gradient SFIDA + C2 cards -->
-        <div id="s2SplitCards" style="opacity:0;display:flex;gap:8px;justify-content:center">
-          <div id="s2ChallengeBox" style="flex:0 0 auto;display:flex;flex-direction:column;align-items:center;gap:6px;background:linear-gradient(180deg,rgba(192,132,252,.16),rgba(192,132,252,.05));border:1px solid rgba(192,132,252,.25);border-radius:16px;padding:18px 22px">
-            <span style="font-size:clamp(10px,1vw,12px);font-weight:600;color:rgba(192,132,252,.55);text-transform:uppercase;letter-spacing:.08em;text-align:center">SFIDA C1</span>
-            <div style="display:flex;align-items:flex-end;gap:10px">
-              <i class="fa-solid fa-arrow-trend-up" style="font-size:clamp(29px,3.8vw,39px);color:#c084fc"></i>
-              <span style="font-size:clamp(34px,5vw,44px);font-weight:900;color:#fff;font-family:'Manrope',sans-serif;line-height:1"><span id="s2ChallengeCount">4</span><span style="font-size:.35em;color:rgba(255,255,255,.5);font-weight:600">/10</span></span>
-            </div>
+      <section class="slide pricing-slide" data-caption-mode="editorial" role="group" aria-roledescription="slide" aria-label="Slide 4 di 4" aria-hidden="true" style="padding-bottom:160px">
+        <div class="container" style="flex-direction:column;text-align:center;gap:28px">
+          <div style="text-align:center">
+            <span class="eyebrow">Scegli il tuo piano</span>
+            <h2 class="headline">Un modo semplice<br>per capire meglio.</h2>
+            <p class="body-text" style="max-width:440px;margin:0 auto 20px">Inizia gratis con 15 minuti a settimana.</p>
           </div>
-          <div id="s2C2Box" style="flex:0 0 auto;visibility:hidden;opacity:0;display:flex;flex-direction:column;align-items:center;gap:6px;background:linear-gradient(180deg,rgba(6,182,212,.14),rgba(6,182,212,.04));border:1px solid rgba(6,182,212,.25);border-radius:16px;padding:18px 22px">
-            <span style="font-size:clamp(10px,1vw,12px);font-weight:600;color:rgba(6,182,212,.5);text-transform:uppercase;letter-spacing:.08em;text-align:center">C2 Trovata</span>
-            <div style="display:flex;align-items:flex-end;gap:10px">
-              <i class="fa-solid fa-gem" style="font-size:clamp(29px,3.8vw,39px);color:#06b6d4"></i>
-              <span style="font-size:clamp(34px,5vw,44px);font-weight:900;color:#06b6d4;font-family:'Manrope',sans-serif;line-height:1">+1<span style="font-size:.35em;color:rgba(6,182,212,.35);font-weight:500">parola</span></span>
+          <div class="s4-pricing" id="s4Pricing" style="opacity:0;transform:translateY(16px);max-width:640px;width:100%;margin:0 auto">
+            <div class="s4-table" id="s4Table">
+              <div class="s4-table-inner">
+                <div class="row head"><div class="cell"></div><div class="cell">Gratis</div><div class="cell feat-col">Starter</div><div class="cell feat-col">Standard</div><div class="cell">Premium</div></div>
+                <div class="row"><div class="cell">Prezzo</div><div class="cell"><span class="price">€0</span></div><div class="cell feat-col"><span class="price">€4<small>,99</small></span></div><div class="cell feat-col"><span class="price">€14<small>,99</small></span></div><div class="cell"><span class="price">€29<small>,99</small></span></div></div>
+                <div class="row"><div class="cell">Minuti</div><div class="cell">15 / sett</div><div class="cell feat-col">60 / mese</div><div class="cell feat-col">300 / mese</div><div class="cell">900 / mese</div></div>
+                <div class="row"><div class="cell">Sottotitoli</div><div class="cell"><i class="fa-solid fa-check check anim"></i></div><div class="cell feat-col"><i class="fa-solid fa-check check anim"></i></div><div class="cell feat-col"><i class="fa-solid fa-check check anim"></i></div><div class="cell"><i class="fa-solid fa-check check anim"></i></div></div>
+                <div class="row"><div class="cell">Traduzione</div><div class="cell"><i class="fa-solid fa-check check anim"></i></div><div class="cell feat-col"><i class="fa-solid fa-check check anim"></i></div><div class="cell feat-col"><i class="fa-solid fa-check check anim"></i></div><div class="cell"><i class="fa-solid fa-check check anim"></i></div></div>
+                <div class="row"><div class="cell">Vocabolario</div><div class="cell"><span class="dash">—</span></div><div class="cell feat-col"><i class="fa-solid fa-check check anim"></i></div><div class="cell feat-col"><i class="fa-solid fa-check check anim"></i></div><div class="cell"><i class="fa-solid fa-check check anim"></i></div></div>
+                <div class="row"><div class="cell">Report AI</div><div class="cell"><span class="dash">—</span></div><div class="cell feat-col"><span class="num anim-num">5</span></div><div class="cell feat-col"><span class="num anim-num">20</span></div><div class="cell"><span class="num anim-num">60</span></div></div>
+              </div>
+            </div>
+            <div class="s4-toggle" id="s4Toggle">
+              <div class="toggle-row" id="s4ToggleBtns">
+                <button class="toggle-btn active" onclick="s4TogglePlan(0,this)">Gratis</button>
+                <button class="toggle-btn" onclick="s4TogglePlan(1,this)">Starter</button>
+                <button class="toggle-btn" onclick="s4TogglePlan(2,this)">Standard</button>
+                <button class="toggle-btn" onclick="s4TogglePlan(3,this)">Premium</button>
+              </div>
+              <div class="main-card" id="s4ToggleCard">
+                <div class="main-tier">Gratis</div>
+                <div class="main-price">€0</div>
+                <div class="main-detail">15 minuti a settimana &nbsp;·&nbsp; Per sempre</div>
+              </div>
+              <div class="dots" id="s4ToggleDots">
+                <span class="dot active" onclick="s4TogglePlan(0)"></span>
+                <span class="dot" onclick="s4TogglePlan(1)"></span>
+                <span class="dot" onclick="s4TogglePlan(2)"></span>
+                <span class="dot" onclick="s4TogglePlan(3)"></span>
+              </div>
             </div>
           </div>
         </div>
-      </div>
-      <!-- Right column: title, captions -->
-      <div style="width:42%;display:flex;flex-direction:column;gap:clamp(10px,1.8vh,16px);min-width:0;padding-right:clamp(28px,5vw,80px)">
-        <h2 class="slide-h2" id="s2TitleR" style="font-size:clamp(38px,6vw,60px);margin:0;opacity:0;white-space:nowrap">Ogni parola,<br><span class="hl">il suo momento.</span></h2>
-        <!-- Captions — pre-rendered -->
-        <div id="s2CapWrap" style="opacity:0;display:flex;flex-direction:column;gap:8px">
-          <div id="s2CapArea" style="display:flex;flex-direction:column;gap:8px;min-height:clamp(200px,26vh,280px)">
-            <div class="s2-caption s2-caption-1" style="opacity:0;background:rgba(0,0,0,.35);border:1px solid rgba(255,255,255,.06);border-radius:12px;padding:clamp(10px,1.5vh,14px) clamp(12px,2vw,16px);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);display:flex;align-items:flex-start;gap:10px">
-              <span class="s2-caption-time" style="font-size:clamp(13px,1.3vw,16px);color:rgba(255,255,255,.5);font-family:'JetBrains Mono',monospace;min-width:42px;text-align:right;font-weight:500;padding-top:2px">00:00</span>
-              <p class="s2-caption-text" style="flex:1;font-size:clamp(15px,1.5vw,18px);color:rgba(255,255,255,.85);line-height:1.5;font-weight:400;margin:0">Each moment is a <span class="s2-word s2-word-c1" data-word="skyline">skyline</span> of words.</p>
-            </div>
-            <div class="s2-caption s2-caption-2" style="opacity:0;background:rgba(0,0,0,.35);border:1px solid rgba(255,255,255,.06);border-radius:12px;padding:clamp(10px,1.5vh,14px) clamp(12px,2vw,16px);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);display:flex;align-items:flex-start;gap:10px">
-              <span class="s2-caption-time" style="font-size:clamp(13px,1.3vw,16px);color:rgba(255,255,255,.5);font-family:'JetBrains Mono',monospace;min-width:42px;text-align:right;font-weight:500;padding-top:2px">00:00</span>
-              <p class="s2-caption-text" style="flex:1;font-size:clamp(15px,1.5vw,18px);color:rgba(255,255,255,.85);line-height:1.5;font-weight:400;margin:0">Just one moment...</p>
-            </div>
-            <div class="s2-caption s2-caption-3" style="opacity:0;background:rgba(0,0,0,.35);border:1px solid rgba(255,255,255,.06);border-radius:12px;padding:clamp(10px,1.5vh,14px) clamp(12px,2vw,16px);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);display:flex;align-items:flex-start;gap:10px">
-              <span class="s2-caption-time" style="font-size:clamp(13px,1.3vw,16px);color:rgba(255,255,255,.5);font-family:'JetBrains Mono',monospace;min-width:42px;text-align:right;font-weight:500;padding-top:2px">00:00</span>
-              <p class="s2-caption-text" style="flex:1;font-size:clamp(15px,1.5vw,18px);color:rgba(255,255,255,.85);line-height:1.5;font-weight:400;margin:0">We can make all moments <span class="s2-word s2-word-c2" data-word="indelible">indelible</span>.</p>
-            </div>
-          </div>
-        </div>
-        <!-- Word definition box -->
-        <div id="s2WordDef" style="display:none;background:rgba(15,18,28,.92);border:1px solid rgba(255,255,255,.08);border-radius:14px;padding:clamp(14px,2vh,20px) clamp(16px,2.5vw,22px);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);margin-top:4px">
-          <div style="display:flex;align-items:flex-start;gap:clamp(8px,1.5vw,14px)"><div style="flex:1">
-            <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px"><span id="defWord" style="font-size:clamp(16px,1.8vw,20px);font-weight:700;color:#fff;font-family:'Inter',sans-serif"></span><span id="defCefr" style="font-size:11px;font-weight:700;padding:2px 8px;border-radius:5px"></span><span id="defPos" style="font-size:11px;color:rgba(255,255,255,.35);text-transform:uppercase;letter-spacing:.04em"></span></div>
-            <div id="defIpa" style="font-size:12px;color:rgba(255,255,255,.3);font-family:'JetBrains Mono',monospace;margin-bottom:4px"></div>
-            <div id="defDef" style="font-size:13px;color:rgba(255,255,255,.7);line-height:1.5;margin-bottom:4px"></div>
-            <div id="defTrans" style="font-size:13px;color:#06b6d4;font-weight:500;margin-bottom:6px"></div>
-            <div id="defSyns" style="display:flex;flex-wrap:wrap;gap:6px"></div>
-          </div></div>
-        </div>
-        </div>
-      </div>
+        <a href="#" class="slide-cta-btn" id="pricingCta">Inizia gratis<span class="pill-arrow">→</span></a>
+      </section>
+
     </div>
-    <button class="continua-btn" id="s2Continua">Continua <svg class="icon"><use href="#i-arrow-down"/></svg></button>
-  </div>
+  </main>
 
-  <div class="slide s3" data-idx="3" style="display:flex;align-items:center;justify-content:center">
-    <div class="s4-slide-inner" style="display:flex;flex-direction:column;align-items:center;gap:clamp(20px,3vh,36px);width:100%;max-width:780px;padding:0 clamp(24px,5vw,40px);text-align:center">
-      <div class="text-inner" style="text-align:center">
-        <h2 class="slide-h2" id="s4Title" style="opacity:0;transition:opacity .6s ease">Un modo semplice<br><span class="hl">per capire meglio.</span></h2>
-        <p class="slide-p" id="s4Text" style="opacity:0;transition:opacity .6s ease .2s;max-width:440px;margin:0 auto 28px"><span id="s4Underline" style="position:relative">Inizia gratis con 15 minuti a settimana<span style="position:absolute;bottom:-2px;left:0;width:0;height:2px;background:var(--cyan);border-radius:1px" id="s4UlLine"></span></span>.</p>
-      </div>
-      <div class="s4-pricing" id="s4Pricing">
-        <!-- Desktop: Feature Table -->
-        <div class="s4-table" id="s4Table">
-          <div class="s4-table-inner">
-            <div class="row head"><div class="cell"></div><div class="cell">Gratis</div><div class="cell feat-col">Starter</div><div class="cell feat-col">Standard</div><div class="cell">Premium</div></div>
-            <div class="row"><div class="cell">Prezzo</div><div class="cell"><span class="price">€0</span></div><div class="cell feat-col"><span class="price">€4<small>,99</small></span></div><div class="cell feat-col"><span class="price">€14<small>,99</small></span></div><div class="cell"><span class="price">€29<small>,99</small></span></div></div>
-            <div class="row"><div class="cell">Minuti</div><div class="cell">15 / sett</div><div class="cell feat-col">60 / mese</div><div class="cell feat-col">300 / mese</div><div class="cell">900 / mese</div></div>
-            <div class="row"><div class="cell">Report AI</div><div class="cell"><span class="dash">—</span></div><div class="cell feat-col">5</div><div class="cell feat-col">20</div><div class="cell">60</div></div>
-            <div class="row"><div class="cell">Sottotitoli</div><div class="cell"><i class="fa-solid fa-check check"></i></div><div class="cell feat-col"><i class="fa-solid fa-check check"></i></div><div class="cell feat-col"><i class="fa-solid fa-check check"></i></div><div class="cell"><i class="fa-solid fa-check check"></i></div></div>
-            <div class="row"><div class="cell">Traduzione</div><div class="cell"><i class="fa-solid fa-check check"></i></div><div class="cell feat-col"><i class="fa-solid fa-check check"></i></div><div class="cell feat-col"><i class="fa-solid fa-check check"></i></div><div class="cell"><i class="fa-solid fa-check check"></i></div></div>
-            <div class="row"><div class="cell">Vocabolario</div><div class="cell"><span class="dash">—</span></div><div class="cell feat-col"><i class="fa-solid fa-check check"></i></div><div class="cell feat-col"><i class="fa-solid fa-check check"></i></div><div class="cell"><i class="fa-solid fa-check check"></i></div></div>
-          </div>
-        </div>
-        <!-- Mobile: Toggle Card -->
-        <div class="s4-toggle" id="s4Toggle">
-          <div class="toggle-row" id="s4ToggleBtns">
-            <button class="toggle-btn active" onclick="s4TogglePlan(0,this)">Gratis</button>
-            <button class="toggle-btn" onclick="s4TogglePlan(1,this)">Starter</button>
-            <button class="toggle-btn" onclick="s4TogglePlan(2,this)">Standard</button>
-            <button class="toggle-btn" onclick="s4TogglePlan(3,this)">Premium</button>
-          </div>
-          <div class="main-card" id="s4ToggleCard">
-            <div class="main-tier">Gratis</div>
-            <div class="main-price">€0</div>
-            <div class="main-detail">15 minuti a settimana &nbsp;·&nbsp; Per sempre</div>
-          </div>
-          <div class="dots" id="s4ToggleDots">
-            <span class="dot active" onclick="s4TogglePlan(0)"></span>
-            <span class="dot" onclick="s4TogglePlan(1)"></span>
-            <span class="dot" onclick="s4TogglePlan(2)"></span>
-            <span class="dot" onclick="s4TogglePlan(3)"></span>
-          </div>
-        </div>
-      </div>
-      <a href="#" class="slide-cta" id="s4CTA" style="font-size:18px;padding:14px 32px;opacity:0;transition:opacity .8s ease 1s">Inizia gratis</a>
+  <nav class="controls" aria-label="Navigazione slide">
+    <button type="button" class="arrow-btn" id="prevBtn" aria-label="Slide precedente">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+    </button>
+    <div class="control-dots" role="tablist" aria-label="Selettore slide"></div>
+    <button type="button" class="arrow-btn" id="nextBtn" aria-label="Slide successiva">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
+    </button>
+  </nav>
+
+  <footer class="bottom-nav" role="contentinfo">
+    <div class="bottom-nav-row">
+      <a href="privacy.html">Privacy</a>
+      <a href="termini.html">Termini</a>
     </div>
-  </div>
-        </div>
-      </div>
-    </div>
-  </div>
-</div>
-<div class="bottom-nav">
-  <div class="bottom-nav-row">
-    <a href="privacy.html">Privacy</a>
-    <div class="nav-dots" id="navDots">
-      <span class="nav-dot active"></span>
-      <span class="nav-dot"></span>
-      <span class="nav-dot"></span>
-      <span class="nav-dot"></span>
-      <span class="nav-dot"></span>
-    </div>
-    <a href="termini.html">Termini</a>
-  </div>
-  <div class="bottom-copy">© Sottotitoli 2026 — Tutti i diritti riservati</div>
-</div>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="config.js"></script>
-<script src="js/auth.js"></script>
-<script src="js/i18n.js"></script>
-<script src="js/theme.js"></script>
-<script>
-(function(){
-  var slides=[].slice.call(document.querySelectorAll('.slide'));
-  var dots=[].slice.call(document.querySelectorAll('.nav-dot'));
-  var total=slides.length;
-  var state={current:0,transitioning:false,token:1,timers:new Map(),rafs:new Map()};
-  var MASK_MS=680;
-  var tY=0;
+    <div class="bottom-copy">© Sottotitoli 2026 — Tutti i diritti riservati</div>
+  </footer>
 
-  function addTimer(slideIdx,id){
-    if(!state.timers.has(slideIdx))state.timers.set(slideIdx,[]);
-    state.timers.get(slideIdx).push(id);
-    return id;
-  }
-  function addRaf(slideIdx,id){
-    if(!state.rafs.has(slideIdx))state.rafs.set(slideIdx,[]);
-    state.rafs.get(slideIdx).push(id);
-    return id;
-  }
-  function clearSlideAsync(slideIdx){
-    (state.timers.get(slideIdx)||[]).forEach(clearTimeout);
-    (state.rafs.get(slideIdx)||[]).forEach(cancelAnimationFrame);
-    state.timers.set(slideIdx,[]);
-    state.rafs.set(slideIdx,[]);
-  }
-  function isLive(token){return token===state.token}
-  function setDot(idx){ dots.forEach(function(d,i){ d.classList.toggle('active',i===idx); }); }
-  function updateAria(idx){
-    slides.forEach(function(s,i){
-      s.setAttribute('aria-hidden', i===idx ? 'false' : 'true');
-      s.setAttribute('aria-label', 'Slide '+(i+1)+' di '+total);
-      s.setAttribute('role','group');
-      s.setAttribute('aria-roledescription','slide');
-    });
-    dots.forEach(function(d,i){
-      d.setAttribute('role','tab');
-      d.setAttribute('aria-selected', i===idx ? 'true' : 'false');
-      d.setAttribute('tabindex', i===idx ? '0' : '-1');
-      d.setAttribute('aria-label','Vai alla slide '+(i+1));
-    });
-  }
-  function safeTimeout(slideIdx, token, fn, ms){
-    return addTimer(slideIdx,setTimeout(function(){ if(!isLive(token)) return; fn(); },ms));
-  }
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="config.js"></script>
+  <script src="js/auth.js"></script>
+  <script src="js/i18n.js"></script>
+  <script src="js/theme.js"></script>
+  <script>
+  window.onerror = function(msg, url, line){ console.error('Sottotitoli global error:', msg, 'at line', line); };
+  (function(){
+ 'use strict';
+    try {
+    var slides = document.querySelectorAll('.slide');
+    var dots = [];
+    var total = slides.length;
+    var current = 0;
+    var transitioning = false;
+    var tokenCounter = 0;
+    var lock = 0;
 
-  var controllers=[];
+    function isLive(token){ return token === lock; }
 
-  // Slide 0
-  controllers[0]=(function(){
-    var hero=document.getElementById('s0HeroWrap');
-    return {
-      reset:function(){
-        hero.classList.remove('slide-exit');
-        hero.style.opacity='';
-        hero.style.transition='';
-        hero.style.transform='';
-      },
-      enter:function(token){
-        hero.classList.remove('slide-exit');
-        hero.style.opacity='0';
-        hero.style.transition='opacity 1s ease';
-        safeTimeout(0,token,function(){ hero.style.opacity='1'; },200);
-      },
-      exit:function(token,ctx){
-        hero.classList.add('slide-exit');
-        safeTimeout(0,token,function(){ ctx.done(); },550);
-      }
-    };
-  })();
+    function performTransition(toIdx, fromIdx){
+      if(toIdx === fromIdx || toIdx < 0 || toIdx >= total) return;
+      tokenCounter++;
+      var token = tokenCounter;
+      lock = token;
+      transitioning = true;
 
-  // Slide 1 — Subtitle Stream ("Le parole non hanno confini")
-  controllers[1]=(function(){
-    var lines,indicator,cta;
-    return {
-      reset:function(){
-        lines=document.querySelectorAll('.flow-slide .subtitle-line');
-        indicator=document.querySelector('.flow-slide .stream-indicator');
-        cta=document.querySelector('.flow-slide .flow-cta');
-        lines.forEach(function(l){l.classList.remove('is-visible');});
-        if(indicator)indicator.style.opacity='0';
-        if(cta){cta.style.opacity='0';cta.style.transform='translateY(16px)';cta.style.pointerEvents='none';}
-      },
-      enter:function(token){
+      setDot(toIdx);
+      updateAria(toIdx);
+
+      if(controllers[fromIdx]) controllers[fromIdx].leave(token);
+
+      // Phase 1: fade out old slide
+      slides[fromIdx].classList.remove('active');
+
+      // Phase 2: after old fades out, fade in new slide
+      setTimeout(function(){
         if(!isLive(token)) return;
-        if(cta){cta.style.opacity='';cta.style.transform='';cta.style.pointerEvents='';}
-        lines.forEach(function(line,i){
-          safeTimeout(1,token,function(){
-            if(!isLive(token)) return;
-            line.classList.add('is-visible');
-          },180+(i*750));
-        });
-        safeTimeout(1,token,function(){
-          if(!isLive(token)) return;
-          if(indicator)indicator.style.opacity='1';
-        },180+(lines.length*750)+200);
-      },
-      exit:function(token,ctx){
-        lines.forEach(function(l){l.classList.remove('is-visible');});
-        if(indicator)indicator.style.opacity='0';
-        safeTimeout(1,token,function(){ctx.done();},400);
-      }
-    };
-  })();
-
-  // Slide 2 — Phone conversation + word tap with zoom
-  controllers[2]=(function(){
-    var phoneBubbles=[
-      {type:'other',text:'Il concetto è semplice.',orig:'The concept is simple.',speaker:'Sebastian',snl:'🇬🇧',color:'#3b82f6'},
-      {type:'other',text:'È un modo migliore per capire di più e imparare più velocemente.',orig:"It's a better way to understand more and learn faster.",speaker:'Sebastian',snl:'🇬🇧',color:'#3b82f6'},
-      {type:'self',text:'Lo provo ora.',orig:'',speaker:'Tu',snl:'🇮🇹',color:'#22c55e'}
-    ];
-    var phoneDict={
-      concetto:{w:'concetto',cefr:'B1',pos:'NOUN',ipa:'/konˈtʃɛt.to/',def:'Idea o nozione astratta.',trans:'→ concept',syns:['concept','notion','idea'],cefrColor:'#facc15'},
-      semplice:{w:'semplice',cefr:'A2',pos:'ADJ',ipa:'/ˈsem.pli.tʃe/',def:'Facile da capire o da fare.',trans:'→ simple',syns:['simple','easy'],cefrColor:'#a3e635'},
-      vedere:{w:'vedere',cefr:'A1',pos:'VERB',ipa:'/veˈde.re/',def:'Percepire con gli occhi.',trans:'→ see',syns:['see','watch','look'],cefrColor:'#22c55e'},
-      parole:{w:'parole',cefr:'A1',pos:'NOUN',ipa:'/paˈrɔ.le/',def:'Unità del linguaggio.',trans:'→ words',syns:['words','terms'],cefrColor:'#22c55e'},
-      ascolti:{w:'ascolti',cefr:'A2',pos:'VERB',ipa:'/aˈskol.ti/',def:'Prestare attenzione ai suoni.',trans:'→ you listen',syns:['listen','hear'],cefrColor:'#a3e635'},
-      capirle:{w:'capirle',cefr:'A2',pos:'VERB',ipa:'/kaˈpir.le/',def:'Comprenderle, afferrarne il senso.',trans:'→ understand them',syns:['understand','grasp','comprehend'],cefrColor:'#a3e635'},
-      ricordarle:{w:'ricordarle',cefr:'A2',pos:'VERB',ipa:'/ri.korˈdar.le/',def:'Tenerle a mente, non dimenticarle.',trans:'→ remember them',syns:['remember','recall','retain'],cefrColor:'#a3e635'},
-      usarle:{w:'usarle',cefr:'A2',pos:'VERB',ipa:'/uˈzar.le/',def:'Impiegarle, servirsene.',trans:'→ use them',syns:['use','employ','utilize'],cefrColor:'#a3e635'},
-      concept:{w:'concept',cefr:'B1',pos:'NOUN',ipa:'/ˈkɒn.sept/',def:'An abstract idea or general notion.',trans:'→ concetto',syns:['idea','notion','abstraction'],cefrColor:'#facc15'},
-      simple:{w:'simple',cefr:'A2',pos:'ADJ',ipa:'/ˈsɪm.pəl/',def:'Easily understood or done.',trans:'→ semplice',syns:['easy','basic','plain'],cefrColor:'#a3e635'},
-      seeing:{w:'seeing',cefr:'A2',pos:'VERB',ipa:'/ˈsiː.ɪŋ/',def:'Perceiving with the eyes.',trans:'→ vedendo',syns:['viewing','watching','observing'],cefrColor:'#a3e635'},
-      words:{w:'words',cefr:'A1',pos:'NOUN',ipa:'/wɜːdz/',def:'Units of language.',trans:'→ parole',syns:['terms','expressions'],cefrColor:'#22c55e'},
-      while:{w:'while',cefr:'A2',pos:'CONJ',ipa:'/waɪl/',def:'During the time that.',trans:'→ mentre',syns:['whilst','as','during'],cefrColor:'#a3e635'},
-      listen:{w:'listen',cefr:'A1',pos:'VERB',ipa:'/ˈlɪs.ən/',def:'Give attention to sound.',trans:'→ ascoltare',syns:['hear','attend','heed'],cefrColor:'#22c55e'},
-      helps:{w:'helps',cefr:'A2',pos:'VERB',ipa:'/helps/',def:'Makes it easier or better.',trans:'→ aiuta',syns:['assists','aids','supports'],cefrColor:'#a3e635'},
-      understand:{w:'understand',cefr:'A2',pos:'VERB',ipa:'/ˌʌn.dəˈstænd/',def:'Grasp the meaning of.',trans:'→ capire',syns:['comprehend','grasp','get'],cefrColor:'#a3e635'},
-      remember:{w:'remember',cefr:'A2',pos:'VERB',ipa:'/rɪˈmem.bə/',def:'Keep in memory; not forget.',trans:'→ ricordare',syns:['recall','retain','recollect'],cefrColor:'#a3e635'},
-      use:{w:'use',cefr:'A1',pos:'VERB',ipa:'/juːz/',def:'Employ for a purpose.',trans:'→ usare',syns:['utilize','employ','apply'],cefrColor:'#22c55e'},
-      them:{w:'them',cefr:'A1',pos:'PRON',ipa:'/ðem/',def:'Referring to people or things mentioned.',trans:'→ loro/li/le',syns:['those'],cefrColor:'#22c55e'},
-      quite:{w:'quite',cefr:'B1',pos:'ADV',ipa:'/kwaɪt/',def:'To a certain extent; fairly.',trans:'→ abbastanza',syns:['fairly','rather','pretty'],cefrColor:'#facc15'},
-      visualizing:{w:'visualizing',cefr:'B2',pos:'VERB',ipa:'/ˈvɪʒ.u.ə.laɪ.zɪŋ/',def:'Forming a mental image.',trans:'→ visualizzando',syns:['imagining','picturing'],cefrColor:'#fb923c'},
-      spoken:{w:'spoken',cefr:'B1',pos:'ADJ',ipa:'/ˈspəʊ.kən/',def:'Expressed in speech.',trans:'→ parlato',syns:['verbal','oral'],cefrColor:'#facc15'},
-      learn:{w:'learn',cefr:'A2',pos:'VERB',ipa:'/lɜːn/',def:'Gain knowledge.',trans:'→ imparare',syns:['study','master'],cefrColor:'#a3e635'},
-      better:{w:'better',cefr:'A2',pos:'ADJ',ipa:'/ˈbet.ə/',def:'More satisfactory.',trans:'→ meglio',syns:['improved','superior'],cefrColor:'#a3e635'},
-      way:{w:'way',cefr:'A2',pos:'NOUN',ipa:'/weɪ/',def:'A method, style, or manner of doing something.',trans:'→ modo',syns:['method','manner','means'],cefrColor:'#a3e635'},
-      more:{w:'more',cefr:'A1',pos:'ADV',ipa:'/mɔː/',def:'A greater or additional amount.',trans:'→ più',syns:['additional','extra','further'],cefrColor:'#22c55e'},
-      faster:{w:'faster',cefr:'A2',pos:'ADJ',ipa:'/ˈfɑː.stə/',def:'At a higher speed; more quickly.',trans:'→ più veloce',syns:['quicker','speedier','swifter'],cefrColor:'#a3e635'},
-      modo:{w:'modo',cefr:'A2',pos:'NOUN',ipa:'/ˈmɔ.do/',def:'Maniera, mezzo con cui si fa qualcosa.',trans:'→ way',syns:['maniera','mezzo','metodo'],cefrColor:'#a3e635'},
-      migliore:{w:'migliore',cefr:'A2',pos:'ADJ',ipa:'/miʎˈʎo.re/',def:'Più buono, superiore.',trans:'→ better',syns:['superiore','ottimo'],cefrColor:'#a3e635'},
-      più:{w:'più',cefr:'A1',pos:'ADV',ipa:'/pju/',def:'In maggiore quantità o grado.',trans:'→ more',syns:['additional','extra'],cefrColor:'#22c55e'},
-      velocemente:{w:'velocemente',cefr:'B1',pos:'ADV',ipa:'/ve.lo.tʃeˈmen.te/',def:'In modo rapido, con velocità.',trans:'→ quickly, faster',syns:['rapidamente','celermente'],cefrColor:'#facc15'},
-      imparare:{w:'imparare',cefr:'A2',pos:'VERB',ipa:'/im.paˈra.re/',def:'Acquisire conoscenza.',trans:'→ learn',syns:['apprendere','studiare'],cefrColor:'#a3e635'}
-    };
-    var convo,cardWrap,cardEl,copy,cont;
-    var built=false;
-
-    function tokenize(text){
-      return text.split(' ').map(function(w){
-        var clean=w.replace(/[.,!?;:'\u2019]/g,'').toLowerCase();
-        if(clean==='thats')clean="that's";
-        return phoneDict[clean]?'<span class="w" data-word="'+clean+'">'+w+'</span>':w;
-      }).join(' ');
+        slides[toIdx].classList.add('active');
+        // Phase 3: after new slide enters, finalize
+        setTimeout(function(){
+          finalTransition(toIdx, fromIdx, token);
+        }, 1300);
+      }, 1200);
     }
 
-    function buildConvo(token){
-      convo=document.getElementById('phoneConvo');
-      cardWrap=document.getElementById('phoneCardWrap');
-      cardEl=document.getElementById('phoneCard');
-      copy=document.getElementById('s2Copy');
-      cont=document.getElementById('s1Continua');
-      convo.innerHTML='';cardWrap.classList.remove('show');built=true;
-      // Smooth rise entrance of the zoomed phone
-      var zoomEl=document.getElementById('phoneZoom');
-      if(zoomEl){zoomEl.classList.add('phone-enter');}
-      safeTimeout(2,token,function(){
-        if(!isLive(token))return;
-        zoomEl.classList.remove('phone-enter');
-        zoomEl.style.opacity='1';zoomEl.style.transform='scale(1.55)';
-      },2100);
-      phoneBubbles.forEach(function(b,i){
-        var delay=i===0?400:i===1?2400:5000;
-        safeTimeout(3,token,function(){
-          if(!isLive(token)) return;
-          var el=document.createElement('div');el.className='phone-bub '+b.type;
-          var origHTML=b.orig?tokenize(b.orig):'';
-          el.innerHTML='<div style=\"font-size:clamp(11px,1.4vw,13px);line-height:1.5\">'+b.text+'</div>'+(b.orig?'<div style=\"font-size:clamp(11px,1.4vw,13px);color:var(--cyan);margin-top:2px;line-height:1.5\">'+origHTML+'</div>':'')+'<div class=\"phone-bub-foot\"><span style=\"display:inline-block;width:5px;height:5px;border-radius:50%;background:'+b.color+'\"></span> '+b.speaker+' <span style=\"font-size:10px\">'+b.snl+'</span></div>';
-          el.querySelectorAll('.w').forEach(function(wEl){wEl.addEventListener('click',function(e){e.stopPropagation();showCard(this.getAttribute('data-word'));});});
-          convo.appendChild(el);
-          if(i===phoneBubbles.length-1){
-            safeTimeout(3,token,function(){
-              // Zoom out
-              if(zoomEl)zoomEl.style.transform='scale(1) translateY(-108px)';
-              // After zoom, animate hand → card → + button
-              safeTimeout(3,token,function(){
-                animateHand('simple',token);
-              },1200);
-            },1000);
-          }
-        },delay);
+    function finalTransition(toIdx, fromIdx, token){
+      if(!isLive(token)) return;
+      current = toIdx;
+      if(controllers[toIdx]) controllers[toIdx].enter(token);
+      transitioning = false;
+    }
+
+    function setDot(idx){
+      dots.forEach(function(d, i){ d.classList.toggle('active', i === idx); });
+    }
+
+    function updateAria(idx){
+      slides.forEach(function(s, i){
+        s.setAttribute('aria-hidden', i === idx ? 'false' : 'true');
+        s.setAttribute('aria-label', 'Slide ' + (i + 1) + ' di ' + total);
+      });
+      dots.forEach(function(d, i){
+        d.setAttribute('role', 'tab');
+        d.setAttribute('aria-selected', i === idx ? 'true' : 'false');
+        d.setAttribute('tabindex', i === idx ? '0' : '-1');
+        d.setAttribute('aria-label', 'Vai alla slide ' + (i + 1));
       });
     }
 
-    function animateHand(wordKey,token){
-      var handEl=document.getElementById('s2Hand');
-      var wEl=convo.querySelector('[data-word=\"'+wordKey+'\"]');
-      if(!handEl||!wEl){showCard(wordKey);copy.style.opacity='1';cont.classList.add('show');return;}
-      var wr=wEl.getBoundingClientRect();
-      var stage=handEl.parentElement;
-      var sr=stage.getBoundingClientRect();
-      // Position hand off-screen then fly to word
-      handEl.style.transition='none';handEl.style.opacity='1';
-      handEl.style.left=(sr.width+40)+'px';handEl.style.top=(sr.height+40)+'px';
-      handEl.offsetHeight;
-      handEl.style.transition='left .6s cubic-bezier(.15,.8,.2,1), top .6s cubic-bezier(.15,.8,.2,1), opacity .3s';
-      handEl.style.left=(wr.left-sr.left+wr.width/2-13)+'px';handEl.style.top=(wr.top-sr.top-8)+'px';
-      safeTimeout(3,token,function(){
-        if(!isLive(token))return;
-        showCard(wordKey);copy.style.opacity='1';
-        // Move hand to card area
-        safeTimeout(3,token,function(){
-          var cr=cardWrap.getBoundingClientRect();
-          handEl.style.transition='left .45s ease, top .45s ease';
-          handEl.style.left=(cr.left-sr.left+cr.width/2-13)+'px';handEl.style.top=(cr.top-sr.top+cr.height/2)+'px';
-          // Move hand to + button and click
-          safeTimeout(3,token,function(){
-            var sb=cardEl.querySelector('button');
-            if(!sb||!isLive(token)){cont.classList.add('show');handEl.style.opacity='0';return;}
-            var sbr=sb.getBoundingClientRect();
-            handEl.style.transition='left .3s ease, top .3s ease';
-            handEl.style.left=(sbr.left-sr.left+sbr.width/2-13)+'px';handEl.style.top=(sbr.top-sr.top+sbr.height/2)+'px';
-            safeTimeout(3,token,function(){
-              sb.click();
-              handEl.style.transform='scale(1.25)';
-              safeTimeout(3,token,function(){handEl.style.transform='scale(1)';},150);
-              safeTimeout(3,token,function(){handEl.style.opacity='0';handEl.style.transform='scale(1)';},400);
-              // Always show continua button + AI paragraph
-              cont.classList.add('show');
-              var aiP=document.getElementById('s1AiP');if(aiP)aiP.style.opacity='1';
-            },450);
-          },800);
-        },500);
-      },700);
-    }
-
-    function showCard(wordKey){
-      var d=phoneDict[wordKey];if(!d)return;
-      convo.querySelectorAll('.w.active').forEach(function(w){w.classList.remove('active');});
-      var wEl=convo.querySelector('[data-word="'+wordKey+'"]');if(wEl)wEl.classList.add('active');
-      var saved=false;
-      cardEl.innerHTML='<div style="display:flex;align-items:flex-start;gap:6px"><div style="flex:1"><div class="pc-head"><span class="pc-w">'+d.w+'</span><span class="pc-cefr" style="background:'+d.cefrColor+'22;color:'+d.cefrColor+'">'+d.cefr+'</span><span class="pc-pos">'+d.pos+'</span></div><div class="pc-ipa">'+d.ipa+'</div><div class="pc-def">'+d.def+'</div><div class="pc-trans">'+d.trans+'</div><div class="pc-syns">'+d.syns.map(function(s){return'<span>'+s+'</span>';}).join('')+'</div></div><div style="display:flex;align-items:center;gap:0;flex-shrink:0"><span id="pcToast" style="font-size:12px;color:#22c55e;font-weight:600;opacity:0;transition:opacity .4s;margin-right:6px;white-space:nowrap">aggiunto</span><button id="pcSaveBtn" style="width:26px;height:26px;border-radius:7px;border:1px solid rgba(8,145,178,.25);background:rgba(8,145,178,.08);color:var(--cyan);cursor:pointer;font-size:15px;display:flex;align-items:center;justify-content:center;font-family:Inter,sans-serif;transition:all .2s">+</button></div></div>';
-      cardWrap.classList.add('show');
-      var sb=document.getElementById('pcSaveBtn');
-      var toast=document.getElementById('pcToast');
-      if(sb){sb.addEventListener('click',function(ev){ev.stopPropagation();saved=!saved;
-        if(saved){sb.textContent='✓';sb.style.background='rgba(34,197,94,.15)';sb.style.borderColor='rgba(34,197,94,.3)';sb.style.color='#22c55e';if(toast)toast.style.opacity='1';}
-        else{sb.textContent='+';sb.style.background='rgba(8,145,178,.08)';sb.style.borderColor='rgba(8,145,178,.25)';sb.style.color='var(--cyan)';if(toast)toast.style.opacity='0';}
-      });}
-    }
-
-    return {
-      reset:function(){
-        built=false;
-        var z=document.getElementById('phoneZoom');if(z){z.style.opacity='0';z.style.transform='scale(1.55)';z.classList.remove('phone-enter');}
-        var h=document.getElementById('s2Hand');if(h)h.style.opacity='0';
-        copy=document.getElementById('s2Copy');if(copy)copy.style.opacity='0';
-        cont=document.getElementById('s1Continua');if(cont)cont.classList.remove('show');
-        convo=document.getElementById('phoneConvo');if(convo)convo.innerHTML='';
-        cardWrap=document.getElementById('phoneCardWrap');if(cardWrap)cardWrap.classList.remove('show');
+    var controllers = [
+      {
+        id: 'hero',
+        enter: function(token){ if(!isLive(token)) return; },
+        leave: function(token){}
       },
-      enter:function(token){
-        copy=document.getElementById('s2Copy');cont=document.getElementById('s1Continua');
-        copy.style.opacity='0';if(cont)cont.classList.remove('show');
-        safeTimeout(3,token,function(){buildConvo(token);},300);
+      {
+        id: 'flow',
+        enter: function(token){
+          if(!isLive(token)) return;
+          // Fade in the caption box first
+          var frame = document.querySelector('.flow-slide .subtitle-stream-frame');
+          if(frame){ frame.style.opacity = '0'; setTimeout(function(){ if(!isLive(token)) return; frame.style.opacity = '1'; }, 300); }
+          // Then reveal subtitle lines with natural pauses
+          var lines = document.querySelectorAll('.flow-slide .subtitle-line');
+          lines.forEach(function(line, i){
+            setTimeout(function(){
+              if(!isLive(token)) return;
+              line.classList.add('is-visible');
+            }, 600 + (i * 1000));
+          });
+          // Show CTA after last subtitle settles
+          var lastLineAt = 600 + ((lines.length - 1) * 1000);
+          var ctaAppear = lastLineAt + 1500;
+          setTimeout(function(){
+            if(!isLive(token)) return;
+            var cta = document.getElementById('s1Cta'); if(cta) cta.classList.add('is-visible');
+          }, ctaAppear);
+        },
+        leave: function(token){
+          var lines = document.querySelectorAll('.flow-slide .subtitle-line');
+          lines.forEach(function(line){ line.classList.remove('is-visible'); });
+          var cta = document.getElementById('s1Cta'); if(cta) cta.classList.remove('is-visible');
+          var frame = document.querySelector('.flow-slide .subtitle-stream-frame');
+          if(frame) frame.style.opacity = '0';
+        }
       },
-      exit:function(token,ctx){
-        cont.classList.remove('show');
-        // Smooth fade to black
-        var zoomEl=document.getElementById('phoneZoom');if(zoomEl)zoomEl.style.transition='opacity .5s ease';if(zoomEl)zoomEl.style.opacity='0';
-        slides[2].style.transition='opacity .8s ease';
-        slides[2].style.opacity='0';
-        safeTimeout(3,token,function(){ctx.done();},900);
+      {
+        id: 'features',
+        enter: function(token){
+          if(!isLive(token)) return;
+          var chips = document.querySelectorAll('.feature-chip');
+          chips.forEach(function(chip, i){
+            setTimeout(function(){
+              if(!isLive(token)) return;
+              chip.classList.add('is-visible');
+            }, 200 + (i * 180));
+          });
+          // Show CTA after last chip resolves
+          var lastChipAt = 200 + ((chips.length - 1) * 180);
+          var chipResolve = 700; // feature-chip transition
+          setTimeout(function(){
+            if(!isLive(token)) return;
+            var cta = document.getElementById('s2Cta'); if(cta) cta.classList.add('is-visible');
+          }, lastChipAt + chipResolve + 400);
+        },
+        leave: function(token){
+          var chips = document.querySelectorAll('.feature-chip');
+          chips.forEach(function(chip){ chip.classList.remove('is-visible'); });
+          var cta = document.getElementById('s2Cta'); if(cta) cta.classList.remove('is-visible');
+        }
+      },
+      {
+        id: 'pricing',
+        enter: function(token){
+          if(!isLive(token)) return;
+          var p = document.getElementById('s4Pricing'); if(p){p.style.opacity='1';p.style.transform='translateY(0)';}
+          var allRows = document.querySelectorAll('.s4-table .row');
+          var dataRows = document.querySelectorAll('.s4-table .row:not(.head)');
+          var colGap = 2800;
+          for (var col = 2; col <= 5; col++) {
+            (function(colIdx){
+              setTimeout(function(){
+                if(!isLive(token)) return;
+                // Fade in permanent column accent
+                allRows.forEach(function(row){
+                  var cell = row.querySelector('.cell:nth-child('+colIdx+')');
+                  if(cell){ cell.classList.add('col-accent','col-accent-'+(colIdx-1),'in'); }
+                });
+                // Pop checks in this column top→bottom
+                var checkCount = 0;
+                dataRows.forEach(function(row, ri){
+                  var cell = row.querySelector('.cell:nth-child('+colIdx+')');
+                  var check = cell ? cell.querySelector('.check.anim') : null;
+                  if(check){
+                    checkCount++;
+                    setTimeout(function(){
+                      if(!isLive(token)) return;
+                      check.classList.add('anim-in');
+                    }, ri * 300);
+                  }
+                });
+                // After checks, pop the Report AI number for this column
+                var numDelay = (checkCount + 1) * 300 + 500;
+                setTimeout(function(){
+                  if(!isLive(token)) return;
+                  var reportRow = document.querySelector('.s4-table .row:last-child');
+                  if(reportRow){
+                    var numCell = reportRow.querySelector('.cell:nth-child('+colIdx+') .num.anim-num');
+                    if(numCell) numCell.classList.add('anim-in');
+                  }
+                }, numDelay);
+              }, (col - 2) * colGap);
+            })(col);
+          }
+          var ctaDelay = (4 * colGap) + 1800;
+          setTimeout(function(){
+            if(!isLive(token)) return;
+            var cta = document.getElementById('pricingCta');
+            if(cta) cta.classList.add('is-visible');
+          }, ctaDelay);
+        },
+        leave: function(token){
+          var p = document.getElementById('s4Pricing'); if(p){p.style.opacity='0';p.style.transform='translateY(16px)';}
+          var cta = document.getElementById('pricingCta'); if(cta) cta.classList.remove('is-visible');
+          var checks = document.querySelectorAll('.s4-table .check.anim-in');
+          checks.forEach(function(ch){ ch.classList.remove('anim-in'); });
+          var nums = document.querySelectorAll('.s4-table .num.anim-in');
+          nums.forEach(function(n){ n.classList.remove('anim-in'); });
+          var accents = document.querySelectorAll('.s4-table .col-accent.in');
+          accents.forEach(function(cell){ cell.classList.remove('in'); });
+        }
       }
-    };
-  })();
-
-  // Slide 3 — Director's Cut
-  controllers[3]=(function(){
-    var tL=document.getElementById('s2TitleL'),tR=document.getElementById('s2TitleR');
-    var capWrap=document.getElementById('s2CapWrap'),liveText=document.getElementById('s2LiveText');
-    var cefrBars=document.getElementById('s2CefrBars'),btn=document.getElementById('s2Continua');
-    var splitCards=document.getElementById('s2SplitCards'),challengeCount=document.getElementById('s2ChallengeCount');
-    var c2Box=document.getElementById('s2C2Box'),defBox=document.getElementById('s2WordDef');
-    var captionLines=[
-      {it:"Each moment is a skyline of words."},
-      {it:"Just one moment..."},
-      {it:"We can make all moments indelible."}
     ];
-    var c1Words=['skyline'],c2Words=['indelible'];
-    var cefrColors={A1:'#22c55e',A2:'#a3e635',B1:'#facc15',B2:'#fb923c',C1:'#c084fc',C2:'#06b6d4'};
-    var PRE_FILLED={a1:40,a2:30,b1:12,b2:10};
-    var wordDict={
-      skyline:{w:'skyline',cefr:'C1',pos:'NOUN',ipa:'/ˈskaɪ.laɪn/',def:'The outline of buildings or mountains against the sky.',trans:'→ profilo urbano, skyline',syns:['horizon','cityscape','silhouette'],cefrColor:'#c084fc'},
-      indelible:{w:'indelible',cefr:'C2',pos:'ADJ',ipa:'/ɪnˈdel.ə.bəl/',def:'Making marks that cannot be removed, or memories that cannot be forgotten.',trans:'→ indelebile, incancellabile',syns:['permanent','unerasable','lasting'],cefrColor:'#06b6d4'}
-    };
-    var captionEls=[],c1Found=0,c2Found=0;
 
-    function addLiveWord(word,token,delay){
-      safeTimeout(3,token,function(){
-        if(!isLive(token))return;
-        var sp=document.createElement('span');
-        sp.textContent=word+' ';sp.style.cssText='animation:fadeIn .25s ease-out both;color:#fff';
-        liveText.appendChild(sp);
-      },delay);
-    }
+    function init(){
+      if(!total){ console.warn('No slides found'); return; }
+      var dotsContainer = document.querySelector('.control-dots');
+      if(dotsContainer){
+        for(var i = 0; i < total; i++){
+          var btn = document.createElement('button');
+          btn.className = 'dot' + (i === 0 ? ' active' : '');
+          btn.type = 'button';
+          btn.addEventListener('click', (function(idx){
+            return function(e){ e.preventDefault(); if(!transitioning) performTransition(idx, current); };
+          })(i));
+          dotsContainer.appendChild(btn);
+          dots.push(btn);
+        }
+        updateAria(0);
+      }
+      if(slides[0]){
+        slides[0].classList.add('active');
+        lock = 1;
+        if(controllers[0]) controllers[0].enter(1);
+      }
 
-    function showCaption(idx,token){
-      safeTimeout(3,token,function(){
-        if(!isLive(token))return;
-        var el=captionEls[idx];if(!el)return;
-        var now=new Date();
-        var hh=now.getHours().toString().padStart(2,'0');
-        var mm=now.getMinutes().toString().padStart(2,'0');
-        el.querySelector('.s2-caption-time').textContent=hh+':'+mm;
-        el.style.opacity='1';
-        el.style.transform='translateY(0) scale(1)';
-        el.style.transition='opacity .55s cubic-bezier(.22,1,.36,1),transform .55s cubic-bezier(.22,1,.36,1)';
-      },0);
-    }
-
-    function showWordDef(key){
-      var d=wordDict[key];if(!d)return;
-      document.getElementById('defWord').textContent=d.w;
-      var c=document.getElementById('defCefr');c.textContent=d.cefr;c.style.background=d.cefrColor+'22';c.style.color=d.cefrColor;
-      document.getElementById('defPos').textContent=d.pos;
-      document.getElementById('defIpa').textContent=d.ipa;
-      document.getElementById('defDef').textContent=d.def;
-      document.getElementById('defTrans').textContent=d.trans;
-      var s=document.getElementById('defSyns');s.innerHTML='';
-      d.syns.forEach(function(syn){var sp=document.createElement('span');sp.textContent=syn;sp.style.cssText='font-size:11px;color:rgba(255,255,255,.25);background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.05);border-radius:100px;padding:2px 10px';s.appendChild(sp);});
-      defBox.style.display='block';defBox.style.animation='none';void defBox.offsetWidth;defBox.style.animation='fadeIn .4s ease-out both';
-    }
-
-    return {
-      reset:function(){
-        tL.style.opacity='0';tL.classList.remove('kubrick-slow');
-        tR.style.opacity='0';tR.classList.remove('kubrick-slow');
-        capWrap.style.opacity='0';capWrap.classList.remove('kubrick-track');
-        liveText.innerHTML='';
-        liveText.style.opacity='1';
-        cefrBars.style.opacity='0';cefrBars.classList.remove('kubrick-track');
-        btn.classList.remove('show');
-        splitCards.style.opacity='0';splitCards.classList.remove('kubrick-track');
-        challengeCount.textContent='4';challengeCount.style.cssText='';
-        c2Box.classList.remove('is-visible');
-        defBox.style.display='none';
-        c1Found=0;c2Found=0;
-        // Reset caption cards
-        captionEls=document.querySelectorAll('#s2CapArea > .s2-caption');
-        captionEls.forEach(function(el){el.style.opacity='0';el.style.transform='translateY(14px) scale(.995)';});
-        // Reset word spans
-        document.querySelectorAll('.s2-word').forEach(function(w){w.classList.remove('is-found-c1','is-found-c2');w.style.cursor='pointer';});
-        // Reset CEFR bars: pre-filled A1-B2, empty C1+C2
-        ['a1','a2','b1','b2'].forEach(function(k){var b=cefrBars.querySelector('.s2-bar-'+k);if(b)b.style.width=PRE_FILLED[k]+'%';});
-        ['c1','c2'].forEach(function(k){var b=cefrBars.querySelector('.s2-bar-'+k);if(b)b.style.width='0%';});
-      },
-      enter:function(token){
-        c1Found=0;c2Found=0;
-        captionEls=document.querySelectorAll('#s2CapArea > .s2-caption');
-        // Setup clickable words
-        document.querySelectorAll('.s2-word[data-word]').forEach(function(el){
-          el.addEventListener('click',function(e){e.stopPropagation();showWordDef(this.getAttribute('data-word'));});
+      var s4ToggleBtns = document.querySelectorAll('#s4ToggleBtns .toggle-btn');
+      if(s4ToggleBtns.length){
+        s4ToggleBtns.forEach(function(btn,i){
+          btn.addEventListener('click',function(){window.s4TogglePlan(i,this)});
         });
-
-        // Phase 1 — Left title (Kubrick slow reveal)
-        safeTimeout(3,token,function(){tL.classList.add('kubrick-slow');},200);
-        // Phase 2 — Right title
-        safeTimeout(3,token,function(){tR.classList.add('kubrick-slow');},1400);
-        // Phase 3 — Captions type out
-        var base=2400;
-        safeTimeout(3,token,function(){capWrap.classList.add('kubrick-track');},base);
-
-        var words1=captionLines[0].it.split(' ');
-        var words2=captionLines[1].it.split(' ');
-        var words3=captionLines[2].it.split(' ');
-
-        var FADE_MS=550; // match CSS transition on #s2LiveText
-
-        var t1=base+300;
-        words1.forEach(function(w,i){addLiveWord(w,token,t1+i*140);});
-        var t1end=t1+words1.length*140;
-        safeTimeout(3,token,function(){if(isLive(token))liveText.style.opacity='0';},t1end+500);
-        safeTimeout(3,token,function(){if(isLive(token)){liveText.innerHTML='';liveText.style.opacity='1';showCaption(0,token);}},t1end+500+FADE_MS+100);
-
-        var t2=t1end+500+FADE_MS+100+800;
-        words2.forEach(function(w,i){addLiveWord(w,token,t2+i*120);});
-        var t2end=t2+words2.length*120;
-        safeTimeout(3,token,function(){if(isLive(token))liveText.style.opacity='0';},t2end+500);
-        safeTimeout(3,token,function(){if(isLive(token)){liveText.innerHTML='';liveText.style.opacity='1';showCaption(1,token);}},t2end+500+FADE_MS+100);
-
-        var t3=t2end+500+FADE_MS+100+800;
-        words3.forEach(function(w,i){addLiveWord(w,token,t3+i*240);});
-        var t3end=t3+words3.length*240;
-        safeTimeout(3,token,function(){if(isLive(token))liveText.style.opacity='0';},t3end+500);
-        safeTimeout(3,token,function(){if(isLive(token)){liveText.innerHTML='';liveText.style.opacity='1';showCaption(2,token);}},t3end+500+FADE_MS+100);
-
-        var captionTotal=t3end+500+FADE_MS+100+800;
-
-        // Phase 4 — show CEFR + cards, then word highlights
-        safeTimeout(3,token,function(){
-          if(!isLive(token))return;
-          // Show CEFR with pre-filled bars
-          ['a1','a2','b1','b2'].forEach(function(k){var b=cefrBars.querySelector('.s2-bar-'+k);if(b)b.style.width=PRE_FILLED[k]+'%';});
-          ['c1','c2'].forEach(function(k){var b=cefrBars.querySelector('.s2-bar-'+k);if(b)b.style.width='0%';});
-          cefrBars.style.opacity='1';cefrBars.classList.add('kubrick-track');
-          splitCards.style.opacity='1';splitCards.classList.add('kubrick-track');
-
-          // C1 word: "skyline"
-          safeTimeout(3,token,function(){
-            if(!isLive(token))return;
-            var el=document.querySelector('.s2-word[data-word="skyline"]');
-            if(el){el.classList.add('is-found-c1');c1Found++;}
-            var b=cefrBars.querySelector('.s2-bar-c1');if(b)b.style.width='7%';
-            safeTimeout(3,token,function(){
-              challengeCount.textContent='5';
-              challengeCount.style.transition='transform .4s cubic-bezier(.175,.885,.32,1.275)';
-              challengeCount.style.transform='scale(1.5)';challengeCount.style.color='#c084fc';
-              setTimeout(function(){challengeCount.style.transform='scale(1)';},400);
-            },300);
-          },600);
-
-          // C2 word: "indelible"
-          safeTimeout(3,token,function(){
-            if(!isLive(token))return;
-            var el=document.querySelector('.s2-word[data-word="indelible"]');
-            if(el){el.classList.add('is-found-c2');c2Found++;}
-            var bc1=cefrBars.querySelector('.s2-bar-c1');if(bc1)bc1.style.width='8%';
-            safeTimeout(3,token,function(){
-              var bc2=cefrBars.querySelector('.s2-bar-c2');if(bc2)bc2.style.width='3%';
-            },400);
-            safeTimeout(3,token,function(){
-              c2Box.classList.add('is-visible');
-            },800);
-          },1800);
-
-          // Continue button
-          safeTimeout(3,token,function(){btn.classList.add('show');},3200);
-        },captionTotal+800);
-      },
-      exit:function(token,ctx){
-        btn.classList.remove('show');
-        slides[3].style.transition='opacity 1s ease';
-        slides[3].style.opacity='0';
-        safeTimeout(3,token,function(){ctx.done();},1100);
       }
+      var s4ToggleDots = document.querySelectorAll('#s4ToggleDots .dot');
+      if(s4ToggleDots.length){
+        s4ToggleDots.forEach(function(d,i){
+          d.addEventListener('click',function(){window.s4TogglePlan(i)});
+        });
+      }
+
+      var prevBtn = document.getElementById('prevBtn');
+      var nextBtn = document.getElementById('nextBtn');
+      if(prevBtn){
+        prevBtn.addEventListener('click', function(e){
+          e.preventDefault();
+          if(!transitioning){ var t = current - 1; if(t < 0) t = total - 1; performTransition(t, current); }
+        });
+      }
+      if(nextBtn){
+        nextBtn.addEventListener('click', function(e){
+          e.preventDefault();
+          if(!transitioning){ var t = current + 1; if(t >= total) t = 0; performTransition(t, current); }
+        });
+      }
+
+      document.addEventListener('keydown', function(e){
+        if(transitioning) return;
+        if(e.key === 'ArrowLeft'){ var t = current - 1; if(t < 0) t = total - 1; performTransition(t, current); }
+        if(e.key === 'ArrowRight'){ var t = current + 1; if(t >= total) t = 0; performTransition(t, current); }
+      });
+
+      var stageRoot = document.querySelector('.stage-root');
+      var touchStartX = 0;
+      stageRoot.addEventListener('touchstart', function(e){ touchStartX = e.changedTouches[0].screenX; }, {passive:true});
+      stageRoot.addEventListener('touchend', function(e){
+        var endX = e.changedTouches[0].screenX;
+        var diff = touchStartX - endX;
+        if(Math.abs(diff) > 40){
+          if(!transitioning){
+            if(diff > 0){ var t = current + 1; if(t >= total) t = 0; performTransition(t, current); }
+            else { var t = current - 1; if(t < 0) t = total - 1; performTransition(t, current); }
+          }
+        }
+      }, {passive:true});
+    }
+
+    window.s4TogglePlan = function(i, el){
+      document.querySelectorAll('#s4ToggleBtns .toggle-btn').forEach(function(b){b.classList.remove('active')});
+      document.querySelectorAll('#s4ToggleDots .dot').forEach(function(d,j){d.classList.toggle('active',j===i)});
+      if(el&&el.classList.contains('toggle-btn'))el.classList.add('active');
+      var plans=[
+        {tier:'Gratis',price:'€0',detail:'15 minuti a settimana &nbsp;·&nbsp; Per sempre'},
+        {tier:'Starter',price:'€4<small>,99</small>',detail:'60 minuti al mese &nbsp;·&nbsp; +5 Report AI'},
+        {tier:'Standard',price:'€14<small>,99</small>',detail:'300 minuti al mese &nbsp;·&nbsp; +20 Report AI'},
+        {tier:'Premium',price:'€29<small>,99</small>',detail:'900 minuti al mese &nbsp;·&nbsp; +60 Report AI'}
+      ];
+      var p=plans[i];
+      var c=document.getElementById('s4ToggleCard');
+      if(!c)return;
+      c.querySelector('.main-tier').textContent=p.tier;
+      c.querySelector('.main-price').innerHTML=p.price;
+      c.querySelector('.main-detail').innerHTML=p.detail;
     };
-  })();
-  // Slide 4 — Pricing
-  controllers[4]=(function(){
-    var t=document.getElementById('s4Title'),txt=document.getElementById('s4Text'),ul=document.getElementById('s4UlLine'),pr=document.getElementById('s4Pricing'),cta=document.getElementById('s4CTA');
-    function resetCTA(){
-      cta.innerHTML='Inizia gratis'; cta.href='#'; cta.style.fontSize='18px'; cta.style.opacity='0';
-      cta.onclick=function(e){
+
+    window._advance = function(){
+      if(!transitioning){ var t = current + 1; if(t >= total) t = 0; performTransition(t, current); }
+    };
+
+    var pricingCta = document.getElementById('pricingCta');
+    if(pricingCta){
+      var pricingPrimed = false;
+      pricingCta.addEventListener('click', function(e){
         e.preventDefault();
-        var b=cta;
-        b.style.transition='opacity .8s ease';
-        b.style.opacity='0';
-        setTimeout(function(){ 
-          b.innerHTML='<i class="fa-brands fa-google" style="font-size:16px"></i> Accedi'; 
-          b.href='#'; 
-          b.onclick=function(e){
-            e.preventDefault();
-            if(typeof signInWithGoogle==='function'){
-              signInWithGoogle();
-            }else{
-              var toast=document.getElementById('authToast');
-              if(toast){
-                toast.textContent='🔐 Accedi per continuare';
-                toast.classList.add('show');
-                setTimeout(function(){toast.classList.remove('show');},4000);
-              }
-              console.warn('Auth provider not loaded');
-            }
-          }; 
-          b.style.fontSize='18px'; 
-          b.style.opacity='1'; 
-        },500);
-      };
+        if(!pricingPrimed){
+          pricingPrimed = true;
+          pricingCta.style.opacity = '0';
+          setTimeout(function(){
+            pricingCta.innerHTML = '<i class=\"fa-brands fa-google\" style=\"font-size:16px\"></i> Accedi';
+            pricingCta.style.opacity = '1';
+          }, 500);
+          return;
+        }
+        if(typeof signInWithGoogle === 'function'){
+          signInWithGoogle();
+        } else {
+          var toast = document.getElementById('authToast');
+          if(toast){ toast.textContent = '🔐 Accedi per continuare'; toast.classList.add('show'); setTimeout(function(){ toast.classList.remove('show'); }, 4000); }
+        }
+      });
     }
-    return {
-      reset:function(){
-        t.style.opacity='0'; txt.style.opacity='0'; pr.style.opacity='0'; if(ul)ul.classList.remove('draw');
-        slides[4].style.opacity=''; slides[4].style.transition='';
-        resetCTA();
-        // Reset toggle to first plan
-        s4TogglePlan(0);
-        document.querySelectorAll('#s4ToggleBtns .toggle-btn').forEach(function(b,i){b.classList.toggle('active',i===0)});
-        document.querySelectorAll('#s4ToggleDots .dot').forEach(function(d,i){d.classList.toggle('active',i===0)});
-      },
-      enter:function(token){
-        safeTimeout(4,token,function(){ t.style.opacity='1'; },300);
-        safeTimeout(4,token,function(){ txt.style.opacity='1'; },800);
-        safeTimeout(4,token,function(){ if(ul)ul.classList.add('draw'); },1400);
-        safeTimeout(4,token,function(){ pr.style.opacity='1'; },2000);
-        safeTimeout(4,token,function(){ cta.style.opacity='1'; },2600);
-      },
-      exit:function(token,ctx){
-        slides[4].style.transition='opacity 1.2s ease';
-        slides[4].style.opacity='0';
-        safeTimeout(4,token,function(){ ctx.done(); },1300);
-      }
-    };
+
+    init();
+    console.log('Sottotitoli v3.1 loaded —', total, 'slides');
+    } catch(err){
+      console.error('Sottotitoli critical init error:', err);
+      var fallback = document.createElement('div');
+      fallback.style.cssText = 'position:fixed;inset:0;z-index:99999;display:flex;align-items:center;justify-content:center;background:#050810;color:#fff;font-family:system-ui;padding:24px;';
+      fallback.innerHTML = '<div>Errore di avvio: <code style="color:#22d3ee;">' + (err.message || err) + '</code></div>';
+      document.body.appendChild(fallback);
+    }
   })();
-
-  // Toggle plan for mobile pricing card (slide 4)
-  var s4Plans=[
-    {tier:'Gratis',price:'€0',detail:'15 minuti a settimana &nbsp;·&nbsp; Per sempre'},
-    {tier:'Starter',price:'€4<small>,99</small>',detail:'60 minuti al mese &nbsp;·&nbsp; +5 Report AI'},
-    {tier:'Standard',price:'€14<small>,99</small>',detail:'300 minuti al mese &nbsp;·&nbsp; +20 Report AI'},
-    {tier:'Premium',price:'€29<small>,99</small>',detail:'900 minuti al mese &nbsp;·&nbsp; +60 Report AI'}
-  ];
-  function s4TogglePlan(i,el){
-    document.querySelectorAll('#s4ToggleBtns .toggle-btn').forEach(function(b){b.classList.remove('active')});
-    document.querySelectorAll('#s4ToggleDots .dot').forEach(function(d,j){d.classList.toggle('active',j===i)});
-    if(el&&el.classList.contains('toggle-btn'))el.classList.add('active');
-    var p=s4Plans[i];
-    var c=document.getElementById('s4ToggleCard');
-    if(!c)return;
-    c.querySelector('.main-tier').textContent=p.tier;
-    c.querySelector('.main-price').innerHTML=p.price;
-    c.querySelector('.main-detail').innerHTML=p.detail;
-  }
-  window.s4TogglePlan=s4TogglePlan;
-
-  function finalTransition(fromIdx,toIdx,token){
-    var oldSlide=slides[fromIdx], newSlide=slides[toIdx];
-    controllers[toIdx].reset();
-    oldSlide.classList.add('mask-out');
-    oldSlide.classList.remove('active');
-    newSlide.classList.add('mask-in','active');
-    setDot(toIdx);
-    updateAria(toIdx);
-    safeTimeout(toIdx,token,function(){
-      oldSlide.classList.remove('mask-out');
-      newSlide.classList.remove('mask-in');
-      slides.forEach(function(s,i){ if(i!==fromIdx&&i!==toIdx) s.classList.remove('active','mask-in','mask-out'); });
-      state.current=toIdx;
-      controllers[toIdx].enter(token);
-      state.transitioning=false;
-    },MASK_MS);
-  }
-
-  function performTransition(toIdx){
-    if(state.transitioning||toIdx===state.current||toIdx<0||toIdx>=total) return;
-    var fromIdx=state.current;
-    state.transitioning=true;
-    state.token+=1;
-    var token=state.token;
-    clearSlideAsync(fromIdx);
-    clearSlideAsync(toIdx);
-    var specialExit=(fromIdx===0&&toIdx===1)||(fromIdx===1&&toIdx===2)||(fromIdx===2&&toIdx===3)||(fromIdx===3&&toIdx===4);
-    if(specialExit && controllers[fromIdx].exit){
-      controllers[fromIdx].exit(token,{to:toIdx,done:function(){ if(!isLive(token)) return; finalTransition(fromIdx,toIdx,token); }});
-    }else{
-      finalTransition(fromIdx,toIdx,token);
-    }
-  }
-
-  function requestAdvance(){ if(state.current<total-1) performTransition(state.current+1); }
-  function init(){
-    slides.forEach(function(slide,i){ if(i===0) slide.classList.add('active'); else slide.classList.remove('active','mask-in','mask-out'); });
-    setDot(0);
-    updateAria(0);
-    controllers[0].reset();
-    controllers[0].enter(state.token);
-  }
-
-  document.getElementById('s0Discover').addEventListener('click',function(e){ e.preventDefault(); performTransition(1); });
-  document.getElementById('s1Continua').addEventListener('click',function(){ if(state.current===2&&!state.transitioning) performTransition(3); });
-  document.getElementById('s2Continua').addEventListener('click',function(){ if(state.current===3&&!state.transitioning) performTransition(4); });
-  document.addEventListener('keydown',function(e){ if(e.key==='ArrowDown'||e.key==='ArrowRight'||e.key===' '){ e.preventDefault(); requestAdvance(); } });
-  document.addEventListener('touchstart',function(e){ tY=e.touches[0].clientY; },{passive:true});
-  document.addEventListener('touchend',function(e){ var dY=e.changedTouches[0].clientY-tY; if(Math.abs(dY)>50&&dY<0) requestAdvance(); },{passive:true});
-  init();
-  // Real-time clock for phone
-  function updatePhoneTime(){var t=document.getElementById('phoneTime');if(t){var d=new Date();t.textContent=d.getHours().toString().padStart(2,'0')+':'+d.getMinutes().toString().padStart(2,'0');}}
-  updatePhoneTime();setInterval(updatePhoneTime,30000);
-  // Force phone logo text (prevent i18n override)
-  var pl=document.getElementById('phoneLogo');if(pl)pl.textContent='sottotitoli';
-})();
-// Force footer, brand, and loader to always stay Italian (runs after i18n)
-window.addEventListener('load',function(){
-  var tl=document.querySelector('.bottom-nav-row a[href="termini.html"]');if(tl)tl.textContent='Termini';
-  var br=document.querySelector('.topbar-brand');if(br)br.textContent='sottotitoli';
-  var ls=document.getElementById('loaderBrand');if(ls)ls.textContent='sottotitoli';
-});
-</script>
-
-<!-- Auth-required toast + Accedi glow -->
-<style>
-  @keyframes glow-pulse {
-    0%,100% { box-shadow: 0 0 4px rgba(124,58,237,.4); }
-    50% { box-shadow: 0 0 18px rgba(124,58,237,.8), 0 0 36px rgba(124,58,237,.3); }
-  }
-  .topbar-login.glow { animation: glow-pulse 1.2s ease-in-out 4; border-color: var(--accent-purple,#7c3aed) !important; }
-  .auth-toast {
-    position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(-6px);
-    background: var(--accent-purple,#7c3aed); color: #fff; padding: 14px 28px; border-radius: 100px;
-    font-size: 15px; font-weight: 600; z-index: 9999; box-shadow: 0 8px 32px rgba(124,58,237,.35);
-    opacity: 0; transition: opacity var(--t-micro), transform var(--t-micro); pointer-events: none;
-  }
-  .auth-toast.show { opacity: 1; transform: translateX(-50%) translateY(0); pointer-events: auto; }
-</style>
-<div class="auth-toast" id="authToast">🔐 Accedi per continuare</div>
-<script>
-(function(){
-  if(window.location.search.indexOf('auth=required')===-1)return;
-  // Show toast
-  var toast=document.getElementById('authToast');
-  if(toast){toast.classList.add('show');setTimeout(function(){toast.classList.remove('show')},6000);}
-  // Glow the Accedi button
-  var btn=document.querySelector('.topbar-login');
-  if(btn){btn.classList.add('glow');setTimeout(function(){btn.classList.remove('glow')},7000);}
-  // Clean URL
-  if(window.history.replaceState){window.history.replaceState({},'',window.location.pathname);}
-})();
 </script>
 </body>
 </html>
