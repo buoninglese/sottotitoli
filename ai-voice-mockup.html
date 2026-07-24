@@ -344,7 +344,7 @@
     <header class="header">
       <a href="panoramica.html" class="brand-row">
         <span class="brand-dot"></span>sottotitoli<span>.ai</span>
-        <span style="font-size:10px;color:var(--text-faint);font-weight:400;margin-left:4px">v1.6 · text-audio sync · 2s VAD</span>
+        <span style="font-size:10px;color:var(--text-faint);font-weight:400;margin-left:4px">v1.7 · audio-synced text · 2.5s VAD</span>
       </a>
       <div class="panel-tabs" id="panelTabs">
         <button class="tab-btn active" data-tab="voice" onclick="switchTab('voice')">
@@ -518,11 +518,12 @@
     var captionIndex = 0;
     var lastUserText = '';
 
-    // Buffered AI text: held until audio playback starts (status "ai-speaking")
+    // Buffered AI text: held until audio ACTUALLY starts playing
     var pendingAiText = '';
     var pendingAiBubble = null;    // the partial bubble being updated
     var aiSpeakingActive = false;   // true while AI audio is playing
     var aiKeepAliveTimer = 0;      // timeout to keep AI bubble visible after speech ends
+    var aiFlushTimer = 0;          // fallback: flush buffered text if no audio after N ms
 
     function pushCaption(role, text, isPartial) {
       var stage = document.getElementById('captionStage');
@@ -537,11 +538,14 @@
         }
       }
 
-      // ── AI text: hold until audio starts ──
+      // ── AI text: buffer it until real audio playback starts ──
+      // We do NOT use 'status: ai-speaking' because it fires too early
+      // (triggered by first text delta, not audio). We detect audio via
+      // 'hf-event' messages containing 'response.output_audio.delta'.
       if (role === 'ai' && !aiSpeakingActive) {
+        pendingAiText = text;
         if (isPartial) {
           // Show a dim "thinking" bubble that updates live
-          pendingAiText = text;
           if (!pendingAiBubble) {
             var el = document.createElement('div');
             el.className = 'caption-bubble ai thinking';
@@ -553,17 +557,22 @@
           } else {
             pendingAiBubble.el.textContent = '🤖 ' + text;
           }
-        } else {
-          // Final text arrived but audio hasn't started — buffer it
-          pendingAiText = text;
-          if (pendingAiBubble) {
-            pendingAiBubble.el.textContent = '🤖 ' + text;
-          }
+        } else if (pendingAiBubble) {
+          // Final text, still buffered — update the thinking bubble
+          pendingAiBubble.el.textContent = '🤖 ' + text;
         }
+        // Start fallback timer: if no audio within 2.5s, show text anyway
+        if (aiFlushTimer) clearTimeout(aiFlushTimer);
+        aiFlushTimer = setTimeout(function() {
+          aiFlushTimer = 0;
+          if (!aiSpeakingActive && (pendingAiText || pendingAiBubble)) {
+            flushAiText(); // fallback flush
+          }
+        }, 2500);
         return;
       }
 
-      // ── AI text while speaking or after: update existing or create new ──
+      // ── AI text while audio is playing: update or finalize the bubble ──
       if (role === 'ai' && aiSpeakingActive) {
         if (isPartial && pendingAiBubble) {
           pendingAiBubble.el.textContent = '🤖 ' + text;
@@ -573,12 +582,11 @@
           return;
         }
         if (!isPartial && pendingAiBubble && pendingAiBubble.partial) {
-          // Final text arrived, replace the thinking bubble
           pendingAiBubble.el.textContent = '🤖 ' + text;
           pendingAiBubble.el.classList.remove('thinking');
+          pendingAiBubble.el.classList.add('ai-final');
           pendingAiBubble.partial = false;
-          pendingAiText = text;
-          // Convert to permanent bubble — it will stay longer
+          pendingAiText = '';
           pendingAiBubble = null;
           resetAiKeepAlive();
           return;
@@ -603,19 +611,18 @@
       }
     }
 
-    /** Flush buffered AI text when audio playback starts. */
+    /** Flush buffered AI text — called when audio ACTUALLY starts playing. */
     function flushAiText() {
       if (!pendingAiText && !pendingAiBubble) return;
+      if (aiFlushTimer) { clearTimeout(aiFlushTimer); aiFlushTimer = 0; }
       aiSpeakingActive = true;
 
       if (pendingAiBubble) {
-        // Convert the thinking bubble to a proper AI bubble
         pendingAiBubble.el.classList.remove('thinking');
         pendingAiBubble.el.classList.add('ai-final');
         pendingAiBubble.partial = false;
         pendingAiBubble.el.textContent = '🤖 ' + (pendingAiText || pendingAiBubble.el.textContent.replace('🤖 ', ''));
-        var b = pendingAiBubble;
-        b.isAi = true;
+        pendingAiBubble.isAi = true;
         pendingAiBubble = null;
         pendingAiText = '';
         resetAiKeepAlive();
@@ -627,7 +634,6 @@
     var AI_KEEP_ALIVE_S = 12;
     function resetAiKeepAlive() {
       if (aiKeepAliveTimer) clearTimeout(aiKeepAliveTimer);
-      // Mark all AI bubbles as "fresh" so animateStack won't fade them
       var now = Date.now();
       for (var i = 0; i < captionBubbles.length; i++) {
         if (captionBubbles[i].isAi) {
@@ -644,6 +650,7 @@
       aiSpeakingActive = false;
       pendingAiText = '';
       pendingAiBubble = null;
+      if (aiFlushTimer) { clearTimeout(aiFlushTimer); aiFlushTimer = 0; }
       resetAiKeepAlive();
     }
 
@@ -667,12 +674,10 @@
         bubble.el.style.bottom = (centerY + offset) + 'px';
         var age = captionBubbles.length - 1 - i;
 
-        // AI bubbles: stay fully visible while fresh, then fade slowly
         if (bubble.isAi && bubble._freshUntil && now < bubble._freshUntil) {
           bubble.el.style.opacity = '1';
           bubble.el.style.transition = 'all .4s ease';
         } else if (bubble.isAi) {
-          // AI bubble past keep-alive: fade very slowly
           if (age >= 8) {
             bubble.el.style.opacity = '0';
             bubble.el.style.transition = 'all 2s ease';
@@ -684,7 +689,6 @@
             bubble.el.style.transition = 'all 1s ease';
           }
         } else {
-          // User bubbles: fade as before
           if (age >= 5) {
             bubble.el.style.opacity = '0';
             bubble.el.style.transition = 'all .8s ease';
@@ -716,12 +720,22 @@
       } else if (e.data.type === 'live-transcript') {
         pushCaption(e.data.role, e.data.text, true);
       } else if (e.data.type === 'status') {
-        // Track AI speaking state for text-audio sync
         var st = e.data.text || '';
-        if (st === 'ai-speaking') {
+        // 'ai-speaking' fires early (from text delta, not audio) so we
+        // DON'T use it for sync. Instead we detect real audio via hf-event.
+        // Track speaking state for keep-alive purposes.
+        if (st === 'connected' && aiSpeakingActive) {
+          onAiStoppedSpeaking();
+        }
+      } else if (e.data.type === 'hf-event') {
+        // The embed bridge forwards low-level events. We watch for the
+        // first audio delta to know when playback truly starts.
+        var d = e.data.detail;
+        if (d && d.type === 'response.output_audio.delta' && !aiSpeakingActive) {
           flushAiText();
-          aiSpeakingActive = true;
-        } else if (aiSpeakingActive && st !== 'ai-speaking') {
+        }
+        // Also detect when AI stops speaking via response.done
+        if (d && d.type === 'response.done' && aiSpeakingActive) {
           onAiStoppedSpeaking();
         }
       }
