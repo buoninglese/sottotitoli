@@ -360,7 +360,7 @@
     <header class="header">
       <a href="panoramica.html" class="brand-row">
         <span class="brand-dot"></span>sottotitoli<span>.ai</span>
-        <span style="font-size:10px;color:var(--text-faint);font-weight:400;margin-left:4px">v1.8 · single-bubble · index-wow style</span>
+        <span style="font-size:10px;color:var(--text-faint);font-weight:400;margin-left:4px">v1.9 · dual-mode · transcript stream</span>
       </a>
       <div class="panel-tabs" id="panelTabs">
         <button class="tab-btn active" data-tab="voice" onclick="switchTab('voice')">
@@ -635,6 +635,9 @@
       currentAiBubble = { el: el, role: 'ai' };
       positionBubble(el, 'ai');
 
+      // Also add to transcript overlay (stacked, continuous)
+      appendTranscript('ai', displayText);
+
       aiPendingText = '';
     }
 
@@ -653,10 +656,42 @@
       el.style.animation = 'captionEnter .5s cubic-bezier(.2,.8,.2,1) forwards';
     }
 
+    // ── Transcript overlay: stacked continuous stream ──
+    var transcriptLineIndex = 0;
+    function appendTranscript(role, text) {
+      var body = document.getElementById('transcriptBody');
+      if (!body) return;
+      // Remove empty placeholder
+      var empty = body.querySelector('.transcript-empty');
+      if (empty) empty.remove();
+
+      var line = document.createElement('div');
+      line.style.cssText = 'display:flex;align-items:flex-start;gap:8px;padding:6px 0;border-bottom:1px solid var(--line);animation:fadeIn .35s ease;';
+      line.innerHTML =
+        '<span style="flex-shrink:0;font-size:13px;margin-top:1px">' + (role === 'user' ? '🎤' : '🤖') + '</span>' +
+        '<span style="font-size:13px;line-height:1.5;color:' + (role === 'user' ? 'var(--cyan)' : 'var(--purple)') + '">' +
+        escapeHtml(text) + '</span>';
+      body.appendChild(line);
+      // Auto-scroll to bottom
+      body.scrollTop = body.scrollHeight;
+      transcriptLineIndex++;
+      // Cap at 200 lines
+      while (body.children.length > 200) {
+        body.firstChild.remove();
+      }
+    }
+
+    function escapeHtml(str) {
+      var div = document.createElement('div');
+      div.textContent = str;
+      return div.innerHTML;
+    }
+
     window.addEventListener('message', function(e) {
       if (!e.data || !e.data.type) return;
       if (e.data.type === 'transcript-final') {
         pushCaption(e.data.role, e.data.text, false);
+        appendTranscript(e.data.role, e.data.text);
       } else if (e.data.type === 'live-transcript') {
         pushCaption(e.data.role, e.data.text, true);
       }
