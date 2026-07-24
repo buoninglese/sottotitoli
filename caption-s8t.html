@@ -42,6 +42,26 @@
 .cap-var5 #captionPanel { background: rgba(255,255,255,.06) !important; backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border-color: rgba(255,255,255,.08) !important; box-shadow: none !important; }
 .cap-var5 .caption-interim { color: #fff; background: transparent; text-shadow: none; -webkit-text-stroke: 0; font-weight: 500; }
 .cap-var5 .caption-interim:empty::after { color: #fff; }
+/* VAR 6 — Cinema (letterboxed, warm) */
+.cap-var6 #captionPanel { background: linear-gradient(180deg,rgba(0,0,0,.85),rgba(0,0,0,.9)) !important; border-top: 1px solid rgba(255,255,255,.06) !important; border-bottom: 1px solid rgba(255,255,255,.06) !important; box-shadow: none !important; }
+.cap-var6 .caption-interim { color: #f5f0e8; background: transparent; text-shadow: 0 1px 2px rgba(0,0,0,.5); -webkit-text-stroke: 0; font-weight: 500; letter-spacing: .01em; }
+.cap-var6 .caption-interim:empty::after { color: #f5f0e8; }
+/* VAR 7 — Neon (cyan accent bar) */
+.cap-var7 #captionPanel { background: #0a0f18 !important; border-left: 3px solid var(--accent) !important; border-color: transparent !important; box-shadow: none !important; }
+.cap-var7 .caption-interim { color: #fff; background: transparent; text-shadow: none; -webkit-text-stroke: 0; font-weight: 500; letter-spacing: -.01em; }
+.cap-var7 .caption-interim:empty::after { color: #fff; }
+/* VAR 8 — Frost (heavy blur) */
+.cap-var8 #captionPanel { background: rgba(255,255,255,.03) !important; backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px); border: 1px solid rgba(255,255,255,.06) !important; border-radius: 12px !important; box-shadow: none !important; }
+.cap-var8 .caption-interim { color: #fff; background: transparent; text-shadow: none; -webkit-text-stroke: 0; font-weight: 400; letter-spacing: .02em; }
+.cap-var8 .caption-interim:empty::after { color: #fff; }
+/* VAR 9 — Ink (deep blue-black, Manrope) */
+.cap-var9 #captionPanel { background: linear-gradient(180deg,#050b14,#02060e) !important; border: 1px solid rgba(6,182,212,.08) !important; box-shadow: none !important; }
+.cap-var9 .caption-interim { color: #e8f4ff; background: transparent; text-shadow: none; -webkit-text-stroke: 0; font-weight: 600; letter-spacing: -.01em; font-family: 'Manrope',sans-serif; }
+.cap-var9 .caption-interim:empty::after { color: #e8f4ff; }
+/* VAR 11 — Studio (broadcast black + cyan glow) */
+.cap-var11 #captionPanel { background: #000 !important; box-shadow: 0 -4px 24px rgba(6,182,212,.08),0 4px 24px rgba(6,182,212,.04) !important; border-top: 1px solid rgba(6,182,212,.15) !important; border-color: transparent !important; }
+.cap-var11 .caption-interim { color: #fff; background: transparent; text-shadow: none; -webkit-text-stroke: 0; font-weight: 600; letter-spacing: 0; }
+.cap-var11 .caption-interim:empty::after { color: #fff; }
 
 
 /* ═══ DARK MODE ═══ */
@@ -1391,6 +1411,49 @@ button[onclick*="addToWordBank"]:hover{background:rgba(52,211,153,.15)!important
 <script src="js/grammar-viz.js?v=2"></script>
 <script src="js/speech-icons.js"></script>
 <script src="translation-providers.js?v=1"></script>
+
+<!-- ═══ NEW: Architecture foundation (2026-07-25) ═══ -->
+<!-- AppState: single source of truth for all application state.
+     Replaces MutationObserver-based data flow. Additive — old pipeline still runs.
+     Load before inline scripts so all modules can consume state. -->
+<script src="js/app-state.js?v=1"></script>
+<!-- Toast: lightweight notification utility. Uses existing #toast element. -->
+<script src="js/toast.js?v=1"></script>
+
+<!-- ═══ Parallel data path: mirror AppState to console (verification only) ═══ -->
+<!-- Remove this block after verifying AppState receives transcript data in console. -->
+<script>
+(function() {
+  'use strict';
+  console.log('%c🏗️ AppState loaded %c— open console and speak to verify',
+    'font-weight:bold;color:#06b6d4', 'color:#888');
+  console.log('  AppState.debug()  — dump full state');
+  console.log('  AppState.get("lines") — all transcript lines');
+  console.log('  AppState.get("micState") — current mic status');
+
+  // Mirror all state changes to console (verbose — remove after verification)
+  var _logState = function(change) {
+    if (change && change.path) {
+      var val = change.value;
+      if (typeof val === 'string' && val.length > 60) val = val.substring(0, 57) + '…';
+      console.log('%c[AppState]%c ' + change.path + ' %c→',
+        'color:#06b6d4;font-weight:600', 'color:#888', 'color:#aaa', val);
+    }
+  };
+  AppState.on('*', _logState);
+
+  // Also log specific events more visibly
+  AppState.on('line:added', function(line) {
+    console.log('%c📝 line #' + line.id + '%c ' + line.text.substring(0, 80),
+      'color:#16a34a;font-weight:600', 'color:#888');
+  });
+  AppState.on('micState', function(state) {
+    console.log('%c🎤 mic %c' + state,
+      'color:#d97706;font-weight:600', 'color:#888');
+  });
+})();
+</script>
+
 <!-- Apply saved theme (from panoramica settings or localStorage) -->
 <script>
 (function(){
@@ -1421,6 +1484,8 @@ button[onclick*="addToWordBank"]:hover{background:rgba(52,211,153,.15)!important
     // If paused, always show paused regardless of what real-mic sends
     if (_overrideState) state = _overrideState;
     _realMic.state = state;
+    // ═══ AppState: mirror mic state (parallel path) ═══
+    if (typeof AppState !== 'undefined') AppState.set('micState', state);
     var dot = document.getElementById('recMicDot');
     var label = document.getElementById('recMicLabel');
     var idleDot = document.getElementById('recIdleDot');
@@ -1773,6 +1838,9 @@ function _createCaptionRoom(langCode) {
           linkEl.innerHTML = '<a href="' + shareUrl + '" style="color:var(--accent);font-size:12px" onclick="navigator.clipboard.writeText(this.href);return false">📋 copy</a>';
         }
       }
+    }).catch(function(err) {
+      console.error('Failed to create caption room:', err);
+      if (typeof Toast !== 'undefined') Toast.warn('Could not connect to saved sessions. Captions are live.', 5000);
     });
   });
 }
@@ -3438,6 +3506,8 @@ _realMic.onInterim = function(text) {
   var interim = document.getElementById('captionInterim');
   if (!interim) return;
   interim.textContent = formatCaptionText(text, 50, 2);
+  // ═══ AppState: mirror interim text (parallel path) ═══
+  if (typeof AppState !== 'undefined') AppState.setInterim(text);
   
   // If the box is full (overflowing 2 lines), force-finalize immediately
   if (interim.scrollHeight > interim.clientHeight && text.trim().length > 0) {
@@ -3584,6 +3654,31 @@ _realMic.onFinal = function(text) {
   // Append — newest line appears at bottom, just above live sentence
   transcript.appendChild(div);
   transcript.scrollTop = transcript.scrollHeight;
+
+  // ═══ AppState: mirror finalized line (parallel path — Step C cutover) ═══
+  // This is the commit point: state-driven pipeline runs alongside DOM-driven pipeline.
+  // Once verified, consumers will read from AppState instead of querySelectorAll('.line').
+  if (typeof AppState !== 'undefined') {
+    AppState.addLine(fixedText);
+    // Reconciliation check: compare state vs DOM (temp — remove after verification)
+    setTimeout(function() {
+      var lines = AppState.get('lines');
+      var domLines = transcript.querySelectorAll('.line');
+      var stateCount = lines ? lines.length : 0;
+      var domCount = domLines.length;
+      if (stateCount !== domCount) {
+        console.warn('%c[AppState] COUNT MISMATCH %cstate=' + stateCount + ' dom=' + domCount,
+          'color:#dc2626;font-weight:700', 'color:#888');
+      } else if (stateCount > 0) {
+        var lastState = lines[stateCount - 1].text.trim();
+        var lastDom = (domLines[domCount - 1].textContent || '').trim();
+        if (lastState !== lastDom) {
+          console.warn('%c[AppState] CONTENT MISMATCH %cstate="' + lastState.substring(0, 50) + '" dom="' + lastDom.substring(0, 50) + '"',
+            'color:#dc2626;font-weight:700', 'color:#888');
+        }
+      }
+    }, 0);
+  }
   
   // ── Speaker mode: color-code line by speaker ──
   if (speakerCount !== 1) {
@@ -3817,7 +3912,11 @@ async function _checkCreditsBeforeStart() {
     var balance = cr.data?.balance_minutes;
     if (balance == null) return true; // no record yet — first use
     return balance > 0;
-  } catch(e) { return true; } // error — allow on fail-safe
+  } catch(e) {
+    console.error('Credit check failed:', e);
+    if (typeof Toast !== 'undefined') Toast.warn('Unable to verify credits. Session may be limited.', 4000);
+    return true; // fail-safe: allow session if credit check errors
+  }
 }
 
 // ── Session UI setup (mic already running — called after credit check passes) ──
@@ -4013,7 +4112,7 @@ function cycleFontSize() {
 })();
 
 // ── Live style cycle (caption background variants) ──
-var _liveStyles = ['0','1','2','10','3'];
+var _liveStyles = ['0','1','2','5','6','7','8','9','11'];
 var _liveStyleIdx = 0;
 function cycleLiveStyle(){
   _liveStyleIdx = (_liveStyleIdx + 1) % _liveStyles.length;
@@ -4226,7 +4325,7 @@ function updateFontSize(val) { /* kept for compatibility, unused */ }
 function resetFontSize() { /* kept for compatibility, unused */ }
 function switchCaptionVar(val) {
   var html = document.documentElement;
-  [1,2,3,4,10].forEach(function(i){ html.classList.remove('cap-var' + i); });
+  [1,2,3,4,5,6,7,8,9,10,11].forEach(function(i){ html.classList.remove('cap-var' + i); });
   if (val && val !== '0') {
     html.classList.add('cap-var' + val);
     localStorage.setItem('sottotitoli-caption-var', val);
@@ -4304,7 +4403,9 @@ function addToWordBank(optionalWord) {
       if (T) {
         T.translateText({ provider: 'auto' }, word, srcLang, tgtLang).then(function(r){
           _saveTranslationWord(word, r.translatedText, srcLang, tgtLang);
-        }).catch(function(){});
+        }).catch(function(err){
+          console.warn('Word translation failed:', err);
+        });
       }
     }
   }
@@ -6911,8 +7012,13 @@ window.fixExtrasPanelColors = function(){
         var lastLine = transcript.querySelector('.line:last-child');
         if (lastLine) lastLine.style.borderLeftColor = window._duoSpeakerMap[label].color;
       }
-      window._duoWs.send(JSON.stringify({ type:'duo-speaking', name:window._duoSpeakerName, lang:window._duoSpeakerLang }));
-      window._duoWs.send(JSON.stringify({ msg:true, final:text, id:Date.now(), label:label, speaker:window._duoSpeakerName, lang:window._duoSpeakerLang }));
+      try {
+        window._duoWs.send(JSON.stringify({ type:'duo-speaking', name:window._duoSpeakerName, lang:window._duoSpeakerLang }));
+        window._duoWs.send(JSON.stringify({ msg:true, final:text, id:Date.now(), label:label, speaker:window._duoSpeakerName, lang:window._duoSpeakerLang }));
+      } catch(e) {
+        console.error('DUO WebSocket send failed:', e);
+        if (typeof Toast !== 'undefined') Toast.error('Connection lost. Reconnecting…', 4000);
+      }
     }
   };
 
@@ -7264,9 +7370,11 @@ window.fixExtrasPanelColors = function(){
         T.translateText({ provider: 'auto' }, text, srcLang, target).then(function(r){
           var txtEl = box.querySelector('.v20q-tran-text');
           if (txtEl) { txtEl.className = 'v20q-tran-text'; txtEl.textContent = r.translatedText; }
-        }).catch(function(){
+        }).catch(function(err){
+          console.warn('Sentence translation failed:', err);
           var txtEl = box.querySelector('.v20q-tran-text');
-          if (txtEl) { txtEl.className = 'v20q-tran-text'; txtEl.textContent = text + ' ⚠'; }
+          if (txtEl) { txtEl.className = 'v20q-tran-text'; txtEl.textContent = text + ' ⚠';
+          if (typeof Toast !== 'undefined') Toast.warn('Translation temporarily unavailable', 3000); }
         });
       } else {
         var txtEl = box.querySelector('.v20q-tran-text');
@@ -7542,6 +7650,27 @@ window.fixExtrasPanelColors = function(){
     observer.observe(ct, { childList: true });
   }
   v20q_bootstrap();
+
+  // ═══ Parallel data path: subscribe v20q to AppState (verification only) ═══
+  // When AppState receives a new line, mirror it to v20q internals.
+  // Runs ALONGSIDE the MutationObserver — both paths active for A/B verification.
+  // Once verified in console, the MutationObserver path is removed.
+  if (typeof AppState !== 'undefined') {
+    AppState.on('line:added', function(line) {
+      // Mirror AppState line into v20q state (same as what MutationObserver does)
+      v20q.sentences.push(line.text);
+      v20q.timestamps.push(v20q_fmtTime(v20q.sIdx * 6));
+      v20q.sIdx++;
+      // NOTE: v20q_render is NOT called here during parallel run.
+      // The MutationObserver still handles rendering. This just keeps
+      // v20q internal state in sync for verification.
+      console.log('%c[v20q→AppState]%c mirrored line #' + line.id + ': ' + line.text.substring(0, 60),
+        'color:#a855f7;font-weight:600', 'color:#888');
+    });
+    AppState.on('mode', function(mode) {
+      v20q.translateOn = (mode === 'translate');
+    });
+  }
 })();
 </script>
 
