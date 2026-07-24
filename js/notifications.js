@@ -24,44 +24,36 @@
       if (this._initialized) return;
       this._initialized = true;
 
-      // Wait for Supabase client
-      this.supabase = await this._getSupabase();
-      if (!this.supabase) {
-        console.warn('NotificationCenter: Supabase not available');
-        return;
-      }
-
-      // Get user
-      const { data: { user } } = await this.supabase.auth.getUser();
-      if (!user) return;
-      this._userId = user.id;
-
-      // Send welcome notification on first visit (once per user)
-      this._maybeSendWelcome();
-
-      // Cache DOM refs
+      // ── DOM refs + click handler — always, even without auth ──
       this.bellEl = document.querySelector('.topbar-bell');
       this.badgeEl = document.querySelector('.topbar-bell .badge');
       this.panelEl = document.querySelector('.notification-panel');
 
-      if (!this.bellEl) return;
+      if (this.bellEl) {
+        this.bellEl.addEventListener('click', (e) => {
+          e.stopPropagation();
+          this.togglePanel();
+        });
+      }
 
-      // Wire click
-      this.bellEl.addEventListener('click', (e) => {
-        e.stopPropagation();
-        this.togglePanel();
-      });
-
-      // Close panel on outside click
+      // Outside click to close
       document.addEventListener('click', (e) => {
         if (this.panelEl && this.panelEl.classList.contains('open') &&
-            !this.bellEl.contains(e.target) &&
+            this.bellEl && !this.bellEl.contains(e.target) &&
             !this.panelEl.contains(e.target)) {
           this.closePanel();
         }
       });
 
-      // Load history + subscribe
+      // ── Auth-dependent setup ──
+      this.supabase = await this._getSupabase();
+      if (!this.supabase) { this._renderUnauth('Supabase non disponibile'); return; }
+
+      const { data: { user } } = await this.supabase.auth.getUser();
+      if (!user) { this._renderUnauth('Accedi per vedere le notifiche'); return; }
+      this._userId = user.id;
+
+      this._maybeSendWelcome();
       await this.loadHistory();
       this.setupRealtime();
     }
@@ -182,6 +174,12 @@
         this.updateBadge();
         this.renderPanel();
       } catch (_) { /* silent */ }
+    }
+
+    _renderUnauth(msg) {
+      if (this.panelEl) {
+        this.panelEl.innerHTML = '<div class="notif-empty">🔔<br>' + this._esc(msg) + '</div>';
+      }
     }
 
     renderPanel() {
