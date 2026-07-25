@@ -55,9 +55,9 @@ window.sottotitoliSupabase = window.supabase.createClient(
         initUserTokens(r.data.session.user.id);
 
         // ── Onboarding gate ──
-        // If user hasn't completed onboarding, redirect to onboarding page
-        // (unless they are already on it, or on a public page like index/panoramica)
-        if (path !== 'onboarding.html' && path !== 'index.html' && path !== 'panoramica.html') {
+        // New users who haven't completed onboarding are redirected.
+        // Skip only on index (landing page) and onboarding itself.
+        if (path !== 'onboarding.html' && path !== 'index.html') {
           var onboardingDone = localStorage.getItem('sottotitoli_onboarding_done');
           if (onboardingDone !== 'true') {
             // Check Supabase for onboarding status
