@@ -391,7 +391,7 @@
     <header class="header">
       <a href="panoramica.html" class="brand-row">
         <span class="brand-dot"></span>sottotitoli<span>.ai</span>
-        <span style="font-size:10px;color:var(--text-faint);font-weight:400;margin-left:4px">v3.1 · Ask Engine · hardened memory</span>
+        <span style="font-size:10px;color:var(--text-faint);font-weight:400;margin-left:4px">v3.2 · proactive intelligence · voids detected</span>
       </a>
       <div class="panel-tabs" id="panelTabs">
         <button class="tab-btn active" data-tab="voice" onclick="switchTab('voice')">
@@ -555,7 +555,18 @@
                 </div>
               </div>
 
-              <!-- Session + System -->
+              <!-- Decision Decay -->
+              <div style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px 16px;display:flex;gap:20px">
+                <div><span style="font-size:10px;color:var(--text-faint)">Decadute (7g)</span><br><span style="font-size:22px;font-weight:700;color:#f0b429" id="dashDecayed">0</span></div>
+                <div><span style="font-size:10px;color:var(--text-faint)">Critiche (30g)</span><br><span style="font-size:22px;font-weight:700;color:#ff6b6b" id="dashCritical">0</span></div>
+                <div><span style="font-size:10px;color:var(--text-faint)">Mood trend</span><br><span style="font-size:22px;font-weight:700" id="dashMood">--</span></div>
+              </div>
+
+              <!-- Strategic Voids -->
+              <div style="background:var(--card);border:1px solid rgba(240,180,41,.15);border-radius:12px;padding:14px 16px" id="dashVoids">
+                <div style="font-size:10px;color:var(--text-faint);text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px">⚠️ Strategic Voids</div>
+                <div style="font-size:11px;color:var(--text-faint)">Caricamento...</div>
+              </div>
               <div style="background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px 20px">
                 <div style="display:flex;gap:24px">
                   <div><span style="font-size:10px;color:var(--text-faint)">Sessione</span><br><span style="font-size:18px;font-weight:700;font-family:'JetBrains Mono',monospace" id="dashSessionTimer">00:00</span></div>
@@ -876,8 +887,20 @@
     }
 
     // ═══════════════════════════════════════════════════
-    //  EXECUTIVE MEMORY SYSTEM (v3.0)
-    //  Decisions · Beliefs · Intel · Family · Anti-Goals
+    //  BANK METADATA — single source of truth for icons/colors
+    // ═══════════════════════════════════════════════════
+    var BANK_META = {
+      decisions:  { icon: '⚡', color: '#f0b429', label: 'Decisioni', emoji: '⚡' },
+      beliefs:    { icon: '💭', color: '#c084fc', label: 'Beliefs', emoji: '💭' },
+      intel:      { icon: '🔍', color: '#22d3ee', label: 'Intel', emoji: '🔍' },
+      family:     { icon: '👨‍👩‍👧', color: '#10b981', label: 'Famiglia', emoji: '👨‍👩‍👧' },
+      violations: { icon: '🛡️', color: '#ff6b6b', label: 'Violazioni', emoji: '🛡️' },
+      psychometrics: { icon: '📊', color: '#a78bfa', label: 'Psicometria', emoji: '📊' }
+    };
+
+    // ═══════════════════════════════════════════════════
+    //  EXECUTIVE MEMORY SYSTEM (v3.2)
+    //  Decisions · Beliefs · Intel · Family · Anti-Goals · Psychometrics
     // ═══════════════════════════════════════════════════
 
     var MEM = {
@@ -968,6 +991,21 @@
         this._save('violations', violations);
       },
 
+      // ── Psychometrics ───────────────────────────────
+      addPsychometric: function(data) {
+        var psych = this._store('psychometrics');
+        psych.unshift({ id: 'psy_' + Date.now(), timestamp: new Date().toISOString(), sessionDuration: data.duration || 0, scarcityScore: data.scarcityScore || 0, commitmentCount: data.commitments ? data.commitments.length : 0, antiGoalProximity: data.antiGoalProximity || [], mood: data.mood || 'neutral' });
+        if (psych.length > 100) psych.length = 100;
+        this._save('psychometrics', psych);
+        this._updateDashboard();
+      },
+
+      getPsychometricTrend: function(days) {
+        var psych = this._store('psychometrics');
+        var cutoff = Date.now() - (days || 7) * 86400000;
+        return psych.filter(function(p) { return new Date(p.timestamp).getTime() > cutoff; });
+      },
+
       // ── Stats ──────────────────────────────────────
       stats: function() {
         return {
@@ -977,26 +1015,37 @@
           intel: this._store('intel').length,
           family: this._store('family').length,
           violations: this._store('violations').length,
-          antiGoals: this.getAntiGoals().length
+          antiGoals: this.getAntiGoals().length,
+          psychometrics: this._store('psychometrics').length,
+          // Decision decay
+          decayedDecisions: this.getDecayedDecisions().length,
+          criticalDecisions: this.getDecayedDecisions(30).length
         };
+      },
+
+      getDecayedDecisions: function(days) {
+        var threshold = (days || 7);
+        var cutoff = Date.now() - threshold * 86400000;
+        return this._store('decisions').filter(function(d) {
+          return !d.reviewed && !d.actualOutcome && new Date(d.timestamp).getTime() < cutoff;
+        });
       },
 
       _updateDashboard: function() {
         var s = this.stats();
-        var el = document.getElementById('dashDecisions');
-        if (el) el.textContent = s.decisions;
-        el = document.getElementById('dashPendingDec');
-        if (el) el.textContent = s.pendingDecisions;
-        el = document.getElementById('dashIntel');
-        if (el) el.textContent = s.intel;
-        el = document.getElementById('dashViolations');
-        if (el) el.textContent = s.violations;
-        el = document.getElementById('dashBeliefs');
-        if (el) el.textContent = s.beliefs;
-        el = document.getElementById('dashFamily');
-        if (el) el.textContent = s.family;
+        setEl('dashDecisions', s.decisions);
+        setEl('dashPendingDec', s.pendingDecisions);
+        setEl('dashIntel', s.intel);
+        setEl('dashViolations', s.violations);
+        setEl('dashBeliefs', s.beliefs);
+        setEl('dashFamily', s.family);
+        setEl('dashDecayed', s.decayedDecisions);
+        setEl('dashCritical', s.criticalDecisions);
+        setEl('dashMood', s.psychometrics > 0 ? (MEM.getPsychometricTrend(7)[0] || {}).mood || '--' : '--');
       }
     };
+
+    function setEl(id, val) { var el = document.getElementById(id); if (el) el.textContent = val; }
 
     // ═══════════════════════════════════════════════════
     //  SEARCH INDEX (inverted keyword index)
@@ -1177,8 +1226,8 @@
         return;
       }
 
-      var icons = { decision: '⚡', intel: '🔍', violation: '🛡️', belief: '💭', family: '👨‍👩‍👧' };
-      var labels = { decision: 'Decisione registrata', intel: 'Intel salvata', violation: 'Violazione registrata', belief: 'Belief salvato', family: 'Evento famiglia salvato' };
+      var icons = { decision: '⚡', intel: '🔍', violation: '🛡️', belief: '💭', family: '👨‍👩‍👧', outcome: '✅', backup: '💾' };
+      var labels = { decision: 'Decisione registrata', intel: 'Intel salvata', violation: 'Violazione registrata', belief: 'Belief salvato', family: 'Evento famiglia salvato', outcome: 'Esito registrato', backup: 'Backup completato' };
       var toast = document.createElement('div');
       toast.style.cssText = 'position:fixed;bottom:24px;left:50%;transform:translateX(-50%);z-index:10000;padding:10px 20px;background:var(--card);border:1px solid var(--purple-line);border-radius:20px;font-size:12px;font-weight:600;color:var(--purple);box-shadow:0 8px 32px rgba(0,0,0,.3);animation:fadeIn .3s ease;pointer-events:none';
       toast.textContent = (icons[cmd.type] || '') + ' ' + (labels[cmd.type] || cmd.type);
@@ -1281,6 +1330,7 @@
 
       // Executive memory stats
       MEM._updateDashboard();
+      renderVoids();
 
       // Space status
       var statusEl = document.getElementById('dashSpaceStatus');
@@ -1298,26 +1348,144 @@
     }
     setInterval(updateDashboard, 10000);
     updateDashboard();
+    renderVoids();
     startSessionTimer();
     SearchIndex._build(); // warm the search index on load
 
-    // ── Auto-export safety net ─────────────────────────
-    function exportMemory() {
-      var dump = {
-        exportedAt: new Date().toISOString(),
-        decisions: MEM._store('decisions'),
-        beliefs: MEM._store('beliefs'),
-        intel: MEM._store('intel'),
-        family: MEM._store('family'),
-        violations: MEM._store('violations'),
-        antiGoals: MEM._store('antiGoals')
+    // ═══════════════════════════════════════════════════
+    //  MODULE 1: Session Auto-Scanner (The Observer)
+    // ═══════════════════════════════════════════════════
+
+    var SCARCITY_TERMS = ['can\'t afford', 'too expensive', 'not ready', 'i wish', 'if only', 'never works', 'always fail', 'afraid to', 'not sure i can'];
+    var COMMITMENT_TERMS = ['i should', 'i need to', 'i have to', 'i\'ll look into', 'let me check', 'i must', 'i ought to'];
+    var ANTI_GOAL_PROXIMITY = ['waiting for', 'need permission', 'playing it safe', 'just a job', 'not my call', 'someone else will'];
+
+    function analyzeSession(lines) {
+      var fullText = lines.map(function(l) { return l.text; }).join(' ').toLowerCase();
+      var scarcityScore = 0;
+      for (var i = 0; i < SCARCITY_TERMS.length; i++) {
+        if (fullText.indexOf(SCARCITY_TERMS[i]) !== -1) scarcityScore++;
+      }
+
+      var commitments = [];
+      for (var j = 0; j < COMMITMENT_TERMS.length; j++) {
+        var idx = fullText.indexOf(COMMITMENT_TERMS[j]);
+        if (idx !== -1) {
+          commitments.push(fullText.substring(idx, idx + 80).split(/[.!?]/)[0]);
+        }
+      }
+
+      var antiGoalProximity = [];
+      for (var k = 0; k < ANTI_GOAL_PROXIMITY.length; k++) {
+        if (fullText.indexOf(ANTI_GOAL_PROXIMITY[k]) !== -1) {
+          antiGoalProximity.push(ANTI_GOAL_PROXIMITY[k]);
+        }
+      }
+
+      var mood = 'neutral';
+      var positiveWords = ['great', 'excited', 'confident', 'love', 'awesome', 'yes', 'opportunity', 'growth'];
+      var negativeWords = ['stressed', 'worried', 'exhausted', 'hate', 'terrible', 'afraid', 'stuck', 'overwhelmed'];
+      var posCount = 0, negCount = 0;
+      for (var p = 0; p < positiveWords.length; p++) { if (fullText.indexOf(positiveWords[p]) !== -1) posCount++; }
+      for (var n = 0; n < negativeWords.length; n++) { if (fullText.indexOf(negativeWords[n]) !== -1) negCount++; }
+      if (negCount > posCount + 1) mood = 'low';
+      else if (posCount > negCount + 1) mood = 'high';
+
+      return {
+        duration: lines.length > 0 ? Math.round((Date.now() - sessionStartTime) / 1000) : 0,
+        scarcityScore: scarcityScore,
+        commitments: commitments,
+        antiGoalProximity: antiGoalProximity,
+        mood: mood
       };
-      var blob = new Blob([JSON.stringify(dump, null, 2)], { type: 'application/json' });
-      var a = document.createElement('a');
-      a.href = URL.createObjectURL(blob);
-      a.download = 's8t-memory-' + new Date().toISOString().slice(0,10) + '.json';
-      a.click();
-      return 'Exported ' + JSON.stringify(dump).length + ' bytes';
+    }
+
+    // ── Run scanner on session save ──
+    var origSaveSession = saveCurrentSession;
+    saveCurrentSession = function() {
+      if (currentSessionLines.length > 0) {
+        var psych = analyzeSession(currentSessionLines);
+        MEM.addPsychometric(psych);
+        if (psych.scarcityScore > 0 || psych.commitments.length > 0 || psych.antiGoalProximity.length > 0) {
+          showSessionIntel(psych);
+        }
+      }
+      origSaveSession();
+    };
+
+    function showSessionIntel(psych) {
+      var msgs = [];
+      if (psych.scarcityScore > 0) msgs.push('Scarsità: ' + psych.scarcityScore + ' termini rilevati');
+      if (psych.commitments.length > 0) msgs.push(psych.commitments.length + ' impegni impliciti');
+      if (psych.antiGoalProximity.length > 0) msgs.push('Prossimità anti-goal: ' + psych.antiGoalProximity.join(', '));
+      if (psych.mood === 'low') msgs.push('Umore in calo questa sessione');
+      if (msgs.length === 0) return;
+      var toast = document.createElement('div');
+      toast.style.cssText = 'position:fixed;bottom:80px;left:50%;transform:translateX(-50%);z-index:10000;padding:12px 20px;background:var(--card);border:1px solid var(--accent-amber, #f0b429);border-radius:16px;font-size:12px;color:var(--text);box-shadow:0 12px 40px rgba(0,0,0,.35);animation:fadeIn .4s ease;max-width:400px;text-align:center;line-height:1.5';
+      toast.innerHTML = '<div style="font-weight:700;margin-bottom:6px">📊 Session Intelligence</div>' + msgs.map(function(m) { return '<div>' + m + '</div>'; }).join('');
+      document.body.appendChild(toast);
+      setTimeout(function() { toast.style.opacity = '0'; toast.style.transition = 'opacity .6s'; }, 6000);
+      setTimeout(function() { if (toast.parentNode) toast.remove(); }, 6500);
+    }
+
+    // ═══════════════════════════════════════════════════
+    //  MODULE 2: Decision Decay Alerts
+    // ═══════════════════════════════════════════════════
+
+    function getDecayAlerts() {
+      var amber = MEM.getDecayedDecisions(7);
+      var red = MEM.getDecayedDecisions(30);
+      return { amber: amber, red: red };
+    }
+
+    // Add "Outcome:" voice command
+    var origDetect2 = detectVoiceCommand;
+    detectVoiceCommand = function(text, role) {
+      if (role === 'user') {
+        var outMatch = text.trim().match(/^outcome\s*:\s*(.+)/i);
+        if (outMatch) {
+          var pending = MEM.getPendingDecisions();
+          if (pending.length > 0) {
+            pending[0].actualOutcome = outMatch[1];
+            pending[0].reviewed = true;
+            var all = MEM._store('decisions');
+            for (var i = 0; i < all.length; i++) {
+              if (all[i].id === pending[0].id) { all[i] = pending[0]; break; }
+            }
+            MEM._save('decisions', all);
+            MEM._updateDashboard();
+            return { type: 'outcome', text: 'Decisione aggiornata: ' + outMatch[1].substring(0, 60) };
+          }
+          return { type: 'outcome', text: 'Nessuna decisione in attesa trovata' };
+        }
+      }
+      return origDetect2(text, role);
+    };
+
+    // ═══════════════════════════════════════════════════
+    //  MODULE 3: Strategic Void Detector
+    // ═══════════════════════════════════════════════════
+
+    function detectStrategicVoids() {
+      var s = MEM.stats();
+      var voids = [];
+      if (s.beliefs > 0 && s.decisions === 0) voids.push("Hai " + s.beliefs + " beliefs ma zero decisioni. Trasformane una in azione: 'Log decision: ...'");
+      if (s.violations > 3 && s.decisions < s.violations) voids.push(s.violations + " violazioni anti-goal. Quale sistema puoi cambiare per prevenirle?");
+      if (s.family === 0 && s.decisions > 3) voids.push("Nessun evento famiglia registrato. Dedica una cattura alla tua famiglia.");
+      if (s.intel > 5 && s.decisions <= s.intel * 0.3) voids.push(s.intel + " insight raccolti, solo " + s.decisions + " decisioni. Agisci su ciò che sai.");
+      if (s.decayedDecisions > 0) voids.push(s.decayedDecisions + " decisioni senza esito da >7 giorni. Usa 'Outcome: [risultato]' per chiuderle.");
+      return voids;
+    }
+
+    function renderVoids() {
+      var el = document.getElementById('dashVoids');
+      if (!el) return;
+      var voids = detectStrategicVoids();
+      if (voids.length === 0) {
+        el.innerHTML = '<div style="font-size:11px;color:var(--text-faint);padding:4px 0">✅ Nessun vuoto strategico rilevato.</div>';
+      } else {
+        el.innerHTML = voids.map(function(v) { return '<div style="font-size:11px;color:var(--accent-amber,#f0b429);padding:4px 0;line-height:1.5">⚠️ ' + v + '</div>'; }).join('');
+      }
     }
 
     // Voice command: "Backup: now" or "Export: memory"
