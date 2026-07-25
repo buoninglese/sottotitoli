@@ -232,6 +232,14 @@ body {
 .metric-row:last-child { border-bottom: none; }
 .metric-row .m-label { font-size: clamp(12px,1.3vw,14px); color: var(--muted); }
 .metric-row .m-value { font-size: clamp(18px,2vw,22px); font-weight: 700; font-family: 'JetBrains Mono', monospace; color: var(--text); }
+/* Info dot for metric tooltips */
+.info-dot{cursor:help;font-size:10px;color:var(--muted2);position:relative;display:inline-block;vertical-align:middle;margin-left:2px}
+.info-dot:hover{color:var(--accent)}
+.info-dot::after{content:attr(data-tooltip);position:absolute;bottom:calc(100% + 8px);left:50%;transform:translateX(-50%);background:var(--card);border:1px solid var(--line);border-radius:10px;padding:8px 12px;font-size:11px;font-weight:400;color:var(--text);white-space:normal;width:240px;text-align:left;line-height:1.45;box-shadow:0 6px 24px rgba(0,0,0,.2);pointer-events:none;opacity:0;transition:opacity .2s;z-index:200;font-family:var(--font-body)}
+.info-dot:hover::after{opacity:1}
+/* Final favorites marker (end-of-session) */
+.v20q-final-fav{position:relative}
+.v20q-final-fav::before{content:'⭐';position:absolute;left:-22px;top:50%;transform:translateY(-50%);font-size:11px;opacity:.7}
 /* POS stack — responsive clamp fonts */
 .pos-stack { display: flex; flex-direction: column; gap: clamp(4px,.8vw,8px); }
 .pos-stack .pos-row-label { font-size: 13px; font-weight: 600; margin-bottom: 2px; }
@@ -1026,8 +1034,11 @@ button[onclick*="addToWordBank"]:hover{background:rgba(52,211,153,.15)!important
 /* Bookmarked line */
 .v20q-bookmarked{border-left:3px solid rgba(245,158,11,.5) !important}
 [data-mode="bookmark"] .v20q-bookmarked{border-left-color:#f59e0b !important;background:rgba(245,158,11,.06)}
+/* Flash highlight (scroll-to from bookmark panel) */
+.v20q-flash{animation:v20qFlash .8s ease}
+@keyframes v20qFlash{0%{background:rgba(245,158,11,.18);box-shadow:0 0 20px rgba(245,158,11,.15)}100%{background:transparent;box-shadow:none}}
 /* Bookmark panel */
-.v20q-bookmark-panel{display:none;position:absolute;bottom:100%;right:0;margin-bottom:8px;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px;min-width:320px;max-height:300px;overflow-y:auto;box-shadow:0 8px 32px rgba(0,0,0,.2);z-index:100;font-family:var(--font-body)}
+.v20q-bookmark-panel{display:none;position:absolute;top:0;right:36px;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px;min-width:280px;max-width:340px;max-height:320px;overflow-y:auto;box-shadow:0 8px 32px rgba(0,0,0,.2);z-index:100;font-family:var(--font-body)}
 @keyframes v20qIn{0%{opacity:.4;transform:translateY(16px) scale(.98)}100%{opacity:1;transform:translateY(0) scale(1)}}
 /* Notification bell */
 .topbar-bell{position:relative}
@@ -1163,8 +1174,8 @@ button[onclick*="addToWordBank"]:hover{background:rgba(52,211,153,.15)!important
         <div class="metric-row" style="border-color:var(--line)"><span class="m-label">Lines</span><span class="m-value" id="popStatLines">0</span></div>
         <div class="metric-row" style="border-color:var(--line)"><span class="m-label">Words</span><span class="m-value" id="popStatWords">0</span></div>
         <div class="metric-row" style="border-color:var(--line)"><span class="m-label" title="Velocità. 100–150 è chiaro e naturale.">WPM</span><span class="m-value" id="popLiveWpm">0</span></div>
-        <div class="metric-row" style="border-color:var(--line)"><span class="m-label" title="Varietà lessicale.">Varietà</span><span class="m-value" id="popLiveLexDiv">—</span></div>
-        <div class="metric-row" style="border-color:var(--line)"><span class="m-label" title="Riempitivi al minuto.">Riemp./min</span><span class="m-value" id="popLiveFillersPerMin">—</span></div>
+        <div class="metric-row" style="border-color:var(--line)"><span class="m-label">Varietà <span class="info-dot" data-tooltip="MATTR (Moving Average Type-Token Ratio). Misura la diversità del vocabolario su finestre di 50 parole. 60%+ = lessico ricco e vario; sotto 40% = ripetitivo. Non dipende dalla lunghezza della sessione.">ⓘ</span></span><span class="m-value" id="popLiveLexDiv">—</span></div>
+        <div class="metric-row" style="border-color:var(--line)"><span class="m-label">Riemp./min <span class="info-dot" data-tooltip="Riempitivi al minuto. Conta parole come 'um', 'uh', 'like', 'you know', 'cioè', 'tipo' per minuto di parlato. Sotto 2 = molto fluido; 2–5 = normale; sopra 8 = molti riempitivi.">ⓘ</span></span><span class="m-value" id="popLiveFillersPerMin">—</span></div>
         <div style="font-size:9px;color:var(--muted2);text-align:center;margin-top:6px;opacity:.35;font-family:'JetBrains Mono',monospace">caption-s8t v48</div>
       </div>
     </div>
@@ -3815,6 +3826,8 @@ async function toggleSession() {
       // Show post-session panel with word count
       var wc = fullText ? fullText.trim().split(/\s+/).filter(Boolean).length : 0;
       showPostSessionPanel(wc);
+      // Mark bookmarked sentences in transcript as end-of-session favorites
+      if (typeof v20q_markFinalFavorites === 'function') v20q_markFinalFavorites();
     }
     window._sessionLines = [];
     startBtn.style.display = '';
@@ -7489,6 +7502,35 @@ window.fixExtrasPanelColors = function(){
     else { v20q.bookmarks.splice(pos, 1); }
     v20q_rerender();
   };
+  // ── Scroll to sentence + highlight (used by bookmark panel clicks) ──
+  window.v20q_scrollToSentence = function(idx){
+    // Close the bookmark panel
+    var panel = document.getElementById('v20qBookmarkPanel');
+    if (panel) panel.style.display = 'none';
+    // Find the v20q-line at this index
+    var container = document.getElementById('v20qContent');
+    if (!container) return;
+    var lines = container.querySelectorAll('.v20q-line');
+    var target = lines[idx];
+    if (!target) return;
+    // Scroll it into view
+    target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    // Brief highlight animation
+    target.classList.add('v20q-flash');
+    setTimeout(function(){ target.classList.remove('v20q-flash'); }, 1200);
+  };
+  // ── Mark end-of-session favorites in transcript ──
+  window.v20q_markFinalFavorites = function(){
+    if (!v20q.bookmarks || v20q.bookmarks.length === 0) return;
+    var container = document.getElementById('v20qContent');
+    if (!container) return;
+    var lines = container.querySelectorAll('.v20q-line');
+    v20q.bookmarks.forEach(function(idx){
+      if (lines[idx]) {
+        lines[idx].classList.add('v20q-final-fav');
+      }
+    });
+  };
   // ── Copy sentence to clipboard ──
   window.v20q_copySentence = function(idx){
     var text = v20q.sentences[idx];
@@ -7535,7 +7577,7 @@ window.fixExtrasPanelColors = function(){
         var words = v20q_extractWords(s);
         var text = words.join(' ');
         var time = v20q.timestamps[bi] || v20q_fmtTime(bi * 6);
-        html += '<div style="display:flex;align-items:center;gap:8px;padding:6px 8px;border-bottom:1px solid var(--line);font-size:13px;cursor:pointer" onmouseover="this.style.background=\'rgba(255,255,255,.02)\'" onmouseout="this.style.background=\'transparent\'" onclick="v20q_toggleBookmark('+bi+');v20q_refreshBookmarkPanel()">';
+        html += '<div style="display:flex;align-items:center;gap:8px;padding:6px 8px;border-bottom:1px solid var(--line);font-size:13px;cursor:pointer" onmouseover="this.style.background=\'rgba(255,255,255,.02)\'" onmouseout="this.style.background=\'transparent\'" onclick="v20q_scrollToSentence('+bi+')">';
         html += '<span style="color:#f59e0b;flex-shrink:0"><i class="fa-solid fa-star"></i></span>';
         html += '<span style="color:var(--muted2);font-family:var(--font-mono);font-size:10px;flex-shrink:0">'+time+'</span>';
         html += '<span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text)">'+text+'</span>';
