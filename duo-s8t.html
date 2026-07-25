@@ -438,6 +438,9 @@ body{background:radial-gradient(circle at top left,rgba(255,255,255,.35),transpa
     renderSpeakerConfigs();
     updateStatus('idle');
 
+    // Restore previous session from sessionStorage (survives refresh)
+    restoreSession();
+
     // Guest: disable settings, show note
     if (!DUO.isHost) {
       var settingsEl = document.getElementById('duoSettings');
@@ -552,11 +555,15 @@ body{background:radial-gradient(circle at top left,rgba(255,255,255,.35),transpa
   // ── Caption message handler ──
   function handleCaption(data){
     var text = data.final;
-    if (!text) return;
+    if (!text || typeof text !== 'string') return;
+    // Anti-spam: cap message length to prevent memory exhaustion
+    if (text.length > 500) { console.warn('Duo: dropped oversized message ('+text.length+' chars)'); return; }
 
     // Determine speaker from label
     var label = data.label || 'A';
-    var speakerName = data.speaker || ('Speaker ' + label);
+    // Sanitize: strip angle brackets from speaker names to prevent HTML injection bypass
+    var rawSpeaker = data.speaker || ('Speaker ' + label);
+    var speakerName = typeof rawSpeaker === 'string' ? rawSpeaker.replace(/[<>]/g, '') : ('Speaker ' + label);
 
     // Auto-register speaker if unknown
     if (!DUO.speakers[speakerName]) {
@@ -614,6 +621,8 @@ body{background:radial-gradient(circle at top left,rgba(255,255,255,.35),transpa
     DUO.translations++;
     renderSentence(speaker, orig, tran);
     renderSpeakers();
+    // Persist to sessionStorage every 30 sentences (survives accidental refresh)
+    if (DUO.sentences.length % 30 === 0) persistSession();
   }
 
   // ── Provider toggle ──
@@ -645,13 +654,71 @@ body{background:radial-gradient(circle at top left,rgba(255,255,255,.35),transpa
 
   function generateRoomId(){ return 'duo-'+Math.random().toString(36).substring(2,8); }
 
-  // ── TTL change ──
+  // ── Session persistence (survives accidental refresh) ──
+  function persistSession(){
+    try {
+      var data = {
+        sentences: DUO.sentences.slice(-400), // keep last 400 to avoid storage bloat
+        speakers: DUO.speakers,
+        speakerOrder: DUO.speakerOrder,
+        translations: DUO.translations,
+        timer: DUO.timer,
+        session: DUO.session,
+        myTTL: DUO.myTTL,
+        roomId: DUO.roomId,
+        savedAt: Date.now()
+      };
+      sessionStorage.setItem('duo-session-'+DUO.roomId, JSON.stringify(data));
+    } catch(e) { /* quota exceeded or private browsing — silent fail */ }
+  }
+
+  function restoreSession(){
+    try {
+      var raw = sessionStorage.getItem('duo-session-'+DUO.roomId);
+      if (!raw) return;
+      var data = JSON.parse(raw);
+      // Only restore if from today (don't show yesterday's session)
+      if (Date.now() - data.savedAt > 86400000) { sessionStorage.removeItem('duo-session-'+DUO.roomId); return; }
+      if (!data.sentences || !data.sentences.length) return;
+      // Restore state
+      DUO.sentences = data.sentences;
+      DUO.speakers = data.speakers || {};
+      DUO.speakerOrder = data.speakerOrder || [];
+      DUO.translations = data.translations || 0;
+      DUO.timer = data.timer || 0;
+      DUO.myTTL = data.myTTL || DUO.myTTL;
+      // Re-render the transcript
+      reRenderAll();
+      renderSpeakers();
+      renderSpeakerConfigs();
+      updateStyleForCount();
+      if (DUO.timer > 0 && !DUO.session) {
+        // Resume timer display (session may not be active, but show elapsed)
+        var m = Math.floor(DUO.timer/60), s = DUO.timer%60;
+        var timerEl = document.getElementById('duoTimer');
+        if (timerEl) timerEl.textContent = (m<10?'0':'')+m+':'+(s<10?'0':'')+s;
+      }
+      addLogEntry('📦','Restored '+data.sentences.length+' sentences from previous session');
+    } catch(e) { /* corrupt data — silent fail */ }
+  }
+
+  // ── TTL change (forward-only: new sentences use new language, past stay as-is) ──
   window.duoUpdateTTL = function(){
+    var oldTTL = DUO.myTTL;
     DUO.myTTL = document.getElementById('duoMyTTL').value;
     localStorage.setItem('duo-my-ttl', DUO.myTTL);
-    showToast('🌐 Your translations now in '+LANGS[DUO.myTTL].name);
-    // Re-translate existing sentences with new TTL
-    if (DUO.sentences.length > 0) reTranslateAll();
+    if (DUO.sentences.length > 0) {
+      // Insert a divider so the viewer sees where the language changed
+      var divider = document.createElement('div');
+      divider.className = 'duo-row';
+      divider.style.cssText = 'text-align:center;padding:8px 0;font-size:11px;color:var(--t3);opacity:0.7';
+      divider.textContent = '── Now in ' + LANGS[DUO.myTTL].name + ' ' + LANGS[DUO.myTTL].flag + ' ──';
+      var container = document.getElementById('duoTranscript');
+      if (container) { container.appendChild(divider); container.scrollTo({top:container.scrollHeight,behavior:'smooth'}); }
+      showToast('🌐 New sentences in ' + LANGS[DUO.myTTL].name + ' · Past sentences unchanged');
+    } else {
+      showToast('🌐 Translations now in ' + LANGS[DUO.myTTL].name);
+    }
   };
 
   // ── Speaker management ──
@@ -898,7 +965,10 @@ body{background:radial-gradient(circle at top left,rgba(255,255,255,.35),transpa
   window.duoCopyInvite=function(){ navigator.clipboard.writeText(document.getElementById('duoInviteLink').textContent).then(function(){showToast('📋 Link copied!')}); };
   window.duoShareWhatsApp=function(){ window.open('https://wa.me/?text='+encodeURIComponent(document.getElementById('duoInviteLink').textContent),'_blank'); };
   window.duoShareEmail=function(){ window.location.href='mailto:?subject=Join my Duo session&body='+encodeURIComponent(document.getElementById('duoInviteLink').textContent); };
-  window.duoNewRoom=function(){ DUO.roomId=generateRoomId(); localStorage.setItem('duo-room-id',DUO.roomId); document.getElementById('duoRoomCode').textContent=DUO.roomId.substring(0,8); updateInviteLink(); showToast('🔄 New room!'); if(DUO.ws){try{DUO.ws.close()}catch(e){}} connectWebSocket(); };
+  window.duoNewRoom=function(){ DUO.roomId=generateRoomId(); localStorage.setItem('duo-room-id',DUO.roomId); document.getElementById('duoRoomCode').textContent=DUO.roomId.substring(0,8); updateInviteLink(); showToast('🔄 New room!'); if(DUO.ws){try{DUO.ws.close()}catch(e){}} DUO.sentences=[]; DUO.translations=0; DUO.timer=0; var c=document.getElementById('duoTranscript'); if(c)c.innerHTML=''; connectWebSocket(); };
+
+  // ── Persist on close/refresh ──
+  window.addEventListener('beforeunload', function(){ if (DUO.sentences.length > 0) persistSession(); });
 
   function esc(s){ return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
   function escAttr(s){ return (s||'').replace(/'/g,"\\'").replace(/"/g,'&quot;'); }
