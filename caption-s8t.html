@@ -7187,25 +7187,31 @@ window.fixExtrasPanelColors = function(){
     if (!skipConfirm) {
       var lang = localStorage.getItem('sottotitoli-lang') || 'en';
       var modeName = topMode === 'caption' ? (lang==='it'?'Sottotitoli':'Caption') : (lang==='it'?'Traduzione':'Translation');
+      var title = lang === 'it' ? 'Cambiare modalità' : 'Switch Mode';
       var msg = lang === 'it'
-        ? 'Passare a modalità '+modeName+'?\n\nLascerai questa stanza. La trascrizione non salvata andrà persa.'
-        : 'Switch to '+modeName+' mode?\n\nYou will leave this room. Unsaved transcript will be lost.';
-      if (!confirm(msg)) return;
+        ? 'Passare a modalità '+modeName+'? Lascerai questa stanza. La trascrizione non salvata andrà persa.'
+        : 'Switch to '+modeName+' mode? You will leave this room. Unsaved transcript will be lost.';
+      var btn = lang === 'it' ? 'Passa a '+modeName : 'Switch to '+modeName;
+      showConfirmModal(title, msg, btn, function() {
+        _doTopModeSwitch(topMode);
+      });
+      return;
     }
+    _doTopModeSwitch(topMode);
+  };
+  function _doTopModeSwitch(topMode) {
     if (topMode === 'caption') {
       var src = localStorage.getItem('sottotitoli-caption-lang') || 'en-US';
       window.location.href = window.location.pathname + '?lang=' + src;
       return;
     }
     if (topMode === 'translate') {
-      // If src was explicitly set (from panoramica), use it — overrides native language
       var urlParams = new URLSearchParams(window.location.search);
       var explicitSrc = urlParams.get('src');
       var nativeCode = localStorage.getItem('sottotitoli-native-lang');
       var captionLang = localStorage.getItem('sottotitoli-caption-lang') || 'en-US';
       var src2 = captionLang;
       if (explicitSrc) {
-        // User explicitly chose source in panoramica — use it
         var codeMap = { en:'en-US', it:'it-IT', nl:'nl-NL', fr:'fr-FR', de:'de-DE', es:'es-ES', pl:'pl-PL', pt:'pt-PT' };
         src2 = codeMap[explicitSrc] || captionLang;
       } else if (nativeCode) {
