@@ -86,8 +86,9 @@
 
   function setTheme(t) {
     html.setAttribute('data-theme', t);
+    // Icon-only toggle — CSS handles sun/moon visibility via data-theme
     if (themeBtn) {
-      themeBtn.textContent = t === 'dark' ? '☀️' : '🌙';
+      themeBtn.setAttribute('aria-label', t === 'dark' ? 'Switch to light mode' : 'Switch to dark mode');
     }
     try { localStorage.setItem('sottotitoli-theme', t); } catch (e) {}
   }
