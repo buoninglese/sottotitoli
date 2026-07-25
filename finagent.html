@@ -326,9 +326,9 @@ input:checked + .slider:before { transform: translateX(17px); }
 
             <div id="aiCostSummary" style="margin-top:8px;font-size:.78rem;color:var(--text-soft);line-height:1.6;background:var(--card);border-radius:8px;padding:10px"></div>
 
-            <span class="form-label">Avg purchases / user / month (prepaid only)</span>
+            <span class="form-label">Avg purchases / user / month (prepaid only) <span title="0.5 = buys every 2 months (default)&#10;1.0 = buys monthly (recurring-like)&#10;0.083 ≈ buys once/year amortized&#10;0.01 ≈ one-time, never again" style="cursor:help;color:var(--accent)">ⓘ</span></span>
             <input class="form-input" type="number" id="purchaseFreq" step="0.1" value="0.5" min="0.01" max="5" oninput="renderNow()">
-            <span class="form-hint"><strong>0.5</strong> = buys every 2 months (avg). <strong>1.0</strong> = buys monthly. <strong>0.083</strong> ≈ one-time/year amortized. Set to 1.0 for "what if everyone bought once this month?" Set &lt;0.1 for near-one-time customers.</span>
+            <span class="form-hint"><strong>0.5</strong> = every 2 months · <strong>1.0</strong> = monthly · <strong>0.083</strong> ≈ yearly · <strong>0.01</strong> ≈ one-time</span>
           </div>
 
           <div class="section">
@@ -757,33 +757,34 @@ function render() {
       const userPricePerMin = r.minutes > 0 ? r.price / r.minutes : 0;
       const reportsPerPack = avgCreditsPerReport > 0 ? r.aiCredits / avgCreditsPerReport : 0;
       const aiCostPerPack = reportsPerPack * costPerReportEUR;
-      const trCostPerMin = costTr;
-      const tlCostPerMin = costTl;
-      const aiCostPerMin = r.minsPerUser > 0 ? r.aiCostPerUser / r.minsPerUser : 0;
-      const standaloneFixedPerMin = r.minsPerUser > 0 ? standaloneFixedPerUser / r.minsPerUser : 0;
-      const totalCostPerMin = trCostPerMin + tlCostPerMin + aiCostPerMin + standaloneFixedPerMin;
-      const profitPerMin = userPricePerMin - totalCostPerMin;
-      // Allow negative margins — only show "—" when there's truly no revenue AND no cost
-      const marginPct = userPricePerMin > 0 ? (profitPerMin / userPricePerMin * 100)
-        : totalCostPerMin > 0 ? null  // free product with costs → can't calculate %
-        : 0;                           // free product, zero costs → break-even
-      const marginLabel = marginPct === null ? '— (losing €' + Math.abs(profitPerMin).toFixed(3) + '/min with €0 revenue)'
-        : marginPct.toFixed(1) + '%';
-      const profitColor = marginPct === null ? 'var(--red)'
-        : marginPct >= 70 ? 'var(--green)' : marginPct >= 40 ? 'var(--accent)' : marginPct >= 10 ? 'var(--amber)' : 'var(--red)';
 
       if (r.minutes > 0) {
+        // ── Minute-based package ──
+        // Per-minute costs (only things that scale with usage)
+        const varCostPerMin = costTr + costTl;
+        const varCostPerPack = varCostPerMin * r.minutes;
+        // Fixed per-pack costs (AI reports + infrastructure — don't scale with minutes)
+        const fixedPerPack = aiCostPerPack + standaloneFixedPerUser;
+        const totalCostPerPack = varCostPerPack + fixedPerPack;
+        const profitPerPack = r.price - totalCostPerPack;
+        const marginPctPack = r.price > 0 ? (profitPerPack / r.price * 100) : null;
+        const marginLabelPack = marginPctPack === null
+          ? '— (losing €' + Math.abs(profitPerPack).toFixed(2) + ' with €0 revenue)'
+          : marginPctPack.toFixed(1) + '%';
+        const profitColorPack = marginPctPack === null ? 'var(--red)'
+          : marginPctPack >= 70 ? 'var(--green)' : marginPctPack >= 40 ? 'var(--accent)' : marginPctPack >= 10 ? 'var(--amber)' : 'var(--red)';
+
         foot.innerHTML = `
-          <div>💰 You charge <strong style="color:#fff">€${userPricePerMin.toFixed(3)}/min</strong></div>
+          <div>💰 You charge <strong style="color:#fff">€${userPricePerMin.toFixed(3)}/min</strong> <span style="color:var(--text-faint);font-size:.68rem">(€${r.price.toFixed(2)} per pack)</span></div>
           <div class="ft-sep"></div>
-          <div style="font-size:.68rem;color:var(--text-faint);margin-bottom:3px">Costs if this was your <em>only</em> product (€${fixedCosts.toFixed(0)}/mo fixed ÷ ${r.subs} users):</div>
-          <div class="ft-sub">Speech-to-text <span style="color:var(--text-faint)">${costTr===0?'(free browser API)':''}</span> <strong>€${trCostPerMin.toFixed(4)}</strong></div>
-          <div class="ft-sub">Translation <span style="color:var(--text-faint)">${costTl===0?'(free MyMemory)':''}</span> <strong>€${tlCostPerMin.toFixed(4)}</strong></div>
-          ${r.aiCredits > 0 ? `<div class="ft-sub">AI reports <span style="color:var(--text-faint)">${r.aiCredits} cr → ${reportsPerPack.toFixed(1)} reports</span> <strong>€${aiCostPerMin.toFixed(4)}</strong></div>` : ''}
-          <div class="ft-sub">Infrastructure <span style="color:var(--text-faint)">€${fixedCosts.toFixed(0)}/mo ÷ ${r.subs} users</span> <strong>€${standaloneFixedPerMin.toFixed(4)}</strong></div>
+          <div style="font-size:.68rem;color:var(--text-faint);margin-bottom:3px">Per minute <span style="font-style:italic">(scales with usage)</span>:</div>
+          <div class="ft-sub">Speech-to-text <span style="color:var(--text-faint)">${costTr===0?'(free browser API)':''}</span> <strong>€${costTr.toFixed(4)}</strong></div>
+          <div class="ft-sub">Translation <span style="color:var(--text-faint)">${costTl===0?'(free MyMemory)':''}</span> <strong>€${costTl.toFixed(4)}</strong></div>
+          <div style="font-size:.68rem;color:var(--text-faint);margin:3px 0">Per pack <span style="font-style:italic">(fixed, regardless of minutes)</span>:</div>
+          ${r.aiCredits > 0 ? `<div class="ft-sub">AI reports <span style="color:var(--text-faint)">${r.aiCredits} cr → ${reportsPerPack.toFixed(1)} reports</span> <strong>€${aiCostPerPack.toFixed(2)}</strong></div>` : ''}
+          <div class="ft-sub">Infrastructure <span style="color:var(--text-faint)">€${fixedCosts.toFixed(0)}/mo ÷ ${r.subs} users</span> <strong>€${standaloneFixedPerUser.toFixed(2)}</strong></div>
           <div class="ft-sep"></div>
-          <div>💸 Standalone margin <strong style="color:${profitColor};font-size:.82rem">${marginLabel}</strong> <span style="color:var(--text-faint)">(€${profitPerMin.toFixed(4)}/min profit)</span></div>
-          ${r.aiCredits > 0 ? `<div style="font-size:.67rem;color:var(--text-faint);margin-top:2px">Per pack: ${r.aiCredits} AI credits → ${reportsPerPack.toFixed(1)} reports (€${aiCostPerPack.toFixed(2)} API cost)</div>` : ''}
+          <div>💸 Profit per pack <strong style="color:${profitColorPack};font-size:.82rem">€${profitPerPack.toFixed(2)}</strong> <span style="color:${profitColorPack}">→ ${marginLabelPack} margin</span></div>
         `;
       } else {
         const profitPerPack = r.price - aiCostPerPack - standaloneFixedPerUser;
