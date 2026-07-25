@@ -555,6 +555,37 @@
     .notif-toast.show{transform:translateX(0)}
     .notif-toast strong{font-size:13px;color:var(--text)}
     .notif-toast span{font-size:12px;color:var(--text-soft)}
+
+    /* ═══ Grammar Error Bank ═══ */
+    .geb-stat-row{display:flex;gap:14px;margin-bottom:22px;flex-wrap:wrap}
+    .geb-stat-card{flex:1 1 140px;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:18px;text-align:center}
+    .geb-stat-num{font-size:1.6rem;font-weight:700;color:var(--cyan);line-height:1}
+    .geb-stat-label{font-size:.82rem;color:var(--text-soft);margin-top:6px}
+    .geb-section{margin-bottom:22px}
+    .geb-bars{display:flex;flex-direction:column;gap:10px}
+    .geb-bar-row{display:flex;align-items:center;gap:12px;font-size:.9rem}
+    .geb-bar-label{width:140px;color:var(--text-soft);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .geb-bar-track{flex:1;height:10px;background:var(--line);border-radius:6px;overflow:hidden}
+    .geb-bar-fill{height:100%;background:linear-gradient(90deg,var(--cyan),var(--teal));border-radius:6px;min-width:4px}
+    .geb-bar-count{width:36px;text-align:right;color:var(--text-soft);font-variant-numeric:tabular-nums}
+    .geb-pill{display:inline-flex;align-items:center;gap:6px;background:var(--card);border:1px solid var(--line);color:var(--text-soft);padding:6px 12px;border-radius:20px;font-size:.82rem;cursor:pointer;margin-right:6px;margin-bottom:6px}
+    .geb-pill:hover{border-color:var(--cyan);color:var(--text)}
+    .geb-pill--active{background:var(--cyan);color:#0b0d12;border-color:var(--cyan);font-weight:600}
+    .geb-list{display:flex;flex-direction:column;gap:10px}
+    .geb-card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px 16px}
+    .geb-card-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+    .geb-meta{font-size:.78rem;color:var(--text-soft)}
+    .geb-action{background:transparent;border:none;color:var(--text-soft);cursor:pointer;font-size:1rem;line-height:1}
+    .geb-action:hover{color:#ff6b6b}
+    .geb-phrase{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:6px}
+    .geb-original{text-decoration:line-through;opacity:.7}
+    .geb-corrected{color:var(--cyan);font-weight:600}
+    .geb-arrow{color:var(--text-soft);font-size:.85rem}
+    .geb-explanation{font-size:.85rem;color:var(--text-soft);line-height:1.4}
+    .geb-state{text-align:center;padding:28px;color:var(--text-soft)}
+    .geb-muted{font-size:.88rem;opacity:.8}
+    .geb-skeleton{color:var(--text-soft);font-style:italic;padding:18px;text-align:center}
+    @media(max-width:640px){.geb-bar-label{width:100px;font-size:.82rem}}
   </style>
   <script src="https://unpkg.com/compromise@14.14.2"></script>
 </head>
@@ -1496,7 +1527,7 @@
         </div>
         <div class="content-panel" id="pnl-grammatica">
           <section class="panel-head"><h2>📐 Grammatica</h2></section>
-          <section class="panel-tabs"><div class="tabs" role="tablist"><button role="tab" aria-selected="true" class="tab-link active" data-subtab="gram-reports">I miei Report</button><button role="tab" aria-selected="false" class="tab-link" data-subtab="gram-generate">Genera Report</button></div></section>
+          <section class="panel-tabs"><div class="tabs" role="tablist"><button role="tab" aria-selected="true" class="tab-link active" data-subtab="gram-reports">I miei Report</button><button role="tab" aria-selected="false" class="tab-link" data-subtab="gram-generate">Genera Report</button><button role="tab" aria-selected="false" class="tab-link" data-subtab="gram-errors" style="color:var(--cyan)">I miei Errori</button></div></section>
           
           <!-- My Reports subtab -->
           <div role="tabpanel" class="subtab-pane active" id="sub-gram-reports">
@@ -1559,6 +1590,56 @@
               </div>
             </div>
           </div>
+
+          <!-- ═══ I miei Errori — saved grammar error bank ═══ -->
+          <div role="tabpanel" class="subtab-pane" id="sub-gram-errors">
+            <div class="rai-product" style="padding:24px">
+
+              <!-- Stat cards -->
+              <div class="geb-stat-row">
+                <div class="geb-stat-card">
+                  <div class="geb-stat-num" id="geb-count">—</div>
+                  <div class="geb-stat-label">Errori salvati</div>
+                </div>
+                <div class="geb-stat-card">
+                  <div class="geb-stat-num" id="geb-types">—</div>
+                  <div class="geb-stat-label">Tipi diversi</div>
+                </div>
+                <div class="geb-stat-card">
+                  <div class="geb-stat-num" id="geb-top">—</div>
+                  <div class="geb-stat-label">Più frequente</div>
+                </div>
+              </div>
+
+              <!-- Category breakdown -->
+              <div class="geb-section">
+                <h4 style="margin:0 0 12px 0;font-size:.95rem;color:var(--text-soft)">Riepilogo per categoria</h4>
+                <div id="geb-bars" class="geb-bars">
+                  <p class="geb-empty" style="display:none">Nessun dato di categoria disponibile.</p>
+                </div>
+              </div>
+
+              <!-- Filter chips -->
+              <div class="geb-section" id="geb-filters" style="display:none">
+                <span style="color:var(--text-soft);font-size:.88rem;margin-right:8px">Filtra:</span>
+                <button class="geb-pill geb-pill--active" data-filter="all" onclick="filterErrors('all')">Mostra tutti</button>
+              </div>
+
+              <!-- Error list -->
+              <div class="geb-section">
+                <h4 style="margin:0 0 12px 0;font-size:.95rem;color:var(--text-soft)">Errori salvati</h4>
+                <div id="geb-list" class="geb-list">
+                  <div class="geb-skeleton">Caricamento…</div>
+                </div>
+                <div id="geb-empty" class="geb-state" style="display:none">
+                  <p>Nessun errore salvato.</p>
+                  <p class="geb-muted">Vai su Caption S8T, clicca una frase nel pannello Grammar Fix, e salva i tuoi errori con <strong>Save to Error Bank</strong>.</p>
+                </div>
+              </div>
+
+            </div>
+          </div>
+
         </div>
         <!-- Report AI panel -->
         <div class="content-panel" id="pnl-report-ai">
@@ -7290,6 +7371,161 @@
       while (box.children.length > 30) box.removeChild(box.firstChild);
     }
   })();
+
+  // ═══ Grammar Error Bank — saved errors from caption-s8t ═══
+  var gebAllErrors = [];
+  
+  function deriveCategory(explanation) {
+    if (!explanation) return 'Altro';
+    var ex = explanation.toLowerCase();
+    if (ex.indexOf('preposizion') !== -1) return 'Preposizioni';
+    if (ex.indexOf('verbo') !== -1 || ex.indexOf('tempo') !== -1 || ex.indexOf('congiuntiv') !== -1 || ex.indexOf('condizional') !== -1) return 'Tempi verbali';
+    if (ex.indexOf('articolo') !== -1) return 'Articoli';
+    if (ex.indexOf('ordine') !== -1 || ex.indexOf('word order') !== -1) return 'Ordine parole';
+    if (ex.indexOf('ortograf') !== -1 || ex.indexOf('spelling') !== -1 || ex.indexOf('accent') !== -1) return 'Ortografia';
+    return 'Altro';
+  }
+
+  async function loadGrammarErrors() {
+    var listEl = document.getElementById('geb-list');
+    var emptyEl = document.getElementById('geb-empty');
+    if (!listEl) return;
+    listEl.innerHTML = '<div class="geb-skeleton">Caricamento…</div>';
+    if (emptyEl) emptyEl.style.display = 'none';
+
+    var sb = window.sottotitoliSupabase;
+    if (!sb) { listEl.innerHTML = '<div class="geb-state">Accedi per vedere i tuoi errori.</div>'; return; }
+
+    try {
+      var resp = await sb.from('grammar_errors').select('*').order('saved_at', { ascending: false });
+      if (resp.error) throw resp.error;
+
+      gebAllErrors = (resp.data || []).map(function(r) {
+        return Object.assign({}, r, { category: r.error_category || r.error_type || deriveCategory(r.explanation) });
+      });
+
+      if (gebAllErrors.length === 0) {
+        listEl.innerHTML = '';
+        if (emptyEl) emptyEl.style.display = '';
+        renderErrorStats([]);
+        return;
+      }
+
+      renderErrorStats(gebAllErrors);
+      renderBreakdown(gebAllErrors);
+      renderErrorList(gebAllErrors, 'all');
+
+    } catch(e) {
+      console.error('Grammar Error Bank load failed:', e);
+      listEl.innerHTML = '<div class="geb-state">Errore di caricamento. Riprova.</div>';
+    }
+  }
+
+  function renderErrorStats(rows) {
+    var count = rows.length;
+    var cats = {}; rows.forEach(function(r) { cats[r.category] = true; });
+    var typeCount = Object.keys(cats).length;
+    var freq = {}; rows.forEach(function(r) { freq[r.category] = (freq[r.category] || 0) + 1; });
+    var topCat = '—', topN = 0;
+    Object.keys(freq).forEach(function(c) { if (freq[c] > topN) { topN = freq[c]; topCat = c; } });
+
+    var countEl = document.getElementById('geb-count'); if (countEl) countEl.textContent = count;
+    var typesEl = document.getElementById('geb-types'); if (typesEl) typesEl.textContent = typeCount;
+    var topEl = document.getElementById('geb-top'); if (topEl) topEl.textContent = topN > 0 ? topCat + ' (' + topN + ')' : '—';
+  }
+
+  function renderBreakdown(rows) {
+    var barsEl = document.getElementById('geb-bars');
+    if (!barsEl) return;
+    barsEl.innerHTML = '';
+    var freq = {}; rows.forEach(function(r) { freq[r.category] = (freq[r.category] || 0) + 1; });
+    var sorted = Object.keys(freq).map(function(k) { return [k, freq[k]]; }).sort(function(a, b) { return b[1] - a[1]; });
+    var max = Math.max.apply(null, sorted.map(function(x) { return x[1]; }).concat([1]));
+
+    if (sorted.length === 0) {
+      barsEl.innerHTML = '<p class="geb-empty">Nessun dato di categoria disponibile.</p>';
+      return;
+    }
+    sorted.forEach(function(entry) {
+      var cat = entry[0], n = entry[1];
+      var pct = (n / max) * 100;
+      var row = document.createElement('div');
+      row.className = 'geb-bar-row';
+      row.innerHTML = '<div class="geb-bar-label">' + cat + '</div><div class="geb-bar-track"><div class="geb-bar-fill" style="width:' + pct + '%"></div></div><div class="geb-bar-count">' + n + '</div>';
+      barsEl.appendChild(row);
+    });
+  }
+
+  function renderErrorList(rows, filter) {
+    var listEl = document.getElementById('geb-list');
+    var filtersEl = document.getElementById('geb-filters');
+    if (!listEl) return;
+
+    // Rebuild filter pills
+    if (filtersEl) {
+      var cats = {}; gebAllErrors.forEach(function(r) { cats[r.category] = true; });
+      var catList = Object.keys(cats).sort();
+      var pillsHtml = '<span style="color:var(--text-soft);font-size:.88rem;margin-right:8px">Filtra:</span>';
+      pillsHtml += '<button class="geb-pill geb-pill--active" data-filter="all" onclick="filterErrors(\'all\')">Mostra tutti</button>';
+      catList.forEach(function(c) {
+        pillsHtml += '<button class="geb-pill' + (filter === c ? ' geb-pill--active' : '') + '" data-filter="' + c + '" onclick="filterErrors(\'' + c.replace(/'/g, "\\'") + '\')">' + c + '</button>';
+      });
+      filtersEl.innerHTML = pillsHtml;
+      filtersEl.style.display = '';
+    }
+
+    var filtered = filter === 'all' ? rows : rows.filter(function(r) { return r.category === filter; });
+    listEl.innerHTML = '';
+
+    if (filtered.length === 0) {
+      listEl.innerHTML = '<div class="geb-state">Nessun errore per questa categoria.</div>';
+      return;
+    }
+
+    filtered.forEach(function(r) {
+      var dateStr = r.saved_at ? new Date(r.saved_at).toLocaleDateString('it-IT') : '';
+      var card = document.createElement('div');
+      card.className = 'geb-card';
+      card.innerHTML = '<div class="geb-card-header"><span class="geb-meta">' + dateStr + '</span><button class="geb-action" onclick="deleteGrammarError(\'' + r.id + '\', this)" title="Elimina">×</button></div>' +
+        '<div class="geb-phrase"><span class="geb-original">' + escapeHtml(r.original_text || '') + '</span><span class="geb-arrow">→</span><span class="geb-corrected">' + escapeHtml(r.corrected_text || '') + '</span></div>' +
+        '<div class="geb-explanation">' + escapeHtml(r.explanation || '') + '</div>';
+      listEl.appendChild(card);
+    });
+  }
+
+  function filterErrors(cat) {
+    document.querySelectorAll('.geb-pill').forEach(function(b) {
+      b.classList.toggle('geb-pill--active', b.getAttribute('data-filter') === cat);
+    });
+    renderErrorList(gebAllErrors, cat);
+  }
+
+  async function deleteGrammarError(id, btn) {
+    if (!confirm('Eliminare questo errore?')) return;
+    btn.disabled = true;
+    try {
+      var sb = window.sottotitoliSupabase;
+      if (!sb) throw new Error('Not signed in');
+      var resp = await sb.from('grammar_errors').delete().eq('id', id);
+      if (resp.error) throw resp.error;
+      loadGrammarErrors();
+    } catch(e) {
+      console.error('Delete failed:', e);
+      alert('Eliminazione non riuscita.');
+      btn.disabled = false;
+    }
+  }
+
+  function escapeHtml(str) {
+    if (!str) return '';
+    return str.replace(/[&<>"']/g, function(m) { return ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','\'':'&#39;' })[m]; });
+  }
+
+  // Hook into the tab switching — when the "I miei Errori" tab is activated
+  document.addEventListener('click', function(e) {
+    var tab = e.target.closest('.tab-link[data-subtab="gram-errors"]');
+    if (tab) loadGrammarErrors();
+  });
 })();
 </script>
 
