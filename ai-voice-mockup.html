@@ -391,7 +391,7 @@
     <header class="header">
       <a href="panoramica.html" class="brand-row">
         <span class="brand-dot"></span>sottotitoli<span>.ai</span>
-        <span style="font-size:10px;color:var(--text-faint);font-weight:400;margin-left:4px">v3.2 · proactive intelligence · voids detected</span>
+        <span style="font-size:10px;color:var(--text-faint);font-weight:400;margin-left:4px">v3.3 · generative · sim chamber</span>
       </a>
       <div class="panel-tabs" id="panelTabs">
         <button class="tab-btn active" data-tab="voice" onclick="switchTab('voice')">
@@ -1180,6 +1180,7 @@
     var sessionHistory = JSON.parse(localStorage.getItem('aivoice-history') || '[]');
     var currentSessionLines = [];
     var sessionStartTime = Date.now();
+    var alertsThisSession = 0;                // alert throttle counter
 
     // Capture each transcript line + run voice command detection
     var origAppendTranscript = appendTranscript;
@@ -1196,6 +1197,21 @@
     };
 
     function showCommandToast(cmd) {
+      if (cmd.type === 'sim-start') {
+        showSimulationStart(cmd);
+        return;
+      }
+      if (cmd.type === 'sim-end') {
+        var body = document.getElementById('transcriptBody');
+        if (body) {
+          var banner = document.createElement('div');
+          banner.style.cssText = 'padding:8px 14px;margin-bottom:8px;background:rgba(16,185,129,.1);border:1px solid rgba(16,185,129,.25);border-radius:10px;font-size:12px;color:var(--green);text-align:center';
+          banner.textContent = '✅ Simulazione terminata.';
+          body.appendChild(banner);
+          body.scrollTop = body.scrollHeight;
+        }
+        return;
+      }
       if (cmd.type === 'ask') {
         // Ask Engine: show results in transcript overlay
         var body = document.getElementById('transcriptBody');
@@ -1251,6 +1267,7 @@
       localStorage.setItem('aivoice-history', JSON.stringify(sessionHistory));
       currentSessionLines = [];
       sessionStartTime = Date.now();
+      alertsThisSession = 0;
       renderHistoryList();
     }
 
@@ -1424,8 +1441,37 @@
       toast.style.cssText = 'position:fixed;bottom:80px;left:50%;transform:translateX(-50%);z-index:10000;padding:12px 20px;background:var(--card);border:1px solid var(--accent-amber, #f0b429);border-radius:16px;font-size:12px;color:var(--text);box-shadow:0 12px 40px rgba(0,0,0,.35);animation:fadeIn .4s ease;max-width:400px;text-align:center;line-height:1.5';
       toast.innerHTML = '<div style="font-weight:700;margin-bottom:6px">📊 Session Intelligence</div>' + msgs.map(function(m) { return '<div>' + m + '</div>'; }).join('');
       document.body.appendChild(toast);
-      setTimeout(function() { toast.style.opacity = '0'; toast.style.transition = 'opacity .6s'; }, 6000);
-      setTimeout(function() { if (toast.parentNode) toast.remove(); }, 6500);
+      setTimeout(function() { toast.style.opacity = '0'; toast.style.transition = 'opacity .6s'; }, 8000);
+      setTimeout(function() { if (toast.parentNode) toast.remove(); }, 8500);
+
+      // ── PRESCRIPTION BRIDGE: offer a one-tap action ──
+      if (psych.scarcityScore > 1) {
+        prescribe('Hai ' + psych.scarcityScore + ' segnali di scarsità. Vuoi fare un reframing di 2 minuti?', 'reframe');
+      } else if (psych.commitments.length > 0) {
+        prescribe(psych.commitments.length + ' impegni impliciti rilevati. Vuoi promuoverne uno a decisione?', 'promote');
+      } else if (psych.antiGoalProximity.length > 0) {
+        prescribe('Ti sei avvicinato a violare un anti-goal. Vuoi registrare una violazione?', 'log-violation');
+      }
+    }
+
+    // ── Alert throttle ──
+    var alertsThisSession = 0;
+    var MAX_ALERTS_PER_SESSION = 1;
+
+    function prescribe(message, action) {
+      if (alertsThisSession >= MAX_ALERTS_PER_SESSION) return;
+      alertsThisSession++;
+      var toast = document.createElement('div');
+      toast.style.cssText = 'position:fixed;bottom:140px;left:50%;transform:translateX(-50%);z-index:10001;padding:12px 20px;background:var(--card);border:2px solid var(--purple);border-radius:16px;font-size:13px;color:var(--text);box-shadow:0 12px 40px rgba(0,0,0,.35);animation:fadeIn .4s ease;max-width:420px;text-align:center;line-height:1.5;cursor:pointer';
+      toast.innerHTML = '<div style="margin-bottom:8px">💡 ' + message + '</div><div style="display:inline-block;padding:6px 16px;background:var(--purple);color:#fff;border-radius:20px;font-size:12px;font-weight:600">▶ ' + (action === 'reframe' ? 'Avvia reframing' : action === 'promote' ? 'Promuovi a decisione' : 'Registra violazione') + '</div>';
+      toast.onclick = function() {
+        if (action === 'reframe') { pushCaption('ai', 'Facciamo un reframing. Dimmi cosa hai detto e lo riformuliamo in chiave di abbondanza.', true); showFinalAiBubble('Pronto? Partiamo da ciò che hai detto.'); }
+        if (action === 'promote') { pushCaption('ai', 'Quale di questi impegni vuoi trasformare in una decisione? Dillo a voce: Log decision: ...', true); showFinalAiBubble('Scegli uno degli impegni e formula una decisione.'); }
+        if (action === 'log-violation') { pushCaption('ai', 'Registra la violazione: Anti-goal: ...', true); showFinalAiBubble('Descrivi la violazione e la registrerò.'); }
+        toast.remove();
+      };
+      document.body.appendChild(toast);
+      setTimeout(function() { if (toast.parentNode) { toast.style.opacity = '0'; toast.style.transition = 'opacity .5s'; setTimeout(function() { if (toast.parentNode) toast.remove(); }, 500); } }, 15000);
     }
 
     // ═══════════════════════════════════════════════════
@@ -1486,6 +1532,64 @@
       } else {
         el.innerHTML = voids.map(function(v) { return '<div style="font-size:11px;color:var(--accent-amber,#f0b429);padding:4px 0;line-height:1.5">⚠️ ' + v + '</div>'; }).join('');
       }
+    }
+
+    // ═══════════════════════════════════════════════════
+    //  MODULE 4: Simulation Chamber (The Generative Layer)
+    // ═══════════════════════════════════════════════════
+
+    var SIM_SCENARIOS = {
+      investor: { role: 'Investitore scettico', prompt: 'Sei un venture capitalist italiano di nome Mario. Sei scettico, fai domande difficili sul modello di business, chiedi metriche precise, e vuoi vedere traction prima di investire. Non sei scortese ma sei esigente.' },
+      client: { role: 'Cliente esigente', prompt: 'Sei un cliente che vuole raddoppiare lo scope del progetto senza pagare di più. Cerchi di ottenere il massimo al minimo costo. Sei gentile ma insistente.' },
+      rate: { role: 'Cliente sul prezzo', prompt: 'Sei un cliente a cui è stato appena comunicato un aumento di tariffa del 100%. Sei sorpreso, offeso, e minacci di andare dalla concorrenza. Metti alla prova la determinazione.' },
+      family: { role: 'Moglie preoccupata', prompt: 'Sei la moglie che ama la vita attuale. Sei preoccupata per un possibile trasloco. Vuoi stabilità per i bambini. Non sei contraria ma hai paura.' },
+      hire: { role: 'Candidato senior', prompt: 'Sei un candidato senior che valuta un\'offerta. Fai domande su equity, crescita, visione. Vuoi capire se il founder è serio.' }
+    };
+
+    var simulationActive = false;
+
+    // "Simula:" voice command
+    var origDetect3 = detectVoiceCommand;
+    detectVoiceCommand = function(text, role) {
+      if (role === 'user') {
+        var simMatch = text.trim().match(/^simula\s*:\s*(.+)/i);
+        if (simMatch) {
+          var query = simMatch[1].toLowerCase();
+          var simType = 'rate';
+          if (query.indexOf('investor') !== -1 || query.indexOf('investitore') !== -1) simType = 'investor';
+          else if (query.indexOf('rate') !== -1 || query.indexOf('tariff') !== -1 || query.indexOf('prezzo') !== -1) simType = 'rate';
+          else if (query.indexOf('client') !== -1 || query.indexOf('cliente') !== -1) simType = 'client';
+          else if (query.indexOf('family') !== -1 || query.indexOf('famiglia') !== -1 || query.indexOf('moglie') !== -1 || query.indexOf('trasloco') !== -1) simType = 'family';
+          else if (query.indexOf('hire') !== -1 || query.indexOf('assumere') !== -1 || query.indexOf('colloquio') !== -1) simType = 'hire';
+
+          if (SIM_SCENARIOS[simType]) {
+            simulationActive = true;
+            var sc = SIM_SCENARIOS[simType];
+            return { type: 'sim-start', text: query, role: sc.role, prompt: sc.prompt };
+          }
+          return { type: 'sim-start', text: query, error: true };
+        }
+        if (/^(?:end|stop|fine)\s*sim/i.test(text.trim()) && simulationActive) {
+          simulationActive = false;
+          return { type: 'sim-end', text: 'Simulazione terminata.' };
+        }
+      }
+      return origDetect3(text, role);
+    };
+
+    // ── Handle simulation toast display ──
+    function showSimulationStart(cmd) {
+      var overlay = document.getElementById('transcriptOverlay');
+      var body = document.getElementById('transcriptBody');
+      if (!overlay || !body) return;
+      overlay.classList.add('open');
+      var empty = body.querySelector('.transcript-empty');
+      if (empty) empty.remove();
+      var banner = document.createElement('div');
+      banner.style.cssText = 'padding:10px 14px;margin-bottom:8px;background:rgba(139,125,255,.1);border:1px solid rgba(139,125,255,.25);border-radius:10px;font-size:12px;color:var(--purple);text-align:center';
+      banner.innerHTML = '<strong>🎭 SIMULAZIONE ATTIVA:</strong> ' + cmd.role + '<br><span style="font-size:10px;color:var(--text-faint)">Parla normalmente. Di\' "End sim" per uscire.</span>';
+      body.appendChild(banner);
+      body.scrollTop = body.scrollHeight;
     }
 
     // Voice command: "Backup: now" or "Export: memory"
