@@ -340,9 +340,21 @@ input:checked + .slider:before { transform: translateX(17px); }
 
             <div id="aiCostSummary" style="margin-top:8px;font-size:.78rem;color:var(--text-soft);line-height:1.6;background:var(--card);border-radius:8px;padding:10px"></div>
 
-            <span class="form-label">Avg purchases / user / month (prepaid only) <span title="0.5 = buys every 2 months (default)&#10;1.0 = buys monthly (recurring-like)&#10;0.083 ≈ buys once/year amortized&#10;0.01 ≈ one-time, never again" style="cursor:help;color:var(--accent)">ⓘ</span></span>
-            <input class="form-input" type="number" id="purchaseFreq" step="0.1" value="0.5" min="0.01" max="5" oninput="renderNow()">
-            <span class="form-hint"><strong>0.5</strong> = every 2 months · <strong>1.0</strong> = monthly · <strong>0.083</strong> ≈ yearly · <strong>0.01</strong> ≈ one-time</span>
+            <span class="form-label">How often do users buy? (prepaid only)</span>
+            <select class="form-select" id="purchaseFreqPreset" onchange="onPurchaseFreqPreset()">
+              <option value="0.01">One-time only (buy once, never again)</option>
+              <option value="0.083">~Once per year (0.083/mo)</option>
+              <option value="0.167">~Every 6 months (0.167/mo)</option>
+              <option value="0.5" selected>Every 2 months (0.5/mo)</option>
+              <option value="1.0">Monthly (1.0/mo)</option>
+              <option value="2.0">Twice per month (2.0/mo)</option>
+              <option value="custom">Custom…</option>
+            </select>
+            <div id="purchaseFreqCustomWrap" style="display:none">
+              <span class="form-label">Custom purchases / user / month</span>
+              <input class="form-input" type="number" id="purchaseFreq" step="0.01" value="0.5" min="0.001" max="10" oninput="renderNow()">
+            </div>
+            <span class="form-hint">How many packs does the average user buy per month? Revenue = users × price × this number.</span>
           </div>
 
           <div class="section">
@@ -590,6 +602,21 @@ function onProviderChange() {
 }
 function onAiModelChange() { renderNow(); }
 
+function onPurchaseFreqPreset() {
+  const sel = document.getElementById('purchaseFreqPreset');
+  const wrap = document.getElementById('purchaseFreqCustomWrap');
+  const inp = document.getElementById('purchaseFreq');
+  if (sel.value === 'custom') {
+    wrap.style.display = '';
+    inp.focus();
+  } else {
+    wrap.style.display = 'none';
+    const n = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set;
+    n.call(inp, sel.value);
+    inp.dispatchEvent(new Event('input', {bubbles:true}));
+  }
+}
+
 function applyTaxPreset() {
   state.taxPreset = document.getElementById('taxPreset').value;
   const map = { custom:'15', forf5:'5', forf15:'15', srl:'27.9', ordinario:'35' };
@@ -733,6 +760,8 @@ function resetDefaults() {
   document.getElementById('costStripe').value='0.35';
   document.getElementById('eurUsdRate').value='0.92';
   document.getElementById('purchaseFreq').value='0.5';
+  document.getElementById('purchaseFreqPreset').value='0.5';
+  document.getElementById('purchaseFreqCustomWrap').style.display='none';
   document.getElementById('selAiModel').value='gpt4o';
   document.getElementById('transcriptWords').value='5000';
   document.getElementById('promptTokens').value='1500';
