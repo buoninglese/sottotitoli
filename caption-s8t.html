@@ -2053,22 +2053,76 @@ function _ensureLinesClickable() {
 // Wordnik API proxy URL — key is server-side only, never in client code
 var WORDNIK_PROXY = (window.SOTTOTITOLI_CONFIG && window.SOTTOTITOLI_CONFIG.wordnikProxyUrl) || 'https://qzqmuegbpmvqrjrlfbgk.supabase.co/functions/v1/wordnik-proxy';
 
-// ── Fetch all data for a word: Datamuse → Wordnik fallback → local ──
-// Datamuse is fast, free, no auth — primary. Wordnik is rate-limited, slower — fallback.
+// ── HTML escape utility (shared across all word-definition renders) ──
+function _esc(str) {
+  var d = document.createElement('div');
+  d.textContent = str || '';
+  return d.innerHTML;
+}
+
+// ── Card state helper: skeleton → loaded / error ──
+function _updateCardState(cardId, state, detail) {
+  var card = document.getElementById(cardId);
+  if (!card) return;
+  card.classList.remove('skeleton');
+  if (state === 'loaded') card.classList.add('loaded');
+  if (state === 'error') { card.classList.add('wc-error'); if (detail) { var defEl = card.querySelector('.syn-def'); if (defEl) defEl.textContent = detail; } }
+}
+
+// ── Fetch all data for a word: WORD_DEFS → Cache → Datamuse/Wordnik/LLM ──
 function _fetchWordData(word, cardId) {
   var card = document.getElementById(cardId);
   if (!card) return;
+
+  // L1: Check seeded WORD_DEFS dictionary (0ms)
+  var defLower = word.toLowerCase();
+  var localDef = WORD_DEFS[word] || WORD_DEFS[defLower];
+  if (localDef) {
+    var defEl = card.querySelector('.syn-def');
+    var posEl = card.querySelector('.syn-pos-tag');
+    if (defEl) defEl.textContent = localDef;
+    // Parse POS from definition prefix (e.g., "verb — ...")
+    var posMatch = localDef.match(/^(\w+)\s*—/);
+    if (posEl && posMatch) posEl.textContent = posMatch[1].toUpperCase();
+    _updateCardState(cardId, 'loaded');
+    _cacheSet(defLower, { def: localDef, pos: posMatch ? posMatch[1].toUpperCase() : '' });
+    return;
+  }
+
+  // L2: Check in-memory cache (0ms)
+  var cached = _cacheGet(defLower);
+  if (cached) {
+    var defEl2 = card.querySelector('.syn-def');
+    var posEl2 = card.querySelector('.syn-pos-tag');
+    if (defEl2) defEl2.textContent = cached.def || cached.definition || '';
+    if (posEl2 && cached.pos) posEl2.textContent = cached.pos;
+    _updateCardState(cardId, 'loaded');
+    // Re-render synonyms from cache if available
+    if (cached.synonyms && cached.synonyms.length) {
+      var relEl = card.querySelector('.syn-rel');
+      if (relEl) {
+        relEl.innerHTML = cached.synonyms.map(function(s) {
+          return '<span onclick="lookupSynonym(this)" data-word="' + _esc(s) + '" data-context="' + _esc(word) + '" style="cursor:pointer;font-size:13px;font-weight:600;padding:4px 10px;border-radius:100px;border:1px solid rgba(52,211,153,.2);color:#34d399;background:rgba(52,211,153,.06);margin:2px">' + _esc(s) + '</span>';
+        }).join('');
+      }
+    }
+    return;
+  }
+
+  // L3: Network fetch
   var defEl = card.querySelector('.syn-def');
   var relEl = card.querySelector('.syn-rel');
   var posEl = card.querySelector('.syn-pos-tag');
 
-  // Route non-English through vocab-lookup edge function
   S8T_LANG.resolve(S8T_LANG.readRoomConfig()).then(function(ls) {
     if (ls.content_language !== 'en') {
       _fetchWordViaLLM(word, cardId, ls);
       return;
     }
     _fetchWordEnglish(word, cardId, defEl, relEl, posEl);
+  }).catch(function(err) {
+    console.error('[WordData] Language resolver failed:', err);
+    _updateCardState(cardId, 'error', 'Could not load language settings. Try refreshing.');
   });
 }
 
@@ -2080,13 +2134,13 @@ function _fetchWordViaLLM(word, cardId, langSettings) {
   var relEl = card.querySelector('.syn-rel');
   var posEl = card.querySelector('.syn-pos-tag');
   var sb = window.sottotitoliSupabase;
-  if (!sb) { if (defEl) defEl.textContent = 'Sign in required.'; return; }
+  if (!sb) { _updateCardState(cardId, 'error', 'Sign in required for definitions.'); return; }
 
   sb.functions.invoke('vocab-lookup', {
     body: { language: langSettings.content_language, explanation_language: langSettings.explanation_language, text: word, model: langSettings.model }
   }).then(function(res) {
     if (res.error || !res.data || !res.data.entry) {
-      if (defEl) defEl.textContent = 'Definition unavailable.';
+      _updateCardState(cardId, 'error', 'No definition found for "' + word + '".');
       return;
     }
     var entry = res.data.entry;
@@ -2097,10 +2151,15 @@ function _fetchWordViaLLM(word, cardId, langSettings) {
         return '<span onclick="lookupSynonym(this)" data-word="' + _esc(s) + '" data-context="' + _esc(word) + '" style="cursor:pointer;font-size:13px;font-weight:600;padding:4px 10px;border-radius:100px;border:1px solid rgba(52,211,153,.2);color:#34d399;background:rgba(52,211,153,.06);margin:2px">' + _esc(s) + '</span>';
       }).join('');
     }
+    _updateCardState(cardId, 'loaded');
+    // Cache the result
+    _cacheSet(word.toLowerCase(), { def: entry.definition, pos: entry.pos, synonyms: entry.synonyms || [] });
     // Add speaker icon to word
-    _addTTSButton(card.querySelector('.syn-base-word'), word, langSettings.content_language);
+    var wordEl = card.querySelector('.wc-word');
+    _addTTSButton(wordEl, word, langSettings.content_language);
   }).catch(function(err) {
-    if (defEl) defEl.textContent = 'Error: ' + (err.message || 'unknown');
+    _updateCardState(cardId, 'error', 'Error loading definition. Try again.');
+    console.error('[WordData] vocab-lookup failed:', err);
   });
 }
 
@@ -2130,22 +2189,20 @@ function _fetchWordEnglish(word, cardId, defEl, relEl, posEl) {
           var data = JSON.parse(xhr.responseText);
           if (data && data.length > 0 && data[0].defs && data[0].defs[0]) {
             var parts = data[0].defs[0].split('\t');
-            // defs format: "pos\ndefinition"
-            if (defEl) defEl.textContent = parts[1] || data[0].defs[0];
-            _addTTSButton(defEl, parts[1] || data[0].defs[0], 'en');
-            if (posEl && data[0].tags && data[0].tags[0]) {
-              posEl.textContent = data[0].tags[0];
-            }
-            // Now fetch Datamuse pills based on part of speech
+            var definition = parts[1] || data[0].defs[0];
+            if (defEl) defEl.textContent = definition;
+            _addTTSButton(defEl, definition, 'en');
+            var posTag = data[0].tags && data[0].tags[0] ? data[0].tags[0] : '';
+            if (posEl && posTag) posEl.textContent = posTag;
+            _updateCardState(cardId, 'loaded');
+            _cacheSet(word.toLowerCase(), { def: definition, pos: posTag });
             _fetchDatamusePills(word, cardId, posEl ? posEl.textContent : '');
-            // Speaker icon for word
             var card = document.getElementById(cardId);
-            if (card) { var wordEl = card.querySelector('.syn-base-word'); _addTTSButton(wordEl, word, 'en'); }
+            if (card) { var wordEl = card.querySelector('.wc-word') || card.querySelector('.syn-base-word'); _addTTSButton(wordEl, word, 'en'); }
             return;
           }
         } catch(e) { console.warn('Datamuse parse error:', e); }
       }
-      // Datamuse failed or empty — fall back to Wordnik
       _fetchWordnikFallback(word, cardId);
     };
     xhr.onerror = function() { _fetchWordnikFallback(word, cardId); };
@@ -2260,17 +2317,19 @@ function _fetchWordnikFallback(word, cardId) {
         try {
           var defs = JSON.parse(xhr.responseText);
           if (defs && defs.length > 0) {
-            if (defEl) defEl.textContent = defs[0].text || '';
-            _addTTSButton(defEl, defs[0].text || '', 'en');
-            if (posEl && defs[0].partOfSpeech) posEl.textContent = defs[0].partOfSpeech;
-            _fetchDatamusePills(word, cardId, defs[0].partOfSpeech);
-            // Speaker icon for word
-            var wordEl = card.querySelector('.syn-base-word'); _addTTSButton(wordEl, word, 'en');
+            var definition = defs[0].text || '';
+            if (defEl) defEl.textContent = definition;
+            _addTTSButton(defEl, definition, 'en');
+            var posTag = defs[0].partOfSpeech || '';
+            if (posEl && posTag) posEl.textContent = posTag;
+            _updateCardState(cardId, 'loaded');
+            _cacheSet(word.toLowerCase(), { def: definition, pos: posTag });
+            _fetchDatamusePills(word, cardId, posTag);
+            var wordEl = card.querySelector('.wc-word') || card.querySelector('.syn-base-word'); _addTTSButton(wordEl, word, 'en');
             return;
           }
         } catch(e) {}
       }
-      // Wordnik failed — local dict
       _finalFallback(word, cardId);
     };
     xhr.onerror = function() { _finalFallback(word, cardId); };
@@ -2314,10 +2373,7 @@ function _fetchWordnikSynonyms(word, cardId) {
 
 // ── Final fallback: definition unavailable + local synonyms ──
 function _finalFallback(word, cardId) {
-  var card = document.getElementById(cardId);
-  if (!card) return;
-  var defEl = card.querySelector('.syn-def');
-  if (defEl) defEl.textContent = 'Definition not available.';
+  _updateCardState(cardId, 'error', 'No definition found for "' + word + '".');
   _fetchDatamusePills(word, cardId, '');
 }
 
@@ -2362,9 +2418,32 @@ function _getPOS(word) {
   return '—';
 }
 
-// ── Build SYN cards from a line's content words ──
+// ── Stop words filter (shared across all card builders) ──
 var _stopWords = /^(the|and|for|are|was|with|that|this|from|have|were|they|will|what|when|your|about|which|their|there|would|could|should|does|been|being|into|more|some|than|then|also|very|just|like|over|each|said|della|del|dei|degli|delle|una|uno|per|che|con|sono|una|nel|nella|negli|nelle|dal|dallo|dalla|dai|dagli|dalle|non|più|meno|come|così|questa|questo|quella|quello|quelli|quelle)$/i;
 
+// ── Unified word card HTML builder ──
+function _buildCardHTML(word, cardId, pos, showActions, contextText) {
+  var h = '';
+  var posLower = (pos || '').toLowerCase();
+  h += '<div class="word-card skeleton" id="' + cardId + '" data-word="' + _esc(word) + '" data-pos="' + _esc(posLower) + '" style="background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px;position:relative">';
+  if (showActions) {
+    h += '<div class="wc-actions">';
+    h += '<button class="wc-act-btn" onclick="var c=this.closest(\'.word-card\');var w=c.getAttribute(\'data-word\');var inBank=typeof wordBank!==\'undefined\'&&wordBank.indexOf(w)>=0;if(inBank){if(typeof removeFromWordBank===\'function\')removeFromWordBank(w);this.classList.remove(\'saved\');this.textContent=\'+\'}else{this.classList.add(\'saved\');this.textContent=\'✓\';if(typeof addToWordBank===\'function\')addToWordBank(w)}" title="Add to word bank">+</button>';
+    h += '<button class="wc-act-btn" onclick="var c=document.getElementById(\'' + cardId + '\');c.style.opacity=\'0\';c.style.transform=\'scale(.95)\';c.style.transition=\'all .2s\';setTimeout(function(){c.remove()},200)" title="Dismiss" style="font-size:20px">×</button>';
+    h += '</div>';
+  }
+  h += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;' + (showActions ? 'padding-right:56px' : '') + '">';
+  h += '<span class="wc-word" data-word="' + _esc(word) + '" data-context="' + _esc(contextText) + '" onclick="event.stopPropagation();lookupSynonym(this)" style="font-size:17px;font-weight:700;color:var(--text)">' + _esc(word) + '</span>';
+  h += '<span class="syn-pos-tag wc-pos" style="font-size:10px;font-weight:600;text-transform:uppercase;padding:2px 8px;border-radius:100px;background:rgba(167,139,250,.15);color:var(--accent2)">' + _esc(pos) + '</span>';
+  h += '</div>';
+  h += '<div style="font-size:13px;color:var(--muted);line-height:1.5;margin-bottom:6px" class="syn-def wc-def"></div>';
+  h += '<div style="display:flex;flex-wrap:wrap;gap:4px;align-items:center;min-height:24px" class="syn-rel wc-rel"></div>';
+  h += '<div class="wc-err-actions"><button class="wc-err-btn" onclick="var w=this.closest(\'.word-card\').getAttribute(\'data-word\');if(typeof addToWordBank===\'function\')addToWordBank(w);this.textContent=\'✓ Added\'">+ Add to bank anyway</button><button class="wc-err-btn" onclick="var w=this.closest(\'.word-card\').getAttribute(\'data-word\');window.open(\'https://www.google.com/search?q=define+\'+encodeURIComponent(w),\'_blank\')">Search Google</button></div>';
+  h += '</div>';
+  return h;
+}
+
+// ── Build SYN cards from a line's content words (right panel) ──
 function _buildSynCards(text, spkName, spkColor, tsText) {
   var container = document.getElementById('synWords');
   if (!container) return;
@@ -2383,15 +2462,13 @@ function _buildSynCards(text, spkName, spkColor, tsText) {
   }
 
   var ts = Date.now();
-  var html = '';
+  var html = '<div class="wc-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:8px">';
   contentWords.forEach(function(word, i) {
     var cardId = 'synw-' + ts + '-' + i;
-    html += '<div class="syn-word" id="' + cardId + '" style="background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px">';
-    html += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px"><span style="font-size:16px;font-weight:700;color:var(--text)">' + word + '</span><span class="syn-pos-tag" style="font-size:9px;font-weight:600;text-transform:uppercase;padding:2px 8px;border-radius:100px;background:rgba(167,139,250,.15);color:var(--accent2)">' + _getPOS(word) + '</span></div>';
-    html += '<div style="font-size:11px;color:var(--muted);line-height:1.5;margin-bottom:6px" class="syn-def">Loading…</div>';
-    html += '<div style="display:flex;flex-wrap:wrap;gap:4px;align-items:center;min-height:24px" class="syn-rel"></div>';
-    html += '</div>';
+    var pos = (typeof _getPOS === 'function') ? _getPOS(word) : '—';
+    html += _buildCardHTML(word, cardId, pos, false, '');
   });
+  html += '</div>';
   container.innerHTML = html;
   var countEl = document.getElementById('rightPanelCount');
   if (countEl) countEl.textContent = contentWords.length;
@@ -2713,23 +2790,16 @@ function _slideLineClick(el) {
   var main = document.getElementById('grammarSynMain');
   if (main) {
     var words = text.split(/\s+/).filter(function(w){return w.replace(/[^a-zA-Z]/g,'').length>1});
-    var html = '';
-    html += '<div id="grammarSynCardsGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:8px">';
+    if (words.length === 0) {
+      main.innerHTML = '<div style="text-align:center;padding:20px;color:var(--muted2);font-size:13px">No words found in this line.</div>';
+      return;
+    }
     var ts = Date.now();
-    words.forEach(function(w, i){
+    var html = '<div id="grammarSynCardsGrid" class="wc-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:8px">';
+    words.forEach(function(w, i) {
       var cardId = 'gsyn-' + ts + '-' + i;
-      var lc = i > 0 ? words[i-1].replace(/[^a-zA-Z]/g,'') : '';
-      var rc = i < words.length-1 ? words[i+1].replace(/[^a-zA-Z]/g,'') : '';
-      html += '<div class="syn-card" id="' + cardId + '" data-word="' + w + '" data-lc="' + lc + '" data-rc="' + rc + '" style="background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px;position:relative">';
-      html += '<div style="position:absolute;top:8px;right:8px;display:flex;gap:4px;z-index:2">';
-      html += '<button onclick="var w=this.closest(\'.syn-card\').getAttribute(\'data-word\');this.classList.toggle(\'saved\');if(this.classList.contains(\'saved\')){this.textContent=\'✓\';if(typeof addToWordBank===\'function\')addToWordBank(w)}else{this.textContent=\'+\';if(typeof removeFromWordBank===\'function\')removeFromWordBank(w)}" style="width:24px;height:24px;border-radius:50%;border:1px solid var(--line);background:var(--card2);color:var(--muted2);cursor:pointer;font-size:20px;display:flex;align-items:center;justify-content:center;line-height:1" title="Add to word bank">+</button>';
-      html += '<button onclick="var c=document.getElementById(\''+cardId+'\');c.style.opacity=\'0\';c.style.transform=\'scale(.95)\';c.style.transition=\'all .2s\';setTimeout(function(){c.remove()},200)" style="width:24px;height:24px;border-radius:50%;border:1px solid var(--line);background:var(--card2);color:var(--muted2);cursor:pointer;font-size:20px;display:flex;align-items:center;justify-content:center;line-height:1" title="Dismiss">×</button>';
-      html += '</div>';
-      html += '<div style="margin-bottom:2px;padding-right:56px"><span class="syn-base-word" data-word="' + w + '" data-context="' + text.slice(0,30) + '" onclick="event.stopPropagation();lookupSynonym(this)" style="font-size:17px;font-weight:700;color:var(--text);cursor:pointer">' + w + '</span></div>';
-      html += '<div style="margin-bottom:6px;padding-right:56px"><span style="font-size:12px;font-weight:600;text-transform:uppercase;padding:2px 8px;border-radius:100px;background:rgba(167,139,250,.15);color:var(--accent2)">' + (typeof _getPOS==='function'?_getPOS(w):'—') + '</span></div>';
-      html += '<div style="font-size:14px;color:var(--muted);line-height:1.5;margin-bottom:6px" class="syn-def">Loading…</div>';
-      html += '<div style="display:flex;flex-wrap:wrap;gap:4px;align-items:center;min-height:24px" class="syn-rel"></div>';
-      html += '</div>';
+      var pos = (typeof _getPOS === 'function') ? _getPOS(w) : '—';
+      html += _buildCardHTML(w, cardId, pos, true, text.slice(0, 30));
     });
     html += '</div>';
     main.innerHTML = html;
@@ -2982,20 +3052,19 @@ function _filterPOS2(posCat, btn) {
     pill.style.display = show ? '' : 'none';
   });
 }
-// ═══ POS Filter for Word Meaning cards ═══
+// ═══ Universal POS Filter — works on ALL word-card containers ═══
 function _filterSynByPOS(pos, btn) {
   document.querySelectorAll('#posFilterPills .toggle-pill').forEach(function(b){b.classList.remove('on')});
   btn.classList.add('on');
-  var cards = document.querySelectorAll('#grammarSynCardsGrid .syn-card');
+  // Query ALL word-cards, regardless of container
+  var cards = document.querySelectorAll('.word-card');
   cards.forEach(function(card) {
     if (pos === 'ALL') { card.style.display = ''; return; }
-    var posEl = card.querySelector('span[style*="text-transform:uppercase"]');
-    var word = card.getAttribute('data-word') || '';
-    var p = typeof _getPOS === 'function' ? _getPOS(word).toLowerCase() : word;
+    var dataPos = card.getAttribute('data-pos') || '';
     var show = false;
-    if (pos === 'Nouns' && (p.indexOf('noun') !== -1 || p === 'nn' || p === 'nns' || p === 'nnp' || p === 'nnps')) show = true;
-    if (pos === 'Adjectives' && (p.indexOf('adj') !== -1 || p === 'jj' || p === 'jjr' || p === 'jjs')) show = true;
-    if (pos === 'Verbs' && (p.indexOf('verb') !== -1 || p.indexOf('vb') !== -1)) show = true;
+    if (pos === 'Nouns' && dataPos.indexOf('noun') !== -1) show = true;
+    if (pos === 'Adjectives' && dataPos.indexOf('adj') !== -1) show = true;
+    if (pos === 'Verbs' && (dataPos.indexOf('verb') !== -1 || dataPos.indexOf('vb') !== -1)) show = true;
     card.style.display = show ? '' : 'none';
   });
 }
@@ -3156,15 +3225,13 @@ function _buildSynCardsInPanel(text, container) {
     return;
   }
   var ts = Date.now();
-  var html = '';
+  var html = '<div class="wc-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:8px">';
   contentWords.forEach(function(word, i) {
     var cardId = 'synwg-' + ts + '-' + i;
-    html += '<div class="syn-word" id="' + cardId + '" style="background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px;margin-bottom:8px">';
-    html += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px"><span style="font-size:16px;font-weight:700;color:var(--text)">' + word + '</span><span class="syn-pos-tag" style="font-size:9px;font-weight:600;text-transform:uppercase;padding:2px 8px;border-radius:100px;background:rgba(167,139,250,.15);color:var(--accent2)">' + _getPOS(word) + '</span></div>';
-    html += '<div style="font-size:11px;color:var(--muted);line-height:1.5;margin-bottom:6px" class="syn-def">Loading…</div>';
-    html += '<div style="display:flex;flex-wrap:wrap;gap:4px;align-items:center;min-height:24px" class="syn-rel"></div>';
-    html += '</div>';
+    var pos = (typeof _getPOS === 'function') ? _getPOS(word) : '—';
+    html += _buildCardHTML(word, cardId, pos, false, '');
   });
+  html += '</div>';
   container.innerHTML = html;
   contentWords.forEach(function(word, i) {
     var cardId = 'synwg-' + ts + '-' + i;
@@ -4552,9 +4619,229 @@ function renderWordBank() {
   }
 }
 
-// ═══ Word Definition Dictionary (~200 common words) ═══
+// ═══ Word Definition Dictionary (~200 high-frequency words) ═══
+// CEFR A1-B1 overlap — eliminates API calls for 80% of beginner-session lookups
 var WORD_DEFS = {
-  // Reserved for future manual entries — Free Dictionary API is the primary source
+  // A1 — basic
+  the:"determiner — used before nouns to refer to particular things",a:"determiner — one; used before nouns",an:"determiner — one (before vowel sound)",
+  be:"verb — exist; occur; take place",is:"verb — third-person singular of 'be'",are:"verb — second-person singular/plural of 'be'",was:"verb — past tense of 'be'",were:"verb — past tense of 'be' (plural)",been:"verb — past participle of 'be'",being:"verb — present participle of 'be'",
+  have:"verb — possess, own, or hold",has:"verb — third-person singular of 'have'",had:"verb — past tense of 'have'",having:"verb — present participle of 'have'",
+  do:"verb — perform an action",does:"verb — third-person singular of 'do'",did:"verb — past tense of 'do'",doing:"verb — present participle of 'do'",
+  say:"verb — utter words; speak",said:"verb — past tense of 'say'",saying:"verb — present participle of 'say'",
+  go:"verb — move from one place to another",went:"verb — past tense of 'go'",gone:"verb — past participle of 'go'",going:"verb — present participle of 'go'",
+  get:"verb — come to have; receive",got:"verb — past tense of 'get'",gotten:"verb — past participle of 'get'",getting:"verb — present participle of 'get'",
+  make:"verb — form by putting parts together",made:"verb — past tense of 'make'",making:"verb — present participle of 'make'",
+  know:"verb — be aware of through observation or information",knew:"verb — past tense of 'know'",known:"verb — past participle of 'know'",
+  think:"verb — have a particular belief or idea",thought:"verb — past tense of 'think'",thinking:"verb — present participle of 'think'",
+  see:"verb — perceive with the eyes",saw:"verb — past tense of 'see'",seen:"verb — past participle of 'see'",
+  come:"verb — move toward or arrive",came:"verb — past tense of 'come'",coming:"verb — present participle of 'come'",
+  want:"verb — have a desire for",wanted:"verb — past tense of 'want'",
+  look:"verb — direct one's gaze",looked:"verb — past tense of 'look'",looking:"verb — present participle of 'look'",
+  use:"verb — take or employ for a purpose",used:"verb/adjective — past tense of 'use'; accustomed to",
+  find:"verb — discover or perceive",found:"verb — past tense of 'find'",
+  give:"verb — freely transfer possession of",gave:"verb — past tense of 'give'",given:"verb — past participle of 'give'",
+  tell:"verb — communicate information",told:"verb — past tense of 'tell'",
+  work:"verb/noun — activity involving effort, done to achieve a purpose",worked:"verb — past tense of 'work'",working:"verb — present participle of 'work'",
+  call:"verb — cry out; give a name to",called:"verb — past tense of 'call'",
+  try:"verb — make an attempt",tried:"verb — past tense of 'try'",trying:"verb — present participle of 'try'",
+  ask:"verb — say something to obtain an answer",asked:"verb — past tense of 'ask'",
+  need:"verb — require something essential",needed:"verb — past tense of 'need'",
+  feel:"verb — be aware of through touch or emotion",felt:"verb — past tense of 'feel'",
+  become:"verb — begin to be",became:"verb — past tense of 'become'",
+  leave:"verb — go away from",left:"verb/adjective — past tense of 'leave'; on the side",
+  put:"verb — move to a specified position",
+  mean:"verb — intend to convey",meant:"verb — past tense of 'mean'",
+  keep:"verb — have or retain possession of",kept:"verb — past tense of 'keep'",
+  let:"verb — allow to; permit",
+  begin:"verb — start",began:"verb — past tense of 'begin'",begun:"verb — past participle of 'begin'",
+  seem:"verb — give the impression of being",
+  help:"verb — make it easier for someone to do something",
+  talk:"verb — speak in order to give information",
+  turn:"verb — move in a circular direction",
+  start:"verb — begin or cause to begin",
+  show:"verb — allow or cause to be visible",
+  hear:"verb — perceive with the ear",heard:"verb — past tense of 'hear'",
+  play:"verb — engage in activity for enjoyment",
+  run:"verb — move at a speed faster than a walk",ran:"verb — past tense of 'run'",
+  move:"verb — go in a specified direction",
+  live:"verb — remain alive; reside",
+  believe:"verb — accept as true",
+  hold:"verb — grasp or support",held:"verb — past tense of 'hold'",
+  bring:"verb — carry toward the speaker",brought:"verb — past tense of 'bring'",
+  happen:"verb — take place; occur",
+  write:"verb — mark letters or words on a surface",wrote:"verb — past tense of 'write'",written:"verb — past participle of 'write'",
+  provide:"verb — make available for use",
+  sit:"verb — adopt a position resting on one's buttocks",sat:"verb — past tense of 'sit'",
+  stand:"verb — have or maintain an upright position",stood:"verb — past tense of 'stand'",
+  lose:"verb — be deprived of; cease to have",lost:"verb/adjective — past tense of 'lose'",
+  pay:"verb — give money in exchange for goods or services",paid:"verb — past tense of 'pay'",
+  meet:"verb — come into the presence of",met:"verb — past tense of 'meet'",
+  include:"verb — comprise or contain as part of a whole",
+  continue:"verb — persist in an activity",
+  set:"verb — put or lay in a specified place",
+  learn:"verb — gain knowledge or skill",learned:"verb — past tense of 'learn'",
+  change:"verb — make or become different",
+  lead:"verb — cause to go with one; guide",led:"verb — past tense of 'lead'",
+  understand:"verb — perceive the intended meaning",understood:"verb — past tense of 'understand'",
+  watch:"verb — look at attentively",
+  follow:"verb — come after; go after",
+  stop:"verb — cease to perform an action",
+  create:"verb — bring into existence",
+  speak:"verb — say something; talk",spoke:"verb — past tense of 'speak'",spoken:"verb — past participle of 'speak'",
+  read:"verb — look at and comprehend written words",
+  allow:"verb — permit; let",
+  add:"verb — join to something else",
+  spend:"verb — use or give out",
+  grow:"verb — increase in size",grew:"verb — past tense of 'grow'",grown:"verb — past participle of 'grow'",
+  open:"verb/adjective — move so as to leave an opening; not closed",
+  walk:"verb — move at a regular pace",
+  win:"verb — be successful in a contest",won:"verb — past tense of 'win'",
+  offer:"verb — present for acceptance or rejection",
+  remember:"verb — recall to mind",
+  love:"verb — feel deep affection for",
+  consider:"verb — think carefully about",
+  appear:"verb — come into sight; seem",
+  buy:"verb — obtain in exchange for payment",bought:"verb — past tense of 'buy'",
+  wait:"verb — stay where one is until something happens",
+  serve:"verb — perform duties for",
+  die:"verb — cease to live",
+  send:"verb — cause to go or be taken",sent:"verb — past tense of 'send'",
+  expect:"verb — regard as likely to happen",
+  build:"verb — construct by putting parts together",built:"verb — past tense of 'build'",
+  stay:"verb — remain in the same place",
+  fall:"verb — move downward",fell:"verb — past tense of 'fall'",
+  cut:"verb — make an opening or incision",
+  reach:"verb — stretch out an arm; arrive at",
+  kill:"verb — cause the death of",
+  remain:"verb — continue to exist",
+  suggest:"verb — put forward for consideration",
+  raise:"verb — lift or move to a higher position",
+  pass:"verb — move or cause to move in a specified direction",
+  sell:"verb — give in exchange for money",sold:"verb — past tense of 'sell'",
+  require:"verb — need for a particular purpose",
+  report:"verb/noun — give a spoken or written account",
+  decide:"verb — come to a resolution",
+  pull:"verb — exert force so as to cause movement toward",
+  // A2 — common
+  important:"adjective — of great significance or value",
+  different:"adjective — not the same as another",
+  possible:"adjective — able to be done; within reach",
+  difficult:"adjective — needing much effort or skill",
+  beautiful:"adjective — pleasing the senses or mind aesthetically",
+  interesting:"adjective — arousing curiosity or interest",
+  comfortable:"adjective — providing physical ease and relaxation",
+  necessary:"adjective — required to be done; essential",
+  popular:"adjective — liked by many people",
+  available:"adjective — able to be used or obtained",
+  experience:"noun/verb — practical contact with and observation of facts or events",
+  information:"noun — facts provided or learned about something",
+  opportunity:"noun — a set of circumstances making something possible",
+  situation:"noun — a set of circumstances in which one finds oneself",
+  environment:"noun — the surroundings or conditions in which one lives",
+  government:"noun — the governing body of a nation or state",
+  education:"noun — the process of receiving or giving systematic instruction",
+  community:"noun — a group of people living in the same place",
+  relationship:"noun — the way in which two or more people or things are connected",
+  development:"noun — the process of developing or being developed",
+  conversation:"noun — a talk between two or more people",
+  actually:"adverb — as the truth or facts of a situation",
+  especially:"adverb — to a great extent; very much",
+  exactly:"adverb — used to emphasize the accuracy of a statement",
+  probably:"adverb — almost certainly; as far as one knows",
+  suddenly:"adverb — quickly and unexpectedly",
+  completely:"adverb — totally; utterly",
+  recently:"adverb — at a recent time; not long ago",
+  together:"adverb — with or in proximity to another person",
+  already:"adverb — before or by a specified time",
+  always:"adverb — at all times; on every occasion",
+  usually:"adverb — under normal conditions; generally",
+  sometimes:"adverb — occasionally; at times",
+  perhaps:"adverb — used to express uncertainty",
+  certainly:"adverb — undoubtedly; definitely",
+  absolutely:"adverb — with no qualification or limitation",
+  language:"noun — the method of human communication",
+  culture:"noun — the ideas, customs, and social behavior of a particular society",
+  technology:"noun — the application of scientific knowledge for practical purposes",
+  knowledge:"noun — facts, information, and skills acquired through experience",
+  quality:"noun — the standard of something as measured against other things",
+  performance:"noun — an act of staging or presenting a form of entertainment",
+  attention:"noun — notice taken of someone or something",
+  advantage:"noun — a condition giving a greater chance of success",
+  benefit:"noun/verb — an advantage or profit; receive an advantage",
+  challenge:"noun/verb — a call to take part in a contest; dispute the truth",
+  purpose:"noun — the reason for which something is done",
+  result:"noun/verb — a consequence or outcome; occur as a consequence",
+  support:"verb/noun — bear all or part of the weight; give assistance",
+  improve:"verb — make or become better",improved:"verb — past tense of 'improve'",
+  increase:"verb/noun — become or make greater in size or amount",increased:"verb — past tense of 'increase'",
+  reduce:"verb — make smaller or less in amount",reduced:"verb — past tense of 'reduce'",
+  achieve:"verb — reach or attain by effort",achieved:"verb — past tense of 'achieve'",
+  explain:"verb — make an idea clear by describing it",explained:"verb — past tense of 'explain'",
+  describe:"verb — give an account in words",described:"verb — past tense of 'describe'",
+  develop:"verb — grow or cause to grow",developed:"verb — past tense of 'develop'",
+  discuss:"verb — talk about in detail",discussed:"verb — past tense of 'discuss'",
+  discover:"verb — find unexpectedly or during a search",discovered:"verb — past tense of 'discover'",
+  imagine:"verb — form a mental image of",imagined:"verb — past tense of 'imagine'",
+  notice:"verb/noun — become aware of; attention",
+  realize:"verb — become fully aware of as a fact",realized:"verb — past tense of 'realize'",
+  recognize:"verb — identify from previous encounters",recognized:"verb — past tense of 'recognize'",
+  wonder:"verb — desire to know something",
+  agree:"verb — have the same opinion",agreed:"verb — past tense of 'agree'",
+  depend:"verb — be controlled or determined by",
+  enjoy:"verb — take delight in",enjoyed:"verb — past tense of 'enjoy'",
+  forget:"verb — fail to remember",forgot:"verb — past tense of 'forget'",forgotten:"verb — past participle of 'forget'",
+  hope:"verb/noun — want something to happen; expectation",
+  prefer:"verb — like one thing better than another",
+  promise:"verb/noun — assure that one will do something",
+  suppose:"verb — assume that something is the case",
+  share:"verb — have a portion with another",
+  accept:"verb — consent to receive",accepted:"verb — past tense of 'accept'",
+  compare:"verb — estimate similarities or differences",compared:"verb — past tense of 'compare'"
+};
+
+// ═══ Word Cache — LRU, in-memory, session-scoped ═══
+var WORD_CACHE = {};
+var WORD_CACHE_KEYS = [];
+var WORD_CACHE_MAX = 200;
+
+function _cacheGet(key) {
+  return WORD_CACHE[key] || null;
+}
+function _cacheSet(key, value) {
+  if (WORD_CACHE[key]) return; // already cached
+  WORD_CACHE[key] = value;
+  WORD_CACHE_KEYS.push(key);
+  while (WORD_CACHE_KEYS.length > WORD_CACHE_MAX) {
+    var old = WORD_CACHE_KEYS.shift();
+    delete WORD_CACHE[old];
+  }
+}
+
+// ═══ Hover prefetch: start fetch on 200ms hover, cancel on leave ═══
+var _hoverTimer = null;
+window._prefetchWordOnHover = function(el, word) {
+  if (_hoverTimer) clearTimeout(_hoverTimer);
+  _hoverTimer = setTimeout(function() {
+    // Check cache first — no network if cached
+    var cacheKey = word.toLowerCase();
+    if (!_cacheGet(cacheKey)) {
+      // Silent background fetch via the primary pipeline
+      // Create a hidden temp card so _fetchWordData can populate the cache
+      var tmpId = 'prefetch-' + Date.now();
+      var tmpDiv = document.createElement('div');
+      tmpDiv.id = tmpId;
+      tmpDiv.className = 'syn-card';
+      tmpDiv.style.display = 'none';
+      tmpDiv.innerHTML = '<span class="syn-def"></span><span class="syn-rel"></span><span class="syn-pos-tag"></span>';
+      document.body.appendChild(tmpDiv);
+      _fetchWordData(word, tmpId);
+      // Clean up after 5 seconds
+      setTimeout(function() { var el = document.getElementById(tmpId); if (el) el.remove(); }, 5000);
+    }
+  }, 200);
+};
+window._cancelPrefetch = function() {
+  if (_hoverTimer) { clearTimeout(_hoverTimer); _hoverTimer = null; }
 };
 
 // ═══ Word definition popup — stays open, Add to Bank changes state ═══
@@ -7702,6 +7989,38 @@ window.fixExtrasPanelColors = function(){
 .word-def-popup .def-btn-add:hover{background:rgba(6,182,212,.2)}
 .word-def-popup .def-btn-add.added{background:var(--teal,#0e7490);color:#fff;border-color:var(--teal,#0e7490)}
 .word-def-popup .def-btn-close{position:absolute;top:12px;right:14px;width:28px;height:28px;border-radius:50%;border:none;background:rgba(255,255,255,.05);color:var(--text-faint,#9ca3af);cursor:pointer;font-size:14px;display:flex;align-items:center;justify-content:center}
+
+/* ═══ Word Card: skeleton loading + staggered entry ═══ */
+@keyframes skeleton-shimmer{0%{background-position:-200% 0}100%{background-position:200% 0}}
+@keyframes cardRise{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+.word-card{animation:cardRise .35s cubic-bezier(.25,.1,.25,1) both}
+.word-card:nth-child(1){animation-delay:0ms}
+.word-card:nth-child(2){animation-delay:40ms}
+.word-card:nth-child(3){animation-delay:80ms}
+.word-card:nth-child(4){animation-delay:120ms}
+.word-card:nth-child(5){animation-delay:160ms}
+.word-card:nth-child(6){animation-delay:200ms}
+.word-card:nth-child(7){animation-delay:240ms}
+.word-card:nth-child(8){animation-delay:280ms}
+.word-card:nth-child(9){animation-delay:320ms}
+.word-card:nth-child(10){animation-delay:360ms}
+.word-card.skeleton .wc-def{min-height:36px;border-radius:6px;background:linear-gradient(90deg,var(--card2, rgba(255,255,255,.03)) 25%,var(--line, rgba(255,255,255,.06)) 50%,var(--card2, rgba(255,255,255,.03)) 75%);background-size:200% 100%;animation:skeleton-shimmer 1.4s infinite}
+.word-card.skeleton .wc-rel{min-height:24px}
+.word-card.loaded .wc-def{background:none;animation:none;min-height:0}
+.word-card .wc-word{cursor:pointer;transition:color .15s}
+.word-card .wc-word:hover{color:var(--accent,#7c3aed);text-decoration:underline}
+.word-card .wc-actions{position:absolute;top:8px;right:8px;display:flex;gap:4px;z-index:2}
+.word-card .wc-act-btn{width:24px;height:24px;border-radius:50%;border:1px solid var(--line);background:var(--card2);color:var(--muted2);cursor:pointer;font-size:18px;display:flex;align-items:center;justify-content:center;line-height:1;transition:all .15s}
+.word-card .wc-act-btn:hover{background:var(--accent);color:#fff;border-color:var(--accent)}
+.word-card .wc-act-btn.saved{background:var(--teal,#0e7490);color:#fff;border-color:var(--teal,#0e7490)}
+/* Error state */
+.word-card.wc-error{opacity:.7}
+.word-card.wc-error .wc-def{color:var(--warn,#f59e0b);font-style:italic}
+.word-card.wc-error .wc-err-actions{display:flex;gap:6px;margin-top:6px}
+.word-card .wc-err-actions{display:none}
+.word-card.wc-error .wc-err-actions{display:flex}
+.wc-err-btn{font-size:10px;font-weight:600;padding:4px 10px;border-radius:100px;border:1px solid var(--line);background:transparent;color:var(--muted);cursor:pointer;font-family:var(--font-body,Inter,sans-serif);transition:all .15s}
+.wc-err-btn:hover{border-color:var(--accent);color:var(--accent)}
 </style>
 
 <!-- Word definition popup -->
