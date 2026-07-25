@@ -256,12 +256,17 @@ input:checked + .slider:before { transform: translateX(17px); }
             <span class="form-label">Transcription provider</span>
             <select class="form-select" id="selTranscription" onchange="onProviderChange()">
               <option value="web-speech" data-cost="0.0000" selected>Browser Web Speech API — FREE (current)</option>
-              <option value="whisper" data-cost="0.0055">OpenAI Whisper API — ~€0.0055/min (what-if)</option>
-              <option value="deepgram" data-cost="0.0135">Deepgram Nova-2 — ~€0.0135/min</option>
-              <option value="deepgram-base" data-cost="0.0045">Deepgram Base — ~€0.0045/min</option>
-              <option value="assemblyai" data-cost="0.0140">AssemblyAI — ~€0.014/min</option>
-              <option value="azure" data-cost="0.0090">Azure Speech — ~€0.009/min</option>
-              <option value="google-stt" data-cost="0.0055">Google STT v2 — ~€0.0055/min</option>
+              <option value="whisper" data-cost="0.0055">OpenAI Whisper (whisper-1) — ~€0.0055/min</option>
+              <option value="gpt4o-transcribe" data-cost="0.0028">OpenAI gpt-4o-mini-transcribe — ~€0.0028/min</option>
+              <option value="deepgram-nova" data-cost="0.0040">Deepgram Nova-2 (batch) — ~€0.0040/min</option>
+              <option value="deepgram-nova-stream" data-cost="0.0071">Deepgram Nova-2 (streaming) — ~€0.0071/min</option>
+              <option value="deepgram-base" data-cost="0.0130">Deepgram Base — ~€0.013/min</option>
+              <option value="assemblyai" data-cost="0.0035">AssemblyAI Universal-3.5 (batch) — ~€0.0035/min</option>
+              <option value="assemblyai-stream" data-cost="0.0075">AssemblyAI (streaming) — ~€0.0075/min</option>
+              <option value="azure-batch" data-cost="0.0028">Azure Speech (batch) — ~€0.0028/min</option>
+              <option value="azure" data-cost="0.0150">Azure Speech (real-time) — ~€0.015/min</option>
+              <option value="google-stt" data-cost="0.0150">Google STT v2 (standard) — ~€0.015/min</option>
+              <option value="google-stt-batch" data-cost="0.0028">Google STT v2 (batch) — ~€0.0028/min</option>
               <option value="gladia" data-cost="0.0120">Gladia — ~€0.012/min</option>
               <option value="custom" data-cost="0.0000">Custom / Self-hosted (€0)</option>
             </select>
@@ -280,7 +285,7 @@ input:checked + .slider:before { transform: translateX(17px); }
             </select>
             <span class="form-label">Translation cost / min (€)</span>
             <input class="form-input" type="number" id="costTranslation" step="0.0001" value="0.0000" oninput="renderNow()">
-            <span class="form-hint">MyMemory = €0. Free at current scale.</span>
+            <span class="form-hint">MyMemory = €0. DeepL ≈ €0.015/min (assumes 120 wpm × 5 chars/word × $25/1M chars). GPT ≈ €0.003–0.006/min (assumes same wpm, token-based pricing). <strong>Per-min translation costs are derived estimates</strong> — actual APIs charge per character/token.</span>
 
             <span class="form-label">Render WebSocket relay / month (€)</span>
             <input class="form-input" type="number" id="costRender" step="0.5" value="7.00" oninput="renderNow()">
@@ -293,6 +298,14 @@ input:checked + .slider:before { transform: translateX(17px); }
             <span class="form-label">Oxford Dictionary API / month (€)</span>
             <input class="form-input" type="number" id="costOxford" step="0.5" value="0.00" oninput="renderNow()">
             <span class="form-hint">Free tier for low usage. Paid from ~$10/mo.</span>
+
+            <span class="form-label">Stripe payment fees / transaction (€)</span>
+            <input class="form-input" type="number" id="costStripe" step="0.01" value="0.35" oninput="renderNow()">
+            <span class="form-hint">1.5% + €0.25/tx (EU cards). At €4.99 this is ~€0.32 (6.4%), at €29.99 it's ~€0.70 (2.3%). Set to average effective fee per transaction.</span>
+
+            <span class="form-label">EUR/USD conversion rate</span>
+            <input class="form-input" type="number" id="eurUsdRate" step="0.01" value="0.92" oninput="renderNow()">
+            <span class="form-hint">All $ figures converted at 1 USD = 0.92 EUR. Update when rates change significantly.</span>
 
             <span class="form-label">Misc (domain, email, tools) / month (€)</span>
             <input class="form-input" type="number" id="costMisc" step="0.5" value="5.00" oninput="renderNow()">
@@ -349,7 +362,7 @@ input:checked + .slider:before { transform: translateX(17px); }
               <input class="form-input" type="number" id="taxRate" min="0" max="60" value="15" step="0.1" oninput="onTaxManual()">
               <span class="form-label">INPS on taxable base (%)</span>
               <input class="form-input" type="number" id="inpsRate" min="0" max="30" value="0" step="0.1" oninput="renderNow()">
-              <span class="form-hint">Forfettario: ~24-26% on imponibile. Set 0 if separate.</span>
+              <span class="form-hint">Forfettario: INPS Gestione Separata 25.72% on taxable base (after applying sector coefficient, e.g. 78% for professionals). Set 0 if paying INPS separately via altro regime.</span>
               <div style="margin-top:6px;font-size:.73rem;color:var(--text-soft);line-height:1.5">
                 <strong>IVA:</strong> Pass-through, excluded from P&amp;L. Forfettario (&lt;€85k) = no IVA. SRL = 22% to B2C.
               </div>
@@ -440,7 +453,7 @@ input:checked + .slider:before { transform: translateX(17px); }
           </table>
         </div>
         <div class="callout" style="margin-top:12px">
-          <strong>Key insight:</strong> Sottotitoli ranks <strong style="color:var(--accent)">#1 in per-minute value</strong> across every category it competes in. Premium at €0.033/min beats every transcription tool, every caption SaaS, and every school product. The language-learning layer (CEFR levels, vocabulary bubbles, AI reports) is unique — <strong style="color:var(--accent)">no competitor</strong> combines live captioning + translation + language learning in one tool. Lara and WsprFlow are the closest school-focused competitors, but neither offers AI-powered analysis or CEFR tracking.
+          <strong>Key insight:</strong> Sottotitoli Premium at <strong style="color:var(--accent)">€0.033/min</strong> is the <strong style="color:var(--accent)">cheapest prepaid caption tool with built-in live translation and CEFR vocabulary tracking</strong>. Pure transcription APIs (Deepgram, AssemblyAI) are cheaper per-minute but don't include translation, vocabulary analysis, or AI reports. The language-learning layer is unique — <strong style="color:var(--accent)">no competitor</strong> combines live captioning + translation + language learning in one tool. Lara and WsprFlow are the closest school-focused competitors, but neither offers AI-powered analysis or CEFR tracking.
         </div>
       </div>
     </div>
@@ -474,7 +487,7 @@ input:checked + .slider:before { transform: translateX(17px); }
               <tbody>
                 <tr><td>Live transcription cost</td><td><span style="color:var(--green)">✓ €0 — Verified</span></td><td>app.js line 612: new SpeechRecognition()</td><td>Browser Web Speech API. Free. No API keys. This was misidentified as Whisper — it's not.</td></tr>
                 <tr><td>OpenAI (AI reports only)</td><td><span style="color:var(--amber)">⚠ Not tracked</span></td><td>process-ai-reports edge function</td><td>Only used for AI report generation, not live transcription. Check OpenAI billing for actual spend.</td></tr>
-                <tr><td>MyMemory translation</td><td><span style="color:var(--green)">✓ Verified</span></td><td>MyMemory docs</td><td>Free tier: 1000 words/day anonymous</td></tr>
+                <tr><td>MyMemory translation</td><td><span style="color:var(--green)">✓ Verified</span></td><td>MyMemory docs</td><td>5,000 chars/day anonymous, 50,000 chars/day with email parameter. Currently within limits.</td></tr>
                 <tr><td>Render hosting</td><td><span style="color:var(--green)">✓ Verified</span></td><td>Render dashboard</td><td>Confirm both services (relay + learning) on Hobby tier</td></tr>
                 <tr><td>Supabase</td><td><span style="color:var(--green)">✓ Verified</span></td><td>Supabase dashboard</td><td>Monitor DB size against 500MB free limit</td></tr>
                 <tr><td>GitHub Pages</td><td><span style="color:var(--green)">✓ Verified</span></td><td>GitHub</td><td>Free, 100GB bandwidth/mo. Static site ~3MB total.</td></tr>
@@ -717,6 +730,8 @@ function resetDefaults() {
   document.getElementById('costSupabase').value='0.00';
   document.getElementById('costOxford').value='0.00';
   document.getElementById('costMisc').value='5.00';
+  document.getElementById('costStripe').value='0.35';
+  document.getElementById('eurUsdRate').value='0.92';
   document.getElementById('purchaseFreq').value='0.5';
   document.getElementById('selAiModel').value='gpt4o';
   document.getElementById('transcriptWords').value='5000';
@@ -795,7 +810,7 @@ function render() {
   const transcriptTokens = transcriptWords * 1.33;
   const totalInputTokens = promptTokensFixed + transcriptTokens;
   const costPerReportUSD = (totalInputTokens / 1000000) * aiInputPrice + (outputTokens / 1000000) * aiOutputPrice;
-  const costPerReportEUR = costPerReportUSD * 0.917;
+  const costPerReportEUR = costPerReportUSD * val('eurUsdRate');
   const costPerCredit = avgCreditsPerReport > 0 ? costPerReportEUR / avgCreditsPerReport : 0;
 
   const active = state.packages.filter(p=>p.active);
@@ -806,7 +821,8 @@ function render() {
     return;
   }
 
-  let totalRevenue=0, totalVarCost=0, totalAiCost=0, totalUsers=0, totalMins=0, totalReports=0;
+  let totalRevenue=0, totalVarCost=0, totalAiCost=0, totalUsers=0, totalMins=0, totalReports=0, totalStripeFees=0;
+  const costStripe = val('costStripe');
   const pkgResults = [];
   active.forEach(p=>{
     totalUsers += p.subs;
@@ -823,13 +839,16 @@ function render() {
     totalAiCost += aiCostPerUser * p.subs;
     totalReports += reportsPerUser * p.subs;
     const pkgIdx = state.packages.indexOf(p);
-    pkgResults.push({...p, pkgIdx, revPerUser, rev:revPerUser*p.subs, minsPerUser, mins:minsPerUser*p.subs, varCostPerUser, varCost:varCostPerUser*p.subs, reportsPerUser, aiCostPerUser, aiCost:aiCostPerUser*p.subs});
+    // Stripe fee per purchase (only for prepaid, per-transaction)
+    const stripeFeePerUser = state.model==='prepaid' ? costStripe * purchaseFreq : costStripe;
+    totalStripeFees += stripeFeePerUser * p.subs;
+    pkgResults.push({...p, pkgIdx, revPerUser, rev:revPerUser*p.subs, minsPerUser, mins:minsPerUser*p.subs, varCostPerUser, varCost:varCostPerUser*p.subs, reportsPerUser, aiCostPerUser, aiCost:aiCostPerUser*p.subs, stripeFeePerUser, stripeFee:stripeFeePerUser*p.subs});
   });
 
   const fixedCosts = costRender+costSupabase+costOxford+costMisc;
   const fixedPerUser = totalUsers>0?fixedCosts/totalUsers:0;
   let totalCost=0;
-  pkgResults.forEach(r=>{ r.fixedCost=fixedPerUser*r.subs; r.totalCost=r.varCost+r.aiCost+r.fixedCost; r.grossProfit=r.rev-r.totalCost; totalCost+=r.totalCost; });
+  pkgResults.forEach(r=>{ r.fixedCost=fixedPerUser*r.subs; r.totalCost=r.varCost+r.aiCost+r.fixedCost+r.stripeFee; r.grossProfit=r.rev-r.totalCost; totalCost+=r.totalCost; });
 
   // ── Update package card footers — STANDALONE per-package economics ──
   // Each package is evaluated as if it were the ONLY product:
@@ -938,7 +957,7 @@ function render() {
 
   let rows='';
   pkgResults.forEach(r=>{
-    const gpU = r.revPerUser-(r.varCostPerUser+r.aiCostPerUser+fixedPerUser);
+    const gpU = r.revPerUser-(r.varCostPerUser+r.aiCostPerUser+fixedPerUser+r.stripeFeePerUser);
     const inpsU = Math.max(0,gpU*inpsRate);
     const taxU = Math.max(0,(gpU-inpsU)*taxRate);
     const netU = gpU-inpsU-taxU;
@@ -947,8 +966,8 @@ function render() {
     rows += `<tr>
       <td><strong>${r.name}</strong><br><span style="color:var(--text-faint);font-size:.73rem">${r.subs} utenti</span></td>
       <td class="num">€${r.revPerUser.toFixed(2)}</td><td class="num">${fmtInt(r.minsPerUser)}</td>
-      <td class="num">€${r.varCostPerUser.toFixed(3)}</td><td class="num">€${r.aiCostPerUser.toFixed(3)}</td><td class="num">€${fixedPerUser.toFixed(2)}</td>
-      <td class="num">€${(r.varCostPerUser+r.aiCostPerUser+fixedPerUser).toFixed(3)}</td><td class="num">€${cpm.toFixed(4)}</td>
+      <td class="num">€${r.varCostPerUser.toFixed(3)}</td><td class="num">€${r.aiCostPerUser.toFixed(3)}</td><td class="num">€${fixedPerUser.toFixed(2)}</td><td class="num">€${(r.stripeFeePerUser||0).toFixed(2)}</td>
+      <td class="num">€${(r.varCostPerUser+r.aiCostPerUser+fixedPerUser+(r.stripeFeePerUser||0)).toFixed(3)}</td><td class="num">€${cpm.toFixed(4)}</td>
       <td class="num ${gpU>=0?'good':'bad'}">€${gpU.toFixed(2)}</td>
       <td class="num ${netU>=0?'good':'bad'}">€${netU.toFixed(2)}</td>
       <td class="num">${marginU.toFixed(1)}%</td></tr>`;
@@ -957,7 +976,7 @@ function render() {
   document.getElementById('pkgTable').innerHTML = `
     <table><thead><tr>
       <th>Piano</th><th class="num">Ricavo/u</th><th class="num">Min/u</th>
-      <th class="num">API/u</th><th class="num">AI/u</th><th class="num">Fisso/u</th><th class="num">Costo tot/u</th>
+      <th class="num">API/u</th><th class="num">AI/u</th><th class="num">Fisso/u</th><th class="num">Stripe/u</th><th class="num">Costo tot/u</th>
       <th class="num">€/min</th><th class="num">Lordo/u</th><th class="num">Netto/u</th><th class="num">%</th>
     </tr></thead><tbody>${rows}</tbody></table>`;
 
@@ -967,7 +986,10 @@ function render() {
     rs.innerHTML = `
       <div class="summary-row"><span>ARPU</span><span><strong>€${arpu.toFixed(2)}</strong></span></div>
       <div class="summary-row"><span>Avg cost / user</span><span><strong>€${totalUsers>0?(totalCost/totalUsers).toFixed(2):'—'}</strong></span></div>
-      <div class="summary-row"><span>Total API spend</span><span><strong>€${(totalMins*(costTr+costTl)).toFixed(2)}</strong></span></div>      <div class="summary-row"><span>AI Report spend</span><span><strong>€${totalAiCost.toFixed(2)}</strong> <span style="color:var(--text-faint);font-size:.75rem">${totalReports.toFixed(1)} reports</span></span></div>      <div class="summary-row"><span>Fixed costs</span><span><strong>€${fixedCosts.toFixed(2)}</strong></span></div>
+      <div class="summary-row"><span>Total API spend</span><span><strong>€${(totalMins*(costTr+costTl)).toFixed(2)}</strong></span></div>
+      <div class="summary-row"><span>AI Report spend</span><span><strong>€${totalAiCost.toFixed(2)}</strong> <span style="color:var(--text-faint);font-size:.75rem">${totalReports.toFixed(1)} reports</span></span></div>
+      <div class="summary-row"><span>Stripe payment fees</span><span><strong>€${totalStripeFees.toFixed(2)}</strong></span></div>
+      <div class="summary-row"><span>Fixed costs</span><span><strong>€${fixedCosts.toFixed(2)}</strong></span></div>
       <div class="summary-row total" style="color:var(--green)"><span>Net Monthly Profit</span><span>€${fmt(netProfit)}</span></div>
       <div class="summary-row"><span>Annual Net (×12)</span><span style="color:var(--accent);font-weight:800">€${fmt(netProfit*12)}</span></div>
       <div class="summary-row"><span>Break-even users</span><span style="font-weight:700">${be}</span></div>
