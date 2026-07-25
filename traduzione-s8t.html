@@ -62,9 +62,8 @@
     <div style="display:flex;flex-direction:column;align-items:center;gap:3px">
       <button class="slide-dot active" data-slide="1" aria-label="Trascrizione in tempo reale" title="Trascrizione" style="width:28px;height:28px;border-radius:50%;border:1px solid var(--line);background:var(--accent);color:#fff;cursor:pointer;font-size:11px;font-weight:700">1</button>
       <button class="slide-dot" data-slide="2" aria-label="Valutazioni partecipanti" title="Valutazioni" style="width:28px;height:28px;border-radius:50%;border:1px solid var(--line);background:transparent;color:var(--t3);cursor:pointer;font-size:11px;font-weight:700">2</button>
-      <button class="slide-dot" data-slide="3" aria-label="Metriche sessione" title="Metriche" style="width:28px;height:28px;border-radius:50%;border:1px solid var(--line);background:transparent;color:var(--t3);cursor:pointer;font-size:11px;font-weight:700">3</button>
-      <button class="slide-dot" data-slide="4" aria-label="Stanza e inviti" title="Inviti" style="width:28px;height:28px;border-radius:50%;border:1px solid var(--line);background:transparent;color:var(--t3);cursor:pointer;font-size:11px;font-weight:700">4</button>
-      <button class="slide-dot" data-slide="5" aria-label="Vocabolario personale" title="Vocabolario" style="width:28px;height:28px;border-radius:50%;border:1px solid var(--line);background:transparent;color:var(--t3);cursor:pointer;font-size:11px;font-weight:700">📖</button>
+      <button class="slide-dot" data-slide="3" aria-label="Stanza e inviti" title="Inviti" style="width:28px;height:28px;border-radius:50%;border:1px solid var(--line);background:transparent;color:var(--t3);cursor:pointer;font-size:11px;font-weight:700">3</button>
+      <button class="slide-dot" data-slide="4" aria-label="Vocabolario personale" title="Vocabolario" style="width:28px;height:28px;border-radius:50%;border:1px solid var(--line);background:transparent;color:var(--t3);cursor:pointer;font-size:11px;font-weight:700">📖</button>
     </div>
   </div>
 
@@ -142,20 +141,7 @@
             <div style="text-align:center;padding:40px;color:var(--t3);grid-column:1/-1">Avvia una sessione per vedere le statistiche.</div>
           </div>
         </div>
-        <!-- SLIDE 3: Session Metrics -->
-        <div class="duo-panel" data-panel="3" style="display:none;flex-direction:column;flex:1;min-height:0;overflow-y:auto;padding:16px">
-          <h3 style="margin-bottom:14px;font-size:16px">📊 Metriche sessione</h3>
-          <div class="duo-metrics">
-            <div class="duo-metric"><div class="duo-metric-val" id="mTotalTime">0m</div><div class="duo-metric-label">Tempo totale</div></div>
-            <div class="duo-metric"><div class="duo-metric-val" id="mTotalWords">0</div><div class="duo-metric-label">Parole</div></div>
-            <div class="duo-metric"><div class="duo-metric-val" id="mTranslations">0</div><div class="duo-metric-label">Traduzioni</div></div>
-            <div class="duo-metric"><div class="duo-metric-val" id="mAvgWPM">—</div><div class="duo-metric-label">WPM medio</div></div>
-            <div class="duo-matrix">
-              <table><thead><tr><th>Partecipante</th><th>Parole</th><th>Parlato%</th><th>WPM</th><th>Lingua</th><th>→ TTL</th></tr></thead><tbody id="mSpeakerTable"><tr><td colspan="6" style="color:var(--t3)">Nessun dato</td></tr></tbody></table>
-            </div>
-          </div>
-        </div>
-        <!-- SLIDE 4: Room -->
+        <!-- SLIDE 3: Room -->
         <div class="duo-panel" data-panel="4" style="display:none;flex-direction:column;flex:1;min-height:0;overflow-y:auto;padding:16px">
           <h3 style="margin-bottom:14px;font-size:16px">🔗 Stanza e inviti</h3>
           <div class="duo-room-panel">
@@ -1057,7 +1043,7 @@
       d.style.color = s===n ? '#fff' : 'var(--t3)';
     });
     if (n===2) renderSpeakerCards();
-    if (n===3) renderMetrics();
+
     if (n===5) renderGlossary('all');
   };
 
@@ -1260,28 +1246,6 @@
         '<div class="duo-stat-row"><span class="duo-stat-label">Parlato %</span><span class="duo-stat-val">'+pct+'%</span></div>'+
         '<div class="duo-stat-bar"><div class="duo-stat-fill" style="width:'+pct+'%;background:'+color+'"></div></div></div>';
     }); container.innerHTML = html;
-  }
-
-  function renderMetrics(){
-    document.getElementById('mTotalTime').textContent = fmtTime(DUO.timer);
-    document.getElementById('mTotalWords').textContent = S8T_SEGMENTS.getAll().reduce(function(s,x){return s+(x.orig||'').split(/\s+/).length},0);
-    document.getElementById('mTranslations').textContent = DUO.translations;
-    var tbody = document.getElementById('mSpeakerTable');
-    var members = S8T.getActiveMembers();
-    if (members.length === 0 && DUO.speakerOrder.length > 0) {
-      members = DUO.speakerOrder.map(function(name){
-        var sp = DUO.speakers[name];
-        return { displayName: name, sourceLanguage: sp.snl, words: sp.words||0, wpm: sp.wpm||0, id: name };
-      });
-    }
-    var totalWords = members.reduce(function(s,m){return s+(m.words||0);},0)||1;
-    if (!members.length){ tbody.innerHTML='<tr><td colspan="6" style="color:var(--t3)">Nessun dato</td></tr>'; return; }
-    var html = '';
-    members.forEach(function(m){
-      var name = m.displayName || 'Partecipante';
-      var snl = m.sourceLanguage || 'en';
-      html+='<tr><td style="font-weight:600">'+esc(name)+'</td><td>'+(m.words||0)+'</td><td>'+Math.round((m.words||0)/totalWords*100)+'%</td><td>'+(m.wpm||'—')+'</td><td>'+snl.toUpperCase()+'</td><td>'+DUO.myTTL.toUpperCase()+'</td></tr>';
-    }); tbody.innerHTML = html;
   }
 
   // ── Personal Glossary ──
