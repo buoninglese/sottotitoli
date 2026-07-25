@@ -211,7 +211,8 @@ input:checked + .slider:before { transform: translateX(17px); }
   <header class="topbar">
     <div class="topbar-brand">Fin<span>Agent</span><span style="font-weight:400;font-size:.65rem;color:var(--text-faint);margin-left:6px">· Sottotitoli Economics</span></div>
     <div class="topbar-actions">
-      <button class="btn" onclick="copyState()" title="Copy all values as text for sharing"><i class="fa-solid fa-copy"></i> Copy State</button>
+      <button class="btn" onclick="copyState()" title="Copy all values as JSON"><i class="fa-solid fa-copy"></i> Copy State</button>
+      <button class="btn" onclick="copyExact()" title="Copy everything you see as readable text — paste in chat so I can explain" style="border-color:rgba(34,211,238,.3);color:var(--accent)"><i class="fa-solid fa-clipboard-list"></i> Copy Exact</button>
       <button class="btn btn-amber" onclick="resetDefaults()"><i class="fa-solid fa-rotate-left"></i> Reset</button>
       <button class="btn btn-accent" onclick="window.open('https://buoninglese.github.io/sottotitoli/','_blank')">Sottotitoli <i class="fa-solid fa-arrow-up-right-from-square"></i></button>
     </div>
@@ -609,6 +610,96 @@ function copyState() {
   };
   navigator.clipboard.writeText(JSON.stringify(data,null,2)).then(()=>{
     const t=document.getElementById('copyToast'); t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),2000);
+  });
+}
+
+function copyExact() {
+  const lines = [];
+  const pv = (id, label) => { const el = document.getElementById(id); if (el) lines.push(label + ': ' + (el.value || el.textContent)); };
+  
+  lines.push('=== FINAGENT EXACT STATE ===');
+  lines.push('Model: ' + state.model);
+  lines.push('Purchase freq: ' + val('purchaseFreq'));
+  lines.push('');
+  
+  // Packages
+  lines.push('--- PACKAGES ---');
+  state.packages.forEach((p, i) => {
+    const active = p.active ? 'ON' : 'OFF';
+    lines.push(`${p.name} [${active}]  price=€${p.price}  minutes=${p.minutes}  aiCredits=${p.aiCredits}  subs=${p.subs}`);
+    const foot = document.getElementById('pkgFoot' + i);
+    if (foot && foot.textContent.trim() && !foot.textContent.includes('Toggle ON') && !foot.textContent.includes('Inactive')) {
+      lines.push('  Footer: ' + foot.textContent.replace(/\s+/g, ' ').trim());
+    }
+  });
+  lines.push('');
+  
+  // Cost stack
+  lines.push('--- COST STACK ---');
+  pv('selTranscription', 'Transcription provider');
+  pv('costTranscription', 'Transcription €/min');
+  pv('selTranslation', 'Translation provider');
+  pv('costTranslation', 'Translation €/min');
+  pv('costRender', 'Render €/mo');
+  pv('costSupabase', 'Supabase €/mo');
+  pv('costOxford', 'Oxford €/mo');
+  pv('costMisc', 'Misc €/mo');
+  lines.push('');
+  
+  // AI Report
+  lines.push('--- AI REPORT MODEL ---');
+  pv('selAiModel', 'AI model');
+  pv('transcriptWords', 'Transcript words');
+  pv('promptTokens', 'Prompt tokens');
+  pv('outputTokens', 'Output tokens');
+  pv('avgCreditsPerReport', 'Avg credits/report');
+  const aiBox = document.getElementById('aiCostSummary');
+  if (aiBox) lines.push('AI Summary: ' + aiBox.textContent.replace(/\s+/g, ' ').trim());
+  lines.push('');
+  
+  // Tax
+  lines.push('--- TAX ---');
+  pv('taxPreset', 'Tax preset');
+  pv('taxRate', 'Tax rate %');
+  pv('inpsRate', 'INPS %');
+  lines.push('');
+  
+  // KPI grid
+  lines.push('--- KPI GRID ---');
+  document.querySelectorAll('.kpi').forEach(k => {
+    const h = k.querySelector('h3')?.textContent;
+    const v = k.querySelector('.big')?.textContent;
+    const s = k.querySelector('.sub')?.textContent;
+    if (h) lines.push(h + ': ' + v + (s ? ' (' + s + ')' : ''));
+  });
+  lines.push('');
+  
+  // Per-package table
+  lines.push('--- PER-PACKAGE TABLE ---');
+  const table = document.querySelector('#pkgTable table');
+  if (table) {
+    const headers = Array.from(table.querySelectorAll('thead th')).map(h => h.textContent.trim());
+    lines.push(headers.join(' | '));
+    table.querySelectorAll('tbody tr').forEach(row => {
+      const cells = Array.from(row.querySelectorAll('td')).map(td => td.textContent.replace(/\s+/g, ' ').trim());
+      lines.push(cells.join(' | '));
+    });
+  }
+  lines.push('');
+  
+  // Runway
+  lines.push('--- RUNWAY ---');
+  const rs = document.getElementById('runwaySummary');
+  if (rs) lines.push(rs.textContent.replace(/\s+/g, ' ').trim());
+  lines.push('');
+  lines.push('=== END ===');
+  
+  const text = lines.join('\n');
+  navigator.clipboard.writeText(text).then(() => {
+    const t = document.getElementById('copyToast');
+    t.textContent = '✓ Exact state copied — paste in chat';
+    t.classList.add('show');
+    setTimeout(() => { t.textContent = '✓ Copied — paste in chat'; t.classList.remove('show'); }, 2000);
   });
 }
 
