@@ -411,7 +411,7 @@
 
       // ── Purchase ──
       "purchase_secure": "Acquisto Sicuro",
-      "purchase_title": "Acquista crediti voce",
+      "purchase_title": "Aggiungi minuti e crediti",
       "purchase_tls": "Crittografia TLS",
       "purchase_pci": "PCI-DSS Level 1",
       "purchase_nostore": "Dati carta mai salvati",
@@ -857,7 +857,7 @@
 
       // ── Purchase ──
       "purchase_secure": "Secure Purchase",
-      "purchase_title": "Buy voice credits",
+      "purchase_title": "Add minutes and credits",
       "purchase_tls": "TLS Encryption",
       "purchase_pci": "PCI-DSS Level 1",
       "purchase_nostore": "Card data never stored",
