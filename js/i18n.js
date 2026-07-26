@@ -22,6 +22,7 @@
       "home": "Home",
       "panoramica": "Panoramica",
       "language": "Lingua",
+      "back_to_dash": "Indietro",
 
       // ── Sidebar ──
       "mode_view": "Vista",
@@ -468,6 +469,7 @@
       "home": "Home",
       "panoramica": "Dashboard",
       "language": "Language",
+      "back_to_dash": "Go back",
 
       // ── Sidebar ──
       "mode_view": "View",
