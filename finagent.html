@@ -590,7 +590,7 @@ function switchModel(m) {
   if (hint) hint.textContent = m==='prepaid'
     ? 'Prepaid (current): revenue = avg purchases/user/month × price × subs. One-off packs.'
     : 'Subscription (what-if): revenue = price × subs / month. Predictable MRR.';
-  renderNow();
+  renderNow({rebuildGrid: true});
 }
 
 function onProviderChange() {
@@ -619,8 +619,10 @@ function onPurchaseFreqPreset() {
 
 function applyTaxPreset() {
   state.taxPreset = document.getElementById('taxPreset').value;
-  const map = { custom:'15', forf5:'5', forf15:'15', srl:'27.9', ordinario:'35' };
-  document.getElementById('taxRate').value = map[state.taxPreset]||'15';
+  const taxMap = { custom:'15', forf5:'5', forf15:'15', srl:'27.9', ordinario:'35' };
+  const inpsMap = { custom:'0', forf5:'25.72', forf15:'25.72', srl:'0', ordinario:'0' };
+  document.getElementById('taxRate').value = taxMap[state.taxPreset]||'15';
+  document.getElementById('inpsRate').value = inpsMap[state.taxPreset]||'0';
   renderNow();
 }
 function onTaxManual() { state.taxPreset='custom'; document.getElementById('taxPreset').value='custom'; renderNow(); }
@@ -768,7 +770,7 @@ function resetDefaults() {
   document.getElementById('outputTokens').value='5000';
   document.getElementById('avgCreditsPerReport').value='3';
   document.getElementById('taxRate').value='15';
-  document.getElementById('inpsRate').value='0';
+  document.getElementById('inpsRate').value='25.72';
   document.getElementById('taxPreset').value='forf15';
   document.getElementById('selTranscription').value='web-speech';
   document.getElementById('selTranslation').value='mymemory';
@@ -779,18 +781,13 @@ function resetDefaults() {
 function fmt(n){return n.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}
 function fmtInt(n){return Math.round(n).toLocaleString()}
 
-function render() {
+function render(opts = {}) {
+  const { rebuildGrid = false } = opts;
   const grid = document.getElementById('pkgGrid');
-  const calcTab = !!grid;
-  
-  // ── Preserve input focus across rebuild ──
-  let restorePkg = -1, restoreField = '';
-  if (calcTab && document.activeElement && document.activeElement.closest('.pkg')) {
-    restorePkg = parseInt(document.activeElement.dataset.pkg);
-    restoreField = document.activeElement.dataset.field || '';
-  }
+  const calcTab = document.getElementById('panel-calculator').classList.contains('active');
 
-  if (calcTab) {
+  // ── Rebuild package cards ONLY when requested (toggle, model switch, reset) ──
+  if (rebuildGrid && grid) {
     grid.innerHTML = '';
     state.packages.forEach((p,i)=>{
     const card = document.createElement('div');
@@ -814,15 +811,11 @@ function render() {
     `;
     grid.appendChild(card);
     });
-
-    // ── Restore focus to the input the user was typing in ──
-    if (restorePkg >= 0 && restoreField) {
-      const target = document.querySelector('input[data-pkg="' + restorePkg + '"][data-field="' + restoreField + '"]');
-      if (target) { target.focus(); target.select(); }
-    }
   }
 
-  // ── Calculations always run (even if grid not visible) ──
+  if (!calcTab) return;
+
+  // ── Calculations always run (even if grid not rebuilt) ──
   const costTr = val('costTranscription'), costTl = val('costTranslation');
   const costRender = val('costRender'), costSupabase = val('costSupabase');
   const costOxford = val('costOxford'), costMisc = val('costMisc');
@@ -1011,7 +1004,9 @@ function render() {
 
   const rs = document.getElementById('runwaySummary');
   if (rs) {
-    const be = grossProfit>=0?'✓ Already profitable':totalUsers>0?fmtInt(Math.ceil(fixedCosts/((totalRevenue-totalVarCost)/totalUsers))):'—';
+    // FIX: break-even now subtracts AI and Stripe from contribution margin
+    const contribPerUser = totalUsers > 0 ? (totalRevenue - totalVarCost - totalAiCost - totalStripeFees) / totalUsers : 0;
+    const be = grossProfit >= 0 ? '✓ Già in utile' : (totalUsers > 0 && contribPerUser > 0) ? fmtInt(Math.ceil(fixedCosts / contribPerUser)) : '—';
     rs.innerHTML = `
       <div class="summary-row"><span>ARPU</span><span><strong>€${arpu.toFixed(2)}</strong></span></div>
       <div class="summary-row"><span>Avg cost / user</span><span><strong>€${totalUsers>0?(totalCost/totalUsers).toFixed(2):'—'}</strong></span></div>
@@ -1026,10 +1021,10 @@ function render() {
   }
 }
 
-function togglePkg(i){state.packages[i].active=!state.packages[i].active;scheduleRender()}
+function togglePkg(i){state.packages[i].active=!state.packages[i].active;renderNow({rebuildGrid:true})}
 function updatePkg(i,key,val){
-  const v=key==='name'?val:parseFloat(val);
-  if(key!=='name'&&isNaN(v))return;
+  const v = key==='name' ? val : (val==='' ? 0 : parseFloat(val));
+  if(key!=='name' && isNaN(v)) return;
   state.packages[i][key]=v;scheduleRender();
 }
 
