@@ -895,8 +895,8 @@ function render(opts = {}) {
         // Per-minute costs (only things that scale with usage)
         const varCostPerMin = costTr + costTl;
         const varCostPerPack = varCostPerMin * r.minutes;
-        // Fixed per-pack costs (AI reports + infrastructure — don't scale with minutes)
-        const fixedPerPack = aiCostPerPack + standaloneFixedPerUser;
+        // Fixed per-pack costs (AI reports + infrastructure + Stripe — don't scale with minutes)
+        const fixedPerPack = aiCostPerPack + standaloneFixedPerUser + costStripe;
         const totalCostPerPack = varCostPerPack + fixedPerPack;
         const profitPerPack = r.price - totalCostPerPack;
         const marginPctPack = r.price > 0 ? (profitPerPack / r.price * 100) : null;
@@ -966,7 +966,7 @@ function render(opts = {}) {
 
   document.getElementById('kpiGrid').innerHTML = `
     <div class="kpi"><h3>Utenti attivi</h3><div class="big">${fmtInt(totalUsers)}</div></div>
-    <div class="kpi"><h3>Ricavo / mese</h3><div class="big">€${fmt(totalRevenue)}</div><div class="sub">${state.model==='prepaid'?'prepaid × '+purchaseFreq.toFixed(1):'subscription'}</div></div>
+    <div class="kpi"><h3>Ricavo / mese</h3><div class="big">€${fmt(totalRevenue)}</div><div class="sub">${state.model==='prepaid'?'prepaid × '+(purchaseFreq<0.1?purchaseFreq.toFixed(2):purchaseFreq.toFixed(1)):'subscription'}</div></div>
     <div class="kpi"><h3>Report AI / mese</h3><div class="big">${totalReports.toFixed(1)}</div><div class="sub">costo €${totalAiCost.toFixed(2)}</div></div>
     <div class="kpi"><h3>Costo API / mese</h3><div class="big">€${fmt(totalVarCost)}</div><div class="sub">trascrizione+traduz</div></div>
     <div class="kpi"><h3>Costi fissi</h3><div class="big">€${fmt(fixedCosts)}</div></div>
@@ -1017,7 +1017,7 @@ function render(opts = {}) {
       <div class="summary-row total" style="color:var(--green)"><span>Net Monthly Profit</span><span>€${fmt(netProfit)}</span></div>
       <div class="summary-row"><span>Annual Net (×12)</span><span style="color:var(--accent);font-weight:800">€${fmt(netProfit*12)}</span></div>
       <div class="summary-row"><span>Break-even users</span><span style="font-weight:700">${be}</span></div>
-      <div style="margin-top:8px;font-size:.73rem;color:var(--text-faint)">Minutes are 1:1. ${state.model==='prepaid'?'Revenue = '+purchaseFreq.toFixed(1)+' purchases/user/mo.':'Subscription model.'}</div>`;
+      <div style="margin-top:8px;font-size:.73rem;color:var(--text-faint)">Minutes are 1:1. ${state.model==='prepaid'?'Revenue = '+(purchaseFreq<0.1?purchaseFreq.toFixed(2):purchaseFreq.toFixed(1))+' purchases/user/mo.':'Subscription model.'}</div>`;
   }
 }
 
@@ -1092,6 +1092,7 @@ function buildSvcGrid() {
 function initAll() {
   document.getElementById('lastUpdated').textContent = LAST_UPDATED;
   document.getElementById('lastCompCheck').textContent = LAST_COMP_CHECK;
+  applyTaxPreset();
   switchModel('prepaid');
   render({rebuildGrid: true});
   buildSvcGrid();
