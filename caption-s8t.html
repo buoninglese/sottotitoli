@@ -7426,12 +7426,19 @@ window.fixExtrasPanelColors = function(){
 
   // ── Top bar: Caption vs Translation mode ──
   window.v20q_setTopMode = function(topMode, skipConfirm){
-    // If already in the requested mode, do nothing (animation still plays via CSS :active)
-    // Use internal state — URL gets rewritten by setCaptionMode so it's unreliable
     var isTranslate = (typeof v20q !== 'undefined' && v20q.translateOn) || (window.location.search.indexOf('mode=translate') !== -1);
     if (topMode === 'caption' && !isTranslate) return;
     if (topMode === 'translate' && isTranslate) return;
-    if (!skipConfirm) {
+
+    // Check for saved defaults — skip confirm if user has prefs set
+    var hasDefaults = false;
+    try {
+      var sd = JSON.parse(localStorage.getItem('sottotitoli-settings') || '{}');
+      if (topMode === 'caption' && sd.default_caption_lang) hasDefaults = true;
+      if (topMode === 'translate' && sd.default_translation_pair) hasDefaults = true;
+    } catch(e) {}
+
+    if (!skipConfirm && !hasDefaults) {
       var lang = localStorage.getItem('sottotitoli-lang') || 'en';
       var modeName = topMode === 'caption' ? (lang==='it'?'Sottotitoli':'Caption') : (lang==='it'?'Traduzione':'Translation');
       var title = lang === 'it' ? 'Cambiare modalità' : 'Switch Mode';
@@ -7447,25 +7454,54 @@ window.fixExtrasPanelColors = function(){
     _doTopModeSwitch(topMode);
   };
   function _doTopModeSwitch(topMode) {
+    // Read saved settings defaults
+    var sd = {};
+    try { sd = JSON.parse(localStorage.getItem('sottotitoli-settings') || '{}'); } catch(e) {}
+
     if (topMode === 'caption') {
-      var src = localStorage.getItem('sottotitoli-caption-lang') || 'en-US';
+      var src = sd.default_caption_lang || localStorage.getItem('sottotitoli-caption-lang') || 'en-US';
       window.location.href = window.location.pathname + '?lang=' + src;
       return;
     }
     if (topMode === 'translate') {
       var urlParams = new URLSearchParams(window.location.search);
       var explicitSrc = urlParams.get('src');
-      var nativeCode = localStorage.getItem('sottotitoli-native-lang');
-      var captionLang = localStorage.getItem('sottotitoli-caption-lang') || 'en-US';
-      var src2 = captionLang;
-      if (explicitSrc) {
+      var pair = sd.default_translation_pair || '';
+      var src2, tgt;
+
+      if (pair && pair !== 'custom') {
+        // Use saved default pair (e.g. 'en-it' → src=en, tgt=it)
+        var parts = pair.split('-');
         var codeMap = { en:'en-US', it:'it-IT', nl:'nl-NL', fr:'fr-FR', de:'de-DE', es:'es-ES', pl:'pl-PL', pt:'pt-PT' };
-        src2 = codeMap[explicitSrc] || captionLang;
-      } else if (nativeCode) {
-        var codeMap = { en:'en-US', it:'it-IT', nl:'nl-NL', fr:'fr-FR', de:'de-DE', es:'es-ES', pl:'pl-PL', pt:'pt-PT' };
-        src2 = codeMap[nativeCode] || captionLang;
+        src2 = codeMap[parts[0]] || 'en-US';
+        tgt = parts[1] || 'it';
+      } else if (pair === 'custom') {
+        // Custom: use explicit src from URL or native lang, tgt from saved or localStorage
+        var nativeCode = localStorage.getItem('sottotitoli-native-lang');
+        var captionLang = localStorage.getItem('sottotitoli-caption-lang') || 'en-US';
+        src2 = captionLang;
+        if (explicitSrc) {
+          var codeMap = { en:'en-US', it:'it-IT', nl:'nl-NL', fr:'fr-FR', de:'de-DE', es:'es-ES', pl:'pl-PL', pt:'pt-PT' };
+          src2 = codeMap[explicitSrc] || captionLang;
+        } else if (nativeCode) {
+          var codeMap = { en:'en-US', it:'it-IT', nl:'nl-NL', fr:'fr-FR', de:'de-DE', es:'es-ES', pl:'pl-PL', pt:'pt-PT' };
+          src2 = codeMap[nativeCode] || captionLang;
+        }
+        tgt = sd.default_translation_tgt || localStorage.getItem('sottotitoli-translate-target') || 'it';
+      } else {
+        // No default set — fallback to old behavior
+        var nativeCode = localStorage.getItem('sottotitoli-native-lang');
+        var captionLang = localStorage.getItem('sottotitoli-caption-lang') || 'en-US';
+        src2 = captionLang;
+        if (explicitSrc) {
+          var codeMap = { en:'en-US', it:'it-IT', nl:'nl-NL', fr:'fr-FR', de:'de-DE', es:'es-ES', pl:'pl-PL', pt:'pt-PT' };
+          src2 = codeMap[explicitSrc] || captionLang;
+        } else if (nativeCode) {
+          var codeMap = { en:'en-US', it:'it-IT', nl:'nl-NL', fr:'fr-FR', de:'de-DE', es:'es-ES', pl:'pl-PL', pt:'pt-PT' };
+          src2 = codeMap[nativeCode] || captionLang;
+        }
+        tgt = localStorage.getItem('sottotitoli-translate-target') || 'it';
       }
-      var tgt = localStorage.getItem('sottotitoli-translate-target') || 'it';
       window.location.href = window.location.pathname + '?lang=' + src2 + '&mode=translate&tgt=' + tgt;
       return;
     }
