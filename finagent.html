@@ -342,9 +342,9 @@ input:checked + .slider:before { transform: translateX(17px); }
 
             <span class="form-label">How often do users buy? (prepaid only)</span>
             <select class="form-select" id="purchaseFreqPreset" onchange="onPurchaseFreqPreset()">
-              <option value="0.01">One-time only (buy once, never again)</option>
               <option value="0.083">~Once per year (0.083/mo)</option>
               <option value="0.167">~Every 6 months (0.167/mo)</option>
+              <option value="0.333">Every 3 months (0.333/mo)</option>
               <option value="0.5" selected>Every 2 months (0.5/mo)</option>
               <option value="1.0">Monthly (1.0/mo)</option>
               <option value="2.0">Twice per month (2.0/mo)</option>
@@ -354,7 +354,7 @@ input:checked + .slider:before { transform: translateX(17px); }
               <span class="form-label">Custom purchases / user / month</span>
               <input class="form-input" type="number" id="purchaseFreq" step="0.01" value="0.5" min="0.001" max="10" oninput="renderNow()">
             </div>
-            <span class="form-hint">How many packs does the average user buy per month? Revenue = users × price × this number.</span>
+            <span class="form-hint">For recurring revenue planning. See <strong style="color:var(--accent)">One-Time Invoice View ↓</strong> below for one-off sales.</span>
           </div>
 
           <div class="section">
@@ -384,6 +384,11 @@ input:checked + .slider:before { transform: translateX(17px); }
           <div class="section">
             <div class="section-hdr"><span class="icon">🚀</span><h2>Runway & Projections</h2></div>
             <div id="runwaySummary"></div>
+          </div>
+
+          <div class="section" style="border-color:rgba(34,211,238,.25);background:rgba(34,211,238,.02)">
+            <div class="section-hdr"><span class="icon">💶</span><h2>One-Time Invoice View</h2><span style="font-size:.68rem;color:var(--text-faint);margin-left:auto">if users buy once, not per month</span></div>
+            <div id="oneTimeView"></div>
           </div>
         </div>
       </div>
@@ -958,6 +963,36 @@ function render(opts = {}) {
       <div style="display:flex;justify-content:space-between;margin-bottom:2px"><span>Cost/credit:</span><strong>€${costPerCredit.toFixed(4)}</strong></div>
       <div style="display:flex;justify-content:space-between;margin-bottom:2px"><span>Reports/month:</span><strong>${totalReports.toFixed(1)}</strong></div>
       <div style="display:flex;justify-content:space-between"><span>AI spend/month:</span><strong style="color:var(--amber)">€${totalAiCost.toFixed(2)}</strong> <span style="color:var(--text-faint)">(${(totalRevenue>0?totalAiCost/totalRevenue*100:0).toFixed(2)}% of revenue)</span></div>
+    `;
+  }
+
+  // ── One-Time Invoice View (one-off sales, not monthly) ──
+  const otView = document.getElementById('oneTimeView');
+  if (otView && calcTab) {
+    const otInvoice = active.reduce((s,p) => s + p.price * p.subs, 0);
+    const otStripe = costStripe * totalUsers;
+    const otAiCost = active.reduce((s,p) => {
+      const rpp = avgCreditsPerReport > 0 ? p.aiCredits / avgCreditsPerReport : 0;
+      return s + rpp * costPerReportEUR * p.subs;
+    }, 0);
+    const otInfra = fixedCosts;
+    const otPreTax = otInvoice - otStripe - otAiCost - otInfra;
+    const otInps = Math.max(0, otPreTax * inpsRate);
+    const otTaxable = otPreTax - otInps;
+    const otTax = Math.max(0, otTaxable * taxRate);
+    const otNet = otTaxable - otTax;
+    const otMargin = otInvoice > 0 ? (otNet / otInvoice * 100) : 0;
+    otView.innerHTML = `
+      <div class="summary-row"><span>📦 Total invoices</span><span><strong style="color:#fff;font-size:1.05rem">€${fmt(otInvoice)}</strong> <span style="color:var(--text-faint)">(${totalUsers} packs × one-time prices)</span></span></div>
+      <div class="summary-row"><span>💳 Stripe fees</span><span><strong style="color:var(--red)">−€${otStripe.toFixed(2)}</strong> <span style="color:var(--text-faint)">(${totalUsers} tx × €${costStripe.toFixed(2)})</span></span></div>
+      <div class="summary-row"><span>🤖 AI report costs</span><span><strong style="color:var(--amber)">−€${otAiCost.toFixed(2)}</strong> <span style="color:var(--text-faint)">(credits consumed)</span></span></div>
+      <div class="summary-row"><span>🏗️ Infrastructure (1 mo)</span><span><strong style="color:var(--amber)">−€${otInfra.toFixed(2)}</strong></span></div>
+      <div class="summary-row" style="font-weight:700;color:#fff"><span>💰 Pre-tax profit</span><span><strong style="color:${otPreTax>=0?'var(--green)':'var(--red)'}">€${fmt(otPreTax)}</strong></span></div>
+      <div class="summary-row"><span>🏛️ INPS (${(inpsRate*100).toFixed(1)}%)</span><span><strong style="color:var(--amber)">−€${otInps.toFixed(2)}</strong></span></div>
+      <div class="summary-row"><span>📊 Tax (${(taxRate*100).toFixed(1)}%)</span><span><strong style="color:var(--amber)">−€${otTax.toFixed(2)}</strong></span></div>
+      <div class="summary-row total" style="font-size:1.05rem"><span>💸 <strong>You keep</strong></span><span style="color:${otNet>=0?'var(--green)':'var(--red)'};font-weight:800;font-size:1.1rem">€${fmt(otNet)}</span></div>
+      <div class="summary-row"><span>📐 Effective take-home</span><span><strong>${otMargin.toFixed(1)}%</strong> of invoices</span></div>
+      <div style="margin-top:8px;font-size:.73rem;color:var(--text-faint)">This is <strong style="color:var(--accent)">not monthly</strong> — it's what you actually net if every active user buys their pack <em>once</em>. Stripe charged per transaction. AI costs from credits in each pack. One month of infrastructure.</div>
     `;
   }
 
