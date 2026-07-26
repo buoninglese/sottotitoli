@@ -27,7 +27,7 @@
       // ── DOM refs + click handler — always, even without auth ──
       this.bellEl = document.querySelector('.topbar-bell');
       this.badgeEl = document.querySelector('.topbar-bell .badge');
-      this.panelEl = document.querySelector('.notification-panel');
+      this.panelEl = document.getElementById('notifDropdown');
 
       if (this.bellEl) {
         this.bellEl.addEventListener('click', (e) => {
@@ -184,7 +184,7 @@
 
     _renderUnauth(msg) {
       if (this.panelEl) {
-        this.panelEl.innerHTML = '<div class="notif-empty">🔔<br>' + this._esc(msg) + '</div>';
+        this.panelEl.innerHTML = '<div class="dropdown-item" style="color:var(--text-faint);cursor:default;text-align:center;padding:20px">🔔 ' + this._esc(msg) + '</div>';
       }
     }
 
@@ -192,7 +192,7 @@
       if (!this.panelEl) return;
       if (!this.notifications.length) {
         this.panelEl.innerHTML =
-          '<div class="notif-empty">🔔<br>Nessuna notifica</div>';
+          '<div class="dropdown-item" style="color:var(--text-faint);cursor:default;text-align:center;padding:20px">🔔 Nessuna notifica recente</div>';
         return;
       }
       this.panelEl.innerHTML = this.notifications.slice(0, 20).map((n) =>
