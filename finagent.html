@@ -866,8 +866,8 @@ function render(opts = {}) {
     totalAiCost += aiCostPerUser * p.subs;
     totalReports += reportsPerUser * p.subs;
     const pkgIdx = state.packages.indexOf(p);
-    // Stripe fee per purchase (only for prepaid, per-transaction)
-    const stripeFeePerUser = state.model==='prepaid' ? costStripe * purchaseFreq : costStripe;
+    // Stripe fee per purchase — only for paid packages (free users never hit Stripe checkout)
+    const stripeFeePerUser = (p.price > 0 && state.model==='prepaid') ? costStripe * purchaseFreq : costStripe;
     totalStripeFees += stripeFeePerUser * p.subs;
     pkgResults.push({...p, pkgIdx, revPerUser, rev:revPerUser*p.subs, minsPerUser, mins:minsPerUser*p.subs, varCostPerUser, varCost:varCostPerUser*p.subs, reportsPerUser, aiCostPerUser, aiCost:aiCostPerUser*p.subs, stripeFeePerUser, stripeFee:stripeFeePerUser*p.subs});
   });
@@ -901,7 +901,8 @@ function render(opts = {}) {
         const varCostPerMin = costTr + costTl;
         const varCostPerPack = varCostPerMin * r.minutes;
         // Fixed per-pack costs (AI reports + infrastructure + Stripe — don't scale with minutes)
-        const fixedPerPack = aiCostPerPack + standaloneFixedPerUser + costStripe;
+        // Only charge Stripe fee for paid packs (free packs never go through checkout)
+        const fixedPerPack = aiCostPerPack + standaloneFixedPerUser + (r.price > 0 ? costStripe : 0);
         const totalCostPerPack = varCostPerPack + fixedPerPack;
         const profitPerPack = r.price - totalCostPerPack;
         const marginPctPack = r.price > 0 ? (profitPerPack / r.price * 100) : null;
@@ -969,8 +970,10 @@ function render(opts = {}) {
   // ── One-Time Invoice View (one-off sales, not monthly) ──
   const otView = document.getElementById('oneTimeView');
   if (otView && calcTab) {
+    // One-Time Invoice View: Stripe only for paid packages (free users don't go through checkout)
+    const otPaidUsers = active.reduce((s,p) => p.price > 0 ? s + p.subs : s, 0);
+    const otStripe = costStripe * otPaidUsers;
     const otInvoice = active.reduce((s,p) => s + p.price * p.subs, 0);
-    const otStripe = costStripe * totalUsers;
     const otAiCost = active.reduce((s,p) => {
       const rpp = avgCreditsPerReport > 0 ? p.aiCredits / avgCreditsPerReport : 0;
       return s + rpp * costPerReportEUR * p.subs;
@@ -983,8 +986,8 @@ function render(opts = {}) {
     const otNet = otTaxable - otTax;
     const otMargin = otInvoice > 0 ? (otNet / otInvoice * 100) : 0;
     otView.innerHTML = `
-      <div class="summary-row"><span>📦 Total invoices</span><span><strong style="color:#fff;font-size:1.05rem">€${fmt(otInvoice)}</strong> <span style="color:var(--text-faint)">(${totalUsers} packs × one-time prices)</span></span></div>
-      <div class="summary-row"><span>💳 Stripe fees</span><span><strong style="color:var(--red)">−€${otStripe.toFixed(2)}</strong> <span style="color:var(--text-faint)">(${totalUsers} tx × €${costStripe.toFixed(2)})</span></span></div>
+      <div class="summary-row"><span>📦 Total invoices</span><span><strong style="color:#fff;font-size:1.05rem">€${fmt(otInvoice)}</strong> <span style="color:var(--text-faint)">(${totalUsers} packs, ${otPaidUsers} paid)</span></span></div>
+      <div class="summary-row"><span>💳 Stripe fees</span><span><strong style="color:var(--red)">−€${otStripe.toFixed(2)}</strong> <span style="color:var(--text-faint)">(${otPaidUsers} tx × €${costStripe.toFixed(2)})</span></span></div>
       <div class="summary-row"><span>🤖 AI report costs</span><span><strong style="color:var(--amber)">−€${otAiCost.toFixed(2)}</strong> <span style="color:var(--text-faint)">(credits consumed)</span></span></div>
       <div class="summary-row"><span>🏗️ Infrastructure (1 mo)</span><span><strong style="color:var(--amber)">−€${otInfra.toFixed(2)}</strong></span></div>
       <div class="summary-row" style="font-weight:700;color:#fff"><span>💰 Pre-tax profit</span><span><strong style="color:${otPreTax>=0?'var(--green)':'var(--red)'}">€${fmt(otPreTax)}</strong></span></div>
