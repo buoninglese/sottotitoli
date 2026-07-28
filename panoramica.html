@@ -806,7 +806,7 @@
               </div>
             </div>
             <section class="alt-card-grid">
-              <article class="alt-card"><h3>Attività</h3><div style="display:flex;flex-direction:column;gap:8px;margin-top:10px"><div style="display:flex;justify-content:space-between;font-size:14px"><span style="color:var(--text-soft)">Sessioni totali</span><span id="profileTotalSessions" style="font-weight:700">—</span></div><div style="display:flex;justify-content:space-between;font-size:14px"><span style="color:var(--text-soft)">Ore parlate</span><span id="profileTotalHours" style="font-weight:700">—</span></div><div style="display:flex;justify-content:space-between;font-size:14px"><span style="color:var(--text-soft)">Parole uniche</span><span id="profileTotalWords" style="font-weight:700">—</span></div><div style="display:flex;justify-content:space-between;font-size:14px"><span style="color:var(--text-soft)">Giorni consecutivi</span><span id="profileStreak" style="color:var(--cyan);font-weight:700">—</span></div></div></article>
+              <article class="alt-card"><h3>Attività</h3><div style="display:flex;flex-direction:column;gap:8px;margin-top:10px"><div style="display:flex;justify-content:space-between;font-size:14px"><span style="color:var(--text-soft)">Sessioni totali</span><span id="profileTotalSessions" style="font-weight:700">—</span></div><div style="display:flex;justify-content:space-between;font-size:14px"><span style="color:var(--text-soft)">Ore parlate</span><span id="profileTotalHours" style="font-weight:700">—</span></div><div style="display:flex;justify-content:space-between;font-size:14px"><span style="color:var(--text-soft)">Parole uniche</span><span id="profileTotalWords" style="font-weight:700">—</span></div><div id="profileLangWords" style="display:flex;flex-direction:column;gap:2px;margin-top:2px;padding-left:16px"></div><div style="display:flex;justify-content:space-between;font-size:14px"><span style="color:var(--text-soft)">Giorni consecutivi</span><span id="profileStreak" style="color:var(--cyan);font-weight:700">—</span></div></div></article>
               <article class="alt-card"><h3>👤 Chi sono</h3><div style="display:flex;flex-direction:column;gap:8px;margin-top:10px"><div style="display:flex;justify-content:space-between;font-size:14px"><span style="color:var(--text-soft)">Professione</span><span id="profileProfession" style="font-weight:700">—</span></div><div style="display:flex;justify-content:space-between;font-size:14px"><span style="color:var(--text-soft)">Perché studio</span><span id="profileWhyEnglish" style="font-weight:700">—</span></div></div></article>
               <article class="alt-card"><h3>🌍 Lingue</h3><div style="margin-top:6px"><div class="q-row" id="profileSpokenLangs" style="margin-bottom:4px"><span style="font-size:13px;color:var(--text-faint)">Completa l'onboarding per visualizzarle.</span></div></div></article>
             </section>
@@ -3393,6 +3393,39 @@
         // Consecutive days — from stats or fallback
         if (elStreak) elStreak.textContent = (s && s.thisWeekSessions) ? s.thisWeekSessions : '—';
 
+        // ── Language word breakdown under Unique words ──
+        var langWordsEl = document.getElementById('profileLangWords');
+        if (langWordsEl && typeof SottotitoliData !== 'undefined' && SottotitoliData.getLanguageWordStats) {
+          SottotitoliData.getLanguageWordStats().then(function(lwStats) {
+            if (!lwStats) { langWordsEl.innerHTML = ''; return; }
+            var flagMap = {
+              'en': '🇬🇧', 'it': '🇮🇹', 'nl': '🇳🇱',
+              'fr': '🇫🇷', 'de': '🇩🇪', 'es': '🇪🇸',
+              'pt': '🇵🇹', 'pl': '🇵🇱'
+            };
+            var nameMap = {
+              'en': 'English', 'it': 'Italiano', 'nl': 'Nederlands',
+              'fr': 'Français', 'de': 'Deutsch', 'es': 'Español',
+              'pt': 'Português', 'pl': 'Polski'
+            };
+            var rows = [];
+            Object.keys(lwStats).forEach(function(l) {
+              var st = lwStats[l];
+              var flag = flagMap[l] || '🌐';
+              var name = nameMap[l] || l.toUpperCase();
+              rows.push(
+                '<div style="display:flex;justify-content:space-between;align-items:center;font-size:11px;color:var(--text-faint)">' +
+                  '<span>' + flag + ' ' + name + '</span>' +
+                  '<span style="font-weight:600;color:var(--text-soft)">' +
+                    st.unique.toLocaleString() + ' unique · ' + st.total.toLocaleString() + ' totali' +
+                  '</span>' +
+                '</div>'
+              );
+            });
+            langWordsEl.innerHTML = rows.join('');
+          }).catch(function() { langWordsEl.innerHTML = ''; });
+        }
+
         // Display name input
         var dni = document.getElementById('displayNameInput');
         if (dni && !dni.value) {
@@ -3525,13 +3558,25 @@
         var themeEl = document.getElementById('settingsTheme');
         if (themeEl) { themeEl.value = s.theme || 'auto'; applyTheme(s.theme || 'auto'); }
 
-        // Default caption language
+        // Default caption language — try settingsData first, then localStorage directly
         var dcl = document.getElementById('settingsDefaultCapLang');
-        if (dcl) { dcl.value = s.default_caption_lang || ''; }
+        if (dcl) {
+          var capVal = s.default_caption_lang || '';
+          if (!capVal) {
+            try { var ls = JSON.parse(localStorage.getItem('sottotitoli-settings') || 'null'); if (ls && ls.default_caption_lang) capVal = ls.default_caption_lang; } catch(e) {}
+          }
+          dcl.value = capVal;
+        }
 
-        // Default translation pair
+        // Default translation pair — try settingsData first, then localStorage directly
         var dtp = document.getElementById('settingsDefaultTrPair');
-        if (dtp) { dtp.value = s.default_translation_pair || ''; }
+        if (dtp) {
+          var trVal = s.default_translation_pair || '';
+          if (!trVal) {
+            try { var ls2 = JSON.parse(localStorage.getItem('sottotitoli-settings') || 'null'); if (ls2 && ls2.default_translation_pair) trVal = ls2.default_translation_pair; } catch(e) {}
+          }
+          dtp.value = trVal;
+        }
       }
 
       // ── Apply theme immediately (called from settings + on page load) ──
@@ -6636,6 +6681,8 @@
       if (vtNav) { vtNav.addEventListener('click', function () { setTimeout(renderVTReviewDue, 150); setTimeout(renderVTTasks, 250); setTimeout(renderVTAutoTasks, 300); }); }
       var insNav = document.querySelector('[data-panel="insights"]');
       if (insNav) { insNav.addEventListener('click', function () { setTimeout(renderTasks, 100); setTimeout(renderInsightsOverview, 150); }); }
+      var profNav = document.querySelector('[data-panel="profilo"]');
+      if (profNav) { profNav.addEventListener('click', function () { setTimeout(renderProfile, 100); }); }
       var impNav = document.querySelector('[data-panel="impostazioni"]');
       if (impNav) { impNav.addEventListener('click', async function () {
         // Load localStorage first (instant, always works)
@@ -6734,9 +6781,9 @@
     var themeEl = document.getElementById('settingsTheme');
     if (themeEl) settings.theme = themeEl.value;
     var dclEl = document.getElementById('settingsDefaultCapLang');
-    if (dclEl) settings.default_caption_lang = dclEl.value || null;
+    if (dclEl && dclEl.value) settings.default_caption_lang = dclEl.value;
     var dtpEl = document.getElementById('settingsDefaultTrPair');
-    if (dtpEl) settings.default_translation_pair = dtpEl.value || null;
+    if (dtpEl && dtpEl.value) settings.default_translation_pair = dtpEl.value;
 
     // Green flash
     var origBg = btn.style.background;

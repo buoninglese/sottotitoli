@@ -137,6 +137,68 @@
   }
 
   /* ═══════════════════════════════════════════
+     LANGUAGE WORD STATS — per-language unique + total words
+     ═══════════════════════════════════════════ */
+  async function getLanguageWordStats() {
+    var userId = await getUserId();
+    if (!userId) return null;
+
+    var _a = await Promise.all([
+      // Unique words per language from user_vocabulary
+      sb().from('user_vocabulary').select('lang, id.count()')
+        .eq('user_id', userId)
+        .order('lang'),
+      // Total words per language from sessions (parse language_pair)
+      sb().from('sessions').select('language_pair, words_count')
+        .eq('user_id', userId)
+    ]);
+
+    var vocabR = _a[0], sessionsR = _a[1];
+
+    // Count unique words per language
+    var uniqueByLang = {};
+    if (!vocabR.error && vocabR.data) {
+      vocabR.data.forEach(function(row) {
+        uniqueByLang[row.lang] = parseInt(row.count) || 0;
+      });
+    }
+
+    // Sum total words per language from sessions
+    var totalByLang = {};
+    if (!sessionsR.error && sessionsR.data) {
+      sessionsR.data.forEach(function(row) {
+        if (!row.language_pair) return;
+        var lp = row.language_pair.toLowerCase();
+        var wc = row.words_count || 0;
+        if (lp.indexOf('en') !== -1) totalByLang['en'] = (totalByLang['en'] || 0) + wc;
+        if (lp.indexOf('it') !== -1) totalByLang['it'] = (totalByLang['it'] || 0) + wc;
+        if (lp.indexOf('nl') !== -1) totalByLang['nl'] = (totalByLang['nl'] || 0) + wc;
+        if (lp.indexOf('fr') !== -1) totalByLang['fr'] = (totalByLang['fr'] || 0) + wc;
+        if (lp.indexOf('de') !== -1) totalByLang['de'] = (totalByLang['de'] || 0) + wc;
+        if (lp.indexOf('es') !== -1) totalByLang['es'] = (totalByLang['es'] || 0) + wc;
+        if (lp.indexOf('pt') !== -1) totalByLang['pt'] = (totalByLang['pt'] || 0) + wc;
+        if (lp.indexOf('pl') !== -1) totalByLang['pl'] = (totalByLang['pl'] || 0) + wc;
+      });
+    }
+
+    // Merge into result — union of languages from both sources
+    var langs = [];
+    var seen = {};
+    Object.keys(uniqueByLang).forEach(function(l) { if (!seen[l]) { seen[l] = true; langs.push(l); } });
+    Object.keys(totalByLang).forEach(function(l) { if (!seen[l]) { seen[l] = true; langs.push(l); } });
+
+    var result = {};
+    langs.forEach(function(l) {
+      result[l] = {
+        unique: uniqueByLang[l] || 0,
+        total: totalByLang[l] || 0
+      };
+    });
+
+    return result;
+  }
+
+  /* ═══════════════════════════════════════════
      SESSION LIST — for Trascrizioni panel
      ═══════════════════════════════════════════ */
   async function getSessions(lang, limit) {
@@ -282,8 +344,8 @@
       if (local.font_pref && (result.font_pref === 'sans' || !result.font_pref)) result.font_pref = local.font_pref;
       if (local.save_sessions !== undefined) result.save_sessions = local.save_sessions;
       if (local.anonymous_sharing !== undefined) result.anonymous_sharing = local.anonymous_sharing;
-      if (!result.default_caption_lang && local.default_caption_lang) result.default_caption_lang = local.default_caption_lang;
-      if (!result.default_translation_pair && local.default_translation_pair) result.default_translation_pair = local.default_translation_pair;
+      if (local.hasOwnProperty('default_caption_lang') && local.default_caption_lang && !result.default_caption_lang) result.default_caption_lang = local.default_caption_lang;
+      if (local.hasOwnProperty('default_translation_pair') && local.default_translation_pair && !result.default_translation_pair) result.default_translation_pair = local.default_translation_pair;
     }
 
     console.log('loadSettings:', JSON.stringify(result));
@@ -371,8 +433,8 @@
       if (settings.anonymous_sharing !== undefined) existing.anonymous_sharing = settings.anonymous_sharing;
       if (settings.theme !== undefined) existing.theme = settings.theme;
       if (settings.font_pref !== undefined) existing.font_pref = settings.font_pref;
-      if (settings.default_caption_lang !== undefined) existing.default_caption_lang = settings.default_caption_lang;
-      if (settings.default_translation_pair !== undefined) existing.default_translation_pair = settings.default_translation_pair;
+      if (settings.default_caption_lang !== undefined && settings.default_caption_lang !== null) existing.default_caption_lang = settings.default_caption_lang;
+      if (settings.default_translation_pair !== undefined && settings.default_translation_pair !== null) existing.default_translation_pair = settings.default_translation_pair;
       localStorage.setItem('sottotitoli-settings', JSON.stringify(existing));
     } catch(e) {}
   }
@@ -827,6 +889,7 @@
     getUserMeta: getUserMeta,
     getProfile: getProfile,
     getSessionStats: getSessionStats,
+    getLanguageWordStats: getLanguageWordStats,
     getSessions: getSessions,
     getReferralStats: getReferralStats,
     getAIReports: getAIReports,

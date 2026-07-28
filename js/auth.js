@@ -165,7 +165,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             <div class="ud-credit-row"><span data-i18n="credits_report">Crediti report</span><span id="udTokens">—</span></div>
           </div>
           <hr class="ud-divider">
-          <a href="purchase.html" class="ud-link" data-i18n="buy_credits" target="_blank" style="color:var(--blue);font-weight:600"><i class="fa-solid fa-gift" style="width:16px;text-align:center;margin-right:8px;font-size:13px"></i> Aggiungi minuti/crediti</a>
+          <a href="purchase.html" class="ud-link" data-i18n="buy_credits" style="color:var(--blue);font-weight:600"><i class="fa-solid fa-gift" style="width:16px;text-align:center;margin-right:8px;font-size:13px"></i> Acquista crediti</a>
           <hr class="ud-divider">
           <a href="account.html#cs-profile" class="ud-link" data-i18n="settings">Impostazioni</a>
           <a href="panoramica.html#aiuto" class="ud-link" data-i18n="aiuto">Aiuto</a>
