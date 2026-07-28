@@ -112,6 +112,11 @@ window.SOTTOTITOLI_CONFIG = {
       Set secret: supabase secrets set HF_TOKEN=hf_... */
   hfProxyUrl: "https://qzqmuegbpmvqrjrlfbgk.supabase.co/functions/v1/hf-proxy",
 
+  /** Onboarding Starter Report AI endpoint.
+   *  Local dev: "http://localhost:8771/starter-report" (tmp/report-ai-space)
+   *  Production: Supabase Edge Function (deployed) */
+  starterReportUrl: "https://qzqmuegbpmvqrjrlfbgk.supabase.co/functions/v1/starter-report",
+
   /** Stripe payment integration */
   stripe: {
     /** Your Stripe publishable key (pk_test_... for testing, pk_live_... for production) */
