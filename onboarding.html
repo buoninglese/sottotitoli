@@ -311,6 +311,48 @@
       height: 100%; background: var(--accent-green);
       width: 0%; transition: width .1s linear;
     }
+    .mic-permission-btn {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 8px 18px; border-radius: 100px;
+      border: 1.5px solid var(--accent-purple);
+      background: transparent; color: var(--accent-purple);
+      font-family: inherit; font-size: 12px; font-weight: 600;
+      cursor: pointer; transition: all .2s;
+      margin-top: 4px;
+    }
+    .mic-permission-btn:hover { background: var(--accent-purple); color: #fff; }
+    .mic-permission-hint {
+      display: none; font-size: 11px; color: var(--text-dim);
+      text-align: center; margin-top: 8px; line-height: 1.5;
+      max-width: 280px;
+    }
+    .mic-permission-hint.visible { display: block; }
+    .mic-permission-hint i { color: var(--amber); margin-right: 4px; }
+
+    /* ── Word-count nudge modal ── */
+    .word-nudge-overlay {
+      position: fixed; inset: 0; z-index: 9999;
+      background: rgba(0,0,0,.6); backdrop-filter: blur(6px);
+      display: flex; align-items: center; justify-content: center;
+      padding: 24px;
+    }
+    .word-nudge-overlay.hidden { display: none; }
+    .word-nudge-card {
+      width: 100%; max-width: 440px;
+      background: var(--card); border: 1px solid var(--line);
+      border-radius: 20px; padding: 28px 28px 22px;
+      box-shadow: var(--shadow); text-align: center;
+    }
+    .word-nudge-card h3 {
+      font-family: 'Manrope', sans-serif; font-size: 18px;
+      font-weight: 800; letter-spacing: -.4px;
+      color: var(--text); margin-bottom: 8px;
+    }
+    .word-nudge-card p {
+      font-size: 13px; color: var(--text-dim); line-height: 1.6;
+      margin-bottom: 20px;
+    }
+    .word-nudge-card .nudge-btns { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
 
     /* ── Voice iframe card ── */
     .voice-embed {
@@ -669,6 +711,12 @@
               <div class="mic-level-fill" id="micLevelFill"></div>
             </div>
             <div style="font-size:13px;color:var(--text-dim);" id="micStatus">Clicca il microfono per iniziare il test</div>
+            <button class="mic-permission-btn" id="micPermBtn" onclick="requestMicPermission()" title="Richiedi nuovamente il permesso del microfono">
+              <i class="fa-solid fa-unlock-keyhole"></i> Consenti microfono
+            </button>
+            <div class="mic-permission-hint" id="micPermHint">
+              <i class="fa-solid fa-circle-info"></i> Se il microfono non funziona su iPhone/iPad: apri <strong>Impostazioni → Safari → Microfono</strong> e assicurati che sia attivato per questo sito. Poi torna qui e riprova.
+            </div>
           </div>
         </div>
 
@@ -868,6 +916,28 @@
 
     </div><!-- /onboard-card -->
   </div><!-- /overlay -->
+
+  <!-- ═══ Word-count nudge modal ═══ -->
+  <div class="word-nudge-overlay hidden" id="wordNudgeOverlay">
+    <div class="word-nudge-card">
+      <div style="font-size:40px;margin-bottom:10px;">📝</div>
+      <h3 id="wordNudgeTitle">Ancora poche parole…</h3>
+      <p id="wordNudgeBody">
+        Hai scritto <strong id="wordNudgeCount">0</strong> parole. Più informazioni ci darai, più la tua esperienza su Sottotitoli sarà personalizzata. Vuoi aggiungere altri dettagli?
+      </p>
+      <div class="nudge-btns">
+        <button class="btn btn-back" id="wordNudgeStay" onclick="closeWordNudge(true)">
+          <i class="fa-solid fa-pen-to-square"></i> Aggiungi altro
+        </button>
+        <button class="btn btn-next" id="wordNudgeGo" onclick="closeWordNudge(false)">
+          Continua comunque <i class="fa-solid fa-arrow-right"></i>
+        </button>
+      </div>
+      <p style="font-size:11px;color:var(--text-muted);margin-top:14px;">
+        <i class="fa-solid fa-lightbulb"></i> Puoi sempre aggiornare le tue informazioni più tardi dal tuo profilo.
+      </p>
+    </div>
+  </div>
 
   <!-- ═══════════════════════ Scripts ═══════════════════════ -->
   <!-- 1. Dependencies -->
@@ -1082,6 +1152,10 @@
       }
     }
 
+    // ── Nudge tracking: which slide triggered the nudge, and where we were going ──
+    var _wordNudgeSlide = null;   // the slide type ('intake','longterm','shortterm')
+    var _wordNudgeTarget = null;  // target slide index
+
     function goToSlide(idx) {
       if (idx > 0 && !hasConsented()) {
         var err = document.getElementById('consentError');
@@ -1097,6 +1171,29 @@
     }
 
     function nextSlide() {
+      // Check for word-count nudge before leaving transcript slides
+      if (currentSlide === 8) {
+        // Slide 8 → 9: intake transcript, recommend 200 words
+        var wc = getWordCount(onboardData['intake_transcript'] || '');
+        if (wc > 0 && wc < 200) {
+          showWordNudge('intake', currentSlide + 1, wc, 200);
+          return;
+        }
+      } else if (currentSlide === 9) {
+        // Slide 9 → 10: longterm transcript, recommend 100 words
+        var wc2 = getWordCount(onboardData['longterm_transcript'] || '');
+        if (wc2 > 0 && wc2 < 100) {
+          showWordNudge('longterm', currentSlide + 1, wc2, 100);
+          return;
+        }
+      } else if (currentSlide === 10) {
+        // Slide 10 → 11: shortterm transcript, recommend 100 words
+        var wc3 = getWordCount(onboardData['shortterm_transcript'] || '');
+        if (wc3 > 0 && wc3 < 100) {
+          showWordNudge('shortterm', currentSlide + 1, wc3, 100);
+          return;
+        }
+      }
       if (currentSlide < TOTAL_SLIDES - 1) goToSlide(currentSlide + 1);
     }
 
@@ -1136,7 +1233,7 @@
       if (currentSlide === 12) buildDashboard();
     }
 
-    // ── Completion tracking (6 required fields now) ──
+    // ── Completion tracking (6 required fields — word counts are soft targets) ──
     function getWordCount(text) {
       if (!text || !text.trim()) return 0;
       return text.trim().split(/\s+/).filter(function(w) { return w.length > 0; }).length;
@@ -1147,7 +1244,8 @@
       var filled = 0;
       required.forEach(function(k) {
         if (k === 'intake_transcript' || k === 'longterm_transcript' || k === 'shortterm_transcript') {
-          if (getWordCount(onboardData[k]) >= 200) filled++;
+          // Only need at least 1 word — word count is a soft suggestion, not a hard block
+          if (getWordCount(onboardData[k]) >= 1) filled++;
         } else {
           var v = onboardData[k];
           if (v && (!Array.isArray(v) || v.length > 0)) filled++;
@@ -1161,14 +1259,14 @@
         'native_lang': 'Lingua madre (slide 3)',
         'difficulties': 'Difficoltà in inglese (slide 6)',
         'why_english': 'Perché parli inglese (slide 4)',
-        'intake_transcript': 'Trascrizione Parlami di te ≥200 parole (slide 8)',
-        'longterm_transcript': 'Obiettivo a lungo termine ≥100 parole (slide 9)',
-        'shortterm_transcript': 'Traguardi a breve termine ≥100 parole (slide 10)'
+        'intake_transcript': 'Parlami di te (slide 8)',
+        'longterm_transcript': 'Obiettivo a lungo termine (slide 9)',
+        'shortterm_transcript': 'Traguardi a breve termine (slide 10)'
       };
       var missing = [];
       Object.keys(labels).forEach(function(k) {
         if (k === 'intake_transcript' || k === 'longterm_transcript' || k === 'shortterm_transcript') {
-          if (getWordCount(onboardData[k]) < 100) missing.push(labels[k]);
+          if (getWordCount(onboardData[k]) < 1) missing.push(labels[k]);
         } else {
           var v = onboardData[k];
           if (!v || (Array.isArray(v) && v.length === 0)) missing.push(labels[k]);
@@ -1323,26 +1421,53 @@
     }
 
     // ── Transcript input handler (real-time word count) ──
+    // Debounce persist to avoid localStorage writes on every keystroke (which can cause
+    // cursor-jumping on mobile Safari due to synchronous I/O during input events).
+    var _transcriptPersistTimers = {};
     function onTranscriptInput(type, text) {
       onboardData[type + '_transcript'] = text;
-      persist();
+      // Debounce localStorage persist to 500ms after last keystroke
+      if (_transcriptPersistTimers[type]) clearTimeout(_transcriptPersistTimers[type]);
+      _transcriptPersistTimers[type] = setTimeout(function() { persist(); }, 500);
+
       var wc = getWordCount(text);
       var wcEl = document.getElementById(type + 'WordCount');
       var statusEl = document.getElementById(type + 'Status');
+      // Use textContent (not innerHTML) for the number to avoid reflow during input
       if (wcEl) wcEl.textContent = wc;
+      // Defer status HTML update to avoid layout thrashing during typing
       if (statusEl) {
-        if (wc >= 200) {
-          statusEl.innerHTML = wc + '/200 parole — <i class="fa-solid fa-circle-check"></i> Trascrizione valida';
-          statusEl.className = 'transcript-status valid';
-        } else {
-          statusEl.innerHTML = wc + '/200 parole — Minimo 200 parole richieste';
-          statusEl.className = 'transcript-status';
-        }
+        var _wc = wc, _type = type, _statusEl = statusEl;
+        requestAnimationFrame(function() {
+          if (_type === 'intake') {
+            if (_wc >= 200) {
+              _statusEl.innerHTML = _wc + '/200 parole — <i class="fa-solid fa-circle-check"></i> Ottimo!';
+              _statusEl.className = 'transcript-status valid';
+            } else if (_wc > 0) {
+              _statusEl.innerHTML = _wc + '/200 parole — Più scrivi, più la tua esperienza sarà personalizzata';
+              _statusEl.className = 'transcript-status';
+            } else {
+              _statusEl.innerHTML = '0/200 parole — Raccontaci qualcosa di te per personalizzare la piattaforma';
+              _statusEl.className = 'transcript-status';
+            }
+          } else {
+            // longterm / shortterm: 100-word soft target
+            if (_wc >= 100) {
+              _statusEl.innerHTML = _wc + '/100 parole — <i class="fa-solid fa-circle-check"></i> Ottimo!';
+              _statusEl.className = 'transcript-status valid';
+            } else if (_wc > 0) {
+              _statusEl.innerHTML = _wc + '/100 parole — Più dettagli dai, meglio è';
+              _statusEl.className = 'transcript-status';
+            } else {
+              _statusEl.innerHTML = '0/100 parole — Descrivi il tuo obiettivo';
+              _statusEl.className = 'transcript-status';
+            }
+          }
+        });
       }
       // Update completion on dashboard if visible
       if (currentSlide === 12) { buildDashboard(); updateUI(); }
       // Echo manual text to live caption only when voice is not active
-      // (voice session manages live caption via live-transcript postMessage)
       if (!VOICE_TIMERS[type]) {
         var liveEl = document.getElementById(type + 'Live');
         if (liveEl && text.trim()) {
@@ -1603,7 +1728,92 @@
       persist();
     }
 
-    // ── Mic test ──
+    // ── Word-count nudge modal ──
+    function showWordNudge(slideType, targetSlide, wordCount, recommended) {
+      _wordNudgeSlide = slideType;
+      _wordNudgeTarget = targetSlide;
+      var overlayEl = document.getElementById('wordNudgeOverlay');
+      var titleEl = document.getElementById('wordNudgeTitle');
+      var bodyEl = document.getElementById('wordNudgeBody');
+      var countEl = document.getElementById('wordNudgeCount');
+      if (!overlayEl) return;
+      if (titleEl) {
+        titleEl.textContent = slideType === 'intake'
+          ? 'Ancora poche parole…'
+          : 'Pochi dettagli…';
+      }
+      if (countEl) countEl.textContent = wordCount;
+      if (bodyEl) {
+        if (slideType === 'intake') {
+          bodyEl.innerHTML = 'Hai scritto <strong id="wordNudgeCount">' + wordCount + '</strong> parole (consigliate: ' + recommended + '). Più informazioni ci darai su di te, più la tua esperienza su Sottotitoli sarà personalizzata. Vuoi aggiungere altri dettagli?';
+        } else {
+          bodyEl.innerHTML = 'Hai scritto <strong id="wordNudgeCount">' + wordCount + '</strong> parole (consigliate: ' + recommended + '). Obiettivi più dettagliati ci aiutano a creare un percorso migliore per te.';
+        }
+      }
+      overlayEl.classList.remove('hidden');
+    }
+
+    function closeWordNudge(stay) {
+      var overlayEl = document.getElementById('wordNudgeOverlay');
+      if (overlayEl) overlayEl.classList.add('hidden');
+      if (!stay && _wordNudgeTarget !== null) {
+        goToSlide(_wordNudgeTarget);
+      }
+      _wordNudgeSlide = null;
+      _wordNudgeTarget = null;
+    }
+
+    // ── Mic permission request (re-trigger for iOS/Safari after denial) ──
+    function requestMicPermission() {
+      var hint = document.getElementById('micPermHint');
+      var status = document.getElementById('micStatus');
+      var btn = document.getElementById('micPermBtn');
+
+      if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spin" style="width:12px;height:12px;border:2px solid var(--line);border-top-color:var(--accent-purple);border-radius:50%;animation:spin .7s linear infinite;display:inline-block;"></span> Richiedo permesso…';
+      }
+
+      navigator.mediaDevices.getUserMedia({ audio: true })
+        .then(function(stream) {
+          // Permission granted! Stop the test stream immediately
+          stream.getTracks().forEach(function(t) { t.stop(); });
+          if (status) {
+            status.textContent = '✅ Permesso microfono concesso! Ora puoi fare il test.';
+            status.style.color = 'var(--accent-green)';
+          }
+          if (hint) hint.classList.remove('visible');
+          if (btn) {
+            btn.innerHTML = '<i class="fa-solid fa-circle-check"></i> Permesso concesso';
+            btn.style.borderColor = 'var(--accent-green)';
+            btn.style.color = 'var(--accent-green)';
+            setTimeout(function() {
+              btn.disabled = false;
+              btn.innerHTML = '<i class="fa-solid fa-unlock-keyhole"></i> Consenti microfono';
+              btn.style.borderColor = '';
+              btn.style.color = '';
+            }, 3000);
+          }
+          onboardData['mic_permission_granted'] = true;
+          persist();
+        })
+        .catch(function(err) {
+          if (status) {
+            if (err.name === 'NotAllowedError') {
+              status.innerHTML = '⚠️ Permesso microfono negato. Su iPhone/iPad, vai in <strong>Impostazioni → Safari → Microfono</strong> e riprova.';
+              status.style.color = 'var(--amber)';
+            } else {
+              status.textContent = '⚠️ Microfono non disponibile: ' + err.message;
+              status.style.color = '#ef4444';
+            }
+          }
+          if (hint) hint.classList.add('visible');
+          if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fa-solid fa-unlock-keyhole"></i> Consenti microfono';
+          }
+        });
+    }
     var micStream = null;
     var micInterval = null;
 
@@ -1651,6 +1861,12 @@
       }).catch(function(err) {
         status.textContent = '⚠️ Microfono non disponibile: ' + err.message;
         status.style.color = '#ef4444';
+        // Show iOS help hint if permission was denied
+        if (err.name === 'NotAllowedError') {
+          var hint = document.getElementById('micPermHint');
+          if (hint) hint.classList.add('visible');
+          status.innerHTML = '⚠️ Permesso microfono negato. Su iPhone/iPad, vai in <strong>Impostazioni → Safari → Microfono</strong> e riprova.';
+        }
       });
     }
 
