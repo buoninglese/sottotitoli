@@ -66,14 +66,16 @@ window.sottotitoliSupabase = window.supabase.createClient(
               .eq('user_id', user.id)
               .maybeSingle()
               .then(function(_r) {
-                if (!_r.data?.onboarding_completed && !_r.error) {
-                  // Onboarding not completed — redirect
-                  window.location.replace('onboarding.html');
-                } else if (_r.data?.onboarding_completed) {
-                  // Mark locally so we don't re-check on every page
+                if (_r.error) return; // Table might not exist — skip silently
+                // Only redirect if explicitly NOT completed.
+                // A missing row (_r.data === null) means nothing was saved —
+                // don't redirect in that case (the save might have failed).
+                if (_r.data && _r.data.onboarding_completed === true) {
                   localStorage.setItem('sottotitoli_onboarding_done', 'true');
+                } else if (_r.data && _r.data.onboarding_completed === false) {
+                  window.location.replace('onboarding.html');
                 }
-                // If table doesn't exist yet (_r.error), silently skip
+                // If _r.data is null (no row), don't redirect
               });
           }
         }
@@ -429,12 +431,15 @@ function initUserTokens(userId) {
         .maybeSingle()
         .then(function(_r){
           if (_r.error) return; // Table might not exist yet — skip silently
-          if (!_r.data?.onboarding_completed) {
+          // Only redirect if explicitly NOT completed.
+          // A missing row means nothing was saved — don't redirect.
+          if (_r.data && _r.data.onboarding_completed === true) {
+            localStorage.setItem('sottotitoli_onboarding_done', 'true');
+          } else if (_r.data && _r.data.onboarding_completed === false) {
             console.log('🆕 Onboarding not completed — redirecting');
             window.location.replace('onboarding.html');
-          } else {
-            localStorage.setItem('sottotitoli_onboarding_done', 'true');
           }
+          // If _r.data is null (no row), don't redirect
         });
     });
   }
