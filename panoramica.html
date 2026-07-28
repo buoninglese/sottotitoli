@@ -6892,10 +6892,15 @@
             if (!whyEnglish && res.data.use_cases) whyEnglish = res.data.use_cases;
             // Difficulties / focus areas
             if (res.data.learning_profile) {
-              try {
-                var lp = JSON.parse(res.data.learning_profile);
-                if (Array.isArray(lp) && lp.length > 0) difficulties = lp;
-              } catch(e) {}
+              var lp = res.data.learning_profile;
+              // learning_profile is JSONB — already parsed by Supabase, no JSON.parse needed
+              if (typeof lp === 'string') { try { lp = JSON.parse(lp); } catch(e) {} }
+              if (Array.isArray(lp) && lp.length > 0) {
+                // Normalize: each item may be a string or { title, ... } object
+                difficulties = lp.map(function(item) {
+                  return typeof item === 'string' ? item : (item.title || item.name || '');
+                }).filter(Boolean);
+              }
             }
             // Populate settings native_lang if empty
             if (res.data.native_lang) {
@@ -6921,9 +6926,17 @@
       if (focusEl && difficulties.length > 0) {
         var chips = '';
         difficulties.forEach(function(d) {
-          chips += '<button class=\"q-chip active\" style=\"pointer-events:none\">' + d + '</button>';
+          var label = typeof d === 'string' ? d : (d && d.title ? d.title : (d && d.name ? d.name : ''));
+          if (!label) return;
+          chips += '<button class=\"q-chip active\" style=\"pointer-events:none\">' + label + '</button>';
         });
-        focusEl.innerHTML = chips;
+        // Fallback: if all items were objects without titles, show raw data
+        if (!chips) {
+          chips = difficulties.map(function(d) {
+            return '<button class=\"q-chip active\" style=\"pointer-events:none\">' + (typeof d === 'string' ? d : JSON.stringify(d)) + '</button>';
+          }).join('');
+        }
+        focusEl.innerHTML = chips || '<span style=\"font-size:13px;color:var(--text-faint)\">Completa l\'onboarding per vedere le tue aree di miglioramento.</span>';
       }
       // Profilo → Profilo Linguistico → Spoken languages
       try {
