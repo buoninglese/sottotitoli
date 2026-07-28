@@ -150,7 +150,7 @@ document.addEventListener('DOMContentLoaded', async () => {
           <div class="ud-header">
             <div class="ud-avatar">${initial}</div>
             <div>
-              <div class="ud-name">${firstName || 'Utente'}</div>
+              <div class="ud-name" id="udName">${firstName || 'Utente'}</div>
               <div class="ud-email">${user?.email || ''}</div>
             </div>
           </div>
@@ -174,29 +174,41 @@ document.addEventListener('DOMContentLoaded', async () => {
       </div>
     `;
     
-    // Fetch credit balances
-    (async function(){
+    // Fetch credit balances — reusable so we can refresh on dropdown open
+    async function refreshUserCredits() {
       try {
         var _ref = await window.sottotitoliSupabase.auth.getSession();
         var userId = _ref.data.session?.user?.id;
-        if (userId) {
-          // Minutes pool (caption 0.5× & translation 1× share this)
-          var _c = await window.sottotitoliSupabase.from('user_credits').select('balance_minutes').eq('user_id', userId).maybeSingle();
-          var minEl = document.getElementById('udMinutes');
-          if (minEl) minEl.textContent = (_c.data?.balance_minutes || 0) + ' min';
-
-          // Credits (reports only)
-          var _r = await window.sottotitoliSupabase.from('user_tokens').select('balance').eq('user_id', userId).maybeSingle();
-          var tokEl = document.getElementById('udTokens');
-          if (tokEl) tokEl.textContent = (_r.data?.balance || 0);
-
-          // Load avatar from profiles if column exists (skip for now — columns not yet created)
-          // TODO: add avatar_url, full_name columns to profiles table
+        if (!userId) return;
+        // Minutes pool
+        var _c = await window.sottotitoliSupabase.from('user_credits').select('balance_minutes').eq('user_id', userId).maybeSingle();
+        var minEl = document.getElementById('udMinutes');
+        if (minEl) minEl.textContent = (_c.data?.balance_minutes || 0) + ' min';
+        // Credits (reports)
+        var _r = await window.sottotitoliSupabase.from('user_tokens').select('balance').eq('user_id', userId).maybeSingle();
+        var tokEl = document.getElementById('udTokens');
+        if (tokEl) tokEl.textContent = (_r.data?.balance || 0);
+        // Display name from profiles (may differ from Google name)
+        var _p = await window.sottotitoliSupabase.from('profiles').select('display_name').eq('id', userId).maybeSingle();
+        if (_p.data?.display_name) {
+          var nameEl = document.getElementById('udName');
+          if (nameEl) nameEl.textContent = _p.data.display_name;
+          var avEl = document.getElementById('userAvatar');
+          if (avEl) avEl.textContent = _p.data.display_name.charAt(0).toUpperCase();
+          var greEl = document.querySelector('.user-greeting');
+          if (greEl) {
+            var parts = _p.data.display_name.split(' ');
+            var lang = (navigator.language || 'it').split('-')[0];
+            var greetings = {it:'Ciao', en:'Hello', fr:'Bonjour', es:'Hola', de:'Hallo', pt:'Ola', nl:'Hallo', pl:'Czesc'};
+            greEl.textContent = (greetings[lang] || 'Ciao') + ' ' + parts[0];
+          }
         }
       } catch(e) {}
-    })();
+    }
+    // Initial fetch
+    refreshUserCredits();
     
-    // Toggle dropdown
+    // Toggle dropdown — refresh credits on every open
     var avatar = document.getElementById('userAvatar');
     var dropdown = document.getElementById('userDropdown');
     var overlay = document.getElementById('udOverlay');
@@ -211,6 +223,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     function openDropdown(){
       dropdown.classList.add('open');
       overlay.classList.add('active');
+      refreshUserCredits(); // refresh balances + name on every open
     }
     function closeDropdown(){
       dropdown.classList.remove('open');
