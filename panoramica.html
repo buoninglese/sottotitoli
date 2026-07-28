@@ -6682,7 +6682,7 @@
       var insNav = document.querySelector('[data-panel="insights"]');
       if (insNav) { insNav.addEventListener('click', function () { setTimeout(renderTasks, 100); setTimeout(renderInsightsOverview, 150); }); }
       var profNav = document.querySelector('[data-panel="profilo"]');
-      if (profNav) { profNav.addEventListener('click', function () { setTimeout(renderProfile, 100); }); }
+      if (profNav) { profNav.addEventListener('click', function () { setTimeout(renderProfile, 100); setTimeout(loadProfileAvatar, 200); }); }
       var impNav = document.querySelector('[data-panel="impostazioni"]');
       if (impNav) { impNav.addEventListener('click', async function () {
         // Load localStorage first (instant, always works)
@@ -7009,42 +7009,106 @@
     var emailEl = document.getElementById('profileEmail');
     var sb = window.sottotitoliSupabase;
     if (!sb) { setTimeout(loadProfileAvatar, 500); return; }
-    sb.auth.getSession().then(function(r) {
+    sb.auth.getSession().then(async function(r) {
       var user = r.data?.session?.user;
       if (!user) return;
-      var avatar = user.user_metadata?.avatar_url || user.user_metadata?.picture || '';
       var name = user.user_metadata?.full_name || user.email?.split('@')[0] || '';
-      if (img && avatar) {
-        img.src = avatar;
-        img.style.display = '';
-        if (placeholder) placeholder.style.display = 'none';
-      }
       if (nameEl) nameEl.textContent = name || 'Utente';
       if (emailEl) emailEl.textContent = user.email || '';
+
+      // 1. Try profiles.avatar_url from Supabase first (custom upload)
+      try {
+        var pr = await sb.from('profiles').select('avatar_url').eq('id', user.id).maybeSingle();
+        if (!pr.error && pr.data && pr.data.avatar_url) {
+          if (img) { img.src = pr.data.avatar_url; img.style.display = ''; }
+          if (placeholder) placeholder.style.display = 'none';
+          // Update localStorage cache
+          try { localStorage.setItem('sottotitoli-avatar', pr.data.avatar_url); } catch(ex) {}
+          return;
+        }
+      } catch(e) { /* fall through to Google avatar */ }
+
+      // 2. Google OAuth avatar fallback
+      var googleAvatar = user.user_metadata?.avatar_url || user.user_metadata?.picture || '';
+      if (img && googleAvatar) {
+        img.src = googleAvatar;
+        img.style.display = '';
+        if (placeholder) placeholder.style.display = 'none';
+        return;
+      }
+
+      // 3. localStorage fallback (last resort)
+      try {
+        var saved = localStorage.getItem('sottotitoli-avatar');
+        if (saved && img) {
+          img.src = saved; img.style.display = '';
+          if (placeholder) placeholder.style.display = 'none';
+        }
+      } catch(e) {}
     });
   }
 
-  // ═══ Avatar upload ═══
-  window.uploadAvatar = function(input) {
+  // ═══ Avatar upload — persists to Supabase profiles ═══
+  window.uploadAvatar = async function(input) {
     var file = input.files && input.files[0];
     if (!file) return;
     // Validate: max 200KB, only PNG/JPG/WebP
     if (file.size > 200 * 1024) { alert('Immagine troppo grande. Massimo 200KB.'); return; }
     var allowed = ['image/png','image/jpeg','image/webp'];
     if (allowed.indexOf(file.type) === -1) { alert('Formato non supportato. Usa PNG, JPG o WebP.'); return; }
+
     var reader = new FileReader();
-    reader.onload = function(e) {
+    reader.onload = async function(e) {
+      var dataUrl = e.target.result;
       var img = document.getElementById('profileAvatar');
       var placeholder = document.getElementById('profileAvatarPlaceholder');
-      if (img) { img.src = e.target.result; img.style.display = ''; }
+      // Show immediately
+      if (img) { img.src = dataUrl; img.style.display = ''; }
       if (placeholder) placeholder.style.display = 'none';
-      // Save to localStorage as data URL (Supabase Storage not set up yet)
-      try { localStorage.setItem('sottotitoli-avatar', e.target.result); } catch(ex) {}
+
+      // Save to localStorage as instant cache
+      try { localStorage.setItem('sottotitoli-avatar', dataUrl); } catch(ex) {}
+
+      // Persist to Supabase profiles.avatar_url
+      var sb = window.sottotitoliSupabase;
+      if (sb) {
+        try {
+          var r = await sb.auth.getSession();
+          var userId = r.data?.session?.user?.id;
+          if (userId) {
+            var ur = await sb.from('profiles').upsert(
+              { id: userId, avatar_url: dataUrl, updated_at: new Date().toISOString() },
+              { onConflict: 'id' }
+            );
+            if (ur.error) {
+              console.warn('Avatar save to profiles failed:', ur.error.message);
+              // Still show toast — image is at least in localStorage
+              showAvatarToast('⚠️ Salvata in locale — ' + ur.error.message);
+            } else {
+              showAvatarToast('✓ Immagine profilo salvata');
+            }
+          }
+        } catch(e) {
+          console.warn('Avatar save error:', e.message);
+          showAvatarToast('⚠️ Salvata in locale');
+        }
+      } else {
+        showAvatarToast('⚠️ Accedi per salvare permanentemente');
+      }
     };
     reader.readAsDataURL(file);
   };
 
-  // Try to load saved avatar from localStorage
+  function showAvatarToast(msg) {
+    var toast = document.getElementById('toastMsg');
+    if (!toast) return;
+    toast.textContent = msg;
+    toast.style.background = msg.indexOf('✓') === 0 ? 'var(--green, #059669)' : 'var(--amber, #d97706)';
+    toast.classList.add('show');
+    setTimeout(function(){ toast.classList.remove('show'); toast.style.background = ''; }, 3000);
+  }
+
+  // Try to load saved avatar from localStorage (instant, before Supabase)
   (function() {
     try {
       var saved = localStorage.getItem('sottotitoli-avatar');
