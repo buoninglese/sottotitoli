@@ -65,9 +65,9 @@ window.SOTTOTITOLI_CONFIG = {
   hfProxyUrl: "https://qzqmuegbpmvqrjrlfbgk.supabase.co/functions/v1/hf-proxy",
 
   /** Onboarding Starter Report AI endpoint.
-   *  Local dev: "http://localhost:8771/starter-report" (report-ai-space)
-   *  Production: deploy as Supabase Edge Function or HF Space */
-  starterReportUrl: "http://localhost:8771/starter-report",
+   *  Deploy with: supabase functions deploy starter-report --no-verify-jwt
+   *  Requires secret: supabase secrets set OPENAI_API_KEY=sk-... */
+  starterReportUrl: "https://qzqmuegbpmvqrjrlfbgk.supabase.co/functions/v1/starter-report",
 
   /** Language and translation mode definitions */
   modes: {
