@@ -5675,6 +5675,12 @@
           var resp = await fetch('https://qzqmuegbpmvqrjrlfbgk.supabase.co/functions/v1/dictionary-proxy?word=' + encodeURIComponent(word));
           if (!resp.ok) return null;
           var data = await resp.json();
+          if (!data) return null;
+          // The proxy returns simplified format { definition, ipa } — POS disambiguation
+          // needs the raw format. Try the raw Free Dictionary API directly for POS data.
+          var rawResp = await fetch('https://api.dictionaryapi.dev/api/v2/entries/en/' + encodeURIComponent(word));
+          if (!rawResp.ok) return null;
+          data = await rawResp.json();
           if (!data || !data.length) return null;
           var posSet = {};
           var posMap = { noun:'n', verb:'v', adjective:'adj', adverb:'adv', interjection:'—', pronoun:'—', preposition:'—', conjunction:'—', determiner:'—', numeral:'—' };
@@ -5690,7 +5696,7 @@
             }
           }
           var options = Object.values(posSet);
-          return options.length >= 2 ? options : null; // Only return if truly ambiguous
+          return options.length >= 2 ? options : null;
         } catch(e) { return null; }
       }
 
@@ -5792,15 +5798,22 @@
           var resp = await fetch('https://qzqmuegbpmvqrjrlfbgk.supabase.co/functions/v1/dictionary-proxy?word=' + encodeURIComponent(word));
           if (!resp.ok) return null;
           var data = await resp.json();
-          if (!data || !data.length) return null;
+          if (!data) return null;
+
+          // Handle simplified proxy format: { definition, ipa, notFound }
+          if (data.definition !== undefined) {
+            if (data.notFound) return null; // Negative cache hit
+            return { definition: data.definition, ipa: data.ipa || '' };
+          }
+
+          // Handle raw Free Dictionary API format: [{ meanings, phonetics }]
+          if (!data.length) return null;
           var entry = data[0];
           var def = '';
           var ipa = '';
-          // POS code → FreeDict partOfSpeech mapping
           var posToFD = { n:'noun', v:'verb', adj:'adjective', adv:'adverb' };
           var preferredFD = preferredPos ? posToFD[preferredPos] : null;
           if (entry.meanings && entry.meanings.length) {
-            // First pass: try to match preferred POS
             if (preferredFD) {
               for (var i = 0; i < entry.meanings.length; i++) {
                 var m = entry.meanings[i];
@@ -5809,7 +5822,6 @@
                 }
               }
             }
-            // Second pass: take first available if no POS match
             if (!def) {
               for (var i = 0; i < entry.meanings.length; i++) {
                 var m = entry.meanings[i];
