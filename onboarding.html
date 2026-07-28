@@ -886,6 +886,29 @@
                 <p style="font-size:11px;color:var(--text-dim);margin:8px 0 0;">Torna indietro con le frecce o clicca sui pallini per completare le domande mancanti.</p>
               </div>
             </div>
+            <!-- ── AI Starter Report card ── -->
+            <div class="insight-card" id="dashReportCard" style="text-align:center;">
+              <div style="font-size:28px;margin-bottom:6px;">🤖</div>
+              <h4 style="margin-bottom:6px;">Starter Report AI</h4>
+              <p id="dashReportStatus" style="font-size:12px;color:var(--text-dim);margin-bottom:12px;">
+                Completa tutte le domande per generare il tuo report personalizzato.
+              </p>
+              <button class="report-download-btn" id="dashGenerateReportBtn" onclick="generateReportFromDashboard()"
+                style="display:inline-flex;align-items:center;gap:6px;font-family:inherit;font-size:12px;font-weight:700;
+                padding:8px 18px;border-radius:99px;cursor:pointer;border:1.5px solid var(--accent-purple);
+                background:transparent;color:var(--accent-purple);transition:all .15s;"
+                onmouseover="this.style.background='var(--accent-purple)';this.style.color='#fff';"
+                onmouseout="this.style.background='transparent';this.style.color='var(--accent-purple)';">
+                <i class="fa-solid fa-wand-magic-sparkles"></i> Genera il mio report
+              </button>
+              <div id="dashReportLoading" style="display:none;margin-top:10px;color:var(--text-muted);font-size:12px;">
+                <span class="spin" style="display:inline-block;width:14px;height:14px;border:2px solid var(--line);border-top-color:var(--accent-purple);border-radius:50%;animation:spin .7s linear infinite;vertical-align:middle;margin-right:6px;"></span>
+                L'AI sta analizzando il tuo profilo…
+              </div>
+              <p id="dashReportDone" style="display:none;margin-top:10px;font-size:12px;color:var(--accent-green);">
+                <i class="fa-solid fa-circle-check"></i> Report generato! <a href="#" onclick="document.getElementById('starterReportSection').scrollIntoView({behavior:'smooth'});return false;" style="color:var(--accent-purple);font-weight:600;">Vedi il report ↓</a>
+              </p>
+            </div>
             <div class="insight-card">
               <h4><i class="fa-solid fa-shield-halved"></i> Affidabilità</h4>
               <p id="dashReliability">—</p>
@@ -2051,6 +2074,23 @@
       // Show 'Sei a posto!' when 100%
       var readyEl = document.getElementById('readySection');
       if (readyEl) readyEl.style.display = completionPct >= 100 ? 'block' : 'none';
+
+      // Update report card state
+      var reportStatus = document.getElementById('dashReportStatus');
+      var reportBtn = document.getElementById('dashGenerateReportBtn');
+      if (reportStatus && reportBtn) {
+        if (completionPct >= 100) {
+          reportStatus.textContent = 'Tutte le domande sono complete. Genera il tuo report personalizzato!';
+          reportBtn.disabled = false;
+          reportBtn.style.opacity = '1';
+          reportBtn.style.cursor = 'pointer';
+        } else {
+          reportStatus.textContent = 'Completa tutte le domande per generare il tuo report personalizzato.';
+          reportBtn.disabled = true;
+          reportBtn.style.opacity = '0.45';
+          reportBtn.style.cursor = 'not-allowed';
+        }
+      }
     }
 
     // ── Supabase Auto-save (debounced) ──
@@ -2217,6 +2257,40 @@
       btnFinish.onclick = function() {
         window.location.href = 'panoramica.html';
       };
+    }
+
+    // ── Generate report from dashboard button ──
+    async function generateReportFromDashboard() {
+      var comp = getCompletionPercent();
+      if (comp < 100) {
+        alert('Completa tutte le domande prima di generare il report.\n\nCampi mancanti:\n' + getMissingFields().join('\n'));
+        return;
+      }
+      var btn = document.getElementById('dashGenerateReportBtn');
+      var loading = document.getElementById('dashReportLoading');
+      var done = document.getElementById('dashReportDone');
+      var status = document.getElementById('dashReportStatus');
+
+      if (btn) { btn.disabled = true; btn.style.opacity = '0.5'; }
+      if (loading) loading.style.display = 'block';
+      if (done) done.style.display = 'none';
+      if (status) status.textContent = 'Generazione in corso…';
+
+      var result = await generateStarterReport();
+
+      if (loading) loading.style.display = 'none';
+      if (btn) { btn.disabled = false; btn.style.opacity = '1'; }
+
+      if (result) {
+        if (done) done.style.display = 'block';
+        if (status) status.textContent = 'Il tuo report personalizzato è pronto!';
+        // Scroll to report
+        var reportSection = document.getElementById('starterReportSection');
+        if (reportSection) reportSection.scrollIntoView({ behavior: 'smooth' });
+      } else {
+        if (status) status.textContent = 'Servizio AI non disponibile al momento. Riprova più tardi.';
+        if (btn) btn.style.opacity = '1';
+      }
     }
 
     // ── Generate Starter Report via AI ──
