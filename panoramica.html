@@ -795,6 +795,7 @@
           <div role="tabpanel" class="subtab-pane active" id="sub-generale">
             <section class="alt-card-grid">
               <article class="alt-card"><h3>Attività</h3><div style="display:flex;flex-direction:column;gap:8px;margin-top:10px"><div style="display:flex;justify-content:space-between;font-size:14px"><span style="color:var(--text-soft)">Sessioni totali</span><span id="profileTotalSessions" style="font-weight:700">—</span></div><div style="display:flex;justify-content:space-between;font-size:14px"><span style="color:var(--text-soft)">Ore parlate</span><span id="profileTotalHours" style="font-weight:700">—</span></div><div style="display:flex;justify-content:space-between;font-size:14px"><span style="color:var(--text-soft)">Parole uniche</span><span id="profileTotalWords" style="font-weight:700">—</span></div><div style="display:flex;justify-content:space-between;font-size:14px"><span style="color:var(--text-soft)">Giorni consecutivi</span><span id="profileStreak" style="color:var(--cyan);font-weight:700">—</span></div></div></article>
+              <article class="alt-card"><h3>👤 Chi sono</h3><div style="display:flex;flex-direction:column;gap:8px;margin-top:10px"><div style="display:flex;justify-content:space-between;font-size:14px"><span style="color:var(--text-soft)">Professione</span><span id="profileProfession" style="font-weight:700">—</span></div><div style="display:flex;justify-content:space-between;font-size:14px"><span style="color:var(--text-soft)">Perché studio</span><span id="profileWhyEnglish" style="font-weight:700">—</span></div></div></article>
             </section>
           </div>
           <!-- Sub-tab: Profilo Linguistico -->
@@ -914,6 +915,7 @@
               <article class="alt-card"><h3>Affidabilità</h3><p id="insightsOverviewConfidence" style="font-size:14px;color:var(--text-soft);line-height:1.6">Caricamento…</p><p id="insightsOverviewConfidenceNote" style="font-size:11px;color:var(--text-faint);margin-top:6px">Sono indicazioni direzionali, non valutazioni definitive.</p></article>
               <article class="alt-card"><h3>Abitudini</h3><div style="display:flex;flex-direction:column;gap:8px;margin-top:10px"><div style="display:flex;justify-content:space-between;font-size:13px"><span id="insightsAvgDaily">—</span><span style="color:var(--text-faint)">Media giornaliera</span></div><div style="display:flex;justify-content:space-between;font-size:13px"><span id="insightsFascia">—</span><span style="color:var(--text-faint)">Fascia preferita</span></div><div style="display:flex;justify-content:space-between;font-size:13px"><span id="insightsGiorni">—</span><span style="color:var(--text-faint)">Giorni più attivi</span></div></div><div id="insightsOverviewPatterns" class="habit-chips" style="margin-top:10px"></div></article>
               <article class="alt-card"><h3>Prossimo passo</h3><p id="insightsOverviewNext" style="font-size:14px;color:var(--text-soft);line-height:1.6">Caricamento…</p></article>
+              <article class="alt-card"><h3>🎯 Aree di miglioramento</h3><div class="q-row" id="insightsFocusAreas" style="margin-top:8px"><span style="font-size:13px;color:var(--text-faint)">Completa l'onboarding per vedere le tue aree di miglioramento.</span></div></article>
             </section>
           </div>
           <div role="tabpanel" class="subtab-pane" id="sub-obiettivi">
@@ -6874,41 +6876,70 @@
   function loadOnboardingObjectives() {
     var stEl = document.getElementById('goalBreveTesto');
     var ltEl = document.getElementById('goalLungoTesto');
-    if (!stEl && !ltEl) return;
+    var profEl = document.getElementById('profileProfession');
+    var whyEl = document.getElementById('profileWhyEnglish');
+    var focusEl = document.getElementById('insightsFocusAreas');
 
     // Try localStorage first (instant)
-    var stGoal = '', ltGoal = '';
+    var stGoal = '', ltGoal = '', profession = '', whyEnglish = '', difficulties = [];
     try {
       var ob = JSON.parse(localStorage.getItem('sottotitoli_onboarding') || '{}');
       stGoal = ob['short_term_goal'] || '';
       ltGoal = ob['long_term_goal'] || '';
+      profession = ob['profession'] || (ob['profession_other'] || '');
+      whyEnglish = ob['why_english'] || (ob['why_english_other'] || '');
+      difficulties = ob['difficulties'] || [];
     } catch(e) {}
 
-    // Also try Supabase profiles (more permanent source)
+    // Also try Supabase profiles (more permanent + AI-refined data)
     var sb = window.sottotitoliSupabase;
     if (sb) {
       sb.auth.getSession().then(function(r) {
         if (!r.data?.session) return;
-        sb.from('profiles').select('short_term_goal,long_term_goal,native_lang').eq('id', r.data.session.user.id).maybeSingle().then(function(res) {
+        sb.from('profiles').select('short_term_goal,long_term_goal,native_lang,domain,use_cases,learning_profile').eq('id', r.data.session.user.id).maybeSingle().then(function(res) {
           if (res.data) {
-            if (!stGoal && res.data.short_term_goal) stGoal = res.data.short_term_goal;
-            if (!ltGoal && res.data.long_term_goal) ltGoal = res.data.long_term_goal;
+            // Goals — prefer AI-refined versions from Supabase
+            if (res.data.short_term_goal) stGoal = res.data.short_term_goal;
+            if (res.data.long_term_goal) ltGoal = res.data.long_term_goal;
+            // Profession
+            if (!profession && res.data.domain) profession = res.data.domain;
+            // Why English
+            if (!whyEnglish && res.data.use_cases) whyEnglish = res.data.use_cases;
+            // Difficulties / focus areas
+            if (res.data.learning_profile) {
+              try {
+                var lp = JSON.parse(res.data.learning_profile);
+                if (Array.isArray(lp) && lp.length > 0) difficulties = lp;
+              } catch(e) {}
+            }
             // Populate settings native_lang if empty
             if (res.data.native_lang) {
               var natEl = document.getElementById('settingsNativeLang');
               if (natEl && !natEl.value) natEl.value = res.data.native_lang;
             }
           }
-          _setGoalTexts(stGoal, ltGoal);
+          _populateAll();
         });
       });
     } else {
-      _setGoalTexts(stGoal, ltGoal);
+      _populateAll();
     }
 
-    function _setGoalTexts(st, lt) {
-      if (stEl) { stEl.textContent = st || 'Nessun obiettivo a breve termine impostato. Completa l\'onboarding per definirlo.'; }
-      if (ltEl) { ltEl.textContent = lt || 'Nessun obiettivo a lungo termine impostato. Completa l\'onboarding per definirlo.'; }
+    function _populateAll() {
+      // Goals
+      if (stEl) { stEl.textContent = stGoal || 'Nessun obiettivo a breve termine impostato. Completa l\'onboarding per definirlo.'; }
+      if (ltEl) { ltEl.textContent = ltGoal || 'Nessun obiettivo a lungo termine impostato. Completa l\'onboarding per definirlo.'; }
+      // Profilo → Generale
+      if (profEl) { profEl.textContent = profession || '—'; }
+      if (whyEl) { whyEl.textContent = whyEnglish || '—'; }
+      // Insights → Overview → Focus areas
+      if (focusEl && difficulties.length > 0) {
+        var chips = '';
+        difficulties.forEach(function(d) {
+          chips += '<button class=\"q-chip active\" style=\"pointer-events:none\">' + d + '</button>';
+        });
+        focusEl.innerHTML = chips;
+      }
     }
   }
 
