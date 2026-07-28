@@ -6715,12 +6715,24 @@
       if (insNav) { insNav.addEventListener('click', function () { setTimeout(renderTasks, 100); setTimeout(renderInsightsOverview, 150); }); }
       var impNav = document.querySelector('[data-panel="impostazioni"]');
       if (impNav) { impNav.addEventListener('click', async function () {
-        var sd = null;
-        if (typeof SottotitoliData !== 'undefined' && SottotitoliData.loadSettings) {
-          sd = await SottotitoliData.loadSettings();
+        // Load localStorage first (instant, always works)
+        var localSettings = null;
+        try { localSettings = JSON.parse(localStorage.getItem('sottotitoli-settings') || 'null'); } catch(e) {}
+        // Immediately populate with localStorage so fields are never empty
+        if (localSettings) {
+          window._settingsData = localSettings;
+          renderSettings(localSettings);
         }
-        window._settingsData = sd;
-        setTimeout(function(){ renderSettings(sd); }, 100);
+        // Then try Supabase for fresher data
+        if (typeof SottotitoliData !== 'undefined' && SottotitoliData.loadSettings) {
+          try {
+            var sd = await SottotitoliData.loadSettings();
+            if (sd && (sd.display_name || sd.native_lang || sd.theme)) {
+              window._settingsData = sd;
+              renderSettings(sd);
+            }
+          } catch(e) { console.warn('Supabase settings load failed, using localStorage:', e.message); }
+        }
       }); }
       // ── Profilo Linguistico subsubtabs (native / target) ──
       document.querySelectorAll('.tab-link[data-plang]').forEach(function(tab){
