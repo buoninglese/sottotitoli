@@ -599,7 +599,8 @@
     <div class="onboard-card">
 
       <!-- Saving indicator -->
-      <div style="padding:0 36px;display:flex;justify-content:flex-end;">
+      <div style="padding:0 36px;display:flex;justify-content:space-between;align-items:center;">
+        <button id="marcoMockBtn" style="font-size:10px;padding:4px 10px;border-radius:99px;border:1px dashed var(--line);background:transparent;color:var(--text-muted);cursor:pointer;font-family:inherit" title="Fill all slides with Marco's preset data for testing">Marco mockup</button>
         <span class="saving-indicator" id="savingIndicator">
           <span class="spin"></span> Salvataggio…
         </span>
@@ -1116,6 +1117,14 @@
   <!-- Auth guard: onboarding requires a logged-in user to save data -->
   <script>
   (function(){
+    // Allow ?mock=1 param for testing without auth
+    if (window.location.search.indexOf('mock=1') !== -1) {
+      window.sottotitoliSupabase = {
+        auth: { getSession: async function(){ return { data: { session: { user: { id: 'test-mock-user', email: 'marco@mock.it' } } } }; } },
+        from: function(t){ return { select: function(){ return this; }, eq: function(){ return this; }, maybeSingle: async function(){ return { data: null }; }, upsert: async function(d,opts){ console.log('mock upsert →', t, d); return { error: null }; } }; }
+      };
+      return;
+    }
     function guard(){
       var sb = window.sottotitoliSupabase;
       if (!sb) { setTimeout(guard, 200); return; }
@@ -1155,6 +1164,80 @@
     function persist() {
       localStorage.setItem('sottotitoli_onboarding', JSON.stringify(onboardData));
     }
+
+    // ── Marco mockup — fills every slide with rich preset data ──
+    function marcoMockup() {
+      if (!confirm('Fill all slides with Marco\'s preset test data? This overwrites your current answers.')) return;
+
+      // Slide 1: Heard from
+      onboardData['heard_from'] = 'reddit';
+
+      // Slide 2: Profession
+      onboardData['profession'] = 'software_engineer';
+
+      // Slide 3: Native lang + UI
+      onboardData['native_lang'] = 'nl';
+      onboardData['native_lang_other'] = '';
+      onboardData['ui_language'] = 'it';
+
+      // Slide 4: Why English
+      onboardData['why_english'] = ['work', 'travel'];
+      onboardData['why_english_other'] = '';
+
+      // Slide 5: Languages spoken + improve
+      onboardData['spoken_languages'] = ['it', 'en', 'nl'];
+      onboardData['spoken_languages_other'] = '';
+      onboardData['improve_languages'] = ['it', 'fr'];
+      onboardData['improve_languages_other'] = '';
+
+      // Slide 6: Difficulties
+      onboardData['difficulties'] = ['speaking_fluently', 'listening_native', 'pronunciation', 'vocabulary'];
+      onboardData['difficulties_other'] = 'Sometimes I freeze mid-sentence when I can\'t find the right word.';
+
+      // Slide 7: Mic test
+      onboardData['mic_tested'] = true;
+
+      // Slide 8: Parlami di te (intake transcript)
+      onboardData['intake_transcript'] = 'Ciao, sono Marco. Lavoro come ingegnere del software in una startup a Milano — sviluppiamo una piattaforma per la gestione di dati clinici in cloud. Vivo in Italia da quasi 8 anni — prima ero a Eindhoven, nei Paesi Bassi, dove ho studiato informatica alla TU/e.\n\nParlo olandese come lingua madre, inglese a livello professionale (l\'ho usato per anni al lavoro e all\'università), e italiano — che sto ancora perfezionando. Ho iniziato a studiare italiano seriamente quando mi sono trasferito, e ora posso gestire conversazioni quotidiane senza problemi, ma quando si tratta di riunioni di lavoro o discussioni tecniche mi sento ancora insicuro.\n\nIl mio obiettivo è raggiungere un livello C1 in italiano entro i prossimi due anni. Vorrei poter partecipare a riunioni in italiano senza prepararmi prima, scrivere documentazione tecnica senza errori, e capire le sfumature culturali nelle conversazioni. Mi interessa anche migliorare il mio francese — l\'ho studiato a scuola ma l\'ho trascurato completamente.';
+
+      // Slide 9: Long-term goal
+      onboardData['long_term_goal'] = 'Il mio sogno è diventare completamente bilingue italiano-inglese, e avere una buona padronanza del francese come terza lingua. Professionalmente, voglio poter presentare a conferenze tech in italiano senza problemi. Personalmente, voglio leggere letteratura italiana contemporanea in originale — autori come Elena Ferrante, Italo Calvino, Primo Levi. Mi piacerebbe anche viaggiare in Francia e riuscire a conversare con naturalezza, non solo ordinare al ristorante.\n\nA lungo termine, mi vedo come un professionista che opera senza barriere linguistiche in tre lingue. Voglio che la lingua non sia mai un ostacolo nella mia carriera o nella mia vita sociale.';
+
+      // Slide 10: Short-term goal
+      onboardData['short_term_goal'] = 'Nei prossimi 3 mesi:\n\n1. Completare 4 sessioni di pratica a settimana su Sottotitoli (2 di captioning + 2 di traduzione)\n2. Imparare 300 nuovi vocaboli italiani, specialmente nel dominio tech/business\n3. Fare almeno 2 riunioni di lavoro completamente in italiano senza switchnare all\'inglese\n4. Guardare una serie TV italiana senza sottotitoli (sto pensando a "L\'amica geniale")\n5. Scrivere un breve articolo tecnico in italiano — anche solo 500 parole — per il blog aziendale\n6. Riprendere il francese: completare il livello A2 su Duolingo o equivalente';
+
+      // Slide 11: English situations
+      onboardData['english_situations'] = ['Riunioni', 'Email', 'Presentazioni', 'Conversazioni sociali', 'Lettura'];
+
+      // Slide 12: English level
+      onboardData['english_level'] = 'upper-intermediate';
+
+      // Terms consent
+      onboardData['terms_consent'] = true;
+      onboardData['terms_consent_at'] = new Date().toISOString();
+
+      persist();
+
+      // Navigate to summary slide so user can see all filled data
+      goToSlide(13);
+      updateUI();
+
+      // Flash feedback
+      var btn = document.getElementById('marcoMockBtn');
+      if (btn) {
+        btn.textContent = '✓ Filled!';
+        btn.style.borderColor = 'var(--accent-green)';
+        btn.style.color = 'var(--accent-green)';
+        setTimeout(function() {
+          btn.textContent = 'Marco mockup';
+          btn.style.borderColor = '';
+          btn.style.color = '';
+        }, 2000);
+      }
+    }
+
+    // Wire the button
+    document.getElementById('marcoMockBtn').addEventListener('click', marcoMockup);
 
     // ── Consent management ──
     function hasConsented() {
