@@ -443,6 +443,12 @@
       width: 8px; height: 8px; border-radius: 50%;
       background: var(--line); transition: all .25s;
       cursor: pointer; border: none;
+      position: relative;
+      /* Invisible hit area for mobile — 44px minimum touch target */
+    }
+    .onboard-dot::after {
+      content: ''; position: absolute;
+      top: -18px; left: -18px; right: -18px; bottom: -18px;
     }
     .onboard-dot.active { background: var(--accent-purple); width: 24px; border-radius: 99px; }
     .onboard-dot.done { background: var(--accent-green); }
@@ -475,15 +481,51 @@
     }
     .btn-skip:hover { color: var(--text-dim); }
 
+    /* ── Tablet / iPad touch optimizations ── */
+    @media (pointer: coarse) {
+      .pill { padding: 12px 20px; }
+      .btn { padding: 12px 26px; }
+      .mic-btn { width: 88px; height: 88px; font-size: 32px; }
+      .onboard-dot { width: 12px; height: 12px; }
+      .onboard-dot.active { width: 30px; }
+      .onboard-dot::after { top: -18px; left: -18px; right: -18px; bottom: -18px; }
+    }
+
+    /* ── Reduced motion ── */
+    @media (prefers-reduced-motion: reduce) {
+      .onboard-slide { animation: none; }
+      .onboard-progress-fill { transition: none; }
+      .mic-btn.recording { animation: none; box-shadow: 0 0 0 4px rgba(239,68,68,.3); }
+      .loader { animation: none; border-top-color: transparent; opacity: .5; }
+    }
+
     /* ── Responsive ── */
     @media (max-width: 640px) {
-      .onboard-card { max-width: 100%; border-radius: 20px; max-height: 95vh; }
-      .onboard-slides { padding: 28px 24px 18px; }
-      .onboard-footer { padding: 16px 24px 22px; flex-wrap: wrap; gap: 12px; }
+      body { padding: 12px; padding: max(12px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) max(12px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left)); }
+      .onboard-card { max-width: 100%; border-radius: 20px; max-height: calc(100vh - 24px - env(safe-area-inset-top) - env(safe-area-inset-bottom)); min-height: 360px; }
+      .onboard-slides { padding: 24px 20px 16px; }
+      .onboard-footer { padding: 12px 20px 20px; flex-wrap: wrap; gap: 10px; }
+      .onboard-footer .onboard-dots { order: 2; width: 100%; justify-content: center; }
+      .onboard-footer .onboard-btns { order: 1; width: 100%; justify-content: space-between; }
       .slide-title { font-size: 20px; }
       .pill { font-size: 12px; padding: 8px 14px; }
       .insights-grid { grid-template-columns: 1fr; }
       .voice-embed { height: 180px; }
+      .btn { padding: 10px 18px; font-size: 13px; }
+      .word-nudge-card { max-width: calc(100vw - 40px); padding: 22px 18px 18px; }
+      .word-nudge-card h3 { font-size: 16px; }
+      /* Larger touch targets for nav dots */
+      .onboard-dot { width: 12px; height: 12px; }
+      .onboard-dot.active { width: 28px; }
+      .onboard-dot::after { top: -16px; left: -16px; right: -16px; bottom: -16px; }
+      /* Prevent landscape card overflow */
+      @media (max-height: 500px) {
+        .onboard-card { max-height: calc(100vh - 16px); min-height: 280px; }
+        .onboard-slides { padding: 16px 20px 12px; }
+        .slide-title { font-size: 18px; margin-bottom: 6px; }
+        .slide-subtitle { margin-bottom: 14px; font-size: 12px; }
+        .slide-icon { font-size: 28px; margin-bottom: 6px; }
+      }
     }
   </style>
 </head>
@@ -1024,12 +1066,18 @@
 
     function onConsentChange() {
       var err = document.getElementById('consentError');
-      if (err) err.style.display = hasConsented() ? 'none' : 'none';
-      if (hasConsented()) {
+      var consented = hasConsented();
+      if (err) err.style.display = consented ? 'none' : 'block';
+      if (consented) {
         onboardData['terms_consent'] = true;
         onboardData['terms_consent_at'] = new Date().toISOString();
-        persist();
+      } else {
+        // User unchecked — clear consent and force them back to slide 0
+        delete onboardData['terms_consent'];
+        delete onboardData['terms_consent_at'];
+        if (currentSlide > 0) goToSlide(0);
       }
+      persist();
     }
 
     function onMarketingConsentChange() {
@@ -1166,6 +1214,8 @@
       document.querySelectorAll('.onboard-slide').forEach(function(s) { s.classList.remove('active'); });
       document.querySelectorAll('.onboard-slide')[idx].classList.add('active');
       currentSlide = idx;
+      onboardData['_last_slide'] = idx;
+      persist();
       updateUI();
       slidesContainer.scrollTop = 0;
     }
@@ -1229,7 +1279,7 @@
 
       buildDots();
 
-      if (currentSlide === 10) buildSummary();
+      if (currentSlide === 11) buildSummary();
       if (currentSlide === 12) buildDashboard();
     }
 
@@ -1365,6 +1415,13 @@
       _speechRecognition.onerror = function(event) {
         console.warn('Speech error:', event.error);
         if (event.error === 'no-speech') return;
+        if (event.error === 'not-allowed') {
+          if (status) {
+            status.innerHTML = '⚠️ Microfono non consentito. Su iPhone/iPad, vai in <strong>Impostazioni → Safari → Microfono</strong>.';
+            status.style.color = 'var(--amber)';
+            status.style.display = 'inline';
+          }
+        }
         stopSpeechRecord();
       };
 
@@ -2280,6 +2337,16 @@
 
     // ── Restore selections from saved data ──
     function restoreSelections() {
+      // Restore consent checkbox
+      if (onboardData['terms_consent']) {
+        var consentCb = document.getElementById('consentCheck');
+        if (consentCb) consentCb.checked = true;
+      }
+      // Restore marketing consent
+      if (onboardData['marketing_consent']) {
+        var mktCb = document.getElementById('marketingConsent');
+        if (mktCb) mktCb.checked = true;
+      }
       ['heard_from', 'profession', 'ui_language'].forEach(function(key) {
         var val = onboardData[key];
         if (!val) return;
@@ -2308,13 +2375,20 @@
         }
       }
 
-      if (onboardData['native_lang_other']) { document.getElementById('nativeLangOther').style.display = 'block'; document.getElementById('nativeLangOther').value = onboardData['native_lang_other']; }
-      if (onboardData['heard_from_other']) { document.getElementById('heardOtherInput').style.display = 'block'; document.getElementById('heardOtherInput').value = onboardData['heard_from_other']; }
-      if (onboardData['profession_other']) { document.getElementById('jobOtherInput').style.display = 'block'; document.getElementById('jobOtherInput').value = onboardData['profession_other']; }
-      if (onboardData['why_english_other']) { document.getElementById('whyEngOtherInput').style.display = 'block'; document.getElementById('whyEngOtherInput').value = onboardData['why_english_other']; }
-      if (onboardData['spoken_languages_other']) { document.getElementById('spokenOtherInput').style.display = 'block'; document.getElementById('spokenOtherInput').value = onboardData['spoken_languages_other']; }
-      if (onboardData['improve_languages_other']) { document.getElementById('improveOtherInput').style.display = 'block'; document.getElementById('improveOtherInput').value = onboardData['improve_languages_other']; }
-      if (onboardData['difficulties_other']) { document.getElementById('diffOtherInput').style.display = 'block'; document.getElementById('diffOtherInput').value = onboardData['difficulties_other']; }
+      // Restore "other" text inputs — only show if the corresponding "other_*" pill is selected
+      function _shouldShowOther(key, otherVal) {
+        var v = onboardData[key];
+        if (!v) return false;
+        if (Array.isArray(v)) return v.indexOf(otherVal) !== -1;
+        return v === otherVal;
+      }
+      if (onboardData['heard_from_other'] && _shouldShowOther('heard_from', 'other_heard')) { document.getElementById('heardOtherInput').style.display = 'block'; document.getElementById('heardOtherInput').value = onboardData['heard_from_other']; }
+      if (onboardData['profession_other'] && _shouldShowOther('profession', 'other_job')) { document.getElementById('jobOtherInput').style.display = 'block'; document.getElementById('jobOtherInput').value = onboardData['profession_other']; }
+      if (onboardData['why_english_other'] && _shouldShowOther('why_english', 'other_why')) { document.getElementById('whyEngOtherInput').style.display = 'block'; document.getElementById('whyEngOtherInput').value = onboardData['why_english_other']; }
+      if (onboardData['spoken_languages_other'] && _shouldShowOther('spoken_languages', 'other_spoken')) { document.getElementById('spokenOtherInput').style.display = 'block'; document.getElementById('spokenOtherInput').value = onboardData['spoken_languages_other']; }
+      if (onboardData['improve_languages_other'] && _shouldShowOther('improve_languages', 'other_improve')) { document.getElementById('improveOtherInput').style.display = 'block'; document.getElementById('improveOtherInput').value = onboardData['improve_languages_other']; }
+      if (onboardData['difficulties_other'] && _shouldShowOther('difficulties', 'other_diff')) { document.getElementById('diffOtherInput').style.display = 'block'; document.getElementById('diffOtherInput').value = onboardData['difficulties_other']; }
+      if (onboardData['native_lang_other'] && onboardData['native_lang'] === 'other_lang') { document.getElementById('nativeLangOther').style.display = 'block'; document.getElementById('nativeLangOther').value = onboardData['native_lang_other']; }
       if (onboardData['short_term_goal']) { var stEl = document.getElementById('shorttermTranscript'); if (stEl) { stEl.value = onboardData['short_term_goal']; onTranscriptInput('shortterm', onboardData['short_term_goal']); } }
       if (onboardData['long_term_goal']) { var ltEl = document.getElementById('longtermTranscript'); if (ltEl) { ltEl.value = onboardData['long_term_goal']; onTranscriptInput('longterm', onboardData['long_term_goal']); } }
       // Restore transcripts
@@ -2340,13 +2414,28 @@
     }
 
     // ── Init ──
+    var _initAttempts = 0;
+    var _initMaxAttempts = 30; // ~6 seconds with 200ms intervals
     async function init() {
       // Wait for Supabase auth to be ready
       var sb = window.sottotitoliSupabase;
-      if (!sb) { setTimeout(init, 200); return; }
+      if (!sb) {
+        _initAttempts++;
+        if (_initAttempts > _initMaxAttempts) {
+          showState('stateNoAuth');
+          return;
+        }
+        setTimeout(init, 200); return;
+      }
 
-      var _s = await sb.auth.getSession();
-      var session = _s.data?.session;
+      try {
+        var _s = await sb.auth.getSession();
+        var session = _s.data?.session;
+      } catch(e) {
+        console.warn('Supabase auth error:', e.message);
+        showState('stateNoAuth');
+        return;
+      }
 
       if (!session) {
         showState('stateNoAuth');
@@ -2381,7 +2470,13 @@
       restoreSelections();
       filterLanguagePills();
       showOverlay();
-      goToSlide(0);
+      // Resume from last visited slide, or start at 0
+      var lastSlide = parseInt(onboardData['_last_slide']) || 0;
+      if (lastSlide > 0 && lastSlide < TOTAL_SLIDES) {
+        goToSlide(lastSlide);
+      } else {
+        goToSlide(0);
+      }
 
       // Theme from js/theme.js or localStorage
       var savedTheme = localStorage.getItem('sottotitoli-theme') || 'dark';
