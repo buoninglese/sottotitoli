@@ -1546,9 +1546,8 @@ setState("idle");
 chat.renderEmptyState();
 initGateArc();
 void fetchConfig();
-// Start the webcam as soon as the user lands (camera tool defaults on), and
-// react to later permission changes (re-grant after a denial re-enables it).
-void autoStartCamera();
+// Camera auto-start disabled — Sottotitoli never requests camera access.
+// void autoStartCamera();
 void watchCameraPermission();
 
 // Reconcile a live session if the tab is closed/hidden mid-call (no teardown).
