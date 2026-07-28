@@ -339,7 +339,9 @@
     if (settings.anonymous_sharing !== undefined) prefUpdate.anonymous_sharing = settings.anonymous_sharing;
     if (settings.theme !== undefined) prefUpdate.theme = settings.theme;
     if (settings.font_pref !== undefined) prefUpdate.font_pref = settings.font_pref;
-    if (settings.ui_language !== undefined || settings.save_sessions !== undefined || settings.anonymous_sharing !== undefined || settings.theme !== undefined || settings.font_pref !== undefined) {
+    if (settings.default_caption_lang !== undefined) prefUpdate.default_caption_lang = settings.default_caption_lang;
+    if (settings.default_translation_pair !== undefined) prefUpdate.default_translation_pair = settings.default_translation_pair;
+    if (settings.ui_language !== undefined || settings.save_sessions !== undefined || settings.anonymous_sharing !== undefined || settings.theme !== undefined || settings.font_pref !== undefined || settings.default_caption_lang !== undefined || settings.default_translation_pair !== undefined) {
       var r2 = await sb().from('user_preferences').upsert(prefUpdate, { onConflict: 'user_id' });
       if (r2.error) {
         errors.push('preferences: ' + r2.error.message);
@@ -365,6 +367,8 @@
       if (settings.anonymous_sharing !== undefined) existing.anonymous_sharing = settings.anonymous_sharing;
       if (settings.theme !== undefined) existing.theme = settings.theme;
       if (settings.font_pref !== undefined) existing.font_pref = settings.font_pref;
+      if (settings.default_caption_lang !== undefined) existing.default_caption_lang = settings.default_caption_lang;
+      if (settings.default_translation_pair !== undefined) existing.default_translation_pair = settings.default_translation_pair;
       localStorage.setItem('sottotitoli-settings', JSON.stringify(existing));
     } catch(e) {}
   }
