@@ -1370,6 +1370,7 @@
     var _speechRecognition = null;
     var _speechRecType = null;
     var _speechLang = { intake: 'it-IT', longterm: 'it-IT', shortterm: 'it-IT' };
+    var _speechBaseText = {}; // preserve existing text when re-recording
 
     function setSpeechLang(type, lang, btn) {
       _speechLang[type] = lang;
@@ -1404,6 +1405,10 @@
       var status = document.getElementById(type + 'RecordStatus');
       var textarea = document.getElementById(type + 'Transcript');
 
+      // Preserve existing text so re-recording appends instead of replacing
+      var existing = (textarea.value || '').trim();
+      _speechBaseText[type] = existing;
+
       _speechRecognition.onresult = function(event) {
         var transcript = '';
         for (var i = 0; i < event.results.length; i++) {
@@ -1415,7 +1420,9 @@
             transcript += t;
           }
         }
-        textarea.value = transcript.trim();
+        // Prepend preserved text so nothing is lost on re-record
+        var base = _speechBaseText[type] || '';
+        textarea.value = (base ? base + '\n' : '') + transcript.trim();
         textarea.dispatchEvent(new Event('input', { bubbles: true }));
         textarea.scrollTop = textarea.scrollHeight;
       };
