@@ -783,7 +783,7 @@
           </div>
           <textarea class="onboard-input" id="intakeTranscript" rows="6" placeholder="Scrivi qui in italiano (o inglese) — raccontaci di te, il tuo lavoro, i tuoi hobby, e cosa ti motiva…" oninput="onTranscriptInput('intake', this.value)"></textarea>
           <div style="display:flex;align-items:center;margin-top:6px;">
-            <span class="transcript-status" id="intakeStatus"><span id="intakeWordCount">0</span>/200 parole — Minimo 200 parole richieste</span>
+            <span class="transcript-status" id="intakeStatus"><span id="intakeWordCount">0</span>/200 parole — Più scrivi, più la tua esperienza sarà personalizzata</span>
           </div>
         </div>
 
@@ -808,7 +808,7 @@
           </div>
           <textarea class="onboard-input" id="longtermTranscript" rows="4" placeholder="Es: Ottenere una certificazione C1 entro fine anno, oppure tenere una presentazione di 30 minuti in inglese senza preparazione…" oninput="onTranscriptInput('longterm', this.value); saveText('long_term_goal', this.value)"></textarea>
           <div style="display:flex;align-items:center;margin-top:6px;">
-            <span class="transcript-status" id="longtermStatus"><span id="longtermWordCount">0</span>/100 parole — Minimo 100 parole</span>
+            <span class="transcript-status" id="longtermStatus"><span id="longtermWordCount">0</span>/100 parole — Più dettagli dai, meglio è</span>
           </div>
         </div>
 
@@ -833,7 +833,7 @@
           </div>
           <textarea class="onboard-input" id="shorttermTranscript" rows="4" placeholder="Es: Sostenere una riunione in inglese senza preparazione, guardare un film in lingua originale senza sottotitoli, imparare 200 nuovi vocaboli…" oninput="onTranscriptInput('shortterm', this.value); saveText('short_term_goal', this.value)"></textarea>
           <div style="display:flex;align-items:center;margin-top:6px;">
-            <span class="transcript-status" id="shorttermStatus"><span id="shorttermWordCount">0</span>/100 parole — Minimo 100 parole</span>
+            <span class="transcript-status" id="shorttermStatus"><span id="shorttermWordCount">0</span>/100 parole — Più dettagli dai, meglio è</span>
           </div>
         </div>
 
@@ -878,6 +878,13 @@
             <div class="insight-card full">
               <h4><i class="fa-solid fa-chart-pie"></i> Dashboard</h4>
               <p id="dashSummary">Completamento benvenuto: <strong style="color:var(--accent-green);" id="dashCompletionPct">0%</strong></p>
+              <div id="dashMissingSection" style="display:none;margin-top:10px;padding:10px 14px;border-radius:10px;background:rgba(251,191,36,.08);border:1px solid rgba(251,191,36,.2);">
+                <p style="font-size:12px;color:var(--amber);margin:0;line-height:1.6;">
+                  <i class="fa-solid fa-circle-exclamation"></i> <strong>Non hai ancora completato:</strong>
+                  <span id="dashMissingList" style="display:block;margin-top:4px;"></span>
+                </p>
+                <p style="font-size:11px;color:var(--text-dim);margin:8px 0 0;">Torna indietro con le frecce o clicca sui pallini per completare le domande mancanti.</p>
+              </div>
             </div>
             <div class="insight-card">
               <h4><i class="fa-solid fa-shield-halved"></i> Affidabilità</h4>
@@ -1092,7 +1099,6 @@
     var btnBack = document.getElementById('btnBack');
     var btnNext = document.getElementById('btnNext');
     var btnFinish = document.getElementById('btnFinish');
-    var btnSkip = document.getElementById('btnSkip');
     var navDots = document.getElementById('navDots');
     var savingIndicator = document.getElementById('savingIndicator');
 
@@ -1259,6 +1265,8 @@
       if (currentSlide === TOTAL_SLIDES - 1) {
         btnNext.style.display = 'none';
         btnFinish.style.display = 'flex';
+        // Reset onclick in case it was changed by a previous finishOnboarding call
+        btnFinish.onclick = function() { finishOnboarding(); };
         // Validate completion — disable finish if not 100%
         var comp = getCompletionPercent();
         if (comp < 100) {
@@ -1782,7 +1790,7 @@
 
     function saveText(key, val) {
       onboardData[key] = val;
-      persist();
+      // persist() is already called by onTranscriptInput (debounced) — avoid double writes
     }
 
     // ── Word-count nudge modal ──
@@ -1792,19 +1800,17 @@
       var overlayEl = document.getElementById('wordNudgeOverlay');
       var titleEl = document.getElementById('wordNudgeTitle');
       var bodyEl = document.getElementById('wordNudgeBody');
-      var countEl = document.getElementById('wordNudgeCount');
       if (!overlayEl) return;
       if (titleEl) {
         titleEl.textContent = slideType === 'intake'
           ? 'Ancora poche parole…'
           : 'Pochi dettagli…';
       }
-      if (countEl) countEl.textContent = wordCount;
       if (bodyEl) {
         if (slideType === 'intake') {
-          bodyEl.innerHTML = 'Hai scritto <strong id="wordNudgeCount">' + wordCount + '</strong> parole (consigliate: ' + recommended + '). Più informazioni ci darai su di te, più la tua esperienza su Sottotitoli sarà personalizzata. Vuoi aggiungere altri dettagli?';
+          bodyEl.innerHTML = 'Hai scritto <strong>' + wordCount + '</strong> parole (consigliate: ' + recommended + '). Più informazioni ci darai su di te, più la tua esperienza su Sottotitoli sarà personalizzata. Vuoi aggiungere altri dettagli?';
         } else {
-          bodyEl.innerHTML = 'Hai scritto <strong id="wordNudgeCount">' + wordCount + '</strong> parole (consigliate: ' + recommended + '). Obiettivi più dettagliati ci aiutano a creare un percorso migliore per te.';
+          bodyEl.innerHTML = 'Hai scritto <strong>' + wordCount + '</strong> parole (consigliate: ' + recommended + '). Obiettivi più dettagliati ci aiutano a creare un percorso migliore per te.';
         }
       }
       overlayEl.classList.remove('hidden');
@@ -2017,6 +2023,23 @@
 
       var completionPct = getCompletionPercent();
       document.getElementById('dashSummary').innerHTML = 'Completamento benvenuto: <strong style="color:var(--accent-green);">' + completionPct + '%</strong>';
+
+      // Show missing fields if not 100%
+      var missingSection = document.getElementById('dashMissingSection');
+      var missingList = document.getElementById('dashMissingList');
+      if (missingSection && missingList) {
+        if (completionPct < 100) {
+          var missing = getMissingFields();
+          // Skip the 'Manca: ' prefix
+          var fields = missing.slice(missing[0] === 'Manca: ' ? 1 : 0);
+          missingList.innerHTML = fields.map(function(f) {
+            return '<span style="display:inline-block;margin:2px 6px 2px 0;padding:2px 8px;border-radius:99px;background:rgba(251,191,36,.15);font-size:11px;">' + f + '</span>';
+          }).join('');
+          missingSection.style.display = 'block';
+        } else {
+          missingSection.style.display = 'none';
+        }
+      }
 
       // Show 'Sei a posto!' when 100%
       var readyEl = document.getElementById('readySection');
