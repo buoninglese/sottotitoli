@@ -1485,70 +1485,97 @@
         alert('Riconoscimento vocale non supportato. Usa Chrome o Edge.');
         return;
       }
-      _speechRecognition = new SR();
-      _speechRecognition.continuous = true;
-      _speechRecognition.interimResults = true;
-      _speechRecognition.lang = _speechLang[type];
 
       var btn = document.getElementById(type + 'MicBtn');
       var status = document.getElementById(type + 'RecordStatus');
       var textarea = document.getElementById(type + 'Transcript');
 
-      // Preserve existing text so re-recording appends instead of replacing
-      var existing = (textarea.value || '').trim();
-      _speechBaseText[type] = existing;
+      // ── Inner: begin speech recognition after mic permission confirmed ──
+      function _beginSpeech() {
+        _speechRecognition = new SR();
+        _speechRecognition.continuous = true;
+        _speechRecognition.interimResults = true;
+        _speechRecognition.lang = _speechLang[type];
 
-      _speechRecognition.onresult = function(event) {
-        var transcript = '';
-        for (var i = 0; i < event.results.length; i++) {
-          var t = event.results[i][0].transcript.trim();
-          if (!t) continue;
-          if (event.results[i].isFinal) {
-            transcript += '• ' + t.charAt(0).toUpperCase() + t.slice(1) + '\n';
-          } else {
-            transcript += t;
+        var existing = (textarea.value || '').trim();
+        _speechBaseText[type] = existing;
+
+        _speechRecognition.onresult = function(event) {
+          var transcript = '';
+          for (var i = 0; i < event.results.length; i++) {
+            var t = event.results[i][0].transcript.trim();
+            if (!t) continue;
+            if (event.results[i].isFinal) {
+              transcript += '• ' + t.charAt(0).toUpperCase() + t.slice(1) + '\n';
+            } else {
+              transcript += t;
+            }
           }
-        }
-        // Prepend preserved text so nothing is lost on re-record
-        var base = _speechBaseText[type] || '';
-        textarea.value = (base ? base + '\n' : '') + transcript.trim();
-        textarea.dispatchEvent(new Event('input', { bubbles: true }));
-        textarea.scrollTop = textarea.scrollHeight;
-      };
+          var base = _speechBaseText[type] || '';
+          textarea.value = (base ? base + '\n' : '') + transcript.trim();
+          textarea.dispatchEvent(new Event('input', { bubbles: true }));
+          textarea.scrollTop = textarea.scrollHeight;
+        };
 
-      _speechRecognition.onerror = function(event) {
-        console.warn('Speech error:', event.error);
-        if (event.error === 'no-speech') return;
-        if (event.error === 'not-allowed') {
-          if (status) {
-            status.innerHTML = '⚠️ Microfono non consentito. Su iPhone/iPad, vai in <strong>Impostazioni → Safari → Microfono</strong>.';
-            status.style.color = 'var(--amber)';
-            status.style.display = 'inline';
+        _speechRecognition.onerror = function(event) {
+          console.warn('Speech error:', event.error);
+          if (event.error === 'no-speech') return;
+          if (event.error === 'not-allowed') {
+            if (status) {
+              status.innerHTML = '⚠️ Microfono non consentito. Su iPhone/iPad, vai in <strong>Impostazioni → Safari → Microfono</strong>.';
+              status.style.color = 'var(--amber)';
+              status.style.display = 'inline';
+            }
           }
-        }
-        stopSpeechRecord();
-      };
+          stopSpeechRecord();
+        };
 
-      _speechRecognition.onend = function() {
-        if (_speechRecognition && _speechRecType === type) {
-          try { _speechRecognition.start(); } catch(e) {
-            stopSpeechRecord();
+        _speechRecognition.onend = function() {
+          if (_speechRecognition && _speechRecType === type) {
+            try { _speechRecognition.start(); } catch(e) {
+              stopSpeechRecord();
+            }
           }
+        };
+
+        _speechRecognition.start();
+        _speechRecType = type;
+
+        var langContainer = btn && btn.parentElement ? btn.parentElement.querySelector('.lang-pills') : null;
+        if (langContainer) langContainer.classList.add('disabled');
+
+        if (btn) {
+          btn.innerHTML = '<i class="fa-solid fa-stop"></i> Ferma';
+          btn.classList.add('recording');
         }
-      };
-
-      _speechRecognition.start();
-      _speechRecType = type;
-
-      // Disable language toggle while recording
-      var langContainer = btn && btn.parentElement ? btn.parentElement.querySelector('.lang-pills') : null;
-      if (langContainer) langContainer.classList.add('disabled');
-
-      if (btn) {
-        btn.innerHTML = '<i class="fa-solid fa-stop"></i> Ferma';
-        btn.classList.add('recording');
+        if (status) status.style.display = 'inline';
       }
-      if (status) status.style.display = 'inline';
+
+      // ── Ensure mic permission before starting ──
+      if (onboardData['mic_permission_granted']) {
+        // Permission already granted (e.g. from slide 7) — go straight to speech
+        _beginSpeech();
+      } else {
+        // Request mic permission first — this triggers the browser dialog if needed
+        if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spin" style="display:inline-block;width:14px;height:14px;border:2px solid var(--line);border-top-color:var(--accent-purple);border-radius:50%;animation:spin .7s linear infinite;vertical-align:middle;"></span>'; }
+        navigator.mediaDevices.getUserMedia({ audio: true })
+          .then(function(stream) {
+            // Got permission — stop the test stream, mark as granted, start speech
+            stream.getTracks().forEach(function(t) { t.stop(); });
+            onboardData['mic_permission_granted'] = true;
+            persist();
+            if (btn) btn.disabled = false;
+            _beginSpeech();
+          })
+          .catch(function(err) {
+            if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-microphone"></i> Registra'; }
+            if (status) {
+              status.innerHTML = '⚠️ Per favore, consenti l\'accesso al microfono per usare la registrazione vocale.';
+              status.style.color = 'var(--amber)';
+              status.style.display = 'inline';
+            }
+          });
+      }
     }
 
     function stopSpeechRecord() {
@@ -2070,6 +2097,7 @@
         btn.innerHTML = '<i class="fa-solid fa-stop"></i>';
         status.textContent = 'Microfono attivo — parla per testare!';
         onboardData['mic_tested'] = true;
+        onboardData['mic_permission_granted'] = true;
         persist();
         autoSaveToSupabase();
 
