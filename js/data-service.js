@@ -70,16 +70,14 @@
     lang = lang || getStudyLang();
     var userId = await getUserId();
     if (!userId) return null;
-    var cacheKey = 'sessionStats_' + lang;
+    var cacheKey = 'sessionStats_all';
     var cached = cacheGet(cacheKey);
     if (cached) return cached;
 
-    // Build filter: sessions where language_pair starts with the study lang
-    var langFilter = lang + '%';
+    // Fetch all sessions for this user (no language filter — stats are global)
     var r = await sb().from('sessions')
       .select('id,duration_seconds,words_count,started_at,language_pair,wpm,lexical_diversity,quality_score')
       .eq('user_id', userId)
-      .like('language_pair', langFilter)
       .order('started_at', { ascending: false });
 
     if (r.error) { console.warn('session stats:', r.error.message); return null; }
@@ -150,7 +148,6 @@
     var r = await sb().from('sessions')
       .select('id,name,started_at,duration_seconds,words_count,favorite,language_pair,session_type,quality_score')
       .eq('user_id', userId)
-      .like('language_pair', lang + '%')
       .order('started_at', { ascending: false })
       .limit(limit);
 
