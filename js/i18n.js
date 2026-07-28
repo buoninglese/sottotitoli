@@ -441,8 +441,11 @@
       "purchase_includes": "Include",
       "purchase_pay_btn": "Vai al pagamento →",
       "purchase_terms": "Termini e Condizioni",
+      "purchase_terms_text": "I minuti acquistati sono utilizzabili per caption e traduzione in tempo reale. I crediti AI sono dedicati esclusivamente alla generazione di Report AI. Il pagamento è gestito da Stripe. I crediti sono associati al tuo account e non sono trasferibili.",
       "purchase_privacy": "Informativa Privacy",
+      "purchase_privacy_text": "Trattiamo i tuoi dati personali nel rispetto del GDPR. Raccogliamo esclusivamente email, nome e storico acquisti. I dati di pagamento sono gestiti interamente da Stripe e non transitano sui nostri server.",
       "purchase_refunds": "Rimborsi",
+      "purchase_refunds_text": "Hai diritto a 14 giorni di recesso se meno del 10% dei crediti è stato utilizzato. I crediti acquistati non scadono. In caso di problemi tecnici che impediscono l'uso del servizio, hai diritto a un rimborso proporzionale.",
       "purchase_footer": "© 2026 Sottotitoli · Fatto con cura in Puglia. Made in Italy. | ",
       "terms": "Termini",
 
@@ -891,8 +894,11 @@
       "purchase_includes": "Includes",
       "purchase_pay_btn": "Go to payment →",
       "purchase_terms": "Terms and Conditions",
+      "purchase_terms_text": "Purchased minutes can be used for live caption and translation. AI credits are dedicated exclusively to AI Report generation. Payment is handled by Stripe. Credits are tied to your account and are non-transferable.",
       "purchase_privacy": "Privacy Policy",
+      "purchase_privacy_text": "We process your personal data in compliance with GDPR. We only collect email, name, and purchase history. Payment data is handled entirely by Stripe and never touches our servers.",
       "purchase_refunds": "Refunds",
+      "purchase_refunds_text": "You have a 14-day right of withdrawal if less than 10% of credits have been used. Purchased credits never expire. In case of technical issues preventing use of the service, you are entitled to a proportional refund.",
       "purchase_footer": "© 2026 Sottotitoli · Crafted with care in Puglia. Made in Italy. | ",
       "terms": "Terms",
 
