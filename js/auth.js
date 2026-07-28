@@ -7,10 +7,10 @@ const SUPABASE_ANON_KEY = 'sb_publishable_l-PG1wsO1FMWADK9GVBqoQ_0EtPA2K7';
 // Redirect target — change this if deploying to a different domain
 // IMPORTANT: This must be whitelisted in Supabase Auth settings
 function getAuthRedirectUrl() {
-  return window.SOTTOTITOLI_CONFIG?.AUTH_REDIRECT_URL || 'https://buoninglese.github.io/sottotitoli/panoramica.html';
+  return window.SOTTOTITOLI_CONFIG?.AUTH_REDIRECT_URL || 'https://www.sottotitoli.pro/panoramica.html';
 }
 function getPostLogoutUrl() {
-  return window.SOTTOTITOLI_CONFIG?.AUTH_REDIRECT_URL || 'https://buoninglese.github.io/sottotitoli/index.html';
+  return window.SOTTOTITOLI_CONFIG?.AUTH_REDIRECT_URL || 'https://www.sottotitoli.pro/index.html';
 }
 
 window.sottotitoliSupabase = window.supabase.createClient(
