@@ -12,7 +12,7 @@
 import { serve } from 'https://deno.land/std@0.208.0/http/server.ts';
 
 const HF_TOKEN = Deno.env.get('HF_TOKEN') || '';
-const ALLOWED_ORIGIN = 'https://buoninglese.github.io';
+const ALLOWED_ORIGIN = 'https://www.sottotitoli.pro';
 
 function corsHeaders(): Record<string, string> {
   return {

@@ -9,7 +9,7 @@ import { serve } from 'https://deno.land/std@0.208.0/http/server.ts';
 
 const SPACE_ID = 's8t/Sottotitoli-voice';
 const HF_API = `https://huggingface.co/api/spaces/${SPACE_ID}`;
-const ALLOWED_ORIGIN = 'https://buoninglese.github.io';
+const ALLOWED_ORIGIN = 'https://www.sottotitoli.pro';
 
 function corsHeaders(): Record<string, string> {
   return {

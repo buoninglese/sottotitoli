@@ -12,7 +12,7 @@ const HF_API_TOKEN = Deno.env.get('HF_API_TOKEN') || '';
 const DEFAULT_MODEL = 'meta-llama/Llama-3.3-70B-Instruct';
 
 const corsHeaders = {
-  'Access-Control-Allow-Origin': 'https://buoninglese.github.io',
+  'Access-Control-Allow-Origin': 'https://www.sottotitoli.pro',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 };

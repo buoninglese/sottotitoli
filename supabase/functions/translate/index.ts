@@ -14,7 +14,7 @@ import { serve } from 'https://deno.land/std@0.208.0/http/server.ts';
 
 // ── Configuration ──────────────────────────────────────────────────────────
 
-const ALLOWED_ORIGIN = 'https://buoninglese.github.io';
+const ALLOWED_ORIGIN = 'https://www.sottotitoli.pro';
 const MYMEMORY_EMAIL = 'studiobuoninglese@gmail.com'; // free tier attribution
 const MAX_CACHE_SIZE = 2000; // max entries before eviction
 const CACHE_TTL_MS = 10 * 60 * 1000; // 10 minutes
