@@ -808,6 +808,10 @@
             <!-- ── Native language questionnaire ── -->
             <div class="plang-pane active" id="plang-native">
               <div class="alt-card" style="margin-bottom:14px;padding:16px 20px;min-height:auto">
+                <h3 style="margin-bottom:8px">🌍 Lingue che parli</h3>
+                <div class="q-row" id="profileSpokenLangs" style="margin-bottom:4px"><span style="font-size:13px;color:var(--text-faint)">Completa l'onboarding per visualizzarle.</span></div>
+              </div>
+              <div class="alt-card" style="margin-bottom:14px;padding:16px 20px;min-height:auto">
                 <h3 style="margin-bottom:8px">Come descriveresti la tua padronanza?</h3>
                 <div class="q-row" id="nativeProficiency">
                   <button type="button" class="q-chip" data-val="native">Madrelingua</button>
@@ -930,7 +934,15 @@
               <p id="goalLungoTesto" style="font-size:14px;color:var(--text-soft);margin-bottom:12px">Caricamento…</p>
               <div class="q-row" id="goalLungoChips"></div>
             </article>
-          </section></div>
+          </section>
+          <!-- AI Starter Report from onboarding -->
+          <article class="alt-card" id="starterReportCard" style="display:none;margin-top:20px;border:2px solid rgba(124,58,237,.25);border-radius:20px;box-shadow:0 4px 24px rgba(124,58,237,.08)">
+            <h3>🤖 Il tuo profilo AI</h3>
+            <p style="font-size:12px;color:var(--text-faint);margin-bottom:12px">Generato dall'onboarding — obiettivi ottimizzati e suggerimenti personalizzati.</p>
+            <div id="starterReportContent" style="font-size:13px;color:var(--text-soft);line-height:1.6;max-height:300px;overflow-y:auto;padding-right:8px"></div>
+            <button id="starterReportToggle" onclick="toggleStarterReport()" style="margin-top:10px;font-size:12px;color:var(--accent);background:none;border:none;cursor:pointer;font-weight:600">Leggi il report completo →</button>
+          </article>
+        </div>
           
           <div role="tabpanel" class="subtab-pane" id="sub-percorso">
             <section class="panel-head" style="margin-top:8px">
@@ -6955,6 +6967,74 @@
         });
         focusEl.innerHTML = chips;
       }
+      // Profilo → Profilo Linguistico → Spoken languages
+      try {
+        var ob = JSON.parse(localStorage.getItem('sottotitoli_onboarding') || '{}');
+        var spoken = ob['spoken_languages'] || [];
+        var spokenOther = ob['spoken_languages_other'] || '';
+        var spEl = document.getElementById('profileSpokenLangs');
+        if (spEl && (spoken.length > 0 || spokenOther)) {
+          var allLangs = spoken.slice();
+          if (spokenOther) allLangs.push(spokenOther);
+          spEl.innerHTML = allLangs.map(function(l) {
+            return '<button class=\"q-chip active\" style=\"pointer-events:none\">' + l + '</button>';
+          }).join('');
+        }
+      } catch(e) {}
+      // AI Starter Report
+      _loadStarterReport();
+    }
+
+    // ═══ Load AI Starter Report from Supabase ═══
+    function _loadStarterReport() {
+      var card = document.getElementById('starterReportCard');
+      var content = document.getElementById('starterReportContent');
+      if (!card || !content) return;
+      var sb = window.sottotitoliSupabase;
+      if (!sb) return;
+      sb.auth.getSession().then(function(r) {
+        if (!r.data?.session) return;
+        sb.from('onboarding_responses').select('starter_report_md').eq('user_id', r.data.session.user.id).maybeSingle().then(function(res) {
+          if (res.data && res.data.starter_report_md) {
+            var md = res.data.starter_report_md;
+            // Show first 3 paragraphs as preview
+            var preview = md.split('\n').filter(function(l) { return l.trim(); }).slice(0, 8).join('\n');
+            content.innerHTML = _simpleMarkdown(preview) + '<p style=\"color:var(--text-faint);font-style:italic;margin-top:8px\">…</p>';
+            content.setAttribute('data-full', md);
+            card.style.display = 'block';
+          }
+        });
+      });
+    }
+
+    window.toggleStarterReport = function() {
+      var content = document.getElementById('starterReportContent');
+      var btn = document.getElementById('starterReportToggle');
+      if (!content || !btn) return;
+      var full = content.getAttribute('data-full');
+      if (!full) return;
+      if (btn.textContent.indexOf('Leggi') !== -1) {
+        content.innerHTML = _simpleMarkdown(full);
+        content.style.maxHeight = 'none';
+        btn.textContent = 'Mostra meno ↑';
+      } else {
+        var preview = full.split('\n').filter(function(l) { return l.trim(); }).slice(0, 8).join('\n');
+        content.innerHTML = _simpleMarkdown(preview) + '<p style=\"color:var(--text-faint);font-style:italic;margin-top:8px\">…</p>';
+        content.style.maxHeight = '300px';
+        btn.textContent = 'Leggi il report completo →';
+      }
+    };
+
+    function _simpleMarkdown(md) {
+      if (!md) return '';
+      return md
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+        .replace(/^### (.+)$/gm, '<h4 style=\"margin:12px 0 4px;color:var(--text)\">$1</h4>')
+        .replace(/^## (.+)$/gm, '<h3 style=\"margin:14px 0 6px;color:var(--text)\">$1</h3>')
+        .replace(/^# (.+)$/gm, '<h3 style=\"margin:14px 0 6px;color:var(--text)\">$1</h3>')
+        .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+        .replace(/\n\n/g, '</p><p style=\"margin:4px 0\">')
+        .replace(/\n/g, '<br>');
     }
   }
 
