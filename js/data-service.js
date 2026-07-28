@@ -265,7 +265,9 @@
       save_sessions: prefs.save_sessions !== undefined ? prefs.save_sessions : true,
       anonymous_sharing: prefs.anonymous_sharing !== undefined ? prefs.anonymous_sharing : false,
       theme: prefs.theme || prefs.dark_mode ? 'dark' : 'auto', // dark_mode is legacy column
-      font_pref: prefs.font_pref || 'sans'
+      font_pref: prefs.font_pref || 'sans',
+      default_caption_lang: prefs.default_caption_lang || '',
+      default_translation_pair: prefs.default_translation_pair || ''
     };
 
     // ── Full localStorage fallback for ALL fields ──
@@ -280,6 +282,8 @@
       if (local.font_pref && (result.font_pref === 'sans' || !result.font_pref)) result.font_pref = local.font_pref;
       if (local.save_sessions !== undefined) result.save_sessions = local.save_sessions;
       if (local.anonymous_sharing !== undefined) result.anonymous_sharing = local.anonymous_sharing;
+      if (!result.default_caption_lang && local.default_caption_lang) result.default_caption_lang = local.default_caption_lang;
+      if (!result.default_translation_pair && local.default_translation_pair) result.default_translation_pair = local.default_translation_pair;
     }
 
     console.log('loadSettings:', JSON.stringify(result));
