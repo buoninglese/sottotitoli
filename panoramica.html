@@ -6908,11 +6908,14 @@
     if (sb) {
       sb.auth.getSession().then(function(r) {
         if (!r.data?.session) return;
-        sb.from('profiles').select('short_term_goal,long_term_goal,native_lang,domain,use_cases,learning_profile').eq('id', r.data.session.user.id).maybeSingle().then(function(res) {
+        sb.from('profiles').select('goal_primary,native_lang,domain,use_cases,learning_profile').eq('id', r.data.session.user.id).maybeSingle().then(function(res) {
           if (res.data) {
-            // Goals — prefer AI-refined versions from Supabase
-            if (res.data.short_term_goal) stGoal = res.data.short_term_goal;
-            if (res.data.long_term_goal) ltGoal = res.data.long_term_goal;
+            // Goals — parse from goal_primary (format: "short_term | LT: long_term")
+            if (res.data.goal_primary) {
+              var parts = res.data.goal_primary.split(' | LT: ');
+              if (!stGoal && parts[0]) stGoal = parts[0];
+              if (!ltGoal && parts[1]) ltGoal = parts[1];
+            }
             // Profession
             if (!profession && res.data.domain) profession = res.data.domain;
             // Why English
