@@ -30,15 +30,25 @@
       this.panelEl = document.getElementById('notifDropdown');
 
       if (this.bellEl) {
-        this.bellEl.addEventListener('click', (e) => {
-          e.stopPropagation();
-          this.togglePanel();
-        });
+        // Click handling is done by theme-2.js (shared across all pages).
+        // We observe the .open class to know when to mark notifications read.
+        if (typeof MutationObserver !== 'undefined' && this.panelEl) {
+          const observer = new MutationObserver((mutations) => {
+            for (const m of mutations) {
+              if (m.type === 'attributes' && m.attributeName === 'class') {
+                if (this.panelEl.classList.contains('open')) {
+                  this.markAllRead();
+                }
+              }
+            }
+          });
+          observer.observe(this.panelEl, { attributes: true, attributeFilter: ['class'] });
+        }
       }
 
       // Outside click to close
       document.addEventListener('click', (e) => {
-        if (this.panelEl && this.panelEl.style.opacity === '1' &&
+        if (this.panelEl && this.panelEl.classList.contains('open') &&
             this.bellEl && !this.bellEl.contains(e.target) &&
             !this.panelEl.contains(e.target)) {
           this.closePanel();
@@ -146,13 +156,10 @@
 
     togglePanel() {
       if (!this.panelEl) return;
-      const isOpen = this.panelEl.style.opacity === '1';
+      const isOpen = this.panelEl.classList.contains('open');
       if (isOpen) {
         this.closePanel();
       } else {
-        this.panelEl.style.opacity = '1';
-        this.panelEl.style.pointerEvents = 'auto';
-        this.panelEl.style.transform = 'translateY(0)';
         this.panelEl.classList.add('open');
         this.markAllRead();
       }
@@ -160,9 +167,6 @@
 
     closePanel() {
       if (!this.panelEl) return;
-      this.panelEl.style.opacity = '0';
-      this.panelEl.style.pointerEvents = 'none';
-      this.panelEl.style.transform = 'translateY(-8px)';
       this.panelEl.classList.remove('open');
     }
 
