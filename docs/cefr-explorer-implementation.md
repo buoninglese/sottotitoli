@@ -192,13 +192,13 @@ Find the block starting around line ~8280 (`// ── Topic Browser ──` thro
           <div class="cefr-panel" id="cefr-tab-b">
             <div class="cefr-toolbar">
               <div class="cefr-seg">
-                <button class="active" onclick="filterCefrFamilySource('sessions')">From sessions</button>
+                <button class="active" onclick="filterCefrFamilySource('sessions')">From popular roots</button>
                 <button onclick="filterCefrFamilySource('search')">Search</button>
               </div>
               <input type="text" id="cefr-family-input" placeholder="Type a lemma…" style="display:none" onkeydown="if(event.key==='Enter')searchCefrFamily()">
               <button class="cefr-primary" onclick="surpriseCefrFamily()">🎲 Surprise me</button>
             </div>
-            <div id="cefr-family-hint" style="margin-bottom:8px;color:var(--text-muted);font-size:0.9rem">Extracted from your last 3 sessions.</div>
+            <div id="cefr-family-hint" style="margin-bottom:8px;color:var(--text-muted);font-size:0.9rem">Popular English word families to explore.</div>
             <div id="cefr-family-grid" class="wbx-grid"></div>
           </div>
           <div class="cefr-panel" id="cefr-tab-c">
@@ -207,8 +207,6 @@ Find the block starting around line ~8280 (`// ── Topic Browser ──` thro
               <select id="cefrGapSort" onchange="loadCefrFrequencies()">
                 <option value="freq-desc">Most frequent first</option>
                 <option value="freq-asc">Rare first</option>
-                <option value="alpha">Alphabetical</option>
-                <option value="cefr">CEFR level</option>
               </select>
             </div>
             <div id="cefr-gap-sections"></div>
