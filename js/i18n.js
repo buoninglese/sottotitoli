@@ -1,4 +1,22 @@
-/* ═══ Sottotitoli i18n — Italian/English translations ═══ */
+/* ═══ Sottotitoli i18n — Italian/English translations ═══
+ *
+ * Architecture (v2, guardless):
+ *   - Italian is the HTML source-of-truth. Every visible string MUST have
+ *     a data-i18n="key" attribute on its containing element.
+ *   - At init(), captureOriginals() snapshots Italian text into
+ *     data-i18n-orig-txt / data-i18n-orig-html attributes.
+ *   - apply() restores originals when switching to IT, translates when
+ *     switching to EN. No fragile textContent===dictValue guard.
+ *   - characterData MutationObserver auto-translates JS-injected content.
+ *   - Dynamic content convention: JS MUST inject ITALIAN text into the DOM.
+ *     If JS injects English text and the user switches to IT, the English
+ *     text is captured as the "original" — a silent corruption.
+ *
+ * Migration:
+ *   - Run I18n.annotate(document.body) in DevTools on each page to discover
+ *     untagged text. Add the suggested data-i18n attributes to your HTML,
+ *     then remove the annotate() helper.
+ * ═══════════════════════════════════════════════════════════════════════ */
 (function(){
   'use strict';
 
