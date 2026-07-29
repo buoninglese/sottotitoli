@@ -6571,6 +6571,8 @@
         if (!customHtml) {
           customHtml = '<div style="text-align:center;padding:20px;color:var(--text-faint);grid-column:1/-1">Nessuna banca italiana ancora. Usa il Vocabulary Builder italiano o la modalità Traduzione per crearne una.</div>';
         }
+        // Add "create new bank" card
+        customHtml += '<div class="wb-card" style="border:2px dashed var(--line);background:transparent;display:flex;align-items:center;justify-content:center;min-height:130px;cursor:pointer" onclick="newItalianWordbank()"><div style="text-align:center;color:var(--text-faint);font-size:14px;font-weight:600"><i class="fa-solid fa-plus" style="margin-right:6px;font-size:13px"></i> Crea nuova banca</div></div>';
         var cgEl = document.getElementById('wbItCustomGrid');
         if (cgEl) cgEl.innerHTML = customHtml;
       }
@@ -6751,6 +6753,23 @@
           alert('Banca "' + name + '" creata!');
           SottotitoliData.cacheClear();
           renderWordbanks();
+        } catch(e) { alert('Errore nella creazione: ' + e.message); }
+      };
+
+      // ── Create new Italian wordbank ──
+      window.newItalianWordbank = async function() {
+        var name = prompt('Nome della nuova banca italiana:');
+        if (!name) return;
+        name = name.trim();
+        if (!name) return;
+        try {
+          var uid = await SottotitoliData.getUserId();
+          if (!uid || !window.sottotitoliSupabase) { alert('Devi accedere per creare una banca.'); return; }
+          var { data, error } = await window.sottotitoliSupabase.from('user_wordbanks').insert({ user_id: uid, name: name, lang: 'it' }).select().single();
+          if (error) { alert('Errore: ' + error.message); return; }
+          alert('Banca italiana "' + name + '" creata!');
+          SottotitoliData.cacheClear();
+          renderWordbanksIt();
         } catch(e) { alert('Errore nella creazione: ' + e.message); }
       };
 
