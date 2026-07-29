@@ -39,6 +39,9 @@ window.SOTTOTITOLI_CONFIG = {
     speakerEndpoint: "https://sottotitoli-websocket.onrender.com/analyze-speakers"
   },
 
+  /** CEFR vocabulary API (sottotitoli-websocket Render service + Words-CEFR-Dataset) */
+  cefrApiUrl: "https://sottotitoli-websocket.onrender.com/api/cefr",
+
   /** Language and translation mode definitions */
   modes: {
     // Caption-only modes
