@@ -3218,6 +3218,182 @@ function _updateCEFRBars(){
   // Draw sparkline after DOM update
   setTimeout(function(){ _drawGSEsparkline(); }, 50);
 }
+
+// ═══ Topic Explorer — donut chart + word list ═══
+var _topicCache = null;
+var _topicLastFetch = 0;
+var _topicSelected = null;
+
+function _fetchTopics() {
+  var container = document.getElementById('topicDonut');
+  if (!container) return;
+  
+  if (!isCapabilityAvailable('cefrMetrics')) {
+    container.innerHTML = '<div style="text-align:center;padding:20px;color:var(--muted2);font-size:13px">Topics available for English only.<br><span style="font-size:11px">Switch caption language to English.</span></div>';
+    return;
+  }
+  
+  var now = Date.now();
+  if (_topicCache && (now - _topicLastFetch) < 30000) {
+    _renderTopicDonut(_topicCache);
+    return;
+  }
+  
+  var lines = document.querySelectorAll('#captionTranscript .line');
+  if (lines.length === 0) {
+    container.innerHTML = '<div style="text-align:center;padding:20px;color:var(--muted2);font-size:13px">Start speaking to see topic distribution.<br><span style="font-size:11px">Topics appear after ~30 words of transcript.</span></div>';
+    return;
+  }
+  
+  var fullText = '';
+  lines.forEach(function(l) {
+    var clone = l.cloneNode(true);
+    clone.querySelectorAll('span,.spk-tag').forEach(function(s) { s.remove(); });
+    fullText += (clone.textContent || '') + ' ';
+  });
+  fullText = fullText.trim();
+  
+  if (fullText.length < 30) {
+    container.innerHTML = '<div style="text-align:center;padding:20px;color:var(--muted2);font-size:13px">Need more text for topic analysis.<br><span style="font-size:11px">Keep speaking — topics appear after ~30 words.</span></div>';
+    return;
+  }
+  
+  container.innerHTML = '<div style="text-align:center;padding:20px;color:var(--muted2);font-size:13px"><i class="fas fa-spinner fa-spin"></i> Analyzing topics…</div>';
+  
+  fetch(_cefrApiUrl + '/analyze', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ text: fullText, lang: (currentCaptionLang || 'en-US').split('-')[0] })
+  })
+  .then(function(r) {
+    if (!r.ok) throw new Error('API returned ' + r.status);
+    return r.json();
+  })
+  .then(function(data) {
+    if (data && data.topicDistribution && Object.keys(data.topicDistribution).length > 0) {
+      _topicCache = data.topicDistribution;
+      _topicLastFetch = Date.now();
+      _renderTopicDonut(data.topicDistribution);
+    } else {
+      container.innerHTML = '<div style="text-align:center;padding:20px;color:var(--muted2);font-size:13px">No topics detected yet.<br><span style="font-size:11px">Try speaking for longer — topics need diverse vocabulary.</span></div>';
+    }
+  })
+  .catch(function(err) {
+    console.warn('Topic API unavailable:', err.message || err);
+    container.innerHTML = '<div style="text-align:center;padding:20px;color:var(--muted2);font-size:13px">Topic analysis unavailable.<br><span style="font-size:11px">The CEFR service may be starting up (free tier cold start). Try again in 30s.</span></div>';
+  });
+}
+
+function _renderTopicDonut(topics) {
+  var container = document.getElementById('topicDonut');
+  if (!container) return;
+  var total = 0;
+  for (var k in topics) { total += topics[k]; }
+  if (total === 0) return;
+  
+  var colors = ['#a855f7','#3b82f6','#22c55e','#eab308','#f97316','#ef4444',
+                '#8b5cf6','#06b6d4','#84cc16','#f59e0b','#f43f5e'];
+  var cx = 100, cy = 100, r = 65, strokeWidth = 28;
+  var circumference = 2 * Math.PI * r;
+  var offset = 0;
+  var paths = '';
+  var legendHtml = '';
+  var i = 0;
+  var sorted = [];
+  for (var k in topics) { sorted.push([k, topics[k]]); }
+  sorted.sort(function(a, b) { return b[1] - a[1]; });
+  
+  sorted.forEach(function(entry) {
+    var topic = entry[0], count = entry[1];
+    var pct = count / total;
+    var dash = pct * circumference;
+    var color = colors[i % colors.length];
+    paths += '<circle cx="' + cx + '" cy="' + cy + '" r="' + r +
+      '" fill="none" stroke="' + color + '" stroke-width="' + strokeWidth +
+      '" stroke-dasharray="' + dash + ' ' + (circumference - dash) +
+      '" stroke-dashoffset="' + (-offset) + '" style="cursor:pointer" ' +
+      'onclick="_selectTopic(\'' + topic.replace(/'/g,"\\'") + '\')"/>';
+    legendHtml += '<div style="display:flex;align-items:center;gap:8px;margin:3px 0;cursor:pointer;font-size:12px" onclick="_selectTopic(\'' + topic.replace(/'/g,"\\'") + '\')">' +
+      '<span style="width:10px;height:10px;border-radius:3px;background:' + color + ';flex-shrink:0"></span>' +
+      '<span style="flex:1;color:var(--text)">' + topic + '</span>' +
+      '<span style="font-weight:600;color:var(--muted);min-width:24px;text-align:right">' + count + '</span>' +
+      '<span style="color:var(--muted2);min-width:32px;text-align:right;font-size:10px">' + Math.round(pct * 100) + '%</span></div>';
+    offset += dash;
+    i++;
+  });
+  
+  container.innerHTML =
+    '<div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap;justify-content:center">' +
+    '<svg width="200" height="200" viewBox="0 0 200 200">' + paths + '</svg>' +
+    '<div style="flex:1;min-width:140px;max-height:200px;overflow-y:auto">' + legendHtml + '</div>' +
+    '</div>';
+}
+
+function _selectTopic(topic) {
+  _topicSelected = topic;
+  _renderTopicWords();
+}
+
+function _renderTopicWords() {
+  var container = document.getElementById('topicWordList');
+  if (!container) return;
+  if (!_topicSelected) {
+    container.innerHTML = '<div style="text-align:center;padding:20px;color:var(--muted2);font-size:13px">Click a topic → to see words.</div>';
+    return;
+  }
+  var sortBy = (document.getElementById('topicSortSel') || {}).value || 'freq';
+  var words = [];
+  for (var w in _sessionWordCache) {
+    var info = _sessionWordCache[w];
+    words.push({ word: w, level: info.level || 1, pos: info.pos || '-' });
+  }
+  if (words.length === 0) {
+    container.innerHTML = '<div style="text-align:center;padding:20px;color:var(--muted2);font-size:12px">No words analyzed yet. Start speaking to build the topic word list.</div>';
+    return;
+  }
+  if (sortBy === 'level') {
+    words.sort(function(a, b) { return (b.level || 0) - (a.level || 0); });
+  } else {
+    words.sort(function(a, b) { return a.word.localeCompare(b.word); });
+  }
+  var html = '<div style="font-size:12px;color:var(--muted2);margin-bottom:6px">' + words.length + ' words</div>';
+  html += '<div style="display:flex;flex-wrap:wrap;gap:4px">';
+  var levelColors = {1:'#22c55e',2:'#a3e635',3:'#facc15',4:'#fb923c',5:'#f87171',6:'#c084fc'};
+  words.forEach(function(w) {
+    var lvl = Math.round(w.level) || 1;
+    var color = levelColors[lvl] || '#888';
+    html += '<span style="padding:3px 8px;border-radius:6px;font-size:11px;font-weight:600;background:' + color + '20;color:' + color + ';border:1px solid ' + color + '30">' + w.word + '</span>';
+  });
+  html += '</div>';
+  container.innerHTML = html;
+}
+
+// ═══ Rarity indicator — highlight rare words in transcript ═══
+var _rareWordsSpotted = {};
+function _checkRareWords(text) {
+  if (!isCapabilityAvailable('cefrMetrics')) return;
+  var tokens = text.toLowerCase().match(/\b[a-z]+\b/g) || [];
+  tokens.forEach(function(w) {
+    if (_rareWordsSpotted[w]) return;
+    var info = _sessionWordCache[w];
+    if (info && info.frequency_count != null && info.frequency_count < 1000) {
+      _rareWordsSpotted[w] = true;
+      _highlightRareWord(w);
+    }
+  });
+}
+function _highlightRareWord(word) {
+  var container = document.getElementById('v20qContent') || document.getElementById('captionTranscript');
+  if (!container) return;
+  var spans = container.querySelectorAll('.v20q-w');
+  spans.forEach(function(span) {
+    if (span.textContent.trim().toLowerCase().replace(/[^a-z]/g, '') === word) {
+      span.classList.add('word-rare');
+      setTimeout(function() { span.classList.remove('word-rare'); }, 1600);
+    }
+  });
+}
+
 function downloadCEFRPDF(){
   var lines=document.querySelectorAll('#captionTranscript .line');
   var posWords={NOUN:[],VERB:[],ADJ:[],ADV:[]};var seen=new Set();
