@@ -37,7 +37,20 @@
 
       // ── Dashboard cards ──
       dashboard_gse: 'Il tuo punteggio GSE complessivo, calcolato sulle ultime 5 sessioni. Combina vocabolario (90%) e complessità delle frasi (10%). Monitoralo nel tempo per vedere i tuoi progressi linguistici.',
-      dashboard_vocab_ring: 'Il livello del tuo vocabolario basato sulle sessioni recenti. Il numero grande è il punteggio GSE (10-90), l\'etichetta mostra la banda CEFR corrispondente (A1-C2).'
+      dashboard_vocab_ring: 'Il livello del tuo vocabolario basato sulle sessioni recenti. Il numero grande è il punteggio GSE (10-90), l\'etichetta mostra la banda CEFR corrispondente (A1-C2).',
+      dashboard_sessions: 'Il numero totale di sessioni di captions che hai completato. Ogni sessione è una conversazione registrata e analizzata. Più sessioni = più dati per misurare i tuoi progressi reali.',
+      dashboard_minutes: 'Il tempo totale che hai passato a parlare in inglese durante le sessioni. La quantità di pratica è il fattore più importante per il miglioramento — ogni minuto conta.',
+      dashboard_words: 'Il numero di parole uniche (distinte) che hai usato in tutte le tue sessioni. Non conta le ripetizioni. Una crescita costante indica che stai espandendo il tuo vocabolario attivo.',
+      dashboard_lexical: 'La diversità lessicale misura quante parole diverse usi rispetto al totale. Un valore alto (es. 0.7) significa che usi un vocabolario vario; un valore basso indica ripetizione. È un indicatore chiave di fluenza.',
+      dashboard_session_chart: 'Ogni barra rappresenta i minuti di conversazione in una giornata. Ti aiuta a vedere la tua costanza: l\'ideale è praticare un po\' ogni giorno, non tanto in un giorno solo.',
+      dashboard_practice_chart: 'I minuti di pratica extra (esercizi di vocabolario, lettura, ascolto) che hai registrato. Complementa le sessioni di conversazione per un apprendimento bilanciato.',
+
+      // ── Insights cards ──
+      insights_overview: 'Un riassunto automatico del tuo profilo linguistico basato su tutte le sessioni. L\'AI analizza pattern, punti di forza e aree di crescita per darti una visione d\'insieme.',
+      insights_confidence: 'Quanto sono affidabili le stime del sistema basate sui tuoi dati. Con poche sessioni la confidenza è bassa. Più parli, più le metriche diventano accurate e personalizzate.',
+      insights_habits: 'Le tue abitudini di pratica: quanto parli in media al giorno, in quali fasce orarie, e quali giorni della settimana sei più attivo. Conoscere le tue abitudini ti aiuta a costruire una routine sostenibile.',
+      insights_next: 'Un suggerimento concreto su cosa fare per migliorare, basato sui tuoi dati attuali. Può essere un obiettivo di vocabolario, un suggerimento di pratica, o un\'area grammaticale da approfondire.',
+      insights_focus: 'Le aree in cui hai più margine di miglioramento, identificate dall\'AI analizzando il tuo vocabolario, la grammatica e la fluenza. Concentrati su queste per massimizzare i progressi.'
     },
 
     en: {
@@ -63,7 +76,20 @@
 
       // ── Dashboard cards ──
       dashboard_gse: 'Your overall GSE score, calculated from your last 5 sessions. Combines vocabulary (90%) and sentence complexity (10%). Track it over time to see your language progress.',
-      dashboard_vocab_ring: 'Your vocabulary level based on recent sessions. The large number is the GSE score (10-90), the label shows the corresponding CEFR band (A1-C2).'
+      dashboard_vocab_ring: 'Your vocabulary level based on recent sessions. The large number is the GSE score (10-90), the label shows the corresponding CEFR band (A1-C2).',
+      dashboard_sessions: 'The total number of caption sessions you\'ve completed. Each session is a recorded and analyzed conversation. More sessions = more data to measure your real progress.',
+      dashboard_minutes: 'The total time you\'ve spent speaking English during sessions. Practice quantity is the most important factor for improvement — every minute counts.',
+      dashboard_words: 'The number of unique (distinct) words you\'ve used across all your sessions. Does not count repetitions. Steady growth means you\'re expanding your active vocabulary.',
+      dashboard_lexical: 'Lexical diversity measures how many different words you use relative to total words. A high value (e.g. 0.7) means varied vocabulary; a low value indicates repetition. A key fluency indicator.',
+      dashboard_session_chart: 'Each bar represents minutes of conversation on a given day. Helps you see your consistency — the ideal is to practice a little every day, not a lot in one day.',
+      dashboard_practice_chart: 'Extra practice minutes (vocabulary drills, reading, listening) you\'ve logged. Complements conversation sessions for balanced learning.',
+
+      // ── Insights cards ──
+      insights_overview: 'An automatic summary of your language profile based on all sessions. The AI analyzes patterns, strengths, and growth areas to give you a big-picture view.',
+      insights_confidence: 'How reliable the system\'s estimates are based on your data. With few sessions confidence is low. The more you speak, the more accurate and personalized the metrics become.',
+      insights_habits: 'Your practice habits: average daily speaking time, preferred time of day, and which days of the week you\'re most active. Knowing your habits helps you build a sustainable routine.',
+      insights_next: 'A concrete suggestion for what to do next to improve, based on your current data. Could be a vocabulary goal, a practice suggestion, or a grammar area to focus on.',
+      insights_focus: 'The areas where you have the most room for improvement, identified by AI analyzing your vocabulary, grammar, and fluency. Focus on these to maximize progress.'
     }
   };
 
