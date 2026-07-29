@@ -358,13 +358,14 @@ function initUserCredits(userId) {
   if (!userId) return;
   var sb = window.sottotitoliSupabase;
   if (!sb) return;
-  sb.from('user_credits').select('balance_seconds, last_weekly_topup').eq('user_id', userId).maybeSingle().then(function(r){
+  sb.from('user_credits').select('balance_minutes, last_weekly_topup').eq('user_id', userId).maybeSingle().then(function(r){
     if (r.error) { console.warn('Credit check failed:', r.error.message); return; }
     var now = new Date();
     if (!r.data) {
       // New user — create credit row with 15 min free
       sb.from('user_credits').insert({
         user_id: userId,
+        balance_minutes: 15,
         balance_seconds: 900,
         lifetime_seconds: 0,
         last_weekly_topup: now.toISOString(),
@@ -377,13 +378,14 @@ function initUserCredits(userId) {
       var lastTopup = r.data.last_weekly_topup ? new Date(r.data.last_weekly_topup) : null;
       var needsTopup = !lastTopup || (now - lastTopup > 7 * 24 * 60 * 60 * 1000);
       if (needsTopup) {
-        var newBalance = (r.data.balance_seconds || 0) + 900;
+        var newBalance = (r.data.balance_minutes || 0) + 15;
         sb.from('user_credits').update({
-          balance_seconds: newBalance,
+          balance_minutes: newBalance,
+          balance_seconds: newBalance * 60,
           last_weekly_topup: now.toISOString(),
           updated_at: now.toISOString()
         }).eq('user_id', userId).then(function(upd){
-          if (!upd.error) console.log('🔄 Weekly top-up: +15 min (balance: ' + Math.floor(newBalance/60) + ' min)');
+          if (!upd.error) console.log('🔄 Weekly top-up: +15 min (balance: ' + newBalance + ' min)');
         });
       }
     }
