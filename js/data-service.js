@@ -82,7 +82,7 @@
 
     if (r.error) { console.warn('session stats:', r.error.message); return null; }
 
-    var sessions = r.data || [];
+    var sessions = (r.data || []).filter(function(s) { return (s.duration_seconds || 0) > 0 || (s.words_count || 0) > 0; });
     var totalSessions = sessions.length;
     var totalSeconds = sessions.reduce(function(s, row) { return s + (row.duration_seconds || 0); }, 0);
     var totalWords = sessions.reduce(function(s, row) { return s + (row.words_count || 0); }, 0);
@@ -214,7 +214,7 @@
       .limit(limit);
 
     if (r.error) { console.warn('sessions:', r.error.message); return []; }
-    return r.data || [];
+    return (r.data || []).filter(function(s) { return (s.duration_seconds || 0) > 0 || (s.words_count || 0) > 0; });
   }
 
   /* ═══════════════════════════════════════════
