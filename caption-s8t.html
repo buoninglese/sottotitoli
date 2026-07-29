@@ -8095,6 +8095,9 @@ window.fixExtrasPanelColors = function(){
     setTimeout(function(){ applyCaptionModeUI(); }, 200);
   }
 
+  // ── Translation cache — avoids re-fetching unchanged sentences ──
+  var _tranCache = {}; // key: "srcLang→tgtLang::text" → translatedText
+
   // ── Render translations for all lines ──
   // v20q.tranStyle: 's1' = Style 1 side-by-side (V5 Bold Gradient), 's2' = Style 2 card/dashboard (S2-V5)
   function v20q_renderTranslations(){
@@ -8166,12 +8169,17 @@ window.fixExtrasPanelColors = function(){
         line.appendChild(box);
       }
       
-      // ── Trigger translation API ──
+      // ── Trigger translation API (with cache) ──
       var T = window.SottotitoliTranslationProviders;
-      if (T && srcLang !== target) {
+      var cacheKey = srcLang + '→' + target + '::' + text;
+      if (_tranCache[cacheKey]) {
+        var txtEl = box.querySelector('.v20q-tran-text');
+        if (txtEl) { txtEl.className = 'v20q-tran-text'; txtEl.textContent = _tranCache[cacheKey]; }
+      } else if (T && srcLang !== target) {
         T.translateText({ provider: 'auto' }, text, srcLang, target).then(function(r){
           var txtEl = box.querySelector('.v20q-tran-text');
           if (txtEl) { txtEl.className = 'v20q-tran-text'; txtEl.textContent = r.translatedText; }
+          _tranCache[cacheKey] = r.translatedText;
         }).catch(function(){
           var txtEl = box.querySelector('.v20q-tran-text');
           if (txtEl) { txtEl.className = 'v20q-tran-text'; txtEl.textContent = text + ' ⚠'; }
@@ -8182,6 +8190,40 @@ window.fixExtrasPanelColors = function(){
       }
     });
   }
+  // ── Retranslate a single line (called after editing) ──
+  window.v20q_retranslateLine = function(idx) {
+    var container = document.getElementById('v20qContent');
+    if (!container) return;
+    var lines = container.querySelectorAll('.v20q-line');
+    var line = lines[idx];
+    if (!line) return;
+    
+    var target = localStorage.getItem('sottotitoli-translate-target') || 'it';
+    var srcLang = (window._currentCaptionLang || 'en-US').split('-')[0];
+    var textEl = line.querySelector('.v20q-text');
+    var text = textEl ? textEl.textContent.trim() : '';
+    if (!text || text.length < 3) return;
+    
+    // Remove old translation box
+    var tranBox = line.querySelector('.v20q-tran-box');
+    if (tranBox) { tranBox.innerHTML = '<div class="v20q-tran-text v20q-tran-loading"><i class="fa-solid fa-spinner"></i> Translating…</div>'; }
+    
+    // Clear cache for this text so it re-fetches
+    var cacheKey = srcLang + '→' + target + '::' + text;
+    delete _tranCache[cacheKey];
+    
+    var T = window.SottotitoliTranslationProviders;
+    if (T && srcLang !== target) {
+      T.translateText({ provider: 'auto' }, text, srcLang, target).then(function(r){
+        if (tranBox) {
+          var txtEl = tranBox.querySelector('.v20q-tran-text');
+          if (txtEl) { txtEl.className = 'v20q-tran-text'; txtEl.textContent = r.translatedText; }
+        }
+        _tranCache[cacheKey] = r.translatedText;
+      });
+    }
+  };
+
   // ── Toggle: Translation Style ──
   window.v20q_setTranStyle = function(style){
     if (typeof v20q === 'undefined') return;
@@ -8266,16 +8308,29 @@ window.fixExtrasPanelColors = function(){
           if (typeof _updateGrammarLines === 'function') {
             try { _updateGrammarLines(); } catch(e) {}
           }
+          // Re-translate this specific line if in translate mode
+          if (v20q.translateOn) {
+            try { v20q_retranslateLine(idx); } catch(e) {}
+          }
+          // Re-translate this specific line if in translate mode
+          if (v20q.translateOn && typeof v20q_retranslateLine === 'function') {
+            try { v20q_retranslateLine(idx); } catch(e) {}
+          }
         }
       };
       inp.onkeydown = function(ev){ if (ev.key === 'Enter') inp.blur(); if (ev.key === 'Escape'){ inp.value = orig; inp.blur(); } };
     } else if (v20q.mode === 'collect') {
       span.classList.toggle('collected');
       var w = span.textContent.trim().toLowerCase();
+      // Detect language from parent context
+      var isTranWord = !!span.closest('.v20q-tran-box');
+      var saveLang = isTranWord
+        ? (localStorage.getItem('sottotitoli-translate-target') || 'it').split('-')[0]
+        : (currentCaptionLang || 'en-US').split('-')[0];
       if (span.classList.contains('collected')) {
         if (v20q.words.indexOf(w) === -1) v20q.words.push(w);
-        if (typeof addToWordBank === 'function') addToWordBank(w);
-        v20q_toast('<i class="fa-solid fa-check"></i> Added: ' + w);
+        if (typeof addToWordBank === 'function') addToWordBank(w, saveLang);
+        v20q_toast('<i class="fa-solid fa-check"></i> Added: ' + w + ' (' + saveLang + ')');
       } else {
         v20q.words = v20q.words.filter(function(x){ return x !== w; });
         if (typeof removeFromWordBank === 'function') removeFromWordBank(w);
@@ -8345,7 +8400,16 @@ window.fixExtrasPanelColors = function(){
     var pos = v20q.bookmarks.indexOf(idx);
     if (pos === -1) { v20q.bookmarks.push(idx); }
     else { v20q.bookmarks.splice(pos, 1); }
-    v20q_rerender();
+    // Toggle bookmark class on the specific line without full re-render
+    var container = document.getElementById('v20qContent');
+    if (container) {
+      var lines = container.querySelectorAll('.v20q-line');
+      var line = lines[idx];
+      if (line) {
+        var isBm = v20q.bookmarks.indexOf(idx) !== -1;
+        line.classList.toggle('v20q-bookmarked', isBm);
+      }
+    }
   };
   // ── Scroll to sentence + highlight (used by bookmark panel clicks) ──
   window.v20q_scrollToSentence = function(idx){
