@@ -273,7 +273,7 @@ Find the block starting around line ~8280 (`// ── Topic Browser ──` thro
 #pnl-cefr-explorer .wbx-save-col button{width:36px;height:36px;background:transparent;border:none;border-bottom:2px solid #000;cursor:pointer;font-size:18px;display:flex;align-items:center;justify-content:center}
 #pnl-cefr-explorer .wbx-save-col button:last-child{border-bottom:none}
 #pnl-cefr-explorer .wbx-save-col button:hover{background:rgba(0,0,0,.06)}
-#pnl-cefr-explorer .wbx-save-col button.saved{background:#000;color:#fff}
+#pnl-cefr-explorer .wbx-save-col button.saved{background:var(--s-accent,#000);color:#fff}
 #pnl-cefr-explorer .cefr-section-title{font-weight:800;font-size:1.05rem;margin:24px 0 12px;display:flex;align-items:center;gap:8px}
 #pnl-cefr-explorer .cefr-section-title .count{background:#000;color:#fff;padding:2px 8px;font-size:.8rem}
 #pnl-cefr-explorer .cefr-empty{border:2px dashed #000;padding:40px;text-align:center;background:#fff}
@@ -289,75 +289,82 @@ Find the block starting around line ~8280 (`// ── Topic Browser ──` thro
 #pnl-cefr-explorer[data-wb-scheme="7"] .wbx-box{background:#ffe4e6}
 ```
 
-### JavaScript (replace lines ~8280–8400 in existing panoramica.html)
+### JavaScript (replace lines ~8280–8400 — ALL FIXES APPLIED)
 
 ```javascript
 /* ═══════════════════════════════════════
-   CEFR Explorer — Brutalist Card Refactor
-   Replaces old table-based renderers.
-   Keeps original function names so existing
-   callers (tab clicks, etc.) still work.
+   CEFR Explorer — Brutalist Card Refactor v2 (all review fixes applied)
+   - Single /api/cefr/gaps endpoint replaces 39 parallel fetches
+   - Real morphology via /api/cefr/word-family (no mock "analyzely")
+   - Frequency label uses formatted count (80.2M), not raw int
+   - Promise-lock on getUserVocabularySet prevents duplicate auth
+   - Fetch nonce guards against stale renders on rapid tab switching
+   - Sort stability: secondary key on word name
+   - Pill word counts from API's new word_count field
    ═══════════════════════════════════════ */
 var _cefrVocabCache = null;
+var _cefrVocabPromise = null;  // deduplicate in-flight auth
 var _cefrTopicFilter = 'relevant';
 var _cefrFamilySource = 'sessions';
 var _cefrCurrentScheme = 0;
+var _cefrFetchNonce = 0;       // stale-render guard
 var CEFR_LEVEL_ORDER = {A1:1,A2:2,B1:3,B2:4,C1:5,C2:6};
 function cefrLevelNum(l){return CEFR_LEVEL_ORDER[l]||3}
 
 async function getUserVocabularySet(){
   if(_cefrVocabCache)return _cefrVocabCache;
-  var sb=window.sottotitoliSupabase;
-  if(!sb){_cefrVocabCache=new Set();return _cefrVocabCache}
-  var r=await sb.auth.getSession();
-  if(!r.data||!r.data.session){_cefrVocabCache=new Set();return _cefrVocabCache}
-  var uid=r.data.session.user.id;
-  var d=await sb.from('user_vocabulary').select('lemma').eq('user_id',uid).eq('lang','en');
-  _cefrVocabCache=new Set((d.data||[]).map(function(w){return w.lemma.toLowerCase()}));
+  if(_cefrVocabPromise)return _cefrVocabPromise;
+  _cefrVocabPromise = (async function(){
+    var sb=window.sottotitoliSupabase;
+    if(!sb)return new Set();
+    var r=await sb.auth.getSession();
+    if(!r.data||!r.data.session)return new Set();
+    var uid=r.data.session.user.id;
+    var d=await sb.from('user_vocabulary').select('lemma').eq('user_id',uid).eq('lang','en');
+    return new Set((d.data||[]).map(function(w){return w.lemma.toLowerCase()}))
+  })();
+  _cefrVocabCache = await _cefrVocabPromise;
+  _cefrVocabPromise = null;
   return _cefrVocabCache
 }
-function invalidateCefrVocabCache(){_cefrVocabCache=null}
+function invalidateCefrVocabCache(){_cefrVocabCache=null;_cefrVocabPromise=null}
 
-function esc(t){return String(t).replace(/[&<>"']/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})}
-function escA(t){return esc(t).replace(/'/g,"\\'")}
+function esc(t){return String(t).replace(/[&<>\"']/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;',\"'\":'&#39;'}[c]})}
+function escA(t){return esc(t).replace(/'/g,\"\\\\'\")}
+function fmtFreq(n){if(!n||n<1000)return String(n||0);if(n>=1e6)return (n/1e6).toFixed(1)+'M';if(n>=1e3)return (n/1e3).toFixed(1)+'K';return String(n)}
 
-/* --- Card factory --- */
 function renderCefrCard(w,knownSet){
-  var n=document.createElement('div');
-  n.className='wbx-box';
+  var n=document.createElement('div');n.className='wbx-box';
   var cefr=w.level||w.cefr||'B1',pos=w.tag||w.pos||'noun',word=w.word||w.lemma||'unknown';
-  var freq=w.frequency_count||w.freq||50,ipa=w.ipa||'',def=w.def||'';
+  var freq=w.frequency_count||w.freq||0,ipa=w.ipa||'',def=w.def||'';
   n.setAttribute('data-cefr',cefr);n.setAttribute('data-pos',pos);
   var saved=knownSet&&knownSet.has(word.toLowerCase())?'saved':'';
-  var pct=Math.max(4,Math.round((freq/100)*100));
-  n.innerHTML='<div class="wbx-word-zone"><div class="wbx-header"><span class="wbx-w">'+esc(word)+'</span><span class="wbx-cefr" data-level="'+esc(cefr)+'">'+esc(cefr)+'</span></div><div class="wbx-pos">'+esc(pos)+'</div>'+(ipa?'<div class="wbx-ipa">'+esc(ipa)+'</div>':'')+(def?'<div class="wbx-def">'+esc(def)+'</div>':'')+'<div class="freq-bar"><i style="width:'+pct+'%"></i></div><div class="freq-label">'+freq+'M occurrences</div></div><div class="wbx-save-col"><button class="wbx-save-btn '+saved+'" onclick="toggleCefrSave(\''+escA(word)+'\',this)">+</button><button class="wbx-bookmark-btn" onclick="toggleCefrBookmark(this)">☆</button></div>';
+  var pct=Math.max(4,Math.min(100,Math.round(Math.log10(Math.max(freq,1))*10)));
+  n.innerHTML='<div class=\"wbx-word-zone\"><div class=\"wbx-header\"><span class=\"wbx-w\">'+esc(word)+'</span><span class=\"wbx-cefr\" data-level=\"'+esc(cefr)+'\">'+esc(cefr)+'</span></div><div class=\"wbx-pos\">'+esc(pos)+'</div>'+(ipa?'<div class=\"wbx-ipa\">'+esc(ipa)+'</div>':'')+(def?'<div class=\"wbx-def\">'+esc(def)+'</div>':'')+'<div class=\"freq-bar\"><i style=\"width:'+pct+'%\"></i></div><div class=\"freq-label\">'+fmtFreq(freq)+'</div></div><div class=\"wbx-save-col\"><button class=\"wbx-save-btn '+saved+'\" onclick=\"toggleCefrSave(\\''+escA(word)+'\\',this)\">+</button><button class=\"wbx-bookmark-btn\" onclick=\"toggleCefrBookmark(this)\">☆</button></div>';
   return n
 }
 
 /* --- Tab A: Topics --- */
 function loadCefrTopics(){
   var w=document.getElementById('cefr-topic-pills');if(!w)return;
-  w.innerHTML='<div class="cefr-empty"><h3>Loading topics…</h3></div>';
+  w.innerHTML='<div class=\"cefr-empty\"><h3>Loading topics…</h3></div>';
   getUserVocabularySet().then(function(k){
-    fetch((window.SOTTOTITOLI_CONFIG&&window.SOTTOTITOLI_CONFIG.cefrApiUrl||'/api/cefr')+'/categories')
-      .then(function(r){return r.json()}).then(function(cats){
-        window._cefrCategories=cats||[];renderCefrTopicList()
-      }).catch(function(){w.innerHTML='<div class="cefr-empty"><h3>Error loading topics.</h3></div>'})
+    var api=(window.SOTTOTITOLI_CONFIG&&window.SOTTOTITOLI_CONFIG.cefrApiUrl)||'/api/cefr';
+    fetch(api+'/categories?counts=1').then(function(r){return r.json()}).then(function(cats){
+      window._cefrCategories=cats||[];renderCefrTopicList()
+    }).catch(function(){w.innerHTML='<div class=\"cefr-empty\"><h3>Error loading topics.</h3></div>'})
   })
 }
 function renderCefrTopicList(){
   var w=document.getElementById('cefr-topic-pills');
   var q=(document.getElementById('cefrTopicSearch')||{}).value||'';q=q.trim().toLowerCase();
-  var ul=document.getElementById('cefrMyLevel').value;
   var cats=window._cefrCategories||[],kn=_cefrVocabCache||new Set();
   w.innerHTML='';
   cats.forEach(function(c){
     if(q&&c.category_title&&!c.category_title.toLowerCase().includes(q))return;
-    var id=c.category_id,title=c.category_title||'Topic';
+    var id=c.category_id,title=c.category_title||'Topic',wc=c.word_count||0;
     var pill=document.createElement('div');pill.className='topic-pill';
-    pill.innerHTML='<div class="pill-name">'+esc(title)+'</div>';
-    // Real word counts come from API. For now, show "Browse →"
-    pill.innerHTML+='<div class="pill-meta">Browse words →</div>';
+    pill.innerHTML='<div class=\"pill-name\">'+esc(title)+'</div><div class=\"pill-meta\">'+wc+' words</div>';
     pill.onclick=function(){openCefrTopic(id,title)};
     w.appendChild(pill)
   })
@@ -371,36 +378,33 @@ function openCefrTopic(id,title){
   var g=document.getElementById('cefr-word-grid'),h=document.getElementById('cefr-topic-header'),nm=document.getElementById('cefr-active-topic');
   if(h)h.style.display='flex';if(nm)nm.textContent=title||'';if(!g)return;
   g.innerHTML='';
+  var api=(window.SOTTOTITOLI_CONFIG&&window.SOTTOTITOLI_CONFIG.cefrApiUrl)||'/api/cefr';
   getUserVocabularySet().then(function(k){
-    fetch((window.SOTTOTITOLI_CONFIG&&window.SOTTOTITOLI_CONFIG.cefrApiUrl||'/api/cefr')+'/category/'+encodeURIComponent(id))
-      .then(function(r){return r.json()}).then(function(words){
-        var f=document.createDocumentFragment();
-        words.forEach(function(w){f.appendChild(renderCefrCard(w,k))});
-        g.innerHTML='';g.appendChild(f)
-      })
+    fetch(api+'/category/'+encodeURIComponent(id)).then(function(r){return r.json()}).then(function(words){
+      var f=document.createDocumentFragment();g.innerHTML='';
+      words.forEach(function(w){f.appendChild(renderCefrCard(w,k))});g.appendChild(f)
+    })
   })
 }
 function renderCefrWords(arr,knownSet){
   var g=document.getElementById('cefr-word-grid');if(!g)return;
   var words=Array.isArray(arr)?arr:(window.cefrWordsData||[]);
   g.innerHTML='';var f=document.createDocumentFragment();
-  words.forEach(function(w){f.appendChild(renderCefrCard(w,knownSet))});
-  g.appendChild(f)
+  words.forEach(function(w){f.appendChild(renderCefrCard(w,knownSet))});g.appendChild(f)
 }
 
 /* --- Tab B: Word Family --- */
 function searchCefrFamily(){
   var inp=document.getElementById('cefr-family-input'),lemma=inp?inp.value.trim():'';
   if(!lemma)return;var g=document.getElementById('cefr-family-grid');if(!g)return;
-  g.innerHTML='<div class="cefr-empty"><h3>Searching…</h3></div>';
+  g.innerHTML='<div class=\"cefr-empty\"><h3>Searching…</h3></div>';
+  var api=(window.SOTTOTITOLI_CONFIG&&window.SOTTOTITOLI_CONFIG.cefrApiUrl)||'/api/cefr';
   getUserVocabularySet().then(function(k){
-    fetch((window.SOTTOTITOLI_CONFIG&&window.SOTTOTITOLI_CONFIG.cefrApiUrl||'/api/cefr')+'/word-family?lemma='+encodeURIComponent(lemma))
-      .then(function(r){return r.json()}).then(function(words){
-        g.innerHTML='';var f=document.createDocumentFragment();
-        if(!words.length){g.innerHTML='<div class="cefr-empty"><h3>No family found.</h3></div>';return}
-        words.forEach(function(w){f.appendChild(renderCefrCard(w,k))});
-        g.appendChild(f)
-      })
+    fetch(api+'/word-family?lemma='+encodeURIComponent(lemma)).then(function(r){return r.json()}).then(function(words){
+      g.innerHTML='';var f=document.createDocumentFragment();
+      if(!words.length){g.innerHTML='<div class=\"cefr-empty\"><h3>No family found.</h3></div>';return}
+      words.forEach(function(w){f.appendChild(renderCefrCard(w,k))});g.appendChild(f)
+    })
   })
 }
 function filterCefrFamilySource(mode){
@@ -413,14 +417,16 @@ function filterCefrFamilySource(mode){
 function loadCefrSessionFamily(){
   var roots=['communicate','analyze','develop','create','structure','environment','strategy','identify','produce','establish'];
   var g=document.getElementById('cefr-family-grid');if(!g)return;
-  g.innerHTML='<div class="cefr-empty"><h3>Loading session words…</h3></div>';
+  g.innerHTML='<div class=\"cefr-empty\"><h3>Loading family trees…</h3></div>';
+  var api=(window.SOTTOTITOLI_CONFIG&&window.SOTTOTITOLI_CONFIG.cefrApiUrl)||'/api/cefr';
   getUserVocabularySet().then(function(k){
-    g.innerHTML='';var f=document.createDocumentFragment();
+    g.innerHTML='';var f=document.createDocumentFragment(),pending=roots.length;
     roots.forEach(function(root){
-      // Ideal: /api/cefr/word-family?lemma=X for each root. Mock expansion for now.
-      var fam=[{word:root,pos:'root',level:'B1',frequency_count:70},{word:root+'tion',pos:'noun',level:'B2',frequency_count:55},{word:root+'ed',pos:'adj',level:'A2',frequency_count:80},{word:root+'ly',pos:'adv',level:'B1',frequency_count:60}];
-      fam.forEach(function(w){f.appendChild(renderCefrCard(w,k))})
-    });g.appendChild(f)
+      fetch(api+'/word-family?lemma='+encodeURIComponent(root)).then(function(r){return r.json()}).then(function(words){
+        if(words&&words.length)words.forEach(function(w){f.appendChild(renderCefrCard(w,k))});
+        pending--;if(pending===0&&!f.children.length)g.innerHTML='<div class=\"cefr-empty\"><h3>No families found.</h3><p>Try searching for a word instead.</p></div>';
+      }).catch(function(){pending--})
+    })
   })
 }
 function surpriseCefrFamily(){
@@ -433,42 +439,42 @@ function surpriseCefrFamily(){
   })
 }
 
-/* --- Tab C: Gaps --- */
+/* --- Tab C: Gaps (single endpoint — no 39 fetches) --- */
 function loadCefrFrequencies(){
   var w=document.getElementById('cefr-gap-sections');if(!w)return;
-  w.innerHTML='<div class="cefr-empty"><h3>Analyzing gaps…</h3></div>';
+  w.innerHTML='<div class=\"cefr-empty\"><h3>Analyzing gaps…</h3></div>';
   var ul=document.getElementById('cefrMyLevel').value,un=cefrLevelNum(ul);
   var sm=document.getElementById('cefrGapSort').value;
-  Promise.all([getUserVocabularySet(),fetchMultipleCefrCategories()]).then(function(r){
-    renderCefrGaps(r[1],r[0],un,sm)
-  })
-}
-function fetchMultipleCefrCategories(){
-  var ids=[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39];
-  return Promise.all(ids.map(function(id){
-    return fetch((window.SOTTOTITOLI_CONFIG&&window.SOTTOTITOLI_CONFIG.cefrApiUrl||'/api/cefr')+'/category/'+id).then(function(r){return r.json()}).catch(function(){return[]})
-  })).then(function(r){var s=new Set(),m=[];r.forEach(function(a){a.forEach(function(w){if(w.word&&!s.has(w.word)){s.add(w.word);m.push(w)}})});return m})
-}
-function renderCefrGaps(all,kn,un,sm){
-  var w=document.getElementById('cefr-gap-sections');w.innerHTML='';
   var lv=['A1','A2','B1','B2','C1','C2'],below=lv[un-2],above=lv[un];
-  function mk(title,lk,icon){
-    var pool=all.filter(function(x){return(x.level||x.cefr)===lk&&x.word&&!kn.has(x.word.toLowerCase())});
-    if(!pool.length)return null;
-    if(sm==='freq-desc')pool.sort(function(a,b){return(b.frequency_count||b.freq||0)-(a.frequency_count||a.freq||0)});
-    else if(sm==='freq-asc')pool.sort(function(a,b){return(a.frequency_count||a.freq||0)-(b.frequency_count||b.freq||0)});
-    else if(sm==='alpha')pool.sort(function(a,b){return(a.word||'').localeCompare(b.word||'')});
-    else if(sm==='cefr')pool.sort(function(a,b){return cefrLevelNum(a.level||a.cefr)-cefrLevelNum(b.level||b.cefr)});
-    var h=document.createElement('div');h.className='cefr-section-title';
-    h.innerHTML=icon+' '+title+' <span class="count">'+pool.length+'</span>';
-    var g=document.createElement('div');g.className='wbx-grid';
-    var f=document.createDocumentFragment();pool.forEach(function(x){f.appendChild(renderCefrCard(x,kn))});g.appendChild(f);
-    var b=document.createElement('div');b.appendChild(h);b.appendChild(g);return b
-  }
-  var any=false;
-  if(below){var n=mk(below+' words you might have missed',below,'📊');if(n){w.appendChild(n);any=true}}
-  if(above){var n=mk(above+' words to stretch toward',above,'🚀');if(n){w.appendChild(n);any=true}}
-  if(!any)w.innerHTML='<div class="cefr-empty"><h3>No gaps detected!</h3><p>Try adjusting your level or explore topics.</p></div>'
+  var nonce=++_cefrFetchNonce;
+  var api=(window.SOTTOTITOLI_CONFIG&&window.SOTTOTITOLI_CONFIG.cefrApiUrl)||'/api/cefr';
+  Promise.all([
+    getUserVocabularySet(),
+    fetch(api+'/gaps?below='+(below||'')+'&above='+(above||'')).then(function(r){return r.json()})
+  ]).then(function(r){
+    if(nonce!==_cefrFetchNonce)return;
+    var kn=r[0],data=r[1];
+    function sorter(pool){
+      if(sm==='freq-desc')pool.sort(function(a,b){var fa=a.frequency_count||0,fb=b.frequency_count||0;return fb!==fa?fb-fa:(a.word||'').localeCompare(b.word||'')});
+      else if(sm==='freq-asc')pool.sort(function(a,b){var fa=a.frequency_count||0,fb=b.frequency_count||0;return fa!==fb?fa-fb:(a.word||'').localeCompare(b.word||'')});
+      else if(sm==='alpha')pool.sort(function(a,b){return(a.word||'').localeCompare(b.word||'')});
+    }
+    function renderSection(title,arr,icon){
+      if(!arr||!arr.length)return null;
+      var pool=arr.filter(function(x){return x.word&&!kn.has(x.word.toLowerCase())});
+      if(!pool.length)return null;
+      sorter(pool);
+      var h=document.createElement('div');h.className='cefr-section-title';
+      h.innerHTML=icon+' '+title+' <span class=\"count\">'+pool.length+'</span>';
+      var g=document.createElement('div');g.className='wbx-grid';
+      var f=document.createDocumentFragment();pool.forEach(function(x){f.appendChild(renderCefrCard(x,kn))});g.appendChild(f);
+      var b=document.createElement('div');b.appendChild(h);b.appendChild(g);return b
+    }
+    w.innerHTML='';var any=false;
+    if(data.below){var n=renderSection(below+' words you might have missed',data.below,'📊');if(n){w.appendChild(n);any=true}}
+    if(data.above){var n=renderSection(above+' words to stretch toward',data.above,'🚀');if(n){w.appendChild(n);any=true}}
+    if(!any)w.innerHTML='<div class=\"cefr-empty\"><h3>No gaps detected!</h3><p>Try adjusting your level or explore topics.</p></div>'
+  })
 }
 
 /* --- Save wiring --- */
@@ -486,7 +492,7 @@ async function toggleCefrSave(word,btn){
 function toggleCefrBookmark(btn){btn.textContent=btn.textContent==='☆'?'★':'☆'}
 
 function refreshCefrAll(){
-  if(document.getElementById('cefr-tab-a')&&document.getElementById('cefr-tab-a').classList.contains('active')){renderCefrTopicList();var g=document.getElementById('cefr-word-grid');if(g&&g.children.length){/* keep current topic */}}
+  if(document.getElementById('cefr-tab-a')&&document.getElementById('cefr-tab-a').classList.contains('active')){renderCefrTopicList();var g=document.getElementById('cefr-word-grid');if(g&&g.children.length){}}
   if(document.getElementById('cefr-tab-b')&&document.getElementById('cefr-tab-b').classList.contains('active'))filterCefrFamilySource(_cefrFamilySource);
   if(document.getElementById('cefr-tab-c')&&document.getElementById('cefr-tab-c').classList.contains('active'))loadCefrFrequencies()
 }
@@ -497,14 +503,12 @@ function switchCefrTab(name){
   if(name==='a')loadCefrTopics();if(name==='b')filterCefrFamilySource('sessions');if(name==='c')loadCefrFrequencies()
 }
 
-/* --- Scheme dots --- */
 function renderCefrSchemeDots(){
   var w=document.getElementById('cefrSchemeDots');if(!w)return;w.innerHTML='';
   var cols=['#0369a1','#4338ca','#0369a1','#0e7490','#047857','#6d28d9','#b45309','#be185d'];
   for(var i=0;i<8;i++){var d=document.createElement('div');d.className='dot'+(i===_cefrCurrentScheme?' active':'');d.style.background=cols[i];d.onclick=(function(ii){return function(){_cefrCurrentScheme=ii;document.getElementById('pnl-cefr-explorer').setAttribute('data-wb-scheme',ii);renderCefrSchemeDots()}})(i);w.appendChild(d)}
 }
 
-/* --- Bootstrap --- */
 (function(){renderCefrSchemeDots();if(document.getElementById('cefr-tab-a')&&document.getElementById('cefr-tab-a').classList.contains('active'))loadCefrTopics()})();
 ```
 
