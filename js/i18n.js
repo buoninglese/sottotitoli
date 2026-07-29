@@ -1180,72 +1180,139 @@
     return 'it';
   }
 
+  /* ─── UTIL ─── */
   function t(key) {
-    var dict = DICT[_lang] || DICT.it;
-    return dict[key] || key;
+    var d = (_lang === 'it') ? DICT.it : DICT.en;
+    if (d && d[key] !== undefined) return d[key];
+    if (DICT.it && DICT.it[key] !== undefined) return DICT.it[key];
+    if (DICT.en && DICT.en[key] !== undefined) return DICT.en[key];
+    return key;
   }
 
-  function apply(root) {
-    root = root || document;
-    // data-i18n attributes on elements
-    root.querySelectorAll('[data-i18n]').forEach(function(el){
-      var key = el.getAttribute('data-i18n');
-      if (!key) return;
-      var itText = DICT.it[key] || key;
-      var enText = DICT.en[key] || key;
-      // Strip HTML from dict values for textContent comparison
-      var itPlain = itText.replace(/<[^>]*>/g, '');
-      var enPlain = enText.replace(/<[^>]*>/g, '');
-      if (el.textContent.trim() === itPlain || el.textContent.trim() === enPlain) {
-        el.textContent = t(key);
+  function getScope(root) {
+    return (root && root.nodeType) ? root : document.body;
+  }
+
+  function hasHtml(str) {
+    // Detects tags like <strong>, <br>, <span class="x">.
+    // Rare false positive "5 < 6" is accepted trade-off for zero-config.
+    return /<[a-z][\s\S]*?>/i.test(str);
+  }
+
+  /* ─── ORIGINAL CAPTURE ───
+   * Captures Italian source-of-truth from the DOM exactly once.
+   * Only runs during init or when _lang === 'it' so we never snapshot
+   * an already-translated English string as the Italian original.
+   */
+  function captureOriginals(root, force) {
+    if (!force && _lang !== 'it') return;
+    var scope = getScope(root);
+
+    scope.querySelectorAll('[data-i18n]').forEach(function(el) {
+      if (el.hasAttribute('data-i18n-orig-txt')) return;
+      el.setAttribute('data-i18n-orig-txt', el.textContent);
+      if (el.innerHTML !== el.textContent) {
+        el.setAttribute('data-i18n-orig-html', el.innerHTML);
       }
     });
-    // data-i18n-html: same as data-i18n but uses innerHTML (for formatted text)
-    root.querySelectorAll('[data-i18n-html]').forEach(function(el){
-      var key = el.getAttribute('data-i18n-html');
-      if (!key) return;
-      var itText = DICT.it[key] || key;
-      var enText = DICT.en[key] || key;
-      var itPlain = itText.replace(/<[^>]*>/g, '');
-      var enPlain = enText.replace(/<[^>]*>/g, '');
-      if (el.textContent.trim() === itPlain || el.textContent.trim() === enPlain) {
-        el.innerHTML = t(key);
-      }
+
+    scope.querySelectorAll('[data-i18n-placeholder]').forEach(function(el) {
+      if (el.hasAttribute('data-i18n-orig-placeholder')) return;
+      el.setAttribute('data-i18n-orig-placeholder', el.getAttribute('placeholder') || '');
     });
-    // data-i18n-placeholder
-    root.querySelectorAll('[data-i18n-placeholder]').forEach(function(el){
-      var key = el.getAttribute('data-i18n-placeholder');
-      if (key) el.placeholder = t(key);
+
+    scope.querySelectorAll('[data-i18n-title]').forEach(function(el) {
+      if (el.hasAttribute('data-i18n-orig-title')) return;
+      el.setAttribute('data-i18n-orig-title', el.getAttribute('title') || '');
     });
-    // data-i18n-title
-    root.querySelectorAll('[data-i18n-title]').forEach(function(el){
-      var key = el.getAttribute('data-i18n-title');
-      if (key) el.title = t(key);
-    });
-    // Translate select options
-    root.querySelectorAll('option[data-i18n]').forEach(function(el){
-      var key = el.getAttribute('data-i18n');
-      if (key) el.textContent = t(key);
-    });
-    // Walk text nodes and translate known Italian strings
-    if (_lang === 'en') {
-      var walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, null, false);
-      var textNodes = [];
-      while(walker.nextNode()) textNodes.push(walker.currentNode);
-      textNodes.forEach(function(tn){
-        // Skip brand elements and anything marked no-i18n
-        var parent = tn.parentElement;
-        if (parent && (parent.closest('.topbar-brand') || parent.closest('[data-i18n-ignore]') || parent.closest('.no-i18n'))) return;
-        var text = tn.textContent.trim();
-        if (!text || text.length < 2) return;
-        // Check if this matches any Italian key (reverse lookup)
-        for (var k in DICT.it) {
-          if (DICT.it[k] === text && DICT.en[k] && DICT.en[k] !== text) {
-            tn.textContent = tn.textContent.replace(text, DICT.en[k]);
-            break;
+  }
+
+  /* ─── CORE APPLY (Guardless Architecture) ─── */
+  var _isTranslating = false;
+
+  function apply(root, lang) {
+    // Smart-swap: apply('en') means lang='en', root=document
+    if (typeof root === 'string') { lang = root; root = null; }
+    if (_isTranslating) return;
+    _isTranslating = true;
+    if (lang) _lang = lang;
+
+    var scope = getScope(root);
+
+    // Capture freshly injected Italian elements before translating
+    if (_lang === 'it') captureOriginals(scope);
+
+    try {
+      /* 1. data-i18n elements (handles <option> + leaf-safe HTML auto-detect) */
+      scope.querySelectorAll('[data-i18n]').forEach(function(el) {
+        var key = el.getAttribute('data-i18n');
+        if (!key) return;
+
+        // ── RESTORE ITALIAN ──
+        if (_lang === 'it') {
+          var origHtml = el.getAttribute('data-i18n-orig-html');
+          if (origHtml !== null) {
+            el.innerHTML = origHtml;
+          } else {
+            var origTxt = el.getAttribute('data-i18n-orig-txt');
+            if (origTxt !== null) el.textContent = origTxt;
           }
+          return;
+        }
+
+        // ── TRANSLATE ──
+        var translated = t(key);
+        var isOption = el.tagName === 'OPTION';
+        var safeForHtml = !isOption && el.children.length === 0;
+
+        if (hasHtml(translated) && safeForHtml) {
+          el.innerHTML = translated;
+        } else {
+          el.textContent = translated;
         }
       });
+
+      /* 2. data-i18n-html (backward compat — redirects to data-i18n logic) */
+      scope.querySelectorAll('[data-i18n-html]').forEach(function(el) {
+        var key = el.getAttribute('data-i18n-html');
+        if (!key) return;
+        // Restore or translate using innerHTML (these are intentionally HTML)
+        if (_lang === 'it') {
+          var origHtml = el.getAttribute('data-i18n-orig-html');
+          if (origHtml !== null) { el.innerHTML = origHtml; }
+          else { var origTxt = el.getAttribute('data-i18n-orig-txt'); if (origTxt !== null) el.textContent = origTxt; }
+        } else {
+          el.innerHTML = t(key);
+        }
+      });
+
+      /* 3. Placeholders */
+      scope.querySelectorAll('[data-i18n-placeholder]').forEach(function(el) {
+        if (_lang === 'it') {
+          var orig = el.getAttribute('data-i18n-orig-placeholder');
+          if (orig !== null) el.setAttribute('placeholder', orig);
+          return;
+        }
+        el.setAttribute('placeholder', t(el.getAttribute('data-i18n-placeholder')));
+      });
+
+      /* 4. Titles */
+      scope.querySelectorAll('[data-i18n-title]').forEach(function(el) {
+        if (_lang === 'it') {
+          var orig = el.getAttribute('data-i18n-orig-title');
+          if (orig !== null) el.setAttribute('title', orig);
+          return;
+        }
+        el.setAttribute('title', t(el.getAttribute('data-i18n-title')));
+      });
+
+    } finally {
+      // MutationObserver callbacks are microtasks; rAF fires after they drain.
+      if (typeof requestAnimationFrame !== 'undefined') {
+        requestAnimationFrame(function() { _isTranslating = false; });
+      } else {
+        setTimeout(function() { _isTranslating = false; }, 0);
+      }
     }
   }
 
@@ -1266,17 +1333,53 @@
         });
       }
     } catch(e) {}
-    apply();
+    apply(null, lang);
     // Dispatch event for page-specific handlers
     window.dispatchEvent(new CustomEvent('i18n-changed', { detail: { lang: lang } }));
     updateToggleBtns();
     return lang;
   }
 
+  /* ─── MUTATION OBSERVER (childList + characterData) ─── */
+  var _debounceTimer = null;
+
+  function observe(container) {
+    _observer = new MutationObserver(function(mutations) {
+      if (_isTranslating) return;
+
+      var relevant = false;
+      for (var i = 0; i < mutations.length; i++) {
+        var m = mutations[i];
+        if (m.type === 'childList' || m.type === 'characterData') { relevant = true; break; }
+      }
+      if (!relevant) return;
+
+      clearTimeout(_debounceTimer);
+      _debounceTimer = setTimeout(function() {
+        if (_isTranslating) return;
+        apply();
+        // Inject lang toggle into any newly-added user dropdowns
+        if (typeof injectLangToggle === 'function') injectLangToggle();
+      }, 60);
+    });
+
+    _observer.observe(container || document.body, {
+      childList: true,
+      subtree: true,
+      characterData: true
+    });
+  }
+
   async function init() {
     if (_loaded) return _lang;
     _loaded = true;
     var lang = detectLang();
+
+    // Capture Italian originals FIRST, before any translation
+    captureOriginals(null, true);
+
+    // Start the observer
+    observe(document.body);
 
     // Inject toggle immediately — don't wait for Supabase
     injectLangToggle();
@@ -1330,13 +1433,56 @@
     document.querySelectorAll('.i18n-btn-en').forEach(function(b){ b.style.color = _lang==='en' ? 'var(--teal, #059669)' : 'var(--text-faint, #9ca3af)'; });
   }
 
+  /* ═══════════════════════════════════════════════════════
+     PUBLIC API
+     ═══════════════════════════════════════════════════════ */
   window.I18n = {
     init: init,
     setLang: setLang,
     t: t,
     apply: apply,
     getLang: function(){ return _lang; },
-    DICT: DICT
+    DICT: DICT,
+
+    /** Translate a single element manually (e.g. after dynamic injection). */
+    translateElement: function(el, key) {
+      key = key || el.getAttribute('data-i18n');
+      if (!key) return;
+      if (_lang === 'it') captureOriginals(el, true);
+      var prev = _isTranslating;
+      _isTranslating = true;
+      try {
+        if (_lang === 'it') {
+          var h = el.getAttribute('data-i18n-orig-html');
+          if (h !== null) { el.innerHTML = h; }
+          else { var txt = el.getAttribute('data-i18n-orig-txt'); if (txt !== null) el.textContent = txt; }
+        } else {
+          var trans = t(key);
+          var safeForHtml = el.tagName !== 'OPTION' && el.children.length === 0;
+          if (hasHtml(trans) && safeForHtml) { el.innerHTML = trans; }
+          else { el.textContent = trans; }
+        }
+      } finally { _isTranslating = prev; }
+    },
+
+    /** One-time migration helper. Run in DevTools, commit HTML, remove helper. */
+    annotate: function(root) {
+      var rev = {};
+      var it = DICT.it, en = DICT.en;
+      for (var k in it) { if (en[k] && en[k] !== it[k] && !rev[it[k]]) rev[it[k]] = k; }
+      var w = document.createTreeWalker(getScope(root), NodeFilter.SHOW_TEXT, null, false);
+      var n;
+      while ((n = w.nextNode())) {
+        var txt = n.textContent.trim();
+        if (rev[txt]) {
+          var p = n.parentElement;
+          if (p && !p.closest('[data-i18n]') && !p.getAttribute('data-i18n')) {
+            p.setAttribute('data-i18n', rev[txt]);
+          }
+        }
+      }
+      console.log('I18n.annotate: done. Call I18n.apply() to preview.');
+    }
   };
 
   // Auto-init on DOM ready
@@ -1345,20 +1491,5 @@
   } else {
     init();
   }
-
-  // ── MutationObserver: auto-translate dynamically added content ──
-  var _observer = new MutationObserver(function(mutations){
-    mutations.forEach(function(m){
-      m.addedNodes.forEach(function(node){
-        if (node.nodeType === 1) {
-          apply(node);
-          if (node.querySelector && (node.querySelector('#userDropdown') || node.classList.contains('user-dropdown'))) {
-            injectLangToggle();
-          }
-        }
-      });
-    });
-  });
-  _observer.observe(document.body || document.documentElement, { childList: true, subtree: true });
 
 })();
