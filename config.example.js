@@ -26,6 +26,9 @@ window.SOTTOTITOLI_CONFIG = {
       Get your free token at https://huggingface.co/settings/tokens */
   kokoroToken: "hf_your_token_here",
 
+  /** CEFR vocabulary API (sottotitoli-websocket Render service + Words-CEFR-Dataset) */
+  cefrApiUrl: "https://sottotitoli-websocket.onrender.com/api/cefr",
+
   /** Translation provider settings */
   translation: {
     /** Translation provider: "proxy" = server-side with caching + fallback.
