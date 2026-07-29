@@ -278,6 +278,35 @@ function _endSupabaseSession(data) {
     });
 }
 
+// ═══ Fallback: save session even if no session ID was created ═══
+function _fallbackSaveSession(data) {
+  if (!window.sottotitoliSupabase) return;
+  window.sottotitoliSupabase.auth.getSession().then(function(r) {
+    if (!r.data?.session) { console.warn('⚠ Cannot fallback save — not logged in'); return; }
+    var userId = r.data.session.user.id;
+    var roomId = 'caption-fallback-' + Date.now().toString(36);
+    var lines = data.lines || [];
+    var fullText = lines.map(function(l) { return l.en || l.text || l || ''; }).filter(Boolean).join('\n');
+    var words = (fullText.toLowerCase().match(/[a-zàèéìòù]{2,}/g) || []);
+    window.sottotitoliSupabase.from('sessions').insert({
+      user_id: userId,
+      room: roomId,
+      mode: 'caption-en',
+      started_at: new Date(Date.now() - (data.durationSeconds || 0) * 1000).toISOString(),
+      ended_at: new Date().toISOString(),
+      language_pair: 'en-US',
+      session_type: 'caption',
+      transcript_text: fullText,
+      words_count: words.length,
+      duration_seconds: data.durationSeconds || 0,
+      wpm: data.durationSeconds > 0 ? Math.round((words.length / data.durationSeconds) * 60) : 0
+    }).then(function(ins) {
+      if (ins.error) { console.error('Fallback save failed:', ins.error.message); }
+      else { console.log('✅ Session fallback-saved'); }
+    });
+  });
+}
+
 // ═══ Minutes deduction from user_credits ═══
 function _deductSessionMinutes(durationSeconds) {
   if (!window.sottotitoliSupabase || durationSeconds <= 0) return;
