@@ -223,8 +223,6 @@
   async function getReferralStats() {
     var userId = await getUserId();
     if (!userId) return null;
-    var cached = cacheGet('referrals');
-    if (cached) return cached;
 
     var r = await sb().from('referrals')
       .select('*')
@@ -234,11 +232,9 @@
 
     var refs = r.data || [];
     var active = refs.filter(function(ref) { return ref.status === 'active'; }).length;
-    // earned_minutes column not on referrals table — compute from active count
     var earnedMinutes = active * 15; // 15 min bonus per active referral
 
     var data = { total: refs.length, active: active, earnedMinutes: earnedMinutes };
-    cacheSet('referrals', data);
     return data;
   }
 
