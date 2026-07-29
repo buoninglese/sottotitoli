@@ -713,8 +713,8 @@
           <a class="nav-item" href="#" data-panel="vocabulary-trainer"><i class="fa-solid fa-dumbbell"></i><span>Vocabulary Trainer</span></a>
           <a class="nav-item" href="#" data-panel="grammatica"><svg class="icon"><use href="#i-scratchpad"></use></svg><span data-i18n="grammatica">Grammatica</span></a>
           <a class="nav-item" href="#" data-panel="trascrizioni"><svg class="icon"><use href="#i-dictionary"></use></svg><span data-i18n="trascrizioni">Trascrizioni</span></a>
-          <a class="nav-item premium" href="#" data-panel="report-ai" style="opacity:.35;pointer-events:none;cursor:not-allowed" title="Coming soon"><svg class="icon"><use href="#i-star"></use></svg><span data-i18n="report_ai">Report AI</span><span class="premium-badge">PREMIUM</span></a>
-          <a class="nav-item premium" href="#" data-panel="ai-voice" style="opacity:.35;pointer-events:none;cursor:not-allowed" title="Coming soon"><svg class="icon"><use href="#i-voice"></use></svg><span>AI Voice</span><span class="premium-badge">PREMIUM</span></a>
+          <a class="nav-item premium" href="#" data-panel="report-ai" style="color:var(--cyan);opacity:.35;pointer-events:none;cursor:not-allowed" title="Coming soon"><svg class="icon"><use href="#i-star"></use></svg><span data-i18n="report_ai">Report AI</span><span class="premium-badge">PREMIUM</span></a>
+          <a class="nav-item premium" href="#" data-panel="ai-voice" style="color:var(--cyan);opacity:.35;pointer-events:none;cursor:not-allowed" title="Coming soon"><svg class="icon"><use href="#i-voice"></use></svg><span>AI Voice</span><span class="premium-badge">PREMIUM</span></a>
         </nav>
       </div>
       <div class="sidebar-bottom">
@@ -1923,7 +1923,49 @@
             <section class="dictionary-list-card" id="raiMieiList"><div class="tbl-head"><span style="flex:2">Report</span><span style="flex:1;text-align:right">Data</span><span style="flex:1;text-align:right">Punti</span><span class="th-action"></span></div><p style="text-align:center;padding:24px;color:var(--text-faint);font-size:13px">Nessun report ancora generato. Vai alla tab "Genera" per crearne uno.</p></section>
           </div>
           <div role="tabpanel" class="subtab-pane" id="sub-rai-impostazioni">
-            <p style="text-align:center;padding:24px;color:var(--text-faint);font-size:13px">Le impostazioni dei report AI non sono ancora disponibili.</p>
+            <section class="alt-card-grid">
+              <article class="alt-card">
+                <h3><i class="fa-solid fa-language"></i> Lingua dei report</h3>
+                <p style="font-size:13px;color:var(--text-soft);margin-bottom:12px">In che lingua vuoi che i report vengano generati?</p>
+                <div style="display:flex;gap:8px">
+                  <button class="fchip active" data-rai-lang="it" onclick="document.querySelectorAll('[data-rai-lang]').forEach(function(b){b.classList.remove('active')});this.classList.add('active');localStorage.setItem('rai-lang','it')">🇮🇹 Italiano</button>
+                  <button class="fchip" data-rai-lang="en" onclick="document.querySelectorAll('[data-rai-lang]').forEach(function(b){b.classList.remove('active')});this.classList.add('active');localStorage.setItem('rai-lang','en')">🇬🇧 English</button>
+                </div>
+              </article>
+              <article class="alt-card">
+                <h3><i class="fa-solid fa-clock"></i> Auto-generazione</h3>
+                <p style="font-size:13px;color:var(--text-soft);margin-bottom:12px">Genera automaticamente un report dopo ogni sessione?</p>
+                <div style="display:flex;gap:8px">
+                  <button class="fchip" data-rai-auto="off" onclick="document.querySelectorAll('[data-rai-auto]').forEach(function(b){b.classList.remove('active')});this.classList.add('active');localStorage.setItem('rai-auto','off')">No, manuale</button>
+                  <button class="fchip active" data-rai-auto="on" onclick="document.querySelectorAll('[data-rai-auto]').forEach(function(b){b.classList.remove('active')});this.classList.add('active');localStorage.setItem('rai-auto','on')">Sì, automatico</button>
+                </div>
+              </article>
+              <article class="alt-card">
+                <h3><i class="fa-solid fa-database"></i> Cronologia</h3>
+                <p style="font-size:13px;color:var(--text-soft);margin-bottom:6px">I report vengono conservati per 90 giorni. Puoi cancellarli tutti.</p>
+                <button class="btn btn-ghost btn-sm" style="color:var(--red);font-family:var(--font-ui)" onclick="if(confirm('Eliminare tutti i report? Questa azione non può essere annullata.')){deleteAllReports()}"><i class="fa-solid fa-trash"></i> Elimina tutti i report</button>
+              </article>
+            </section>
+            <script>
+              // Restore saved settings
+              (function(){
+                var rl = localStorage.getItem('rai-lang') || 'it';
+                var ra = localStorage.getItem('rai-auto') || 'on';
+                document.querySelectorAll('[data-rai-lang]').forEach(function(b){ b.classList.toggle('active', b.getAttribute('data-rai-lang') === rl); });
+                document.querySelectorAll('[data-rai-auto]').forEach(function(b){ b.classList.toggle('active', b.getAttribute('data-rai-auto') === ra); });
+              })();
+              window.deleteAllReports = async function() {
+                var sb = window.sottotitoliSupabase;
+                if (!sb) { alert('Accedi per gestire i report.'); return; }
+                var r = await sb.auth.getSession();
+                if (!r.data?.session) { alert('Sessione scaduta.'); return; }
+                var uid = r.data.session.user.id;
+                var dr = await sb.from('session_ai_reports').delete().eq('user_id', uid);
+                if (dr.error) { alert('Errore: ' + dr.error.message); return; }
+                alert('Tutti i report eliminati.');
+                window.location.reload();
+              };
+            </script>
           </div>
         </div>
         <div class="content-panel" id="pnl-impostazioni">
