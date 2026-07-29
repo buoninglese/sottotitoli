@@ -45,13 +45,28 @@ async function startRealMic() {
   
   // Warm up audio subsystem — critical for Chrome: first rec.start()
   // silently captures silence if getUserMedia hasn't initialized audio.
-  // Keep the stream alive — releasing it tells Chrome we're done with audio.
+  // Use BlackHole device if system audio mode is active.
+  var audioConstraint = (typeof window !== 'undefined' && window._getAudioSourceConfig)
+    ? window._getAudioSourceConfig()
+    : true;
   try {
-    _realMic.stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    _realMic.stream = await navigator.mediaDevices.getUserMedia({ audio: audioConstraint });
   } catch(e) {
-    console.error('Mic permission denied:', e);
-    updateMicUI('blocked');
-    return false;
+    // If BlackHole device fails, fall back to default mic
+    if (audioConstraint !== true && audioConstraint.deviceId) {
+      console.warn('BlackHole device not available, falling back to default mic:', e.message);
+      try {
+        _realMic.stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      } catch(e2) {
+        console.error('Mic permission denied:', e2);
+        updateMicUI('blocked');
+        return false;
+      }
+    } else {
+      console.error('Mic permission denied:', e);
+      updateMicUI('blocked');
+      return false;
+    }
   }
   
   var SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -170,7 +185,13 @@ function _endSupabaseSession(data) {
   var sessionId = localStorage.getItem('sottotitoli-active-session')
     || localStorage.getItem('sottotitoli-caption-session')
     || localStorage.getItem('sottotitoli-translate-session');
-  if (!sessionId || !window.sottotitoliSupabase) return;
+  
+  if (!sessionId) {
+    console.warn('⚠ No session ID found — session may not have been created. Trying fallback save.');
+    _fallbackSaveSession(data);
+    return;
+  }
+  if (!window.sottotitoliSupabase) return;
   
   data = data || {};
   var updateObj = { ended_at: new Date().toISOString() };
@@ -237,7 +258,13 @@ function _endSupabaseSession(data) {
   window._lastSessionId = sessionId;
   
   window.sottotitoliSupabase.from('sessions').update(updateObj)
-    .eq('id', sessionId).then(function() {
+    .eq('id', sessionId).then(function(upd) {
+      if (upd.error) {
+        console.error('Session save failed:', upd.error.message);
+        return;
+      }
+      console.log('✅ Session saved:', sessionId, '| words:', updateObj.words_count, '| duration:', Math.round((updateObj.duration_seconds || 0) / 60) + 'min');
+      
       // Clear all session keys
       localStorage.removeItem('sottotitoli-active-session');
       localStorage.removeItem('sottotitoli-caption-session');
