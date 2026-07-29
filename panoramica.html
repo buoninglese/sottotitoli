@@ -2251,7 +2251,7 @@
 
   <!-- Dependencies (order matters) -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="config.js"></script>
+  <script src="config.js?v=2"></script>
   <script src="config.secrets.js"></script>
   <script src="js/auth.js?v=22"></script>
   <script src="js/language-resolver.js?v=1"></script>
@@ -8402,7 +8402,7 @@
     if(mode==='sessions')loadCefrSessionFamily()
   }
   function loadCefrSessionFamily(){
-    var roots=['communicate','analyze','develop','create','structure','environment','strategy','identify','produce','establish'];
+    var roots=['develop','establish','environment','happy','communicate','analyze','create','structure','strategy','identify'];
     var g=document.getElementById('cefr-family-grid');if(!g)return;
     g.innerHTML='<div class="cefr-empty"><h3>Loading family trees…</h3></div>';
     var api=window.SOTTOTITOLI_CONFIG&&window.SOTTOTITOLI_CONFIG.cefrApiUrl||'/api/cefr';
@@ -8411,8 +8411,9 @@
       roots.forEach(function(root){
         fetch(api+'/word-family?lemma='+encodeURIComponent(root)).then(function(r){return r.json()}).then(function(words){
           if(words&&words.length)words.forEach(function(w){f.appendChild(renderCefrCard(w,k))});
-          pending--;if(pending===0&&!f.children.length){
-            if(failures===roots.length)g.innerHTML='<div class="cefr-empty"><h3>🔌 Service warming up</h3><p style="margin:8px 0 12px">Backend is spinning up (can take ~30s on free tier).</p><button class="cefr-primary" onclick="loadCefrSessionFamily()">Retry</button></div>';
+          pending--;if(pending===0){
+            if(f.children.length){g.appendChild(f)}
+            else if(failures===roots.length)g.innerHTML='<div class="cefr-empty"><h3>🔌 Service warming up</h3><p style="margin:8px 0 12px">Backend is spinning up (can take ~30s on free tier).</p><button class="cefr-primary" onclick="loadCefrSessionFamily()">Retry</button></div>';
             else g.innerHTML='<div class="cefr-empty"><h3>No families found.</h3><p>Try searching for a word instead. <button class="cefr-primary" style="margin-top:8px" onclick="loadCefrSessionFamily()">Retry</button></p></div>'
           }
         }).catch(function(){failures++;pending--;if(pending===0&&!f.children.length){
@@ -8455,11 +8456,14 @@
         var pool=arr.filter(function(x){return x.word&&!kn.has(x.word.toLowerCase())});
         if(!pool.length)return null;
         sorter(pool);
+        var total=pool.length,capped=pool.length>50;
+        if(capped)pool=pool.slice(0,50);
         var h=document.createElement('div');h.className='cefr-section-title';
-        h.innerHTML=icon+' '+title+' <span class="count">'+pool.length+'</span>';
+        h.innerHTML=icon+' '+title+' <span class=\"count\">'+(capped?'50 / ':'')+total+'</span>';
         var g=document.createElement('div');g.className='wbx-grid';
         var f=document.createDocumentFragment();pool.forEach(function(x){f.appendChild(renderCefrCard(x,kn))});g.appendChild(f);
-        var b=document.createElement('div');b.appendChild(h);b.appendChild(g);return b
+        var b=document.createElement('div');b.appendChild(h);b.appendChild(g);
+        return b
       }
       w.innerHTML='';var any=false;
       if(data.below){var n=renderSection(below+' words you might have missed',data.below,'📊');if(n){w.appendChild(n);any=true}}
