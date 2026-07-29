@@ -123,6 +123,7 @@
       "insights_read_full": "Leggi il report completo →",
       "insights_traguardi_title": "Traguardi",
       "insights_traguardi_sub": "Ogni traguardo raggiunto è una pietra miliare nel tuo percorso. Continua a fare pratica per sbloccarli tutti.",
+      "insights_journey_start": "Il tuo percorso inizia qui. Completa la tua prima sessione per sbloccare il primo traguardo e vedere la tua timeline crescere.",
       "insights_sessions": "Sessioni",
       "insights_minutes_spoken": "Minuti parlati",
       "insights_unique_words": "Parole uniche",
@@ -257,7 +258,7 @@
       "monthly_goal": "obiettivo mensile",
       "last_30d": "ultimi 30gg",
       "cefr_distribution": "Distribuzione CEFR",
-      "loading": "Caricamento...",
+      "loading": "Caricamento…",
       "complete_sessions_cefr": "Completa alcune sessioni per vedere la distribuzione CEFR del tuo vocabolario.",
       "total_vocabulary": "Vocabolario totale",
       "words": "parole",
@@ -640,6 +641,7 @@
       "insights_read_full": "Read full report →",
       "insights_traguardi_title": "Milestones",
       "insights_traguardi_sub": "Every milestone reached is a stepping stone on your journey. Keep practicing to unlock them all.",
+      "insights_journey_start": "Your journey starts here. Complete your first session to unlock the first milestone and watch your timeline grow.",
       "insights_sessions": "Sessions",
       "insights_minutes_spoken": "Minutes spoken",
       "insights_unique_words": "Unique words",
@@ -838,7 +840,7 @@
       "monthly_goal": "monthly goal",
       "last_30d": "last 30 days",
       "cefr_distribution": "CEFR Distribution",
-      "loading": "Loading...",
+      "loading": "Loading…",
       "complete_sessions_cefr": "Complete some sessions to see your CEFR vocabulary distribution.",
       "total_vocabulary": "Total vocabulary",
       "words": "words",
@@ -1191,8 +1193,23 @@
       if (!key) return;
       var itText = DICT.it[key] || key;
       var enText = DICT.en[key] || key;
-      if (el.textContent.trim() === itText || el.textContent.trim() === enText) {
+      // Strip HTML from dict values for textContent comparison
+      var itPlain = itText.replace(/<[^>]*>/g, '');
+      var enPlain = enText.replace(/<[^>]*>/g, '');
+      if (el.textContent.trim() === itPlain || el.textContent.trim() === enPlain) {
         el.textContent = t(key);
+      }
+    });
+    // data-i18n-html: same as data-i18n but uses innerHTML (for formatted text)
+    root.querySelectorAll('[data-i18n-html]').forEach(function(el){
+      var key = el.getAttribute('data-i18n-html');
+      if (!key) return;
+      var itText = DICT.it[key] || key;
+      var enText = DICT.en[key] || key;
+      var itPlain = itText.replace(/<[^>]*>/g, '');
+      var enPlain = enText.replace(/<[^>]*>/g, '');
+      if (el.textContent.trim() === itPlain || el.textContent.trim() === enPlain) {
+        el.innerHTML = t(key);
       }
     });
     // data-i18n-placeholder
