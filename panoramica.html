@@ -1345,9 +1345,11 @@
               <button class="fchip active" data-wbx-it-mode="none" title="Nessuna colorazione speciale" style="font-size:13px;padding:7px 14px">Default</button>
               <button class="fchip" data-wbx-it-mode="pos" title="Colora l'intestazione in base alla parte del discorso" style="font-size:13px;padding:7px 14px">POS Accent</button>
               <button class="fchip" data-wbx-it-mode="cefr" title="Colora l'intestazione in base al livello CEFR" style="font-size:13px;padding:7px 14px">CEFR Accent</button>
-              <span style="flex:1"></span>
-              <input class="wb-search-input" id="wbItExpandSearch" placeholder="Cerca una parola italiana…" style="max-width:280px;margin:0" onkeydown="if(event.key==='Enter')renderItExpandSuggestions()">
-              <button class="btn btn-primary btn-sm" onclick="renderItExpandSuggestions()" style="font-family:var(--font-ui);font-size:14px;padding:8px 16px;border-radius:99px"><i class="fa-solid fa-magnifying-glass"></i> Cerca</button>
+            </div>
+            <!-- ── Search bar (full width) ── -->
+            <div style="display:flex;gap:10px;margin-bottom:14px">
+              <input class="wb-search-input" id="wbItExpandSearch" placeholder="Cerca una parola italiana…" style="flex:1;font-size:15px;padding:12px 18px" onkeydown="if(event.key==='Enter')renderItExpandSuggestions()">
+              <button class="btn btn-primary btn-sm" onclick="renderItExpandSuggestions()" style="font-family:var(--font-ui);font-size:15px;padding:12px 24px;border-radius:99px;white-space:nowrap"><i class="fa-solid fa-magnifying-glass"></i> Cerca</button>
             </div>
             <!-- ── Results area ── -->
             <div id="wbItExpandResults">
@@ -6264,20 +6266,48 @@
         });
       })();
 
-      // Italian definition (Wiktionary IT API)
+      // Italian definition (Wiktionary mediawiki API)
       async function fetchItalianDefinition(word) {
         try {
-          var resp = await fetch('https://it.wiktionary.org/api/rest_v1/page/definition/' + encodeURIComponent(word));
+          var apiUrl = 'https://it.wiktionary.org/w/api.php?action=query&prop=extracts&explaintext=1&titles=' + encodeURIComponent(word) + '&format=json&origin=*';
+          var resp = await fetch(apiUrl);
           if (!resp.ok) return null;
           var data = await resp.json();
-          if (!data || !data.it) return null;
-          var defs = data.it;
-          for (var i = 0; i < defs.length; i++) {
-            if (defs[i].definitions && defs[i].definitions.length) {
-              return { definition: defs[i].definitions[0].definition, pos: defs[i].partOfSpeech || '' };
+          if (!data || !data.query || !data.query.pages) return null;
+          var pages = data.query.pages;
+          var pageId = Object.keys(pages)[0];
+          if (pageId === '-1') return null;
+          var extract = pages[pageId].extract || '';
+          if (!extract.trim()) return null;
+
+          // Parse POS from === Sostantivo === / === Verbo === etc.
+          var posMatch = extract.match(/=== ([A-Za-z]+) ===/);
+          var pos = posMatch ? posMatch[1].toLowerCase() : '';
+
+          // Parse definition: find the first real definition line after the POS header
+          var lines = extract.split('\n');
+          var definition = '';
+          var inDefSection = false;
+          var skippedHeadword = false;
+          var wLower = word.toLowerCase();
+          for (var i = 0; i < lines.length; i++) {
+            var line = lines[i].trim();
+            if (!line) continue;
+            if (line.indexOf('===') === 0) { inDefSection = true; skippedHeadword = false; continue; }
+            if (inDefSection && line.indexOf('==') === 0) break;
+            if (inDefSection) {
+              var clean = line.replace(/\([^)]*approfondimento[^)]*\)/gi, '').replace(/\s+/g, ' ').trim();
+              // Skip headword line (starts with the word itself + grammar like "m sing", "f pl", "v")
+              if (!skippedHeadword && (clean.toLowerCase().indexOf(wLower) === 0 || /^[a-zà-ù]+\s+(m|f|v|sing|pl|inv)/i.test(clean))) {
+                skippedHeadword = true;
+                continue;
+              }
+              if (clean.length > 8) { definition = clean; break; }
             }
           }
-          return null;
+          if (!definition) definition = extract.replace(/\n/g, ' ').replace(/\s+/g, ' ').substring(0, 200).trim();
+
+          return { definition: definition, pos: pos };
         } catch(e) { return null; }
       }
 
