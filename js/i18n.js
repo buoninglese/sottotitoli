@@ -1359,6 +1359,7 @@
   }
 
   /* ─── MUTATION OBSERVER (childList + characterData) ─── */
+  var _observer = null;
   var _debounceTimer = null;
 
   function observe(container) {
