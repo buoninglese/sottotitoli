@@ -394,6 +394,21 @@ body.session-active .caption-transcript:empty::after { content: none; }
 [data-theme="light"] .btn-stop:hover { background: rgba(239,68,68,.18); }
 [data-theme="light"] .btn-pause { background: rgba(245,158,11,.1); }
 [data-theme="light"] .btn-pause:hover { background: rgba(245,158,11,.18); }
+/* ═══ Audio Source Chip (distinct from btn-grad start button) ═══ */
+.audio-source-chip {
+  font-family: var(--font-body); font-size: 11px; font-weight: 600;
+  padding: 4px 12px; border-radius: 100px;
+  border: 1.5px solid var(--line); background: var(--card);
+  color: var(--muted); cursor: pointer; transition: all .2s;
+  display: inline-flex; align-items: center; gap: 5px; white-space: nowrap;
+  letter-spacing: .02em;
+}
+.audio-source-chip:hover { border-color: var(--accent); color: var(--text); background: var(--card-hover, rgba(0,0,0,.03)); }
+.audio-source-chip.mic-mode { color: #22c55e; border-color: rgba(34,197,94,.2); background: rgba(34,197,94,.05); }
+.audio-source-chip.sys-mode { color: #22d3ee; border-color: rgba(6,182,212,.2); background: rgba(6,182,212,.05); }
+.audio-source-chip.not-installed { border-color: rgba(239,68,68,.2); color: var(--muted); background: rgba(239,68,68,.04); cursor: help; }
+.audio-source-chip i { font-size: 12px; }
+.audio-source-chip .chip-label { font-size: 10px; opacity: .7; }
 /* ═══ TOGGLE PILLS (Analysis mode switch) ═══ */
 .toggle-pill {
   font-family: var(--font-body); font-size: 15px;
@@ -1387,7 +1402,7 @@ button[onclick*="addToWordBank"]:hover{background:rgba(52,211,153,.15)!important
   </div>
   <!-- Transport controls — simplified -->
   <div class="action-bar" id="actionBar" style="margin-top:10px;display:flex;align-items:center;justify-content:center;gap:16px;flex-wrap:wrap">
-    <button type="button" id="audioSourceBtn" class="btn-grad" onclick="toggleAudioSource()" title="Audio source: Microphone / System Audio" style="font-size:13px;padding:6px 14px;border-radius:100px;background:rgba(34,197,94,.12);color:#22c55e;border:1.5px solid rgba(34,197,94,.25);cursor:pointer;font-family:Inter,sans-serif;display:inline-flex;align-items:center;gap:6px"><i class="fas fa-microphone"></i><span id="audioSourceLabel">Mic</span></button>
+    <button type="button" id="audioSourceBtn" class="audio-source-chip mic-mode" onclick="toggleAudioSource()" title="Audio source: Microphone / System Audio" style="font-family:Inter,sans-serif"><i class="fas fa-microphone"></i><span id="audioSourceLabel">Mic</span></button>
     <button type="button" class="btn-grad btn-start" id="startBtn" onclick="toggleSession()" style="font-size:15px;padding:8px 22px;border-radius:100px"><i class="fas fa-microphone"></i> <span data-i18n="listen">Ascolta</span></button>
     <button type="button" class="btn-grad btn-pause" id="pauseBtn" style="display:none;font-size:15px;padding:8px 22px;border-radius:100px" onclick="togglePause()"><i class="fas fa-pause"></i> <span data-i18n="pause">Pausa</span></button>
     <span id="recTimer" style="font-family:Inter,sans-serif;font-size:16px;font-weight:600;color:var(--text);min-width:48px;text-align:center">00:00</span>
@@ -4643,21 +4658,65 @@ function closeConfirmModal() {
 
 // ═══ Audio Source Toggle — Mic / System Audio ═══
 var _audioSource = 'mic'; // 'mic' or 'system'
+var _blackholeReady = false; // verified via enumerateDevices()
+var _blackholeChecked = false; // have we attempted detection?
+
+// Detect if BlackHole 2ch is installed (async — needs enumerateDevices)
+function _checkBlackholeInstalled() {
+  return new Promise(function(resolve) {
+    if (!navigator.mediaDevices || !navigator.mediaDevices.enumerateDevices) {
+      _blackholeChecked = true;
+      _blackholeReady = false;
+      resolve(false);
+      return;
+    }
+    navigator.mediaDevices.enumerateDevices().then(function(devices) {
+      _blackholeChecked = true;
+      var found = devices.some(function(d) {
+        return d.kind === 'audioinput' && d.label && /blackhole/i.test(d.label);
+      });
+      // Also check if any label is empty (no permission) — can't verify
+      var hasLabels = devices.some(function(d) { return d.kind === 'audioinput' && d.label; });
+      if (!hasLabels && !found && !localStorage.getItem('sottotitoli-blackhole-verified')) {
+        // Can't verify — user hasn't granted mic permission yet
+        _blackholeReady = false;
+      } else {
+        _blackholeReady = found;
+      }
+      if (found) {
+        localStorage.setItem('sottotitoli-blackhole-verified', '1');
+      }
+      resolve(_blackholeReady);
+    }).catch(function() {
+      _blackholeChecked = true;
+      _blackholeReady = false;
+      resolve(false);
+    });
+  });
+}
+
+// Eagerly check on load (won't block UI)
+_checkBlackholeInstalled().then(function(ready) {
+  if (ready) { _updateAudioSourceUI(); }
+});
 
 function toggleAudioSource() {
   if (_audioSource === 'mic') {
-    // First time? Show setup guide
-    if (!localStorage.getItem('sottotitoli-blackhole-seen')) {
-      showBlackholeGuide();
-      return;
-    }
-    // Switch to system audio
-    _audioSource = 'system';
-    _updateAudioSourceUI();
-  } else {
-    _audioSource = 'mic';
-    _updateAudioSourceUI();
+    // Need to verify BlackHole before allowing switch to system audio
+    _checkBlackholeInstalled().then(function(ready) {
+      if (ready) {
+        _audioSource = 'system';
+        _updateAudioSourceUI();
+      } else {
+        // Show guide — but only if not already verified previously
+        showBlackholeGuide();
+      }
+    });
+    return;
   }
+  // Switching back to mic is always allowed
+  _audioSource = 'mic';
+  _updateAudioSourceUI();
 }
 
 function _updateAudioSourceUI() {
@@ -4665,35 +4724,64 @@ function _updateAudioSourceUI() {
   var label = document.getElementById('audioSourceLabel');
   if (!btn || !label) return;
   if (_audioSource === 'system') {
-    btn.style.background = 'rgba(6,182,212,.12)';
-    btn.style.color = '#22d3ee';
-    btn.style.borderColor = 'rgba(6,182,212,.25)';
+    btn.className = 'audio-source-chip sys-mode';
     btn.innerHTML = '<i class="fas fa-volume-high"></i><span id="audioSourceLabel">System</span>';
     localStorage.setItem('sottotitoli-audio-source', 'system');
   } else {
-    btn.style.background = 'rgba(34,197,94,.12)';
-    btn.style.color = '#22c55e';
-    btn.style.borderColor = 'rgba(34,197,94,.25)';
+    // Mic mode — show warning badge if BlackHole not installed
+    if (_blackholeChecked && !_blackholeReady) {
+      btn.className = 'audio-source-chip mic-mode not-installed';
+      btn.title = 'System Audio unavailable — BlackHole not detected. Click for setup.';
+    } else {
+      btn.className = 'audio-source-chip mic-mode';
+      btn.title = 'Audio source: Microphone / System Audio';
+    }
     btn.innerHTML = '<i class="fas fa-microphone"></i><span id="audioSourceLabel">Mic</span>';
     localStorage.setItem('sottotitoli-audio-source', 'mic');
   }
 }
 
 function showBlackholeGuide() {
+  var detectedEl = document.getElementById('bhDetectedMsg');
+  var step1El = document.getElementById('bhStep1');
+  if (_blackholeReady) {
+    if (detectedEl) detectedEl.style.display = 'block';
+    if (step1El) step1El.style.opacity = '.5';
+  } else {
+    if (detectedEl) detectedEl.style.display = 'none';
+    if (step1El) step1El.style.opacity = '1';
+  }
   document.getElementById('blackholeGuide').style.display = 'flex';
 }
 function closeBlackholeGuide() {
   document.getElementById('blackholeGuide').style.display = 'none';
   localStorage.setItem('sottotitoli-blackhole-seen', '1');
-  // Switch to system audio after closing guide
-  _audioSource = 'system';
-  _updateAudioSourceUI();
+  // Re-check after user may have installed BlackHole
+  _checkBlackholeInstalled().then(function(ready) {
+    if (ready) {
+      // BlackHole is now available — switch to system audio
+      _audioSource = 'system';
+    }
+    _updateAudioSourceUI();
+  });
 }
 
-// Restore saved audio source
+// Restore saved audio source (but verify BlackHole first if system was saved)
 (function(){
   var saved = localStorage.getItem('sottotitoli-audio-source');
-  if (saved === 'system') { _audioSource = 'system'; _updateAudioSourceUI(); }
+  if (saved === 'system') {
+    // Defer until detection completes
+    _checkBlackholeInstalled().then(function(ready) {
+      if (ready) {
+        _audioSource = 'system';
+      } else {
+        // BlackHole was removed since last use — fall back to mic
+        _audioSource = 'mic';
+        localStorage.setItem('sottotitoli-audio-source', 'mic');
+      }
+      _updateAudioSourceUI();
+    });
+  }
 })();
 
 // ── Select caption language → styled confirm then reload ──
@@ -8462,12 +8550,13 @@ window.fixExtrasPanelColors = function(){
   <div onclick="event.stopPropagation()" style="position:relative;background:linear-gradient(135deg,rgba(6,182,212,.12),rgba(6,182,212,.04));border:2px solid rgba(6,182,212,.25);border-radius:24px;padding:36px 44px;max-width:540px;width:90%;box-shadow:0 24px 80px rgba(0,0,0,.3)">
     <button onclick="closeBlackholeGuide()" style="position:absolute;top:16px;right:16px;width:36px;height:36px;border-radius:50%;border:none;background:rgba(6,182,212,.12);color:var(--cyan);font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center"><i class="fa-solid fa-xmark"></i></button>
     <div style="font-size:40px;margin-bottom:8px">🔊</div>
-    <h2 style="font-size:22px;font-weight:900;margin:0 0 12px;color:var(--text)">Capture System Audio</h2>
+    <h2 style="font-size:22px;font-weight:900;margin:0 0 4px;color:var(--text)">Capture System Audio</h2>
+    <p id="bhDetectedMsg" style="display:none;font-size:12px;color:#22c55e;margin:0 0 12px;font-weight:600">✅ BlackHole detected — ready to use!</p>
     <p style="font-size:14px;color:var(--muted);margin:0 0 20px;line-height:1.5">Transcribe YouTube, podcasts, or any audio playing on your Mac — for free — by routing system audio through a virtual microphone. One-time setup, ~2 minutes.</p>
-    <div class="bh-step"><span class="bh-num">1</span><span>Download <a href="https://existential.audio/blackhole/" target="_blank" style="color:var(--accent);font-weight:700">BlackHole 2ch <i class="fa-solid fa-arrow-up-right-from-square" style="font-size:10px"></i></a> (free, open source). Install and restart your Mac.</span></div>
+    <div class="bh-step" id="bhStep1"><span class="bh-num">1</span><span>Download <a href="https://existential.audio/blackhole/" target="_blank" style="color:var(--accent);font-weight:700">BlackHole 2ch <i class="fa-solid fa-arrow-up-right-from-square" style="font-size:10px"></i></a> (free, open source). Install and restart your Mac.</span></div>
     <div class="bh-step"><span class="bh-num">2</span><span>Open <strong>Audio MIDI Setup</strong> (⌘Space → type "Audio MIDI"). Click <code>+</code> → <strong>Create Multi-Output Device</strong>. Check <strong>BlackHole 2ch</strong> + your speakers.</span></div>
     <div class="bh-step"><span class="bh-num">3</span><span>In <strong>System Settings → Sound → Input</strong>, select <strong>BlackHole 2ch</strong> as your microphone.</span></div>
-    <div class="bh-step"><span class="bh-num">4</span><span>Come back here, click <strong>System Audio</strong>, and start a session. Any audio playing on your Mac will be captioned live.</span></div>
+    <div class="bh-step"><span class="bh-num">4</span><span>Come back here, click the <strong>Mic</strong> chip to switch to <strong>System Audio</strong>, and start a session. Any audio playing on your Mac will be captioned live.</span></div>
     <p style="font-size:12px;color:var(--muted2);margin-top:14px">💡 To hear audio while capturing: keep the Multi-Output Device selected in System Settings → Sound → Output.</p>
     <button onclick="closeBlackholeGuide()" style="display:block;width:100%;margin-top:16px;padding:14px;border-radius:100px;border:none;background:var(--accent);color:#fff;font-size:15px;font-weight:700;cursor:pointer;font-family:Inter,sans-serif">Got it</button>
   </div>
