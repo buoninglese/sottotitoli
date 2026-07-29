@@ -1226,7 +1226,7 @@
     if (!force && _lang !== 'it') return;
     var scope = getScope(root);
 
-    scope.querySelectorAll('[data-i18n]').forEach(function(el) {
+    scope.querySelectorAll('[data-i18n],[data-i18n-html]').forEach(function(el) {
       if (el.hasAttribute('data-i18n-orig-txt')) return;
       el.setAttribute('data-i18n-orig-txt', el.textContent);
       if (el.innerHTML !== el.textContent) {
