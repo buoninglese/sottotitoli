@@ -1402,12 +1402,9 @@ button[onclick*="addToWordBank"]:hover{background:rgba(52,211,153,.15)!important
   </div>
   <!-- Transport controls — simplified -->
   <div class="action-bar" id="actionBar" style="margin-top:10px;display:flex;align-items:center;justify-content:center;gap:16px;flex-wrap:wrap">
-    <button type="button" id="audioSourceBtn" class="audio-source-chip mic-mode" onclick="toggleAudioSource()" title="Audio source: Microphone / System Audio" style="font-family:Inter,sans-serif"><i class="fas fa-microphone"></i><span id="audioSourceLabel">Mic</span></button>
     <button type="button" class="btn-grad btn-start" id="startBtn" onclick="toggleSession()" style="font-size:15px;padding:8px 22px;border-radius:100px"><i class="fas fa-microphone"></i> <span data-i18n="listen">Ascolta</span></button>
     <button type="button" class="btn-grad btn-pause" id="pauseBtn" style="display:none;font-size:15px;padding:8px 22px;border-radius:100px" onclick="togglePause()"><i class="fas fa-pause"></i> <span data-i18n="pause">Pausa</span></button>
     <span id="recTimer" style="font-family:Inter,sans-serif;font-size:16px;font-weight:600;color:var(--text);min-width:48px;text-align:center">00:00</span>
-    <span id="gseBadge" style="display:none;font-size:13px;font-weight:600;color:var(--accent);padding:4px 10px;border-radius:100px;border:1px solid var(--line);background:var(--card);white-space:nowrap">—</span>
-    <span class="cefr-info-icon" data-cefr-info="caption_gse" style="display:none" id="gseInfoIcon">ⓘ</span>
     <span class="topbar-pill" style="border:none;background:transparent;padding:0">
       <span class="tp-dot" id="micDot"></span>
       <span id="micStatus" style="font-size:13px;font-weight:600;color:var(--muted)" data-i18n="mic_off">Mic Off</span>
@@ -3218,10 +3215,7 @@ function _updateCEFRBars(){
     });
   });
   var total=Object.values(counts).reduce(function(a,b){return a+b},0)||1;
-  var bars=document.getElementById('cefrBars');
-  if(!bars)return;
-  // Only rebuild bars if the element doesn't exist or has been cleared
-  var barSection = document.getElementById('cefrBarSection');
+  var bars=document.getElementById('cefrBars');if(!bars)return;
   var html='';var order=['C2','C1','B2','B1','A2','A1'];
   order.forEach(function(lvl){
     var c=counts[lvl]||0;var pct=Math.round(c/total*100);
@@ -3234,31 +3228,8 @@ function _updateCEFRBars(){
     html+='<span style="font-size:11px;color:var(--muted);min-width:28px;text-align:right;font-family:JetBrains Mono,monospace">'+c+'w</span>';
     html+='</div>';
   });
-  // Keep GSE section separate — update it via DOM, not innerHTML rebuild
-  if (!barSection) {
-    bars.innerHTML = '<div id="cefrBarSection">' + html + '</div><div id="cefrGSESection"></div>';
-  } else {
-    barSection.innerHTML = html;
-  }
-  if (html==='') bars.innerHTML='<div style="text-align:center;padding:20px;color:var(--muted2);font-size:13px">Start speaking to see CEFR breakdown.</div>';
-  
-  // Update GSE section separately (no DOM destruction)
-  _updateGSESection();
+  bars.innerHTML=html||'<div style="text-align:center;padding:20px;color:var(--muted2);font-size:13px">Start speaking to see CEFR breakdown.</div>';
 }
-
-function _updateGSESection() {
-  var section = document.getElementById('cefrGSESection');
-  if (!section) { section = document.getElementById('cefrBars'); if (!section) return; }
-  if (!isCapabilityAvailable('cefrMetrics') || _sessionGSE == null) {
-    section.innerHTML = '';
-    return;
-  }
-  var band = window.SottotitoliGSE && window.SottotitoliGSE.cefrBand 
-    ? window.SottotitoliGSE.cefrBand(_sessionGSE) 
-    : { band: _sessionCEFRBand || '—', label: '', color: 'var(--accent)' };
-  section.innerHTML = 
-    '<div style="margin-top:12px;padding-top:10px;border-top:1px solid var(--line);display:flex;align-items:center;gap:12px">' +
-    '<div style="text-align:center;min-width:56px"><div style="font-size:28px;font-weight:900;color:' + (band.color || 'var(--accent)') + ';line-height:1">' + _sessionGSE + '</div><div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px">' + (band.band || 'GSE') + '</div></div>' +
     '<div style="flex:1;min-width:0"><div id="gseSparkline" style="width:100%;height:34px"></div></div>' +
     '</div>';
   setTimeout(function(){ _drawGSEsparkline(); }, 50);
@@ -3442,68 +3413,25 @@ function _highlightRareWord(word) {
 function downloadCEFRPDF(){
   var lines=document.querySelectorAll('#captionTranscript .line');
   var posWords={NOUN:[],VERB:[],ADJ:[],ADV:[]};var seen=new Set();
-  var allWords=[];
   lines.forEach(function(l){
     var clone=l.cloneNode(true);clone.querySelectorAll('span,.spk-tag').forEach(function(s){s.remove()});
     (clone.textContent||'').trim().split(/\s+/).forEach(function(w){
-      var clean=w.replace(/[^a-zA-Z]/g,'').toLowerCase();if(clean.length<2)return;
-      allWords.push(clean);
-      if(!seen.has(clean)){
-        seen.add(clean);
-        var pos = (typeof tagWord === 'function') ? tagWord(clean) : 'WORD';
-        if(posWords[pos])posWords[pos].push(clean);
-      }
+      var clean=w.replace(/[^a-zA-Z]/g,'').toLowerCase();if(clean.length<2||seen.has(clean))return;
+      seen.add(clean);
+      var pos = (typeof tagWord === 'function') ? tagWord(clean) : 'WORD';
+      if(posWords[pos])posWords[pos].push(clean);
     });
   });
-  var totalWords=allWords.length;
-  var uniqueWords=seen.size;
-  var h='<!DOCTYPE html><html><head><meta charset="utf-8"><title>CEFR Report</title><style>body{font-family:Inter,sans-serif;font-size:12px;padding:24px;max-width:720px;margin:0 auto;color:#1a1a1a}h1{font-size:22px;margin-bottom:4px}h2{font-size:15px;color:#555;margin-top:24px;border-bottom:1px solid #eee;padding-bottom:4px}.stat-row{display:flex;gap:24px;margin:8px 0;flex-wrap:wrap}.stat{text-align:center;padding:12px 20px;background:#f8f9fa;border-radius:8px}.stat .val{font-size:24px;font-weight:800}.stat .lbl{font-size:10px;color:#888;text-transform:uppercase;letter-spacing:.5px;margin-top:2px}.bar-wrap{display:flex;align-items:center;gap:8px;margin:5px 0}.bar-wrap span{font-size:11px}.bar{flex:1;height:16px;background:#eee;border-radius:4px}.bar-fill{height:100%;border-radius:4px}.words{columns:3;font-size:10px;color:#333;line-height:1.6;margin-top:8px}.topic-chip{display:inline-block;padding:3px 10px;margin:2px;background:#e8f4fd;border-radius:12px;font-size:11px}</style></head><body>';
-  h+='<h1>📊 CEFR Vocabulary Report</h1>';
-  h+='<p style="color:#888">'+new Date().toLocaleDateString()+' · Sottotitoli</p>';
-  
-  // GSE Score section
-  if (_sessionGSE != null) {
-    var band = window.SottotitoliGSE && window.SottotitoliGSE.cefrBand 
-      ? window.SottotitoliGSE.cefrBand(_sessionGSE) 
-      : { band: _sessionCEFRBand || '—', label: '' };
-    h+='<div class="stat-row">';
-    h+='<div class="stat"><div class="val" style="color:'+(band.color||'#06b6d4')+'">'+_sessionGSE+'</div><div class="lbl">GSE Score</div></div>';
-    h+='<div class="stat"><div class="val">'+(band.band||'—')+'</div><div class="lbl">CEFR Band</div></div>';
-    h+='<div class="stat"><div class="val">'+totalWords+'</div><div class="lbl">Total Words</div></div>';
-    h+='<div class="stat"><div class="val">'+uniqueWords+'</div><div class="lbl">Unique Words</div></div>';
-    h+='</div>';
-    // GSE sparkline as simple text
-    if (_gseHistory.length >= 2) {
-      h+='<p style="font-size:10px;color:#888">GSE trend: '+_gseHistory.join(' → ')+'</p>';
-    }
-  }
-  
-  // CEFR levels
-  h+='<h2>CEFR Level Distribution</h2>';
+  var h='<!DOCTYPE html><html><head><meta charset="utf-8"><title>CEFR Report</title><style>body{font-family:sans-serif;font-size:12px;padding:20px;max-width:700px;margin:0 auto}h1{font-size:18px}h2{font-size:14px;color:#555;margin-top:20px}.bar-wrap{display:flex;align-items:center;gap:8px;margin:4px 0}.bar-wrap span{font-size:11px}.bar{flex:1;height:16px;background:#eee;border-radius:4px}.bar-fill{height:100%;border-radius:4px}.words{columns:3;font-size:10px;color:#333;line-height:1.6;margin-top:8px}</style></head><body>';
+  h+='<h1>📊 CEFR Report</h1><p>'+new Date().toLocaleDateString()+'</p><h2>CEFR Levels</h2>';
   ['C2','C1','B2','B1','A2','A1'].forEach(function(lvl){
-    var words=_cefrWordLists[lvl]||[];
-    var pct=totalWords>0?Math.round(words.length/totalWords*100):0;
-    h+='<div class="bar-wrap"><span style="font-weight:700;color:'+(_cefrColors[lvl]||'#888')+';min-width:22px">'+lvl+'</span><div class="bar"><div class="bar-fill" style="width:'+Math.max(1,pct)+'%;background:'+(_cefrColors[lvl]||'#888')+'"></div></div><span>'+words.length+' words ('+pct+'%)</span></div>';
-    if(words.length>0)h+='<div class="words">'+words.join(', ')+'</div>';
+    var words=_cefrWordLists[lvl]||[];h+='<div class="bar-wrap"><span style="font-weight:700;color:'+(_cefrColors[lvl]||'#888')+'">'+lvl+'</span><div class="bar"><div class="bar-fill" style="width:'+Math.min(100,words.length*5)+'%;background:'+(_cefrColors[lvl]||'#888')+'"></div></div><span>'+words.length+' words</span></div><div class="words">'+words.join(', ')+'</div>';
   });
-  
-  // POS breakdown
-  h+='<h2>Vocabulary by Part of Speech</h2>';
+  h+='<h2>Vocabulary by POS</h2>';
   [{k:'NOUN',n:'Nouns'},{k:'VERB',n:'Verbs'},{k:'ADJ',n:'Adjectives'},{k:'ADV',n:'Adverbs'}].forEach(function(p){
     var words=posWords[p.k]||[];if(!words.length)return;
     h+='<h3>'+p.n+' ('+words.length+')</h3><div class="words">'+words.join(', ')+'</div>';
   });
-  
-  // Topic distribution (if available)
-  if (_topicCache && Object.keys(_topicCache).length > 0) {
-    h+='<h2>Topic Distribution</h2>';
-    var sorted=[];for(var k in _topicCache)sorted.push([k,_topicCache[k]]);
-    sorted.sort(function(a,b){return b[1]-a[1]});
-    sorted.forEach(function(e){
-      h+='<span class="topic-chip"><strong>'+e[0]+'</strong> ('+e[1]+')</span>';
-    });
-  }
-  
   h+='</body></html>';
   var w=window.open('','_blank','width=800,height=600');w.document.write(h);w.document.close();setTimeout(function(){w.print()},500);
 }
@@ -4660,8 +4588,12 @@ function closeConfirmModal() {
 var _audioSource = 'mic'; // 'mic' or 'system'
 var _blackholeReady = false; // verified via enumerateDevices()
 var _blackholeChecked = false; // have we attempted detection?
+var _blackholeDeviceId = null; // deviceId of BlackHole 2ch for getUserMedia
 
-// Detect if BlackHole 2ch is installed (async — needs enumerateDevices)
+// Detect if BlackHole 2ch is installed.
+// Strategy: try enumerateDevices() first (fast). If mic permission hasn't been
+// granted yet, labels will be empty — we then request getUserMedia({audio:true})
+// to get permission, which reveals labels on the next enumerateDevices() call.
 function _checkBlackholeInstalled() {
   return new Promise(function(resolve) {
     if (!navigator.mediaDevices || !navigator.mediaDevices.enumerateDevices) {
@@ -4670,30 +4602,76 @@ function _checkBlackholeInstalled() {
       resolve(false);
       return;
     }
-    navigator.mediaDevices.enumerateDevices().then(function(devices) {
-      _blackholeChecked = true;
-      var found = devices.some(function(d) {
-        return d.kind === 'audioinput' && d.label && /blackhole/i.test(d.label);
-      });
-      // Also check if any label is empty (no permission) — can't verify
-      var hasLabels = devices.some(function(d) { return d.kind === 'audioinput' && d.label; });
-      if (!hasLabels && !found && !localStorage.getItem('sottotitoli-blackhole-verified')) {
-        // Can't verify — user hasn't granted mic permission yet
+
+    function _scanDevices() {
+      return navigator.mediaDevices.enumerateDevices().then(function(devices) {
+        _blackholeChecked = true;
+        var bhDevice = null;
+        for (var i = 0; i < devices.length; i++) {
+          var d = devices[i];
+          if (d.kind === 'audioinput' && d.label && /blackhole/i.test(d.label)) {
+            bhDevice = d;
+            break;
+          }
+        }
+        var hasLabels = devices.some(function(d) { return d.kind === 'audioinput' && d.label; });
+
+        if (bhDevice) {
+          _blackholeReady = true;
+          _blackholeDeviceId = bhDevice.deviceId;
+          localStorage.setItem('sottotitoli-blackhole-verified', '1');
+          return true;
+        } else if (!hasLabels) {
+          // No labels = no mic permission yet. Request it so we can scan properly.
+          if (navigator.mediaDevices.getUserMedia) {
+            return navigator.mediaDevices.getUserMedia({ audio: true }).then(function(stream) {
+              stream.getTracks().forEach(function(t) { t.stop(); });
+              return navigator.mediaDevices.enumerateDevices().then(function(devices2) {
+                for (var j = 0; j < devices2.length; j++) {
+                  var d2 = devices2[j];
+                  if (d2.kind === 'audioinput' && d2.label && /blackhole/i.test(d2.label)) {
+                    _blackholeReady = true;
+                    _blackholeDeviceId = d2.deviceId;
+                    localStorage.setItem('sottotitoli-blackhole-verified', '1');
+                    return true;
+                  }
+                }
+                _blackholeReady = false;
+                return false;
+              }).catch(function() {
+                _blackholeReady = false;
+                return false;
+              });
+            }).catch(function() {
+              _blackholeReady = false;
+              return false;
+            });
+          } else {
+            _blackholeReady = false;
+            return false;
+          }
+        } else {
+          _blackholeReady = false;
+          return false;
+        }
+      }).catch(function() {
+        _blackholeChecked = true;
         _blackholeReady = false;
-      } else {
-        _blackholeReady = found;
-      }
-      if (found) {
-        localStorage.setItem('sottotitoli-blackhole-verified', '1');
-      }
-      resolve(_blackholeReady);
-    }).catch(function() {
-      _blackholeChecked = true;
-      _blackholeReady = false;
-      resolve(false);
-    });
+        return false;
+      });
+    }
+
+    _scanDevices().then(function(result) { resolve(result); });
   });
 }
+
+// Expose for real-mic.js — returns audio constraint for getUserMedia
+window._getAudioSourceConfig = function() {
+  if (_audioSource === 'system' && _blackholeReady && _blackholeDeviceId) {
+    return { deviceId: { exact: _blackholeDeviceId } };
+  }
+  return true; // default mic
+};
 
 // Eagerly check on load (won't block UI)
 _checkBlackholeInstalled().then(function(ready) {
