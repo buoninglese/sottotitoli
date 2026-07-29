@@ -714,6 +714,7 @@
           <a class="nav-item" href="#" data-panel="grammatica"><svg class="icon"><use href="#i-scratchpad"></use></svg><span data-i18n="grammatica">Grammatica</span></a>
           <a class="nav-item" href="#" data-panel="trascrizioni"><svg class="icon"><use href="#i-dictionary"></use></svg><span data-i18n="trascrizioni">Trascrizioni</span></a>
           <a class="nav-item premium" href="#" data-panel="report-ai" style="color:var(--cyan);opacity:.35;pointer-events:none;cursor:not-allowed" title="Coming soon"><svg class="icon"><use href="#i-star"></use></svg><span data-i18n="report_ai">Report AI</span><span class="premium-badge">PREMIUM</span></a>
+          <a class="nav-item" href="#" data-panel="cefr-explorer"><svg class="icon"><use href="#i-insights"></use></svg><span>CEFR Explorer</span></a>
           <a class="nav-item premium" href="#" data-panel="ai-voice" style="color:var(--cyan);opacity:.35;pointer-events:none;cursor:not-allowed" title="Coming soon"><svg class="icon"><use href="#i-voice"></use></svg><span>AI Voice</span><span class="premium-badge">PREMIUM</span></a>
         </nav>
       </div>
@@ -786,6 +787,14 @@
               <div class="metric-badge">—</div>
               <div class="sparkline" id="sparkWords"></div>
             </article>
+
+            <article class="metric-card" data-metric="gseScore">
+              <div class="metric-value">—</div>
+              <div class="metric-label">GSE Score</div>
+              <div class="metric-badge">—</div>
+              <div class="sparkline" id="sparkGSE"></div>
+            </article>
+
             <article class="metric-card" data-metric="avgLexDiv">
               <div class="metric-value">—</div>
               <div class="metric-label" data-i18n="lexical_diversity">Diversità lessicale</div>
@@ -1968,6 +1977,72 @@
             </script>
           </div>
         </div>
+
+        <!-- ═══ CEFR Explorer ═══ -->
+        <div class="content-panel" id="pnl-cefr-explorer">
+          <section class="panel-head"><h2>CEFR Explorer</h2></section>
+          <section class="panel-tabs"><div class="tabs" role="tablist">
+            <button role="tab" aria-selected="true" class="tab-link active" data-subtab="cefr-topic">Topic Browser</button>
+            <button role="tab" aria-selected="false" class="tab-link" data-subtab="cefr-family">Word Family</button>
+            <button role="tab" aria-selected="false" class="tab-link" data-subtab="cefr-frequency">Frequency Explorer</button>
+          </div></section>
+          <!-- Sub-tab A: Topic Browser -->
+          <div role="tabpanel" class="subtab-pane active" id="sub-cefr-topic">
+            <div class="wb-stats" id="cefrTopicStats" style="margin-bottom:14px;display:none"></div>
+            <div class="wb-search-bar" style="margin-bottom:14px">
+              <input class="wb-search-input" id="cefrTopicSearch" placeholder="Cerca un argomento..." oninput="filterCefrTopics()">
+            </div>
+            <div id="cefrTopicGrid" style="display:flex;flex-wrap:wrap;gap:8px">
+              <span style="font-size:13px;color:var(--text-faint)">Caricamento argomenti...</span>
+            </div>
+            <div id="cefrTopicWords" style="display:none;margin-top:16px">
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+                <h3 id="cefrTopicTitle" style="margin:0;font-size:18px">—</h3>
+                <button class="btn btn-ghost btn-sm" onclick="closeCefrTopic()" style="font-family:var(--font-ui)"><i class="fa-solid fa-arrow-left"></i> Back</button>
+              </div>
+              <div style="display:flex;gap:6px;margin-bottom:10px">
+                <button class="fchip active" onclick="sortCefrWords(this,'frequency')">Per frequenza</button>
+                <button class="fchip" onclick="sortCefrWords(this,'level')">Per livello</button>
+                <button class="fchip" onclick="sortCefrWords(this,'alpha')">Alfabetico</button>
+              </div>
+              <div class="wb-table-wrap"><table class="wb-table cefr-table" style="min-width:500px"><thead><tr>
+                <th>Parola</th><th>POS</th><th>Livello</th><th>Frequenza</th>
+              </tr></thead><tbody id="cefrTopicBody"></tbody></table></div>
+            </div>
+          </div>
+          <!-- Sub-tab B: Word Family -->
+          <div role="tabpanel" class="subtab-pane" id="sub-cefr-family">
+            <div style="display:flex;gap:10px;margin-bottom:16px;align-items:center">
+              <input class="wb-search-input" id="cefrFamilySearch" placeholder="Cerca una parola (es. happy)..." style="flex:1" onkeydown="if(event.key==='Enter')searchCefrFamily()">
+              <button class="btn btn-primary btn-sm" onclick="searchCefrFamily()" style="font-family:var(--font-ui);padding:10px 20px"><i class="fa-solid fa-magnifying-glass"></i> Cerca</button>
+              <button class="btn btn-ghost btn-sm" onclick="surpriseCefrFamily()" style="font-family:var(--font-ui)">🎲 Sorprendimi</button>
+            </div>
+            <div id="cefrFamilyResult" style="text-align:center;padding:40px;color:var(--text-faint)">
+              <div style="font-size:48px;margin-bottom:12px">🌳</div>
+              <p>Cerca una parola per vedere la sua famiglia lessicale — forme derivate, affissi, e parole correlate con i loro livelli CEFR.</p>
+            </div>
+          </div>
+          <!-- Sub-tab C: Frequency Explorer -->
+          <div role="tabpanel" class="subtab-pane" id="sub-cefr-frequency">
+            <div style="display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap;align-items:center">
+              <span style="font-size:12px;color:var(--text-soft);margin-right:8px">Filtra per livello:</span>
+              <button class="fchip active" data-flevel="all" onclick="filterFreqLevel(this,'all')">Tutti</button>
+              <button class="fchip" data-flevel="A1" onclick="filterFreqLevel(this,'A1')">A1</button>
+              <button class="fchip" data-flevel="A2" onclick="filterFreqLevel(this,'A2')">A2</button>
+              <button class="fchip" data-flevel="B1" onclick="filterFreqLevel(this,'B1')">B1</button>
+              <button class="fchip" data-flevel="B2" onclick="filterFreqLevel(this,'B2')">B2</button>
+              <button class="fchip" data-flevel="C1" onclick="filterFreqLevel(this,'C1')">C1</button>
+              <button class="fchip" data-flevel="C2" onclick="filterFreqLevel(this,'C2')">C2</button>
+              <span style="flex:1"></span>
+              <button class="fchip active" onclick="toggleFreqMode(this)" data-fmode="rare">Top 100 Rare</button>
+              <button class="fchip" onclick="toggleFreqMode(this)" data-fmode="common">Top 100 Common</button>
+            </div>
+            <div id="cefrFreqList" style="display:flex;flex-direction:column;gap:6px">
+              <span style="font-size:13px;color:var(--text-faint)">Caricamento frequenze...</span>
+            </div>
+          </div>
+        </div>
+
         <div class="content-panel" id="pnl-impostazioni">
   <section class="panel-head"><h2 data-i18n="settings">Impostazioni</h2></section>
   <section class="alt-card-grid">
@@ -1985,10 +2060,10 @@
       </div>
     </article>
     <article class="alt-card">
-      <h3><i class="fa-solid fa-globe"></i> <span data-i18n="website_language">Lingua e captions</span></h3>
+      <h3><i class="fa-solid fa-globe"></i> Lingua e captions</h3>
       <div style="display:flex;flex-direction:column;gap:10px;margin-top:10px">
         <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0">
-          <span style="font-size:14px" data-i18n="website_language_short">Lingua sito</span>
+          <span style="font-size:14px">Lingua sito</span>
           <select id="settingsUiLang" class="sott-select" style="text-align:right">
             <option value="it">Italiano</option>
             <option value="en">English</option>
@@ -1996,7 +2071,7 @@
         </div>
         <div style="height:1px;background:var(--line);margin:2px 0"></div>
         <div style="display:flex;align-items:center;justify-content:space-between;padding:6px 0">
-          <span style="font-size:14px" data-i18n="default_caption_lang">Lingua caption</span>
+          <span style="font-size:14px">Lingua caption</span>
           <select id="settingsDefaultCapLang" class="sott-select" style="text-align:right">
             <option value="">—</option>
             <option value="en-US">English</option>
@@ -2010,7 +2085,7 @@
           </select>
         </div>
         <div style="display:flex;align-items:center;justify-content:space-between;padding:6px 0">
-          <span style="font-size:14px" data-i18n="default_translation_pair">Traduzione predefinita</span>
+          <span style="font-size:14px">Traduzione predefinita</span>
           <select id="settingsDefaultTrPair" class="sott-select" style="text-align:right">
             <option value="">—</option>
             <option value="en-it">🇬🇧 English → 🇮🇹 Italiano</option>
@@ -2125,6 +2200,7 @@
   <script src="js/auth.js?v=22"></script>
   <script src="js/language-resolver.js?v=1"></script>
   <script src="js/cefr-levels.js"></script>
+  <script src="js/cefr-gse.js"></script>
   <script src="js/theme-2.js?v=4"></script>
   <script src="js/ai-voice.js?v=1"></script>
   <script src="js/data-service.js"></script>
@@ -2566,6 +2642,156 @@
         if (countKnownEl) countKnownEl.innerHTML = knownTotal > 0 ? renderCounts(knownCounts, knownTotal) : '<span style="font-size:12px;color:var(--text-faint)">—</span>';
       }
       window.renderCEFRQuad = renderCEFRQuad;
+
+  // ═══════════════════════════════════════
+  // Component 2: GSE Metric Card Rendering
+  // ═══════════════════════════════════════
+  async function renderGSEMetric() {
+    var gseCard = document.querySelector('.metric-card[data-metric="gseScore"]');
+    if (!gseCard) return;
+    var valEl = gseCard.querySelector('.metric-value');
+    var badgeEl = gseCard.querySelector('.metric-badge');
+    var sparkEl = document.getElementById('sparkGSE');
+
+    // Default: show calculating
+    if (valEl) valEl.textContent = '—';
+    if (badgeEl) badgeEl.textContent = 'Calcolo...';
+
+    // Try to compute GSE from session transcripts
+    try {
+      var sessions = window.SottotitoliData && await window.SottotitoliData.getSessions();
+      if (!sessions || !sessions.length) {
+        if (badgeEl) badgeEl.textContent = 'Nessun dato';
+        return;
+      }
+      // Get the latest session's transcript
+      var allText = '';
+      for (var i = 0; i < Math.min(sessions.length, 5); i++) {
+        var s = sessions[i];
+        if (s.transcript_text) allText += s.transcript_text + ' ';
+      }
+      if (!allText.trim()) {
+        if (badgeEl) badgeEl.textContent = 'Trascrivi';
+        return;
+      }
+
+      // Use SottotitoliGSE to compute the GSE score
+      var gse = null;
+      if (window.SottotitoliGSE && window.SottotitoliGSE.scoreText) {
+        gse = window.SottotitoliGSE.scoreText(allText);
+      }
+      if (!gse || gse.score == null) {
+        if (badgeEl) badgeEl.textContent = 'Analisi...';
+        return;
+      }
+
+      var score = Math.round(gse.score);
+      var band = gse.band || '';
+      var color = gse.color || 'var(--teal)';
+
+      if (valEl) {
+        valEl.textContent = score;
+        valEl.style.color = color;
+      }
+      if (badgeEl) {
+        badgeEl.textContent = band;
+        badgeEl.style.background = color + '20';
+        badgeEl.style.color = color;
+      }
+
+      // Render sparkline from recent session GSE scores
+      if (sparkEl) {
+        var recentGscores = [];
+        for (var j = Math.min(sessions.length - 1, 6); j >= 0; j--) {
+          if (sessions[j] && sessions[j].gse_score) recentGscores.push(sessions[j].gse_score);
+        }
+        if (recentGscores.length > 1) {
+          var maxG = Math.max.apply(null, recentGscores);
+          var minG = Math.min.apply(null, recentGscores);
+          var range = maxG - minG || 1;
+          sparkEl.innerHTML = recentGscores.map(function(gs) {
+            var h = Math.max(10, ((gs - minG) / range) * 100);
+            return '<div class="bar" style="height:' + h + '%;background:' + color + '" title="GSE ' + Math.round(gs) + '"></div>';
+          }).join('');
+        } else {
+          sparkEl.innerHTML = '<div class="bar" style="height:50%"></div><div class="bar" style="height:50%"></div>';
+        }
+      }
+    } catch(e) {
+      if (badgeEl) badgeEl.textContent = 'Errore';
+    }
+  }
+
+  // ── Enhanced CEFR Quad with GSE scores ──
+  var _cefrQuadEnhanced = false;
+  async function enhanceCEFRQuad() {
+    if (_cefrQuadEnhanced) return;
+    _cefrQuadEnhanced = true;
+
+    // Add GSE Score badges to each CEFR level in the quad
+    var levelGseMap = { A1: 22, A2: 30, B1: 39, B2: 51, C1: 59, C2: 75 };
+    var gseColors = { A1:'#22c55e', A2:'#3b82f6', B1:'#eab308', B2:'#f97316', C1:'#ef4444', C2:'#a855f7' };
+
+    // Enhance the Vocab Level card with GSE score
+    var levelVal = document.getElementById('dashboardLevelValue');
+    if (levelVal && window.SottotitoliGSE) {
+      try {
+        // Get GSE from session text
+        var sessions = window.SottotitoliData && await window.SottotitoliData.getSessions();
+        if (sessions && sessions.length) {
+          var text = '';
+          for (var i = 0; i < Math.min(sessions.length, 5); i++) {
+            if (sessions[i].transcript_text) text += sessions[i].transcript_text + ' ';
+          }
+          if (text.trim() && window.SottotitoliGSE.scoreText) {
+            var gseResult = window.SottotitoliGSE.scoreText(text);
+            if (gseResult && gseResult.score) {
+              var gseScore = Math.round(gseResult.score);
+              var gseBand = gseResult.band || '';
+              levelVal.textContent = gseScore;
+              levelVal.style.fontSize = '22px';
+              // Add sub-label with band
+              var sub = document.getElementById('dashboardLevelSub');
+              if (sub) sub.textContent = 'GSE ' + gseScore + ' · ' + gseBand + ' · basato sulle ultime sessioni';
+            }
+          }
+        }
+      } catch(e) {}
+    }
+
+    // Add 30-day sparkline to level card (simplified)
+    var barWrap = document.getElementById('dashboardLevelBarWrap');
+    if (barWrap) {
+      var sparkDays = [];
+      for (var d = 0; d < 30; d++) { sparkDays.push(Math.random() * 30 + 50); } // placeholder
+      // Just update the bar fill to show GSE score range
+    }
+  }
+
+  // ═══════════════════════════════════════
+  // Component 4: Word Banks By Topic Filter
+  // ═══════════════════════════════════════
+  var _bankTopicFilter = 'all';
+
+  function filterBanksByTopic(btn, topic) {
+    _bankTopicFilter = topic || 'all';
+    if (btn) {
+      var bar = btn.closest('.wbx-toggle-bar, div');
+      if (bar) bar.querySelectorAll('[data-bank-topic]').forEach(function(c){ c.classList.remove('active'); });
+      btn.classList.add('active');
+    }
+    // Re-render word banks if function exists
+    if (typeof renderTranslationBanks === 'function') renderTranslationBanks();
+    if (typeof renderItalianBanks === 'function') renderItalianBanks();
+  }
+
+  window.filterBanksByTopic = filterBanksByTopic;
+  window.renderGSEMetric = renderGSEMetric;
+  window.enhanceCEFRQuad = enhanceCEFRQuad;
+
+  // Trigger GSE rendering after CEFR quad renders
+  setTimeout(function() { renderGSEMetric(); enhanceCEFRQuad(); }, 800);
+
 
       // ═══ RENDER: Panoramica hero ───
 
@@ -8005,6 +8231,237 @@
   // Translation banks now integrated into English/Italian Collections
   // (renderTranslationBanks still runs to populate language boxes if needed)
   setTimeout(renderTranslationBanks, 500);
+
+  // ═══════════════════════════════════════
+  // CEFR Explorer JavaScript
+  // ═══════════════════════════════════════
+  var _cefrApi = (window.SOTTOTITOLI_CONFIG && window.SOTTOTITOLI_CONFIG.cefrApiUrl) || 'https://sottotitoli-websocket.onrender.com/api/cefr';
+  var _cefrCache = {};
+
+  function cachedCefrFetch(url, ttlMs) {
+    ttlMs = ttlMs || 3600000; // 1 hour default
+    var key = 'cefr_cache_' + url.replace(/[^a-z0-9]/gi, '_');
+    var cached = _cefrCache[key];
+    if (cached && (Date.now() - cached.ts) < ttlMs) return Promise.resolve(cached.data);
+    return fetch(url).then(function(r) { return r.json(); }).then(function(data) {
+      _cefrCache[key] = { data: data, ts: Date.now() };
+      return data;
+    });
+  }
+
+  // ── Topic Browser ──
+  var _cefrCategories = null;
+  var _cefrCurrentWords = [];
+  var _cefrCurrentSort = 'frequency';
+
+  async function loadCefrTopics() {
+    var grid = document.getElementById('cefrTopicGrid');
+    if (!grid) return;
+    try {
+      _cefrCategories = await cachedCefrFetch(_cefrApi + '/categories');
+      if (!_cefrCategories || !_cefrCategories.length) {
+        grid.innerHTML = '<span style="font-size:13px;color:var(--text-faint)">Nessuna categoria disponibile.</span>';
+        return;
+      }
+      grid.innerHTML = _cefrCategories.map(function(c) {
+        return '<button class="topic-pill fchip" onclick="openCefrTopic(\'' + c.category_id + '\',\'' + (c.category_title || c.category_id).replace(/'/g,"\\'") + '\')" style="font-size:13px;padding:8px 16px">' + (c.category_title || c.category_id) + '</button>';
+      }).join('');
+    } catch(e) {
+      grid.innerHTML = '<span style="font-size:13px;color:var(--text-faint)">Errore nel caricamento degli argomenti.</span>';
+    }
+  }
+
+  function filterCefrTopics() {
+    var q = (document.getElementById('cefrTopicSearch')?.value || '').toLowerCase();
+    document.querySelectorAll('#cefrTopicGrid .topic-pill').forEach(function(btn) {
+      btn.style.display = (btn.textContent || '').toLowerCase().includes(q) ? '' : 'none';
+    });
+  }
+
+  async function openCefrTopic(catId, catTitle) {
+    var grid = document.getElementById('cefrTopicGrid');
+    var wordsDiv = document.getElementById('cefrTopicWords');
+    var title = document.getElementById('cefrTopicTitle');
+    var tbody = document.getElementById('cefrTopicBody');
+    if (grid) grid.style.display = 'none';
+    if (wordsDiv) wordsDiv.style.display = 'block';
+    if (title) title.textContent = catTitle;
+    if (tbody) tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;padding:20px;color:var(--text-faint)">Caricamento parole...</td></tr>';
+    try {
+      var data = await cachedCefrFetch(_cefrApi + '/category/' + encodeURIComponent(catId));
+      _cefrCurrentWords = data || [];
+      renderCefrWords();
+      document.getElementById('cefrTopicSearch').closest('.wb-search-bar').style.display = 'none';
+    } catch(e) {
+      if (tbody) tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;color:var(--text-faint)">Errore nel caricamento.</td></tr>';
+    }
+  }
+
+  function closeCefrTopic() {
+    var grid = document.getElementById('cefrTopicGrid');
+    var wordsDiv = document.getElementById('cefrTopicWords');
+    if (grid) grid.style.display = '';
+    if (wordsDiv) wordsDiv.style.display = 'none';
+    var sb = document.getElementById('cefrTopicSearch');
+    if (sb) sb.closest('.wb-search-bar').style.display = '';
+    _cefrCurrentWords = [];
+  }
+
+  function sortCefrWords(btn, mode) {
+    btn.parentElement.querySelectorAll('.fchip').forEach(function(c){ c.classList.remove('active'); });
+    btn.classList.add('active');
+    _cefrCurrentSort = mode;
+    renderCefrWords();
+  }
+
+  function renderCefrWords() {
+    var words = _cefrCurrentWords.slice();
+    if (_cefrCurrentSort === 'frequency') {
+      words.sort(function(a,b){ return (b.frequency_count||0) - (a.frequency_count||0); });
+    } else if (_cefrCurrentSort === 'level') {
+      var order = ['C2','C1','B2','B1','A2','A1'];
+      words.sort(function(a,b){ return order.indexOf(a.level||'') - order.indexOf(b.level||''); });
+    } else {
+      words.sort(function(a,b){ return (a.word||'').localeCompare(b.word||''); });
+    }
+    var levelColors = { A1:'#22c55e', A2:'#3b82f6', B1:'#eab308', B2:'#f97316', C1:'#ef4444', C2:'#a855f7' };
+    var tbody = document.getElementById('cefrTopicBody');
+    if (!tbody) return;
+    tbody.innerHTML = words.map(function(w) {
+      var color = levelColors[w.level] || 'var(--text-faint)';
+      return '<tr style="cursor:pointer" onclick="openCefrWordDetail(\'' + (w.word||'').replace(/'/g,"\\'") + '\',\'' + (w.level||'') + '\',\'' + (w.tag||'') + '\')"><td style="font-weight:600">' + (w.word||'—') + '</td><td style="font-size:11px">' + (w.tag||'—') + '</td><td><span class="badge" style="background:' + color + '20;color:' + color + ';font-weight:700">' + (w.level||'—') + '</span></td><td style="font-size:12px">' + (w.frequency_count||0) + '</td></tr>';
+    }).join('');
+  }
+
+  function openCefrWordDetail(word, level, pos) {
+    alert('Dettaglio: ' + word + '\\nLivello: ' + level + '\\nPOS: ' + pos + '\\n\\nDettaglio completo in arrivo.');
+  }
+
+  // ── Word Family ──
+  async function searchCefrFamily() {
+    var inp = document.getElementById('cefrFamilySearch');
+    var result = document.getElementById('cefrFamilyResult');
+    if (!inp || !result) return;
+    var word = inp.value.trim();
+    if (!word) return;
+    result.innerHTML = '<div style="text-align:center;padding:30px;color:var(--text-faint)"><i class="fa-solid fa-spinner fa-spin"></i> Ricerca famiglia di ' + word + '...</div>';
+    try {
+      var data = await cachedCefrFetch(_cefrApi + '/word-family?lemma=' + encodeURIComponent(word));
+      if (!data || !data.length) {
+        result.innerHTML = '<div style="text-align:center;padding:40px;color:var(--text-faint)"><p>Nessuna famiglia trovata per "' + word + '".</p></div>';
+        return;
+      }
+      var levelColors = { A1:'#22c55e', A2:'#3b82f6', B1:'#eab308', B2:'#f97316', C1:'#ef4444', C2:'#a855f7' };
+      var html = '<div style="text-align:center;margin-bottom:20px"><div style="display:inline-block;padding:14px 28px;background:var(--accent-purple);color:#fff;border-radius:14px;font-size:20px;font-weight:800">' + word + '</div></div>';
+      html += '<div style="display:flex;flex-wrap:wrap;gap:8px;justify-content:center">';
+      data.forEach(function(w) {
+        var color = levelColors[w.level] || '#888';
+        html += '<div style="padding:10px 16px;background:var(--card);border:1px solid var(--line);border-radius:10px;text-align:center;min-width:100px"><div style="font-weight:700;font-size:15px">' + w.word + '</div><div style="font-size:10px;color:var(--text-muted)">' + (w.tag||'') + '</div><div style="margin-top:4px"><span class="badge" style="background:' + color + '20;color:' + color + ';font-weight:700;font-size:10px">' + (w.level||'') + '</span></div><div style="margin-top:4px;height:4px;background:var(--line);border-radius:99px"><div style="height:100%;width:' + Math.min(100,(w.frequency_count||1)*2) + '%;background:' + color + ';border-radius:99px"></div></div></div>';
+      });
+      html += '</div>';
+      result.innerHTML = html;
+    } catch(e) {
+      result.innerHTML = '<div style="text-align:center;padding:40px;color:var(--text-faint)"><p>Errore nella ricerca.</p></div>';
+    }
+  }
+
+  async function surpriseCefrFamily() {
+    var words = ['happy','work','nature','create','beauty','strong','light','water','mind','power'];
+    var word = words[Math.floor(Math.random() * words.length)];
+    var inp = document.getElementById('cefrFamilySearch');
+    if (inp) inp.value = word;
+    searchCefrFamily();
+  }
+
+  // ── Frequency Explorer ──
+  var _freqLevel = 'all';
+  var _freqMode = 'rare';
+
+  async function loadCefrFrequencies() {
+    var list = document.getElementById('cefrFreqList');
+    if (!list) return;
+    try {
+      // Fetch all categories and merge words
+      var cats = await cachedCefrFetch(_cefrApi + '/categories');
+      if (!cats || !cats.length) { list.innerHTML = '<span style="font-size:13px;color:var(--text-faint)">Nessun dato disponibile.</span>'; return; }
+      var allWords = [];
+      for (var i = 0; i < Math.min(cats.length, 10); i++) {
+        try {
+          var words = await cachedCefrFetch(_cefrApi + '/category/' + encodeURIComponent(cats[i].category_id));
+          if (words) allWords = allWords.concat(words);
+        } catch(e) {}
+      }
+      // Deduplicate
+      var seen = {};
+      var unique = [];
+      allWords.forEach(function(w) {
+        var key = (w.word||'').toLowerCase();
+        if (!seen[key]) { seen[key] = true; unique.push(w); }
+      });
+      _cefrFreqWords = unique;
+      renderFreqList();
+    } catch(e) {
+      list.innerHTML = '<span style="font-size:13px;color:var(--text-faint)">Errore nel caricamento.</span>';
+    }
+  }
+
+  var _cefrFreqWords = [];
+
+  function filterFreqLevel(btn, level) {
+    btn.parentElement.querySelectorAll('[data-flevel]').forEach(function(c){ c.classList.remove('active'); });
+    btn.classList.add('active');
+    _freqLevel = level;
+    renderFreqList();
+  }
+
+  function toggleFreqMode(btn, mode) {
+    btn.parentElement.querySelectorAll('[data-fmode]').forEach(function(c){ c.classList.remove('active'); });
+    btn.classList.add('active');
+    _freqMode = mode;
+    renderFreqList();
+  }
+
+  function renderFreqList() {
+    var words = _cefrFreqWords.slice();
+    if (_freqLevel !== 'all') words = words.filter(function(w){ return w.level === _freqLevel; });
+    if (_freqMode === 'rare') words.sort(function(a,b){ return (a.frequency_count||0) - (b.frequency_count||0); });
+    else words.sort(function(a,b){ return (b.frequency_count||0) - (a.frequency_count||0); });
+    words = words.slice(0, 100);
+    var levelColors = { A1:'#22c55e', A2:'#3b82f6', B1:'#eab308', B2:'#f97316', C1:'#ef4444', C2:'#a855f7' };
+    var maxFreq = words.length > 0 ? Math.max.apply(null, words.map(function(w){ return w.frequency_count||0; })) : 1;
+    var list = document.getElementById('cefrFreqList');
+    if (!list) return;
+    list.innerHTML = words.map(function(w, i) {
+      var color = levelColors[w.level] || '#888';
+      var barW = Math.max(2, Math.round(((w.frequency_count||0) / maxFreq) * 100));
+      return '<div style="display:flex;align-items:center;gap:10px;padding:6px 10px;background:var(--card);border-radius:8px;border:1px solid var(--line)">' +
+        '<span style="font-size:10px;color:var(--text-faint);min-width:24px">' + (i+1) + '</span>' +
+        '<span style="font-weight:600;min-width:100px;font-size:14px">' + (w.word||'') + '</span>' +
+        '<div style="flex:1;height:6px;background:var(--line);border-radius:99px"><div style="height:100%;width:' + barW + '%;background:' + color + ';border-radius:99px"></div></div>' +
+        '<span class="badge" style="background:' + color + '20;color:' + color + ';font-weight:700;font-size:10px">' + (w.level||'') + '</span>' +
+        '<span style="font-size:10px;color:var(--text-muted);min-width:40px;text-align:right">' + (w.frequency_count||0) + '</span>' +
+      '</div>';
+    }).join('');
+  }
+
+  // ── Tab click handlers ──
+  document.querySelector('[data-subtab="cefr-topic"]')?.addEventListener('click', function(){ setTimeout(loadCefrTopics, 100); });
+  document.querySelector('[data-subtab="cefr-frequency"]')?.addEventListener('click', function(){ setTimeout(loadCefrFrequencies, 100); });
+  // Load topics on first panel open
+  var cefrNav = document.querySelector('[data-panel="cefr-explorer"]');
+  if (cefrNav) cefrNav.addEventListener('click', function(){ setTimeout(loadCefrTopics, 100); });
+
+  // Expose to global
+  window.filterCefrTopics = filterCefrTopics;
+  window.openCefrTopic = openCefrTopic;
+  window.closeCefrTopic = closeCefrTopic;
+  window.sortCefrWords = sortCefrWords;
+  window.openCefrWordDetail = openCefrWordDetail;
+  window.searchCefrFamily = searchCefrFamily;
+  window.surpriseCefrFamily = surpriseCefrFamily;
+  window.filterFreqLevel = filterFreqLevel;
+  window.toggleFreqMode = toggleFreqMode;
+
 
   // ── AI Voice mode toggle (Browser ↔ Kokoro) ──────────────
   window.setVoiceMode = function(mode) {
