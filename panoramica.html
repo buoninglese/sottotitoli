@@ -1727,13 +1727,17 @@
                   });
                 }).catch(function(){});
               }
-              // Credits
-              if(window.SottotitoliData && window.SottotitoliData.getAITokens){
-                window.SottotitoliData.getAITokens().then(function(t){
-                  var el = document.getElementById('raiCreditsAvailable');
-                  if(el) el.textContent = (t||0);
-                }).catch(function(){});
-              }
+              // Credits — retry until SottotitoliData is available
+              (function loadCredits(){
+                if(window.SottotitoliData && window.SottotitoliData.getAITokens){
+                  window.SottotitoliData.getAITokens().then(function(t){
+                    var el = document.getElementById('raiCreditsAvailable');
+                    if(el) el.textContent = (t != null ? t : 0);
+                  }).catch(function(){});
+                } else {
+                  setTimeout(loadCredits, 500);
+                }
+              })();
 
               // ── Report generation ──
               window.generateReport = function(type) {
@@ -2682,32 +2686,58 @@
         // ── Build copy based on confidence state ──
         var heroP = document.getElementById('heroText');
         var heroChips = document.getElementById('heroChips');
-        var text = '';
-        var ctaLabel = 'Inizia sessione';
+        var textKey = '';
+        var ctaKey = '';
 
         if (state.key === 'no_data') {
-          text = 'Completa alcune sessioni per trasformare il tuo modo di parlare in feedback utile su fluidità, vocabolario e progressi.';
-          ctaLabel = 'Inizia sessione';
+          textKey = 'hero_no_data';
+          ctaKey = 'start_session_btn';
         } else if (state.key === 'early_data') {
-          text = 'Iniziamo a vedere i primi pattern, ma con un po\' più di tempo di parola il tuo feedback diventerà molto più preciso e personale.';
-          ctaLabel = 'Continua a parlare';
+          textKey = 'hero_early_data';
+          ctaKey = 'hero_keep_talking';
         } else if (state.key === 'growing_data') {
-          text = 'I tuoi dati rivelano già tendenze utili. Apri Insights per vedere cosa sta migliorando e cosa merita più attenzione.';
-          ctaLabel = 'Apri Insights';
+          textKey = 'hero_growing_data';
+          ctaKey = 'hero_open_insights';
         } else {
-          text = 'Abbiamo identificato pattern significativi tra le tue sessioni. Apri Insights per un\'analisi più approfondita su punti di forza, abitudini e prossimi passi.';
-          ctaLabel = 'Apri Insights';
+          textKey = 'hero_established_data';
+          ctaKey = 'hero_open_insights';
+        }
+
+        // Default Italian text (used as fallback + data-i18n seed)
+        var defaults = {
+          hero_no_data: 'Completa alcune sessioni per trasformare il tuo modo di parlare in feedback utile su fluidità, vocabolario e progressi.',
+          hero_early_data: 'Iniziamo a vedere i primi pattern, ma con un po\' più di tempo di parola il tuo feedback diventerà molto più preciso e personale.',
+          hero_growing_data: 'I tuoi dati rivelano già tendenze utili. Apri Insights per vedere cosa sta migliorando e cosa merita più attenzione.',
+          hero_established_data: 'Abbiamo identificato pattern significativi tra le tue sessioni. Apri Insights per un\'analisi più approfondita su punti di forza, abitudini e prossimi passi.',
+          start_session_btn: 'Inizia sessione',
+          hero_keep_talking: 'Continua a parlare',
+          hero_open_insights: 'Apri Insights'
+        };
+
+        var text = defaults[textKey] || '';
+        var ctaLabel = defaults[ctaKey] || 'Inizia sessione';
+
+        // Use i18n if available
+        if (typeof I18n !== 'undefined' && I18n.t) {
+          text = I18n.t(textKey) || text;
+          ctaLabel = I18n.t(ctaKey) || ctaLabel;
         }
 
         if (heroP) {
+          heroP.setAttribute('data-i18n', textKey);
           heroP.textContent = text;
-          heroP.removeAttribute('data-i18n');
         }
 
         if (heroChips) {
           heroChips.innerHTML =
-            '<button class=\"hero-chip strong\" onclick=\"toggleStartSession()\">' + ctaLabel + '</button>' +
-            '<button class=\"hero-chip\" onclick=\"openInsightsOverview()\">Scopri di più</button>';
+            '<button class=\"hero-chip strong\" onclick=\"toggleStartSession()\" data-i18n=\"' + ctaKey + '\">' + ctaLabel + '</button>' +
+            '<button class=\"hero-chip\" onclick=\"openInsightsOverview()\" data-i18n=\"hero_learn_more\">Scopri di più</button>';
+        }
+
+        // Apply i18n to the newly created elements
+        if (typeof I18n !== 'undefined' && I18n.apply) {
+          if (heroP) I18n.apply(heroP);
+          if (heroChips) I18n.apply(heroChips);
         }
       }
       window.renderHero = renderHero;
@@ -3578,6 +3608,13 @@
 
       // ═══ RENDER: Report AI ───
       function renderAIReports() {
+        // Refresh credits display
+        var credEl = document.getElementById('raiCreditsAvailable');
+        if (credEl && window.SottotitoliData && window.SottotitoliData.getAITokens) {
+          window.SottotitoliData.getAITokens().then(function(t) {
+            if (credEl) credEl.textContent = (t != null ? t : 0);
+          }).catch(function(){});
+        }
         var badge = document.querySelector('#pnl-report-ai .alt-card:last-child p');
         if (badge && tokens !== undefined) {
           badge.textContent = tokens + ' crediti disponibili. Scalati solo a report completato.';
