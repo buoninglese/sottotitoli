@@ -2653,18 +2653,16 @@
     var badgeEl = gseCard.querySelector('.metric-badge');
     var sparkEl = document.getElementById('sparkGSE');
 
-    // Default: show calculating
     if (valEl) valEl.textContent = '—';
     if (badgeEl) badgeEl.textContent = 'Calcolo...';
 
-    // Try to compute GSE from session transcripts
     try {
       var sessions = window.SottotitoliData && await window.SottotitoliData.getSessions();
       if (!sessions || !sessions.length) {
         if (badgeEl) badgeEl.textContent = 'Nessun dato';
         return;
       }
-      // Get the latest session's transcript
+
       var allText = '';
       for (var i = 0; i < Math.min(sessions.length, 5); i++) {
         var s = sessions[i];
@@ -2675,31 +2673,57 @@
         return;
       }
 
-      // Use SottotitoliGSE to compute the GSE score
-      var gse = null;
-      if (window.SottotitoliGSE && window.SottotitoliGSE.scoreText) {
-        gse = window.SottotitoliGSE.scoreText(allText);
+      var cefrApi = (window.SOTTOTITOLI_CONFIG && window.SOTTOTITOLI_CONFIG.cefrApiUrl) || 'https://sottotitoli-websocket.onrender.com/api/cefr';
+      var GSE = window.SottotitoliGSE;
+      var score, band, color, label;
+
+      // ── Try full vocabulary-weighted pipeline ──
+      try {
+        var apiResp = await fetch(cefrApi + '/analyze', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text: allText })
+        });
+        if (apiResp.ok) {
+          var data = await apiResp.json();
+          if (data && data.avgLevel != null && GSE) {
+            // Blend: vocab from API + reading from local Flesch
+            var vocabGse = GSE.vocabGSE(data.avgLevel);
+            var flesch = GSE.fleschReadingEase(allText);
+            var readGse = GSE.readingGSE(flesch);
+            var blended = GSE.overallGSE(readGse, vocabGse);
+            var bandInfo = GSE.cefrBand(blended);
+            score = blended;
+            band = bandInfo.band;
+            color = bandInfo.color;
+            label = bandInfo.label;
+          }
+        }
+      } catch (_) { /* API call failed — fall through to local */ }
+
+      // ── Fallback: Flesch-only if API didn't give us a score ──
+      if (score == null && GSE && GSE.scoreText) {
+        var local = GSE.scoreText(allText);
+        score = local.score;
+        band = local.band;
+        color = local.color;
+        label = local.label;
       }
-      if (!gse || gse.score == null) {
+
+      if (score == null) {
         if (badgeEl) badgeEl.textContent = 'Analisi...';
         return;
       }
 
-      var score = Math.round(gse.score);
-      var band = gse.band || '';
-      var color = gse.color || 'var(--teal)';
-
-      if (valEl) {
-        valEl.textContent = score;
-        valEl.style.color = color;
-      }
+      score = Math.round(score);
+      if (valEl) { valEl.textContent = score; valEl.style.color = color; }
       if (badgeEl) {
         badgeEl.textContent = band;
         badgeEl.style.background = color + '20';
         badgeEl.style.color = color;
       }
 
-      // Render sparkline from recent session GSE scores
+      // Sparkline from recent session GSE scores
       if (sparkEl) {
         var recentGscores = [];
         for (var j = Math.min(sessions.length - 1, 6); j >= 0; j--) {
@@ -2728,44 +2752,58 @@
     if (_cefrQuadEnhanced) return;
     _cefrQuadEnhanced = true;
 
-    // Add GSE Score badges to each CEFR level in the quad
-    var levelGseMap = { A1: 22, A2: 30, B1: 39, B2: 51, C1: 59, C2: 75 };
-    var gseColors = { A1:'#22c55e', A2:'#3b82f6', B1:'#eab308', B2:'#f97316', C1:'#ef4444', C2:'#a855f7' };
-
-    // Enhance the Vocab Level card with GSE score
     var levelVal = document.getElementById('dashboardLevelValue');
-    if (levelVal && window.SottotitoliGSE) {
+    if (!levelVal || !window.SottotitoliGSE) return;
+
+    try {
+      var sessions = window.SottotitoliData && await window.SottotitoliData.getSessions();
+      if (!sessions || !sessions.length) return;
+
+      var text = '';
+      for (var i = 0; i < Math.min(sessions.length, 5); i++) {
+        if (sessions[i].transcript_text) text += sessions[i].transcript_text + ' ';
+      }
+      if (!text.trim()) return;
+
+      var GSE = window.SottotitoliGSE;
+      var cefrApi = (window.SOTTOTITOLI_CONFIG && window.SOTTOTITOLI_CONFIG.cefrApiUrl) || 'https://sottotitoli-websocket.onrender.com/api/cefr';
+      var gseScore = null, gseBand = '';
+
+      // ── Try full vocabulary-weighted pipeline ──
       try {
-        // Get GSE from session text
-        var sessions = window.SottotitoliData && await window.SottotitoliData.getSessions();
-        if (sessions && sessions.length) {
-          var text = '';
-          for (var i = 0; i < Math.min(sessions.length, 5); i++) {
-            if (sessions[i].transcript_text) text += sessions[i].transcript_text + ' ';
-          }
-          if (text.trim() && window.SottotitoliGSE.scoreText) {
-            var gseResult = window.SottotitoliGSE.scoreText(text);
-            if (gseResult && gseResult.score) {
-              var gseScore = Math.round(gseResult.score);
-              var gseBand = gseResult.band || '';
-              levelVal.textContent = gseScore;
-              levelVal.style.fontSize = '22px';
-              // Add sub-label with band
-              var sub = document.getElementById('dashboardLevelSub');
-              if (sub) sub.textContent = 'GSE ' + gseScore + ' · ' + gseBand + ' · basato sulle ultime sessioni';
-            }
+        var apiResp = await fetch(cefrApi + '/analyze', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text: text })
+        });
+        if (apiResp.ok) {
+          var data = await apiResp.json();
+          if (data && data.avgLevel != null) {
+            var vocabGse = GSE.vocabGSE(data.avgLevel);
+            var flesch = GSE.fleschReadingEase(text);
+            var readGse = GSE.readingGSE(flesch);
+            var blended = GSE.overallGSE(readGse, vocabGse);
+            var bandInfo = GSE.cefrBand(blended);
+            gseScore = blended;
+            gseBand = bandInfo.band;
           }
         }
-      } catch(e) {}
-    }
+      } catch (_) {}
 
-    // Add 30-day sparkline to level card (simplified)
-    var barWrap = document.getElementById('dashboardLevelBarWrap');
-    if (barWrap) {
-      var sparkDays = [];
-      for (var d = 0; d < 30; d++) { sparkDays.push(Math.random() * 30 + 50); } // placeholder
-      // Just update the bar fill to show GSE score range
-    }
+      // ── Fallback: Flesch-only ──
+      if (gseScore == null && GSE.scoreText) {
+        var local = GSE.scoreText(text);
+        gseScore = local.score;
+        gseBand = local.band;
+      }
+
+      if (gseScore != null) {
+        levelVal.textContent = Math.round(gseScore);
+        levelVal.style.fontSize = '22px';
+        var sub = document.getElementById('dashboardLevelSub');
+        if (sub) sub.textContent = 'GSE ' + Math.round(gseScore) + ' · ' + gseBand + ' · basato sulle ultime sessioni';
+      }
+    } catch(e) {}
   }
 
   // ═══════════════════════════════════════
