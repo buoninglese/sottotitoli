@@ -448,7 +448,7 @@ function loadCefrFrequencies(){
   var api=(window.SOTTOTITOLI_CONFIG&&window.SOTTOTITOLI_CONFIG.cefrApiUrl)||'/api/cefr';
   Promise.all([
     getUserVocabularySet(),
-    fetch(api+'/gaps?below='+(below||'')+'&above='+(above||'')).then(function(r){return r.json()})
+    fetch(api+'/gaps?below='+(below||'')+'&above='+(above||'')+'&sort='+sm).then(function(r){return r.json()})
   ]).then(function(r){
     if(nonce!==_cefrFetchNonce)return;
     var kn=r[0],data=r[1];
@@ -472,6 +472,9 @@ function loadCefrFrequencies(){
     if(data.below){var n=renderSection(below+' words you might have missed',data.below,'📊');if(n){w.appendChild(n);any=true}}
     if(data.above){var n=renderSection(above+' words to stretch toward',data.above,'🚀');if(n){w.appendChild(n);any=true}}
     if(!any)w.innerHTML='<div class=\"cefr-empty\"><h3>No gaps detected!</h3><p>Try adjusting your level or explore topics.</p></div>'
+  }).catch(function(){
+    if(nonce!==_cefrFetchNonce)return;
+    w.innerHTML='<div class=\"cefr-empty\"><h3>Service warming up…</h3><p>The vocabulary engine is waking up. Try again in a few seconds.</p></div>'
   })
 }
 
