@@ -1064,6 +1064,15 @@ button[onclick*="addToWordBank"]:hover{background:rgba(52,211,153,.15)!important
 .notif-toast.show{transform:translateX(0)}
 .notif-toast strong{font-size:13px;color:var(--text)}
 .notif-toast span{font-size:12px;color:var(--muted)}
+
+/* ═══ CEFR Rarity indicator ═══ */
+.word-rare { animation: rarePulse 1.5s ease-out; }
+@keyframes rarePulse {
+  0% { text-shadow: 0 0 8px var(--accent-amber,#f59e0b); }
+  100% { text-shadow: 0 0 0 transparent; }
+}
+.cefr-above { font-weight: 700; text-shadow: 0 0 6px rgba(250,204,21,.5); }
+.cefr-way-above { font-weight: 700; text-shadow: 0 0 8px rgba(239,68,68,.6); }
 </style>
 </head>
 <body class="hb-start" style="display:flex;flex-direction:column;height:100vh;overflow:hidden">
@@ -1192,6 +1201,7 @@ button[onclick*="addToWordBank"]:hover{background:rgba(52,211,153,.15)!important
     <button class="slide-dot" data-slide="1" title="Vocabolario"><i class="fas fa-book"></i><span data-i18n="slide_vocab">Vocab</span></button>
     <button class="slide-dot" data-slide="2" title="Word Meaning"><i class="fas fa-magnifying-glass"></i><span data-i18n="slide_words">Words</span></button>
     <button class="slide-dot" data-slide="3" title="Grammar Fix"><i class="fas fa-spell-check"></i><span data-i18n="slide_grammar">Grammar</span></button>
+    <button class="slide-dot" data-slide="4" title="Topics"><i class="fas fa-tags"></i><span>Topics</span></button>
   </div>
   <script>requestAnimationFrame(function(){ var d=document.getElementById('slideDots'); if(d) d.style.opacity='1'; });</script>
 
@@ -1329,6 +1339,34 @@ button[onclick*="addToWordBank"]:hover{background:rgba(52,211,153,.15)!important
           </div>
         </div>
       </section>
+      <!-- PANEL 5: Topic Explorer -->
+      <section class="h-panel h-panel-alt h-panel-scroll" id="topicPanel">
+        <div class="h-panel-inner">
+          <div class="slide-split" style="flex:1;min-height:0">
+            <div class="slide-main" style="display:flex;flex-direction:column;min-height:0;overflow:hidden">
+              <div style="background:var(--panel-bg);border:1px solid var(--line);border-radius:var(--mode-radius);padding:clamp(14px,2vw,20px);flex:1;overflow-y:auto;min-height:0">
+                <div class="slide-box-title">Topics</div>
+                <div id="topicDonut" style="display:flex;align-items:center;justify-content:center;min-height:200px">
+                  <div style="text-align:center;padding:20px;color:var(--muted2);font-size:13px">Start speaking to see topic distribution.<br><span style="font-size:11px">English only · updates every 30s</span></div>
+                </div>
+                <div id="topicLegend" style="margin-top:8px;max-height:160px;overflow-y:auto"></div>
+              </div>
+            </div>
+            <div class="slide-side">
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+                <span style="font-size:12px;color:var(--muted2);text-transform:uppercase;letter-spacing:.5px">Words by Topic</span>
+                <select id="topicSortSel" onchange="_renderTopicWords()" style="font-size:11px;padding:3px 8px;border-radius:6px;border:1px solid var(--line);background:var(--card);color:var(--text);font-family:Inter,sans-serif">
+                  <option value="freq">By frequency</option>
+                  <option value="level">By level</option>
+                </select>
+              </div>
+              <div style="background:var(--panel-bg);border:1px solid var(--line);border-radius:var(--mode-radius);padding:clamp(10px,2vw,14px);flex:1;overflow-y:auto;min-height:0" id="topicWordList">
+                <div style="text-align:center;padding:20px;color:var(--muted2);font-size:13px">Click a topic → to see words.</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
     </div>
   </div>
 </div><!-- /app-main -->
@@ -1352,6 +1390,7 @@ button[onclick*="addToWordBank"]:hover{background:rgba(52,211,153,.15)!important
     <button type="button" class="btn-grad btn-start" id="startBtn" onclick="toggleSession()" style="font-size:15px;padding:8px 22px;border-radius:100px"><i class="fas fa-microphone"></i> <span data-i18n="listen">Ascolta</span></button>
     <button type="button" class="btn-grad btn-pause" id="pauseBtn" style="display:none;font-size:15px;padding:8px 22px;border-radius:100px" onclick="togglePause()"><i class="fas fa-pause"></i> <span data-i18n="pause">Pausa</span></button>
     <span id="recTimer" style="font-family:Inter,sans-serif;font-size:16px;font-weight:600;color:var(--text);min-width:48px;text-align:center">00:00</span>
+    <span id="gseBadge" style="display:none;font-size:13px;font-weight:600;color:var(--accent);padding:4px 10px;border-radius:100px;border:1px solid var(--line);background:var(--card);white-space:nowrap">—</span>
     <span class="topbar-pill" style="border:none;background:transparent;padding:0">
       <span class="tp-dot" id="micDot"></span>
       <span id="micStatus" style="font-size:13px;font-weight:600;color:var(--muted)" data-i18n="mic_off">Mic Off</span>
@@ -1392,6 +1431,7 @@ button[onclick*="addToWordBank"]:hover{background:rgba(52,211,153,.15)!important
 <script src="js/real-mic.js?v=13"></script>
 <script src="js/grammar-viz.js?v=2"></script>
 <script src="js/speech-icons.js"></script>
+<script src="js/cefr-gse.js"></script>
 <script src="translation-providers.js?v=1"></script>
 <!-- Apply saved theme (from panoramica settings or localStorage) -->
 <script>
@@ -2989,14 +3029,152 @@ setInterval(function() {
   }
 }, 800);
 
-// ═══ CEFR Level Analysis ═══
+// ═══ CEFR Level Analysis (GSE-powered) ═══
 var _cefrColors={A1:'#22c55e',A2:'#a3e635',B1:'#facc15',B2:'#fb923c',C1:'#f87171',C2:'#c084fc'};
 var _cefrWordLists={};
+var _sessionWordCache = {};        // word → {level, pos} from API
+var _gseHistory = [];              // rolling last 10 GSE scores
+var _sessionGSE = null;            // current overall GSE
+var _sessionCEFRBand = null;       // current CEFR band string
+var _cefrApiUrl = '';
+var _cefrApiBusy = false;
+var _cefrApiQueue = [];
+
+// Derive CEFR API URL from websocket config
+(function(){
+  var ws = (window.SOTTOTITOLI_CONFIG && window.SOTTOTITOLI_CONFIG.websocketUrl) || '';
+  if (ws) {
+    _cefrApiUrl = ws.replace('wss://','https://').replace('/ws','') + '/api/cefr';
+  }
+  // Fallback
+  if (!_cefrApiUrl || _cefrApiUrl.indexOf('http') !== 0) {
+    _cefrApiUrl = 'https://sottotitoli-websocket.onrender.com/api/cefr';
+  }
+})();
+
 function _getCEFR(w){
   var c=w.toLowerCase().replace(/[^a-z]/g,'');
   if(window.CEFR_LEVELS&&window.CEFR_LEVELS[c])return window.CEFR_LEVELS[c];
   if(c.length<=3)return'A1';if(c.length<=5)return'A2';if(c.length<=7)return'B1';if(c.length<=9)return'B2';if(c.length<=11)return'C1';return'C2';
 }
+
+/** Call CEFR batch API for new words, merge into cache, then re-analyze. */
+function _cefrFetchAndAnalyze(text) {
+  if (!isCapabilityAvailable('cefrMetrics')) return;
+  if (!text || typeof text !== 'string') return;
+  
+  // Extract unique new words not yet cached
+  var tokens = text.toLowerCase().match(/\b[a-z]+\b/g) || [];
+  var newWords = [];
+  var seen = {};
+  for (var i = 0; i < tokens.length; i++) {
+    var w = tokens[i];
+    if (w.length < 2 || _sessionWordCache[w] || seen[w]) continue;
+    seen[w] = true;
+    newWords.push(w);
+  }
+  
+  if (newWords.length === 0) {
+    // All words cached — just re-analyze
+    _cefrRunAnalysis(text);
+    return;
+  }
+  
+  // Queue API call (debounced — only one in flight at a time)
+  _cefrApiQueue.push({ words: newWords, text: text });
+  _cefrProcessQueue();
+}
+
+function _cefrProcessQueue() {
+  if (_cefrApiBusy || _cefrApiQueue.length === 0) return;
+  _cefrApiBusy = true;
+  var job = _cefrApiQueue.shift();
+  
+  fetch(_cefrApiUrl + '/batch', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ words: job.words })
+  })
+  .then(function(r) { return r.json(); })
+  .then(function(data) {
+    if (data && data.results) {
+      for (var w in data.results) {
+        _sessionWordCache[w] = data.results[w];
+      }
+    }
+    _cefrRunAnalysis(job.text);
+  })
+  .catch(function() { /* silent — CEFR API unavailable */ })
+  .finally(function() {
+    _cefrApiBusy = false;
+    // Process next queued job after a short debounce
+    setTimeout(function() { _cefrProcessQueue(); }, 1500);
+  });
+}
+
+/** Run GSE analysis on text using cached word levels. */
+function _cefrRunAnalysis(text) {
+  if (!window.SottotitoliGSE || !window.SottotitoliGSE.analyze) return;
+  
+  var vocabLookup = {};
+  var tokens = text.toLowerCase().match(/\b[a-z]+\b/g) || [];
+  for (var i = 0; i < tokens.length; i++) {
+    var w = tokens[i];
+    if (_sessionWordCache[w]) vocabLookup[w] = _sessionWordCache[w];
+  }
+  
+  var result = window.SottotitoliGSE.analyze(text, Object.keys(vocabLookup).length > 0 ? vocabLookup : null);
+  if (!result) return;
+  
+  _sessionGSE = result.overallGSE;
+  _sessionCEFRBand = result.cefrBand || 'A1';
+  
+  // Rolling history (last 10)
+  _gseHistory.push(result.overallGSE);
+  if (_gseHistory.length > 10) _gseHistory.shift();
+  
+  // Update all CEFR displays
+  _updateCEFRBars();
+  _updateGSEBadge();
+  _drawGSEsparkline();
+}
+
+function _updateGSEBadge() {
+  var badge = document.getElementById('gseBadge');
+  if (!badge) return;
+  if (!isCapabilityAvailable('cefrMetrics') || _sessionGSE == null) {
+    badge.style.display = 'none';
+    return;
+  }
+  badge.style.display = '';
+  var band = window.SottotitoliGSE && window.SottotitoliGSE.cefrBand 
+    ? window.SottotitoliGSE.cefrBand(_sessionGSE) 
+    : { band: _sessionCEFRBand, color: '#22c55e' };
+  badge.innerHTML = '<span style="font-weight:700;color:' + (band && band.color || '#fff') + '">GSE ' + _sessionGSE + '</span> <span style="font-size:11px;color:var(--muted)">(' + (band && band.band || '—') + ')</span>';
+}
+
+function _drawGSEsparkline() {
+  var container = document.getElementById('gseSparkline');
+  if (!container || _gseHistory.length < 2) {
+    if (container) container.innerHTML = '';
+    return;
+  }
+  var w = container.clientWidth || 120;
+  var h = 36;
+  var min = Math.min.apply(null, _gseHistory) - 2;
+  var max = Math.max.apply(null, _gseHistory) + 2;
+  var range = max - min || 1;
+  var points = [];
+  for (var i = 0; i < _gseHistory.length; i++) {
+    var x = (i / (_gseHistory.length - 1)) * w;
+    var y = h - ((_gseHistory[i] - min) / range) * h;
+    points.push(x + ',' + y);
+  }
+  container.innerHTML = '<svg width="' + w + '" height="' + h + '" style="display:block">' +
+    '<polyline points="' + points.join(' ') + '" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>' +
+    '</svg>';
+}
+
 function _updateCEFRBars(){
   var lines=document.querySelectorAll('#captionTranscript .line');
   var counts={A1:0,A2:0,B1:0,B2:0,C1:0,C2:0};_cefrWordLists={A1:[],A2:[],B1:[],B2:[],C1:[],C2:[]};
@@ -3023,7 +3201,16 @@ function _updateCEFRBars(){
     html+='<span style="font-size:11px;color:var(--muted);min-width:28px;text-align:right;font-family:JetBrains Mono,monospace">'+c+'w</span>';
     html+='</div>';
   });
+  // GSE score + sparkline
+  if (isCapabilityAvailable('cefrMetrics') && _sessionGSE != null) {
+    html+='<div style="margin-top:12px;padding-top:10px;border-top:1px solid var(--line);display:flex;align-items:center;gap:12px">';
+    html+='<div style="text-align:center;min-width:56px"><div style="font-size:28px;font-weight:900;color:var(--accent);line-height:1" id="gseScoreInline">'+_sessionGSE+'</div><div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px">GSE</div></div>';
+    html+='<div style="flex:1;min-width:0"><div id="gseSparkline" style="width:100%;height:36px"></div></div>';
+    html+='</div>';
+  }
   bars.innerHTML=html||'<div style="text-align:center;padding:20px;color:var(--muted2);font-size:13px">Start speaking to see CEFR breakdown.</div>';
+  // Draw sparkline after DOM update
+  setTimeout(function(){ _drawGSEsparkline(); }, 50);
 }
 function downloadCEFRPDF(){
   var lines=document.querySelectorAll('#captionTranscript .line');
@@ -3249,7 +3436,7 @@ if (isTranslateUrl) {
   var panels=document.querySelectorAll('.h-panel');
   var scrollEl=document.getElementById('modeScroll');
   var total=panels.length,idx=0;
-  var visibleIndices = [0,1,2,3]; // panel indices (was 5, now 4 — Live Analysis removed)
+  var visibleIndices = [0,1,2,3,4]; // panel indices (5 slides: Cap, Vocab, Words, Grammar, Topics)
 
   function goTo(i){
     if(i<0||i>=visibleIndices.length)return;
@@ -3263,7 +3450,7 @@ if (isTranslateUrl) {
 
   function updateDots(){
     var allDots = document.querySelectorAll('.slide-dot');
-    var titles = ['Captions','Vocabulary','Word Meaning','Grammar Fix'];
+    var titles = ['Captions','Vocabulary','Word Meaning','Grammar Fix','Topics'];
 
     allDots.forEach(function(d,i){
       var realI = parseInt(d.getAttribute('data-slide'));
@@ -3281,7 +3468,7 @@ if (isTranslateUrl) {
   // Apply language-specific visibility (4 slides: 0=Cap, 1=Vocab, 2=WordMeaning, 3=GrammarFix)
   S8T_LANG.resolve(S8T_LANG.readRoomConfig()).then(function(ls){
     if (ls.content_language && ls.content_language !== 'en') {
-      // Non-English: hide Vocabulary (slide 1) — keep Captions, Word Meaning, Grammar Fix
+      // Non-English: hide Vocabulary (slide 1) and Topics (slide 4) — keep Captions, Word Meaning, Grammar Fix
       visibleIndices = [0,2,3];
     }
     // View POS mode: English only (requires Penn Treebank tagger)
@@ -3687,6 +3874,9 @@ _realMic.onFinal = function(text) {
   // ── Update slide panels with live data ──
   try { _updateGrammarLines(); } catch(e) { console.error('_updateGrammarLines error:', e); }
   try { _refreshMetricsPanel(); } catch(e) {}
+  try { _updateCEFRBars(); } catch(e) {}
+  // ── CEFR GSE analysis (async, non-blocking) ──
+  try { _cefrFetchAndAnalyze(text); } catch(e) {}
 };
 
 // Hook grammar-viz into speech pipeline
@@ -3698,6 +3888,8 @@ _realMic.onFinal = function(text) {
       try { _gvProcessFinal(_fixContractions(text)); } catch(e) { console.error('grammar-viz error:', e); }
       try { _updateGrammarLines(); } catch(e) { console.error('_updateGrammarLines error:', e); }
       try { _refreshMetricsPanel(); } catch(e) {}
+      try { _updateCEFRBars(); } catch(e) {}
+      try { _cefrFetchAndAnalyze(text); } catch(e) {}
     };
   }
 })();
