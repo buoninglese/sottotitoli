@@ -1116,15 +1116,15 @@
             </div>
           </div>
         </div>
-        <!-- ═══ WORD BANKS — three-layer vocabulary workspace ═══ -->
+        <!-- ═══ WORD BANKS ═══ -->
         <div class="content-panel" id="pnl-wordbanks">
           <section class="panel-head"><h2>Word banks</h2></section>
           <section class="panel-tabs"><div class="tabs" role="tablist">
-            <button role="tab" aria-selected="true" class="tab-link active" data-subtab="wb-overview">Collection</button>
-            <button role="tab" aria-selected="false" class="tab-link" data-subtab="wb-translation">Translation</button>
+            <button role="tab" aria-selected="true" class="tab-link active" data-subtab="wb-overview">🇬🇧 English Collection</button>
+            <button role="tab" aria-selected="false" class="tab-link" data-subtab="wb-overview-it">🇮🇹 Italian Collection</button>
           </div></section>
-          <!-- Subtab: Overview (Collection) -->
-          <div role="tabpanel" class="subtab-pane active" id="sub-wb-overview">
+          <!-- Subtab: English Collection -->
+          <div role="tabpanel" class="subtab-pane active" id="sub-wb-overview" data-wb-lang="en">
             <div class="wb-search-bar">
               <div class="wb-filter-chips">
                 <button class="fchip active" onclick="filterWbType(this,'all')" data-i18n="wb_filter_all">All</button>
@@ -1148,16 +1148,37 @@
                 <div class="wb-grid" id="wbCustomGrid"></div>
               </div>
             </div>
-            <!-- Inside-bank view (replaces overview when bank opened) -->
+            <!-- Inside-bank view -->
             <div id="wbInsideView" style="display:none"></div>
           </div>
-          <!-- Subtab: Translation Word Banks -->
-          <div role="tabpanel" class="subtab-pane" id="sub-wb-translation" style="display:none">
-            <p style="font-size:13px;color:var(--text-soft);margin-bottom:20px;max-width:600px;line-height:1.5">Words saved during translation mode — organised by language. Each language gets its own word bank automatically.</p>
-            <div id="wbTranslationGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px">
-              <div style="text-align:center;padding:40px;color:var(--text-faint);grid-column:1/-1">No translation words saved yet. Use Translation mode in a caption session to start collecting.</div>
+          <!-- Subtab: Italian Collection -->
+          <div role="tabpanel" class="subtab-pane" id="sub-wb-overview-it" data-wb-lang="it">
+            <div class="wb-search-bar">
+              <div class="wb-filter-chips">
+                <button class="fchip active" onclick="filterWbTypeIt(this,'all')">Tutte</button>
+                <button class="fchip" onclick="filterWbTypeIt(this,'pinned')">Pinned</button>
+                <button class="fchip" onclick="filterWbTypeIt(this,'smart')">Smart</button>
+                <button class="fchip" onclick="filterWbTypeIt(this,'custom')">Proprie</button>
+              </div>
+              <input class="wb-search-input" id="wbItSearchInput" placeholder="Cerca banche o parole italiane…" oninput="filterWordbanksIt()">
             </div>
+            <div id="wordbanksItOverview">
+              <div class="wb-section" data-section="pinned" id="wbItPinnedSection">
+                <div class="wb-section-head"><h3>Pinned</h3><span class="section-badge badge-pinned">Sempre disponibile</span></div>
+                <div class="wb-grid" id="wbItPinnedGrid"></div>
+              </div>
+              <div class="wb-section" data-section="smart" id="wbItSmartSection">
+                <div class="wb-section-head"><h3>Smart</h3><span class="section-badge badge-smart">Suggerito da Sottotitoli</span></div>
+                <div class="wb-grid" id="wbItSmartGrid"></div>
+              </div>
+              <div class="wb-section" data-section="custom" id="wbItCustomSection">
+                <div class="wb-section-head"><h3>Proprie</h3><span class="section-badge badge-custom">Le tue collezioni</span></div>
+                <div class="wb-grid" id="wbItCustomGrid"></div>
+              </div>
+            </div>
+            <div id="wbItInsideView" style="display:none"></div>
           </div>
+          <!-- Subtab: Translation Word Banks — REMOVED, merged into English/Italian collections -->
           <!-- Subtab: Review Due — driven by review subsystem, with classic fallback -->
           <div role="tabpanel" class="subtab-pane" id="sub-wb-review">
             <section id="reviewDashboardMount">
@@ -6499,7 +6520,63 @@
       }
       window.renderInsightsOverview = renderInsightsOverview;
 
-      // ═══ RENDER: Vocabolario Traguardi ───
+      
+      // ── Render Italian Collection ──
+      async function renderWordbanksIt() {
+        var lang = 'it';
+        var stats = await SottotitoliData.getWordbankStats(lang);
+        var statsEl = document.getElementById('wbItStats');
+        if (statsEl) {
+          statsEl.innerHTML = '<div class="stats-row" style="grid-template-columns:repeat(5,1fr);margin-bottom:0">' +
+            ['Totale parole','In scadenza oggi','Nuove questa settimana','Known','Learning'].map(function(l,i){
+              var vals = [stats.totalWords, stats.dueToday, stats.newThisWeek, stats.known, stats.learning];
+              return '<div class="metric-card" style="min-height:80px;padding:14px 16px"><div class="metric-label" style="margin-bottom:2px">'+l+'</div><div class="metric-value" style="font-size:26px">'+vals[i]+'</div></div>';
+            }).join('') + '</div>';
+        }
+
+        var pinnedBanks = [
+          { id: 'it_review_due', name: 'Ripasso immediato', desc: 'Parole italiane da ripassare', count: 0, signal: 'Prossimamente', subtitle: 'Parole italiane pronte per il ripasso' },
+          { id: 'it_saved_sessions', name: 'Salvate da sessioni', desc: 'Parole italiane salvate durante sessioni live', count: stats.totalWords || 0, signal: (stats.totalWords || 0) + ' parole', subtitle: 'Salvate durante l\'uso dal vivo' },
+          { id: 'it_new_weekly', name: 'Nuove questa settimana', desc: 'Parole italiane raccolte di recente', count: stats.newThisWeek || 0, signal: stats.newThisWeek > 0 ? '+' + stats.newThisWeek + ' questa settimana' : 'Ancora nessuna', subtitle: 'Parole italiane recenti' },
+          { id: 'it_fragile', name: 'Parole Fragili', desc: 'Parole italiane a rischio', count: 0, signal: 'Prossimamente', subtitle: 'Parole che necessitano rinforzo' }
+        ];
+        var pinnedHtml = '';
+        pinnedBanks.forEach(function(b) {
+          pinnedHtml += wbCardHTML(b.id, b.name, 'pinned', b.desc, b.count, b.signal, [], b.subtitle);
+        });
+        var pgEl = document.getElementById('wbItPinnedGrid');
+        if (pgEl) pgEl.innerHTML = pinnedHtml;
+
+        var smartHtml = '';
+        var smartBanks = [
+          { id: 'it_next_step', name: 'Prossimo passo', desc: 'Vocabolario italiano per i tuoi obiettivi', count: 0, signal: 'Completa il profilo', subtitle: 'Suggerito per il tuo obiettivo' },
+          { id: 'it_build_known', name: 'Costruisci da ciò che sai', desc: 'Progressione lessicale italiana', count: 0, signal: 'Cerca parole', subtitle: 'Parole derivate dal tuo vocabolario' },
+          { id: 'it_activate', name: 'Attiva ciò che riconosci', desc: 'Parole che capisci ma non usi', count: 0, signal: 'Nessun gap rilevato', subtitle: 'Trasforma riconoscimento in uso attivo' }
+        ];
+        smartBanks.forEach(function(b) {
+          smartHtml += wbCardHTML(b.id, b.name, 'smart', b.desc, b.count, b.signal, [], b.subtitle);
+        });
+        var sgEl = document.getElementById('wbItSmartGrid');
+        if (sgEl) sgEl.innerHTML = smartHtml;
+
+        var customHtml = '';
+        try {
+          var banks = await SottotitoliData.getWordbanks('it');
+          if (banks && banks.length) {
+            banks.forEach(function(b) {
+              customHtml += wbCardHTML(b.id, b.name, 'custom', b.description || '', b.word_count || 0, '', [], '');
+            });
+          }
+        } catch(e) {}
+        if (!customHtml) {
+          customHtml = '<div style="text-align:center;padding:20px;color:var(--text-faint);grid-column:1/-1">Nessuna banca italiana ancora. Usa il Vocabulary Builder italiano o la modalità Traduzione per crearne una.</div>';
+        }
+        var cgEl = document.getElementById('wbItCustomGrid');
+        if (cgEl) cgEl.innerHTML = customHtml;
+      }
+      window.renderWordbanksIt = renderWordbanksIt;
+
+// ═══ RENDER: Vocabolario Traguardi ───
       function renderVocabTraguardi() {
         var container = document.querySelector('#sub-voc-traguardi');
         if (!container) return;
@@ -6963,6 +7040,8 @@
       var wbNav = document.querySelector('[data-panel="wordbanks"]');
       if (wbNav) { wbNav.addEventListener('click', function () { setTimeout(renderWordbanks, 100); }); }
       // ── Wordbank sub-tab click handlers ──
+      var wbItTab = document.querySelector('[data-subtab="wb-overview-it"]');
+      if (wbItTab) { wbItTab.addEventListener('click', function () { setTimeout(renderWordbanksIt, 150); }); }
       var wbReviewTab = document.querySelector('[data-subtab="wb-review"]');
       if (wbReviewTab) { wbReviewTab.addEventListener('click', function () { setTimeout(renderReviewDue, 100); }); }
       var wbExpandTab = document.querySelector('[data-subtab="wb-expand"]');
@@ -7684,7 +7763,7 @@
 
   function renderTranslationBanks(){
     var grid = document.getElementById('wbTranslationGrid');
-    if (!grid) return;
+    if (!grid) return; // Translation tab removed — banks integrated into Collections
     
     // ── Collect language-specific banks (sottotitoli_wb_*) ──
     var langBanks = {};
@@ -7778,10 +7857,8 @@
     grid.innerHTML = html;
   }
 
-  // Render when Translation tab is clicked
-  var tab = document.querySelector('[data-subtab="wb-translation"]');
-  if (tab) tab.addEventListener('click', function(){ setTimeout(renderTranslationBanks, 100); });
-  // Also render on page load in case it's the active tab
+  // Translation banks now integrated into English/Italian Collections
+  // (renderTranslationBanks still runs to populate language boxes if needed)
   setTimeout(renderTranslationBanks, 500);
 
   // ── AI Voice mode toggle (Browser ↔ Kokoro) ──────────────
