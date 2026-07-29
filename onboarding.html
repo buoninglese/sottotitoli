@@ -1150,8 +1150,8 @@
   <!-- Auth guard: onboarding requires a logged-in user to save data -->
   <script>
   (function(){
-    // Allow ?mock=1 param for testing without auth
-    if (window.location.search.indexOf('mock=1') !== -1) {
+    // Allow ?mock=1 param for testing without auth — localhost only
+    if (window.location.search.indexOf('mock=1') !== -1 && window.location.hostname === 'localhost') {
       window.sottotitoliSupabase = {
         auth: { getSession: async function(){ return { data: { session: { user: { id: 'test-mock-user', email: 'marco@mock.it' } } } }; } },
         from: function(t){ return { select: function(){ return this; }, eq: function(){ return this; }, maybeSingle: async function(){ return { data: null }; }, upsert: async function(d,opts){ console.log('mock upsert →', t, d); return { error: null }; } }; }
@@ -1495,17 +1495,11 @@
         // Reset onclick in case it was changed by a previous finishOnboarding call
         btnFinish.onclick = function() { finishOnboarding(); };
         var comp = getCompletionPercent();
-        var hasReport = !!(onboardData['_ai_report'] || aiInsights);
         if (comp < 100) {
           btnFinish.disabled = true;
           btnFinish.style.opacity = '0.5';
           btnFinish.title = getMissingFields().join(' · ');
           btnFinish.innerHTML = '<i class="fa-solid fa-lock"></i> Completa le domande (' + comp + '%)';
-        } else if (!hasReport) {
-          btnFinish.disabled = true;
-          btnFinish.style.opacity = '0.5';
-          btnFinish.title = 'Genera prima il tuo Starter Report AI';
-          btnFinish.innerHTML = '<i class="fa-solid fa-lock"></i> Genera il report prima di completare';
         } else {
           btnFinish.disabled = false;
           btnFinish.style.opacity = '1';
@@ -2540,10 +2534,38 @@
         return;
       }
 
-      // Guard: if report hasn't been generated yet, guide the user
+      // Guard: if report hasn't been generated yet, try once with a timeout.
+      // If the AI endpoint is down or slow, let the user proceed — the report
+      // will be generated asynchronously and appear on their dashboard later.
       if (!onboardData['_ai_report'] && !aiInsights) {
-        alert('Prima di completare, genera il tuo Starter Report AI!\n\nClicca su "Genera il mio report" — ci vogliono pochi secondi. Poi potrai premere Completa.');
-        return;
+        btnFinish.disabled = true;
+        btnFinish.innerHTML = '<span class="spin" style="width:16px;height:16px;border:2px solid rgba(0,0,0,.3);border-top-color:#000;border-radius:50%;animation:spin .7s linear infinite;"></span> Generando report…';
+
+        var reportGenerated = false;
+        try {
+          // Race: AI report generation vs 15-second timeout
+          var timeoutPromise = new Promise(function(_, reject) {
+            setTimeout(function() { reject(new Error('timeout')); }, 15000);
+          });
+          var result = await Promise.race([generateStarterReport(), timeoutPromise]);
+          if (result) {
+            reportGenerated = true;
+            aiInsights = result;
+            // Render the report card even on this fast path
+            var rc = document.getElementById('starterReportContent');
+            if (rc && result.report_md) rc.innerHTML = markedToHtml(result.report_md);
+            var rs = document.getElementById('starterReportSection');
+            if (rs) rs.style.display = 'block';
+          }
+        } catch(e) {
+          console.warn('finishOnboarding: report generation failed or timed out (' + e.message + '), proceeding without it');
+        }
+
+        if (!reportGenerated) {
+          // Mark that the report should be generated async later
+          onboardData['_ai_report_pending'] = true;
+          persist();
+        }
       }
 
       btnFinish.disabled = true;
