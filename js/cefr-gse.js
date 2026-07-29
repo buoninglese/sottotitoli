@@ -261,6 +261,21 @@
     return { band: b.band, label: b.label, color: b.color };
   }
 
+  // ── Convenience: score a text without vocab data (Flesch-only mode) ──
+  /**
+   * Quick GSE score from plain text. No vocab lookup needed.
+   * Returns { score, band, color, label } — flat convenience shape.
+   */
+  function scoreText(text) {
+    var result = analyze(text, null);
+    return {
+      score: result.overallGSE,
+      band: result.cefrBand,
+      color: result.cefrColor,
+      label: result.cefrLabel
+    };
+  }
+
   // ── Export ────────────────────────────────────────────────────────────
 
   w.SottotitoliGSE = {
@@ -281,6 +296,7 @@
 
     // Full pipeline
     analyze: analyze,
+    scoreText: scoreText,
 
     // Constants
     BANDS: BANDS,
