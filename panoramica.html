@@ -8721,39 +8721,17 @@
     var seen = new Set(words.map(function(w){ return (w.word||'').toLowerCase(); }));
     var newWords = [];
 
-    // Helper: determine real POS from local maps
-    function realPOS(word, datamuseTags) {
-      var w = word.toLowerCase();
-      // 1. Check lemma-pos-map first (authoritative)
-      if (window.LEMMA_POS_MAP && window.LEMMA_POS_MAP[w]) return window.LEMMA_POS_MAP[w];
-      // 2. Check Datamuse tags
-      if (datamuseTags && datamuseTags.indexOf('adj') >= 0) return 'JJ';
-      if (datamuseTags && datamuseTags.indexOf('v') >= 0) return 'VB';
-      if (datamuseTags && datamuseTags.indexOf('n') >= 0) return 'NN';
-      if (datamuseTags && datamuseTags.indexOf('adv') >= 0) return 'RB';
-      // 3. Common suffixes as fallback
-      if (w.endsWith('ing')) return 'VBG';
-      if (w.endsWith('ly')) return 'RB';
-      if (w.endsWith('ness') || w.endsWith('tion') || w.endsWith('sion') || w.endsWith('ment') || w.endsWith('ity') || w.endsWith('ence') || w.endsWith('ance') || w.endsWith('ism') || w.endsWith('ship') || w.endsWith('er') || w.endsWith('or') || w.endsWith('ist')) return 'NN';
-      if (w.endsWith('ous') || w.endsWith('ive') || w.endsWith('able') || w.endsWith('ible') || w.endsWith('ful') || w.endsWith('less') || w.endsWith('al') || w.endsWith('ic') || w.endsWith('ant') || w.endsWith('ent') || w.endsWith('ary') || w.endsWith('ish')) return 'JJ';
-      if (w.endsWith('ed') && w.length > 4) return 'VBD';
-      if (w.endsWith('es') && w.length > 4) return 'VBZ';
-      return null;
-    }
-
-    // Helper: is this a real English word? Check against known word lists
-    function isRealWord(word) {
+    // Helper: check if word exists in any local dictionary
+    function isKnownWord(word) {
       var w = word.toLowerCase();
       if (window.LEMMA_POS_MAP && window.LEMMA_POS_MAP[w]) return true;
       if (window.CEFR_LEVELS && window.CEFR_LEVELS[w]) return true;
       if (window.CEFR_GSE && window.CEFR_GSE[w]) return true;
-      // Fallback: basic sanity checks
+      // Basic sanity: must have at least one vowel, be ≥2 chars, only letters
       if (w.length < 2) return false;
       if (/[^a-z]/.test(w)) return false;
-      if (/^(.)\1+$/.test(w)) return false; // all same letter (e.g. "iii")
-      // Must contain at least one vowel
-      if (!/[aeiouy]/.test(w)) return false;
-      return true;
+      if (/^(.)\1+$/.test(w)) return false;
+      return /[aeiouy]/.test(w);
     }
 
     for (var i = 0; i < topNouns.length; i++) {
@@ -8772,31 +8750,27 @@
       var batch = [];
       try {
         // Adjectives: rel_jjb = "popular adjectives modifying noun"
-        var adjResp = await fetch('https://api.datamuse.com/words?rel_jjb=' + encodeURIComponent(noun) + '&max=8&md=d');
+        var adjResp = await fetch('https://api.datamuse.com/words?rel_jjb=' + encodeURIComponent(noun) + '&max=6');
         if (adjResp.ok) {
           var adjData = await adjResp.json();
           adjData.forEach(function(d) {
             var w = d.word.toLowerCase();
             if (seen.has(w) || w.indexOf(' ') >= 0) return;
-            if (!isRealWord(d.word)) return; // skip garbage like "III"
-            var rpos = realPOS(d.word, d.tags);
-            var tag = rpos || 'JJ';
+            if (!isKnownWord(d.word)) return;
             seen.add(w);
-            batch.push({ word: d.word, tag: tag, level: estimateCEFRLevel(d.word), frequency_count: 0, category_title: catTitle, _augmented: true });
+            batch.push({ word: d.word, tag: 'JJ', level: estimateCEFRLevel(d.word), frequency_count: 0, category_title: catTitle, _augmented: true });
           });
         }
         // Verbs: rel_trg = "words often triggered by noun"
-        var trgResp = await fetch('https://api.datamuse.com/words?rel_trg=' + encodeURIComponent(noun) + '&max=8&md=d');
+        var trgResp = await fetch('https://api.datamuse.com/words?rel_trg=' + encodeURIComponent(noun) + '&max=6');
         if (trgResp.ok) {
           var trgData = await trgResp.json();
           trgData.forEach(function(d) {
             var w = d.word.toLowerCase();
             if (seen.has(w) || w.indexOf(' ') >= 0) return;
-            if (!isRealWord(d.word)) return; // skip garbage like "AGROUND"
-            var rpos = realPOS(d.word, d.tags);
-            var tag = rpos || 'VB';
+            if (!isKnownWord(d.word)) return;
             seen.add(w);
-            batch.push({ word: d.word, tag: tag, level: estimateCEFRLevel(d.word), frequency_count: 0, category_title: catTitle, _augmented: true });
+            batch.push({ word: d.word, tag: 'VB', level: estimateCEFRLevel(d.word), frequency_count: 0, category_title: catTitle, _augmented: true });
           });
         }
       } catch(e) { /* skip this noun */ }
