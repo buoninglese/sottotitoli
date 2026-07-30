@@ -2226,6 +2226,7 @@
   <script src="js/language-resolver.js?v=1"></script>
   <script src="js/cefr-levels.js"></script>
   <script src="js/cefr-gse.js"></script>
+  <script src="js/lemma-pos-map.js"></script>
   <script src="js/theme-2.js?v=4"></script>
   <script src="js/ai-voice.js?v=1"></script>
   <script src="js/data-service.js"></script>
@@ -8715,71 +8716,92 @@
       return tag.startsWith('NN');
     });
     if (!nouns.length) return words;
-    // Take top 10 nouns by frequency
-    var topNouns = nouns.sort(function(a,b){ return (b.frequency_count||0) - (a.frequency_count||0); }).slice(0, 10);
+    // Take top 8 nouns by frequency
+    var topNouns = nouns.sort(function(a,b){ return (b.frequency_count||0) - (a.frequency_count||0); }).slice(0, 8);
     var seen = new Set(words.map(function(w){ return (w.word||'').toLowerCase(); }));
     var newWords = [];
 
-    // Fetch adjectives (rel_jja = popular adjectives modifying this noun)
-    // Fetch related verbs (rel_trg = words triggered by this noun)
+    // Helper: determine real POS from local maps
+    function realPOS(word, datamuseTags) {
+      var w = word.toLowerCase();
+      // 1. Check lemma-pos-map first (authoritative)
+      if (window.LEMMA_POS_MAP && window.LEMMA_POS_MAP[w]) return window.LEMMA_POS_MAP[w];
+      // 2. Check Datamuse tags
+      if (datamuseTags && datamuseTags.indexOf('adj') >= 0) return 'JJ';
+      if (datamuseTags && datamuseTags.indexOf('v') >= 0) return 'VB';
+      if (datamuseTags && datamuseTags.indexOf('n') >= 0) return 'NN';
+      if (datamuseTags && datamuseTags.indexOf('adv') >= 0) return 'RB';
+      // 3. Common suffixes as fallback
+      if (w.endsWith('ing')) return 'VBG';
+      if (w.endsWith('ly')) return 'RB';
+      if (w.endsWith('ness') || w.endsWith('tion') || w.endsWith('ment') || w.endsWith('ity')) return 'NN';
+      if (w.endsWith('ous') || w.endsWith('ive') || w.endsWith('able') || w.endsWith('ible') || w.endsWith('ful') || w.endsWith('less')) return 'JJ';
+      return null;
+    }
+
     for (var i = 0; i < topNouns.length; i++) {
       var noun = topNouns[i].word;
-      var cacheKey = 'aug_' + noun.toLowerCase();
+      var cacheKey = 'aug2_' + noun.toLowerCase();
       if (_augCache[cacheKey]) {
-        newWords = newWords.concat(_augCache[cacheKey]);
+        for (var j = 0; j < _augCache[cacheKey].length; j++) {
+          var cw = _augCache[cacheKey][j];
+          if (!seen.has(cw.word.toLowerCase())) {
+            seen.add(cw.word.toLowerCase());
+            newWords.push(cw);
+          }
+        }
         continue;
       }
       var batch = [];
       try {
-        // Adjectives for this noun
-        var adjResp = await fetch('https://api.datamuse.com/words?rel_jja=' + encodeURIComponent(noun) + '&max=5');
+        // Adjectives: rel_jja = "popular adjectives used to modify noun"
+        var adjResp = await fetch('https://api.datamuse.com/words?rel_jja=' + encodeURIComponent(noun) + '&max=6');
         if (adjResp.ok) {
           var adjData = await adjResp.json();
           adjData.forEach(function(d) {
             var w = d.word.toLowerCase();
-            if (!seen.has(w)) {
-              seen.add(w);
-              var tags = d.tags || [];
-              batch.push({
-                word: d.word, tag: 'JJ', // adjective
-                level: estimateCEFRLevel(d.word),
-                frequency_count: d.score ? d.score * 10 : 0,
-                category_title: catTitle,
-                _augmented: true, _source: 'adjective for ' + noun
-              });
-            }
+            if (seen.has(w) || w.indexOf(' ') >= 0) return;
+            var rpos = realPOS(d.word, d.tags);
+            if (!rpos || !(rpos === 'JJ' || rpos === 'JJR' || rpos === 'JJS')) return; // only real adjectives
+            seen.add(w);
+            batch.push({
+              word: d.word, tag: 'JJ',
+              level: estimateCEFRLevel(d.word),
+              frequency_count: 0,
+              category_title: catTitle,
+              _augmented: true
+            });
           });
         }
-        // Verbs triggered by this noun
-        var verbResp = await fetch('https://api.datamuse.com/words?rel_trg=' + encodeURIComponent(noun) + '&max=5');
-        if (verbResp.ok) {
-          var verbData = await verbResp.json();
-          verbData.forEach(function(d) {
+        // Related words: rel_trg = "words often triggered by noun" — filter for verbs
+        var trgResp = await fetch('https://api.datamuse.com/words?rel_trg=' + encodeURIComponent(noun) + '&max=6');
+        if (trgResp.ok) {
+          var trgData = await trgResp.json();
+          trgData.forEach(function(d) {
             var w = d.word.toLowerCase();
-            if (!seen.has(w) && w.indexOf(' ') === -1) {
-              seen.add(w);
-              var tags = d.tags || [];
-              var isVerb = tags.indexOf('v') >= 0;
-              batch.push({
-                word: d.word, tag: isVerb ? 'VB' : 'NN',
-                level: estimateCEFRLevel(d.word),
-                frequency_count: d.score ? d.score * 10 : 0,
-                category_title: catTitle,
-                _augmented: true, _source: 'verb for ' + noun
-              });
-            }
+            if (seen.has(w) || w.indexOf(' ') >= 0) return;
+            var rpos = realPOS(d.word, d.tags);
+            if (!rpos || !(rpos.startsWith('VB'))) return; // only real verbs
+            seen.add(w);
+            batch.push({
+              word: d.word, tag: 'VB',
+              level: estimateCEFRLevel(d.word),
+              frequency_count: 0,
+              category_title: catTitle,
+              _augmented: true
+            });
           });
         }
       } catch(e) { /* skip this noun */ }
       _augCache[cacheKey] = batch;
-      newWords = newWords.concat(batch);
+      for (var k = 0; k < batch.length; k++) {
+        newWords.push(batch[k]);
+      }
     }
 
-    // Deduplicate by word
+    // Deduplicate
     var known = new Set(words.map(function(w){ return (w.word||'').toLowerCase(); }));
     newWords = newWords.filter(function(w) { return !known.has(w.word.toLowerCase()); });
-
-    // Merge: original nouns + augmented adjectives + augmented verbs
     return words.concat(newWords);
   }
 
