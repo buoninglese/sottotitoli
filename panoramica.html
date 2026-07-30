@@ -8721,6 +8721,18 @@
     var seen = new Set(words.map(function(w){ return (w.word||'').toLowerCase(); }));
     var newWords = [];
 
+    // Helper: extract real frequency from Datamuse tags (occurrences per million)
+    function parseDatamuseFreq(tags) {
+      if (!tags || !tags.length) return 0;
+      for (var i = 0; i < tags.length; i++) {
+        if (tags[i].indexOf('f:') === 0) {
+          var v = parseFloat(tags[i].substring(2));
+          return isNaN(v) ? 0 : Math.round(v * 10000); // scale to ~CEFR range
+        }
+      }
+      return 0;
+    }
+
     // Helper: check if word exists in any local dictionary
     function isKnownWord(word) {
       var w = word.toLowerCase();
@@ -8749,28 +8761,30 @@
       }
       var batch = [];
       try {
-        // Adjectives: rel_jjb = "popular adjectives modifying noun"
-        var adjResp = await fetch('https://api.datamuse.com/words?rel_jjb=' + encodeURIComponent(noun) + '&max=6');
+        // Adjectives: rel_jjb = "popular adjectives modifying noun" — with real frequency data
+        var adjResp = await fetch('https://api.datamuse.com/words?rel_jjb=' + encodeURIComponent(noun) + '&max=6&md=f');
         if (adjResp.ok) {
           var adjData = await adjResp.json();
           adjData.forEach(function(d) {
             var w = d.word.toLowerCase();
             if (seen.has(w) || w.indexOf(' ') >= 0) return;
             if (!isKnownWord(d.word)) return;
+            var freq = parseDatamuseFreq(d.tags);
             seen.add(w);
-            batch.push({ word: d.word, tag: 'JJ', level: estimateCEFRLevel(d.word), frequency_count: 0, category_title: catTitle, _augmented: true });
+            batch.push({ word: d.word, tag: 'JJ', level: estimateCEFRLevel(d.word), frequency_count: freq, category_title: catTitle, _augmented: true });
           });
         }
-        // Verbs: rel_trg = "words often triggered by noun"
-        var trgResp = await fetch('https://api.datamuse.com/words?rel_trg=' + encodeURIComponent(noun) + '&max=6');
+        // Verbs: rel_trg = "words often triggered by noun" — with real frequency data
+        var trgResp = await fetch('https://api.datamuse.com/words?rel_trg=' + encodeURIComponent(noun) + '&max=6&md=f');
         if (trgResp.ok) {
           var trgData = await trgResp.json();
           trgData.forEach(function(d) {
             var w = d.word.toLowerCase();
             if (seen.has(w) || w.indexOf(' ') >= 0) return;
             if (!isKnownWord(d.word)) return;
+            var freq = parseDatamuseFreq(d.tags);
             seen.add(w);
-            batch.push({ word: d.word, tag: 'VB', level: estimateCEFRLevel(d.word), frequency_count: 0, category_title: catTitle, _augmented: true });
+            batch.push({ word: d.word, tag: 'VB', level: estimateCEFRLevel(d.word), frequency_count: freq, category_title: catTitle, _augmented: true });
           });
         }
       } catch(e) { /* skip this noun */ }
@@ -8847,7 +8861,7 @@
     groupOrder.forEach(function(posLabel) {
       var groupWords = groups[posLabel];
       if (!groupWords || !groupWords.length) return;
-      var maxFreq = Math.max.apply(null, groupWords.filter(function(w){ return !w._augmented; }).map(function(w){ return w.frequency_count||0; })) || 1;
+      var maxFreq = Math.max.apply(null, groupWords.map(function(w){ return w.frequency_count||0; })) || 1;
       html += '<div class="wbx-pos-section" style="margin-bottom:18px">';
       html += '<h4 style="margin:0 0 8px;font-size:13px;font-weight:700;color:var(--text-soft);text-transform:capitalize;letter-spacing:0.03em">' + posLabel + 's <span style="font-weight:400;opacity:.6;font-size:11px">(' + groupWords.length + ' words)</span></h4>';
       html += '<div class="wbx-grid" style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px">';
@@ -8857,19 +8871,8 @@
         var word = w.word || '—';
         var wordLen = word.length;
         var wordFontSize = wordLen <= 5 ? '24px' : '19px';
-        var isAugmented = w._augmented === true;
-        // Only show frequency bar for original CEFR words (not Datamuse-augmented)
-        var freqHTML = '';
-        if (!isAugmented) {
-          var barW = Math.max(2, Math.round(((w.frequency_count||0) / maxFreq) * 100));
-          var freqDisplay = formatFreqCount(w.frequency_count||0);
-          freqHTML = '<div style="margin-top:10px">' +
-            '<div class="freq-bar" style="height:5px;background:var(--line);border:1px solid rgba(0,0,0,.15);display:flex"><i style="height:100%;width:' + barW + '%;background:' + color + ';display:block"></i></div>' +
-            '<div class="freq-label" style="font-size:11px;margin-top:4px;color:var(--sz-darktext2);font-weight:600">' + freqDisplay + '</div>' +
-            '</div>';
-        } else {
-          freqHTML = '<div style="margin-top:10px;font-size:10px;color:var(--text-faint);font-style:italic">via Datamuse</div>';
-        }
+        var barW = Math.max(2, Math.round(((w.frequency_count||0) / maxFreq) * 100));
+        var freqDisplay = formatFreqCount(w.frequency_count||0);
         html += '<article class="wbx-box" data-cefr="' + levelLabel + '" data-pos="' + (w.tag||'') + '" style="border-left:5px solid ' + color + '">' +
           '<div class="wbx-word-zone">' +
             '<div class="wbx-head">' +
@@ -8877,7 +8880,10 @@
               '<span class="wbx-cefr" style="border-color:' + color + ';color:' + color + '">' + levelLabel + '</span>' +
             '</div>' +
             '<div class="wbx-pos">' + fullPosLabel(w.tag) + '</div>' +
-            freqHTML +
+            '<div style="margin-top:10px">' +
+              '<div class="freq-bar" style="height:5px;background:var(--line);border:1px solid rgba(0,0,0,.15);display:flex"><i style="height:100%;width:' + barW + '%;background:' + color + ';display:block"></i></div>' +
+              '<div class="freq-label" style="font-size:11px;margin-top:4px;color:var(--sz-darktext2);font-weight:600">' + freqDisplay + '</div>' +
+            '</div>' +
           '</div>' +
           '<div class="wbx-save-col">' +
             '<button class="wbx-save-btn" onclick="event.stopPropagation();saveCefrWord(\'' + (w.word||'').replace(/'/g,"\\'") + '\',this)" title="Salva nel vocabolario">+</button>' +
