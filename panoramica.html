@@ -8746,9 +8746,13 @@
       return /[aeiouy]/.test(w);
     }
 
+    // Build topic keywords from category name for Datamuse bias
+    var topicWords = catTitle.toLowerCase().replace(/[^a-z\s]/g,'').split(/\s+/).filter(function(w){ return w.length > 2 && ['the','and','for','with','from','that','this','your','into','about'].indexOf(w) === -1; }).slice(0,4);
+    var topicsParam = topicWords.join('+');
+
     for (var i = 0; i < topNouns.length; i++) {
       var noun = topNouns[i].word;
-      var cacheKey = 'aug3_' + noun.toLowerCase();
+      var cacheKey = 'aug4_' + noun.toLowerCase() + '_' + topicsParam;
       if (_augCache[cacheKey]) {
         for (var j = 0; j < _augCache[cacheKey].length; j++) {
           var cw = _augCache[cacheKey][j];
@@ -8761,8 +8765,10 @@
       }
       var batch = [];
       try {
-        // Adjectives: rel_jjb = "popular adjectives modifying noun" — with real frequency data
-        var adjResp = await fetch('https://api.datamuse.com/words?rel_jjb=' + encodeURIComponent(noun) + '&max=6&md=f');
+        // Adjectives: rel_jjb + topics bias for topic-relevant adjectives
+        var adjUrl = 'https://api.datamuse.com/words?rel_jjb=' + encodeURIComponent(noun) + '&max=5&md=f';
+        if (topicsParam) adjUrl += '&topics=' + topicsParam;
+        var adjResp = await fetch(adjUrl);
         if (adjResp.ok) {
           var adjData = await adjResp.json();
           adjData.forEach(function(d) {
@@ -8774,17 +8780,19 @@
             batch.push({ word: d.word, tag: 'JJ', level: estimateCEFRLevel(d.word), frequency_count: freq, category_title: catTitle, _augmented: true });
           });
         }
-        // Verbs: rel_trg = "words often triggered by noun" — with real frequency data
-        var trgResp = await fetch('https://api.datamuse.com/words?rel_trg=' + encodeURIComponent(noun) + '&max=6&md=f');
-        if (trgResp.ok) {
-          var trgData = await trgResp.json();
-          trgData.forEach(function(d) {
+        // Related terms: rel_gen (hypernyms — broader/narrower related words)
+        var genUrl = 'https://api.datamuse.com/words?rel_gen=' + encodeURIComponent(noun) + '&max=4&md=f';
+        if (topicsParam) genUrl += '&topics=' + topicsParam;
+        var genResp = await fetch(genUrl);
+        if (genResp.ok) {
+          var genData = await genResp.json();
+          genData.forEach(function(d) {
             var w = d.word.toLowerCase();
             if (seen.has(w) || w.indexOf(' ') >= 0) return;
             if (!isKnownWord(d.word)) return;
             var freq = parseDatamuseFreq(d.tags);
             seen.add(w);
-            batch.push({ word: d.word, tag: 'VB', level: estimateCEFRLevel(d.word), frequency_count: freq, category_title: catTitle, _augmented: true });
+            batch.push({ word: d.word, tag: 'NN', level: estimateCEFRLevel(d.word), frequency_count: freq, category_title: catTitle, _augmented: true });
           });
         }
       } catch(e) { /* skip this noun */ }
