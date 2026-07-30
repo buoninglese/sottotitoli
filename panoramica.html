@@ -8721,16 +8721,33 @@
     var seen = new Set(words.map(function(w){ return (w.word||'').toLowerCase(); }));
     var newWords = [];
 
-    // Helper: extract real frequency from Datamuse tags (occurrences per million)
+    // Helper: extract real frequency from Datamuse tags (per-million → total via Google Ngrams ~468B words)
     function parseDatamuseFreq(tags) {
       if (!tags || !tags.length) return 0;
       for (var i = 0; i < tags.length; i++) {
         if (tags[i].indexOf('f:') === 0) {
           var v = parseFloat(tags[i].substring(2));
-          return isNaN(v) ? 0 : Math.round(v * 10000); // scale to ~CEFR range
+          return isNaN(v) ? 0 : Math.round(v * 468000); // per-million → estimated total count
         }
       }
       return 0;
+    }
+
+    // Helper: does word look like a verb rather than a noun?
+    function looksLikeVerb(word) {
+      var w = word.toLowerCase();
+      // Definite verb forms (gerunds, past tense, 3rd person, verb-creating suffixes)
+      if (w.endsWith('ing')) return true;
+      if (w.endsWith('ed') && w.length > 4) return true;
+      if (w.endsWith('es') && w.length > 4 && !w.endsWith('ness')) return true;
+      if (w.endsWith('ate') || w.endsWith('ize') || w.endsWith('ise') || w.endsWith('ify')) return true;
+      // Exclude obvious nouns (common noun suffixes)
+      if (w.endsWith('tion') || w.endsWith('sion') || w.endsWith('ment')) return false;
+      if (w.endsWith('ness') || w.endsWith('ity') || w.endsWith('ance') || w.endsWith('ence')) return false;
+      if (w.endsWith('ism') || w.endsWith('ship') || w.endsWith('er') || w.endsWith('or') || w.endsWith('ist')) return false;
+      if (w.endsWith('ure') || w.endsWith('age') || w.endsWith('cy')) return false;
+      // Base form: include (likely a verb — manufacture, design, paint, create)
+      return true;
     }
 
     // Helper: check if word exists in any local dictionary
@@ -8752,7 +8769,7 @@
 
     for (var i = 0; i < topNouns.length; i++) {
       var noun = topNouns[i].word;
-      var cacheKey = 'aug4_' + noun.toLowerCase() + '_' + topicsParam;
+      var cacheKey = 'aug5_' + noun.toLowerCase() + '_' + topicsParam;
       if (_augCache[cacheKey]) {
         for (var j = 0; j < _augCache[cacheKey].length; j++) {
           var cw = _augCache[cacheKey][j];
@@ -8793,6 +8810,22 @@
             var freq = parseDatamuseFreq(d.tags);
             seen.add(w);
             batch.push({ word: d.word, tag: 'NN', level: estimateCEFRLevel(d.word), frequency_count: freq, category_title: catTitle, _augmented: true });
+          });
+        }
+        // Verbs: rel_trg + topics bias, filtered through LEMMA_POS_MAP for confirmed verbs only
+        var trgUrl = 'https://api.datamuse.com/words?rel_trg=' + encodeURIComponent(noun) + '&max=5&md=f';
+        if (topicsParam) trgUrl += '&topics=' + topicsParam;
+        var trgResp = await fetch(trgUrl);
+        if (trgResp.ok) {
+          var trgData = await trgResp.json();
+          trgData.forEach(function(d) {
+            var w = d.word.toLowerCase();
+            if (seen.has(w) || w.indexOf(' ') >= 0) return;
+            if (!isKnownWord(d.word)) return;
+            if (!looksLikeVerb(d.word)) return; // only verb-form words
+            var freq = parseDatamuseFreq(d.tags);
+            seen.add(w);
+            batch.push({ word: d.word, tag: 'VB', level: estimateCEFRLevel(d.word), frequency_count: freq, category_title: catTitle, _augmented: true });
           });
         }
       } catch(e) { /* skip this noun */ }
