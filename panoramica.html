@@ -2569,7 +2569,7 @@
             await sb.from('review_words').update({ goal_relevance_score: 5, pos: w.pos }).eq('id', wordId);
           } else {
             var { data: insData } = await sb.from('review_words').insert({
-              user_id: userId, lemma: w.word, normalized: clean,
+              user_id: userId, lemma: w.word, normalized: clean, lang: lang,
               pos: w.pos, is_new: true, first_seen_at: new Date().toISOString(),
               source_type: 'smart', review_state: 'new',
               goal_relevance_score: 5, relevance_score: 5
@@ -4321,7 +4321,12 @@
           try {
             var sbClient = window.sottotitoliSupabase;
             if (sbClient) {
-              var query = sbClient.from('review_words').select('*').limit(100);
+              var rSession = await sbClient.auth.getSession();
+              if (!rSession.data?.session) { /* not logged in — leave empty */ }
+              else {
+                var userId = rSession.data.session.user.id;
+                var bankLang = isItalian ? 'it' : 'en';
+                var query = sbClient.from('review_words').select('*').eq('user_id', userId).eq('lang', bankLang).limit(200);
               var nowISO = new Date().toISOString();
               var weekAgo = new Date(Date.now() - 7*86400000).toISOString();
               if (bankId === 'review_due_now') {
@@ -4333,14 +4338,22 @@
               }
               var { data: rwData } = await query;
               if (rwData && rwData.length) {
-                // Map review_words fields to what renderWbTable expects
-                words = rwData.map(function(r) { return {
-                  id: r.id, word: r.lemma, lemma: r.lemma, pos: r.pos,
-                  cefr: r.cefr, cefr_level: r.cefr, level: r.cefr,
-                  usage_count: r.personal_frequency, frequency: r.personal_frequency, reps: r.reps,
-                  status: r.review_state, source_type: r.source_type,
-                  definition: r.translation_primary
-                }; });
+                // Map review_words fields and deduplicate by lemma
+                var seen = {};
+                words = [];
+                rwData.forEach(function(r) {
+                  var key = (r.lemma || '').toLowerCase();
+                  if (!seen[key]) {
+                    seen[key] = true;
+                    words.push({
+                      id: r.id, word: r.lemma, lemma: r.lemma, pos: r.pos,
+                      cefr: r.cefr, cefr_level: r.cefr, level: r.cefr,
+                      usage_count: r.personal_frequency, frequency: r.personal_frequency, reps: r.reps,
+                      status: r.review_state, source_type: r.source_type, lang: r.lang,
+                      definition: r.translation_primary
+                    });
+                  }
+                });
               }
             }
           } catch(e) { /* leave empty */ }
@@ -6574,7 +6587,7 @@
               await sb.from('review_words').update(rwUpdate).eq('id', rwRes.data.id);
             } else {
               await sb.from('review_words').insert({
-                user_id: userId, lemma: clean, normalized: norm,
+                user_id: userId, lemma: clean, normalized: norm, lang: lang,
                 pos: pos || null, is_new: true, first_seen_at: new Date().toISOString(),
                 source_type: 'expand', review_state: 'new',
                 personal_frequency: 1
