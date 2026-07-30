@@ -421,6 +421,9 @@
     [data-theme="dark"] #sub-wb-expand[data-wb-accent="pos"] .wbx-def,[data-theme="dark"] #sub-wb-expand[data-wb-accent="pos"] .wbx-trans{color:#e2e8f0!important}
     [data-theme="dark"] #sub-wb-expand[data-wb-accent="pos"] .wbx-syns span{color:#e2e8f0!important;border-color:rgba(226,232,240,.4)!important}
     [data-theme="dark"] #sub-wb-expand[data-wb-accent="pos"] .wbx-save-btn,[data-theme="dark"] #sub-wb-expand[data-wb-accent="pos"] .wbx-bookmark-btn,[data-theme="dark"] #sub-wb-expand[data-wb-accent="pos"] .wbx-close-btn{border-color:rgba(226,232,240,.25)!important;color:rgba(226,232,240,.6)!important}
+    [data-theme="dark"] #sub-wb-expand[data-wb-accent="pos"] .wbx-save-btn:hover{background:#059669!important;border-color:#059669!important;color:#fff!important}
+    [data-theme="dark"] #sub-wb-expand[data-wb-accent="pos"] .wbx-bookmark-btn:hover{background:rgba(6,182,212,.3)!important;border-color:var(--cyan)!important;color:var(--cyan)!important}
+    [data-theme="dark"] #sub-wb-expand[data-wb-accent="pos"] .wbx-close-btn:hover{background:#dc2626!important;border-color:#dc2626!important;color:#fff!important}
     [data-theme="dark"] #sub-wb-expand[data-wb-accent="pos"] .wbx-ipa{color:rgba(226,232,240,.45)!important}
 
     /* ── CEFR accent colours ── */
@@ -450,6 +453,9 @@
     [data-theme="dark"] #sub-wb-expand[data-wb-accent="cefr"] .wbx-def,[data-theme="dark"] #sub-wb-expand[data-wb-accent="cefr"] .wbx-trans{color:#e2e8f0!important}
     [data-theme="dark"] #sub-wb-expand[data-wb-accent="cefr"] .wbx-syns span{color:#e2e8f0!important;border-color:rgba(226,232,240,.4)!important}
     [data-theme="dark"] #sub-wb-expand[data-wb-accent="cefr"] .wbx-save-btn,[data-theme="dark"] #sub-wb-expand[data-wb-accent="cefr"] .wbx-bookmark-btn,[data-theme="dark"] #sub-wb-expand[data-wb-accent="cefr"] .wbx-close-btn{border-color:rgba(226,232,240,.25)!important;color:rgba(226,232,240,.6)!important}
+    [data-theme="dark"] #sub-wb-expand[data-wb-accent="cefr"] .wbx-save-btn:hover{background:#059669!important;border-color:#059669!important;color:#fff!important}
+    [data-theme="dark"] #sub-wb-expand[data-wb-accent="cefr"] .wbx-bookmark-btn:hover{background:rgba(6,182,212,.3)!important;border-color:var(--cyan)!important;color:var(--cyan)!important}
+    [data-theme="dark"] #sub-wb-expand[data-wb-accent="cefr"] .wbx-close-btn:hover{background:#dc2626!important;border-color:#dc2626!important;color:#fff!important}
     [data-theme="dark"] #sub-wb-expand[data-wb-accent="cefr"] .wbx-ipa{color:rgba(226,232,240,.45)!important}
     [data-theme="dark"] #sub-wb-expand[data-wb-accent="cefr"] .wbx-save-btn,[data-theme="dark"] #sub-wb-expand[data-wb-accent="cefr"] .wbx-bookmark-btn,[data-theme="dark"] #sub-wb-expand[data-wb-accent="cefr"] .wbx-close-btn{border-color:rgba(11,21,28,.25)!important;color:rgba(11,21,28,.6)!important}
 
@@ -1416,8 +1422,9 @@
               <span style="font-size:11px;color:var(--text-faint)" id="wbExpandLevelInfo"></span>
             </div>
             <!-- POS disambiguation bar (hidden until multi-POS word detected) -->
-            <div id="wbExpandDisambig" style="display:none;align-items:center;gap:10px;margin-bottom:14px;padding:10px 18px;background:var(--panel-2);border-radius:12px;border:1px solid var(--line);font-family:var(--font-ui)">
-              <span style="font-size:13px;font-weight:700;color:var(--text-soft);white-space:nowrap">Intendevi…</span>
+            <div id="wbExpandDisambig" style="display:none;align-items:center;gap:10px;margin-bottom:14px;padding:10px 18px;background:var(--panel-2);border-radius:12px;border:1px solid var(--line);font-family:var(--font-ui);flex-wrap:wrap">
+              <span style="font-size:12px;color:var(--text-soft)" id="wbDisambigContext"></span>
+              <span style="font-size:13px;font-weight:700;color:var(--text);white-space:nowrap">Intendevi…</span>
               <span id="wbDisambigChips" style="display:flex;gap:6px;flex-wrap:wrap"></span>
             </div>
             <div id="wbExpandResults">
@@ -4337,6 +4344,20 @@
               }
             }
           } catch(e) { /* leave empty */ }
+        } else if (bankId === 'it_translations') {
+          // Pinned "Traduzioni salvate" — read from localStorage (must precede generic pinned handler)
+          try {
+            var stored = JSON.parse(localStorage.getItem('sottotitoli_wb_it_pinned') || '{"words":[]}');
+            words = (stored.words || []).map(function(w, i) {
+              return { id: 'tr_' + i, word: w, lemma: w, pos: '', lang: 'it', status: 'known', usage_count: 1 };
+            });
+          } catch(e) { /* leave empty */ }
+        } else if (bankId === 'it_saved_sessions') {
+          // Italian "Saved from sessions" — fetch from actual user bank
+          var itSfBank = banks.find(function(b){ return b.name === 'Saved from sessions' && b.lang === 'it'; });
+          if (itSfBank) {
+            words = await SottotitoliData.getWordbankWords(itSfBank.id);
+          }
         } else if (type !== 'custom') {
           // Other pinned/smart bank: try to fetch real membership from review_bank_words
           try {
@@ -4352,14 +4373,6 @@
                 words = bwData.map(function(r) { return r.review_words; }).filter(Boolean);
               }
             }
-          } catch(e) { /* leave empty */ }
-        } else if (bankId === 'it_translations') {
-          // Pinned "Traduzioni salvate" — read from localStorage
-          try {
-            var stored = JSON.parse(localStorage.getItem('sottotitoli_wb_it_pinned') || '{"words":[]}');
-            words = (stored.words || []).map(function(w, i) {
-              return { id: 'tr_' + i, word: w, lemma: w, pos: '', lang: 'it', status: 'known', usage_count: 1 };
-            });
           } catch(e) { /* leave empty */ }
         }
         // ── Enrich all words with CEFR from local lookup ──
@@ -6261,8 +6274,10 @@
       function showPosDisambig(options, queryWord, currentPos) {
         var bar = document.getElementById('wbExpandDisambig');
         var chips = document.getElementById('wbDisambigChips');
+        var ctx = document.getElementById('wbDisambigContext');
         if (!bar || !chips) return;
         bar.style.display = 'flex';
+        if (ctx) ctx.textContent = 'You searched for \'' + queryWord + '\'. This word has different meanings.';
         chips.innerHTML = options.map(function(opt, idx) {
           var isActive = (currentPos && opt.code === currentPos) || (!currentPos && idx === 0);
           return '<button class="fchip' + (isActive ? ' active' : '') + '" data-pos-code="' + opt.code + '" data-pos-label="' + opt.label + '" onclick="window.wbxSelectPos(this,\'' + queryWord + '\')" style="font-size:13px;padding:7px 14px;font-family:var(--font-ui)">' + opt.label + '</button>';
