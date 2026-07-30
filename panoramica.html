@@ -866,17 +866,6 @@
             </div>
             <div style="display:flex;justify-content:space-between;margin-top:6px;font-size:9px;color:var(--text-faint);padding:0 2px" id="dailyChartLabels"></div>
           </article>
-          <!-- 14-day practice minutes chart -->
-          <article class="alt-card" style="border:2px solid var(--line-strong);border-radius:24px;box-shadow:0 4px 32px rgba(0,0,0,.04);margin-top:16px;padding:24px 24px 20px" id="practiceChartCard">
-            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
-              <h3 style="margin:0;display:flex;align-items:center;gap:6px"><span>Minuti fare pratica — ultimi 14 giorni</span><span class="cefr-info-icon" data-cefr-info="Minuti di pratica registrati negli ultimi 14 giorni">ⓘ</span></h3>
-              <span style="font-size:11px;color:var(--text-faint)" id="practiceChartTotal">—</span>
-            </div>
-            <div id="practiceChart" style="display:flex;align-items:flex-end;gap:4px;height:90px;padding:0 2px;margin-top:6px">
-              <span style="font-size:12px;color:var(--text-faint);align-self:center;width:100%;text-align:center">Caricamento…</span>
-            </div>
-            <div style="display:flex;justify-content:space-between;margin-top:6px;font-size:9px;color:var(--text-faint);padding:0 2px" id="practiceChartLabels"></div>
-          </article>
         </div>
                 <!-- Profilo panel with sub-tabs -->
         <div class="content-panel" id="pnl-profilo">
@@ -1494,6 +1483,17 @@
               <article class="alt-card" style="min-height:auto;padding:18px 20px"><h3 style="font-size:14px;margin:0 0 10px">CEFR Absolute Count <span style="font-weight:400;font-size:11px;color:var(--text-faint)">· parole confermate</span></h3><div id="cefrCountKnown" style="display:flex;flex-direction:column;gap:5px"></div></article>
             </section>
             <div id="vocCefrChart" style="display:none"></div>
+          <!-- Practice time chart (moved from Panoramica) -->
+          <article class="alt-card" style="border:2px solid var(--line-strong);border-radius:24px;box-shadow:0 4px 32px rgba(0,0,0,.04);margin-top:16px;padding:24px 24px 20px" id="practiceChartCard">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+              <h3 style="margin:0;display:flex;align-items:center;gap:6px"><span>Minuti fare pratica — ultimi 14 giorni</span><span class="cefr-info-icon" data-cefr-info="Minuti di pratica registrati negli ultimi 14 giorni">ⓘ</span></h3>
+              <span style="font-size:11px;color:var(--text-faint)" id="practiceChartTotal">—</span>
+            </div>
+            <div id="practiceChart" style="display:flex;align-items:flex-end;gap:4px;height:90px;padding:0 2px;margin-top:6px">
+              <span style="font-size:12px;color:var(--text-faint);align-self:center;width:100%;text-align:center">Caricamento…</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;margin-top:6px;font-size:9px;color:var(--text-faint);padding:0 2px" id="practiceChartLabels"></div>
+          </article>
           <article class="alt-card" style="border:2px solid var(--line-strong);border-radius:24px;box-shadow:0 4px 32px rgba(0,0,0,.04);margin-top:16px;padding:24px 24px 20px" id="dashboardLevelCard">
             <h3 style="margin:0 0 16px" data-i18n="estimated_vocab_level">Livello vocabolario stimato</h3>
             <div style="display:flex;align-items:center;gap:24px">
@@ -3257,7 +3257,6 @@
         renderSparklines();
         // ── Render 14-day chart ──
         renderDailyChart();
-        renderPracticeChart();
       }
 
       // ═══ RENDER: Sparklines — 7-day real data bars ═══
@@ -6297,11 +6296,9 @@
           exactBox.setAttribute('data-pos', newLabel);
           var posEl = exactBox.querySelector('.wbx-pos');
           if (posEl) posEl.textContent = newLabel;
-          // Also update save/bookmark buttons
           exactBox.querySelectorAll('.wbx-save-btn, .wbx-bookmark-btn').forEach(function(btn){
             btn.setAttribute('data-pos', newLabel);
           });
-          // Show loading state immediately
           var defEl = exactBox.querySelector('.wbx-def');
           if (defEl) defEl.textContent = 'Caricamento…';
           var transEl = exactBox.querySelector('.wbx-trans');
@@ -6314,7 +6311,62 @@
         if (exactBox) {
           enrichOneCard(exactBox, queryWord);
         }
+
+        // Clear and re-fetch suggestion cards with new POS context
+        var grid = document.querySelector('#wbExpandResults .wbx-grid');
+        if (grid) {
+          var allBoxes = grid.querySelectorAll('.wbx-box:not(.wbx-exact)');
+          allBoxes.forEach(function(b){ b.style.opacity = '0.4'; b.style.transition = 'opacity .2s'; });
+          // Re-run the Datamuse query with POS filter
+          var input = document.getElementById('wbExpandSearch');
+          var rel = document.getElementById('wbExpandRelation');
+          if (input && rel) {
+            var currentRel = rel.value || 'synonyms';
+            reQuerySuggestions(queryWord, currentRel, newCode).then(function(newSuggestions){
+              // Remove old suggestion boxes
+              allBoxes.forEach(function(b){ b.remove(); });
+              if (newSuggestions && newSuggestions.length) {
+                var cardsHtml = '';
+                newSuggestions.forEach(function(s){
+                  var posLabel = mapPos(s.pos);
+                  cardsHtml += '<article class="wbx-box" data-pos="' + posLabel + '" data-cefr="' + s.level + '" data-word="' + s.word + '">' +
+                    '<div class="wbx-main-col"><div class="wbx-word-zone"><div class="wbx-head"><span class="wbx-w">' + s.word + '</span><span class="wbx-cefr">' + s.level + '</span><span class="wbx-pos">' + posLabel + '</span></div><div class="wbx-ipa">—</div></div>' +
+                    '<div class="wbx-meta-zone"><div class="wbx-def">Caricamento…</div><div class="wbx-trans" style="opacity:0">—</div><div class="wbx-syns"></div></div></div>' +
+                    '<div class="wbx-save-col"><button class="wbx-save-btn" data-word="' + s.word + '" data-level="' + s.level + '" data-pos="' + posLabel + '" title="Aggiungi a Build From Known">+</button>' +
+                    '<button class="wbx-bookmark-btn" data-word="' + s.word + '" data-level="' + s.level + '" data-pos="' + posLabel + '" title="Salva per dopo"><i class="fa-regular fa-bookmark"></i></button>' +
+                    '<button class="wbx-close-btn" title="Rimuovi" onclick="event.stopPropagation();wbxDismissBox(this)">×</button></div></article>';
+                });
+                grid.insertAdjacentHTML('beforeend', cardsHtml);
+                // Re-enrich new cards and check bank status
+                enrichBankStatus();
+                enrichExpandCards(queryWord);
+              }
+            });
+          }
+        }
       };
+
+      // ── Re-query Datamuse with POS filter ──
+      async function reQuerySuggestions(word, rel, posCode) {
+        try {
+          var posTopic = { n:'noun', v:'verb', adj:'adj', adv:'adv' }[posCode] || '';
+          var url = 'https://api.datamuse.com/words?' + relMap[rel] + '=' + encodeURIComponent(word) + '&max=20';
+          if (posTopic) url += '&topics=' + posTopic;
+          var resp = await fetch(url);
+          if (!resp.ok) return [];
+          var data = await resp.json();
+          return data.map(function(d){
+            var tags = d.tags || [];
+            var pos = '—';
+            if (tags.indexOf('n') >= 0) pos = 'n';
+            else if (tags.indexOf('v') >= 0) pos = 'v';
+            else if (tags.indexOf('adj') >= 0) pos = 'adj';
+            else if (tags.indexOf('adv') >= 0) pos = 'adv';
+            return { word: d.word, pos: pos, level: estimateCEFR(d.word), frequency_count: d.score || 0 };
+          }).filter(function(s){ return !posCode || s.pos === posCode || s.pos === '—'; }).slice(0, 15);
+        } catch(e) { return []; }
+      }
+      var relMap = { synonyms:'rel_syn', antonyms:'rel_ant', 'word-family':'rel_spc', collocations:'rel_jjb', 'next-level':'ml' };
 
       // ── Background check for POS ambiguity after results load ──
       async function checkPosAmbiguity(queryWord) {
@@ -6750,28 +6802,47 @@
         lang = lang || 'en';
         var sel = document.getElementById('wbxSaveTarget');
         if (!sel) return;
+        // Default + standard options always available
+        sel.innerHTML = '<option value="">Build From Known (default)</option>' +
+          '<option value="saved_from_sessions">Saved from sessions</option>';
+        // Add localStorage custom banks immediately
+        try {
+          var localBanks = JSON.parse(localStorage.getItem('sottotitoli_wb_custom_' + lang) || '[]');
+          localBanks.forEach(function(b){
+            var opt = document.createElement('option');
+            opt.value = b.id;
+            opt.textContent = '📦 ' + b.name;
+            sel.appendChild(opt);
+          });
+        } catch(e) {}
+        // Then enrich from Supabase
         var sb = window.sottotitoliSupabase;
-        // Always keep default option
-        sel.innerHTML = '<option value="">Build From Known</option>';
-        if (!sb) return;
+        if (!sb) { restoreSaved(); return; }
         try {
           var r = await sb.auth.getSession();
-          if (!r.data?.session) return;
+          if (!r.data?.session) { restoreSaved(); return; }
           var userId = r.data.session.user.id;
           var { data: banks } = await sb.from('user_wordbanks')
             .select('id,name').eq('user_id', userId).eq('lang', lang).order('name');
           if (banks && banks.length) {
+            // Remove any existing Supabase options (to avoid duplicates on re-load)
+            var existingValues = new Set();
+            Array.from(sel.options).forEach(function(o){ existingValues.add(o.value); });
             banks.forEach(function(b){
-              var opt = document.createElement('option');
-              opt.value = b.id;
-              opt.textContent = b.name;
-              sel.appendChild(opt);
+              if (!existingValues.has(b.id)) {
+                var opt = document.createElement('option');
+                opt.value = b.id;
+                opt.textContent = '📦 ' + b.name;
+                sel.appendChild(opt);
+              }
             });
           }
-          // Restore saved selection
+        } catch(e) { /* silently skip */ }
+        function restoreSaved() {
           var saved = localStorage.getItem('wbx-save-target-' + lang);
           if (saved) { sel.value = saved; }
-        } catch(e) { /* silently skip */ }
+        }
+        restoreSaved();
       }
 
       window.onSaveTargetChange = function() {
@@ -7636,7 +7707,7 @@
       var vocNav = document.querySelector('[data-panel="vocabulary-builder"]');
       if (vocNav) { vocNav.addEventListener('click', function () { setTimeout(renderVocabolario, 100); setTimeout(renderCEFRQuad, 150); }); }
       var vtNav = document.querySelector('[data-panel="vocabulary-trainer"]');
-      if (vtNav) { vtNav.addEventListener('click', function () { setTimeout(renderVTReviewDue, 150); setTimeout(renderVTTasks, 250); setTimeout(renderVTAutoTasks, 300); }); }
+      if (vtNav) { vtNav.addEventListener('click', function () { setTimeout(renderVTReviewDue, 150); setTimeout(renderVTTasks, 250); setTimeout(renderVTAutoTasks, 300); setTimeout(renderPracticeChart, 100); }); }
       var insNav = document.querySelector('[data-panel="insights"]');
       if (insNav) { insNav.addEventListener('click', function () { setTimeout(renderTasks, 100); setTimeout(renderInsightsOverview, 150); }); }
       var profNav = document.querySelector('[data-panel="profilo"]');
