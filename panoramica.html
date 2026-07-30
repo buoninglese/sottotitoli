@@ -455,8 +455,9 @@
     .wbx-box{background:#fff;border:3px solid #0f1c24;border-radius:0;padding:0;box-shadow:10px 10px 0 rgba(0,0,0,.2);gap:0;min-height:0;font-family:var(--font-ui);display:grid;grid-template-columns:1fr 56px;grid-template-rows:1fr;grid-template-areas:"main bar";align-items:stretch;transition:transform .25s,box-shadow .25s}
     .wbx-box:hover{transform:translate(-3px,-3px);box-shadow:14px 14px 0 rgba(0,0,0,.28)}
     /* ── First result = exact query word, golden glow, no hover lift ── */
-    .wbx-box.wbx-exact{border-color:#0f1c24!important;box-shadow:0 0 0 3px #f59e0b,0 0 20px rgba(245,158,11,.45),10px 10px 0 rgba(0,0,0,.2)!important}
+    .wbx-box.wbx-exact{border-color:#0f1c24!important;box-shadow:0 0 0 3px #f59e0b,0 0 20px rgba(245,158,11,.45),10px 10px 0 rgba(0,0,0,.2)!important;position:relative}
     .wbx-box.wbx-exact:hover{transform:none!important;box-shadow:0 0 0 3px #f59e0b,0 0 28px rgba(245,158,11,.6),10px 10px 0 rgba(0,0,0,.2)!important}
+    .wbx-box.wbx-exact::before{content:'★ Exact match';position:absolute;top:-12px;left:50%;transform:translateX(-50%);background:#f59e0b;color:#0f1c24;font-size:10px;font-weight:800;padding:3px 14px;letter-spacing:.06em;text-transform:uppercase;white-space:nowrap;z-index:3;pointer-events:none}
     /* ── Exact box in POS accent mode: lose golden glow, adopt POS colour ring ── */
     #sub-wb-expand[data-wb-accent="pos"] .wbx-box.wbx-exact{border-color:#0f1c24!important;box-shadow:10px 10px 0 rgba(0,0,0,.2)!important}
     #sub-wb-expand[data-wb-accent="pos"] .wbx-box.wbx-exact:hover{box-shadow:14px 14px 0 rgba(0,0,0,.28)!important}
@@ -496,6 +497,11 @@
     .wbx-syns{display:flex;gap:4px;flex-wrap:wrap}
     .wbx-syns span{font-size:12px;padding:3px 8px;border-radius:0;border:3px solid var(--sz-accent);font-weight:700;background:transparent;color:var(--sz-accent);cursor:pointer}
     .wbx-syns span:hover{background:var(--sz-accent);color:var(--sz-light,#fff)}
+    /* ── Translation chips with add-to-bank button ── */
+    .pc-trans-chip{display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:600;padding:4px 10px;border-radius:6px;background:rgba(8,149,176,.08);color:var(--cyan);border:1.5px solid rgba(8,149,176,.18);cursor:default;transition:all .15s}
+    .pc-trans-chip .pc-trans-add{width:18px;height:18px;border-radius:3px;border:1px solid rgba(8,149,176,.25);background:transparent;color:var(--cyan);cursor:pointer;font-size:13px;font-weight:700;display:inline-flex;align-items:center;justify-content:center;transition:all .15s;flex-shrink:0;line-height:1}
+    .pc-trans-chip .pc-trans-add:hover{background:var(--cyan);color:#fff;border-color:var(--cyan);transform:scale(1.1)}
+    .pc-trans-chip .pc-trans-add.saved{background:var(--green);color:#fff;border-color:var(--green);pointer-events:none}
     /* ── Dark mode overrides ── */
     [data-theme="dark"] .wbx-box{background:var(--sz-dark,#1a2630);border-color:var(--sz-dark-border,#d8eaf4)}
     [data-theme="dark"] .wbx-word-zone{background:var(--sz-dark)}
@@ -512,6 +518,18 @@
     /* ── Grid for results ── */
     .wbx-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:18px;margin-top:16px;overflow:visible}
     .wbx-box{margin:3px}
+    /* ── Style picker: scheme dots ── */
+    .wbx-scheme-dot{width:22px;height:22px;border-radius:50%;border:2px solid transparent;cursor:pointer;transition:all .15s;flex-shrink:0}
+    .wbx-scheme-dot:hover{transform:scale(1.15)}
+    .wbx-scheme-dot.active{border-color:#0f1c24;box-shadow:0 0 0 2px #fff,0 0 0 4px #0f1c24}
+    [data-theme="dark"] .wbx-scheme-dot.active{border-color:#e2e8f0;box-shadow:0 0 0 2px #0f1117,0 0 0 4px #e2e8f0}
+    /* ── Style picker: segmented mode buttons ── */
+    .mode-btn{padding:6px 14px;border:2px solid var(--line);background:var(--card);font-size:12px;font-weight:700;cursor:pointer;font-family:var(--font-ui);transition:all .15s;color:var(--text-soft)}
+    .mode-btn.active{background:#0f1c24;color:#fff;border-color:#0f1c24}
+    .mode-btn:hover:not(.active){border-color:#0f1c24;color:var(--text)}
+    .mode-btn+.mode-btn{border-left:none}
+    [data-theme="dark"] .mode-btn.active{background:#e2e8f0;color:#0f1729;border-color:#e2e8f0}
+    [data-theme="dark"] .mode-btn:hover:not(.active){border-color:#e2e8f0}
     /* ═══ AI VOICE PANEL ═══ */
     .premium-badge{font-size:8px;font-weight:800;background:linear-gradient(135deg,#7c3aed,#a855f7);color:#fff;padding:2px 7px;border-radius:99px;letter-spacing:.08em;margin-left:auto;text-transform:uppercase;line-height:1.4}
     .nav-item.premium{border-left:3px solid transparent}
@@ -1259,26 +1277,22 @@
             <article class="hero-banner" id="wbGuideBanner" style="min-height:auto;margin-bottom:18px">
               <button class="hero-close" aria-label="Chiudi guida" onclick="this.closest('.hero-banner').style.display='none';localStorage.setItem('wb-guide-dismissed','1')"><svg class="icon"><use href="#i-close"></use></svg></button>
               <div class="hero-content" style="padding:14px 20px">
-                <p style="margin:0;font-size:13px;line-height:1.55;max-width:760px" data-i18n="vb_guide"><strong>Stile</strong> cambia la palette colore delle card. <strong>Modo</strong> colora l'intestazione per parte del discorso (POS) o livello CEFR. Le parole aggiunte con <strong>+</strong> vengono salvate nella tua banca <em>Build From Known</em>.</p>
+                <p style="margin:0;font-size:13px;line-height:1.55;max-width:760px" data-i18n="vb_guide"><strong>Palette</strong> cambia lo schema colore delle card. <strong>Color by</strong> colora l'intestazione per parte del discorso (POS) o livello CEFR. Le parole aggiunte con <strong>+</strong> vengono salvate nella tua banca <em>Build From Known</em>.</p>
               </div>
             </article>
             <script>if(localStorage.getItem('wb-guide-dismissed')){var b=document.getElementById('wbGuideBanner');if(b)b.style.display='none';}</script>
             <div class="wb-stats" id="wbExpandStats" style="display:none"></div>
             <!-- ── Box style controls ── -->
-            <div class="wbx-toggle-bar" style="display:flex;align-items:center;gap:12px;margin-bottom:14px;flex-wrap:wrap;padding:16px 20px;background:var(--panel-2);border-radius:14px;border:1px solid var(--line);min-height:72px">
-              <div style="display:flex;flex-direction:column;gap:3px;flex-shrink:0">
-                <span style="font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--text-soft)"><i class="fa-solid fa-palette"></i> <span data-i18n="vb_style">Stile</span></span>
-                <span style="font-size:11px;color:var(--text-faint);line-height:1.3" data-i18n="vb_style_desc">Schema colore delle card</span>
+            <div class="wbx-toggle-bar" style="display:flex;align-items:center;gap:16px;margin-bottom:14px;flex-wrap:wrap;padding:14px 20px;background:var(--panel-2);border-radius:14px;border:1px solid var(--line)">
+              <span style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--text-soft);white-space:nowrap">🎨 Palette</span>
+              <div id="wbxSchemeDots" style="display:flex;gap:6px"></div>
+              <span style="width:1px;height:30px;background:var(--line);flex-shrink:0;margin:0 4px"></span>
+              <span style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--text-soft);white-space:nowrap">🏷️ Color by</span>
+              <div style="display:flex;gap:0">
+                <button class="mode-btn active" data-wbx-mode="none" onclick="wbxSetMode('none')" style="border-radius:6px 0 0 6px">None</button>
+                <button class="mode-btn" data-wbx-mode="pos" onclick="wbxSetMode('pos')">POS</button>
+                <button class="mode-btn" data-wbx-mode="cefr" onclick="wbxSetMode('cefr')" style="border-radius:0 6px 6px 0">CEFR</button>
               </div>
-              <button class="fchip" id="wbxAccentBtn" title="Clicca per cambiare schema colore" style="font-size:14px;padding:8px 16px"><i class="fa-solid fa-palette"></i> Colore</button>
-              <span style="width:1px;height:36px;background:var(--line);flex-shrink:0;margin:0 6px"></span>
-              <div style="display:flex;flex-direction:column;gap:3px;flex-shrink:0">
-                <span style="font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--text-soft)"><i class="fa-solid fa-droplet"></i> <span data-i18n="vb_mode">Modo</span></span>
-                <span style="font-size:11px;color:var(--text-faint);line-height:1.3" data-i18n="vb_mode_desc">Colora per tipo di parola o livello</span>
-              </div>
-              <button class="fchip active" data-wbx-mode="none" title="Nessuna colorazione speciale" style="font-size:13px;padding:7px 14px" data-i18n="vb_default">Default</button>
-              <button class="fchip" data-wbx-mode="pos" title="Colora l'intestazione in base alla parte del discorso (nome, verbo, aggettivo, avverbio)" style="font-size:13px;padding:7px 14px" data-i18n="vb_pos_accent">POS Accent</button>
-              <button class="fchip" data-wbx-mode="cefr" title="Colora l'intestazione in base al livello CEFR (A1–C2)" style="font-size:13px;padding:7px 14px" data-i18n="vb_cefr_accent">CEFR Accent</button>
               <span style="flex:1"></span>
               <button class="fchip" id="wbxFullscreenBtn" title="Schermo intero" onclick="wbxToggleFullscreen()" style="font-size:14px;padding:8px 12px"><i class="fa-solid fa-expand"></i></button>
             </div>
@@ -1286,11 +1300,34 @@
               // ── Synchronous: accent/mode toggles (must exist before IIFE completes) ──
               (function(){
                 var schemes = ['1','2','3','4','5','6','7'];
+                var schemeColors = ['#0369a1','#4338ca','#0e7490','#047857','#6d28d9','#b45309','#be185d'];
                 var accentIdx = (function(){ var s = localStorage.getItem('wbx-accent-scheme')||'1'; var i = schemes.indexOf(s); return i >= 0 ? i : 0; })();
                 var el = document.getElementById('sub-wb-expand');
                 if (el) { el.setAttribute('data-wb-scheme', schemes[accentIdx]); el.setAttribute('data-wb-accent', localStorage.getItem('wbx-accent-mode')||'none'); }
-                var abtn = document.getElementById('wbxAccentBtn');
-                if (abtn) abtn.innerHTML = '<i class="fa-solid fa-palette"></i> ' + schemes[accentIdx];
+
+                // ── Render scheme dots ──
+                function renderSchemeDots(){
+                  var dotsEl = document.getElementById('wbxSchemeDots');
+                  if (!dotsEl) return;
+                  dotsEl.innerHTML = schemes.map(function(s,i){
+                    return '<span class="wbx-scheme-dot'+(i===accentIdx?' active':'')+'" style="background:'+schemeColors[i]+'" onclick="wbxSetScheme('+i+')" title="Palette '+(i+1)+'"></span>';
+                  }).join('');
+                }
+                renderSchemeDots();
+
+                window.wbxSetScheme = function(idx){
+                  accentIdx = idx;
+                  var s = schemes[idx];
+                  var e = document.getElementById('sub-wb-expand');
+                  if (e) e.setAttribute('data-wb-scheme', s);
+                  localStorage.setItem('wbx-accent-scheme', s);
+                  renderSchemeDots();
+                };
+                // Keep old function for backward compat with Italian/VT panels
+                window.wbxCycleAccent = function(){
+                  accentIdx = (accentIdx + 1) % schemes.length;
+                  wbxSetScheme(accentIdx);
+                };
 
                 window.wbxToggleFullscreen = function(){
                   var mp = document.querySelector('.main-panel');
@@ -1306,20 +1343,12 @@
                     if (btn) btn.title = 'Chiudi schermo intero';
                   }
                 };
-                window.wbxCycleAccent = function(){
-                  accentIdx = (accentIdx + 1) % schemes.length;
-                  var s = schemes[accentIdx];
-                  var e = document.getElementById('sub-wb-expand');
-                  if (e) e.setAttribute('data-wb-scheme', s);
-                  if (abtn) abtn.innerHTML = '<i class="fa-solid fa-palette"></i> ' + s;
-                  localStorage.setItem('wbx-accent-scheme', s);
-                };
                 window.wbxSetMode = function(mode){
                   var e = document.getElementById('sub-wb-expand');
                   if (e) e.setAttribute('data-wb-accent', mode);
-                  document.querySelectorAll('#sub-wb-expand [data-wbx-mode]').forEach(function(c){ c.classList.remove('active'); });
-                  var chip = document.querySelector('#sub-wb-expand [data-wbx-mode="' + mode + '"]');
-                  if (chip) chip.classList.add('active');
+                  document.querySelectorAll('#sub-wb-expand .mode-btn').forEach(function(c){ c.classList.remove('active'); });
+                  var btn = document.querySelector('#sub-wb-expand .mode-btn[data-wbx-mode="' + mode + '"]');
+                  if (btn) btn.classList.add('active');
                   localStorage.setItem('wbx-accent-mode', mode);
                 };
                 window.autoSizeExpandWords = function(){
@@ -6121,8 +6150,8 @@
           // Update translations
           if (trans && transEl) {
             var chips = trans.slice(0, 4).map(function(t){
-              return '<span class="pc-trans-chip">' + t + '</span>';
-            }).join(' <span style="color:rgba(255,255,255,.15);font-weight:400">·</span> ');
+              return '<span class="pc-trans-chip">' + t + '<button class="pc-trans-add" onclick="event.stopPropagation();saveItalianWordToBank(\'' + t.replace(/'/g,"\\'") + '\',this)" title="Aggiungi alla banca italiana">+</button></span>';
+            }).join(' ');
             transEl.innerHTML = '→ ' + chips;
             transEl.style.opacity = '1';
           } else if (transEl) {
@@ -6558,7 +6587,7 @@
           if (trans && trans.length) {
             var transEl = newBox.querySelector('.wbx-trans');
             if (transEl) {
-              var chips = trans.slice(0, 4).map(function(t){ return '<span class="pc-trans-chip">' + t + '</span>'; }).join(' <span style="color:rgba(255,255,255,.15);font-weight:400">·</span> ');
+              var chips = trans.slice(0, 4).map(function(t){ return '<span class="pc-trans-chip">' + t + '<button class="pc-trans-add" onclick="event.stopPropagation();saveItalianWordToBank(\'' + t.replace(/'/g,"\\'") + '\',this)" title="Aggiungi alla banca italiana">+</button></span>'; }).join(' ');
               transEl.innerHTML = '→ ' + chips;
               transEl.style.opacity = '1';
             }
@@ -6620,6 +6649,35 @@
       window.saveExpandWord = saveExpandWord;
       window.openExpandWordDetail = openExpandWordDetail;
       window.showToastMsg = showWbxToast;
+
+      // ── Save Italian translation word to pinned Italian word bank ──
+      window.saveItalianWordToBank = function(word, btn) {
+        if (btn.classList.contains('saved')) return;
+        btn.classList.add('saved');
+        btn.textContent = '✓';
+        // Store in localStorage for immediate persistence
+        var bankKey = 'sottotitoli_wb_it_pinned';
+        var bank = JSON.parse(localStorage.getItem(bankKey) || '{"name":"Build From Translate","words":[]}');
+        if (bank.words.indexOf(word) === -1) {
+          bank.words.push(word);
+          localStorage.setItem(bankKey, JSON.stringify(bank));
+        }
+        // Also save to Supabase if logged in
+        if (window.sottotitoliSupabase) {
+          window.sottotitoliSupabase.auth.getSession().then(function(r){
+            if (!r.data?.session) return;
+            // Upsert into user_wordbank_words
+            window.sottotitoliSupabase.from('user_wordbank_words').upsert({
+              user_id: r.data.session.user.id,
+              word: word,
+              lang: 'it',
+              wordbank_id: bankKey,
+              created_at: new Date().toISOString()
+            }, { onConflict: 'user_id,word,lang' }).then(function(){});
+          });
+        }
+        showWbxToast('📥 ' + word + ' salvato nella banca italiana');
+      };
 
       // ============================================
       // ITALIAN Vocabulary Builder
