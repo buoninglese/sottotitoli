@@ -4952,6 +4952,26 @@ function addToWordBank(optionalWord) {
     }
   }
 
+  // Also feed Ripasso immediato (review_words) — fire-and-forget
+  var _sb = window.sottotitoliSupabase;
+  if (_sb) {
+    var _srcLang = (window._currentCaptionLang || 'en-US').split('-')[0];
+    _sb.auth.getSession().then(function(_r){
+      if (!_r.data?.session) return;
+      var _uid = _r.data.session.user.id;
+      var _lang = _srcLang || 'en';
+      var _norm = word.toLowerCase().replace(/[^a-z0-9 '-]/g, '').trim();
+      if (!_norm || _norm.length < 2) return;
+      _sb.from('review_words').select('id').eq('user_id',_uid).eq('lemma',word).maybeSingle().then(function(_rw){
+        if (_rw.data) {
+          _sb.from('review_words').update({ personal_frequency: (_rw.data.personal_frequency||0)+1 }).eq('id',_rw.data.id).then(function(){});
+        } else {
+          _sb.from('review_words').insert({ user_id:_uid, lemma:word, normalized:_norm, lang:_lang, pos:null, is_new:true, first_seen_at:new Date().toISOString(), source_type:'synonym', review_state:'new', personal_frequency:1 }).then(function(){});
+        }
+      }).catch(function(){});
+    }).catch(function(){});
+  }
+
   if (!optionalWord) {
     var input = document.getElementById('wordbankInput');
     if (input) input.focus();
@@ -7072,6 +7092,20 @@ window.addToWordBank = function(word){
     sb.rpc('save_looked_up_word', { p_word: word, p_pos: null, p_language: 'en' }).then(function(r) {
       if (r.error) console.warn('save_looked_up_word RPC:', r.error);
     });
+    // Also feed Ripasso immediato (review_words)
+    sb.auth.getSession().then(function(_r){
+      if (!_r.data?.session) return;
+      var _uid = _r.data.session.user.id;
+      var _norm = word.toLowerCase().replace(/[^a-z0-9 '-]/g, '').trim();
+      if (!_norm || _norm.length < 2) return;
+      sb.from('review_words').select('id').eq('user_id',_uid).eq('lemma',word).maybeSingle().then(function(_rw){
+        if (_rw.data) {
+          sb.from('review_words').update({ personal_frequency: (_rw.data.personal_frequency||0)+1 }).eq('id',_rw.data.id).then(function(){});
+        } else {
+          sb.from('review_words').insert({ user_id:_uid, lemma:word, normalized:_norm, lang:'en', pos:null, is_new:true, first_seen_at:new Date().toISOString(), source_type:'synonym', review_state:'new', personal_frequency:1 }).then(function(){});
+        }
+      }).catch(function(){});
+    }).catch(function(){});
   }
 };
 
