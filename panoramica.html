@@ -1297,6 +1297,12 @@
                 <button class="mode-btn" data-wbx-mode="pos" onclick="wbxSetMode('pos')">POS</button>
                 <button class="mode-btn" data-wbx-mode="cefr" onclick="wbxSetMode('cefr')" style="border-radius:0 6px 6px 0">CEFR</button>
               </div>
+              <span style="width:1px;height:30px;background:var(--line);flex-shrink:0;margin:0 4px"></span>
+              <span style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--text-soft);white-space:nowrap"><i class="fa-solid fa-folder-plus"></i> Save to</span>
+              <select id="wbxSaveTarget" onchange="onSaveTargetChange()" style="padding:6px 10px;border-radius:6px;border:2px solid var(--line);background:var(--card);color:var(--text);font-size:12px;font-weight:600;font-family:var(--font-ui);cursor:pointer;max-width:180px">
+                <option value="">Build From Known</option>
+              </select>
+              <button class="fchip" onclick="createBankFromSelector()" title="Crea nuova banca" style="font-size:13px;padding:6px 10px"><i class="fa-solid fa-plus"></i></button>
               <span style="flex:1"></span>
               <button class="fchip" id="wbxFullscreenBtn" title="Schermo intero" onclick="wbxToggleFullscreen()" style="font-size:14px;padding:8px 12px"><i class="fa-solid fa-expand"></i></button>
             </div>
@@ -6437,13 +6443,22 @@
         var userId = r.data.session.user.id;
         var lang = window.SOTTOTITOLI_STUDY_LANG || 'en';
 
-        // Save to "Saved from sessions" bank (same as caption word bank chips)
-        var banks = await SottotitoliData.getWordbanks(lang);
-        var targetBank = banks.find(function(b) { return b.name === 'Saved from sessions'; });
+        // Check if user selected a specific save target bank
+        var targetBankId = getSaveTargetBank(lang);
+        var targetBank;
+        if (targetBankId) {
+          var { data: bank } = await sb.from('user_wordbanks').select('*').eq('id', targetBankId).single();
+          targetBank = bank;
+        }
         if (!targetBank) {
-          var createRes = await sb.from('user_wordbanks').insert({ user_id: userId, name: 'Saved from sessions', lang: lang }).select().single();
-          if (createRes.error) { console.warn('create bank:', createRes.error.message); return; }
-          targetBank = createRes.data;
+          // Fallback: "Saved from sessions" bank
+          var banks = await SottotitoliData.getWordbanks(lang);
+          targetBank = banks.find(function(b) { return b.name === 'Saved from sessions'; });
+          if (!targetBank) {
+            var createRes = await sb.from('user_wordbanks').insert({ user_id: userId, name: 'Saved from sessions', lang: lang }).select().single();
+            if (createRes.error) { console.warn('create bank:', createRes.error.message); return; }
+            targetBank = createRes.data;
+          }
         }
         // Only insert columns that exist in user_wordbank_words: wordbank_id, word, pos, usage_count
         var insertRes = await sb.from('user_wordbank_words').insert({
@@ -6715,6 +6730,85 @@
         }
         showWbxToast('📥 ' + word + ' salvato nella banca italiana');
       };
+
+      // ── Bank selector: populate "Save to" dropdown ──
+      async function loadBankSelector(lang) {
+        lang = lang || 'en';
+        var sel = document.getElementById('wbxSaveTarget');
+        if (!sel) return;
+        var sb = window.sottotitoliSupabase;
+        // Always keep default option
+        sel.innerHTML = '<option value="">Build From Known</option>';
+        if (!sb) return;
+        try {
+          var r = await sb.auth.getSession();
+          if (!r.data?.session) return;
+          var userId = r.data.session.user.id;
+          var { data: banks } = await sb.from('user_wordbanks')
+            .select('id,name').eq('user_id', userId).eq('lang', lang).order('name');
+          if (banks && banks.length) {
+            banks.forEach(function(b){
+              var opt = document.createElement('option');
+              opt.value = b.id;
+              opt.textContent = b.name;
+              sel.appendChild(opt);
+            });
+          }
+          // Restore saved selection
+          var saved = localStorage.getItem('wbx-save-target-' + lang);
+          if (saved) { sel.value = saved; }
+        } catch(e) { /* silently skip */ }
+      }
+
+      window.onSaveTargetChange = function() {
+        var sel = document.getElementById('wbxSaveTarget');
+        if (!sel) return;
+        // Determine language from current subtab
+        var lang = document.querySelector('[data-subtab="wb-expand"].active') ? 'en' : 'it';
+        localStorage.setItem('wbx-save-target-' + lang, sel.value);
+      };
+
+      window.createBankFromSelector = async function() {
+        var name = prompt('Nome della nuova banca:');
+        if (!name || !name.trim()) return;
+        var lang = document.querySelector('[data-subtab="wb-expand"].active') ? 'en' : 'it';
+        var sb = window.sottotitoliSupabase;
+        if (sb) {
+          try {
+            var r = await sb.auth.getSession();
+            if (r.data?.session) {
+              var { data: bank } = await sb.from('user_wordbanks')
+                .insert({ user_id: r.data.session.user.id, name: name.trim(), lang: lang })
+                .select().single();
+              if (bank) {
+                loadBankSelector(lang);
+                var sel = document.getElementById('wbxSaveTarget');
+                if (sel) { sel.value = bank.id; onSaveTargetChange(); }
+                showWbxToast('✓ Banca "' + name.trim() + '" creata');
+                return;
+              }
+            }
+          } catch(e) {}
+        }
+        // Fallback: store in localStorage
+        var banks = JSON.parse(localStorage.getItem('sottotitoli_wb_custom_' + lang) || '[]');
+        var newBank = { id: 'local_' + Date.now(), name: name.trim(), lang: lang };
+        banks.push(newBank);
+        localStorage.setItem('sottotitoli_wb_custom_' + lang, JSON.stringify(banks));
+        loadBankSelector(lang);
+        showWbxToast('✓ Banca "' + name.trim() + '" creata (locale)');
+      };
+
+      // ── Get current save target bank ID ──
+      function getSaveTargetBank(lang) {
+        var sel = document.getElementById('wbxSaveTarget');
+        if (sel && sel.value) return sel.value;
+        return null; // null = use default "Build From Known"
+      }
+
+      // Expose
+      window.loadBankSelector = loadBankSelector;
+      window.getSaveTargetBank = getSaveTargetBank;
 
       // ============================================
       // ITALIAN Vocabulary Builder
@@ -7519,7 +7613,9 @@
       var wbReviewTab = document.querySelector('[data-subtab="wb-review"]');
       if (wbReviewTab) { wbReviewTab.addEventListener('click', function () { setTimeout(renderReviewDue, 100); }); }
       var wbExpandTab = document.querySelector('[data-subtab="wb-expand"]');
-      if (wbExpandTab) { wbExpandTab.addEventListener('click', function () { setTimeout(function(){ renderExpandQuickChips(); }, 150); }); }
+      if (wbExpandTab) { wbExpandTab.addEventListener('click', function () { setTimeout(function(){ renderExpandQuickChips(); loadBankSelector('en'); }, 150); }); }
+      var wbExpandItTab = document.querySelector('[data-subtab="wb-expand-it"]');
+      if (wbExpandItTab) { wbExpandItTab.addEventListener('click', function () { setTimeout(function(){ loadBankSelector('it'); }, 150); }); }
       // Initial render for Review Due (Build From expands on demand)
       setTimeout(renderReviewDue, 500);
       var vocNav = document.querySelector('[data-panel="vocabulary-builder"]');
