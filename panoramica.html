@@ -8734,8 +8734,10 @@
       // 3. Common suffixes as fallback
       if (w.endsWith('ing')) return 'VBG';
       if (w.endsWith('ly')) return 'RB';
-      if (w.endsWith('ness') || w.endsWith('tion') || w.endsWith('ment') || w.endsWith('ity')) return 'NN';
-      if (w.endsWith('ous') || w.endsWith('ive') || w.endsWith('able') || w.endsWith('ible') || w.endsWith('ful') || w.endsWith('less')) return 'JJ';
+      if (w.endsWith('ness') || w.endsWith('tion') || w.endsWith('sion') || w.endsWith('ment') || w.endsWith('ity') || w.endsWith('ence') || w.endsWith('ance') || w.endsWith('ism') || w.endsWith('ship') || w.endsWith('er') || w.endsWith('or') || w.endsWith('ist')) return 'NN';
+      if (w.endsWith('ous') || w.endsWith('ive') || w.endsWith('able') || w.endsWith('ible') || w.endsWith('ful') || w.endsWith('less') || w.endsWith('al') || w.endsWith('ic') || w.endsWith('ant') || w.endsWith('ent') || w.endsWith('ary') || w.endsWith('ish')) return 'JJ';
+      if (w.endsWith('ed') && w.length > 4) return 'VBD';
+      if (w.endsWith('es') && w.length > 4) return 'VBZ';
       return null;
     }
 
@@ -8762,18 +8764,18 @@
             var w = d.word.toLowerCase();
             if (seen.has(w) || w.indexOf(' ') >= 0) return;
             var rpos = realPOS(d.word, d.tags);
-            if (!rpos || !(rpos === 'JJ' || rpos === 'JJR' || rpos === 'JJS')) return; // only real adjectives
+            // Use realPOS result as tag; if truly unknown, tag as JJ (adjective query intent)
+            var tag = rpos || 'JJ';
             seen.add(w);
             batch.push({
-              word: d.word, tag: 'JJ',
+              word: d.word, tag: tag,
               level: estimateCEFRLevel(d.word),
-              frequency_count: 0,
-              category_title: catTitle,
+              frequency_count: 0, category_title: catTitle,
               _augmented: true
             });
           });
         }
-        // Related words: rel_trg = "words often triggered by noun" — filter for verbs
+        // Verbs: rel_trg = "words often triggered by noun"
         var trgResp = await fetch('https://api.datamuse.com/words?rel_trg=' + encodeURIComponent(noun) + '&max=6');
         if (trgResp.ok) {
           var trgData = await trgResp.json();
@@ -8781,13 +8783,13 @@
             var w = d.word.toLowerCase();
             if (seen.has(w) || w.indexOf(' ') >= 0) return;
             var rpos = realPOS(d.word, d.tags);
-            if (!rpos || !(rpos.startsWith('VB'))) return; // only real verbs
+            // Use realPOS result as tag; if truly unknown, tag as VB (verb query intent)
+            var tag = rpos || 'VB';
             seen.add(w);
             batch.push({
-              word: d.word, tag: 'VB',
+              word: d.word, tag: tag,
               level: estimateCEFRLevel(d.word),
-              frequency_count: 0,
-              category_title: catTitle,
+              frequency_count: 0, category_title: catTitle,
               _augmented: true
             });
           });
