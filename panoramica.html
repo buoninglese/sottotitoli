@@ -2265,6 +2265,7 @@
   <script src="js/theme-2.js?v=4"></script>
   <script src="js/ai-voice.js?v=1"></script>
   <script src="js/data-service.js"></script>
+  <script src="js/smart-suggestions.js"></script>
   <script src="js/i18n.js"></script>
   <script src="js/notifications.js"></script>
 
@@ -2473,9 +2474,11 @@
                   updated_at: new Date().toISOString()
                 }, { onConflict: 'user_id' });
               } catch(lpErr) { console.warn('learning profile sync:', lpErr.message); }
-              // ═══ Populate Smart bank suggestions based on profile ═══
+              // ═══ Populate Smart bank suggestions via new SMART_SUGGESTIONS module ═══
               try {
-                await generateSmartSuggestions(uid, profile);
+                if (window.SMART_SUGGESTIONS && window.SMART_SUGGESTIONS.refreshAll) {
+                  window.SMART_SUGGESTIONS.refreshAll(window.SOTTOTITOLI_STUDY_LANG || 'en');
+                }
               } catch(gsErr) { console.warn('smart suggestions:', gsErr.message); }
             }
           }
@@ -2505,91 +2508,7 @@
       // Expose globally since onclick calls it
       window.saveProfiloLinguistico = saveProfiloLinguistico;
 
-      // ═══ Smart suggestion engine — populates review_bank_words from profile ═══
-      async function generateSmartSuggestions(userId, profile) {
-        var sb = window.sottotitoliSupabase;
-        if (!sb) return;
-        // Domain-specific starter vocabulary
-        var sectorWords = {
-          tech: [
-            { word: 'implement', pos: 'VERB', reason: 'Utile per discussioni tecniche e documentazione' },
-            { word: 'deploy', pos: 'VERB', reason: 'Comune nei contesti di ingegneria del software' },
-            { word: 'architecture', pos: 'NOUN', reason: 'Termine chiave per conversazioni sulla progettazione di sistemi' },
-            { word: 'scalable', pos: 'ADJ', reason: 'Importante per descrivere requisiti di sistema' },
-            { word: 'debug', pos: 'VERB', reason: 'Essenziale per discussioni sulla risoluzione di problemi' }
-          ],
-          business: [
-            { word: 'revenue', pos: 'NOUN', reason: 'Metrica aziendale fondamentale in riunioni e report' },
-            { word: 'stakeholder', pos: 'NOUN', reason: 'Termine chiave per discussioni su progetti e business' },
-            { word: 'negotiate', pos: 'VERB', reason: 'Importante per la comunicazione aziendale' },
-            { word: 'strategy', pos: 'NOUN', reason: 'Essenziale per pianificazione e processi decisionali' },
-            { word: 'efficient', pos: 'ADJ', reason: 'Utile per descrivere processi e flussi di lavoro' }
-          ],
-          academic: [
-            { word: 'hypothesis', pos: 'NOUN', reason: 'Termine accademico fondamentale per ricerca e pubblicazioni' },
-            { word: 'methodology', pos: 'NOUN', reason: 'Importante per descrivere approcci di ricerca' },
-            { word: 'analyze', pos: 'VERB', reason: 'Essenziale per la scrittura e discussione accademica' },
-            { word: 'significant', pos: 'ADJ', reason: 'Termine chiave per presentare risultati' },
-            { word: 'framework', pos: 'NOUN', reason: 'Utile per strutturare argomentazioni e ricerche' }
-          ],
-          medical: [
-            { word: 'diagnosis', pos: 'NOUN', reason: 'Termine medico fondamentale per discussioni con i pazienti' },
-            { word: 'treatment', pos: 'NOUN', reason: 'Essenziale per la comunicazione in ambito medico' },
-            { word: 'symptom', pos: 'NOUN', reason: 'Termine chiave per descrivere le condizioni dei pazienti' },
-            { word: 'prescribe', pos: 'VERB', reason: 'Importante nei contesti di pratica medica' },
-            { word: 'chronic', pos: 'ADJ', reason: 'Utile per descrivere condizioni a lungo termine' }
-          ],
-          legal: [
-            { word: 'compliance', pos: 'NOUN', reason: 'Essenziale per discussioni normative e legali' },
-            { word: 'liability', pos: 'NOUN', reason: 'Termine legale chiave per contratti e rischi' },
-            { word: 'jurisdiction', pos: 'NOUN', reason: 'Importante per comprendere l\'ambito legale' },
-            { word: 'binding', pos: 'ADJ', reason: 'Utile per contesti di contratti e accordi' },
-            { word: 'clause', pos: 'NOUN', reason: 'Terminologia fondamentale per documenti legali' }
-          ]
-        };
-        var sector = (profile.target_sector || '').toLowerCase();
-        var words = null;
-        if (sector.indexOf('tech') !== -1 || sector.indexOf('it') !== -1 || sector.indexOf('software') !== -1) words = sectorWords.tech;
-        else if (sector.indexOf('business') !== -1 || sector.indexOf('finance') !== -1 || sector.indexOf('marketing') !== -1) words = sectorWords.business;
-        else if (sector.indexOf('academic') !== -1 || sector.indexOf('education') !== -1 || sector.indexOf('research') !== -1) words = sectorWords.academic;
-        else if (sector.indexOf('medical') !== -1 || sector.indexOf('health') !== -1) words = sectorWords.medical;
-        else if (sector.indexOf('legal') !== -1 || sector.indexOf('law') !== -1) words = sectorWords.legal;
-        else words = sectorWords.business; // default
-
-        if (!words) return;
-        // Upsert words to review_words and review_bank_words
-        for (var i = 0; i < words.length; i++) {
-          var w = words[i];
-          var clean = w.word.toLowerCase().trim();
-          // Upsert to review_words
-          var { data: rwData } = await sb.from('review_words').select('id').eq('user_id', userId).eq('lemma', w.word).maybeSingle();
-          var wordId;
-          if (rwData) {
-            wordId = rwData.id;
-            await sb.from('review_words').update({ goal_relevance_score: 5, pos: w.pos }).eq('id', wordId);
-          } else {
-            var { data: insData } = await sb.from('review_words').insert({
-              user_id: userId, lemma: w.word, normalized: clean, lang: lang,
-              pos: w.pos, is_new: true, first_seen_at: new Date().toISOString(),
-              source_type: 'smart', review_state: 'new',
-              goal_relevance_score: 5, relevance_score: 5
-            }).select('id').single();
-            if (insData) wordId = insData.id;
-          }
-          // Upsert to review_bank_words for goal_next_step
-          if (wordId) {
-            try {
-              await sb.from('review_bank_words').upsert({
-                user_id: userId, bank_key: 'goal_next_step', word_id: wordId,
-                source_type: 'smart', rank_score: 5 - i,
-                reason_code: 'goal_relevant', reason_text: w.reason,
-                status: 'active'
-              }, { onConflict: 'user_id,bank_key,word_id' });
-            } catch(dupErr) { /* already exists — skip */ }
-          }
-        }
-        SottotitoliData.cacheClear();
-      }
+      // ═══ Smart suggestions now handled by js/smart-suggestions.js ═══
       } // end else (auth block)
 
       // ── Pick current language stats ──
@@ -4109,23 +4028,26 @@
         var pinnedGrid = document.getElementById('wbPinnedGrid');
         if (pinnedGrid) pinnedGrid.innerHTML = pinnedHtml;
 
-        // ── Smart banks (4 recommendation banks — live counts from DB or 0) ──
-        var smartHtml = '';
-        // Try to get real counts from the review bank system
-        var smartCounts = { goal_next_step: 0, build_from_known: 0, activate_recognized: 0, upcoming_useful_vocab: 0 };
+        // ── Smart banks — powered by SMART_SUGGESTIONS module ──
+        var smartCounts = { goal_next_step: 0, build_from_known: 0, activate_recognized: 0, upcoming_useful_vocab: 0, upcoming_session_driven: 0, upcoming_roadmap: 0 };
         try {
-          var bankSummaries = await SottotitoliData.getBankSummaries ? await SottotitoliData.getBankSummaries() : null;
-          if (bankSummaries) {
-            Object.keys(smartCounts).forEach(function(k) {
-              if (bankSummaries[k]) smartCounts[k] = bankSummaries[k].total || 0;
-            });
+          if (window.SMART_SUGGESTIONS && window.SMART_SUGGESTIONS.getCounts) {
+            smartCounts = await window.SMART_SUGGESTIONS.getCounts(lang);
           }
-        } catch(e) { /* fall through — all zero */ }
+        } catch(e) { /* gracefully fall back to zeros */ }
+
+        var betaBadge = ' <span style="display:inline-block;padding:1px 6px;border-radius:99px;background:var(--cyan);color:#000;font-size:9px;font-weight:700;letter-spacing:0.04em;margin-left:4px">BETA</span>';
+        var infoIcon = function(how) {
+          return ' <span title="' + how.replace(/"/g,'&quot;') + '" style="cursor:help;font-size:11px;color:var(--cyan);opacity:.85" onclick="event.stopPropagation();event.preventDefault();alert(\'' + how.replace(/'/g,"\\'").replace(/\n/g,' ') + '\')"><i class="fa-solid fa-circle-info"></i></span>';
+        };
+
         var smartBanks = [
-          { id: 'goal_next_step', name: 'Next Step For Your Goal', desc: 'Goal-aligned vocabulary for your profile', count: smartCounts.goal_next_step, signal: smartCounts.goal_next_step > 0 ? smartCounts.goal_next_step + ' suggestions' : 'Complete your profile', preview: [], subtitle: 'Suggested for your current goal' },
-          { id: 'build_from_known', name: 'Build From What You Know', desc: 'Lexical progression from words you already know', count: smartCounts.build_from_known, signal: smartCounts.build_from_known > 0 ? smartCounts.build_from_known + ' suggestions' : 'From your vocabulary', preview: [], subtitle: 'Follow-on words from known vocabulary' },
-          { id: 'activate_recognized', name: 'Activate What You Recognize', desc: 'Words you understand but rarely use actively', count: smartCounts.activate_recognized, signal: smartCounts.activate_recognized > 0 ? smartCounts.activate_recognized + ' ready' : 'No gap detected', preview: [], subtitle: 'Turn recognition into active use' },
-          { id: 'upcoming_useful_vocab', name: 'Upcoming Useful Vocabulary', desc: 'Words likely useful for your next stage', count: smartCounts.upcoming_useful_vocab, signal: smartCounts.upcoming_useful_vocab > 0 ? smartCounts.upcoming_useful_vocab + ' queued' : 'Set your goals first', preview: [], subtitle: 'Suggested for what comes next' }
+          { id: 'goal_next_step', name: 'Next Step For Your Goal', desc: 'Goal-aligned vocabulary for your profile', count: smartCounts.goal_next_step, signal: smartCounts.goal_next_step > 0 ? smartCounts.goal_next_step + ' suggestions' : 'Set your goals', preview: [], subtitle: 'For your current goal' + betaBadge + infoIcon('How: Uses your profile (role + domain) to find topic-relevant words via Datamuse. Bridges from known words to goal-domain vocabulary.') },
+          { id: 'build_from_known', name: 'Build From What You Know', desc: 'Higher-level replacements for words you know', count: smartCounts.build_from_known, signal: smartCounts.build_from_known > 0 ? smartCounts.build_from_known + ' suggestions' : 'From your vocabulary', preview: [], subtitle: 'Advance from known words' + betaBadge + infoIcon('How: Takes your top mastered words and finds higher-CEFR semantically related words via Datamuse. Only shows words above your current level. Boosted for your goal domain.') },
+          { id: 'activate_recognized', name: 'Activate What You Recognize', desc: 'Passive vocabulary — words seen but not claimed', count: smartCounts.activate_recognized, signal: smartCounts.activate_recognized > 0 ? smartCounts.activate_recognized + ' passive words' : 'No passive gap', preview: [], subtitle: 'Claim your passive vocab' + betaBadge + infoIcon('How: Subtracts all words you have explicitly saved from all words you have ever encountered. The difference is your passive vocabulary. Saving a word here moves it to active.') },
+          { id: 'upcoming_useful_vocab', name: 'Goal-Based Upcoming Vocab', desc: 'Words for your declared short-term goals', count: smartCounts.upcoming_useful_vocab, signal: smartCounts.upcoming_useful_vocab > 0 ? smartCounts.upcoming_useful_vocab + ' upcoming' : 'Declare a short-term goal', preview: [], subtitle: 'What you said you need next' + betaBadge + infoIcon('How: Reads your declared short-term goal (e.g. "Prepare for job interview") and uses Datamuse topics to find vocabulary. Filtered by your CEFR level. Set your short-term goal in Account > Goals.') },
+          { id: 'upcoming_session_driven', name: 'Session-Detected Themes', desc: 'Predicted needs from your recent session topics', count: smartCounts.upcoming_session_driven, signal: smartCounts.upcoming_session_driven > 0 ? smartCounts.upcoming_session_driven + ' detected' : 'Not enough session data', preview: [], subtitle: 'From your practice patterns' + betaBadge + infoIcon('How: Analyzes your last 20 session titles for recurring themes. If you have been practicing "meetings" a lot, we predict you will need more meeting vocabulary next.') },
+          { id: 'upcoming_roadmap', name: 'Your Learning Roadmap', desc: 'Staged vocabulary for your goal journey', count: smartCounts.upcoming_roadmap, signal: smartCounts.upcoming_roadmap > 0 ? smartCounts.upcoming_roadmap + ' staged' : 'Define goal stages', preview: [], subtitle: 'Stage-by-stage vocab plan' + betaBadge + infoIcon('How: Breaks your long-term goal into stages (e.g. interview → onboarding → daily work → meetings). Each stage has topic-specific vocabulary. Shows current and next stage words. Define stages in Account > Goals.') }
         ];
         smartBanks.forEach(function(b) {
           smartHtml += wbCardHTML(b.id, b.name, 'smart', b.desc, b.count, b.signal, b.preview, b.subtitle);
@@ -4232,6 +4154,7 @@
           'saved_from_sessions':'Salvate dalle sessioni','fragile_words':'Parole fragili',
           'goal_next_step':'Prossimo passo per il tuo obiettivo','build_from_known':'Costruisci da ciò che conosci',
           'activate_recognized':'Attiva ciò che riconosci','upcoming_useful_vocab':'Vocabolario utile in arrivo',
+          'upcoming_session_driven':'Temi rilevati dalle sessioni','upcoming_roadmap':'Il tuo percorso di apprendimento',
           'it_review_due':'Ripasso immediato','it_saved_sessions':'Salvate da sessioni',
           'it_vocab_builder':'Italian Vocabulary Builder',
           'it_new_weekly':'Nuove questa settimana','it_fragile':'Parole Fragili',
@@ -4244,6 +4167,7 @@
           'saved_from_sessions':'pinned','fragile_words':'pinned',
           'goal_next_step':'smart','build_from_known':'smart',
           'activate_recognized':'smart','upcoming_useful_vocab':'smart',
+          'upcoming_session_driven':'smart','upcoming_roadmap':'smart',
           'it_review_due':'pinned','it_saved_sessions':'pinned',
           'it_vocab_builder':'pinned',
           'it_new_weekly':'pinned','it_fragile':'pinned',
@@ -4277,6 +4201,8 @@
           'build_from_known':'Nessun vocabolo collegato disponibile.',
           'activate_recognized':'Nessun candidato per l\'attivazione.',
           'upcoming_useful_vocab':'Nessun vocabolario in coda.',
+          'upcoming_session_driven':'Non abbastanza dati sulle sessioni per rilevare temi.',
+          'upcoming_roadmap':'Definisci le tappe del tuo obiettivo per sbloccare.',
           'it_review_due':'Tutto in ordine per ora.',
           'it_saved_sessions':'Non hai ancora salvato parole italiane dalle sessioni.',
           'it_vocab_builder':'Nessuna parola italiana salvata. Usa il + sui chip di traduzione nel Vocabulary Builder.',
@@ -4494,7 +4420,9 @@
           'goal_next_step': '<strong>Recommendation logic:</strong> Words matched to your profile (role, domain, objectives). Each gets a <code>goal_relevance_score</code>. Only a small batch (5–12) is shown at a time. Every word says why it\'s relevant.',
           'build_from_known': '<strong>Recommendation logic:</strong> Lexical progression from words you already know — synonyms, register upgrades, collocations, derivations. Built from the <code>review_word_relations</code> graph.',
           'activate_recognized': '<strong>Recommendation logic:</strong> Words where recognition ≥ 50 but production/speech/typing &lt; 45. You understand them — now it\'s time to start using them actively.',
-          'upcoming_useful_vocab': '<strong>Recommendation logic:</strong> Words tied to your roadmap stage. If your goal says "work remotely for a Dutch company," the system stages interviews, meetings, and async-communication vocabulary gradually.'
+          'upcoming_useful_vocab': '<strong>Recommendation logic:</strong> Words tied to your declared short-term goal. Extracts keywords from your goal text and queries Datamuse topics to find vocabulary you will need imminently. Filtered to your CEFR level.',
+          'upcoming_session_driven': '<strong>Recommendation logic:</strong> Analyzes your last 20 session titles for recurring word patterns. If you have been practicing a theme repeatedly, predicts you will need more vocabulary in that domain next.',
+          'upcoming_roadmap': '<strong>Recommendation logic:</strong> Breaks your long-term goal into stages (interview, onboarding, daily work, etc.) and stages topic-specific vocabulary. Shows current-stage and next-stage words so you are always prepared for what is coming.'
         };
         section.innerHTML = (whyTexts[bankId] || '<strong>Collection rule:</strong> This bank uses custom criteria defined by you.') +
           '<div style="margin-top:6px;font-size:10px;color:var(--text-faint)">These rules determine which words appear here and in what order.</div>';
@@ -7351,10 +7279,14 @@
         if (pgEl) pgEl.innerHTML = pinnedHtml;
 
         var smartHtml = '';
+        var betaBadge = ' <span style="display:inline-block;padding:1px 6px;border-radius:99px;background:var(--cyan);color:#000;font-size:9px;font-weight:700;letter-spacing:0.04em;margin-left:4px">BETA</span>';
+        var infoIcon = function(how) {
+          return ' <span title="' + how.replace(/"/g,'&quot;') + '" style="cursor:help;font-size:11px;color:var(--cyan);opacity:.85" onclick="event.stopPropagation();event.preventDefault();alert(\'' + how.replace(/'/g,"\\'").replace(/\n/g,' ') + '\')"><i class="fa-solid fa-circle-info"></i></span>';
+        };
         var smartBanks = [
-          { id: 'it_next_step', name: 'Prossimo passo', desc: 'Vocabolario italiano per i tuoi obiettivi', count: 0, signal: 'Completa il profilo', subtitle: 'Suggerito per il tuo obiettivo' },
-          { id: 'it_build_known', name: 'Costruisci da ciò che sai', desc: 'Progressione lessicale italiana', count: 0, signal: 'Cerca parole', subtitle: 'Parole derivate dal tuo vocabolario' },
-          { id: 'it_activate', name: 'Attiva ciò che riconosci', desc: 'Parole che capisci ma non usi', count: 0, signal: 'Nessun gap rilevato', subtitle: 'Trasforma riconoscimento in uso attivo' }
+          { id: 'it_next_step', name: 'Prossimo passo', desc: 'Vocabolario italiano per i tuoi obiettivi', count: 0, signal: 'Completa il profilo', subtitle: 'Per il tuo obiettivo' + betaBadge + infoIcon('How: Uses your profile (role + domain) to find Italian topic-relevant words via Datamuse. Requires a completed profile with Italian as target language.') },
+          { id: 'it_build_known', name: 'Costruisci da ciò che sai', desc: 'Progressione lessicale italiana', count: 0, signal: 'Cerca parole', subtitle: 'Dal tuo vocabolario' + betaBadge + infoIcon('How: Takes your top mastered Italian words and finds higher-level words via Datamuse. Only words above your current CEFR level.') },
+          { id: 'it_activate', name: 'Attiva ciò che riconosci', desc: 'Parole che capisci ma non usi', count: 0, signal: 'Nessun gap rilevato', subtitle: 'Da passivo ad attivo' + betaBadge + infoIcon('How: Subtracts all Italian words you have explicitly saved from all Italian words you have ever encountered. The difference is your passive vocabulary.') }
         ];
         smartBanks.forEach(function(b) {
           smartHtml += wbCardHTML(b.id, b.name, 'smart', b.desc, b.count, b.signal, [], b.subtitle);
