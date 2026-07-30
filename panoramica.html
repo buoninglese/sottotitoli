@@ -8741,6 +8741,21 @@
       return null;
     }
 
+    // Helper: is this a real English word? Check against known word lists
+    function isRealWord(word) {
+      var w = word.toLowerCase();
+      if (window.LEMMA_POS_MAP && window.LEMMA_POS_MAP[w]) return true;
+      if (window.CEFR_LEVELS && window.CEFR_LEVELS[w]) return true;
+      if (window.CEFR_GSE && window.CEFR_GSE[w]) return true;
+      // Fallback: basic sanity checks
+      if (w.length < 2) return false;
+      if (/[^a-z]/.test(w)) return false;
+      if (/^(.)\1+$/.test(w)) return false; // all same letter (e.g. "iii")
+      // Must contain at least one vowel
+      if (!/[aeiouy]/.test(w)) return false;
+      return true;
+    }
+
     for (var i = 0; i < topNouns.length; i++) {
       var noun = topNouns[i].word;
       var cacheKey = 'aug2_' + noun.toLowerCase();
@@ -8757,41 +8772,31 @@
       var batch = [];
       try {
         // Adjectives: rel_jja = "popular adjectives used to modify noun"
-        var adjResp = await fetch('https://api.datamuse.com/words?rel_jja=' + encodeURIComponent(noun) + '&max=6');
+        var adjResp = await fetch('https://api.datamuse.com/words?rel_jja=' + encodeURIComponent(noun) + '&max=8&md=d');
         if (adjResp.ok) {
           var adjData = await adjResp.json();
           adjData.forEach(function(d) {
             var w = d.word.toLowerCase();
             if (seen.has(w) || w.indexOf(' ') >= 0) return;
+            if (!isRealWord(d.word)) return; // skip garbage like "III"
             var rpos = realPOS(d.word, d.tags);
-            // Use realPOS result as tag; if truly unknown, tag as JJ (adjective query intent)
             var tag = rpos || 'JJ';
             seen.add(w);
-            batch.push({
-              word: d.word, tag: tag,
-              level: estimateCEFRLevel(d.word),
-              frequency_count: 0, category_title: catTitle,
-              _augmented: true
-            });
+            batch.push({ word: d.word, tag: tag, level: estimateCEFRLevel(d.word), frequency_count: 0, category_title: catTitle, _augmented: true });
           });
         }
         // Verbs: rel_trg = "words often triggered by noun"
-        var trgResp = await fetch('https://api.datamuse.com/words?rel_trg=' + encodeURIComponent(noun) + '&max=6');
+        var trgResp = await fetch('https://api.datamuse.com/words?rel_trg=' + encodeURIComponent(noun) + '&max=8&md=d');
         if (trgResp.ok) {
           var trgData = await trgResp.json();
           trgData.forEach(function(d) {
             var w = d.word.toLowerCase();
             if (seen.has(w) || w.indexOf(' ') >= 0) return;
+            if (!isRealWord(d.word)) return; // skip garbage like "AGROUND"
             var rpos = realPOS(d.word, d.tags);
-            // Use realPOS result as tag; if truly unknown, tag as VB (verb query intent)
             var tag = rpos || 'VB';
             seen.add(w);
-            batch.push({
-              word: d.word, tag: tag,
-              level: estimateCEFRLevel(d.word),
-              frequency_count: 0, category_title: catTitle,
-              _augmented: true
-            });
+            batch.push({ word: d.word, tag: tag, level: estimateCEFRLevel(d.word), frequency_count: 0, category_title: catTitle, _augmented: true });
           });
         }
       } catch(e) { /* skip this noun */ }
