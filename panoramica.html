@@ -4422,6 +4422,7 @@
             '<div style="display:flex;align-items:center;gap:10px;margin-bottom:4px"><h3 style="margin:0;font-size:20px;font-weight:700">'+name+'</h3><span class="section-badge '+badgeClass+'" style="font-size:9px;letter-spacing:0.08em">'+typeLabel+'</span></div>'+
             (subtitle ? '<p style="margin:0 0 8px;font-size:12px;color:var(--text-soft);max-width:500px">'+subtitle+'</p>' : '')+
             '<div style="font-size:12px;color:var(--text-soft);display:flex;gap:14px;margin-bottom:8px"><span>'+words.length+' words</span></div>'+
+            '<div style="display:flex;gap:8px;margin-bottom:14px"><input id="wbAddWordInput" placeholder="Aggiungi una parola…" style="flex:1;max-width:300px;padding:8px 14px;border-radius:100px;border:1.5px solid var(--line);background:var(--card);color:var(--text);font-size:13px;font-family:var(--font-ui);outline:none" onkeydown="if(event.key===\'Enter\')wbAddWordToBank()"><button class="fchip" onclick="wbAddWordToBank()" style="font-size:13px;padding:8px 16px;font-family:var(--font-ui)"><i class="fa-solid fa-plus"></i> Add</button></div>'+
             '<div id="wbWhySection" style="display:none;margin-top:10px;padding:12px 16px;background:var(--panel-2);border-radius:10px;border:1px solid var(--line);font-size:12px;color:var(--text-soft);line-height:1.5"></div>'+
           '</div>'+
           (words.length === 0 ?
@@ -4430,6 +4431,29 @@
             '<div class="wb-table-wrap"><table class="wb-table"><thead><tr><th class="cb"><input type="checkbox" onchange="wbToggleAll(this)" style="accent-color:var(--cyan)"></th><th class="sortable" data-sort="word">Word <span class="sort-arrow">▲</span></th><th class="sortable" data-sort="pos">POS <span class="sort-arrow">▲</span></th><th class="sortable" data-sort="cefr">CEFR <span class="sort-arrow">▲</span></th><th class="sortable" data-sort="uses">Uses <span class="sort-arrow">▲</span></th><th></th></tr></thead><tbody id="wbTableBody"></tbody></table></div>');
         renderWbTable(words);
       }
+
+      window.wbAddWordToBank = async function() {
+        var inp = document.getElementById('wbAddWordInput');
+        if (!inp || !inp.value.trim()) return;
+        var word = inp.value.trim();
+        var bankId = _wbState.currentBank;
+        if (!bankId) return;
+        var sb = window.sottotitoliSupabase;
+        if (sb) {
+          try {
+            var r = await sb.auth.getSession();
+            if (r.data?.session) {
+              await sb.from('user_wordbank_words').insert({
+                wordbank_id: _wbState.currentBankUUID || bankId, word: word, user_id: r.data.session.user.id, usage_count: 1
+              });
+            }
+          } catch(e) {}
+        }
+        inp.value = '';
+        // Reload the bank view
+        if (typeof openWordbankView === 'function') openWordbankView(bankId);
+        showWbxToast('✓ ' + word + ' aggiunto');
+      };
 
       function closeWordbankView() {
         var itTab = document.querySelector('[data-subtab="wb-overview-it"][aria-selected="true"]');
