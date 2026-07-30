@@ -4080,7 +4080,7 @@
         }
 
         // ── Pinned counts: try review_words first, fall back to wordbank stats ──
-        var pinnedCounts = { review_due_now: 0, new_from_sessions: 0, saved_from_sessions: 0, fragile_words: 0 };
+        var pinnedCounts = { review_due_now: 0, new_from_sessions: 0, saved_from_sessions: 0, fragile_words: 0, vocab_builder_en: 0 };
         try {
           var sbClient = window.sottotitoliSupabase;
           if (sbClient) {
@@ -4104,6 +4104,7 @@
           { id: 'review_due_now', name: 'Ripasso immediato', desc: 'Parole da ripassare ora o in ritardo', count: pinnedCounts.review_due_now, signal: pinnedCounts.review_due_now > 0 ? pinnedCounts.review_due_now + ' da fare' : 'Tutto in ordine!', subtitle: 'Parole pronte per il ripasso immediato' },
           { id: 'new_from_sessions', name: 'New From Recent Sessions', desc: 'Recently captured words not yet stabilized', count: pinnedCounts.new_from_sessions, signal: pinnedCounts.new_from_sessions > 0 ? '+' + pinnedCounts.new_from_sessions + ' this week' : 'None yet', subtitle: 'New words from your recent sessions' },
           { id: 'saved_from_sessions', name: 'Saved From Sessions', desc: 'Words you saved during live sessions', count: pinnedCounts.saved_from_sessions, signal: pinnedCounts.saved_from_sessions > 0 ? pinnedCounts.saved_from_sessions + ' words' : 'Save words during sessions', subtitle: 'Saved words from live use' },
+          { id: 'vocab_builder_en', name: 'English Vocabulary Builder', desc: 'Words saved from Vocabulary Builder search', count: pinnedCounts.vocab_builder_en, signal: pinnedCounts.vocab_builder_en > 0 ? pinnedCounts.vocab_builder_en + ' words' : 'Save from VB', subtitle: 'Saved from Vocabulary Builder English' },
           { id: 'fragile_words', name: 'Fragile Words', desc: 'Weak words at risk of being forgotten', count: pinnedCounts.fragile_words, signal: pinnedCounts.fragile_words > 0 ? pinnedCounts.fragile_words + ' need reinforcement' : 'None at risk', subtitle: 'Words that need reinforcement' }
         ];
         var pinnedHtml = '';
@@ -4237,8 +4238,9 @@
           'goal_next_step':'Prossimo passo per il tuo obiettivo','build_from_known':'Costruisci da ciò che conosci',
           'activate_recognized':'Attiva ciò che riconosci','upcoming_useful_vocab':'Vocabolario utile in arrivo',
           'it_review_due':'Ripasso immediato','it_saved_sessions':'Salvate da sessioni',
-          'it_translations':'Traduzioni salvate',
+          'it_vocab_builder':'Italian Vocabulary Builder',
           'it_new_weekly':'Nuove questa settimana','it_fragile':'Parole Fragili',
+          'vocab_builder_en':'English Vocabulary Builder',
           'it_next_step':'Prossimo passo','it_build_known':'Costruisci da ciò che sai',
           'it_activate':'Attiva ciò che riconosci'
         };
@@ -4248,8 +4250,9 @@
           'goal_next_step':'smart','build_from_known':'smart',
           'activate_recognized':'smart','upcoming_useful_vocab':'smart',
           'it_review_due':'pinned','it_saved_sessions':'pinned',
-          'it_translations':'pinned',
+          'it_vocab_builder':'pinned',
           'it_new_weekly':'pinned','it_fragile':'pinned',
+          'vocab_builder_en':'pinned',
           'it_next_step':'smart','it_build_known':'smart',
           'it_activate':'smart'
         };
@@ -4264,8 +4267,9 @@
           'upcoming_useful_vocab':'Suggerite per i prossimi passi',
           'it_review_due':'Parole italiane pronte per il ripasso',
           'it_saved_sessions':'Parole italiane salvate durante le sessioni',
-          'it_translations':'Parole italiane aggiunte con + dai chip di traduzione',
+          'it_vocab_builder':'Parole italiane aggiunte con + dal Vocabulary Builder',
           'it_new_weekly':'Parole italiane raccolte di recente',
+          'vocab_builder_en':'Parole inglesi salvate dal Vocabulary Builder',
           'it_fragile':'Parole italiane a rischio',
           'it_next_step':'Vocabolario italiano per i tuoi obiettivi',
           'it_build_known':'Progressione lessicale italiana',
@@ -4282,8 +4286,9 @@
           'upcoming_useful_vocab':'Nessun vocabolario in coda.',
           'it_review_due':'Tutto in ordine per ora.',
           'it_saved_sessions':'Non hai ancora salvato parole italiane dalle sessioni.',
-          'it_translations':'Nessuna traduzione salvata. Usa il + sui chip di traduzione nel Vocabulary Builder.',
+          'it_vocab_builder':'Nessuna parola italiana salvata. Usa il + sui chip di traduzione nel Vocabulary Builder.',
           'it_new_weekly':'Nessuna nuova parola italiana questa settimana.',
+          'vocab_builder_en':'No words saved yet. Use + on cards in Vocabulary Builder > English.',
           'it_fragile':'Nessuna parola italiana fragile al momento.',
           'it_next_step':'Nessun suggerimento basato sugli obiettivi.',
           'it_build_known':'Nessun vocabolo collegato disponibile.',
@@ -4358,13 +4363,19 @@
               }
             }
           } catch(e) { /* leave empty */ }
-        } else if (bankId === 'it_translations') {
-          // Pinned "Traduzioni salvate" — read from localStorage (must precede generic pinned handler)
+        } else if (bankId === 'it_vocab_builder') {
+          // Pinned "Italian Vocabulary Builder" — read from localStorage (migrating to Supabase)
           try {
             var stored = JSON.parse(localStorage.getItem('sottotitoli_wb_it_pinned') || '{"words":[]}');
             words = (stored.words || []).map(function(w, i) {
-              return { id: 'tr_' + i, word: w, lemma: w, pos: '', lang: 'it', status: 'known', usage_count: 1 };
+              return { id: 'itvb_' + i, word: w, lemma: w, pos: '', lang: 'it', status: 'known', usage_count: 1 };
             });
+          } catch(e) { /* leave empty */ }
+        } else if (bankId === 'vocab_builder_en') {
+          // Pinned "English Vocabulary Builder" — fetch from Supabase user_wordbank_words
+          try {
+            var vbBank = banks.find(function(b){ return b.name === 'English Vocabulary Builder'; });
+            if (vbBank) { words = await SottotitoliData.getWordbankWords(vbBank.id); }
           } catch(e) { /* leave empty */ }
         } else if (bankId === 'it_saved_sessions') {
           // Italian "Saved from sessions" — fetch from actual user bank
@@ -6563,11 +6574,11 @@
           targetBank = bank;
         }
         if (!targetBank) {
-          // Fallback: "Saved from sessions" bank
+          // Fallback: "English Vocabulary Builder" bank (default for VB saves)
           var banks = await SottotitoliData.getWordbanks(lang);
-          targetBank = banks.find(function(b) { return b.name === 'Saved from sessions'; });
+          targetBank = banks.find(function(b) { return b.name === 'English Vocabulary Builder'; });
           if (!targetBank) {
-            var createRes = await sb.from('user_wordbanks').insert({ user_id: userId, name: 'Saved from sessions', lang: lang }).select().single();
+            var createRes = await sb.from('user_wordbanks').insert({ user_id: userId, name: 'English Vocabulary Builder', lang: lang }).select().single();
             if (createRes.error) { console.warn('create bank:', createRes.error.message); return; }
             targetBank = createRes.data;
           }
@@ -6815,32 +6826,39 @@
       window.showToastMsg = showWbxToast;
 
       // ── Save Italian translation word to pinned Italian word bank ──
-      window.saveItalianWordToBank = function(word, btn) {
+      window.saveItalianWordToBank = async function(word, btn) {
         if (btn.classList.contains('saved')) return;
         btn.classList.add('saved');
         btn.textContent = '✓';
-        // Store in localStorage for immediate persistence
+        var sb = window.sottotitoliSupabase;
+        if (sb) {
+          try {
+            var r = await sb.auth.getSession();
+            if (r.data?.session) {
+              var userId = r.data.session.user.id;
+              // Find or create "Italian Vocabulary Builder" bank
+              var { data: banks } = await sb.from('user_wordbanks').select('id,name').eq('user_id', userId).eq('lang', 'it');
+              var targetBank = (banks||[]).find(function(b){ return b.name === 'Italian Vocabulary Builder'; });
+              if (!targetBank) {
+                var createRes = await sb.from('user_wordbanks').insert({ user_id: userId, name: 'Italian Vocabulary Builder', lang: 'it' }).select().single();
+                if (createRes.data) targetBank = createRes.data;
+              }
+              if (targetBank) {
+                await sb.from('user_wordbank_words').upsert({
+                  wordbank_id: targetBank.id, word: word, user_id: userId, lang: 'it', status: 'new', usage_count: 1
+                }, { onConflict: 'wordbank_id,word' });
+              }
+            }
+          } catch(e) {}
+        }
+        // Also keep localStorage for offline/immediate feedback
         var bankKey = 'sottotitoli_wb_it_pinned';
-        var bank = JSON.parse(localStorage.getItem(bankKey) || '{"name":"Build From Translate","words":[]}');
+        var bank = JSON.parse(localStorage.getItem(bankKey) || '{"name":"Italian Vocabulary Builder","words":[]}');
         if (bank.words.indexOf(word) === -1) {
           bank.words.push(word);
           localStorage.setItem(bankKey, JSON.stringify(bank));
         }
-        // Also save to Supabase if logged in
-        if (window.sottotitoliSupabase) {
-          window.sottotitoliSupabase.auth.getSession().then(function(r){
-            if (!r.data?.session) return;
-            // Upsert into user_wordbank_words
-            window.sottotitoliSupabase.from('user_wordbank_words').upsert({
-              user_id: r.data.session.user.id,
-              word: word,
-              lang: 'it',
-              wordbank_id: bankKey,
-              created_at: new Date().toISOString()
-            }, { onConflict: 'user_id,word,lang' }).then(function(){});
-          });
-        }
-        showWbxToast('📥 ' + word + ' salvato nella banca italiana');
+        showWbxToast('📥 ' + word + ' salvato in Italian Vocabulary Builder');
       };
 
       // ── Bank selector: populate "Save to" dropdown ──
@@ -6849,7 +6867,7 @@
         var sel = document.getElementById('wbxSaveTarget');
         if (!sel) return;
         // Default + standard options always available
-        sel.innerHTML = '<option value="">Build From Known (default)</option>' +
+        sel.innerHTML = '<option value="">English Vocabulary Builder (default)</option>' +
           '<option value="saved_from_sessions">Saved from sessions</option>';
         // Add localStorage custom banks immediately
         try {
@@ -7212,7 +7230,7 @@
         var pinnedBanks = [
           { id: 'it_review_due', name: 'Ripasso immediato', desc: 'Parole italiane da ripassare', count: 0, signal: 'Prossimamente', subtitle: 'Parole italiane pronte per il ripasso' },
           { id: 'it_saved_sessions', name: 'Salvate da sessioni', desc: 'Parole italiane salvate durante sessioni live', count: stats.totalWords || 0, signal: (stats.totalWords || 0) + ' parole', subtitle: 'Salvate durante l\'uso dal vivo' },
-          { id: 'it_translations', name: 'Traduzioni salvate', desc: 'Parole italiane salvate dai chip di traduzione nel Vocabulary Builder', count: (function(){ try { var b=JSON.parse(localStorage.getItem('sottotitoli_wb_it_pinned')||'{"words":[]}'); return (b.words||[]).length; } catch(e){ return 0; } })(), signal: 'Salvate da Build From Known', subtitle: 'Aggiunte con + sui traduzioni' },
+          { id: 'it_vocab_builder', name: 'Italian Vocabulary Builder', desc: 'Parole italiane salvate dal Vocabulary Builder', count: (function(){ try { var b=JSON.parse(localStorage.getItem('sottotitoli_wb_it_pinned')||'{"words":[]}'); return (b.words||[]).length; } catch(e){ return 0; } })(), signal: 'Salvate da VB', subtitle: 'Salvate con + sui chip di traduzione' },
           { id: 'it_new_weekly', name: 'Nuove questa settimana', desc: 'Parole italiane raccolte di recente', count: stats.newThisWeek || 0, signal: stats.newThisWeek > 0 ? '+' + stats.newThisWeek + ' questa settimana' : 'Ancora nessuna', subtitle: 'Parole italiane recenti' },
           { id: 'it_fragile', name: 'Parole Fragili', desc: 'Parole italiane a rischio', count: 0, signal: 'Prossimamente', subtitle: 'Parole che necessitano rinforzo' }
         ];
