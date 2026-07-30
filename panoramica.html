@@ -5871,11 +5871,11 @@
         if (!inp || !results) return;
 
         var query = inp.value.trim();
+        // Always reset disambiguation state on new search
+        var disambig = document.getElementById('wbExpandDisambig');
+        if (disambig) disambig.style.display = 'none';
+        window._wbxSelectedPos = null;
         if (!query || query.length < 2) {
-          // Hide disambiguation bar on empty query
-          var disambig = document.getElementById('wbExpandDisambig');
-          if (disambig) disambig.style.display = 'none';
-          window._wbxSelectedPos = null;
           results.innerHTML = '<div style="text-align:center;padding:40px 20px;color:var(--text-faint)"><div style="font-size:48px;margin-bottom:12px;color:var(--text-faint)"><i class="fa-solid fa-brain"></i></div><h3 style="color:var(--text-soft);margin-bottom:6px">Costruisci da ciò che sai</h3><p style="font-size:14px;max-width:440px;margin:0 auto;line-height:1.5">Scrivi una parola che conosci e Sottotitoli ti mostrerà sinonimi, contrari, collocazioni e parole correlate al tuo livello.</p></div>';
           if (info) info.textContent = '';
           return;
@@ -5925,9 +5925,16 @@
         }
 
         try {
-          var resp = await fetch(apiUrl);
-          if (!resp.ok) throw new Error('API error ' + resp.status);
-          var data = await resp.json();
+          // Check cache first
+          var cacheKey = 'dm_' + rel + '_' + query.toLowerCase();
+          var cached = _datamuseCache[cacheKey];
+          var data = cached || null;
+          if (!data) {
+            var resp = await fetch(apiUrl);
+            if (!resp.ok) throw new Error('API error ' + resp.status);
+            data = await resp.json();
+            _datamuseCache[cacheKey] = data;
+          }
 
           // For collocations, also fetch words that follow the query
           var collocationExtra = [];
@@ -6362,23 +6369,32 @@
       };
 
       // ── Re-query Datamuse with POS filter ──
+      var _datamuseCache = {};
       async function reQuerySuggestions(word, rel, posCode) {
         try {
+          var cacheKey = word + '|' + rel + '|' + (posCode || '');
+          if (_datamuseCache[cacheKey]) return _datamuseCache[cacheKey];
           var posTopic = { n:'noun', v:'verb', adj:'adj', adv:'adv' }[posCode] || '';
           var url = 'https://api.datamuse.com/words?' + relMap[rel] + '=' + encodeURIComponent(word) + '&max=20';
           if (posTopic) url += '&topics=' + posTopic;
           var resp = await fetch(url);
           if (!resp.ok) return [];
           var data = await resp.json();
-          return data.map(function(d){
+          var result = data.map(function(d){
             var tags = d.tags || [];
             var pos = '—';
             if (tags.indexOf('n') >= 0) pos = 'n';
             else if (tags.indexOf('v') >= 0) pos = 'v';
             else if (tags.indexOf('adj') >= 0) pos = 'adj';
             else if (tags.indexOf('adv') >= 0) pos = 'adv';
+            // Enhanced POS via lemma map
+            if (pos === '—' && window.LEMMA_POS_MAP && window.LEMMA_POS_MAP[d.word.toLowerCase()]) {
+              pos = window.LEMMA_POS_MAP[d.word.toLowerCase()];
+            }
             return { word: d.word, pos: pos, level: estimateCEFR(d.word), frequency_count: d.score || 0 };
           }).filter(function(s){ return !posCode || s.pos === posCode || s.pos === '—'; }).slice(0, 15);
+          _datamuseCache[cacheKey] = result;
+          return result;
         } catch(e) { return []; }
       }
       var relMap = { synonyms:'rel_syn', antonyms:'rel_ant', 'word-family':'rel_spc', collocations:'rel_jjb', 'next-level':'ml' };
