@@ -8695,11 +8695,105 @@
     try {
       var data = await cachedCefrFetch(_cefrApi + '/category/' + encodeURIComponent(catId));
       _cefrCurrentWords = data || [];
+      // Augment with adjectives + verbs from Datamuse
+      if (_cefrCurrentWords.length > 0) {
+        cardGrid.innerHTML = '<div style="text-align:center;padding:40px;color:var(--text-faint);grid-column:1/-1"><i class="fa-solid fa-spinner fa-spin"></i> Arricchendo con aggettivi e verbi...</div>';
+        _cefrCurrentWords = await augmentTopicWithDatamuse(catTitle, _cefrCurrentWords);
+      }
       renderCefrWords();
       document.getElementById('cefrTopicSearch').closest('.wb-search-bar').style.display = 'none';
     } catch(e) {
       if (cardGrid) cardGrid.innerHTML = '<div style="text-align:center;padding:40px;color:var(--text-faint);grid-column:1/-1">Errore nel caricamento.</div>';
     }
+  }
+
+  // ── Augment topic nouns with adjectives + verbs from Datamuse ──
+  var _augCache = {};
+  async function augmentTopicWithDatamuse(catTitle, words) {
+    var nouns = words.filter(function(w) {
+      var tag = (w.tag || '').toUpperCase();
+      return tag.startsWith('NN');
+    });
+    if (!nouns.length) return words;
+    // Take top 10 nouns by frequency
+    var topNouns = nouns.sort(function(a,b){ return (b.frequency_count||0) - (a.frequency_count||0); }).slice(0, 10);
+    var seen = new Set(words.map(function(w){ return (w.word||'').toLowerCase(); }));
+    var newWords = [];
+
+    // Fetch adjectives (rel_jja = popular adjectives modifying this noun)
+    // Fetch related verbs (rel_trg = words triggered by this noun)
+    for (var i = 0; i < topNouns.length; i++) {
+      var noun = topNouns[i].word;
+      var cacheKey = 'aug_' + noun.toLowerCase();
+      if (_augCache[cacheKey]) {
+        newWords = newWords.concat(_augCache[cacheKey]);
+        continue;
+      }
+      var batch = [];
+      try {
+        // Adjectives for this noun
+        var adjResp = await fetch('https://api.datamuse.com/words?rel_jja=' + encodeURIComponent(noun) + '&max=5');
+        if (adjResp.ok) {
+          var adjData = await adjResp.json();
+          adjData.forEach(function(d) {
+            var w = d.word.toLowerCase();
+            if (!seen.has(w)) {
+              seen.add(w);
+              var tags = d.tags || [];
+              batch.push({
+                word: d.word, tag: 'JJ', // adjective
+                level: estimateCEFRLevel(d.word),
+                frequency_count: d.score ? d.score * 10 : 0,
+                category_title: catTitle,
+                _augmented: true, _source: 'adjective for ' + noun
+              });
+            }
+          });
+        }
+        // Verbs triggered by this noun
+        var verbResp = await fetch('https://api.datamuse.com/words?rel_trg=' + encodeURIComponent(noun) + '&max=5');
+        if (verbResp.ok) {
+          var verbData = await verbResp.json();
+          verbData.forEach(function(d) {
+            var w = d.word.toLowerCase();
+            if (!seen.has(w) && w.indexOf(' ') === -1) {
+              seen.add(w);
+              var tags = d.tags || [];
+              var isVerb = tags.indexOf('v') >= 0;
+              batch.push({
+                word: d.word, tag: isVerb ? 'VB' : 'NN',
+                level: estimateCEFRLevel(d.word),
+                frequency_count: d.score ? d.score * 10 : 0,
+                category_title: catTitle,
+                _augmented: true, _source: 'verb for ' + noun
+              });
+            }
+          });
+        }
+      } catch(e) { /* skip this noun */ }
+      _augCache[cacheKey] = batch;
+      newWords = newWords.concat(batch);
+    }
+
+    // Deduplicate by word
+    var known = new Set(words.map(function(w){ return (w.word||'').toLowerCase(); }));
+    newWords = newWords.filter(function(w) { return !known.has(w.word.toLowerCase()); });
+
+    // Merge: original nouns + augmented adjectives + augmented verbs
+    return words.concat(newWords);
+  }
+
+  // ── Quick CEFR estimate for Datamuse words (no API call) ──
+  function estimateCEFRLevel(word) {
+    if (!word) return 3;
+    var w = word.toLowerCase();
+    if (window.CEFR_LEVELS && window.CEFR_LEVELS[w]) return typeof window.CEFR_LEVELS[w] === 'string' ? {A1:1,A2:2,B1:3,B2:4,C1:5,C2:6}[window.CEFR_LEVELS[w]]||3 : 3;
+    var len = w.length;
+    if (len <= 4) return 1;
+    if (len <= 6) return 2;
+    if (len <= 8) return 3;
+    if (len <= 10) return 4;
+    return 5;
   }
 
   function closeCefrTopic() {
