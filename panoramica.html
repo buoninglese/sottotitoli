@@ -4320,40 +4320,41 @@
           // Pinned banks 1,2,4 — query review_words directly (words from Pipeline 1)
           try {
             var sbClient = window.sottotitoliSupabase;
-            if (sbClient) {
+            if (!sbClient) { /* skip */ }
+            else {
               var rSession = await sbClient.auth.getSession();
               if (!rSession.data?.session) { /* not logged in — leave empty */ }
               else {
                 var userId = rSession.data.session.user.id;
                 var bankLang = isItalian ? 'it' : 'en';
                 var query = sbClient.from('review_words').select('*').eq('user_id', userId).eq('lang', bankLang).limit(200);
-              var nowISO = new Date().toISOString();
-              var weekAgo = new Date(Date.now() - 7*86400000).toISOString();
-              if (bankId === 'review_due_now') {
-                query = query.or('next_review_at.lte.' + nowISO + ',is_new.eq.true');
-              } else if (bankId === 'new_from_sessions') {
-                query = query.eq('is_new', true).gte('first_seen_at', weekAgo);
-              } else if (bankId === 'fragile_words') {
-                query = query.or('mastery_score.lt.40,lapses.gte.2');
-              }
-              var { data: rwData } = await query;
-              if (rwData && rwData.length) {
-                // Map review_words fields and deduplicate by lemma
-                var seen = {};
-                words = [];
-                rwData.forEach(function(r) {
-                  var key = (r.lemma || '').toLowerCase();
-                  if (!seen[key]) {
-                    seen[key] = true;
-                    words.push({
-                      id: r.id, word: r.lemma, lemma: r.lemma, pos: r.pos,
-                      cefr: r.cefr, cefr_level: r.cefr, level: r.cefr,
-                      usage_count: r.personal_frequency, frequency: r.personal_frequency, reps: r.reps,
-                      status: r.review_state, source_type: r.source_type, lang: r.lang,
-                      definition: r.translation_primary
-                    });
-                  }
-                });
+                var nowISO = new Date().toISOString();
+                var weekAgo = new Date(Date.now() - 7*86400000).toISOString();
+                if (bankId === 'review_due_now') {
+                  query = query.or('next_review_at.lte.' + nowISO + ',is_new.eq.true');
+                } else if (bankId === 'new_from_sessions') {
+                  query = query.eq('is_new', true).gte('first_seen_at', weekAgo);
+                } else if (bankId === 'fragile_words') {
+                  query = query.or('mastery_score.lt.40,lapses.gte.2');
+                }
+                var { data: rwData } = await query;
+                if (rwData && rwData.length) {
+                  var seen = {};
+                  words = [];
+                  rwData.forEach(function(r) {
+                    var key = (r.lemma || '').toLowerCase();
+                    if (!seen[key]) {
+                      seen[key] = true;
+                      words.push({
+                        id: r.id, word: r.lemma, lemma: r.lemma, pos: r.pos,
+                        cefr: r.cefr, cefr_level: r.cefr, level: r.cefr,
+                        usage_count: r.personal_frequency, frequency: r.personal_frequency, reps: r.reps,
+                        status: r.review_state, source_type: r.source_type, lang: r.lang,
+                        definition: r.translation_primary
+                      });
+                    }
+                  });
+                }
               }
             }
           } catch(e) { /* leave empty */ }
@@ -6076,6 +6077,7 @@
           console.warn('Datamuse API error:', e);
         }
       }
+      window.renderExpandSuggestions = renderExpandSuggestions;
 
       function relLabels(rel) {
         var m = { synonyms: 'Sinonimi', antonyms: 'Contrari', 'word-family': 'Famiglia di parole', collocations: 'Collocazioni', 'next-level': 'Livello superiore' };
