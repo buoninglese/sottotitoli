@@ -4080,7 +4080,7 @@
         }
 
         // ── Pinned counts: try review_words first, fall back to wordbank stats ──
-        var pinnedCounts = { review_due_now: 0, new_from_sessions: 0, saved_from_sessions: 0, fragile_words: 0, vocab_builder_en: 0 };
+        var pinnedCounts = { review_due_now: 0, saved_from_sessions: 0, fragile_words: 0, vocab_builder_en: 0 };
         try {
           var sbClient = window.sottotitoliSupabase;
           if (sbClient) {
@@ -4088,10 +4088,6 @@
             // Review Due Now: next_review_at <= now OR is_new=true (never reviewed yet)
             var { count: dueCount } = await sbClient.from('review_words').select('*', { count: 'exact', head: true }).or('next_review_at.lte.' + nowISO + ',is_new.eq.true');
             if (dueCount !== null) pinnedCounts.review_due_now = dueCount;
-            // New From Recent Sessions: is_new = true, first_seen_at within 7 days
-            var weekAgo = new Date(Date.now() - 7*86400000).toISOString();
-            var { count: newCount } = await sbClient.from('review_words').select('*', { count: 'exact', head: true }).eq('is_new', true).gte('first_seen_at', weekAgo);
-            if (newCount !== null) pinnedCounts.new_from_sessions = newCount;
             // Fragile Words: mastery < 40 OR lapses >= 2
             var { count: fragCount } = await sbClient.from('review_words').select('*', { count: 'exact', head: true }).or('mastery_score.lt.40,lapses.gte.2');
             if (fragCount !== null) pinnedCounts.fragile_words = fragCount;
@@ -4102,7 +4098,6 @@
 
         var pinnedBanks = [
           { id: 'review_due_now', name: 'Ripasso immediato', desc: 'Parole da ripassare ora o in ritardo', count: pinnedCounts.review_due_now, signal: pinnedCounts.review_due_now > 0 ? pinnedCounts.review_due_now + ' da fare' : 'Tutto in ordine!', subtitle: 'Parole pronte per il ripasso immediato' },
-          { id: 'new_from_sessions', name: 'New From Recent Sessions', desc: 'Recently captured words not yet stabilized', count: pinnedCounts.new_from_sessions, signal: pinnedCounts.new_from_sessions > 0 ? '+' + pinnedCounts.new_from_sessions + ' this week' : 'None yet', subtitle: 'New words from your recent sessions' },
           { id: 'saved_from_sessions', name: 'Saved From Sessions', desc: 'Words you saved during live sessions', count: pinnedCounts.saved_from_sessions, signal: pinnedCounts.saved_from_sessions > 0 ? pinnedCounts.saved_from_sessions + ' words' : 'Save words during sessions', subtitle: 'Saved words from live use' },
           { id: 'vocab_builder_en', name: 'English Vocabulary Builder', desc: 'Words saved from Vocabulary Builder search', count: pinnedCounts.vocab_builder_en, signal: pinnedCounts.vocab_builder_en > 0 ? pinnedCounts.vocab_builder_en + ' words' : 'Save from VB', subtitle: 'Saved from Vocabulary Builder English' },
           { id: 'fragile_words', name: 'Fragile Words', desc: 'Weak words at risk of being forgotten', count: pinnedCounts.fragile_words, signal: pinnedCounts.fragile_words > 0 ? pinnedCounts.fragile_words + ' need reinforcement' : 'None at risk', subtitle: 'Words that need reinforcement' }
@@ -4140,7 +4135,7 @@
 
         // ── Custom banks from Supabase (exclude system banks already shown in Pinned/Smart) ──
         var banks = await SottotitoliData.getWordbanks(lang);
-        var systemBankNames = ['Saved from sessions', 'Build From Known', 'New Words', 'Saved For Later'];
+        var systemBankNames = ['Saved from sessions', 'Build From Known', 'New Words', 'Saved For Later', 'All Looked-Up Words'];
         var customHtml = '';
         if (banks && banks.length) {
           for (var i = 0; i < banks.length; i++) {
@@ -4233,7 +4228,7 @@
         }
 
         var bankNames = {
-          'review_due_now':'Ripasso immediato','new_from_sessions':'Nuove dalle sessioni recenti',
+          'review_due_now':'Ripasso immediato',
           'saved_from_sessions':'Salvate dalle sessioni','fragile_words':'Parole fragili',
           'goal_next_step':'Prossimo passo per il tuo obiettivo','build_from_known':'Costruisci da ciò che conosci',
           'activate_recognized':'Attiva ciò che riconosci','upcoming_useful_vocab':'Vocabolario utile in arrivo',
@@ -4245,7 +4240,7 @@
           'it_activate':'Attiva ciò che riconosci'
         };
         var bankTypes = {
-          'review_due_now':'pinned','new_from_sessions':'pinned',
+          'review_due_now':'pinned',
           'saved_from_sessions':'pinned','fragile_words':'pinned',
           'goal_next_step':'smart','build_from_known':'smart',
           'activate_recognized':'smart','upcoming_useful_vocab':'smart',
@@ -4258,7 +4253,6 @@
         };
         var bankSubtitles = {
           'review_due_now':'Parole pronte per il ripasso immediato',
-          'new_from_sessions':'Nuove parole dalle tue sessioni recenti',
           'saved_from_sessions':'Parole salvate durante l\'uso',
           'fragile_words':'Parole che hanno bisogno di rinforzo',
           'goal_next_step':'Suggerite per il tuo obiettivo attuale',
@@ -4277,7 +4271,6 @@
         };
         var bankEmptyStates = {
           'review_due_now':'Tutto in ordine per ora.',
-          'new_from_sessions':'Nessuna nuova parola catturata al momento.',
           'saved_from_sessions':'Non hai ancora salvato parole dalle sessioni.',
           'fragile_words':'Nessuna parola fragile al momento.',
           'goal_next_step':'Nessun suggerimento basato sugli obiettivi.',
@@ -4321,8 +4314,8 @@
               }
             });
           }
-        } else if (bankId === 'review_due_now' || bankId === 'new_from_sessions' || bankId === 'fragile_words') {
-          // Pinned banks 1,2,4 — query review_words directly (words from Pipeline 1)
+        } else if (bankId === 'review_due_now' || bankId === 'fragile_words') {
+          // Pinned banks 1,3 — query review_words directly (words from Pipeline 1)
           try {
             var sbClient = window.sottotitoliSupabase;
             if (!sbClient) { /* skip */ }
@@ -4334,11 +4327,8 @@
                 var bankLang = isItalian ? 'it' : 'en';
                 var query = sbClient.from('review_words').select('*').eq('user_id', userId).eq('lang', bankLang).limit(200);
                 var nowISO = new Date().toISOString();
-                var weekAgo = new Date(Date.now() - 7*86400000).toISOString();
                 if (bankId === 'review_due_now') {
                   query = query.or('next_review_at.lte.' + nowISO + ',is_new.eq.true');
-                } else if (bankId === 'new_from_sessions') {
-                  query = query.eq('is_new', true).gte('first_seen_at', weekAgo);
                 } else if (bankId === 'fragile_words') {
                   query = query.or('mastery_score.lt.40,lapses.gte.2');
                 }
@@ -4499,7 +4489,6 @@
         var bankId = _wbState.currentBank;
         var whyTexts = {
           'review_due_now': '<strong>Collection rule:</strong> All words with <code>next_review_at ≤ now</code>. Sorted by overdue first, then lowest mastery. This is your core spaced-repetition queue — the most urgent words to review.',
-          'new_from_sessions': '<strong>Collection rule:</strong> Words first seen in the last 7 days, not yet stabilized (<code>is_new = true</code>, reps &lt; 2). These bridge the gap from capture to learning.',
           'saved_from_sessions': '<strong>Collection rule:</strong> Words you explicitly saved during live sessions (<code>saved_origin = session</code>). Manual save is a strong intent signal. Grouped into due now vs. not due yet.',
           'fragile_words': '<strong>Collection rule:</strong> Words with low mastery (&lt;40), repeated lapses (≥2), or recent "again"/"hard" outcomes. These need targeted reinforcement before they\'re forgotten.',
           'goal_next_step': '<strong>Recommendation logic:</strong> Words matched to your profile (role, domain, objectives). Each gets a <code>goal_relevance_score</code>. Only a small batch (5–12) is shown at a time. Every word says why it\'s relevant.',
@@ -4936,7 +4925,7 @@
         var result = false;
         var sb = window.sottotitoliSupabase;
 
-        if (bankType === 'pinned' && (bankKey === 'review_due_now' || bankKey === 'new_from_sessions' || bankKey === 'fragile_words')) {
+        if (bankType === 'pinned' && (bankKey === 'review_due_now' || bankKey === 'fragile_words')) {
           // These query review_words directly — dismiss by marking not new + dismissed
           try {
             if (sb) {
@@ -5085,7 +5074,7 @@
 
         var sb = window.sottotitoliSupabase;
 
-        if (bankType === 'pinned' && (bankKey === 'review_due_now' || bankKey === 'new_from_sessions' || bankKey === 'fragile_words')) {
+        if (bankType === 'pinned' && (bankKey === 'review_due_now' || bankKey === 'fragile_words')) {
           // Dismiss from review_words
           if (sb) {
             try {
