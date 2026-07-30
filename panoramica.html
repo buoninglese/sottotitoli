@@ -8844,18 +8844,29 @@
     groupOrder.forEach(function(posLabel) {
       var groupWords = groups[posLabel];
       if (!groupWords || !groupWords.length) return;
-      var maxFreq = Math.max.apply(null, groupWords.map(function(w){ return w.frequency_count||0; })) || 1;
+      var maxFreq = Math.max.apply(null, groupWords.filter(function(w){ return !w._augmented; }).map(function(w){ return w.frequency_count||0; })) || 1;
       html += '<div class="wbx-pos-section" style="margin-bottom:18px">';
       html += '<h4 style="margin:0 0 8px;font-size:13px;font-weight:700;color:var(--text-soft);text-transform:capitalize;letter-spacing:0.03em">' + posLabel + 's <span style="font-weight:400;opacity:.6;font-size:11px">(' + groupWords.length + ' words)</span></h4>';
       html += '<div class="wbx-grid" style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px">';
       groupWords.forEach(function(w) {
         var levelLabel = cefrLevelLabel(w.level);
         var color = _cefrLevelColors[levelLabel] || '#888';
-        var barW = Math.max(2, Math.round(((w.frequency_count||0) / maxFreq) * 100));
-        var freqDisplay = formatFreqCount(w.frequency_count||0);
         var word = w.word || '—';
         var wordLen = word.length;
         var wordFontSize = wordLen <= 5 ? '24px' : '19px';
+        var isAugmented = w._augmented === true;
+        // Only show frequency bar for original CEFR words (not Datamuse-augmented)
+        var freqHTML = '';
+        if (!isAugmented) {
+          var barW = Math.max(2, Math.round(((w.frequency_count||0) / maxFreq) * 100));
+          var freqDisplay = formatFreqCount(w.frequency_count||0);
+          freqHTML = '<div style="margin-top:10px">' +
+            '<div class="freq-bar" style="height:5px;background:var(--line);border:1px solid rgba(0,0,0,.15);display:flex"><i style="height:100%;width:' + barW + '%;background:' + color + ';display:block"></i></div>' +
+            '<div class="freq-label" style="font-size:11px;margin-top:4px;color:var(--sz-darktext2);font-weight:600">' + freqDisplay + '</div>' +
+            '</div>';
+        } else {
+          freqHTML = '<div style="margin-top:10px;font-size:10px;color:var(--text-faint);font-style:italic">via Datamuse</div>';
+        }
         html += '<article class="wbx-box" data-cefr="' + levelLabel + '" data-pos="' + (w.tag||'') + '" style="border-left:5px solid ' + color + '">' +
           '<div class="wbx-word-zone">' +
             '<div class="wbx-head">' +
@@ -8863,10 +8874,7 @@
               '<span class="wbx-cefr" style="border-color:' + color + ';color:' + color + '">' + levelLabel + '</span>' +
             '</div>' +
             '<div class="wbx-pos">' + fullPosLabel(w.tag) + '</div>' +
-            '<div style="margin-top:10px">' +
-              '<div class="freq-bar" style="height:5px;background:var(--line);border:1px solid rgba(0,0,0,.15);display:flex"><i style="height:100%;width:' + barW + '%;background:' + color + ';display:block"></i></div>' +
-              '<div class="freq-label" style="font-size:11px;margin-top:4px;color:var(--sz-darktext2);font-weight:600">' + freqDisplay + '</div>' +
-            '</div>' +
+            freqHTML +
           '</div>' +
           '<div class="wbx-save-col">' +
             '<button class="wbx-save-btn" onclick="event.stopPropagation();saveCefrWord(\'' + (w.word||'').replace(/'/g,"\\'") + '\',this)" title="Salva nel vocabolario">+</button>' +
