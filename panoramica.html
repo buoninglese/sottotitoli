@@ -4443,9 +4443,30 @@
           try {
             var r = await sb.auth.getSession();
             if (r.data?.session) {
+              var userId = r.data.session.user.id;
               await sb.from('user_wordbank_words').insert({
-                wordbank_id: _wbState.currentBankUUID || bankId, word: word, user_id: r.data.session.user.id, usage_count: 1
+                wordbank_id: _wbState.currentBankUUID || bankId, word: word, user_id: userId, usage_count: 1
               });
+              // Also feed Ripasso immediato (review_words)
+              try {
+                var isItalian = !!document.querySelector('#wbItInsideView[style*="display:block"], #wbItInsideView:not([style*="display:none"])');
+                var lang = isItalian ? 'it' : (window.SOTTOTITOLI_STUDY_LANG || 'en');
+                var clean = word.replace(/[^a-zA-Z0-9 '\-àèéìòùÀÈÉÌÒÙ]/g, '').trim();
+                if (clean && clean.length >= 2) {
+                  var norm = clean.toLowerCase();
+                  var rwRes = await sb.from('review_words').select('id').eq('user_id', userId).eq('lemma', clean).maybeSingle();
+                  if (rwRes.data) {
+                    await sb.from('review_words').update({ personal_frequency: (rwRes.data.personal_frequency || 0) + 1 }).eq('id', rwRes.data.id);
+                  } else {
+                    await sb.from('review_words').insert({
+                      user_id: userId, lemma: clean, normalized: norm, lang: lang,
+                      pos: null, is_new: true, first_seen_at: new Date().toISOString(),
+                      source_type: 'manual', review_state: 'new',
+                      personal_frequency: 1
+                    });
+                  }
+                }
+              } catch(rwErr) { /* review_words may not exist */ }
             }
           } catch(e) {}
         }
