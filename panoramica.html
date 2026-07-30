@@ -515,6 +515,17 @@
     [data-theme="dark"] .wbx-save-btn,[data-theme="dark"] .wbx-bookmark-btn,[data-theme="dark"] .wbx-close-btn{border-color:var(--sz-darktext2);background:transparent;color:var(--sz-darktext2)}
     [data-theme="dark"] .wbx-syns span{color:var(--sz-accent);border-color:var(--sz-accent)}
     [data-theme="dark"] .wbx-syns span:hover{background:var(--sz-accent);color:var(--sz-darktext,#0b151c)}
+    /* ── Bank membership indicators ── */
+    .wbx-box.in-bank .wbx-word-zone{position:relative}
+    .wbx-box.in-bank .wbx-word-zone::after{content:'📚 In your bank';position:absolute;top:8px;right:8px;font-size:10px;font-weight:700;color:#34d399;opacity:.9;pointer-events:none}
+    .wbx-box.in-bank .wbx-save-btn{background:#059669!important;border-color:#059669!important;color:transparent!important;pointer-events:none;font-size:0}
+    .wbx-box.in-bank .wbx-save-btn::after{content:'✓';font-size:13px;color:#fff}
+    .wbx-card-stats{display:flex;gap:14px;margin-top:8px;padding-top:8px;border-top:2px solid var(--sz-trans-border);font-size:11px;color:var(--sz-darktext2)}
+    .wbx-card-stats .wbx-stat{cursor:help;display:inline-flex;align-items:center;gap:3px;position:relative}
+    .wbx-card-stats .wbx-stat:hover{color:var(--sz-darktext)}
+    .wbx-card-stats .wbx-stat::after{content:attr(data-tip);position:absolute;bottom:calc(100% + 6px);left:50%;transform:translateX(-50%);background:rgba(15,17,23,.94);color:#e2e8f0;font-size:10px;font-weight:400;padding:3px 8px;border-radius:4px;white-space:nowrap;pointer-events:none;z-index:20;opacity:0;transition:opacity .15s}
+    .wbx-card-stats .wbx-stat:hover::after{opacity:1}
+    [data-theme="dark"] .wbx-card-stats .wbx-stat::after{background:rgba(226,232,240,.94);color:#0f1729}
     /* ── Grid for results ── */
     .wbx-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:18px;margin-top:16px;overflow:visible}
     .wbx-box{margin:3px}
@@ -6019,6 +6030,8 @@
             (suggestions.length > 5 ? '<div style="text-align:center;margin-top:16px"><button class="fchip" onclick="window.wbxShowMore(this)" style="font-size:14px;padding:10px 22px;font-family:var(--font-ui)"><i class="fa-solid fa-chevron-down"></i> Mostra di più (' + (suggestions.length - 5) + ')</button></div>' : '');
           // Auto-size long words
           setTimeout(window.autoSizeExpandWords, 100);
+          // Check bank membership before enriching definitions
+          enrichBankStatus();
           // Enrich cards with real definitions, translations, synonyms
           enrichExpandCards(query);
           // Background: check if query word has multiple POS (noun/verb/adjective)
@@ -6108,6 +6121,48 @@
           return 0;
         });
         boxes.forEach(function(box) { grid.appendChild(box); });
+      }
+
+      // ── Check which words are already in the user's word bank ──
+      async function enrichBankStatus(containerSelector) {
+        var sel = containerSelector || '#wbExpandResults';
+        var sb = window.sottotitoliSupabase;
+        if (!sb) return;
+        try {
+          var r = await sb.auth.getSession();
+          if (!r.data?.session) return;
+          var userId = r.data.session.user.id;
+          var boxes = document.querySelectorAll(sel + ' .wbx-box');
+          if (!boxes.length) return;
+          var words = [];
+          boxes.forEach(function(b){ var w = b.getAttribute('data-word'); if (w) words.push(w.toLowerCase()); });
+          if (!words.length) return;
+          var { data: bankData } = await sb.from('user_wordbank_words')
+            .select('word').eq('user_id', userId).eq('lang', 'en').in('word', words);
+          var bankSet = new Set((bankData||[]).map(function(w){ return w.word.toLowerCase(); }));
+          var { data: reviewData } = await sb.from('review_words')
+            .select('word,personal_frequency,mastery_score').eq('user_id', userId).in('word', words);
+          var reviewMap = {};
+          (reviewData||[]).forEach(function(rw){ reviewMap[rw.word.toLowerCase()] = rw; });
+          boxes.forEach(function(box){
+            var w = (box.getAttribute('data-word')||'').toLowerCase();
+            if (!bankSet.has(w)) return;
+            box.classList.add('in-bank');
+            var stats = reviewMap[w];
+            var count = stats ? (stats.personal_frequency || 0) : 0;
+            var mastery = stats ? Math.round(stats.mastery_score || 0) : 0;
+            var meta = box.querySelector('.wbx-meta-zone');
+            if (meta && !meta.querySelector('.wbx-card-stats')) {
+              var sr = document.createElement('div');
+              sr.className = 'wbx-card-stats';
+              sr.innerHTML = '<span class="wbx-stat" data-tip="Usata ' + count + ' volte nelle tue sessioni"><i class="fa-solid fa-rotate"></i> ' + count + '×</span>' +
+                '<span class="wbx-stat" data-tip="Padronanza stimata: ' + mastery + '% (basata sulle revisioni SRS)"><i class="fa-solid fa-bullseye"></i> ' + mastery + '%</span>';
+              meta.appendChild(sr);
+            }
+            var saveBtn = box.querySelector('.wbx-save-btn');
+            if (saveBtn) { saveBtn.classList.add('saved'); }
+          });
+        } catch(e) { /* silently skip */ }
       }
 
       async function enrichOneCard(box, queryWord) {
@@ -6852,6 +6907,9 @@
         });
 
         results.innerHTML = '<div class="wbx-grid">' + exactCardHtml + cardsHtml + '</div>';
+
+        // Check bank membership for Italian builder
+        enrichBankStatus('#wbItExpandResults');
 
         var boxes = document.querySelectorAll('#wbItExpandResults .wbx-box:not(.wbx-exact)');
         boxes.forEach(function(box, i) {
