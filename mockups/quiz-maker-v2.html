@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="it" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Quiz Maker · Sottotitoli</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,400;14..32,500;14..32,600;14..32,700;14..32,800;14..32,900&family=Manrope:wght@500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+  <style>
+    :root {
+      --font-ui: "Inter", sans-serif;
+      --font-head: "Manrope", sans-serif;
+      --bg: #0f1117; --panel: #1a1d26; --card: #1a1d26; --line: #2a2d3a;
+      --text: #e8e4df; --text-soft: #a8a49e; --text-faint: #6b6762;
+      --amber: #f59e0b; --amber-2: #fbbf24; --amber-4: rgba(245,158,11,.1);
+      --teal: #2dd4bf; --teal-4: rgba(45,212,191,.1);
+      --green: #34d399; --red: #f87171; --purple: #a78bfa; --cyan: #22d3ee;
+      --radius: 14px; --pill: 99px;
+    }
+    [data-theme="light"] {
+      --bg: #f0f2f5; --panel: #fff; --card: #fff; --line: #e2e5ea;
+      --text: #111827; --text-soft: #6b7280; --text-faint: #9ca3af;
+      --teal-4: rgba(14,116,144,.08);
+    }
+    * { box-sizing:border-box; margin:0; padding:0; }
+    body { font-family:var(--font-ui); background:var(--bg); color:var(--text); min-height:100vh; padding:24px; }
+    .container { max-width:900px; margin:0 auto; }
+    h1 { font-family:var(--font-head); font-size:28px; margin-bottom:6px; }
+    .subtitle { font-size:13px; color:var(--text-soft); margin-bottom:20px; }
+
+    .bar { display:flex; align-items:center; justify-content:space-between; margin-bottom:16px; flex-wrap:wrap; gap:8px; }
+    .bar h2 { font-size:16px; font-weight:700; }
+    .fchip, .btn { font-family:var(--font-ui); font-size:12px; font-weight:600; padding:7px 14px; border-radius:var(--pill); border:1.5px solid var(--line); background:var(--card); color:var(--text-soft); cursor:pointer; transition:all .15s; display:inline-flex; align-items:center; gap:5px; }
+    .fchip:hover, .btn:hover { border-color:var(--teal); color:var(--teal); }
+    .btn.primary { background:var(--amber); color:#000; border-color:var(--amber); }
+
+    .grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(280px,1fr)); gap:12px; margin-bottom:20px; }
+    .qcard { background:var(--card); border:1px solid var(--line); border-radius:var(--radius); padding:16px; cursor:pointer; position:relative; transition:all .15s; }
+    .qcard:hover { border-color:var(--amber); transform:translateY(-1px); }
+    .qcard .cat { font-size:9px; font-weight:700; text-transform:uppercase; letter-spacing:.06em; color:var(--teal); margin-bottom:6px; }
+    .qcard h3 { font-size:14px; margin-bottom:4px; }
+    .qcard .meta { font-size:10px; color:var(--text-faint); display:flex; gap:10px; margin-top:6px; }
+    .badge { position:absolute; top:8px; right:8px; font-size:9px; font-weight:700; padding:2px 8px; border-radius:var(--pill); background:var(--amber); color:#000; }
+
+    .player { background:var(--card); border:2px solid var(--teal); border-radius:var(--radius); padding:24px; margin-bottom:16px; display:none; }
+    .player .qhead { display:flex; justify-content:space-between; margin-bottom:14px; font-size:11px; font-weight:600; }
+    .player .qtext { font-size:17px; font-weight:600; margin-bottom:16px; line-height:1.4; }
+    .option { display:flex; align-items:center; gap:10px; padding:12px 14px; border:1.5px solid var(--line); border-radius:10px; font-size:14px; cursor:pointer; margin-bottom:6px; transition:all .15s; }
+    .option:hover { border-color:var(--teal); background:var(--teal-4); }
+    .option.sel { border-color:var(--teal); background:var(--teal-4); }
+    .option.sel .marker { border-color:var(--teal); background:var(--teal); color:#000; }
+    .option.correct { border-color:var(--green); background:rgba(52,211,153,.08); }
+    .option.correct .marker { border-color:var(--green); background:var(--green); color:#000; }
+    .option.wrong { border-color:var(--red); background:rgba(248,113,113,.06); }
+    .option.wrong .marker { border-color:var(--red); background:var(--red); color:#fff; }
+    .marker { width:26px; height:26px; border-radius:50%; border:2px solid var(--line); display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:700; flex-shrink:0; color:var(--text-faint); }
+    .nav { display:flex; align-items:center; justify-content:space-between; margin-top:16px; }
+    .dots { display:flex; gap:4px; }
+    .dots span { width:8px; height:8px; border-radius:50%; background:var(--line); }
+    .dots span.done { background:var(--teal); }
+    .dots span.curr { background:var(--amber); }
+
+    .results { display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:10px; margin-top:16px; }
+    .rbox { background:var(--card); border:1px solid var(--line); border-radius:var(--radius); padding:16px; text-align:center; }
+    .rbox .val { font-size:22px; font-weight:800; }
+    .rbox .lbl { font-size:10px; color:var(--text-faint); margin-top:4px; }
+
+    .modal-overlay { position:fixed; inset:0; z-index:100; background:rgba(0,0,0,.6); display:flex; align-items:center; justify-content:center; padding:20px; }
+    .modal { background:var(--panel); border:1px solid var(--line); border-radius:var(--radius); padding:24px; max-width:600px; width:100%; max-height:85vh; overflow-y:auto; }
+    .modal h2 { font-size:18px; margin-bottom:16px; }
+    .modal label { display:block; font-size:11px; font-weight:600; color:var(--text-soft); margin:8px 0 3px; }
+    .modal input[type=text] { width:100%; padding:7px 10px; border-radius:8px; border:1px solid var(--line); background:var(--bg); color:var(--text); font-size:13px; font-family:var(--font-ui); }
+    .qblock { border:1px solid var(--line); border-radius:10px; padding:10px; margin-bottom:8px; position:relative; }
+    .qblock .qnum { font-size:10px; font-weight:700; color:var(--teal); }
+    .qblock .qremove { position:absolute; top:6px; right:8px; background:none; border:none; color:var(--text-faint); cursor:pointer; font-size:14px; }
+    .qblock .optrow { display:flex; align-items:center; gap:6px; margin-bottom:3px; }
+    .qblock .optrow span { font-size:10px; font-weight:700; width:16px; color:var(--text-faint); }
+    .qblock .optrow input[type=text] { flex:1; }
+
+    .overlay { position:fixed; inset:0; z-index:200; background:rgba(0,0,0,.7); display:flex; align-items:center; justify-content:center; padding:20px; }
+    .overlay .ocard { background:var(--panel); border-radius:var(--radius); padding:32px; text-align:center; max-width:380px; }
+    .overlay .score { width:80px; height:80px; border-radius:50%; border:4px solid var(--teal); display:flex; align-items:center; justify-content:center; margin:0 auto 16px; font-size:24px; font-weight:800; }
+    .overlay h2 { font-size:20px; margin-bottom:8px; }
+    .overlay p { font-size:13px; color:var(--text-soft); margin-bottom:16px; }
+
+    .empty { text-align:center; padding:40px; color:var(--text-faint); }
+  </style>
+</head>
+<body>
+<div class="container">
+  <h1>🎯 Quiz Maker</h1>
+  <p class="subtitle">Crea quiz personalizzati o gioca con quelli incorporati. Tutti i dati sono salvati nel browser.</p>
+
+  <div class="bar">
+    <h2>Quiz <span id="count" style="font-weight:400;font-size:12px;color:var(--text-faint)"></span></h2>
+    <div style="display:flex;gap:6px">
+      <button class="fchip" onclick="Q.openCreate()"><i class="fa-solid fa-plus"></i> Crea Quiz</button>
+      <button class="fchip" onclick="Q.reset()"><i class="fa-solid fa-rotate"></i></button>
+    </div>
+  </div>
+
+  <div class="grid" id="grid"><div class="empty">Caricamento...</div></div>
+
+  <div class="player" id="player">
+    <div class="qhead"><span id="qnum">Domanda 1 di 5</span><span id="qtimer" style="color:var(--amber)">00:00</span></div>
+    <div class="qtext" id="qtext"></div>
+    <div id="qopts"></div>
+    <div class="nav">
+      <button class="fchip" onclick="Q.prev()"><i class="fa-solid fa-arrow-left"></i></button>
+      <div class="dots" id="qdots"></div>
+      <button class="fchip" id="nextbtn" onclick="Q.next()">Salta <i class="fa-solid fa-arrow-right"></i></button>
+      <button class="fchip" id="finishbtn" onclick="Q.finish()" style="display:none;background:var(--amber);color:#000;border-color:var(--amber)"><i class="fa-solid fa-flag-checkered"></i> Finisci</button>
+    </div>
+  </div>
+  <div class="empty" id="empty">📝 Scegli un quiz dalla lista o creane uno nuovo.</div>
+
+  <div class="results">
+    <div class="rbox"><div class="val" id="rAvg">—</div><div class="lbl">Media</div></div>
+    <div class="rbox"><div class="val" id="rDone">0</div><div class="lbl">Completati</div></div>
+    <div class="rbox"><div class="val" id="rTotal">0</div><div class="lbl">Domande</div></div>
+    <div class="rbox"><div class="val" id="rBest">—</div><div class="lbl">Migliore</div></div>
+  </div>
+</div>
+
+<!-- Modal -->
+<div class="modal-overlay" id="modal" style="display:none">
+  <div class="modal">
+    <h2 id="modalTitle"><i class="fa-solid fa-plus"></i> Crea Quiz</h2>
+    <label>Titolo</label><input type="text" id="mtitle" placeholder="Titolo del quiz...">
+    <label>Categoria</label><input type="text" id="mcat" placeholder="es. Vocabolario · B1">
+    <div style="margin-top:12px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+        <span style="font-size:12px;font-weight:600;color:var(--text-soft)">Domande</span>
+        <button class="fchip" onclick="Q.addQ()" style="font-size:11px;padding:4px 10px"><i class="fa-solid fa-plus"></i> Aggiungi</button>
+      </div>
+      <div id="qblocks"></div>
+    </div>
+    <div style="display:flex;gap:8px;margin-top:16px;justify-content:flex-end">
+      <button class="fchip" onclick="Q.save()" style="background:var(--amber);color:#000;border-color:var(--amber);font-size:13px;padding:8px 20px"><i class="fa-solid fa-floppy-disk"></i> Salva</button>
+      <button class="fchip" onclick="Q.closeModal()" style="font-size:13px;padding:8px 20px">Annulla</button>
+    </div>
+  </div>
+</div>
+
+<!-- Completion -->
+<div class="overlay" id="complete" style="display:none">
+  <div class="ocard">
+    <div class="score" id="scoreCircle">0%</div>
+    <h2 id="completeTitle">Quiz Completato!</h2>
+    <p id="completeText"></p>
+    <div style="display:flex;gap:8px;justify-content:center">
+      <button class="fchip" onclick="Q.restart()" style="background:var(--amber);color:#000;border-color:var(--amber);font-size:13px;padding:8px 20px"><i class="fa-solid fa-rotate"></i> Rifai</button>
+      <button class="fchip" onclick="Q.closeComplete()" style="font-size:13px;padding:8px 20px">Chiudi</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function() {
+  var K = 'qm2_quizzes', RK = 'qm2_results';
+  var cur = null, idx = 0, answers = [], timer = 0, interval = null, finished = false, editingId = null;
+
+  var BUILTIN = [
+    { id:'b1', builtin:true, title:'Verbi Italiani Essenziali', cat:'Vocabolario · Italiano', badge:'Popolare', questions:[
+      {q:'Qual è il participio passato di "scrivere"?', opts:['Scrivuto','Scritto','Scrivato','Scrivendo'], correct:1},
+      {q:'Cosa significa "mangiare"?', opts:['To drink','To sleep','To eat','To run'], correct:2},
+      {q:'Prima persona di "essere" al presente?', opts:['Sono','Sei','È','Siamo'], correct:0},
+      {q:'Come si dice "they go"?', opts:['Vanno','Andate','Vanno loro','Andiamo'], correct:0},
+      {q:'Quale è un verbo riflessivo?', opts:['Correre','Alzarsi','Dormire','Parlare'], correct:1}
+    ]},
+    { id:'b2', builtin:true, title:'Preposizioni — Il Grande Quiz', cat:'Grammatica · B1', badge:'Nuovo', questions:[
+      {q:'Vado ___ Roma domani.', opts:['in','a','di','da'], correct:1},
+      {q:'Il libro è ___ tavolo.', opts:['sul','nel','al','dal'], correct:0},
+      {q:'Parto ___ casa alle otto.', opts:['in','a','da','di'], correct:2},
+      {q:'Parlo ___ mio amico.', opts:['con','per','di','a'], correct:0},
+      {q:'Questo regalo è ___ te.', opts:['a','di','per','con'], correct:2}
+    ]},
+    { id:'b3', builtin:true, title:'Quanto Conosci l\'Italia?', cat:'Cultura · Italia', badge:'Gratuito', questions:[
+      {q:'Capitale d\'Italia?', opts:['Milano','Napoli','Roma','Firenze'], correct:2},
+      {q:'Dove si trova il Colosseo?', opts:['Venezia','Roma','Firenze','Milano'], correct:1},
+      {q:'Famoso piatto di riso?', opts:['Pasta','Pizza','Risotto','Polenta'], correct:2},
+      {q:'Chi dipinse la Cappella Sistina?', opts:['Leonardo','Raffaello','Michelangelo','Donatello'], correct:2},
+      {q:'Quante regioni ha l\'Italia?', opts:['18','20','21','22'], correct:1}
+    ]}
+  ];
+
+  function load() { try { return JSON.parse(localStorage.getItem(K)) || BUILTIN.slice(); } catch(e) { return BUILTIN.slice(); } }
+  function save(d) { localStorage.setItem(K, JSON.stringify(d)); }
+  function loadR() { try { var r=JSON.parse(localStorage.getItem(RK)); return r||{done:0,correct:0,total:0,best:0}; } catch(e) { return {done:0,correct:0,total:0,best:0}; } }
+  function saveR(r) { localStorage.setItem(RK, JSON.stringify(r)); }
+
+  window.Q = {
+    render: function() {
+      var quizzes = load();
+      document.getElementById('count').textContent = '(' + quizzes.length + ' disponibili)';
+      document.getElementById('grid').innerHTML = quizzes.map(function(qz) {
+        var qc = (qz.questions||[]).length;
+        var badgeH = qz.badge ? '<span class="badge">'+qz.badge+'</span>' : '';
+        return '<div class="qcard" onclick="Q.start(\''+qz.id+'\')">'+badgeH+
+          '<div class="cat">'+(qz.cat||'Senza categoria')+'</div>'+
+          '<h3>'+qz.title+'</h3>'+
+          '<div class="meta"><span><i class="fa-regular fa-clock"></i> ~'+Math.round(qc*0.6)+' min</span><span><i class="fa-regular fa-circle-question"></i> '+qc+' domande</span>'+(qz.builtin?'':'<span style="color:var(--purple)"><i class="fa-solid fa-user-pen"></i> Tuo</span>')+'</div></div>';
+      }).join('');
+      Q.updateResults();
+    },
+
+    start: function(qid) {
+      var quizzes = load();
+      var qz = quizzes.find(function(q){return q.id===qid;});
+      if (!qz||!qz.questions||!qz.questions.length) return;
+      cur = qz; idx = 0; answers = new Array(qz.questions.length).fill(-1); finished = false; timer = 0;
+      clearInterval(interval);
+      interval = setInterval(function(){ timer++; document.getElementById('qtimer').textContent = fmt(timer); }, 1000);
+      document.getElementById('player').style.display = '';
+      document.getElementById('empty').style.display = 'none';
+      document.getElementById('qtimer').textContent = '00:00';
+      Q.renderQ();
+    },
+
+    renderQ: function() {
+      if (!cur) return;
+      var q = cur.questions[idx];
+      document.getElementById('qnum').textContent = 'Domanda ' + (idx+1) + ' di ' + cur.questions.length;
+      document.getElementById('qtext').textContent = q.q;
+      var M = ['A','B','C','D'];
+      document.getElementById('qopts').innerHTML = q.opts.map(function(opt, i) {
+        var cls = ''; var click = '';
+        if (answers[idx] === i) cls += ' sel';
+        if (finished) { if (i === q.correct) cls += ' correct'; else if (answers[idx] === i) cls += ' wrong'; }
+        if (!finished) click = 'onclick="Q.select('+i+')"';
+        return '<div class="option'+cls+'" '+click+'><span class="marker">'+M[i]+'</span> '+opt+'</div>';
+      }).join('');
+      document.getElementById('nextbtn').style.display = idx === cur.questions.length-1 ? 'none' : '';
+      document.getElementById('finishbtn').style.display = idx === cur.questions.length-1 ? '' : 'none';
+      Q.renderDots();
+    },
+
+    select: function(i) { if (finished) return; answers[idx] = i; Q.renderQ(); },
+
+    renderDots: function() {
+      document.getElementById('qdots').innerHTML = cur.questions.map(function(_, i) {
+        var cls = ''; if (i === idx) cls += 'curr'; if (answers[i] >= 0) cls += ' done';
+        return '<span class="'+cls.trim()+'"></span>';
+      }).join('');
+    },
+
+    next: function() { if (idx < cur.questions.length-1) { idx++; Q.renderQ(); } },
+    prev: function() { if (idx > 0) { idx--; Q.renderQ(); } },
+
+    finish: function() {
+      finished = true; clearInterval(interval);
+      var correct = 0;
+      cur.questions.forEach(function(q, i) { if (answers[i] === q.correct) correct++; });
+      var pct = Math.round(correct / cur.questions.length * 100);
+      var r = loadR(); r.done++; r.correct += correct; r.total += cur.questions.length;
+      if (pct > r.best) r.best = pct; saveR(r);
+      Q.renderQ();
+      var c = document.getElementById('scoreCircle');
+      c.textContent = pct + '%';
+      c.style.borderColor = pct >= 80 ? 'var(--green)' : pct >= 50 ? 'var(--amber)' : 'var(--red)';
+      c.style.color = pct >= 80 ? 'var(--green)' : pct >= 50 ? 'var(--amber)' : 'var(--red)';
+      document.getElementById('completeTitle').textContent = pct >= 90 ? 'Eccellente! 🎉' : pct >= 70 ? 'Ottimo! 👏' : pct >= 50 ? 'Buon impegno! 💪' : 'Continua! 📚';
+      document.getElementById('completeText').textContent = correct + ' su ' + cur.questions.length + ' corrette in ' + fmt(timer) + '.';
+      document.getElementById('complete').style.display = 'flex';
+      Q.updateResults();
+    },
+
+    restart: function() { document.getElementById('complete').style.display = 'none'; if (cur) Q.start(cur.id); },
+    closeComplete: function() { document.getElementById('complete').style.display = 'none'; Q.resetPlayer(); },
+
+    resetPlayer: function() {
+      cur = null; idx = 0; answers = []; finished = false; clearInterval(interval);
+      document.getElementById('player').style.display = 'none'; document.getElementById('empty').style.display = '';
+    },
+
+    updateResults: function() {
+      var r = loadR();
+      document.getElementById('rDone').textContent = r.done;
+      document.getElementById('rTotal').textContent = r.total;
+      document.getElementById('rAvg').textContent = r.total > 0 ? Math.round(r.correct/r.total*100)+'%' : '—';
+      document.getElementById('rBest').textContent = r.best > 0 ? r.best+'%' : '—';
+    },
+
+    openCreate: function(qid) {
+      editingId = qid || null;
+      document.getElementById('modalTitle').innerHTML = qid ? '<i class="fa-solid fa-pen-to-square"></i> Modifica Quiz' : '<i class="fa-solid fa-plus"></i> Crea Quiz';
+      var qz = qid ? load().find(function(q){return q.id===qid}) : null;
+      document.getElementById('mtitle').value = qz ? qz.title : '';
+      document.getElementById('mcat').value = qz ? qz.cat : '';
+      Q.buildBlocks(qz ? qz.questions : [{q:'',opts:['','','',''],correct:0}]);
+      document.getElementById('modal').style.display = 'flex';
+    },
+
+    closeModal: function() { document.getElementById('modal').style.display = 'none'; editingId = null; },
+
+    addQ: function(d) {
+      d = d || {q:'',opts:['','','',''],correct:0};
+      var c = document.getElementById('qblocks'); var i = c.children.length;
+      var div = document.createElement('div'); div.className = 'qblock';
+      div.innerHTML = '<span class="qnum">Domanda '+(i+1)+'</span><button class="qremove" onclick="this.parentElement.remove();Q.renumber()">&times;</button>'+
+        '<input type="text" value="'+esc(d.q)+'" placeholder="Testo..." style="width:100%;margin:4px 0 6px;padding:6px 10px;border-radius:6px;border:1px solid var(--line);background:var(--bg);color:var(--text);font-size:13px;font-family:var(--font-ui)">'+
+        ['A','B','C','D'].map(function(m,j){return '<div class="optrow"><span>'+m+'</span><input type="text" value="'+esc(d.opts[j]||'')+'" placeholder="Opzione '+m+'..." style="padding:4px 8px;border-radius:6px;border:1px solid var(--line);background:var(--bg);color:var(--text);font-size:12px;font-family:var(--font-ui)"><input type="radio" name="mc'+i+'" value="'+j+'" '+(d.correct===j?'checked':'')+' title="Corretta"></div>';}).join('');
+      c.appendChild(div);
+    },
+
+    buildBlocks: function(qs) { document.getElementById('qblocks').innerHTML = ''; qs.forEach(function(q){Q.addQ(q);}); },
+
+    renumber: function() {
+      var blocks = document.getElementById('qblocks').children;
+      for (var i = 0; i < blocks.length; i++) {
+        blocks[i].querySelector('.qnum').textContent = 'Domanda '+(i+1);
+        var radios = blocks[i].querySelectorAll('input[type=radio]');
+        for (var j = 0; j < radios.length; j++) radios[j].name = 'mc'+i;
+      }
+    },
+
+    save: function() {
+      var title = document.getElementById('mtitle').value.trim(); if (!title) return;
+      var blocks = document.getElementById('qblocks').children; if (!blocks.length) return;
+      var questions = [];
+      for (var i = 0; i < blocks.length; i++) {
+        var b = blocks[i];
+        var qText = b.querySelector('input[type=text]').value.trim(); if (!qText) continue;
+        var opts = Array.from(b.querySelectorAll('.optrow input[type=text]')).map(function(el){return el.value.trim()});
+        var correct = parseInt((b.querySelector('input[type=radio]:checked')||{}).value)||0;
+        questions.push({q:qText, opts:opts, correct:correct});
+      }
+      if (!questions.length) return;
+      var quizzes = load();
+      if (editingId) { var idx2 = quizzes.findIndex(function(q){return q.id===editingId}); if (idx2>=0) { quizzes[idx2].title=title; quizzes[idx2].cat=document.getElementById('mcat').value.trim(); quizzes[idx2].questions=questions; } }
+      else { quizzes.push({id:'c'+Date.now(), title:title, cat:document.getElementById('mcat').value.trim(), questions:questions}); }
+      save(quizzes); Q.closeModal(); Q.render();
+    },
+
+    reset: function() { if (!confirm('Eliminare tutti i quiz personalizzati e risultati?')) return; localStorage.removeItem(K); localStorage.removeItem(RK); Q.render(); Q.resetPlayer(); }
+  };
+
+  function esc(s) { return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+  function fmt(s) { var m = Math.floor(s/60); var sec = String(s%60).padStart(2,'0'); return String(m).padStart(2,'0')+':'+sec; }
+
+  // Init
+  Q.render();
+})();
+</script>
+</body>
+</html>
