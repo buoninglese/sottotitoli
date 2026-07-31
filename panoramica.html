@@ -1593,6 +1593,40 @@
               <span style="font-size:16px;flex-shrink:0">💡</span>
               <span>Ripassa le parole una a una. Clicca <strong style="color:var(--green)">✓ Fatto</strong> se la conosci — la parola verrà consolidata e tornerà più tardi con spaziatura crescente. Clicca <strong style="color:var(--amber)">⏭ Più tardi</strong> per saltarla: tornerà tra qualche ora. L'obiettivo è svuotare la pila ogni giorno.</span>
             </div>
+            <!-- Quiz toggle -->
+            <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:wrap" id="vtQuizToggleBar">
+              <button class="fchip" id="vtQuizBtn" onclick="window.vtToggleQuiz()" style="font-size:13px;padding:8px 18px"><i class="fa-solid fa-brain"></i> &nbsp;Genera Quiz</button>
+              <span style="font-size:11px;color:var(--text-faint)">Traduci le parole da ripassare — risposte corrette = ✓ Fatto automatico</span>
+            </div>
+            <!-- Quiz player (hidden by default) -->
+            <div id="vtQuizPlayer" style="display:none;background:var(--panel);border:2px solid var(--teal);border-radius:16px;padding:24px 20px 18px;margin-bottom:16px">
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px">
+                <span style="font-family:var(--font-mono);font-size:11px;font-weight:500;color:var(--teal);text-transform:uppercase;letter-spacing:.06em" id="vtQuizCounter">Parola 1 di 10</span>
+                <span style="font-family:var(--font-mono);font-size:15px;font-weight:600;color:var(--amber)" id="vtQuizScore">0/0</span>
+              </div>
+              <div style="font-size:24px;font-weight:700;color:var(--text);margin-bottom:4px" id="vtQuizWord">—</div>
+              <div style="font-size:11px;color:var(--text-faint);margin-bottom:16px" id="vtQuizHint">Traduci in inglese</div>
+              <div id="vtQuizOptions" style="display:flex;flex-direction:column;gap:8px"></div>
+              <div id="vtQuizOpen" style="display:none">
+                <div style="display:flex;gap:8px;align-items:center">
+                  <input id="vtQuizInput" type="text" placeholder="Scrivi la traduzione…" autocomplete="off" style="flex:1;font-family:var(--font-ui);font-size:14px;padding:10px 14px;border-radius:10px;border:1.5px solid var(--line);background:var(--bg);color:var(--text);outline:none">
+                  <button id="vtQuizCheckBtn" onclick="window.vtCheckOpen()" style="font-family:var(--font-ui);font-size:14px;font-weight:600;padding:10px 20px;border-radius:100px;background:var(--teal);color:#fff;border:none;cursor:pointer;white-space:nowrap">Verifica</button>
+                </div>
+                <div id="vtQuizFeedback" style="font-size:13px;font-weight:600;margin-top:8px;min-height:20px"></div>
+              </div>
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-top:16px;flex-wrap:wrap;gap:8px">
+                <button class="fchip" onclick="window.vtQuizPrev()" style="font-size:12px"><i class="fa-solid fa-arrow-left"></i></button>
+                <div id="vtQuizDots" style="display:flex;gap:4px"></div>
+                <button class="fchip" id="vtQuizNextBtn" onclick="window.vtQuizNext()" style="font-size:12px">Salta <i class="fa-solid fa-arrow-right"></i></button>
+                <button class="fchip" id="vtQuizFinishBtn" onclick="window.vtQuizFinish()" style="display:none;font-size:12px;background:var(--amber);color:#fff;border-color:var(--amber)"><i class="fa-solid fa-flag-checkered"></i> Finisci</button>
+              </div>
+            </div>
+            <!-- Quiz mode selector (shown when quiz active) -->
+            <div id="vtQuizModeBar" style="display:none;gap:6px;margin-bottom:12px;flex-wrap:wrap">
+              <button class="fchip active" onclick="window.vtQuizSetMode(this,'multiple')" style="font-size:11px;padding:5px 12px">Scelta multipla</button>
+              <button class="fchip" onclick="window.vtQuizSetMode(this,'open')" style="font-size:11px;padding:5px 12px">Risposta aperta</button>
+              <button class="fchip" onclick="window.vtQuizToggleDir()" style="font-size:11px;padding:5px 12px;margin-left:auto"><i class="fa-solid fa-right-left"></i> <span id="vtQuizDirLabel">IT→EN</span></button>
+            </div>
             <div id="vtReviewCards" class="wbx-grid" style="margin-top:0">
               <div style="text-align:center;padding:30px 20px;color:var(--text-faint);font-size:13px"><i class="fa-solid fa-spinner"></i> &nbsp;Caricamento parole da ripassare…</div>
             </div>
@@ -5623,6 +5657,9 @@
         }
         // Default priority: new first, then by mastery asc
 
+        // Store for quiz access
+        window._vtReviewWords = words;
+
         // Render cards
         var html = '';
         words.forEach(function(w) {
@@ -5691,6 +5728,242 @@
         } catch(e) { console.warn('vtMarkFatto:', e); }
         renderVTReviewDue();
       };
+
+      // ═══ VOCAB QUIZ — auto-generated from review words ═══
+      window._vtQuizWords = [];
+      window._vtQuizIdx = 0;
+      window._vtQuizAnswers = [];
+      window._vtQuizMode = 'multiple';
+      window._vtQuizDir = 'it-en';
+      window._vtQuizActive = false;
+
+      var _vtDict = {
+        'ciao':'hello','arrivederci':'goodbye','grazie':'thank you','prego':"you're welcome",
+        'buongiorno':'good morning','buonasera':'good evening','buonanotte':'good night',
+        'scusa':'sorry','per favore':'please','sì':'yes','no':'no','forse':'maybe',
+        'oggi':'today','domani':'tomorrow','ieri':'yesterday','adesso':'now','dopo':'after','prima':'before',
+        'sempre':'always','mai':'never','spesso':'often','qui':'here','là':'there',
+        'bello':'beautiful','brutto':'ugly','grande':'big','piccolo':'small','nuovo':'new','vecchio':'old',
+        'buono':'good','cattivo':'bad','caldo':'hot','freddo':'cold','veloce':'fast','lento':'slow',
+        'amico':'friend','famiglia':'family','casa':'house','città':'city','paese':'country',
+        'acqua':'water','cibo':'food','vino':'wine','pane':'bread','latte':'milk','carne':'meat',
+        'tempo':'time','giorno':'day','notte':'night','anno':'year','mese':'month','settimana':'week',
+        'uomo':'man','donna':'woman','bambino':'child','ragazzo':'boy','ragazza':'girl',
+        'amore':'love','vita':'life','lavoro':'work','scuola':'school','libro':'book',
+        'essere':'to be','avere':'to have','fare':'to do','andare':'to go','venire':'to come',
+        'parlare':'to speak','mangiare':'to eat','bere':'to drink','dormire':'to sleep','leggere':'to read',
+        'scrivere':'to write','vedere':'to see','sentire':'to hear','sapere':'to know','volere':'to want',
+        'potere':'can','dovere':'must','prendere':'to take','dare':'to give','trovare':'to find',
+        'capire':'to understand','pensare':'to think','credere':'to believe','chiamare':'to call',
+        'aiutare':'to help','giocare':'to play','comprare':'to buy','vendere':'to sell','imparare':'to learn',
+        'studiare':'to study','lavorare':'to work','viaggiare':'to travel','aspettare':'to wait',
+        'cane':'dog','gatto':'cat','cavallo':'horse','uccello':'bird','pesce':'fish',
+        'rosso':'red','blu':'blue','verde':'green','giallo':'yellow','bianco':'white','nero':'black',
+        'mano':'hand','piede':'foot','testa':'head','cuore':'heart','occhio':'eye','bocca':'mouth',
+        'strada':'road','porta':'door','finestra':'window','tavolo':'table','sedia':'chair','letto':'bed'
+      };
+
+      window.vtToggleQuiz = function() {
+        if (window._vtQuizActive) { window.vtQuizCancel(); return; }
+        var words = window._vtReviewWords || [];
+        var quizWords = [];
+        var seen = new Set();
+        words.forEach(function(w) {
+          var lemma = (w.lemma || '').toLowerCase().trim();
+          if (!lemma || seen.has(lemma)) return;
+          var en = _vtDict[lemma];
+          if (en) { quizWords.push({ id: w.id, it: lemma, en: en }); seen.add(lemma); }
+        });
+        if (quizWords.length < 3) {
+          alert('Servono almeno 3 parole traducibili. Le tue parole da ripassare non hanno corrispondenze nel dizionario built-in.');
+          return;
+        }
+        quizWords.sort(function(){ return Math.random() - 0.5; });
+        quizWords = quizWords.slice(0, Math.min(15, quizWords.length));
+        window._vtQuizWords = quizWords;
+        window._vtQuizIdx = 0;
+        window._vtQuizAnswers = quizWords.map(function(){ return { chosen: null, correct: false }; });
+        window._vtQuizActive = true;
+
+        document.getElementById('vtQuizPlayer').style.display = '';
+        document.getElementById('vtQuizModeBar').style.display = 'flex';
+        document.getElementById('vtReviewCards').style.display = 'none';
+        document.getElementById('vtReviewGuide').style.display = 'none';
+        document.getElementById('vtReviewOrderToggles').style.display = 'none';
+        var btn = document.getElementById('vtQuizBtn');
+        btn.innerHTML = '<i class=\"fa-solid fa-xmark\"></i> &nbsp;Annulla Quiz';
+        btn.style.background = 'var(--red)';
+        btn.style.color = '#fff';
+        btn.style.borderColor = 'var(--red)';
+        window.vtQuizRender();
+      };
+
+      window.vtQuizCancel = function() {
+        window._vtQuizActive = false;
+        document.getElementById('vtQuizPlayer').style.display = 'none';
+        document.getElementById('vtQuizModeBar').style.display = 'none';
+        document.getElementById('vtReviewCards').style.display = '';
+        document.getElementById('vtReviewGuide').style.display = '';
+        document.getElementById('vtReviewOrderToggles').style.display = '';
+        var btn = document.getElementById('vtQuizBtn');
+        btn.innerHTML = '<i class=\"fa-solid fa-brain\"></i> &nbsp;Genera Quiz';
+        btn.style.background = '';
+        btn.style.color = '';
+        btn.style.borderColor = '';
+      };
+
+      window.vtQuizRender = function() {
+        var qw = window._vtQuizWords;
+        var idx = window._vtQuizIdx;
+        if (idx >= qw.length) { window.vtQuizFinish(); return; }
+        var p = qw[idx];
+        var prompt = window._vtQuizDir === 'it-en' ? p.it : p.en;
+        var answer = window._vtQuizDir === 'it-en' ? p.en : p.it;
+        var hint = window._vtQuizDir === 'it-en' ? 'Traduci in inglese' : 'Traduci in italiano';
+
+        document.getElementById('vtQuizCounter').textContent = 'Parola ' + (idx+1) + ' di ' + qw.length;
+        var corr = window._vtQuizAnswers.filter(function(a){ return a.correct; }).length;
+        var ansd = window._vtQuizAnswers.filter(function(a){ return a.chosen !== null; }).length;
+        document.getElementById('vtQuizScore').textContent = corr + '/' + ansd;
+        document.getElementById('vtQuizWord').textContent = prompt;
+        document.getElementById('vtQuizHint').textContent = hint;
+
+        var isOpen = window._vtQuizMode === 'open';
+        document.getElementById('vtQuizOptions').style.display = isOpen ? 'none' : '';
+        document.getElementById('vtQuizOpen').style.display = isOpen ? '' : 'none';
+        document.getElementById('vtQuizFeedback').textContent = '';
+        document.getElementById('vtQuizFeedback').style.color = '';
+        var inp = document.getElementById('vtQuizInput');
+        if (inp) { inp.value = ''; inp.style.borderColor = ''; }
+        var checkBtn = document.getElementById('vtQuizCheckBtn');
+        if (checkBtn) checkBtn.disabled = false;
+
+        var isLast = idx === qw.length - 1;
+        document.getElementById('vtQuizNextBtn').style.display = isLast ? 'none' : '';
+        document.getElementById('vtQuizFinishBtn').style.display = isLast ? '' : '';
+
+        if (!isOpen) {
+          var allEn = [];
+          for (var k in _vtDict) { if (_vtDict[k] !== answer) allEn.push(_vtDict[k]); }
+          allEn.sort(function(){ return Math.random() - 0.5; });
+          var wrongs = allEn.slice(0, 3);
+          var opts = [answer].concat(wrongs).sort(function(){ return Math.random() - 0.5; });
+          var markers = ['A','B','C','D'];
+          var ans = window._vtQuizAnswers[idx];
+          document.getElementById('vtQuizOptions').innerHTML = opts.map(function(opt, i) {
+            var style = 'justify-content:flex-start;font-size:14px;padding:10px 16px;text-align:left';
+            var disabled = '';
+            if (ans && ans.chosen !== null) {
+              disabled = 'disabled';
+              if (ans.chosen === opt) {
+                style += ';background:' + (opt === answer ? 'var(--green)' : 'var(--red)') + ';color:#fff;border-color:' + (opt === answer ? 'var(--green)' : 'var(--red)');
+              }
+            }
+            return '<button class="fchip vt-quiz-opt" style="' + style + '" data-answer="' + opt.replace(/"/g,'&quot;') + '" ' + disabled + '><span style="font-weight:700;margin-right:8px;opacity:.5">' + markers[i] + '</span> ' + opt + '</button>';
+          }).join('');
+
+          // Delegated click handler
+          setTimeout(function() {
+            var optsEl = document.getElementById('vtQuizOptions');
+            if (optsEl && !optsEl._quizBound) {
+              optsEl._quizBound = true;
+              optsEl.addEventListener('click', function(e) {
+                var btn = e.target.closest('.vt-quiz-opt');
+                if (btn && !btn.disabled) {
+                  window.vtQuizPick(btn.getAttribute('data-answer'));
+                }
+              });
+            }
+          }, 0);
+        }
+
+        var dots = document.getElementById('vtQuizDots');
+        dots.innerHTML = window._vtQuizAnswers.map(function(a, i) {
+          var bg = a.chosen !== null ? (a.correct ? 'var(--green)' : 'var(--red)') : (i === idx ? 'var(--amber)' : 'var(--line)');
+          return '<span style=\"display:inline-block;width:8px;height:8px;border-radius:50%;background:' + bg + '\"></span>';
+        }).join('');
+      };
+
+      window.vtQuizPick = function(chosen) {
+        if (window._vtQuizAnswers[window._vtQuizIdx].chosen !== null) return;
+        var p = window._vtQuizWords[window._vtQuizIdx];
+        var answer = window._vtQuizDir === 'it-en' ? p.en : p.it;
+        window._vtQuizAnswers[window._vtQuizIdx] = { chosen: chosen, correct: chosen === answer };
+        if (chosen === answer) { window._vtQuizMarkReviewed(p.id); }
+        window.vtQuizRender();
+      };
+
+      window.vtCheckOpen = function() {
+        if (window._vtQuizAnswers[window._vtQuizIdx].chosen !== null) return;
+        var inp = document.getElementById('vtQuizInput');
+        var raw = (inp.value || '').trim();
+        if (!raw) return;
+        var p = window._vtQuizWords[window._vtQuizIdx];
+        var answer = window._vtQuizDir === 'it-en' ? p.en : p.it;
+        var norm = function(s) { return s.toLowerCase().replace(/[^a-z0-9àèéìòù\s]/g,'').replace(/\s+/g,' ').trim(); };
+        var correct = norm(raw) === norm(answer) || (raw.length > 2 && norm(answer).includes(norm(raw)));
+        window._vtQuizAnswers[window._vtQuizIdx] = { chosen: raw, correct: correct };
+        inp.style.borderColor = correct ? 'var(--green)' : 'var(--red)';
+        var fb = document.getElementById('vtQuizFeedback');
+        fb.textContent = correct ? '✅ Corretto!' : '❌ La risposta era: ' + answer;
+        fb.style.color = correct ? 'var(--green)' : 'var(--red)';
+        document.getElementById('vtQuizCheckBtn').disabled = true;
+        if (correct) { window._vtQuizMarkReviewed(p.id); }
+        window.vtQuizRender();
+      };
+
+      window._vtQuizMarkReviewed = async function(wid) {
+        try {
+          var sb = window.sottotitoliSupabase;
+          if (sb) {
+            var tomorrow = new Date(Date.now() + 24*3600000).toISOString();
+            await sb.from('review_words').update({
+              review_state: 'review',
+              last_reviewed_at: new Date().toISOString(),
+              next_review_at: tomorrow,
+              is_new: false
+            }).eq('id', wid);
+          }
+        } catch(e) {}
+      };
+
+      window.vtQuizNext = function() {
+        if (window._vtQuizIdx < window._vtQuizWords.length - 1) { window._vtQuizIdx++; window.vtQuizRender(); }
+      };
+
+      window.vtQuizPrev = function() {
+        if (window._vtQuizIdx > 0) { window._vtQuizIdx--; window.vtQuizRender(); }
+      };
+
+      window.vtQuizFinish = function() {
+        var correct = window._vtQuizAnswers.filter(function(a){ return a.correct; }).length;
+        var total = window._vtQuizAnswers.length;
+        window.vtQuizCancel();
+        if (typeof renderVTReviewDue === 'function') { setTimeout(renderVTReviewDue, 500); }
+        alert('Quiz completato! ' + correct + '/' + total + ' corrette.\nLe parole corrette sono state segnate come ripassate ✓');
+      };
+
+      window.vtQuizSetMode = function(btn, mode) {
+        window._vtQuizMode = mode;
+        var bar = document.getElementById('vtQuizModeBar');
+        if (bar) bar.querySelectorAll('.fchip').forEach(function(c){ c.classList.remove('active'); });
+        btn.classList.add('active');
+        window.vtQuizRender();
+      };
+
+      window.vtQuizToggleDir = function() {
+        window._vtQuizDir = window._vtQuizDir === 'it-en' ? 'en-it' : 'it-en';
+        document.getElementById('vtQuizDirLabel').textContent = window._vtQuizDir === 'it-en' ? 'IT→EN' : 'EN→IT';
+        window._vtQuizAnswers = window._vtQuizWords.map(function(){ return { chosen: null, correct: false }; });
+        window._vtQuizIdx = 0;
+        window.vtQuizRender();
+      };
+
+      document.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter' && document.activeElement === document.getElementById('vtQuizInput')) {
+          window.vtCheckOpen();
+        }
+      });
 
       // ── Più tardi: reschedule for later ──
       window.vtMarkPiuTardi = async function(btn) {
