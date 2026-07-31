@@ -5737,47 +5737,66 @@
       window._vtQuizDir = 'it-en';
       window._vtQuizActive = false;
 
-      var _vtDict = {
-        'ciao':'hello','arrivederci':'goodbye','grazie':'thank you','prego':"you're welcome",
-        'buongiorno':'good morning','buonasera':'good evening','buonanotte':'good night',
-        'scusa':'sorry','per favore':'please','sì':'yes','no':'no','forse':'maybe',
-        'oggi':'today','domani':'tomorrow','ieri':'yesterday','adesso':'now','dopo':'after','prima':'before',
-        'sempre':'always','mai':'never','spesso':'often','qui':'here','là':'there',
-        'bello':'beautiful','brutto':'ugly','grande':'big','piccolo':'small','nuovo':'new','vecchio':'old',
-        'buono':'good','cattivo':'bad','caldo':'hot','freddo':'cold','veloce':'fast','lento':'slow',
-        'amico':'friend','famiglia':'family','casa':'house','città':'city','paese':'country',
-        'acqua':'water','cibo':'food','vino':'wine','pane':'bread','latte':'milk','carne':'meat',
-        'tempo':'time','giorno':'day','notte':'night','anno':'year','mese':'month','settimana':'week',
-        'uomo':'man','donna':'woman','bambino':'child','ragazzo':'boy','ragazza':'girl',
-        'amore':'love','vita':'life','lavoro':'work','scuola':'school','libro':'book',
-        'essere':'to be','avere':'to have','fare':'to do','andare':'to go','venire':'to come',
-        'parlare':'to speak','mangiare':'to eat','bere':'to drink','dormire':'to sleep','leggere':'to read',
-        'scrivere':'to write','vedere':'to see','sentire':'to hear','sapere':'to know','volere':'to want',
-        'potere':'can','dovere':'must','prendere':'to take','dare':'to give','trovare':'to find',
-        'capire':'to understand','pensare':'to think','credere':'to believe','chiamare':'to call',
-        'aiutare':'to help','giocare':'to play','comprare':'to buy','vendere':'to sell','imparare':'to learn',
-        'studiare':'to study','lavorare':'to work','viaggiare':'to travel','aspettare':'to wait',
-        'cane':'dog','gatto':'cat','cavallo':'horse','uccello':'bird','pesce':'fish',
-        'rosso':'red','blu':'blue','verde':'green','giallo':'yellow','bianco':'white','nero':'black',
-        'mano':'hand','piede':'foot','testa':'head','cuore':'heart','occhio':'eye','bocca':'mouth',
-        'strada':'road','porta':'door','finestra':'window','tavolo':'table','sedia':'chair','letto':'bed'
+      // MyMemory translation cache for quiz
+      window._vtTranslateCache = {};
+
+      window._vtTranslateWord = async function(word, fromLang, toLang) {
+        var key = fromLang + ':' + word;
+        if (window._vtTranslateCache[key]) return window._vtTranslateCache[key];
+        try {
+          var resp = await fetch('https://api.mymemory.translated.net/get?q=' + encodeURIComponent(word) + '&langpair=' + fromLang + '|' + toLang);
+          if (!resp.ok) return null;
+          var data = await resp.json();
+          if (data.responseData && data.responseData.translatedText) {
+            var txt = data.responseData.translatedText.split(/[,;]/)[0].trim().toLowerCase();
+            window._vtTranslateCache[key] = txt;
+            return txt;
+          }
+          return null;
+        } catch(e) { return null; }
       };
 
-      window.vtToggleQuiz = function() {
+      window.vtToggleQuiz = async function() {
         if (window._vtQuizActive) { window.vtQuizCancel(); return; }
         var words = window._vtReviewWords || [];
-        var quizWords = [];
-        var seen = new Set();
-        words.forEach(function(w) {
-          var lemma = (w.lemma || '').toLowerCase().trim();
-          if (!lemma || seen.has(lemma)) return;
-          var en = _vtDict[lemma];
-          if (en) { quizWords.push({ id: w.id, it: lemma, en: en }); seen.add(lemma); }
-        });
-        if (quizWords.length < 3) {
-          alert('Servono almeno 3 parole traducibili. Le tue parole da ripassare non hanno corrispondenze nel dizionario built-in.');
+        if (words.length < 3) {
+          alert('Servono almeno 3 parole da ripassare per generare un quiz.');
           return;
         }
+
+        // Show loading state
+        var btn = document.getElementById('vtQuizBtn');
+        btn.innerHTML = '<i class=\"fa-solid fa-spinner fa-spin\"></i> &nbsp;Traducendo…';
+        btn.disabled = true;
+
+        // Batch translate all review words via MyMemory
+        var fromLang = window._vtQuizDir === 'it-en' ? 'it' : 'en';
+        var toLang = window._vtQuizDir === 'it-en' ? 'en' : 'it';
+        var quizWords = [];
+        var seen = new Set();
+
+        for (var i = 0; i < words.length; i++) {
+          var w = words[i];
+          var lemma = (w.lemma || '').toLowerCase().trim();
+          if (!lemma || seen.has(lemma) || lemma.length < 2) continue;
+          var translation = await window._vtTranslateWord(lemma, fromLang, toLang);
+          if (translation && translation !== lemma) {
+            quizWords.push({ id: w.id, it: fromLang === 'it' ? lemma : translation, en: fromLang === 'it' ? translation : lemma });
+            seen.add(lemma);
+          }
+          // Cap at 20 words to avoid too many API calls
+          if (quizWords.length >= 20) break;
+        }
+
+        btn.disabled = false;
+
+        if (quizWords.length < 3) {
+          alert('MyMemory non ha restituito abbastanza traduzioni. Prova con altre parole o cambia direzione.');
+          btn.innerHTML = '<i class=\"fa-solid fa-brain\"></i> &nbsp;Genera Quiz';
+          return;
+        }
+
+        // Shuffle and take up to 15
         quizWords.sort(function(){ return Math.random() - 0.5; });
         quizWords = quizWords.slice(0, Math.min(15, quizWords.length));
         window._vtQuizWords = quizWords;
@@ -5790,11 +5809,11 @@
         document.getElementById('vtReviewCards').style.display = 'none';
         document.getElementById('vtReviewGuide').style.display = 'none';
         document.getElementById('vtReviewOrderToggles').style.display = 'none';
-        var btn = document.getElementById('vtQuizBtn');
         btn.innerHTML = '<i class=\"fa-solid fa-xmark\"></i> &nbsp;Annulla Quiz';
         btn.style.background = 'var(--red)';
         btn.style.color = '#fff';
         btn.style.borderColor = 'var(--red)';
+
         window.vtQuizRender();
       };
 
@@ -5843,10 +5862,19 @@
         document.getElementById('vtQuizFinishBtn').style.display = isLast ? '' : '';
 
         if (!isOpen) {
-          var allEn = [];
-          for (var k in _vtDict) { if (_vtDict[k] !== answer) allEn.push(_vtDict[k]); }
-          allEn.sort(function(){ return Math.random() - 0.5; });
-          var wrongs = allEn.slice(0, 3);
+          // Build wrong answers from MyMemory cache
+          var allAnswers = [];
+          var cache = window._vtTranslateCache || {};
+          for (var k in cache) {
+            if (cache[k] && cache[k] !== answer) allAnswers.push(cache[k]);
+          }
+          // If not enough from cache, add some from other quiz words
+          for (var j = 0; j < qw.length && allAnswers.length < 10; j++) {
+            var other = window._vtQuizDir === 'it-en' ? qw[j].en : qw[j].it;
+            if (other && other !== answer && allAnswers.indexOf(other) < 0) allAnswers.push(other);
+          }
+          allAnswers.sort(function(){ return Math.random() - 0.5; });
+          var wrongs = allAnswers.slice(0, 3);
           var opts = [answer].concat(wrongs).sort(function(){ return Math.random() - 0.5; });
           var markers = ['A','B','C','D'];
           var ans = window._vtQuizAnswers[idx];
