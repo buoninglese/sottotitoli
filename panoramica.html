@@ -620,11 +620,6 @@
     /* Keep the fullscreen toggle button visible and fixed when in fullscreen */
     .main-panel.wbx-fullscreen #wbxFullscreenBtn{display:flex !important;position:fixed;top:16px;right:16px;z-index:5001;width:40px;height:40px;border-radius:50%;background:rgba(0,0,0,.5);color:#fff;font-size:16px;padding:0;align-items:center;justify-content:center;border:none;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
     @media(max-width:860px){.wbx-grid{grid-template-columns:1fr}}
-    /* ── Grammar Verb Tenses: compact cards ── */
-    #sub-gram-tempi .alt-card{padding:12px 16px!important;min-height:auto!important}
-    #sub-gram-tempi .alt-card h3{font-size:20px!important;margin-bottom:2px!important}
-    #sub-gram-tempi .alt-card p{font-size:13px!important;margin:0!important}
-    #sub-gram-tempi .prog{margin-top:6px!important}
     /* Auth toast */
     .auth-toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--accent-purple,#7c3aed);color:#fff;padding:14px 28px;border-radius:100px;font-size:15px;font-weight:600;z-index:9999;box-shadow:0 8px 32px rgba(124,58,237,.35);opacity:0;transition:opacity .4s;pointer-events:none}
     .auth-toast.show{opacity:1}
@@ -772,6 +767,7 @@
           <a class="nav-item" href="#" data-panel="vocable-explorer"><svg class="icon"><use href="#i-insights"></use></svg><span>Vocabulary Explorer</span></a>
           <a class="nav-item" href="#" data-panel="vocabulary-builder"><svg class="icon"><use href="#i-transforms"></use></svg><span>Vocabulary Builder</span></a>
           <a class="nav-item" href="#" data-panel="vocabulary-trainer"><i class="fa-solid fa-dumbbell"></i><span>Vocabulary Trainer</span></a>
+          <a class="nav-item" href="#" data-panel="learning-hub"><i class="fa-solid fa-graduation-cap"></i><span>Learning Hub</span></a>
           <a class="nav-item" href="#" data-panel="grammatica"><svg class="icon"><use href="#i-scratchpad"></use></svg><span data-i18n="grammatica">Grammatica</span></a>
           <a class="nav-item" href="#" data-panel="trascrizioni"><svg class="icon"><use href="#i-dictionary"></use></svg><span data-i18n="trascrizioni">Trascrizioni</span></a>
           <a class="nav-item premium" href="#" data-panel="report-ai" style="color:var(--cyan);opacity:.35;pointer-events:none;cursor:not-allowed" title="Coming soon"><svg class="icon"><use href="#i-star"></use></svg><span data-i18n="report_ai">Report AI</span><span class="premium-badge">PREMIUM</span></a>
@@ -1676,6 +1672,20 @@
               </div>
             </section>
           </div>
+          </div>
+        </div>
+        <div class="content-panel" id="pnl-learning-hub">
+          <section class="panel-head"><h2>🎓 Learning Hub</h2></section>
+          <p style="font-size:14px;color:var(--text-soft);margin:0 0 20px;line-height:1.6">Corsi e risorse didattiche da Learning Hub API by BlackAlphaLabs. Dati aggiornati in tempo reale.</p>
+          <section class="alt-card-grid" id="learningHubGrid">
+            <div style="text-align:center;padding:48px 20px;color:var(--text-faint);grid-column:1/-1">
+              <i class="fa-solid fa-spinner fa-spin" style="font-size:28px;margin-bottom:12px;display:block"></i>
+              Caricamento corsi…
+            </div>
+          </section>
+          <div id="learningHubError" style="display:none;text-align:center;padding:32px;color:var(--text-faint)">
+            <i class="fa-solid fa-triangle-exclamation" style="font-size:28px;margin-bottom:8px;display:block;color:var(--amber)"></i>
+            <span id="learningHubErrorMsg">API non disponibile al momento.</span>
           </div>
         </div>
         <div class="content-panel" id="pnl-grammatica">
@@ -2893,75 +2903,6 @@
       window.openInsightsOverview = openInsightsOverview;
 
       // ── Profilo Linguistico modal ──
-      var _profileLingModalInit = false;
-      function initProfileLingModal() {
-        if (_profileLingModalInit) return;
-        _profileLingModalInit = true;
-        var src = document.getElementById('sub-profilo-ling');
-        var dst = document.getElementById('modalProfileLingContent');
-        if (src && dst) {
-          // Clone the plang panes (skip the subtabs which are already in modal)
-          var nativePane = document.getElementById('plang-native');
-          var targetPane = document.getElementById('plang-target');
-          var saveRow = src.querySelector('.save-row');
-          var html = '';
-          if (nativePane) html += '<div class="plang-pane active" id="modal-plang-native">' + nativePane.innerHTML + '</div>';
-          if (targetPane) html += '<div class="plang-pane" id="modal-plang-target" style="display:none">' + targetPane.innerHTML + '</div>';
-          if (saveRow) html += '<div class="save-row" style="margin-top:18px">' + saveRow.innerHTML + '</div>';
-          dst.innerHTML = html;
-          // Re-bind save button
-          var saveBtn = dst.querySelector('#saveProfileLingBtn');
-          if (saveBtn) saveBtn.onclick = function() { saveProfiloLinguistico(); };
-        }
-      }
-      window.openProfileLingModal = function() {
-        initProfileLingModal();
-        var modal = document.getElementById('profileLingModal');
-        if (modal) modal.classList.add('active');
-        // Render saved selections
-        if (typeof renderProfiloLinguistico === 'function') {
-          // Sync selections from main profile to modal clones
-          setTimeout(function() {
-            syncModalProfileSelections();
-          }, 100);
-        }
-      };
-      window.closeProfileLingModal = function(e) {
-        if (e && e.target !== document.getElementById('profileLingModal')) return;
-        var modal = document.getElementById('profileLingModal');
-        if (modal) modal.classList.remove('active');
-      };
-      window.switchModalPlang = function(btn, plang) {
-        btn.parentElement.querySelectorAll('.tab-link').forEach(function(t){ t.classList.remove('active'); t.setAttribute('aria-selected','false'); });
-        btn.classList.add('active'); btn.setAttribute('aria-selected','true');
-        var panes = document.querySelectorAll('#modalProfileLingContent .plang-pane');
-        panes.forEach(function(p){ p.style.display = 'none'; });
-        var target = document.getElementById('modal-plang-' + plang);
-        if (target) target.style.display = 'block';
-      };
-      function syncModalProfileSelections() {
-        // Copy selected states from original elements to modal clones
-        ['nativeProficiency','nativeContexts','nativeImprove','targetPurpose','targetSituations','targetSector','targetLevel'].forEach(function(id) {
-          var orig = document.getElementById(id);
-          var modal = document.querySelector('#modalProfileLingContent #' + id);
-          if (!orig || !modal) return;
-          var origActives = orig.querySelectorAll('.q-chip.active, .q-chip[aria-pressed="true"]');
-          modal.querySelectorAll('.q-chip').forEach(function(chip) {
-            chip.classList.remove('active'); chip.setAttribute('aria-pressed','false');
-          });
-          origActives.forEach(function(ac) {
-            var val = ac.getAttribute('data-val');
-            var match = modal.querySelector('.q-chip[data-val="' + val + '"]');
-            if (match) { match.classList.add('active'); match.setAttribute('aria-pressed','true'); }
-          });
-        });
-        ['nativeGoalsInput','targetGoalInput'].forEach(function(id) {
-          var orig = document.getElementById(id);
-          var modal = document.querySelector('#modalProfileLingContent #' + id);
-          if (orig && modal) modal.value = orig.value;
-        });
-      }
-
       // ── Modal chip click: toggle in modal AND sync to original ──
       document.addEventListener('click', function(e) {
         var chip = e.target.closest('#modalProfileLingContent .q-chip');
@@ -7905,7 +7846,7 @@
           'Hai fatto <strong>'+questions+' domande</strong> in '+texts.length+' sessioni. '+
           (avgWordsPerSentence >= 10 ? 'Buona complessità! Per passare a C1, punta a 12+ parole per frase.' : 'Per migliorare, cerca di costruire frasi più articolate con subordinate e connettivi.')+
           '</p></article></section>';
-        document.getElementById('sub-gram-reports').innerHTML = panHtml;
+        document.getElementById('sub-gram-panoramica').innerHTML = panHtml;
         
         // ── Tempi Verbali tab ──
         var verbList = doc.verbs().json();
@@ -7929,21 +7870,21 @@
           tHtml += '<article class="alt-card"><h3 style="font-size:28px;font-weight:900;color:'+tenseColors[t]+';margin-bottom:4px">'+pct+'%</h3><p style="font-weight:600">'+tenseLabels[t]+'</p><div class="prog" style="margin-top:10px"><div class="prog-fill" style="width:'+pct+'%;background:'+tenseColors[t]+'"></div></div></article>';
         });
         tHtml += '</section>';
-        document.getElementById('sub-gram-reports').innerHTML += tHtml;
+        document.getElementById('sub-gram-tempi').innerHTML = tHtml;
         
         // ── Errori tab ──
         var errorPatterns = [];
         // Check common errors
         var lowerText = allText.toLowerCase();
-        if (lowerText.match(/\bhe don't\b/)) errorPatterns.push({wrong:"he don't", correct:"he doesn't", count:(lowerText.match(/\bhe don't\b/g)||[]).length});
-        if (lowerText.match(/\bshe don't\b/)) errorPatterns.push({wrong:"she don't", correct:"she doesn't", count:(lowerText.match(/\bshe don't\b/g)||[]).length});
+        if (lowerText.match(/\bhe don't\b/)) errorPatterns.push({wrong:'he don\'t', correct:'he doesn\'t', count:(lowerText.match(/\bhe don't\b/g)||[]).length});
+        if (lowerText.match(/\bshe don't\b/)) errorPatterns.push({wrong:'she don\'t', correct:'she doesn\'t', count:(lowerText.match(/\bshe don't\b/g)||[]).length});
         if (lowerText.match(/\bmore better\b/)) errorPatterns.push({wrong:'more better', correct:'better', count:(lowerText.match(/\bmore better\b/g)||[]).length});
         if (lowerText.match(/\bmore bigger\b/)) errorPatterns.push({wrong:'more bigger', correct:'bigger', count:(lowerText.match(/\bmore bigger\b/g)||[]).length});
         if (lowerText.match(/\binformations?\b/)) errorPatterns.push({wrong:'informations', correct:'information', count:(lowerText.match(/\binformations?\b/g)||[]).length});
         if (lowerText.match(/\bi have \d+ years?\b/)) errorPatterns.push({wrong:'I have X years', correct:'I am X years old', count:(lowerText.match(/\bi have \d+ years?\b/g)||[]).length});
         if (lowerText.match(/\bcan you able to\b/)) errorPatterns.push({wrong:'can you able to', correct:'can you / are you able to', count:(lowerText.match(/\bcan you able to\b/g)||[]).length});
         
-        var eHtml = '<section class="alt-card-grid" style="margin-top:16px"><article class="alt-card"><h3>Pattern di errori rilevati</h3><div style="display:flex;flex-direction:column;gap:6px;margin-top:10px">';
+        var eHtml = '<section class="alt-card-grid"><article class="alt-card"><h3>Pattern di errori rilevati</h3><div style="display:flex;flex-direction:column;gap:6px;margin-top:10px">';
         if (errorPatterns.length === 0) {
           eHtml += '<p style="font-size:13px;color:var(--text-soft)">Nessun errore comune rilevato nelle tue trascrizioni. Continua così! 🎉</p>';
         } else {
@@ -7953,16 +7894,16 @@
           });
         }
         eHtml += '</div></article></section>';
-        document.getElementById('sub-gram-reports').innerHTML += eHtml;
+        document.getElementById('sub-gram-errori').innerHTML = eHtml;
         
         // Source note
         var sourceDiv = '<div style="margin-top:14px;padding:12px 20px;background:var(--bg);border:1px solid var(--line);border-radius:12px;font-size:11px;color:var(--text-faint)">Analisi basata su <strong>'+texts.length+' sessioni</strong> e <strong>'+totalWords+' parole</strong> totali.</div>';
-        document.getElementById('sub-gram-reports').innerHTML += sourceDiv;
+        document.getElementById('sub-gram-panoramica').innerHTML += sourceDiv;
       }
       
       function showGrammaticaEmpty(msg) {
-        var m = msg || "I dati grammaticali saranno disponibili dopo l'analisi delle tue sessioni.";
-        ['sub-gram-reports'].forEach(function(id){
+        var m = msg || 'I dati grammaticali saranno disponibili dopo l\'analisi delle tue sessioni.';
+        ['sub-gram-panoramica','sub-gram-tempi','sub-gram-errori'].forEach(function(id){
           var el = document.getElementById(id);
           if (el) el.innerHTML = '<section class="alt-card-grid"><article class="alt-card"><h3>Prossimamente</h3><p style="font-size:14px;color:var(--text-soft)">'+m+'</p></article></section>';
         });
@@ -8721,31 +8662,6 @@
     });
   }
 </script>
-
-<!-- Profilo Linguistico modal -->
-<div class="modal-overlay" id="profileLingModal" onclick="closeProfileLingModal(event)">
-  <div class="modal-panel" onclick="event.stopPropagation()">
-    <button class="modal-close" onclick="closeProfileLingModal()">&times;</button>
-    <h2 style="margin:0 0 20px;font-size:22px;font-weight:800">Profilo Linguistico</h2>
-    <div class="tabs" role="tablist" style="margin-bottom:18px">
-      <button role="tab" aria-selected="true" class="tab-link active" data-plang="native" onclick="switchModalPlang(this,'native')">🏠 Lingua madre</button>
-      <button role="tab" aria-selected="false" class="tab-link" data-plang="target" onclick="switchModalPlang(this,'target')">🎯 Lingua obiettivo</button>
-    </div>
-    <div id="modalProfileLingContent"></div>
-  </div>
-</div>
-
-<style>
-  .modal-overlay{display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.6);backdrop-filter:blur(6px);align-items:center;justify-content:center}
-  .modal-overlay.active{display:flex}
-  .modal-panel{background:var(--card);border:2px solid var(--line-strong);border-radius:24px;padding:32px 36px;max-width:700px;width:calc(100vw - 48px);max-height:85vh;overflow-y:auto;box-shadow:0 24px 64px rgba(0,0,0,.3);position:relative}
-  [data-theme="dark"] .modal-panel{box-shadow:0 24px 64px rgba(0,0,0,.6)}
-  .modal-close{position:absolute;top:14px;right:18px;width:36px;height:36px;border-radius:50%;border:1.5px solid var(--line);background:var(--card);color:var(--text-soft);font-size:20px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .15s;font-family:var(--font-ui)}
-  .modal-close:hover{background:var(--line);color:var(--text)}
-  @media(max-width:600px){.modal-panel{padding:24px 20px}}
-  .model-select-row{display:flex;align-items:center;gap:8px;margin-top:10px;padding-top:10px;border-top:1px solid var(--line);font-size:11px;color:var(--muted2)}
-  .model-select-row select{padding:4px 8px;border-radius:6px;border:1px solid var(--line);background:var(--card);color:var(--text);font-size:11px;font-family:Inter,sans-serif;cursor:pointer}
-</style>
 
 <script>
 // ═══ Override Start Session: 7 languages + Llama model selector ═══
@@ -9604,7 +9520,147 @@
 })();
 </script>
 
-</script>
+  <!-- ═══ Learning Hub API Integration ═══ -->
+  <script>
+  (function() {
+    const API_BASE = 'https://learning-hub-api-by-blackalphalabs.p.rapidapi.com';
+    const API_HEADERS = {
+      'Content-Type': 'application/json',
+      'x-rapidapi-host': 'learning-hub-api-by-blackalphalabs.p.rapidapi.com',
+      'x-rapidapi-key': 'a2ad59b4famshd2c4c1338c2c73dp1e1712jsn23cff1a56f08'
+    };
+
+    let _lhCourses = [];
+    let _lhLoaded = false;
+
+    async function loadLearningHub() {
+      const grid = document.getElementById('learningHubGrid');
+      const errEl = document.getElementById('learningHubError');
+      if (!grid) return;
+
+      try {
+        const res = await fetch(API_BASE + '/get-alldata', { headers: API_HEADERS });
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        const json = await res.json();
+
+        if (json.Status !== 'Success' || !Array.isArray(json.Result)) {
+          throw new Error('Invalid API response');
+        }
+
+        _lhCourses = json.Result;
+        _lhLoaded = true;
+        renderLearningHubCards();
+        console.log('🎓 Learning Hub: ' + _lhCourses.length + ' corsi caricati');
+      } catch (err) {
+        console.warn('🎓 Learning Hub API error:', err.message);
+        if (grid) grid.innerHTML = '';
+        if (errEl) {
+          errEl.style.display = '';
+          document.getElementById('learningHubErrorMsg').textContent =
+            'API non disponibile (offline o CORS). Riprova più tardi.';
+        }
+      }
+    }
+
+    function isPlaceholderLink(link) {
+      if (!link || link === '#') return true;
+      const lower = link.toLowerCase();
+      return lower.includes('google.com') || lower.includes('example.com') || lower.includes('placeholder');
+    }
+
+    async function expandCourseDetail(courseId, cardEl) {
+      let existing = cardEl.querySelector('.lh-detail');
+      if (existing) { existing.remove(); return; }
+
+      const detail = document.createElement('div');
+      detail.className = 'lh-detail';
+      detail.style.cssText = 'margin-top:12px;padding:14px 16px;background:var(--bg);border-radius:12px;border:1px solid var(--line);font-size:12px;color:var(--text-soft)';
+      detail.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Caricamento dettagli…';
+      cardEl.appendChild(detail);
+
+      try {
+        const res = await fetch(API_BASE + '/get-onedata/' + encodeURIComponent(courseId), { headers: API_HEADERS });
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        const json = await res.json();
+        if (json.Status === 'Success' && json.Result) {
+          const d = json.Result;
+          detail.innerHTML = '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">'
+            + '<div><strong style="color:var(--teal)">Titolo:</strong> ' + escHtml(d.main_title || '—') + '</div>'
+            + '<div><strong style="color:var(--teal)">Materia:</strong> ' + escHtml(d.subject || '—') + '</div>'
+            + '<div><strong style="color:var(--teal)">Categoria:</strong> ' + escHtml(d.cetogray || '—') + '</div>'
+            + '<div><strong style="color:var(--teal)">ID:</strong> <code style="font-size:11px">' + escHtml(d.id || '—') + '</code></div>'
+            + '</div>'
+            + '<div style="margin-top:8px"><strong style="color:var(--teal)">Descrizione:</strong> ' + escHtml(d.desc || 'Nessuna descrizione') + '</div>'
+            + (d.link ? '<div style="margin-top:8px"><strong style="color:var(--teal)">Link:</strong> <a href="' + escHtml(d.link) + '" target="_blank" style="color:var(--cyan)">' + escHtml(d.link) + '</a></div>' : '');
+        } else {
+          detail.innerHTML = '<span style="color:var(--text-faint)">Nessun dettaglio disponibile.</span>';
+        }
+      } catch (err) {
+        detail.innerHTML = '<span style="color:var(--amber)"><i class="fa-solid fa-triangle-exclamation"></i> Dettaglio non disponibile.</span>';
+      }
+    }
+
+    function renderLearningHubCards() {
+      const grid = document.getElementById('learningHubGrid');
+      if (!grid) return;
+
+      if (_lhCourses.length === 0) {
+        grid.innerHTML = '<div style="text-align:center;padding:48px 20px;color:var(--text-faint);grid-column:1/-1"><i class="fa-solid fa-inbox" style="font-size:28px;margin-bottom:8px;display:block"></i>Nessun corso disponibile.</div>';
+        return;
+      }
+
+      const subjects = ['📚','💻','🔬','🎨','📊','🗣️','🎵','🌍','⚙️','📖'];
+      window._lhExpandCourse = expandCourseDetail;
+      grid.innerHTML = _lhCourses.map((c, i) => {
+        const emoji = subjects[i % subjects.length];
+        const title = c.main_title || 'Senza titolo';
+        const subject = c.subject || 'Generale';
+        const category = c.cetogray || '—';
+        const desc = c.desc || '';
+        const link = c.link || '';
+        const id = c.id || '';
+        const isPlaceholder = isPlaceholderLink(link);
+
+        const actionBtn = isPlaceholder
+          ? '<button onclick="event.stopPropagation();window._lhExpandCourse(\'' + escHtml(id) + '\',this.closest(\'.alt-card\'))" style="font-size:12px;font-weight:600;color:var(--teal);background:transparent;border:1px solid var(--teal);padding:6px 14px;border-radius:100px;cursor:pointer;transition:all var(--transition)" onmouseover="this.style.background=\'var(--teal)\';this.style.color=\'#fff\'" onmouseout="this.style.background=\'transparent\';this.style.color=\'var(--teal)\'">Dettagli <i class="fa-solid fa-chevron-down" style="font-size:10px;margin-left:4px"></i></button>'
+          : '<a href="' + escHtml(link) + '" target="_blank" rel="noopener" onclick="event.stopPropagation()" style="font-size:12px;font-weight:600;color:var(--teal);text-decoration:none;padding:6px 14px;border-radius:100px;border:1px solid var(--teal);transition:all var(--transition)" onmouseover="this.style.background=\'var(--teal)\';this.style.color=\'#fff\'" onmouseout="this.style.background=\'transparent\';this.style.color=\'var(--teal)\'">Apri <i class="fa-solid fa-arrow-up-right-from-square" style="font-size:10px;margin-left:4px"></i></a>';
+
+        return '<article class="alt-card" style="cursor:default">'
+          + '<div style="display:flex;align-items:flex-start;gap:12px;margin-bottom:10px">'
+          + '<span style="font-size:28px;flex-shrink:0">' + emoji + '</span>'
+          + '<div>'
+          + '<h3 style="margin:0 0 4px;font-size:16px">' + escHtml(title) + '</h3>'
+          + '<div style="display:flex;gap:6px;flex-wrap:wrap">'
+          + '<span style="font-size:10px;font-weight:600;padding:2px 8px;border-radius:100px;background:var(--teal-4);color:var(--teal)">' + escHtml(subject) + '</span>'
+          + '<span style="font-size:10px;font-weight:600;padding:2px 8px;border-radius:100px;background:var(--purple-soft);color:var(--purple)">' + escHtml(category) + '</span>'
+          + '</div></div></div>'
+          + '<p style="font-size:12px;color:var(--text-soft);line-height:1.5;margin:0 0 12px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">' + escHtml(desc) + '</p>'
+          + '<div style="display:flex;align-items:center;justify-content:space-between">'
+          + '<code style="font-size:10px;color:var(--text-faint);font-family:var(--font-mono)">' + escHtml(id.slice(0,8)) + '…</code>'
+          + actionBtn
+          + '</div></article>';
+      }).join('');
+    }
+
+    function escHtml(s) {
+      if (!s) return '';
+      return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+
+    // Load when user clicks the Learning Hub nav item
+    var lhNav = document.querySelector('[data-panel="learning-hub"]');
+    if (lhNav) {
+      lhNav.addEventListener('click', function() {
+        if (!_lhLoaded) loadLearningHub();
+      });
+    }
+
+    // Also load eagerly after a short delay (non-blocking)
+    setTimeout(function() {
+      if (!_lhLoaded) loadLearningHub();
+    }, 2000);
+  })();
+  </script>
 
 </body>
 </html>
