@@ -370,7 +370,103 @@
     .api-panel pre .str { color:var(--teal); }
     .api-panel pre .cmt { color:var(--text-faint); }
 
-    /* ── Responsive ── */
+    /* ── Modal overlay ── */
+    .modal-overlay {
+      position:fixed; inset:0; z-index:200;
+      background:rgba(0,0,0,.55);
+      display:flex; align-items:center; justify-content:center;
+      padding:20px; opacity:0; pointer-events:none;
+      transition:opacity .25s;
+    }
+    .modal-overlay.open { opacity:1; pointer-events:auto; }
+    .modal {
+      background:var(--panel);
+      border:1px solid var(--line);
+      border-radius:var(--radius-card);
+      padding:28px; max-width:600px; width:100%;
+      max-height:85vh; overflow-y:auto;
+      box-shadow:var(--shadow-lg);
+    }
+    .modal h2 {
+      font-family:var(--font-head);
+      font-size:var(--fs-h2); font-weight:700;
+      margin-bottom:18px; color:var(--text);
+    }
+    .modal label {
+      display:block; font-size:var(--fs-cap); font-weight:600;
+      color:var(--text-soft); margin-bottom:4px; margin-top:14px;
+    }
+    .modal input, .modal textarea {
+      width:100%; font-family:var(--font-ui); font-size:var(--fs-ui);
+      padding:10px 14px; border-radius:10px;
+      border:1.5px solid var(--line); background:var(--bg);
+      color:var(--text); outline:none; resize:vertical;
+      transition:border-color var(--transition);
+    }
+    .modal input:focus, .modal textarea:focus { border-color:var(--teal); }
+    .modal textarea { min-height:60px; }
+    .modal .q-block {
+      background:var(--bg); border:1px solid var(--line);
+      border-radius:12px; padding:16px; margin-bottom:10px;
+      position:relative;
+    }
+    .modal .q-block .q-num {
+      font-family:var(--font-mono); font-size:10px; font-weight:600;
+      color:var(--teal); text-transform:uppercase; letter-spacing:.06em;
+      margin-bottom:6px;
+    }
+    .modal .q-block .remove-q {
+      position:absolute; top:10px; right:10px;
+      width:26px; height:26px; border-radius:50%;
+      border:1px solid var(--line); background:var(--panel);
+      color:var(--red); cursor:pointer; font-size:11px;
+      display:flex; align-items:center; justify-content:center;
+      transition:all var(--transition);
+    }
+    .modal .q-block .remove-q:hover { border-color:var(--red); background:rgba(239,68,68,.06); }
+    .modal .btn-row {
+      display:flex; gap:8px; margin-top:18px; flex-wrap:wrap;
+    }
+
+    /* ── Quiz complete overlay ── */
+    .complete-overlay {
+      position:fixed; inset:0; z-index:200;
+      background:rgba(0,0,0,.6);
+      display:flex; align-items:center; justify-content:center;
+      padding:20px; opacity:0; pointer-events:none;
+      transition:opacity .3s;
+    }
+    .complete-overlay.open { opacity:1; pointer-events:auto; }
+    .complete-card {
+      background:var(--panel);
+      border:2px solid var(--teal);
+      border-radius:var(--radius-card);
+      padding:32px; text-align:center; max-width:420px; width:100%;
+    }
+    .complete-card .score-circle {
+      width:120px; height:120px; border-radius:50%;
+      border:4px solid var(--teal);
+      display:flex; align-items:center; justify-content:center;
+      margin:0 auto 20px;
+      font-family:var(--font-head); font-size:40px; font-weight:800;
+      color:var(--teal);
+    }
+    .complete-card h2 {
+      font-family:var(--font-head); font-size:var(--fs-h2);
+      font-weight:700; margin-bottom:8px;
+    }
+    .complete-card p { color:var(--text-soft); margin-bottom:18px; }
+
+    /* ── Toast ── */
+    .toast {
+      position:fixed; bottom:30px; left:50%; transform:translateX(-50%);
+      background:var(--black-btn); color:var(--panel);
+      padding:12px 24px; border-radius:var(--radius-pill);
+      font-size:var(--fs-ui); font-weight:600;
+      z-index:300; opacity:0; pointer-events:none;
+      transition:opacity .3s; box-shadow:var(--shadow-lg);
+    }
+    .toast.show { opacity:1; }
     @media (max-width:760px) {
       .main { padding:24px 16px 48px; }
       .hero { padding:28px 22px; flex-direction:column; align-items:flex-start; }
@@ -407,159 +503,143 @@
     <section class="hero">
       <div>
         <div class="hero-badge">
-          <i class="fa-solid fa-clipboard-question"></i> ProProfs Quiz Maker API
+          <i class="fa-solid fa-clipboard-question"></i> Quiz Maker
         </div>
         <h1>Crea, gioca,<br><span>impara</span></h1>
-        <p>Oltre 300.000 quiz già pronti o creane uno da zero. Valutazione automatica, certificati di completamento e analisi dei risultati — tutto integrato con l'API ProProfs Quiz Maker.</p>
+        <p>Crea quiz personalizzati, gioca con quelli esistenti e tieni traccia dei tuoi risultati. Tutti i quiz vengono salvati nel tuo browser.</p>
       </div>
-      <button class="btn-pill primary" style="font-size:16px;padding:14px 28px;">
+      <button class="btn-pill primary" style="font-size:16px;padding:14px 28px;" onclick="openCreateModal()">
         <i class="fa-solid fa-plus"></i> Crea un quiz
       </button>
     </section>
 
     <!-- Quiz Templates -->
     <div class="section-head">
-      <h2>Quiz in evidenza</h2>
-      <span class="chip">300.000+ templates</span>
+      <h2>Quiz Incorporati</h2>
+      <span class="chip" id="quizCount">3 disponibili</span>
       <div class="actions">
-        <button class="btn-pill"><i class="fa-solid fa-filter"></i> Filtri</button>
-        <button class="btn-pill"><i class="fa-solid fa-magnifying-glass"></i> Cerca</button>
+        <button class="btn-pill" onclick="openCreateModal()"><i class="fa-solid fa-plus"></i> Nuovo</button>
+        <button class="btn-pill" onclick="resetAllQuizzes()"><i class="fa-solid fa-rotate"></i> Reset</button>
       </div>
     </div>
-    <div class="quiz-grid">
-      <div class="quiz-card" onclick="this.querySelector('.badge').textContent='Aperto'">
-        <span class="badge pop">Popolare</span>
-        <div class="cat">Vocabolario · Italiano</div>
-        <h3>Verbi Italiani Essenziali</h3>
-        <p>Metti alla prova la tua conoscenza dei verbi italiani più comuni — presente, passato e futuro in contesti reali.</p>
-        <div class="meta">
-          <span><i class="fa-regular fa-clock"></i> 15 min</span>
-          <span><i class="fa-regular fa-circle-question"></i> 25 domande</span>
-          <span><i class="fa-solid fa-users"></i> 4.8k</span>
-        </div>
-      </div>
-      <div class="quiz-card">
-        <span class="badge new">Nuovo</span>
-        <div class="cat">Grammatica · Livello B1</div>
-        <h3>Preposizioni — Il Grande Quiz</h3>
-        <p>Di, a, da, in, con, su, per, tra, fra… Domina le preposizioni italiane con esempi autentici e spiegazioni.</p>
-        <div class="meta">
-          <span><i class="fa-regular fa-clock"></i> 20 min</span>
-          <span><i class="fa-regular fa-circle-question"></i> 30 domande</span>
-          <span><i class="fa-solid fa-users"></i> 2.1k</span>
-        </div>
-      </div>
-      <div class="quiz-card">
-        <span class="badge free">Gratuito</span>
-        <div class="cat">Cultura · Italia</div>
-        <h3>Quanto Conosci l'Italia?</h3>
-        <p>Geografia, storia, cucina, arte e tradizioni. Un viaggio attraverso la cultura italiana in 20 domande.</p>
-        <div class="meta">
-          <span><i class="fa-regular fa-clock"></i> 10 min</span>
-          <span><i class="fa-regular fa-circle-question"></i> 20 domande</span>
-          <span><i class="fa-solid fa-users"></i> 8.3k</span>
-        </div>
-      </div>
+    <div class="quiz-grid" id="quizGrid">
+      <!-- Built-in quizzes rendered by JS -->
     </div>
 
-    <!-- Active Quiz Preview -->
+    <!-- Active Quiz Player -->
     <div class="section-head">
-      <h2>Anteprima Quiz Attivo</h2>
-      <span class="chip">Verbi Italiani Essenziali</span>
+      <h2 id="quizPlayerTitle">Gioca</h2>
+      <span class="chip" id="quizPlayerChip">Scegli un quiz</span>
       <div class="actions">
-        <button class="btn-pill"><i class="fa-solid fa-arrow-left"></i></button>
-        <button class="btn-pill"><i class="fa-solid fa-arrow-right"></i></button>
+        <button class="btn-pill" id="btnPrevQ" onclick="prevQuestion()" style="display:none"><i class="fa-solid fa-arrow-left"></i></button>
+        <button class="btn-pill" id="btnNextQ" onclick="nextQuestion()" style="display:none"><i class="fa-solid fa-arrow-right"></i></button>
       </div>
     </div>
-    <div class="quiz-preview" id="quizPreview">
+    <div class="quiz-preview" id="quizPlayer" style="display:none">
       <div class="q-header">
-        <span class="q-num">Domanda 3 di 25</span>
-        <span class="q-timer" id="quizTimer">00:42</span>
+        <span class="q-num" id="qNum">Domanda 1 di 5</span>
+        <span class="q-timer" id="quizTimer">--:--</span>
       </div>
-      <div class="q-text">Qual è il participio passato del verbo <em>"scrivere"</em>?</div>
-      <div class="options-list" id="optionsList">
-        <div class="option-item" data-idx="0" onclick="selectOption(0)">
-          <span class="option-marker">A</span> Scrivuto
-        </div>
-        <div class="option-item selected correct" data-idx="1" onclick="selectOption(1)">
-          <span class="option-marker">B</span> Scritto ✓
-        </div>
-        <div class="option-item" data-idx="2" onclick="selectOption(2)">
-          <span class="option-marker">C</span> Scrivato
-        </div>
-        <div class="option-item" data-idx="3" onclick="selectOption(3)">
-          <span class="option-marker">D</span> Scrivendo
-        </div>
-      </div>
+      <div class="q-text" id="qText"></div>
+      <div class="options-list" id="optionsList"></div>
       <div class="quiz-nav">
-        <button class="btn-pill"><i class="fa-solid fa-arrow-left"></i> Indietro</button>
-        <div class="dots">
-          <span class="done"></span><span class="done"></span><span class="curr"></span>
-          <span></span><span></span><span></span><span></span><span></span>
-          <span></span><span></span><span></span><span></span><span></span>
-          <span></span><span></span><span></span><span></span><span></span>
-          <span></span><span></span><span></span><span></span><span></span>
-          <span></span>
-        </div>
-        <button class="btn-pill primary">Avanti <i class="fa-solid fa-arrow-right"></i></button>
+        <button class="btn-pill" onclick="prevQuestion()"><i class="fa-solid fa-arrow-left"></i> Indietro</button>
+        <div class="dots" id="qDots"></div>
+        <button class="btn-pill primary" id="btnNextOrFinish" onclick="nextOrFinish()">Avanti <i class="fa-solid fa-arrow-right"></i></button>
       </div>
+    </div>
+    <div id="quizEmpty" style="text-align:center;padding:40px;color:var(--text-faint)">
+      <i class="fa-solid fa-hand-pointer" style="font-size:40px;margin-bottom:12px;display:block;opacity:.5"></i>
+      Clicca su un quiz qui sopra per iniziare a giocare —<br>oppure creane uno tuo con il pulsante "Crea un quiz".
     </div>
 
     <!-- Results Dashboard -->
     <div class="section-head">
-      <h2>I Tuoi Risultati Recenti</h2>
-      <span class="chip">Ultimo quiz completato</span>
+      <h2>I Tuoi Risultati</h2>
+      <span class="chip">Salvati localmente</span>
     </div>
-    <div class="results-grid">
+    <div class="results-grid" id="resultsGrid">
       <div class="result-card">
         <div class="icon">🎯</div>
-        <div class="val">84<span style="font-size:16px;opacity:.7">%</span></div>
+        <div class="val" id="resAvg">—</div>
         <div class="lbl">Punteggio medio</div>
       </div>
       <div class="result-card">
-        <div class="icon">⚡</div>
-        <div class="val">3.2<span style="font-size:16px;opacity:.7">s</span></div>
-        <div class="lbl">Tempo medio/domanda</div>
-      </div>
-      <div class="result-card">
         <div class="icon">🏆</div>
-        <div class="val">12</div>
+        <div class="val" id="resCompleted">0</div>
         <div class="lbl">Quiz completati</div>
       </div>
       <div class="result-card">
+        <div class="icon">📝</div>
+        <div class="val" id="resTotal">0</div>
+        <div class="lbl">Domande risposte</div>
+      </div>
+      <div class="result-card">
         <div class="icon">📈</div>
-        <div class="val">+7<span style="font-size:16px;opacity:.7">%</span></div>
-        <div class="lbl">Miglioramento mensile</div>
+        <div class="val" id="resBest">—</div>
+        <div class="lbl">Miglior punteggio</div>
       </div>
     </div>
 
     <!-- API Integration panel -->
     <div class="api-panel">
       <h3><span class="dot"></span> API Integration — ProProfs Quiz Maker</h3>
-      <pre><span class="cmt">// GET https://sameerbhatia-proprofs-quiz-maker.p.rapidapi.com/</span>
-<span class="cmt">// Headers: x-rapidapi-host, x-rapidapi-key, Content-Type</span>
+      <pre><span class="cmt">// L'API ProProfs su RapidAPI restituisce HTML (proxy al sito ProProfs).</span>
+<span class="cmt">// Questo mockup funziona LOCALMENTE: crea quiz, gioca, salva risultati.</span>
+<span class="cmt">// Tutti i dati sono salvati in localStorage del browser.</span>
 
-<span class="key">const</span> options = {
-  method: <span class="str">'GET'</span>,
-  headers: {
-    <span class="str">'Content-Type'</span>: <span class="str">'application/json'</span>,
-    <span class="str">'x-rapidapi-host'</span>: <span class="str">'sameerbhatia-proprofs-quiz-maker.p.rapidapi.com'</span>,
-    <span class="str">'x-rapidapi-key'</span>: <span class="str">'a2ad59b4famshd2c4c1338c2c73dp1e1712jsn23cff1a56f08'</span>
-  }
-};
-
-<span class="key">async function</span> <span class="key">fetchQuizzes</span>() {
-  <span class="key">const</span> res = <span class="key">await</span> fetch(
-    <span class="str">'https://sameerbhatia-proprofs-quiz-maker.p.rapidapi.com/'</span>,
-    options
-  );
-  <span class="key">const</span> data = <span class="key">await</span> res.json();
-  <span class="cmt">// data contiene: quiz templates, questions, grading config</span>
-  <span class="key">return</span> data;
-}</pre>
+<span class="key">const</span> endpoint = <span class="str">'https://sameerbhatia-proprofs-quiz-maker.p.rapidapi.com/'</span>;
+<span class="key">const</span> headers = {
+  <span class="str">'x-rapidapi-host'</span>: <span class="str">'sameerbhatia-proprofs-quiz-maker.p.rapidapi.com'</span>,
+  <span class="str">'x-rapidapi-key'</span>: <span class="str">'a2ad59b4famshd2c4c1338c2c73dp1e1712jsn23cff1a56f08'</span>
+};</pre>
     </div>
 
   </main>
+
+  <!-- ═══ CREATE QUIZ MODAL ═══ -->
+  <div class="modal-overlay" id="createModal">
+    <div class="modal">
+      <h2 id="modalTitle"><i class="fa-solid fa-plus"></i> Crea un Nuovo Quiz</h2>
+      <label>Titolo del quiz</label>
+      <input type="text" id="quizTitle" placeholder="Es: Verbi Italiani Essenziali">
+      <label>Categoria</label>
+      <input type="text" id="quizCat" placeholder="Es: Vocabolario · Italiano">
+      <label>Descrizione</label>
+      <textarea id="quizDesc" placeholder="Una breve descrizione del quiz..."></textarea>
+
+      <div style="margin-top:16px">
+        <div class="section-head" style="margin-bottom:10px">
+          <h2 style="font-size:16px">Domande</h2>
+          <button class="btn-pill" onclick="addQuestionBlock()" style="font-size:12px;padding:6px 14px"><i class="fa-solid fa-plus"></i> Aggiungi domanda</button>
+        </div>
+        <div id="questionBlocks">
+          <!-- Filled by JS -->
+        </div>
+      </div>
+
+      <div class="btn-row">
+        <button class="btn-pill primary" onclick="saveQuiz()"><i class="fa-solid fa-floppy-disk"></i> Salva Quiz</button>
+        <button class="btn-pill" onclick="closeCreateModal()">Annulla</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ QUIZ COMPLETE OVERLAY ═══ -->
+  <div class="complete-overlay" id="completeOverlay">
+    <div class="complete-card">
+      <div class="score-circle" id="scoreCircle">0%</div>
+      <h2 id="completeTitle">Quiz Completato!</h2>
+      <p id="completeText"></p>
+      <div class="btn-row" style="justify-content:center">
+        <button class="btn-pill primary" onclick="restartQuiz()"><i class="fa-solid fa-rotate"></i> Rifai</button>
+        <button class="btn-pill" onclick="closeComplete()">Chiudi</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ TOAST ═══ -->
+  <div class="toast" id="toast"></div>
 
   <!-- ═══ SCRIPTS ═══ -->
   <script>
@@ -585,47 +665,512 @@
       icon.className = isDark ? 'fa-solid fa-moon' : 'fa-solid fa-sun';
     }
 
-    // ── Quiz option selection ──
-    function selectOption(idx) {
-      const items = document.querySelectorAll('#optionsList .option-item');
-      items.forEach(el => {
-        el.classList.remove('selected', 'correct', 'incorrect');
-      });
-      const el = items[idx];
-      el.classList.add('selected');
-      if (idx === 1) el.classList.add('correct');
+    // ── Toast ──
+    let toastTimer;
+    function showToast(msg) {
+      const t = document.getElementById('toast');
+      t.textContent = msg; t.classList.add('show');
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => t.classList.remove('show'), 2200);
     }
 
-    // ── Quiz timer (mock) ──
-    let timerSec = 42;
-    setInterval(() => {
-      timerSec = timerSec > 0 ? timerSec - 1 : 0;
-      const m = Math.floor(timerSec / 60);
-      const s = String(timerSec % 60).padStart(2, '0');
-      const el = document.getElementById('quizTimer');
-      if (el) el.textContent = `${String(m).padStart(2,'0')}:${s}`;
-    }, 1000);
+    // ═══════════════════════════════════════════
+    //  DATA LAYER
+    // ═══════════════════════════════════════════
 
-    // ── API integration (real call on page load) ──
-    async function loadQuizzes() {
+    const STORAGE_QUIZZES = 'sottomock_quizzes';
+    const STORAGE_RESULTS = 'sottomock_results';
+
+    // Built-in quizzes
+    const BUILT_IN = [
+      {
+        id: 'builtin-1', builtin: true,
+        title: 'Verbi Italiani Essenziali',
+        cat: 'Vocabolario · Italiano',
+        desc: 'Metti alla prova la tua conoscenza dei verbi italiani più comuni — presente, passato e futuro in contesti reali.',
+        badge: 'Popolare', badgeClass: 'pop',
+        questions: [
+          { q: 'Qual è il participio passato del verbo "scrivere"?', opts: ['Scrivuto','Scritto','Scrivato','Scrivendo'], correct: 1 },
+          { q: 'Cosa significa "mangiare" in italiano?', opts: ['To drink','To sleep','To eat','To run'], correct: 2 },
+          { q: 'Qual è la prima persona singolare del verbo "essere" al presente?', opts: ['Sono','Sei','È','Siamo'], correct: 0 },
+          { q: 'Come si dice "they go" in italiano?', opts: ['Vanno','Andate','Vanno loro','Andiamo'], correct: 0 },
+          { q: 'Quale di questi è un verbo riflessivo?', opts: ['Correre','Alzarsi','Dormire','Parlare'], correct: 1 }
+        ]
+      },
+      {
+        id: 'builtin-2', builtin: true,
+        title: 'Preposizioni — Il Grande Quiz',
+        cat: 'Grammatica · Livello B1',
+        desc: 'Di, a, da, in, con, su, per, tra, fra… Domina le preposizioni italiane con esempi autentici e spiegazioni.',
+        badge: 'Nuovo', badgeClass: 'new',
+        questions: [
+          { q: 'Vado ___ Roma domani.', opts: ['in','a','di','da'], correct: 1 },
+          { q: 'Il libro è ___ tavolo.', opts: ['sul','nel','al','dal'], correct: 0 },
+          { q: 'Parto ___ casa alle otto.', opts: ['in','a','da','di'], correct: 2 },
+          { q: 'Parlo ___ mio amico al telefono.', opts: ['con','per','di','a'], correct: 0 },
+          { q: 'Questo regalo è ___ te.', opts: ['a','di','per','con'], correct: 2 }
+        ]
+      },
+      {
+        id: 'builtin-3', builtin: true,
+        title: 'Quanto Conosci l\'Italia?',
+        cat: 'Cultura · Italia',
+        desc: 'Geografia, storia, cucina, arte e tradizioni. Un viaggio attraverso la cultura italiana.',
+        badge: 'Gratuito', badgeClass: 'free',
+        questions: [
+          { q: 'Qual è la capitale d\'Italia?', opts: ['Milano','Napoli','Roma','Firenze'], correct: 2 },
+          { q: 'In quale città si trova il Colosseo?', opts: ['Venezia','Roma','Firenze','Milano'], correct: 1 },
+          { q: 'Come si chiama il famoso piatto italiano a base di riso?', opts: ['Pasta','Pizza','Risotto','Polenta'], correct: 2 },
+          { q: 'Chi ha dipinto la Cappella Sistina?', opts: ['Leonardo','Raffaello','Michelangelo','Donatello'], correct: 2 },
+          { q: 'Quante regioni ha l\'Italia?', opts: ['18','20','21','22'], correct: 1 }
+        ]
+      }
+    ];
+
+    function loadQuizzes() {
       try {
-        const res = await fetch('https://sameerbhatia-proprofs-quiz-maker.p.rapidapi.com/', {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-            'x-rapidapi-host': 'sameerbhatia-proprofs-quiz-maker.p.rapidapi.com',
-            'x-rapidapi-key': 'a2ad59b4famshd2c4c1338c2c73dp1e1712jsn23cff1a56f08'
-          }
-        });
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const data = await res.json();
-        console.log('📝 ProProfs Quiz API response:', data);
-      } catch (err) {
-        console.warn('⚠️ ProProfs Quiz API non disponibile (mockup attivo):', err.message);
+        const raw = localStorage.getItem(STORAGE_QUIZZES);
+        return raw ? JSON.parse(raw) : [...BUILT_IN];
+      } catch(e) { return [...BUILT_IN]; }
+    }
+
+    function saveQuizzes(quizzes) {
+      localStorage.setItem(STORAGE_QUIZZES, JSON.stringify(quizzes));
+    }
+
+    function loadResults() {
+      try {
+        const raw = localStorage.getItem(STORAGE_RESULTS);
+        return raw ? JSON.parse(raw) : { completed:0, totalCorrect:0, totalQuestions:0, bestScore:0, history:[] };
+      } catch(e) { return { completed:0, totalCorrect:0, totalQuestions:0, bestScore:0, history:[] }; }
+    }
+
+    function saveResults(r) {
+      localStorage.setItem(STORAGE_RESULTS, JSON.stringify(r));
+    }
+
+    function resetAllQuizzes() {
+      if (!confirm('Sei sicuro? Tutti i quiz personalizzati e i risultati verranno eliminati.')) return;
+      localStorage.removeItem(STORAGE_QUIZZES);
+      localStorage.removeItem(STORAGE_RESULTS);
+      window._quizzes = [...BUILT_IN];
+      window._results = { completed:0, totalCorrect:0, totalQuestions:0, bestScore:0, history:[] };
+      renderQuizCards();
+      updateResultsUI();
+      resetPlayer();
+      showToast('Tutti i dati sono stati azzerati');
+    }
+
+    // Init
+    window._quizzes = loadQuizzes();
+    window._results = loadResults();
+
+    // ═══════════════════════════════════════════
+    //  QUIZ CARD RENDERING
+    // ═══════════════════════════════════════════
+
+    function renderQuizCards() {
+      const grid = document.getElementById('quizGrid');
+      const countEl = document.getElementById('quizCount');
+      const quizzes = window._quizzes;
+
+      countEl.textContent = quizzes.length + ' disponibili';
+
+      grid.innerHTML = quizzes.map((qz, i) => {
+        const qCount = qz.questions ? qz.questions.length : 0;
+        const badgeHtml = qz.badge
+          ? `<span class="badge ${qz.badgeClass || 'pop'}">${qz.badge}</span>`
+          : '';
+        return `
+          <div class="quiz-card" onclick="startQuiz('${qz.id}')">
+            ${badgeHtml}
+            <div class="cat">${qz.cat || 'Senza categoria'}</div>
+            <h3>${qz.title}</h3>
+            <p>${qz.desc || ''}</p>
+            <div class="meta">
+              <span><i class="fa-regular fa-clock"></i> ~${Math.round(qCount * 0.6)} min</span>
+              <span><i class="fa-regular fa-circle-question"></i> ${qCount} domande</span>
+              ${qz.builtin ? '' : '<span style="color:var(--purple)"><i class="fa-solid fa-user-pen"></i> Tuo</span>'}
+            </div>
+          </div>`;
+      }).join('');
+    }
+
+    // ═══════════════════════════════════════════
+    //  QUIZ PLAYER
+    // ═══════════════════════════════════════════
+
+    let _currentQuiz = null;
+    let _currentQIdx = 0;
+    let _answers = [];       // index of selected option per question (-1 = unanswered)
+    let _timerSec = 0;
+    let _timerInterval = null;
+    let _quizFinished = false;
+
+    function startQuiz(quizId) {
+      const quiz = window._quizzes.find(q => q.id === quizId);
+      if (!quiz || !quiz.questions || quiz.questions.length === 0) {
+        showToast('Questo quiz non ha domande!');
+        return;
+      }
+
+      // Pick a random question order but keep correct answer mapping
+      const shuffled = quiz.questions.map((q,i) => ({...q, _origIdx: i}));
+      // Actually let's keep order for now - shuffle can be overwhelming
+      
+      _currentQuiz = quiz;
+      _currentQIdx = 0;
+      _answers = new Array(quiz.questions.length).fill(-1);
+      _quizFinished = false;
+      _timerSec = 0;
+
+      document.getElementById('quizPlayer').style.display = '';
+      document.getElementById('quizEmpty').style.display = 'none';
+      document.getElementById('quizPlayerTitle').textContent = quiz.title;
+      document.getElementById('quizPlayerChip').textContent = quiz.questions.length + ' domande';
+      document.getElementById('btnPrevQ').style.display = '';
+      document.getElementById('btnNextQ').style.display = '';
+
+      clearInterval(_timerInterval);
+      _timerInterval = setInterval(() => {
+        _timerSec++;
+        updateTimerDisplay();
+      }, 1000);
+      updateTimerDisplay();
+
+      renderQuestion();
+      renderDots();
+    }
+
+    function renderQuestion() {
+      const quiz = _currentQuiz;
+      if (!quiz) return;
+      const q = quiz.questions[_currentQIdx];
+      document.getElementById('qNum').textContent = `Domanda ${_currentQIdx + 1} di ${quiz.questions.length}`;
+      document.getElementById('qText').innerHTML = q.q;
+
+      const markers = ['A','B','C','D'];
+      const list = document.getElementById('optionsList');
+      list.innerHTML = q.opts.map((opt, i) => {
+        let cls = 'option-item';
+        if (_answers[_currentQIdx] === i) cls += ' selected';
+        if (_quizFinished) {
+          if (i === q.correct) cls += ' correct';
+          else if (_answers[_currentQIdx] === i) cls += ' incorrect';
+        }
+        const clickable = _quizFinished ? '' : `onclick="selectAnswer(${i})"`;
+        return `<div class="${cls}" data-idx="${i}" ${clickable}>
+          <span class="option-marker">${markers[i]}</span> ${opt}
+        </div>`;
+      }).join('');
+
+      document.getElementById('btnNextOrFinish').textContent =
+        (_currentQIdx === quiz.questions.length - 1) ? 'Finisci <i class="fa-solid fa-flag-checkered"></i>' : 'Avanti <i class="fa-solid fa-arrow-right"></i>';
+    }
+
+    function selectAnswer(idx) {
+      if (_quizFinished) return;
+      _answers[_currentQIdx] = idx;
+      renderQuestion();
+    }
+
+    function renderDots() {
+      const quiz = _currentQuiz;
+      if (!quiz) return;
+      const dots = document.getElementById('qDots');
+      dots.innerHTML = quiz.questions.map((_, i) => {
+        let cls = '';
+        if (_quizFinished && _answers[i] === quiz.questions[i].correct) cls = 'done';
+        else if (_quizFinished && _answers[i] >= 0 && _answers[i] !== quiz.questions[i].correct) cls = 'miss';
+        else if (_answers[i] >= 0) cls = 'done';
+        if (i === _currentQIdx) cls += ' curr';
+        return `<span class="${cls.trim()}"></span>`;
+      }).join('');
+    }
+
+    function nextQuestion() {
+      if (_currentQIdx < _currentQuiz.questions.length - 1) {
+        _currentQIdx++;
+        renderQuestion();
+        renderDots();
       }
     }
 
-    document.addEventListener('DOMContentLoaded', loadQuizzes);
+    function prevQuestion() {
+      if (_currentQIdx > 0) {
+        _currentQIdx--;
+        renderQuestion();
+        renderDots();
+      }
+    }
+
+    function nextOrFinish() {
+      if (_currentQIdx < _currentQuiz.questions.length - 1) {
+        nextQuestion();
+      } else {
+        finishQuiz();
+      }
+    }
+
+    function finishQuiz() {
+      _quizFinished = true;
+      clearInterval(_timerInterval);
+
+      const quiz = _currentQuiz;
+      let correct = 0;
+      quiz.questions.forEach((q, i) => {
+        if (_answers[i] === q.correct) correct++;
+      });
+
+      const pct = Math.round((correct / quiz.questions.length) * 100);
+      const totalTime = _timerSec;
+
+      // Save result
+      const r = window._results;
+      r.completed++;
+      r.totalCorrect += correct;
+      r.totalQuestions += quiz.questions.length;
+      if (pct > r.bestScore) r.bestScore = pct;
+      r.history.push({
+        quizId: quiz.id,
+        quizTitle: quiz.title,
+        pct, correct, total: quiz.questions.length,
+        time: totalTime,
+        date: new Date().toISOString()
+      });
+      saveResults(r);
+      window._results = r;
+
+      renderQuestion();
+      renderDots();
+      updateResultsUI();
+
+      // Show complete overlay
+      const circle = document.getElementById('scoreCircle');
+      circle.textContent = pct + '%';
+      circle.style.borderColor = pct >= 80 ? 'var(--green)' : pct >= 50 ? 'var(--amber)' : 'var(--red)';
+      circle.style.color = pct >= 80 ? 'var(--green)' : pct >= 50 ? 'var(--amber)' : 'var(--red)';
+
+      document.getElementById('completeTitle').textContent =
+        pct >= 90 ? 'Eccellente! 🎉' : pct >= 70 ? 'Ottimo lavoro! 👏' : pct >= 50 ? 'Buon impegno! 💪' : 'Continua a studiare! 📚';
+
+      document.getElementById('completeText').textContent =
+        `Hai risposto correttamente a ${correct} su ${quiz.questions.length} domande in ${formatTime(totalTime)}.`;
+
+      document.getElementById('completeOverlay').classList.add('open');
+    }
+
+    function restartQuiz() {
+      document.getElementById('completeOverlay').classList.remove('open');
+      if (_currentQuiz) startQuiz(_currentQuiz.id);
+    }
+
+    function closeComplete() {
+      document.getElementById('completeOverlay').classList.remove('open');
+      resetPlayer();
+    }
+
+    function resetPlayer() {
+      _currentQuiz = null;
+      _currentQIdx = 0;
+      _answers = [];
+      _quizFinished = false;
+      _timerSec = 0;
+      clearInterval(_timerInterval);
+
+      document.getElementById('quizPlayer').style.display = 'none';
+      document.getElementById('quizEmpty').style.display = '';
+      document.getElementById('quizPlayerTitle').textContent = 'Gioca';
+      document.getElementById('quizPlayerChip').textContent = 'Scegli un quiz';
+      document.getElementById('btnPrevQ').style.display = 'none';
+      document.getElementById('btnNextQ').style.display = 'none';
+    }
+
+    function updateTimerDisplay() {
+      document.getElementById('quizTimer').textContent = formatTime(_timerSec);
+    }
+
+    function formatTime(sec) {
+      const m = Math.floor(sec / 60);
+      const s = String(sec % 60).padStart(2, '0');
+      return String(m).padStart(2, '0') + ':' + s;
+    }
+
+    // ═══════════════════════════════════════════
+    //  RESULTS UI
+    // ═══════════════════════════════════════════
+
+    function updateResultsUI() {
+      const r = window._results;
+      document.getElementById('resCompleted').textContent = r.completed;
+      document.getElementById('resTotal').textContent = r.totalQuestions;
+
+      if (r.totalQuestions > 0 && r.completed > 0) {
+        const avg = Math.round((r.totalCorrect / r.totalQuestions) * 100);
+        document.getElementById('resAvg').textContent = avg + '%';
+        document.getElementById('resBest').textContent = r.bestScore + '%';
+      } else {
+        document.getElementById('resAvg').textContent = '—';
+        document.getElementById('resBest').textContent = '—';
+      }
+    }
+
+    // ═══════════════════════════════════════════
+    //  CREATE QUIZ MODAL
+    // ═══════════════════════════════════════════
+
+    let _editingQuizId = null;
+
+    function openCreateModal(quizId) {
+      _editingQuizId = quizId || null;
+      const modal = document.getElementById('createModal');
+      document.getElementById('modalTitle').innerHTML = quizId
+        ? '<i class="fa-solid fa-pen-to-square"></i> Modifica Quiz'
+        : '<i class="fa-solid fa-plus"></i> Crea un Nuovo Quiz';
+
+      if (quizId) {
+        const quiz = window._quizzes.find(q => q.id === quizId);
+        if (quiz) {
+          document.getElementById('quizTitle').value = quiz.title || '';
+          document.getElementById('quizCat').value = quiz.cat || '';
+          document.getElementById('quizDesc').value = quiz.desc || '';
+          buildQuestionBlocks(quiz.questions || []);
+        }
+      } else {
+        document.getElementById('quizTitle').value = '';
+        document.getElementById('quizCat').value = '';
+        document.getElementById('quizDesc').value = '';
+        buildQuestionBlocks([{ q:'', opts:['','','',''], correct:0 }]);
+      }
+
+      modal.classList.add('open');
+    }
+
+    function closeCreateModal() {
+      document.getElementById('createModal').classList.remove('open');
+      _editingQuizId = null;
+    }
+
+    function addQuestionBlock(qData) {
+      qData = qData || { q:'', opts:['','','',''], correct:0 };
+      const container = document.getElementById('questionBlocks');
+      const idx = container.children.length;
+      const div = document.createElement('div');
+      div.className = 'q-block';
+      div.innerHTML = `
+        <div class="q-num">Domanda ${idx + 1}</div>
+        <button class="remove-q" onclick="removeQuestionBlock(this)" title="Rimuovi domanda">&times;</button>
+        <input type="text" class="q-text-input" placeholder="Testo della domanda..." value="${escHtml(qData.q)}" style="margin-bottom:6px">
+        ${['A','B','C','D'].map((m, i) => `
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+            <span style="font-weight:700;font-size:12px;width:18px;color:var(--text-faint)">${m}</span>
+            <input type="text" class="opt-input" placeholder="Opzione ${m}..." value="${escHtml(qData.opts[i] || '')}" style="flex:1">
+            <input type="radio" name="correct-${idx}" value="${i}" ${qData.correct === i ? 'checked' : ''} title="Risposta corretta">
+          </div>
+        `).join('')}
+      `;
+      container.appendChild(div);
+    }
+
+    function buildQuestionBlocks(questions) {
+      const container = document.getElementById('questionBlocks');
+      container.innerHTML = '';
+      questions.forEach(q => addQuestionBlock(q));
+      // Ensure at least 1 question
+      if (questions.length === 0) addQuestionBlock();
+    }
+
+    function removeQuestionBlock(btn) {
+      const blocks = document.getElementById('questionBlocks');
+      if (blocks.children.length <= 1) {
+        showToast('Devi avere almeno una domanda');
+        return;
+      }
+      btn.closest('.q-block').remove();
+      // Renumber
+      [...blocks.children].forEach((b, i) => {
+        b.querySelector('.q-num').textContent = 'Domanda ' + (i + 1);
+        const radios = b.querySelectorAll('input[type="radio"]');
+        radios.forEach(r => r.name = 'correct-' + i);
+      });
+    }
+
+    function saveQuiz() {
+      const title = document.getElementById('quizTitle').value.trim();
+      if (!title) { showToast('Inserisci un titolo!'); return; }
+
+      const cat = document.getElementById('quizCat').value.trim();
+      const desc = document.getElementById('quizDesc').value.trim();
+
+      const blocks = [...document.getElementById('questionBlocks').children];
+      const questions = blocks.map((block, i) => {
+        const qText = block.querySelector('.q-text-input').value.trim();
+        const opts = [...block.querySelectorAll('.opt-input')].map(inp => inp.value.trim());
+        const correctRadio = block.querySelector(`input[name="correct-${i}"]:checked`);
+        const correct = correctRadio ? parseInt(correctRadio.value) : 0;
+        return { q: qText || 'Domanda ' + (i+1), opts, correct };
+      });
+
+      if (questions.length === 0) { showToast('Aggiungi almeno una domanda!'); return; }
+
+      if (_editingQuizId) {
+        // Edit existing
+        const idx = window._quizzes.findIndex(q => q.id === _editingQuizId);
+        if (idx >= 0) {
+          window._quizzes[idx] = {
+            ...window._quizzes[idx],
+            title, cat, desc,
+            badge: 'Modificato', badgeClass: 'new',
+            questions
+          };
+          showToast('Quiz aggiornato!');
+        }
+      } else {
+        // New quiz
+        window._quizzes.push({
+          id: 'user-' + Date.now(),
+          builtin: false,
+          title, cat, desc,
+          badge: 'Tuo', badgeClass: 'free',
+          questions
+        });
+        showToast('Quiz creato con successo! 🎉');
+      }
+
+      saveQuizzes(window._quizzes);
+      renderQuizCards();
+      closeCreateModal();
+    }
+
+    function escHtml(s) {
+      if (!s) return '';
+      return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+
+    // ═══════════════════════════════════════════
+    //  INIT
+    // ═══════════════════════════════════════════
+
+    renderQuizCards();
+    updateResultsUI();
+
+    // Close modal on overlay click
+    document.getElementById('createModal').addEventListener('click', function(e) {
+      if (e.target === this) closeCreateModal();
+    });
+    document.getElementById('completeOverlay').addEventListener('click', function(e) {
+      if (e.target === this) closeComplete();
+    });
+
+    // Keyboard nav
+    document.addEventListener('keydown', function(e) {
+      if (!_currentQuiz || _quizFinished) return;
+      if (document.getElementById('createModal').classList.contains('open')) return;
+      if (document.getElementById('completeOverlay').classList.contains('open')) return;
+      if (e.key === 'ArrowRight') nextOrFinish();
+      if (e.key === 'ArrowLeft') prevQuestion();
+      if (e.key >= '1' && e.key <= '4') selectAnswer(parseInt(e.key) - 1);
+    });
   </script>
 
 </body>
