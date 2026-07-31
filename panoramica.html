@@ -548,6 +548,14 @@
     .mode-btn.active{background:#0f1c24;color:#fff;border-color:#0f1c24}
     .mode-btn:hover:not(.active){border-color:#0f1c24;color:var(--text)}
     .mode-btn+.mode-btn{border-left:none}
+    /* ── VT Quiz player ── */
+    .option-item:hover{border-color:var(--teal)!important;background:var(--teal-4)!important}
+    .option-item-selected{border-color:var(--teal)!important;background:var(--teal-4)!important}
+    .option-item-selected span:first-child{border-color:var(--teal)!important;background:var(--teal)!important;color:#fff!important}
+    .option-item-correct{border-color:var(--green)!important;background:rgba(16,185,129,.08)!important}
+    .option-item-correct span:first-child{border-color:var(--green)!important;background:var(--green)!important;color:#fff!important}
+    .option-item-incorrect{border-color:var(--red)!important;background:rgba(239,68,68,.06)!important}
+    .option-item-incorrect span:first-child{border-color:var(--red)!important;background:var(--red)!important;color:#fff!important}
     [data-theme="dark"] .mode-btn.active{background:#e2e8f0;color:#0f1729;border-color:#e2e8f0}
     [data-theme="dark"] .mode-btn:hover:not(.active){border-color:#e2e8f0}
     /* ═══ AI VOICE PANEL ═══ */
@@ -1474,6 +1482,7 @@
             <button role="tab" aria-selected="true" class="tab-link active" data-subtab="vt-dashboard" data-i18n="vt_dashboard">Dashboard</button>
             <button role="tab" aria-selected="false" class="tab-link" data-subtab="vt-tasks">Compiti</button>
             <button role="tab" aria-selected="false" class="tab-link" data-subtab="vt-review" style="color:var(--cyan);border-color:var(--cyan)">Ripasso</button>
+            <button role="tab" aria-selected="false" class="tab-link" data-subtab="vt-quiz" style="color:var(--amber)">Quiz</button>
           </div></section>
           <!-- Subtab: Review Due — word cards with fatto/più tardi -->
           <div role="tabpanel" class="subtab-pane active" id="sub-vt-dashboard">
@@ -1670,6 +1679,79 @@
                 <div style="padding:12px;text-align:center;color:var(--text-faint);font-size:13px"><i class="fa-solid fa-spinner"></i> &nbsp;Caricamento…</div>
               </div>
             </section>
+          </div>
+          <!-- Subtab: Quiz Maker -->
+          <div role="tabpanel" class="subtab-pane" id="sub-vt-quiz">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:10px">
+              <h3 style="margin:0;font-size:18px;font-weight:700">Quiz <span id="vtQuizCount" style="font-weight:400;font-size:13px;color:var(--text-faint)"></span></h3>
+              <div style="display:flex;gap:6px">
+                <button class="fchip" onclick="vtQuizOpenCreate()" style="font-size:12px"><i class="fa-solid fa-plus"></i> Crea Quiz</button>
+                <button class="fchip" onclick="vtQuizReset()" style="font-size:12px"><i class="fa-solid fa-rotate"></i></button>
+              </div>
+            </div>
+            <!-- Quiz cards grid -->
+            <div class="alt-card-grid" id="vtQuizGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px;margin-bottom:16px">
+              <div style="text-align:center;padding:40px;color:var(--text-faint);grid-column:1/-1">Caricamento quiz...</div>
+            </div>
+            <!-- Quiz player -->
+            <div id="vtQuizPlayer" style="display:none;background:var(--panel);border:2px solid var(--teal);border-radius:16px;padding:24px 20px 18px;margin-bottom:16px">
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px">
+                <span style="font-size:11px;font-weight:500;color:var(--teal);text-transform:uppercase;letter-spacing:.06em" id="vtQNum">Domanda 1 di 5</span>
+                <span style="font-size:15px;font-weight:600;color:var(--amber)" id="vtQTimer">00:00</span>
+              </div>
+              <div style="font-size:18px;font-weight:600;color:var(--text);margin-bottom:16px;line-height:1.4" id="vtQText"></div>
+              <div style="display:flex;flex-direction:column;gap:8px" id="vtQOptions"></div>
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-top:16px;flex-wrap:wrap;gap:8px">
+                <button class="fchip" onclick="vtQuizPrev()" style="font-size:12px"><i class="fa-solid fa-arrow-left"></i></button>
+                <div style="display:flex;gap:4px" id="vtQDots"></div>
+                <button class="fchip" id="vtQNextBtn" onclick="vtQuizNext()" style="font-size:12px">Salta <i class="fa-solid fa-arrow-right"></i></button>
+                <button class="fchip" id="vtQFinishBtn" onclick="vtQuizFinish()" style="display:none;font-size:12px;background:var(--amber);color:#fff;border-color:var(--amber)"><i class="fa-solid fa-flag-checkered"></i> Finisci</button>
+              </div>
+            </div>
+            <div id="vtQuizEmpty" style="text-align:center;padding:40px;color:var(--text-faint)">
+              <div style="font-size:40px;margin-bottom:8px">📝</div>
+              <p style="font-size:14px">Scegli un quiz dalla lista o creane uno nuovo.</p>
+            </div>
+            <!-- Results stats -->
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-top:16px" id="vtQuizResults">
+              <div class="alt-card" style="text-align:center;padding:16px"><div style="font-size:24px;font-weight:800" id="vtResAvg">—</div><div style="font-size:11px;color:var(--text-faint);margin-top:4px">Media</div></div>
+              <div class="alt-card" style="text-align:center;padding:16px"><div style="font-size:24px;font-weight:800" id="vtResDone">0</div><div style="font-size:11px;color:var(--text-faint);margin-top:4px">Completati</div></div>
+              <div class="alt-card" style="text-align:center;padding:16px"><div style="font-size:24px;font-weight:800" id="vtResTotal">0</div><div style="font-size:11px;color:var(--text-faint);margin-top:4px">Domande</div></div>
+              <div class="alt-card" style="text-align:center;padding:16px"><div style="font-size:24px;font-weight:800" id="vtResBest">—</div><div style="font-size:11px;color:var(--text-faint);margin-top:4px">Migliore</div></div>
+            </div>
+            <!-- Create/Edit Quiz Modal -->
+            <div id="vtQuizModal" style="display:none;position:fixed;inset:0;z-index:300;background:rgba(0,0,0,.55);align-items:center;justify-content:center;padding:20px">
+              <div style="background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:24px;max-width:600px;width:100%;max-height:85vh;overflow-y:auto;box-shadow:0 20px 48px rgba(0,0,0,.3)">
+                <h2 style="margin:0 0 16px;font-size:18px;font-weight:700" id="vtQuizModalTitle"><i class="fa-solid fa-plus"></i> Crea Quiz</h2>
+                <label style="display:block;font-size:11px;font-weight:600;color:var(--text-soft);margin:10px 0 4px">Titolo</label>
+                <input id="vtQuizTitle" placeholder="Titolo del quiz..." style="width:100%;padding:8px 12px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--text);font-size:14px;font-family:var(--font-ui)">
+                <label style="display:block;font-size:11px;font-weight:600;color:var(--text-soft);margin:10px 0 4px">Categoria</label>
+                <input id="vtQuizCat" placeholder="es. Vocabolario · B1" style="width:100%;padding:8px 12px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--text);font-size:14px;font-family:var(--font-ui)">
+                <div style="margin-top:12px">
+                  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+                    <span style="font-size:12px;font-weight:600;color:var(--text-soft)">Domande</span>
+                    <button class="fchip" onclick="vtQuizAddQ()" style="font-size:11px;padding:4px 10px"><i class="fa-solid fa-plus"></i> Aggiungi</button>
+                  </div>
+                  <div id="vtQuizQBlocks"></div>
+                </div>
+                <div style="display:flex;gap:8px;margin-top:16px;justify-content:flex-end">
+                  <button class="fchip" onclick="vtQuizSave()" style="font-size:13px;padding:8px 20px;background:var(--amber);color:#fff;border-color:var(--amber)"><i class="fa-solid fa-floppy-disk"></i> Salva</button>
+                  <button class="fchip" onclick="vtQuizCloseModal()" style="font-size:13px;padding:8px 20px">Annulla</button>
+                </div>
+              </div>
+            </div>
+            <!-- Completion overlay -->
+            <div id="vtQuizComplete" style="display:none;position:fixed;inset:0;z-index:310;background:rgba(0,0,0,.65);align-items:center;justify-content:center;padding:20px">
+              <div style="background:var(--panel);border-radius:20px;padding:32px;text-align:center;max-width:400px;width:100%;box-shadow:0 20px 48px rgba(0,0,0,.4)">
+                <div style="width:80px;height:80px;border-radius:50%;border:4px solid var(--green);display:flex;align-items:center;justify-content:center;margin:0 auto 16px;font-size:24px;font-weight:800" id="vtQScoreCircle">0%</div>
+                <h2 style="margin:0 0 8px;font-size:20px" id="vtQCompleteTitle">Quiz Completato!</h2>
+                <p style="font-size:13px;color:var(--text-soft);margin:0 0 16px" id="vtQCompleteText"></p>
+                <div style="display:flex;gap:8px;justify-content:center">
+                  <button class="fchip" onclick="vtQuizRestart()" style="font-size:13px;padding:8px 20px;background:var(--amber);color:#fff;border-color:var(--amber)"><i class="fa-solid fa-rotate"></i> Rifai</button>
+                  <button class="fchip" onclick="vtQuizCloseComplete()" style="font-size:13px;padding:8px 20px">Chiudi</button>
+                </div>
+              </div>
+            </div>
           </div>
           </div>
         </div>
@@ -6022,6 +6104,194 @@
       }
       window.renderVTAutoTasks = renderVTAutoTasks;
 
+      // ═══ VT Quiz Maker ═══
+      var _vtQuizKey = 'sottotitoli_vt_quizzes';
+      var _vtQuizResultsKey = 'sottotitoli_vt_quiz_results';
+      var _vtQCurrent = null, _vtQIdx = 0, _vtQAnswers = [], _vtQTimer = 0, _vtQInterval = null, _vtQFinished = false;
+      var _vtEditingId = null;
+
+      var VT_BUILTIN_QUIZZES = [
+        { id:'vtb1', builtin:true, title:'Verbi Italiani Essenziali', cat:'Vocabolario · Italiano', badge:'Popolare', questions:[
+          {q:'Qual è il participio passato di "scrivere"?', opts:['Scrivuto','Scritto','Scrivato','Scrivendo'], correct:1},
+          {q:'Cosa significa "mangiare"?', opts:['To drink','To sleep','To eat','To run'], correct:2},
+          {q:'Prima persona di "essere" al presente?', opts:['Sono','Sei','È','Siamo'], correct:0},
+          {q:'Come si dice "they go"?', opts:['Vanno','Andate','Vanno loro','Andiamo'], correct:0},
+          {q:'Quale è un verbo riflessivo?', opts:['Correre','Alzarsi','Dormire','Parlare'], correct:1}
+        ]},
+        { id:'vtb2', builtin:true, title:'Preposizioni — Il Grande Quiz', cat:'Grammatica · B1', badge:'Nuovo', questions:[
+          {q:'Vado ___ Roma domani.', opts:['in','a','di','da'], correct:1},
+          {q:'Il libro è ___ tavolo.', opts:['sul','nel','al','dal'], correct:0},
+          {q:'Parto ___ casa alle otto.', opts:['in','a','da','di'], correct:2},
+          {q:'Parlo ___ mio amico.', opts:['con','per','di','a'], correct:0},
+          {q:'Questo regalo è ___ te.', opts:['a','di','per','con'], correct:2}
+        ]},
+        { id:'vtb3', builtin:true, title:'Quanto Conosci l\'Italia?', cat:'Cultura · Italia', badge:'Gratuito', questions:[
+          {q:'Capitale d\'Italia?', opts:['Milano','Napoli','Roma','Firenze'], correct:2},
+          {q:'Dove si trova il Colosseo?', opts:['Venezia','Roma','Firenze','Milano'], correct:1},
+          {q:'Famoso piatto di riso?', opts:['Pasta','Pizza','Risotto','Polenta'], correct:2},
+          {q:'Chi dipinse la Cappella Sistina?', opts:['Leonardo','Raffaello','Michelangelo','Donatello'], correct:2},
+          {q:'Quante regioni ha l\'Italia?', opts:['18','20','21','22'], correct:1}
+        ]}
+      ];
+
+      function vtQuizLoad() { try { return JSON.parse(localStorage.getItem(_vtQuizKey)) || VT_BUILTIN_QUIZZES.slice(); } catch(e) { return VT_BUILTIN_QUIZZES.slice(); } }
+      function vtQuizSave(d) { localStorage.setItem(_vtQuizKey, JSON.stringify(d)); }
+      function vtQuizLoadResults() { try { var r=JSON.parse(localStorage.getItem(_vtQuizResultsKey)); return r||{done:0,correct:0,total:0,best:0}; } catch(e) { return {done:0,correct:0,total:0,best:0}; } }
+      function vtQuizSaveResults(r) { localStorage.setItem(_vtQuizResultsKey, JSON.stringify(r)); }
+
+      function vtQuizRender() {
+        var quizzes = vtQuizLoad();
+        var grid = document.getElementById('vtQuizGrid');
+        var countEl = document.getElementById('vtQuizCount');
+        if (!grid) return;
+        countEl.textContent = '(' + quizzes.length + ' disponibili)';
+        grid.innerHTML = quizzes.map(function(qz) {
+          var qc = (qz.questions||[]).length;
+          var badgeH = qz.badge ? '<span style="position:absolute;top:8px;right:8px;font-size:9px;font-weight:700;padding:2px 8px;border-radius:99px;background:var(--amber);color:#fff">'+qz.badge+'</span>' : '';
+          return '<article class="alt-card" style="cursor:pointer;position:relative;padding:16px" onclick="vtQuizStart(\''+qz.id+'\')">'+badgeH+
+            '<div style="font-size:10px;font-weight:600;color:var(--teal);text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px">'+(qz.cat||'Senza categoria')+'</div>'+
+            '<h3 style="margin:0 0 4px;font-size:15px">'+qz.title+'</h3>'+
+            '<div style="display:flex;gap:12px;font-size:11px;color:var(--text-faint);margin-top:8px">'+
+            '<span><i class="fa-regular fa-clock"></i> ~'+Math.round(qc*0.6)+' min</span>'+
+            '<span><i class="fa-regular fa-circle-question"></i> '+qc+' domande</span>'+
+            (qz.builtin?'':'<span style="color:var(--purple)"><i class="fa-solid fa-user-pen"></i> Tuo</span>')+
+            '</div></article>';
+        }).join('');
+        vtQuizUpdateResults();
+      }
+
+      function vtQuizStart(qid) {
+        var quizzes = vtQuizLoad();
+        var qz = quizzes.find(function(q){return q.id===qid;});
+        if (!qz||!qz.questions||!qz.questions.length) return;
+        _vtQCurrent = qz; _vtQIdx = 0; _vtQAnswers = new Array(qz.questions.length).fill(-1);
+        _vtQFinished = false; _vtQTimer = 0;
+        clearInterval(_vtQInterval);
+        _vtQInterval = setInterval(function(){_vtQTimer++;document.getElementById('vtQTimer').textContent=vtQFormatTime(_vtQTimer);},1000);
+        document.getElementById('vtQuizPlayer').style.display='';
+        document.getElementById('vtQuizEmpty').style.display='none';
+        document.getElementById('vtQTimer').textContent='00:00';
+        vtQRenderQ();
+      }
+
+      function vtQRenderQ() {
+        var qz=_vtQCurrent; if(!qz)return;
+        var q=qz.questions[_vtQIdx];
+        document.getElementById('vtQNum').textContent='Domanda ' + (_vtQIdx+1) + ' di ' + qz.questions.length;
+        document.getElementById('vtQText').textContent=q.q;
+        var markers=['A','B','C','D'];
+        document.getElementById('vtQOptions').innerHTML = q.opts.map(function(opt,i){
+          var cls=''; var sel='';
+          if(_vtQAnswers[_vtQIdx]===i) cls+=' selected';
+          if(_vtQFinished){ if(i===q.correct)cls+=' correct'; else if(_vtQAnswers[_vtQIdx]===i)cls+=' incorrect'; }
+          if(!_vtQFinished) sel='onclick="vtQSelect('+i+')"';
+          return '<div class="option-item'+cls.replace(/ /g,' option-item-')+'" '+sel+' style="display:flex;align-items:center;gap:10px;padding:12px 14px;border:1.5px solid var(--line);border-radius:10px;font-size:14px;cursor:pointer;transition:all .15s"><span style="width:24px;height:24px;border-radius:50%;border:2px solid var(--line);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;flex-shrink:0;color:var(--text-faint)">'+markers[i]+'</span> '+opt+'</div>';
+        }).join('');
+        vtQRenderDots();
+        document.getElementById('vtQNextBtn').style.display=_vtQIdx===qz.questions.length-1?'none':'';
+        document.getElementById('vtQFinishBtn').style.display=_vtQIdx===qz.questions.length-1?'':'none';
+      }
+
+      function vtQSelect(i){ if(_vtQFinished)return; _vtQAnswers[_vtQIdx]=i; vtQRenderQ(); }
+      function vtQRenderDots(){
+        var qz=_vtQCurrent; if(!qz)return;
+        document.getElementById('vtQDots').innerHTML=qz.questions.map(function(_,i){
+          var cls=''; if(i===_vtQIdx)cls+='curr'; if(_vtQAnswers[i]>=0)cls+=' done';
+          return '<span class="vtq-dot-'+cls.trim()+'" style="display:inline-block;width:10px;height:10px;border-radius:50%;background:'+(cls.indexOf('curr')>=0?'var(--amber)':cls.indexOf('done')>=0?'var(--teal)':'var(--line)')+'"></span>';
+        }).join('');
+      }
+      function vtQuizNext(){ if(_vtQIdx<_vtQCurrent.questions.length-1){_vtQIdx++;vtQRenderQ();} }
+      function vtQuizPrev(){ if(_vtQIdx>0){_vtQIdx--;vtQRenderQ();} }
+
+      function vtQuizFinish(){
+        _vtQFinished=true; clearInterval(_vtQInterval);
+        var qz=_vtQCurrent; var correct=0;
+        qz.questions.forEach(function(q,i){if(_vtQAnswers[i]===q.correct)correct++;});
+        var pct=Math.round(correct/qz.questions.length*100);
+        var r=vtQuizLoadResults(); r.done++; r.correct+=correct; r.total+=qz.questions.length;
+        if(pct>r.best)r.best=pct; vtQuizSaveResults(r);
+        vtQRenderQ();
+        var circle=document.getElementById('vtQScoreCircle');
+        circle.textContent=pct+'%';
+        circle.style.borderColor=pct>=80?'var(--green)':pct>=50?'var(--amber)':'var(--red)';
+        circle.style.color=pct>=80?'var(--green)':pct>=50?'var(--amber)':'var(--red)';
+        document.getElementById('vtQCompleteTitle').textContent=pct>=90?'Eccellente! 🎉':pct>=70?'Ottimo! 👏':pct>=50?'Buon impegno! 💪':'Continua! 📚';
+        document.getElementById('vtQCompleteText').textContent=correct+' su '+qz.questions.length+' corrette in '+vtQFormatTime(_vtQTimer)+'.';
+        document.getElementById('vtQuizComplete').style.display='flex';
+        vtQuizUpdateResults();
+      }
+
+      function vtQuizRestart(){ document.getElementById('vtQuizComplete').style.display='none'; if(_vtQCurrent) vtQuizStart(_vtQCurrent.id); }
+      function vtQuizCloseComplete(){ document.getElementById('vtQuizComplete').style.display='none'; vtQuizResetPlayer(); }
+      function vtQuizResetPlayer(){
+        _vtQCurrent=null;_vtQIdx=0;_vtQAnswers=[];_vtQFinished=false;clearInterval(_vtQInterval);
+        document.getElementById('vtQuizPlayer').style.display='none';
+        document.getElementById('vtQuizEmpty').style.display='';
+      }
+
+      function vtQuizUpdateResults(){
+        var r=vtQuizLoadResults();
+        document.getElementById('vtResDone').textContent=r.done;
+        document.getElementById('vtResTotal').textContent=r.total;
+        document.getElementById('vtResAvg').textContent=r.total>0?Math.round(r.correct/r.total*100)+'%':'—';
+        document.getElementById('vtResBest').textContent=r.best>0?r.best+'%':'—';
+      }
+
+      function vtQFormatTime(s){ var m=Math.floor(s/60); var sec=String(s%60).padStart(2,'0'); return String(m).padStart(2,'0')+':'+sec; }
+
+      // Modal: create/edit quiz
+      function vtQuizOpenCreate(qid){
+        _vtEditingId=qid||null;
+        document.getElementById('vtQuizModalTitle').innerHTML=qid?'<i class="fa-solid fa-pen-to-square"></i> Modifica Quiz':'<i class="fa-solid fa-plus"></i> Crea Quiz';
+        var qz=qid?(vtQuizLoad().find(function(q){return q.id===qid})):null;
+        document.getElementById('vtQuizTitle').value=qz?qz.title:'';
+        document.getElementById('vtQuizCat').value=qz?qz.cat:'';
+        vtQuizBuildQBlocks(qz?qz.questions:[{q:'',opts:['','','',''],correct:0}]);
+        document.getElementById('vtQuizModal').style.display='flex';
+      }
+      function vtQuizCloseModal(){ document.getElementById('vtQuizModal').style.display='none'; _vtEditingId=null; }
+      function vtQuizAddQ(qData){ qData=qData||{q:'',opts:['','','',''],correct:0}; var c=document.getElementById('vtQuizQBlocks'); var i=c.children.length;
+        var d=document.createElement('div'); d.style.cssText='border:1px solid var(--line);border-radius:10px;padding:10px;margin-bottom:8px;position:relative';
+        d.innerHTML='<span style="font-size:10px;font-weight:700;color:var(--teal)">Domanda '+(i+1)+'</span><button onclick="this.parentElement.remove();vtQuizRenumber()" style="position:absolute;top:6px;right:8px;background:none;border:none;color:var(--text-faint);cursor:pointer;font-size:14px">&times;</button>'+
+          '<input class="vtq-qtext" value="'+vtQEsc(qData.q)+'" placeholder="Testo..." style="width:100%;margin:4px 0 6px;padding:6px 10px;border-radius:6px;border:1px solid var(--line);background:var(--bg);color:var(--text);font-size:13px;font-family:var(--font-ui)">'+
+          ['A','B','C','D'].map(function(m,j){return '<div style="display:flex;align-items:center;gap:6px;margin-bottom:3px"><span style="font-size:10px;font-weight:700;width:16px;color:var(--text-faint)">'+m+'</span><input class="vtq-opt" value="'+vtQEsc(qData.opts[j]||'')+'" placeholder="Opzione '+m+'..." style="flex:1;padding:4px 8px;border-radius:6px;border:1px solid var(--line);background:var(--bg);color:var(--text);font-size:12px;font-family:var(--font-ui)"><input type="radio" name="vtq-correct-'+i+'" value="'+j+'" '+(qData.correct===j?'checked':'')+' title="Corretta"></div>';}).join('');
+        c.appendChild(d);
+      }
+      function vtQuizBuildQBlocks(qs){ var c=document.getElementById('vtQuizQBlocks'); c.innerHTML=''; qs.forEach(function(q){vtQuizAddQ(q);}); }
+      function vtQuizRenumber(){ var blocks=document.getElementById('vtQuizQBlocks').children; for(var i=0;i<blocks.length;i++){blocks[i].querySelector('span').textContent='Domanda '+(i+1);var radios=blocks[i].querySelectorAll('input[type=radio]');for(var j=0;j<radios.length;j++)radios[j].name='vtq-correct-'+i;}}
+      function vtQEsc(s){ return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+      function vtQuizSave(){
+        var title=document.getElementById('vtQuizTitle').value.trim(); if(!title)return;
+        var blocks=document.getElementById('vtQuizQBlocks').children; if(!blocks.length)return;
+        var questions=[];
+        for(var i=0;i<blocks.length;i++){
+          var b=blocks[i]; var qText=b.querySelector('.vtq-qtext').value.trim(); if(!qText)continue;
+          var opts=Array.from(b.querySelectorAll('.vtq-opt')).map(function(el){return el.value.trim()});
+          var correct=parseInt((b.querySelector('input[type=radio]:checked')||{}).value)||0;
+          questions.push({q:qText,opts:opts,correct:correct});
+        }
+        if(!questions.length)return;
+        var quizzes=vtQuizLoad();
+        if(_vtEditingId){ var idx=quizzes.findIndex(function(q){return q.id===_vtEditingId}); if(idx>=0){quizzes[idx].title=title;quizzes[idx].cat=document.getElementById('vtQuizCat').value.trim();quizzes[idx].questions=questions;} }
+        else { quizzes.push({id:'vtc'+Date.now(),title:title,cat:document.getElementById('vtQuizCat').value.trim(),questions:questions}); }
+        vtQuizSave(quizzes); vtQuizCloseModal(); vtQuizRender();
+      }
+
+      function vtQuizReset(){ if(!confirm('Eliminare tutti i quiz personalizzati e risultati?'))return; localStorage.removeItem(_vtQuizKey); localStorage.removeItem(_vtQuizResultsKey); vtQuizRender(); vtQuizResetPlayer(); }
+
+      window.vtQuizStart = vtQuizStart;
+      window.vtQuizNext = vtQuizNext;
+      window.vtQuizPrev = vtQuizPrev;
+      window.vtQuizFinish = vtQuizFinish;
+      window.vtQuizRestart = vtQuizRestart;
+      window.vtQuizCloseComplete = vtQuizCloseComplete;
+      window.vtQuizOpenCreate = vtQuizOpenCreate;
+      window.vtQuizCloseModal = vtQuizCloseModal;
+      window.vtQuizAddQ = vtQuizAddQ;
+      window.vtQuizSave = vtQuizSave;
+      window.vtQuizReset = vtQuizReset;
+
       // ── VT Style toggle (color schemes 2,4,5,6,7) ──
       var _vtAccentIdx = (function(){ var s = localStorage.getItem('vt-accent-scheme')||'2'; var schemes=['2','4','5','6','7']; var i=schemes.indexOf(s); return i>=0?i:0; })();
       
@@ -8009,7 +8279,9 @@
       var vocNav = document.querySelector('[data-panel="vocabulary-builder"]');
       if (vocNav) { vocNav.addEventListener('click', function () { setTimeout(renderVocabolario, 100); setTimeout(renderCEFRQuad, 150); }); }
       var vtNav = document.querySelector('[data-panel="vocabulary-trainer"]');
-      if (vtNav) { vtNav.addEventListener('click', function () { setTimeout(renderVTReviewDue, 150); setTimeout(renderVTTasks, 250); setTimeout(renderVTAutoTasks, 300); setTimeout(renderPracticeChart, 100); }); }
+      if (vtNav) { vtNav.addEventListener('click', function () { setTimeout(renderVTReviewDue, 150); setTimeout(renderVTTasks, 250); setTimeout(renderVTAutoTasks, 300); setTimeout(renderPracticeChart, 100); setTimeout(vtQuizRender, 350); }); }
+      // Quiz subtab: re-render on click
+      document.querySelector('[data-subtab="vt-quiz"]')?.addEventListener('click', function(){ setTimeout(vtQuizRender, 50); });
       var insNav = document.querySelector('[data-panel="insights"]');
       if (insNav) { insNav.addEventListener('click', function () { setTimeout(renderTasks, 100); setTimeout(renderInsightsOverview, 150); }); }
       var profNav = document.querySelector('[data-panel="profilo"]');
