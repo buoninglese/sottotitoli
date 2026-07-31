@@ -2080,6 +2080,10 @@
             <div class="wb-search-bar" style="margin-bottom:14px">
               <input class="wb-search-input" id="cefrTopicSearch" placeholder="Cerca un argomento..." oninput="filterCefrTopics()">
             </div>
+            <div style="display:flex;gap:8px;margin-bottom:14px">
+              <button class="fchip active" onclick="toggleCefrRelevance('all')">All topics</button>
+              <button class="fchip" onclick="toggleCefrRelevance('relevant')">Relevant to me</button>
+            </div>
             <div id="cefrTopicGrid" style="display:flex;flex-wrap:wrap;gap:8px">
               <span style="font-size:13px;color:var(--text-faint)">Caricamento argomenti...</span>
             </div>
@@ -8860,19 +8864,41 @@
   var _cefrCategories = null;
   var _cefrCurrentWords = [];
   var _cefrCurrentSort = 'frequency';
+  var _cefrTopicRelevance = 'all';
+
+  function toggleCefrRelevance(mode) {
+    _cefrTopicRelevance = mode;
+    document.querySelectorAll('#pnl-vocable-explorer .fchip').forEach(function(b, i) {
+      if (i < 2) b.classList.toggle('active', b.textContent.trim().toLowerCase().indexOf(mode) >= 0);
+    });
+    renderCefrTopicPills();
+  }
+
+  function renderCefrTopicPills() {
+    var grid = document.getElementById('cefrTopicGrid');
+    if (!grid || !_cefrCategories) return;
+    var cats = _cefrCategories;
+    if (_cefrTopicRelevance === 'relevant') {
+      cats = cats.filter(function(c) { return (c.word_count || 0) >= 10; });
+    }
+    grid.innerHTML = cats.map(function(c) {
+      return '<button class="topic-pill fchip" onclick="openCefrTopic(\'' + c.category_id + '\',\'' + (c.category_title || c.category_id).replace(/'/g,"\\'") + '\')" style="font-size:13px;padding:8px 16px">' + (c.category_title || c.category_id) + '</button>';
+    }).join('');
+    // Update the displayed count somewhere if needed
+    var stats = document.getElementById('cefrTopicStats');
+    if (stats) { stats.style.display = ''; stats.textContent = cats.length + ' topics'; }
+  }
 
   async function loadCefrTopics() {
     var grid = document.getElementById('cefrTopicGrid');
     if (!grid) return;
     try {
-      _cefrCategories = await cachedCefrFetch(_cefrApi + '/categories');
+      _cefrCategories = await cachedCefrFetch(_cefrApi + '/categories?counts=1');
       if (!_cefrCategories || !_cefrCategories.length) {
         grid.innerHTML = '<span style="font-size:13px;color:var(--text-faint)">Nessuna categoria disponibile.</span>';
         return;
       }
-      grid.innerHTML = _cefrCategories.map(function(c) {
-        return '<button class="topic-pill fchip" onclick="openCefrTopic(\'' + c.category_id + '\',\'' + (c.category_title || c.category_id).replace(/'/g,"\\'") + '\')" style="font-size:13px;padding:8px 16px">' + (c.category_title || c.category_id) + '</button>';
-      }).join('');
+      renderCefrTopicPills();
     } catch(e) {
       grid.innerHTML = '<span style="font-size:13px;color:var(--text-faint)">Errore nel caricamento degli argomenti.</span>';
     }
@@ -8881,7 +8907,8 @@
   function filterCefrTopics() {
     var q = (document.getElementById('cefrTopicSearch')?.value || '').toLowerCase();
     document.querySelectorAll('#cefrTopicGrid .topic-pill').forEach(function(btn) {
-      btn.style.display = (btn.textContent || '').toLowerCase().includes(q) ? '' : 'none';
+      var matchesText = (btn.textContent || '').toLowerCase().includes(q);
+      btn.style.display = matchesText ? '' : 'none';
     });
   }
 
@@ -9171,6 +9198,7 @@
 
   // Expose to global
   window.filterCefrTopics = filterCefrTopics;
+  window.toggleCefrRelevance = toggleCefrRelevance;
   window.openCefrTopic = openCefrTopic;
   window.closeCefrTopic = closeCefrTopic;
   window.sortCefrWords = sortCefrWords;
