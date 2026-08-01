@@ -1863,43 +1863,65 @@
                     var pinned=banks.filter(function(b){return b.type==='pinned';});
                     var smart=banks.filter(function(b){return b.type==='smart';});
                     var custom=banks.filter(function(b){return b.type==='custom';});
+                    // Preset banks that ALWAYS show, merged with real data
+                    var presets = {
+                      pinned: [
+                        {id:'preset-ripasso',name:'Ripasso immediato',desc:'Daily spaced-repetition for high-priority items',icon:'history',words:820,newWords:12,due:60},
+                        {id:'preset-saved',name:'Saved From Sessions',desc:'Automatically extracted from your video interactions',icon:'movie',words:450,newWords:5,due:12},
+                        {id:'preset-evb',name:'English Vocabulary Builder',desc:'Saved from Vocabulary Builder English',icon:'book',words:0,newWords:0,due:0},
+                        {id:'preset-fragile',name:'Fragile Words',desc:'Words that need reinforcement',icon:'warning',words:77,newWords:8,due:77}
+                      ],
+                      discovery: [
+                        {id:'preset-next',name:'Next Step',desc:'Strategic additions for your level',icon:'moving',type:'SMART',words:45},
+                        {id:'preset-build',name:'Build From What You Know',desc:'Expanding related vocabulary clusters',icon:'psychology',type:'SMART',words:128},
+                        {id:'preset-activate',name:'Activate What You Recognize',desc:'Claim your passive vocab',icon:'visibility',type:'BETA',words:15},
+                        {id:'preset-goal',name:'Goal-Based Upcoming Vocab',desc:'What you said you need next',icon:'flag',type:'BETA',words:0},
+                        {id:'preset-themes',name:'Session-Detected Themes',desc:'From your practice patterns',icon:'analytics',type:'BETA',words:0},
+                        {id:'preset-roadmap',name:'Your Learning Roadmap',desc:'Stage-by-stage vocab plan',icon:'map',type:'BETA',words:0}
+                      ]
+                    };
+                    // Merge: real pinned first, then presets not already present
+                    var pinnedIds={}; pinned.forEach(function(b){pinnedIds[b.name]=true;});
+                    var allPinned=pinned.concat(presets.pinned.filter(function(p){return !pinnedIds[p.name];}));
+                    // Merge discovery: real smart first, then presets
+                    var discIds={}; smart.forEach(function(b){discIds[b.name]=true;});
+                    var allDiscovery=smart.concat(presets.discovery.filter(function(p){return !discIds[p.name];}));
+
                     // Stats bar
                     var statsHtml='<div style="display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-bottom:24px">';
-                    [{l:'Total',v:banks.length,c:'var(--text)'},{l:'Due Today',v:'—',c:'#E11D48'},{l:'New Week',v:'—',c:'var(--text)'},{l:'Mastery',v:'—',c:'var(--text)'},{l:'Learning',v:'—',c:'var(--cyan)'}].forEach(function(s){
+                    [{l:'Total',v:banks.length+presets.pinned.length,c:'var(--text)'},{l:'Due Today',v:'—',c:'#E11D48'},{l:'New Week',v:'—',c:'var(--text)'},{l:'Mastery',v:'—',c:'var(--text)'},{l:'Learning',v:'—',c:'var(--cyan)'}].forEach(function(s){
                       statsHtml+='<div style="background:var(--card);border:1px solid var(--line);padding:14px 16px;border-radius:8px"><span style="font-size:10px;font-weight:700;font-family:\'Manrope\',sans-serif;color:var(--text-soft);text-transform:uppercase;letter-spacing:.05em">'+s.l+'</span><div style="font-size:18px;font-weight:700;color:'+s.c+';margin-top:2px">'+s.v+'</div></div>';
                     });
                     statsHtml+='</div>';
-                    // Pinned — matching design: WORDS | NEW WORDS | progress bar + TO DO
+                    // Pinned
                     statsHtml+='<div style="background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:20px;margin-bottom:24px"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px"><div style="display:flex;align-items:center;gap:8px"><span class="material-symbols-outlined" style="color:var(--cyan)">push_pin</span><h3 style="font-size:13px;font-weight:700;font-family:\'Manrope\',sans-serif;text-transform:uppercase;letter-spacing:.03em;color:var(--text-soft);margin:0">Pinned Collections</h3><span style="background:rgba(6,182,212,.1);color:var(--cyan);font-size:9px;font-weight:700;font-family:\'Manrope\',sans-serif;padding:2px 8px;border-radius:99px;text-transform:uppercase">Always Synced</span></div></div>';
-                    if(pinned.length){
-                      pinned.forEach(function(b){
-                        var due=b.due_count||0;
-                        var newWords=b.new_words||0;
-                        var total=b.word_count||0;
-                        var done=total-due;
-                        var pct=total>0?Math.round(done/total*100):100;
-                        statsHtml+='<div style="background:var(--card);border:1px solid var(--line);border-radius:8px;padding:12px 16px;display:flex;align-items:center;gap:16px;cursor:pointer;margin-bottom:4px" onmouseover="this.style.borderColor=\'var(--cyan)\'" onmouseout="this.style.borderColor=\'var(--line)\'" onclick="wbOpenBank(\''+b.id+'\')">'+
-                          '<span class="material-symbols-outlined" style="color:var(--cyan);font-size:18px">'+(b.icon||'history')+'</span>'+
-                          '<div style="flex:1;min-width:0"><div style="font-weight:700;font-size:14px;color:var(--text)">'+esc(b.name||'Bank')+'</div><div style="font-size:11px;color:var(--text-soft)">'+esc(b.description||'')+'</div></div>'+
-                          '<div style="display:flex;align-items:center;gap:24px;flex-shrink:0">'+
-                            '<div style="text-align:center"><span style="font-size:9px;font-weight:700;font-family:\'Manrope\',sans-serif;color:var(--text-soft);text-transform:uppercase">Words</span><div style="font-size:13px;font-weight:700;color:var(--text)">'+total+'</div></div>'+
-                            '<div style="text-align:center"><span style="font-size:9px;font-weight:700;font-family:\'Manrope\',sans-serif;color:var(--text-soft);text-transform:uppercase">New Words</span><div style="font-size:13px;font-weight:700;color:#10B981">'+(newWords||0)+'</div></div>'+
-                            '<div style="text-align:right;min-width:80px">'+
-                              (due>0?'<span style="font-size:9px;font-weight:700;font-family:\'Manrope\',sans-serif;color:#E11D48;text-transform:uppercase">'+due+' TO DO</span><div style="width:64px;height:4px;background:var(--bg);border-radius:2px;margin-top:4px;overflow:hidden"><div style="height:100%;background:#E11D48;width:'+Math.min(100,Math.round(due/total*100))+'%"></div></div>':'<span style="font-size:10px;font-weight:600;color:var(--text-soft);font-family:\'Manrope\',sans-serif">UP TO DATE</span>')+
-                            '</div>'+
+                    allPinned.forEach(function(b){
+                      var due=b.due||b.due_count||0;
+                      var newWords=b.newWords||b.new_words||0;
+                      var total=b.words||b.word_count||0;
+                      var isPreset=String(b.id).indexOf('preset-')===0;
+                      statsHtml+='<div style="background:var(--card);border:1px solid var(--line);border-radius:8px;padding:12px 16px;display:flex;align-items:center;gap:16px;cursor:pointer;margin-bottom:4px" onmouseover="this.style.borderColor=\'var(--cyan)\'" onmouseout="this.style.borderColor=\'var(--line)\'" onclick="'+(isPreset?'alert(\'Coming soon: '+esc(b.name)+'\')':'wbOpenBank(\''+b.id+'\')')+'">'+
+                        '<span class="material-symbols-outlined" style="color:var(--cyan);font-size:18px">'+(b.icon||'history')+'</span>'+
+                        '<div style="flex:1;min-width:0"><div style="font-weight:700;font-size:14px;color:var(--text)">'+esc(b.name||'Bank')+'</div><div style="font-size:11px;color:var(--text-soft)">'+esc(b.desc||b.description||'')+'</div></div>'+
+                        '<div style="display:flex;align-items:center;gap:24px;flex-shrink:0">'+
+                          '<div style="text-align:center"><span style="font-size:9px;font-weight:700;font-family:\'Manrope\',sans-serif;color:var(--text-soft);text-transform:uppercase">Words</span><div style="font-size:13px;font-weight:700;color:var(--text)">'+total+'</div></div>'+
+                          '<div style="text-align:center"><span style="font-size:9px;font-weight:700;font-family:\'Manrope\',sans-serif;color:var(--text-soft);text-transform:uppercase">New Words</span><div style="font-size:13px;font-weight:700;color:#10B981">'+newWords+'</div></div>'+
+                          '<div style="text-align:right;min-width:80px">'+
+                            (due>0?'<span style="font-size:9px;font-weight:700;font-family:\'Manrope\',sans-serif;color:#E11D48;text-transform:uppercase">'+due+' TO DO</span><div style="width:64px;height:4px;background:var(--bg);border-radius:2px;margin-top:4px;overflow:hidden"><div style="height:100%;background:#E11D48;width:'+Math.min(100,Math.round(due/total*100))+'%"></div></div>':'<span style="font-size:10px;font-weight:600;color:var(--text-soft);font-family:\'Manrope\',sans-serif">UP TO DATE</span>')+
                           '</div>'+
-                          '<button style="padding:6px 14px;background:rgba(6,182,212,.1);color:var(--cyan);border:none;border-radius:6px;font-size:11px;font-weight:700;font-family:\'Manrope\',sans-serif;cursor:pointer;white-space:nowrap">Open</button>'+
-                        '</div>';
-                      });
-                    }else{statsHtml+='<p style="text-align:center;color:var(--text-faint);padding:16px;font-size:12px">No pinned banks yet.</p>';}
+                        '</div>'+
+                        '<button style="padding:6px 14px;background:rgba(6,182,212,.1);color:var(--cyan);border:none;border-radius:6px;font-size:11px;font-weight:700;font-family:\'Manrope\',sans-serif;cursor:pointer;white-space:nowrap">Open</button>'+
+                      '</div>';
+                    });
                     statsHtml+='</div>';
-                    // Discovery + sidebar
+                    // Discovery
                     statsHtml+='<div style="display:grid;grid-template-columns:2fr 1fr;gap:24px;margin-bottom:24px"><div><div style="display:flex;align-items:center;gap:8px;margin-bottom:16px"><h3 style="font-size:13px;font-weight:700;font-family:\'Manrope\',sans-serif;text-transform:uppercase;letter-spacing:.03em;color:var(--text-soft);margin:0">Discovery</h3><span style="font-size:9px;font-weight:700;color:var(--text-soft);font-family:\'Manrope\',sans-serif;text-transform:uppercase">AI Powered</span></div><div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">';
-                    smart.concat(custom.slice(0,4)).slice(0,6).forEach(function(b){
-                      statsHtml+='<div style="background:var(--card);border:1px solid var(--line);border-radius:10px;padding:18px;cursor:pointer" onmouseover="this.style.borderColor=\'var(--cyan)\';this.style.transform=\'translateY(-2px)\'" onmouseout="this.style.borderColor=\'var(--line)\';this.style.transform=\'\'" onclick="wbOpenBank(\''+b.id+'\')">'+
-                        '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px"><span class="material-symbols-outlined" style="color:var(--cyan);font-size:24px">auto_awesome</span><span style="font-size:9px;font-weight:700;background:var(--text);color:var(--card);padding:2px 6px;border-radius:4px;font-family:\'Manrope\',sans-serif;text-transform:uppercase">'+(b.type||'smart').toUpperCase()+'</span></div>'+
-                        '<div style="font-weight:700;font-size:14px;color:var(--text);margin-bottom:4px">'+esc(b.name||'Bank')+'</div><div style="font-size:11px;color:var(--text-soft);margin-bottom:12px">'+esc(b.description||'')+'</div>'+
-                        '<div style="display:flex;justify-content:space-between;align-items:center;border-top:1px solid var(--line);padding-top:10px"><span style="font-size:10px;font-weight:600;font-family:\'Manrope\',sans-serif;color:var(--text-soft)">'+(b.word_count||0)+' words</span><span style="font-size:11px;font-weight:700;color:var(--cyan);font-family:\'Manrope\',sans-serif">Open</span></div></div>';
+                    allDiscovery.forEach(function(b){
+                      var isPreset=String(b.id).indexOf('preset-')===0;
+                      statsHtml+='<div style="background:var(--card);border:1px solid var(--line);border-radius:10px;padding:18px;cursor:pointer" onmouseover="this.style.borderColor=\'var(--cyan)\';this.style.transform=\'translateY(-2px)\'" onmouseout="this.style.borderColor=\'var(--line)\';this.style.transform=\'\'" onclick="'+(isPreset?'alert(\'Coming soon: '+esc(b.name)+'\')':'wbOpenBank(\''+b.id+'\')')+'">'+
+                        '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px"><span class="material-symbols-outlined" style="color:var(--cyan);font-size:24px">'+(b.icon||'auto_awesome')+'</span><span style="font-size:9px;font-weight:700;background:var(--text);color:var(--card);padding:2px 6px;border-radius:4px;font-family:\'Manrope\',sans-serif;text-transform:uppercase">'+(b.type||'SMART')+'</span></div>'+
+                        '<div style="font-weight:700;font-size:14px;color:var(--text);margin-bottom:4px">'+esc(b.name||'Bank')+'</div><div style="font-size:11px;color:var(--text-soft);margin-bottom:12px">'+esc(b.desc||b.description||'')+'</div>'+
+                        '<div style="display:flex;justify-content:space-between;align-items:center;border-top:1px solid var(--line);padding-top:10px"><span style="font-size:10px;font-weight:600;font-family:\'Manrope\',sans-serif;color:var(--text-soft)">'+(b.words||b.word_count||0)+' words</span><span style="font-size:11px;font-weight:700;color:var(--cyan);font-family:\'Manrope\',sans-serif">Open</span></div></div>';
                     });
                     statsHtml+='</div></div><div style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:20px"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px"><h3 style="font-size:11px;font-weight:700;font-family:\'Manrope\',sans-serif;text-transform:uppercase;letter-spacing:.05em;color:var(--text-soft);margin:0">Your Banks</h3><button onclick="wbNewBank()" style="background:none;border:none;color:var(--cyan);cursor:pointer;padding:4px"><span class="material-symbols-outlined" style="font-size:20px">add_circle</span></button></div>';
                     if(custom.length){
