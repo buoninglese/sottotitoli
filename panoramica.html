@@ -1853,6 +1853,8 @@
           </div></section>
           <div role="tabpanel" class="subtab-pane active" id="sub-wb-overview" data-wb-lang="en">
             <div id="wbEnContent"><p style="text-align:center;color:var(--text-faint);padding:40px">Loading word banks...</p></div>
+            <div id="wordbanksOverview"></div>
+            <div id="wbInsideView" style="display:none"></div>
             <script>
               (function(){
                 var lang = 'en';
@@ -1922,7 +1924,7 @@
                         '<div style="font-weight:700;font-size:14px;color:var(--text);margin-bottom:4px">'+esc(b.name||'Bank')+'</div><div style="font-size:11px;color:var(--text-soft);margin-bottom:12px">'+esc(b.desc||b.description||'')+'</div>'+
                         '<div style="display:flex;justify-content:space-between;align-items:center;border-top:1px solid var(--line);padding-top:10px"><span style="font-size:10px;font-weight:600;font-family:\'Manrope\',sans-serif;color:var(--text-soft)">'+(b.words||b.word_count||0)+' words</span><span style="font-size:11px;font-weight:700;color:var(--cyan);font-family:\'Manrope\',sans-serif">Open</span></div></div>';
                     });
-                    statsHtml+='</div></div><div style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:20px"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px"><h3 style="font-size:11px;font-weight:700;font-family:\'Manrope\',sans-serif;text-transform:uppercase;letter-spacing:.05em;color:var(--text-soft);margin:0">Your Banks</h3><button onclick="wbNewBank()" style="background:none;border:none;color:var(--cyan);cursor:pointer;padding:4px"><span class="material-symbols-outlined" style="font-size:20px">add_circle</span></button></div>';
+                    statsHtml+='</div></div><div style="background:rgba(6,182,212,.06);border:1px solid rgba(6,182,212,.18);border-radius:12px;padding:20px"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px"><div style="display:flex;align-items:center;gap:6px"><h3 style="font-size:11px;font-weight:700;font-family:\'Manrope\',sans-serif;text-transform:uppercase;letter-spacing:.05em;color:var(--cyan);margin:0">Your Banks</h3><span class="material-symbols-outlined" style="font-size:15px;color:var(--cyan);cursor:help" title="Create and manage your personal word banks here. Add words from sessions, import from files, or build manually. Pinned banks above are auto-generated from your activity.">info</span></div><button onclick="wbNewBank()" style="background:none;border:none;color:var(--cyan);cursor:pointer;padding:4px"><span class="material-symbols-outlined" style="font-size:20px">add_circle</span></button></div>';
                     if(custom.length){
                       custom.slice(0,5).forEach(function(b){
                         statsHtml+='<div style="display:flex;align-items:center;gap:10px;padding:8px 10px;cursor:pointer;border-radius:6px;margin-bottom:4px" onmouseover="this.style.background=\'var(--bg)\'" onmouseout="this.style.background=\'\'" onclick="wbOpenBank(\''+b.id+'\')"><span class="material-symbols-outlined" style="font-size:16px;color:var(--text-soft)">label</span><div style="flex:1;min-width:0"><div style="font-size:12px;font-weight:600;color:var(--text)">'+esc(b.name||'Bank')+'</div></div><span style="font-size:10px;font-weight:700;color:var(--cyan);font-family:\'Manrope\',sans-serif;white-space:nowrap">'+(b.word_count||0)+' w</span></div>';
@@ -1931,41 +1933,51 @@
                     statsHtml+='<div style="border-top:1px solid var(--line);margin-top:16px;padding-top:16px"><button onclick="wbShowImport()" style="width:100%;padding:10px;background:var(--bg);border:1px dashed var(--line);border-radius:8px;cursor:pointer;font-size:11px;font-weight:600;font-family:\'Manrope\',sans-serif;color:var(--text-soft);display:flex;align-items:center;justify-content:center;gap:6px;margin-bottom:8px"><span class="material-symbols-outlined" style="font-size:16px">upload_file</span> Import from text</button><button onclick="alert(\'All banks coming soon\')" style="width:100%;padding:8px;background:none;border:none;cursor:pointer;font-size:10px;font-weight:700;font-family:\'Manrope\',sans-serif;color:var(--text-soft);text-transform:uppercase;letter-spacing:.05em">Show all</button></div></div></div>';
                     // Full library
                     statsHtml+='<div><h3 style="font-size:13px;font-weight:700;font-family:\'Manrope\',sans-serif;text-transform:uppercase;letter-spacing:.03em;color:var(--text-soft);margin:0 0 16px">Full Library</h3><div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px">';
-                    statsHtml+='<div style="background:var(--bg);border:1px dashed var(--line);border-radius:10px;padding:24px;display:flex;align-items:center;justify-content:center;cursor:pointer;min-height:100px" onclick="wbShowImport()"><span class="material-symbols-outlined" style="font-size:24px;color:var(--text-soft);margin-right:8px">upload_file</span><span style="font-size:12px;font-weight:700;font-family:\'Manrope\',sans-serif;color:var(--text-soft);text-transform:uppercase">Import New Bank</span></div>';
+                    statsHtml+='<div style="background:var(--bg);border:1px dashed var(--line);border-radius:10px;padding:24px;display:flex;align-items:center;justify-content:center;cursor:pointer;min-height:100px" onclick="wbShowCreate()"><span class="material-symbols-outlined" style="font-size:24px;color:var(--text-soft);margin-right:8px">add_circle</span><span style="font-size:12px;font-weight:700;font-family:\'Manrope\',sans-serif;color:var(--text-soft);text-transform:uppercase">Create New Bank</span></div>';
                     banks.slice(0,7).forEach(function(b){
                       statsHtml+='<div style="background:var(--card);border:1px solid var(--line);border-radius:10px;padding:16px;cursor:pointer" onmouseover="this.style.borderColor=\'var(--cyan)\'" onmouseout="this.style.borderColor=\'var(--line)\'" onclick="wbOpenBank(\''+b.id+'\')"><div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px"><span style="font-size:10px;font-weight:700;background:rgba(6,182,212,.1);color:var(--cyan);padding:2px 6px;border-radius:4px;font-family:\'Manrope\',sans-serif">'+(b.cefr_level||'—')+'</span></div><div style="font-weight:700;font-size:13px;color:var(--text);margin-bottom:4px">'+esc(b.name||'Bank')+'</div><div style="display:flex;justify-content:space-between;font-size:10px;color:var(--text-soft)"><span>'+(b.word_count||0)+' words</span><span style="font-weight:600;color:var(--cyan)">Open</span></div></div>';
                     });
                     statsHtml+='</div></div>';
-                    document.getElementById('wbEnContent').innerHTML=statsHtml;
-                  }).catch(function(){document.getElementById('wbEnContent').innerHTML='<p style="text-align:center;color:var(--text-faint);padding:40px">Unable to load word banks.</p>';});
+                    document.getElementById('wordbanksOverview').innerHTML=statsHtml;
+                  }).catch(function(){document.getElementById('wordbanksOverview').innerHTML='<p style="text-align:center;color:var(--text-faint);padding:40px">Unable to load word banks.</p>';});
                 }
                 loadAll();
                 window.wbNewBank=function(){ if(window.newWordbank) window.newWordbank(); else { var n=prompt('Bank name:'); if(n) alert('Create: '+n); } setTimeout(function(){ loadAll(); }, 800); };
-                window.wbOpenBank=function(id){ if(String(id).indexOf('preset-')===0){ alert('This collection is coming soon.'); return; } if(window.openWordbankView) openWordbankView(id); else alert('Open bank: '+id); };
-                window.wbShowImport=function(){
-                  document.getElementById('wbImportPopup').style.display='flex';
+                window.wbOpenBank=function(id){
+                  var presetMap={'preset-ripasso':'review_due_now','preset-saved':'saved_from_sessions','preset-evb':'vocab_builder_en','preset-fragile':'fragile_words','preset-next':'goal_next_step','preset-build':'build_from_known','preset-activate':'activate_recognized','preset-goal':'upcoming_useful_vocab','preset-themes':'upcoming_session_driven','preset-roadmap':'upcoming_roadmap'};
+                  if(presetMap[id]) id=presetMap[id];
+                  if(window.openWordbankView) openWordbankView(id); else alert('Open bank: '+id);
                 };
-                window.wbCloseImport=function(){
-                  document.getElementById('wbImportPopup').style.display='none';
+                window.wbShowImport=function(){ document.getElementById('wbImportPopup').style.display='flex'; };
+                window.wbCloseImport=function(){ document.getElementById('wbImportPopup').style.display='none'; };
+                window.wbShowCreate=function(){ document.getElementById('wbCreatePopup').style.display='flex'; };
+                window.wbCloseCreate=function(){ document.getElementById('wbCreatePopup').style.display='none'; };
+                window.wbDoCreate=function(){
+                  var name=(document.getElementById('wbCreateName').value||'').trim();
+                  if(!name){alert('Enter a bank name.');return;}
+                  if(window.newWordbank){ window.newWordbank(); setTimeout(function(){ loadAll(); }, 800); }
+                  else { alert('Created: '+name); }
+                  wbCloseCreate();
                 };
                 window.wbDoImport=function(){
                   var file=document.getElementById('wbImportFile').files[0];
+                  var name=(document.getElementById('wbImportName').value||'').trim();
+                  var tag=(document.getElementById('wbImportTag').value||'').trim();
                   if(!file){alert('Select a file first.');return;}
+                  if(!name){alert('Enter a bank name.');return;}
                   var reader=new FileReader();
                   reader.onload=function(e){
                     var text=e.target.result;
                     var words=text.split(/[\\s,;:|!?.\\-\\[\\]\\(\\)\\{\\}"'<>\\n\\r\\t]+/).filter(function(w){return w.length>1&&!/^\\d+$/.test(w);});
-                    // Apply filters
-                    var filters=document.querySelectorAll('#wbImportFilters input:checked');
-                    if(filters.length){} // placeholder for POS/CEFR filters
+                    
                     if(!words.length){alert('No words found in file.');return;}
-                    var name=file.name.replace(/\\.[^.]+$/,'')||'Imported '+new Date().toLocaleDateString();
+                    
                     if(window.SottotitoliData&&window.SottotitoliData.createWordbank){
-                      window.SottotitoliData.createWordbank(name,'en').then(function(bank){
-                        alert('Bank "'+name+'" created with '+words.length+' words. Adding words...');
+                      window.SottotitoliData.createWordbank(name,'en',tag).then(function(){
+                        alert('Bank "'+name+'" created with '+words.length+' words.');
                         wbCloseImport(); loadAll();
                       }).catch(function(){alert('Error creating bank.');});
-                    }else{alert('Import not available offline. Created: '+name+' ('+words.length+' words)');wbCloseImport();}
+                    }else{alert('Offline: created '+name+' ('+words.length+' words)');wbCloseImport();}
                   };
                   reader.readAsText(file);
                 };
@@ -1975,9 +1987,13 @@
             <div id="wbImportPopup" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);backdrop-filter:blur(4px);z-index:10000;align-items:center;justify-content:center" onclick="wbCloseImport()">
               <div style="background:var(--panel);border:1px solid var(--line-strong);border-radius:22px;padding:32px;max-width:500px;width:90%;box-shadow:0 16px 48px rgba(0,0,0,.25)" onclick="event.stopPropagation()">
                 <h3 style="font-size:18px;font-weight:700;margin:0 0 8px;color:var(--text)">Import Vocabulary Bank</h3>
-                <p style="font-size:13px;color:var(--text-soft);margin:0 0 20px">Upload a file (.txt, .csv, .doc, .pdf) — words will be extracted automatically.</p>
-                <div style="border:2px dashed var(--line);border-radius:12px;padding:30px;text-align:center;margin-bottom:20px;cursor:pointer;background:var(--bg)" onclick="document.getElementById('wbImportFile').click()">
-                  <span class="material-symbols-outlined" style="font-size:40px;color:var(--cyan);display:block;margin-bottom:8px">cloud_upload</span>
+                <p style="font-size:13px;color:var(--text-soft);margin:0 0 16px">Upload a file — words will be extracted automatically.</p>
+                <label style="font-size:10px;font-weight:700;font-family:'Manrope',sans-serif;text-transform:uppercase;color:var(--text-soft);display:block;margin-bottom:4px">Bank Name</label>
+                <input id="wbImportName" placeholder="e.g. Medical Terms" style="width:100%;padding:8px 12px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--text);font-size:14px;font-family:inherit;margin-bottom:12px;box-sizing:border-box">
+                <label style="font-size:10px;font-weight:700;font-family:'Manrope',sans-serif;text-transform:uppercase;color:var(--text-soft);display:block;margin-bottom:4px">Tag (optional)</label>
+                <input id="wbImportTag" placeholder="e.g. Medical, Work" style="width:100%;padding:8px 12px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--text);font-size:14px;font-family:inherit;margin-bottom:16px;box-sizing:border-box">
+                <div style="border:2px dashed var(--line);border-radius:12px;padding:24px;text-align:center;margin-bottom:16px;cursor:pointer;background:var(--bg)" onclick="document.getElementById('wbImportFile').click()">
+                  <span class="material-symbols-outlined" style="font-size:36px;color:var(--cyan);display:block;margin-bottom:6px">cloud_upload</span>
                   <p style="font-size:13px;font-weight:600;color:var(--text)">Click to select file</p>
                   <p id="wbImportFileName" style="font-size:11px;color:var(--text-soft);margin-top:4px">No file selected</p>
                   <input type="file" id="wbImportFile" accept=".txt,.csv,.doc,.docx,.pdf" style="display:none" onchange="document.getElementById('wbImportFileName').textContent=this.files[0]?this.files[0].name:'No file selected'">
@@ -1996,6 +2012,21 @@
                 <div style="display:flex;gap:8px;justify-content:flex-end">
                   <button onclick="wbCloseImport()" style="padding:10px 20px;border:1px solid var(--line);border-radius:8px;background:transparent;cursor:pointer;font-size:13px;font-weight:600;font-family:'Manrope',sans-serif;color:var(--text-soft)">Cancel</button>
                   <button onclick="wbDoImport()" style="padding:10px 24px;background:var(--cyan);color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:13px;font-weight:700;font-family:'Manrope',sans-serif">Import & Create Bank</button>
+                </div>
+              </div>
+            </div>
+            <!-- Create Bank Popup -->
+            <div id="wbCreatePopup" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);backdrop-filter:blur(4px);z-index:10000;align-items:center;justify-content:center" onclick="wbCloseCreate()">
+              <div style="background:var(--panel);border:1px solid var(--line-strong);border-radius:22px;padding:32px;max-width:440px;width:90%;box-shadow:0 16px 48px rgba(0,0,0,.25)" onclick="event.stopPropagation()">
+                <h3 style="font-size:18px;font-weight:700;margin:0 0 8px;color:var(--text)">Create New Bank</h3>
+                <p style="font-size:13px;color:var(--text-soft);margin:0 0 20px">Create an empty word bank to fill manually or import later.</p>
+                <label style="font-size:10px;font-weight:700;font-family:'Manrope',sans-serif;text-transform:uppercase;color:var(--text-soft);display:block;margin-bottom:4px">Bank Name</label>
+                <input id="wbCreateName" placeholder="e.g. Phrasal Verbs" style="width:100%;padding:8px 12px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--text);font-size:14px;font-family:inherit;margin-bottom:12px;box-sizing:border-box">
+                <label style="font-size:10px;font-weight:700;font-family:'Manrope',sans-serif;text-transform:uppercase;color:var(--text-soft);display:block;margin-bottom:4px">Tag (optional)</label>
+                <input id="wbCreateTag" placeholder="e.g. B2, Work, Travel" style="width:100%;padding:8px 12px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--text);font-size:14px;font-family:inherit;margin-bottom:24px;box-sizing:border-box">
+                <div style="display:flex;gap:8px;justify-content:flex-end">
+                  <button onclick="wbCloseCreate()" style="padding:10px 20px;border:1px solid var(--line);border-radius:8px;background:transparent;cursor:pointer;font-size:13px;font-weight:600;font-family:'Manrope',sans-serif;color:var(--text-soft)">Cancel</button>
+                  <button onclick="wbDoCreate()" style="padding:10px 24px;background:var(--cyan);color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:13px;font-weight:700;font-family:'Manrope',sans-serif">Create Bank</button>
                 </div>
               </div>
             </div>
