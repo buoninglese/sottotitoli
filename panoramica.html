@@ -154,7 +154,7 @@
   <div class="app-shell">
     <header class="topbar">
       <div style="display:flex;align-items:center;gap:0">
-        <a href="index.html" class="topbar-brand" style="font-size:31px;font-family:'Manrope',sans-serif;font-weight:700;text-decoration:none;letter-spacing:-0.02em;display:inline-flex;align-items:baseline;gap:0">sottotitoli<span style="font-family:'Manrope',sans-serif;font-weight:800;color:var(--accent-purple,#7c3aed);letter-spacing:-.5px">.pro</span><span class="topbar-version" style="font-size:10px;font-weight:600;font-family:'Manrope',sans-serif;color:var(--text-soft);margin-left:6px;opacity:.55;letter-spacing:.02em">v50</span></a>
+        <a href="index.html" class="topbar-brand" style="font-size:31px;font-family:'Manrope',sans-serif;font-weight:700;text-decoration:none;letter-spacing:-0.02em;display:inline-flex;align-items:baseline;gap:0">sottotitoli<span style="font-family:'Manrope',sans-serif;font-weight:800;color:var(--accent-purple,#7c3aed);letter-spacing:-.5px">.pro</span><span class="topbar-version" style="font-size:10px;font-weight:600;font-family:'Manrope',sans-serif;color:var(--text-soft);margin-left:6px;opacity:.55;letter-spacing:.02em">v51</span></a>
       </div>
       <div style="display:flex;align-items:center;gap:12px">
         <button class="btn-start-session" id="btnStartSession" onclick="toggleStartSession()" style="font-size:15px;height:42px;padding:0 20px;border-radius:12px;background:linear-gradient(135deg,rgba(192,132,252,.18),rgba(192,132,252,.06));color:#c084fc;border:1px solid rgba(192,132,252,.25);font-weight:700;font-family:'Manrope',sans-serif;display:inline-flex;align-items:center;gap:8px;box-shadow:0 0 20px rgba(192,132,252,.12),0 2px 8px rgba(0,0,0,.2);cursor:pointer;letter-spacing:-.01em;transition:all .2s ease" onmouseover="this.style.background='linear-gradient(135deg,rgba(192,132,252,.28),rgba(192,132,252,.12))';this.style.borderColor='rgba(192,132,252,.4)';this.style.boxShadow='0 0 28px rgba(192,132,252,.22),0 4px 12px rgba(0,0,0,.25)'" onmouseout="this.style.background='linear-gradient(135deg,rgba(192,132,252,.18),rgba(192,132,252,.06))';this.style.borderColor='rgba(192,132,252,.25)';this.style.boxShadow='0 0 20px rgba(192,132,252,.12),0 2px 8px rgba(0,0,0,.2)'">
@@ -380,14 +380,12 @@
                 <p class="metric-label">GSE Score<span class="cefr-info-icon" data-cefr-info="Global Scale of English 10–90: misura il livello del tuo inglese">ⓘ</span></p>
                 <div class="metric-value">—</div>
               </div>
-              <div class="metric-badge" style="border-top:1px solid var(--line);display:flex;align-items:center;gap:6px"><span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--text-soft);opacity:.4;flex-shrink:0"></span><span class="metric-badge-text" style="color:var(--text-soft);opacity:.4">—</span></div>
             </article>
             <article class="metric-card" data-metric="avgLexDiv" onclick="selectMetricCard(this)" style="background:var(--card);border:1px solid var(--line);border-radius:48px;padding:40px;display:flex;flex-direction:column;justify-content:space-between;min-height:220px;transition:border-color .3s ease,box-shadow .3s ease;cursor:pointer;container-type:inline-size">
               <div>
                 <p class="metric-label"><span data-i18n="lexical_diversity">Lexical div.</span><span class="cefr-info-icon" data-cefr-info="Rapporto parole uniche/totali: più alto = vocabolario più vario">ⓘ</span></p>
                 <div class="metric-value">—</div>
               </div>
-              <div class="metric-badge" style="border-top:1px solid var(--line);display:flex;align-items:center;gap:6px"><span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--text-soft);opacity:.4;flex-shrink:0"></span><span class="metric-badge-text" style="color:var(--text-soft);opacity:.4">—</span></div>
             </article>
           </section>
           <!-- 14-day session minutes chart — exact match to reference -->
@@ -4203,60 +4201,38 @@
     var gseCard = document.querySelector('.metric-card[data-metric="gseScore"]');
     if (!gseCard) return;
     var valEl = gseCard.querySelector('.metric-value');
-    var badgeEl = gseCard.querySelector('.metric-badge-text');
 
-    // Default: show calculating
+    // Default
     if (valEl) valEl.textContent = '—';
-    if (badgeEl) badgeEl.textContent = 'Calcolo...';
-    // Store GSE value globally so renderMetrics can use it
     window._gseScore = null;
 
     // Try to compute GSE from session transcripts
     try {
       var sessions = window.SottotitoliData && await window.SottotitoliData.getSessions();
-      if (!sessions || !sessions.length) {
-        if (badgeEl) badgeEl.textContent = 'Nessun dato';
-        return;
-      }
-      // Get the latest session's transcript
+      if (!sessions || !sessions.length) return;
+
       var allText = '';
       for (var i = 0; i < Math.min(sessions.length, 5); i++) {
         var s = sessions[i];
         if (s.transcript_text) allText += s.transcript_text + ' ';
       }
-      if (!allText.trim()) {
-        if (badgeEl) badgeEl.textContent = 'Trascrivi';
-        return;
-      }
+      if (!allText.trim()) return;
 
-      // Use SottotitoliGSE to compute the GSE score
       var gse = null;
       if (window.SottotitoliGSE && window.SottotitoliGSE.scoreText) {
         gse = window.SottotitoliGSE.scoreText(allText);
       }
-      if (!gse || gse.score == null) {
-        if (badgeEl) badgeEl.textContent = 'Analisi...';
-        return;
-      }
+      if (!gse || gse.score == null) return;
 
       var score = Math.round(gse.score);
-      var band = gse.band || '';
       var color = gse.color || 'var(--teal)';
 
       if (valEl) {
         valEl.textContent = score;
         valEl.style.color = color;
       }
-      if (badgeEl) {
-        badgeEl.textContent = band;
-        badgeEl.style.color = color;
-      }
-      // Store globally so renderMetrics can read it
       window._gseScore = score;
-
-    } catch(e) {
-      if (badgeEl) badgeEl.textContent = 'Errore';
-    }
+    } catch(e) { /* silent */ }
   }
 
   // ── Enhanced CEFR Quad with GSE scores ──
