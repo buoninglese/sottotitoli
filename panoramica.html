@@ -1728,6 +1728,37 @@
                 <input id="vtQuizTitle" placeholder="Titolo del quiz..." style="width:100%;padding:8px 12px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--text);font-size:14px;font-family:var(--font-ui)">
                 <label style="display:block;font-size:11px;font-weight:600;color:var(--text-soft);margin:10px 0 4px">Categoria</label>
                 <input id="vtQuizCat" placeholder="es. Vocabolario · B1" style="width:100%;padding:8px 12px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--text);font-size:14px;font-family:var(--font-ui)">
+                <!-- Word Bank Import -->
+                <div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--line)">
+                  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+                    <span style="font-size:12px;font-weight:600;color:var(--text-soft)">📦 Importa da Word Bank</span>
+                    <button class="fchip" id="vtQmBankToggle" onclick="window.vtQmToggleBankImport()" style="font-size:11px;padding:4px 12px"><i class="fa-solid fa-chevron-down"></i> Apri</button>
+                  </div>
+                  <div id="vtQmBankPanel" style="display:none;border:1px solid var(--line);border-radius:10px;padding:12px;background:var(--bg);margin-top:6px">
+                    <div id="vtQmBankLoading" style="text-align:center;padding:12px;color:var(--text-faint);font-size:12px">Caricamento word bank...</div>
+                    <div id="vtQmBankSelector" style="display:none">
+                      <label style="font-size:10px;font-weight:600;color:var(--text-soft)">Scegli una banca</label>
+                      <select id="vtQmBankSelect" onchange="window.vtQmLoadBankWords(this.value)" style="width:100%;margin:4px 0 8px;padding:6px 10px;border-radius:8px;border:1px solid var(--line);background:var(--panel);color:var(--text);font-size:12px;font-family:var(--font-ui)">
+                        <option value="">— Seleziona —</option>
+                      </select>
+                    </div>
+                    <div id="vtQmBankWords" style="display:none">
+                      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+                        <span style="font-size:11px;font-weight:600;color:var(--text-soft)" id="vtQmBankWordCount"></span>
+                        <button class="fchip" onclick="window.vtQmSelectAllWords()" style="font-size:10px;padding:3px 10px">Tutti</button>
+                      </div>
+                      <div id="vtQmBankWordList" style="max-height:200px;overflow-y:auto;display:flex;flex-wrap:wrap;gap:4px;margin-bottom:10px"></div>
+                      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+                        <span style="font-size:10px;color:var(--text-soft)">Direzione:</span>
+                        <select id="vtQmBankDirection" style="padding:4px 8px;border-radius:6px;border:1px solid var(--line);background:var(--panel);color:var(--text);font-size:11px;font-family:var(--font-ui)">
+                          <option value="it-en">IT → EN</option>
+                          <option value="en-it">EN → IT</option>
+                        </select>
+                        <button class="fchip" onclick="window.vtQmGenerateFromBank()" style="font-size:11px;padding:5px 12px;background:var(--teal);color:#fff;border-color:var(--teal)"><i class="fa-solid fa-wand-magic-sparkles"></i> Genera Domande</button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
                 <div style="margin-top:12px">
                   <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
                     <span style="font-size:12px;font-weight:600;color:var(--text-soft)">Domande</span>
@@ -10164,6 +10195,142 @@
     localStorage.removeItem(_vtQuizResultsKey);
     window.vtQmRender();
   };
+
+  // ── Word Bank Import ──
+  var _bankWordsCache = [];
+
+  window.vtQmToggleBankImport = function(){
+    var panel = document.getElementById('vtQmBankPanel');
+    var btn = document.getElementById('vtQmBankToggle');
+    if (!panel || !btn) return;
+    var open = panel.style.display === 'block';
+    panel.style.display = open ? 'none' : 'block';
+    btn.innerHTML = open ? '<i class="fa-solid fa-chevron-down"></i> Apri' : '<i class="fa-solid fa-chevron-up"></i> Chiudi';
+    if (!open && !window._vtQmBanksLoaded) window.vtQmLoadBanks();
+  };
+
+  window.vtQmLoadBanks = async function(){
+    window._vtQmBanksLoaded = true;
+    var loadEl = document.getElementById('vtQmBankLoading');
+    var selEl = document.getElementById('vtQmBankSelector');
+    var sel = document.getElementById('vtQmBankSelect');
+    if (!loadEl || !selEl || !sel) return;
+    loadEl.style.display = 'block';
+    selEl.style.display = 'none';
+    try {
+      var sb = window.sottotitoliSupabase;
+      if (!sb) { loadEl.innerHTML = '<span style="color:var(--amber)">⚠️ Accedi per usare le word bank.</span>'; return; }
+      var r = await sb.auth.getSession();
+      if (!r.data?.session) { loadEl.innerHTML = '<span style="color:var(--amber)">⚠️ Accedi per usare le word bank.</span>'; return; }
+      var uid = r.data.session.user.id;
+      var { data: banks, error } = await sb.from('user_wordbanks').select('id,name,lang').eq('user_id', uid).order('created_at');
+      if (error) throw error;
+      if (!banks || !banks.length) { loadEl.innerHTML = '<span style="color:var(--text-soft)">Nessuna word bank trovata. Creane una nel Vocabulary Builder.</span>'; return; }
+      sel.innerHTML = '<option value="">— Seleziona —</option>' + banks.map(function(b){ return '<option value="'+b.id+'">'+b.name+' ('+b.lang+')</option>'; }).join('');
+      loadEl.style.display = 'none';
+      selEl.style.display = 'block';
+    } catch(e) {
+      loadEl.innerHTML = '<span style="color:var(--red)">Errore: '+e.message+'</span>';
+    }
+  };
+
+  window.vtQmLoadBankWords = async function(bankId){
+    if (!bankId) { document.getElementById('vtQmBankWords').style.display='none'; return; }
+    var wordsDiv = document.getElementById('vtQmBankWords');
+    var listEl = document.getElementById('vtQmBankWordList');
+    var countEl = document.getElementById('vtQmBankWordCount');
+    if (!wordsDiv || !listEl) return;
+    listEl.innerHTML = '<span style="font-size:11px;color:var(--text-faint)">Caricamento parole...</span>';
+    wordsDiv.style.display = 'block';
+    try {
+      var sb = window.sottotitoliSupabase;
+      var r = await sb.auth.getSession();
+      var uid = r.data.session.user.id;
+      var { data: words, error } = await sb.from('user_wordbank_words').select('word,pos').eq('wordbank_id', bankId).order('usage_count', { ascending: false }).limit(100);
+      if (error) throw error;
+      if (!words || !words.length) { listEl.innerHTML = '<span style="font-size:11px;color:var(--text-soft)">Nessuna parola in questa banca.</span>'; return; }
+      _bankWordsCache = words;
+      countEl.textContent = words.length + ' parole';
+      listEl.innerHTML = words.map(function(w, i){
+        return '<label style="display:inline-flex;align-items:center;gap:4px;padding:4px 10px;border:1px solid var(--line);border-radius:99px;font-size:12px;cursor:pointer;background:var(--panel);user-select:none"><input type="checkbox" class="vtq-bank-word-cb" value="'+i+'" checked style="accent-color:var(--teal)"> '+w.word+'</label>';
+      }).join('');
+    } catch(e) {
+      listEl.innerHTML = '<span style="color:var(--red);font-size:11px">Errore: '+e.message+'</span>';
+    }
+  };
+
+  window.vtQmSelectAllWords = function(){
+    var cbs = document.querySelectorAll('.vtq-bank-word-cb');
+    var allChecked = Array.from(cbs).every(function(cb){ return cb.checked; });
+    cbs.forEach(function(cb){ cb.checked = !allChecked; });
+  };
+
+  window.vtQmGenerateFromBank = async function(){
+    var cbs = document.querySelectorAll('.vtq-bank-word-cb:checked');
+    if (!cbs.length) return;
+    var selected = [];
+    cbs.forEach(function(cb){ selected.push(_bankWordsCache[parseInt(cb.value)]); });
+    if (!selected.length) return;
+
+    var dir = document.getElementById('vtQmBankDirection').value; // 'it-en' or 'en-it'
+    var titleEl = document.getElementById('vtQuizTitle');
+    var catEl = document.getElementById('vtQuizCat');
+    if (!titleEl.value.trim()) titleEl.value = 'Word Bank Quiz';
+    if (!catEl.value.trim()) catEl.value = 'Importato · '+selected.length+' parole';
+
+    // Show loading in question blocks
+    var blocks = document.getElementById('vtQuizQBlocks');
+    if (blocks) blocks.innerHTML = '<div style="text-align:center;padding:12px;color:var(--text-faint);font-size:12px"><i class="fa-solid fa-spinner fa-spin"></i> Traduzione in corso...</div>';
+
+    // Get translations for all selected words
+    var questions = [];
+    for (var i = 0; i < selected.length; i++) {
+      var word = selected[i].word;
+      var question = { q: '', opts: ['','','',''], correct: 0 };
+      if (dir === 'it-en') {
+        question.q = 'Traduci: "' + word + '"';
+        try {
+          var translation = await vtQmFetchTranslation(word, 'it', 'en');
+          question.opts = [translation, '...', '...', '...'];
+          question.correct = 0;
+        } catch(e) {
+          question.q = 'Cosa significa "' + word + '"?';
+          question.opts = ['(traduzione non disponibile)', '', '', ''];
+        }
+      } else {
+        question.q = 'Translate: "' + word + '"';
+        try {
+          var trans2 = await vtQmFetchTranslation(word, 'en', 'it');
+          question.opts = [trans2, '...', '...', '...'];
+          question.correct = 0;
+        } catch(e) {
+          question.q = 'What does "' + word + '" mean?';
+          question.opts = ['(translation unavailable)', '', '', ''];
+        }
+      }
+      questions.push(question);
+    }
+
+    // Build the question blocks
+    if (blocks) blocks.innerHTML = '';
+    questions.forEach(function(q){ window.vtQmAddQ(q); });
+
+    // Hide the bank panel
+    document.getElementById('vtQmBankPanel').style.display = 'none';
+    document.getElementById('vtQmBankToggle').innerHTML = '<i class="fa-solid fa-chevron-down"></i> Apri';
+  };
+
+  async function vtQmFetchTranslation(text, from, to){
+    // Use MyMemory API (free, no key needed)
+    var url = 'https://api.mymemory.translated.net/get?q=' + encodeURIComponent(text) + '&langpair=' + from + '|' + to;
+    var resp = await fetch(url);
+    if (!resp.ok) throw new Error('API error');
+    var data = await resp.json();
+    if (data.responseStatus === 200 && data.responseData && data.responseData.translatedText) {
+      return data.responseData.translatedText;
+    }
+    throw new Error('No translation');
+  }
 
   // Auto-render if the Quiz tab is open on load
   if (document.querySelector('[data-subtab="vt-quiz"]')) {
