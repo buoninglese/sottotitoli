@@ -839,7 +839,7 @@
   <div class="app-shell">
     <header class="topbar">
       <div style="display:flex;align-items:center;gap:0">
-        <a href="index.html" class="topbar-brand" style="font-size:31px;font-family:'Manrope',sans-serif;font-weight:700;text-decoration:none;letter-spacing:-0.02em;display:inline-flex;align-items:baseline;gap:0">sottotitoli<span style="font-family:'Manrope',sans-serif;font-weight:800;color:var(--accent-purple,#7c3aed);letter-spacing:-.5px">.pro</span><span class="topbar-version" style="font-size:10px;font-weight:600;font-family:'Manrope',sans-serif;color:var(--text-soft);margin-left:6px;opacity:.55;letter-spacing:.02em">v22</span></a>
+        <a href="index.html" class="topbar-brand" style="font-size:31px;font-family:'Manrope',sans-serif;font-weight:700;text-decoration:none;letter-spacing:-0.02em;display:inline-flex;align-items:baseline;gap:0">sottotitoli<span style="font-family:'Manrope',sans-serif;font-weight:800;color:var(--accent-purple,#7c3aed);letter-spacing:-.5px">.pro</span><span class="topbar-version" style="font-size:10px;font-weight:600;font-family:'Manrope',sans-serif;color:var(--text-soft);margin-left:6px;opacity:.55;letter-spacing:.02em">v23</span></a>
       </div>
       <div style="display:flex;align-items:center;gap:12px">
         <button class="btn-start-session" id="btnStartSession" onclick="toggleStartSession()" style="font-size:15px;height:42px;padding:0 20px;border-radius:12px;background:linear-gradient(135deg,rgba(192,132,252,.18),rgba(192,132,252,.06));color:#c084fc;border:1px solid rgba(192,132,252,.25);font-weight:700;font-family:'Manrope',sans-serif;display:inline-flex;align-items:center;gap:8px;box-shadow:0 0 20px rgba(192,132,252,.12),0 2px 8px rgba(0,0,0,.2);cursor:pointer;letter-spacing:-.01em;transition:all .2s ease" onmouseover="this.style.background='linear-gradient(135deg,rgba(192,132,252,.28),rgba(192,132,252,.12))';this.style.borderColor='rgba(192,132,252,.4)';this.style.boxShadow='0 0 28px rgba(192,132,252,.22),0 4px 12px rgba(0,0,0,.25)'" onmouseout="this.style.background='linear-gradient(135deg,rgba(192,132,252,.18),rgba(192,132,252,.06))';this.style.borderColor='rgba(192,132,252,.25)';this.style.boxShadow='0 0 20px rgba(192,132,252,.12),0 2px 8px rgba(0,0,0,.2)'">
@@ -2314,25 +2314,14 @@
                   });
                 }
 
-                // Translate a single word via MyMemory
-                function translateWord(lemma, fromLang, toLang){
-                  var key=fromLang+':'+lemma;
-                  if(_qCache[key]) return Promise.resolve(_qCache[key]);
-                  return fetch('https://api.mymemory.translated.net/get?q='+encodeURIComponent(lemma)+'&langpair='+fromLang+'|'+toLang)
-                    .then(function(r){ return r.ok?r.json():null; })
-                    .then(function(d){
-                      var txt=(d&&d.responseData&&d.responseData.translatedText||'').split(/[,;]/)[0].trim().toLowerCase();
-                      if(txt) _qCache[key]=txt;
-                      return txt||null;
-                    }).catch(function(){ return null; });
-                }
+                // Translate a single word via MyMemory — DISABLED, unreliable
+                // function translateWord(lemma, fromLang, toLang){ ... }
 
                 window.wbQuizGenerate=async function(){
                   var bankId=document.getElementById('wbQuizBank').value;
                   if(!bankId){alert('Seleziona una word bank.');return;}
                   if(!window.SottotitoliData){alert('Data module not loaded.');return;}
 
-                  // Show loading state
                   var btn=document.getElementById('wbQuizGenerateBtn');
                   var origHTML=btn.innerHTML;
                   btn.innerHTML='<span style="display:inline-flex;align-items:center;gap:8px"><span class="material-symbols-outlined" style="animation:spin 1s linear infinite;font-size:16px">progress_activity</span> Generando…</span>';
@@ -2343,34 +2332,22 @@
                     if(!words||words.length<3){alert('La banca ha meno di 3 parole.'); btn.innerHTML=origHTML; btn.disabled=false; return;}
 
                     var fromLang=_qDir==='it-en'?'it':'en', toLang=_qDir==='it-en'?'en':'it';
-                    // Collect words needing translation
-                    var toTranslate=[], seenWords=new Set();
-                    for(var i=0;i<words.length&&seenWords.size<_qCount;i++){
+                    // Use ONLY words that already have a cached translation (definition/translation field)
+                    var quizWords=[], seen=new Set();
+                    for(var i=0;i<words.length&&quizWords.length<_qCount;i++){
                       var w=words[i], lemma=(w.word||w.lemma||'').trim();
-                      if(!lemma||seenWords.has(lemma)||lemma.length<2) continue;
-                      var existing=w.definition||w.translation||'';
-                      if(existing){ seenWords.add(lemma); toTranslate.push({lemma:lemma,translation:existing,hasTranslation:true}); }
-                      else { seenWords.add(lemma); toTranslate.push({lemma:lemma,translation:null,hasTranslation:false}); }
-                    }
-
-                    // Parallel translate all missing ones
-                    var missing=toTranslate.filter(function(t){return !t.hasTranslation;});
-                    if(missing.length>0){
-                      var results=await Promise.all(missing.map(function(t){
-                        return translateWord(t.lemma, fromLang, toLang).then(function(tr){ t.translation=tr; });
-                      }));
-                    }
-
-                    // Build quiz pairs
-                    var quizWords=[];
-                    for(var j=0;j<toTranslate.length;j++){
-                      var t=toTranslate[j];
-                      if(t.translation&&t.translation!==t.lemma){
-                        quizWords.push({it:fromLang==='it'?t.lemma:t.translation, en:fromLang==='it'?t.translation:t.lemma});
+                      if(!lemma||seen.has(lemma)||lemma.length<2) continue;
+                      var tr=(w.definition||w.translation||'').trim();
+                      // Must have a translation that differs from the source
+                      if(tr&&tr.toLowerCase()!==lemma.toLowerCase()&&tr.length>=2){
+                        quizWords.push({it:fromLang==='it'?lemma:tr, en:fromLang==='it'?tr:lemma});
+                        seen.add(lemma);
                       }
-                      if(quizWords.length>=_qCount) break;
                     }
-                    if(quizWords.length<3){alert('Non abbastanza traduzioni trovate. Prova un\'altra banca.'); btn.innerHTML=origHTML; btn.disabled=false; return;}
+                    if(quizWords.length<3){
+                      alert('Solo '+quizWords.length+' parole con traduzione trovata in questa banca. Aggiungi traduzioni alle parole prima di generare un quiz.');
+                      btn.innerHTML=origHTML; btn.disabled=false; return;
+                    }
 
                     quizWords.sort(function(){return Math.random()-0.5;});
                     _qWords=quizWords; _qIdx=0; _qAnswers=quizWords.map(function(){return{chosen:null,correct:false};}); _qActive=true;
