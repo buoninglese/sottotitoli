@@ -837,7 +837,7 @@
   <div class="app-shell">
     <header class="topbar">
       <div style="display:flex;align-items:center;gap:0">
-        <a href="index.html" class="topbar-brand" style="font-size:31px;font-family:'Manrope',sans-serif;font-weight:700;text-decoration:none;letter-spacing:-0.02em;display:inline-flex;align-items:baseline;gap:0">sottotitoli<span style="font-family:'Manrope',sans-serif;font-weight:800;color:var(--accent-purple,#7c3aed);letter-spacing:-.5px">.pro</span><span class="topbar-version" style="font-size:10px;font-weight:600;font-family:'Manrope',sans-serif;color:var(--text-soft);margin-left:6px;opacity:.55;letter-spacing:.02em">v5</span></a>
+        <a href="index.html" class="topbar-brand" style="font-size:31px;font-family:'Manrope',sans-serif;font-weight:700;text-decoration:none;letter-spacing:-0.02em;display:inline-flex;align-items:baseline;gap:0">sottotitoli<span style="font-family:'Manrope',sans-serif;font-weight:800;color:var(--accent-purple,#7c3aed);letter-spacing:-.5px">.pro</span><span class="topbar-version" style="font-size:10px;font-weight:600;font-family:'Manrope',sans-serif;color:var(--text-soft);margin-left:6px;opacity:.55;letter-spacing:.02em">v6</span></a>
       </div>
       <div style="display:flex;align-items:center;gap:12px">
         <button class="btn-start-session" id="btnStartSession" onclick="toggleStartSession()" style="font-size:15px;height:42px;padding:0 20px;border-radius:12px;background:linear-gradient(135deg,rgba(192,132,252,.18),rgba(192,132,252,.06));color:#c084fc;border:1px solid rgba(192,132,252,.25);font-weight:700;font-family:'Manrope',sans-serif;display:inline-flex;align-items:center;gap:8px;box-shadow:0 0 20px rgba(192,132,252,.12),0 2px 8px rgba(0,0,0,.2);cursor:pointer;letter-spacing:-.01em;transition:all .2s ease" onmouseover="this.style.background='linear-gradient(135deg,rgba(192,132,252,.28),rgba(192,132,252,.12))';this.style.borderColor='rgba(192,132,252,.4)';this.style.boxShadow='0 0 28px rgba(192,132,252,.22),0 4px 12px rgba(0,0,0,.25)'" onmouseout="this.style.background='linear-gradient(135deg,rgba(192,132,252,.18),rgba(192,132,252,.06))';this.style.borderColor='rgba(192,132,252,.25)';this.style.boxShadow='0 0 20px rgba(192,132,252,.12),0 2px 8px rgba(0,0,0,.2)'">
@@ -1890,12 +1890,24 @@
                     var discIds={}; smart.forEach(function(b){discIds[b.name]=true;});
                     var allDiscovery=smart.concat(presets.discovery.filter(function(p){return !discIds[p.name];}));
 
-                    // Stats bar
-                    var statsHtml='<div style="display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-bottom:24px">';
-                    [{l:'Total',v:banks.length+presets.pinned.length,c:'var(--text)'},{l:'Due Today',v:'—',c:'#E11D48'},{l:'New Week',v:'—',c:'var(--text)'},{l:'Mastery',v:'—',c:'var(--text)'},{l:'Learning',v:'—',c:'var(--cyan)'}].forEach(function(s){
-                      statsHtml+='<div style="background:var(--card);border:1px solid var(--line);padding:14px 16px;border-radius:8px"><span style="font-size:10px;font-weight:700;font-family:\'Manrope\',sans-serif;color:var(--text-soft);text-transform:uppercase;letter-spacing:.05em">'+s.l+'</span><div style="font-size:18px;font-weight:700;color:'+s.c+';margin-top:2px">'+s.v+'</div></div>';
-                    });
-                    statsHtml+='</div>';
+                    // Stats bar — fetch real stats
+                    var statsHtml='';
+                    if(window.SottotitoliData&&window.SottotitoliData.getWordbankStats){
+                      window.SottotitoliData.getWordbankStats(lang).then(function(stats){
+                        var statsEl=document.getElementById('wbEnStatsBar');
+                        if(statsEl){
+                          statsEl.innerHTML='<div style="display:grid;grid-template-columns:repeat(5,1fr);gap:8px">'+
+                            '<div style="background:var(--card);border:1px solid var(--line);padding:14px 16px;border-radius:8px"><span style="font-size:10px;font-weight:700;font-family:\'Manrope\',sans-serif;color:var(--text-soft);text-transform:uppercase;letter-spacing:.05em">Totale parole</span><div style="font-size:22px;font-weight:700;color:var(--text);margin-top:2px">'+(stats.totalWords||0)+'</div></div>'+
+                            '<div style="background:var(--card);border:1px solid var(--line);padding:14px 16px;border-radius:8px"><span style="font-size:10px;font-weight:700;font-family:\'Manrope\',sans-serif;color:var(--text-soft);text-transform:uppercase;letter-spacing:.05em">In scadenza oggi</span><div style="font-size:22px;font-weight:700;color:'+(stats.dueToday>0?'#E11D48':'var(--text)')+';margin-top:2px">'+(stats.dueToday||0)+'</div>'+(stats.dueToday===0?'<div style="font-size:10px;font-weight:600;color:#10B981;font-family:\'Manrope\',sans-serif;margin-top:2px">Tutto in ordine</div>':'')+'</div>'+
+                            '<div style="background:var(--card);border:1px solid var(--line);padding:14px 16px;border-radius:8px"><span style="font-size:10px;font-weight:700;font-family:\'Manrope\',sans-serif;color:var(--text-soft);text-transform:uppercase;letter-spacing:.05em">Nuove questa settimana</span><div style="font-size:22px;font-weight:700;color:var(--text);margin-top:2px">'+(stats.newThisWeek||0)+'</div>'+(stats.newThisWeek>0?'<div style="font-size:10px;font-weight:600;color:var(--cyan);font-family:\'Manrope\',sans-serif;margin-top:2px">+'+(stats.newThisWeek||0)+' questa settimana</div>':'')+'</div>'+
+                            '<div style="background:var(--card);border:1px solid var(--line);padding:14px 16px;border-radius:8px"><span style="font-size:10px;font-weight:700;font-family:\'Manrope\',sans-serif;color:var(--text-soft);text-transform:uppercase;letter-spacing:.05em">Known</span><div style="font-size:22px;font-weight:700;color:var(--text);margin-top:2px">'+(stats.known||0)+'</div></div>'+
+                            '<div style="background:var(--card);border:1px solid var(--line);padding:14px 16px;border-radius:8px"><span style="font-size:10px;font-weight:700;font-family:\'Manrope\',sans-serif;color:var(--text-soft);text-transform:uppercase;letter-spacing:.05em">Learning</span><div style="font-size:22px;font-weight:700;color:var(--cyan);margin-top:2px">'+(stats.learning||0)+'</div></div>'+
+                          '</div>';
+                        }
+                      }).catch(function(){});
+                    }
+                    // Add stats bar placeholder (filled async above)
+                    statsHtml='<div id="wbEnStatsBar" style="margin-bottom:24px"><div style="display:grid;grid-template-columns:repeat(5,1fr);gap:8px"><div style="background:var(--card);border:1px solid var(--line);padding:14px 16px;border-radius:8px"><span style="font-size:10px;font-weight:700;font-family:\'Manrope\',sans-serif;color:var(--text-soft);text-transform:uppercase;letter-spacing:.05em">Totale parole</span><div style="font-size:22px;font-weight:700;color:var(--text);margin-top:2px">…</div></div></div></div>';
                     // Pinned
                     statsHtml+='<div style="background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:20px;margin-bottom:24px"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px"><div style="display:flex;align-items:center;gap:8px"><span class="material-symbols-outlined" style="color:var(--cyan)">push_pin</span><h3 style="font-size:13px;font-weight:700;font-family:\'Manrope\',sans-serif;text-transform:uppercase;letter-spacing:.03em;color:var(--text-soft);margin:0">Pinned Collections</h3><span style="background:rgba(6,182,212,.1);color:var(--cyan);font-size:9px;font-weight:700;font-family:\'Manrope\',sans-serif;padding:2px 8px;border-radius:99px;text-transform:uppercase">Always Synced</span></div></div>';
                     allPinned.forEach(function(b){
