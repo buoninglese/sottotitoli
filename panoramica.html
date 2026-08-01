@@ -154,7 +154,7 @@
   <div class="app-shell">
     <header class="topbar">
       <div style="display:flex;align-items:center;gap:0">
-        <a href="index.html" class="topbar-brand" style="font-size:31px;font-family:'Manrope',sans-serif;font-weight:700;text-decoration:none;letter-spacing:-0.02em;display:inline-flex;align-items:baseline;gap:0">sottotitoli<span style="font-family:'Manrope',sans-serif;font-weight:800;color:var(--accent-purple,#7c3aed);letter-spacing:-.5px">.pro</span><span class="topbar-version" style="font-size:10px;font-weight:600;font-family:'Manrope',sans-serif;color:var(--text-soft);margin-left:6px;opacity:.55;letter-spacing:.02em">v48</span></a>
+        <a href="index.html" class="topbar-brand" style="font-size:31px;font-family:'Manrope',sans-serif;font-weight:700;text-decoration:none;letter-spacing:-0.02em;display:inline-flex;align-items:baseline;gap:0">sottotitoli<span style="font-family:'Manrope',sans-serif;font-weight:800;color:var(--accent-purple,#7c3aed);letter-spacing:-.5px">.pro</span><span class="topbar-version" style="font-size:10px;font-weight:600;font-family:'Manrope',sans-serif;color:var(--text-soft);margin-left:6px;opacity:.55;letter-spacing:.02em">v49</span></a>
       </div>
       <div style="display:flex;align-items:center;gap:12px">
         <button class="btn-start-session" id="btnStartSession" onclick="toggleStartSession()" style="font-size:15px;height:42px;padding:0 20px;border-radius:12px;background:linear-gradient(135deg,rgba(192,132,252,.18),rgba(192,132,252,.06));color:#c084fc;border:1px solid rgba(192,132,252,.25);font-weight:700;font-family:'Manrope',sans-serif;display:inline-flex;align-items:center;gap:8px;box-shadow:0 0 20px rgba(192,132,252,.12),0 2px 8px rgba(0,0,0,.2);cursor:pointer;letter-spacing:-.01em;transition:all .2s ease" onmouseover="this.style.background='linear-gradient(135deg,rgba(192,132,252,.28),rgba(192,132,252,.12))';this.style.borderColor='rgba(192,132,252,.4)';this.style.boxShadow='0 0 28px rgba(192,132,252,.22),0 4px 12px rgba(0,0,0,.25)'" onmouseout="this.style.background='linear-gradient(135deg,rgba(192,132,252,.18),rgba(192,132,252,.06))';this.style.borderColor='rgba(192,132,252,.25)';this.style.boxShadow='0 0 20px rgba(192,132,252,.12),0 2px 8px rgba(0,0,0,.2)'">
@@ -4204,11 +4204,12 @@
     if (!gseCard) return;
     var valEl = gseCard.querySelector('.metric-value');
     var badgeEl = gseCard.querySelector('.metric-badge-text');
-    var sparkEl = document.getElementById('sparkGSE');
 
     // Default: show calculating
     if (valEl) valEl.textContent = '—';
     if (badgeEl) badgeEl.textContent = 'Calcolo...';
+    // Store GSE value globally so renderMetrics can use it
+    window._gseScore = null;
 
     // Try to compute GSE from session transcripts
     try {
@@ -4248,28 +4249,11 @@
       }
       if (badgeEl) {
         badgeEl.textContent = band;
-        badgeEl.style.background = color + '20';
         badgeEl.style.color = color;
       }
+      // Store globally so renderMetrics can read it
+      window._gseScore = score;
 
-      // Render sparkline from recent session GSE scores
-      if (sparkEl) {
-        var recentGscores = [];
-        for (var j = Math.min(sessions.length - 1, 6); j >= 0; j--) {
-          if (sessions[j] && sessions[j].gse_score) recentGscores.push(sessions[j].gse_score);
-        }
-        if (recentGscores.length > 1) {
-          var maxG = Math.max.apply(null, recentGscores);
-          var minG = Math.min.apply(null, recentGscores);
-          var range = maxG - minG || 1;
-          sparkEl.innerHTML = recentGscores.map(function(gs) {
-            var h = Math.max(10, ((gs - minG) / range) * 100);
-            return '<div class="bar" style="height:' + h + '%;background:' + color + '" title="GSE ' + Math.round(gs) + '"></div>';
-          }).join('');
-        } else {
-          sparkEl.innerHTML = '<div class="bar" style="height:50%"></div><div class="bar" style="height:50%"></div>';
-        }
-      }
     } catch(e) {
       if (badgeEl) badgeEl.textContent = 'Errore';
     }
@@ -4807,26 +4791,29 @@
       // ═══ Metric card selection — switches the big chart ═══
       function selectMetricCard(card) {
         var metric = card.getAttribute('data-metric');
+        // Grab the card's displayed number for the chart total
+        var cardVal = card.querySelector('.metric-value');
+        var cardNumber = cardVal ? cardVal.textContent.trim() : '—';
         // Update selected state — remove from all, add to clicked
         document.querySelectorAll('#pnl-panoramica .metric-card').forEach(function(c){
           c.classList.remove('selected');
           c.style.borderColor = 'var(--line)';
           c.style.borderWidth = '1px';
           c.style.boxShadow = '';
-          c.style.opacity = ''; // reset any dimming
+          c.style.opacity = '';
         });
         card.classList.add('selected');
         card.style.borderColor = 'var(--cyan)';
         card.style.borderWidth = '2px';
         card.style.boxShadow = '0 0 24px rgba(6,182,212,.12)';
         card.style.opacity = '1';
-        // Update chart
-        renderDailyChart(metric);
+        // Update chart — pass the card's number so the total matches
+        renderDailyChart(metric, cardNumber);
       }
       window.selectMetricCard = selectMetricCard;
 
       // ═══ RENDER: Daily chart — 14-day data for selected metric ═══
-      async function renderDailyChart(metric) {
+      async function renderDailyChart(metric, cardNumber) {
         var container = document.getElementById('dailyChart');
         var totalEl = document.getElementById('dailyChartTotal');
         var titleEl = document.getElementById('dailyChartTitle');
@@ -4889,7 +4876,10 @@
           var maxVal = Math.max.apply(null, days.map(function(d) { return d.value; })) || 1;
           var totalVal = days.reduce(function(s, d) { return s + d.value; }, 0);
           if (totalEl) {
-            if (metric === 'totalWords') {
+            // Use the card's displayed number for consistency
+            if (cardNumber && cardNumber !== '—') {
+              totalEl.textContent = cardNumber;
+            } else if (metric === 'totalWords') {
               totalEl.textContent = totalVal > 999 ? (totalVal / 1000).toFixed(1) + 'k' : totalVal;
             } else if (metric === 'totalMinutes') {
               totalEl.textContent = fmtMinutes(totalVal);
