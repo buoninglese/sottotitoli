@@ -1847,91 +1847,76 @@
         <div class="content-panel" id="pnl-wordbanks">
           <section class="panel-head"><h2>Word banks</h2></section>
           <section class="panel-tabs"><div class="tabs" role="tablist">
-            <button role="tab" aria-selected="true" class="tab-link active" data-subtab="wb-overview">🇬🇧 English Collection</button>
-            <button role="tab" aria-selected="false" class="tab-link" data-subtab="wb-overview-it">🇮🇹 Italian Collection</button>
+            <button role="tab" aria-selected="true" class="tab-link active" data-subtab="wb-overview">English</button>
+            <button role="tab" aria-selected="false" class="tab-link" data-subtab="wb-overview-it">Italiano</button>
           </div></section>
-          <!-- Subtab: English Collection -->
           <div role="tabpanel" class="subtab-pane active" id="sub-wb-overview" data-wb-lang="en">
-            <div class="wb-search-bar">
-              <div class="wb-filter-chips">
-                <button class="fchip active" onclick="filterWbType(this,'all')" data-i18n="wb_filter_all">All</button>
-                <button class="fchip" onclick="filterWbType(this,'pinned')" data-i18n="wb_filter_pinned">Pinned</button>
-                <button class="fchip" onclick="filterWbType(this,'smart')" data-i18n="wb_filter_smart">Smart</button>
-                <button class="fchip" onclick="filterWbType(this,'custom')" data-i18n="wb_filter_yours">Yours</button>
-              </div>
-              <input class="wb-search-input" id="wbSearchInput" placeholder="Cerca banche o parole…" oninput="filterWordbanks()">
-            </div>
-            <div id="wordbanksOverview">
-              <div class="wb-section" data-section="pinned" id="wbPinnedSection">
-                <div class="wb-section-head"><h3 data-i18n="wb_pinned">Pinned</h3><span class="section-badge badge-pinned" data-i18n="wb_pinned_sub">Always available</span></div>
-                <div class="wb-grid" id="wbPinnedGrid"></div>
-              </div>
-              <div class="wb-section" data-section="smart" id="wbSmartSection">
-                <div class="wb-section-head"><h3 data-i18n="wb_smart">Smart</h3><span class="section-badge badge-smart" data-i18n="wb_smart_sub">Suggested by Sottotitoli</span></div>
-                <div class="wb-grid" id="wbSmartGrid"></div>
-              </div>
-              <div class="wb-section" data-section="custom" id="wbCustomSection">
-                <div class="wb-section-head"><h3 data-i18n="wb_yours">Yours</h3><span class="section-badge badge-custom" data-i18n="wb_yours_sub">Your collections</span></div>
-                <div class="wb-grid" id="wbCustomGrid"></div>
-              </div>
-            </div>
-            <!-- Inside-bank view -->
-            <div id="wbInsideView" style="display:none"></div>
+            <div id="wbEnContent"><p style="text-align:center;color:var(--text-faint);padding:40px">Loading word banks...</p></div>
+            <script>
+              (function(){
+                var lang = 'en';
+                function esc(s){ return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
+                function loadAll(){
+                  if(!window.SottotitoliData||!window.SottotitoliData.getWordbanks){setTimeout(loadAll,300);return;}
+                  window.SottotitoliData.getWordbanks(lang).then(function(banks){
+                    banks=banks||[];
+                    var pinned=banks.filter(function(b){return b.type==='pinned';});
+                    var smart=banks.filter(function(b){return b.type==='smart';});
+                    var custom=banks.filter(function(b){return b.type==='custom';});
+                    // Stats bar
+                    var statsHtml='<div style="display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-bottom:24px">';
+                    [{l:'Total',v:banks.length,c:'var(--text)'},{l:'Due Today',v:'—',c:'#E11D48'},{l:'New Week',v:'—',c:'var(--text)'},{l:'Mastery',v:'—',c:'var(--text)'},{l:'Learning',v:'—',c:'var(--cyan)'}].forEach(function(s){
+                      statsHtml+='<div style="background:var(--card);border:1px solid var(--line);padding:14px 16px;border-radius:8px"><span style="font-size:10px;font-weight:700;font-family:\'Manrope\',sans-serif;color:var(--text-soft);text-transform:uppercase;letter-spacing:.05em">'+s.l+'</span><div style="font-size:18px;font-weight:700;color:'+s.c+';margin-top:2px">'+s.v+'</div></div>';
+                    });
+                    statsHtml+='</div>';
+                    // Pinned
+                    statsHtml+='<div style="background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:20px;margin-bottom:24px"><div style="display:flex;align-items:center;gap:8px;margin-bottom:16px"><span class="material-symbols-outlined" style="color:var(--cyan)">push_pin</span><h3 style="font-size:13px;font-weight:700;font-family:\'Manrope\',sans-serif;text-transform:uppercase;letter-spacing:.03em;color:var(--text-soft);margin:0">Pinned Collections</h3></div>';
+                    if(pinned.length){
+                      pinned.forEach(function(b){
+                        var due=b.due_count||0;
+                        statsHtml+='<div style="background:var(--card);border:1px solid var(--line);border-radius:8px;padding:12px 16px;display:flex;align-items:center;gap:16px;cursor:pointer;margin-bottom:4px" onmouseover="this.style.borderColor=\'var(--cyan)\'" onmouseout="this.style.borderColor=\'var(--line)\'" onclick="wbOpenBank(\''+b.id+'\')">'+
+                          '<span class="material-symbols-outlined" style="color:var(--cyan);font-size:18px">'+(b.icon||'folder')+'</span>'+
+                          '<div style="flex:1;min-width:0"><div style="font-weight:700;font-size:14px;color:var(--text)">'+esc(b.name||'Bank')+'</div><div style="font-size:11px;color:var(--text-soft)">'+esc(b.description||'')+'</div></div>'+
+                          '<div style="display:flex;align-items:center;gap:20px;flex-shrink:0"><div style="text-align:center"><span style="font-size:9px;font-weight:700;font-family:\'Manrope\',sans-serif;color:var(--text-soft);text-transform:uppercase">Words</span><div style="font-size:13px;font-weight:700;color:var(--text)">'+(b.word_count||0)+'</div></div>'+
+                          (due>0?'<div style="text-align:right"><span style="font-size:9px;font-weight:700;font-family:\'Manrope\',sans-serif;color:#E11D48;text-transform:uppercase">'+due+' to do</span></div>':'<span style="font-size:10px;font-weight:600;color:var(--text-soft);font-family:\'Manrope\',sans-serif">Up to date</span>')+
+                          '</div><button style="padding:6px 14px;background:rgba(6,182,212,.1);color:var(--cyan);border:none;border-radius:6px;font-size:11px;font-weight:700;font-family:\'Manrope\',sans-serif;cursor:pointer;white-space:nowrap">Open</button></div>';
+                      });
+                    }else{statsHtml+='<p style="text-align:center;color:var(--text-faint);padding:16px;font-size:12px">No pinned banks yet.</p>';}
+                    statsHtml+='</div>';
+                    // Discovery + sidebar
+                    statsHtml+='<div style="display:grid;grid-template-columns:2fr 1fr;gap:24px;margin-bottom:24px"><div><h3 style="font-size:13px;font-weight:700;font-family:\'Manrope\',sans-serif;text-transform:uppercase;letter-spacing:.03em;color:var(--text-soft);margin:0 0 16px">Discovery</h3><div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">';
+                    smart.concat(custom.slice(0,4)).slice(0,6).forEach(function(b){
+                      statsHtml+='<div style="background:var(--card);border:1px solid var(--line);border-radius:10px;padding:18px;cursor:pointer" onmouseover="this.style.borderColor=\'var(--cyan)\';this.style.transform=\'translateY(-2px)\'" onmouseout="this.style.borderColor=\'var(--line)\';this.style.transform=\'\'" onclick="wbOpenBank(\''+b.id+'\')">'+
+                        '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px"><span class="material-symbols-outlined" style="color:var(--cyan);font-size:24px">auto_awesome</span><span style="font-size:9px;font-weight:700;background:var(--text);color:var(--card);padding:2px 6px;border-radius:4px;font-family:\'Manrope\',sans-serif;text-transform:uppercase">'+(b.type||'smart').toUpperCase()+'</span></div>'+
+                        '<div style="font-weight:700;font-size:14px;color:var(--text);margin-bottom:4px">'+esc(b.name||'Bank')+'</div><div style="font-size:11px;color:var(--text-soft);margin-bottom:12px">'+esc(b.description||'')+'</div>'+
+                        '<div style="display:flex;justify-content:space-between;align-items:center;border-top:1px solid var(--line);padding-top:10px"><span style="font-size:10px;font-weight:600;font-family:\'Manrope\',sans-serif;color:var(--text-soft)">'+(b.word_count||0)+' words</span><span style="font-size:11px;font-weight:700;color:var(--cyan);font-family:\'Manrope\',sans-serif">Open</span></div></div>';
+                    });
+                    statsHtml+='</div></div><div style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:20px"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px"><h3 style="font-size:11px;font-weight:700;font-family:\'Manrope\',sans-serif;text-transform:uppercase;letter-spacing:.05em;color:var(--text-soft);margin:0">Your Banks</h3><button onclick="wbNewBank()" style="background:none;border:none;color:var(--cyan);cursor:pointer;padding:4px"><span class="material-symbols-outlined" style="font-size:20px">add_circle</span></button></div>';
+                    if(custom.length){
+                      custom.slice(0,5).forEach(function(b){
+                        statsHtml+='<div style="display:flex;align-items:center;gap:10px;padding:8px 10px;cursor:pointer;border-radius:6px;margin-bottom:4px" onmouseover="this.style.background=\'var(--bg)\'" onmouseout="this.style.background=\'\'" onclick="wbOpenBank(\''+b.id+'\')"><span class="material-symbols-outlined" style="font-size:16px;color:var(--text-soft)">label</span><div style="flex:1;min-width:0"><div style="font-size:12px;font-weight:600;color:var(--text)">'+esc(b.name||'Bank')+'</div></div><span style="font-size:10px;font-weight:700;color:var(--cyan);font-family:\'Manrope\',sans-serif;white-space:nowrap">'+(b.word_count||0)+' w</span></div>';
+                      });
+                    }else{statsHtml+='<p style="text-align:center;color:var(--text-faint);padding:16px;font-size:12px">No banks yet.</p>';}
+                    statsHtml+='<div style="border-top:1px solid var(--line);margin-top:16px;padding-top:16px"><button onclick="alert(\'Import coming soon\')" style="width:100%;padding:10px;background:var(--bg);border:1px dashed var(--line);border-radius:8px;cursor:pointer;font-size:11px;font-weight:600;font-family:\'Manrope\',sans-serif;color:var(--text-soft);display:flex;align-items:center;justify-content:center;gap:6px"><span class="material-symbols-outlined" style="font-size:16px">upload_file</span> Import from text</button></div></div></div>';
+                    // Full library
+                    statsHtml+='<div><h3 style="font-size:13px;font-weight:700;font-family:\'Manrope\',sans-serif;text-transform:uppercase;letter-spacing:.03em;color:var(--text-soft);margin:0 0 16px">Full Library</h3><div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px">';
+                    statsHtml+='<div style="background:var(--bg);border:1px dashed var(--line);border-radius:10px;padding:24px;display:flex;align-items:center;justify-content:center;cursor:pointer;min-height:100px" onclick="wbNewBank()"><span class="material-symbols-outlined" style="font-size:24px;color:var(--text-soft);margin-right:8px">add_circle</span><span style="font-size:12px;font-weight:700;font-family:\'Manrope\',sans-serif;color:var(--text-soft);text-transform:uppercase">Create New Bank</span></div>';
+                    banks.slice(0,7).forEach(function(b){
+                      statsHtml+='<div style="background:var(--card);border:1px solid var(--line);border-radius:10px;padding:16px;cursor:pointer" onmouseover="this.style.borderColor=\'var(--cyan)\'" onmouseout="this.style.borderColor=\'var(--line)\'" onclick="wbOpenBank(\''+b.id+'\')"><div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px"><span style="font-size:10px;font-weight:700;background:rgba(6,182,212,.1);color:var(--cyan);padding:2px 6px;border-radius:4px;font-family:\'Manrope\',sans-serif">'+(b.cefr_level||'—')+'</span></div><div style="font-weight:700;font-size:13px;color:var(--text);margin-bottom:4px">'+esc(b.name||'Bank')+'</div><div style="display:flex;justify-content:space-between;font-size:10px;color:var(--text-soft)"><span>'+(b.word_count||0)+' words</span><span style="font-weight:600;color:#10B981">Ready</span></div></div>';
+                    });
+                    statsHtml+='</div></div>';
+                    document.getElementById('wbEnContent').innerHTML=statsHtml;
+                  }).catch(function(){document.getElementById('wbEnContent').innerHTML='<p style="text-align:center;color:var(--text-faint);padding:40px">Unable to load word banks.</p>';});
+                }
+                loadAll();
+                window.wbNewBank=function(){var n=prompt('Bank name:');if(!n||!(n=n.trim()))return;if(window.SottotitoliData&&window.SottotitoliData.createWordbank){window.SottotitoliData.createWordbank(n,lang).then(function(){loadAll();}).catch(function(){alert('Error');});}};
+                window.wbOpenBank=function(id){alert('Open bank detail: '+id);};
+              })();
+            </script>
           </div>
-          <!-- Subtab: Italian Collection -->
           <div role="tabpanel" class="subtab-pane" id="sub-wb-overview-it" data-wb-lang="it">
-            <div class="wb-search-bar">
-              <div class="wb-filter-chips">
-                <button class="fchip active" onclick="filterWbTypeIt(this,'all')">Tutte</button>
-                <button class="fchip" onclick="filterWbTypeIt(this,'pinned')">Pinned</button>
-                <button class="fchip" onclick="filterWbTypeIt(this,'smart')">Smart</button>
-                <button class="fchip" onclick="filterWbTypeIt(this,'custom')">Proprie</button>
-              </div>
-              <input class="wb-search-input" id="wbItSearchInput" placeholder="Cerca banche o parole italiane…" oninput="filterWordbanksIt()">
-            </div>
-            <div id="wordbanksItOverview">
-              <div class="wb-section" data-section="pinned" id="wbItPinnedSection">
-                <div class="wb-section-head"><h3>Pinned</h3><span class="section-badge badge-pinned">Sempre disponibile</span></div>
-                <div class="wb-grid" id="wbItPinnedGrid"></div>
-              </div>
-              <div class="wb-section" data-section="smart" id="wbItSmartSection">
-                <div class="wb-section-head"><h3>Smart</h3><span class="section-badge badge-smart">Suggerito da Sottotitoli</span></div>
-                <div class="wb-grid" id="wbItSmartGrid"></div>
-              </div>
-              <div class="wb-section" data-section="custom" id="wbItCustomSection">
-                <div class="wb-section-head"><h3>Proprie</h3><span class="section-badge badge-custom">Le tue collezioni</span></div>
-                <div class="wb-grid" id="wbItCustomGrid"></div>
-              </div>
-            </div>
-            <div id="wbItInsideView" style="display:none"></div>
+            <div style="text-align:center;padding:60px 20px;color:var(--text-faint)"><span style="font-size:48px;display:block;margin-bottom:12px">🇮🇹</span><p style="font-size:14px">Italian word banks coming soon.</p></div>
           </div>
-          <!-- Subtab: Translation Word Banks — REMOVED, merged into English/Italian collections -->
-          <!-- Subtab: Review Due — driven by review subsystem, with classic fallback -->
-          <div role="tabpanel" class="subtab-pane" id="sub-wb-review">
-            <section id="reviewDashboardMount">
-              <!-- Classic fallback (hidden once review subsystem mounts) -->
-              <div id="wbReviewClassicFallback">
-                <div class="wb-stats" id="wbReviewStats"></div>
-                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:10px">
-                  <h3 style="margin:0;font-size:18px;font-weight:700">⏰ Parole da ripassare</h3>
-                  <div style="display:flex;gap:8px;flex-wrap:wrap">
-                    <button class="btn btn-ghost btn-sm" onclick="renderReviewDue()" style="font-family:var(--font-ui)"><i class="fa-solid fa-rotate"></i> Refresh</button>
-                    <button class="btn btn-primary btn-sm" id="btnReviewAllDue" onclick="reviewAllDue()" style="font-family:var(--font-ui)"><i class="fa-solid fa-check"></i> Segna tutte come ripassate</button>
-                  </div>
-                </div>
-                <div class="bulk-bar" id="wbReviewBulkBar"><span id="wbReviewBulkCount">0 selezionate</span><button onclick="wbReviewBulkDone()">✓ Fatto</button><button class="bulk-close" onclick="wbReviewClearSelection()">&times;</button></div>
-                <div class="wb-table-wrap"><table class="wb-table"><thead><tr><th class="cb"><input type="checkbox" onchange="wbReviewToggleAll(this)" style="accent-color:var(--cyan)"></th><th class="sortable" data-sort="word">Parola <span class="sort-arrow">▲</span></th><th class="sortable" data-sort="cefr">CEFR <span class="sort-arrow">▲</span></th><th class="sortable" data-sort="pos">POS <span class="sort-arrow">▲</span></th><th class="sortable" data-sort="lastReview">Ultimo ripasso <span class="sort-arrow">▲</span></th><th class="sortable" data-sort="interval">Intervallo SRS <span class="sort-arrow">▲</span></th><th class="sortable" data-sort="status">Stato <span class="sort-arrow">▲</span></th><th></th></tr></thead><tbody id="wbReviewBody"></tbody></table></div>
-                <div id="wbReviewEmpty" style="display:none;text-align:center;padding:40px 20px;color:var(--text-faint)">
-                  <div style="font-size:48px;margin-bottom:12px">🎉</div>
-                  <h3 style="color:var(--text-soft);margin-bottom:6px">Tutto in ordine!</h3>
-                  <p style="font-size:14px;max-width:400px;margin:0 auto;line-height:1.5">Nessuna parola da ripassare oggi. Torna domani o inizia una nuova sessione per aggiungere parole.</p>
-                </div>
-              </div>
-            </section>
-            <div id="reviewSessionMount"></div>
-          </div>
-          <!-- Word detail drawer is inside .main-panel (absolute positioned relative to it) -->
-        </div>
         <div class="content-panel" id="pnl-vocabulary-builder">
           <section class="panel-head"><h2>Vocabulary Builder</h2></section>
           <section class="panel-tabs"><div class="tabs" role="tablist"><button role="tab" aria-selected="true" class="tab-link active" data-subtab="wb-expand" style="color:var(--cyan)">🇬🇧 English</button><button role="tab" aria-selected="false" class="tab-link" data-subtab="wb-expand-it" style="color:var(--accent-green)">🇮🇹 Italian</button><button role="tab" aria-selected="false" class="tab-link" data-subtab="wb-explore" style="color:var(--purple)">🗺️ Esplora</button></div></section>
