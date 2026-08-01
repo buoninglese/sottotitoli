@@ -2424,6 +2424,45 @@
               </div>
             </div>
           </div>
+          <!-- ═══ VT Errors subtab ═══ -->
+          <div role="tabpanel" class="subtab-pane" id="sub-vt-errors">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:10px">
+              <h3 style="margin:0;font-size:18px;font-weight:700">Errori frequenti</h3>
+            </div>
+            <div id="vtErrorsContent">
+              <p style="text-align:center;padding:40px 20px;color:var(--text-faint);font-size:13px">Caricamento errori...</p>
+            </div>
+            <script>
+              (function(){
+                function loadErrors(){
+                  var el = document.getElementById('vtErrorsContent');
+                  if (!el) return;
+                  if (window.SottotitoliData && window.SottotitoliData.getCommonErrors) {
+                    window.SottotitoliData.getCommonErrors().then(function(errors){
+                      if (!errors || !errors.length) {
+                        el.innerHTML = '<p style="text-align:center;padding:40px 20px;color:var(--text-faint);font-size:14px">Nessun errore comune rilevato nelle tue trascrizioni. Continua cos\u00ec! \uD83C\uDF89</p>';
+                        return;
+                      }
+                      var html = '<div style="display:flex;flex-direction:column;gap:8px">';
+                      errors.forEach(function(e){
+                        html += '<div style="background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px 18px;display:flex;align-items:center;gap:14px">'+
+                          '<div style="flex:1"><div style="font-size:14px;font-weight:600;color:var(--text)">'+(e.error||e.word||'Error')+'</div><div style="font-size:12px;color:var(--text-soft);margin-top:2px">'+(e.correction||e.suggestion||'')+'</div></div>'+
+                          '<div style="font-size:11px;font-weight:600;color:var(--text-soft);font-family:\'Manrope\',sans-serif">'+((e.count||e.frequency||'')+'x').trim()+'</div>'+
+                        '</div>';
+                      });
+                      html += '</div>';
+                      el.innerHTML = html;
+                    }).catch(function(){
+                      el.innerHTML = '<p style="text-align:center;padding:40px 20px;color:var(--text-faint);font-size:13px">Unable to load errors. Try again later.</p>';
+                    });
+                  } else {
+                    setTimeout(loadErrors, 300);
+                  }
+                }
+                loadErrors();
+              })();
+            </script>
+          </div>
           <!-- ═══ CEFR Vocabulary Explorer ═══ -->
           <div role="tabpanel" class="subtab-pane" id="sub-wb-explore">
             <div class="wb-stats" id="cefrTopicStats" style="margin-bottom:14px;display:none"></div>
@@ -5734,41 +5773,7 @@
 
       // (trDeleteSession now handled by inline script in pnl-trascrizioni)
 
-      // ── Select all / bulk delete ──
-      window.trToggleSelectAll = function(masterCb) {
-        document.querySelectorAll('#trSessionsBody .tr-session-cb').forEach(function(cb){ cb.checked = masterCb.checked; });
-        trUpdateBulkBar();
-      };
-      window.trUpdateBulkBar = function() {
-        var bar = document.getElementById('trBulkBar');
-        var count = document.getElementById('trBulkCount');
-        var checked = document.querySelectorAll('#trSessionsBody .tr-session-cb:checked');
-        if (bar && count) {
-          if (checked.length > 0) {
-            bar.classList.add('active');
-            var label = (typeof I18n !== 'undefined' && I18n.t ? I18n.t('tr_bulk_selected') : 'selezionate');
-            count.textContent = checked.length + ' ' + label;
-          }
-          else { bar.classList.remove('active'); }
-        }
-      };
-      window.trClearSelection = function() {
-        document.querySelectorAll('#trSessionsBody .tr-session-cb').forEach(function(cb){ cb.checked = false; });
-        var master = document.getElementById('trSelectAll'); if (master) master.checked = false;
-        trUpdateBulkBar();
-      };
-      window.trBulkDelete = async function() {
-        var checked = document.querySelectorAll('#trSessionsBody .tr-session-cb:checked');
-        if (!checked.length) return;
-        if (!confirm('Eliminare ' + checked.length + ' sessione/i selezionata/e?')) return;
-        var sb = window.sottotitoliSupabase;
-        if (!sb) return;
-        for (var i = 0; i < checked.length; i++) {
-          var sid = checked[i].getAttribute('data-sid');
-          try { await sb.from('sessions').delete().eq('id', sid); } catch(e) {}
-        }
-        renderTrascrizioni();
-      };
+      // (trToggleSelectAll + trUpdateBulkBar + trBulkDelete now handled by inline script)
 
       // ── Rename session ──
       window.trRenameSession = function(sid, btn) {
