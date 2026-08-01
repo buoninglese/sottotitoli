@@ -839,7 +839,7 @@
   <div class="app-shell">
     <header class="topbar">
       <div style="display:flex;align-items:center;gap:0">
-        <a href="index.html" class="topbar-brand" style="font-size:31px;font-family:'Manrope',sans-serif;font-weight:700;text-decoration:none;letter-spacing:-0.02em;display:inline-flex;align-items:baseline;gap:0">sottotitoli<span style="font-family:'Manrope',sans-serif;font-weight:800;color:var(--accent-purple,#7c3aed);letter-spacing:-.5px">.pro</span><span class="topbar-version" style="font-size:10px;font-weight:600;font-family:'Manrope',sans-serif;color:var(--text-soft);margin-left:6px;opacity:.55;letter-spacing:.02em">v11</span></a>
+        <a href="index.html" class="topbar-brand" style="font-size:31px;font-family:'Manrope',sans-serif;font-weight:700;text-decoration:none;letter-spacing:-0.02em;display:inline-flex;align-items:baseline;gap:0">sottotitoli<span style="font-family:'Manrope',sans-serif;font-weight:800;color:var(--accent-purple,#7c3aed);letter-spacing:-.5px">.pro</span><span class="topbar-version" style="font-size:10px;font-weight:600;font-family:'Manrope',sans-serif;color:var(--text-soft);margin-left:6px;opacity:.55;letter-spacing:.02em">v12</span></a>
       </div>
       <div style="display:flex;align-items:center;gap:12px">
         <button class="btn-start-session" id="btnStartSession" onclick="toggleStartSession()" style="font-size:15px;height:42px;padding:0 20px;border-radius:12px;background:linear-gradient(135deg,rgba(192,132,252,.18),rgba(192,132,252,.06));color:#c084fc;border:1px solid rgba(192,132,252,.25);font-weight:700;font-family:'Manrope',sans-serif;display:inline-flex;align-items:center;gap:8px;box-shadow:0 0 20px rgba(192,132,252,.12),0 2px 8px rgba(0,0,0,.2);cursor:pointer;letter-spacing:-.01em;transition:all .2s ease" onmouseover="this.style.background='linear-gradient(135deg,rgba(192,132,252,.28),rgba(192,132,252,.12))';this.style.borderColor='rgba(192,132,252,.4)';this.style.boxShadow='0 0 28px rgba(192,132,252,.22),0 4px 12px rgba(0,0,0,.25)'" onmouseout="this.style.background='linear-gradient(135deg,rgba(192,132,252,.18),rgba(192,132,252,.06))';this.style.borderColor='rgba(192,132,252,.25)';this.style.boxShadow='0 0 20px rgba(192,132,252,.12),0 2px 8px rgba(0,0,0,.2)'">
@@ -10401,14 +10401,19 @@
     var grid = document.getElementById('cefrTopicGrid');
     if (!grid) return;
     try {
-      _cefrCategories = await cachedCefrFetch(_cefrApi + '/categories?counts=1');
+      var controller = new AbortController();
+      var timeout = setTimeout(function(){ controller.abort(); }, 8000);
+      var resp = await fetch(_cefrApi + '/categories?counts=1', { signal: controller.signal });
+      clearTimeout(timeout);
+      if (!resp.ok) throw new Error('HTTP ' + resp.status);
+      _cefrCategories = await resp.json();
       if (!_cefrCategories || !_cefrCategories.length) {
         grid.innerHTML = '<span style="font-size:13px;color:var(--text-faint)">Nessuna categoria disponibile.</span>';
         return;
       }
       renderCefrTopicPills();
     } catch(e) {
-      grid.innerHTML = '<span style="font-size:13px;color:var(--text-faint)">Errore nel caricamento degli argomenti.</span>';
+      grid.innerHTML = '<span style="font-size:13px;color:var(--text-faint)">Servizio CEFR non disponibile. Riprova più tardi.</span>';
     }
   }
 
@@ -10722,6 +10727,7 @@
   document.querySelector('[data-subtab="vt-review"]')?.addEventListener('click', function(){ setTimeout(function(){ if(window.renderVTReviewDue) window.renderVTReviewDue(); }, 100); });
 
   // Expose to global
+  window.loadCefrTopics = loadCefrTopics;
   window.filterCefrTopics = filterCefrTopics;
   window.toggleCefrRelevance = toggleCefrRelevance;
   window.openCefrTopic = openCefrTopic;
