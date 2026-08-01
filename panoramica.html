@@ -1603,7 +1603,7 @@
               <span style="font-size:11px;color:var(--text-faint)">Traduci le parole da ripassare — risposte corrette = ✓ Fatto automatico</span>
             </div>
             <!-- Quiz player (hidden by default) -->
-            <div id="vtQuizPlayer" style="display:none;background:var(--panel);border:2px solid var(--teal);border-radius:16px;padding:24px 20px 18px;margin-bottom:16px">
+            <div id="vtReviewQuizPlayer" style="display:none;background:var(--panel);border:2px solid var(--teal);border-radius:16px;padding:24px 20px 18px;margin-bottom:16px">
               <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px">
                 <span style="font-family:var(--font-mono);font-size:11px;font-weight:500;color:var(--teal);text-transform:uppercase;letter-spacing:.06em" id="vtQuizCounter">Parola 1 di 10</span>
                 <span style="font-family:var(--font-mono);font-size:15px;font-weight:600;color:var(--amber)" id="vtQuizScore">0/0</span>
@@ -5800,7 +5800,7 @@
         window._vtQuizAnswers = quizWords.map(function(){ return { chosen: null, correct: false }; });
         window._vtQuizActive = true;
 
-        document.getElementById('vtQuizPlayer').style.display = '';
+        document.getElementById('vtReviewQuizPlayer').style.display = '';
         document.getElementById('vtQuizModeBar').style.display = 'flex';
         document.getElementById('vtReviewCards').style.display = 'none';
         document.getElementById('vtReviewGuide').style.display = 'none';
@@ -5815,7 +5815,7 @@
 
       window.vtQuizCancel = function() {
         window._vtQuizActive = false;
-        document.getElementById('vtQuizPlayer').style.display = 'none';
+        document.getElementById('vtReviewQuizPlayer').style.display = 'none';
         document.getElementById('vtQuizModeBar').style.display = 'none';
         document.getElementById('vtReviewCards').style.display = '';
         document.getElementById('vtReviewGuide').style.display = '';
@@ -9947,6 +9947,230 @@
     }, 2000);
   })();
   </script>
+
+<!-- 🎯 QUIZ MAKER — standalone, guaranteed to execute 🎯 -->
+<script>
+(function(){
+  'use strict';
+  var _vtQuizKey = 'sottotitoli_vt_quizzes';
+  var _vtQuizResultsKey = 'sottotitoli_vt_quiz_results';
+  var _vtQCurrent = null, _vtQIdx = 0, _vtQAnswers = [], _vtQTimer = 0, _vtQInterval = null, _vtQFinished = false;
+  var _vtEditingId = null;
+
+  var VT_BUILTIN_QUIZZES = [
+    { id:'vtb1', builtin:true, title:'Verbi Italiani Essenziali', cat:'Vocabolario · Italiano', badge:'Popolare', questions:[
+      {q:'Qual è il participio passato di "scrivere"?', opts:['Scrivuto','Scritto','Scrivato','Scrivendo'], correct:1},
+      {q:'Cosa significa "mangiare"?', opts:['To drink','To sleep','To eat','To run'], correct:2},
+      {q:'Prima persona di "essere" al presente?', opts:['Sono','Sei','È','Siamo'], correct:0},
+      {q:'Come si dice "they go"?', opts:['Vanno','Andate','Vanno loro','Andiamo'], correct:0},
+      {q:'Quale è un verbo riflessivo?', opts:['Correre','Alzarsi','Dormire','Parlare'], correct:1}
+    ]},
+    { id:'vtb2', builtin:true, title:'Preposizioni — Il Grande Quiz', cat:'Grammatica · B1', badge:'Nuovo', questions:[
+      {q:'Vado ___ Roma domani.', opts:['in','a','di','da'], correct:1},
+      {q:'Il libro è ___ tavolo.', opts:['sul','nel','al','dal'], correct:0},
+      {q:'Parto ___ casa alle otto.', opts:['in','a','da','di'], correct:2},
+      {q:'Parlo ___ mio amico.', opts:['con','per','di','a'], correct:0},
+      {q:'Questo regalo è ___ te.', opts:['a','di','per','con'], correct:2}
+    ]},
+    { id:'vtb3', builtin:true, title:"Quanto Conosci l'Italia?", cat:'Cultura · Italia', badge:'Gratuito', questions:[
+      {q:"Capitale d'Italia?", opts:['Milano','Napoli','Roma','Firenze'], correct:2},
+      {q:'Dove si trova il Colosseo?', opts:['Venezia','Roma','Firenze','Milano'], correct:1},
+      {q:'Famoso piatto di riso?', opts:['Pasta','Pizza','Risotto','Polenta'], correct:2},
+      {q:'Chi dipinse la Cappella Sistina?', opts:['Leonardo','Raffaello','Michelangelo','Donatello'], correct:2},
+      {q:"Quante regioni ha l'Italia?", opts:['18','20','21','22'], correct:1}
+    ]}
+  ];
+
+  function vtQmLoad() { try { return JSON.parse(localStorage.getItem(_vtQuizKey)) || VT_BUILTIN_QUIZZES.slice(); } catch(e) { return VT_BUILTIN_QUIZZES.slice(); } }
+  function vtQmSave(d) { localStorage.setItem(_vtQuizKey, JSON.stringify(d)); }
+  function vtQmLoadResults() { try { var r=JSON.parse(localStorage.getItem(_vtQuizResultsKey)); return r||{done:0,correct:0,total:0,best:0}; } catch(e) { return {done:0,correct:0,total:0,best:0}; } }
+  function vtQmSaveResults(r) { localStorage.setItem(_vtQuizResultsKey, JSON.stringify(r)); }
+  function vtQmFormatTime(s){ var m=Math.floor(s/60); var sec=String(s%60).padStart(2,'0'); return String(m).padStart(2,'0')+':'+sec; }
+  function vtQmEsc(s){ return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+  function vtQmRenderQ() {
+    var qz=_vtQCurrent; if(!qz)return;
+    var q=qz.questions[_vtQIdx];
+    document.getElementById('vtQNum').textContent='Domanda ' + (_vtQIdx+1) + ' di ' + qz.questions.length;
+    document.getElementById('vtQText').textContent=q.q;
+    var markers=['A','B','C','D'];
+    document.getElementById('vtQOptions').innerHTML = q.opts.map(function(opt,i){
+      var cls=''; if(_vtQAnswers[_vtQIdx]===i) cls+=' selected';
+      if(_vtQFinished){ if(i===q.correct)cls+=' correct'; else if(_vtQAnswers[_vtQIdx]===i)cls+=' incorrect'; }
+      var sel=_vtQFinished?'':'onclick="window.vtQmSelect('+i+')"';
+      return '<div class="option-item'+cls.replace(/ /g,' option-item-')+'" '+sel+' style="display:flex;align-items:center;gap:10px;padding:12px 14px;border:1.5px solid var(--line);border-radius:10px;font-size:14px;cursor:pointer;transition:all .15s"><span style="width:24px;height:24px;border-radius:50%;border:2px solid var(--line);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;flex-shrink:0;color:var(--text-faint)">'+markers[i]+'</span> '+opt+'</div>';
+    }).join('');
+    vtQmRenderDots();
+    document.getElementById('vtQNextBtn').style.display=_vtQIdx===qz.questions.length-1?'none':'';
+    document.getElementById('vtQFinishBtn').style.display=_vtQIdx===qz.questions.length-1?'':'none';
+  }
+
+  function vtQmRenderDots(){
+    var qz=_vtQCurrent; if(!qz)return;
+    document.getElementById('vtQDots').innerHTML=qz.questions.map(function(_,i){
+      var cls=''; if(i===_vtQIdx)cls+='curr'; if(_vtQAnswers[i]>=0)cls+=' done';
+      return '<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:'+(cls.indexOf('curr')>=0?'var(--amber)':cls.indexOf('done')>=0?'var(--teal)':'var(--line)')+'"></span>';
+    }).join('');
+  }
+
+  function vtQmUpdateResults(){
+    var r=vtQmLoadResults();
+    var elDone=document.getElementById('vtResDone'); if(elDone)elDone.textContent=r.done;
+    var elTotal=document.getElementById('vtResTotal'); if(elTotal)elTotal.textContent=r.total;
+    var elAvg=document.getElementById('vtResAvg'); if(elAvg)elAvg.textContent=r.total>0?Math.round(r.correct/r.total*100)+'%':'—';
+    var elBest=document.getElementById('vtResBest'); if(elBest)elBest.textContent=r.best>0?r.best+'%':'—';
+  }
+
+  function vtQmResetPlayer(){
+    _vtQCurrent=null;_vtQIdx=0;_vtQAnswers=[];_vtQFinished=false;clearInterval(_vtQInterval);
+    var p=document.getElementById('vtQuizPlayer'); if(p)p.style.display='none';
+    var e=document.getElementById('vtQuizEmpty'); if(e)e.style.display='';
+  }
+
+  // ── Public API (on window) ──
+  window.vtQmRender = function() {
+    var quizzes = vtQmLoad();
+    var grid = document.getElementById('vtQuizGrid');
+    var countEl = document.getElementById('vtQuizCount');
+    if (!grid) return;
+    if (countEl) countEl.textContent = '(' + quizzes.length + ' disponibili)';
+    grid.innerHTML = quizzes.map(function(qz) {
+      var qc = (qz.questions||[]).length;
+      var badgeH = qz.badge ? '<span style="position:absolute;top:8px;right:8px;font-size:9px;font-weight:700;padding:2px 8px;border-radius:99px;background:var(--amber);color:#fff">'+qz.badge+'</span>' : '';
+      return '<article class="alt-card" style="cursor:pointer;position:relative;padding:16px" onclick="window.vtQmStart(\''+qz.id+'\')">'+badgeH+
+        '<div style="font-size:10px;font-weight:600;color:var(--teal);text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px">'+(qz.cat||'Senza categoria')+'</div>'+
+        '<h3 style="margin:0 0 4px;font-size:15px">'+qz.title+'</h3>'+
+        '<div style="display:flex;gap:12px;font-size:11px;color:var(--text-faint);margin-top:8px">'+
+        '<span><i class="fa-regular fa-clock"></i> ~'+Math.round(qc*0.6)+' min</span>'+
+        '<span><i class="fa-regular fa-circle-question"></i> '+qc+' domande</span>'+
+        (qz.builtin?'':'<span style="color:var(--purple)"><i class="fa-solid fa-user-pen"></i> Tuo</span>')+
+        '</div></article>';
+    }).join('');
+    vtQmUpdateResults();
+  };
+
+  window.vtQmStart = function(qid) {
+    var quizzes = vtQmLoad();
+    var qz = quizzes.find(function(q){return q.id===qid;});
+    if (!qz||!qz.questions||!qz.questions.length) return;
+    _vtQCurrent = qz; _vtQIdx = 0; _vtQAnswers = new Array(qz.questions.length).fill(-1);
+    _vtQFinished = false; _vtQTimer = 0;
+    clearInterval(_vtQInterval);
+    _vtQInterval = setInterval(function(){_vtQTimer++;var el=document.getElementById('vtQTimer');if(el)el.textContent=vtQmFormatTime(_vtQTimer);},1000);
+    var p=document.getElementById('vtQuizPlayer'); if(p)p.style.display='';
+    var e=document.getElementById('vtQuizEmpty'); if(e)e.style.display='none';
+    var t=document.getElementById('vtQTimer'); if(t)t.textContent='00:00';
+    vtQmRenderQ();
+  };
+
+  window.vtQmSelect = function(i){ if(_vtQFinished)return; _vtQAnswers[_vtQIdx]=i; vtQmRenderQ(); };
+  window.vtQmNext = function(){ if(_vtQCurrent&&_vtQIdx<_vtQCurrent.questions.length-1){_vtQIdx++;vtQmRenderQ();} };
+  window.vtQmPrev = function(){ if(_vtQIdx>0){_vtQIdx--;vtQmRenderQ();} };
+
+  window.vtQmFinish = function(){
+    _vtQFinished=true; clearInterval(_vtQInterval);
+    var qz=_vtQCurrent; if(!qz)return;
+    var correct=0;
+    qz.questions.forEach(function(q,i){if(_vtQAnswers[i]===q.correct)correct++;});
+    var pct=Math.round(correct/qz.questions.length*100);
+    var r=vtQmLoadResults(); r.done++; r.correct+=correct; r.total+=qz.questions.length;
+    if(pct>r.best)r.best=pct; vtQmSaveResults(r);
+    vtQmRenderQ();
+    var circle=document.getElementById('vtQScoreCircle');
+    if(circle){
+      circle.textContent=pct+'%';
+      circle.style.borderColor=pct>=80?'var(--green)':pct>=50?'var(--amber)':'var(--red)';
+      circle.style.color=pct>=80?'var(--green)':pct>=50?'var(--amber)':'var(--red)';
+    }
+    var titleEl=document.getElementById('vtQCompleteTitle');
+    if(titleEl)titleEl.textContent=pct>=90?'Eccellente! 🎉':pct>=70?'Ottimo! 👏':pct>=50?'Buon impegno! 💪':'Continua! 📚';
+    var textEl=document.getElementById('vtQCompleteText');
+    if(textEl)textEl.textContent=correct+' su '+qz.questions.length+' corrette in '+vtQmFormatTime(_vtQTimer)+'.';
+    var completeEl=document.getElementById('vtQuizComplete');
+    if(completeEl)completeEl.style.display='flex';
+    vtQmUpdateResults();
+  };
+
+  window.vtQmRestart = function(){ var el=document.getElementById('vtQuizComplete'); if(el)el.style.display='none'; if(_vtQCurrent) window.vtQmStart(_vtQCurrent.id); };
+  window.vtQmCloseComplete = function(){ var el=document.getElementById('vtQuizComplete'); if(el)el.style.display='none'; vtQmResetPlayer(); };
+
+  window.vtQmOpenCreate = function(qid){
+    _vtEditingId=qid||null;
+    var modal=document.getElementById('vtQuizModal'); if(!modal)return;
+    var titleEl=document.getElementById('vtQuizModalTitle');
+    if(titleEl)titleEl.innerHTML=qid?'<i class="fa-solid fa-pen-to-square"></i> Modifica Quiz':'<i class="fa-solid fa-plus"></i> Crea Quiz';
+    var qz=qid?(vtQmLoad().find(function(q){return q.id===qid})):null;
+    var t=document.getElementById('vtQuizTitle'); if(t)t.value=qz?qz.title:'';
+    var c=document.getElementById('vtQuizCat'); if(c)c.value=qz?qz.cat:'';
+    vtQmBuildQBlocks(qz?qz.questions:[{q:'',opts:['','','',''],correct:0}]);
+    modal.style.display='flex';
+  };
+
+  window.vtQmCloseModal = function(){ var m=document.getElementById('vtQuizModal'); if(m)m.style.display='none'; _vtEditingId=null; };
+
+  window.vtQmAddQ = function(qData){
+    qData=qData||{q:'',opts:['','','',''],correct:0};
+    var c=document.getElementById('vtQuizQBlocks'); if(!c)return;
+    var i=c.children.length;
+    var d=document.createElement('div');
+    d.style.cssText='border:1px solid var(--line);border-radius:10px;padding:10px;margin-bottom:8px;position:relative';
+    d.innerHTML='<span style="font-size:10px;font-weight:700;color:var(--teal)">Domanda '+(i+1)+'</span><button onclick="this.parentElement.remove();window.vtQmRenumber()" style="position:absolute;top:6px;right:8px;background:none;border:none;color:var(--text-faint);cursor:pointer;font-size:14px">&times;</button>'+
+      '<input class="vtq-qtext" value="'+vtQmEsc(qData.q)+'" placeholder="Testo..." style="width:100%;margin:4px 0 6px;padding:6px 10px;border-radius:6px;border:1px solid var(--line);background:var(--bg);color:var(--text);font-size:13px;font-family:var(--font-ui)">'+
+      ['A','B','C','D'].map(function(m,j){return '<div style="display:flex;align-items:center;gap:6px;margin-bottom:3px"><span style="font-size:10px;font-weight:700;width:16px;color:var(--text-faint)">'+m+'</span><input class="vtq-opt" value="'+vtQmEsc(qData.opts[j]||'')+'" placeholder="Opzione '+m+'..." style="flex:1;padding:4px 8px;border-radius:6px;border:1px solid var(--line);background:var(--bg);color:var(--text);font-size:12px;font-family:var(--font-ui)"><input type="radio" name="vtq-correct-'+i+'" value="'+j+'" '+(qData.correct===j?'checked':'')+' title="Corretta"></div>';}).join('');
+    c.appendChild(d);
+  };
+
+  function vtQmBuildQBlocks(qs){ var c=document.getElementById('vtQuizQBlocks'); if(c){c.innerHTML=''; qs.forEach(function(q){window.vtQmAddQ(q);});} }
+
+  window.vtQmRenumber = function(){
+    var blocks=document.getElementById('vtQuizQBlocks'); if(!blocks)return;
+    for(var i=0;i<blocks.children.length;i++){
+      var span=blocks.children[i].querySelector('span'); if(span)span.textContent='Domanda '+(i+1);
+      var radios=blocks.children[i].querySelectorAll('input[type=radio]');
+      for(var j=0;j<radios.length;j++)radios[j].name='vtq-correct-'+i;
+    }
+  };
+
+  window.vtQmSave = function(){
+    var titleEl=document.getElementById('vtQuizTitle');
+    var title=titleEl?titleEl.value.trim():''; if(!title)return;
+    var blocks=document.getElementById('vtQuizQBlocks'); if(!blocks||!blocks.children.length)return;
+    var questions=[];
+    for(var i=0;i<blocks.children.length;i++){
+      var b=blocks.children[i];
+      var qEl=b.querySelector('.vtq-qtext'); var qText=qEl?qEl.value.trim():''; if(!qText)continue;
+      var opts=Array.from(b.querySelectorAll('.vtq-opt')).map(function(el){return el.value.trim()});
+      var correctRb=b.querySelector('input[type=radio]:checked'); var correct=correctRb?parseInt(correctRb.value)||0:0;
+      questions.push({q:qText,opts:opts,correct:correct});
+    }
+    if(!questions.length)return;
+    var quizzes=vtQmLoad();
+    if(_vtEditingId){
+      var idx=quizzes.findIndex(function(q){return q.id===_vtEditingId});
+      if(idx>=0){
+        quizzes[idx].title=title;
+        var catEl=document.getElementById('vtQuizCat'); quizzes[idx].cat=catEl?catEl.value.trim():'';
+        quizzes[idx].questions=questions;
+      }
+    } else {
+      var catEl2=document.getElementById('vtQuizCat');
+      quizzes.push({id:'vtc'+Date.now(),title:title,cat:catEl2?catEl2.value.trim():'',questions:questions});
+    }
+    vtQmSave(quizzes); window.vtQmCloseModal(); window.vtQmRender();
+  };
+
+  window.vtQmReset = function(){
+    localStorage.removeItem(_vtQuizKey);
+    localStorage.removeItem(_vtQuizResultsKey);
+    window.vtQmRender();
+  };
+
+  // Auto-render if the Quiz tab is open on load
+  if (document.querySelector('[data-subtab="vt-quiz"]')) {
+    setTimeout(function(){ window.vtQmRender(); }, 100);
+  }
+})();
+</script>
 
 </body>
 </html>
