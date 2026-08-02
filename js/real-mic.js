@@ -186,6 +186,8 @@ function _endSupabaseSession(data) {
     || localStorage.getItem('sottotitoli-caption-session')
     || localStorage.getItem('sottotitoli-translate-session');
   
+  console.log('💾 _endSupabaseSession called. sessionId:', sessionId, 'lines:', (data.lines||[]).length, 'duration:', data.durationSeconds);
+  
   if (!sessionId) {
     console.warn('⚠ No session ID found — session may not have been created. Trying fallback save.');
     _fallbackSaveSession(data);
@@ -440,16 +442,23 @@ window.addEventListener('beforeunload', function() {
       || '';
   } catch(e) {}
 
-  // Always save to localStorage as fallback (even 0 lines — tracks duration)
+  // Only save to localStorage if there's actual content (lines or duration > 0).
+  // Empty sessions (0 lines, 0 seconds) are noise — skip them.
+  var hasContent = (lines && lines.length > 0) || secs > 0;
   try {
-    var payload = {
-      sessionId: activeSessionId || null,
-      lines: lines,
-      durationSeconds: secs,
-      lang: (typeof currentCaptionLang !== 'undefined') ? currentCaptionLang : 'en-US',
-      savedAt: Date.now()
-    };
-    localStorage.setItem('sottotitoli-pending-session', JSON.stringify(payload));
+    if (hasContent && activeSessionId) {
+      var payload = {
+        sessionId: activeSessionId,
+        lines: lines,
+        durationSeconds: secs,
+        lang: (typeof currentCaptionLang !== 'undefined') ? currentCaptionLang : 'en-US',
+        savedAt: Date.now()
+      };
+      localStorage.setItem('sottotitoli-pending-session', JSON.stringify(payload));
+    } else {
+      // Clean up any stale empty pending session
+      localStorage.removeItem('sottotitoli-pending-session');
+    }
   } catch(e) {}
 
   // If we have a session ID, try direct Supabase REST save + credit deduction
@@ -517,10 +526,23 @@ function _recoverPendingSession(supabaseClient) {
     var raw = localStorage.getItem('sottotitoli-pending-session');
     if (!raw) return;
     var payload = JSON.parse(raw);
+    console.log('🔄 Recovery: found pending session. lines:', (payload.lines||[]).length, 'duration:', payload.durationSeconds, 'sessionId:', payload.sessionId);
     localStorage.removeItem('sottotitoli-pending-session');
+
+    // Skip recovery if truly empty (no lines AND no duration)
+    if (!payload || (!payload.lines || !payload.lines.length) && !(payload.durationSeconds > 0)) {
+      console.log('🔄 Recovery: skipping — empty session (no lines, no duration)');
+      if (payload && payload.sessionId) {
+        // Still close the orphaned session row if one exists
+        _finalizeOrphanedSession(supabaseClient, payload);
+      }
+      return;
+    }
+
     if (!payload || !payload.lines || !payload.lines.length) {
       // Even with 0 lines, if there was a session ID, close it with the duration
       if (payload && payload.sessionId && (payload.durationSeconds || 0) > 0) {
+        console.log('🔄 Recovery: closing orphaned session (no transcript, ' + payload.durationSeconds + 's)');
         _finalizeOrphanedSession(supabaseClient, payload);
       }
       return;
