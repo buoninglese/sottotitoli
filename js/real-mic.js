@@ -307,37 +307,75 @@ function _fallbackSaveSession(data) {
   });
 }
 
-// ═══ Minutes deduction from user_credits ═══
+// ═══ Minutes deduction from user_credits (atomic CAS with retry) ═══
 function _deductSessionMinutes(durationSeconds) {
   if (!window.sottotitoliSupabase || durationSeconds <= 0) return;
+  
+  var totalSeconds = Math.ceil(durationSeconds);
+  var minutesUsed = totalSeconds > 0 ? Math.max(1, Math.floor(totalSeconds / 60)) : 0;
+  if (!minutesUsed) return;
   
   window.sottotitoliSupabase.auth.getSession().then(function(r) {
     if (!r.data?.session) return;
     var userId = r.data.session.user.id;
-    
-    // Round up any fractional seconds to full seconds, then accumulate into full minutes.
-    // Minimum 1 minute deducted if any time was used at all.
-    var totalSeconds = Math.ceil(durationSeconds);
-    var minutesUsed = totalSeconds > 0 ? Math.max(1, Math.floor(totalSeconds / 60)) : 0;
-    
-    // Get current balance
-    window.sottotitoliSupabase.from('user_credits')
-      .select('balance_minutes')
-      .eq('user_id', userId)
-      .maybeSingle()
-      .then(function(cr) {
-        var currentBalance = cr.data?.balance_minutes || 0;
-        var newBalance = Math.max(0, currentBalance - minutesUsed);
-        
-        // Update balance
-        window.sottotitoliSupabase.from('user_credits')
-          .upsert({ user_id: userId, balance_minutes: newBalance, updated_at: new Date().toISOString() }, { onConflict: 'user_id' })
-          .then(function() {
-            // Update all credit displays across the UI
-            _refreshCreditDisplays(newBalance);
-          });
-      });
+    _atomicDeductCredits(userId, minutesUsed, 0);
   });
+}
+
+// CAS loop: read balance, subtract, write only if unchanged. Retry on conflict.
+function _atomicDeductCredits(userId, minutesUsed, retries) {
+  if (retries >= 3) { console.error('❌ Credit deduction failed after 3 CAS retries'); return; }
+  var sb = window.sottotitoliSupabase;
+  if (!sb) return;
+
+  sb.from('user_credits')
+    .select('balance_minutes')
+    .eq('user_id', userId)
+    .maybeSingle()
+    .then(function(cr) {
+      if (cr.error) { console.error('Credit read failed:', cr.error.message); return; }
+
+      var currentBalance = cr.data?.balance_minutes;
+      if (currentBalance === null || currentBalance === undefined) {
+        // No credit row yet — create one with initial 15 min minus this session.
+        // Only insert if row still doesn't exist (race-safe for new users).
+        var initialBalance = Math.max(0, 15 - minutesUsed);
+        sb.from('user_credits')
+          .insert({ user_id: userId, balance_minutes: initialBalance, updated_at: new Date().toISOString() })
+          .select()
+          .then(function(ins) {
+            if (ins.error && ins.error.code === '23505') {
+              // Row was created between our check and insert — retry
+              _atomicDeductCredits(userId, minutesUsed, retries + 1);
+              return;
+            }
+            if (!ins.error) _refreshCreditDisplays(initialBalance);
+          });
+        return;
+      }
+
+      var newBalance = Math.max(0, currentBalance - minutesUsed);
+
+      // CAS: only update if balance hasn't changed since we read it
+      sb.from('user_credits')
+        .update({ balance_minutes: newBalance, updated_at: new Date().toISOString() })
+        .eq('user_id', userId)
+        .eq('balance_minutes', currentBalance)
+        .select()
+        .then(function(upd) {
+          if (upd.error) { console.error('Deduction update failed:', upd.error.message); return; }
+          if (!upd.data || upd.data.length === 0) {
+            // CAS conflict — balance was changed by another operation, retry
+            console.warn('⚠ Credit CAS conflict (retry ' + (retries + 1) + '/3)');
+            _atomicDeductCredits(userId, minutesUsed, retries + 1);
+            return;
+          }
+          console.log('💰 Deducted ' + minutesUsed + ' min — balance: ' + newBalance);
+          _refreshCreditDisplays(newBalance);
+        });
+    }).catch(function(err) {
+      console.error('Credit deduction error:', err);
+    });
 }
 
 // ═══ Refresh credit/minutes displays across the page ═══
@@ -377,33 +415,118 @@ function _refreshCreditDisplays(newMinutesBalance) {
 }
 
 // ═══ Page-unload cleanup — stop mic + save session when user leaves ═══
-// beforeunload: fires on tab close / navigation
-// IMPORTANT: sync operations only — we dump state to localStorage.
-// Recovery happens on next page load via _recoverPendingSession().
+// beforeunload: fires on tab close / navigation. We use fetch+keepalive
+// to save the session AND deduct credits synchronously via Supabase REST API.
+// Falls back to localStorage recovery if the fetch can't complete.
 window.addEventListener('beforeunload', function() {
-  // Stop mic
+  // Stop mic synchronously
   if (_realMic.recognition) {
     try { _realMic.recognition.stop(); } catch(e) {}
     _realMic.recognition = null;
   }
-  // Save pending session data so it's not lost if user closes during recording
+  if (_realMic.stream) {
+    try { _realMic.stream.getTracks().forEach(function(t){ t.stop(); }); } catch(e) {}
+    _realMic.stream = null;
+  }
+
+  // Gather session state (may be undefined if toggleSession hasn't run yet)
+  var lines = (typeof window !== 'undefined' && window._sessionLines) ? window._sessionLines : [];
+  var secs = (typeof sessionSeconds !== 'undefined') ? sessionSeconds : 0;
+  var activeSessionId = '';
   try {
-    var lines = window._sessionLines;
-    var activeSessionId = localStorage.getItem('sottotitoli-active-session')
-      || localStorage.getItem('sottotitoli-caption-session')
-      || localStorage.getItem('sottotitoli-translate-session');
-    if (lines && lines.length > 0 && activeSessionId) {
-      var payload = {
-        sessionId: activeSessionId,
-        lines: lines,
-        durationSeconds: (typeof sessionSeconds !== 'undefined') ? sessionSeconds : 0,
-        lang: (typeof currentCaptionLang !== 'undefined') ? currentCaptionLang : 'en-US',
-        savedAt: Date.now()
-      };
-      localStorage.setItem('sottotitoli-pending-session', JSON.stringify(payload));
-    }
-  } catch(e) { /* silent — best effort */ }
+    activeSessionId = localStorage.getItem('sottotitoli-caption-session')
+      || localStorage.getItem('sottotitoli-active-session')
+      || localStorage.getItem('sottotitoli-translate-session')
+      || '';
+  } catch(e) {}
+
+  // Always save to localStorage as fallback (even 0 lines — tracks duration)
+  try {
+    var payload = {
+      sessionId: activeSessionId || null,
+      lines: lines,
+      durationSeconds: secs,
+      lang: (typeof currentCaptionLang !== 'undefined') ? currentCaptionLang : 'en-US',
+      savedAt: Date.now()
+    };
+    localStorage.setItem('sottotitoli-pending-session', JSON.stringify(payload));
+  } catch(e) {}
+
+  // If we have a session ID, try direct Supabase REST save + credit deduction
+  if (activeSessionId && window.sottotitoliSupabase) {
+    _emergencySaveViaFetch(activeSessionId, lines, secs);
+  }
 });
+
+// Direct Supabase REST API save — uses fetch+keepalive for beforeunload reliability
+function _emergencySaveViaFetch(sessionId, lines, durationSeconds) {
+  var SUPABASE_URL = 'https://qzqmuegbpmvqrjrlfbgk.supabase.co';
+  var ANON_KEY = 'sb_publishable_l-PG1wsO1FMWADK9GVBqoQ_0EtPA2K7';
+
+  // Extract user JWT from Supabase's localStorage (format: sb-<ref>-auth-token)
+  var accessToken = '';
+  try {
+    var authKey = 'sb-qzqmuegbpmvqrjrlfbgk-auth-token';
+    var raw = localStorage.getItem(authKey);
+    if (raw) {
+      var parsed = JSON.parse(raw);
+      accessToken = parsed.access_token || '';
+    }
+  } catch(e) {}
+
+  if (!accessToken) return; // can't auth — will rely on recovery fallback
+
+  var authHeaders = {
+    'Content-Type': 'application/json',
+    'apikey': ANON_KEY,
+    'Authorization': 'Bearer ' + accessToken,
+    'Prefer': 'return=minimal'
+  };
+
+  // 1) Save session
+  var fullText = lines.map(function(l) { return l.en || l.text || l || ''; }).filter(Boolean).join('\n');
+  var allWords = fullText.toLowerCase().match(/[a-zàèéìòù]{2,}/g) || [];
+  var sessionBody = JSON.stringify({
+    ended_at: new Date().toISOString(),
+    transcript_text: fullText || null,
+    words_count: allWords.length || 0,
+    duration_seconds: durationSeconds || 0,
+    wpm: durationSeconds > 0 ? Math.round((allWords.length / durationSeconds) * 60) : 0
+  });
+
+  fetch(SUPABASE_URL + '/rest/v1/sessions?id=eq.' + encodeURIComponent(sessionId), {
+    method: 'PATCH',
+    headers: authHeaders,
+    body: sessionBody,
+    keepalive: true
+  }).catch(function(){});
+
+  // 2) Deduct credits (only if duration > 0)
+  if (durationSeconds > 0) {
+    var totalSecs = Math.ceil(durationSeconds);
+    var minsToDeduct = Math.max(1, Math.floor(totalSecs / 60));
+
+    // Read current balance, then deduct via CAS
+    fetch(SUPABASE_URL + '/rest/v1/user_credits?select=balance_minutes&user_id=eq.' + encodeURIComponent(accessToken), {
+      method: 'GET',
+      headers: authHeaders,
+      keepalive: true
+    }).then(function(res) { return res.json(); }).then(function(data) {
+      var currentBalance = (data && data[0]) ? data[0].balance_minutes : 15;
+      var newBalance = Math.max(0, currentBalance - minsToDeduct);
+      var creditBody = JSON.stringify({
+        balance_minutes: newBalance,
+        updated_at: new Date().toISOString()
+      });
+      return fetch(SUPABASE_URL + '/rest/v1/user_credits?user_id=eq.' + encodeURIComponent(accessToken), {
+        method: 'PATCH',
+        headers: authHeaders,
+        body: creditBody,
+        keepalive: true
+      });
+    }).catch(function(){});
+  }
+}
 
 // ═══ Recover pending session on page load ═══
 // Called by caption-s8t.html and other session pages on init.
@@ -413,7 +536,13 @@ function _recoverPendingSession(supabaseClient) {
     if (!raw) return;
     var payload = JSON.parse(raw);
     localStorage.removeItem('sottotitoli-pending-session');
-    if (!payload || !payload.sessionId || !payload.lines || !payload.lines.length) return;
+    if (!payload || !payload.lines || !payload.lines.length) {
+      // Even with 0 lines, if there was a session ID, close it with the duration
+      if (payload && payload.sessionId && (payload.durationSeconds || 0) > 0) {
+        _finalizeOrphanedSession(supabaseClient, payload);
+      }
+      return;
+    }
 
     // Restore session ID
     localStorage.setItem('sottotitoli-caption-session', payload.sessionId);
@@ -439,7 +568,7 @@ function _recoverPendingSession(supabaseClient) {
     }
     updateObj.metrics_version = 2;
 
-    // Save via sendBeacon for reliability, or fetch fallback
+    // Save via Supabase client, then deduct credits
     if (supabaseClient && typeof supabaseClient === 'object') {
       supabaseClient
         .from('sessions')
@@ -447,6 +576,8 @@ function _recoverPendingSession(supabaseClient) {
         .eq('id', payload.sessionId)
         .then(function() {
           console.log('🔄 Recovered session:', payload.sessionId);
+          // Deduct credits for the recovered session
+          _deductSessionMinutes(payload.durationSeconds || 0);
         }).catch(function(e) {
           console.warn('Failed to recover session:', e.message);
         });
@@ -454,6 +585,24 @@ function _recoverPendingSession(supabaseClient) {
   } catch(e) {
     console.warn('Session recovery failed:', e.message);
   }
+}
+
+// Finalize an orphaned session that has duration but no transcript lines
+function _finalizeOrphanedSession(supabaseClient, payload) {
+  if (!supabaseClient || !payload.sessionId) return;
+  supabaseClient
+    .from('sessions')
+    .update({
+      ended_at: new Date().toISOString(),
+      duration_seconds: payload.durationSeconds || 0
+    })
+    .eq('id', payload.sessionId)
+    .then(function() {
+      console.log('🔄 Closed orphaned session:', payload.sessionId);
+      _deductSessionMinutes(payload.durationSeconds || 0);
+    }).catch(function(e) {
+      console.warn('Failed to close orphaned session:', e.message);
+    });
 }
 
 // ═══ Force-finalize timer — restarts recognition after silence to flush results ═══
