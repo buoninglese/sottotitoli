@@ -458,7 +458,10 @@ window.addEventListener('beforeunload', function() {
   }
 });
 
-// Direct Supabase REST API save — uses fetch+keepalive for beforeunload reliability
+// Direct Supabase REST API save — uses fetch+keepalive for beforeunload reliability.
+// Saves the SESSION only (ended_at, transcript, duration).
+// Credit deduction is NOT attempted here — it's handled by _recoverPendingSession
+// on the next page load, which uses the proper CAS+retry path.
 function _emergencySaveViaFetch(sessionId, lines, durationSeconds) {
   var SUPABASE_URL = 'https://qzqmuegbpmvqrjrlfbgk.supabase.co';
   var ANON_KEY = 'sb_publishable_l-PG1wsO1FMWADK9GVBqoQ_0EtPA2K7';
@@ -483,7 +486,7 @@ function _emergencySaveViaFetch(sessionId, lines, durationSeconds) {
     'Prefer': 'return=minimal'
   };
 
-  // 1) Save session
+  // Save session with ended_at + transcript + duration
   var fullText = lines.map(function(l) { return l.en || l.text || l || ''; }).filter(Boolean).join('\n');
   var allWords = fullText.toLowerCase().match(/[a-zàèéìòù]{2,}/g) || [];
   var sessionBody = JSON.stringify({
@@ -501,31 +504,10 @@ function _emergencySaveViaFetch(sessionId, lines, durationSeconds) {
     keepalive: true
   }).catch(function(){});
 
-  // 2) Deduct credits (only if duration > 0)
-  if (durationSeconds > 0) {
-    var totalSecs = Math.ceil(durationSeconds);
-    var minsToDeduct = Math.max(1, Math.floor(totalSecs / 60));
-
-    // Read current balance, then deduct via CAS
-    fetch(SUPABASE_URL + '/rest/v1/user_credits?select=balance_minutes&user_id=eq.' + encodeURIComponent(accessToken), {
-      method: 'GET',
-      headers: authHeaders,
-      keepalive: true
-    }).then(function(res) { return res.json(); }).then(function(data) {
-      var currentBalance = (data && data[0]) ? data[0].balance_minutes : 15;
-      var newBalance = Math.max(0, currentBalance - minsToDeduct);
-      var creditBody = JSON.stringify({
-        balance_minutes: newBalance,
-        updated_at: new Date().toISOString()
-      });
-      return fetch(SUPABASE_URL + '/rest/v1/user_credits?user_id=eq.' + encodeURIComponent(accessToken), {
-        method: 'PATCH',
-        headers: authHeaders,
-        body: creditBody,
-        keepalive: true
-      });
-    }).catch(function(){});
-  }
+  // Credit deduction happens on next page load via _recoverPendingSession →
+  // _deductSessionMinutes → _atomicDeductCredits (CAS + retry).
+  // We intentionally do NOT deduct here because beforeunload doesn't allow
+  // the multiple round-trips needed for a proper CAS loop.
 }
 
 // ═══ Recover pending session on page load ═══
