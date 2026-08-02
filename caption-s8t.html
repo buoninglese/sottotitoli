@@ -4213,7 +4213,20 @@ async function _checkCreditsBeforeStart() {
     if (!userId) return true; // not logged in
     var cr = await sb.from('user_credits').select('balance_minutes').eq('user_id', userId).maybeSingle();
     var balance = cr.data?.balance_minutes;
-    if (balance == null) return true; // no record yet — first use
+    if (balance == null) {
+      // No credit row — new user. Ensure initUserCredits creates the row.
+      if (typeof initUserCredits === 'function') {
+        initUserCredits(userId);
+        // Wait for the insert to complete (brief delay, then re-check)
+        await new Promise(function(resolve) { setTimeout(resolve, 800); });
+        var cr2 = await sb.from('user_credits').select('balance_minutes').eq('user_id', userId).maybeSingle();
+        var balance2 = cr2.data?.balance_minutes;
+        // If row still doesn't exist, allow once (fail-safe)
+        if (balance2 == null) return true;
+        return balance2 > 0;
+      }
+      return true; // fail-safe — allow if initUserCredits not available
+    }
     return balance > 0;
   } catch(e) { return true; } // error — allow on fail-safe
 }
