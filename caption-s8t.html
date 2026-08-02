@@ -386,9 +386,16 @@ body.session-active .caption-transcript:empty::after { content: none; }
 /* Paused state — slightly brighter */
 .btn-pause.paused { background: rgba(245,158,11,.2); color: #fbbf24; border-color: rgba(251,191,36,.4); }
 
+/* Start button — disabled / loading states */
+.btn-start:disabled { opacity: .45; cursor: not-allowed; pointer-events: none; transform: none; }
+.btn-start.loading { opacity: .7; }
+.btn-start.loading i { animation: btnSpin .8s linear infinite; }
+@keyframes btnSpin { to { transform: rotate(360deg); } }
+
 /* Light mode — glass needs slightly more opacity */
 [data-theme="light"] .btn-start { background: rgba(34,197,94,.1); }
 [data-theme="light"] .btn-start:hover { background: rgba(34,197,94,.18); }
+[data-theme="light"] .btn-start:disabled { opacity: .4; }
 [data-theme="light"] .btn-start.danger { background: rgba(239,68,68,.1); }
 [data-theme="light"] .btn-start.danger:hover { background: rgba(239,68,68,.18); }
 [data-theme="light"] .btn-stop { background: rgba(239,68,68,.1); }
@@ -4122,15 +4129,19 @@ async function toggleSession() {
   
   if (sessionActive) {
     paused = false;
-    // Disable start button during async startup to prevent double-clicks
-    if (startBtn) startBtn.disabled = true;
+    // Disable + loading state during async startup (prevents double-clicks)
+    if (startBtn) {
+      startBtn.disabled = true;
+      startBtn.classList.add('loading');
+      startBtn.innerHTML = '<i class="fas fa-spinner"></i> <span data-i18n="starting">Avvio…</span>';
+    }
     // Create Supabase room ONLY when user presses Start (not on page load)
     _createCaptionRoom(currentCaptionLang || 'en-US');
     // ── Start mic (await getUserMedia warm-up + rec.start — both during gesture) ──
     var micOk = await startRealMic();
     if (!micOk) {
       sessionActive = false;
-      if (startBtn) startBtn.disabled = false;
+      if (startBtn) { startBtn.disabled = false; startBtn.classList.remove('loading'); startBtn.innerHTML = '<i class="fas fa-microphone"></i> <span data-i18n="listen">Ascolta</span>'; }
       startBtn.style.display = '';
       stopBtn.style.display = 'none';
     } else {
@@ -4139,7 +4150,7 @@ async function toggleSession() {
         if (!hasCredits) {
           stopRealMic();
           sessionActive = false;
-          if (startBtn) startBtn.disabled = false;
+          if (startBtn) { startBtn.disabled = false; startBtn.classList.remove('loading'); startBtn.innerHTML = '<i class="fas fa-microphone"></i> <span data-i18n="listen">Ascolta</span>'; }
           startBtn.style.display = '';
           stopBtn.style.display = 'none';
           if (pauseBtn) pauseBtn.style.display = 'none';
@@ -4147,12 +4158,12 @@ async function toggleSession() {
           alert('⏰ Nessun credito. Acquista su Purchase.');
           return;
         }
-        // ✅ Mic running + credits OK — just update UI
+        // ✅ Mic running + credits OK — restore button (gets hidden by _applySessionLiveUI)
+        if (startBtn) { startBtn.disabled = false; startBtn.classList.remove('loading'); startBtn.innerHTML = '<i class="fas fa-microphone"></i> <span data-i18n="listen">Ascolta</span>'; }
         _applySessionLiveUI(startBtn, stopBtn);
-        if (startBtn) startBtn.disabled = false;
       }).catch(function(err) {
         console.error('Credit check failed:', err);
-        if (startBtn) startBtn.disabled = false;
+        if (startBtn) { startBtn.disabled = false; startBtn.classList.remove('loading'); startBtn.innerHTML = '<i class="fas fa-microphone"></i> <span data-i18n="listen">Ascolta</span>'; }
       });
     }
   } else {
