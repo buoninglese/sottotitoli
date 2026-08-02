@@ -154,9 +154,15 @@ window.SMART_SUGGESTIONS = (function() {
     var sb = _sb();
     if (!sb) return new Set();
     try {
+      // user_wordbank_words has no user_id column — join through user_wordbanks
+      var { data: banks } = await sb.from('user_wordbanks')
+        .select('id')
+        .eq('user_id', uid);
+      var bankIds = (banks || []).map(function(b) { return b.id; });
+      if (!bankIds.length) return new Set();
       var { data } = await sb.from('user_wordbank_words')
         .select('word')
-        .eq('user_id', uid)
+        .in('wordbank_id', bankIds)
         .limit(2000);
       var s = new Set();
       (data || []).forEach(function(r) { s.add((r.word || '').toLowerCase()); });

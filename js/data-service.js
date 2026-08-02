@@ -145,9 +145,9 @@
 
     var _a = await Promise.all([
       // Unique words per language from user_vocabulary
-      sb().from('user_vocabulary').select('lang, id.count()')
-        .eq('user_id', userId)
-        .order('lang'),
+      // (select all rows and count in JS — avoids PostgREST aggregate 400 on id.count())
+      sb().from('user_vocabulary').select('lang')
+        .eq('user_id', userId),
       // Total words per language from sessions (parse language_pair)
       sb().from('sessions').select('language_pair, words_count')
         .eq('user_id', userId)
@@ -159,7 +159,8 @@
     var uniqueByLang = {};
     if (!vocabR.error && vocabR.data) {
       vocabR.data.forEach(function(row) {
-        uniqueByLang[row.lang] = parseInt(row.count) || 0;
+        var l = row.lang;
+        uniqueByLang[l] = (uniqueByLang[l] || 0) + 1;
       });
     }
 
