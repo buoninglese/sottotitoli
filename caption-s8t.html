@@ -3797,7 +3797,6 @@ document.addEventListener('keydown', function(e) {
   }
 });
 var sessionActive = false;
-var _sessionToggling = false; // guard against double-click during async mic startup
 var timerInterval = null;
 var sessionSeconds = 0;
 var paused = false;
@@ -4098,26 +4097,21 @@ _realMic.onFinal = function(text) {
 updateMicUI('idle');
 
 async function toggleSession() {
-  // Guard: prevent re-entry during async mic startup (avoids premature 0-min session)
-  if (_sessionToggling) { console.warn('toggleSession: already in progress, ignoring'); return; }
-  _sessionToggling = true;
   // In DUO+ mode, only the host can start/stop the session
   if (window._duoMode && !window._duoIsHost) {
     // Invitee: just toggle their own mic
     if (!sessionActive) {
       startRealMic().then(function(ok){
-        if (!ok) { alert('⚠ Mic access denied'); _sessionToggling = false; return; }
+        if (!ok) { alert('⚠ Mic access denied'); return; }
         sessionActive = true;
         var startBtn = document.getElementById('startBtn');
         if (startBtn) { startBtn.textContent = '⏹ Leave'; startBtn.classList.add('danger'); }
-        _sessionToggling = false;
       });
     } else {
       stopRealMic();
       sessionActive = false;
       var startBtn = document.getElementById('startBtn');
       if (startBtn) { startBtn.textContent = '🎤 Join'; startBtn.classList.remove('danger'); }
-      _sessionToggling = false;
     }
     return;
   }
@@ -4128,13 +4122,15 @@ async function toggleSession() {
   
   if (sessionActive) {
     paused = false;
+    // Disable start button during async startup to prevent double-clicks
+    if (startBtn) startBtn.disabled = true;
     // Create Supabase room ONLY when user presses Start (not on page load)
     _createCaptionRoom(currentCaptionLang || 'en-US');
     // ── Start mic (await getUserMedia warm-up + rec.start — both during gesture) ──
     var micOk = await startRealMic();
     if (!micOk) {
       sessionActive = false;
-      _sessionToggling = false;
+      if (startBtn) startBtn.disabled = false;
       startBtn.style.display = '';
       stopBtn.style.display = 'none';
     } else {
@@ -4143,7 +4139,7 @@ async function toggleSession() {
         if (!hasCredits) {
           stopRealMic();
           sessionActive = false;
-          _sessionToggling = false;
+          if (startBtn) startBtn.disabled = false;
           startBtn.style.display = '';
           stopBtn.style.display = 'none';
           if (pauseBtn) pauseBtn.style.display = 'none';
@@ -4153,7 +4149,10 @@ async function toggleSession() {
         }
         // ✅ Mic running + credits OK — just update UI
         _applySessionLiveUI(startBtn, stopBtn);
-        _sessionToggling = false;
+        if (startBtn) startBtn.disabled = false;
+      }).catch(function(err) {
+        console.error('Credit check failed:', err);
+        if (startBtn) startBtn.disabled = false;
       });
     }
   } else {
@@ -4190,7 +4189,6 @@ async function toggleSession() {
     document.body.classList.remove('session-active');
     // Don't clear transcript — user may want to scroll through it after session
     updateListenBar();
-    _sessionToggling = false;
   }
 }
 
