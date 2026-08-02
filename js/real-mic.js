@@ -43,30 +43,13 @@ async function startRealMic() {
   if (_realMic.recognition) return true; // already running
   updateMicUI('requesting');
   
-  // Warm up audio subsystem — critical for Chrome: first rec.start()
-  // silently captures silence if getUserMedia hasn't initialized audio.
-  // Use BlackHole device if system audio mode is active.
-  var audioConstraint = (typeof window !== 'undefined' && window._getAudioSourceConfig)
-    ? window._getAudioSourceConfig()
-    : true;
+  // Always use default mic
   try {
-    _realMic.stream = await navigator.mediaDevices.getUserMedia({ audio: audioConstraint });
+    _realMic.stream = await navigator.mediaDevices.getUserMedia({ audio: true });
   } catch(e) {
-    // If BlackHole device fails, fall back to default mic
-    if (audioConstraint !== true && audioConstraint.deviceId) {
-      console.warn('BlackHole device not available, falling back to default mic:', e.message);
-      try {
-        _realMic.stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      } catch(e2) {
-        console.error('Mic permission denied:', e2);
-        updateMicUI('blocked');
-        return false;
-      }
-    } else {
-      console.error('Mic permission denied:', e);
-      updateMicUI('blocked');
-      return false;
-    }
+    console.error('Mic permission denied:', e);
+    updateMicUI('blocked');
+    return false;
   }
   
   var SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
