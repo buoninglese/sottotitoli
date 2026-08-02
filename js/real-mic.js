@@ -315,8 +315,10 @@ function _deductSessionMinutes(durationSeconds) {
     if (!r.data?.session) return;
     var userId = r.data.session.user.id;
     
-    // Calculate minutes used (round up to nearest minute, minimum 1)
-    var minutesUsed = Math.max(1, Math.ceil(durationSeconds / 60));
+    // Round up any fractional seconds to full seconds, then accumulate into full minutes.
+    // Minimum 1 minute deducted if any time was used at all.
+    var totalSeconds = Math.ceil(durationSeconds);
+    var minutesUsed = totalSeconds > 0 ? Math.max(1, Math.floor(totalSeconds / 60)) : 0;
     
     // Get current balance
     window.sottotitoliSupabase.from('user_credits')
