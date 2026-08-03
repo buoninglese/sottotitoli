@@ -3271,6 +3271,8 @@ function _updateCEFRBars(){
 
 // ═══ Topic Explorer — donut chart + word list ═══
 var _topicCache = null;
+var _topicWordMap = {};  // word → {level, topics[]} from /analyze wordData
+var _topicColorMap = {}; // topic → color from donut chart
 var _topicLastFetch = 0;
 var _topicSelected = null;
 
@@ -3323,6 +3325,16 @@ function _fetchTopics() {
     if (data && data.topicDistribution && Object.keys(data.topicDistribution).length > 0) {
       _topicCache = data.topicDistribution;
       _topicLastFetch = Date.now();
+      // Store word→topic mappings for the right panel
+      if (data.wordData) {
+        _topicWordMap = {};
+        for (var w in data.wordData) {
+          _topicWordMap[w] = {
+            level: data.wordData[w].level,
+            topics: data.wordData[w].topics || []
+          };
+        }
+      }
       _renderTopicDonut(data.topicDistribution);
     } else {
       container.innerHTML = '<div style="text-align:center;padding:20px;color:var(--muted2);font-size:13px">No topics detected yet.<br><span style="font-size:11px">Try speaking for longer — topics need diverse vocabulary.</span></div>';
@@ -3358,6 +3370,7 @@ function _renderTopicDonut(topics) {
     var pct = count / total;
     var dash = pct * circumference;
     var color = colors[i % colors.length];
+    _topicColorMap[topic] = color;
     paths += '<circle cx="' + cx + '" cy="' + cy + '" r="' + r +
       '" fill="none" stroke="' + color + '" stroke-width="' + strokeWidth +
       '" stroke-dasharray="' + dash + ' ' + (circumference - dash) +
@@ -3392,58 +3405,102 @@ function _selectTopic(topic) {
 function _renderTopicWords() {
   var container = document.getElementById('topicWordList');
   if (!container) return;
-  if (!_topicSelected) {
-    container.innerHTML = '<div style="text-align:center;padding:20px;color:var(--muted2);font-size:13px">Click a topic → to see words.</div>';
-    return;
+  
+  // Build word→topics from _topicWordMap (CEFR /analyze wordData with topics)
+  var topicGroups = {}; // topic → [{word, level}]
+  var hasTopicData = false;
+  
+  for (var w in _topicWordMap) {
+    var info = _topicWordMap[w];
+    var topics = info.topics || [];
+    if (topics.length === 0) continue;
+    hasTopicData = true;
+    for (var t = 0; t < topics.length; t++) {
+      var topic = topics[t];
+      if (_topicSelected && topic !== _topicSelected) continue;
+      if (!topicGroups[topic]) topicGroups[topic] = [];
+      topicGroups[topic].push({ word: w, level: info.level || 1 });
+    }
   }
-  var sortBy = (document.getElementById('topicSortSel') || {}).value || 'freq';
   
-  // Collect words from transcript as fallback (always available, no API needed)
-  var words = [];
-  var seen = {};
-  
-  // First try _sessionWordCache (CEFR API data with levels)
-  for (var w in _sessionWordCache) {
-    if (seen[w]) continue; seen[w] = true;
-    var info = _sessionWordCache[w];
-    words.push({ word: w, level: info.level || 1, pos: info.pos || '-' });
-  }
-  
-  // Fallback: extract words from transcript lines if cache is empty
-  if (words.length === 0) {
-    var lines = document.querySelectorAll('#captionTranscript .line');
-    lines.forEach(function(l) {
-      var clone = l.cloneNode(true);
-      clone.querySelectorAll('span,.spk-tag').forEach(function(s) { s.remove(); });
-      (clone.textContent || '').trim().split(/\s+/).forEach(function(w) {
-        var clean = w.replace(/[^a-zA-Z'-]/g, '').toLowerCase();
-        if (clean.length < 2 || seen[clean]) return;
-        seen[clean] = true;
-        words.push({ word: clean, level: 1, pos: '-' });
+  // Fallback: use _sessionWordCache (no topic data) — flat list
+  if (!hasTopicData) {
+    var words = [];
+    var seen = {};
+    for (var w2 in _sessionWordCache) {
+      if (seen[w2]) continue; seen[w2] = true;
+      var inf = _sessionWordCache[w2];
+      words.push({ word: w2, level: inf.level || 1 });
+    }
+    if (words.length === 0) {
+      // Transcript fallback
+      var lines = document.querySelectorAll('#captionTranscript .line');
+      lines.forEach(function(l) {
+        var clone = l.cloneNode(true);
+        clone.querySelectorAll('span,.spk-tag').forEach(function(s) { s.remove(); });
+        (clone.textContent || '').trim().split(/\s+/).forEach(function(w3) {
+          var clean = w3.replace(/[^a-zA-Z'-]/g, '').toLowerCase();
+          if (clean.length < 2 || seen[clean]) return;
+          seen[clean] = true;
+          words.push({ word: clean, level: 1 });
+        });
       });
+    }
+    if (words.length === 0) {
+      container.innerHTML = '<div style="text-align:center;padding:20px;color:var(--muted2);font-size:13px">No words yet. Start speaking to see them here.</div>';
+      return;
+    }
+    // Flat list fallback
+    var sortBy = (document.getElementById('topicSortSel') || {}).value || 'freq';
+    words.sort(function(a, b) { return (b.level || 0) - (a.level || 0); });
+    var html2 = '<div style="font-size:12px;color:var(--muted2);margin-bottom:8px;font-weight:600">' + words.length + ' parole</div>';
+    html2 += '<div style="display:flex;flex-wrap:wrap;gap:5px">';
+    var levelColors = {1:'#22c55e',2:'#a3e635',3:'#facc15',4:'#fb923c',5:'#f87171',6:'#c084fc'};
+    words.forEach(function(w) {
+      var lvl = Math.min(6, Math.max(1, Math.round(w.level) || 1));
+      var color = levelColors[lvl] || '#888';
+      html2 += '<span style="padding:4px 10px;border-radius:99px;font-size:12px;font-weight:500;background:' + color + '18;color:' + color + ';border:1px solid ' + color + '30;cursor:default">' + w.word + '</span>';
     });
-  }
-  
-  if (words.length === 0) {
-    container.innerHTML = '<div style="text-align:center;padding:20px;color:var(--muted2);font-size:13px">No words yet. Start speaking to see them here.</div>';
+    html2 += '</div>';
+    container.innerHTML = html2;
     return;
   }
   
-  if (sortBy === 'level') {
-    words.sort(function(a, b) { return (b.level || 0) - (a.level || 0); });
-  } else {
-    words.sort(function(a, b) { return (b.level || 0) - (a.level || 0); }); // default: by level too (freq = most advanced first)
+  // Sort topics by word count descending
+  var sortedTopics = Object.keys(topicGroups).sort(function(a, b) {
+    return topicGroups[b].length - topicGroups[a].length;
+  });
+  
+  // Sort words within each topic by level
+  for (var t2 = 0; t2 < sortedTopics.length; t2++) {
+    topicGroups[sortedTopics[t2]].sort(function(a, b) { return (b.level || 0) - (a.level || 0); });
   }
   
-  var html = '<div style="font-size:12px;color:var(--muted2);margin-bottom:8px;font-weight:600">' + words.length + ' parole</div>';
-  html += '<div style="display:flex;flex-wrap:wrap;gap:5px">';
-  var levelColors = {1:'#22c55e',2:'#a3e635',3:'#facc15',4:'#fb923c',5:'#f87171',6:'#c084fc'};
-  words.forEach(function(w) {
-    var lvl = Math.min(6, Math.max(1, Math.round(w.level) || 1));
-    var color = levelColors[lvl] || '#888';
-    html += '<span style="padding:4px 10px;border-radius:99px;font-size:12px;font-weight:500;background:' + color + '18;color:' + color + ';border:1px solid ' + color + '30;cursor:default">' + w.word + '</span>';
+  var html = '';
+  // If a specific topic is selected, show a back link
+  if (_topicSelected && sortedTopics.length === 1) {
+    html += '<div style="margin-bottom:10px"><span onclick="_topicSelected=null;_renderTopicWords()" style="cursor:pointer;font-size:12px;color:var(--accent);font-weight:600">← All topics</span></div>';
+  }
+  // Total word count
+  var totalWords = 0;
+  sortedTopics.forEach(function(t) { totalWords += topicGroups[t].length; });
+  html += '<div style="font-size:12px;color:var(--muted2);margin-bottom:10px;font-weight:600">' + totalWords + ' parole in ' + sortedTopics.length + ' temi</div>';
+  
+  sortedTopics.forEach(function(topic) {
+    var color = _topicColorMap[topic] || '#888';
+    var words = topicGroups[topic];
+    html += '<div style="margin-bottom:12px">';
+    html += '<div style="font-weight:700;font-size:13px;color:' + color + ';margin-bottom:6px;display:flex;align-items:center;gap:6px">';
+    html += '<span style="width:8px;height:8px;border-radius:2px;background:' + color + ';flex-shrink:0"></span>';
+    html += topic + ' <span style="font-weight:400;font-size:11px;color:var(--muted2)">(' + words.length + ')</span>';
+    html += '</div>';
+    html += '<div style="display:flex;flex-wrap:wrap;gap:4px">';
+    words.forEach(function(w) {
+      html += '<span style="padding:3px 9px;border-radius:99px;font-size:11px;font-weight:500;background:' + color + '14;color:' + color + ';border:1px solid ' + color + '28;cursor:default">' + w.word + '</span>';
+    });
+    html += '</div></div>';
   });
-  html += '</div>';
+  
   container.innerHTML = html;
 }
 
