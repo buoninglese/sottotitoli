@@ -2866,32 +2866,28 @@
                 var totalCredits = mapping.credits + engineCost;
 
                 // ── Credit Check ──
+                var balance = 0;
                 try {
                   var tokenRes = await sb.rpc('get_token_balance', { p_user_id: uid });
-                  var balance = tokenRes.data;
-                  if (balance === null || balance === undefined) {
-                    // Fallback to direct query
-                    var tb = await sb.from('user_tokens').select('balance').eq('user_id', uid).single();
-                    balance = tb.data ? tb.data.balance : 0;
+                  if (tokenRes.data !== null && tokenRes.data !== undefined) {
+                    balance = tokenRes.data;
                   }
-                  if (balance < totalCredits) {
-                    showToastMsg('⚠️ Crediti insufficienti. Hai ' + balance + ' crediti, servono ' + totalCredits + '.');
-                    if (confirm('Ti servono ' + totalCredits + ' crediti ma ne hai solo ' + balance + '. Vuoi acquistare altri crediti?')) {
-                      window.location.href = 'wallet.html';
-                    }
-                    return;
-                  }
-                } catch(e) {
-                  console.warn('Token balance check failed:', e);
-                  // Try direct query fallback
+                } catch(e) { console.warn('RPC get_token_balance failed:', e.message); }
+
+                // Fallback to direct query if RPC didn't give us a balance
+                if (balance === 0) {
                   try {
-                    var tb2 = await sb.from('user_tokens').select('balance').eq('user_id', uid).single();
-                    var bal2 = tb2.data ? tb2.data.balance : 0;
-                    if (bal2 < totalCredits) {
-                      showToastMsg('⚠️ Crediti insufficienti. Hai ' + bal2 + ' crediti, servono ' + totalCredits + '.');
-                      return;
-                    }
-                  } catch(e2) { console.warn('Token fallback also failed:', e2); }
+                    var tb = await sb.from('user_tokens').select('balance').eq('user_id', uid).single();
+                    if (!tb.error && tb.data) balance = tb.data.balance;
+                  } catch(e2) { console.warn('Token direct query failed:', e2); }
+                }
+
+                if (balance < totalCredits) {
+                  showToastMsg('⚠️ Crediti insufficienti. Hai ' + balance + ' crediti, servono ' + totalCredits + '.');
+                  if (confirm('Ti servono ' + totalCredits + ' crediti ma ne hai solo ' + balance + '. Vuoi acquistare altri crediti?')) {
+                    window.location.href = 'wallet.html';
+                  }
+                  return;
                 }
 
                 // ── Show loading ──
