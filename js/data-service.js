@@ -457,18 +457,16 @@
      WORD BANKS
      ═══════════════════════════════════════════ */
   async function getWordbanks(lang) {
-    try {
-      lang = lang || getStudyLang();
-      var userId = await getUserId();
-      if (!userId) return [];
-      var cacheKey = 'wordbanks_' + lang;
-      var cached = cacheGet(cacheKey);
-      if (cached) return cached;
-      var r = await sb().from('user_wordbanks').select('*').eq('user_id', userId).eq('lang', lang).order('created_at');
-      if (r.error) { console.warn('wordbanks:', r.error.message); return []; }
-      cacheSet(cacheKey, r.data);
-      return r.data || [];
-    } catch(e) { console.warn('getWordbanks:', e.message); return []; }
+    lang = lang || getStudyLang();
+    var userId = await getUserId();
+    if (!userId) return [];
+    var cacheKey = 'wordbanks_' + lang;
+    var cached = cacheGet(cacheKey);
+    if (cached) return cached;
+    var r = await sb().from('user_wordbanks').select('*').eq('user_id', userId).eq('lang', lang).order('created_at');
+    if (r.error) { console.warn('wordbanks:', r.error.message); return []; }
+    cacheSet(cacheKey, r.data);
+    return r.data || [];
   }
 
   async function getWordbankWords(wordbankId) {
