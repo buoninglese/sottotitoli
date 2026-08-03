@@ -93,26 +93,30 @@ async function startRealMic() {
   
   rec.onend = function() {
     // Auto-restart if still supposed to be live.
-    // Chrome may abort recognition on silence — the old instance is dead,
-    // so create a fresh one rather than calling rec.start() on it.
+    // Chrome on Android may abort recognition frequently — delay restart
+    // to prevent tight loops that prevent onresult from ever firing.
     if (_realMic.state === 'live' && _realMic.recognition === rec) {
       _realMic.recognition = null;
       var SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
       if (!SpeechRecognition) return;
-      try {
-        var newRec = new SpeechRecognition();
-        newRec.continuous = true;
-        newRec.interimResults = true;
-        newRec.lang = _realMic.lang || 'en-US';
-        newRec.onresult = _realMic._onresult;
-        newRec.onerror = _realMic._onerror;
-        newRec.onend = _realMic._onend;
-        newRec.start();
-        _realMic.recognition = newRec;
-      } catch(e) {
-        console.error('Speech auto-restart failed:', e);
-        updateMicUI('error');
-      }
+      // 400ms delay prevents tight restart loops on mobile Chrome
+      setTimeout(function() {
+        if (_realMic.state !== 'live') return;
+        try {
+          var newRec = new SpeechRecognition();
+          newRec.continuous = true;
+          newRec.interimResults = true;
+          newRec.lang = _realMic.lang || 'en-US';
+          newRec.onresult = _realMic._onresult;
+          newRec.onerror = _realMic._onerror;
+          newRec.onend = _realMic._onend;
+          newRec.start();
+          _realMic.recognition = newRec;
+        } catch(e) {
+          console.error('Speech auto-restart failed:', e);
+          updateMicUI('error');
+        }
+      }, 400);
     }
   };
   _realMic._onend = rec.onend;
