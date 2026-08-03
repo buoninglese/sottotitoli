@@ -234,7 +234,7 @@
       var s=key==='cap'?document.getElementById('ssCapSpinner'):document.getElementById('ssTrSpinner');
       if(s){
         s.classList.remove('show');
-        var half=s.closest('.ss-content');
+        var half=key==='cap'?document.getElementById('ssCapHalf'):document.getElementById('ssTrHalf');
         if(half){
           half.classList.remove('spinner-open');
           half.style.pointerEvents='none';void half.offsetHeight;half.style.pointerEvents='';
