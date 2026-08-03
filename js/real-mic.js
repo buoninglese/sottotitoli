@@ -248,7 +248,9 @@ function _endSupabaseSession(data) {
         console.error('Session save failed:', upd.error.message);
         return;
       }
-      console.log('✅ Session saved:', sessionId, '| words:', updateObj.words_count, '| duration:', Math.round((updateObj.duration_seconds || 0) / 60) + 'min');
+      var ds = updateObj.duration_seconds || 0;
+      var durLabel = ds < 60 ? ds + 's' : Math.round(ds / 60) + 'min';
+      console.log('✅ Session saved:', sessionId, '| words:', updateObj.words_count, '| duration:', durLabel);
       
       // Clear all session keys
       localStorage.removeItem('sottotitoli-active-session');
