@@ -231,8 +231,8 @@ function _endSupabaseSession(data) {
     if (posCounts.ADJ) updateObj.pos_adjectives = posCounts.ADJ;
     if (posCounts.ADV) updateObj.pos_adverbs = posCounts.ADV;
     
-    // Additional stats — passed pre-computed from studio-caption.html
-    if (data.fillersPerMinute != null) updateObj.filler_count = Math.round(data.fillersPerMinute);
+    // Additional stats — passed pre-computed from caption-s8t.html
+    if (data.fillerCount != null) updateObj.filler_count = data.fillerCount;
     if (data.turnCount != null) updateObj.turn_count = data.turnCount;
     if (data.sentenceMetrics && data.sentenceMetrics.length > 0) updateObj.sentence_metrics = data.sentenceMetrics.slice(0, 50);
     if (data.connectors) updateObj.connectors = data.connectors;
