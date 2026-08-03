@@ -25,7 +25,29 @@ window.sottotitoliSupabase = window.supabase.createClient(
   }
 );
 
-// 1.5) Auth guard — redirect to index if not signed in (skip for index.html)
+// 1.5) Auth bypass — for development/testing without Supabase OAuth
+// Activate via URL: ?bypass_auth=1  or  window.SOTTOTITOLI_BYPASS_AUTH = true
+(function(){
+  var bypass = window.SOTTOTITOLI_BYPASS_AUTH || (window.location.search.indexOf('bypass_auth=1') !== -1);
+  console.log('🔧 Auth bypass check:', { bypass, search: window.location.search, flag: window.SOTTOTITOLI_BYPASS_AUTH });
+  if (!bypass) return;
+  window.SOTTOTITOLI_BYPASS_AUTH = true;
+  var MOCK_USER = {
+    id: '00000000-0000-0000-0000-00000000test',
+    email: 'test@localhost.local',
+    user_metadata: { full_name: 'Test User', avatar_url: '' }
+  };
+  var MOCK_SESSION = { user: MOCK_USER, access_token: 'mock-token', expires_at: 9999999999 };
+  var originalGetSession = window.sottotitoliSupabase.auth.getSession.bind(window.sottotitoliSupabase.auth);
+  window.sottotitoliSupabase.auth.getSession = function() {
+    console.log('🔧 Bypass getSession called — returning mock user');
+    return Promise.resolve({ data: { session: MOCK_SESSION }, error: null });
+  };
+  window.sottotitoliSupabase.auth.getUser = function() {
+    return Promise.resolve({ data: { user: MOCK_USER }, error: null });
+  };
+  console.log('🔧 Auth bypass active — mock user:', MOCK_USER.id);
+})();
 (function(){
   var path = window.location.pathname.replace(/\/$/,'').split('/').pop() || 'index.html';
   // Pages that are publicly accessible (no auth required)
