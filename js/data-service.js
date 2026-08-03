@@ -27,7 +27,10 @@
   async function getUserId() {
     if (!sb()) return null;
     var r = await sb().auth.getSession();
-    return r.data?.session?.user?.id || null;
+    var id = r.data?.session?.user?.id || null;
+    // Block mock/test IDs from hitting Supabase
+    if (id && (String(id).startsWith('mock-') || String(id).startsWith('00000000-'))) return null;
+    return id;
   }
 
   async function getUserEmail() {
