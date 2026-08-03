@@ -25,12 +25,14 @@
   function sb() { return window.sottotitoliSupabase; }
 
   async function getUserId() {
-    if (!sb()) return null;
-    var r = await sb().auth.getSession();
-    var id = r.data?.session?.user?.id || null;
-    // Block mock/test IDs from hitting Supabase
-    if (id && (String(id).startsWith('mock-') || String(id).startsWith('00000000-'))) return null;
-    return id;
+    try {
+      if (!sb()) return null;
+      var r = await sb().auth.getSession();
+      var id = r.data?.session?.user?.id || null;
+      // Block mock/test IDs from hitting Supabase
+      if (id && (String(id).startsWith('mock-') || String(id).startsWith('00000000-'))) return null;
+      return id;
+    } catch(e) { return null; }
   }
 
   async function getUserEmail() {
@@ -455,16 +457,18 @@
      WORD BANKS
      ═══════════════════════════════════════════ */
   async function getWordbanks(lang) {
-    lang = lang || getStudyLang();
-    var userId = await getUserId();
-    if (!userId) return [];
-    var cacheKey = 'wordbanks_' + lang;
-    var cached = cacheGet(cacheKey);
-    if (cached) return cached;
-    var r = await sb().from('user_wordbanks').select('*').eq('user_id', userId).eq('lang', lang).order('created_at');
-    if (r.error) { console.warn('wordbanks:', r.error.message); return []; }
-    cacheSet(cacheKey, r.data);
-    return r.data || [];
+    try {
+      lang = lang || getStudyLang();
+      var userId = await getUserId();
+      if (!userId) return [];
+      var cacheKey = 'wordbanks_' + lang;
+      var cached = cacheGet(cacheKey);
+      if (cached) return cached;
+      var r = await sb().from('user_wordbanks').select('*').eq('user_id', userId).eq('lang', lang).order('created_at');
+      if (r.error) { console.warn('wordbanks:', r.error.message); return []; }
+      cacheSet(cacheKey, r.data);
+      return r.data || [];
+    } catch(e) { console.warn('getWordbanks:', e.message); return []; }
   }
 
   async function getWordbankWords(wordbankId) {
