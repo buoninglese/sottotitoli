@@ -1686,19 +1686,7 @@
         var key = el.getAttribute('data-i18n');
         if (!key) return;
 
-        // ── RESTORE ITALIAN ──
-        if (_lang === 'it') {
-          var origHtml = el.getAttribute('data-i18n-orig-html');
-          if (origHtml !== null) {
-            el.innerHTML = origHtml;
-          } else {
-            var origTxt = el.getAttribute('data-i18n-orig-txt');
-            if (origTxt !== null) el.textContent = origTxt;
-          }
-          return;
-        }
-
-        // ── TRANSLATE ──
+        // ── BOTH LANGUAGES: use dictionary ──
         var translated = t(key);
         var isOption = el.tagName === 'OPTION';
         var safeForHtml = !isOption && el.children.length === 0;
@@ -1714,33 +1702,16 @@
       scope.querySelectorAll('[data-i18n-html]').forEach(function(el) {
         var key = el.getAttribute('data-i18n-html');
         if (!key) return;
-        // Restore or translate using innerHTML (these are intentionally HTML)
-        if (_lang === 'it') {
-          var origHtml = el.getAttribute('data-i18n-orig-html');
-          if (origHtml !== null) { el.innerHTML = origHtml; }
-          else { var origTxt = el.getAttribute('data-i18n-orig-txt'); if (origTxt !== null) el.textContent = origTxt; }
-        } else {
-          el.innerHTML = t(key);
-        }
+        el.innerHTML = t(key);
       });
 
       /* 3. Placeholders */
       scope.querySelectorAll('[data-i18n-placeholder]').forEach(function(el) {
-        if (_lang === 'it') {
-          var orig = el.getAttribute('data-i18n-orig-placeholder');
-          if (orig !== null) el.setAttribute('placeholder', orig);
-          return;
-        }
         el.setAttribute('placeholder', t(el.getAttribute('data-i18n-placeholder')));
       });
 
       /* 4. Titles */
       scope.querySelectorAll('[data-i18n-title]').forEach(function(el) {
-        if (_lang === 'it') {
-          var orig = el.getAttribute('data-i18n-orig-title');
-          if (orig !== null) el.setAttribute('title', orig);
-          return;
-        }
         el.setAttribute('title', t(el.getAttribute('data-i18n-title')));
       });
 
