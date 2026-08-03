@@ -223,8 +223,10 @@
     function openSSSpinner(el,key){
       var half=key==='cap'?document.getElementById('ssCapHalf'):document.getElementById('ssTrHalf'),spinner=half.querySelector('.ss-spinner'),grid=spinner.querySelector('.ssg');
       var cur=key==='cap'?ssCapCode:key==='src'?ssSrcCode:ssTgtCode;
-      if(key==='src'){spinner.querySelector('.sst').textContent='Io parlo in…'}
-      else if(key==='tgt'){spinner.querySelector('.sst').textContent='Sottotitoli in…'}
+      var titleEl=spinner.querySelector('.sst');
+      if(key==='src'){titleEl.setAttribute('data-i18n','ss_i_speak');titleEl.textContent=I18n.t('ss_i_speak')}
+      else if(key==='tgt'){titleEl.setAttribute('data-i18n','ss_subtitles_in');titleEl.textContent=I18n.t('ss_subtitles_in')}
+      else{titleEl.setAttribute('data-i18n','ss_choose_lang');titleEl.textContent=I18n.t('ss_choose_lang')}
       grid.innerHTML='';
       ssFlags.forEach(function(f){var c=document.createElement('button');c.className='ssc'+(f.code===cur?' selected':'');c.textContent=f.flag+' '+f.name;c.onclick=function(){if(key==='cap')ssCapCode=f.code;else if(key==='src')ssSrcCode=f.code;else ssTgtCode=f.code;grid.querySelectorAll('.ssc').forEach(function(x){x.classList.remove('selected')});c.classList.add('selected');updSSFlags()};grid.appendChild(c)});
       spinner.classList.add('show');
