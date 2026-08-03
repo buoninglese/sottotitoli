@@ -55,7 +55,7 @@
   <div class="app-shell">
     <header class="topbar">
       <div style="display:flex;align-items:center;gap:0">
-        <a href="index.html" class="topbar-brand" style="font-size:31px;font-family:'Manrope',sans-serif;font-weight:700;text-decoration:none;letter-spacing:-0.02em;display:inline-flex;align-items:baseline;gap:0">sottotitoli<span style="font-family:'Manrope',sans-serif;font-weight:800;color:var(--accent-purple,#7c3aed);letter-spacing:-.5px">.pro</span><span class="topbar-version" style="font-size:10px;font-weight:600;font-family:'Manrope',sans-serif;color:var(--text-soft);margin-left:6px;opacity:.55;letter-spacing:.02em">v87</span></a>
+        <a href="index.html" class="topbar-brand" style="font-size:31px;font-family:'Manrope',sans-serif;font-weight:700;text-decoration:none;letter-spacing:-0.02em;display:inline-flex;align-items:baseline;gap:0">sottotitoli<span style="font-family:'Manrope',sans-serif;font-weight:800;color:var(--accent-purple,#7c3aed);letter-spacing:-.5px">.pro</span><span class="topbar-version" style="font-size:10px;font-weight:600;font-family:'Manrope',sans-serif;color:var(--text-soft);margin-left:6px;opacity:.55;letter-spacing:.02em">v88</span></a>
       </div>
       <div style="display:flex;align-items:center;gap:12px">
         <button class="btn-start-session" id="btnStartSession" onclick="toggleStartSession()" style="font-size:15px;height:42px;padding:0 20px;border-radius:12px;background:linear-gradient(135deg,rgba(192,132,252,.18),rgba(192,132,252,.06));color:#c084fc;border:1px solid rgba(192,132,252,.25);font-weight:700;font-family:'Manrope',sans-serif;display:inline-flex;align-items:center;gap:8px;box-shadow:0 0 20px rgba(192,132,252,.12),0 2px 8px rgba(0,0,0,.2);cursor:pointer;letter-spacing:-.01em;transition:all .2s ease" onmouseover="this.style.background='linear-gradient(135deg,rgba(192,132,252,.28),rgba(192,132,252,.12))';this.style.borderColor='rgba(192,132,252,.4)';this.style.boxShadow='0 0 28px rgba(192,132,252,.22),0 4px 12px rgba(0,0,0,.25)'" onmouseout="this.style.background='linear-gradient(135deg,rgba(192,132,252,.18),rgba(192,132,252,.06))';this.style.borderColor='rgba(192,132,252,.25)';this.style.boxShadow='0 0 20px rgba(192,132,252,.12),0 2px 8px rgba(0,0,0,.2)'">
@@ -2359,7 +2359,7 @@
                       '<td style="padding:16px 24px">'+statusBadge(status)+'</td>' +
                       '<td style="padding:16px 24px;text-align:right">' +
                         '<div style="display:flex;justify-content:flex-end;gap:8px">' +
-                          (isDone ? '<button title="Download" style="padding:8px;background:none;border:1px solid var(--line);border-radius:8px;cursor:pointer;color:var(--text-soft)" onclick="event.stopPropagation();alert(\'Download coming soon\')"><span class="material-symbols-outlined" style="font-size:18px">download</span></button>' : '<button disabled style="padding:8px;background:none;border:1px solid var(--line);border-radius:8px;opacity:.3;cursor:not-allowed"><span class="material-symbols-outlined" style="font-size:18px">download</span></button>') +
+                          (isDone ? '<button title="Download PDF" style="padding:8px;background:none;border:1px solid var(--line);border-radius:8px;cursor:pointer;color:var(--text-soft)" onclick="event.stopPropagation();downloadReportPDF(\''+(r.id||'')+'\')"><span class="material-symbols-outlined" style="font-size:18px">download</span></button>' : '<button disabled style="padding:8px;background:none;border:1px solid var(--line);border-radius:8px;opacity:.3;cursor:not-allowed"><span class="material-symbols-outlined" style="font-size:18px">download</span></button>') +
                           (isDone ? '<button style="padding:6px 16px;background:var(--bg);color:var(--cyan);border:1px solid var(--cyan);border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;font-family:\'Manrope\',sans-serif" onclick="event.stopPropagation();viewReportDetail(\''+(r.id||'')+'\')">View</button>' :
                            isFailed ? '<button style="padding:6px 16px;background:none;color:#E11D48;border:1px solid #E11D48;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;font-family:\'Manrope\',sans-serif" onclick="event.stopPropagation();retryReport(\''+(r.id||'')+'\')">Retry</button>' :
                            '<button disabled style="padding:6px 16px;background:none;color:var(--text-soft);border:1px solid var(--line);border-radius:8px;font-size:13px;opacity:.5;cursor:not-allowed;font-family:\'Manrope\',sans-serif">Pending</button>') +
@@ -2420,15 +2420,59 @@
                   if (icon && icon.textContent === 'chevron_right') { var tp=Math.ceil(allReports.length/REPORTS_PER_PAGE); if (currentPage<tp) { currentPage++; renderTable(); } }
                 });
 
-                // View report detail
+                // View report detail — opens a modal with the full report
                 window.viewReportDetail = function(id) {
-                  alert('Report detail view coming soon. Report ID: ' + id);
+                  var report = allReports.find(function(r){ return r.id == id; });
+                  if (!report) { alert('Report non trovato.'); return; }
+                  var summary = report.summary || report.summary_text || 'Nessun contenuto disponibile.';
+                  var score = report.overall_score || report.confidence || 'N/A';
+                  var date = report.created_at ? new Date(report.created_at).toLocaleString('it-IT') : '—';
+                  var status = report.status || 'completed';
+                  var content = '<div style="font-family:Inter,sans-serif;max-height:70vh;overflow-y:auto;padding:8px">' +
+                    '<p style="font-size:12px;color:var(--text-dim);margin:0 0 4px">Report ID: ' + id + ' · ' + date + '</p>' +
+                    '<p style="font-size:12px;color:var(--text-dim);margin:0 0 16px">Status: ' + status + ' · Score: ' + score + '</p>' +
+                    '<div style="white-space:pre-wrap;font-size:14px;line-height:1.7;color:var(--text);background:var(--bg);padding:16px;border-radius:12px;border:1px solid var(--line)">' + escapeHtml(summary) + '</div>' +
+                  '</div>';
+                  showModal('Report Detail', content);
                 };
                 window.retryReport = function(id) {
-                  if (confirm('Retry this report?')) {
-                    alert('Retry requested for report: ' + id);
-                  }
+                  if (!confirm('Riprova questo report? I crediti verranno dedotti nuovamente.')) return;
+                  var sb = window.sottotitoliSupabase;
+                  if (!sb) return;
+                  sb.auth.getSession().then(async function(r){
+                    if (!r.data?.session) return;
+                    var uid = r.data.session.user.id;
+                    // Reset the request status to queued
+                    await sb.from('ai_report_requests').update({ status: 'queued' }).eq('id', id).eq('user_id', uid);
+                    // Delete the old report
+                    await sb.from('session_ai_reports').delete().eq('request_id', id);
+                    showToastMsg('🔄 Report re-queued. Controlla tra poco.');
+                    loadReports();
+                  }).catch(function(e){ console.warn('retryReport:', e); });
                 };
+
+                // ── Simple modal helper (if not already defined) ──
+                window.showModal = function(title, content) {
+                  var existing = document.getElementById('raiDetailModal');
+                  if (existing) existing.remove();
+                  var modal = document.createElement('div');
+                  modal.id = 'raiDetailModal';
+                  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:10000;display:flex;align-items:center;justify-content:center;padding:24px';
+                  modal.innerHTML = '<div style="background:var(--card);border:2px solid var(--line);border-radius:20px;padding:28px;max-width:700px;width:100%;max-height:85vh;overflow-y:auto;box-shadow:0 24px 64px rgba(0,0,0,.4)">' +
+                    '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">' +
+                      '<h3 style="font-size:18px;font-weight:800;margin:0;color:var(--text)">' + title + '</h3>' +
+                      '<button onclick="this.closest(\'#raiDetailModal\').remove()" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--text-dim);padding:4px 8px">&times;</button>' +
+                    '</div>' +
+                    content +
+                  '</div>';
+                  modal.addEventListener('click', function(e){ if (e.target === modal) modal.remove(); });
+                  document.body.appendChild(modal);
+                };
+
+                function escapeHtml(str) {
+                  if (!str) return '';
+                  return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+                }
 
                 // Load on tab activation
                 var observer = new MutationObserver(function(mutations){
@@ -2751,14 +2795,173 @@
               reportRadios.forEach(function(r){ r.addEventListener('change', updateView); });
               engineRadios.forEach(function(r){ r.addEventListener('change', updateView); });
 
-              generateBtn.addEventListener('click', function(){
-                loadingOverlay.style.display = 'flex';
-                setTimeout(function(){
-                  if (loadingOverlay.style.display !== 'none') {
-                    alert('Analysis complete! Your report has been generated.');
-                    loadingOverlay.style.display = 'none';
+              // ═══ Preset → Module mapping (sync with ai_configs preset_pricing) ═══
+              var PRESET_MAP = {
+                holistic:     { moduleId: 1, moduleKey: '1', credits: 3 },
+                personalized: { moduleId: 1, moduleKey: '1', credits: 3 },
+                growth:       { moduleId: 1, moduleKey: '1', credits: 3 },
+                cefr:         { moduleId: 4, moduleKey: '4', credits: 4 },
+                explorer:     { moduleId: 3, moduleKey: '3', credits: 2 },
+                homework:     { moduleId: 3, moduleKey: '3', credits: 2 },
+                cambridge:    { moduleId: 11, moduleKey: '11', credits: 4 },
+                speech:       { moduleId: 4, moduleKey: '4', credits: 4 },
+                drills:       { moduleId: 2, moduleKey: '2', credits: 2 }
+              };
+
+              generateBtn.addEventListener('click', async function(){
+                // ── Validation ──
+                var sb = window.sottotitoliSupabase;
+                if (!sb) { showToastMsg('⚠️ Effettua il login per generare report.'); return; }
+                var r = await sb.auth.getSession();
+                if (!r.data?.session) { showToastMsg('⚠️ Sessione scaduta. Rieffettua il login.'); return; }
+                var uid = r.data.session.user.id;
+
+                // Get selected preset
+                var selectedPreset;
+                reportRadios.forEach(function(rd){ if(rd.checked) selectedPreset = rd; });
+                if (!selectedPreset) { showToastMsg('⚠️ Seleziona un tipo di analisi.'); return; }
+                var presetKey = selectedPreset.value;
+                var mapping = PRESET_MAP[presetKey];
+                if (!mapping) { showToastMsg('⚠️ Tipo di analisi non riconosciuto.'); return; }
+
+                // Get selected sessions from transcript picker
+                var sessionIds = selectedTranscriptIds.slice();
+                if (!sessionIds.length) {
+                  // Fallback: try to use sessions from the panorama list
+                  if (allSessions && allSessions.length) {
+                    sessionIds = [allSessions[0].id];
                   }
-                }, 3500);
+                }
+                if (!sessionIds.length) { showToastMsg('⚠️ Seleziona almeno una sessione da analizzare.'); return; }
+
+                // Get engine (0=standard, 5=neural deep dive)
+                var engineCost = 0;
+                engineRadios.forEach(function(er){ if(er.checked) engineCost = parseInt(er.value); });
+                var totalCredits = mapping.credits + engineCost;
+
+                // ── Credit Check ──
+                try {
+                  var tokenRes = await sb.rpc('get_token_balance', { p_user_id: uid });
+                  var balance = tokenRes.data;
+                  if (balance === null || balance === undefined) {
+                    // Fallback to direct query
+                    var tb = await sb.from('user_tokens').select('balance').eq('user_id', uid).single();
+                    balance = tb.data ? tb.data.balance : 0;
+                  }
+                  if (balance < totalCredits) {
+                    showToastMsg('⚠️ Crediti insufficienti. Hai ' + balance + ' crediti, servono ' + totalCredits + '.');
+                    if (confirm('Ti servono ' + totalCredits + ' crediti ma ne hai solo ' + balance + '. Vuoi acquistare altri crediti?')) {
+                      window.location.href = 'wallet.html';
+                    }
+                    return;
+                  }
+                } catch(e) {
+                  console.warn('Token balance check failed:', e);
+                  // Try direct query fallback
+                  try {
+                    var tb2 = await sb.from('user_tokens').select('balance').eq('user_id', uid).single();
+                    var bal2 = tb2.data ? tb2.data.balance : 0;
+                    if (bal2 < totalCredits) {
+                      showToastMsg('⚠️ Crediti insufficienti. Hai ' + bal2 + ' crediti, servono ' + totalCredits + '.');
+                      return;
+                    }
+                  } catch(e2) { console.warn('Token fallback also failed:', e2); }
+                }
+
+                // ── Show loading ──
+                loadingOverlay.style.display = 'flex';
+                generateBtn.disabled = true;
+
+                try {
+                  // ── Atomic token deduction ──
+                  var deductResult = await sb.rpc('deduct_tokens', {
+                    p_user_id: uid,
+                    p_amount: totalCredits,
+                    p_reference: 'report_' + presetKey + '_' + Date.now()
+                  });
+                  if (deductResult.error) {
+                    console.warn('Deduct error:', deductResult.error);
+                    // Fallback: try direct update
+                    var upd = await sb.from('user_tokens').update({ balance: balance - totalCredits, updated_at: new Date().toISOString() }).eq('user_id', uid).eq('balance', balance);
+                    if (upd.error || !upd.data || upd.data.length === 0) {
+                      loadingOverlay.style.display = 'none';
+                      generateBtn.disabled = false;
+                      showToastMsg('⚠️ Impossibile dedurre i crediti. Riprova.');
+                      return;
+                    }
+                    // Log transaction
+                    await sb.from('token_transactions').insert({
+                      user_id: uid, amount: -totalCredits, type: 'report_usage',
+                      reference: 'report_' + presetKey, balance_after: balance - totalCredits
+                    });
+                  }
+
+                  // ── Insert request ──
+                  var ins = await sb.from('ai_report_requests').insert({
+                    user_id: uid,
+                    session_ids: sessionIds,
+                    module_id: mapping.moduleId,
+                    module_key: mapping.moduleKey,
+                    scope_type: sessionIds.length > 1 ? 'multi_session' : 'single_session',
+                    status: 'queued'
+                  });
+                  if (ins.error) {
+                    console.warn('Insert error:', ins.error.message);
+                    loadingOverlay.style.display = 'none';
+                    generateBtn.disabled = false;
+                    showToastMsg('⚠️ Errore: ' + ins.error.message);
+                    return;
+                  }
+                  var requestId = ins.data && ins.data[0] ? ins.data[0].id : null;
+
+                  // ── Trigger edge function ──
+                  try {
+                    var token = r.data.session.access_token;
+                    await fetch('https://qzqmuegbpmvqrjrlfbgk.supabase.co/functions/v1/process-ai-reports', {
+                      method: 'POST',
+                      headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ requestId: requestId })
+                    });
+                  } catch(efErr) {
+                    console.warn('Edge function trigger failed (will be picked up by cron):', efErr);
+                  }
+
+                  // ── Poll for completion ──
+                  var pollCount = 0;
+                  var maxPolls = 30; // 30 × 2s = 60s max
+                  var pollInterval = setInterval(async function(){
+                    pollCount++;
+                    try {
+                      var check = await sb.from('session_ai_reports')
+                        .select('id,summary,overall_score,status')
+                        .eq('user_id', uid)
+                        .order('created_at', { ascending: false })
+                        .limit(1);
+                      if (check.data && check.data.length && check.data[0].status === 'completed') {
+                        clearInterval(pollInterval);
+                        loadingOverlay.style.display = 'none';
+                        generateBtn.disabled = false;
+                        var report = check.data[0];
+                        showToastMsg('✅ Report completato! Score: ' + (report.overall_score || 'N/A'));
+                        // Refresh "I miei Report" tab if visible
+                        var mieiPanel = document.getElementById('sub-rai-miei');
+                        if (mieiPanel) mieiPanel.dispatchEvent(new Event('reports-loaded'));
+                      }
+                    } catch(e) {}
+                    if (pollCount >= maxPolls) {
+                      clearInterval(pollInterval);
+                      loadingOverlay.style.display = 'none';
+                      generateBtn.disabled = false;
+                      showToastMsg('⏳ Report in elaborazione. Controlla "I miei Report" tra poco.');
+                    }
+                  }, 2000);
+
+                } catch(e) {
+                  console.error('Generate report error:', e);
+                  loadingOverlay.style.display = 'none';
+                  generateBtn.disabled = false;
+                  showToastMsg('❌ Errore: ' + (e.message || 'Sconosciuto'));
+                }
               });
 
               cancelBtn.addEventListener('click', function(){
@@ -2827,7 +3030,12 @@
                 updateTranscriptPickerUI();
               });
               if (confirmBtn) confirmBtn.addEventListener('click', function(){
+                if (!selectedTranscriptIds.length) {
+                  showToastMsg('⚠️ Seleziona almeno una sessione.');
+                  return;
+                }
                 document.getElementById('transcriptPickerModal').style.display = 'none';
+                showToastMsg('✅ ' + selectedTranscriptIds.length + ' sessione/i selezionata/e per l\'analisi.');
               });
 
               // Load sessions
@@ -4527,16 +4735,17 @@
           var sb = window.sottotitoliSupabase;
           var r = await sb.auth.getSession();
           if (!r.data?.session) return;
-          var modules = [];
-          // Modules no longer come from UI toggles — use defaults
-          modules = ['grammar', 'vocabulary', 'fluency'];
-          await sb.from('ai_report_requests').insert({
-            user_id: r.data.session.user.id,
-            session_id: sessionId,
-            report_type: 'full',
-            modules: modules,
-            status: 'pending'
+          var uid = r.data.session.user.id;
+          // Module 1 = Comprehensive (3cr)
+          var ins = await sb.from('ai_report_requests').insert({
+            user_id: uid,
+            session_ids: [sessionId],
+            module_id: 1,
+            module_key: '1',
+            scope_type: 'single_session',
+            status: 'queued'
           });
+          if (ins.error) { console.warn('FullReport insert error:', ins.error.message); throw ins.error; }
           var t = document.createElement('div');
           t.style.cssText = 'position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--accent);color:#fff;font-size:13px;font-weight:700;padding:10px 24px;border-radius:99px;z-index:99999;opacity:0;transition:opacity .3s;pointer-events:none;font-family:var(--font-body)';
           t.textContent = '✅ Report richiesto! Riceverai una notifica quando è pronto.';
@@ -5732,7 +5941,7 @@
             if (r.data?.session) {
               var userId = r.data.session.user.id;
               await sb.from('user_wordbank_words').insert({
-                wordbank_id: _wbState.currentBankUUID || bankId, word: word, user_id: userId, usage_count: 1
+                wordbank_id: _wbState.currentBankUUID || bankId, word: word, usage_count: 1
               });
               // Also feed Ripasso immediato (review_words)
               try {
