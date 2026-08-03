@@ -172,8 +172,8 @@
           var ss=document.getElementById('startSplit');
           if(ss&&ss.classList.contains('active')){
             ss.classList.remove('active');
+            document.body.style.overflow='';
             panels.forEach(function(p){ p.style.display = ''; });
-            document.querySelector('.main-panel').style.overflowY = 'auto';
           }
           navItems.forEach(function(n){ n.classList.remove('active'); n.removeAttribute('aria-current'); });
           this.classList.add('active');
@@ -201,35 +201,42 @@
     });
 
     function toggleStartSession(){
-      var ss=document.getElementById('startSplit'),cp=document.querySelectorAll('.content-panel'),mp=document.querySelector('.main-panel');
+      var ss=document.getElementById('startSplit');
       ss.classList.toggle('active');
-      cp.forEach(function(p){p.style.display=ss.classList.contains('active')?'none':''});
-      mp.style.overflowY=ss.classList.contains('active')?'hidden':'auto';
-      if(!ss.classList.contains('active')){document.getElementById('pnl-panoramica').classList.add('active');document.getElementById('pnl-panoramica').style.display=''}
+      document.body.style.overflow=ss.classList.contains('active')?'hidden':'';
     }
+    // Click backdrop to close
+    document.addEventListener('click',function(e){
+      if(e.target.id==='startSplit') toggleStartSession();
+    });
+    // Esc to close
+    document.addEventListener('keydown',function(e){
+      if(e.key==='Escape'){
+        var ss=document.getElementById('startSplit');
+        if(ss&&ss.classList.contains('active')) toggleStartSession();
+      }
+    });
 
     var ssFlags=[{code:'en',flag:'🇬🇧',name:'English'},{code:'it',flag:'🇮🇹',name:'Italiano'},{code:'nl',flag:'🇳🇱',name:'Nederlands'},{code:'fr',flag:'🇫🇷',name:'Français'},{code:'de',flag:'🇩🇪',name:'Deutsch'},{code:'es',flag:'🇪🇸',name:'Español'},{code:'pl',flag:'🇵🇱',name:'Polski'},{code:'pt',flag:'🇵🇹',name:'Português'}];
     var ssCapCode='en',ssSrcCode='en',ssTgtCode='it';
 
     function openSSSpinner(el,key){
-      var half=el.closest('.start-half'),spinner=half.querySelector('.start-spinner'),grid=spinner.querySelector('.ssg');
+      var half=key==='cap'?document.getElementById('ssCapHalf'):document.getElementById('ssTrHalf'),spinner=half.querySelector('.ss-spinner'),grid=spinner.querySelector('.ssg');
       var cur=key==='cap'?ssCapCode:key==='src'?ssSrcCode:ssTgtCode;
       if(key==='src'){spinner.querySelector('.sst').textContent='Io parlo in…'}
       else if(key==='tgt'){spinner.querySelector('.sst').textContent='Sottotitoli in…'}
       grid.innerHTML='';
       ssFlags.forEach(function(f){var c=document.createElement('button');c.className='ssc'+(f.code===cur?' selected':'');c.textContent=f.flag+' '+f.name;c.onclick=function(){if(key==='cap')ssCapCode=f.code;else if(key==='src')ssSrcCode=f.code;else ssTgtCode=f.code;grid.querySelectorAll('.ssc').forEach(function(x){x.classList.remove('selected')});c.classList.add('selected');updSSFlags()};grid.appendChild(c)});
       spinner.classList.add('show');
-      // Force parent hover state so the dim highlight stays visible behind overlay
       half.classList.add('spinner-open');
     }
     function closeSSSpinner(key){
       var s=key==='cap'?document.getElementById('ssCapSpinner'):document.getElementById('ssTrSpinner');
       if(s){
         s.classList.remove('show');
-        var half=s.closest('.start-half');
+        var half=s.closest('.ss-content');
         if(half){
           half.classList.remove('spinner-open');
-          // Force parent to re-evaluate :hover state after overlay is gone
           half.style.pointerEvents='none';void half.offsetHeight;half.style.pointerEvents='';
         }
       }
@@ -240,20 +247,33 @@
       var sfEl=document.getElementById('ssSrcFlag'),snEl=document.getElementById('ssSrcName');if(sfEl)sfEl.textContent=sf.flag;if(snEl)snEl.textContent=sf.name;
       var tfEl=document.getElementById('ssTgtFlag'),tnEl=document.getElementById('ssTgtName');if(tfEl)tfEl.textContent=tf.flag;if(tnEl)tnEl.textContent=tf.name;
     }
-    /* ── Start session buttons ── */
+    /* ── Start session buttons (handled via inline onclick) ── */
+
+    /* ── 3D Tilt Effect for Start Session Popup ── */
     (function(){
-      var capBtn=document.querySelector('.start-btn.cap');
-      var trBtn=document.querySelector('.start-btn.tr');
-      if(capBtn){
-        capBtn.addEventListener('click',function(){
-          window.location.href='caption-s8t.html?lang='+ssCapCode;
-        });
+      var tiltActive = false;
+      var tiltFrame = null;
+      var popup = document.getElementById('ssPopup');
+      var diagonal = document.getElementById('ssDiagonal');
+      if(!popup||!diagonal) return;
+      function tilt(e){
+        if(!tiltActive) return;
+        var rect = popup.getBoundingClientRect();
+        var x = (e.clientX - rect.left) / rect.width;   // 0..1
+        var y = (e.clientY - rect.top) / rect.height;   // 0..1
+        var rotateY = (x - 0.5) * 8;  // ±4deg
+        var rotateX = (0.5 - y) * 4;  // ±2deg
+        diagonal.style.transform = 'perspective(2000px) rotateX('+rotateX+'deg) rotateY('+rotateY+'deg)';
       }
-      if(trBtn){
-        trBtn.addEventListener('click',function(){
-          window.location.href='caption-s8t.html?lang='+ssSrcCode+'&mode=translate&tgt='+ssTgtCode+'&src='+ssSrcCode;
-        });
-      }
+      popup.addEventListener('mouseenter',function(){tiltActive=true;tiltFrame=requestAnimationFrame(function loop(e){tilt(e);if(tiltActive)tiltFrame=requestAnimationFrame(loop)});});
+      popup.addEventListener('mousemove',function(e){/* handled by rAF loop */});
+      popup.addEventListener('mouseleave',function(){
+        tiltActive=false;
+        if(tiltFrame) cancelAnimationFrame(tiltFrame);
+        diagonal.style.transform = 'perspective(2000px) rotateX(0deg) rotateY(0deg)';
+        diagonal.style.transition = 'transform .6s cubic-bezier(.1,0,0,1)';
+        setTimeout(function(){diagonal.style.transition='';},600);
+      });
     })();
     /* ── Genera Snapshot ── */
     var generaSnapshotBtn=document.getElementById('generaSnapshotBtn');
