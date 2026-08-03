@@ -77,15 +77,17 @@ async function startRealMic() {
     }
     // Track last speech time for force-finalize timer
     if (interim || final) _realMic._lastInterim = Date.now();
-    if (interim && _realMic.onInterim) _realMic.onInterim(interim);
-    if (final && _realMic.onFinal) _realMic.onFinal(final);
+    if (interim && _realMic.onInterim) { console.log('🎤 interim:', interim); _realMic.onInterim(interim); }
+    if (final && _realMic.onFinal) { console.log('🎤 final:', final); _realMic.onFinal(final); }
   };
   _realMic._onresult = rec.onresult;
   
   rec.onerror = function(event) {
-    if (event.error === 'not-allowed') { updateMicUI('blocked'); console.warn('Speech error:', event.error); }
-    else if (event.error === 'no-speech' || event.error === 'aborted') { /* normal — silence / stop */ }
-    else { console.error('Speech error:', event.error); updateMicUI('error'); }
+    // Log ALL errors on mobile for debugging — 'no-speech' is common on Chrome Android
+    console.log('🎤 SpeechRecognition error:', event.error, event.message || '');
+    if (event.error === 'not-allowed') { updateMicUI('blocked'); }
+    else if (event.error === 'no-speech' || event.error === 'aborted') { /* normal — will auto-restart in onend */ }
+    else { updateMicUI('error'); }
   };
   _realMic._onerror = rec.onerror;
   
