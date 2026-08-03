@@ -224,15 +224,15 @@ function _endSupabaseSession(data) {
     // Metrics version — v2 = MATTR, v1 = raw TTR (deprecated)
     updateObj.metrics_version = 2;
     
-    // POS counts
+    // POS counts — matches sessions table columns: pos_nouns, pos_verbs, pos_adjectives, pos_adverbs
     var posCounts = data.posCounts || {};
-    if (posCounts.NOUN) updateObj.noun_count = posCounts.NOUN;
-    if (posCounts.VERB) updateObj.verb_count = posCounts.VERB;
-    if (posCounts.ADJ) updateObj.adjective_count = posCounts.ADJ;
-    if (posCounts.ADV) updateObj.adverb_count = posCounts.ADV;
+    if (posCounts.NOUN) updateObj.pos_nouns = posCounts.NOUN;
+    if (posCounts.VERB) updateObj.pos_verbs = posCounts.VERB;
+    if (posCounts.ADJ) updateObj.pos_adjectives = posCounts.ADJ;
+    if (posCounts.ADV) updateObj.pos_adverbs = posCounts.ADV;
     
     // Additional stats — passed pre-computed from studio-caption.html
-    if (data.fillersPerMinute != null) updateObj.fillers_per_minute = data.fillersPerMinute;
+    if (data.fillersPerMinute != null) updateObj.filler_count = Math.round(data.fillersPerMinute);
     if (data.turnCount != null) updateObj.turn_count = data.turnCount;
     if (data.sentenceMetrics && data.sentenceMetrics.length > 0) updateObj.sentence_metrics = data.sentenceMetrics.slice(0, 50);
     if (data.connectors) updateObj.connectors = data.connectors;
