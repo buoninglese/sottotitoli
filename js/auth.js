@@ -25,11 +25,10 @@ window.sottotitoliSupabase = window.supabase.createClient(
   }
 );
 
-// 1.5) Auth bypass — for development/testing without Supabase OAuth
+// 1.5) Auth bypass — for localhost development without Supabase OAuth
 // Activate via URL: ?bypass_auth=1  or  window.SOTTOTITOLI_BYPASS_AUTH = true
 (function(){
   var bypass = window.SOTTOTITOLI_BYPASS_AUTH || (window.location.search.indexOf('bypass_auth=1') !== -1);
-  console.log('🔧 Auth bypass check:', { bypass, search: window.location.search, flag: window.SOTTOTITOLI_BYPASS_AUTH });
   if (!bypass) return;
   window.SOTTOTITOLI_BYPASS_AUTH = true;
   var MOCK_USER = {
