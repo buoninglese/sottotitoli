@@ -461,14 +461,14 @@ window.SMART_SUGGESTIONS = (function() {
     var recentTopics = [];
     try {
       var { data: sessions } = await sb.from('sessions')
-        .select('title,metadata')
+        .select('name')
         .eq('user_id', uid)
         .order('created_at', { ascending: false })
         .limit(20);
       if (sessions && sessions.length) {
         var topicCounts = {};
         sessions.forEach(function(s) {
-          var title = (s.title || '').toLowerCase();
+          var title = (s.name || '').toLowerCase();
           var words = title.replace(/[^a-z\s]/g, '').split(/\s+/).filter(function(w) { return w.length > 3 && ['this','that','your','with','from','just','have','will','want','need','session','captions','translate','test','practice'].indexOf(w) === -1; });
           words.forEach(function(w) {
             topicCounts[w] = (topicCounts[w] || 0) + 1;
@@ -660,8 +660,7 @@ window.SMART_SUGGESTIONS = (function() {
             wordId = rwRes.data.id;
             await sb.from('review_words').update({
               pos: w.pos || null,
-              cefr: w.cefr || null,
-              smart_score: w.score || 0
+              cefr: w.cefr || null
             }).eq('id', wordId);
           } else {
             var ins = await sb.from('review_words').insert({
@@ -674,9 +673,7 @@ window.SMART_SUGGESTIONS = (function() {
               is_new: true,
               first_seen_at: new Date().toISOString(),
               source_type: 'smart',
-              review_state: 'new',
-              smart_score: w.score || 0,
-              personal_frequency: 0
+              review_state: 'new'
             }).select('id').single();
             if (ins.data) wordId = ins.data.id;
           }
