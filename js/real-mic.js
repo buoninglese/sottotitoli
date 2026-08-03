@@ -194,9 +194,9 @@ function _endSupabaseSession(data) {
     // Duration
     if (data.durationSeconds) {
       updateObj.duration_seconds = data.durationSeconds;
-      // WPM
+      // WPM (column is wpm_avg in Supabase)
       if (data.durationSeconds > 0) {
-        updateObj.wpm = Math.round((allWords.length / data.durationSeconds) * 60);
+        updateObj.wpm_avg = Math.round((allWords.length / data.durationSeconds) * 60);
       }
     }
     

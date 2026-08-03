@@ -76,7 +76,7 @@
 
     // Fetch all sessions for this user (no language filter — stats are global)
     var r = await sb().from('sessions')
-      .select('id,duration_seconds,words_count,started_at,language_pair,wpm,lexical_diversity,quality_score')
+      .select('id,duration_seconds,words_count,started_at,language_pair,wpm_avg,lexical_diversity,quality_score')
       .eq('user_id', userId)
       .order('started_at', { ascending: false });
 
@@ -98,9 +98,9 @@
     });
 
     // Compute real WPM and lexical diversity from sessions that have them
-    var sessionsWithWpm = sessions.filter(function(s) { return s.wpm > 0; });
+    var sessionsWithWpm = sessions.filter(function(s) { return s.wpm_avg > 0; });
     var avgWpm = sessionsWithWpm.length > 0
-      ? Math.round(sessionsWithWpm.reduce(function(s, r) { return s + r.wpm; }, 0) / sessionsWithWpm.length)
+      ? Math.round(sessionsWithWpm.reduce(function(s, r) { return s + r.wpm_avg; }, 0) / sessionsWithWpm.length)
       : 0;
     var sessionsWithLexDiv = sessions.filter(function(s) { return s.lexical_diversity > 0; });
     var avgLexDiv = sessionsWithLexDiv.length > 0
@@ -560,9 +560,8 @@
      WORD STATUS — update learning status (never CEFR)
      ═══════════════════════════════════════════ */
   async function updateWordStatus(lexemeId, status) {
-    var userId = await getUserId();
-    if (!userId) return false;
-    var r = await sb().from('user_wordbank_words').update({ status: status, updated_at: new Date().toISOString() }).eq('id', lexemeId).eq('user_id', userId);
+    // RLS policy enforces ownership via wordbank join — no user_id on this table
+    var r = await sb().from('user_wordbank_words').update({ status: status, updated_at: new Date().toISOString() }).eq('id', lexemeId);
     if (r.error) { console.warn('updateWordStatus:', r.error.message); return false; }
     return true;
   }
@@ -580,18 +579,17 @@
   /* ═══════════════════════════════════════════
      WORD BANK — bulk add words to bank
      ═══════════════════════════════════════════ */
-  async function bulkAddToBank(wordbankId, wordIds, sourceType) {
+  async function bulkAddToBank(wordbankId, words, sourceType) {
     sourceType = sourceType || 'manual';
-    var userId = await getUserId();
-    if (!userId) return { added: 0, duplicates: 0 };
-    var rows = wordIds.map(function(wid) {
-      return { wordbank_id: wordbankId, word_id: wid, user_id: userId, source_type: sourceType, added_at: new Date().toISOString() };
+    // words is an array of word strings (not UUIDs). Columns match actual schema.
+    var rows = words.map(function(w) {
+      return { wordbank_id: wordbankId, word: w, created_at: new Date().toISOString() };
     });
-    // Insert ignoring conflicts (word already in bank)
-    var r = await sb().from('user_wordbank_words').upsert(rows, { onConflict: 'wordbank_id,word_id', ignoreDuplicates: true });
+    // Insert ignoring conflicts (word already in bank — onConflict on wordbank_id + word)
+    var r = await sb().from('user_wordbank_words').upsert(rows, { onConflict: 'wordbank_id,word', ignoreDuplicates: true });
     if (r.error) { console.warn('bulkAddToBank:', r.error.message); return { added: 0, duplicates: 0 }; }
     cacheClear();
-    return { added: wordIds.length, duplicates: 0 };
+    return { added: words.length, duplicates: 0 };
   }
 
   /* ═══════════════════════════════════════════
@@ -611,9 +609,8 @@
      WORD — get detail for drawer
      ═══════════════════════════════════════════ */
   async function getWordDetail(lexemeId) {
-    var userId = await getUserId();
-    if (!userId) return null;
-    var r = await sb().from('user_wordbank_words').select('*').eq('id', lexemeId).eq('user_id', userId).single();
+    // RLS policy enforces ownership via wordbank join — no user_id on this table
+    var r = await sb().from('user_wordbank_words').select('*').eq('id', lexemeId).single();
     if (r.error) return null;
     return r.data;
   }
