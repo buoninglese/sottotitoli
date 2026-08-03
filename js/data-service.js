@@ -76,7 +76,7 @@
 
     // Fetch all sessions for this user (no language filter — stats are global)
     var r = await sb().from('sessions')
-      .select('id,duration_seconds,words_count,started_at,language_pair,wpm_avg,lexical_diversity,quality_score')
+      .select('id,duration_seconds,words_count,started_at,language_pair,wpm,lexical_diversity,quality_score')
       .eq('user_id', userId)
       .order('started_at', { ascending: false });
 
@@ -98,9 +98,9 @@
     });
 
     // Compute real WPM and lexical diversity from sessions that have them
-    var sessionsWithWpm = sessions.filter(function(s) { return s.wpm_avg > 0; });
+    var sessionsWithWpm = sessions.filter(function(s) { return s.wpm > 0; });
     var avgWpm = sessionsWithWpm.length > 0
-      ? Math.round(sessionsWithWpm.reduce(function(s, r) { return s + r.wpm_avg; }, 0) / sessionsWithWpm.length)
+      ? Math.round(sessionsWithWpm.reduce(function(s, r) { return s + r.wpm; }, 0) / sessionsWithWpm.length)
       : 0;
     var sessionsWithLexDiv = sessions.filter(function(s) { return s.lexical_diversity > 0; });
     var avgLexDiv = sessionsWithLexDiv.length > 0
