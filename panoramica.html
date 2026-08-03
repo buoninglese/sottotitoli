@@ -55,7 +55,7 @@
   <div class="app-shell">
     <header class="topbar">
       <div style="display:flex;align-items:center;gap:0">
-        <a href="index.html" class="topbar-brand" style="font-size:31px;font-family:'Manrope',sans-serif;font-weight:700;text-decoration:none;letter-spacing:-0.02em;display:inline-flex;align-items:baseline;gap:0">sottotitoli<span style="font-family:'Manrope',sans-serif;font-weight:800;color:var(--accent-purple,#7c3aed);letter-spacing:-.5px">.pro</span><span class="topbar-version" style="font-size:10px;font-weight:600;font-family:'Manrope',sans-serif;color:var(--text-soft);margin-left:6px;opacity:.55;letter-spacing:.02em">v88</span></a>
+        <a href="index.html" class="topbar-brand" style="font-size:31px;font-family:'Manrope',sans-serif;font-weight:700;text-decoration:none;letter-spacing:-0.02em;display:inline-flex;align-items:baseline;gap:0">sottotitoli<span style="font-family:'Manrope',sans-serif;font-weight:800;color:var(--accent-purple,#7c3aed);letter-spacing:-.5px">.pro</span><span class="topbar-version" style="font-size:10px;font-weight:600;font-family:'Manrope',sans-serif;color:var(--text-soft);margin-left:6px;opacity:.55;letter-spacing:.02em">v89</span></a>
       </div>
       <div style="display:flex;align-items:center;gap:12px">
         <button class="btn-start-session" id="btnStartSession" onclick="toggleStartSession()" style="font-size:15px;height:42px;padding:0 20px;border-radius:12px;background:linear-gradient(135deg,rgba(192,132,252,.18),rgba(192,132,252,.06));color:#c084fc;border:1px solid rgba(192,132,252,.25);font-weight:700;font-family:'Manrope',sans-serif;display:inline-flex;align-items:center;gap:8px;box-shadow:0 0 20px rgba(192,132,252,.12),0 2px 8px rgba(0,0,0,.2);cursor:pointer;letter-spacing:-.01em;transition:all .2s ease" onmouseover="this.style.background='linear-gradient(135deg,rgba(192,132,252,.28),rgba(192,132,252,.12))';this.style.borderColor='rgba(192,132,252,.4)';this.style.boxShadow='0 0 28px rgba(192,132,252,.22),0 4px 12px rgba(0,0,0,.25)'" onmouseout="this.style.background='linear-gradient(135deg,rgba(192,132,252,.18),rgba(192,132,252,.06))';this.style.borderColor='rgba(192,132,252,.25)';this.style.boxShadow='0 0 20px rgba(192,132,252,.12),0 2px 8px rgba(0,0,0,.2)'">
@@ -2473,6 +2473,31 @@
                   if (!str) return '';
                   return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
                 }
+
+                // ── PDF Download ──
+                window.downloadReportPDF = function(id) {
+                  var report = allReports.find(function(r){ return r.id == id; });
+                  if (!report) { alert('Report non trovato.'); return; }
+                  var summary = report.summary || report.summary_text || '';
+                  var score = report.overall_score || '';
+                  var date = report.created_at ? new Date(report.created_at).toLocaleDateString('it-IT') : '';
+                  // Build a simple HTML doc and trigger print-to-PDF
+                  var w = window.open('', '_blank', 'width=800,height=600');
+                  if (!w) { alert('⚠️ Popup bloccato. Consenti i popup per scaricare il PDF.'); return; }
+                  w.document.write('<!DOCTYPE html><html lang="it"><head><meta charset="UTF-8"><title>Report AI - Sottotitoli</title>');
+                  w.document.write('<style>body{font-family:Inter,system-ui,sans-serif;max-width:700px;margin:40px auto;padding:20px;color:#111;line-height:1.7}' +
+                    'h1{font-size:22px;margin:0 0 4px}h2{font-size:14px;color:#666;margin:0 0 20px}.meta{font-size:12px;color:#888;margin-bottom:24px}' +
+                    '.content{white-space:pre-wrap;font-size:14px;border-top:1px solid #ddd;padding-top:20px}' +
+                    '@media print{body{margin:0;padding:20px}}</style>');
+                  w.document.write('</head><body>');
+                  w.document.write('<h1>🤖 Report AI</h1><h2>Sottotitoli — Analisi Linguistica</h2>');
+                  w.document.write('<div class="meta">Generato: ' + date + (score ? ' · Score: ' + score : '') + ' · ID: ' + id + '</div>');
+                  w.document.write('<div class="content">' + escapeHtml(summary) + '</div>');
+                  w.document.write('<p style="margin-top:40px;font-size:11px;color:#999;border-top:1px solid #ddd;padding-top:12px">Powered by Sottotitoli AI · sottotitoli.ai</p>');
+                  w.document.write('</body></html>');
+                  w.document.close();
+                  setTimeout(function(){ w.print(); }, 500);
+                };
 
                 // Load on tab activation
                 var observer = new MutationObserver(function(mutations){
