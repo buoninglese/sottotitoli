@@ -515,8 +515,9 @@ function _recoverPendingSession(supabaseClient) {
     // Skip recovery if truly empty (no lines AND no duration)
     if (!payload || (!payload.lines || !payload.lines.length) && !(payload.durationSeconds > 0)) {
       console.log('🔄 Recovery: skipping — empty session (no lines, no duration)');
-      if (payload && payload.sessionId) {
-        // Still close the orphaned session row if one exists
+      // Only close orphan if it had actual duration (not 0)
+      if (payload && payload.sessionId && (payload.durationSeconds || 0) > 0) {
+        console.log('🔄 Recovery: closing orphaned session (no transcript, ' + payload.durationSeconds + 's)');
         _finalizeOrphanedSession(supabaseClient, payload);
       }
       return;
