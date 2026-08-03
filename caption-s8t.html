@@ -1081,6 +1081,9 @@ button[onclick*="addToWordBank"]:hover{background:rgba(52,211,153,.15)!important
 }
 .cefr-above { font-weight: 700; text-shadow: 0 0 6px rgba(250,204,21,.5); }
 .cefr-way-above { font-weight: 700; text-shadow: 0 0 8px rgba(239,68,68,.6); }
+/* Toast notification keyframes (used by showSessionSaved) */
+@keyframes toastIn { from { opacity: 0; transform: translateX(-50%) translateY(10px); } to { opacity: 1; transform: translateX(-50%) translateY(0); } }
+@keyframes toastOut { from { opacity: 1; } to { opacity: 0; } }
 </style>
 </head>
 <body class="hb-start" style="display:flex;flex-direction:column;height:100vh;overflow:hidden">
@@ -1402,7 +1405,7 @@ button[onclick*="addToWordBank"]:hover{background:rgba(52,211,153,.15)!important
       <span class="tp-dot" id="micDot"></span>
       <span id="micStatus" style="font-size:13px;font-weight:600;color:var(--muted)" data-i18n="mic_off">Mic Off</span>
     </span>
-    <button type="button" class="btn-grad btn-stop" id="stopBtn" style="display:none;font-size:15px;padding:8px 22px;border-radius:100px" onclick="toggleSession()"><i class="fas fa-stop"></i> <span data-i18n="stop">Stop</span></button>
+    <button type="button" class="btn-grad btn-stop" id="stopBtn" style="display:none;font-size:15px;padding:8px 22px;border-radius:100px"><i class="fas fa-stop"></i> <span data-i18n="stop">Stop</span></button>
   </div>
 </div>
 
@@ -4200,6 +4203,7 @@ async function toggleSession() {
     window._sessionLines = [];
     startBtn.style.display = '';
     stopBtn.style.display = 'none';
+    stopBtn.onclick = null; // clear handler — only set when button is shown
     if (pauseBtn) { pauseBtn.style.display = 'none'; pauseBtn.classList.remove('paused'); }
     paused = false;
     if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
@@ -4256,8 +4260,8 @@ function _applySessionLiveUI(startBtn, stopBtn) {
     // timer is already running from togglePause, just sync buttons
     if (_realMic.state === 'live' && !paused && timerInterval !== null) {
       startBtn.style.display = 'none';
-      // Defer showing stop button to prevent phantom click (mouseup retargeting)
-      setTimeout(function() { if (sessionActive) stopBtn.style.display = ''; }, 150);
+      // Defer showing stop button — attach onclick only when visible
+      setTimeout(function() { if (sessionActive) { stopBtn.style.display = ''; stopBtn.onclick = toggleSession; } }, 150);
       if (pauseBtn) { pauseBtn.style.display = ''; pauseBtn.textContent = '⏸'; pauseBtn.classList.remove('paused'); }
       updateRecDash('live');
       document.body.classList.add('session-active');
@@ -4265,8 +4269,8 @@ function _applySessionLiveUI(startBtn, stopBtn) {
     }
     // Fresh start — mic just started, set up everything
     startBtn.style.display = 'none';
-    // Defer showing stop button to prevent phantom click (mouseup retargeting)
-    setTimeout(function() { if (sessionActive) stopBtn.style.display = ''; }, 150);
+    // Defer showing stop button — attach onclick only when visible
+    setTimeout(function() { if (sessionActive) { stopBtn.style.display = ''; stopBtn.onclick = toggleSession; } }, 150);
     if (pauseBtn) { pauseBtn.style.display = ''; pauseBtn.textContent = '⏸'; pauseBtn.classList.remove('paused'); }
     sessionSeconds = 0;
     wordBank = [];
