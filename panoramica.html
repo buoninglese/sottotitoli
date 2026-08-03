@@ -55,7 +55,7 @@
   <div class="app-shell">
     <header class="topbar">
       <div style="display:flex;align-items:center;gap:0">
-        <a href="index.html" class="topbar-brand" style="font-size:31px;font-family:'Manrope',sans-serif;font-weight:700;text-decoration:none;letter-spacing:-0.02em;display:inline-flex;align-items:baseline;gap:0">sottotitoli<span style="font-family:'Manrope',sans-serif;font-weight:800;color:var(--accent-purple,#7c3aed);letter-spacing:-.5px">.pro</span><span class="topbar-version" style="font-size:10px;font-weight:600;font-family:'Manrope',sans-serif;color:var(--text-soft);margin-left:6px;opacity:.55;letter-spacing:.02em">v94</span></a>
+        <a href="index.html" class="topbar-brand" style="font-size:31px;font-family:'Manrope',sans-serif;font-weight:700;text-decoration:none;letter-spacing:-0.02em;display:inline-flex;align-items:baseline;gap:0">sottotitoli<span style="font-family:'Manrope',sans-serif;font-weight:800;color:var(--accent-purple,#7c3aed);letter-spacing:-.5px">.pro</span><span class="topbar-version" style="font-size:10px;font-weight:600;font-family:'Manrope',sans-serif;color:var(--text-soft);margin-left:6px;opacity:.55;letter-spacing:.02em">v95</span></a>
       </div>
       <div style="display:flex;align-items:center;gap:12px">
         <button class="btn-start-session" id="btnStartSession" onclick="toggleStartSession()" style="font-size:15px;height:42px;padding:0 20px;border-radius:12px;background:linear-gradient(135deg,rgba(192,132,252,.18),rgba(192,132,252,.06));color:#c084fc;border:1px solid rgba(192,132,252,.25);font-weight:700;font-family:'Manrope',sans-serif;display:inline-flex;align-items:center;gap:8px;box-shadow:0 0 20px rgba(192,132,252,.12),0 2px 8px rgba(0,0,0,.2);cursor:pointer;letter-spacing:-.01em;transition:all .2s ease" onmouseover="this.style.background='linear-gradient(135deg,rgba(192,132,252,.28),rgba(192,132,252,.12))';this.style.borderColor='rgba(192,132,252,.4)';this.style.boxShadow='0 0 28px rgba(192,132,252,.22),0 4px 12px rgba(0,0,0,.25)'" onmouseout="this.style.background='linear-gradient(135deg,rgba(192,132,252,.18),rgba(192,132,252,.06))';this.style.borderColor='rgba(192,132,252,.25)';this.style.boxShadow='0 0 20px rgba(192,132,252,.12),0 2px 8px rgba(0,0,0,.2)'">
@@ -144,29 +144,121 @@
 
     <div class="workspace">
       <main class="main-panel js-loading" id="main-content">
-        <!-- Start Session panel -->
+        <!-- ═══ Start Session Popup — Diagonal Split ═══ -->
+        <style>
+          #startSplit{display:none;position:fixed;inset:0;z-index:500;align-items:center;justify-content:center;padding:20px;background:rgba(0,0,0,.7);backdrop-filter:blur(8px)}
+          #startSplit.active{display:flex}
+          #startSplit .ss-popup{position:relative;width:100%;max-width:1100px;height:85vh;max-height:700px;border-radius:2rem;overflow:hidden;background:var(--bg);border:1px solid var(--line);perspective:2000px;transition:transform .6s cubic-bezier(.1,0,0,1)}
+          #startSplit .ss-diagonal-container{position:relative;width:100%;height:100%;display:flex;align-items:stretch;border-radius:2rem;overflow:hidden}
+          #startSplit .ss-close{position:absolute;top:16px;right:16px;z-index:50;width:36px;height:36px;border-radius:50%;background:var(--card);border:1px solid var(--line);display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--text-soft);font-size:18px;transition:all .2s}
+          #startSplit .ss-close:hover{background:var(--red);color:#fff;border-color:var(--red)}
+          #startSplit .ss-left{flex:1;display:flex;align-items:center;justify-content:flex-start;padding:3rem;position:relative;background:linear-gradient(135deg,rgba(6,182,212,.04) 0%,transparent 60%);z-index:2;transition:background .4s}
+          #startSplit .ss-left:hover{background:linear-gradient(135deg,rgba(6,182,212,.1) 0%,transparent 60%)}
+          #startSplit .ss-right{flex:1;display:flex;align-items:center;justify-content:flex-end;text-align:right;padding:3rem;position:relative;background:linear-gradient(225deg,rgba(168,85,247,.04) 0%,transparent 60%);z-index:2;transition:background .4s}
+          #startSplit .ss-right:hover{background:linear-gradient(225deg,rgba(168,85,247,.08) 0%,transparent 60%)}
+          #startSplit .ss-divider{position:absolute;top:-10%;left:50%;width:2px;height:120%;background:var(--cyan);box-shadow:0 0 10px var(--cyan),0 0 24px var(--cyan);transform:translateX(-50%) rotate(13deg);z-index:3;pointer-events:none;transition:all .7s cubic-bezier(.1,0,0,1)}
+          #startSplit .ss-left:hover ~ .ss-divider{transform:translateX(-50%) rotate(14deg);left:52%}
+          #startSplit .ss-right:hover ~ .ss-divider{transform:translateX(-50%) rotate(12deg);left:48%}
+          #startSplit .ss-content{max-width:440px;z-index:10;transition:transform .5s ease-out}
+          #startSplit .ss-left:hover .ss-content{transform:translateX(8px)}
+          #startSplit .ss-right:hover .ss-content{transform:translateX(-8px)}
+          #startSplit .ss-tag{display:inline-flex;align-items:center;gap:8px;font-size:10px;font-weight:900;text-transform:uppercase;letter-spacing:.15em;font-family:'Manrope',sans-serif;margin-bottom:16px}
+          #startSplit .ss-left .ss-tag{color:var(--cyan)}
+          #startSplit .ss-right .ss-tag{color:#a855f7}
+          #startSplit .ss-tag .ss-dot{width:7px;height:7px;border-radius:50%;animation:pulse 2s infinite}
+          #startSplit .ss-left .ss-dot{background:var(--cyan);box-shadow:0 0 8px var(--cyan)}
+          #startSplit .ss-right .ss-dot{background:#a855f7;box-shadow:0 0 8px #a855f7}
+          #startSplit .ss-title{font-size:clamp(2.5rem,6vw,5rem);font-weight:900;line-height:.9;letter-spacing:-.03em;margin:0 0 20px;font-family:'Manrope',sans-serif;color:var(--text)}
+          #startSplit .ss-title em{font-style:normal;color:var(--cyan)}
+          #startSplit .ss-right .ss-title em{color:#a855f7}
+          #startSplit .ss-desc{font-size:15px;color:var(--text-soft);line-height:1.6;margin:0 0 24px;max-width:380px}
+          #startSplit .ss-right .ss-desc{margin-left:auto}
+          #startSplit .ss-lang-row{display:flex;align-items:center;gap:12px;margin-bottom:20px;flex-wrap:wrap}
+          #startSplit .ss-right .ss-lang-row{justify-content:flex-end}
+          #startSplit .ss-lang-chip{display:inline-flex;align-items:center;gap:10px;padding:12px 20px;border-radius:16px;background:var(--card);border:1px solid var(--line);cursor:pointer;transition:all .3s;font-family:'Inter',sans-serif}
+          #startSplit .ss-lang-chip:hover{border-color:var(--cyan);transform:translateY(-2px);box-shadow:0 8px 24px rgba(0,0,0,.15)}
+          #startSplit .ss-lang-chip .ss-flag{font-size:28px;transition:transform .3s}
+          #startSplit .ss-lang-chip:hover .ss-flag{transform:scale(1.15)}
+          #startSplit .ss-lang-chip .ss-lang-name{font-size:16px;font-weight:700;color:var(--text)}
+          #startSplit .ss-lang-chip .ss-lang-hint{font-size:10px;color:var(--text-soft);text-transform:uppercase;letter-spacing:.05em}
+          #startSplit .ss-lang-arrow{color:var(--text-faint);font-size:18px;flex-shrink:0}
+          #startSplit .ss-btn{display:inline-flex;align-items:center;gap:10px;padding:18px 36px;border-radius:16px;font-family:'Manrope',sans-serif;font-size:16px;font-weight:800;text-transform:uppercase;letter-spacing:.02em;cursor:pointer;border:none;transition:all .3s cubic-bezier(.1,0,0,1);position:relative;overflow:hidden}
+          #startSplit .ss-btn-cap{background:var(--cyan);color:#fff}
+          #startSplit .ss-btn-cap:hover{transform:translateY(-3px);box-shadow:0 12px 32px rgba(6,182,212,.35)}
+          #startSplit .ss-btn-tr{background:transparent;color:#a855f7;border:2px solid #a855f7}
+          #startSplit .ss-btn-tr:hover{background:rgba(168,85,247,.08);transform:translateY(-3px);box-shadow:0 12px 32px rgba(168,85,247,.2)}
+          #startSplit .ss-btn:active{transform:scale(.97)}
+          #startSplit .ss-btn::after{content:'';position:absolute;top:0;left:-150%;width:100%;height:100%;background:linear-gradient(120deg,transparent,rgba(255,255,255,.25),transparent);transition:.6s}
+          #startSplit .ss-btn:hover::after{left:150%}
+          /* Spinner */
+          #startSplit .ss-spinner{display:none;position:absolute;inset:0;z-index:20;background:var(--bg);border-radius:2rem;padding:2rem;flex-direction:column;align-items:center;justify-content:center}
+          #startSplit .ss-left .ss-spinner{align-items:flex-start;padding-left:3rem}
+          #startSplit .ss-right .ss-spinner{align-items:flex-end;padding-right:3rem;text-align:right}
+          #startSplit .ss-spinner.show{display:flex}
+          #startSplit .ss-spinner .sst{font-size:20px;font-weight:700;margin-bottom:20px;color:var(--text)}
+          #startSplit .ss-spinner .ssg{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;max-width:400px}
+          #startSplit .ss-spinner .ssc{padding:14px 18px;border-radius:14px;border:1px solid var(--line);background:var(--card);color:var(--text);font-size:14px;font-weight:600;cursor:pointer;transition:all .2s;font-family:inherit;text-align:left}
+          #startSplit .ss-spinner .ssc:hover{border-color:var(--cyan);background:rgba(6,182,212,.06)}
+          #startSplit .ss-spinner .ssc.selected{border-color:var(--cyan);background:rgba(6,182,212,.12);color:var(--cyan)}
+          #startSplit .ss-spinner .ssconfirm{margin-top:18px;padding:12px 28px;border-radius:12px;background:var(--cyan);color:#fff;border:none;font-weight:700;cursor:pointer;font-family:inherit;transition:all .2s}
+          #startSplit .ss-spinner .ssconfirm:hover{box-shadow:0 6px 20px rgba(6,182,212,.3)}
+          @media(max-width:768px){
+            #startSplit .ss-diagonal-container{flex-direction:column;height:auto;max-height:90vh;overflow-y:auto}
+            #startSplit .ss-divider{display:none}
+            #startSplit .ss-left,#startSplit .ss-right{padding:2rem;text-align:center;justify-content:center;align-items:center}
+            #startSplit .ss-right .ss-content,#startSplit .ss-desc,#startSplit .ss-right .ss-desc{margin:0 auto;text-align:center}
+            #startSplit .ss-right .ss-lang-row{justify-content:center}
+            #startSplit .ss-title{font-size:2.5rem}
+            #startSplit .ss-popup{max-height:90vh;height:auto}
+          }
+        </style>
         <div class="start-split" id="startSplit">
-          <div class="start-half caption">
-            <div class="start-icon"><svg class="icon" style="width:20px;height:20px"><use href="#i-mic"></use></svg></div>
-            <div class="start-tag" data-i18n="ss_caption_tag">Caption</div>
-            <h3><span data-i18n-html="ss_caption_title">Sottotitoli in<br><em>una sola lingua</em></span></h3>
-            <p><span data-i18n="ss_caption_desc">Scegli la lingua e avvia i sottotitoli in tempo reale.</span></p>
-            <div class="start-flag" onclick="openSSSpinner(this,'cap')"><span class="fl" id="ssCapFlag">🇬🇧</span><span id="ssCapName">English</span><span class="hint"><span class="hint" data-i18n="ss_caption_hint">clicca per cambiare</span></span></div>
-            <button class="start-btn cap" data-i18n="ss_caption_btn">Avvia Caption</button>
-            <div class="start-spinner" id="ssCapSpinner"><div class="sst">Scegli la lingua</div><div class="ssg" id="ssCapGrid"></div><button class="ssconfirm" onclick="closeSSSpinner('cap')">Conferma</button></div>
-          </div>
-          <div class="start-half translate">
-            <div class="start-icon"><svg class="icon" style="width:20px;height:20px"><use href="#i-language"></use></svg></div>
-            <div class="start-tag" data-i18n="ss_translate_tag">Translate</div>
-            <h3><span data-i18n-html="ss_translate_title">Traduzione<br><em>in tempo reale</em></span></h3>
-            <p><span data-i18n="ss_translate_desc">Scegli la lingua che parli e quella per i sottotitoli.</span></p>
-            <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">
-              <div class="start-flag" style="margin-bottom:0" onclick="openSSSpinner(this,'src')"><span class="fl" id="ssSrcFlag">🇬🇧</span><span id="ssSrcName">English</span><span class="hint">parlato</span></div>
-              <span style="color:var(--text-faint);font-size:18px">→</span>
-              <div class="start-flag" style="margin-bottom:0" onclick="openSSSpinner(this,'tgt')"><span class="fl" id="ssTgtFlag">🇮🇹</span><span id="ssTgtName">Italiano</span><span class="hint">sottotitoli</span></div>
+          <div class="ss-popup" id="ssPopup">
+            <button class="ss-close" onclick="toggleStartSession()" aria-label="Close">✕</button>
+            <div class="ss-diagonal-container" id="ssDiagonal">
+              <div class="ss-divider"></div>
+              <!-- Left: Caption Mode -->
+              <div class="ss-left" id="ssCapHalf">
+                <div class="ss-content">
+                  <div class="ss-tag"><span class="ss-dot"></span> CAPTION</div>
+                  <h2 class="ss-title">Solo<br><em>Lingua</em></h2>
+                  <p class="ss-desc">Scegli la lingua e avvia i sottotitoli in tempo reale.</p>
+                  <div class="ss-lang-row">
+                    <div class="ss-lang-chip" onclick="openSSSpinner(this,'cap')">
+                      <span class="ss-flag" id="ssCapFlag">🇬🇧</span>
+                      <div><div class="ss-lang-name" id="ssCapName">English</div><div class="ss-lang-hint">clicca per cambiare</div></div>
+                    </div>
+                  </div>
+                  <button class="ss-btn ss-btn-cap" onclick="window.open('caption-s8t.html?'+ssCapCode,'_blank')">
+                    <span>▶</span> Avvia Caption
+                  </button>
+                  <div class="ss-spinner" id="ssCapSpinner"><div class="sst">Scegli la lingua</div><div class="ssg" id="ssCapGrid"></div><button class="ssconfirm" onclick="closeSSSpinner('cap')">Conferma</button></div>
+                </div>
+              </div>
+              <!-- Right: Translate Mode -->
+              <div class="ss-right" id="ssTrHalf">
+                <div class="ss-content">
+                  <div class="ss-tag"><span class="ss-dot"></span> TRANSLATE</div>
+                  <h2 class="ss-title">Live<br><em>Relay</em></h2>
+                  <p class="ss-desc">Scegli la lingua che parli e quella per i sottotitoli.</p>
+                  <div class="ss-lang-row">
+                    <div class="ss-lang-chip" onclick="openSSSpinner(this,'src')">
+                      <span class="ss-flag" id="ssSrcFlag">🇬🇧</span>
+                      <div><div class="ss-lang-name" id="ssSrcName">English</div><div class="ss-lang-hint">parlato</div></div>
+                    </div>
+                    <span class="ss-lang-arrow">→</span>
+                    <div class="ss-lang-chip" onclick="openSSSpinner(this,'tgt')">
+                      <span class="ss-flag" id="ssTgtFlag">🇮🇹</span>
+                      <div><div class="ss-lang-name" id="ssTgtName">Italiano</div><div class="ss-lang-hint">sottotitoli</div></div>
+                    </div>
+                  </div>
+                  <button class="ss-btn ss-btn-tr" onclick="window.open('traduzione-s8t.html?src='+ssSrcCode+'&tgt='+ssTgtCode,'_blank')">
+                    <span>🌐</span> Avvia Traduzione
+                  </button>
+                  <div class="ss-spinner" id="ssTrSpinner"><div class="sst" id="ssTrTitle">Io parlo in…</div><div class="ssg" id="ssTrGrid"></div><button class="ssconfirm" onclick="closeSSSpinner('tr')">Conferma</button></div>
+                </div>
+              </div>
             </div>
-            <button class="start-btn tr" data-i18n="ss_translate_btn">Avvia Traduzione</button>
-            <div class="start-spinner" id="ssTrSpinner"><div class="sst" id="ssTrTitle">Io parlo in…</div><div class="ssg" id="ssTrGrid"></div><button class="ssconfirm" onclick="closeSSSpinner('tr')">Conferma</button></div>
           </div>
         </div>
         <!-- Panoramica panel -->
@@ -4963,13 +5055,21 @@
             if (metric === 'totalSessions') d.value = d.sessions;
             else if (metric === 'totalMinutes') d.value = d.minutes;
             else if (metric === 'totalWords') d.value = d.words;
-            else if (metric === 'gseScore') d.value = d.wpmCount > 0 ? Math.round(d.wpmSum / d.wpmCount) : 0;
+            else if (metric === 'gseScore') d.value = 0; // GSE is computed globally, not per-session
             else if (metric === 'avgLexDiv') d.value = d.lexDivCount > 0 ? Math.round(d.lexDivSum / d.lexDivCount * 100) / 100 : 0;
             else d.value = d.minutes;
           });
 
           var maxVal = Math.max.apply(null, days.map(function(d) { return d.value; })) || 1;
           var totalVal = days.reduce(function(s, d) { return s + d.value; }, 0);
+
+          // GSE has no daily data — show the card value instead of a chart
+          if (metric === 'gseScore') {
+            if (totalEl) totalEl.textContent = cardNumber !== '—' ? cardNumber : '—';
+            container.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;width:100%"><p style="font-size:14px;color:var(--text-soft);text-align:center">Il GSE Score è calcolato sull\'intero vocabolario,<br>non per singola sessione giornaliera.</p></div>';
+            return;
+          }
+
           if (totalEl) {
             // Use the card's displayed number for consistency
             if (cardNumber && cardNumber !== '—') {
