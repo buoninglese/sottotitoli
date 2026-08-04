@@ -7397,28 +7397,39 @@ window.lookupSynonym = function(el) {
     });
   }, 100);
   
-  // Fetch definition from Free Dictionary API
-  var lang = (currentCaptionLang || 'en-US').split('-')[0];
-  fetch('https://api.dictionaryapi.dev/api/v2/entries/' + lang + '/' + encodeURIComponent(word))
+  // Fetch definition via Supabase dictionary proxy (cached, more reliable)
+  fetch('https://qzqmuegbpmvqrjrlfbgk.supabase.co/functions/v1/dictionary-proxy?word=' + encodeURIComponent(word))
     .then(function(r) { return r.json(); })
     .then(function(data) {
       var defEl = document.getElementById('synDefContent');
       if (!defEl) return;
-      if (data && data[0] && data[0].meanings) {
-        var defHtml = '';
-        data[0].meanings.forEach(function(m) {
-          defHtml += '<div style="margin-bottom:8px"><span style="font-size:9px;font-weight:700;color:var(--accent);text-transform:uppercase">' + m.partOfSpeech + '</span>';
-          if (m.definitions && m.definitions[0]) {
-            defHtml += '<div style="margin-top:2px">' + m.definitions[0].definition + '</div>';
-            if (m.definitions[0].example) {
-              defHtml += '<div style="margin-top:3px;font-style:italic;color:var(--muted2);font-size:10px">"' + m.definitions[0].example + '"</div>';
-            }
-          }
-          defHtml += '</div>';
-        });
-        defEl.innerHTML = defHtml || 'No definition found.';
-      } else {
+      if (data && data.definition) {
+        defEl.innerHTML = data.definition;
+        if (data.ipa) {
+          defEl.innerHTML = '<span style="font-size:10px;color:var(--muted);margin-right:8px">/' + data.ipa + '/</span>' + defEl.innerHTML;
+        }
+      } else if (data && data.notFound) {
         defEl.innerHTML = 'No definition found for "' + word + '".';
+      } else {
+        // Try direct Free Dictionary API as fallback
+        var lang = (currentCaptionLang || 'en-US').split('-')[0];
+        return fetch('https://api.dictionaryapi.dev/api/v2/entries/' + lang + '/' + encodeURIComponent(word))
+          .then(function(r2) { return r2.json(); })
+          .then(function(raw) {
+            if (raw && raw[0] && raw[0].meanings) {
+              var defHtml = '';
+              raw[0].meanings.forEach(function(m) {
+                defHtml += '<div style="margin-bottom:8px"><span style="font-size:9px;font-weight:700;color:var(--accent);text-transform:uppercase">' + m.partOfSpeech + '</span>';
+                if (m.definitions && m.definitions[0]) {
+                  defHtml += '<div style="margin-top:2px">' + m.definitions[0].definition + '</div>';
+                }
+                defHtml += '</div>';
+              });
+              defEl.innerHTML = defHtml || 'No definition found.';
+            } else {
+              defEl.innerHTML = 'No definition found for "' + word + '".';
+            }
+          });
       }
     })
     .catch(function() {
