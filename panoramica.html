@@ -4273,17 +4273,18 @@
       function renderPanoramicaCEFR() {
         var container = document.getElementById('panoramicaCefrChart');
         if (!container) return;
-        if (!cefrBreakdown || cefrBreakdown.total === 0) {
+        var bd = window.cefrBreakdown;
+        if (!bd || bd.total === 0) {
           container.innerHTML = '<p style="font-size:13px;color:var(--text-faint)">Completa alcune sessioni per vedere la distribuzione CEFR del tuo vocabolario.</p>';
           return;
         }
         var levels = [
-          {k:'C2',v:cefrBreakdown.C2,c:'#8b5cf6'},
-          {k:'C1',v:cefrBreakdown.C1,c:'var(--amber)'},
-          {k:'B2',v:cefrBreakdown.B2,c:'var(--green)'},
-          {k:'B1',v:cefrBreakdown.B1,c:'var(--teal-2)'},
-          {k:'A2',v:cefrBreakdown.A2,c:'var(--teal)'},
-          {k:'A1',v:cefrBreakdown.A1,c:'var(--blue)'}
+          {k:'C2',v:bd.C2,c:'#8b5cf6'},
+          {k:'C1',v:bd.C1,c:'var(--amber)'},
+          {k:'B2',v:bd.B2,c:'var(--green)'},
+          {k:'B1',v:bd.B1,c:'var(--teal-2)'},
+          {k:'A2',v:bd.A2,c:'var(--teal)'},
+          {k:'A1',v:bd.A1,c:'var(--blue)'}
         ];
         var maxVal = Math.max.apply(null, levels.map(function(l){return l.v;})) || 1;
         var html = '<div style="display:flex;flex-direction:column;gap:6px">';
@@ -4295,7 +4296,7 @@
             '<div style="height:100%;width:' + pct + '%;background:' + l.c + ';border-radius:4px;min-width:2px"></div></div>' +
             '<span style="font-size:12px;font-weight:600;color:var(--text-soft);min-width:44px">' + l.v + '</span></div>';
         });
-        html += '<div style="font-size:11px;color:var(--text-faint);margin-top:4px">Vocabolario totale: <strong>' + cefrBreakdown.vocabSize + ' parole</strong> · MATTR: <strong>' + (cefrBreakdown.mattr > 0 ? cefrBreakdown.mattr.toFixed(3) : '—') + '</strong></div>';
+        html += '<div style="font-size:11px;color:var(--text-faint);margin-top:4px">Vocabolario totale: <strong>' + bd.vocabSize + ' parole</strong> · MATTR: <strong>' + (bd.mattr > 0 ? bd.mattr.toFixed(3) : '—') + '</strong></div>';
         html += '</div>';
         container.innerHTML = html;
       }
@@ -4307,8 +4308,20 @@
           {k:'B1',c:'var(--teal-2)'},{k:'A2',c:'var(--teal)'},{k:'A1',c:'var(--blue)'}
         ];
 
-        // ── All words (from cefrBreakdown) ──
-        var allData = cefrBreakdown || {};
+        // ── All words (from window.cefrBreakdown) ──
+        var allData = window.cefrBreakdown || {};
+        // If data isn't loaded yet, try fetching it now
+        if ((!allData || !allData.total) && window.SottotitoliData && window.SottotitoliData.getCEFRBreakdown) {
+          try {
+            window.cefrBreakdown = await SottotitoliData.getCEFRBreakdown();
+            allData = window.cefrBreakdown || {};
+          } catch(e) { /* will retry later */ }
+        }
+        // If still no data, schedule a retry
+        if (!allData || !allData.total) {
+          setTimeout(function(){ renderCEFRQuad(); }, 2000);
+          return;
+        }
         var allTotal = allData.total || 0;
         var allCounts = { A1: allData.A1||0, A2: allData.A2||0, B1: allData.B1||0, B2: allData.B2||0, C1: allData.C1||0, C2: allData.C2||0 };
         var allMax = Math.max.apply(null, Object.values(allCounts)) || 1;
@@ -5148,7 +5161,7 @@
           totalWords: s ? (s.totalWords > 999 ? (s.totalWords / 1000).toFixed(1) + 'k' : s.totalWords) : '0',
           avgWpm: s ? Math.round(s.avgWpm) : '—',
           avgLexDiv: s ? s.avgLexDiv.toFixed(2) : '—',
-          mattr: cefrBreakdown && cefrBreakdown.mattr > 0 ? cefrBreakdown.mattr.toFixed(3) : (s ? s.avgLexDiv.toFixed(2) : '—'),
+          mattr: window.cefrBreakdown && window.cefrBreakdown.mattr > 0 ? window.cefrBreakdown.mattr.toFixed(3) : (s ? s.avgLexDiv.toFixed(2) : '—'),
           reportCount: (reports || []).length,
           dailyMin: (s && s.thisWeekSessions > 0) ? fmtMinutes(Math.round(s.thisWeekMinutes / Math.min(7, s.thisWeekSessions || 1))) : '0m',
           completionPct: (s && s.thisWeekSessions > 0) ? Math.min(100, Math.round(s.thisWeekSessions / 7 * 100)) + '%' : '0%'
@@ -5437,10 +5450,10 @@
         var levelSubtext = 'Nessuna sessione registrata. Inizia a parlare!';
         var levelBarPct = 0;
         var levelRingOffset = 264; // full dasharray (hidden)
-        if (cefrBreakdown && cefrBreakdown.total > 0) {
+        if (window.cefrBreakdown && window.cefrBreakdown.total > 0) {
           // Weighted score: A1=1, A2=2, B1=3, B2=4, C1=5, C2=6
-          var wSum = cefrBreakdown.A1*1 + cefrBreakdown.A2*2 + cefrBreakdown.B1*3 + cefrBreakdown.B2*4 + cefrBreakdown.C1*5 + cefrBreakdown.C2*6;
-          var wAvg = wSum / cefrBreakdown.total;
+          var wSum = window.cefrBreakdown.A1*1 + window.cefrBreakdown.A2*2 + window.cefrBreakdown.B1*3 + window.cefrBreakdown.B2*4 + window.cefrBreakdown.C1*5 + window.cefrBreakdown.C2*6;
+          var wAvg = wSum / window.cefrBreakdown.total;
           var lvlIdx = Math.round(wAvg) - 1;
           lvlIdx = Math.max(0, Math.min(5, lvlIdx));
           var lvlMap = ['A1','A2','B1','B2','C1','C2'];
@@ -5449,13 +5462,13 @@
           // Ring: offset proportional to weighted average (264 = empty, 0 = full C2)
           levelRingOffset = 264 - (wAvg / 6 * 264);
           // Build richer subtext
-          var pctAboveA2 = Math.round((cefrBreakdown.B1 + cefrBreakdown.B2 + cefrBreakdown.C1 + cefrBreakdown.C2) / cefrBreakdown.total * 100);
-          levelSubtext = 'Basato su <strong>' + cefrBreakdown.vocabSize + ' parole</strong>. Livello pesato: ' + estimatedLevel + ' · ' + pctAboveA2 + '% sopra A2.';
+          var pctAboveA2 = Math.round((window.cefrBreakdown.B1 + window.cefrBreakdown.B2 + window.cefrBreakdown.C1 + window.cefrBreakdown.C2) / window.cefrBreakdown.total * 100);
+          levelSubtext = 'Basato su <strong>' + window.cefrBreakdown.vocabSize + ' parole</strong>. Livello pesato: ' + estimatedLevel + ' · ' + pctAboveA2 + '% sopra A2.';
           // Store per-level data for POS detail
           window._vocabLevelData = {
-            A1: cefrBreakdown.A1, A2: cefrBreakdown.A2, B1: cefrBreakdown.B1,
-            B2: cefrBreakdown.B2, C1: cefrBreakdown.C1, C2: cefrBreakdown.C2,
-            total: cefrBreakdown.total, vocabSize: cefrBreakdown.vocabSize
+            A1: window.cefrBreakdown.A1, A2: window.cefrBreakdown.A2, B1: window.cefrBreakdown.B1,
+            B2: window.cefrBreakdown.B2, C1: window.cefrBreakdown.C1, C2: window.cefrBreakdown.C2,
+            total: window.cefrBreakdown.total, vocabSize: window.cefrBreakdown.vocabSize
           };
         } else if (s && s.totalSessions > 0) {
           levelSubtext = 'Basato su <strong>' + s.totalSessions + ' sessioni</strong> registrate. Attiva l\'analisi per una stima del livello.';
@@ -9644,7 +9657,7 @@
       function renderVocabTraguardi() {
         var container = document.querySelector('#sub-voc-traguardi');
         if (!container) return;
-        var totalWords = cefrBreakdown ? cefrBreakdown.vocabSize : 0;
+        var totalWords = window.cefrBreakdown ? window.cefrBreakdown.vocabSize : 0;
         var milestones = [
           { label: '100 parole', reached: totalWords >= 100 },
           { label: '500 parole', reached: totalWords >= 500 },
@@ -9657,7 +9670,7 @@
         if (!milestones.some(function(m){return m.reached;})) html += '<span style="font-size:13px;color:var(--text-faint)">Nessun traguardo ancora. Continua a parlare!</span>';
         html += '</div></article><article class="alt-card"><h3>In corso</h3><div style="display:flex;flex-direction:column;gap:8px;margin-top:10px">';
         html += '<div style="display:flex;justify-content:space-between;font-size:14px"><span style="color:var(--text-soft)">1,500 parole uniche</span><span style="font-weight:700">' + totalWords + ' / 1,500</span></div>';
-        var c1c2 = cefrBreakdown ? (cefrBreakdown.C1 + cefrBreakdown.C2) : 0;
+        var c1c2 = window.cefrBreakdown ? (window.cefrBreakdown.C1 + window.cefrBreakdown.C2) : 0;
         if (c1c2 > 0) html += '<div style="display:flex;justify-content:space-between;font-size:14px"><span style="color:var(--text-soft)">50 parole C1+</span><span style="font-weight:700;color:' + (c1c2 >= 50 ? 'var(--green)' : 'var(--teal)') + '">' + c1c2 + ' / 50' + (c1c2 >= 50 ? ' ✓' : '') + '</span></div>';
         html += '</div></article></section>';
         html += '<div style="margin-top:14px;padding:20px 24px;background:linear-gradient(135deg,var(--teal-4),rgba(6,182,212,.05));border:1px solid rgba(14,116,144,.15);border-radius:16px;font-size:13px;color:var(--text-soft);line-height:1.6"><p>Il tuo vocabolario conta <strong style="color:var(--teal)">' + totalWords + ' parole uniche</strong>. Ogni sessione arricchisce il tuo lessico.</p></div>';
