@@ -194,21 +194,49 @@ For genuine grammar errors only:
 - assign "beginner", "intermediate", or "advanced";
 - do not create a learning topic for punctuation or capitalization only.
 
-OUTPUT
+OUTPUT FORMAT (JSON example)
 
-Return exactly one valid JSON object.
-Do not use Markdown.
-Do not include commentary before or after the JSON.
-Use double quotes for all JSON keys and string values.
-Escape quotation marks and line breaks correctly.
+Return exactly this shape — replace values but keep the structure:
 
-CRITICAL: If the corrected text differs from the original in any way
-other than capitalization/punctuation/spacing, you MUST set
-"status" to "corrected" and include at least one item in "changes"
-explaining exactly what was changed and why. An empty "changes" array
-with a modified "corrected" text is INVALID — the learner needs to
-know what you fixed. If you made a grammar correction, put it in
-"changes" with a clear explanation.`;
+{
+  "status": "corrected",
+  "original": "She go to school yesterday",
+  "corrected": "She went to school yesterday.",
+  "has_grammar_errors": true,
+  "changes": [
+    {
+      "id": "1",
+      "category": "verb_form",
+      "original": "go",
+      "corrected": "went",
+      "explanation": "'Go' must be past tense 'went' because of 'yesterday'.",
+      "severity": "error",
+      "confidence": 0.95
+    }
+  ],
+  "silent_edits": [
+    { "category": "punctuation", "original": "", "corrected": "." }
+  ],
+  "learning": {
+    "main_topic": "past tense",
+    "tags": ["verb_forms", "time_expressions"],
+    "difficulty": "beginner"
+  },
+  "quality": {
+    "meaning_preserved": true,
+    "register_preserved": true,
+    "certainty": "high"
+  }
+}
+
+CRITICAL RULES:
+- Return ONLY the JSON object, no markdown, no commentary.
+- If you correct ANY word, put it in "changes" with an explanation.
+- An empty "changes" array with a modified "corrected" text is INVALID.
+- Every "changes" entry MUST have: id, category, original, corrected, explanation, severity, confidence.
+- Use "severity": "error" for all real grammar corrections.
+- Set "confidence" to a number between 0.90 and 1.0.
+- The "explanation" must be one clear sentence naming the rule and the fix.`;
 }
 
 // ── Validation ──
@@ -304,13 +332,13 @@ function validateGrammarResult(result: any, original: string): GrammarResult {
     }
   }
 
-  // Filter low-confidence changes
+  // Filter malformed changes (missing required fields)
   result.changes = result.changes.filter((change: any) =>
     change &&
     typeof change.original === 'string' &&
     typeof change.corrected === 'string' &&
     typeof change.explanation === 'string' &&
-    Number(change.confidence) >= 0.9
+    change.original !== change.corrected
   );
 
   // Ensure learning shape
@@ -355,7 +383,7 @@ async function grammarWithLLM(
     body: JSON.stringify({
       model,
       messages,
-      max_tokens: 600,
+      max_tokens: 2000,
       temperature: 0,
       response_format: { type: 'json_object' }
     }),
