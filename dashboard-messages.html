@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dashboard Messages · Dev</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,400;14..32,500;14..32,600;14..32,700;14..32,800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+  <style>
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    :root{--bg:#0a0f1e;--text:#f1f5f9;--text-dim:#94a3b8;--text-soft:#64748b;--card:#111827;--card2:#1a1d26;--line:rgba(255,255,255,.08);--accent:#8b5cf6;--cyan:#06b6d4;--green:#10b981;--amber:#f59e0b;--red:#ef4444;--pink:#ec4899}
+    body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;padding:20px}
+    .topbar{display:flex;align-items:center;justify-content:space-between;max-width:1400px;margin:0 auto 20px}
+    .brand{font-size:14px;font-weight:600;color:var(--text-dim);text-decoration:none;display:flex;align-items:center;gap:8px}
+    .brand-dot{width:7px;height:7px;border-radius:50%;background:var(--accent);box-shadow:0 0 6px rgba(139,92,246,.5)}
+    h1{font-size:24px;font-weight:800;letter-spacing:-.02em}
+    .container{max-width:1400px;margin:0 auto}
+
+    /* Filters */
+    .filters{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px}
+    .fchip{padding:6px 14px;font-size:12px;font-weight:600;border-radius:99px;border:1px solid var(--line);background:var(--card2);color:var(--text-dim);cursor:pointer;font-family:inherit;transition:all .15s}
+    .fchip:hover{border-color:var(--accent);color:var(--text)}
+    .fchip.active{background:var(--accent);color:#fff;border-color:var(--accent)}
+
+    /* Stats row */
+    .stats{display:grid;grid-template-columns:repeat(6,1fr);gap:12px;margin-bottom:20px}
+    .stat{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px;text-align:center}
+    .stat .num{font-size:28px;font-weight:900;line-height:1}
+    .stat .lbl{font-size:10px;color:var(--text-dim);text-transform:uppercase;letter-spacing:.1em;margin-top:4px}
+    @media(max-width:900px){.stats{grid-template-columns:repeat(3,1fr)}}
+
+    /* Table */
+    .table-wrap{border-radius:16px;overflow:hidden;border:1px solid var(--line);background:var(--card)}
+    table{width:100%;border-collapse:collapse;font-size:13px}
+    thead th{background:var(--card2);padding:12px 16px;font-size:10px;font-weight:700;color:var(--text-dim);text-transform:uppercase;letter-spacing:.08em;text-align:left;border-bottom:1px solid var(--line);position:sticky;top:0;z-index:1}
+    tbody td{padding:10px 16px;border-bottom:1px solid var(--line);vertical-align:top}
+    tbody tr:hover{background:var(--card2)}
+    .priority-badge{display:inline-block;padding:2px 8px;border-radius:99px;font-size:11px;font-weight:700;min-width:32px;text-align:center}
+    .p-high{background:rgba(139,92,246,.15);color:#a78bfa}
+    .p-mid{background:rgba(6,182,212,.12);color:var(--cyan)}
+    .p-low{background:rgba(100,116,139,.12);color:var(--text-dim)}
+    .cat-tag{display:inline-block;padding:2px 8px;border-radius:4px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em}
+    .cat-return{background:rgba(236,72,153,.12);color:var(--pink)}
+    .cat-streak{background:rgba(245,158,11,.12);color:var(--amber)}
+    .cat-goal{background:rgba(16,185,129,.12);color:var(--green)}
+    .cat-improve{background:rgba(59,130,246,.12);color:#60a5fa}
+    .cat-early{background:rgba(6,182,212,.12);color:var(--cyan)}
+    .cat-new{background:rgba(100,116,139,.12);color:var(--text-dim)}
+    .condition{font-family:'SF Mono','Fira Code',monospace;font-size:11px;color:var(--text-soft);line-height:1.5;max-width:320px;word-break:break-word}
+    .message{font-size:13px;line-height:1.5;color:var(--text);font-style:italic;max-width:400px}
+    .message:before{content:'"'}
+    .message:after{content:'"'}
+
+    /* Edit modal */
+    .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:1000;display:none;align-items:center;justify-content:center;padding:20px}
+    .modal{background:var(--card);border:2px solid var(--line);border-radius:20px;padding:28px;max-width:560px;width:100%;max-height:85vh;overflow-y:auto}
+    .modal h3{font-size:18px;font-weight:800;margin:0 0 20px}
+    label.field{display:block;margin-bottom:14px}
+    label.field .lbl{display:block;font-size:11px;font-weight:700;color:var(--text-dim);margin-bottom:4px;text-transform:uppercase;letter-spacing:.05em}
+    input,textarea,select{width:100%;padding:10px 14px;font-size:14px;font-family:inherit;background:var(--card2);color:var(--text);border:1px solid var(--line);border-radius:8px;outline:none}
+    textarea{min-height:80px;resize:vertical;font-family:'SF Mono','Fira Code',monospace;font-size:12px}
+    input:focus,textarea:focus,select:focus{border-color:var(--accent)}
+    .btn{padding:10px 20px;font-size:13px;font-weight:700;border:none;border-radius:100px;cursor:pointer;font-family:inherit;display:inline-flex;align-items:center;gap:6px}
+    .btn-primary{background:var(--accent);color:#fff}
+    .btn-outline{background:none;border:1.5px solid var(--line);color:var(--text)}
+    .btn-sm{padding:5px 12px;font-size:11px}
+    .btn-danger{background:var(--red);color:#fff}
+    .actions{display:flex;gap:6px}
+    .actions button{opacity:.5;transition:opacity .15s}
+    .actions button:hover{opacity:1}
+    .empty{text-align:center;padding:60px 20px;color:var(--text-dim)}
+    .empty i{font-size:40px;display:block;margin-bottom:12px;opacity:.3}
+
+    /* JSON export */
+    .toolbar{display:flex;gap:8px;margin-bottom:16px;align-items:center}
+    .count{font-size:12px;color:var(--text-dim);margin-left:auto}
+  </style>
+</head>
+<body>
+  <div class="topbar">
+    <a class="brand" href="dev.html"><span class="brand-dot"></span>sottotitoli.ai — Dashboard Messages</a>
+    <span style="font-size:12px;color:var(--text-dim)">60+ priority-ordered messages</span>
+  </div>
+
+  <div class="container">
+    <div class="stats">
+      <div class="stat"><div class="num" id="statTotal" style="color:var(--accent)">—</div><div class="lbl">Total</div></div>
+      <div class="stat"><div class="num" id="statReturn" style="color:var(--pink)">—</div><div class="lbl">Return</div></div>
+      <div class="stat"><div class="num" id="statStreak" style="color:var(--amber)">—</div><div class="lbl">Streak</div></div>
+      <div class="stat"><div class="num" id="statGoal" style="color:var(--green)">—</div><div class="lbl">Goals</div></div>
+      <div class="stat"><div class="num" id="statImprove" style="color:#60a5fa">—</div><div class="lbl">Improve</div></div>
+      <div class="stat"><div class="num" id="statNew" style="color:var(--text-dim)">—</div><div class="lbl">Early/New</div></div>
+    </div>
+
+    <div class="toolbar">
+      <div class="filters" id="categoryFilters">
+        <button class="fchip active" data-cat="all">All</button>
+        <button class="fchip" data-cat="return">Return</button>
+        <button class="fchip" data-cat="streak">Streak</button>
+        <button class="fchip" data-cat="goal">Goals</button>
+        <button class="fchip" data-cat="improve">Improvement</button>
+        <button class="fchip" data-cat="early">Early Progress</button>
+        <button class="fchip" data-cat="new">New User</button>
+      </div>
+      <span class="count" id="filteredCount"></span>
+    </div>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th style="width:60px">Priority</th>
+            <th style="width:100px">Category</th>
+            <th style="width:300px">Condition</th>
+            <th>Message</th>
+            <th style="width:80px">Actions</th>
+          </tr>
+        </thead>
+        <tbody id="messagesTable"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Edit Modal -->
+  <div class="modal-overlay" id="editModal">
+    <div class="modal">
+      <h3 id="editTitle">Edit Message</h3>
+      <label class="field"><span class="lbl">Message Text</span><textarea id="editText" placeholder="Dashboard message…"></textarea></label>
+      <label class="field"><span class="lbl">Priority (0-100)</span><input type="number" id="editPriority" min="0" max="100"></label>
+      <label class="field"><span class="lbl">Category</span><select id="editCategory">
+        <option value="return">Return / Recovery</option>
+        <option value="streak">Streak & Consistency</option>
+        <option value="goal">Goals & Milestones</option>
+        <option value="improve">Improvement & Performance</option>
+        <option value="early">Early Progress</option>
+        <option value="new">New User</option>
+      </select></label>
+      <label class="field"><span class="lbl">Condition (JavaScript — uses 'm' parameter)</span><textarea id="editCondition" placeholder="return m.streak_days === 7;" style="font-family:'SF Mono',monospace"></textarea></label>
+      <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:8px">
+        <button class="btn btn-outline" onclick="closeEditModal()">Cancel</button>
+        <button class="btn btn-primary" id="saveEditBtn">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+  // ═══ Default messages (mirrors panoramica.html) ═══
+  var DEFAULT_CATEGORIES = {
+    return: [
+      {p:100, c:'return', f:'m.last_active_days>30', t:'You can restart without starting over.'},
+      {p:100, c:'return', f:'m.last_active_days>=15&&m.last_active_days<=30', t:'Your previous progress is still a useful foundation.'},
+      {p:100, c:'return', f:'m.last_active_days>=7&&m.last_active_days<=14', t:'Good to see you back. Start with one clear step.'},
+      {p:99, c:'return', f:'m.returning_user&&m.goal_progress<100', t:'Take a moment to reconnect with what you were learning.'},
+      {p:99, c:'return', f:'m.returning_user&&m.insights_available', t:'Your next session can turn reflection into progress.'}
+    ],
+    streak: [
+      {p:89, c:'streak', f:'m.streak_days===30', t:'You are showing what steady progress looks like.'},
+      {p:88, c:'streak', f:'m.streak_days>=30', t:'Your habit is now part of your learning system.'},
+      {p:87, c:'streak', f:'m.streak_days===21', t:'Your discipline is doing useful work.'},
+      {p:86, c:'streak', f:'m.streak_days===14', t:'You have created a routine with real momentum.'},
+      {p:85, c:'streak', f:'m.streak_days===14', t:'Two consistent weeks can change how learning feels.'},
+      {p:84, c:'streak', f:'m.streak_days===10', t:'Your regular effort is becoming visible.'},
+      {p:83, c:'streak', f:'m.streak_days===10', t:'Ten consecutive days reflect deliberate practice.'},
+      {p:82, c:'streak', f:'m.streak_days===7', t:'Your routine is beginning to carry you forward.'},
+      {p:81, c:'streak', f:'m.streak_days===7', t:'A full week of consistency is behind you.'},
+      {p:80, c:'streak', f:'m.streak_days===5', t:'You are building a rhythm that can last.'},
+      {p:80, c:'streak', f:'m.streak_days===5', t:'Five focused days show real commitment.'},
+      {p:79, c:'streak', f:'m.streak_days===3', t:'Your consistency is becoming a strength.'},
+      {p:79, c:'streak', f:'m.streak_days===3', t:'Three days in a row is a meaningful start.'},
+      {p:78, c:'streak', f:'m.streak_days>=8', t:'Keep protecting the rhythm you have created.'},
+      {p:75, c:'streak', f:'m.consistency_score>=0.85', t:'Your strongest advantage is consistency.'},
+      {p:75, c:'streak', f:'m.consistency_score>=0.8&&m.minutes_7d<60', t:'Your routine is reliable, even when sessions are short.'},
+      {p:74, c:'streak', f:'m.active_days_30d>=20', t:'Regular practice is giving your progress structure.'},
+      {p:74, c:'streak', f:'m.active_days_7d>=5', t:'You are returning often enough to retain momentum.'},
+      {p:73, c:'streak', f:'m.sessions_7d>=5&&m.avg_session_minutes<15', t:'You do not need long sessions to make steady progress.'}
+    ],
+    goal: [
+      {p:70, c:'goal', f:'m.goal_progress>=90&&m.goal_progress<100', t:'One more focused step could complete this goal.'},
+      {p:70, c:'goal', f:'m.goal_progress>=90&&m.goal_progress<100', t:'The finish line is now clearly visible.'},
+      {p:69, c:'goal', f:'m.goal_progress>=80', t:'You are close enough to finish with intention.'},
+      {p:69, c:'goal', f:'m.goal_progress>=75&&m.goal_progress<=89', t:'Your goal is becoming a completed plan.'},
+      {p:68, c:'goal', f:'m.goal_progress>=50&&m.goal_progress<=74', t:'Your next milestone is within reach.'},
+      {p:68, c:'goal', f:'m.goal_progress===50', t:'You are more than halfway there.'},
+      {p:67, c:'goal', f:'m.weekly_goal_met', t:'Your weekly goal is complete. Keep the momentum useful.'},
+      {p:67, c:'goal', f:'m.weekly_goal_met', t:'You followed through on this week\'s plan.'}
+    ],
+    improve: [
+      {p:65, c:'improve', f:'m.accuracy_delta_30d>=10&&m.sessions_30d>=8', t:'You have evidence that your method is working.'},
+      {p:65, c:'improve', f:'m.accuracy_delta_30d>=5&&m.sessions_30d>=5', t:'Your recent practice is producing measurable gains.'},
+      {p:64, c:'improve', f:'m.accuracy_delta_30d>=5', t:'Your recent results show clear improvement.'},
+      {p:64, c:'improve', f:'m.accuracy_delta_30d>0', t:'Your accuracy is moving in the right direction.'},
+      {p:63, c:'improve', f:'m.accuracy_7d>=85&&m.consistency_score>=0.7', t:'Your strengths are becoming more consistent.'},
+      {p:63, c:'improve', f:'m.accuracy_7d>=80&&m.sessions_7d>=3', t:'Your latest sessions show useful control.'}
+    ],
+    early: [
+      {p:50, c:'early', f:'m.consistency_score>=0.6', t:'Your learning is moving from effort to routine.'},
+      {p:49, c:'early', f:'m.active_days_7d>=3&&m.sessions_7d>=4', t:'Your learning rhythm is taking shape.'},
+      {p:48, c:'early', f:'m.sessions_7d>=3', t:'Your recent activity shows useful momentum.'},
+      {p:47, c:'early', f:'m.sessions_total>=7', t:'You are creating a reliable base.'},
+      {p:46, c:'early', f:'m.sessions_total>=5', t:'You have moved beyond the starting point.'},
+      {p:45, c:'early', f:'m.sessions_total>=3', t:'Small efforts are beginning to add up.'},
+      {p:44, c:'early', f:'m.sessions_total>=2&&m.sessions_total<=3', t:'You have started building momentum.'},
+      {p:43, c:'early', f:'m.sessions_total>=2', t:'Your first steps are becoming a pattern.'},
+      {p:42, c:'early', f:'m.sessions_total>=1', t:'You are turning intention into action.'},
+      {p:41, c:'early', f:'m.sessions_total===2', t:'Consistency begins with returning once more.'}
+    ],
+    new: [
+      {p:20, c:'new', f:'m.new_user&&m.days_since_signup<=7', t:'Your first step is already within reach.'},
+      {p:20, c:'new', f:'m.new_user', t:'Start small. Build something lasting.'},
+      {p:19, c:'new', f:'m.new_user&&m.sessions_total===0', t:'Your learning journey starts here.'},
+      {p:19, c:'new', f:'m.sessions_total===0', t:'A strong start begins with one focused session.'},
+      {p:18, c:'new', f:'m.sessions_total===0', t:'One session is enough to create momentum.'},
+      {p:18, c:'new', f:'m.sessions_total===0&&m.minutes_7d===0', t:'Give yourself one focused moment today.'},
+      {p:17, c:'new', f:'m.new_user&&m.sessions_total===0', t:'Make today your first meaningful step.'},
+      {p:17, c:'new', f:'m.new_user', t:'Begin with curiosity, not pressure.'},
+      {p:16, c:'new', f:'m.sessions_total===0', t:'Progress starts with showing up.'},
+      {p:16, c:'new', f:'m.sessions_total===0', t:'Your progress has a simple starting point: today.'}
+    ]
+  };
+
+  // Flatten
+  function getAllMessages() {
+    return [].concat.apply([], Object.values(DEFAULT_CATEGORIES));
+  }
+
+  var messages = getAllMessages();
+  var currentFilter = 'all';
+  var editingIndex = -1;
+
+  // ═══ Render ═══
+  function render() {
+    var filtered = currentFilter === 'all' ? messages : messages.filter(function(m){ return m.c === currentFilter; });
+    filtered.sort(function(a,b){ return b.p - a.p; });
+
+    var tbody = document.getElementById('messagesTable');
+    tbody.innerHTML = filtered.map(function(m, i){
+      var catClass = 'cat-' + m.c;
+      var priClass = m.p >= 80 ? 'p-high' : m.p >= 50 ? 'p-mid' : 'p-low';
+      var catLabel = {return:'Return',streak:'Streak',goal:'Goals',improve:'Improve',early:'Early',new:'New User'}[m.c] || m.c;
+      var realIndex = messages.indexOf(m);
+      return '<tr>' +
+        '<td><span class="priority-badge ' + priClass + '">' + m.p + '</span></td>' +
+        '<td><span class="cat-tag ' + catClass + '">' + catLabel + '</span></td>' +
+        '<td><code class="condition">' + escHtml(m.f) + '</code></td>' +
+        '<td><span class="message">' + escHtml(m.t) + '</span></td>' +
+        '<td><div class="actions">' +
+          '<button class="btn btn-sm btn-outline" onclick="editMsg(' + realIndex + ')" title="Edit"><i class="fa-solid fa-pen"></i></button>' +
+          '<button class="btn btn-sm btn-outline" onclick="deleteMsg(' + realIndex + ')" title="Delete" style="color:var(--red)"><i class="fa-solid fa-trash"></i></button>' +
+        '</div></td>' +
+      '</tr>';
+    }).join('');
+
+    document.getElementById('filteredCount').textContent = filtered.length + ' messages';
+
+    // Stats
+    document.getElementById('statTotal').textContent = messages.length;
+    document.getElementById('statReturn').textContent = messages.filter(function(m){return m.c==='return';}).length;
+    document.getElementById('statStreak').textContent = messages.filter(function(m){return m.c==='streak';}).length;
+    document.getElementById('statGoal').textContent = messages.filter(function(m){return m.c==='goal';}).length;
+    document.getElementById('statImprove').textContent = messages.filter(function(m){return m.c==='improve';}).length;
+    document.getElementById('statNew').textContent = messages.filter(function(m){return m.c==='early'||m.c==='new';}).length;
+  }
+
+  function escHtml(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+  // ═══ Edit ═══
+  function editMsg(idx) {
+    editingIndex = idx;
+    var m = messages[idx];
+    document.getElementById('editTitle').textContent = m.c === 'new' && !m.t ? 'Add Message' : 'Edit Message';
+    document.getElementById('editText').value = m.t || '';
+    document.getElementById('editPriority').value = m.p;
+    document.getElementById('editCategory').value = m.c;
+    document.getElementById('editCondition').value = m.f || '';
+    document.getElementById('editModal').style.display = 'flex';
+  }
+
+  function closeEditModal() {
+    document.getElementById('editModal').style.display = 'none';
+    editingIndex = -1;
+  }
+
+  document.getElementById('saveEditBtn').addEventListener('click', function(){
+    if (editingIndex < 0 || editingIndex >= messages.length) return;
+    var m = messages[editingIndex];
+    m.t = document.getElementById('editText').value.trim();
+    m.p = parseInt(document.getElementById('editPriority').value) || 0;
+    m.c = document.getElementById('editCategory').value;
+    m.f = document.getElementById('editCondition').value.trim();
+    if (!m.t || !m.f) { alert('Message text and condition are required.'); return; }
+
+    // Validate condition syntax
+    try { new Function('m', 'return (' + m.f + ');'); } catch(e) {
+      alert('Invalid condition: ' + e.message);
+      return;
+    }
+
+    saveToLocalStorage();
+    closeEditModal();
+    render();
+  });
+
+  function deleteMsg(idx) {
+    if (!confirm('Delete this message?')) return;
+    messages.splice(idx, 1);
+    saveToLocalStorage();
+    render();
+  }
+
+  // ═══ Add new ═══
+  function addNewMsg() {
+    messages.push({p:10, c:'new', f:'m.sessions_total===0', t:''});
+    editMsg(messages.length - 1);
+  }
+
+  // ═══ Persistence ═══
+  function saveToLocalStorage() {
+    localStorage.setItem('dashboard-messages-overrides', JSON.stringify(messages));
+  }
+
+  function loadFromLocalStorage() {
+    try {
+      var saved = JSON.parse(localStorage.getItem('dashboard-messages-overrides') || 'null');
+      if (saved && Array.isArray(saved) && saved.length > 0) {
+        messages = saved;
+      }
+    } catch(e) {}
+  }
+
+  // ═══ Category filter ═══
+  document.getElementById('categoryFilters').addEventListener('click', function(e){
+    var chip = e.target.closest('.fchip');
+    if (!chip) return;
+    document.querySelectorAll('#categoryFilters .fchip').forEach(function(c){ c.classList.remove('active'); });
+    chip.classList.add('active');
+    currentFilter = chip.getAttribute('data-cat');
+    render();
+  });
+
+  // ═══ Export ═══
+  function exportJSON() {
+    var json = JSON.stringify(messages, null, 2);
+    var blob = new Blob([json], {type:'application/json'});
+    var a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'dashboard-messages.json'; a.click();
+  }
+
+  function resetToDefaults() {
+    if (!confirm('Reset ALL messages to defaults? Custom changes will be lost.')) return;
+    messages = getAllMessages();
+    localStorage.removeItem('dashboard-messages-overrides');
+    render();
+  }
+
+  // ═══ Init ═══
+  loadFromLocalStorage();
+  render();
+
+  // Add toolbar buttons
+  var toolbar = document.querySelector('.toolbar');
+  toolbar.insertAdjacentHTML('beforeend', '<button class="btn btn-sm btn-primary" onclick="addNewMsg()"><i class="fa-solid fa-plus"></i> Add</button>');
+  toolbar.insertAdjacentHTML('beforeend', '<button class="btn btn-sm btn-outline" onclick="exportJSON()"><i class="fa-solid fa-download"></i> Export</button>');
+  toolbar.insertAdjacentHTML('beforeend', '<button class="btn btn-sm btn-outline" onclick="resetToDefaults()" style="color:var(--amber)"><i class="fa-solid fa-rotate-left"></i> Reset</button>');
+  </script>
+</body>
+</html>
