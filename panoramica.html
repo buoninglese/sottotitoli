@@ -16,6 +16,8 @@
   <link rel="stylesheet" href="css/panoramica.css">
   <link rel="stylesheet" href="css/tailwind.min.css">
   <script src="https://unpkg.com/compromise@14.14.2"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
 </head>
 <body data-theme="light">
 
@@ -1275,11 +1277,11 @@
             <button role="tab" aria-selected="false" class="tab-link" data-subtab="wb-overview-it">Italiano</button>
           </div></section>
           <div role="tabpanel" class="subtab-pane active" id="sub-wb-overview-panel">
-            <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin-bottom:24px" id="wbCefrQuadGrid">
-              <div style="background:var(--card);border:1px solid var(--line);border-radius:10px;padding:18px 20px" id="wbCefrCard1"><h3 style="font-size:11px;font-weight:700;font-family:'Manrope',sans-serif;text-transform:uppercase;letter-spacing:.03em;color:var(--text-soft);margin:0 0 12px">Distribuzione CEFR <span style="font-weight:400;font-size:10px;color:var(--text-soft);opacity:.7">· tutte le parole</span></h3><div id="wbCefrDistAll" style="display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--text-faint)">…</div></div>
-              <div style="background:var(--card);border:1px solid var(--line);border-radius:10px;padding:18px 20px" id="wbCefrCard2"><h3 style="font-size:11px;font-weight:700;font-family:'Manrope',sans-serif;text-transform:uppercase;letter-spacing:.03em;color:var(--text-soft);margin:0 0 12px">Conteggio CEFR <span style="font-weight:400;font-size:10px;color:var(--text-soft);opacity:.7">· tutte le parole</span></h3><div id="wbCefrCountAll" style="display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--text-faint)">…</div></div>
-              <div style="background:var(--card);border:1px solid var(--line);border-radius:10px;padding:18px 20px" id="wbCefrCard3"><h3 style="font-size:11px;font-weight:700;font-family:'Manrope',sans-serif;text-transform:uppercase;letter-spacing:.03em;color:var(--text-soft);margin:0 0 12px">CEFR Distribution <span style="font-weight:400;font-size:10px;color:var(--text-soft);opacity:.7">· parole confermate</span></h3><div id="wbCefrDistKnown" style="display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--text-faint)">…</div></div>
-              <div style="background:var(--card);border:1px solid var(--line);border-radius:10px;padding:18px 20px" id="wbCefrCard4"><h3 style="font-size:11px;font-weight:700;font-family:'Manrope',sans-serif;text-transform:uppercase;letter-spacing:.03em;color:var(--text-soft);margin:0 0 12px">CEFR Absolute Count <span style="font-weight:400;font-size:10px;color:var(--text-soft);opacity:.7">· parole confermate</span></h3><div id="wbCefrCountKnown" style="display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--text-faint)">…</div></div>
+            <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:24px" id="wbCefrQuadGrid">
+              <div class="metric-card" style="padding:16px 18px;cursor:default" id="wbCefrCard1"><p class="metric-label" style="margin:0 0 8px">Distribuzione CEFR <span style="font-weight:400;opacity:.7">· tutte</span></p><div id="wbCefrDistAll" style="display:flex;flex-direction:column;gap:3px;font-size:11px;color:var(--text-faint)">…</div></div>
+              <div class="metric-card" style="padding:16px 18px;cursor:default" id="wbCefrCard2"><p class="metric-label" style="margin:0 0 8px">Conteggio CEFR <span style="font-weight:400;opacity:.7">· tutte</span></p><div id="wbCefrCountAll" style="display:flex;flex-direction:column;gap:3px;font-size:11px;color:var(--text-faint)">…</div></div>
+              <div class="metric-card" style="padding:16px 18px;cursor:default" id="wbCefrCard3"><p class="metric-label" style="margin:0 0 8px">CEFR Distribution <span style="font-weight:400;opacity:.7">· note</span></p><div id="wbCefrDistKnown" style="display:flex;flex-direction:column;gap:3px;font-size:11px;color:var(--text-faint)">…</div></div>
+              <div class="metric-card" style="padding:16px 18px;cursor:default" id="wbCefrCard4"><p class="metric-label" style="margin:0 0 8px">CEFR Count <span style="font-weight:400;opacity:.7">· note</span></p><div id="wbCefrCountKnown" style="display:flex;flex-direction:column;gap:3px;font-size:11px;color:var(--text-faint)">…</div></div>
             </div>
           </div>
           <div role="tabpanel" class="subtab-pane" id="sub-wb-overview" data-wb-lang="en">
@@ -1412,50 +1414,75 @@
                   else { alert('Created: '+name); }
                   wbCloseCreate();
                 };
+                function processWords(text,name){
+                  var words=text.split(/[\\s,;:|!?.\\-\\[\\]\\(\\)\\{\\}"'<>\\n\\r\\t]+/).filter(function(w){return w.length>1&&!/^\\d+$/.test(w);});
+                  if(!words.length){alert('No words found in file.');return;}
+                  var recent=[];
+                  try{recent=JSON.parse(localStorage.getItem('sottotitoli-recent-imports')||'[]');}catch(e){}
+                  var today=new Date().toISOString().substring(0,10);
+                  if(window.SottotitoliData&&window.SottotitoliData.addWordbank){
+                    window.SottotitoliData.addWordbank(name,'en').then(function(bank){
+                      if(bank&&bank.id&&window.SottotitoliData.bulkAddToBank){
+                        window.SottotitoliData.bulkAddToBank(bank.id,words).then(function(){
+                          recent.unshift({id:bank.id,name:name,date:today,word_count:words.length});
+                          if(recent.length>20)recent=recent.slice(0,20);
+                          localStorage.setItem('sottotitoli-recent-imports',JSON.stringify(recent));
+                          alert('Bank "'+name+'" created with '+words.length+' words.');
+                          wbCloseImport();loadAll();
+                        }).catch(function(){alert('Error adding words to bank.');});
+                      }else{
+                        recent.unshift({id:bank.id,name:name,date:today,word_count:words.length});
+                        if(recent.length>20)recent=recent.slice(0,20);
+                        localStorage.setItem('sottotitoli-recent-imports',JSON.stringify(recent));
+                        alert('Bank "'+name+'" created with '+words.length+' words.');
+                        wbCloseImport();loadAll();
+                      }
+                    }).catch(function(){alert('Error creating bank.');});
+                  }else{
+                    recent.unshift({id:'local-'+Date.now(),name:name,date:today,word_count:words.length});
+                    if(recent.length>20)recent=recent.slice(0,20);
+                    localStorage.setItem('sottotitoli-recent-imports',JSON.stringify(recent));
+                    alert('Offline: created '+name+' ('+words.length+' words)');wbCloseImport();
+                  }
+                }
                 window.wbDoImport=function(){
                   var file=document.getElementById('wbImportFile').files[0];
                   var name=(document.getElementById('wbImportName').value||'').trim();
-                  var tag=(document.getElementById('wbImportTag').value||'').trim();
                   if(!file){alert('Select a file first.');return;}
                   if(!name){alert('Enter a bank name.');return;}
-                  var reader=new FileReader();
-                  reader.onload=function(e){
-                    var text=e.target.result;
-                    var words=text.split(/[\\s,;:|!?.\\-\\[\\]\\(\\)\\{\\}"'<>\\n\\r\\t]+/).filter(function(w){return w.length>1&&!/^\\d+$/.test(w);});
-                    
-                    if(!words.length){alert('No words found in file.');return;}
-
-                    // Track recent import
-                    var recent = [];
-                    try { recent = JSON.parse(localStorage.getItem('sottotitoli-recent-imports') || '[]'); } catch(e) {}
-                    var today = new Date().toISOString().substring(0,10);
-                    
-                    if(window.SottotitoliData&&window.SottotitoliData.addWordbank){
-                      window.SottotitoliData.addWordbank(name,'en').then(function(bank){
-                        if(bank&&bank.id&&window.SottotitoliData.bulkAddToBank){
-                          window.SottotitoliData.bulkAddToBank(bank.id,words).then(function(){
-                            recent.unshift({id:bank.id,name:name,date:today,word_count:words.length});
-                            if(recent.length>20) recent=recent.slice(0,20);
-                            localStorage.setItem('sottotitoli-recent-imports',JSON.stringify(recent));
-                            alert('Bank "'+name+'" created with '+words.length+' words.');
-                            wbCloseImport(); loadAll();
-                          }).catch(function(){alert('Error adding words to bank.');});
-                        }else{
-                          recent.unshift({id:bank.id,name:name,date:today,word_count:words.length});
-                          if(recent.length>20) recent=recent.slice(0,20);
-                          localStorage.setItem('sottotitoli-recent-imports',JSON.stringify(recent));
-                          alert('Bank "'+name+'" created with '+words.length+' words.');
-                          wbCloseImport(); loadAll();
+                  var ext=(file.name||'').split('.').pop().toLowerCase();
+                  if(ext==='pdf'){
+                    if(typeof pdfjsLib==='undefined'){alert('PDF parser not loaded. Try refreshing.');return;}
+                    var reader=new FileReader();
+                    reader.onload=function(e){
+                      pdfjsLib.getDocument({data:e.target.result}).promise.then(function(pdf){
+                        var pages=[],loaded=0;
+                        for(var i=1;i<=pdf.numPages;i++){
+                          pdf.getPage(i).then(function(page){
+                            return page.getTextContent();
+                          }).then(function(tc){
+                            var txt=tc.items.map(function(it){return it.str;}).join(' ');
+                            pages.push(txt);loaded++;
+                            if(loaded===pdf.numPages) processWords(pages.join(' '),name);
+                          });
                         }
-                      }).catch(function(){alert('Error creating bank.');})
-                    }else{
-                      recent.unshift({id:'local-'+Date.now(),name:name,date:today,word_count:words.length});
-                      if(recent.length>20) recent=recent.slice(0,20);
-                      localStorage.setItem('sottotitoli-recent-imports',JSON.stringify(recent));
-                      alert('Offline: created '+name+' ('+words.length+' words)');wbCloseImport();
-                    }
-                  };
-                  reader.readAsText(file);
+                      }).catch(function(){alert('Failed to parse PDF.');});
+                    };
+                    reader.readAsArrayBuffer(file);
+                  }else if(ext==='docx'){
+                    if(typeof mammoth==='undefined'){alert('DOCX parser not loaded. Try refreshing.');return;}
+                    var reader=new FileReader();
+                    reader.onload=function(e){
+                      mammoth.extractRawText({arrayBuffer:e.target.result}).then(function(result){
+                        processWords(result.value,name);
+                      }).catch(function(){alert('Failed to parse DOCX.');});
+                    };
+                    reader.readAsArrayBuffer(file);
+                  }else{
+                    var reader=new FileReader();
+                    reader.onload=function(e){processWords(e.target.result,name);};
+                    reader.readAsText(file);
+                  }
                 };
               })();
             </script>
