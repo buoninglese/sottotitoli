@@ -1344,11 +1344,16 @@ button[onclick*="addToWordBank"]:hover{background:rgba(52,211,153,.15)!important
               </div>
               <!-- 3: What Changed (explanation) -->
               <div id="grammarExplainBox" style="flex:1;background:var(--panel-bg);border:1px solid var(--line);border-radius:16px;padding:clamp(14px,2vw,20px);overflow-y:auto;min-height:0">
-                <div class="slide-box-title">What Changed</div>
-                <div id="grammarEngineBadge" style="display:inline-flex;align-items:center;gap:4px;font-size:12px;color:var(--muted2);margin-bottom:8px;cursor:help" title="AI engine auto-selected for this language">🧠 <span id="grammarEngineLabel">—</span></div>
-                <div id="grammarUpgradeBtns" style="display:none;gap:4px;margin-bottom:8px">
-                  <button onclick="retryGrammarCheck('meta-llama/Llama-3.3-70B-Instruct')" style="font-size:12px;padding:4px 10px;border-radius:6px;border:1px solid rgba(167,139,250,.3);background:rgba(167,139,250,.08);color:#a78bfa;cursor:pointer;font-family:Inter,sans-serif">🔄 Try Llama 3.3</button>
-                  <button onclick="retryGrammarCheck('meta-llama/Llama-4-Scout-17B-16E-Instruct')" style="font-size:12px;padding:4px 10px;border-radius:6px;border:1px solid rgba(6,182,212,.3);background:rgba(6,182,212,.08);color:#22d3ee;cursor:pointer;font-family:Inter,sans-serif">🔄 Try Llama 4</button>
+                <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px;flex-wrap:wrap;gap:8px">
+                  <div>
+                    <div class="slide-box-title" style="margin-bottom:2px">Grammar Breakdown</div>
+                    <div style="font-size:12px;color:var(--muted2);font-weight:400">Linguistic analysis of the corrections.</div>
+                  </div>
+                  <div style="display:flex;align-items:center;gap:2px;background:var(--bg);border-radius:99px;padding:3px;border:1px solid var(--line)">
+                    <button onclick="retryGrammarCheck('meta-llama/Llama-3.1-8B-Instruct')" id="gbBtn31" style="font-size:11px;padding:4px 10px;border-radius:99px;border:none;background:transparent;color:var(--muted2);cursor:pointer;font-family:Inter,sans-serif;font-weight:600;text-transform:uppercase;letter-spacing:.3px;transition:all .15s">Llama 3.1</button>
+                    <button onclick="retryGrammarCheck('meta-llama/Llama-3.3-70B-Instruct')" id="gbBtn33" style="font-size:11px;padding:4px 10px;border-radius:99px;border:none;background:transparent;color:var(--muted2);cursor:pointer;font-family:Inter,sans-serif;font-weight:600;text-transform:uppercase;letter-spacing:.3px;transition:all .15s">Llama 3.3</button>
+                    <button onclick="retryGrammarCheck('meta-llama/Llama-4-Scout-17B-16E-Instruct')" id="gbBtn4" style="font-size:11px;padding:4px 10px;border-radius:99px;border:none;background:transparent;color:var(--muted2);cursor:pointer;font-family:Inter,sans-serif;font-weight:600;text-transform:uppercase;letter-spacing:.3px;transition:all .15s">Llama 4</button>
+                  </div>
                 </div>
                 <div id="grammarExplanation">
                   <div style="text-align:center;padding:20px;color:var(--muted2);font-size:13px">Select a sentence → to see grammar corrections and explanations.</div>
@@ -2891,13 +2896,8 @@ async function _s5LineClick(el) {
   _lastGrammarText = text;
   _lastLangSettings = langSettings;
 
-  // Update engine badge
-  var engineEl = document.getElementById('grammarEngineLabel');
-  if (engineEl) engineEl.textContent = S8T_LANG.getModelLabel(langSettings.model);
-
-  // Show/hide upgrade buttons (only for 3.1 results)
-  var upgradeBtns = document.getElementById('grammarUpgradeBtns');
-  if (upgradeBtns) upgradeBtns.style.display = langSettings.model.includes('3.1') ? 'flex' : 'none';
+  // Highlight active model in segmented control
+  _highlightGrammarModelBtn(langSettings.model);
 
   sb.functions.invoke('grammar-segment', {
     body: { text: text, mode: 'fix_grammar', content_language: langSettings.content_language, explanation_language: langSettings.explanation_language, model: langSettings.model }
@@ -2907,7 +2907,7 @@ async function _s5LineClick(el) {
     var grammar = data.grammar;
     if (!grammar || grammar.status === 'failed') {
       if (corrEl) corrEl.innerHTML = '<span style="color:var(--warn)">⚠️ Grammar check failed' + (data.error ? ': ' + data.error : '') + '</span>';
-      if (explEl) explEl.textContent = 'Could not check grammar for this sentence.';
+      if (explEl) explEl.innerHTML = '<div style="text-align:center;padding:20px;color:var(--muted2);font-size:13px">Could not check grammar for this sentence.</div>';
       return;
     }
     // Show corrected text
@@ -2918,11 +2918,11 @@ async function _s5LineClick(el) {
         corrEl.textContent = grammar.corrected_text || text;
       }
     }
-    // Show explanation
+    // Show explanation as rich error cards
     if (explEl && data.explanation) {
-      explEl.textContent = data.explanation;
+      _renderGrammarErrors(explEl, data.explanation);
     } else if (explEl && grammar.corrected_text === text) {
-      explEl.textContent = 'No grammar issues detected in this sentence.';
+      explEl.innerHTML = '<div style="text-align:center;padding:20px;color:var(--good);font-size:14px;font-weight:500">✓ No grammar issues detected in this sentence.</div>';
     }
     // Enable save button
     if (saveBtn && grammar.corrected_text !== text) {
@@ -2935,6 +2935,68 @@ async function _s5LineClick(el) {
     if (corrEl) corrEl.innerHTML = '<span style="color:var(--danger)">⚠️ ' + (err.message || 'Error') + '</span>';
     if (explEl) explEl.textContent = 'Could not reach grammar service.';
   });
+}
+
+// ── Render grammar explanation as rich error cards ──
+function _renderGrammarErrors(container, explanationText) {
+  if (!container || !explanationText) return;
+  // Split numbered list into individual errors
+  var errors = [];
+  var parts = explanationText.split('\n');
+  parts.forEach(function(part) {
+    var cleaned = part.replace(/^\d+\.\s*/, '').trim();
+    if (cleaned) errors.push(cleaned);
+  });
+  if (errors.length === 0) {
+    container.innerHTML = '<div style="text-align:center;padding:20px;color:var(--muted2);font-size:13px">' + explanationText + '</div>';
+    return;
+  }
+  // Infer error category from text
+  function inferCategory(text) {
+    var t = text.toLowerCase();
+    if (t.indexOf('subject-verb')!==-1||t.indexOf('agreement')!==-1) return 'SUBJECT-VERB AGREEMENT';
+    if (t.indexOf('article')!==-1||t.indexOf('definite')!==-1||t.indexOf('indefinite')!==-1) return 'ARTICLE USAGE';
+    if (t.indexOf('tense')!==-1||t.indexOf('conjugation')!==-1) return 'VERB TENSE';
+    if (t.indexOf('preposition')!==-1) return 'PREPOSITION';
+    if (t.indexOf('word order')!==-1) return 'WORD ORDER';
+    if (t.indexOf('pronoun')!==-1) return 'PRONOUN';
+    if (t.indexOf('plural')!==-1||t.indexOf('singular')!==-1||t.indexOf('number')!==-1) return 'NUMBER AGREEMENT';
+    if (t.indexOf('spell')!==-1||t.indexOf('typo')!==-1) return 'SPELLING';
+    if (t.indexOf('punctuation')!==-1||t.indexOf('comma')!==-1||t.indexOf('period')!==-1) return 'PUNCTUATION';
+    return 'GRAMMAR CORRECTION';
+  }
+  var dotColors = ['var(--danger)','var(--warn)','var(--accent)','var(--accent2)','#a78bfa','var(--good)'];
+  var html = '<div style="display:flex;flex-direction:column;gap:10px">';
+  errors.forEach(function(err, i) {
+    var cat = inferCategory(err);
+    var dotColor = dotColors[i % dotColors.length];
+    html += '<div style="background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:12px 14px">';
+    html += '<div style="display:flex;align-items:center;gap:6px;margin-bottom:6px">';
+    html += '<span style="width:6px;height:6px;border-radius:50%;background:' + dotColor + ';flex-shrink:0"></span>';
+    html += '<span style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:' + dotColor + '">' + cat + '</span>';
+    html += '</div>';
+    html += '<p style="font-size:13px;color:var(--text);line-height:1.6;margin:0">' + err + '</p>';
+    html += '</div>';
+  });
+  html += '</div>';
+  container.innerHTML = html;
+}
+
+// ── Highlight active model in segmented control ──
+function _highlightGrammarModelBtn(modelId) {
+  var btn31 = document.getElementById('gbBtn31');
+  var btn33 = document.getElementById('gbBtn33');
+  var btn4 = document.getElementById('gbBtn4');
+  var activeBg = 'var(--accent)'; var activeColor = '#fff';
+  var inactiveBg = 'transparent'; var inactiveColor = 'var(--muted2)';
+  function set(btn, active) {
+    if (!btn) return;
+    btn.style.background = active ? activeBg : inactiveBg;
+    btn.style.color = active ? activeColor : inactiveColor;
+  }
+  set(btn31, modelId && modelId.includes('3.1') && !modelId.includes('3.3'));
+  set(btn33, modelId && modelId.includes('3.3'));
+  set(btn4, modelId && modelId.includes('4-'));
 }
 
 // ── Save grammar error to error bank ──
@@ -3870,9 +3932,8 @@ var _lastLangSettings = null;
 window.retryGrammarCheck = function(modelId) {
   var corrEl = document.getElementById('grammarCorrectedText');
   var explEl = document.getElementById('grammarExplanation');
-  var engineEl = document.getElementById('grammarEngineLabel');
-  if (corrEl) corrEl.innerHTML = '<span style=\"opacity:.5\">Checking with ' + S8T_LANG.getModelLabel(modelId) + '…</span>';
-  if (engineEl) engineEl.textContent = S8T_LANG.getModelLabel(modelId) + '…';
+  if (corrEl) corrEl.innerHTML = '<span style="opacity:.5">Checking with ' + S8T_LANG.getModelLabel(modelId) + '…</span>';
+  _highlightGrammarModelBtn(modelId);
   if (!_lastLangSettings || !_lastGrammarText) return;
 
   var sb = window.sottotitoliSupabase;
@@ -3885,21 +3946,21 @@ window.retryGrammarCheck = function(modelId) {
     var data = res.data;
     var grammar = data.grammar;
     if (!grammar || grammar.status === 'failed') {
-      if (corrEl) corrEl.innerHTML = '<span style=\"color:var(--warn)\">⚠️ ' + (data.error || 'Failed') + '</span>';
+      if (corrEl) corrEl.innerHTML = '<span style="color:var(--warn)">⚠️ ' + (data.error || 'Failed') + '</span>';
       return;
     }
     if (corrEl) {
       if (grammar.corrected_text === _lastGrammarText) {
-        corrEl.innerHTML = '<span style=\"color:var(--good)\">✓ No errors found</span>';
+        corrEl.innerHTML = '<span style="color:var(--good)">✓ No errors found</span>';
       } else {
         corrEl.textContent = grammar.corrected_text || _lastGrammarText;
       }
     }
-    if (explEl && data.explanation) explEl.textContent = data.explanation;
-    else if (explEl && grammar.corrected_text === _lastGrammarText) explEl.textContent = 'No grammar issues detected.';
-    if (engineEl) engineEl.textContent = S8T_LANG.getModelLabel(modelId);
+    if (explEl && data.explanation) _renderGrammarErrors(explEl, data.explanation);
+    else if (explEl && grammar.corrected_text === _lastGrammarText) explEl.innerHTML = '<div style="text-align:center;padding:20px;color:var(--good);font-size:14px;font-weight:500">✓ No grammar issues detected.</div>';
+    _highlightGrammarModelBtn(modelId);
   }).catch(function(err) {
-    if (corrEl) corrEl.innerHTML = '<span style=\"color:var(--danger)\">⚠️ ' + (err.message || 'Error') + '</span>';
+    if (corrEl) corrEl.innerHTML = '<span style="color:var(--danger)">⚠️ ' + (err.message || 'Error') + '</span>';
   });
 };
 
