@@ -432,10 +432,6 @@
               <p class="metric-label" data-i18n="metric_unique_words">Parole uniche</p>
               <div class="metric-value">—</div>
             </article>
-            <article class="metric-card" data-metric="gseScore" onclick="selectMetricCard(this)" style="cursor:pointer;container-type:inline-size">
-              <p class="metric-label" data-i18n="metric_gse_score">Punteggio GSE</p>
-              <div class="metric-value">—</div>
-            </article>
             <article class="metric-card" data-metric="avgLexDiv" onclick="selectMetricCard(this)" style="cursor:pointer;container-type:inline-size">
               <p class="metric-label" data-i18n="metric_lexical_div">Div. lessicale</p>
               <div class="metric-value">—</div>
@@ -4464,93 +4460,6 @@
       window.renderCEFRQuad = renderCEFRQuad;
 
   // ═══════════════════════════════════════
-  // Component 2: GSE Metric Card Rendering
-  // ═══════════════════════════════════════
-  async function renderGSEMetric() {
-    var gseCard = document.querySelector('.metric-card[data-metric="gseScore"]');
-    if (!gseCard) return;
-    var valEl = gseCard.querySelector('.metric-value');
-
-    // Default
-    if (valEl) valEl.textContent = '—';
-    window._gseScore = null;
-
-    // Try to compute GSE from session transcripts
-    try {
-      var sessions = window.SottotitoliData && await window.SottotitoliData.getSessions();
-      if (!sessions || !sessions.length) return;
-
-      var allText = '';
-      for (var i = 0; i < Math.min(sessions.length, 5); i++) {
-        var s = sessions[i];
-        if (s.transcript_text) allText += s.transcript_text + ' ';
-      }
-      if (!allText.trim()) return;
-
-      var gse = null;
-      if (window.SottotitoliGSE && window.SottotitoliGSE.scoreText) {
-        gse = window.SottotitoliGSE.scoreText(allText);
-      }
-      if (!gse || gse.score == null) return;
-
-      var score = Math.round(gse.score);
-      var color = gse.color || 'var(--teal)';
-
-      if (valEl) {
-        valEl.textContent = score;
-        valEl.style.color = color;
-      }
-      window._gseScore = score;
-    } catch(e) { /* silent */ }
-  }
-
-  // ── Enhanced CEFR Quad with GSE scores ──
-  var _cefrQuadEnhanced = false;
-  async function enhanceCEFRQuad() {
-    if (_cefrQuadEnhanced) return;
-    _cefrQuadEnhanced = true;
-
-    // Add GSE Score badges to each CEFR level in the quad
-    var levelGseMap = { A1: 22, A2: 30, B1: 39, B2: 51, C1: 59, C2: 75 };
-    var gseColors = { A1:'#22c55e', A2:'#3b82f6', B1:'#eab308', B2:'#f97316', C1:'#ef4444', C2:'#a855f7' };
-
-    // Enhance the Vocab Level card with GSE score
-    var levelVal = document.getElementById('dashboardLevelValue');
-    if (levelVal && window.SottotitoliGSE) {
-      try {
-        // Get GSE from session text
-        var sessions = window.SottotitoliData && await window.SottotitoliData.getSessions();
-        if (sessions && sessions.length) {
-          var text = '';
-          for (var i = 0; i < Math.min(sessions.length, 5); i++) {
-            if (sessions[i].transcript_text) text += sessions[i].transcript_text + ' ';
-          }
-          if (text.trim() && window.SottotitoliGSE.scoreText) {
-            var gseResult = window.SottotitoliGSE.scoreText(text);
-            if (gseResult && gseResult.score) {
-              var gseScore = Math.round(gseResult.score);
-              var gseBand = gseResult.band || '';
-              levelVal.textContent = gseScore;
-              levelVal.style.fontSize = '22px';
-              // Add sub-label with band
-              var sub = document.getElementById('dashboardLevelSub');
-              if (sub) sub.textContent = 'GSE ' + gseScore + ' · ' + gseBand + ' · basato sulle ultime sessioni';
-            }
-          }
-        }
-      } catch(e) {}
-    }
-
-    // Add 30-day sparkline to level card (simplified)
-    var barWrap = document.getElementById('dashboardLevelBarWrap');
-    if (barWrap) {
-      var sparkDays = [];
-      for (var d = 0; d < 30; d++) { sparkDays.push(Math.random() * 30 + 50); } // placeholder
-      // Just update the bar fill to show GSE score range
-    }
-  }
-
-  // ═══════════════════════════════════════
   // Component 4: Word Banks By Topic Filter
   // ═══════════════════════════════════════
   var _bankTopicFilter = 'all';
@@ -4568,11 +4477,6 @@
   }
 
   window.filterBanksByTopic = filterBanksByTopic;
-  window.renderGSEMetric = renderGSEMetric;
-  window.enhanceCEFRQuad = enhanceCEFRQuad;
-
-  // Trigger GSE rendering after CEFR quad renders
-  setTimeout(function() { renderGSEMetric(); enhanceCEFRQuad(); }, 800);
 
 
       // ═══ RENDER: Panoramica hero ───
@@ -5306,8 +5210,6 @@
         mc.totalSessions = { title: isEn?'Total sessions':'Sessioni totali', subtitle: isEn?'Sessions completed in the last 14 days.':'Numero di sessioni completate negli ultimi 14 giorni.', label: isEn?'Total Sessions':'Sessioni Totali', unit:'' };
         mc.totalMinutes  = { title: isEn?'Session minutes':'Minuti di sessione', subtitle: isEn?'Your speaking consistency over the last 14 days.':'Analisi della tua costanza verbale negli ultimi 14 giorni.', label: isEn?'Total Minutes':'Minuti Totali', unit:' min' };
         mc.totalWords    = { title: isEn?'Unique words':'Parole uniche', subtitle: isEn?'Distinct words used in the last 14 days.':'Parole distinte usate nelle sessioni degli ultimi 14 giorni.', label: isEn?'Total Words':'Parole Totali', unit:'' };
-        mc.gseScore      = { title: isEn?'GSE Score':'GSE Score', subtitle: isEn?'Lexical diversity trend over 14 days \u2014 GSE proxy.':'Andamento diversit\u00E0 lessicale su 14 giorni \u2014 proxy GSE.', label: isEn?'GSE Average':'Media GSE', unit:' pts',
-          info: isEn ? 'The GSE (Global Scale of English) is a numerical scale from 10 to 90 that measures English proficiency. The score shown in the card above is calculated from your entire active vocabulary. The daily bars below use lexical diversity (unique word ratio) as a per-session proxy to show your vocabulary richness trend over time.' : 'Il GSE (Global Scale of English) \u00E8 una scala numerica da 10 a 90 che misura la competenza in inglese. Il punteggio nella scheda sopra \u00E8 calcolato sull\u2019intero vocabolario attivo. Le barre giornaliere sotto usano la diversit\u00E0 lessicale (rapporto parole uniche) come proxy per sessione per mostrare l\u2019andamento della ricchezza lessicale nel tempo.' };
         mc.avgLexDiv     = { title: isEn?'Lexical diversity':'Diversit\u00E0 lessicale', subtitle: isEn?'Unique/total word ratio over the last 14 days.':'Rapporto parole uniche/totali negli ultimi 14 giorni.', label: isEn?'Avg Ratio':'Media Rapporto', unit:'',
           info: isEn ? 'Lexical diversity measures how varied your vocabulary is. It\u2019s calculated as: unique words \u00F7 total words per session. A higher ratio means you used a wider range of vocabulary. Typical values range from 0.3 (repetitive) to 0.9 (highly varied). Tracking this over time shows whether your active vocabulary is expanding.' : 'La diversit\u00E0 lessicale misura quanto \u00E8 vario il tuo vocabolario. Si calcola come: parole uniche \u00F7 parole totali per sessione. Un rapporto pi\u00F9 alto significa che hai usato una gamma pi\u00F9 ampia di vocaboli. I valori tipici vanno da 0,3 (ripetitivo) a 0,9 (molto vario). Monitorarlo nel tempo mostra se il tuo vocabolario attivo si sta espandendo.' };
         var metricConfig = mc;
@@ -5380,7 +5282,6 @@
             if (metric === 'totalSessions') d.value = d.sessions;
             else if (metric === 'totalMinutes') d.value = d.minutes;
             else if (metric === 'totalWords') d.value = d.words;
-            else if (metric === 'gseScore') d.value = d.lexDivCount > 0 ? Math.round(d.lexDivSum / d.lexDivCount * 100) : 0;
             else if (metric === 'avgLexDiv') d.value = d.lexDivCount > 0 ? Math.round(d.lexDivSum / d.lexDivCount * 100) / 100 : 0;
             else d.value = d.minutes;
           });
