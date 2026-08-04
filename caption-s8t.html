@@ -3351,6 +3351,7 @@ var _topicWordMap = {};  // word → {level, topics[]} from /analyze wordData
 var _topicColorMap = {}; // topic → color from donut chart
 var _topicLastFetch = 0;
 var _topicSelected = null;
+var _topicEverAutoSelected = false;
 
 function _fetchTopics() {
   var container = document.getElementById('topicDonut');
@@ -3401,6 +3402,8 @@ function _fetchTopics() {
     if (data && data.topicDistribution && Object.keys(data.topicDistribution).length > 0) {
       _topicCache = data.topicDistribution;
       _topicLastFetch = Date.now();
+      // Reset auto-select flag for fresh data
+      _topicEverAutoSelected = false;
       // Store word→topic mappings for the right panel
       if (data.wordData) {
         _topicWordMap = {};
@@ -3467,9 +3470,14 @@ function _renderTopicDonut(topics) {
     '<div style="flex:1;min-width:140px;max-height:200px;overflow-y:auto">' + legendHtml + '</div>' +
     '</div>';
   
-  // Auto-select first topic so word list populates immediately
-  if (sorted.length > 0 && !_topicSelected) {
+  // Auto-select first topic only once so the word list populates initially.
+  // After that, let the user navigate freely — don't override their choice.
+  if (sorted.length > 0 && !_topicSelected && !_topicEverAutoSelected) {
+    _topicEverAutoSelected = true;
     _selectTopic(sorted[0][0]);
+  } else if (!_topicSelected) {
+    // No topic selected — show all topics overview
+    _renderTopicWords();
   }
 }
 
