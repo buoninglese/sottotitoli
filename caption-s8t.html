@@ -1409,9 +1409,10 @@ button[onclick*="addToWordBank"]:hover{background:rgba(52,211,153,.15)!important
               <div style="background:var(--panel-bg);border:1px solid var(--line);border-radius:16px;padding:clamp(14px,2vw,24px);flex:1;overflow-y:auto;min-height:0">
                 <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:clamp(10px,1.5vw,16px)">
                   <div class="slide-box-title" style="margin-bottom:0">Topics</div>
+                  <button id="topicRefreshBtn" onclick="_fetchTopics()" title="Refresh topics" style="background:var(--card);border:1px solid var(--line);border-radius:8px;width:32px;height:32px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--text-soft);font-size:14px;transition:all .15s" onmouseover="this.style.borderColor='var(--cyan)';this.style.color='var(--cyan)'" onmouseout="this.style.borderColor='var(--line)';this.style.color='var(--text-soft)'"><i class="fas fa-sync-alt"></i></button>
                 </div>
                 <div id="topicDonut" style="display:flex;align-items:center;justify-content:center;min-height:200px">
-                  <div style="text-align:center;padding:20px;color:var(--muted2);font-size:13px">Start speaking to see topic distribution.<br><span style="font-size:11px">English only · updates every 30s</span></div>
+                  <div style="text-align:center;padding:20px;color:var(--muted2);font-size:13px">Start speaking to see topic distribution.<br><span style="font-size:11px">English only · auto-refreshes every 20s while on this slide</span></div>
                 </div>
                 <div id="topicLegend" style="margin-top:8px;max-height:160px;overflow-y:auto"></div>
               </div>
@@ -3232,7 +3233,7 @@ var _slidePollInterval = setInterval(function() {
     try { _updateGrammarLines(); } catch(e) {}
     try { _refreshMetricsPanel(); } catch(e) {}
     try { _updateCEFRBars(); } catch(e) {}
-    try { _fetchTopics(); } catch(e) {}
+    // Topics has its own gentle interval — not polled here
   }
 }, 800);
 
@@ -3433,25 +3434,52 @@ var _topicWordMap = {};  // word → {level, topics[]} from /analyze wordData
 var _topicColorMap = {}; // topic → color from donut chart
 var _topicLastFetch = 0;
 var _topicSelected = null;
+var _topicRefreshInterval = null;
+
+// Gentle auto-refresh only while the Topics slide is visible (every 20s)
+function _startTopicInterval() {
+  _stopTopicInterval();
+  _topicRefreshInterval = setInterval(function() {
+    if (!sessionActive) return;
+    try { _fetchTopics(); } catch(e) {}
+  }, 20000);
+}
+
+function _stopTopicInterval() {
+  if (_topicRefreshInterval) {
+    clearInterval(_topicRefreshInterval);
+    _topicRefreshInterval = null;
+  }
+}
 
 function _fetchTopics() {
   var container = document.getElementById('topicDonut');
   if (!container) return;
-  
+
+  // Show spinner on refresh button
+  var refreshBtn = document.getElementById('topicRefreshBtn');
+  if (refreshBtn) {
+    refreshBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+    refreshBtn.style.pointerEvents = 'none';
+  }
+
   if (!isCapabilityAvailable('cefrMetrics')) {
     container.innerHTML = '<div style="text-align:center;padding:20px;color:var(--muted2);font-size:13px">Topics available for English only.<br><span style="font-size:11px">Switch caption language to English.</span></div>';
+    _resetTopicRefreshBtn();
     return;
   }
   
   var now = Date.now();
   if (_topicCache && (now - _topicLastFetch) < 15000) {
     _renderTopicDonut(_topicCache);
+    _resetTopicRefreshBtn();
     return;
   }
   
   var lines = document.querySelectorAll('#captionTranscript .line');
   if (lines.length === 0) {
     container.innerHTML = '<div style="text-align:center;padding:20px;color:var(--muted2);font-size:13px">Start speaking to see topic distribution.<br><span style="font-size:11px">Topics appear after ~30 words of transcript.</span></div>';
+    _resetTopicRefreshBtn();
     return;
   }
   
@@ -3465,6 +3493,7 @@ function _fetchTopics() {
   
   if (fullText.length < 30) {
     container.innerHTML = '<div style="text-align:center;padding:20px;color:var(--muted2);font-size:13px">Need more text for topic analysis.<br><span style="font-size:11px">Keep speaking — topics appear after ~30 words.</span></div>';
+    _resetTopicRefreshBtn();
     return;
   }
   
@@ -3497,11 +3526,21 @@ function _fetchTopics() {
     } else {
       container.innerHTML = '<div style="text-align:center;padding:20px;color:var(--muted2);font-size:13px">No topics detected yet.<br><span style="font-size:11px">Try speaking for longer — topics need diverse vocabulary.</span></div>';
     }
+    _resetTopicRefreshBtn();
   })
   .catch(function(err) {
     console.warn('Topic API unavailable:', err.message || err);
     container.innerHTML = '<div style="text-align:center;padding:20px;color:var(--muted2);font-size:13px">Topic analysis unavailable.<br><span style="font-size:11px">The CEFR service may be starting up (free tier cold start). Try again in 30s.</span></div>';
+    _resetTopicRefreshBtn();
   });
+}
+
+function _resetTopicRefreshBtn() {
+  var btn = document.getElementById('topicRefreshBtn');
+  if (btn) {
+    btn.innerHTML = '<i class="fas fa-sync-alt"></i>';
+    btn.style.pointerEvents = '';
+  }
 }
 
 function _renderTopicDonut(topics) {
@@ -3928,7 +3967,15 @@ if (isTranslateUrl) {
     panels.forEach(function(p){p.style.opacity='0';p.style.transition='opacity .12s'});
     setTimeout(function(){
       idx=i;scrollEl.scrollLeft=realIdx*scrollEl.clientWidth;updateDots();
-      if (realIdx === 4) { try { _fetchTopics(); } catch(e) {} }
+      
+      // Topics slide: auto-refresh on entry + gentle interval while visible
+      if (realIdx === 4) {
+        try { _fetchTopics(); } catch(e) {}
+        _startTopicInterval();
+      } else {
+        _stopTopicInterval();
+      }
+      
       setTimeout(function(){panels.forEach(function(p){p.style.opacity='1'})},30);
     },130);
   }
