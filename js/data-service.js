@@ -135,7 +135,8 @@
       thisWeekMinutes: thisWeekMinutes,
       dailyAverageMinutes: dailyAverageMinutes,
       sessionsTrend: lastWeek.length > 0 ? Math.round((thisWeek.length - lastWeek.length) / lastWeek.length * 100) : 0,
-      lang: lang
+      lang: lang,
+      _allSessions: sessions
     };
     cacheSet(cacheKey, data);
     return data;
