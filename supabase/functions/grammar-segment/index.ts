@@ -12,7 +12,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 const HF_API_TOKEN = Deno.env.get('HF_API_TOKEN') || '';
-const DEFAULT_MODEL = 'meta-llama/Llama-4-Scout-17B-16E-Instruct';
+const DEFAULT_MODEL = 'meta-llama/Llama-3.3-70B-Instruct';
 
 const LANG_NAMES: Record<string, string> = {
   en:'English',it:'Italian',fr:'French',de:'German',es:'Spanish',nl:'Dutch',pl:'Polish'
