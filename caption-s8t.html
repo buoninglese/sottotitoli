@@ -2878,9 +2878,6 @@ async function _s5LineClick(el) {
   var origEl = document.getElementById('grammarOriginalText');
   if (origEl) origEl.textContent = text;
 
-  // Auto-complete basic punctuation (speech-to-text doesn't add it)
-  var grammarText = _autoPunctuate(text);
-
   // Show loading state
   var corrEl = document.getElementById('grammarCorrectedText');
   if (corrEl) corrEl.innerHTML = '<span style="opacity:.5">Checking grammar…</span>';
@@ -2905,14 +2902,14 @@ async function _s5LineClick(el) {
     if (explEl) explEl.textContent = 'Could not load language configuration. Try refreshing.';
     return;
   }
-  _lastGrammarText = grammarText;
+  _lastGrammarText = text;
   _lastLangSettings = langSettings;
 
   // Highlight active model in segmented control
   _highlightGrammarModelBtn(langSettings.model);
 
   sb.functions.invoke('grammar-segment', {
-    body: { text: grammarText, mode: 'fix_grammar', content_language: langSettings.content_language, explanation_language: langSettings.explanation_language, model: langSettings.model }
+    body: { text: text, mode: 'fix_grammar', content_language: langSettings.content_language, explanation_language: langSettings.explanation_language, model: langSettings.model }
   }).then(function(res) {
     if (res.error) throw new Error(res.error.message || res.error);
     var data = res.data;
@@ -2924,25 +2921,25 @@ async function _s5LineClick(el) {
     }
     // Show corrected text
     if (corrEl) {
-      if (grammar.corrected_text === grammarText) {
+      if (grammar.corrected_text === text) {
         corrEl.innerHTML = '<span style="color:var(--good)">✓ No errors found</span>';
       } else {
-        corrEl.textContent = grammar.corrected_text || grammarText;
+        corrEl.textContent = grammar.corrected_text || text;
       }
     }
     // Show explanation as rich error cards
     if (explEl && data.explanation) {
       _renderGrammarErrors(explEl, data.explanation);
-    } else if (explEl && grammar.corrected_text === grammarText) {
+    } else if (explEl && grammar.corrected_text === text) {
       explEl.innerHTML = '<div style="text-align:center;padding:20px;color:var(--good);font-size:14px;font-weight:500">✓ No grammar issues detected in this sentence.</div>';
     } else if (explEl) {
       explEl.innerHTML = '<div style="text-align:center;padding:20px;color:var(--muted2);font-size:13px">No specific grammar errors identified.</div>';
     }
     // Enable save button
-    if (saveBtn && grammar.corrected_text !== grammarText) {
+    if (saveBtn && grammar.corrected_text !== text) {
       saveBtn.disabled = false;
-      saveBtn.setAttribute('data-original', grammarText);
-      saveBtn.setAttribute('data-corrected', grammar.corrected_text || grammarText);
+      saveBtn.setAttribute('data-original', text);
+      saveBtn.setAttribute('data-corrected', grammar.corrected_text || text);
       saveBtn.setAttribute('data-explanation', data.explanation || '');
     }
   }).catch(function(err) {
@@ -3943,17 +3940,6 @@ function adjustGrammarFont(delta){
 // ═══ Grammar engine: auto-selected per language ═══
 var _lastGrammarText = '';
 var _lastLangSettings = null;
-
-// ── Auto-complete basic punctuation (speech-to-text doesn't add it) ──
-function _autoPunctuate(text) {
-  if (!text) return text;
-  var t = text.trim();
-  // Capitalize first letter
-  t = t.charAt(0).toUpperCase() + t.slice(1);
-  // Add period if no sentence-ending punctuation
-  if (!/[.!?]$/.test(t)) t += '.';
-  return t;
-}
 
 // Retry with a different model
 window.retryGrammarCheck = function(modelId) {
