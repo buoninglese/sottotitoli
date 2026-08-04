@@ -55,7 +55,7 @@
   <div class="app-shell">
     <header class="topbar">
       <div style="display:flex;align-items:center;gap:0">
-        <a href="index.html" class="topbar-brand" style="font-size:31px;font-family:'Manrope',sans-serif;font-weight:700;text-decoration:none;letter-spacing:-0.02em;display:inline-flex;align-items:baseline;gap:0">sottotitoli<span style="font-family:'Manrope',sans-serif;font-weight:800;color:var(--accent-purple,#7c3aed);letter-spacing:-.5px">.pro</span><span class="topbar-version" style="font-size:10px;font-weight:600;font-family:'Manrope',sans-serif;color:var(--text-soft);margin-left:6px;opacity:.55;letter-spacing:.02em">v138</span></a>
+        <a href="index.html" class="topbar-brand" style="font-size:31px;font-family:'Manrope',sans-serif;font-weight:700;text-decoration:none;letter-spacing:-0.02em;display:inline-flex;align-items:baseline;gap:0">sottotitoli<span style="font-family:'Manrope',sans-serif;font-weight:800;color:var(--accent-purple,#7c3aed);letter-spacing:-.5px">.pro</span><span class="topbar-version" style="font-size:10px;font-weight:600;font-family:'Manrope',sans-serif;color:var(--text-soft);margin-left:6px;opacity:.55;letter-spacing:.02em">v139</span></a>
       </div>
       <div style="display:flex;align-items:center;gap:12px">
         <button class="btn-start-session" id="btnStartSession" onclick="toggleStartSession()" style="font-size:15px;height:42px;padding:0 20px;border-radius:12px;background:linear-gradient(135deg,rgba(192,132,252,.18),rgba(192,132,252,.06));color:#c084fc;border:1px solid rgba(192,132,252,.25);font-weight:700;font-family:'Manrope',sans-serif;display:inline-flex;align-items:center;gap:8px;box-shadow:0 0 20px rgba(192,132,252,.12),0 2px 8px rgba(0,0,0,.2);cursor:pointer;letter-spacing:-.01em;transition:all .2s ease" onmouseover="this.style.background='linear-gradient(135deg,rgba(192,132,252,.28),rgba(192,132,252,.12))';this.style.borderColor='rgba(192,132,252,.4)';this.style.boxShadow='0 0 28px rgba(192,132,252,.22),0 4px 12px rgba(0,0,0,.25)'" onmouseout="this.style.background='linear-gradient(135deg,rgba(192,132,252,.18),rgba(192,132,252,.06))';this.style.borderColor='rgba(192,132,252,.25)';this.style.boxShadow='0 0 20px rgba(192,132,252,.12),0 2px 8px rgba(0,0,0,.2)'">
@@ -4148,8 +4148,9 @@
     }
     initSparklineTooltips();
     function fmtDate(iso) {
-      if (!iso) return '—';
-      return new Date(iso).toLocaleDateString('it-IT', { day: 'numeric', month: 'short' });
+      if (!iso) return '\u2014';
+      var lang = (window.I18n && I18n.getLang() === 'en') ? 'en-US' : 'it-IT';
+      return new Date(iso).toLocaleDateString(lang, { day: 'numeric', month: 'long', year: 'numeric' });
     }
 
     /* ── Wait for Supabase ── */
@@ -5286,7 +5287,7 @@
         mc.totalSessions = { title: isEn?'Total sessions':'Sessioni totali', subtitle: isEn?'Sessions completed in the last 14 days.':'Numero di sessioni completate negli ultimi 14 giorni.', label: isEn?'Total Sessions':'Sessioni Totali', unit:'' };
         mc.totalMinutes  = { title: isEn?'Session minutes':'Minuti di sessione', subtitle: isEn?'Your speaking consistency over the last 14 days.':'Analisi della tua costanza verbale negli ultimi 14 giorni.', label: isEn?'Total Minutes':'Minuti Totali', unit:' min' };
         mc.totalWords    = { title: isEn?'Unique words':'Parole uniche', subtitle: isEn?'Distinct words used in the last 14 days.':'Parole distinte usate nelle sessioni degli ultimi 14 giorni.', label: isEn?'Total Words':'Parole Totali', unit:'' };
-        mc.gseScore      = { title: isEn?'GSE Score':'GSE Score', subtitle: isEn?'Global Scale of English \u2014 trend over 14 days.':'Global Scale of English \u2014 andamento negli ultimi 14 giorni.', label: isEn?'GSE Average':'Media GSE', unit:'' };
+        mc.gseScore      = { title: isEn?'GSE Score':'GSE Score', subtitle: isEn?'Lexical diversity trend over 14 days \u2014 GSE proxy.':'Andamento diversit\u00E0 lessicale su 14 giorni \u2014 proxy GSE.', label: isEn?'GSE Average':'Media GSE', unit:' pts' };
         mc.avgLexDiv     = { title: isEn?'Lexical diversity':'Diversit\u00E0 lessicale', subtitle: isEn?'Unique/total word ratio over the last 14 days.':'Rapporto parole uniche/totali negli ultimi 14 giorni.', label: isEn?'Avg Ratio':'Media Rapporto', unit:'' };
         var metricConfig = mc;
         var cfg = metricConfig[metric] || metricConfig.totalMinutes;
@@ -5328,7 +5329,7 @@
             if (metric === 'totalSessions') d.value = d.sessions;
             else if (metric === 'totalMinutes') d.value = d.minutes;
             else if (metric === 'totalWords') d.value = d.words;
-            else if (metric === 'gseScore') d.value = 0; // GSE is computed globally, not per-session
+            else if (metric === 'gseScore') d.value = d.lexDivCount > 0 ? Math.round(d.lexDivSum / d.lexDivCount * 100) : 0;
             else if (metric === 'avgLexDiv') d.value = d.lexDivCount > 0 ? Math.round(d.lexDivSum / d.lexDivCount * 100) / 100 : 0;
             else d.value = d.minutes;
           });
@@ -5336,13 +5337,7 @@
           var maxVal = Math.max.apply(null, days.map(function(d) { return d.value; })) || 1;
           var totalVal = days.reduce(function(s, d) { return s + d.value; }, 0);
 
-          // GSE has no daily data — show score prominently instead of chart
-          if (metric === 'gseScore') {
-            if (totalEl) totalEl.textContent = cardNumber !== '—' ? cardNumber : '—';
-            container.innerHTML = '<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;width:100%;gap:8px"><div style="font-size:64px;font-weight:900;color:var(--cyan);line-height:1;letter-spacing:-.03em;font-family:\'Inter\',sans-serif">'+(cardNumber!=='—'?cardNumber:'—')+'</div><p style="font-size:13px;color:var(--text-soft);text-align:center;margin:0">GSE · Global Scale of English</p></div>';
-            return;
-          }
-
+          // GSE uses lexical diversity as daily proxy — show as chart like any metric
           if (totalEl) {
             // Use the card's displayed number for consistency
             if (cardNumber && cardNumber !== '—') {
@@ -5375,7 +5370,7 @@
             var barColor = isToday ? '#F59E0B' : barBg;
             var barHover = isToday ? '#FAB73D' : 'rgba(6,182,212,.8)';
             var barGlow = isToday ? '0 0 25px rgba(245,158,11,.3)' : (ratio >= 0.8 ? '0 0 20px rgba(6,182,212,.2)' : 'none');
-            var tooltip = day.iso + ' — ' + (metric==='avgLexDiv'?day.value.toFixed(2):Math.round(day.value)) + cfg.unit;
+            var tooltip = fmtDate(day.iso) + ' \u2014 ' + (metric==='avgLexDiv'?day.value.toFixed(2):Math.round(day.value)) + cfg.unit;
             barHtml += '<div class="chart-bar" style="flex:1;display:flex;align-items:flex-end;height:100%;position:relative;cursor:pointer" data-tip="' + tooltip + '"><div style="width:100%;height:' + h + 'px;min-height:4px;background:' + barColor + ';box-shadow:' + barGlow + '" onmouseenter="this.style.background=&#39;'+barHover+'&#39;;this.style.boxShadow=&#39;0 0 16px rgba(6,182,212,.6)&#39;;var tip=this.parentElement.getAttribute(&#39;data-tip&#39;);if(tip){var el=document.createElement(&#39;span&#39;);el.className=&#39;chart-tooltip&#39;;el.textContent=tip;this.parentElement.appendChild(el);setTimeout(function(){el.classList.add(&#39;show&#39;)},10)}" onmouseleave="this.style.background=&#39;'+barColor+'&#39;;this.style.boxShadow=&#39;'+barGlow+'&#39;;var tip=this.parentElement.querySelector(&#39;.chart-tooltip&#39;);if(tip)tip.remove()"></div></div>';
           });
           container.innerHTML = barHtml;
