@@ -3119,11 +3119,19 @@ window.saveGrammarError = async function() {
     btn.textContent = '⚠️ Failed';
     btn.disabled = false;
     console.error('saveGrammarError:', error);
+    // Show error toast
+    var errToast = document.createElement('div');
+    errToast.textContent = '⚠️ Could not save error — try again';
+    errToast.style.cssText = 'position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:#fef2f2;border:1px solid #fecaca;border-radius:10px;padding:10px 18px;font-size:13px;font-weight:600;color:#dc2626;z-index:300;box-shadow:0 4px 20px rgba(0,0,0,.3);white-space:nowrap';
+    document.body.appendChild(errToast);
+    setTimeout(function(){ errToast.remove(); }, 4000);
   } else {
     btn.textContent = '✓ Saved';
     btn.style.background = 'rgba(34,197,94,.15)';
     btn.style.color = '#22c55e';
     btn.style.borderColor = 'rgba(34,197,94,.3)';
+    // Show success toast
+    showToastMsg('💾 Grammar error saved to your error bank');
     setTimeout(function() {
       btn.textContent = '💾 Save to Error Bank';
       btn.style.background = '';
@@ -4132,6 +4140,18 @@ window.retryGrammarCheck = function(modelId) {
     }
 
     _highlightGrammarModelBtn(modelId);
+
+    // Update save button for the new model's results
+    var saveBtn = document.getElementById('grammarSaveBtn');
+    if (saveBtn && hasChanges) {
+      saveBtn.disabled = false;
+      saveBtn.setAttribute('data-original', _lastGrammarText);
+      saveBtn.setAttribute('data-corrected', correctedText || _lastGrammarText);
+      saveBtn.setAttribute('data-explanation', data.explanation || '');
+      if (result) saveBtn.setAttribute('data-changes', JSON.stringify(result.changes));
+    } else if (saveBtn && !hasChanges) {
+      saveBtn.disabled = true;
+    }
   }).catch(function(err) {
     if (corrEl) corrEl.innerHTML = '<span style="color:var(--danger)">⚠️ ' + (err.message || 'Error') + '</span>';
   });
