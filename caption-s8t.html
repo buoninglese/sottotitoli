@@ -2929,10 +2929,20 @@ async function _s5LineClick(el) {
       ? (result.silent_edits && result.silent_edits.length > 0)
       : false;
 
+    // Detect when model corrected text but failed to provide change details
+    var wordsDiffer = false;
+    if (!hasChanges && correctedText && correctedText !== text) {
+      var norm = function(s) { return (s||'').replace(/[^a-zA-Z0-9]/g,'').toLowerCase(); };
+      wordsDiffer = norm(correctedText) !== norm(text);
+    }
+    var unexplainedFix = !hasChanges && wordsDiffer;
+
     // Show corrected text
     if (corrEl) {
-      if (!hasChanges && !hasSilentEdits) {
+      if (!hasChanges && !hasSilentEdits && !unexplainedFix) {
         corrEl.innerHTML = '<span style="color:var(--good)">✓ No errors found</span>';
+      } else if (unexplainedFix) {
+        corrEl.innerHTML = correctedText + ' <span style="font-size:10px;color:var(--amber);margin-left:8px">(corrected, see below)</span>';
       } else if (!hasChanges && hasSilentEdits) {
         corrEl.innerHTML = correctedText + ' <span style="font-size:10px;color:var(--muted2);margin-left:8px">(punctuation only)</span>';
       } else {
@@ -2943,6 +2953,8 @@ async function _s5LineClick(el) {
     // Show explanation — use structured changes if available, fall back to legacy text
     if (result && result.changes && result.changes.length > 0) {
       _renderGrammarChanges(explEl, result.changes, result.silent_edits || []);
+    } else if (explEl && unexplainedFix) {
+      explEl.innerHTML = '<div style="text-align:center;padding:20px;background:rgba(245,158,11,.06);border:1px solid rgba(245,158,11,.15);border-radius:10px"><span style="color:var(--amber);font-size:18px">⚠️</span><p style="color:var(--amber);font-size:13px;font-weight:600;margin:8px 0 4px">Model corrected the text but didn\'t explain how.</p><p style="color:var(--muted2);font-size:12px;margin:0">Try clicking a different model (Llama 3.3 or Llama 4) to get detailed explanations.</p></div>';
     } else if (explEl && data.explanation) {
       _renderGrammarErrors(explEl, data.explanation);
     } else if (explEl && !hasChanges && !hasSilentEdits) {
@@ -4040,9 +4052,19 @@ window.retryGrammarCheck = function(modelId) {
       ? (result.silent_edits && result.silent_edits.length > 0)
       : false;
 
+    // Detect when model corrected text but failed to provide change details
+    var wordsDiffer = false;
+    if (!hasChanges && correctedText && correctedText !== _lastGrammarText) {
+      var norm = function(s) { return (s||'').replace(/[^a-zA-Z0-9]/g,'').toLowerCase(); };
+      wordsDiffer = norm(correctedText) !== norm(_lastGrammarText);
+    }
+    var unexplainedFix = !hasChanges && wordsDiffer;
+
     if (corrEl) {
-      if (!hasChanges && !hasSilentEdits) {
+      if (!hasChanges && !hasSilentEdits && !unexplainedFix) {
         corrEl.innerHTML = '<span style="color:var(--good)">✓ No errors found</span>';
+      } else if (unexplainedFix) {
+        corrEl.innerHTML = correctedText + ' <span style="font-size:10px;color:var(--amber);margin-left:8px">(corrected, see below)</span>';
       } else if (!hasChanges && hasSilentEdits) {
         corrEl.innerHTML = correctedText + ' <span style="font-size:10px;color:var(--muted2);margin-left:8px">(punctuation only)</span>';
       } else {
@@ -4052,6 +4074,8 @@ window.retryGrammarCheck = function(modelId) {
 
     if (result && result.changes && result.changes.length > 0) {
       _renderGrammarChanges(explEl, result.changes, result.silent_edits || []);
+    } else if (explEl && unexplainedFix) {
+      explEl.innerHTML = '<div style="text-align:center;padding:20px;background:rgba(245,158,11,.06);border:1px solid rgba(245,158,11,.15);border-radius:10px"><span style="color:var(--amber);font-size:18px">⚠️</span><p style="color:var(--amber);font-size:13px;font-weight:600;margin:8px 0 4px">Model corrected the text but didn\'t explain how.</p><p style="color:var(--muted2);font-size:12px;margin:0">Try clicking a different model (Llama 3.3 or Llama 4) to get detailed explanations.</p></div>';
     } else if (explEl && data.explanation) {
       _renderGrammarErrors(explEl, data.explanation);
     } else if (explEl && !hasChanges && !hasSilentEdits) {
