@@ -4313,13 +4313,27 @@
         // If data isn't loaded yet, try fetching it now
         if ((!allData || !allData.total) && window.SottotitoliData && window.SottotitoliData.getCEFRBreakdown) {
           try {
-            window.cefrBreakdown = await SottotitoliData.getCEFRBreakdown();
-            allData = window.cefrBreakdown || {};
-          } catch(e) { /* will retry later */ }
+            var fetched = await SottotitoliData.getCEFRBreakdown();
+            if (fetched && fetched.total) { window.cefrBreakdown = fetched; allData = fetched; }
+          } catch(e) { /* will use fallback below */ }
         }
-        // If still no data, schedule a retry
+        // If still no data, show empty states rather than looping
         if (!allData || !allData.total) {
-          setTimeout(function(){ renderCEFRQuad(); }, 2000);
+          // Populate with graceful empty states
+          var d1 = document.getElementById('wbCefrDistAll');
+          if (d1) d1.innerHTML = '<div class="wb-empty"><span class="material-symbols-outlined wb-empty-icon">bar_chart</span><p class="wb-empty-text">Completa alcune sessioni per vedere la distribuzione CEFR.</p></div>';
+          var d2 = document.getElementById('wbCefrCountAll');
+          if (d2) d2.innerHTML = '<div class="wb-chip-box"><div class="wb-chip-num" style="color:rgba(224,230,230,.25)">0</div><div class="wb-chip-lvl">C2</div></div><div class="wb-chip-box"><div class="wb-chip-num" style="color:rgba(224,230,230,.25)">0</div><div class="wb-chip-lvl">C1</div></div><div class="wb-chip-box"><div class="wb-chip-num" style="color:rgba(224,230,230,.25)">0</div><div class="wb-chip-lvl">B2</div></div><div class="wb-chip-box"><div class="wb-chip-num" style="color:rgba(224,230,230,.25)">0</div><div class="wb-chip-lvl">B1</div></div><div class="wb-chip-box"><div class="wb-chip-num" style="color:rgba(224,230,230,.25)">0</div><div class="wb-chip-lvl">A2</div></div><div class="wb-chip-box"><div class="wb-chip-num" style="color:rgba(224,230,230,.25)">0</div><div class="wb-chip-lvl">A1</div></div>';
+          var d3 = document.getElementById('wbCefrDistKnown');
+          if (d3) d3.innerHTML = '<div class="wb-empty"><span class="material-symbols-outlined wb-empty-icon">psychology_alt</span><p class="wb-empty-text">Nessuna parola confermata. Usa il Trainer.</p></div>';
+          var d4 = document.getElementById('wbCefrCountKnown');
+          if (d4) d4.innerHTML = '<div class="wb-chip-box"><div class="wb-chip-num" style="color:rgba(224,230,230,.25)">0</div><div class="wb-chip-lvl">C2</div></div><div class="wb-chip-box"><div class="wb-chip-num" style="color:rgba(224,230,230,.25)">0</div><div class="wb-chip-lvl">C1</div></div><div class="wb-chip-box"><div class="wb-chip-num" style="color:rgba(224,230,230,.25)">0</div><div class="wb-chip-lvl">B2</div></div><div class="wb-chip-box"><div class="wb-chip-num" style="color:rgba(224,230,230,.25)">0</div><div class="wb-chip-lvl">B1</div></div><div class="wb-chip-box"><div class="wb-chip-num" style="color:rgba(224,230,230,.25)">0</div><div class="wb-chip-lvl">A2</div></div><div class="wb-chip-box"><div class="wb-chip-num" style="color:rgba(224,230,230,.25)">0</div><div class="wb-chip-lvl">A1</div></div>';
+          var t1 = document.getElementById('wbCefrDistAllTotal');
+          if (t1) t1.textContent = '';
+          var t2 = document.getElementById('wbCefrCountAllTotal');
+          if (t2) t2.textContent = '';
+          var t4 = document.getElementById('wbCefrCountKnownTotal');
+          if (t4) t4.textContent = 'Trainer inattivo';
           return;
         }
         var allTotal = allData.total || 0;
