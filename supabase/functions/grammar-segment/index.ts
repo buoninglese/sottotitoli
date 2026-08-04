@@ -12,7 +12,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 const HF_API_TOKEN = Deno.env.get('HF_API_TOKEN') || '';
-const DEFAULT_MODEL = 'meta-llama/Llama-3.3-70B-Instruct';
+const DEFAULT_MODEL = 'meta-llama/Llama-4-Scout-17B-16E-Instruct';
 
 const LANG_NAMES: Record<string, string> = {
   en:'English',it:'Italian',fr:'French',de:'German',es:'Spanish',nl:'Dutch',pl:'Polish'
@@ -258,8 +258,26 @@ function validateGrammarResult(result: any, original: string): GrammarResult {
   }
 
   if (result.status === 'mechanics_only') {
-    result.changes = [];
-    result.has_grammar_errors = false;
+    // Guard: if model claimed "mechanics_only" but actually changed words,
+    // it made real corrections it's not explaining — override to corrected
+    const wordsDiffer = normalizeForComparison(result.corrected) !== normalizeForComparison(original);
+    if (wordsDiffer && result.corrected !== original) {
+      console.warn('Model claimed mechanics_only but changed words — overriding to corrected');
+      result.status = 'corrected';
+      result.has_grammar_errors = true;
+      result.changes = [{
+        id: 'unexplained',
+        category: 'other',
+        original: original,
+        corrected: result.corrected,
+        explanation: 'The text was corrected but no detailed breakdown was provided. Try a different model for explanations.',
+        severity: 'error' as const,
+        confidence: 0.5
+      }];
+    } else {
+      result.changes = [];
+      result.has_grammar_errors = false;
+    }
   }
 
   if (result.status === 'corrected' && result.changes.length === 0) {
