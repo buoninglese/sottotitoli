@@ -4831,7 +4831,18 @@
       }
 
       // ═══ Dashboard message rules — priority-ordered ═══
-      var DASHBOARD_MESSAGES = [
+      // Load from localStorage overrides if available, else use hardcoded defaults
+      function buildMessageRules() {
+        try {
+          var saved = JSON.parse(localStorage.getItem('dashboard-messages-overrides') || 'null');
+          if (saved && Array.isArray(saved) && saved.length > 0) {
+            return saved.map(function(r){
+              return {p: r.p, f: new Function('m', 'return (' + r.f + ');'), t: r.t};
+            });
+          }
+        } catch(e) { /* use defaults */ }
+        // Hardcoded defaults
+        return [
         // ── Return / recovery (priority 100) ──
         {p:100, f:function(m){return m.last_active_days>30;}, t:"You can restart without starting over."},
         {p:100, f:function(m){return m.last_active_days>=15&&m.last_active_days<=30;}, t:"Your previous progress is still a useful foundation."},
@@ -4903,7 +4914,10 @@
         {p:17, f:function(m){return m.new_user;}, t:"Begin with curiosity, not pressure."},
         {p:16, f:function(m){return m.sessions_total===0;}, t:"Progress starts with showing up."},
         {p:16, f:function(m){return m.sessions_total===0;}, t:"Your progress has a simple starting point: today."}
-      ];
+        ];
+      }
+
+      var DASHBOARD_MESSAGES = buildMessageRules();
 
       function chooseDashboardMessage(metrics) {
         // Filter rules whose conditions match, sort by priority descending
