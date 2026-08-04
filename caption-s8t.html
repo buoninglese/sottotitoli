@@ -2913,34 +2913,51 @@ async function _s5LineClick(el) {
   }).then(function(res) {
     if (res.error) throw new Error(res.error.message || res.error);
     var data = res.data;
+    var result = data.result; // new structured response
     var grammar = data.grammar;
     if (!grammar || grammar.status === 'failed') {
       if (corrEl) corrEl.innerHTML = '<span style="color:var(--warn)">⚠️ Grammar check failed' + (data.error ? ': ' + data.error : '') + '</span>';
       if (explEl) explEl.innerHTML = '<div style="text-align:center;padding:20px;color:var(--muted2);font-size:13px">Could not check grammar for this sentence.</div>';
       return;
     }
+
+    var correctedText = result ? result.corrected : grammar.corrected_text;
+    var hasChanges = result
+      ? (result.changes && result.changes.length > 0)
+      : (grammar.corrected_text !== text);
+    var hasSilentEdits = result
+      ? (result.silent_edits && result.silent_edits.length > 0)
+      : false;
+
     // Show corrected text
     if (corrEl) {
-      if (grammar.corrected_text === text) {
+      if (!hasChanges && !hasSilentEdits) {
         corrEl.innerHTML = '<span style="color:var(--good)">✓ No errors found</span>';
+      } else if (!hasChanges && hasSilentEdits) {
+        corrEl.innerHTML = correctedText + ' <span style="font-size:10px;color:var(--muted2);margin-left:8px">(punctuation only)</span>';
       } else {
-        corrEl.textContent = grammar.corrected_text || text;
+        corrEl.textContent = correctedText || text;
       }
     }
-    // Show explanation as rich error cards
-    if (explEl && data.explanation) {
+
+    // Show explanation — use structured changes if available, fall back to legacy text
+    if (result && result.changes && result.changes.length > 0) {
+      _renderGrammarChanges(explEl, result.changes, result.silent_edits || []);
+    } else if (explEl && data.explanation) {
       _renderGrammarErrors(explEl, data.explanation);
-    } else if (explEl && grammar.corrected_text === text) {
+    } else if (explEl && !hasChanges && !hasSilentEdits) {
       explEl.innerHTML = '<div style="text-align:center;padding:20px;color:var(--good);font-size:14px;font-weight:500">✓ No grammar issues detected in this sentence.</div>';
     } else if (explEl) {
       explEl.innerHTML = '<div style="text-align:center;padding:20px;color:var(--muted2);font-size:13px">No specific grammar errors identified.</div>';
     }
+
     // Enable save button
-    if (saveBtn && grammar.corrected_text !== text) {
+    if (saveBtn && hasChanges) {
       saveBtn.disabled = false;
       saveBtn.setAttribute('data-original', text);
-      saveBtn.setAttribute('data-corrected', grammar.corrected_text || text);
+      saveBtn.setAttribute('data-corrected', correctedText || text);
       saveBtn.setAttribute('data-explanation', data.explanation || '');
+      if (result) saveBtn.setAttribute('data-changes', JSON.stringify(result.changes));
     }
   }).catch(function(err) {
     if (corrEl) corrEl.innerHTML = '<span style="color:var(--danger)">⚠️ ' + (err.message || 'Error') + '</span>';
@@ -2948,7 +2965,52 @@ async function _s5LineClick(el) {
   });
 }
 
-// ── Render grammar explanation as rich error cards ──
+// ── Render grammar changes from structured result ──
+function _renderGrammarChanges(container, changes, silentEdits) {
+  if (!container) return;
+  var dotColors = ['var(--danger)','var(--warn)','var(--accent)','var(--accent2)','#a78bfa','var(--good)'];
+  var html = '<div style="display:flex;flex-direction:column;gap:10px">';
+
+  // Render genuine grammar errors
+  if (changes && changes.length > 0) {
+    changes.forEach(function(c, i) {
+      var dotColor = dotColors[i % dotColors.length];
+      var cat = (c.category || 'other').replace(/_/g, ' ').toUpperCase();
+      html += '<div class="grammar-change-card" style="background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:12px 14px;cursor:pointer" data-change-id="' + (c.id || '') + '">';
+      html += '<div style="display:flex;align-items:center;gap:6px;margin-bottom:6px">';
+      html += '<span style="width:6px;height:6px;border-radius:50%;background:' + dotColor + ';flex-shrink:0"></span>';
+      html += '<span style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:' + dotColor + '">' + cat + '</span>';
+      if (c.confidence) {
+        html += '<span style="font-size:9px;color:var(--muted2);margin-left:auto">' + Math.round(c.confidence * 100) + '% confident</span>';
+      }
+      html += '</div>';
+      // Show the correction inline
+      html += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">';
+      html += '<span style="font-size:13px;color:var(--danger);text-decoration:line-through;text-decoration-color:rgba(239,68,68,.4)">' + (c.original || '') + '</span>';
+      html += '<span style="font-size:10px;color:var(--muted2)">→</span>';
+      html += '<span style="font-size:13px;color:var(--good);font-weight:600">' + (c.corrected || '') + '</span>';
+      html += '</div>';
+      html += '<p style="font-size:13px;color:var(--text);line-height:1.6;margin:0">' + (c.explanation || '') + '</p>';
+      html += '</div>';
+    });
+  }
+
+  // Render silent edits (mechanics only)
+  if (silentEdits && silentEdits.length > 0) {
+    html += '<div style="margin-top:4px;padding:8px 12px;background:rgba(156,163,175,.06);border-radius:8px">';
+    html += '<span style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--muted2)">Mechanics only</span>';
+    html += '<div style="margin-top:4px;font-size:12px;color:var(--text-soft)">';
+    silentEdits.forEach(function(s) {
+      html += '<span style="margin-right:12px">' + s.category + ': <span style="text-decoration:line-through;opacity:.6">' + (s.original || '∅') + '</span> → <span style="font-weight:600">' + (s.corrected || '∅') + '</span></span>';
+    });
+    html += '</div></div>';
+  }
+
+  html += '</div>';
+  container.innerHTML = html;
+}
+
+// ── Render grammar explanation as rich error cards (legacy fallback) ──
 function _renderGrammarErrors(container, explanationText) {
   if (!container || !explanationText) return;
   // Split numbered list into individual errors
@@ -3081,19 +3143,25 @@ window._checkGrammarInline = async function(icon) {
     });
     if (res.error) throw new Error(res.error.message || res.error);
     var data = res.data;
+    var result = data.result;
     var grammar = data.grammar;
     if (!grammar || grammar.status === 'failed') { icon.textContent = '⚠️'; return; }
+
+    var correctedText = result ? result.corrected : grammar.corrected_text;
+    var hasChanges = result
+      ? (result.changes && result.changes.length > 0)
+      : (grammar.corrected_text && grammar.corrected_text !== text);
 
     // Remove any existing correction annotation
     var existing = line.querySelector('.tline-correction');
     if (existing) existing.remove();
 
-    if (grammar.corrected_text && grammar.corrected_text !== text) {
+    if (hasChanges) {
       // Show corrected version below the line
       var corr = document.createElement('div');
       corr.className = 'tline-correction';
       corr.style.cssText = 'font-size:11px;color:var(--accent);padding:2px 0 2px 56px;line-height:1.4;border-bottom:1px solid var(--line);background:rgba(6,182,212,.04)';
-      corr.textContent = '→ ' + grammar.corrected_text;
+      corr.textContent = '→ ' + correctedText;
       line.after(corr);
       icon.classList.add('checked');
       icon.textContent = '✓';
@@ -3957,21 +4025,41 @@ window.retryGrammarCheck = function(modelId) {
   }).then(function(res) {
     if (res.error) throw new Error(res.error.message || res.error);
     var data = res.data;
+    var result = data.result;
     var grammar = data.grammar;
     if (!grammar || grammar.status === 'failed') {
       if (corrEl) corrEl.innerHTML = '<span style="color:var(--warn)">⚠️ ' + (data.error || 'Failed') + '</span>';
       return;
     }
+
+    var correctedText = result ? result.corrected : grammar.corrected_text;
+    var hasChanges = result
+      ? (result.changes && result.changes.length > 0)
+      : (grammar.corrected_text !== _lastGrammarText);
+    var hasSilentEdits = result
+      ? (result.silent_edits && result.silent_edits.length > 0)
+      : false;
+
     if (corrEl) {
-      if (grammar.corrected_text === _lastGrammarText) {
+      if (!hasChanges && !hasSilentEdits) {
         corrEl.innerHTML = '<span style="color:var(--good)">✓ No errors found</span>';
+      } else if (!hasChanges && hasSilentEdits) {
+        corrEl.innerHTML = correctedText + ' <span style="font-size:10px;color:var(--muted2);margin-left:8px">(punctuation only)</span>';
       } else {
-        corrEl.textContent = grammar.corrected_text || _lastGrammarText;
+        corrEl.textContent = correctedText || _lastGrammarText;
       }
     }
-    if (explEl && data.explanation) _renderGrammarErrors(explEl, data.explanation);
-    else if (explEl && grammar.corrected_text === _lastGrammarText) explEl.innerHTML = '<div style="text-align:center;padding:20px;color:var(--good);font-size:14px;font-weight:500">✓ No grammar issues detected.</div>';
-    else if (explEl) explEl.innerHTML = '<div style="text-align:center;padding:20px;color:var(--muted2);font-size:13px">No specific grammar errors identified.</div>';
+
+    if (result && result.changes && result.changes.length > 0) {
+      _renderGrammarChanges(explEl, result.changes, result.silent_edits || []);
+    } else if (explEl && data.explanation) {
+      _renderGrammarErrors(explEl, data.explanation);
+    } else if (explEl && !hasChanges && !hasSilentEdits) {
+      explEl.innerHTML = '<div style="text-align:center;padding:20px;color:var(--good);font-size:14px;font-weight:500">✓ No grammar issues detected.</div>';
+    } else if (explEl) {
+      explEl.innerHTML = '<div style="text-align:center;padding:20px;color:var(--muted2);font-size:13px">No specific grammar errors identified.</div>';
+    }
+
     _highlightGrammarModelBtn(modelId);
   }).catch(function(err) {
     if (corrEl) corrEl.innerHTML = '<span style="color:var(--danger)">⚠️ ' + (err.message || 'Error') + '</span>';
