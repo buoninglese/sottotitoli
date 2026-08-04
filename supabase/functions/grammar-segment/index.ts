@@ -200,7 +200,15 @@ Return exactly one valid JSON object.
 Do not use Markdown.
 Do not include commentary before or after the JSON.
 Use double quotes for all JSON keys and string values.
-Escape quotation marks and line breaks correctly.`;
+Escape quotation marks and line breaks correctly.
+
+CRITICAL: If the corrected text differs from the original in any way
+other than capitalization/punctuation/spacing, you MUST set
+"status" to "corrected" and include at least one item in "changes"
+explaining exactly what was changed and why. An empty "changes" array
+with a modified "corrected" text is INVALID — the learner needs to
+know what you fixed. If you made a grammar correction, put it in
+"changes" with a clear explanation.`;
 }
 
 // ── Validation ──
@@ -255,9 +263,27 @@ function validateGrammarResult(result: any, original: string): GrammarResult {
   }
 
   if (result.status === 'corrected' && result.changes.length === 0) {
-    // Model claimed "corrected" but gave no changes → downgrade
-    result.status = result.silent_edits.length > 0 ? 'mechanics_only' : 'unchanged';
-    result.has_grammar_errors = false;
+    // Model claimed "corrected" but gave no changes → try to salvage
+    const wordsDiffer = normalizeForComparison(result.corrected) !== normalizeForComparison(original);
+    if (wordsDiffer && result.corrected !== original) {
+      // Model made real word changes but didn't explain them — keep the corrected
+      // text but flag it so the client can show a helpful message
+      console.warn('Model corrected words but returned no changes — marking as unexplained');
+      result.status = 'corrected';
+      result.has_grammar_errors = true;
+      result.changes = [{
+        id: 'unexplained',
+        category: 'other',
+        original: original,
+        corrected: result.corrected,
+        explanation: 'The text was corrected but no detailed breakdown was provided. Try a different model for explanations.',
+        severity: 'error' as const,
+        confidence: 0.5
+      }];
+    } else {
+      result.status = result.silent_edits.length > 0 ? 'mechanics_only' : 'unchanged';
+      result.has_grammar_errors = false;
+    }
   }
 
   // Filter low-confidence changes
