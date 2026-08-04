@@ -214,7 +214,7 @@
     if (!userId) return [];
 
     var r = await sb().from('sessions')
-      .select('id,name,started_at,duration_seconds,words_count,favorite,language_pair,session_type,quality_score')
+      .select('id,name,started_at,duration_seconds,words_count,favorite,language_pair,session_type,quality_score,transcript_text')
       .eq('user_id', userId)
       .order('started_at', { ascending: false })
       .limit(limit);
