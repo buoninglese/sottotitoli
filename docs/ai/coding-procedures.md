@@ -1,99 +1,192 @@
-# coding-procedures.md — Safe Coding Procedures
+# coding-procedures.md — Sottotitoli Coding Procedures
 
-> **Cross-refs:** `solve-mistakes.md` · `testing-checklist.md` · `css-theme-guide.md` · `AGENTS.md`
+> **For any AI agent writing or editing code in the Sottotitoli repos.**
+> These are the mandatory procedures. Follow them or you WILL break things.
 
 ---
 
 ## 1. Before You Write Any Code
 
-### Read These First
+### 1.1 Read the Context Files
 | Order | File | Why |
 |-------|------|-----|
-| 1 | `../AGENTS.md` | Architecture, conventions, pitfalls |
-| 2 | `glossary.md` | Understand the vocabulary |
-| 3 | `solve-mistakes.md` | Don't repeat known bugs |
+| 1 | `AGENTS.md` | Architecture, conventions, pitfalls, known issues |
+| 2 | `DESIGN.md` | Visual design system, colors, typography |
+| 3 | `Sebastian-Preferences-Agent.md` | How to work with me |
 | 4 | `/memories/repo/supabase-schema.md` | Correct column names |
-| 5 | `/memories/repo/i18n-rules.md` | Leaf-span i18n pattern |
+| 5 | `/memories/repo/i18n-rules.md` | i18n leaf-span rules |
+
+### 1.2 Understand the Repo Structure
+- **Frontend:** `/Users/sebastiankrauwel/sottotitoli` — static HTML/CSS/JS
+- **WebSocket relay:** Separate repo `sottotitoli-websocket` (Node.js ESM, Render)
+- **Learning backend:** Separate repo `sottotitoli-learning` (Node.js CJS, Render)
+- **No build step.** No webpack, no vite, no npm build. Pure static files served by GitHub Pages.
+
+### 1.3 Know Which File You're Editing
+- Check if the file is a **production page** or a **mockup** (mockups in `mockups/`, `mockup-relics/`, `Reference-mockups/` — never edit these unless asked)
+- Check if the file is **synced from another source** (e.g., `hugging-voice/` files synced from `voice-core/` by `sync_voice.py`)
+- Check if the file is **gitignored** (`config.js` — edit `config.example.js` instead)
 
 ---
 
 ## 2. Editing HTML Files
 
-### CSS Variable Pattern
-Every page has its OWN `:root` and `[data-theme="dark"]` block. See `css-theme-guide.md`.
+### 2.1 CSS Variable Pattern
+Every page has its OWN `:root` and `[data-theme="dark"]` CSS variables in a `<style>` block. Copy from `panoramica.html` or `caption-s8t.html` as a starting point.
 
-### i18n Leaf-Span (MUST FOLLOW)
+```css
+:root {
+  --bg: #f0f6f8;
+  --text: #0f1c24;
+  /* ... */
+}
+[data-theme="dark"] {
+  --bg: #0b151c;
+  --text: #d8eaf4;
+  /* ... */
+}
+```
+
+### 2.2 i18n Leaf-Span Pattern (MUST FOLLOW)
 ```html
-<!-- ❌ WRONG — wipes child icons -->
+<!-- ❌ WRONG — wipes child elements -->
 <button data-i18n="key"><i class="fa fa-check"></i> Save</button>
 
-<!-- ✅ CORRECT -->
+<!-- ✅ CORRECT — icon survives -->
 <button><i class="fa fa-check"></i> <span data-i18n="key">Save</span></button>
 ```
-See `/memories/repo/i18n-rules.md` for full details.
 
-### Script Loading Order (Auth Pages)
-1. `supabase-js@2` (CDN)
-2. `config.js`
-3. `js/auth.js`
-4. `js/theme.js`
-5. Page-specific scripts
+### 2.3 Script Loading Order (auth pages)
+```html
+<!-- 1. Dependencies -->
+<script src="supabase-js@2"></script>
+<!-- 2. Config (before auth!) -->
+<script src="config.js"></script>
+<!-- 3. Auth -->
+<script src="js/auth.js"></script>
+<!-- 4. Theme -->
+<script src="js/theme.js"></script>
+<!-- 5. Page-specific -->
+```
+
+### 2.4 External Resources
+- Supabase JS: `@supabase/supabase-js@2` (CDN)
+- NLP: `compromise@14` (unpkg)
+- Font Awesome 6: CDN link (free)
+- Google Fonts: Inter, Manrope, JetBrains Mono, Cormorant Garamond
+- Material Symbols Outlined: Google Fonts CDN
 
 ---
 
 ## 3. Editing JavaScript Files
 
-### Syntax Check (MANDATORY)
+### 3.1 Syntax Check (MANDATORY)
 ```bash
 node --check /path/to/file.js
 ```
-For HTML: use `get_errors` tool.
+For HTML files with inline scripts, use the `get_errors` tool.
 
-### Config Access
-Always use `window.SOTTOTITOLI_CONFIG`. Never hardcode URLs.
+### 3.2 Config Access
+Always use `window.SOTTOTITOLI_CONFIG` — never hardcode URLs or keys.
 
-### Auth Access
-Always `await window.sottotitoliSupabase.auth.getSession()`. User not available at load time.
+### 3.3 Auth Access
+Always wait for `window.sottotitoliSupabase.auth.getSession()` — user is not available at script load time.
 
-### Supabase Column Traps
-| ❌ Wrong | ✅ Correct | Table |
-|----------|-----------|-------|
-| `transcript` | `transcript_text` | sessions |
-| `wpm_avg` | `wpm` | sessions |
-| `lemma` | `word` | user_vocabulary |
-| `cefr` | `cefr_level` | user_vocabulary |
+### 3.4 Supabase Column Names (VERIFIED)
+| ❌ Wrong | ✅ Correct |
+|----------|-----------|
+| `transcript` | `transcript_text` |
+| `wpm_avg` | `wpm` |
+| `cefr` (user_vocabulary) | `cefr_level` |
+| `lemma` | `word` |
+| `transaction_type` | `type` |
+| `metadata` (token_transactions) | Doesn't exist |
 
-### WebSocket Format (DO NOT CHANGE)
+### 3.5 WebSocket Message Format (DO NOT CHANGE)
 ```json
 {"msg": true, "final": "text", "id": counter, "label": "label"}
+{"msg": true, "interm": "partial", "id": counter}
 ```
+
+### 3.6 localStorage Keys (standard)
+- `sottotitoli-theme` — day/night
+- `sottotitoli-lang` — UI language
+- `sottotitoli-caption-lang` — caption language
+- `sottotitoli-translate-target` — translation target
+- `sottotitoli_wordbank` — saved words
+- `sottotitoli-settings` — user settings JSON
 
 ---
 
-## 4. Git Workflow
+## 4. Editing CSS Files
+
+### 4.1 Theme File Map
+| File | Scope |
+|------|-------|
+| `css/theme.css` | Legacy shared theme (older pages) |
+| `css/theme-2.css` | Newer shared theme (navbar, panels) |
+| `css/panoramica.css` | Panoramica-specific styles |
+| `css/studio-caption.css` | Studio/caption styles |
+| `css/responsive.css` | Global responsive breakpoints |
+| `<style>` blocks in HTML | Page-specific overrides |
+
+### 4.2 Never Do
+- Don't add `!important` unless absolutely necessary
+- Don't change CSS variable names — they're used across multiple pages
+- Don't remove the `data-theme` attribute pattern
+
+---
+
+## 5. Testing Checklist (Before Committing)
+
+- [ ] Syntax check passed (`node --check` for .js, `get_errors` for .html)
+- [ ] Tested at **desktop** width (1200px+)
+- [ ] Tested at **mobile** width (375px)
+- [ ] Tested in **day mode** (`data-theme="light"`)
+- [ ] Tested in **night mode** (`data-theme="dark"`)
+- [ ] Browser console: **no errors**
+- [ ] i18n: **no icons disappearing** after language toggle
+- [ ] WebSocket: **message format unchanged**
+- [ ] Auth: **login flow works**
+- [ ] No hardcoded URLs
+- [ ] `config.js` changes are **NOT staged** (gitignored)
+- [ ] Version number bumped (if editing `panoramica.html`)
+
+---
+
+## 6. Git Workflow
 
 ```bash
-git status                           # Check what changed
-git add <files>                      # Stage (NEVER config.js!)
-git commit -m "type: description"    # fix:, feat:, style:, refactor:
-git push origin main                 # ALWAYS push
+# 1. Check what you changed
+git status
+git diff
+
+# 2. Stage specific files (NOT config.js!)
+git add <files>
+
+# 3. Commit with descriptive message in English
+git commit -m "fix: description of what was fixed"
+
+# 4. ALWAYS push immediately after commit
+git push origin main
 ```
 
-Commit conventions: `fix:`, `feat:`, `style:`, `refactor:`, `docs:`
+### Commit Message Convention
+- `fix: ...` — bug fixes
+- `feat: ...` — new features
+- `style: ...` — visual/CSS changes
+- `refactor: ...` — code restructuring
+- `docs: ...` — documentation
 
 ---
 
-## 5. Testing (See `testing-checklist.md` for full list)
+## 7. Deployment
 
-Minimum before commit:
-- [ ] Syntax check passed
-- [ ] Desktop (1200px+) + mobile (375px)
-- [ ] Day + night mode
-- [ ] No console errors
-- [ ] config.js NOT staged
-- [ ] Version bumped if editing panoramica.html
+- **Frontend:** Push to `main` → GitHub Pages auto-deploys
+- **WebSocket relay:** Deploy on Render dashboard (separate repo)
+- **Supabase functions:** `supabase functions deploy <name>`
+- **Stripe:** Products configured in Stripe dashboard (test mode)
 
 ---
 
-*→ Next: `testing-checklist.md` for the full checklist*
-*→ Related: `solve-mistakes.md` for bugs to avoid*
+*Last updated: 2026-08-05*
