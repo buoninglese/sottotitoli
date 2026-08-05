@@ -103,7 +103,9 @@ These extensions catch syntax errors and lint issues in real-time. All are insta
 |------|---------|
 | **[docs/ai/firecrawl-capabilities.md](docs/ai/firecrawl-capabilities.md)** | Web search, scrape, monitor, parse, research |
 | **[docs/ai/apify-capabilities.md](docs/ai/apify-capabilities.md)** | Actor marketplace, social scrapers, storage |
-| **[docs/ai/composio-capabilities.md](docs/ai/composio-capabilities.md)** | 15 accounts: Gmail, GitHub, Supabase, Stripe, Linear, PostHog, etc. |
+| **[docs/ai/composio-capabilities.md](docs/ai/composio-capabilities.md)** | 15 accounts + smart routing: scan full stack, propose best tool, report cost |
+
+> **When the user says "use Composio" or "check my stack":** Scan ALL four tool surfaces (Composio, Firecrawl, Apify, Hugging Face). Propose the best tool, explain why, and report cost. If credits are zero, skip paid tools and propose free fallbacks. If cost would burn >20% of remaining credits, warn first. SaaS tools (Gmail, GitHub, Stripe, etc.) are always free — use immediately. See `docs/ai/composio-capabilities.md` for the routing matrix.
 
 ### Archived (historical reference, not actively maintained)
 `docs/archive/` — CEFR planning, brutalist migration, hero specs, etc.

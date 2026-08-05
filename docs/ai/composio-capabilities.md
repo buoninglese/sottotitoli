@@ -5,6 +5,77 @@
 
 ---
 
+## ⚡ "Use Composio" — Smart Routing Protocol
+
+When the user says **"use Composio"** or **"check my stack"**, do NOT just look at Composio accounts. Scan the ENTIRE installed tool surface and propose the BEST tool for the job:
+
+```
+Full Stack Available:
+┌─ Composio MCP (15 SaaS accounts — all free)
+├─ Firecrawl CLI (web search, scrape, monitor, parse, research — credit-based)
+├─ Apify MCP (1,500+ Actors — credit/cost per Actor)
+└─ Hugging Face MCP (models, datasets, Spaces — free)
+```
+
+### Credit-Aware Decision Rules
+
+**Before suggesting ANY tool that costs credits, check current balances:**
+
+| Platform | How to Check | Current Balance |
+|----------|-------------|-----------------|
+| Firecrawl | `firecrawl --status` | ~1,372 credits |
+| Apify | Check dashboard or Actor pricing | Varies per Actor |
+| DeepSeek | Composio connection info | $15.10 |
+
+**Decision logic (in order of priority):**
+
+1. **No credits?** → Skip paid tools entirely. Propose the best free alternative. Warn: "X has 0 credits — using Y (free) instead."
+2. **Free tool is 80% as good?** → Prefer the free one. Mention the paid option exists if they want better results.
+3. **Paid tool is clearly better AND has credits?** → Propose it with exact cost estimate. Use it without asking for small costs (≤5 credits or ≤$0.50). Ask for anything larger.
+4. **Would burn >20% of remaining credits?** → Warn: "This would use X credits (Y% of your balance). Proceed?"
+5. **Composio SaaS tools (Gmail, GitHub, Stripe, etc.)** → Always free. Use immediately, no questions.
+
+### Routing Decision Matrix
+
+| User Wants To | Best Tool | Why | Cost | Fallback (if no credits) |
+|--------------|-----------|-----|------|--------------------------|
+| Search the web | **Firecrawl search** | Full page content | ~1 credit | Apify RAG Web Browser (via Composio, free if Apify has credits) |
+| Scrape a known URL | **Firecrawl scrape** | Clean markdown, JS | ~1 credit | Apify Web Scraper |
+| Crawl a whole site | **Firecrawl crawl** | Concurrent, filtering | ~1 credit/page | Apify site crawler Actor |
+| Monitor for changes | **Firecrawl monitor** | AI judge, alerts | Credits/check | Manual scrape (remind user) |
+| Parse local PDF/DOCX | **Firecrawl parse** | Convert to markdown | ~1 credit | None — warn user |
+| Search academic papers | **Firecrawl research** | Semantic, citations | Free | — |
+| Search developer issues | **Firecrawl developer** | GitHub issues, PRs | Free | — |
+| Scrape social media | **Apify** (specific Actor) | Purpose-built | Varies | None — warn user |
+| Structured extraction | **Apify/Firecrawl agent** | Schema JSON | Credits | Manual scrape + parse |
+| Read/send Gmail | **Composio Gmail** | OAuth | Free | — |
+| GitHub issues/PRs | **Composio GitHub** | Full repo mgmt | Free | — |
+| Query Supabase DB | **Composio Supabase** | Direct SQL | Free | — |
+| Stripe payments/customers | **Composio Stripe** | Revenue, subs | Free | — |
+| Bug tracking | **Composio Linear** | Dev PM | Free | — |
+| Error monitoring | **Composio PostHog** | JS errors | Free tier | — |
+| Website analytics | **Composio Google Analytics** | Traffic, funnels | Free | — |
+| AI text generation | **Composio DeepSeek** | Chat, drafts | ~$0.50-2 | Hugging Face (free, less polished) |
+| AI image generation | **Hugging Face** (Spaces) | SD, FLUX | Free | — |
+| AI TTS / voice | **Hugging Face** (Spaces) | Voice models | Free | — |
+| Google Workspace | **Composio** (Docs/Sheets/Calendar) | CRUD | Free | — |
+
+### Response Format When User Says "Use Composio"
+
+Always respond with:
+1. **Best tool** for the job (scanned from full stack)
+2. **Why** it's the best
+3. **Cost** — free, exact credits, or estimated API cost
+4. **Fallback** if paid tool has no credits
+
+Example:
+> "Best: **Firecrawl scrape** (~1 credit). You have 1,372 credits — fine. Free fallback: Apify RAG Web Browser via Composio."
+
+If credits are low or tool is expensive:
+> "⚠️ **Firecrawl crawl** would use ~50 credits (3.6% of balance). You have enough, but for this use case **Apify's site crawler** might be cheaper. Want me to check?"
+
+---
+
 ## All Connected Accounts
 
 | # | Toolkit | Account | What I Can Do |
