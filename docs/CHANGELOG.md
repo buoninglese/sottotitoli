@@ -1,8 +1,21 @@
 # Changelog
 
-All notable changes to this project will be documented in this file.
+## [2026-08-05] Documentation System Overhaul
 
-## [Unreleased]
+### Added
+- `docs/ai/` folder with 11 interlinked agent reference docs
+- New `docs/ai/README.md` documentation index
+- Architecture, coding procedures, solve-mistakes, CSS theme guide, testing checklist, deploy runbook, brand voice, business info, glossary, pages directory
+
+### Changed
+- `AGENTS.md` rewritten as definitive hub with cross-references
+- `CLAUDE.md` simplified to redirect stub
+- `README.md` updated with documentation map
+- `docs/ROADMAP.md` updated to reflect current priorities
+- 12 outdated docs moved to `docs/archive/`
+- `DESIGN-INDEX.md` removed (superseded by DESIGN.md)
+
+## [Unreleased — Previous]
 
 ### Added
 - README files for all three repositories
@@ -12,19 +25,14 @@ All notable changes to this project will be documented in this file.
 - `CONTRIBUTING.md` with setup and PR checklist
 - `CHANGELOG.md` (this file)
 - `js/config.example.js` — configuration template for frontend
-- Dependabot config (`.github/dependabot.yml`) for npm dependency updates
-- Basic CI workflow (`.github/workflows/basic-checks.yml`)
 
 ### Changed
-- `sitemap.xml` — updated URLs from caption.ninja to buoninglese.github.io/sottotitoli
+- `sitemap.xml` — updated URLs from caption.ninja to sottotitoli
 - `robots.txt` — fixed stale sitemap URL
 - `404.html` — replaced Appland template branding with Sottotitoli
 - `CLAUDE.md` — replaced Caption.Ninja docs with Sottotitoli-specific agent guidance
-- `js/auth.js` — redirect URLs now read from config (configurable per deployment)
-- `server.js` (websocket) — restricted CORS, secured health route, added API key guard
-- `learning-service.js` (learning) — added CORS middleware, API key guards
+- `js/auth.js` — redirect URLs now read from config
 
 ### Fixed
 - Redirect URLs in auth no longer hardcoded
-- OpenAI errors no longer leaked to clients (logged server-side)
-- Oxford API errors normalized to generic messages
+- OpenAI errors no longer leaked to clients

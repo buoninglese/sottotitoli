@@ -1,38 +1,38 @@
 # Roadmap
 
-## Current Phase: Cleanup & Security (issues2.csv)
+> Last updated: 2026-08-05
 
-- [x] Security policy (SECURITY.md)
-- [x] Contributing guide (CONTRIBUTING.md)
-- [x] Issue/PR templates
-- [x] Privacy/GDPR documentation
-- [x] Architecture & data-flow docs
-- [ ] Input length limits (learning service)
-- [ ] WebSocket message validation, heartbeat, room limits
-- [ ] Audio MIME validation
-- [ ] Cost guardrails
+## 🔴 Critical Bugs (Fix First)
 
-## Next: Testing
+- [ ] Session duration shows 0s after recording (`studio.html`)
+- [ ] Account settings not persisting (`account.html`)
+- [ ] Hamburger menu links broken (Wallet, Settings, Logout)
+- [ ] Gara multiplayer: mic stops after 2 sentences
+- [ ] AI report generation: constraint violations
+- [ ] Translation duplicate outputs (intermittent)
+- [ ] Day/night mode on studio.html (possibly fixed, verify)
 
-- [ ] Manual QA checklist
-- [ ] End-to-end test flow
-- [ ] Sample test data for learning service
-- [ ] Test user account
+## 🟡 In Progress
 
-## Later: Features
+- [ ] CEFR vocabulary integration (word-level difficulty scoring)
+- [ ] DUO+ multi-speaker mode stabilization
+- [ ] caption-s8t.html feature completion
+- [ ] Mobile-responsive pass on all pages
+
+## 🟢 Planned
 
 - [ ] User deletion flow
 - [ ] Session deletion flow
 - [ ] Export transcripts/reports
 - [ ] Staging environment
-- [ ] Monorepo consideration
 - [ ] Cache dictionary lookups
 - [ ] Graceful offline UI
-
-## Future: Scale
-
-- [ ] Cost monitoring
-- [ ] Quota alerting
+- [ ] Cost monitoring & quota alerting
 - [ ] Key rotation process
-- [ ] Rollback plan
-- [ ] Backup plan
+- [ ] Mobile PWA / app store deployment
+- [ ] Additional language pairs
+- [ ] Enterprise/education plans
+
+---
+
+*See `docs/ai/deploy-runbook.md` for deployment procedures.*

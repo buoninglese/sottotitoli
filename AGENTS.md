@@ -1,315 +1,245 @@
-# AGENTS.md — AI Agent Handoff File
+# AGENTS.md — Sottotitoli AI Agent Hub
 
-This file gives future AI coding agents the full context needed to work on this project effectively — architecture, conventions, pitfalls, and lessons learned through trial and error.
+> **You are an AI coding agent. This is your entry point.**
+> Start here. Everything you need is linked from this file.
+>
+> Last updated: 2026-08-05 · Version: 3.0
 
 ---
 
-## 1. Project Identity
+## ⚡ Quickstart (60 seconds)
 
-Sottotitoli is a **real-time AI captioning + translation web app**, user-facing in **Italian**, code/comments in **English**. Freemium model with usage-based prepaid credits via Stripe.
+```bash
+cd /Users/sebastiankrauwel/sottotitoli
+python3 serve.py                   # → http://localhost:8000 (blocks internal docs)
+# or for simple access:
+python3 -m http.server 8000        # → serves everything (no blocking)
+node --check <file.js>             # syntax check after EVERY edit
+git commit -m "fix: …" && git push # auto-push after EVERY commit
+```
 
-- **Live:** `https://buoninglese.github.io/sottotitoli/`
-- **Local dev:** `python3 -m http.server 8000` → `http://localhost:8000`
-- **No build step.** Pure static HTML/CSS/JS. GitHub Pages hosting.
+**Use `python3 serve.py` for local dev.** It blocks public access to `docs/ai/`, `supabase/`, `config.js`, and other internal paths. The raw `http.server` exposes everything.
 
-## 2. Multi-Repo Architecture
+**Three non-negotiable rules before you touch any code:**
+1. **Read `docs/ai/coding-procedures.md`** — how to safely edit HTML/CSS/JS
+2. **Read `docs/ai/solve-mistakes.md`** — 12 bugs we've already solved, don't repeat them
+3. **Check syntax after EVERY edit** — `node --check` for .js, `get_errors` for .html
 
-| Repo | Purpose | Stack |
-|------|---------|-------|
-| `sottotitoli` (this one) | Frontend — all pages, UI, client logic | Static JS/HTML/CSS |
-| `sottotitoli-websocket` | WebSocket relay + OpenAI Whisper | Node.js (ESM), Render |
-| `sottotitoli-learning` | Lesson reports + Oxford dictionary | Node.js (CJS), Render |
+---
 
-**Communication flow:** Browser mic → WebSocket relay → back to all clients in room. Room IDs stored in `localStorage`, passed via URL params.
+## 🗺️ Documentation Map
 
-**Message format (WebSocket):**
-- Final: `{"msg": true, "final": "text", "id": counter, "label": label}`
-- Interim: `{"msg": true, "interm": "partial", "id": counter}`
-
-## 3. File Map — What Everything Does
-
-### Core Pages (the ones that matter)
-
-| File | Purpose | Key Notes |
+### For Agents (AI coding assistants)
+| File | Purpose | Read When |
 |------|---------|-----------|
-| `index.html` | Landing page | Parallax slider (4 slides), diagonal wipe transitions, pricing, testimonials. The slider is custom JS/CSS — fragile, don't rewrite it. |
-| `studio.html` | Workspace selector | Horizontal scroll panels for caption/translate modes. Login redirect target. |
-| `studio.html` | Main cockpit/dashboard | **The biggest page (114KB).** Live transcription room, vocabulary bubbles, metrics, AI reports. The "control room." |
-| `account.html` | User profile + "Il tuo viaggio" + goals/preferences | Settings persistence issues (see Known Issues). |
-| `analysis.html` | Session analysis | Session history cards, AI reports, expandable cards, performance dashboard, NGSL mastery, favorite sessions, viaggio. |
-| `wallet.html` | Credits & transactions | Voice Credits (VC) balance, token ledger, vouchers. |
-| `gara.html` | Multiplayer language game | Supabase Realtime. Connection/sync bugs (see Known Issues). |
-| `overlay.html` / `overlay-roll.html` / `overlay-cinema.html` | Caption display overlays | Different visual styles for captions. Used as pop-out windows. |
+| **[docs/ai/README.md](docs/ai/README.md)** | Index of all AI docs | First thing |
+| **[docs/ai/UPDATE-MASTER-MDs.md](docs/ai/UPDATE-MASTER-MDs.md)** | Protocol for updating any MD | When asked to update docs |
+| **[docs/ai/coding-procedures.md](docs/ai/coding-procedures.md)** | Safe editing rules | Before any edit |
+| **[docs/ai/solve-mistakes.md](docs/ai/solve-mistakes.md)** | Bug encyclopedia | Debugging |
+| **[docs/ai/architecture.md](docs/ai/architecture.md)** | System architecture | Understanding the stack |
+| **[docs/ai/css-theme-guide.md](docs/ai/css-theme-guide.md)** | Day/night theming | Editing CSS |
+| **[docs/ai/pages-directory.md](docs/ai/pages-directory.md)** | Every page & status | Finding files |
+| **[docs/ai/glossary.md](docs/ai/glossary.md)** | Terminology | Understanding jargon |
+| **[docs/ai/testing-checklist.md](docs/ai/testing-checklist.md)** | Pre-commit checklist | Before committing |
+| **[docs/ai/deploy-runbook.md](docs/ai/deploy-runbook.md)** | Deploy procedures | Deploying |
 
-### JavaScript Files
+### For Humans (designers, marketers, business)
+| File | Purpose |
+|------|---------|
+| **[docs/ai/brand-voice.md](docs/ai/brand-voice.md)** | Tone, messaging, copy rules |
+| **[docs/ai/business-info.md](docs/ai/business-info.md)** | Company, pricing, legal, Stripe |
+| **[DESIGN.md](DESIGN.md)** | Visual design system (colors, fonts, components) |
 
-| File | Role | Dependencies |
-|------|------|-------------|
-| `config.js` | **All configuration.** WebSocket URL, translation provider, modes. | Gitignored! Use `config.example.js` as template. |
-| `js/auth.js` | Supabase auth (Google OAuth). Defines `window.sottotitoliSupabase`. | Must load before any Supabase-using code. |
-| `js/theme.js` | Shared navbar, hamburger menu, theme toggle (day/night), iOS flexbox gap polyfill. | Load on every page. |
-| `app.js` | Main application logic — huge file, core of the cockpit. | |
-| `audio-recorder.js` | Audio capture module. | |
-| `translation-providers.js` | MyMemory + Google Translate backends. | |
-| `session-utils.js` | Session management utilities. | |
-| `speaker-analytics.js` | Speaker diarization analysis. | |
-| `text-rules.js` | Text processing rules. | |
-| `ws-publisher.js` | WebSocket publishing client. | |
-| `lesson-report.js` | Lesson report generation. | |
-| `security-utils.js` | Security utilities. **Fragile — don't modify lightly.** | |
-| `js/cefr-levels.js` | CEFR word-level mappings (A1-C2). Used for vocabulary coloring. | |
-| `js/lemma-pos-map.js` | Lemma → Part-of-Speech mappings. | |
-| `js/account.js` | Account page logic. Theme/settings persistence. | |
-| `js/preferences.js` | User preferences management. | |
-| `js/pos-coloring.js` | Part-of-speech coloring for overlay. | |
+### For Backend & Operations
+| File | Purpose |
+|------|---------|
+| **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)** | Full architecture diagram + data flows |
+| **[docs/SERVICES.md](docs/SERVICES.md)** | Production URLs, health endpoints |
+| **[docs/METRICS.md](docs/METRICS.md)** | Every metric, calculation, source file |
+| **[docs/SECURITY.md](docs/SECURITY.md)** | Security policy, secrets, keys |
+| **[docs/ROADMAP.md](docs/ROADMAP.md)** | What's next |
+| **[docs/CHANGELOG.md](docs/CHANGELOG.md)** | What changed |
+| **[docs/CONTRIBUTING.md](docs/CONTRIBUTING.md)** | How to contribute |
+| **[docs/DEPLOYMENT_CHECKLIST.md](docs/DEPLOYMENT_CHECKLIST.md)** | Pre-deploy verification |
+| **[docs/STRIPE_PRODUCTS.md](docs/STRIPE_PRODUCTS.md)** | Stripe product config |
+| **[dev/WORKFLOW.md](dev/WORKFLOW.md)** | AI report prompt workflow |
+
+### Archived (historical reference, not actively maintained)
+`docs/archive/` — CEFR planning, brutalist migration, hero specs, etc.
+
+---
+
+## 🏗️ Project Identity
+
+**Sottotitoli** (Italian: "Subtitles") — Real-time AI captioning + translation web app.
+- **Live:** https://www.sottotitoli.pro (GitHub Pages: `buoninglese.github.io/sottotitoli`)
+- **Stack:** Static HTML/CSS/JS. No build step. No framework.
+- **UI Language:** Italian. Code comments: English.
+- **Business:** Freemium. 15 min/week free. Prepaid credit packs via Stripe.
+- **Aesthetic:** Cinema-inspired. Wes Anderson meets Tarantino.
+- **Founder:** Sebastian Krauwel. Dutch native, practicing Dutch→Italian.
+
+### Multi-Repo Architecture
+
+| Repo | What | Stack | Host |
+|------|------|-------|------|
+| `sottotitoli` (this) | Frontend — all pages, UI, client logic | Static HTML/CSS/JS | GitHub Pages |
+| `sottotitoli-websocket` | WebSocket relay + OpenAI Whisper | Node.js ESM | Render |
+| `sottotitoli-learning` | CEFR vocabulary + Oxford dictionary | Node.js CJS | Render |
+
+---
+
+## 🔗 Communication Flow
+
+```
+Browser Mic → WebSocket relay → OpenAI Whisper → back to all clients in room
+```
+
+**WebSocket message format (DO NOT CHANGE):**
+```json
+{"msg": true, "final": "text", "id": counter, "label": "label"}
+{"msg": true, "interm": "partial", "id": counter}
+```
+
+---
+
+## 📁 Key Files
+
+### Core Pages
+| File | Purpose | Size |
+|------|---------|------|
+| `index.html` | Landing page — parallax slider, diagonal wipes | ~30KB |
+| `panoramica.html` | Main dashboard — the most complex page | 114KB+ |
+| `caption-s8t.html` | Next-gen caption interface — 5 slides, word bank | ~8K lines |
+| `studio.html` | Original caption workspace — legacy | ~114KB |
+| `purchase.html` | Stripe checkout / pricing | ~20KB |
+| `onboarding.html` | New user onboarding flow | ~15KB |
+| `account.html` | User profile + "Il tuo viaggio" | ~30KB |
+| `analysis.html` | Session analysis + AI reports | ~50KB |
+| `gara.html` | Multiplayer language game | ~40KB |
+| `overlay.html` / `overlay-roll.html` / `overlay-cinema.html` | Caption display overlays | ~10KB each |
+
+### Critical JavaScript
+| File | Role | Load Order |
+|------|------|------------|
+| `config.js` | All configuration (**GITIGNORED!**) | 1st |
+| `js/auth.js` | Supabase Google OAuth → `window.sottotitoliSupabase` | 2nd |
+| `js/theme.js` | Navbar, hamburger, day/night toggle | 3rd |
+| `js/i18n.js` | Language toggle (IT↔EN) | Page-specific |
+| `app.js` | Main application logic (huge) | Page-specific |
+| `translation-providers.js` | MyMemory + Google Translate | Page-specific |
+| `session-utils.js` | Session management | Page-specific |
+| `audio-recorder.js` | Audio capture | Page-specific |
+| `security-utils.js` | Security utilities (**FRAGILE**) | Page-specific |
 
 ### CSS Files
-
 | File | Role |
 |------|------|
-| `css/theme.css` | **Shared theme.** Navbar, panels, CSS variables, snapping. Imported by most pages. |
-| `style.css` | Legacy global styles — mostly superseded by per-page `<style>` blocks. |
-| `css/responsive.css` | Responsive breakpoints. |
-| `css/bootstrap.min.css` / `css/bootstrap-theme.min.css` | Bootstrap 4 — used sparingly, mainly for grid utilities on older pages. |
-| `css/animate.min.css` / `css/animate-text.css` | Animation libraries. |
-| `css/magnific-popup.css` | Lightbox. |
-| `css/owl.carousel.min.css` / `css/owl.theme.default.min.css` | Carousel (used on some mockup pages). |
+| `css/theme-2.css` | Shared theme — navbar, panels, snapping |
+| `css/theme.css` | Legacy shared theme (older pages) |
+| `css/panoramica.css` | Panoramica-specific styles |
+| `css/responsive.css` | Global responsive breakpoints |
+| `css/tailwind.min.css` | Tailwind utilities (sparingly) |
 
 ### Supabase
-
-| Path | Purpose |
-|------|---------|
-| `supabase/functions/create-checkout-session/` | Stripe checkout edge function |
-| `supabase/functions/stripe-webhook/` | Stripe webhook handler |
-| `supabase/functions/process-ai-reports/` | AI report generation |
-| `supabase/migrations/` | Database migrations |
-| `supabase_setup.sql` | Schema reference |
-| `ai_report_modules.sql` | AI report module definitions |
-
-## 4. CSS/Theming System — CRITICAL
-
-### How Day/Night Mode Works
-
-Every page uses `data-theme` attribute on `<html>`:
-```html
-<html lang="it" data-theme="dark">
-```
-
-Theme is toggled via `js/theme.js` which:
-1. Reads `localStorage.getItem('sottotitoli-theme')`
-2. Sets `document.documentElement.setAttribute('data-theme', t)`
-3. Updates the toggle button icon (☀️/🌙)
-
-### CSS Variable Pattern (per-page)
-
-**Each page defines its OWN `:root` and `[data-theme="dark"]` variables in a `<style>` block.** Variables are NOT globally consistent across pages — each page has its own palette. Common variable names:
-
-```css
-:root {
-  --bg: #f0f2f5;          /* page background */
-  --card: #fff;            /* card/surface background */
-  --line: #e2e5ea;         /* borders/dividers */
-  --text: #111827;         /* primary text */
-  --text-primary: #111827;
-  --text-secondary: #6b7280;
-  --text-muted: #9ca3af;
-  --accent-purple: #7c3aed;
-  --accent-green: #059669;
-  --accent-blue: #2563eb;
-  --accent-amber: #d97706;
-}
-[data-theme="dark"] {
-  --bg: #0f1117;
-  --card: #1a1d26;
-  /* ... darker equivalents ... */
-}
-```
-
-**If you add a new page, follow this pattern.** Copy the `:root`/`[data-theme="dark"]` block from `studio.html` or `studio.html` as a starting point.
-
-### Font
-
-All pages use **Inter** from Google Fonts:
-```html
-<link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,400;14..32,500;14..32,600;14..32,700;14..32,800;14..32,900&display=swap" rel="stylesheet">
-```
-
-### Icons
-
-Font Awesome 6 (Free) via CDN:
-```html
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
-```
-
-## 5. JavaScript Conventions
-
-### Script Loading Order (critical for pages with auth)
-
-```html
-<!-- 1. Dependencies -->
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<!-- 2. Config (must come before auth) -->
-<script src="config.js"></script>
-<!-- 3. Auth (creates window.sottotitoliSupabase) -->
-<script src="js/auth.js"></script>
-<!-- 4. Theme (navbar, hamburger, theme toggle) -->
-<script src="js/theme.js"></script>
-<!-- 5. Page-specific logic -->
-```
-
-**Never load `auth.js` before `config.js`** — it needs `window.SOTTOTITOLI_CONFIG`.
-
-### Config Pattern
-
-`config.js` is **gitignored**. `config.example.js` is the template. All config lives on `window.SOTTOTITOLI_CONFIG`:
-```js
-window.SOTTOTITOLI_CONFIG = {
-  websocketUrl: "wss://...",
-  AUTH_REDIRECT_URL: "https://...",
-  translation: { provider: "auto", ... },
-  modes: { ... }
-};
-```
-
-### Auth Flow
-
-1. User clicks "Accedi" → `signInWithGoogle()` in `js/auth.js`
-2. Google OAuth popup → redirects to `AUTH_REDIRECT_URL` (studio.html)
-3. Supabase reads `#access_token` from URL via `detectSessionInUrl: true`
-4. Return page stored in `localStorage.setItem('sottotitoli_return_page', ...)`
-5. Referral codes preserved through OAuth via `localStorage.setItem('sottotitoli_referrer', ...)`
-
-## 6. Supabase Integration
-
 - **Project:** `qzqmuegbpmvqrjrlfbgk`
 - **URL:** `https://qzqmuegbpmvqrjrlfbgk.supabase.co`
-- **Anon Key:** `sb_publishable_l-PG1wsO1FMWADK9GVBqoQ_0EtPA2K7` (publishable-safe, in `js/auth.js`)
 - **Auth:** Google OAuth only
-- **Edge Functions:** `create-checkout-session`, `stripe-webhook`, `process-ai-reports`
+- **Edge Functions:** `create-checkout-session`, `stripe-webhook`, `process-ai-reports`, `wordnik-proxy`
+- **Key Tables:** `profiles`, `sessions`, `user_vocabulary`, `token_transactions`, `ai_report_requests`, `session_ai_reports`
+- **Column traps:** `transcript_text` NOT `transcript` · `wpm` NOT `wpm_avg` · `cefr_level` NOT `cefr`
 
-### Key Tables
+---
 
-`profiles`, `ai_report_requests`, `user_ai_entitlements`, `user_token_ledger`, `ai_configs`, `ai_report_modules`, `session_ai_reports`, `newsletter_subscribers`, `token_transactions`, `referrals`, `user_credits`
+## 🎨 Design Quick Reference
 
-### Stripe Products
+| Element | Value |
+|---------|-------|
+| **UI Font** | Inter (400–900) |
+| **Headline Font** | Manrope (500–800) |
+| **Mono Font** | JetBrains Mono (labels, eyebrow text) |
+| **Day Mode** | Off-white (`#f0f6f8`), warm purples |
+| **Night Mode** | Deep blue→blackish (`#0b151c`), cyan accents |
+| **Buttons** | Pill-shaped (`border-radius:100px`), purple accent |
+| **Cards** | Rounded (14–18px), subtle borders, soft shadows |
+| **Transitions** | `cubic-bezier(.2,.8,.2,1)` |
 
-- 50h (3000 min): `prod_UcOPJ8zxdBTvxy`
-- 90 tokens: `prod_UcORHDDoSul6TS`
+Each page has its **own** `:root`/`[data-theme="dark"]` CSS variables. They are NOT shared across pages. See `docs/ai/css-theme-guide.md`.
 
-## 7. Common Pitfalls & Lessons Learned
+---
 
-### DO NOT
-
-1. **Never commit `config.js`** — it contains production URLs and is gitignored.
-2. **Never hardcode URLs** — always use `window.SOTTOTITOLI_CONFIG` or relative paths.
-3. **Never remove the `data-theme` attribute pattern** — every page depends on it for day/night mode.
-4. **Never change the WebSocket message format** — the relay server and all clients depend on `{"msg":true, "final":"...", "id":..., "label":"..."}`.
-5. **Never modify `js/auth.js` auth redirect logic** without understanding the full OAuth flow.
-6. **Never edit files in the `Users/` directory** — it's a stale copy inside the workspace.
-7. **Never write to `~/Desktop/...` from workspace** — paths don't resolve to the real Desktop.
-8. **Don't copy Caption.Ninja branding** — already replaced with Sottotitoli.
-9. **Don't add build steps** — this is a static site served by GitHub Pages.
-10. **Don't use `status` as a variable name in zsh** — it's read-only.
-
-### CSS/UI Pitfalls
-
-1. **Each page has its own CSS variables.** If something looks wrong on one page but not another, check the `:root`/`[data-theme="dark"]` block on that specific page.
-2. **`body` has `overflow:hidden` on many pages** (e.g., index, app). If you need scrolling, override with `overflow-y:auto` or `body.snap-body` class.
-3. **The parallax slider on `index.html` is delicate.** Diagonal wipe transitions were perfected after many iterations. Don't rewrite the slider — make targeted fixes.
-4. **Mobile is NOT fully designed yet.** Most pages are desktop-first. Test at 375px width before claiming something works.
-5. **Italian is the UI language.** All user-facing text should be in Italian. Code/comments in English.
-
-### JavaScript Pitfalls
-
-1. **Auth race condition:** Code that needs the user must wait for `window.sottotitoliSupabase.auth.getSession()`. Don't assume the user is available at script load time.
-2. **WebSocket rooms:** Room IDs come from URL params or localStorage. If WebSocket isn't connecting, check the room ID.
-3. **Translation duplicates:** There's a known bug where translations can output duplicate/simultaneous results. The sentence concatenation issue may reappear after fixes.
-
-### Supabase Pitfalls
-
-1. **Policy names must be unique.** Error `42710: policy already exists` means you're trying to create a duplicate policy. Drop it first.
-2. **Edge function secrets** are set in Supabase dashboard, NOT in code. `STRIPE_SECRET_KEY` for create-checkout-session.
-3. **CORS:** Edge functions need explicit CORS headers. The template in `create-checkout-session/index.ts` handles this.
-4. **Stripe product IDs must match** between `config.js`, the edge function's `PRICE_MAP`, and the Stripe dashboard.
-
-## 8. Known Issues (as of Jun 18, 2026)
+## ⚠️ Known Issues (2026-08-05)
 
 | Issue | Location | Status |
 |-------|----------|--------|
-| Session duration shows 0s after recording | `studio.html` | Unresolved |
-| Account settings not persisting | `account.html` | Unresolved |
-| Hamburger menu links broken (Wallet, Impostazioni, Esci) | Some pages | Unresolved |
-| "Pronto a cominciare" box has closeable X that shouldn't be there | `studio.html` | Unresolved |
-| Gara multiplayer: mic stops after 2 sentences, connection/sync bugs | `gara.html` | Unresolved |
-| AI report generation: constraint violations in `ai_report_requests` | Supabase | Unresolved |
-| Translation duplicate outputs bug | `translation-providers.js` | Intermittent |
-| NGSL coverage metric calculation questionable | `studio.html` | Needs verification |
-| Day/night mode doesn't work on `studio.html` | `studio.html` | Possibly fixed, verify |
-| Index slider: occasional visual glitch blocks on backgrounds | `index.html` | Mostly fixed |
+| Session duration shows 0s after recording | `studio.html` | 🔴 Unresolved |
+| Account settings not persisting | `account.html` | 🔴 Unresolved |
+| Hamburger menu links broken (Wallet, Settings, Logout) | Some pages | 🔴 Unresolved |
+| Gara multiplayer: mic stops after 2 sentences | `gara.html` | 🔴 Unresolved |
+| AI report generation: constraint violations | Supabase | 🔴 Unresolved |
+| Translation duplicate outputs | `translation-providers.js` | 🟡 Intermittent |
+| Day/night mode doesn't work on studio.html | `studio.html` | 🟡 Possibly fixed |
 
-## 9. User Design Preferences
+---
 
-- **Aesthetic:** Cinema-inspired (Wes Anderson, Tarantino palettes). Clean, bold, dramatic.
-- **Day mode:** Off-white/light gradients. Warm purples.
-- **Night mode:** Dark blue→blackish gradients (not pure black). Deep space feel.
-- **Font:** Inter only. No serif, no monospace (except for code/URLs).
-- **Buttons:** Pill-shaped (`border-radius:100px`), purple accent for primary CTAs.
-- **Cards:** Rounded corners (14-18px), subtle borders, soft shadows.
-- **Language:** UI in Italian. The user is Dutch native, practicing Dutch→Italian.
-- **Test account:** `studiobuoninglese@gmail.com` / `joliechanel84@gmail.com` (1000 VC)
-- **Known preference:** User iterates heavily on copy/text and visual polish. Expect multiple rounds.
+## 🧠 Repo Memory Files
 
-## 10. Workflow
+Located in `/memories/repo/` — loaded automatically into AI agent context:
 
-### Local Development
+| File | Knowledge |
+|------|-----------|
+| `caption-s8t-expert-guide.md` | Deep dive: 8K lines, 142 functions, 5 slides |
+| `supabase-schema.md` | Verified column names (traps to avoid!) |
+| `database-schema.md` | Profiles, preferences, migration notes |
+| `i18n-rules.md` | Leaf-span pattern — CRITICAL |
+| `hugging-voice-rules.md` | 34 critical IDs, never remove them |
+| `s2s-voice-pitfalls.md` | VAD bugs, STT truncation, flag formats |
+| `cefr-integration-plan.md` | CEFR API architecture |
+| `version.md` | Current panoramica.html version |
+
+---
+
+## 🔧 Git Workflow
+
 ```bash
-cd /Users/sebastiankrauwel/sottotitoli
-python3 -m http.server 8000
-# Open http://localhost:8000
+git status                           # Check what changed
+git add <files>                      # Stage (NEVER config.js!)
+git commit -m "type: description"    # fix:, feat:, style:, refactor:
+git push origin main                 # ALWAYS push after commit
 ```
 
-### Before Committing
-1. Test the changed page at desktop AND mobile (375px)
-2. Test day AND night mode
-3. Check browser console for errors
-4. Verify no hardcoded URLs slipped in
-5. Make sure `config.js` changes aren't staged (it's gitignored)
+---
 
-### Deployment
-- **Frontend:** Push to `main` → GitHub Pages auto-deploys
-- **WebSocket relay:** Deploy on Render (separate repo)
-- **Supabase functions:** `supabase functions deploy <name>`
-- **Stripe:** Test mode. Products configured in Stripe dashboard.
+## 🚨 The "Never" List
 
-## 11. External Services
+1. ❌ Commit `config.js` — it's gitignored. Edit `config.example.js`.
+2. ❌ Hardcode URLs — use `window.SOTTOTITOLI_CONFIG` or relative paths.
+3. ❌ Put `data-i18n` on elements with children — wrap text in `<span>`.
+4. ❌ Change WebSocket message format — relay server depends on it.
+5. ❌ Use wrong Supabase column names — check `supabase-schema.md`.
+6. ❌ Remove elements with `id` from `hugging-voice/` — 34 critical IDs.
+7. ❌ Use `?embed=1` on hugging-voice iframe — kills `showModal()`.
+8. ❌ Skip syntax check after JS edits — `node --check` MANDATORY.
+9. ❌ Skip mobile (375px) or day/night mode testing.
+10. ❌ Use `~/` unquoted in shell commands — expands to home directory.
+11. ❌ Add build steps — this is a static site.
+12. ❌ Use `status` as a variable name in zsh — it's read-only.
 
-| Service | Purpose | Config Location |
-|---------|---------|----------------|
-| GitHub Pages | Frontend hosting | Repo settings |
-| Render | WebSocket + learning backends | Render dashboard |
-| Supabase | Auth, DB, Edge Functions | `js/auth.js`, Supabase dashboard |
-| Stripe | Payments (test mode) | Edge function secrets + dashboard |
-| MyMemory | Free translation API | `config.js` |
-| Google Cloud STT | Browser-based speech | Web Speech API (no config) |
-| OpenAI | Transcription, AI reports | WebSocket relay env vars |
-| Font Awesome 6 | Icons | CDN link in `<head>` |
-| Google Fonts | Inter font | CDN link in `<head>` |
+---
 
-## 12. Mockup Files (Reference Only)
+## 📋 Quick Checklist (Before Every Commit)
 
-These are design exploration files — not production pages:
-`*-mockups.html`, `analisi-mockups.html`, `analysis-account-mockups.html`, `bg-shapes-mockups.html`, `blob-hover-mockups.html`, `font-mockups.html`, `gauge-mockup.html`, `gradient-mockups.html`, `hero-bg-mockups.html`, `index-mockup.html`, `index-parallax-mockup.html`, `prezzi-*-mockups.html`, `scheme-mockups.html`, `site-gradients-mockups.html`, `slider-*-mockups.html`, `steps-mockups.html`, `style-mockups.html`, `translate-pipeline-mockup.html`, `viaggio-mockup.html`
+- [ ] `node --check <file.js>` passed (or `get_errors` for HTML)
+- [ ] Tested at desktop (1200px+) and mobile (375px)
+- [ ] Tested day AND night mode
+- [ ] No console errors
+- [ ] `config.js` NOT staged
+- [ ] Version bumped (if editing `panoramica.html`)
+- [ ] Committed AND pushed
 
-**Do not modify mockup files unless the user explicitly asks.** They serve as visual reference/snapshots.
+---
 
-## 13. Fragile Files — Modify With Extreme Caution
-
-- `config.js` — Production config. Gitignored. Edit `config.example.js` instead.
-- `js/auth.js` — Supabase anon key + OAuth redirect. Breaking this locks everyone out.
-- `security-utils.js` — Security invariants.
-- `index.html` slider code — The diagonal wipe transitions took many iterations to perfect.
-- `.github/workflows/` — CI/CD pipeline definitions.
-- Supabase edge functions — Deployed separately; test locally first.
-- Render environment variables — Set via dashboard, not in code.
+*This file is the authoritative entry point. All other docs link back here.*
+*See [docs/ai/README.md](docs/ai/README.md) for the full AI documentation index.*
 
 
