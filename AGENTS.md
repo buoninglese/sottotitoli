@@ -98,6 +98,13 @@ These extensions catch syntax errors and lint issues in real-time. All are insta
 | **[docs/STRIPE_PRODUCTS.md](docs/STRIPE_PRODUCTS.md)** | Stripe product config |
 | **[dev/WORKFLOW.md](dev/WORKFLOW.md)** | AI report prompt workflow |
 
+### For AI Agent Tool Access (MCP + Composio)
+| File | Purpose |
+|------|---------|
+| **[docs/ai/firecrawl-capabilities.md](docs/ai/firecrawl-capabilities.md)** | Web search, scrape, monitor, parse, research |
+| **[docs/ai/apify-capabilities.md](docs/ai/apify-capabilities.md)** | Actor marketplace, social scrapers, storage |
+| **[docs/ai/composio-capabilities.md](docs/ai/composio-capabilities.md)** | 15 accounts: Gmail, GitHub, Supabase, Stripe, Linear, PostHog, etc. |
+
 ### Archived (historical reference, not actively maintained)
 `docs/archive/` — CEFR planning, brutalist migration, hero specs, etc.
 
