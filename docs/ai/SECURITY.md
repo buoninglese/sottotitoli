@@ -1,11 +1,7 @@
 # Security Policy
 
-> Last updated: 2026-08-05
-> See also: `docs/ai/security-hardening.md` for the full audit and implementation plan.
-
-## Supported Versions
-
-Current `main` branch is the only supported version.
+> Last updated: 2026-08-06
+> Cross-refs: `AGENTS.md` · `deploy-runbook.md` · `coding-procedures.md`
 
 ## Reporting a Vulnerability
 
@@ -19,41 +15,51 @@ Contact: studiobuoninglese@gmail.com
 | Measure | Status | Details |
 |---------|--------|---------|
 | HTTPS | ✅ Enforced | GitHub Pages enforces HTTPS + HSTS on `.github.io` |
-| Content Security Policy | ✅ Implemented | CSP via `<meta>` on index.html, panoramica.html, caption-s8t.html |
-| `X-Content-Type-Options` | ✅ Implemented | `nosniff` on all production pages |
-| `Referrer-Policy` | ✅ Implemented | `strict-origin-when-cross-origin` |
-| `rel="noopener noreferrer"` | ✅ Fixed | All `target="_blank"` links on production pages |
-| `robots.txt` | ✅ Hardened | 55+ blocked paths for internal files |
+| Content Security Policy | ✅ Active | CSP via `<meta>` on index.html, panoramica.html, caption-s8t.html, privacy.html, termini.html |
+| `X-Content-Type-Options` | ✅ Active | `nosniff` on all production pages |
+| `Referrer-Policy` | ✅ Active | `strict-origin-when-cross-origin` |
+| `rel="noopener noreferrer"` | ✅ Active | All `target="_blank"` links |
+| `robots.txt` | ✅ Active | Blocks internal files (60+ paths) |
 | `serve.py` | ✅ Active | Local dev server blocks internal paths (403) |
-| Room ID validation | ✅ Active | `security-utils.js` warns on predictable room IDs |
 | Supabase RLS | ✅ Active | Row-Level Security on all tables |
 | `config.js` | ✅ Gitignored | Production config not in version control |
-| API keys | ✅ Server-side | OpenAI, Stripe, Wordnik keys in Render/Supabase env vars |
-
-## Secrets and API Keys
-
-- Never commit `.env` files, API keys, tokens, or passwords
-- Supabase anon keys are publishable-safe (client-side, unavoidable)
-- OpenAI, Oxford, Stripe keys in Render/Supabase environment variables only
-- Use `.env.example` files as templates (never with real values)
-- Rotate keys if ever committed or exposed
-
-## Data Security
-
-- Transcript text in Supabase with Row-Level Security (RLS)
-- Audio processed in memory, not persisted
-- All endpoints support optional `x-api-key` header authentication
-
-## Dependencies
-
-- npm dependencies checked via Dependabot (weekly)
-- Outdated/vulnerable dependencies updated promptly
-
-## Branch Protection
-
-- Direct pushes to `main` avoided
-- Pull requests recommended for all changes
+| API keys | ✅ Server-side | OpenAI, Stripe keys in Render/Supabase env vars only |
+| Room ID security | ✅ Active | Crypto-random room IDs (`crypto.randomUUID()`) |
 
 ---
 
-*For the full security audit, see `docs/ai/security-hardening.md`*
+## Secrets and API Keys
+
+- **Never** commit `.env` files, API keys, tokens, or passwords
+- Supabase anon keys are publishable-safe (client-side, unavoidable)
+- OpenAI and Stripe keys live in Render/Supabase environment variables only
+- Use `config.example.js` as template — never with real values
+- Rotate keys immediately if ever committed or exposed
+
+---
+
+## Data Security
+
+- All user data in Supabase PostgreSQL with Row-Level Security (RLS)
+- Audio processed in memory via Web Speech API — never persisted
+- Transcript text stored with per-user RLS policies
+- Auto-deletion: unsaved sessions purged after 30 days
+- Users can delete their own data at any time from the app
+
+---
+
+## Git Workflow
+
+- `config.js` and `config.secrets.js` are gitignored — never force-add them
+- Always check `git status` before committing to verify no secrets are staged
+- Push directly to `main` — GitHub Pages deploys automatically
+- No PR workflow needed for this single-developer project
+
+---
+
+## Dependencies
+
+- Frontend: static HTML/CSS/JS — no npm production dependencies
+- Dev only: Tailwind CSS (via npm, for building `css/tailwind.min.css`)
+- CDN: Supabase SDK, Font Awesome, Google Fonts, compromise.js
+- Supabase Edge Functions: Deno runtime, auto-updated

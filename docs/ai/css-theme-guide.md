@@ -2,6 +2,7 @@
 
 > **For any AI agent editing styles in Sottotitoli.**
 > The theming system is the most fragile part of the codebase. Understand it before touching CSS.
+> Last updated: 2026-08-06
 
 ---
 
@@ -12,7 +13,7 @@ Every page uses a `data-theme` attribute on `<html>`:
 <html lang="it" data-theme="dark">
 ```
 
-`js/theme.js` (or inline theme toggle) handles:
+`js/theme-2.js` (or inline theme toggle on simpler pages) handles:
 1. Reading `localStorage.getItem('sottotitoli-theme')`
 2. Setting `document.documentElement.setAttribute('data-theme', t)`
 3. Updating the toggle button icon (☀️/🌙)
@@ -96,6 +97,10 @@ body[data-theme="dark"] {
 ```
 Note: Some pages use `body[data-theme="dark"]` instead of `[data-theme="dark"]`.
 
+### Legacy Pages (privacy.html, termini.html)
+
+Use `theme.css` with different variable names (`--text-primary`, `--accent-purple`, `--border`). These are being migrated to `theme-2.css`. For now, they have a compatibility bridge in their inline `<style>` that maps old names to `theme-2.css` equivalents.
+
 ---
 
 ## 3. Variable Naming Conventions
@@ -120,34 +125,33 @@ Note: Some pages use `body[data-theme="dark"]` instead of `[data-theme="dark"]`.
 
 ---
 
-## 4. Common Variable Patterns Per Page
+## 4. Per-Page Theme Patterns
 
-### Older Pages (studio.html, account.html)
-```css
-:root {
-  --bg: #f0f2f5;
-  --card: #fff;
-  --line: #e2e5ea;
-  --text: #111827;
-  --text-primary: #111827;
-  --text-secondary: #6b7280;
-  --text-muted: #9ca3af;
-  --accent-purple: #7c3aed;
-  --accent-green: #059669;
-  --accent-blue: #2563eb;
-  --accent-amber: #d97706;
-}
-```
+### panoramica.html + grammarhub.html
+Share the same variable set (shown above). Both load `css/theme-2.css`, `css/panoramica.css`, `css/review.css`, `css/tailwind.min.css`.
 
-### caption-s8t.html (Extended Theme)
+### caption-s8t.html
 Has additional caption-specific variables:
 ```css
 --cap-v5-color, --cap-v5-panel-bg, --cap-v6-*, --cap-v7-*
 ```
-Plus font variables:
+Plus font variables inside `.font-crisp`:
 ```css
-.font-crisp { --font-live: ...; --font-tx: ...; }
+--font-live: Inter, size clamp(28px, 4.5vw, 40px), weight 500
+--font-tx: Inter, 15px, weight 400
+--font-mono: JetBrains Mono
 ```
+
+### privacy.html + termini.html (Legacy)
+Use `theme.css` with different naming:
+```css
+--text-primary   (not --text)
+--text-secondary (not --text-soft)
+--text-muted     (not --text-faint)
+--accent-purple  (not --purple)
+--border         (not --line)
+```
+A compatibility bridge in their inline `<style>` maps these to `theme-2.css` equivalents. These will be migrated to `theme-2.css` fully in a future pass.
 
 ---
 
@@ -157,7 +161,7 @@ Plus font variables:
 2. Adjust colors if needed for your page's specific aesthetic
 3. Use `var(--variable)` for ALL colors in your CSS
 4. Add `<html data-theme="light">` or `data-theme="dark"` as default
-5. Include `js/theme.js` or an inline theme toggle
+5. Include `js/theme-2.js` or an inline theme toggle
 6. Test both modes
 
 ---
@@ -172,7 +176,7 @@ Plus font variables:
 
 ---
 
-## 7. Responsive Breakpoints (General)
+## 7. Responsive Breakpoints
 
 | Breakpoint | Target |
 |-----------|--------|
@@ -196,13 +200,24 @@ Plus font variables:
 
 | Page | Fonts |
 |------|-------|
-| `panoramica.html` | Inter, Manrope, Cormorant Garamond, Material Symbols |
+| `panoramica.html`, `grammarhub.html` | Inter, Manrope, Cormorant Garamond, Material Symbols |
 | `index.html` | Inter, Manrope, JetBrains Mono |
-| `caption-s8t.html` | Inter (primary) |
+| `caption-s8t.html` | Inter (primary), JetBrains Mono |
 | `purchase.html` | Inter, Manrope |
 | `onboarding.html` | Inter, Manrope |
-| Older pages | Inter only |
+| `duo-s8t.html`, `ai-s8t.html` | Inter |
+| `privacy.html`, `termini.html` | Inter |
 
 ---
 
-*Last updated: 2026-08-05*
+## 9. CSS File Map
+
+| File | Loaded By | Role |
+|------|-----------|------|
+| `css/theme-2.css` | 6 pages | Current shared theme (navbar, panels, snapping) |
+| `css/panoramica.css` | 2 pages | Dashboard-specific styles |
+| `css/review.css` | 2 pages | AI review display |
+| `css/tailwind.min.css` | 2 pages | Compiled Tailwind utilities |
+| `css/theme.css` | 2 pages | Legacy theme (privacy, termini only) |
+| `css/traduzione.css` | (archived) | Translation page styles |
+| `style.css` | 5 pages | Original Appland template — no conflicts with theme-2 |
