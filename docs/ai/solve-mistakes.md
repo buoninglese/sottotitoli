@@ -190,7 +190,7 @@ const user = session?.user;
 
 ### Prevention
 - Always use CSS variables from the page's `:root` block
-- Check DESIGN.md for available variable names
+- Check `css-theme-guide.md` for available variable names
 
 ---
 
@@ -371,4 +371,4 @@ broken, suspect a missing `</div>` on a `display:none` element between them.
 
 ---
 
-*Last updated: 2026-08-05 · Based on real bugs encountered across all sessions*
+*Last updated: 2026-08-06 · Based on real bugs encountered across all sessions*

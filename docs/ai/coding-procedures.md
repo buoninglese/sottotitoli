@@ -11,10 +11,9 @@
 | Order | File | Why |
 |-------|------|-----|
 | 1 | `AGENTS.md` | Architecture, conventions, pitfalls, known issues |
-| 2 | `DESIGN.md` | Visual design system, colors, typography |
-| 3 | `Sebastian-Preferences-Agent.md` | How to work with me |
-| 4 | `/memories/repo/supabase-schema.md` | Correct column names |
-| 5 | `/memories/repo/i18n-rules.md` | i18n leaf-span rules |
+| 2 | `docs/ai/glossary.md` | Understand the vocabulary |
+| 3 | `/memories/repo/supabase-schema.md` | Correct column names |
+| 4 | `/memories/repo/i18n-rules.md` | i18n leaf-span rules |
 
 ### 1.2 Understand the Repo Structure
 - **Frontend:** `/Users/sebastiankrauwel/sottotitoli` — static HTML/CSS/JS
@@ -123,11 +122,12 @@ Always wait for `window.sottotitoliSupabase.auth.getSession()` — user is not a
 ### 4.1 Theme File Map
 | File | Scope |
 |------|-------|
-| `css/theme.css` | Legacy shared theme (older pages) |
-| `css/theme-2.css` | Newer shared theme (navbar, panels) |
+| `css/theme-2.css` | Current shared theme (navbar, panels, snapping) |
+| `css/theme.css` | Legacy theme (privacy, termini only) |
 | `css/panoramica.css` | Panoramica-specific styles |
-| `css/studio-caption.css` | Studio/caption styles |
-| `css/responsive.css` | Global responsive breakpoints |
+| `css/review.css` | AI review/testimonial styles |
+| `css/tailwind.min.css` | Compiled Tailwind utilities |
+| `style.css` | Original Appland template (legacy, no conflicts) |
 | `<style>` blocks in HTML | Page-specific overrides |
 
 ### 4.2 Never Do

@@ -11,11 +11,10 @@
 |------|---------|
 | **Sottotitoli** | Full product name. Italian for "Subtitles." |
 | **sottotitoli.pro** | Premium tier branding. Always lowercase with dot. |
-| **Panoramica** | The main dashboard/overview page (`panoramica.html`). Italian for "Overview." |
-| **Studio** | The original live captioning workspace (`studio.html`). |
+| **Panoramica** | The main dashboard (`panoramica.html`). Italian for "Overview." |
 | **Caption-S8T** | Next-gen caption interface (`caption-s8t.html`). "S8T" = abbreviation of "Sottotitoli." |
 | **DUO+** | Multi-speaker collaborative mode (in `duo-s8t.html` and caption-s8t DUO+ module). |
-| **Il tuo viaggio** | "Your journey" — the user's learning progress tracker on `account.html` and `panoramica.html`. |
+| **Il tuo viaggio** | "Your journey" — the user's learning progress tracker. |
 
 ---
 
@@ -65,7 +64,7 @@
 
 | Term | Meaning |
 |------|---------|
-| **Supabase** | Backend-as-a-service: auth, database, edge functions, realtime. |
+| **Supabase** | Backend-as-a-service: auth, database, 21 edge functions, realtime. |
 | **Edge Function** | Serverless functions running on Supabase (Deno runtime). |
 | **profiles** | User profile table (linked to `auth.users`). |
 | **sessions** | Recording session table with metrics. |
@@ -81,11 +80,9 @@
 |------|---------|
 | **config.js** | Gitignored production config. Template: `config.example.js`. |
 | **AGENTS.md** | Agent handoff file — the primary reference for AI agents. |
-| **CLAUDE.md** | Older agent reference file (Claude-specific). |
-| **DESIGN.md** | Visual design system reference. |
+| **CLAUDE.md** | Redirect stub → AGENTS.md. |
 | **i18n** | Internationalization — Italian↔English language toggle system. |
 | **leaf-span pattern** | i18n rule: `data-i18n` MUST go on a leaf element with no children. |
-| **MASTER MD FILE 2026** | Desktop folder for agent handoff documentation. |
 
 ---
 

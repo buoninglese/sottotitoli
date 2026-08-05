@@ -149,11 +149,11 @@ For the most common checks:
 ```bash
 # Run these before every commit
 node --check js/auth.js 2>&1 && echo "✓ auth.js syntax OK"
-node --check js/theme.js 2>&1 && echo "✓ theme.js syntax OK"
+node --check js/theme-2.js 2>&1 && echo "✓ theme-2.js syntax OK"
 git status | grep -q "config.js" && echo "⚠ config.js is staged!" || echo "✓ config.js not staged"
 grep -r "topbar-version" panoramica.html | grep -o "v[0-9]*"
 ```
 
 ---
 
-*Last updated: 2026-08-05*
+*Last updated: 2026-08-06*

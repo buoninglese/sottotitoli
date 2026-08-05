@@ -60,10 +60,9 @@ git push origin main
 | `SUPABASE_SERVICE_ROLE_KEY` | Supabase service role (server-side) |
 
 ### Verify
-- Open `studio.html` or `caption-s8t.html`
+- Open `caption-s8t.html` or `duo-s8t.html`
 - Start a session
 - Check that captions appear
-- Open overlay page with same room ID — should receive messages
 
 ---
 
@@ -109,7 +108,6 @@ cd /Users/sebastiankrauwel/sottotitoli
 supabase functions deploy create-checkout-session
 supabase functions deploy stripe-webhook
 supabase functions deploy process-ai-reports
-supabase functions deploy wordnik-proxy
 
 # Deploy all functions
 supabase functions deploy
@@ -121,9 +119,6 @@ supabase functions deploy
 supabase secrets set STRIPE_SECRET_KEY=sk_test_...
 supabase secrets set STRIPE_WEBHOOK_SECRET=whsec_...
 
-# Wordnik
-supabase secrets set WORDNIK_API_KEY=...
-
 # OpenAI (for AI reports)
 supabase secrets set OPENAI_API_KEY=sk-...
 ```
@@ -132,7 +127,7 @@ supabase secrets set OPENAI_API_KEY=sk-...
 - `create-checkout-session`: Go to `purchase.html`, click a product → should redirect to Stripe Checkout
 - `stripe-webhook`: Check Stripe dashboard → Webhooks → recent deliveries
 - `process-ai-reports`: Trigger an AI report from panoramica → check `ai_report_requests` table
-- `wordnik-proxy`: Check browser console for dictionary lookups in caption-s8t
+- `grammar-segment`: Use caption-s8t grammar check → verify response
 
 ---
 
@@ -153,10 +148,8 @@ supabase db push
 ### Migration Files
 Located in `supabase/migrations/`:
 - `ensure_profiles_table.sql` — Creates profiles table + columns + trigger + RLS
-- `add_settings_columns.sql` — Adds display_name, ui_language, save_sessions, anonymous_sharing
-- `add_display_name.sql` — display_name column
-- Other migration files in directory
-
+- `20260803_*.sql` — Recent migrations (4 files)
+- `archived/` — 43 historical migrations applied to production
 ### Verify
 ```sql
 -- Check if migration applied

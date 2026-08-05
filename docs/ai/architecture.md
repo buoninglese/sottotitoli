@@ -11,8 +11,8 @@
 │                     USER'S BROWSER                          │
 │                                                             │
 │  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌────────────┐ │
-│  │ index    │  │panoramica│  │caption-  │  │ overlay    │ │
-│  │ (landing)│  │(dashboard│  │s8t       │  │ (display)  │ │
+│  │ index    │  │panoramica│  │caption-  │  │duo-s8t     │ │
+│  │ (landing)│  │(dashboard│  │s8t       │  │(multi-spkr)│ │
 │  │          │  │)         │  │(capture) │  │            │ │
 │  └──────────┘  └──────────┘  └────┬─────┘  └──────┬─────┘ │
 │                                    │Mic              │       │
@@ -36,7 +36,7 @@
 │                 │ │                 │ │                 │
 │ • Auth (Google) │ │ • WebSocket     │ │ • CEFR API      │
 │ • PostgreSQL    │ │   relay         │ │ • word_cefr.db  │
-│ • Edge Funcs    │ │ • OpenAI STT    │ │ • Oxford dict   │
+│ • 21 Edge Funcs │ │ • OpenAI STT    │ │ • Oxford dict   │
 │ • Realtime      │ │ • Translation   │ │                 │
 └─────────────────┘ └─────────────────┘ └─────────────────┘
           │
@@ -54,12 +54,12 @@
 
 ### Live Captioning Session
 ```
-1. User opens caption-s8t.html
+1. User opens caption-s8t.html (or duo-s8t.html, traduzione-s8t.html)
 2. Config loaded → wsUrl from window.SOTTOTITOLI_CONFIG
 3. User clicks "Avvia sessione" → toggleSession()
-4. AudioRecorder captures mic → sends via WebSocket to Render relay
+4. real-mic.js captures mic → sends via WebSocket to Render relay
 5. Render relay → OpenAI Whisper → returns text
-6. Text broadcast to all clients in room (overlay pages too)
+6. Text broadcast to all clients in room
 7. Translation provider (MyMemory/Google) translates
 8. Captions rendered in real-time in caption bar
 9. Session saved to Supabase sessions table on stop
@@ -129,6 +129,23 @@ Room IDs: URL params or localStorage. No auth on WebSocket — rooms are the sec
 | i18n leaf-span | Icons get wiped | Wrap text in span |
 | Auth race condition | User null at load | Always await getSession() |
 | config.js | Contains secrets | Edit config.example.js only |
+| HTML div balance | Missing </div> hides panels | Count divs after edits |
+
+---
+
+## 6. Page Architecture
+
+### Core Pages
+| Page | Role | JS Dependencies |
+|------|------|----------------|
+| `index.html` | Landing, auth gate | auth.js, theme.js, i18n.js, notifications.js |
+| `panoramica.html` | Main dashboard | auth.js, theme-2.js, i18n.js, notifications.js, cefr-*.js, ai-voice.js, data-service.js, smart-suggestions.js, lemma-pos-map.js, language-resolver.js |
+| `caption-s8t.html` | Live captioning | auth.js, theme-2.js, i18n.js, notifications.js, real-mic.js, grammar-viz.js, speech-icons.js, cefr-gse.js, cefr-info.js, language-resolver.js |
+
+### Theme
+- Current theme: `theme-2.css` (6 pages) + `css/` per-page styles
+- Legacy: `theme.css` used only by privacy/termini (migrating to theme-2)
+- Root `style.css`: Original Appland template CSS, 5 pages still load it (no conflicts)
 
 ---
 
