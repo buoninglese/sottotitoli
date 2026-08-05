@@ -58,6 +58,8 @@ When you update one doc, check the three it links to — they may need updates t
 | `pages-directory.md` | ~100 | Complete page index with statuses |
 | `solve-mistakes.md` | ~310 | 12 documented bugs with fixes |
 | `testing-checklist.md` | ~160 | 11-section pre-commit checklist |
+| `firecrawl-capabilities.md` | ~230 | All Firecrawl tools, trigger phrases, and when to use each |
+| `apify-capabilities.md` | ~200 | Apify MCP Actor marketplace, 16 tools, storage, and when to use each |
 
 ---
 
