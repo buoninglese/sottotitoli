@@ -27,7 +27,33 @@ git commit -m "fix: …" && git push # auto-push after EVERY commit
 
 ---
 
-## 🗺️ Documentation Map
+## � Developer Tools (VS Code Extensions)
+
+These extensions catch syntax errors and lint issues in real-time. All are installed and configured.
+
+| Extension | ID | What It Does |
+|-----------|-----|--------------|
+| **Error Lens** | `usernamehw.errorlens` | Shows errors/warnings inline, right next to the code — no need to hover or open Problems panel |
+| **ESLint** | `dbaeumer.vscode-eslint` | Checks standalone `.js` files for common mistakes (unused vars, unreachable code, etc.) |
+| **HTMLHint** | `htmlhint.vscode-htmlhint` | Validates HTML structure — tag pairing, duplicate IDs, missing alt attributes |
+
+### How to check for errors
+
+| Method | What | When |
+|--------|------|------|
+| **Inline (Error Lens)** | Errors appear in red text right on the line | Immediately as you type/save |
+| **Problems panel** | `Cmd+Shift+M` — full error list with line numbers | When you want all errors at once |
+| **Terminal** | `node --check <file.js>` | After every JS edit |
+| **get_errors tool** | AI agent can call `get_errors` on any file | Before committing, for AI agent to verify |
+
+### Config files
+- `.eslintrc.json` — ESLint rules (browser env, ES2020, warns on unused vars)
+- `.htmlhintrc` — HTMLHint rules (lowercase tags, unique IDs, alt attributes)
+- `.vscode/settings.json` — Workspace settings (Error Lens styling, file exclusions)
+
+---
+
+## �🗺️ Documentation Map
 
 ### For Agents (AI coding assistants)
 | File | Purpose | Read When |
@@ -41,8 +67,7 @@ git commit -m "fix: …" && git push # auto-push after EVERY commit
 | **[docs/ai/pages-directory.md](docs/ai/pages-directory.md)** | Every page & status | Finding files |
 | **[docs/ai/glossary.md](docs/ai/glossary.md)** | Terminology | Understanding jargon |
 | **[docs/ai/testing-checklist.md](docs/ai/testing-checklist.md)** | Pre-commit checklist | Before committing |
-| **[docs/ai/deploy-runbook.md](docs/ai/deploy-runbook.md)** | Deploy procedures | Deploying |
-
+| **[docs/ai/deploy-runbook.md](docs/ai/deploy-runbook.md)** | Deploy procedures | Deploying || **[docs/ai/security-hardening.md](docs/ai/security-hardening.md)** | Security audit & hardening | Security review |
 ### For Humans (designers, marketers, business)
 | File | Purpose |
 |------|---------|
