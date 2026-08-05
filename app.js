@@ -1836,7 +1836,7 @@
       }
     }
 
-    // Handle translate mode — toggle the translated output card on start.html
+    // Handle translate mode — toggle the translated output card
     if (modeKey.indexOf("translate-") === 0 && typeof window.studioSwitchTab === "function") {
       window.studioSwitchTab("translate");
     }

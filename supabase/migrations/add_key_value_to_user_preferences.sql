@@ -1,5 +1,5 @@
 -- Add key/value columns to user_preferences for key-value store pattern
--- Used by: studio-caption.html, studio-traduzione.html (WordBank sync)
+-- Used by: studio-caption.html (WordBank sync)
 -- Run this in Supabase SQL Editor
 
 -- Add key column (the preference key, e.g. 'wordbank')

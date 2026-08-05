@@ -11,7 +11,7 @@
 
   var pages = [
     { href: 'index.html', label: 'Home' },
-    { href: 'start.html', label: 'Start' },
+    { href: 'panoramica.html', label: 'Panoramica' },
     { href: 'account.html', label: 'Mio Profilo' },
     { href: 'analysis.html', label: 'Report AI' }
   ];
@@ -32,7 +32,7 @@
     '<div class="overlay" id="overlay">' +
     '  <nav>' +
     '    <a href="index.html">Home</a>' +
-    '    <a href="start.html">Start</a>' +
+    '    <a href="panoramica.html">Panoramica</a>' +
     '    <a href="account.html">Mio Profilo</a>' +
     '    <a href="analysis.html">Report AI</a>' +
     '  </nav>' +

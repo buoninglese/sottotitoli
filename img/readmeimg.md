@@ -85,11 +85,11 @@ img/blog/main-2.png – Second homepage blog card image.
 
 img/blog/main-3.png – Third homepage blog card image.
 
-img/blog/blog1.jpg – First “What’s new in Studio” card on start.html.
+img/blog/blog1.jpg – Blog card image.
 
-img/blog/blog2.jpg – Second “What’s new in Studio” card on start.html.
+img/blog/blog2.jpg – Blog card image.
 
-img/blog/blog3.jpg – Third “What’s new in Studio” card on start.html.
+img/blog/blog3.jpg – Blog card image.
 
 img/blog/blog4.jpg, blog5.jpg, blog6.jpg – Reserved for future posts or other pages.
 

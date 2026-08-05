@@ -14,7 +14,6 @@
       '</div>' +
       '<a href="index.html"><i class="fa-solid fa-house" style="width:16px;text-align:center;margin-right:8px;font-size:13px"></i> Home</a>' +
       '<a href="panoramica.html"><i class="fa-solid fa-table-cells" style="width:16px;text-align:center;margin-right:8px;font-size:13px"></i> Panoramica</a>' +
-      '<a href="start.html"><i class="fa-solid fa-microphone" style="width:16px;text-align:center;margin-right:8px;font-size:13px"></i> Start</a>' +
       '<a href="account.html"><i class="fa-solid fa-user" style="width:16px;text-align:center;margin-right:8px;font-size:13px"></i> Profilo</a>' +
       '<a href="analysis.html"><i class="fa-solid fa-star" style="width:16px;text-align:center;margin-right:8px;font-size:13px"></i> Report AI</a>' +
       '<hr>' +

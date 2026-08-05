@@ -5,7 +5,7 @@ Use this checklist before every production deploy.
 ## Frontend (sottotitoli — GitHub Pages)
 
 - [ ] `config.js` has correct production URLs (not localhost)
-- [ ] `js/auth.js` redirects point to production start.html
+- [ ] `js/auth.js` redirects point to production pages
 - [ ] All API endpoints in `config.js` point to production Render services
 - [ ] No `.env` files or real secrets in committed code
 - [ ] Tested locally with `python -m http.server 8000`

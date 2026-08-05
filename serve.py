@@ -25,7 +25,6 @@ Blocked paths return 403:
     /__pycache__/       — Python cache
     /config.js          — Production config
     /config.secrets.js  — Production secrets
-    /seb-va-supabase-schema.sql — DB schema
 
 Standard HTML/CSS/JS/asset files are served normally.
 """
@@ -62,7 +61,6 @@ BLOCKED_PREFIXES = [
 BLOCKED_FILES = [
     '/config.js',
     '/config.secrets.js',
-    '/seb-va-supabase-schema.sql',
     '/actions.log',
     '/AGENTS.md',
     '/CLAUDE.md',
