@@ -119,5 +119,28 @@
 
 ---
 
+## 13. Mismatched `<div>` Tags in HTML (panoramica.html)
+
+**Symptom:** Multiple tabs show blank content, or content overflows into sidebar area.
+**Root cause:** Extra or missing `</div>` tags that shift element nesting. A single wrong `</div>` at line 1747 closed `<main>` 2,300 lines early, pushing 6 panels outside `.workspace`. A missing `</div>` at line 1794 nested 6 panels inside a `display:none` popup.
+**Fix:** Track div depth through the edited section:
+```bash
+python3 -c "
+import re
+with open('panoramica.html') as f:
+    lines = f.readlines()
+depth = 0
+for i in range(START_LINE-1, END_LINE):
+    line = lines[i]
+    opens = len(re.findall(r'<div\b', line))
+    closes = len(re.findall(r'</div>', line))
+    depth += opens - closes
+    if depth < 0:
+        print(f'L{i+1}: OVER-CLOSE depth={depth}')
+```
+**Prevention:** After any HTML edit, run `get_errors`. If `<main>` shows "not paired" or `</div>` shows "no start tag", review nesting. Never add or remove a single `</div>` without tracing its matching `<div>`.
+
+---
+
 *→ Next: `testing-checklist.md` to prevent these before they happen*
 *→ Related: `coding-procedures.md` for the editing rules that avoid these*

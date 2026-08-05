@@ -25,6 +25,15 @@ git commit -m "fix: …" && git push # auto-push after EVERY commit
 2. **Read `docs/ai/solve-mistakes.md`** — 12 bugs we've already solved, don't repeat them
 3. **Check syntax after EVERY edit** — `node --check` for .js, `get_errors` for .html
 
+**⚠️ For HTML edits (panoramica.html, any page >1000 lines):**
+- **Count `<div>` / `</div>` balance** in the edited section — `grep -c '<div'` vs `grep -c '</div>'` across the changed range
+- **Check `get_errors`** before committing. If `<main>` or `</div>` shows "not paired" or "no start tag" after your edit, you miscounted
+- **Never add a `</div>` without verifying the matching `<div>` exists and is at the right nesting level**
+- **When adding an opening `<div>`, add its closing `</div>` in the same edit** — don't leave it for later
+- **After HTML edits: run `git diff --stat`** — if the line delta isn't balanced (added/deleted divs should come in pairs), review carefully
+
+**2026-08-05 lesson:** A single extra `</div>` at line 1747 closed `<main>` 2,300 lines early. A single missing `</div>` at line 1794 nested 6 content panels inside a `display:none` popup. Both went undetected for weeks. When user reports "empty tabs" or "squeezed layout", check HTML structure FIRST.
+
 ---
 
 ## � Developer Tools (VS Code Extensions)
