@@ -63,7 +63,7 @@
   <div class="app-shell">
     <header class="topbar">
       <div style="display:flex;align-items:center;gap:0">
-        <a href="index.html" class="topbar-brand" style="font-size:31px;font-family:'Manrope',sans-serif;font-weight:700;text-decoration:none;letter-spacing:-0.02em;display:inline-flex;align-items:baseline;gap:0">sottotitoli<span style="font-family:'Manrope',sans-serif;font-weight:800;color:var(--accent-purple,#7c3aed);letter-spacing:-.5px">.pro</span><span class="topbar-version" style="font-size:10px;font-weight:600;font-family:'Manrope',sans-serif;color:var(--text-soft);margin-left:6px;opacity:.55;letter-spacing:.02em">v163</span></a>
+        <a href="index.html" class="topbar-brand" style="font-size:31px;font-family:'Manrope',sans-serif;font-weight:700;text-decoration:none;letter-spacing:-0.02em;display:inline-flex;align-items:baseline;gap:0">sottotitoli<span style="font-family:'Manrope',sans-serif;font-weight:800;color:var(--accent-purple,#7c3aed);letter-spacing:-.5px">.pro</span><span class="topbar-version" style="font-size:10px;font-weight:600;font-family:'Manrope',sans-serif;color:var(--text-soft);margin-left:6px;opacity:.55;letter-spacing:.02em">v164</span></a>
       </div>
       <div style="display:flex;align-items:center;gap:12px">
         <button class="btn-start-session" id="btnStartSession" onclick="toggleStartSession()" style="font-size:15px;height:42px;padding:0 20px;border-radius:12px;background:linear-gradient(135deg,rgba(192,132,252,.18),rgba(192,132,252,.06));color:#c084fc;border:1px solid rgba(192,132,252,.25);font-weight:700;font-family:'Manrope',sans-serif;display:inline-flex;align-items:center;gap:8px;box-shadow:0 0 20px rgba(192,132,252,.12),0 2px 8px rgba(0,0,0,.2);cursor:pointer;letter-spacing:-.01em;transition:all .2s ease" onmouseover="this.style.background='linear-gradient(135deg,rgba(192,132,252,.28),rgba(192,132,252,.12))';this.style.borderColor='rgba(192,132,252,.4)';this.style.boxShadow='0 0 28px rgba(192,132,252,.22),0 4px 12px rgba(0,0,0,.25)'" onmouseout="this.style.background='linear-gradient(135deg,rgba(192,132,252,.18),rgba(192,132,252,.06))';this.style.borderColor='rgba(192,132,252,.25)';this.style.boxShadow='0 0 20px rgba(192,132,252,.12),0 2px 8px rgba(0,0,0,.2)'">
@@ -4213,17 +4213,19 @@
         var ddEmail = document.getElementById('ddEmail');
         if (ddEmail) ddEmail.textContent = meta.email || '';
 
-        // ── Load all data in parallel ──
-        window._sottotitoliProfile = await SottotitoliData.getProfile();
-        window.profile = window._sottotitoliProfile; // compat for bare references in IIFE
-        window.statsEN = await SottotitoliData.getSessionStats('en');
-        window.statsIT = await SottotitoliData.getSessionStats('it');
-        window.refs = await SottotitoliData.getReferralStats();
-        window.reports = await SottotitoliData.getAIReports();
-        window.tokens = await SottotitoliData.getAITokens();
-        window.credits = await SottotitoliData.getCredits();
-        window._sottotitoliPrefs = await SottotitoliData.getPreferences();
-        window.cefrBreakdown = await SottotitoliData.getCEFRBreakdown();
+        // ── Load all data with error resilience ──
+        try {
+          window._sottotitoliProfile = await SottotitoliData.getProfile();
+        } catch(e) { console.warn('getProfile failed:', e.message); window._sottotitoliProfile = null; }
+        window.profile = window._sottotitoliProfile;
+        try { window.statsEN = await SottotitoliData.getSessionStats('en'); } catch(e) { console.warn('statsEN failed:', e.message); window.statsEN = null; }
+        try { window.statsIT = await SottotitoliData.getSessionStats('it'); } catch(e) { console.warn('statsIT failed:', e.message); window.statsIT = null; }
+        try { window.refs = await SottotitoliData.getReferralStats(); } catch(e) { console.warn('refs failed:', e.message); window.refs = null; }
+        try { window.reports = await SottotitoliData.getAIReports(); } catch(e) { console.warn('reports failed:', e.message); window.reports = []; }
+        try { window.tokens = await SottotitoliData.getAITokens(); } catch(e) { console.warn('tokens failed:', e.message); window.tokens = 0; }
+        try { window.credits = await SottotitoliData.getCredits(); } catch(e) { console.warn('credits failed:', e.message); window.credits = null; }
+        try { window._sottotitoliPrefs = await SottotitoliData.getPreferences(); } catch(e) { console.warn('prefs failed:', e.message); window._sottotitoliPrefs = null; }
+        try { window.cefrBreakdown = await SottotitoliData.getCEFRBreakdown(); } catch(e) { console.warn('cefr failed:', e.message); window.cefrBreakdown = null; }
 
         // ── Update dropdown with real data ──
         var ddName = document.getElementById('ddName');
@@ -10068,6 +10070,13 @@
         }
       }
 
+      // ── Reveal content BEFORE render calls (prevent total blank-out on render errors) ──
+      var mainPanel = document.querySelector('.main-panel');
+      if (mainPanel) {
+        mainPanel.classList.remove('js-loading');
+        mainPanel.classList.add('js-ready');
+      }
+
       // ── Initial render (settingsData already loaded above) ──
       var _sd = window._settingsData;
       renderHero(window._settingsData && window._settingsData.display_name);
@@ -10169,12 +10178,6 @@
           if (pane) pane.classList.add('active');
         });
       });
-      // ── Reveal content (no more flash of mock HTML) ──
-      var mainPanel = document.querySelector('.main-panel');
-      if (mainPanel) {
-        mainPanel.classList.remove('js-loading');
-        mainPanel.classList.add('js-ready');
-      }
 
       // ── Auto-refresh when switching back from a recording session ──
       document.addEventListener('visibilitychange', function() {
