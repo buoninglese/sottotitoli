@@ -143,7 +143,22 @@
   w.SottotitoliSecurity = {
     validateRoom: validateRoom,
     showWarning: showWarning,
-    dismissWarning: dismissWarning
+    dismissWarning: dismissWarning,
+    /** Generate a cryptographically secure room ID. Prefer this over Date.now() or Math.random(). */
+    generateSecureRoomId: function(prefix) {
+      prefix = prefix || 'room';
+      if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+        return prefix + '-' + crypto.randomUUID().substring(0, 8);
+      }
+      // Fallback for older browsers
+      var arr = new Uint32Array(4);
+      if (typeof crypto !== 'undefined' && crypto.getRandomValues) {
+        crypto.getRandomValues(arr);
+        return prefix + '-' + arr[0].toString(36) + arr[1].toString(36);
+      }
+      // Last resort (not cryptographically secure)
+      return prefix + '-' + Date.now().toString(36) + '-' + Math.random().toString(36).substring(2, 8);
+    }
   };
 
   // Inject warning banner CSS
