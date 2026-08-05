@@ -1,12 +1,7 @@
-# docs/ai/README.md — AI Documentation Index
+# docs/ai/ — AI Agent Documentation System
 
 > **🔒 INTERNAL — For AI agents only. Not for public distribution.**
-> These docs contain architecture internals, credentials patterns, and development procedures.
 > Blocked from search engines via `robots.txt`. Blocked on local dev via `serve.py`.
-
-> **For AI agents starting work on Sottotitoli.**
-> This is the index. Every doc here is designed to be self-contained but cross-linked.
-> Read them in order if you're new. Jump to specific ones as needed.
 
 ---
 
@@ -14,7 +9,7 @@
 
 | # | File | Why |
 |---|------|-----|
-| 1 | `../AGENTS.md` | Hub — project identity, quickstart, key files |
+| 1 | `../../AGENTS.md` | Hub — project identity, quickstart, key files |
 | 2 | `glossary.md` | Understand the vocabulary first |
 | 3 | `architecture.md` | How the pieces fit together |
 | 4 | `pages-directory.md` | What every file does |
@@ -26,41 +21,61 @@
 
 ---
 
-## 🔄 Cross-Reference Loop
+## 📋 Full File Index (23 files)
 
-Each document links to at least three others, forming a self-reinforcing knowledge graph:
+### Core Procedures
+| File | Lines | Purpose |
+|------|-------|---------|
+| `coding-procedures.md` | 192 | Safe HTML/CSS/JS editing rules |
+| `testing-checklist.md` | 159 | 11-section pre-commit checklist |
+| `deploy-runbook.md` | 237 | All deployment procedures |
+| `solve-mistakes.md` | 374 | 12 documented bugs with fixes |
 
-```
-AGENTS.md (hub)
-    ├── coding-procedures.md ←→ solve-mistakes.md ←→ testing-checklist.md
-    ├── architecture.md ←→ pages-directory.md ←→ deploy-runbook.md
-    ├── css-theme-guide.md ←→ glossary.md ←→ brand-voice.md
-    └── business-info.md ←→ deploy-runbook.md ←→ testing-checklist.md
-```
+### Architecture & Pages
+| File | Lines | Purpose |
+|------|-------|---------|
+| `architecture.md` | 136 | System diagram, data flows, WebSocket contract |
+| `pages-directory.md` | 102 | Complete page index with statuses |
 
-When you update one doc, check the three it links to — they may need updates too.
+### Design & Theming
+| File | Lines | Purpose |
+|------|-------|---------|
+| `css-theme-guide.md` | 208 | Day/night theming system per page |
+| `brand-voice.md` | 126 | Tone, messaging, copy rules |
 
----
+### Per-Page Deep Dives
+| File | Lines | Covers |
+|------|-------|--------|
+| `caption-s8t.md` | 496 | `caption-s8t.html` — 142 functions, 5 slides, word bank |
+| `onboarding-s8t.md` | 423 | `onboarding.html` — every slide, function, data key |
+| `duo-s8t.md` | 362 | `duo-s8t.html` — dual-language mode |
+| `voc-explorer.md` | 315 | `panoramica.html` — vocabulary explorer features |
+| `ai-s8t.md` | 107 | `ai-s8t.html` — AI voice iframe shell |
 
-## 📋 All Files in This Directory
+### Business & Strategy
+| File | Lines | Purpose |
+|------|-------|---------|
+| `business-info.md` | 167 | Company, pricing, Stripe, legal |
+| `financial-model.md` | 339 | Pricing, costs, revenue, Stripe integration |
+| `ideal-customer.md` | 153 | ICP, marketing positioning, feature prioritization |
 
-| File | Lines | What It Covers |
-|------|-------|---------------|
-| `README.md` | this file | Index and reading order |
-| `UPDATE-MASTER-MDs.md` | ~120 | Protocol for updating any MD file |
-| `architecture.md` | ~175 | System diagram, data flows, WebSocket contract |
-| `brand-voice.md` | ~130 | Tone, messaging, copy rules, sample copy |
-| `business-info.md` | ~185 | Company, pricing, Stripe, legal, roadmap |
-| `coding-procedures.md` | ~190 | Safe HTML/CSS/JS editing rules |
-| `css-theme-guide.md` | ~200 | Day/night theming system per page |
-| `deploy-runbook.md` | ~235 | All deployment procedures |
-| `glossary.md` | ~110 | Every term, acronym, concept |
-| `pages-directory.md` | ~100 | Complete page index with statuses |
-| `solve-mistakes.md` | ~310 | 12 documented bugs with fixes |
-| `testing-checklist.md` | ~160 | 11-section pre-commit checklist |
-| `firecrawl-capabilities.md` | ~230 | All Firecrawl tools, trigger phrases, and when to use each |
-| `apify-capabilities.md` | ~200 | Apify MCP Actor marketplace, 16 tools, storage, and when to use each |
-| `composio-capabilities.md` | ~180 | 15 connected accounts (Gmail, GitHub, Supabase, Stripe, Linear, etc.) and when to use each |
+### Tool Capabilities
+| File | Lines | Purpose |
+|------|-------|---------|
+| `firecrawl-capabilities.md` | 343 | Web search, scrape, monitor, parse, research |
+| `apify-capabilities.md` | 206 | Actor marketplace, social scrapers, storage |
+| `composio-capabilities.md` | 212 | 15 connected accounts, smart routing matrix |
+
+### Reference
+| File | Lines | Purpose |
+|------|-------|---------|
+| `glossary.md` | 109 | Every term, acronym, concept |
+| `SECURITY.md` | 59 | Security policy, secrets, keys |
+
+### Meta
+| File | Lines | Purpose |
+|------|-------|---------|
+| `UPDATE-MASTER-MDs.md` | 208 | Protocol for updating any MD file |
 
 ---
 
@@ -68,16 +83,16 @@ When you update one doc, check the three it links to — they may need updates t
 
 | File | Purpose |
 |------|---------|
-| `../AGENTS.md` | Central hub — start here |
-| `../DESIGN.md` | Visual design system |
-| `../docs/ARCHITECTURE.md` | Architecture diagram + data flows |
-| `../docs/METRICS.md` | Every metric, calculation, source |
-| `../docs/SERVICES.md` | Production URLs, health endpoints |
-| `../docs/SECURITY.md` | Security policy |
-| `../docs/ROADMAP.md` | What's next |
-| `../docs/CHANGELOG.md` | What changed |
-| `../dev/WORKFLOW.md` | AI report prompt workflow |
+| `../../AGENTS.md` | Central hub — project identity, conventions, file map |
+| `../../DESIGN.md` | Visual design system (colors, fonts, components) |
+| `../../dev/WORKFLOW.md` | AI report prompt workflow |
 
 ---
 
-*Last updated: 2026-08-05 · Part of the Sottotitoli AI Documentation System*
+## 📦 Archive
+
+`archive/` contains historical/operational docs moved during cleanup. Not needed by AI agents but preserved for reference.
+
+---
+
+*Last updated: 2026-08-06 · Part of the Sottotitoli AI Documentation System*
