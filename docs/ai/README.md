@@ -21,7 +21,7 @@
 
 ---
 
-## 📋 Full File Index (23 files)
+## 📋 Full File Index (25 files)
 
 ### Core Procedures
 | File | Lines | Purpose |
@@ -29,18 +29,18 @@
 | `coding-procedures.md` | 192 | Safe HTML/CSS/JS editing rules |
 | `testing-checklist.md` | 159 | 11-section pre-commit checklist |
 | `deploy-runbook.md` | 237 | All deployment procedures |
-| `solve-mistakes.md` | 374 | 12 documented bugs with fixes |
+| `solve-mistakes.md` | 374 | 13 documented bugs with fixes |
 
 ### Architecture & Pages
 | File | Lines | Purpose |
 |------|-------|---------|
-| `architecture.md` | 136 | System diagram, data flows, WebSocket contract |
-| `pages-directory.md` | 102 | Complete page index with statuses |
+| `architecture.md` | 153 | System diagram, data flows, WebSocket contract |
+| `pages-directory.md` | 95 | Complete page index with statuses |
 
 ### Design & Theming
 | File | Lines | Purpose |
 |------|-------|---------|
-| `css-theme-guide.md` | 208 | Day/night theming system per page |
+| `css-theme-guide.md` | 223 | Day/night theming, CSS file map |
 | `brand-voice.md` | 126 | Tone, messaging, copy rules |
 
 ### Per-Page Deep Dives
@@ -70,9 +70,9 @@
 | File | Lines | Purpose |
 |------|-------|---------|
 | `glossary.md` | 109 | Every term, acronym, concept |
-| `SECURITY.md` | 59 | Security policy, secrets, keys |
-| `CHANGELOG.md` | — | What changed — agents fill in after each push |
-| `DEPLOYMENT_CHECKLIST.md` | — | Pre-deploy verification steps |
+| `SECURITY.md` | 65 | Security policy, secrets, keys |
+| `CHANGELOG.md` | 38 | What changed — agents fill in after each push |
+| `DEPLOYMENT_CHECKLIST.md` | 38 | Pre-deploy verification steps |
 
 ### Meta
 | File | Lines | Purpose |
@@ -88,12 +88,6 @@
 | `../../AGENTS.md` | Central hub — project identity, conventions, file map |
 | `../../PRIVACY.md` | Privacy policy (public-facing) |
 | `../../dev/WORKFLOW.md` | AI report prompt workflow |
-
----
-
-## 📦 Archive
-
-`archive/` contains historical/operational docs moved during cleanup. Not needed by AI agents but preserved for reference.
 
 ---
 
