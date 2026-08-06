@@ -1,5 +1,17 @@
 # Changelog
 
+## [2026-08-06] Word Bank Overview — Bento Grid Layout
+
+### Changed
+- **panoramica.html** — Restructured the Overview subtab (`#sub-wb-overview-panel`) layout from a 2×2 card grid to a bento grid (12-column asymmetric layout inspired by stitch mockup)
+- Row 1: CEFR Distribution (8 cols) + Known Stats sidebar (4 cols)
+- Row 2: Favorite Collections + Import CTA (8 cols) + Quick Tip card (4 cols)
+- Row 3: Full Library (full width, 12 cols)
+- CSS rewritten to use page CSS variables (`--panel`, `--text`, `--cyan`, etc.) for day/night mode support
+- All element IDs preserved: `wbCefrDistAll`, `wbCefrCountAll`, `wbCefrDistKnown`, `wbCefrCountKnown`, `wbPinnedGrid`, `wbFullLibrary`, and all `*Total` elements
+- `wb-glass` class preserved for JS compatibility with `renderWbOverviewSections()`
+- Mobile: single-column at ≤900px
+
 ## [2026-08-05] Documentation System Overhaul
 
 ### Added
