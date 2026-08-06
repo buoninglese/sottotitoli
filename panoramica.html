@@ -1733,7 +1733,7 @@
                       pinned: [
                         {id:'it_review_due',name:'Ripasso immediato',desc:'Parole italiane da ripassare ogni giorno',icon:'history',words:0,newWords:0,due:0},
                         {id:'it_saved_sessions',name:'Salvate da sessioni',desc:'Parole italiane salvate durante le sessioni live',icon:'mic',words:0,newWords:0,due:0},
-                        {id:'it_vocab_builder',name:'Italian Vocabulary Builder',desc:'Parole italiane salvate dal Vocabulary Builder',icon:'book',words:0,newWords:0,due:0},
+                        {id:'it_vocab_builder',name:'Italian Vocabulary Builder',desc:'Parole italiane salvate dal Vocabulary Builder',icon:'book',words:(function(){ try { var b=JSON.parse(localStorage.getItem('sottotitoli_wb_it_pinned')||'{"words":[]}'); return (b.words||[]).length; } catch(e){ return 0; } })(),newWords:0,due:0},
                         {id:'it_fragile',name:'Parole Fragili',desc:'Parole italiane che necessitano rinforzo',icon:'warning',words:0,newWords:0,due:0}
                       ],
                       discovery: [
@@ -1809,17 +1809,17 @@
                     banks.slice(0,8).forEach(function(b){
                       statsHtml+='<div style="background:var(--card);border:1px solid var(--line);border-radius:10px;padding:16px;cursor:pointer" onmouseover="this.style.borderColor=\'var(--accent-green)\'" onmouseout="this.style.borderColor=\'var(--line)\'" onclick="wbOpenBankIt(\''+b.id+'\')"><div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px"><span style="font-size:10px;font-weight:700;background:rgba(16,185,129,.1);color:var(--accent-green);padding:2px 6px;border-radius:4px;font-family:\'Manrope\',sans-serif">'+(b.cefr_level||'—')+'</span></div><div style="font-weight:700;color:var(--text);margin-bottom:4px">'+esc(b.name||'Banca')+'</div><div style="display:flex;justify-content:space-between;font-size:10px;color:var(--text-soft)"><span>'+(b.word_count||0)+' parole</span><span style="font-weight:600;color:var(--accent-green)">Apri</span></div></div>';
                     });
-                    statsHtml+='</div></div>';
+                    statsHtml+='</div>'+
+                      '<div class="wb-card" style="border:2px dashed var(--line);background:transparent;display:flex;align-items:center;justify-content:center;min-height:110px;cursor:pointer;margin-top:12px" onclick="newWordbank()"><div style="text-align:center;color:var(--text-faint);font-size:13px;font-weight:600"><i class="fa-solid fa-plus" style="margin-right:6px;font-size:12px"></i> Crea nuova banca</div></div>'+
+                    '</div>';
                     document.getElementById('wordbanksItOverview').innerHTML=statsHtml;
                     document.getElementById('wbItContent').style.display='none';
                   }).catch(function(){document.getElementById('wordbanksItOverview').innerHTML='<p style="text-align:center;color:var(--text-faint);padding:40px">Impossibile caricare le banche parole.</p>';document.getElementById('wbItContent').style.display='none';});
                 }
                 loadAllIt();
 
-                // Italian-specific bank opener
+                // Italian-specific bank opener — passes Italian IDs directly (no remapping to English!)
                 window.wbOpenBankIt=function(id){
-                  var presetMap={'it_review_due':'review_due_now','it_saved_sessions':'saved_from_sessions','it_vocab_builder':'vocab_builder_en','it_fragile':'fragile_words','it_next_step':'goal_next_step','it_build_known':'build_from_known','it_activate':'activate_recognized'};
-                  if(presetMap[id]) id=presetMap[id];
                   if(window.openWordbankView){ window.openWordbankView(id); return; }
                   var tries=0;
                   var poll=setInterval(function(){
@@ -6514,8 +6514,9 @@
               }
             });
           }
-        } else if (bankId === 'review_due_now' || bankId === 'fragile_words') {
+        } else if (bankId === 'review_due_now' || bankId === 'fragile_words' || bankId === 'it_review_due' || bankId === 'it_fragile') {
           // Pinned banks 1,3 — query review_words directly (words from Pipeline 1)
+          // Italian variants (it_review_due, it_fragile) use the same logic with lang='it'
           try {
             var sbClient = window.sottotitoliSupabase;
             if (!sbClient) { /* skip */ }
@@ -6524,12 +6525,12 @@
               if (!rSession.data?.session) { /* not logged in — leave empty */ }
               else {
                 var userId = rSession.data.session.user.id;
-                var bankLang = isItalian ? 'it' : 'en';
+                var bankLang = (bankId === 'it_review_due' || bankId === 'it_fragile') ? 'it' : (isItalian ? 'it' : 'en');
                 var query = sbClient.from('review_words').select('*').eq('user_id', userId).eq('lang', bankLang).limit(200);
                 var nowISO = new Date().toISOString();
-                if (bankId === 'review_due_now') {
+                if (bankId === 'review_due_now' || bankId === 'it_review_due') {
                   query = query.or('next_review_at.lte.' + nowISO + ',is_new.eq.true');
-                } else if (bankId === 'fragile_words') {
+                } else if (bankId === 'fragile_words' || bankId === 'it_fragile') {
                   query = query.or('mastery_score.lt.40,lapses.gte.2');
                 }
                 var { data: rwData } = await query;
