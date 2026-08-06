@@ -19,14 +19,14 @@ No build step. Static HTML/CSS/JS served by GitHub Pages.
 | For | Read |
 |-----|------|
 | **AI coding agents** | **[AGENTS.md](AGENTS.md)** — architecture, conventions, key files, pitfalls |
-| **Architecture decisions** | **[docs/DECISIONS.md](docs/DECISIONS.md)** — 11 ADRs, why we built it this way |
+| **Architecture decisions** | **[docs/ai/DECISIONS.md](docs/ai/DECISIONS.md)** — 11 ADRs, why we built it this way |
 | **AI agent deep dives** | **[docs/ai/README.md](docs/ai/README.md)** — 28 interlinked reference docs |
 | **Business** | **[docs/ai/business-info.md](docs/ai/business-info.md)** — pricing, Stripe, legal |
 | **Architecture** | **[docs/ai/architecture.md](docs/ai/architecture.md)** — system diagrams, data flows |
 | **WebSocket protocol** | **[docs/ai/websocket-protocol.md](docs/ai/websocket-protocol.md)** — message contract, room lifecycle |
-| **Error codes** | **[docs/ERROR-CODES.md](docs/ERROR-CODES.md)** — 18 errors with recovery paths |
-| **Performance** | **[docs/PERFORMANCE.md](docs/PERFORMANCE.md)** — bundle sizes, optimization targets |
-| **Accessibility** | **[docs/ACCESSIBILITY.md](docs/ACCESSIBILITY.md)** — ARIA patterns, contrast, screen reader |
+| **Error codes** | **[docs/ai/ERROR-CODES.md](docs/ai/ERROR-CODES.md)** — 18 errors with recovery paths |
+| **Performance** | **[docs/ai/PERFORMANCE.md](docs/ai/PERFORMANCE.md)** — bundle sizes, optimization targets |
+| **Accessibility** | **[docs/ai/ACCESSIBILITY.md](docs/ai/ACCESSIBILITY.md)** — ARIA patterns, contrast, screen reader |
 | **Privacy** | **[PRIVACY.md](PRIVACY.md)** — privacy policy |
 
 ## Stack

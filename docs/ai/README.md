@@ -76,7 +76,7 @@
 | File | Lines | Purpose |
 |------|-------|---------|
 | `glossary.md` | 109 | Every term, acronym, concept |
-| `../ERROR-CODES.md` | NEW | 18 error codes: auth, WebSocket, data, payment, translation, UI, AI |
+| `ERROR-CODES.md` | NEW | 18 error codes: auth, WebSocket, data, payment, translation, UI, AI |
 | `websocket-protocol.md` | NEW | WebSocket message format contract, room lifecycle, CSP config |
 | `SECURITY.md` | 65 | Security policy, secrets, keys |
 | `CHANGELOG.md` | 38 | What changed — agents fill in after each push |
@@ -94,11 +94,11 @@
 | File | Purpose |
 |------|---------|
 | `../../AGENTS.md` | Central hub — project identity, conventions, file map |
-| `../../DECISIONS.md` | Architecture Decision Records — 11 ADRs, why we built it this way |
+| `DECISIONS.md` | Architecture Decision Records — 11 ADRs, why we built it this way |
 | `../../PRIVACY.md` | Privacy policy (public-facing) |
-| `../../docs/ACCESSIBILITY.md` | ARIA patterns, contrast ratios, screen reader support |
-| `../../docs/PERFORMANCE.md` | Bundle sizes, optimization targets, font loading strategy |
-| `../../docs/ERROR-CODES.md` | 18 error codes across 6 categories |
+| `ACCESSIBILITY.md` | ARIA patterns, contrast ratios, screen reader support |
+| `PERFORMANCE.md` | Bundle sizes, optimization targets, font loading strategy |
+| `ERROR-CODES.md` | 18 error codes across 6 categories |
 | `../../dev/WORKFLOW.md` | AI report prompt workflow |
 
 ---

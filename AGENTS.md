@@ -21,7 +21,7 @@ git commit -m "fix: …" && git push # auto-push after EVERY commit
 **Three non-negotiable rules before touching any code:**
 1. **Read `docs/ai/coding-procedures.md`** — how to safely edit HTML/CSS/JS
 2. **Read `docs/ai/solve-mistakes.md`** — 13 bugs already solved, don't repeat them
-3. **Read `docs/DECISIONS.md`** — understand WHY the architecture is what it is before proposing changes
+3. **Read `docs/ai/DECISIONS.md`** — understand WHY the architecture is what it is before proposing changes
 4. **Check syntax after EVERY edit** — `node --check` for .js, `get_errors` for .html
 
 **⚠️ For HTML edits (panoramica.html, any page >1000 lines):**
@@ -44,12 +44,12 @@ That's the index. It lists all 25 AI docs organized by category. Read it first.
 | `docs/ai/coding-procedures.md` | Before any edit |
 | `docs/ai/html-edit-playbook.md` | Fixing structural HTML bugs |
 | `docs/ai/solve-mistakes.md` | Debugging |
-| `docs/DECISIONS.md` | Understanding why we built it this way |
+| `docs/ai/DECISIONS.md` | Understanding why we built it this way |
 | `docs/ai/pages-directory.md` | Finding files |
 | `docs/ai/architecture.md` | Understanding the stack |
 | `docs/ai/supabase-edge-functions.md` | Edge functions catalog |
 | `docs/ai/websocket-protocol.md` | WebSocket message contract |
-| `docs/ERROR-CODES.md` | Error catalog with recovery paths |
+| `docs/ai/ERROR-CODES.md` | Error catalog with recovery paths |
 | `docs/ai/state-management.md` | Where every piece of data lives |
 | `docs/ai/dependency-map.md` | JS load order and global dependencies |
 | `docs/ai/css-theme-guide.md` | Editing CSS |
@@ -234,8 +234,8 @@ git push origin main                 # ALWAYS push after commit
 10. ❌ Use `~/` unquoted in shell commands — expands to home directory.
 11. ❌ Add build steps — this is a static site.
 12. ❌ Use `status` as a variable name in zsh — it's read-only.
-13. ❌ Add SRI integrity hashes to CDN links — they silently break when the CDN updates. (See `docs/DECISIONS.md` ADR-009)
-14. ❌ Skip div-balance check after HTML edits — a missing `</div>` on a `display:none` element can hide multiple panels with zero console errors. (See `docs/DECISIONS.md` ADR-007)
+13. ❌ Add SRI integrity hashes to CDN links — they silently break when the CDN updates. (See `docs/ai/DECISIONS.md` ADR-009)
+14. ❌ Skip div-balance check after HTML edits — a missing `</div>` on a `display:none` element can hide multiple panels with zero console errors. (See `docs/ai/DECISIONS.md` ADR-007)
 
 ---
 
