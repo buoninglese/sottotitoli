@@ -42,6 +42,7 @@ That's the index. It lists all 25 AI docs organized by category. Read it first.
 | File | When |
 |------|------|
 | `docs/ai/coding-procedures.md` | Before any edit |
+| `docs/ai/html-edit-playbook.md` | Fixing structural HTML bugs |
 | `docs/ai/solve-mistakes.md` | Debugging |
 | `docs/DECISIONS.md` | Understanding why we built it this way |
 | `docs/ai/pages-directory.md` | Finding files |

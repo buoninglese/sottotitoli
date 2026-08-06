@@ -14,19 +14,21 @@
 | 3 | `architecture.md` | How the pieces fit together |
 | 4 | `pages-directory.md` | What every file does |
 | 5 | `coding-procedures.md` | How to safely edit code |
-| 6 | `solve-mistakes.md` | Bugs we've already fixed |
-| 7 | `css-theme-guide.md` | Theming system |
-| 8 | `testing-checklist.md` | What to check before committing |
-| 9 | `deploy-runbook.md` | How to ship it |
+| 6 | `html-edit-playbook.md` | Debugging structural HTML: div balance, nesting, orphans |
+| 7 | `solve-mistakes.md` | Bugs we've already fixed |
+| 8 | `css-theme-guide.md` | Theming system |
+| 9 | `testing-checklist.md` | What to check before committing |
+| 10 | `deploy-runbook.md` | How to ship it |
 
 ---
 
-## 📋 Full File Index (28 files)
+## 📋 Full File Index (29 files)
 
 ### Core Procedures
 | File | Lines | Purpose |
 |------|-------|---------|
 | `coding-procedures.md` | 192 | Safe HTML/CSS/JS editing rules |
+| `html-edit-playbook.md` | NEW | 10 techniques for div-balance debugging, decision tree, real examples |
 | `testing-checklist.md` | 159 | 11-section pre-commit checklist |
 | `deploy-runbook.md` | 237 | All deployment procedures |
 | `solve-mistakes.md` | 374 | 13 documented bugs with fixes |
