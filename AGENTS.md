@@ -21,7 +21,8 @@ git commit -m "fix: …" && git push # auto-push after EVERY commit
 **Three non-negotiable rules before touching any code:**
 1. **Read `docs/ai/coding-procedures.md`** — how to safely edit HTML/CSS/JS
 2. **Read `docs/ai/solve-mistakes.md`** — 13 bugs already solved, don't repeat them
-3. **Check syntax after EVERY edit** — `node --check` for .js, `get_errors` for .html
+3. **Read `docs/DECISIONS.md`** — understand WHY the architecture is what it is before proposing changes
+4. **Check syntax after EVERY edit** — `node --check` for .js, `get_errors` for .html
 
 **⚠️ For HTML edits (panoramica.html, any page >1000 lines):**
 - Count `<div>` / `</div>` balance: `grep -c '<div'` vs `grep -c '</div>'` across the changed range
@@ -42,11 +43,13 @@ That's the index. It lists all 25 AI docs organized by category. Read it first.
 |------|------|
 | `docs/ai/coding-procedures.md` | Before any edit |
 | `docs/ai/solve-mistakes.md` | Debugging |
+| `docs/DECISIONS.md` | Understanding why we built it this way |
 | `docs/ai/pages-directory.md` | Finding files |
 | `docs/ai/architecture.md` | Understanding the stack |
 | `docs/ai/css-theme-guide.md` | Editing CSS |
 | `docs/ai/testing-checklist.md` | Before committing |
 | `docs/ai/deploy-runbook.md` | Deploying |
+| `docs/ai/auth-bypass-testing.md` | Testing locally without login |
 | `docs/ai/glossary.md` | Understanding jargon |
 | `docs/ai/CHANGELOG.md` | Fill in after each push |
 
@@ -225,6 +228,8 @@ git push origin main                 # ALWAYS push after commit
 10. ❌ Use `~/` unquoted in shell commands — expands to home directory.
 11. ❌ Add build steps — this is a static site.
 12. ❌ Use `status` as a variable name in zsh — it's read-only.
+13. ❌ Add SRI integrity hashes to CDN links — they silently break when the CDN updates. (See `docs/DECISIONS.md` ADR-009)
+14. ❌ Skip div-balance check after HTML edits — a missing `</div>` on a `display:none` element can hide multiple panels with zero console errors. (See `docs/DECISIONS.md` ADR-007)
 
 ---
 

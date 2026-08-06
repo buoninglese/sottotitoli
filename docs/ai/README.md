@@ -21,7 +21,7 @@
 
 ---
 
-## 📋 Full File Index (25 files)
+## 📋 Full File Index (28 files)
 
 ### Core Procedures
 | File | Lines | Purpose |
@@ -30,6 +30,7 @@
 | `testing-checklist.md` | 159 | 11-section pre-commit checklist |
 | `deploy-runbook.md` | 237 | All deployment procedures |
 | `solve-mistakes.md` | 374 | 13 documented bugs with fixes |
+| `auth-bypass-testing.md` | NEW | Testing authenticated pages locally without login |
 
 ### Architecture & Pages
 | File | Lines | Purpose |
@@ -86,6 +87,7 @@
 | File | Purpose |
 |------|---------|
 | `../../AGENTS.md` | Central hub — project identity, conventions, file map |
+| `../../DECISIONS.md` | Architecture Decision Records — 11 ADRs, why we built it this way |
 | `../../PRIVACY.md` | Privacy policy (public-facing) |
 | `../../dev/WORKFLOW.md` | AI report prompt workflow |
 

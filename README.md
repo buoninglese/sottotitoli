@@ -19,7 +19,8 @@ No build step. Static HTML/CSS/JS served by GitHub Pages.
 | For | Read |
 |-----|------|
 | **AI coding agents** | **[AGENTS.md](AGENTS.md)** — architecture, conventions, key files, pitfalls |
-| **AI agent deep dives** | **[docs/ai/README.md](docs/ai/README.md)** — 25 interlinked reference docs |
+| **Architecture decisions** | **[docs/DECISIONS.md](docs/DECISIONS.md)** — 11 ADRs, why we built it this way |
+| **AI agent deep dives** | **[docs/ai/README.md](docs/ai/README.md)** — 28 interlinked reference docs |
 | **Business** | **[docs/ai/business-info.md](docs/ai/business-info.md)** — pricing, Stripe, legal |
 | **Architecture** | **[docs/ai/architecture.md](docs/ai/architecture.md)** — system diagrams, data flows |
 | **Privacy** | **[PRIVACY.md](PRIVACY.md)** — privacy policy |
