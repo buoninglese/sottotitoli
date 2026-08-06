@@ -71,6 +71,7 @@
 | `firecrawl-capabilities.md` | 343 | Web search, scrape, monitor, parse, research |
 | `apify-capabilities.md` | 206 | Actor marketplace, social scrapers, storage |
 | `composio-capabilities.md` | 212 | 15 connected accounts, smart routing matrix |
+| `../skills/` | 14 files | Agent skills by category (see README) |
 
 ### Reference
 | File | Lines | Purpose |

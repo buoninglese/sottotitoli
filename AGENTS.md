@@ -24,6 +24,16 @@ git commit -m "fix: …" && git push # auto-push after EVERY commit
 3. **Read `docs/ai/DECISIONS.md`** — understand WHY the architecture is what it is before proposing changes
 4. **Check syntax after EVERY edit** — `node --check` for .js, `get_errors` for .html
 
+**For config files (mcp.json, .env, settings):** — just edit them directly. Don't tell the user to paste tokens or fix JSON by hand. You have the tools. Use them.
+
+**⚠️ For prompt design (when user asks "give me a prompt to give another agent"):**
+1. **Reference BOTH repo resources AND desktop resources.** The user has skills/docs in the repo (`docs/skills/`, `docs/ai/`) AND on desktop (`~/Desktop/skills/`). Include exact file paths for both.
+2. **Create a reusable skill file** in `docs/skills/` as the master procedure, then reference it in the prompt. Don't inline every instruction — teach once, reference forever.
+3. **Include tool routing.** Say "use Composio" and point to `docs/ai/composio-capabilities.md` so the receiving agent knows how to pick the right tool (Firecrawl, DeepSeek, Google Sheets, etc.).
+4. **Make it self-contained.** A new agent in a fresh chat has no context. Every file path, every command, every convention must be explicit.
+5. **Separate "read before" from "do now".** List required reading first, then the task. The agent should read before acting.
+6. **Test your prompt mentally.** Would a brand-new agent with zero Sottotitoli knowledge execute this correctly? If not, add more context.
+
 **⚠️ For HTML edits (panoramica.html, any page >1000 lines):**
 - Count `<div>` / `</div>` balance: `grep -c '<div'` vs `grep -c '</div>'` across the changed range
 - Check `get_errors` before committing — if `<main>` shows "not paired", you miscounted
@@ -82,6 +92,15 @@ That's the index. It lists all 25 AI docs organized by category. Read it first.
 | `docs/ai/firecrawl-capabilities.md` | Web search, scrape, monitor |
 | `docs/ai/apify-capabilities.md` | Actor marketplace, social scrapers |
 | `docs/ai/composio-capabilities.md` | 15 accounts + smart routing |
+
+### Agent Skills (by category)
+| File | Purpose |
+|------|---------|
+| `docs/skills/frontend-ui/` | baseline-ui, frontend-developer, frontend-slides, javascript-pro, scroll-experience |
+| `docs/skills/backend-database/` | api-security, database-architect, sql-optimization, supabase-postgres |
+| `docs/skills/ai-prompting/` | ai-engineer, prompt-engineer |
+| `docs/skills/productivity-docs/` | googlesheets-automation, planning-with-files |
+| `docs/skills/data-research/` | mermaid-diagrams |
 
 ### External Docs
 | File | Purpose |
