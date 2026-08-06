@@ -71,6 +71,8 @@
 |------|-------|---------|
 | `glossary.md` | 109 | Every term, acronym, concept |
 | `SECURITY.md` | 59 | Security policy, secrets, keys |
+| `CHANGELOG.md` | — | What changed — agents fill in after each push |
+| `DEPLOYMENT_CHECKLIST.md` | — | Pre-deploy verification steps |
 
 ### Meta
 | File | Lines | Purpose |
@@ -84,7 +86,7 @@
 | File | Purpose |
 |------|---------|
 | `../../AGENTS.md` | Central hub — project identity, conventions, file map |
-| `../../DESIGN.md` | Visual design system (colors, fonts, components) |
+| `../../PRIVACY.md` | Privacy policy (public-facing) |
 | `../../dev/WORKFLOW.md` | AI report prompt workflow |
 
 ---
