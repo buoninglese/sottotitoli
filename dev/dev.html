@@ -419,33 +419,41 @@
 
     function getDefaultPrompts(id) {
       var prompts = {
-        0: {
-          system: 'Sei Sottotitoli, un motore di insight rapidi. Generi osservazioni brevi e utili dopo ogni sessione.',
-          user: 'Genera uno Snapshot basato su questa sessione:\n\n{{transcript}}\n\nFornisci 2–4 osservazioni concrete su grammatica, vocabolario e fluidità. Ogni osservazione deve citare un esempio dal transcript. Concludi con un passo successivo azionabile. Massimo 300 parole.'
+        holistic: {
+          system: 'Sei un esperto di lingua inglese. Esegui un controllo generale della grammatica usata in questo transcript.',
+          user: 'Transcript:\n{{transcript}}\n\nFornisci:\n1. Punteggio complessivo (0-100)\n2. 3 punti di forza con esempi\n3. 3 problemi con esempi specifici\n4. Riassunto CEFR (1-2 frasi)\n5. 3 raccomandazioni pratiche'
         },
-        1: {
-          system: 'Sei il motore di report principale di Sottotitoli. Generi analisi complete basate su evidenze per studenti di lingue.',
-          user: 'Crea un Report Completo basato su questa sessione:\n\n{{transcript}}\n\nFornisci:\n1. Riepilogo (2–3 frasi)\n2. Punti di forza osservati (con esempi)\n3. Problemi prioritari (con esempi)\n4. Pattern ricorrenti vs errori occasionali\n5. Azioni consigliate\n6. Livello di confidenza (0–100)'
+        personalized: {
+          system: 'Sei un coach linguistico personalizzato. Adatta l\'analisi agli obiettivi dell\'utente.',
+          user: 'Obiettivi utente:\n{{USER_OBJECTIVES}}\n\nTranscript:\n{{transcript}}\n\nFornisci: punteggio di allineamento, punti di forza, gap, azioni personalizzate, focus per prossima sessione.'
         },
-        2: {
-          system: 'Sei il motore di analisi dei pattern ricorrenti di Sottotitoli.',
-          user: 'Analizza questo transcript per errori ricorrenti:\n\n{{transcript}}\n\nFornisci errori che si ripetono (≥2 occorrenze), errori occasionali, pattern di correzione pratici, e priorità.'
+        growth: {
+          system: 'Sei uno specialista della crescita nell\'apprendimento dell\'inglese.',
+          user: 'Transcript:\n{{transcript}}\n\nSessioni precedenti:\n{{PREVIOUS_SESSIONS}}\n\nFornisci: traiettoria di crescita, esercizi di grammatica, esercizi di vocabolario, drill di fluidità, stima prossimo traguardo.'
         },
-        3: {
-          system: 'Sei il motore di analisi del vocabolario di Sottotitoli.',
-          user: 'Analizza il vocabolario attivo in questo transcript:\n\n{{transcript}}\n\nFornisci vocabolario attivo, parole emergenti, 5-10 suggerimenti, distribuzione CEFR stimata.'
+        cefr: {
+          system: 'Sei un esperto di vocabolario CEFR. Esegui un controllo completo del vocabolario.',
+          user: 'Transcript:\n{{transcript}}\n\nFornisci: distribuzione CEFR (A1-C2), stima dimensione vocabolario, copertura NGSL, mappa argomenti, gap analysis, 10 parole suggerite, punteggio diversità lessicale.'
         },
-        4: {
-          system: 'Sei il motore di stima CEFR di Sottotitoli. Fornisci stime prudenti e basate su evidenze.',
-          user: 'Stima il profilo CEFR basato su questo transcript:\n\n{{transcript}}\n\nProfilo per abilità: produzione, interazione, ricezione, vocabolario, accuratezza grammaticale, coerenza.'
+        explorer: {
+          system: 'Sei un coach di vocabolario personalizzato.',
+          user: 'Transcript:\n{{transcript}}\n\nWord bank:\n{{WORD_BANK}}\n\nFornisci: parole usate dal bank, parole mancate, nuove parole scoperte, analisi collocazioni, suggerimenti sinonimi, piano di vocabolario.'
         },
-        9: {
-          system: 'Sei il motore di analisi contrastiva italiano-inglese di Sottotitoli.',
-          user: 'Analizza questo transcript per interferenze dall\'italiano:\n\n{{transcript}}\n\nPattern di transfer, fonte L1, evidenze, alternative migliori, falsi amici.'
+        homework: {
+          system: 'Sei un creatore di esercizi e compiti.',
+          user: 'Transcript:\n{{transcript}}\n\nVocabolario selezionato:\n{{SELECTED_VOCABULARY}}\n\nFornisci: 5 esercizi fill-in-the-blank, 3 esercizi di creazione frasi, 5 coppie context matching, 3 esercizi di traduzione, rubrica di autovalutazione.'
         },
-        11: {
-          system: 'Sei il motore di analisi per esami Cambridge di Sottotitoli.',
-          user: 'Analizza questo transcript in formato Cambridge Speaking:\n\n{{transcript}}\n\nOsservazioni per task, indicatori di pronuncia, punti di forza, aree da migliorare.'
+        cambridge: {
+          system: 'Sei un esaminatore Cambridge English.',
+          user: 'Transcript:\n{{transcript}}\n\nLivello CEFR target: {{TARGET_LEVEL}}\n\nFornisci: band score Cambridge, punteggi per criterio, feedback esaminatore, 5 prompt di pratica.'
+        },
+        speech: {
+          system: 'Sei un analista di pronuncia e fluidità.',
+          user: 'Transcript:\n{{transcript}}\n\nAnalizza: WPM e ritmo, filler words, pause, complessità frasi, indicatori intonazione, profilo complessivo, confronto con benchmark nativi.'
+        },
+        drills: {
+          system: 'Sei un designer di drill linguistici.',
+          user: 'Transcript:\n{{transcript}}\n\nArea target: {{TARGET_AREA}}\n\nFornisci: diagnosi, 5 drill con istruzioni, progressione difficoltà, criteri di successo, frequenza pratica, suggerimenti tracking.'
         }
       };
       return prompts[id] || { system:'', user:'' };
@@ -492,7 +500,7 @@
           headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
           body: JSON.stringify({
             testMode: true,
-            moduleId: parseInt(currentModuleId),
+            moduleId: currentModuleId,
             systemPrompt: sysPrompt,
             userPrompt: fullPrompt
           })
@@ -534,7 +542,7 @@
       document.querySelectorAll('.price-row').forEach(function(row){
         var preset = row.querySelector('.price-input').getAttribute('data-preset');
         var credits = parseInt(row.querySelector('.price-input').value) || 0;
-        var moduleId = parseInt(row.querySelector('.module-select').value) || 1;
+        var moduleId = row.querySelector('.module-select').value;
         pricing[preset] = { credits: credits, module_id: moduleId };
       });
       await saveConfig('preset_pricing', pricing, 'Credit costs and module mappings');
@@ -579,7 +587,7 @@
         html += '<tr style="border-bottom:1px solid var(--line)">' +
           '<td style="padding:10px 12px;font-weight:600">' + key + '</td>' +
           '<td style="padding:10px 12px;color:var(--text-dim)">' + (PRESET_CATEGORIES[key] || '—') + '</td>' +
-          '<td style="padding:10px 12px">Module #' + p.module_id + ' — ' + mod.name + '</td>' +
+          '<td style="padding:10px 12px">' + mod.name + '</td>' +
           '<td style="padding:10px 12px;font-weight:600;color:var(--accent)">' + p.credits + ' cr</td>' +
         '</tr>';
       });
@@ -594,7 +602,7 @@
         var r = await sb.auth.getSession();
         if (!r.data?.session) { resultDiv.textContent = 'Not logged in.'; return; }
         var token = r.data.session.access_token;
-        var moduleId = parseInt(document.getElementById('testModule').value);
+        var moduleId = document.getElementById('testModule').value;
         var transcript = document.getElementById('testTranscript').value;
 
         var resp = await fetch('https://qzqmuegbpmvqrjrlfbgk.supabase.co/functions/v1/process-ai-reports', {
