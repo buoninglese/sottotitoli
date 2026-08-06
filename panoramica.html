@@ -8813,6 +8813,8 @@
         var sel = containerSelector || '#wbExpandResults';
         var sb = window.sottotitoliSupabase;
         if (!sb) return;
+        // Detect language from the container — Italian VB uses #wbItExpandResults
+        var lang = (sel === '#wbItExpandResults') ? 'it' : 'en';
         try {
           var r = await sb.auth.getSession();
           if (!r.data?.session) return;
@@ -8823,7 +8825,7 @@
           boxes.forEach(function(b){ var w = b.getAttribute('data-word'); if (w) words.push(w.toLowerCase()); });
           if (!words.length) return;
           var { data: bankData } = await sb.from('user_wordbank_words')
-            .select('word').eq('user_id', userId).eq('lang', 'en').in('word', words);
+            .select('word').eq('user_id', userId).eq('lang', lang).in('word', words);
           var bankSet = new Set((bankData||[]).map(function(w){ return w.word.toLowerCase(); }));
           var { data: reviewData } = await sb.from('review_words')
             .select('word,personal_frequency,mastery_score').eq('user_id', userId).in('word', words);
@@ -9275,6 +9277,13 @@
         var level = btn.getAttribute('data-level');
         var pos = btn.getAttribute('data-pos');
         if (!word) return;
+        // Detect if click came from Italian Vocabulary Builder subtab
+        var isItalian = btn.closest('#sub-wb-expand-it');
+        if (isItalian) {
+          // Route to Italian save path
+          window.saveItalianWordToBank(word, btn);
+          return;
+        }
         saveExpandWord(word, level, pos);
         btn.classList.add('saved');
         btn.textContent = '✓';
