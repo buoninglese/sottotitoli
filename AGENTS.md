@@ -48,6 +48,8 @@ That's the index. It lists all 25 AI docs organized by category. Read it first.
 | `docs/ai/pages-directory.md` | Finding files |
 | `docs/ai/architecture.md` | Understanding the stack |
 | `docs/ai/supabase-edge-functions.md` | Edge functions catalog |
+| `docs/ai/websocket-protocol.md` | WebSocket message contract |
+| `docs/ERROR-CODES.md` | Error catalog with recovery paths |
 | `docs/ai/css-theme-guide.md` | Editing CSS |
 | `docs/ai/testing-checklist.md` | Before committing |
 | `docs/ai/deploy-runbook.md` | Deploying |

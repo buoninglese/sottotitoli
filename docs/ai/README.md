@@ -22,7 +22,7 @@
 
 ---
 
-## 📋 Full File Index (30 files)
+## 📋 Full File Index (32 files)
 
 ### Core Procedures
 | File | Lines | Purpose |
@@ -74,6 +74,8 @@
 | File | Lines | Purpose |
 |------|-------|---------|
 | `glossary.md` | 109 | Every term, acronym, concept |
+| `../ERROR-CODES.md` | NEW | 18 error codes: auth, WebSocket, data, payment, translation, UI, AI |
+| `websocket-protocol.md` | NEW | WebSocket message format contract, room lifecycle, CSP config |
 | `SECURITY.md` | 65 | Security policy, secrets, keys |
 | `CHANGELOG.md` | 38 | What changed — agents fill in after each push |
 | `DEPLOYMENT_CHECKLIST.md` | 38 | Pre-deploy verification steps |

@@ -23,6 +23,8 @@ No build step. Static HTML/CSS/JS served by GitHub Pages.
 | **AI agent deep dives** | **[docs/ai/README.md](docs/ai/README.md)** — 28 interlinked reference docs |
 | **Business** | **[docs/ai/business-info.md](docs/ai/business-info.md)** — pricing, Stripe, legal |
 | **Architecture** | **[docs/ai/architecture.md](docs/ai/architecture.md)** — system diagrams, data flows |
+| **WebSocket protocol** | **[docs/ai/websocket-protocol.md](docs/ai/websocket-protocol.md)** — message contract, room lifecycle |
+| **Error codes** | **[docs/ERROR-CODES.md](docs/ERROR-CODES.md)** — 18 errors with recovery paths |
 | **Privacy** | **[PRIVACY.md](PRIVACY.md)** — privacy policy |
 
 ## Stack
