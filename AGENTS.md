@@ -47,6 +47,7 @@ That's the index. It lists all 25 AI docs organized by category. Read it first.
 | `docs/DECISIONS.md` | Understanding why we built it this way |
 | `docs/ai/pages-directory.md` | Finding files |
 | `docs/ai/architecture.md` | Understanding the stack |
+| `docs/ai/supabase-edge-functions.md` | Edge functions catalog |
 | `docs/ai/css-theme-guide.md` | Editing CSS |
 | `docs/ai/testing-checklist.md` | Before committing |
 | `docs/ai/deploy-runbook.md` | Deploying |

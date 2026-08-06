@@ -22,7 +22,7 @@
 
 ---
 
-## 📋 Full File Index (29 files)
+## 📋 Full File Index (30 files)
 
 ### Core Procedures
 | File | Lines | Purpose |
@@ -38,6 +38,7 @@
 | File | Lines | Purpose |
 |------|-------|---------|
 | `architecture.md` | 153 | System diagram, data flows, WebSocket contract |
+| `supabase-edge-functions.md` | NEW | 20 edge functions catalog: tables, APIs, dependencies, cold starts |
 | `pages-directory.md` | 95 | Complete page index with statuses |
 
 ### Design & Theming
