@@ -22,7 +22,7 @@
 
 ---
 
-## 📋 Full File Index (32 files)
+## 📋 Full File Index (35 files)
 
 ### Core Procedures
 | File | Lines | Purpose |
@@ -40,6 +40,8 @@
 | `architecture.md` | 153 | System diagram, data flows, WebSocket contract |
 | `supabase-edge-functions.md` | NEW | 20 edge functions catalog: tables, APIs, dependencies, cold starts |
 | `pages-directory.md` | 95 | Complete page index with statuses |
+| `dependency-map.md` | NEW | JS load order, global dependency matrix, CDN deps |
+| `state-management.md` | NEW | Where data lives: localStorage vs Supabase vs in-memory |
 
 ### Design & Theming
 | File | Lines | Purpose |
@@ -94,6 +96,9 @@
 | `../../AGENTS.md` | Central hub — project identity, conventions, file map |
 | `../../DECISIONS.md` | Architecture Decision Records — 11 ADRs, why we built it this way |
 | `../../PRIVACY.md` | Privacy policy (public-facing) |
+| `../../docs/ACCESSIBILITY.md` | ARIA patterns, contrast ratios, screen reader support |
+| `../../docs/PERFORMANCE.md` | Bundle sizes, optimization targets, font loading strategy |
+| `../../docs/ERROR-CODES.md` | 18 error codes across 6 categories |
 | `../../dev/WORKFLOW.md` | AI report prompt workflow |
 
 ---

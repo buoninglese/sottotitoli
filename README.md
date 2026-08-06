@@ -25,6 +25,8 @@ No build step. Static HTML/CSS/JS served by GitHub Pages.
 | **Architecture** | **[docs/ai/architecture.md](docs/ai/architecture.md)** — system diagrams, data flows |
 | **WebSocket protocol** | **[docs/ai/websocket-protocol.md](docs/ai/websocket-protocol.md)** — message contract, room lifecycle |
 | **Error codes** | **[docs/ERROR-CODES.md](docs/ERROR-CODES.md)** — 18 errors with recovery paths |
+| **Performance** | **[docs/PERFORMANCE.md](docs/PERFORMANCE.md)** — bundle sizes, optimization targets |
+| **Accessibility** | **[docs/ACCESSIBILITY.md](docs/ACCESSIBILITY.md)** — ARIA patterns, contrast, screen reader |
 | **Privacy** | **[PRIVACY.md](PRIVACY.md)** — privacy policy |
 
 ## Stack
