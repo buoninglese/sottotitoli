@@ -161,7 +161,7 @@ body { font-family: 'Inter', system-ui, -apple-system, sans-serif; background: v
   <!-- APPS TAB -->
   <div class="panel" id="panel-apps">
     <div class="quick-row">
-      <button class="quick-btn" onclick="launchApp('com.sec.android.app.sbrowser')">🌐 Samsung Browser</button>
+      <button class="quick-btn" onclick="launchApp('com.sec.android.app.sbrowser')">🌐 Browser</button>
       <button class="quick-btn" onclick="launchApp('com.google.android.gm')">📧 Gmail</button>
       <button class="quick-btn" onclick="launchApp('com.google.android.apps.maps')">🗺 Maps</button>
       <button class="quick-btn" onclick="launchApp('com.google.android.calendar')">📅 Calendar</button>
@@ -169,6 +169,8 @@ body { font-family: 'Inter', system-ui, -apple-system, sans-serif; background: v
       <button class="quick-btn" onclick="launchApp('com.google.android.deskclock')">⏰ Clock</button>
       <button class="quick-btn" onclick="launchApp('com.termux')">💻 Termux</button>
       <button class="quick-btn" onclick="launchApp('com.android.settings')">⚙️ Settings</button>
+      <button class="quick-btn" onclick="launchApp('com.spotify.music')">🎵 Spotify</button>
+      <button class="quick-btn" onclick="launchApp('com.google.android.apps.photos')">🖼 Photos</button>
     </div>
     <div style="margin-top:16px">
       <input type="text" id="appPkgInput" placeholder="Package name (e.g. com.example.app)" style="background:var(--surface);border:1px solid var(--border);color:var(--text);padding:10px;border-radius:var(--radius);width:300px;font-size:12px;">
@@ -201,6 +203,17 @@ body { font-family: 'Inter', system-ui, -apple-system, sans-serif; background: v
         <h3 style="font-size:13px;color:var(--muted);margin-top:12px;margin-bottom:8px;">📝 Quick Note to Phone</h3>
         <textarea id="quickNote" placeholder="Text to save on phone..." rows="2" style="width:100%;background:var(--surface);border:1px solid var(--border);color:var(--text);padding:8px;border-radius:var(--radius);margin-bottom:6px;font-size:12px;resize:vertical;"></textarea>
         <button onclick="saveNoteToPhone()" style="background:var(--accent);border:none;color:#fff;padding:8px 16px;border-radius:var(--radius);cursor:pointer;font-weight:600;font-size:12px;">Save to Phone</button>
+      </div>
+    </div>
+    <div style="margin-top:16px;">
+      <h3 style="font-size:13px;color:var(--muted);margin-bottom:8px;">🎨 Creative Features</h3>
+      <div class="quick-row">
+        <button class="quick-btn" onclick="phoneTTS('Hello from laptop! This is a text to speech test.')">🗣 Speak Text</button>
+        <button class="quick-btn" onclick="takePhoto()">📷 Take Photo</button>
+        <button class="quick-btn" onclick="sendSMS()">💬 Send SMS</button>
+        <button class="quick-btn" onclick="getClipboard()">📋 Get Clipboard</button>
+        <button class="quick-btn" onclick="phoneShell('termux-location')">📍 GPS Location</button>
+        <button class="quick-btn" onclick="phoneShell('termux-wifi-scaninfo')">📡 WiFi Scan</button>
       </div>
     </div>
   </div>
@@ -502,6 +515,40 @@ async function restartBridge() {
 
 function openDashboard() {
   switchTab.call({target: document.querySelector('.tab:nth-child(1)')}, 'dashboard');
+}
+
+// === CREATIVE FEATURES ===
+async function phoneTTS(text) {
+  if (!text) { text = prompt('Text to speak:'); if (!text) return; }
+  const r = await api('tts/speak', 'POST', {text});
+  toast(r.ok ? '🗣 Speaking...' : '❌ Failed', !r.ok);
+}
+
+async function takePhoto() {
+  toast('📷 Taking photo...');
+  const cam = confirm('Use front camera? (OK=front, Cancel=rear)') ? '1' : '0';
+  const r = await api('camera/photo', 'POST', {camera: cam});
+  if (r.ok) toast('✅ Photo saved to /sdcard/bridge-photo.jpg');
+  else toast('❌ ' + (r.stderr || 'Failed'), true);
+}
+
+async function sendSMS() {
+  const num = prompt('Phone number:');
+  if (!num) return;
+  const msg = prompt('Message:');
+  if (!msg) return;
+  const r = await api('sms/send', 'POST', {number: num, message: msg});
+  toast(r.ok ? '✅ SMS sent' : '❌ ' + (r.stderr || 'Failed'), !r.ok);
+}
+
+async function getClipboard() {
+  const r = await api('clipboard/get');
+  if (r.ok && r.stdout) {
+    toast('📋 Copied: ' + r.stdout.slice(0, 50));
+    await navigator.clipboard.writeText(r.stdout);
+  } else {
+    toast('❌ Clipboard empty or error', true);
+  }
 }
 
 // === INIT ===
