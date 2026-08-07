@@ -1,0 +1,500 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>📱 Phone Control Center — Samsung Galaxy A14</title>
+<style>
+:root {
+  --bg: #060d12; --surface: #0d1820; --surface2: #111e28;
+  --border: #1a2d3a; --cyan: #00c8e8; --green: #00c853;
+  --yellow: #ffd600; --red: #ff3d3d; --text: #c8d6e5;
+  --muted: #5a7288; --accent: #0088cc; --radius: 8px;
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family: 'Inter', system-ui, -apple-system, sans-serif; background: var(--bg); color: var(--text); height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+
+/* TOP BAR */
+.topbar { background: var(--surface); border-bottom: 1px solid var(--border); padding: 8px 16px; display: flex; align-items: center; gap: 16px; flex-shrink: 0; }
+.topbar .title { font-weight: 700; font-size: 14px; color: var(--cyan); margin-right: auto; }
+.topbar .stat { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); }
+.topbar .stat .dot { width: 7px; height: 7px; border-radius: 50%; }
+.topbar .stat .dot.online { background: var(--green); }
+.topbar .stat .dot.offline { background: var(--red); }
+.topbar button { background: var(--surface2); border: 1px solid var(--border); color: var(--text); padding: 5px 12px; border-radius: var(--radius); font-size: 11px; cursor: pointer; transition: .15s; }
+.topbar button:hover { background: var(--accent); border-color: var(--accent); color: #fff; }
+
+/* TABS */
+.tabs { display: flex; gap: 2px; background: var(--surface); padding: 0 16px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
+.tab { padding: 10px 20px; font-size: 12px; color: var(--muted); cursor: pointer; border: none; background: none; border-bottom: 2px solid transparent; transition: .15s; font-weight: 500; }
+.tab:hover { color: var(--text); }
+.tab.active { color: var(--cyan); border-bottom-color: var(--cyan); }
+
+/* CONTENT */
+.content { flex: 1; overflow: hidden; display: flex; }
+.panel { display: none; flex: 1; overflow: auto; padding: 16px; }
+.panel.active { display: flex; flex-direction: column; }
+
+/* DASHBOARD */
+.dash-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 12px; }
+.dash-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; }
+.dash-card .label { font-size: 10px; text-transform: uppercase; letter-spacing: .5px; color: var(--muted); margin-bottom: 6px; }
+.dash-card .val { font-size: 26px; font-weight: 700; }
+.dash-card .sub { font-size: 11px; color: var(--muted); margin-top: 4px; }
+.cyan { color: var(--cyan); } .green { color: var(--green); } .yellow { color: var(--yellow); } .red { color: var(--red); }
+
+/* TERMINAL */
+.term { flex: 1; background: #000; border: 1px solid var(--border); border-radius: var(--radius); padding: 12px; font-family: 'JetBrains Mono', 'Fira Code', monospace; font-size: 12px; overflow-y: auto; white-space: pre-wrap; line-height: 1.5; }
+.term .prompt { color: var(--green); }
+.term .output { color: var(--text); }
+.term .error { color: var(--red); }
+.term-input-row { display: flex; gap: 8px; margin-top: 8px; flex-shrink: 0; }
+.term-input-row input { flex: 1; background: var(--surface); border: 1px solid var(--border); color: var(--green); padding: 10px 14px; border-radius: var(--radius); font-family: 'JetBrains Mono', monospace; font-size: 13px; outline: none; }
+.term-input-row input:focus { border-color: var(--cyan); }
+.term-input-row button { background: var(--accent); border: none; color: #fff; padding: 10px 20px; border-radius: var(--radius); cursor: pointer; font-weight: 600; font-size: 12px; }
+.term-input-row button:hover { opacity: .85; }
+
+/* FILE BROWSER */
+.file-list { list-style: none; }
+.file-item { display: flex; align-items: center; gap: 10px; padding: 8px 12px; border-radius: 6px; cursor: pointer; font-size: 13px; transition: .1s; }
+.file-item:hover { background: var(--surface2); }
+.file-item .icon { font-size: 18px; width: 24px; text-align: center; }
+.file-item .name { flex: 1; }
+.file-item .size { color: var(--muted); font-size: 11px; }
+.file-path { font-size: 11px; color: var(--muted); margin-bottom: 12px; padding: 8px 12px; background: var(--surface); border-radius: var(--radius); }
+.file-actions { display: flex; gap: 8px; margin-bottom: 12px; }
+.file-actions button { background: var(--surface2); border: 1px solid var(--border); color: var(--text); padding: 6px 14px; border-radius: var(--radius); font-size: 11px; cursor: pointer; }
+.file-actions button:hover { background: var(--accent); color: #fff; }
+
+/* APPS */
+.app-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 10px; }
+.app-btn { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px 10px; text-align: center; cursor: pointer; transition: .15s; font-size: 12px; color: var(--text); }
+.app-btn:hover { background: var(--surface2); border-color: var(--cyan); }
+.app-btn .icon { font-size: 28px; display: block; margin-bottom: 6px; }
+.app-btn .pkg { font-size: 9px; color: var(--muted); display: block; margin-top: 2px; }
+
+/* QUICK ACTIONS */
+.quick-row { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 16px; }
+.quick-btn { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 10px 18px; cursor: pointer; font-size: 12px; color: var(--text); transition: .15s; display: flex; align-items: center; gap: 8px; }
+.quick-btn:hover { background: var(--surface2); border-color: var(--cyan); }
+.quick-btn.danger:hover { border-color: var(--red); background: #1a0a0a; }
+
+/* TOAST */
+.toast { position: fixed; bottom: 20px; right: 20px; background: var(--surface); border: 1px solid var(--green); border-radius: var(--radius); padding: 10px 18px; font-size: 12px; z-index: 100; animation: slideUp .3s; display: none; }
+.toast.show { display: block; }
+.toast.error { border-color: var(--red); }
+@keyframes slideUp { from { opacity:0; transform:translateY(10px); } to { opacity:1; transform:translateY(0); } }
+
+/* RESPONSIVE */
+@media (max-width: 600px) {
+  .dash-grid { grid-template-columns: 1fr 1fr; }
+  .app-grid { grid-template-columns: 1fr 1fr 1fr; }
+  .topbar { flex-wrap: wrap; }
+}
+</style>
+</head>
+<body>
+
+<!-- TOP BAR -->
+<div class="topbar">
+  <span class="title">📱 Galaxy A14 Control Center</span>
+  <span class="stat"><span class="dot online" id="dot"></span><span id="statusText">checking...</span></span>
+  <span class="stat">🔋 <span id="topBattery">--</span></span>
+  <span class="stat">📶 <span id="topWifi">--</span></span>
+  <span class="stat">🌡 <span id="topTemp">--</span></span>
+  <button onclick="pingBridge()">🔄 Refresh</button>
+  <button onclick="openDashboard()">📊 Dashboard</button>
+</div>
+
+<!-- TABS -->
+<div class="tabs">
+  <button class="tab active" onclick="switchTab('dashboard')">📊 Dashboard</button>
+  <button class="tab" onclick="switchTab('terminal')">💻 Terminal</button>
+  <button class="tab" onclick="switchTab('files')">📁 Files</button>
+  <button class="tab" onclick="switchTab('apps')">📱 Apps</button>
+  <button class="tab" onclick="switchTab('actions')">⚡ Actions</button>
+</div>
+
+<!-- CONTENT -->
+<div class="content">
+
+  <!-- DASHBOARD TAB -->
+  <div class="panel active" id="panel-dashboard">
+    <div class="dash-grid" id="dashGrid">
+      <div class="dash-card"><div class="label">🔋 Battery</div><div class="val cyan" id="dBattery">--</div><div class="sub" id="dBatterySub"></div></div>
+      <div class="dash-card"><div class="label">🌡 Temperature</div><div class="val" id="dTemp">--</div></div>
+      <div class="dash-card"><div class="label">💾 Storage</div><div class="val cyan" id="dStorage">--</div><div class="sub" id="dStorageSub"></div></div>
+      <div class="dash-card"><div class="label">📶 WiFi Signal</div><div class="val" id="dWifi">--</div><div class="sub" id="dWifiSub"></div></div>
+      <div class="dash-card"><div class="label">🧠 Memory</div><div class="val cyan" id="dMem">--</div><div class="sub" id="dMemSub"></div></div>
+      <div class="dash-card"><div class="label">⏱ Uptime</div><div class="val" id="dUptime">--</div></div>
+      <div class="dash-card"><div class="label">🔌 Bridge</div><div class="val green" id="dBridge">--</div></div>
+      <div class="dash-card"><div class="label">📱 Device</div><div class="val" id="dDevice">--</div><div class="sub" id="dDeviceSub"></div></div>
+    </div>
+    <div style="margin-top:16px; background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:12px; font-size:12px; color:var(--muted); font-family:monospace; max-height:200px; overflow-y:auto;" id="dLog">Event log loading...</div>
+  </div>
+
+  <!-- TERMINAL TAB -->
+  <div class="panel" id="panel-terminal">
+    <div class="term" id="termOutput"><span class="prompt">$ </span>Phone shell ready. Type a command and press Enter.</div>
+    <div class="term-input-row">
+      <input type="text" id="termInput" placeholder="ls /sdcard/ ..." onkeydown="if(event.key==='Enter')runTermCmd()">
+      <button onclick="runTermCmd()">Run ▶</button>
+      <button onclick="quickCmd('df -h')" style="background:var(--surface2);font-size:10px;padding:8px 10px;">df</button>
+      <button onclick="quickCmd('free -h')" style="background:var(--surface2);font-size:10px;padding:8px 10px;">free</button>
+      <button onclick="quickCmd('ps -A | head -10')" style="background:var(--surface2);font-size:10px;padding:8px 10px;">ps</button>
+      <button onclick="document.getElementById('termOutput').innerHTML=''" style="background:var(--surface2);font-size:10px;padding:8px 10px;">Clear</button>
+    </div>
+  </div>
+
+  <!-- FILES TAB -->
+  <div class="panel" id="panel-files">
+    <div class="file-path" id="filePath">/sdcard/sottotitoli/</div>
+    <div class="file-actions">
+      <button onclick="refreshFiles()">🔄 Refresh</button>
+      <button onclick="uploadFile()">📤 Upload</button>
+      <input type="file" id="fileUpload" style="display:none" onchange="doUpload(this)">
+      <button onclick="createNewFile()">➕ New File</button>
+    </div>
+    <ul class="file-list" id="fileList"></ul>
+  </div>
+
+  <!-- APPS TAB -->
+  <div class="panel" id="panel-apps">
+    <div class="quick-row">
+      <button class="quick-btn" onclick="launchApp('com.sec.android.app.sbrowser')">🌐 Samsung Browser</button>
+      <button class="quick-btn" onclick="launchApp('com.google.android.gm')">📧 Gmail</button>
+      <button class="quick-btn" onclick="launchApp('com.google.android.apps.maps')">🗺 Maps</button>
+      <button class="quick-btn" onclick="launchApp('com.google.android.calendar')">📅 Calendar</button>
+      <button class="quick-btn" onclick="launchApp('com.google.android.youtube')">▶️ YouTube</button>
+      <button class="quick-btn" onclick="launchApp('com.google.android.deskclock')">⏰ Clock</button>
+      <button class="quick-btn" onclick="launchApp('com.termux')">💻 Termux</button>
+      <button class="quick-btn" onclick="launchApp('com.android.settings')">⚙️ Settings</button>
+    </div>
+    <div style="margin-top:16px">
+      <input type="text" id="appPkgInput" placeholder="Package name (e.g. com.example.app)" style="background:var(--surface);border:1px solid var(--border);color:var(--text);padding:10px;border-radius:var(--radius);width:300px;font-size:12px;">
+      <button onclick="launchApp(document.getElementById('appPkgInput').value)" style="background:var(--accent);border:none;color:#fff;padding:10px 16px;border-radius:var(--radius);cursor:pointer;font-weight:600;font-size:12px;margin-left:8px;">Launch</button>
+      <button onclick="listApps()" style="background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:10px 16px;border-radius:var(--radius);cursor:pointer;font-size:12px;margin-left:8px;">📋 List Installed</button>
+    </div>
+    <div style="margin-top:16px; background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:12px; font-size:11px; color:var(--muted); font-family:monospace; max-height:300px; overflow-y:auto; white-space:pre-wrap;" id="appListOutput">Click "List Installed" to see apps</div>
+  </div>
+
+  <!-- ACTIONS TAB -->
+  <div class="panel" id="panel-actions">
+    <div class="quick-row">
+      <button class="quick-btn" onclick="notifyPhone('Hello from Laptop','Control Center says hi! 👋')">🔔 Test Notification</button>
+      <button class="quick-btn" onclick="takeScreenshot()">📸 Screenshot</button>
+      <button class="quick-btn" onclick="phoneShell('am start -a android.intent.action.VIEW -d https://sottotitoli.pro')">🌐 Open Sottotitoli</button>
+      <button class="quick-btn" onclick="phoneShell('termux-vibrate -d 500')">📳 Vibrate</button>
+      <button class="quick-btn danger" onclick="restartBridge()">🔄 Restart Bridge</button>
+    </div>
+    <div style="margin-top:16px; display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+      <div>
+        <h3 style="font-size:13px;color:var(--muted);margin-bottom:8px;">📨 Send Notification</h3>
+        <input type="text" id="notifTitle" placeholder="Title" style="width:100%;background:var(--surface);border:1px solid var(--border);color:var(--text);padding:8px;border-radius:var(--radius);margin-bottom:6px;font-size:12px;">
+        <textarea id="notifBody" placeholder="Message..." rows="3" style="width:100%;background:var(--surface);border:1px solid var(--border);color:var(--text);padding:8px;border-radius:var(--radius);margin-bottom:6px;font-size:12px;resize:vertical;"></textarea>
+        <button onclick="notifyPhone(document.getElementById('notifTitle').value, document.getElementById('notifBody').value)" style="background:var(--accent);border:none;color:#fff;padding:8px 16px;border-radius:var(--radius);cursor:pointer;font-weight:600;font-size:12px;">Send Notification</button>
+      </div>
+      <div>
+        <h3 style="font-size:13px;color:var(--muted);margin-bottom:8px;">🔗 Open URL on Phone</h3>
+        <input type="text" id="openUrl" placeholder="https://..." style="width:100%;background:var(--surface);border:1px solid var(--border);color:var(--text);padding:8px;border-radius:var(--radius);margin-bottom:6px;font-size:12px;">
+        <button onclick="openUrlOnPhone(document.getElementById('openUrl').value)" style="background:var(--accent);border:none;color:#fff;padding:8px 16px;border-radius:var(--radius);cursor:pointer;font-weight:600;font-size:12px;">Open on Phone</button>
+        <h3 style="font-size:13px;color:var(--muted);margin-top:12px;margin-bottom:8px;">📝 Quick Note to Phone</h3>
+        <textarea id="quickNote" placeholder="Text to save on phone..." rows="2" style="width:100%;background:var(--surface);border:1px solid var(--border);color:var(--text);padding:8px;border-radius:var(--radius);margin-bottom:6px;font-size:12px;resize:vertical;"></textarea>
+        <button onclick="saveNoteToPhone()" style="background:var(--accent);border:none;color:#fff;padding:8px 16px;border-radius:var(--radius);cursor:pointer;font-weight:600;font-size:12px;">Save to Phone</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div class="toast" id="toast"></div>
+
+<script>
+// === CONFIG ===
+const BRIDGE = 'http://172.20.10.2:8765';
+const LOCAL_SYNC = '/Users/sebastiankrauwel/sottotitoli-mobile';
+let cmdHistory = [];
+
+// === API ===
+async function api(path, method='GET', body=null) {
+  const opts = { method, headers: {'Content-Type': 'application/json'} };
+  if (body) opts.body = JSON.stringify(body);
+  try {
+    const r = await fetch(`${BRIDGE}/${path}`, opts);
+    return await r.json();
+  } catch(e) {
+    return {error: e.message, ok: false};
+  }
+}
+
+// === TOAST ===
+function toast(msg, isError=false) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast show' + (isError ? ' error' : '');
+  setTimeout(() => t.classList.remove('show'), 2500);
+}
+
+// === TABS ===
+function switchTab(name) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  event.target.classList.add('active');
+  document.getElementById('panel-' + name).classList.add('active');
+  if (name === 'dashboard') refreshDashboard();
+  if (name === 'files') refreshFiles();
+}
+
+// === DASHBOARD ===
+async function refreshDashboard() {
+  const h = await api('health');
+  const dot = document.getElementById('dot');
+  const st = document.getElementById('statusText');
+  if (h.status === 'ok') {
+    dot.className = 'dot online'; st.textContent = 'Online';
+    document.getElementById('dBridge').textContent = h.bridge;
+    document.getElementById('dBridge').className = 'val green';
+  } else {
+    dot.className = 'dot offline'; st.textContent = 'Offline';
+    document.getElementById('dBridge').textContent = 'DOWN';
+    document.getElementById('dBridge').className = 'val red';
+    return;
+  }
+
+  // Battery
+  const bat = await api('device/battery');
+  if (bat.ok) {
+    const b = JSON.parse(bat.stdout);
+    document.getElementById('topBattery').textContent = b.percentage + '%';
+    document.getElementById('dBattery').textContent = b.percentage + '%';
+    document.getElementById('dBatterySub').textContent = b.status + ' · ' + b.health;
+    document.getElementById('topTemp').textContent = b.temperature + '°C';
+    document.getElementById('dTemp').textContent = b.temperature + '°C';
+    document.getElementById('dTemp').className = 'val ' + (b.temperature > 40 ? 'red' : b.temperature > 35 ? 'yellow' : 'green');
+  }
+
+  // Storage
+  const stor = await api('device/storage');
+  if (stor.ok) {
+    const lines = stor.stdout.split('\n');
+    const parts = (lines[2] || lines[1] || '').split(/\s+/);
+    if (parts.length >= 5) {
+      document.getElementById('dStorage').textContent = parts[4] || parts[3];
+      document.getElementById('dStorageSub').textContent = 'free of ' + (parts[1] || '?');
+    }
+  }
+
+  // WiFi
+  const wifi = await api('wifi/info');
+  if (wifi.ok) {
+    const w = JSON.parse(wifi.stdout);
+    document.getElementById('topWifi').textContent = (w.rssi || '?') + ' dBm';
+    document.getElementById('dWifi').textContent = (w.rssi || '?') + ' dBm';
+    document.getElementById('dWifiSub').textContent = w.ssid || w.ip || '';
+  }
+
+  // Memory (via shell)
+  const mem = await api('shell', 'POST', {command: 'free -h | grep Mem'});
+  if (mem.ok && mem.stdout) {
+    const parts = mem.stdout.split(/\s+/);
+    document.getElementById('dMem').textContent = parts[2] || '?';
+    document.getElementById('dMemSub').textContent = 'used / ' + (parts[1] || '?') + ' total';
+  }
+
+  // Uptime
+  const up = await api('shell', 'POST', {command: 'uptime -p'});
+  if (up.ok) document.getElementById('dUptime').textContent = up.stdout || '--';
+
+  // Device
+  document.getElementById('dDevice').textContent = 'SM-A146P';
+  document.getElementById('dDeviceSub').textContent = 'Android 14 · Samsung Galaxy A14';
+
+  // Event log
+  const log = await api('files/read?path=/sdcard/sottotitoli/logs/phone-events.log');
+  if (log.content) {
+    const lines = log.content.trim().split('\n').slice(-15).reverse();
+    document.getElementById('dLog').innerHTML = lines.map(l => {
+      const p = l.split(' | ');
+      return `<div style="padding:2px 0;border-bottom:1px solid var(--border);"><span style="color:var(--cyan)">${(p[0]||'').slice(11,19)}</span> ${p.slice(1).join(' · ')}</div>`;
+    }).join('') || 'No events yet';
+  }
+}
+
+async function pingBridge() {
+  const h = await api('health');
+  if (h.status === 'ok') {
+    document.getElementById('dot').className = 'dot online';
+    document.getElementById('statusText').textContent = 'Online';
+    toast('✅ Phone connected — ' + h.bridge);
+  } else {
+    document.getElementById('dot').className = 'dot offline';
+    document.getElementById('statusText').textContent = 'Offline';
+    toast('❌ Cannot reach phone', true);
+  }
+  refreshDashboard();
+}
+
+// === TERMINAL ===
+async function runTermCmd() {
+  const input = document.getElementById('termInput');
+  const cmd = input.value.trim();
+  if (!cmd) return;
+  
+  const out = document.getElementById('termOutput');
+  out.innerHTML += `\n<span class="prompt">$</span> <span style="color:#fff">${cmd}</span>\n`;
+  input.value = '';
+  cmdHistory.push(cmd);
+  
+  const r = await api('shell', 'POST', {command: cmd});
+  if (r.error) {
+    out.innerHTML += `<span class="error">Error: ${r.error}</span>\n`;
+  } else {
+    out.innerHTML += `<span class="output">${r.stdout || '(no output)'}</span>\n`;
+    if (r.stderr) out.innerHTML += `<span class="error">${r.stderr}</span>\n`;
+  }
+  out.scrollTop = out.scrollHeight;
+}
+
+function quickCmd(cmd) {
+  document.getElementById('termInput').value = cmd;
+  runTermCmd();
+}
+
+// === FILES ===
+async function refreshFiles() {
+  const r = await api('files/list?path=/storage/emulated/0/sottotitoli');
+  if (!r.ok) { document.getElementById('fileList').innerHTML = '<li class="file-item"><span class="error">Cannot read directory</span></li>'; return; }
+  
+  const dirs = [], files = [];
+  const lines = r.stdout.split('\n').slice(1); // skip "total" line
+  lines.forEach(l => {
+    const parts = l.split(/\s+/);
+    if (parts.length < 6) return;
+    const name = parts.slice(5).join(' ');
+    const isDir = parts[0].startsWith('d');
+    const size = parts[4];
+    (isDir ? dirs : files).push({name, size, isDir});
+  });
+  
+  const all = [...dirs, ...files].filter(f => f.name && f.name !== '.' && f.name !== '..');
+  document.getElementById('fileList').innerHTML = all.map(f => `
+    <li class="file-item" onclick="${f.isDir ? `navigateDir('${f.name}')` : `viewFile('${f.name}')`}">
+      <span class="icon">${f.isDir ? '📁' : fileIcon(f.name)}</span>
+      <span class="name">${f.name}</span>
+      <span class="size">${f.isDir ? '' : formatSize(f.size)}</span>
+      <button onclick="event.stopPropagation();deleteFile('${f.name}')" style="background:none;border:none;cursor:pointer;padding:4px 8px;color:var(--red)">🗑</button>
+    </li>
+  `).join('');
+}
+
+function fileIcon(name) {
+  const ext = name.split('.').pop();
+  const map = { html:'🌐', py:'🐍', sh:'⚡', md:'📝', txt:'📄', json:'📋', js:'📜', css:'🎨', jpg:'🖼', png:'🖼', pdf:'📕', zip:'📦' };
+  return map[ext] || '📄';
+}
+
+function formatSize(b) { const s = parseInt(b); if (s > 1e6) return (s/1e6).toFixed(1)+'MB'; if (s>1e3) return (s/1e3).toFixed(1)+'KB'; return s+'B'; }
+
+async function viewFile(name) {
+  const r = await api(`files/read?path=/storage/emulated/0/sottotitoli/${name}`);
+  if (r.content) {
+    const ext = name.split('.').pop();
+    if (ext === 'html') {
+      // Open HTML files on phone browser
+      await api('web/open', 'POST', {url: `file:///storage/emulated/0/sottotitoli/${name}`});
+      toast('📱 Opening ' + name + ' on phone...');
+    }
+    // Show in terminal tab
+    switchTab.call({target: document.querySelector('.tab:nth-child(2)')}, 'terminal');
+    const out = document.getElementById('termOutput');
+    out.innerHTML = `<span class="prompt"># ${name}</span>\n<span class="output">${r.content.slice(0, 5000)}</span>`;
+  }
+}
+
+async function deleteFile(name) {
+  if (!confirm('Delete ' + name + '?')) return;
+  const r = await api('files/delete', 'POST', {path: `/storage/emulated/0/sottotitoli/${name}`});
+  toast(r.ok ? '🗑 Deleted' : '❌ Failed', !r.ok);
+  refreshFiles();
+}
+
+async function createNewFile() {
+  const name = prompt('File name:');
+  if (!name) return;
+  const content = prompt('Content (optional):') || '';
+  const r = await api('files/write', 'POST', {path: `/storage/emulated/0/sottotitoli/${name}`, content});
+  toast(r.ok ? '✅ Created ' + name : '❌ Failed', !r.ok);
+  refreshFiles();
+}
+
+function uploadFile() { document.getElementById('fileUpload').click(); }
+
+async function doUpload(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const text = await file.text();
+  const r = await api('files/write', 'POST', {path: `/storage/emulated/0/sottotitoli/${file.name}`, content: text});
+  toast(r.ok ? '📤 Uploaded ' + file.name : '❌ Upload failed', !r.ok);
+  refreshFiles();
+}
+
+// === APPS ===
+async function launchApp(pkg) {
+  if (!pkg) return toast('Enter a package name', true);
+  const r = await api('apps/launch', 'POST', {package: pkg});
+  toast(r.ok ? '📱 Launched' : '⚠️ Could not launch', !r.ok);
+}
+
+async function listApps() {
+  const r = await api('shell', 'POST', {command: 'pm list packages 2>/dev/null | head -60'});
+  document.getElementById('appListOutput').textContent = (r.stdout || r.stderr || 'No output');
+}
+
+// === ACTIONS ===
+async function notifyPhone(title, body) {
+  const r = await api('notify', 'POST', {title, content: body});
+  toast(r.ok ? '🔔 Notification sent' : '❌ Failed', !r.ok);
+}
+
+async function takeScreenshot() {
+  toast('📸 Taking screenshot...');
+  const r = await api('screen/screenshot');
+  toast(r.ok ? '✅ Screenshot saved to phone' : '❌ Failed', !r.ok);
+}
+
+async function openUrlOnPhone(url) {
+  if (!url) return toast('Enter a URL', true);
+  const r = await api('web/open', 'POST', {url});
+  toast(r.ok ? '🌐 Opened on phone' : '❌ Failed', !r.ok);
+}
+
+async function saveNoteToPhone() {
+  const text = document.getElementById('quickNote').value;
+  if (!text) return toast('Enter some text', true);
+  const ts = new Date().toISOString().replace(/[:.]/g, '-').slice(0,19);
+  const r = await api('files/write', 'POST', {path: `/storage/emulated/0/sottotitoli/note-${ts}.txt`, content: text});
+  toast(r.ok ? '💾 Note saved to phone' : '❌ Failed', !r.ok);
+}
+
+async function phoneShell(cmd) {
+  const r = await api('shell', 'POST', {command: cmd});
+  toast(r.ok ? '✅ Done' : '❌ ' + (r.stderr || 'Failed'), !r.ok);
+}
+
+async function restartBridge() {
+  if (!confirm('Restart bridge server on phone? This will kill the current connection.')) return;
+  await api('shell', 'POST', {command: '(sleep 1; kill -9 $(pgrep -f bridge-server)) & echo restarting'});
+  toast('🔄 Bridge restarting... Wait 3 seconds');
+  setTimeout(pingBridge, 4000);
+}
+
+function openDashboard() {
+  switchTab.call({target: document.querySelector('.tab:nth-child(1)')}, 'dashboard');
+}
+
+// === INIT ===
+pingBridge();
+setInterval(refreshDashboard, 60000);
+</script>
+</body>
+</html>
