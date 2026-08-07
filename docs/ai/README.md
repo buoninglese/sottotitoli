@@ -71,6 +71,9 @@
 | `firecrawl-capabilities.md` | 343 | Web search, scrape, monitor, parse, research |
 | `apify-capabilities.md` | 206 | Actor marketplace, social scrapers, storage |
 | `composio-capabilities.md` | 212 | 15 connected accounts, smart routing matrix |
+| `../skills/` | 16 files | Agent skills by category (see [skills README](../skills/README.md)) |
+
+> **Superpowers workflow:** 14 orchestration skills in `~/.agents/skills/` auto-trigger before any coding task — brainstorming, debugging, planning, verification. See [AGENTS.md](../../AGENTS.md) for the trigger rules.
 
 ### Reference
 | File | Lines | Purpose |

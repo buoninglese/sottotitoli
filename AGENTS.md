@@ -24,6 +24,14 @@ git commit -m "fix: …" && git push # auto-push after EVERY commit
 3. **Read `docs/ai/DECISIONS.md`** — understand WHY the architecture is what it is before proposing changes
 4. **Check syntax after EVERY edit** — `node --check` for .js, `get_errors` for .html
 
+**🚀 Superpowers workflow (automatic — do NOT skip):**
+- **"Let's build X"** → invoke `brainstorming` skill FIRST, then `writing-plans`, then code
+- **"Fix this bug"** → invoke `systematic-debugging` FIRST, then fix
+- **Any creative work** → invoke `brainstorming` BEFORE writing any code
+- **Before committing** → invoke `verification-before-completion`
+- Skills auto-trigger from `~/.agents/skills/superpowers/` — check `using-superpowers` if unsure
+- **Rule:** If there's even a 1% chance a skill applies, you MUST use it. Think → Plan → Build. Never build first.
+
 **⚠️ For HTML edits (panoramica.html, any page >1000 lines):**
 - Count `<div>` / `</div>` balance: `grep -c '<div'` vs `grep -c '</div>'` across the changed range
 - Check `get_errors` before committing — if `<main>` shows "not paired", you miscounted
@@ -82,6 +90,12 @@ That's the index. It lists all 25 AI docs organized by category. Read it first.
 | `docs/ai/firecrawl-capabilities.md` | Web search, scrape, monitor |
 | `docs/ai/apify-capabilities.md` | Actor marketplace, social scrapers |
 | `docs/ai/composio-capabilities.md` | 15 accounts + smart routing |
+
+### Agent Skills
+| Location | Purpose |
+|----------|---------|
+| `docs/skills/` | 16 categorized skills — frontend, backend, AI, data, productivity |
+| `~/.agents/skills/` | 61 skills auto-discovered by Copilot — 14 superpowers + 29 domain + 18 others |
 
 ### External Docs
 | File | Purpose |

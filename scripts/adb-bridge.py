@@ -10,7 +10,7 @@ from urllib.parse import urlparse
 
 PORT = 8766
 ADB = "adb"
-PHONE = "172.20.10.2:41923"
+PHONE = "172.20.10.2:34255"
 
 def adb(cmd, timeout=15):
     """Run an ADB command and return result."""
