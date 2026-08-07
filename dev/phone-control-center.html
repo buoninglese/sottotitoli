@@ -212,6 +212,7 @@ body { font-family: 'Inter', system-ui, -apple-system, sans-serif; background: v
 <script>
 // === CONFIG ===
 const BRIDGE = 'http://172.20.10.2:8765';
+const ADB_BRIDGE = 'http://localhost:8766';
 const LOCAL_SYNC = '/Users/sebastiankrauwel/sottotitoli-mobile';
 let cmdHistory = [];
 
@@ -446,7 +447,7 @@ async function launchApp(pkg) {
 }
 
 async function listApps() {
-  const r = await api('shell', 'POST', {command: 'pm list packages 2>/dev/null | head -60'});
+  const r = await fetch(ADB_BRIDGE + '/apps').then(r => r.json());
   document.getElementById('appListOutput').textContent = (r.stdout || r.stderr || 'No output');
 }
 
@@ -458,8 +459,19 @@ async function notifyPhone(title, body) {
 
 async function takeScreenshot() {
   toast('📸 Taking screenshot...');
-  const r = await api('screen/screenshot');
-  toast(r.ok ? '✅ Screenshot saved to phone' : '❌ Failed', !r.ok);
+  try {
+    const r = await fetch(ADB_BRIDGE + '/screenshot');
+    if (r.ok) {
+      const blob = await r.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a'); a.href = url; a.download = 'phone-screenshot-' + new Date().toISOString().slice(0,19).replace(/:/g,'-') + '.png'; a.click();
+      toast('✅ Screenshot downloaded!');
+    } else {
+      toast('❌ Screenshot failed', true);
+    }
+  } catch(e) {
+    toast('❌ ' + e.message, true);
+  }
 }
 
 async function openUrlOnPhone(url) {
