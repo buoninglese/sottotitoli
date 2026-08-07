@@ -12,11 +12,11 @@ echo "🔍 Scanning $HOTSPOT_NET.0/24 for Samsung Galaxy A14..."
 # Try known IPs first (hotspot DHCP usually assigns .2 or .3)
 for i in 2 3 4 5 6 7 8 9 10; do
     IP="${HOTSPOT_NET}.${i}"
-    if timeout 2 bash -c "echo >/dev/tcp/$IP/5555" 2>/dev/null; then
-        echo "📱 Found device at $IP:5555, connecting..."
-        adb connect "$IP:5555" 2>&1
-        if adb -s "$IP:5555" shell getprop ro.product.model 2>/dev/null | grep -q "$PHONE_MODEL"; then
-            echo "✅ Connected to $PHONE_MODEL at $IP:5555"
+    if timeout 2 bash -c "echo >/dev/tcp/$IP/41923" 2>/dev/null; then
+        echo "📱 Found device at $IP:41923, connecting..."
+        adb connect "$IP:41923" 2>&1
+        if adb -s "$IP:41923" shell getprop ro.product.model 2>/dev/null | grep -q "$PHONE_MODEL"; then
+            echo "✅ Connected to $PHONE_MODEL at $IP:41923"
             exit 0
         fi
     fi
