@@ -1085,6 +1085,20 @@ button[onclick*="addToWordBank"]:hover{background:rgba(52,211,153,.15)!important
 .v20q-act .v20q-bm:hover{border-color:var(--warn);color:var(--warn);background:rgba(245,158,11,.08)}
 .v20q-act .v20q-bm-on,.v20q-act .v20q-bm-on:hover{color:#f59e0b;border-color:rgba(245,158,11,.4)}
 .v20q-act .v20q-copy:hover{border-color:var(--accent);color:var(--accent);background:rgba(6,182,212,.08)}
+.v20q-act .v20q-tiktok{color:#888}
+.v20q-act .v20q-tiktok:hover{border-color:#ff0050;color:#ff0050;background:rgba(255,0,80,.08)}
+/* TikTok Share Popup */
+.tiktok-share-overlay{position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:10000;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(4px)}
+.tiktok-share-popup{background:var(--panel-bg);border:1px solid var(--line);border-radius:20px;padding:32px;max-width:440px;width:90%;box-shadow:0 20px 60px rgba(0,0,0,.3);text-align:center;font-family:var(--font-body)}
+.tiktok-share-popup h3{font-family:'Manrope',sans-serif;font-weight:800;font-size:22px;color:var(--text);margin-bottom:6px}
+.tiktok-share-popup .tiktok-badge{display:inline-block;background:linear-gradient(135deg,#ff0050,#00f2ea);color:#fff;font-size:12px;font-weight:700;padding:4px 12px;border-radius:20px;margin-bottom:16px;letter-spacing:.5px}
+.tiktok-share-popup .tiktok-preview{background:var(--bg);border:2px solid var(--line);border-radius:14px;padding:20px;margin:16px 0;text-align:left;font-size:15px;color:var(--text);line-height:1.5;white-space:pre-wrap;word-break:break-word;min-height:60px}
+.tiktok-share-popup .tiktok-actions{display:flex;gap:10px;justify-content:center;flex-wrap:wrap}
+.tiktok-share-popup .tiktok-actions button{padding:10px 24px;border-radius:100px;font-weight:600;font-size:14px;cursor:pointer;transition:all .15s;font-family:var(--font-body);border:none}
+.tiktok-share-popup .btn-copy-post{background:var(--accent);color:#fff}
+.tiktok-share-popup .btn-copy-post:hover{background:var(--accent2)}
+.tiktok-share-popup .btn-close-popup{background:transparent;border:1px solid var(--line) !important;color:var(--muted)}
+.tiktok-share-popup .btn-close-popup:hover{background:rgba(128,128,128,.08)}
 /* Bookmarked line */
 .v20q-bookmarked{border-left:3px solid rgba(245,158,11,.5) !important}
 [data-mode="bookmark"] .v20q-bookmarked{border-left-color:#f59e0b !important;background:rgba(245,158,11,.06)}
@@ -8644,7 +8658,7 @@ window.fixExtrasPanelColors = function(){
     var time = v20q.timestamps[idx] || v20q_fmtTime(idx * 6);
     var isBm = v20q.bookmarks.indexOf(idx) !== -1;
     var bmCls = isBm ? ' v20q-bm-on' : '';
-    var actIcons = '<span class="v20q-act"><button class="v20q-copy" title="Copy" onclick="event.stopPropagation();v20q_copySentence('+idx+')"><i class="fa-regular fa-copy"></i></button><button class="v20q-del" title="Delete" onclick="event.stopPropagation();v20q_deleteSentence('+idx+')"><i class="fa-solid fa-trash"></i></button></span>';
+    var actIcons = '<span class="v20q-act"><button class="v20q-tiktok" title="Share to TikTok" onclick="event.stopPropagation();v20q_shareTikTok('+idx+')"><i class="fa-brands fa-tiktok"></i></button><button class="v20q-copy" title="Copy" onclick="event.stopPropagation();v20q_copySentence('+idx+')"><i class="fa-regular fa-copy"></i></button><button class="v20q-del" title="Delete" onclick="event.stopPropagation();v20q_deleteSentence('+idx+')"><i class="fa-solid fa-trash"></i></button></span>';
     var el = document.createElement('div');
     el.className = 'v20q-line' + (isBm ? ' v20q-bookmarked' : '');
     var style = v20q.style; // cap1..cap5
@@ -8723,6 +8737,37 @@ window.fixExtrasPanelColors = function(){
     });
   };
   // ── Copy sentence to clipboard ──
+  // ── TikTok Share ──
+  window.v20q_shareTikTok = function(idx){
+    var text = v20q.sentences[idx]; if (!text) return;
+    var overlay = document.createElement('div');
+    overlay.className = 'tiktok-share-overlay';
+    overlay.onclick = function(e){ if (e.target === overlay) overlay.remove(); };
+    overlay.innerHTML = '<div class="tiktok-share-popup">'+
+      '<div class="tiktok-badge"><i class="fa-brands fa-tiktok"></i> Share Kit</div>'+
+      '<h3>Post to TikTok</h3>'+
+      '<p style="color:var(--muted2);font-size:13px;margin-bottom:4px">Your subtitle moment is ready:</p>'+
+      '<div class="tiktok-preview">'+v20q_escapeHtml(text)+'</div>'+
+      '<div class="tiktok-actions">'+
+        '<button class="btn-copy-post" onclick="v20q_copyToClipboard(\''+v20q_escapeAttr(text)+'\', this)"><i class="fa-regular fa-copy"></i> Copy &amp; Open TikTok</button>'+
+        '<button class="btn-close-popup" onclick="this.closest(\'.tiktok-share-overlay\').remove()">Close</button>'+
+      '</div>'+
+    '</div>';
+    document.body.appendChild(overlay);
+  };
+  // ── Copy to clipboard helper ──
+  window.v20q_copyToClipboard = function(text, btn){
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(function(){
+        btn.innerHTML = '<i class="fa-solid fa-check"></i> Copied!';
+        setTimeout(function(){ btn.innerHTML = '<i class="fa-brands fa-tiktok"></i> Open TikTok'; }, 2000);
+        window.open('https://www.tiktok.com/upload?lang=en','_blank');
+      });
+    }
+  };
+  window.v20q_escapeHtml = function(s){ var d=document.createElement('div');d.textContent=s;return d.innerHTML; };
+  window.v20q_escapeAttr = function(s){ return s.replace(/'/g,"\\'").replace(/"/g,'&quot;').replace(/\\/g,'\\\\'); };
+
   window.v20q_copySentence = function(idx){
     var text = v20q.sentences[idx];
     if (!text) return;
