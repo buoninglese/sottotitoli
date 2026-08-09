@@ -177,6 +177,19 @@ body{
 /* Copied state */
 .tx-actions .copy-btn.copied{color:var(--good);border-color:rgba(34,197,94,.3);background:rgba(34,197,94,.08)}
 
+/* V20quint mode states */
+.tx-line.mode-edit{transition:all var(--ease)}.tx-line.mode-edit:hover{background:rgba(139,92,246,.04);border-left-color:#a78bfa}
+.tx-line.mode-collect{transition:all var(--ease)}.tx-line.mode-collect:hover{background:rgba(59,130,246,.04);border-left-color:#60a5fa}
+.tx-line.mode-bookmark{transition:all var(--ease)}.tx-line.mode-bookmark:hover{background:rgba(245,158,11,.04);border-left-color:var(--warn)}
+.tx-line.mode-pos{transition:all var(--ease)}.tx-line.mode-pos:hover{background:rgba(34,197,94,.04);border-left-color:var(--good)}
+/* POS tags */
+.pos-tag{display:inline-block;font-size:9px;font-weight:700;padding:1px 4px;border-radius:3px;margin:0 1px;vertical-align:super;line-height:1;position:relative;top:-4px}
+.pos-tag.noun{background:rgba(59,130,246,.15);color:#60a5fa}
+.pos-tag.verb{background:rgba(16,185,129,.15);color:#34d399}
+.pos-tag.adj{background:rgba(236,72,153,.15);color:#f472b6}
+.pos-tag.adv{background:rgba(139,92,246,.15);color:#a78bfa}
+.pos-tag.prep{background:rgba(245,158,11,.15);color:#fbbf24}
+
 /* ═══ CARDS ═══ */
 .card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:18px;transition:all var(--ease);position:relative;overflow:hidden;backdrop-filter:blur(12px)}
 .card::before{content:'';position:absolute;top:0;left:12px;right:12px;height:1px;background:var(--grad);opacity:0;transition:opacity var(--ease)}
@@ -360,11 +373,11 @@ body{
   <button class="palette-dot" onclick="showModal('Caption style cycled: cap1 → cap5')" title="Style"><i class="fa-solid fa-palette"></i></button>
 
   <div class="mode-bar" id="mb">
-    <button class="mode-btn active" data-mode="0" onclick="go(0)"><i class="fa-regular fa-eye"></i><span>View</span></button>
-    <button class="mode-btn" data-mode="1" onclick="go(1)"><i class="fa-solid fa-pen-to-square"></i><span>Edit</span></button>
-    <button class="mode-btn" data-mode="2" onclick="go(2)"><i class="fa-solid fa-book"></i><span>Save Words</span></button>
-    <button class="mode-btn" data-mode="3" onclick="go(3)"><i class="fa-regular fa-star"></i><span>Save Lines</span></button>
-    <button class="mode-btn" data-mode="4" onclick="go(4)"><i class="fa-solid fa-tags"></i><span>View POS</span></button>
+    <button class="mode-btn active" data-mode="view" onclick="setV20qMode('view',this)"><i class="fa-regular fa-eye"></i><span>View</span></button>
+    <button class="mode-btn" data-mode="edit" onclick="setV20qMode('edit',this)"><i class="fa-solid fa-pen-to-square"></i><span>Edit</span></button>
+    <button class="mode-btn" data-mode="collect" onclick="setV20qMode('collect',this)"><i class="fa-solid fa-book"></i><span>Save Words</span></button>
+    <button class="mode-btn" data-mode="bookmark" onclick="setV20qMode('bookmark',this)"><i class="fa-regular fa-star"></i><span>Save Lines</span></button>
+    <button class="mode-btn" data-mode="pos" onclick="setV20qMode('pos',this)"><i class="fa-solid fa-tags"></i><span>View POS</span></button>
   </div>
   <div class="slide-dots" id="sd">
     <button class="slide-dot active" onclick="go(0)"><i class="fa-solid fa-closed-captioning"></i><span>Captions</span></button>
@@ -468,11 +481,66 @@ body{
 
 <script>
 var cs=0,ps='',st=['CAPTIONS','VOCABULARY','WORD MEANING','GRAMMAR FIX','TOPICS'];
-var isBright=false;
+var isBright=false, v20qMode='view';
 
-function go(n){if(n===cs)return;var p=document.querySelectorAll('#ss .slide');p[cs].classList.remove('active');p[n].classList.add('active');cs=n;document.getElementById('st').textContent=st[n];document.querySelectorAll('#mb .mode-btn').forEach(function(b,i){b.classList.toggle('active',b.dataset.mode==n)});document.querySelectorAll('#sd .slide-dot').forEach(function(d,i){d.classList.toggle('active',i===n)})}
+function go(n){if(n===cs)return;var p=document.querySelectorAll('#ss .slide');p[cs].classList.remove('active');p[n].classList.add('active');cs=n;document.getElementById('st').textContent=st[n];document.querySelectorAll('#sd .slide-dot').forEach(function(d,i){d.classList.toggle('active',i===n)})}
 function setMode(m,b){b.parentElement.querySelectorAll('button').forEach(function(x){x.classList.remove('active')});b.classList.add('active');var tf=document.getElementById('tf');if(m==='translate'){tf.style.display='flex'}else{tf.style.display='none'}}
 function toggleFlagRow(){document.getElementById('flagRow').classList.toggle('open')}
+
+/* ── V20quint Mode Bar (changes transcript interaction, not slides) ── */
+function setV20qMode(mode,btn){
+  v20qMode=mode;
+  /* Update mode bar active state */
+  document.querySelectorAll('#mb .mode-btn').forEach(function(b){b.classList.toggle('active',b.dataset.mode===mode)});
+  /* Update the transcript container's data-mode attribute */
+  var tx=document.querySelector('.caption-transcript,.tx-box');
+  if(tx){tx.setAttribute('data-mode',mode)}
+  /* Show appropriate toast */
+  var msgs={view:'View mode — read-only transcript',edit:'Edit mode — click words to edit inline',collect:'Save Words mode — click words to add to Word Bank',bookmark:'Save Lines mode — click a line to bookmark it',pos:'View POS mode — part-of-speech tags shown on words'};
+  /* Briefly flash the mode name on the slide title */
+  var stEl=document.getElementById('st');var orig=stEl.textContent;
+  stEl.textContent=mode.toUpperCase()+' MODE';stEl.style.color='var(--pink)';
+  setTimeout(function(){stEl.textContent=st[cs];stEl.style.color=''},1200);
+
+  /* Visual feedback on transcript lines based on mode */
+  var lines=document.querySelectorAll('.tx-line');
+  lines.forEach(function(l){l.classList.remove('mode-edit','mode-collect','mode-bookmark','mode-pos')});
+  if(mode==='edit'){lines.forEach(function(l){l.classList.add('mode-edit');l.style.cursor='text'})}
+  else if(mode==='collect'){lines.forEach(function(l){l.classList.add('mode-collect');l.style.cursor='copy'})}
+  else if(mode==='bookmark'){
+    lines.forEach(function(l){l.classList.add('mode-bookmark');l.style.cursor='pointer';
+      l.onclick=function(e){if(e.target.closest('.tx-actions'))return;toggleBM(l.querySelector('.bm-btn'))}
+    })
+  }else if(mode==='pos'){
+    lines.forEach(function(l){l.classList.add('mode-pos')})
+    /* Show sample POS tags */
+    showPOSPreview();
+  }else{
+    lines.forEach(function(l){l.style.cursor='default';l.onclick=null});
+    hidePOSPreview();
+  }
+}
+
+function showPOSPreview(){
+  var tx=document.querySelector('.tx-box');if(!tx)return;
+  var words=tx.querySelectorAll('.tx-text');
+  words.forEach(function(w){
+    var html=w.innerHTML;
+    html=html.replace(/\b(rule|fight|club|shirt|shoe|guy|night)\b/gi,'<span class="pos-tag noun">$&</span>');
+    html=html.replace(/\b(talk|stop|go|have|yells)\b/gi,'<span class="pos-tag verb">$&</span>');
+    html=html.replace(/\b(first|second|third|fourth|fifth|sixth|seventh|eighth|final)\b/gi,'<span class="pos-tag adj">$&</span>');
+    html=html.replace(/\b(only|over|out|up|long|as)\b/gi,'<span class="pos-tag adv">$&</span>');
+    html=html.replace(/\b(of|to|at|in|for|on|about)\b/gi,'<span class="pos-tag prep">$&</span>');
+    w.innerHTML=html;
+  })
+}
+function hidePOSPreview(){
+  var tx=document.querySelector('.tx-box');if(!tx)return;
+  var words=tx.querySelectorAll('.tx-text');
+  words.forEach(function(w){
+    w.innerHTML=w.textContent;
+  })
+}
 
 /* ── Theme ── */
 function toggleTheme(){isBright=!isBright;var root=document.documentElement;root.className=isBright?'bright':'dark';var icon=document.querySelector('.tool-btn[title="Toggle theme"] i');icon.className=isBright?'fa-regular fa-moon':'fa-regular fa-sun'}
