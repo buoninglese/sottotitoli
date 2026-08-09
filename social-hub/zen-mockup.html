@@ -1,0 +1,227 @@
+<!doctype html><html lang="it">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>ZEN · Caption Studio</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@200;300;400;500&family=DM+Serif+Display:ital@0;1&family=JetBrains+Mono:wght@300;400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --washi:#f5f0e6;--washi2:#ede6d8;--clay:#8c7b6d;--clay2:#a89885;
+  --moss:#5a7a5a;--moss2:#6b8f6b;--stone:#d4c8b8;--ink:#2c2416;
+  --border:#e0d6c4;--border2:#d0c4b0;
+  --text:#3a3028;--text2:#5a4e40;--muted:#9a8c78;--muted2:#c0b4a0;
+  --font:'Inter',sans-serif;--display:'DM Serif Display',serif;--mono:'JetBrains Mono',monospace;
+  --good:#5a8a5a;--warn:#c4a050;--danger:#b05050;
+  --ease:cubic-bezier(.4,0,.2,1);
+}
+body{font-family:var(--font);font-size:15px;font-weight:300;color:var(--text);display:flex;flex-direction:column;height:100dvh;overflow:hidden;background:var(--washi);-webkit-font-smoothing:antialiased;letter-spacing:.01em}
+
+/* ═══ TOPBAR — minimal, asymmetric ═══ */
+.topbar{display:flex;align-items:baseline;justify-content:space-between;padding:20px 48px 16px;flex-shrink:0;z-index:100}
+.topbar-left{display:flex;align-items:baseline;gap:32px}
+.topbar-logo{font-family:var(--display);font-size:20px;color:var(--clay);line-height:1;font-style:italic}
+.topbar-back{font-size:12px;color:var(--muted2);cursor:pointer;display:flex;align-items:center;gap:8px;transition:color .4s;font-weight:300}
+.topbar-back:hover{color:var(--clay)}
+/* Mode — subtle underline */
+.mode-seg{display:flex;gap:28px}
+.mode-seg button{font-size:13px;font-weight:300;border:none;background:none;color:var(--muted2);cursor:pointer;transition:all .4s;padding:0 0 4px;border-bottom:1px solid transparent}
+.mode-seg button.active{color:var(--clay);border-bottom-color:var(--clay)}
+.mode-seg button:not(.active):hover{color:var(--clay)}
+.topbar-tools{display:flex;align-items:center;gap:16px}
+.topbar-tools button{width:28px;height:28px;border:none;background:none;color:var(--muted2);cursor:pointer;font-size:13px;display:flex;align-items:center;justify-content:center;transition:color .4s}
+.topbar-tools button:hover{color:var(--clay)}
+.user-dot{width:28px;height:28px;border-radius:50%;background:var(--clay2);cursor:pointer;transition:all .4s;opacity:.6}
+.user-dot:hover{opacity:1}
+
+/* ═══ APP — asymmetric, vast negative space ═══ */
+.app-main{flex:1;min-height:0;display:flex;position:relative;overflow:hidden;padding:0 48px}
+
+/* Mode bar — far left, wide spacing */
+.mode-rail{width:48px;flex-shrink:0;display:flex;flex-direction:column;align-items:flex-start;padding-top:40px;gap:20px;z-index:50}
+.mode-rail button{width:24px;height:24px;border:none;background:none;color:var(--muted2);cursor:pointer;font-size:11px;display:flex;align-items:center;justify-content:center;transition:all .4s;position:relative}
+.mode-rail button:hover{color:var(--clay)}
+.mode-rail button.active{color:var(--moss)}
+.mode-rail button.active::before{content:'';position:absolute;left:-10px;top:50%;width:20px;height:1px;background:var(--moss)}
+.mode-label{position:absolute;left:28px;top:50%;transform:translateY(-50%);font-size:11px;font-weight:300;color:var(--clay);white-space:nowrap;pointer-events:none;opacity:0;transition:opacity .4s;letter-spacing:.03em}
+.mode-rail button:hover .mode-label{opacity:1}
+
+.slide-area{flex:1;min-width:0;position:relative}
+.slide-title{position:absolute;top:32px;left:60px;font-family:var(--display);font-size:11px;font-style:italic;color:var(--muted2);z-index:50;letter-spacing:.04em}
+.slide-nav{position:absolute;right:0;top:50%;transform:translateY(-50%);display:flex;flex-direction:column;gap:16px;z-index:50;align-items:flex-end}
+.slide-nav button{width:auto;padding:4px 0;border:none;background:none;color:var(--muted2);cursor:pointer;font-size:9px;font-family:var(--font);font-weight:300;display:flex;align-items:center;gap:8px;transition:all .4s;text-transform:uppercase;letter-spacing:.08em}
+.slide-nav button i{font-size:10px;width:16px;text-align:center}
+.slide-nav button:hover{color:var(--clay)}
+.slide-nav button.active{color:var(--moss);font-weight:400}
+.slide-nav button.active::after{content:'';width:8px;height:1px;background:var(--moss)}
+
+.slide-stage{position:absolute;inset:60px 72px 0 100px;overflow:hidden}
+.slide{position:absolute;inset:0;display:none;overflow-y:auto;scrollbar-width:thin;scrollbar-color:var(--border) transparent}
+.slide::-webkit-scrollbar{width:3px}.slide::-webkit-scrollbar-thumb{background:var(--border)}
+.slide.active{display:block;animation:zenIn .6s var(--ease)}
+@keyframes zenIn{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
+
+/* ═══ TRANSCRIPT — centered, breathy ═══ */
+.tx-box{max-width:560px;margin:0 auto;padding:32px 0;display:flex;flex-direction:column;gap:28px}
+.tx-line{text-align:left;padding:0;transition:all .5s;position:relative}
+.tx-line:hover{transform:translateX(6px)}
+.tx-time{display:block;font-family:var(--mono);font-size:9px;color:var(--muted2);margin-bottom:6px;letter-spacing:.06em;font-weight:300}
+.tx-text{display:block;font-family:var(--display);font-size:20px;color:var(--text);line-height:1.55;font-weight:400;font-style:italic}
+.tx-actions{display:flex;gap:12px;margin-top:6px;opacity:0;transition:opacity .4s}
+.tx-line:hover .tx-actions{opacity:1}
+.tx-actions button{width:22px;height:22px;border:none;background:none;color:var(--muted2);cursor:pointer;font-size:9px;display:flex;align-items:center;justify-content:center;transition:color .4s}
+.tx-actions button:hover{color:var(--moss)}
+
+/* Cards */
+.slide-inner{max-width:580px;margin:32px auto 0;padding:0}
+.card{background:var(--washi2);padding:28px;margin-bottom:20px;border:1px solid var(--border2)}
+.card-title{font-family:var(--display);font-size:11px;font-style:italic;color:var(--clay);margin-bottom:16px;letter-spacing:.04em}
+.m-row{display:flex;align-items:center;gap:16px;padding:5px 0}
+.m-row .ml{font-size:12px;color:var(--muted);min-width:64px;font-weight:300}
+.m-row .mb{flex:1;height:4px;background:var(--stone)}
+.m-row .mbf{height:100%;background:var(--moss)}
+.m-row .mv{font-family:var(--mono);font-size:10px;color:var(--text2);min-width:28px;text-align:right;font-weight:300}
+.pos-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:3px 0}
+.pos-dot{width:5px;height:5px;flex-shrink:0;border-radius:50%}
+.pos-label{font-size:11px;font-weight:400;min-width:40px;color:var(--clay)}
+.pos-chip{padding:2px 8px;border:1px solid var(--border);font-size:10px;color:var(--text2);background:var(--washi);font-weight:300}
+.wc{background:var(--washi);border:1px solid var(--border);padding:18px 22px;margin-bottom:10px;transition:all .4s}
+.wc:hover{border-color:var(--clay)}
+.wc .w{font-family:var(--display);font-weight:400;font-size:18px;color:var(--text);font-style:italic}
+.wc .p{font-size:9px;color:var(--muted2);margin-left:8px;font-weight:300}
+.wc .d{font-size:13px;color:var(--muted);margin-top:6px;line-height:1.6;font-weight:300}
+.gb{padding:16px 20px;margin-bottom:8px;font-size:14px;line-height:1.6;font-weight:300}
+.gb.orig{background:rgba(176,80,80,.04);border-left:2px solid var(--danger);color:var(--muted);font-style:italic}
+.gb.corr{background:rgba(90,138,90,.04);border-left:2px solid var(--good);color:var(--text2)}
+.gb .err{text-decoration:line-through;color:var(--danger)}
+.gb .fix{color:var(--good)}
+.tp{display:inline-block;padding:3px 10px;border:1px solid var(--border);font-size:9px;font-weight:300;margin:3px;cursor:pointer;transition:all .4s;background:var(--washi);letter-spacing:.04em}
+.tp:hover{border-color:var(--clay);color:var(--clay)}
+.sb{background:var(--washi2);border:1px solid var(--border2);padding:12px;min-height:80px}
+.sb .sl{display:flex;align-items:baseline;gap:10px;padding:5px 8px;font-size:12px;color:var(--muted);cursor:pointer;transition:all .3s;font-weight:300;font-style:italic}
+.sb .sl:hover{color:var(--text)}
+.sb .sl .ts{font-family:var(--mono);font-size:8px;color:var(--muted2);min-width:36px;text-align:right;font-weight:300}
+.split{display:flex;gap:20px;width:100%}.split-main{flex:2}.split-side{flex:1}
+
+/* ═══ BOTTOM BAR — minimal ═══ */
+.zazen-bar{flex-shrink:0;padding:20px 48px;display:flex;align-items:center;gap:24px;border-top:1px solid var(--border);z-index:100}
+.zazen-live{flex:1;display:flex;align-items:center;gap:14px}
+.zazen-dot{width:5px;height:5px;background:var(--moss);border-radius:50%;animation:zpulse 3s infinite}
+@keyframes zpulse{0%,100%{opacity:.2}50%{opacity:.8}}
+.zazen-text{font-family:var(--display);font-size:20px;font-weight:400;color:var(--text);font-style:italic}
+.zazen-text .ph{color:var(--muted2)}
+.zazen-timer{font-family:var(--mono);font-size:12px;color:var(--muted2);flex-shrink:0;font-weight:300}
+.zazen-btns{display:flex;gap:14px;flex-shrink:0}
+.zazen-btns button{width:30px;height:30px;border:none;background:none;color:var(--muted2);cursor:pointer;font-size:11px;display:flex;align-items:center;justify-content:center;transition:color .4s}
+.zazen-btns button:hover{color:var(--moss)}
+.zazen-btns button.rec{color:var(--moss)}
+</style></head>
+<body>
+
+<header class="topbar">
+<div class="topbar-left">
+  <span class="topbar-logo">sottotitoli</span>
+  <span class="topbar-back" onclick="alert('Dashboard')"><i class="fa-solid fa-arrow-left"></i> back</span>
+  <div class="mode-seg">
+    <button class="active" onclick="setM(this,'caption')">caption</button>
+    <button onclick="setM(this,'translate')">translate</button>
+  </div>
+</div>
+<div class="topbar-tools">
+  <button title="light"><i class="fa-regular fa-moon"></i></button>
+  <button title="breath"><i class="fa-regular fa-clock"></i></button>
+  <div class="user-dot" title="you"></div>
+</div>
+</header>
+
+<div class="app-main">
+<div class="mode-rail" id="mb">
+  <button class="active" data-mode="view" onclick="setMode('view',this)"><i class="fa-regular fa-eye"></i><span class="mode-label">observe</span></button>
+  <button data-mode="edit" onclick="setMode('edit',this)"><i class="fa-solid fa-pen-to-square"></i><span class="mode-label">edit</span></button>
+  <button data-mode="collect" onclick="setMode('collect',this)"><i class="fa-solid fa-book"></i><span class="mode-label">collect</span></button>
+  <button data-mode="bookmark" onclick="setMode('bookmark',this)"><i class="fa-regular fa-star"></i><span class="mode-label">mark</span></button>
+  <button data-mode="pos" onclick="setMode('pos',this)"><i class="fa-solid fa-tags"></i><span class="mode-label">tag</span></button>
+</div>
+
+<div class="slide-area">
+<div class="slide-title" id="st">captions</div>
+<div class="slide-nav" id="sd">
+  <button class="active" onclick="go(0)"><i class="fa-solid fa-closed-captioning"></i>captions</button>
+  <button onclick="go(1)"><i class="fa-solid fa-book"></i>vocab</button>
+  <button onclick="go(2)"><i class="fa-solid fa-magnifying-glass"></i>words</button>
+  <button onclick="go(3)"><i class="fa-solid fa-spell-check"></i>grammar</button>
+  <button onclick="go(4)"><i class="fa-solid fa-tags"></i>topics</button>
+</div>
+
+<div class="slide-stage" id="ss">
+<div class="slide active" data-slide="0"><div class="tx-box">
+<div class="tx-line"><span class="tx-time">00:04</span><span class="tx-text">The first rule of Fight Club is: you do not talk about Fight Club.</span><span class="tx-actions"><button title="clip"><i class="fa-brands fa-tiktok"></i></button><button title="copy"><i class="fa-regular fa-copy"></i></button><button title="mark"><i class="fa-regular fa-star"></i></button></span></div>
+<div class="tx-line"><span class="tx-time">00:12</span><span class="tx-text">The second rule of Fight Club is: you DO NOT talk about Fight Club.</span><span class="tx-actions"><button title="clip"><i class="fa-brands fa-tiktok"></i></button><button title="copy"><i class="fa-regular fa-copy"></i></button><button title="mark"><i class="fa-regular fa-star"></i></button></span></div>
+<div class="tx-line"><span class="tx-time">00:23</span><span class="tx-text">Third rule: someone yells stop, goes limp, taps out, the fight is over.</span><span class="tx-actions"><button title="clip"><i class="fa-brands fa-tiktok"></i></button><button title="copy"><i class="fa-regular fa-copy"></i></button><button title="mark"><i class="fa-regular fa-star"></i></button></span></div>
+<div class="tx-line"><span class="tx-time">00:32</span><span class="tx-text">Fourth rule: only two guys to a fight. Fifth rule: one fight at a time.</span><span class="tx-actions"><button title="clip"><i class="fa-brands fa-tiktok"></i></button><button title="copy"><i class="fa-regular fa-copy"></i></button><button title="mark"><i class="fa-regular fa-star"></i></button></span></div>
+<div class="tx-line"><span class="tx-time">00:44</span><span class="tx-text">Sixth rule: no shirts, no shoes. Seventh rule: fights go on as long as they have to.</span><span class="tx-actions"><button title="clip"><i class="fa-brands fa-tiktok"></i></button><button title="copy"><i class="fa-regular fa-copy"></i></button><button title="mark"><i class="fa-regular fa-star"></i></button></span></div>
+<div class="tx-line"><span class="tx-time">00:58</span><span class="tx-text">And the eighth and final rule: if this is your first night at Fight Club, you have to fight.</span><span class="tx-actions"><button title="clip"><i class="fa-brands fa-tiktok"></i></button><button title="copy"><i class="fa-regular fa-copy"></i></button><button title="mark"><i class="fa-regular fa-star"></i></button></span></div>
+</div></div>
+
+<div class="slide" data-slide="1"><div class="slide-inner"><div class="split"><div class="split-main"><div class="card"><div class="card-title">parts of speech</div>
+<div class="pos-row"><span class="pos-dot" style="background:#7a9eb8"></span><span class="pos-label">nouns</span><span class="pos-chip">rule×3</span><span class="pos-chip">fight×6</span><span class="pos-chip">club×3</span></div>
+<div class="pos-row"><span class="pos-dot" style="background:#7aaa7a"></span><span class="pos-label">verbs</span><span class="pos-chip">talk×3</span><span class="pos-chip">stop</span><span class="pos-chip">go</span></div>
+<div class="pos-row"><span class="pos-dot" style="background:#c48878"></span><span class="pos-label">adj</span><span class="pos-chip">first</span><span class="pos-chip">second</span><span class="pos-chip">third</span></div>
+</div></div><div class="split-side"><div class="card"><div class="card-title">cefr levels</div>
+<div class="m-row"><span class="ml">c2 mastery</span><span class="mb"><span class="mbf" style="width:8%"></span></span><span class="mv">8%</span></div>
+<div class="m-row"><span class="ml">c1 advanced</span><span class="mb"><span class="mbf" style="width:14%"></span></span><span class="mv">14%</span></div>
+<div class="m-row"><span class="ml">b2 upper-int</span><span class="mb"><span class="mbf" style="width:24%"></span></span><span class="mv">24%</span></div>
+<div class="m-row"><span class="ml">b1 interm</span><span class="mb"><span class="mbf" style="width:28%"></span></span><span class="mv">28%</span></div>
+<div class="m-row"><span class="ml">a2 elem</span><span class="mb"><span class="mbf" style="width:18%"></span></span><span class="mv">18%</span></div>
+<div class="m-row"><span class="ml">a1 begin</span><span class="mb"><span class="mbf" style="width:8%"></span></span><span class="mv">8%</span></div>
+</div></div></div></div></div>
+
+<div class="slide" data-slide="2"><div class="slide-inner"><div class="split"><div class="split-main"><div class="card"><div class="card-title">word bank</div>
+<div class="wc"><span class="w">fight</span><span class="p">verb / noun</span><div class="d">To take part in a violent struggle involving physical force.</div></div>
+<div class="wc"><span class="w">rule</span><span class="p">noun</span><div class="d">An authoritative principle set by a governing body.</div></div>
+<div class="wc"><span class="w">limp</span><span class="p">verb / adj</span><div class="d">Walk with difficulty; lacking firmness.</div></div>
+</div></div><div class="split-side"><div class="sb"><div class="card-title">session lines</div>
+<div class="sl"><span class="ts">00:04</span>you do not talk about Fight Club</div>
+<div class="sl"><span class="ts">00:12</span>you DO NOT talk about Fight Club</div>
+<div class="sl"><span class="ts">00:23</span>someone yells stop, goes limp</div>
+<div class="sl"><span class="ts">00:32</span>only two guys to a fight</div>
+</div></div></div></div></div>
+
+<div class="slide" data-slide="3"><div class="slide-inner"><div class="split"><div class="split-main"><div class="card"><div class="card-title">grammar correction</div>
+<div class="gb orig">The first rule of Fight Club <span class="err">are</span> you do not talk about Fight Club</div>
+<div class="gb corr">The first rule of Fight Club <span class="fix">is</span>: you do not talk about Fight Club.</div>
+<div style="margin-top:10px;font-size:12px;color:var(--muted);font-weight:300;font-style:italic">Subject-verb agreement. "Rule" is singular.</div>
+</div></div><div class="split-side"><div class="sb"><div class="card-title">error log</div>
+<div class="sl"><span style="color:var(--danger)">are</span> → <span style="color:var(--good)">is</span></div>
+<div style="padding:12px;text-align:center;color:var(--muted2);font-size:11px;font-weight:300">1 error</div>
+</div></div></div></div></div>
+
+<div class="slide" data-slide="4"><div class="slide-inner"><div class="split"><div class="split-main"><div class="card"><div class="card-title">topics</div>
+<div style="display:flex;flex-wrap:wrap;gap:4px"><span class="tp">Rules & Order</span><span class="tp">Fighting</span><span class="tp">Identity</span><span class="tp">Community</span><span class="tp">Initiation</span><span class="tp">Discipline</span><span class="tp">Masculinity</span></div>
+<div style="margin-top:12px;font-size:12px;color:var(--muted);line-height:1.6;font-weight:300;font-style:italic">Dominant: Rules & Order — 8 references across 6 lines.</div>
+</div></div><div class="split-side"><div class="sb"><div class="card-title">key lines</div>
+<div class="sl"><span class="ts">00:04</span>first rule of Fight Club</div>
+<div class="sl"><span class="ts">00:12</span>second rule of Fight Club</div>
+<div class="sl"><span class="ts">00:50</span>no shirts, no shoes</div>
+</div></div></div></div></div>
+</div></div></div>
+
+<div class="zazen-bar">
+<div class="zazen-live">
+  <span class="zazen-dot"></span>
+  <span class="zazen-text"><span class="ph">speak to see your words…</span></span>
+</div>
+<span class="zazen-timer">12:34</span>
+<div class="zazen-btns">
+  <button class="rec" title="begin"><i class="fa-solid fa-circle"></i></button>
+  <button title="pause"><i class="fa-solid fa-pause"></i></button>
+  <button title="end"><i class="fa-solid fa-square"></i></button>
+</div>
+</div>
+
+<script>
+var cs=0,st=['captions','vocabulary','word meanings','grammar fix','topics'];
+function go(n){if(n===cs)return;document.querySelectorAll('#ss .slide')[cs].classList.remove('active');document.querySelectorAll('#ss .slide')[n].classList.add('active');cs=n;document.getElementById('st').textContent=st[n];document.querySelectorAll('#sd button').forEach(function(d,i){d.classList.toggle('active',i===n)})}
+function setM(b,m){b.parentElement.querySelectorAll('button').forEach(function(x){x.classList.remove('active')});b.classList.add('active')}
+function setMode(m,btn){document.querySelectorAll('#mb button').forEach(function(b){b.classList.toggle('active',b.dataset.mode===m)})}
+</script>
+</body></html>
