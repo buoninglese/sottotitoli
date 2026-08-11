@@ -174,6 +174,32 @@ async function preloadAllPanels() {
     var panelEl = wrap.querySelector('.content-panel');
     if (panelEl) panelEl.classList.add('active');
 
+    // ── Wire subtab onclick handlers (replaces theme-2.js delegated handler) ──
+    var subtabs = wrap.querySelectorAll('.tab-link[data-subtab]');
+    for (var j = 0; j < subtabs.length; j++) {
+      subtabs[j].onclick = function () {
+        var tab = this;
+        var parentPanel = tab.closest('.content-panel');
+        if (!parentPanel) return;
+        var subId = tab.getAttribute('data-subtab');
+        // Deactivate all tabs in this panel
+        parentPanel.querySelectorAll('.tab-link').forEach(function (t) {
+          t.classList.remove('active');
+          t.setAttribute('aria-selected', 'false');
+        });
+        // Activate clicked tab
+        tab.classList.add('active');
+        tab.setAttribute('aria-selected', 'true');
+        // Show target pane, hide others
+        parentPanel.querySelectorAll('.subtab-pane').forEach(function (p) {
+          p.classList.remove('active');
+        });
+        var target = document.getElementById('sub-' + subId);
+        if (target) target.classList.add('active');
+        return false;
+      };
+    }
+
     // Init
     if (entry.module.init) {
       try { await entry.module.init(); } catch (e) { console.error('init error for', name, ':', e); }
