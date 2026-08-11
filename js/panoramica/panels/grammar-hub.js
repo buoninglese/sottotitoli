@@ -464,5 +464,10 @@ export async function render(parentEl) {
 `;
 }
 
-export async function init() {}
+export async function init() {
+  // Grammar Hub is a static content panel with inline event handlers.
+  // The intervention timeline, phase cards, and accordion toggles are
+  // self-contained in the template HTML. No dynamic data loading needed yet.
+  // Future: wire up Supabase grammar_errors table for real error data.
+}
 export function destroy() { container = null; }

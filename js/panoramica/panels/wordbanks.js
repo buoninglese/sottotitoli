@@ -633,131 +633,46 @@ export async function render(parentEl) {
 }
 
 export async function init() {
-  // Tab switching
-  var tabs = document.getElementById('wbTabs');
-  if (tabs) {
-    tabs.addEventListener('click', function(e) {
-      var btn = e.target.closest('.wb-tab-btn');
-      if (!btn) return;
-      tabs.querySelectorAll('.wb-tab-btn').forEach(function(b) {
-        b.style.background = b === btn ? 'var(--cyan)' : 'var(--card)';
-        b.style.color = b === btn ? '#fff' : 'var(--text-soft)';
-        b.style.border = b === btn ? 'none' : '1px solid var(--line)';
-      });
-      loadBanks(btn.getAttribute('data-tab'));
-    });
-  }
+  // Sub-tab switching is handled by theme-2.js (data-subtab attributes).
+  // Data loading is handled by inline scripts injected by app.js.
+  // Word bank create/import dialogs are handled by inline scripts.
+  // This init() sets up any module-specific behaviors not covered by the scripts.
 
-  // Create bank button
-  var createBtn = document.getElementById('wbCreateBtn');
-  if (createBtn) createBtn.addEventListener('click', showCreateBankDialog);
-
-  // Import button delegated
+  // Populate full library section with loaded banks when sub-tab switches to overview
   document.addEventListener('click', function(e) {
-    var btn = e.target.closest('#wbImportBtn');
-    if (!btn) return;
-    var input = document.createElement('input');
-    input.type = 'file'; input.accept = '.pdf,.docx,.txt';
-    input.onchange = function() { if (this.files[0]) importBankFile(this.files[0]); };
-    input.click();
+    var tab = e.target.closest('.tab-link[data-subtab="wb-overview-panel"]');
+    if (!tab) return;
+    // Trigger English load if not already loaded
+    if (window.SottotitoliData && window.SottotitoliData.getWordbanks) {
+      window.SottotitoliData.getWordbanks('en').then(function(banks) {
+        populateFullLibrary(banks);
+        populatePinnedGrid(banks);
+      }).catch(function(){});
+    }
   });
-
-  // Initial load
-  loadBanks('overview');
 }
 
 export function destroy() { container = null; }
 
-async function loadBanks(tab) {
-  tab = tab || 'overview';
-  var sb = window.sottotitoliSupabase;
-  var content = document.getElementById('wbContent');
-  if (!sb) { if (content) content.innerHTML = '<p style="text-align:center;color:var(--text-faint);padding:60px">Accedi per visualizzare le banche.</p>'; return; }
-  try {
-    var resp = await sb.from('user_wordbanks').select('id, name, lang, created_at').order('created_at', { ascending: false });
-    if (resp.error) throw resp.error;
-    var banks = resp.data || [];
-    if (tab === 'overview') renderBankOverview(banks);
-    else {
-      var filtered = banks.filter(function(b) { return tab === 'english' ? (b.lang||'').toLowerCase().indexOf('en')!==-1 : tab === 'italian' ? (b.lang||'').toLowerCase().indexOf('it')!==-1 : true; });
-      renderBankList(filtered, tab === 'review');
-    }
-  } catch(e) { console.error('Wordbanks:', e); if (content) content.innerHTML = '<p style="text-align:center;color:var(--text-faint);padding:60px">Errore nel caricamento.</p>'; }
-}
-
-function renderBankOverview(banks) {
-  var content = document.getElementById('wbContent');
-  if (!content) return;
-  if (!banks.length) { content.innerHTML = '<p style="text-align:center;color:var(--text-faint);padding:60px">Nessuna banca. Crea la tua prima banca!</p>'; return; }
-  content.innerHTML = '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:16px">' +
-    banks.map(function(b) {
-      return '<div class="wb-card" data-id="' + b.id + '" style="background:var(--card);border:1px solid var(--line);border-radius:14px;padding:18px;cursor:pointer;transition:border-color .15s" onmouseover="this.style.borderColor=\'var(--cyan)\'" onmouseout="this.style.borderColor=\'var(--line)\'">' +
-        '<strong style="color:var(--text);font-size:15px">' + esc(b.name) + '</strong>' +
-        '<div style="display:flex;gap:12px;margin-top:8px;font-size:12px;color:var(--text-soft)">' +
-        '<span style="padding:2px 10px;border-radius:99px;background:rgba(6,182,212,.1);color:var(--cyan);font-size:10px;font-weight:700">' + esc(b.lang||'—') + '</span>' +
-        '<span>' + (b.created_at?new Date(b.created_at).toLocaleDateString('it-IT'):'') + '</span></div></div>';
-    }).join('') + '</div>';
-
-  // Bank card click → view words
-  content.addEventListener('click', function(e) {
-    var card = e.target.closest('.wb-card');
-    if (!card) return;
-    viewBankWords(card.getAttribute('data-id'));
-  });
-}
-
-function renderBankList(banks, isReview) {
-  var content = document.getElementById('wbContent');
-  if (!content) return;
-  if (isReview) { content.innerHTML = '<p style="text-align:center;color:var(--text-faint);padding:60px">Da ripassare — in arrivo.</p>'; return; }
-  if (!banks.length) { content.innerHTML = '<p style="text-align:center;color:var(--text-faint);padding:60px">Nessuna banca in questa lingua.</p>'; return; }
-  content.innerHTML = banks.map(function(b) {
-    return '<div class="wb-card" data-id="' + b.id + '" style="background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px 18px;margin-bottom:8px;display:flex;align-items:center;justify-content:space-between;cursor:pointer" onmouseover="this.style.borderColor=\'var(--cyan)\'" onmouseout="this.style.borderColor=\'var(--line)\'">' +
-      '<strong style="color:var(--text)">' + esc(b.name) + '</strong>' +
-      '<span style="font-size:11px;color:var(--text-faint)">' + esc(b.lang||'') + '</span></div>';
+function populateFullLibrary(banks) {
+  var lib = document.getElementById('wbFullLibrary');
+  if (!lib || !banks || !banks.length) return;
+  lib.innerHTML = banks.slice(0, 12).map(function(b) {
+    return '<div class="wb-lib-row wb-lib-divider" onclick="if(window.wbOpenBank)wbOpenBank(\'' + b.id + '\')">' +
+      '<div style="display:flex;align-items:center;gap:16px"><span class="wb-lib-dot" style="background:#059669"></span>' +
+      '<span class="wb-lib-name">' + (b.name || 'Bank') + '</span></div>' +
+      '<span class="wb-lib-count">' + (b.word_count || 0) + ' parole</span></div>';
   }).join('');
 }
 
-async function viewBankWords(bankId) {
-  var sb = window.sottotitoliSupabase;
-  if (!sb) return;
-  try {
-    var resp = await sb.from('user_wordbank_words').select('word, pos, cefr_level, added_at').eq('wordbank_id', bankId).order('added_at',{ascending:false}).limit(200);
-    var words = resp.data || [];
-    var modal = document.createElement('div');
-    modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:100000;display:flex;align-items:center;justify-content:center;padding:20px';
-    modal.innerHTML = '<div style="background:var(--card);border-radius:16px;padding:24px;max-width:600px;width:100%;max-height:80vh;overflow-y:auto;box-shadow:0 8px 40px rgba(0,0,0,.3)">' +
-      '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px"><h3 style="margin:0;font-family:Manrope,sans-serif">Parole</h3><button style="background:none;border:none;font-size:24px;cursor:pointer;color:var(--text-dim)">&times;</button></div>' +
-      (words.length ? words.map(function(w) { return '<div style="display:flex;justify-content:space-between;padding:8px 12px;border-bottom:1px solid var(--line);font-size:13px"><span style="font-weight:600;color:var(--text)">' + esc(w.word) + '</span><span style="color:var(--text-soft);font-size:11px">' + esc(w.pos||'') + (w.cefr_level?' · '+w.cefr_level:'') + '</span></div>'; }).join('') : '<p style="text-align:center;color:var(--text-faint);padding:40px">Nessuna parola.</p>') + '</div>';
-    modal.addEventListener('click', function(e) { if (e.target===modal||e.target.closest('button')) modal.remove(); });
-    document.body.appendChild(modal);
-  } catch(e) { console.error('View bank:', e); }
+function populatePinnedGrid(banks) {
+  var grid = document.getElementById('wbPinnedGrid');
+  if (!grid || !banks || !banks.length) return;
+  var sample = banks.slice(0, 4);
+  grid.innerHTML = sample.map(function(b) {
+    return '<div class="wb-pin-card" onclick="if(window.wbOpenBank)wbOpenBank(\'' + b.id + '\')">' +
+      '<div class="wb-pin-icon"><span class="material-symbols-outlined">menu_book</span></div>' +
+      '<div class="wb-pin-name">' + (b.name || 'Bank') + '</div>' +
+      '<div class="wb-pin-sub">' + (b.word_count || 0) + ' parole</div></div>';
+  }).join('');
 }
-
-function showCreateBankDialog() {
-  var modal = document.createElement('div');
-  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:100000;display:flex;align-items:center;justify-content:center;padding:20px';
-  modal.innerHTML = '<div style="background:var(--card);border-radius:16px;padding:24px;max-width:420px;width:100%;box-shadow:0 8px 40px rgba(0,0,0,.3)">' +
-    '<h3 style="margin:0 0 16px;font-family:Manrope,sans-serif;font-size:18px;color:var(--text)">Nuova Banca Parole</h3>' +
-    '<input id="wbNewName" placeholder="Nome banca" style="width:100%;padding:10px 14px;border:1px solid var(--line);border-radius:10px;background:var(--bg);color:var(--text);font-size:14px;font-family:inherit;margin-bottom:12px;box-sizing:border-box">' +
-    '<select id="wbNewLang" style="width:100%;padding:10px 14px;border:1px solid var(--line);border-radius:10px;background:var(--bg);color:var(--text);font-size:14px;font-family:inherit;margin-bottom:16px;box-sizing:border-box"><option value="en">English</option><option value="it">Italiano</option></select>' +
-    '<div style="display:flex;gap:8px;justify-content:flex-end"><button id="wbNewCancel" style="padding:10px 20px;border:1px solid var(--line);border-radius:100px;background:var(--card);color:var(--text-soft);font-size:13px;font-weight:600;cursor:pointer">Annulla</button><button id="wbNewConfirm" style="padding:10px 24px;background:var(--cyan);color:#fff;border:none;border-radius:100px;font-size:13px;font-weight:700;cursor:pointer">Crea</button></div></div>';
-  modal.addEventListener('click', function(e) { if (e.target===modal) modal.remove(); });
-  modal.querySelector('#wbNewCancel').addEventListener('click', function() { modal.remove(); });
-  modal.querySelector('#wbNewConfirm').addEventListener('click', async function() {
-    var name = document.getElementById('wbNewName').value.trim();
-    var lang = document.getElementById('wbNewLang').value;
-    if (!name) return;
-    var sb = window.sottotitoliSupabase;
-    if (!sb) { modal.remove(); return; }
-    try {
-      var userResp = await sb.auth.getUser();
-      await sb.from('user_wordbanks').insert({ name: name, lang: lang, user_id: userResp.data.user.id });
-      modal.remove();
-      loadBanks('overview');
-    } catch(e) { alert('Errore: ' + e.message); }
-  });
-  document.body.appendChild(modal);
-}
-
-function esc(s) { return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
