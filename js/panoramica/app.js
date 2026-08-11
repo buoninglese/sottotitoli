@@ -93,32 +93,16 @@ function switchPanel(name) {
   emit('panel:switch', { from: previousPanel, to: name });
 }
 
-// ── Hash-based routing ──
+// ── Hash-based routing (native browser behavior — no JS click handlers needed) ──
+// Sidebar links use href="#panelname". The browser updates the URL hash on click.
+// hashchange event calls switchPanel(). No onclick, no return false, no addEventListener.
 function handleHash() {
-  var hash = window.location.hash.replace('#', '');
-  // Map old hash patterns to panel names
-  var hashMap = {
-    'report-ai': 'report-ai',
-    'impostazioni': 'impostazioni',
-    'aiuto': 'aiuto',
-    'profilo': 'profilo'
-  };
-  var panel = hashMap[hash] || hash;
-  if (panels[panel]) {
-    switchPanel(panel);
-  }
+  var hash = window.location.hash.replace('#', '') || 'panoramica';
+  switchPanel(hash);
 }
 
-// ── Set up sidebar navigation (onclick property — simplest possible, works everywhere) ──
-function setupNavigation() {
-  var links = document.querySelectorAll('.sidebar-link[data-panel]');
-  for (var i = 0; i < links.length; i++) {
-    links[i].onclick = function () {
-      switchPanel(this.getAttribute('data-panel'));
-      return false;
-    };
-  }
-}
+// ── No setupNavigation() needed. Sidebar links are plain <a href="#panel">.
+// The browser's native link behavior drives everything via hashchange.
 
 // ── Set up user dropdown panel links ──
 function setupDropdownLinks() {
@@ -295,9 +279,8 @@ async function init() {
   // Sync window globals to shared store
   syncWindowGlobals();
 
-  // Set up navigation
-  setupNavigation();
-  setupDropdownLinks();
+  // ── Listen for hash changes BEFORE any routing (native browser link behavior) ──
+  window.addEventListener('hashchange', handleHash);
 
   // ── Preload ALL panels (no lazy loading — everything renders upfront) ──
   await preloadAllPanels();
@@ -310,13 +293,8 @@ async function init() {
     mp.classList.add('js-ready');
   }
 
-  // Route to initial panel
-  var hash = window.location.hash.replace('#', '');
-  var initialPanel = hash && panels[hash] ? hash : 'panoramica';
-  switchPanel(initialPanel);
-
-  // Listen for hash changes
-  window.addEventListener('hashchange', handleHash);
+  // Route to initial panel (hashchange listener already registered)
+  handleHash();
 
   // Listen for i18n changes to update panels
   window.addEventListener('i18n-changed', function (e) {
