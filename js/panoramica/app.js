@@ -308,7 +308,9 @@ async function init() {
   // ── Preload ALL panels (no lazy loading — everything renders upfront) ──
   await preloadAllPanels();
 
-  // Show the main panel (hide loading spinner, show content)
+  // Hide loading screen (multiple methods for reliability)
+  var loader = document.getElementById('pageLoader');
+  if (loader) loader.style.display = 'none';
   if (mp) {
     mp.classList.remove('js-loading');
     mp.classList.add('js-ready');
