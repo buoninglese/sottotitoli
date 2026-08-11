@@ -1,77 +1,178 @@
 // js/panoramica/panels/dashboard.js — Panoramica (Dashboard) panel
-// Hero banner + metric cards + 14-day chart
-
-import { escapeHtml } from '../shared/dom.js';
+// Full original HTML extracted from panoramica-v1.html
 import { getSupabase } from '../shared/supabase.js';
-import { formatDate, formatNumber } from '../shared/formatters.js';
-import { store } from '../shared/state.js';
-import { emit } from '../shared/events.js';
+import { formatNumber } from '../shared/formatters.js';
+import { emit, on } from '../shared/events.js';
 
 var container = null;
 var initialized = false;
 
 export async function render(parentEl) {
   container = parentEl;
-  container.innerHTML = `
-    <div class="content-panel active" id="pnl-panoramica">
-      <section class="panel-head"><h2>Panoramica</h2></section>
-
-      <!-- Hero Banner -->
-      <div class="hero-glass-card" style="background:linear-gradient(135deg,rgba(6,182,212,.06),rgba(168,85,247,.04));border:1px solid var(--line);border-radius:20px;padding:32px 36px;margin-bottom:24px;position:relative;overflow:hidden">
-        <div style="display:flex;align-items:center;gap:20px;flex-wrap:wrap">
-          <div style="flex:1;min-width:200px">
-            <h2 style="font-size:32px;font-weight:800;margin:0 0 8px;font-family:Manrope,sans-serif;letter-spacing:-.02em;color:var(--text)">
-              <span>Bentornato,</span> <em id="heroName" style="font-style:normal;color:var(--cyan)">—</em>
-            </h2>
-            <p id="heroText" style="font-size:15px;color:var(--text-soft);margin:0;line-height:1.6" data-i18n="your_stats_ready">
-              Le tue statistiche di apprendimento sono pronte.
-            </p>
-          </div>
-          <div style="display:flex;gap:12px;flex-wrap:wrap">
-            <div class="metric-card" data-metric="total-sessions" style="background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px 20px;min-width:100px;text-align:center">
-              <div class="metric-value" id="heroSessions" style="font-size:28px;font-weight:800;color:var(--text);font-family:Manrope,sans-serif">—</div>
-              <div class="metric-label" style="font-size:11px;color:var(--text-soft);text-transform:uppercase;letter-spacing:.05em">Sessioni</div>
+  container.innerHTML = `        <div class="content-panel active" id="pnl-panoramica">
+          <section class="panel-head"><h2>Panoramica</h2></section>
+          <!-- Hero Banner — Lumina glass-morphism design -->
+          <article class="hero-banner" id="heroBanner" style="position:relative;overflow:hidden;border-radius:48px;margin-bottom:40px;min-height:520px">
+            <style>
+              #heroBanner{background:rgba(30,31,38,.25);backdrop-filter:blur(48px);border:1px solid rgba(255,255,255,.05)}
+              #heroBanner::before{content:'';position:absolute;inset:-50%;background:conic-gradient(from 180deg at 50% 50%,transparent 0%,rgba(6,182,212,.06) 10%,transparent 20%,rgba(5,150,105,.05) 40%,transparent 50%,rgba(217,119,6,.04) 70%,transparent 80%);animation:hero-prism-rotate 30s linear infinite;z-index:0}
+              @keyframes hero-prism-rotate{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
+              .glass-card{background:rgba(30,31,38,.4);backdrop-filter:blur(16px);border:1px solid rgba(255,255,255,.05);border-radius:28px;transition:all .3s ease}
+              .glass-card:hover{background:rgba(255,255,255,.06);border-color:rgba(6,182,212,.15)}
+              .glass-card .gc-icon-box{transition:all .3s ease}
+              .glass-card:hover .gc-icon-box.gc-cyan{background:var(--cyan);color:#003640}
+              .glass-card:hover .gc-icon-box.gc-teal{background:var(--teal);color:#003731}
+              /* Light mode */
+              [data-theme="light"] #heroBanner{background:rgba(255,255,255,.5);backdrop-filter:blur(48px);border-color:rgba(139,92,246,.1)}
+              [data-theme="light"] #heroBanner::before{background:conic-gradient(from 180deg at 50% 50%,transparent 0%,rgba(99,102,241,.05) 10%,transparent 20%,rgba(5,150,105,.04) 40%,transparent 50%,rgba(217,119,6,.03) 70%,transparent 80%)}
+              [data-theme="light"] .glass-card{background:rgba(255,255,255,.6);backdrop-filter:blur(16px);border-color:rgba(0,0,0,.06)}
+              [data-theme="light"] .glass-card:hover{background:rgba(255,255,255,.85);border-color:rgba(99,102,241,.15)}
+              /* ── Mobile: stack columns, shrink padding ── */
+              @media(max-width:900px){
+                #heroBanner .hero-inner-row{flex-direction:column;gap:40px}
+                #heroBanner .hero-inner{padding:32px 24px;gap:40px}
+                #heroBanner .hero-streak-value{font-size:36px}
+                #heroBanner .hero-streak-card{padding:24px}
+                #heroBanner{min-height:auto;border-radius:32px}
+              }
+              @media(max-width:500px){
+                #heroBanner .hero-inner{padding:24px 16px;gap:28px}
+                #heroBanner .hero-streak-value{font-size:28px}
+                #heroBanner .hero-streak-card{padding:18px}
+                #heroBanner .hero-glass-card{padding:18px}
+                #heroBanner .hero-glass-title{font-size:16px}
+              }
+            </style>
+            <div class="hero-inner" style="position:relative;z-index:1;padding:64px;display:flex;flex-direction:column;gap:64px">
+              <div class="hero-inner-row" style="display:flex;gap:64px;align-items:flex-start">
+              <!-- Left Column -->
+              <div style="flex:7;display:flex;flex-direction:column;gap:32px">
+                <div style="display:inline-flex;align-items:center;gap:8px;padding:6px 16px;border-radius:99px;background:rgba(255,255,255,.05);backdrop-filter:blur(20px);border:1px solid rgba(255,255,255,.08);width:fit-content">
+                  <span style="width:7px;height:7px;border-radius:50%;background:var(--cyan);animation:pulse 2s infinite"></span>
+                  <span style="font-size:9px;font-weight:700;color:var(--cyan);text-transform:uppercase;letter-spacing:.12em;font-family:'Inter',sans-serif" data-i18n="hero_suggested">Suggerito per Te</span>
+                </div>
+                <h2 style="font-size:clamp(36px,5vw,56px);font-weight:200;margin:0;letter-spacing:-.04em;color:var(--text);line-height:1.05"><span data-i18n="welcome_back">Bentornato,</span> <span id="heroName" style="font-weight:600">Utente</span></h2>
+                <p id="heroText" style="font-size:20px;color:var(--text-soft);margin:0;max-width:560px;line-height:1.6;font-weight:400;opacity:.9">Completa alcune sessioni per trasformare il tuo modo di parlare in feedback utile su fluidità, vocabolario e progressi.</p>
+                <div style="position:relative;max-width:420px">
+                  <span class="material-symbols-outlined" style="position:absolute;left:16px;top:50%;transform:translateY(-50%);color:var(--text-soft);opacity:.5;font-size:20px">search</span>
+                  <input type="text" placeholder="Cerca nel vocabolario…" data-i18n-placeholder="hero_search_placeholder" style="width:100%;padding:16px 16px 16px 48px;border-radius:16px;border:1px solid rgba(255,255,255,.1);background:rgba(0,0,0,.2);backdrop-filter:blur(12px);color:var(--text);font-size:14px;font-family:'Inter',sans-serif;outline:none;transition:border-color .2s" onfocus="this.style.borderColor='var(--cyan)'" onblur="this.style.borderColor='rgba(255,255,255,.1)'" onkeydown="if(event.key==='Enter'){var w=this.value.trim();if(!w)return;var vbPanel=document.getElementById('pnl-vocabulary-builder');var vbNav=document.querySelector('[data-panel=vocabulary-builder]');if(vbNav)vbNav.click();setTimeout(function(){var enTab=document.querySelector('#pnl-vocabulary-builder .tab-link[data-subtab=wb-expand]');if(enTab)enTab.click();setTimeout(function(){var inp=document.getElementById('wbExpandSearch');if(inp){inp.value=w;if(window.renderExpandSuggestions)renderExpandSuggestions();}},200)},100)}">
+                </div>
+                <div class="hero-chips" id="heroChips"></div>
+              </div>
+              <!-- Right Column: Streak + Continue Learning -->
+              <div style="flex:5;display:flex;flex-direction:column;gap:24px;justify-content:center">
+                <div class="glass-card hero-streak-card" style="padding:32px;display:flex;align-items:center;justify-content:space-between;cursor:default">
+                  <div>
+                    <p style="font-size:11px;font-weight:700;color:var(--cyan);opacity:.7;text-transform:uppercase;letter-spacing:.15em;font-family:'Inter',sans-serif;margin:0 0 4px" data-i18n="hero_streak">Serie di apprendimento</p>
+                    <p class="hero-streak-value" style="font-size:48px;font-weight:200;color:var(--text);margin:0;font-family:'Inter',sans-serif;font-variant-numeric:tabular-nums;letter-spacing:-.03em" id="heroStreakDays">—<span style="font-size:18px;font-weight:300;opacity:.5;margin-left:4px">giorni</span></p>
+                  </div>
+                  <div id="heroStreakBox" style="width:64px;height:64px;border-radius:24px;display:flex;align-items:center;justify-content:center;position:relative;flex-shrink:0;background:rgba(6,182,212,.08);border:1px solid rgba(255,255,255,.05)">
+                    <div id="heroStreakGlow" style="position:absolute;inset:-4px;background:rgba(6,182,212,.15);filter:blur(16px);border-radius:28px;z-index:-1"></div>
+                    <span class="material-symbols-outlined" style="color:var(--cyan);font-size:32px;font-variation-settings:'FILL'1">local_fire_department</span>
+                  </div>
+                </div>
+                <p style="font-size:11px;font-weight:700;color:var(--text-soft);opacity:.5;text-transform:uppercase;letter-spacing:.2em;font-family:'Inter',sans-serif;margin:0" data-i18n="hero_continue">Continua ad apprendere</p>
+                <div style="display:flex;flex-direction:column;gap:16px" id="heroCards">
+                  <div class="glass-card hero-glass-card" style="padding:24px;display:flex;align-items:center;justify-content:space-between;cursor:pointer;opacity:.7">
+                    <div style="flex:1;min-width:0">
+                      <p style="font-size:10px;font-weight:700;color:var(--text-soft);opacity:.5;text-transform:uppercase;letter-spacing:.15em;font-family:'Inter',sans-serif;margin:0 0 4px" data-i18n="hero_transcript">Trascrizione</p>
+                      <p class="hero-glass-title" style="font-size:20px;font-weight:500;color:var(--text);margin:0;font-family:'Inter',sans-serif">Caricamento…</p>
+                      <p style="font-size:13px;color:var(--text-soft);opacity:.5;margin:4px 0 0">Caricamento…</p>
+                    </div>
+                    <div class="gc-icon-box gc-cyan" style="width:44px;height:44px;border-radius:50%;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.05);display:flex;align-items:center;justify-content:center;flex-shrink:0;color:var(--cyan)">
+                      <span class="material-symbols-outlined" style="font-size:22px;font-variation-settings:'FILL'1">play_arrow</span>
+                    </div>
+                  </div>
+                  <div class="glass-card hero-glass-card" style="padding:24px;display:flex;align-items:center;justify-content:space-between;cursor:pointer;opacity:.7">
+                    <div style="flex:1;min-width:0">
+                      <p style="font-size:10px;font-weight:700;color:var(--text-soft);opacity:.5;text-transform:uppercase;letter-spacing:.15em;font-family:'Inter',sans-serif;margin:0 0 4px" data-i18n="hero_word_bank">Banca Parole</p>
+                      <p class="hero-glass-title" style="font-size:20px;font-weight:500;color:var(--text);margin:0;font-family:'Inter',sans-serif">Caricamento…</p>
+                      <p style="font-size:13px;color:var(--text-soft);opacity:.5;margin:4px 0 0">Caricamento…</p>
+                    </div>
+                    <div class="gc-icon-box gc-teal" style="width:44px;height:44px;border-radius:50%;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.05);display:flex;align-items:center;justify-content:center;flex-shrink:0;color:var(--teal)">
+                      <span class="material-symbols-outlined" style="font-size:22px">add</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              </div>
             </div>
-            <div class="metric-card" data-metric="total-minutes" style="background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px 20px;min-width:100px;text-align:center">
-              <div class="metric-value" id="heroMinutes" style="font-size:28px;font-weight:800;color:var(--text);font-family:Manrope,sans-serif">—</div>
-              <div class="metric-label" style="font-size:11px;color:var(--text-soft);text-transform:uppercase;letter-spacing:.05em" data-i18n="minutes">Minuti</div>
+          </article>
+          <!-- Metric Boxes -->
+          <section class="stats-row">
+            <article class="metric-card" data-metric="totalSessions" onclick="selectMetricCard(this)" style="cursor:pointer;container-type:inline-size">
+              <p class="metric-label" data-i18n="metric_total_sessions">Sessioni totali</p>
+              <div class="metric-value" style="display:flex;align-items:baseline;gap:8px"><span>—</span></div>
+            </article>
+            <article class="metric-card selected" data-metric="totalMinutes" onclick="selectMetricCard(this)" style="cursor:pointer;container-type:inline-size">
+              <p class="metric-label" data-i18n="metric_spoken_time">Tempo parlato</p>
+              <div class="metric-value">—</div>
+            </article>
+            <article class="metric-card" data-metric="totalWords" onclick="selectMetricCard(this)" style="cursor:pointer;container-type:inline-size">
+              <p class="metric-label" data-i18n="metric_unique_words">Parole uniche</p>
+              <div class="metric-value">—</div>
+            </article>
+            <article class="metric-card" data-metric="avgLexDiv" onclick="selectMetricCard(this)" style="cursor:pointer;container-type:inline-size">
+              <p class="metric-label" data-i18n="metric_lexical_div">Div. lessicale</p>
+              <div class="metric-value">—</div>
+            </article>
+          </section>
+          <!-- Chart Section -->
+          <style>
+            #dailyChartCard .chart-bar { transition: all .3s ease; }
+            #dailyChartCard .chart-bar > div {
+              border-radius: 12px 12px 0 0;
+              transition: height .5s cubic-bezier(.34,1.56,.64,1), background .4s ease, box-shadow .4s ease;
+            }
+            #dailyChartCard .chart-tooltip {
+              position: absolute;
+              bottom: calc(100% + 6px);
+              left: 50%;
+              transform: translateX(-50%);
+              background: var(--text);
+              color: var(--bg);
+              padding: 4px 10px;
+              border-radius: 8px;
+              font-size: 11px;
+              font-weight: 600;
+              white-space: nowrap;
+              pointer-events: none;
+              opacity: 0;
+              transition: opacity .15s ease;
+              z-index: 10;
+            }
+            #dailyChartCard .chart-tooltip.show { opacity: 1; }
+          </style>
+          <article style="background:var(--card);border:1px solid var(--line);border-radius:32px;padding:32px" id="dailyChartCard">
+            <div style="display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:40px;flex-wrap:wrap;gap:20px">
+              <div>
+                <h3 id="dailyChartTitle" style="font-size:36px;font-weight:900;color:var(--text);margin:0 0 16px;letter-spacing:-.02em;font-family:'Inter',sans-serif" data-i18n="chart_session_minutes">Session minutes</h3>
+                <p id="dailyChartSubtitle" style="font-size:20px;color:var(--text-soft);opacity:.9;margin:0;max-width:500px;line-height:1.6;font-weight:400">Analisi della tua costanza verbale negli ultimi 14 giorni.</p>
+              </div>
+              <div style="text-align:right;flex-shrink:0">
+                <div id="dailyChartTotal" style="font-size:56px;font-weight:900;color:var(--cyan);line-height:1;letter-spacing:-.03em;font-family:'Inter',sans-serif;font-variant-numeric:tabular-nums;margin-bottom:8px">—</div>
+                <div id="dailyChartLabel" style="font-size:12px;font-weight:400;color:var(--text-soft);opacity:.9;text-transform:uppercase;letter-spacing:.3em;font-family:'Inter',sans-serif" data-i18n="chart_minutes_total">Minutes Total</div>
+              </div>
             </div>
-            <div class="metric-card" data-metric="total-words" style="background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px 20px;min-width:100px;text-align:center">
-              <div class="metric-value" id="heroWords" style="font-size:28px;font-weight:800;color:var(--text);font-family:Manrope,sans-serif">—</div>
-              <div class="metric-label" style="font-size:11px;color:var(--text-soft);text-transform:uppercase;letter-spacing:.05em" data-i18n="words">Parole</div>
+            <div id="dailyChart" style="display:flex;align-items:flex-end;justify-content:stretch;height:192px;padding:0 12px;position:relative;gap:4px">
+              <span style="color:var(--text-faint);font-size:14px">Caricamento…</span>
             </div>
-          </div>
+            <div style="display:flex;justify-content:space-between;height:20px;margin-top:8px;padding:0 12px;font-size:10px;color:var(--text-faint)" id="dailyChartLabels">
+              <span></span><span></span><span></span>
+            </div>
+          </article>
         </div>
-        <div style="position:absolute;top:-60px;right:-40px;width:200px;height:200px;background:radial-gradient(circle,rgba(6,182,212,.08),transparent 70%);border-radius:50%;pointer-events:none"></div>
-      </div>
-
-      <!-- 14-Day Chart -->
-      <div class="glass-card" style="background:var(--card);border:1px solid var(--line);border-radius:16px;padding:24px;margin-bottom:24px">
-        <h3 style="font-size:16px;font-weight:700;margin:0 0 16px;color:var(--text);font-family:Manrope,sans-serif">Andamento 14 giorni</h3>
-        <div id="dailyChart" style="display:flex;align-items:flex-end;gap:6px;height:160px;padding:0 4px">
-          <p style="color:var(--text-faint);text-align:center;width:100%;padding:40px" data-i18n="loading">Caricamento…</p>
-        </div>
-      </div>
-
-      <!-- Metric Cards Row -->
-      <div class="stats-row" id="metricsRow" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px;margin-bottom:24px">
-      </div>
-    </div>
-  `;
+`;
 }
 
 export async function init() {
   if (initialized) return;
   initialized = true;
-
   await refreshHero();
   await refreshChart();
   await refreshMetrics();
-
-  // Listen for session saves
-  var events = await import('../shared/events.js');
-  events.on('session:saved', function () { refreshHero(); refreshChart(); refreshMetrics(); });
-  events.on('session:deleted', function () { refreshHero(); refreshChart(); refreshMetrics(); });
+  on('session:saved', refreshAll);
+  on('session:deleted', refreshAll);
 }
 
 export function destroy() {
@@ -79,113 +180,72 @@ export function destroy() {
   container = null;
 }
 
-export async function rerender() {
-  // Re-apply i18n labels
-  if (typeof I18n !== 'undefined' && I18n.apply && container) {
-    I18n.apply(container);
-  }
-}
-
-// ── Refresh functions ──
+function refreshAll() { refreshHero(); refreshChart(); refreshMetrics(); }
 
 async function refreshHero() {
   var profile = window._sottotitoliProfile || window.profile;
   var nameEl = document.getElementById('heroName');
-  if (nameEl) {
-    nameEl.textContent = (profile && profile.display_name) || (profile && profile.full_name) || 'Utente';
-  }
+  if (nameEl) nameEl.textContent = (profile && profile.display_name) || (profile && profile.full_name) || 'Utente';
 
-  // Aggregate stats from EN + IT
-  var statsEN = window.statsEN;
-  var statsIT = window.statsIT;
+  var statsEN = window.statsEN || {};
+  var statsIT = window.statsIT || {};
+  var totalSessions = statsEN.total_sessions || 0 + (statsIT.total_sessions || 0);
+  var totalMinutes = Math.round((statsEN.total_minutes || 0) + (statsIT.total_minutes || 0));
+  var totalWords = (statsEN.total_words || 0) + (statsIT.total_words || 0);
+  var avgLexDiv = statsEN.avg_lexical_diversity || statsIT.avg_lexical_diversity || 0;
 
-  var totalSessions = (statsEN ? statsEN.total_sessions || 0 : 0) + (statsIT ? statsIT.total_sessions || 0 : 0);
-  var totalMinutes = (statsEN ? statsEN.total_minutes || 0 : 0) + (statsIT ? statsIT.total_minutes || 0 : 0);
-  var totalWords = (statsEN ? statsEN.total_words || 0 : 0) + (statsIT ? statsIT.total_words || 0 : 0);
+  // Update metric cards
+  var cards = document.querySelectorAll('.metric-card');
+  cards.forEach(function(c) {
+    var metric = c.getAttribute('data-metric');
+    var val = c.querySelector('.metric-value');
+    if (!val) return;
+    if (metric === 'totalSessions') val.innerHTML = '<span>' + formatNumber(totalSessions) + '</span>';
+    else if (metric === 'totalMinutes') val.textContent = totalMinutes + ' min';
+    else if (metric === 'totalWords') val.innerHTML = '<span>' + formatNumber(totalWords) + '</span>';
+    else if (metric === 'avgLexDiv') val.innerHTML = '<span>' + (avgLexDiv * 100).toFixed(0) + '</span><span style="font-size:.4em;opacity:.5">%</span>';
+  });
 
-  var sEl = document.getElementById('heroSessions');
-  var mEl = document.getElementById('heroMinutes');
-  var wEl = document.getElementById('heroWords');
-  if (sEl) sEl.textContent = formatNumber(totalSessions);
-  if (mEl) mEl.textContent = formatNumber(totalMinutes);
-  if (wEl) wEl.textContent = formatNumber(totalWords);
+  // Update streak
+  try {
+    if (window._sottotitoliProfile && window._sottotitoliProfile.streak_days) {
+      var sd = document.getElementById('heroStreakDays');
+      if (sd) sd.innerHTML = window._sottotitoliProfile.streak_days + '<span style="font-size:18px;font-weight:300;opacity:.5;margin-left:4px">giorni</span>';
+    }
+  } catch(e) {}
 }
 
 async function refreshChart() {
   var chartEl = document.getElementById('dailyChart');
   if (!chartEl) return;
-
   try {
     var sb = getSupabase();
-    if (!sb) { chartEl.innerHTML = '<p style="color:var(--text-faint);text-align:center;width:100%;padding:40px">Accedi per vedere il grafico</p>'; return; }
-
+    if (!sb) { chartEl.innerHTML = '<span style="color:var(--text-faint);font-size:14px;padding:40px">Accedi per vedere il grafico</span>'; return; }
     var since = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString();
-    var resp = await sb.from('sessions')
-      .select('created_at, duration_seconds')
-      .gte('created_at', since)
-      .order('created_at', { ascending: true });
-
+    var resp = await sb.from('sessions').select('created_at, duration_seconds').gte('created_at', since).order('created_at', { ascending: true });
     if (resp.error) throw resp.error;
-
     var sessions = resp.data || [];
     var days = {};
     for (var i = 0; i < 14; i++) {
       var d = new Date(Date.now() - (13 - i) * 24 * 60 * 60 * 1000);
-      var key = d.toISOString().slice(0, 10);
-      days[key] = 0;
+      days[d.toISOString().slice(0, 10)] = 0;
     }
-
-    sessions.forEach(function (s) {
+    sessions.forEach(function(s) {
       var key = s.created_at ? s.created_at.slice(0, 10) : null;
       if (key && days[key] !== undefined) days[key] += Math.round((s.duration_seconds || 0) / 60);
     });
-
     var values = Object.values(days);
     var maxVal = Math.max.apply(null, values.concat([1]));
-
-    var isEn = window.I18n && window.I18n.getLang && window.I18n.getLang() === 'en';
-    var dayLabels = isEn ? ['6d', '5d', '4d', '3d', '2d', 'yest', 'today'] : ['6g', '5g', '4g', '3g', '2g', 'ieri', 'oggi'];
-
-    chartEl.innerHTML = values.map(function (v, i) {
-      var h = maxVal > 0 ? Math.max(4, (v / maxVal) * 140) : 4;
-      var isToday = i === values.length - 1;
-      return '<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px">' +
-        '<span style="font-size:10px;font-weight:600;color:var(--text-soft)">' + (v || '') + '</span>' +
-        '<div class="bar" style="width:100%;max-width:32px;height:' + h + 'px;background:' + (isToday ? 'var(--cyan)' : 'var(--cyan)') + ';opacity:' + (isToday ? '1' : '.4') + ';border-radius:6px 6px 0 0;transition:height .3s" title="' + v + ' min"></div>' +
-        '<span style="font-size:9px;color:var(--text-soft);opacity:.6">' + dayLabels[Math.floor(i / 2)] + '</span>' +
-        '</div>';
+    var total = values.reduce(function(a,b){return a+b;},0);
+    var totalEl = document.getElementById('dailyChartTotal');
+    if (totalEl) totalEl.textContent = total;
+    chartEl.innerHTML = values.map(function(v, i) {
+      var h = maxVal > 0 ? Math.max(6, (v / maxVal) * 172) : 6;
+      return '<div class="chart-bar" style="flex:1;display:flex;flex-direction:column;align-items:center;gap:6px;position:relative"><div class="chart-tooltip">' + v + ' min</div><div style="width:100%;max-width:40px;height:' + h + 'px;background:var(--cyan);opacity:' + (i >= 11 ? 1 : 0.35 + (i * 0.03)) + ';box-shadow:0 0 12px rgba(6,182,212,' + (i >= 11 ? 0.2 : 0.05) + ')"></div></div>';
     }).join('');
-  } catch (e) {
-    console.warn('Chart load failed:', e.message);
-    chartEl.innerHTML = '<p style="color:var(--text-faint);text-align:center;width:100%;padding:40px">Dati non disponibili</p>';
-  }
+  } catch(e) { console.warn('Chart failed:', e.message); }
 }
 
 async function refreshMetrics() {
-  var row = document.getElementById('metricsRow');
-  if (!row) return;
-
-  var statsEN = window.statsEN || {};
-  var statsIT = window.statsIT || {};
-
-  var metrics = [
-    { icon: 'speed', label: 'WPM medio', value: statsEN.avg_wpm || statsIT.avg_wpm || '—', suffix: '' },
-    { icon: 'translate', label: 'Diversità lessicale', value: statsEN.avg_lexical_diversity || statsIT.avg_lexical_diversity || '—', suffix: '%' },
-    { icon: 'auto_awesome', label: 'Livello CEFR', value: statsEN.cefr_level || statsIT.cefr_level || '—', suffix: '' },
-    { icon: 'trending_up', label: 'Sessioni questa settimana', value: statsEN.week_sessions || statsIT.week_sessions || 0, suffix: '' }
-  ];
-
-  row.innerHTML = metrics.map(function (m) {
-    var v = typeof m.value === 'number' ? formatNumber(m.value) : m.value;
-    return '<div class="metric-card" style="background:var(--card);border:1px solid var(--line);border-radius:16px;padding:18px;display:flex;flex-direction:column;gap:6px">' +
-      '<div style="display:flex;align-items:center;gap:8px">' +
-      '<span class="material-symbols-outlined" style="font-size:20px;color:var(--cyan)">' + m.icon + '</span>' +
-      '<span style="font-size:12px;font-weight:600;color:var(--text-soft);text-transform:uppercase;letter-spacing:.03em">' + m.label + '</span>' +
-      '</div>' +
-      '<div style="font-size:28px;font-weight:800;color:var(--text);font-family:Manrope,sans-serif">' + v + (m.suffix ? '<span style="font-size:16px;font-weight:500;opacity:.6">' + m.suffix + '</span>' : '') + '</div>' +
-      '</div>';
-  }).join('');
-
-  // Apply i18n
-  if (typeof I18n !== 'undefined' && I18n.apply) { I18n.apply(row); }
+  // Metric cards already updated in refreshHero
 }
