@@ -51,14 +51,14 @@ async function switchPanel(name) {
     try { prev.module.destroy(); } catch (e) { console.warn('destroy error:', e); }
   }
 
-  // Render and init new panel
+  // Render and init new panel (always re-render to ensure fresh DOM)
   if (!panelContainer) {
     panelContainer = document.getElementById('panelContainer');
     if (!panelContainer) { console.error('panelContainer not found'); return; }
   }
 
-  // Render panel HTML
-  if (!next.loaded && next.module.render) {
+  // Always call render — panels are cheap to rebuild, and this avoids stale DOM bugs
+  if (next.module.render) {
     try {
       await next.module.render(panelContainer);
       next.loaded = true;
@@ -69,7 +69,7 @@ async function switchPanel(name) {
     }
   }
 
-  // Init panel (attach listeners, load data)
+  // Always call init (panels guard against double-init internally)
   if (next.module.init) {
     try { await next.module.init(); } catch (e) { console.error('init error for', name, ':', e); }
   }
