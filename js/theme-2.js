@@ -189,6 +189,9 @@
     })();
     */
     /* ── Sub-tab switching within content panels ── */
+    /* DISABLED — preloadAllPanels() in app.js wires .onclick directly on each
+       .tab-link[data-subtab] button. Same Safari compat issue as sidebar:
+       e.target.closest() fails on icon font text nodes.
     document.addEventListener('click', function(e){
       var tab = e.target.closest('.tab-link[data-subtab]');
       if(!tab) return;
@@ -203,6 +206,7 @@
       var target = document.getElementById('sub-' + subId);
       if(target) target.classList.add('active');
     });
+    */
 
     function toggleStartSession(){
       var ss=document.getElementById('startSplit');
