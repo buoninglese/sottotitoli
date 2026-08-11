@@ -46,18 +46,21 @@ async function switchPanel(name) {
 
   if (!next) { console.warn('Unknown panel:', name); return; }
 
-  // Destroy previous panel
-  if (prev && prev.loaded && prev.module.destroy) {
-    try { prev.module.destroy(); } catch (e) { console.warn('destroy error:', e); }
-  }
-
-  // Render and init new panel (always re-render to ensure fresh DOM)
+  // Get panel container
   if (!panelContainer) {
     panelContainer = document.getElementById('panelContainer');
     if (!panelContainer) { console.error('panelContainer not found'); return; }
   }
 
-  // Always call render — panels are cheap to rebuild, and this avoids stale DOM bugs
+  // Destroy previous panel
+  if (prev && prev.loaded && prev.module.destroy) {
+    try { prev.module.destroy(); } catch (e) { console.warn('destroy error:', e); }
+  }
+
+  // Clear the container
+  panelContainer.innerHTML = '';
+
+  // Render new panel HTML
   if (next.module.render) {
     try {
       await next.module.render(panelContainer);
@@ -69,11 +72,12 @@ async function switchPanel(name) {
     }
   }
 
-  // Always call init (panels guard against double-init internally)
+  // Init panel
   if (next.module.init) {
     try { await next.module.init(); } catch (e) { console.error('init error for', name, ':', e); }
   }
 
+  var previousPanel = currentPanel;
   currentPanel = name;
 
   // Update sidebar active state
@@ -93,7 +97,7 @@ async function switchPanel(name) {
     history.replaceState(null, '', '#' + name);
   }
 
-  emit('panel:switch', { from: prev ? currentPanel : null, to: name });
+  emit('panel:switch', { from: previousPanel, to: name });
 }
 
 // ── Hash-based routing ──
@@ -112,14 +116,20 @@ function handleHash() {
   }
 }
 
-// ── Set up sidebar navigation ──
+// ── Set up sidebar navigation (event delegation — robust against dynamically added links) ──
 function setupNavigation() {
-  document.querySelectorAll('.sidebar-link[data-panel]').forEach(function (link) {
-    link.addEventListener('click', function (e) {
-      e.preventDefault();
-      var panel = this.getAttribute('data-panel');
-      if (panel) switchPanel(panel);
-    });
+  var sidebar = document.querySelector('.sidebar');
+  if (!sidebar) { console.error('Sidebar not found'); return; }
+  
+  sidebar.addEventListener('click', function (e) {
+    var link = e.target.closest('.sidebar-link[data-panel]');
+    if (!link) return;
+    e.preventDefault();
+    e.stopPropagation();
+    var panel = link.getAttribute('data-panel');
+    if (panel) {
+      switchPanel(panel);
+    }
   });
 }
 
