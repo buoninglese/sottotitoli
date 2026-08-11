@@ -171,6 +171,7 @@ export async function init() {
   await refreshHero();
   await refreshChart();
   await refreshMetrics();
+  if (window.initSparklineTooltips) window.initSparklineTooltips();
   on('session:saved', refreshAll);
   on('session:deleted', refreshAll);
 }
