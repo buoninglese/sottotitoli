@@ -206,8 +206,20 @@ async function refreshHero() {
     try { var s = await sb.auth.getSession(); userId = s.data?.session?.user?.id || null; } catch(e) {}
   }
 
-  // ── Profile name ──
+  // ── Fetch profile from Supabase (bypass stale window globals) ──
   var profile = window._sottotitoliProfile || window.profile;
+  if (userId && sb && (!profile || !profile.streak_days)) {
+    try {
+      var profileResp = await sb.from('profiles').select('*').eq('id', userId).maybeSingle();
+      if (!profileResp.error && profileResp.data) {
+        profile = profileResp.data;
+        // Normalize display_name
+        if (!profile.display_name) profile.display_name = profile.full_name || '';
+      }
+    } catch(e) {}
+  }
+
+  // ── Profile name ──
   var nameEl = document.getElementById('heroName');
   if (nameEl) nameEl.textContent = (profile && profile.display_name) || (profile && profile.full_name) || (profile && profile.email && profile.email.split('@')[0]) || 'Utente';
 
@@ -361,8 +373,17 @@ async function refreshChart() {
   try {
     var sb = getSupabase();
     if (!sb) { chartEl.innerHTML = '<span style="color:var(--text-faint);font-size:14px;padding:40px">Accedi per vedere il grafico</span>'; return; }
+    // Get user ID for row-level filtering
+    var userId = null;
+    try { var authResp = await sb.auth.getSession(); userId = authResp.data?.session?.user?.id || null; } catch(e) {}
+    if (!userId) { chartEl.innerHTML = '<span style="color:var(--text-faint);font-size:14px;padding:40px">Accedi per vedere il grafico</span>'; return; }
+
     var since = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString();
-    var resp = await sb.from('sessions').select('created_at, duration_seconds').gte('created_at', since).order('created_at', { ascending: true });
+    var resp = await sb.from('sessions')
+      .select('started_at, duration_seconds')
+      .eq('user_id', userId)
+      .gte('started_at', since)
+      .order('started_at', { ascending: true });
     if (resp.error) throw resp.error;
     var sessions = resp.data || [];
     var days = {};
@@ -371,7 +392,7 @@ async function refreshChart() {
       days[d.toISOString().slice(0, 10)] = 0;
     }
     sessions.forEach(function(s) {
-      var key = s.created_at ? s.created_at.slice(0, 10) : null;
+      var key = s.started_at ? s.started_at.slice(0, 10) : null;
       if (key && days[key] !== undefined) days[key] += Math.round((s.duration_seconds || 0) / 60);
     });
     var values = Object.values(days);
