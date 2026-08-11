@@ -89,6 +89,10 @@ async function switchPanel(name) {
   // Show target panel
   wrap.style.display = '';
 
+  // Re-apply active class (theme-2.js removes it from ALL .content-panel on every click)
+  var panelEl = wrap.querySelector('.content-panel');
+  if (panelEl) panelEl.classList.add('active');
+
   var previousPanel = currentPanel;
   currentPanel = name;
   window._currentPanel = name;
