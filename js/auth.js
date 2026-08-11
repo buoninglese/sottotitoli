@@ -124,6 +124,9 @@ async function signInWithGoogle() {
     provider: 'google',
     options: {
       redirectTo: getAuthRedirectUrl(),
+      queryParams: {
+        prompt: 'select_account',  // force Google account chooser on every sign-in
+      },
     },
   });
   if (error) {
