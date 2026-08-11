@@ -17,6 +17,9 @@ window.SOTTOTITOLI_CONFIG = {
   /** Auth redirect URL (after Google OAuth login) */
   AUTH_REDIRECT_URL: "https://www.sottotitoli.pro/panoramica.html",
 
+  /** PostHog project API key (find in PostHog → Project Settings → API key) */
+  posthogKey: "phx_YOUR_POSTHOG_KEY",
+
   /** Wordnik proxy URL (Supabase Edge Function). Key is server-side only.
       Deploy with: supabase functions deploy wordnik-proxy
       Set secret: supabase secrets set WORDNIK_API_KEY=your_key */
