@@ -109,18 +109,15 @@ function handleHash() {
   }
 }
 
-// ── Set up sidebar navigation (direct handlers — no event delegation for Safari compat) ──
+// ── Set up sidebar navigation (onclick property — simplest possible, works everywhere) ──
 function setupNavigation() {
   var links = document.querySelectorAll('.sidebar-link[data-panel]');
-  links.forEach(function (link) {
-    link.addEventListener('click', function (e) {
-      e.preventDefault();
-      var panel = link.getAttribute('data-panel');
-      if (panel) {
-        switchPanel(panel);
-      }
-    });
-  });
+  for (var i = 0; i < links.length; i++) {
+    links[i].onclick = function () {
+      switchPanel(this.getAttribute('data-panel'));
+      return false;
+    };
+  }
 }
 
 // ── Set up user dropdown panel links ──
