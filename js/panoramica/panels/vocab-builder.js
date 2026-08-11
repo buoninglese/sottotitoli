@@ -245,5 +245,74 @@ export async function render(parentEl) {
 `;
 }
 
-export async function init() {}
-export function destroy() { container = null; }
+export async function init() {
+  if (window._vbInitDone) return;
+  window._vbInitDone = true;
+
+  // Tab switching
+  var tabs = document.getElementById('vbTabs');
+  if (tabs) {
+    tabs.addEventListener('click', function(e) {
+      var btn = e.target.closest('.vb-tab-btn');
+      if (!btn) return;
+      tabs.querySelectorAll('.vb-tab-btn').forEach(function(b) {
+        b.style.background = b === btn ? 'var(--cyan)' : 'var(--card)';
+        b.style.color = b === btn ? '#fff' : 'var(--text-soft)';
+        b.style.border = b === btn ? 'none' : '1px solid var(--line)';
+      });
+      var tab = btn.getAttribute('data-tab');
+      var searchInput = document.getElementById('vbSearchInput');
+      if (searchInput) searchInput.placeholder = tab === 'it-builder' ? 'Cerca una parola in italiano...' : 'Cerca una parola in inglese...';
+    });
+  }
+
+  // Search
+  var searchBtn = document.getElementById('vbSearchBtn');
+  var searchInput = document.getElementById('vbSearchInput');
+  if (searchBtn) searchBtn.addEventListener('click', doSearch);
+  if (searchInput) searchInput.addEventListener('keydown', function(e) { if (e.key === 'Enter') doSearch(); });
+}
+
+export function destroy() { container = null; window._vbInitDone = false; }
+
+async function doSearch() {
+  var input = document.getElementById('vbSearchInput');
+  var results = document.getElementById('vbResults');
+  var word = (input.value || '').trim();
+  if (!word) return;
+  results.innerHTML = '<p style="text-align:center;color:var(--text-faint);padding:40px">Cercando "' + esc(word) + '"...</p>';
+  try {
+    var resp = await fetch('https://api.dictionaryapi.dev/api/v2/entries/en/' + encodeURIComponent(word));
+    if (!resp.ok) { results.innerHTML = '<p style="text-align:center;color:var(--text-faint);padding:40px">Nessuna definizione trovata.</p>'; return; }
+    var defs = await resp.json();
+    if (!defs.length) { results.innerHTML = '<p style="text-align:center;color:var(--text-faint);padding:40px">Nessuna definizione trovata.</p>'; return; }
+    var entry = defs[0];
+    var phonetic = entry.phonetic || (entry.phonetics && entry.phonetics[0] && entry.phonetics[0].text) || '';
+    var html = '<div style="margin-bottom:16px"><h3 style="font-size:22px;font-weight:800;color:var(--text);margin:0 0 4px;font-family:Manrope,sans-serif">' + esc(entry.word || word) + '</h3>';
+    if (phonetic) html += '<span style="font-size:14px;color:var(--text-soft);font-family:JetBrains Mono,monospace">' + esc(phonetic) + '</span></div>';
+    (entry.meanings || []).forEach(function(m) {
+      html += '<div style="margin-bottom:20px"><div style="font-size:12px;font-weight:700;color:var(--cyan);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">' + esc(m.partOfSpeech||'') + '</div>';
+      (m.definitions||[]).slice(0,3).forEach(function(d,i) {
+        html += '<div style="padding:8px 0;border-bottom:1px solid var(--line);font-size:13px;color:var(--text);line-height:1.6"><strong>'+(i+1)+'.</strong> '+esc(d.definition);
+        if (d.example) html += '<br><span style="color:var(--text-soft);font-style:italic">"' + esc(d.example) + '"</span>';
+        html += '</div>';
+      }); html += '</div>';
+    });
+    html += '<div style="margin-top:16px"><button onclick="window._vbSaveWord(\'' + word.replace(/'/g,"\\'") + '\')" style="padding:10px 24px;background:var(--cyan);color:#fff;border:none;border-radius:100px;font-size:13px;font-weight:700;cursor:pointer;font-family:Manrope,sans-serif">+ Aggiungi a banca</button></div>';
+    results.innerHTML = html;
+    window._vbSaveWord = async function(w) {
+      var sb = window.sottotitoliSupabase;
+      if (!sb) return;
+      try {
+        var userResp = await sb.auth.getUser();
+        var userId = userResp.data.user.id;
+        var bankResp = await sb.from('user_wordbanks').select('id').eq('user_id',userId).eq('lang','en').limit(1);
+        var bankId = bankResp.data && bankResp.data.length ? bankResp.data[0].id : (await sb.from('user_wordbanks').insert({name:'My English Bank',lang:'en',user_id:userId}).select('id').single()).data.id;
+        await sb.from('user_wordbank_words').insert({wordbank_id:bankId,word:w,user_id:userId,status:'new',added_at:new Date().toISOString()});
+        var t = document.getElementById('toastMsg'); if (t) { t.textContent = '"' + w + '" salvata!'; t.classList.add('show'); setTimeout(function(){t.classList.remove('show')},2500); }
+      } catch(e) { console.error('Save word:', e); }
+    };
+  } catch(e) { results.innerHTML = '<p style="text-align:center;color:var(--text-faint);padding:40px">Errore nella ricerca.</p>'; }
+}
+
+function esc(s) { return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }

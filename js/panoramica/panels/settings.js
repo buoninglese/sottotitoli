@@ -173,5 +173,56 @@ export async function render(parentEl) {
 `;
 }
 
-export async function init() {}
+export async function init() {
+  // Load saved preferences into form fields
+  var prefs = window._settingsData || window._sottotitoliPrefs || {};
+  var uiLang = document.getElementById('settingsUiLang');
+  if (uiLang && prefs.ui_language) uiLang.value = prefs.ui_language;
+  var themeSel = document.getElementById('settingsTheme');
+  if (themeSel && prefs.theme) themeSel.value = prefs.theme;
+  var capLang = document.getElementById('settingsDefaultCapLang');
+  if (capLang && prefs.default_caption_lang) capLang.value = prefs.default_caption_lang;
+  var trPair = document.getElementById('settingsDefaultTrPair');
+  if (trPair && prefs.default_translation_pair) trPair.value = prefs.default_translation_pair;
+
+  // Theme card click handlers (innerHTML script blocks don't execute — must be in init)
+  var cards = document.getElementById('settingsThemeCards');
+  if (cards) {
+    cards.addEventListener('click', function(e) {
+      var label = e.target.closest('label');
+      if (!label) return;
+      var radio = label.querySelector('input[type=radio]');
+      if (!radio) return;
+      var theme = radio.value;
+      var select = document.getElementById('settingsTheme');
+      if (select) select.value = theme;
+
+      cards.querySelectorAll('label').forEach(function(l) {
+        var border = l.querySelector('div:first-child');
+        var check = l.querySelector('.material-symbols-outlined');
+        if (l === label) {
+          if (border) { border.style.borderColor = 'var(--cyan)'; border.style.background = 'rgba(6,182,212,.03)'; }
+          if (check) { check.style.color = 'var(--cyan)'; check.style.opacity = '1'; }
+          l.querySelector('input[type=radio]').checked = true;
+        } else {
+          if (border) { border.style.borderColor = 'var(--line)'; border.style.background = ''; }
+          if (check) { check.style.color = 'var(--text-soft)'; check.style.opacity = '0'; }
+          l.querySelector('input[type=radio]').checked = false;
+        }
+      });
+    });
+
+    // Set initial active card based on current theme
+    var curTheme = prefs.theme || 'light';
+    var target = cards.querySelector('input[value="' + curTheme + '"]');
+    if (target) { var label = target.closest('label'); if (label) label.click(); }
+  }
+
+  // Theme select change → apply immediately
+  if (themeSel) {
+    themeSel.addEventListener('change', function() {
+      if (typeof applyTheme === 'function') applyTheme(this.value);
+    });
+  }
+}
 export function destroy() { container = null; }

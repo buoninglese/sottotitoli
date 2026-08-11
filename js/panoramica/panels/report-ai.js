@@ -1371,5 +1371,92 @@ export async function render(parentEl) {
 `;
 }
 
-export async function init() {}
-export function destroy() { container = null; }
+export async function init() {
+  if (window._raiInitDone) return;
+  window._raiInitDone = true;
+
+  // Tab switching
+  var tabs = document.getElementById('raiTabs');
+  if (tabs) {
+    tabs.addEventListener('click', function(e) {
+      var btn = e.target.closest('.rai-tab-btn');
+      if (!btn) return;
+      tabs.querySelectorAll('.rai-tab-btn').forEach(function(b) {
+        b.style.background = b === btn ? 'var(--cyan)' : 'var(--card)';
+        b.style.color = b === btn ? '#fff' : 'var(--text-soft)';
+        b.style.border = b === btn ? 'none' : '1px solid var(--line)';
+      });
+      renderRaiContent(btn.getAttribute('data-tab'));
+    });
+  }
+
+  // Generate report button
+  var genBtn = document.getElementById('raiGenerateBtn');
+  if (genBtn) genBtn.addEventListener('click', generateReport);
+
+  // Load existing reports
+  loadReports();
+  renderRaiContent('rai-crea');
+}
+
+export function destroy() { container = null; window._raiInitDone = false; }
+
+async function loadReports() {
+  var sb = window.sottotitoliSupabase;
+  if (!sb) { window._raiReports = []; return; }
+  try {
+    var resp = await sb.from('session_ai_reports').select('id, created_at, overall_score, summary, status, session_count').order('created_at',{ascending:false}).limit(50);
+    window._raiReports = resp.data || [];
+  } catch(e) { window._raiReports = []; }
+}
+
+function renderRaiContent(tab) {
+  var content = document.getElementById('raiContent');
+  if (!content) return;
+
+  if (tab === 'rai-miei') {
+    var reports = window._raiReports || [];
+    if (!reports.length) { content.innerHTML = '<p style="text-align:center;color:var(--text-faint);padding:60px">Nessun report. <a href="javascript:void(0)" onclick="document.querySelector(\'.rai-tab-btn[data-tab=rai-crea]\').click()" style="color:var(--cyan)">Genera il tuo primo report</a>.</p>'; return; }
+    content.innerHTML = '<table style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr style="border-bottom:2px solid var(--line)"><th style="padding:10px 12px;text-align:left;font-weight:700;color:var(--text-soft);font-size:11px;text-transform:uppercase">Data</th><th style="padding:10px 12px;text-align:left">Punteggio</th><th style="padding:10px 12px;text-align:left">Sessioni</th><th style="padding:10px 12px;text-align:left">Stato</th><th></th></tr></thead><tbody>' +
+      reports.map(function(r) { return '<tr style="border-bottom:1px solid var(--line)"><td style="padding:10px 12px;color:var(--text)">' + (r.created_at?new Date(r.created_at).toLocaleDateString('it-IT'):'—') + '</td><td style="padding:10px 12px;font-weight:700">' + (r.overall_score||'—') + '</td><td style="padding:10px 12px;color:var(--text-soft)">' + (r.session_count||'—') + '</td><td style="padding:10px 12px">' + raiStatusBadge(r.status) + '</td><td style="padding:10px 12px"><button onclick="window._raiViewReport(\'' + r.id + '\')" style="background:var(--card);border:1px solid var(--line);border-radius:8px;padding:4px 10px;font-size:11px;cursor:pointer;color:var(--text-soft)">Dettagli</button></td></tr>'; }).join('') +
+      '</tbody></table>';
+    window._raiViewReport = viewReport;
+  }
+}
+
+function raiStatusBadge(status) {
+  var map = { completed:{l:'Completed',bg:'rgba(16,185,129,.1)',c:'#10B981'}, processing:{l:'Processing',bg:'rgba(245,158,11,.1)',c:'#F59E0B'}, pending:{l:'Pending',bg:'rgba(107,114,128,.1)',c:'var(--text-soft)'}, failed:{l:'Failed',bg:'rgba(225,29,72,.1)',c:'#E11D48'} };
+  var s = map[status] || map.pending;
+  return '<span style="display:inline-flex;align-items:center;padding:4px 12px;background:'+s.bg+';color:'+s.c+';font-size:11px;font-weight:700;border-radius:99px;text-transform:uppercase">'+s.l+'</span>';
+}
+
+async function generateReport() {
+  var msg = document.getElementById('raiGenerateMsg');
+  var btn = document.getElementById('raiGenerateBtn');
+  var sb = window.sottotitoliSupabase;
+  if (!sb) { if (msg) msg.textContent = 'Accedi per generare report.'; return; }
+  try {
+    if (btn) { btn.disabled = true; btn.textContent = 'Generazione in corso...'; }
+    if (msg) msg.textContent = 'Analisi in corso...';
+    var lang = document.getElementById('raiLang'); var sc = document.getElementById('raiSessionCount');
+    var resp = await sb.functions.invoke('generate-ai-report', { body: { language: lang?lang.value:'en', session_count: sc?parseInt(sc.value):1 } });
+    if (resp.error) throw resp.error;
+    if (msg) msg.textContent = 'Report generato!';
+    if (btn) { btn.disabled = false; btn.textContent = 'Genera Report'; }
+    await loadReports();
+    var tabBtn = document.querySelector('.rai-tab-btn[data-tab="rai-miei"]');
+    if (tabBtn) tabBtn.click();
+  } catch(e) { console.error('Report gen:', e); if (msg) msg.textContent = 'Errore: ' + e.message; if (btn) { btn.disabled = false; btn.textContent = 'Genera Report'; } }
+}
+
+function viewReport(id) {
+  var r = (window._raiReports||[]).find(function(x) { return x.id === id; });
+  if (!r) return;
+  var modal = document.createElement('div');
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:100000;display:flex;align-items:center;justify-content:center;padding:20px';
+  modal.innerHTML = '<div style="background:var(--card);border-radius:16px;padding:24px;max-width:600px;width:100%;max-height:80vh;overflow-y:auto;box-shadow:0 8px 40px rgba(0,0,0,.3)"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px"><h3 style="margin:0;font-family:Manrope,sans-serif;font-size:18px;color:var(--text)">Report AI</h3><button style="background:none;border:none;font-size:24px;cursor:pointer;color:var(--text-dim)">&times;</button></div><p style="font-size:12px;color:var(--text-soft);margin:0 0 8px">Punteggio: ' + (r.overall_score||'—') + ' · ' + (r.session_count||'—') + ' sessioni</p><div style="white-space:pre-wrap;font-size:13px;line-height:1.7;color:var(--text)">' + esc(r.summary||'Nessun riepilogo.') + '</div></div>';
+  modal.addEventListener('click', function(e) { if (e.target===modal||e.target.closest('button')) modal.remove(); });
+  document.body.appendChild(modal);
+}
+
+function esc(s) { return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }

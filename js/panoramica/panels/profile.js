@@ -116,5 +116,33 @@ export async function render(parentEl) {
 `;
 }
 
-export async function init() {}
+export async function init() {
+  var profile = window._sottotitoliProfile || window.profile;
+  if (!profile) return;
+
+  var dn = document.getElementById('profileDisplayName');
+  if (dn) dn.textContent = profile.display_name || profile.full_name || 'Utente';
+  var em = document.getElementById('profileEmail');
+  if (em && profile.email) em.textContent = profile.email;
+  var uid = document.getElementById('profileUserId');
+  if (uid && profile.id) uid.textContent = profile.id.slice(0, 8) + '...';
+  var nat = document.getElementById('profileNativeLang');
+  if (nat && profile.native_language) nat.textContent = profile.native_language;
+
+  var profEl = document.getElementById('insightsProfession');
+  if (profEl) profEl.textContent = profile.profession || profile.learning_goal || '—';
+  var whyEl = document.getElementById('insightsWhyEnglish');
+  if (whyEl) whyEl.textContent = profile.learning_goal || profile.motivation || '—';
+
+  // Plan pill
+  var pill = document.getElementById('profilePlanPill');
+  if (pill && profile.plan) { pill.textContent = profile.plan.toUpperCase(); pill.style.display = 'inline'; }
+
+  // Referral link
+  var refLink = document.getElementById('profileRefLink');
+  if (refLink && profile.id) refLink.textContent = 'https://sottotitoli.pro?ref=' + profile.id.slice(0, 8);
+  var refEarned = document.getElementById('profileRefEarned');
+  if (refEarned && window.refs) refEarned.textContent = '+' + (window.refs.total_earned_minutes || 0);
+}
+
 export function destroy() { container = null; }
