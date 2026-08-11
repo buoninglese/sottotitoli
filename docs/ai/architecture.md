@@ -139,7 +139,7 @@ Room IDs: URL params or localStorage. No auth on WebSocket — rooms are the sec
 | Page | Role | JS Dependencies |
 |------|------|----------------|
 | `index.html` | Landing, auth gate | auth.js, theme.js, i18n.js, notifications.js |
-| `panoramica.html` | Main dashboard | auth.js, theme-2.js, i18n.js, notifications.js, cefr-*.js, ai-voice.js, data-service.js, smart-suggestions.js, lemma-pos-map.js, language-resolver.js |
+| `panoramica.html` | Dashboard shell (118KB) | auth.js, theme-2.js, i18n.js, notifications.js, cefr-*.js, ai-voice.js, data-service.js, smart-suggestions.js, lemma-pos-map.js, language-resolver.js, plus 17 ES modules in `js/panoramica/` (app.js router + 10 panel modules + 6 shared utilities) |
 | `caption-s8t.html` | Live captioning | auth.js, theme-2.js, i18n.js, notifications.js, real-mic.js, grammar-viz.js, speech-icons.js, cefr-gse.js, cefr-info.js, language-resolver.js |
 
 ### Theme

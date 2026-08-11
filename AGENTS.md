@@ -32,12 +32,13 @@ git commit -m "fix: …" && git push # auto-push after EVERY commit
 - Skills auto-trigger from `~/.agents/skills/superpowers/` — check `using-superpowers` if unsure
 - **Rule:** If there's even a 1% chance a skill applies, you MUST use it. Think → Plan → Build. Never build first.
 
-**⚠️ For HTML edits (panoramica.html, any page >1000 lines):**
+**⚠️ For HTML edits (any page >1000 lines like caption-s8t.html):**
 - Count `<div>` / `</div>` balance: `grep -c '<div'` vs `grep -c '</div>'` across the changed range
 - Check `get_errors` before committing — if `<main>` shows "not paired", you miscounted
 - Never add a `</div>` without verifying the matching `<div>` exists
 - When adding an opening `<div>`, add its closing `</div>` in the same edit
 - After HTML edits: run `git diff --stat` — divs should come in pairs
+- **Note:** `panoramica.html` is now a thin shell (~150 lines of shell HTML) — panels live in `js/panoramica/panels/*.js` as ES modules, not inline HTML
 
 ---
 
@@ -144,7 +145,7 @@ Browser Mic → WebSocket relay → OpenAI Whisper → back to all clients in ro
 | File | Purpose |
 |------|---------|
 | `index.html` | Landing page — parallax slider, diagonal wipes |
-| `panoramica.html` | Main dashboard — 114KB+, the most complex page |
+| `panoramica.html` | Dashboard shell (~2,000 lines, 118KB) — 10 panels in `js/panoramica/panels/` |
 | `caption-s8t.html` | Live captioning — 5 slides, word bank, grammar, ~8.9K lines |
 | `traduzione-s8t.html` | Translation-focused caption variant |
 | `duo-s8t.html` | DUO+ multi-speaker collaborative mode |
@@ -169,6 +170,7 @@ Browser Mic → WebSocket relay → OpenAI Whisper → back to all clients in ro
 | `ws-publisher.js` | WebSocket publishing (traduzione-s8t) |
 | `js/cefr-*.js` | CEFR/GSE scoring (3 files, 2-3 pages each) |
 | `js/traduzione/*.js` | Translation module (6 files, traduzione-s8t) |
+| `js/panoramica/` | 17 ES modules — app.js router + 10 panels + 6 shared utils |
 
 Full list: see `docs/ai/pages-directory.md`
 

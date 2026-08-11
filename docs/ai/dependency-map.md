@@ -71,11 +71,19 @@
 ## Page-Specific Scripts
 
 ### panoramica.html
-Loads all 11 shared scripts + large inline `<script>` block (lines 4166–12254) containing:
-- `SottotitoliData.loadSettings()`, `saveSettings()`, `getWordbanks()`, etc.
-- `renderSessions()`, `renderWordbanks()`, `renderAIReports()`, `renderProfile()`
-- `renderCEFRQuad()`, `renderExpandSuggestions()`, `renderReviewDue()`
-- `toggleStartSession()`, `openSSSpinner()`, `closeSSSpinner()`
+Thin shell (~2,000 lines) that loads 11 shared scripts + panel router. Panel logic is in ES modules:
+- `js/panoramica/app.js` — Panel router, data loading, initialization (replaces the former 6,000-line mega-script)
+- `js/panoramica/panels/dashboard.js` — Hero, metrics, 14-day chart
+- `js/panoramica/panels/sessions.js` — Trascrizioni (table/cards, sorting, filtering)
+- `js/panoramica/panels/wordbanks.js` — Word Banks (overview, create, view)
+- `js/panoramica/panels/vocab-builder.js` — Vocabulary Builder (search, dictionary API)
+- `js/panoramica/panels/report-ai.js` — Report AI (create, list, view)
+- `js/panoramica/panels/settings.js` — Impostazioni form
+- `js/panoramica/panels/help.js` — Aiuto FAQ
+- `js/panoramica/panels/profile.js` — Profilo
+- `js/panoramica/panels/grammar-hub.js` — Grammar Hub (placeholder)
+- `js/panoramica/panels/ai-voice.js` — AI Voice
+- `js/panoramica/shared/` — 6 utility modules (dom, supabase, formatters, components, events, state)
 
 ### caption-s8t.html
 Loads shared scripts + `real-mic.js` + `translation-providers.js` + inline script.

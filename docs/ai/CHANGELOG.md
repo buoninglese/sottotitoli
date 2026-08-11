@@ -1,5 +1,21 @@
 # Changelog
 
+## [2026-08-11] Panoramica Architecture Restructure — Monolith to ES Modules
+
+### Changed
+- **panoramica.html** — Reduced from 12,411 lines / 828KB to ~2,000 lines / 118KB (85.7% reduction)
+- All 10 dashboard panels extracted into `js/panoramica/panels/*.js` — one ES module per panel
+- 6 shared utility modules in `js/panoramica/shared/` (dom, supabase, formatters, components, events, state)
+- New panel router `js/panoramica/app.js` replaces the 6,000-line mega-script
+- Sidebar navigation uses event delegation on `.sidebar` container
+- i18n MutationObserver fixed — uses `_pendingApply` retry instead of silently dropping mutations
+- Quiz Maker removed entirely (both copies, ~1,000 lines)
+- Dashboard panel uses full original HTML (hero banner, vocab search, streak card, glass cards, metrics, chart)
+- Sessions, Word Banks, Vocab Builder, Report AI, Settings, Help, Profile, Grammar Hub, AI Voice panels render full original HTML
+- Panel switching: explicit `panelContainer.innerHTML = ''` before each render
+- Backup preserved as `panoramica-v1.html`
+- See `AGENTS.md` for updated architecture docs
+
 ## [2026-08-06] Word Bank Overview — Bento Grid Layout
 
 ### Changed

@@ -10,7 +10,7 @@
 | File | Route | Purpose | Status | Size |
 |------|-------|---------|--------|------|
 | `index.html` | `/` | Landing page with parallax slider, diagonal wipes, pricing, testimonials | 🟢 Live | ~30KB |
-| `panoramica.html` | `/panoramica.html` | Main dashboard — session history, AI reports, vocabulary, metrics, settings. **Largest page.** | 🟢 Live | 114KB+ |
+| `panoramica.html` | `/panoramica.html` | Dashboard shell (~2,000 lines) — 10 panels as ES modules in `js/panoramica/panels/` + 6 shared utilities. Architecture restructured 2026-08-11. | 🟢 Live | 118KB shell + ~2,700 lines JS |
 | `caption-s8t.html` | `/caption-s8t.html` | Real-time captioning — 5 slides, live caption bar, word bank, grammar, DUO+ | 🟢 Live | ~8.9K lines |
 | `traduzione-s8t.html` | `/traduzione-s8t.html` | Translation-focused caption variant | 🟡 In dev | — |
 | `duo-s8t.html` | `/duo-s8t.html` | DUO+ multi-speaker collaborative mode | 🟡 In dev | — |
