@@ -117,8 +117,6 @@ function setupNavigation() {
   sidebar.addEventListener('click', function (e) {
     var link = e.target.closest('.sidebar-link[data-panel]');
     if (!link) return;
-    e.preventDefault();
-    e.stopPropagation();
     var panel = link.getAttribute('data-panel');
     if (panel) {
       switchPanel(panel);
