@@ -76,6 +76,17 @@ async function switchPanel(name) {
       }
     }
 
+    // ── Universal script injection ──
+    // innerHTML creates <script> elements but doesn't execute them.
+    // Find all dead scripts and re-create them as live script elements.
+    var deadScripts = wrap.querySelectorAll('script');
+    for (var i = 0; i < deadScripts.length; i++) {
+      var dead = deadScripts[i];
+      var live = document.createElement('script');
+      live.textContent = dead.textContent;
+      dead.parentNode.replaceChild(live, dead);
+    }
+
     // Add active class (CSS needs it)
     var panelEl = wrap.querySelector('.content-panel');
     if (panelEl) panelEl.classList.add('active');

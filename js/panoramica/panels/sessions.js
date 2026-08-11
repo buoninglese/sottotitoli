@@ -711,138 +711,21 @@ export async function render(parentEl) {
           </script>
         </div>
 `;
+  // ── Inject real <script> (innerHTML creates script elements but doesn't execute them) ──
+  var deadScript = container.querySelector('script');
+  if (deadScript) {
+    var liveScript = document.createElement('script');
+    liveScript.textContent = deadScript.textContent;
+    deadScript.remove();
+    container.appendChild(liveScript);
+  }
 }
 
 export async function init() {
-  var sb = window.sottotitoliSupabase;
-  var tableBody = document.getElementById('trTableBody');
-  if (tableBody) tableBody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:60px;color:var(--text-faint)">' + (sb ? 'Caricamento sessioni...' : 'Accedi per visualizzare le sessioni.') + '</td></tr>';
-  if (sb) loadAndRenderSessions();
-
-  // Filter chips
-  var filterChips = document.getElementById('trFilterChips');
-  if (filterChips) {
-    filterChips.addEventListener('click', function(e) {
-      var chip = e.target.closest('.tr-filter-chip');
-      if (!chip) return;
-      filterChips.querySelectorAll('.tr-filter-chip').forEach(function(c) {
-        c.style.background = 'var(--bg)'; c.style.color = 'var(--text-soft)'; c.style.border = '1px solid var(--line)';
-      });
-      chip.style.background = 'var(--cyan)'; chip.style.color = '#fff'; chip.style.border = 'none';
-      loadAndRenderSessions(chip.getAttribute('data-filter'));
-    });
-  }
-
-  // View toggles (table/cards)
-  document.addEventListener('click', function(e) {
-    var btn = e.target.closest('.tr-view-btn');
-    if (!btn) return;
-    var mode = btn.getAttribute('data-view');
-    var tableWrap = document.getElementById('trTableWrap');
-    var cardsWrap = document.getElementById('trCardsWrap');
-    if (tableWrap) tableWrap.style.display = mode === 'cards' ? 'none' : '';
-    if (cardsWrap) cardsWrap.style.display = mode === 'cards' ? 'flex' : 'none';
-    document.querySelectorAll('.tr-view-btn').forEach(function(b) {
-      b.style.background = b === btn ? 'var(--cyan)' : 'var(--card)';
-      b.style.color = b === btn ? '#fff' : 'var(--text-soft)';
-    });
-  });
-
-  // Session viewer modal — delegated
-  document.addEventListener('click', function(e) {
-    var row = e.target.closest('.tr-session-row');
-    if (!row) return;
-    var id = row.getAttribute('data-id');
-    if (!id) return;
-    viewSessionModal(id);
-  });
-
-  // Bulk select/delete
-  var bulkBar = document.getElementById('trBulkBar');
-  var bulkDel = document.getElementById('trBulkDelete');
-  var bulkDesel = document.getElementById('trBulkDeselect');
-  if (bulkDel) bulkDel.addEventListener('click', bulkDeleteSessions);
-  if (bulkDesel) bulkDesel.addEventListener('click', function() {
-    document.querySelectorAll('.tr-row-check').forEach(function(cb) { cb.checked = false; });
-    updateBulkBar();
-  });
+  // The inline script injected by render() handles ALL session logic:
+  // filter chips, view toggles, data loading, editor panel, bulk actions.
+  // This init() only sets up behaviors NOT covered by the inline script.
+  // (Currently: nothing extra needed — the script is self-contained.)
 }
 
 export function destroy() { container = null; }
-
-// ── Data loading ──
-async function loadAndRenderSessions(filter) {
-  filter = filter || 'all';
-  var sb = window.sottotitoliSupabase;
-  if (!sb) return;
-  var tbody = document.getElementById('trTableBody');
-  try {
-    var query = sb.from('sessions').select('id, name, created_at, duration_seconds, words_count, wpm, language_pair, transcript_text').order('created_at', { ascending: false }).limit(100);
-    if (filter === '7days') query = query.gte('created_at', new Date(Date.now() - 7*24*60*60*1000).toISOString());
-    if (filter === 'en') query = query.ilike('language_pair', 'en%');
-    if (filter === 'it') query = query.ilike('language_pair', '%it%');
-    var resp = await query;
-    if (resp.error) throw resp.error;
-    var sessions = resp.data || [];
-    renderSessionsTable(sessions);
-  } catch(e) { console.error('Sessions load:', e); if (tbody) tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:60px;color:var(--text-faint)">Errore nel caricamento.</td></tr>'; }
-}
-
-function renderSessionsTable(sessions) {
-  var tbody = document.getElementById('trTableBody');
-  if (!tbody) return;
-  if (!sessions.length) { tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:60px;color:var(--text-faint)">Nessuna sessione trovata.</td></tr>'; return; }
-  tbody.innerHTML = sessions.map(function(s) {
-    var name = s.name || 'Senza nome';
-    var date = s.created_at ? new Date(s.created_at).toLocaleDateString('it-IT', {day:'numeric',month:'short',year:'numeric'}) : '—';
-    var dur = s.duration_seconds ? Math.round(s.duration_seconds/60) + 'm' : '—';
-    return '<tr class="tr-session-row" data-id="' + s.id + '" style="border-bottom:1px solid var(--line);cursor:pointer;transition:background .15s" onmouseover="this.style.background=\'var(--bg)\'" onmouseout="this.style.background=\'\'">' +
-      '<td style="padding:12px;font-weight:600;color:var(--text)">' + esc(name) + '</td>' +
-      '<td style="padding:12px;color:var(--text-soft);white-space:nowrap">' + date + '</td>' +
-      '<td style="padding:12px;color:var(--text-soft)">' + esc(s.language_pair || '—') + '</td>' +
-      '<td style="padding:12px;color:var(--text-soft)">' + dur + '</td>' +
-      '<td style="padding:12px;color:var(--text-soft)">' + (s.words_count || '—') + '</td>' +
-      '<td style="padding:12px;color:var(--text-soft)">' + (s.wpm || '—') + '</td>' +
-      '</tr>';
-  }).join('');
-}
-
-function viewSessionModal(id) {
-  var sb = window.sottotitoliSupabase;
-  if (!sb) return;
-  sb.from('sessions').select('*').eq('id', id).single().then(function(r) {
-    if (r.error || !r.data) return;
-    var s = r.data;
-    var transcript = s.transcript_text || 'Nessuna trascrizione disponibile.';
-    var modal = document.createElement('div');
-    modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:100000;display:flex;align-items:center;justify-content:center;padding:20px';
-    modal.innerHTML = '<div style="background:var(--card);border-radius:16px;padding:24px;max-width:700px;width:100%;max-height:85vh;overflow-y:auto;box-shadow:0 8px 40px rgba(0,0,0,.3)">' +
-      '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">' +
-      '<div><h3 style="margin:0;font-family:Manrope,sans-serif;font-size:18px;color:var(--text)">' + esc(s.name || 'Sessione') + '</h3>' +
-      '<p style="margin:4px 0 0;font-size:12px;color:var(--text-soft)">' + (s.words_count||'—') + ' parole · ' + (s.wpm||'—') + ' WPM</p></div>' +
-      '<button style="background:none;border:none;font-size:24px;cursor:pointer;color:var(--text-dim)">&times;</button></div>' +
-      '<div style="max-height:60vh;overflow-y:auto;white-space:pre-wrap;font-size:13px;line-height:1.7;color:var(--text)">' + esc(transcript) + '</div></div>';
-    modal.addEventListener('click', function(e) { if (e.target === modal || e.target.closest('button')) modal.remove(); });
-    document.body.appendChild(modal);
-  }).catch(function(e) { console.error('Session view:', e); });
-}
-
-function esc(s) { return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
-
-function updateBulkBar() {
-  var checked = document.querySelectorAll('.tr-row-check:checked');
-  var bar = document.getElementById('trBulkBar');
-  if (bar) bar.style.display = checked.length ? 'flex' : 'none';
-  var count = document.getElementById('trBulkCount');
-  if (count) count.textContent = checked.length + ' selezionati';
-}
-
-async function bulkDeleteSessions() {
-  var checked = document.querySelectorAll('.tr-row-check:checked');
-  if (!checked.length) return;
-  if (!confirm('Eliminare ' + checked.length + ' sessioni?')) return;
-  var sb = window.sottotitoliSupabase;
-  if (!sb) return;
-  var ids = Array.from(checked).map(function(cb) { return cb.getAttribute('data-id'); });
-  try { for (var i=0;i<ids.length;i++) await sb.from('sessions').delete().eq('id',ids[i]); loadAndRenderSessions(); } catch(e) { console.error(e); }
-}
