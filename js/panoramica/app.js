@@ -38,7 +38,7 @@ var currentPanel = null;
 var panelContainer = null;
 
 // ── Panel switching (CSS toggle — DOM stays, no destroy/re-render, like original) ──
-async function switchPanel(name) {
+function switchPanel(name) {
   if (currentPanel === name) return;
 
   var next = panels[name];
@@ -55,47 +55,12 @@ async function switchPanel(name) {
     if (prevWrap) prevWrap.style.display = 'none';
   }
 
-  // Get or create the target panel's wrapper div (each panel lives in its own div)
+  // Target panel wrapper (pre-rendered by preloadAllPanels)
   var wrapId = 'panel-' + name;
   var wrap = document.getElementById(wrapId);
-  if (!wrap) {
-    wrap = document.createElement('div');
-    wrap.id = wrapId;
-    wrap.style.display = 'none';
-    panelContainer.appendChild(wrap);
 
-    // Render once, stay forever (like original — DOM never destroyed)
-    if (next.module.render) {
-      try {
-        await next.module.render(wrap);
-        next.loaded = true;
-      } catch (e) {
-        console.error('render error for', name, ':', e);
-        wrap.innerHTML = '<p style="padding:40px;color:var(--text-faint);text-align:center">Errore nel caricamento.</p>';
-        return;
-      }
-    }
-
-    // ── Universal script injection ──
-    // innerHTML creates <script> elements but doesn't execute them.
-    // Find all dead scripts and re-create them as live script elements.
-    var deadScripts = wrap.querySelectorAll('script');
-    for (var i = 0; i < deadScripts.length; i++) {
-      var dead = deadScripts[i];
-      var live = document.createElement('script');
-      live.textContent = dead.textContent;
-      dead.parentNode.replaceChild(live, dead);
-    }
-
-    // Add active class (CSS needs it)
-    var panelEl = wrap.querySelector('.content-panel');
-    if (panelEl) panelEl.classList.add('active');
-
-    // Init once — listeners stay attached forever
-    if (next.module.init) {
-      try { await next.module.init(); } catch (e) { console.error('init error:', e); }
-    }
-  }
+  // If panel not preloaded yet (clicked during loading), skip quietly
+  if (!wrap) return;
 
   // Show target panel
   wrap.style.display = '';
@@ -187,9 +152,68 @@ function updateDropdown(meta, profile, credits, tokens) {
   if (ddTokens) ddTokens.textContent = tokens != null ? tokens : '—';
 }
 
+// ── Preload all panels at once (no lazy loading) ──
+async function preloadAllPanels() {
+  var names = Object.keys(panels);
+  var total = names.length;
+  var done = 0;
+
+  // Render all panels in parallel
+  await Promise.all(names.map(async function (name) {
+    var entry = panels[name];
+    if (!entry || !entry.module) return;
+
+    var wrapId = 'panel-' + name;
+    var wrap = document.getElementById(wrapId);
+    if (wrap) return; // already rendered
+
+    wrap = document.createElement('div');
+    wrap.id = wrapId;
+    wrap.style.display = 'none';
+    if (panelContainer) panelContainer.appendChild(wrap);
+
+    if (entry.module.render) {
+      try {
+        await entry.module.render(wrap);
+        entry.loaded = true;
+      } catch (e) {
+        console.error('render error for', name, ':', e);
+        wrap.innerHTML = '<p style="padding:40px;color:var(--text-faint);text-align:center">Errore nel caricamento.</p>';
+        return;
+      }
+    }
+
+    // ── Universal script injection ──
+    var deadScripts = wrap.querySelectorAll('script');
+    for (var i = 0; i < deadScripts.length; i++) {
+      var dead = deadScripts[i];
+      var live = document.createElement('script');
+      live.textContent = dead.textContent;
+      dead.parentNode.replaceChild(live, dead);
+    }
+
+    // Add active class
+    var panelEl = wrap.querySelector('.content-panel');
+    if (panelEl) panelEl.classList.add('active');
+
+    // Init
+    if (entry.module.init) {
+      try { await entry.module.init(); } catch (e) { console.error('init error for', name, ':', e); }
+    }
+
+    done++;
+  }));
+
+  console.log('Preloaded ' + done + '/' + total + ' panels');
+}
+
 // ── Main initialization ──
 async function init() {
   panelContainer = document.getElementById('panelContainer');
+
+  // Show loading state
+  var mp = document.querySelector('.main-panel');
+  if (mp) mp.classList.add('js-loading');
 
   // Wait for Supabase
   var sb = await waitForSupabase();
@@ -281,8 +305,10 @@ async function init() {
   setupNavigation();
   setupDropdownLinks();
 
-  // Show the main panel (remove loading state)
-  var mp = document.querySelector('.main-panel');
+  // ── Preload ALL panels (no lazy loading — everything renders upfront) ──
+  await preloadAllPanels();
+
+  // Show the main panel (hide loading spinner, show content)
   if (mp) {
     mp.classList.remove('js-loading');
     mp.classList.add('js-ready');
