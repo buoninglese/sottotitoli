@@ -92,6 +92,8 @@ With 10+ content panels (Panoramica, Word Banks, Vocabulary Builder, Grammar Hub
 ### Decision
 All panels live in a single HTML file (`panoramica.html`). Navigation uses `data-panel` attributes on sidebar links, with JavaScript toggling `.active` classes. CSS hides all `.content-panel` elements except the one with `.active`.
 
+> **Update 2026-08-11:** Panels now live in separate ES modules (`js/panoramica/panels/*.js`). The `data-panel` navigation pattern is preserved. Panel HTML is rendered dynamically by the router (`app.js`) instead of being pre-loaded in the DOM. See ADR-010.
+
 ```css
 .content-panel { display: none; }
 .content-panel.active { display: block; }
