@@ -37,49 +37,57 @@ var panels = {
 var currentPanel = null;
 var panelContainer = null;
 
-// ── Panel switching ──
+// ── Panel switching (CSS toggle — DOM stays, no destroy/re-render, like original) ──
 async function switchPanel(name) {
   if (currentPanel === name) return;
 
-  var prev = panels[currentPanel];
   var next = panels[name];
-
   if (!next || !next.module) { console.warn('Unknown panel:', name); return; }
 
-  // Get panel container
   if (!panelContainer) {
     panelContainer = document.getElementById('panelContainer');
     if (!panelContainer) { console.error('panelContainer not found'); return; }
   }
 
-  // Destroy previous panel
-  if (prev && prev.loaded && prev.module.destroy) {
-    try { prev.module.destroy(); } catch (e) { console.warn('destroy error:', e); }
+  // Hide current panel
+  if (currentPanel) {
+    var prevWrap = document.getElementById('panel-' + currentPanel);
+    if (prevWrap) prevWrap.style.display = 'none';
   }
 
-  // Clear the container
-  panelContainer.innerHTML = '';
+  // Get or create the target panel's wrapper div (each panel lives in its own div)
+  var wrapId = 'panel-' + name;
+  var wrap = document.getElementById(wrapId);
+  if (!wrap) {
+    wrap = document.createElement('div');
+    wrap.id = wrapId;
+    wrap.style.display = 'none';
+    panelContainer.appendChild(wrap);
 
-  // Render panel HTML
-  if (next.module.render) {
-    try {
-      await next.module.render(panelContainer);
-      next.loaded = true;
-    } catch (e) {
-      console.error('render error for', name, ':', e);
-      panelContainer.innerHTML = '<p style="padding:40px;color:var(--text-faint);text-align:center">Errore nel caricamento del pannello.</p>';
-      return;
+    // Render once, stay forever (like original — DOM never destroyed)
+    if (next.module.render) {
+      try {
+        await next.module.render(wrap);
+        next.loaded = true;
+      } catch (e) {
+        console.error('render error for', name, ':', e);
+        wrap.innerHTML = '<p style="padding:40px;color:var(--text-faint);text-align:center">Errore nel caricamento.</p>';
+        return;
+      }
+    }
+
+    // Add active class (CSS needs it)
+    var panelEl = wrap.querySelector('.content-panel');
+    if (panelEl) panelEl.classList.add('active');
+
+    // Init once — listeners stay attached forever
+    if (next.module.init) {
+      try { await next.module.init(); } catch (e) { console.error('init error:', e); }
     }
   }
 
-  // Add active class to the panel's root element (CSS hides .content-panel without .active)
-  var panelEl = panelContainer.querySelector('.content-panel');
-  if (panelEl) panelEl.classList.add('active');
-
-  // Init panel
-  if (next.module.init) {
-    try { await next.module.init(); } catch (e) { console.error('init error for', name, ':', e); }
-  }
+  // Show target panel
+  wrap.style.display = '';
 
   var previousPanel = currentPanel;
   currentPanel = name;
