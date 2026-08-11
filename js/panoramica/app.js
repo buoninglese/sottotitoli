@@ -104,15 +104,8 @@ function handleHash() {
 // ── No setupNavigation() needed. Sidebar links are plain <a href="#panel">.
 // The browser's native link behavior drives everything via hashchange.
 
-// ── Set up user dropdown panel links ──
-function setupDropdownLinks() {
-  // The dropdown links use inline onclick that dispatches events.
-  // We intercept those and route through switchPanel instead.
-  document.addEventListener('click', function (e) {
-    // Check for dropdown items that reference panels via data-panel attribute lookups
-    // These were inline onclicks in the original — kept for backward compat
-  });
-}
+// ── Dropdown links now use window.location.hash= directly (see panoramica.html line 96-104).
+// No JavaScript handler needed — the browser's native hashchange handles everything.
 
 // ── Update topbar dropdown with user data ──
 function updateDropdown(meta, profile, credits, tokens) {
@@ -136,8 +129,8 @@ async function preloadAllPanels() {
   var total = names.length;
   var done = 0;
 
-  // Render all panels in parallel
-  await Promise.all(names.map(async function (name) {
+  // Render all panels — per-panel error isolation (one failure doesn't block others)
+  var results = await Promise.allSettled(names.map(async function (name) {
     var entry = panels[name];
     if (!entry || !entry.module) return;
 
@@ -151,14 +144,8 @@ async function preloadAllPanels() {
     if (panelContainer) panelContainer.appendChild(wrap);
 
     if (entry.module.render) {
-      try {
-        await entry.module.render(wrap);
-        entry.loaded = true;
-      } catch (e) {
-        console.error('render error for', name, ':', e);
-        wrap.innerHTML = '<p style="padding:40px;color:var(--text-faint);text-align:center">Errore nel caricamento.</p>';
-        return;
-      }
+      await entry.module.render(wrap);
+      entry.loaded = true;
     }
 
     // ── Universal script injection ──
@@ -174,39 +161,52 @@ async function preloadAllPanels() {
     var panelEl = wrap.querySelector('.content-panel');
     if (panelEl) panelEl.classList.add('active');
 
-    // ── Wire subtab onclick handlers (replaces theme-2.js delegated handler) ──
-    var subtabs = wrap.querySelectorAll('.tab-link[data-subtab]');
-    for (var j = 0; j < subtabs.length; j++) {
-      subtabs[j].onclick = function () {
-        var tab = this;
-        var parentPanel = tab.closest('.content-panel');
-        if (!parentPanel) return;
-        var subId = tab.getAttribute('data-subtab');
-        // Deactivate all tabs in this panel
-        parentPanel.querySelectorAll('.tab-link').forEach(function (t) {
-          t.classList.remove('active');
-          t.setAttribute('aria-selected', 'false');
-        });
-        // Activate clicked tab
-        tab.classList.add('active');
-        tab.setAttribute('aria-selected', 'true');
-        // Show target pane, hide others
-        parentPanel.querySelectorAll('.subtab-pane').forEach(function (p) {
-          p.classList.remove('active');
-        });
-        var target = document.getElementById('sub-' + subId);
-        if (target) target.classList.add('active');
-        return false;
-      };
+    // ── Wire subtab onclick handlers ──
+    // Skipped for vocabulary-builder (has its own delegation in panoramica.html line 1510)
+    if (name !== 'vocabulary-builder') {
+      var subtabs = wrap.querySelectorAll('.tab-link[data-subtab]');
+      for (var j = 0; j < subtabs.length; j++) {
+        subtabs[j].onclick = function () {
+          var tab = this;
+          var parentPanel = tab.closest('.content-panel');
+          if (!parentPanel) return;
+          var subId = tab.getAttribute('data-subtab');
+          parentPanel.querySelectorAll('.tab-link').forEach(function (t) {
+            t.classList.remove('active');
+            t.setAttribute('aria-selected', 'false');
+          });
+          tab.classList.add('active');
+          tab.setAttribute('aria-selected', 'true');
+          parentPanel.querySelectorAll('.subtab-pane').forEach(function (p) {
+            p.classList.remove('active');
+          });
+          var target = document.getElementById('sub-' + subId);
+          if (target) target.classList.add('active');
+          return false;
+        };
+      }
     }
 
     // Init
     if (entry.module.init) {
-      try { await entry.module.init(); } catch (e) { console.error('init error for', name, ':', e); }
+      await entry.module.init();
     }
 
     done++;
   }));
+
+  // Report failures
+  var failed = results.filter(function(r) { return r.status === 'rejected'; });
+  if (failed.length > 0) {
+    console.error(failed.length + ' panel(s) failed to load:');
+    failed.forEach(function(r) { console.error('  ', r.reason); });
+    // Show error in first panel wrapper
+    var firstWrap = document.querySelector('[id^="panel-"]');
+    if (firstWrap) {
+      firstWrap.style.display = '';
+      firstWrap.innerHTML = '<div class="content-panel active" style="padding:60px 40px;text-align:center"><p style="font-size:18px;color:var(--red);font-weight:700;margin:0">Alcuni pannelli non sono riusciti a caricare (' + failed.length + ')</p><p style="font-size:13px;color:var(--text-soft);margin:8px 0 0">Ricarica la pagina o controlla la console per i dettagli.</p></div>';
+    }
+  }
 
   console.log('Preloaded ' + done + '/' + total + ' panels');
 }
@@ -340,6 +340,10 @@ window.switchPanel = switchPanel;
 init().catch(function (e) {
   console.error('Panoramica init failed:', e);
   var mp = document.querySelector('.main-panel');
+  var loader = document.getElementById('pageLoader');
+  if (loader) {
+    loader.innerHTML = '<div class="page-loader-logo" style="color:var(--red)">Errore</div><p style="font-size:14px;color:var(--text-soft);margin:12px 0 0;font-family:\'Inter\',sans-serif">Impossibile caricare la dashboard. Ricarica la pagina.</p><p style="font-size:11px;color:var(--text-faint);margin:4px 0 0;font-family:\'Inter\',sans-serif">' + (e.message || 'Errore sconosciuto') + '</p>';
+  }
   if (mp) {
     mp.classList.remove('js-loading');
     mp.classList.add('js-ready');
