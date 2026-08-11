@@ -419,7 +419,7 @@
         sl.querySelectorAll('.bar').forEach(function(b,i){b.setAttribute('data-tip',days[i]||label);});
       });
     }
-    initSparklineTooltips();
+    window.initSparklineTooltips = initSparklineTooltips;
     function fmtDate(iso) {
       if (!iso) return '\u2014';
       var lang = (window.I18n && I18n.getLang() === 'en') ? 'en-US' : 'it-IT';
@@ -1499,30 +1499,28 @@
     alert('Dettaglio: ' + word + '\\nLivello: ' + level + '\\nPOS: ' + pos + '\\n\\nDettaglio completo in arrivo.');
   }
 
-  // ── CEFR Explorer: load when Esplora subtab clicked ──
-  // VB subtab switching handler (English / Italian / Esplora)
-  document.querySelectorAll('#pnl-vocabulary-builder .tab-link[data-subtab]').forEach(function(tab){
-    tab.addEventListener('click', function(){
-      var subtab = this.getAttribute('data-subtab');
-      // Update active tab
-      this.parentElement.querySelectorAll('.tab-link').forEach(function(t){ t.classList.remove('active'); t.setAttribute('aria-selected','false'); });
-      this.classList.add('active'); this.setAttribute('aria-selected','true');
-      // Show matching pane, hide others
-      var panel = document.getElementById('pnl-vocabulary-builder');
-      if (panel) {
-        panel.querySelectorAll('.subtab-pane').forEach(function(p){ p.classList.remove('active'); });
-        var pane = document.getElementById('sub-' + subtab);
-        if (pane) { pane.classList.add('active'); }
-      }
-      // Load data for specific tabs
-      if (subtab === 'wb-explore') { setTimeout(loadCefrTopics, 100); }
-    });
+  // ── CEFR Explorer + VB subtab switching (event delegation — tabs rendered dynamically) ──
+  document.addEventListener('click', function(e){
+    var tab = e.target.closest('#pnl-vocabulary-builder .tab-link[data-subtab]');
+    if (!tab) return;
+    e.preventDefault();
+    var subtab = tab.getAttribute('data-subtab');
+    // Update active tab
+    if (tab.parentElement) {
+      tab.parentElement.querySelectorAll('.tab-link').forEach(function(t){ t.classList.remove('active'); t.setAttribute('aria-selected','false'); });
+    }
+    tab.classList.add('active'); tab.setAttribute('aria-selected','true');
+    // Show matching pane, hide others
+    var panel = document.getElementById('pnl-vocabulary-builder');
+    if (panel) {
+      panel.querySelectorAll('.subtab-pane').forEach(function(p){ p.classList.remove('active'); });
+      var pane = document.getElementById('sub-' + subtab);
+      if (pane) { pane.classList.add('active'); }
+    }
+    // Load data for specific tabs
+    if (subtab === 'wb-explore') { setTimeout(loadCefrTopics, 100); }
+    if (subtab === 'vt-review') { setTimeout(function(){ if(window.renderVTReviewDue) window.renderVTReviewDue(); }, 100); }
   });
-  // Also trigger via existing listener
-  document.querySelector('[data-subtab="wb-explore"]')?.addEventListener('click', function(){ setTimeout(loadCefrTopics, 100); });
-
-  // Ripasso subtab: re-render when clicked
-  document.querySelector('[data-subtab="vt-review"]')?.addEventListener('click', function(){ setTimeout(function(){ if(window.renderVTReviewDue) window.renderVTReviewDue(); }, 100); });
 
   // Expose to global
   window.loadCefrTopics = loadCefrTopics;
