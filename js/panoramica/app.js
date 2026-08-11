@@ -109,18 +109,17 @@ function handleHash() {
   }
 }
 
-// ── Set up sidebar navigation (event delegation — robust against dynamically added links) ──
+// ── Set up sidebar navigation (direct handlers — no event delegation for Safari compat) ──
 function setupNavigation() {
-  var sidebar = document.querySelector('.sidebar');
-  if (!sidebar) { console.error('Sidebar not found'); return; }
-  
-  sidebar.addEventListener('click', function (e) {
-    var link = e.target.closest('.sidebar-link[data-panel]');
-    if (!link) return;
-    var panel = link.getAttribute('data-panel');
-    if (panel) {
-      switchPanel(panel);
-    }
+  var links = document.querySelectorAll('.sidebar-link[data-panel]');
+  links.forEach(function (link) {
+    link.addEventListener('click', function (e) {
+      e.preventDefault();
+      var panel = link.getAttribute('data-panel');
+      if (panel) {
+        switchPanel(panel);
+      }
+    });
   });
 }
 
