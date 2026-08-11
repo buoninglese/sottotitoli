@@ -161,6 +161,10 @@
       });
     })();
     /* ── Sidebar nav: switch content panels ── */
+    /* DISABLED — app.js handles all panel switching in the modular architecture.
+       The old handler used .content-panel selectors which captured an empty
+       NodeList at page load (panels render dynamically now). It also conflicts
+       with app.js's switchPanel() on Safari where event ordering differs.
     (function(){
       var navItems = document.querySelectorAll('.side-nav .nav-item[data-panel]');
       var panels = document.querySelectorAll('.content-panel');
@@ -168,7 +172,6 @@
         item.addEventListener('click', function(e){
           e.preventDefault();
           var panelId = this.getAttribute('data-panel');
-          // If Start Session is open, close it first
           var ss=document.getElementById('startSplit');
           if(ss&&ss.classList.contains('active')){
             ss.classList.remove('active');
@@ -184,6 +187,7 @@
         });
       });
     })();
+    */
     /* ── Sub-tab switching within content panels ── */
     document.addEventListener('click', function(e){
       var tab = e.target.closest('.tab-link[data-subtab]');
