@@ -13,7 +13,7 @@ Measured on GitHub Pages (production), throttled to Fast 3G.
 | Metric | Target | Current (est.) |
 |--------|--------|----------------|
 | **First Contentful Paint (FCP)** | < 2.0s | ~1.5s |
-| **Largest Contentful Paint (LCP)** | < 2.5s | ~2.0s (panoramica) |
+| **Largest Contentful Paint (LCP)** | < 2.5s | ~1.5s (panoramica) |
 | **Time to Interactive (TTI)** | < 3.0s | ~2.5s |
 | **Total Blocking Time (TBT)** | < 200ms | ~100ms |
 | **Cumulative Layout Shift (CLS)** | < 0.1 | ~0.05 |
@@ -34,7 +34,7 @@ Measured on GitHub Pages (production), throttled to Fast 3G.
 | `css/bootstrap-theme.min.css` | ~20KB | ⚠️ Bootstrap — mostly unused |
 | **Total CSS** | **~166KB** | |
 
-### JavaScript (20+ files)
+### JavaScript (20+ files, plus 17 ES modules for panoramica)
 
 | File | Size | Critical? |
 |------|------|-----------|
@@ -44,11 +44,12 @@ Measured on GitHub Pages (production), throttled to Fast 3G.
 | `js/i18n.js` | ~6KB | ✅ Required by 4 pages |
 | `js/data-service.js` | ~15KB | ⚠️ Data-heavy pages only |
 | `js/cefr-*.js` (3 files) | ~20KB | ❌ Vocabulary pages only |
+| `js/panoramica/` (17 modules) | ~40KB | ❌ Dashboard only (lazy-loaded per panel) |
 | CDN: Supabase SDK | ~80KB | ✅ Required by all authenticated pages |
 | CDN: compromise.js | ~60KB | ❌ NLP pages only |
 | CDN: pdf.js | ~300KB | ❌ Import feature only |
 | CDN: mammoth.js | ~100KB | ❌ Import feature only |
-| **Total self-hosted JS** | **~80KB** | |
+| **Total self-hosted JS** | **~120KB** | |
 | **Total CDN JS** | **~540KB** | |
 
 ### Fonts

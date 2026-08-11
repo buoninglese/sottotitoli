@@ -27,6 +27,8 @@ Variables are NOT globally consistent across pages. Each page has its own palett
 
 ### panoramica.html Pattern (Use This as Template)
 
+> **Note (2026-08-11):** `panoramica.html` is now a thin shell (~2,000 lines). The CSS variables below are still in the shell `<style>` block. Panel-specific styles are in `css/panoramica.css`. Panel HTML is rendered by ES modules in `js/panoramica/panels/`. This pattern — `:root` + `[data-theme="dark"]` with per-page variables — remains the canonical template.
+
 ```css
 :root {
   --bg: #f0f6f8;

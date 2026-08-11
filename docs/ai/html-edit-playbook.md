@@ -1,7 +1,9 @@
 # html-edit-playbook.md — Div-Balance Debugging Playbook
 
-> **Battle-tested techniques for fixing structural HTML bugs in 10,000+ line files.**
-> Every technique here was used during the 2026-08-05 panoramica.html audit.
+> **Battle-tested techniques for fixing structural HTML bugs in large files.**
+> Every technique here was used during the 2026-08-05 panoramica.html audit (back when it was 12,000+ lines).
+>
+> **Note (2026-08-11):** `panoramica.html` is now a ~2,000-line thin shell. Panels live in `js/panoramica/panels/*.js` as ES modules. Most techniques below still apply to `caption-s8t.html` and other large pages.
 >
 > **Cross-refs:** `coding-procedures.md` · `solve-mistakes.md` · `docs/DECISIONS.md` (ADR-007) · `AGENTS.md`
 
@@ -75,7 +77,7 @@ The imbalance should cancel out across regions. If a region has a large positive
 
 **When half the panels display and half don't**, the break is at a single point in the HTML. Find the last working panel and the first broken panel, then look at what's between them.
 
-**Real example from 2026-08-05:**
+**Real example from 2026-08-05 (panoramica.html back when it was a 12K-line monolith):**
 
 | Panel | Status | Line |
 |-------|--------|------|
