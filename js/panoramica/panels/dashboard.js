@@ -329,7 +329,7 @@ async function renderHeroCards(userId) {
     // Fallback: direct query
     if (wbWithWords.length === 0 && userId && sb) {
       try {
-        var wbResp = await sb.from('word_banks')
+        var wbResp = await sb.from('user_wordbanks')
           .select('id,name,word_count')
           .eq('user_id', userId)
           .eq('language', studyLang)
