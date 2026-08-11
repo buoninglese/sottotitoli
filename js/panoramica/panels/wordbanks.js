@@ -633,9 +633,6 @@ export async function render(parentEl) {
 }
 
 export async function init() {
-  if (window._wbInitDone) return;
-  window._wbInitDone = true;
-
   // Tab switching
   var tabs = document.getElementById('wbTabs');
   if (tabs) {
@@ -669,7 +666,7 @@ export async function init() {
   loadBanks('overview');
 }
 
-export function destroy() { container = null; window._wbInitDone = false; }
+export function destroy() { container = null; }
 
 async function loadBanks(tab) {
   tab = tab || 'overview';

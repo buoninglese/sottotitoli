@@ -8,35 +8,30 @@ import { formatDate, formatDuration, formatNumber, statusBadge } from './shared/
 import { emit, on } from './shared/events.js';
 import { store, updateStore, syncWindowGlobals } from './shared/state.js';
 
-// ── Panel imports ──
-// Dashboard is preloaded (default panel). All others lazy-load via dynamic import().
-
-// Panel loader map — maps panel name → import() promise
-var panelLoaders = {
-  'panoramica': function() { return import('./panels/dashboard.js'); },
-  'profilo': function() { return import('./panels/profile.js'); },
-  'trascrizioni': function() { return import('./panels/sessions.js'); },
-  'wordbanks': function() { return import('./panels/wordbanks.js'); },
-  'vocabulary-builder': function() { return import('./panels/vocab-builder.js'); },
-  'report-ai': function() { return import('./panels/report-ai.js'); },
-  'impostazioni': function() { return import('./panels/settings.js'); },
-  'aiuto': function() { return import('./panels/help.js'); },
-  'grammar-hub': function() { return import('./panels/grammar-hub.js'); },
-  'ai-voice': function() { return import('./panels/ai-voice.js'); }
-};
+// ── Panel imports (preloaded — all available instantly, no race conditions) ──
+import * as dashboardPanel from './panels/dashboard.js';
+import * as profilePanel from './panels/profile.js';
+import * as sessionsPanel from './panels/sessions.js';
+import * as wordbanksPanel from './panels/wordbanks.js';
+import * as vocabBuilderPanel from './panels/vocab-builder.js';
+import * as reportAiPanel from './panels/report-ai.js';
+import * as settingsPanel from './panels/settings.js';
+import * as helpPanel from './panels/help.js';
+import * as grammarHubPanel from './panels/grammar-hub.js';
+import * as aiVoicePanel from './panels/ai-voice.js';
 
 // ── Panel registry ──
 var panels = {
-  'panoramica': { module: null, loaded: false },
-  'profilo': { module: null, loaded: false },
-  'trascrizioni': { module: null, loaded: false },
-  'wordbanks': { module: null, loaded: false },
-  'vocabulary-builder': { module: null, loaded: false },
-  'report-ai': { module: null, loaded: false },
-  'impostazioni': { module: null, loaded: false },
-  'aiuto': { module: null, loaded: false },
-  'grammar-hub': { module: null, loaded: false },
-  'ai-voice': { module: null, loaded: false }
+  'panoramica': { module: dashboardPanel, loaded: false },
+  'profilo': { module: profilePanel, loaded: false },
+  'trascrizioni': { module: sessionsPanel, loaded: false },
+  'wordbanks': { module: wordbanksPanel, loaded: false },
+  'vocabulary-builder': { module: vocabBuilderPanel, loaded: false },
+  'report-ai': { module: reportAiPanel, loaded: false },
+  'impostazioni': { module: settingsPanel, loaded: false },
+  'aiuto': { module: helpPanel, loaded: false },
+  'grammar-hub': { module: grammarHubPanel, loaded: false },
+  'ai-voice': { module: aiVoicePanel, loaded: false }
 };
 
 var currentPanel = null;
@@ -49,7 +44,7 @@ async function switchPanel(name) {
   var prev = panels[currentPanel];
   var next = panels[name];
 
-  if (!next) { console.warn('Unknown panel:', name); return; }
+  if (!next || !next.module) { console.warn('Unknown panel:', name); return; }
 
   // Get panel container
   if (!panelContainer) {
@@ -58,25 +53,12 @@ async function switchPanel(name) {
   }
 
   // Destroy previous panel
-  if (prev && prev.loaded && prev.module && prev.module.destroy) {
+  if (prev && prev.loaded && prev.module.destroy) {
     try { prev.module.destroy(); } catch (e) { console.warn('destroy error:', e); }
   }
 
   // Clear the container
   panelContainer.innerHTML = '';
-
-  // Lazy-load the panel module if not loaded yet
-  if (!next.module) {
-    var loader = panelLoaders[name];
-    if (!loader) { console.error('No loader for panel:', name); return; }
-    try {
-      next.module = await loader();
-    } catch (e) {
-      console.error('load error for', name, ':', e);
-      panelContainer.innerHTML = '<p style="padding:40px;color:var(--text-faint);text-align:center">Errore nel caricamento del pannello.</p>';
-      return;
-    }
-  }
 
   // Render panel HTML
   if (next.module.render) {

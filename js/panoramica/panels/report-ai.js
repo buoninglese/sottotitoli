@@ -1372,9 +1372,6 @@ export async function render(parentEl) {
 }
 
 export async function init() {
-  if (window._raiInitDone) return;
-  window._raiInitDone = true;
-
   // Tab switching
   var tabs = document.getElementById('raiTabs');
   if (tabs) {
@@ -1399,7 +1396,7 @@ export async function init() {
   renderRaiContent('rai-crea');
 }
 
-export function destroy() { container = null; window._raiInitDone = false; }
+export function destroy() { container = null; }
 
 async function loadReports() {
   var sb = window.sottotitoliSupabase;

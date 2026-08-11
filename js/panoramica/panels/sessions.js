@@ -714,10 +714,6 @@ export async function render(parentEl) {
 }
 
 export async function init() {
-  var initialized = false;
-  if (window._sessionsInitDone) return;
-  window._sessionsInitDone = true;
-
   var sb = window.sottotitoliSupabase;
   var tableBody = document.getElementById('trTableBody');
   if (tableBody) tableBody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:60px;color:var(--text-faint)">' + (sb ? 'Caricamento sessioni...' : 'Accedi per visualizzare le sessioni.') + '</td></tr>';
@@ -772,7 +768,7 @@ export async function init() {
   });
 }
 
-export function destroy() { container = null; window._sessionsInitDone = false; }
+export function destroy() { container = null; }
 
 // ── Data loading ──
 async function loadAndRenderSessions(filter) {

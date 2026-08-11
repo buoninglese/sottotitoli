@@ -246,9 +246,6 @@ export async function render(parentEl) {
 }
 
 export async function init() {
-  if (window._vbInitDone) return;
-  window._vbInitDone = true;
-
   // Tab switching
   var tabs = document.getElementById('vbTabs');
   if (tabs) {
@@ -273,7 +270,7 @@ export async function init() {
   if (searchInput) searchInput.addEventListener('keydown', function(e) { if (e.key === 'Enter') doSearch(); });
 }
 
-export function destroy() { container = null; window._vbInitDone = false; }
+export function destroy() { container = null; }
 
 async function doSearch() {
   var input = document.getElementById('vbSearchInput');
