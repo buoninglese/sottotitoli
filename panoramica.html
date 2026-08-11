@@ -456,12 +456,11 @@
 
 <!-- 🎯 SETTINGS SAVE — single unified handler 🎯 -->
 <script>
+// ── Settings: event delegation (elements rendered dynamically by panel router) ──
 (function(){
   'use strict';
-  var btn = document.getElementById('saveSettingsBtn');
-  if (!btn) return;
 
-  // ── Load email when settings panel opens ──
+  // Load email when settings panel opens (delegation via sidebar click)
   function loadEmail() {
     var emailEl = document.getElementById('settingsEmail');
     if (!emailEl || emailEl.textContent.trim() !== '—') return;
@@ -474,16 +473,24 @@
       }
     } catch(e) {}
   }
-  var impNav = document.querySelector('[data-panel="impostazioni"]');
-  if (impNav) impNav.addEventListener('click', function(){ setTimeout(loadEmail, 200); });
+  document.addEventListener('click', function(e){
+    if (e.target.closest('[data-panel="impostazioni"]')) setTimeout(loadEmail, 200);
+  });
   loadEmail();
 
-  // ── Theme select: apply immediately on change ──
-  var themeSel = document.getElementById('settingsTheme');
-  if (themeSel) themeSel.addEventListener('change', function(){ applyTheme(this.value); });
+  // Theme select: delegate change event
+  document.addEventListener('change', function(e){
+    if (e.target.id === 'settingsTheme') {
+      if (typeof applyTheme === 'function') applyTheme(e.target.value);
+    }
+  });
 
-  // ── Save handler (only one!) ──
-  btn.addEventListener('click', async function(){
+  // Settings save: delegate click on save button
+  document.addEventListener('click', async function(e){
+    var btn = e.target.closest('#saveSettingsBtn');
+    if (!btn) return;
+    e.preventDefault();
+
     var settings = {};
     var uiEl = document.getElementById('settingsUiLang');
     if (uiEl) settings.ui_language = uiEl.value;
@@ -494,13 +501,11 @@
     var dtpEl = document.getElementById('settingsDefaultTrPair');
     if (dtpEl && dtpEl.value) settings.default_translation_pair = dtpEl.value;
 
-    // Green flash
     var origBg = btn.style.background;
     btn.style.background = 'var(--green, #059669)';
     btn.style.transition = 'background 0.15s ease';
     setTimeout(function(){ btn.style.background = origBg; }, 800);
 
-    // Save via unified API → returns { ok, errors }
     var result = { ok: false, errors: ['Nessuna connessione'] };
     try {
       if (typeof SottotitoliData !== 'undefined' && SottotitoliData.saveSettings) {
@@ -508,7 +513,6 @@
       }
     } catch(e) { result = { ok: false, errors: [e.message] }; }
 
-    // Toast with clear feedback
     var toast = document.getElementById('toastMsg');
     if (toast) {
       if (result.ok) {
@@ -525,7 +529,6 @@
       setTimeout(function(){ toast.classList.remove('show'); toast.style.background = ''; }, 3500);
     }
 
-    // Update hero + dropdown name
     if (settings.display_name) {
       var heroEm = document.querySelector('.hero-content h2 em');
       if (heroEm) heroEm.textContent = settings.display_name;
@@ -533,22 +536,18 @@
       if (ddName) ddName.textContent = settings.display_name;
     }
 
-    // Switch UI language if changed
     if (settings.ui_language && typeof I18n !== 'undefined' && I18n.setLang) {
       I18n.setLang(settings.ui_language);
-      // Update cached settings so renderHero picks up new language
       if (window._settingsData) window._settingsData.ui_language = settings.ui_language;
-      // Re-render hero with new language
-      renderHero(window._settingsData && window._settingsData.display_name);
-      renderHeroCards();
+      if (window.switchPanel && window._currentPanel) {
+        window.switchPanel(window._currentPanel);
+      }
     }
 
-    // Update local caches
     var profile = window._sottotitoliProfile;
     if (profile) {
       if (settings.display_name) profile.display_name = settings.display_name;
     }
-
   });
 
 })();
@@ -686,7 +685,6 @@
             // Determine proficiency: if in improve list, 40-60%; otherwise 75-90%
             var isImproving = improve.indexOf(mappedCode) !== -1 || improve.indexOf(l) !== -1;
             var pct = 0;
-            var isImproving = improve.indexOf(mappedCode) !== -1 || improve.indexOf(l) !== -1;
             // Derive proficiency from session data if available
             var sessionLangKey = mappedCode + '_sessions';
             if (!isImproving) {
@@ -1875,7 +1873,7 @@
     const API_HEADERS = {
       'Content-Type': 'application/json',
       'x-rapidapi-host': 'learning-hub-api-by-blackalphalabs.p.rapidapi.com',
-      'x-rapidapi-key': 'a2ad59b4famshd2c4c1338c2c73dp1e1712jsn23cff1a56f08'
+      'x-rapidapi-key': 'YOUR_RAPIDAPI_KEY'
     };
 
     let _lhCourses = [];

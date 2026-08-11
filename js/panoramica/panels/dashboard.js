@@ -180,6 +180,8 @@ export function destroy() {
   container = null;
 }
 
+export function rerender() { refreshAll(); }
+
 function refreshAll() { refreshHero(); refreshChart(); refreshMetrics(); }
 
 async function refreshHero() {

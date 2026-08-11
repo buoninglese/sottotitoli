@@ -79,6 +79,7 @@ async function switchPanel(name) {
 
   var previousPanel = currentPanel;
   currentPanel = name;
+  window._currentPanel = name;
 
   // Update sidebar active state
   document.querySelectorAll('.sidebar-link').forEach(function (link) {
