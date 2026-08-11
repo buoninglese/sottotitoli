@@ -168,9 +168,7 @@ export async function render(parentEl) {
 export async function init() {
   if (initialized) return;
   initialized = true;
-  await refreshHero();
-  await refreshChart();
-  await refreshMetrics();
+  await refreshAll();
   if (window.initSparklineTooltips) window.initSparklineTooltips();
   on('session:saved', refreshAll);
   on('session:deleted', refreshAll);
@@ -183,21 +181,52 @@ export function destroy() {
 
 export function rerender() { refreshAll(); }
 
-function refreshAll() { refreshHero(); refreshChart(); refreshMetrics(); }
+function refreshAll() { refreshHero().catch(function(e){console.warn('refreshHero:',e.message);}); refreshChart().catch(function(e){console.warn('refreshChart:',e.message);}); refreshMetrics(); }
+
+// ── Helpers ──
+function escHtml(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+function timeAgo(dateStr) {
+  if (!dateStr) return '';
+  var diff = Date.now() - new Date(dateStr).getTime();
+  var min = Math.floor(diff / 60000);
+  var hrs = Math.floor(diff / 3600000);
+  var days = Math.floor(diff / 86400000);
+  if (min < 1) return 'adesso';
+  if (min < 60) return min + ' min fa';
+  if (hrs < 24) return hrs + ' ore fa';
+  if (days < 30) return days + ' giorni fa';
+  return new Date(dateStr).toLocaleDateString('it-IT');
+}
 
 async function refreshHero() {
+  var sb = getSupabase();
+  var userId = null;
+  if (sb) {
+    try { var s = await sb.auth.getSession(); userId = s.data?.session?.user?.id || null; } catch(e) {}
+  }
+
+  // ── Profile name ──
   var profile = window._sottotitoliProfile || window.profile;
   var nameEl = document.getElementById('heroName');
-  if (nameEl) nameEl.textContent = (profile && profile.display_name) || (profile && profile.full_name) || 'Utente';
+  if (nameEl) nameEl.textContent = (profile && profile.display_name) || (profile && profile.full_name) || (profile && profile.email && profile.email.split('@')[0]) || 'Utente';
 
+  // ── Session stats (prefer data-service, fall back to window globals) ──
+  var stats = null;
+  if (window.SottotitoliData && window.SottotitoliData.getSessionStats) {
+    try { stats = await window.SottotitoliData.getSessionStats(); } catch(e) {}
+  }
+  // Fallback: window globals
   var statsEN = window.statsEN || {};
   var statsIT = window.statsIT || {};
-  var totalSessions = statsEN.total_sessions || 0 + (statsIT.total_sessions || 0);
-  var totalMinutes = Math.round((statsEN.total_minutes || 0) + (statsIT.total_minutes || 0));
-  var totalWords = (statsEN.total_words || 0) + (statsIT.total_words || 0);
-  var avgLexDiv = statsEN.avg_lexical_diversity || statsIT.avg_lexical_diversity || 0;
 
-  // Update metric cards
+  var totalSessions = stats ? stats.totalSessions : ((statsEN.total_sessions || 0) + (statsIT.total_sessions || 0));
+  var totalMinutes = stats ? stats.totalMinutes : Math.round((statsEN.total_minutes || 0) + (statsIT.total_minutes || 0));
+  var totalWords = stats ? stats.totalWords : ((statsEN.total_words || 0) + (statsIT.total_words || 0));
+  var avgLexDiv = stats ? stats.avgLexDiv : (statsEN.avg_lexical_diversity || statsIT.avg_lexical_diversity || 0);
+  var streakDays = (profile && profile.streak_days) || 0;
+
+  // ── Metric cards ──
   var cards = document.querySelectorAll('.metric-card');
   cards.forEach(function(c) {
     var metric = c.getAttribute('data-metric');
@@ -206,16 +235,124 @@ async function refreshHero() {
     if (metric === 'totalSessions') val.innerHTML = '<span>' + formatNumber(totalSessions) + '</span>';
     else if (metric === 'totalMinutes') val.textContent = totalMinutes + ' min';
     else if (metric === 'totalWords') val.innerHTML = '<span>' + formatNumber(totalWords) + '</span>';
-    else if (metric === 'avgLexDiv') val.innerHTML = '<span>' + (avgLexDiv * 100).toFixed(0) + '</span><span style="font-size:.4em;opacity:.5">%</span>';
+    else if (metric === 'avgLexDiv') val.innerHTML = '<span>' + (typeof avgLexDiv === 'number' && avgLexDiv < 1 ? (avgLexDiv * 100).toFixed(0) : avgLexDiv) + '</span><span style="font-size:.4em;opacity:.5">%</span>';
   });
 
-  // Update streak
-  try {
-    if (window._sottotitoliProfile && window._sottotitoliProfile.streak_days) {
-      var sd = document.getElementById('heroStreakDays');
-      if (sd) sd.innerHTML = window._sottotitoliProfile.streak_days + '<span style="font-size:18px;font-weight:300;opacity:.5;margin-left:4px">giorni</span>';
+  // ── Streak ──
+  var sd = document.getElementById('heroStreakDays');
+  if (sd) {
+    if (streakDays > 0) {
+      sd.innerHTML = streakDays + '<span style="font-size:18px;font-weight:300;opacity:.5;margin-left:4px">giorni</span>';
+    } else {
+      sd.innerHTML = '—<span style="font-size:18px;font-weight:300;opacity:.5;margin-left:4px">giorni</span>';
     }
-  } catch(e) {}
+  }
+
+  // ── Hero "Continue Learning" cards ──
+  await renderHeroCards(userId);
+}
+
+async function renderHeroCards(userId) {
+  var container = document.getElementById('heroCards');
+  if (!container) return;
+  var sb = getSupabase();
+
+  try {
+    var html = '';
+    var studyLang = window.SOTTOTITOLI_STUDY_LANG || localStorage.getItem('sottotitoli-study-lang') || 'en';
+
+    // ── Most recent session ──
+    var recentSession = null;
+    if (userId && sb) {
+      // Prefer data-service if available
+      if (window.SottotitoliData && window.SottotitoliData.getSessions) {
+        try { var sList = await window.SottotitoliData.getSessions(studyLang, 1); recentSession = sList && sList[0]; } catch(e) {}
+      }
+      // Fallback: direct Supabase query
+      if (!recentSession) {
+        try {
+          var sessionResp = await sb.from('sessions')
+            .select('id,name,started_at,words_count,duration_seconds')
+            .eq('user_id', userId)
+            .order('started_at', { ascending: false })
+            .limit(1);
+          if (!sessionResp.error && sessionResp.data && sessionResp.data.length > 0) recentSession = sessionResp.data[0];
+        } catch(e) {}
+      }
+    }
+
+    if (recentSession) {
+      var sName = recentSession.name || 'Session ' + new Date(recentSession.started_at).toLocaleDateString('it-IT');
+      var ago = timeAgo(recentSession.started_at);
+      var words = recentSession.words_count || 0;
+      html += '<div class="glass-card hero-glass-card" style="padding:24px;display:flex;align-items:center;justify-content:space-between;cursor:pointer" onclick="var nav=document.querySelector(\'[data-panel=trascrizioni]\');if(nav)nav.click();setTimeout(function(){if(window.trOpenEditor)trOpenEditor(\''+escHtml(recentSession.id)+'\')},300)">'+
+        '<div style="flex:1;min-width:0">'+
+        '<p style="font-size:10px;font-weight:700;color:var(--text-soft);opacity:.5;text-transform:uppercase;letter-spacing:.15em;font-family:\'Inter\',sans-serif;margin:0 0 4px"><span data-i18n="hero_transcript">Trascrizione</span></p>'+
+        '<p class="hero-glass-title" style="font-size:20px;font-weight:500;color:var(--text);margin:0;font-family:\'Inter\',sans-serif;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+escHtml(sName)+'</p>'+
+        '<p style="font-size:13px;color:var(--text-soft);opacity:.5;margin:4px 0 0">'+ago+' · '+words+' <span data-i18n="hero_words">parole</span></p>'+
+        '</div>'+
+        '<div class="gc-icon-box gc-cyan" style="width:44px;height:44px;border-radius:50%;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.05);display:flex;align-items:center;justify-content:center;flex-shrink:0;color:var(--cyan)">'+
+        '<span class="material-symbols-outlined" style="font-size:22px;font-variation-settings:\'FILL\'1">description</span></div>'+
+        '</div>';
+    } else {
+      html += '<div class="glass-card hero-glass-card" style="padding:24px;display:flex;align-items:center;justify-content:space-between;cursor:pointer;opacity:.7" onclick="var nav=document.querySelector(\'[data-panel=trascrizioni]\');if(nav)nav.click()">'+
+        '<div style="flex:1;min-width:0">'+
+        '<p style="font-size:10px;font-weight:700;color:var(--text-soft);opacity:.5;text-transform:uppercase;letter-spacing:.15em;font-family:\'Inter\',sans-serif;margin:0 0 4px"><span data-i18n="hero_transcript">Trascrizione</span></p>'+
+        '<p class="hero-glass-title" style="font-size:20px;font-weight:500;color:var(--text);margin:0;font-family:\'Inter\',sans-serif"><span data-i18n="hero_new_session_title">Avvia una nuova sessione</span></p>'+
+        '<p style="font-size:13px;color:var(--text-soft);opacity:.5;margin:4px 0 0"><span data-i18n="hero_new_session_desc">Cattura sottotitoli in tempo reale</span></p>'+
+        '</div>'+
+        '<div class="gc-icon-box gc-cyan" style="width:44px;height:44px;border-radius:50%;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.05);display:flex;align-items:center;justify-content:center;flex-shrink:0;color:var(--cyan)">'+
+        '<span class="material-symbols-outlined" style="font-size:22px;font-variation-settings:\'FILL\'1">mic</span></div>'+
+        '</div>';
+    }
+
+    // ── Most recent word bank ──
+    var wbWithWords = [];
+    if (userId && sb && window.SottotitoliData && window.SottotitoliData.getWordbanks) {
+      try {
+        var banks = await window.SottotitoliData.getWordbanks(studyLang);
+        wbWithWords = banks ? banks.filter(function(b){ return (b.word_count || 0) > 0; }) : [];
+      } catch(e) {}
+    }
+    // Fallback: direct query
+    if (wbWithWords.length === 0 && userId && sb) {
+      try {
+        var wbResp = await sb.from('word_banks')
+          .select('id,name,word_count')
+          .eq('user_id', userId)
+          .eq('language', studyLang)
+          .gt('word_count', 0)
+          .order('updated_at', { ascending: false })
+          .limit(1);
+        if (!wbResp.error && wbResp.data && wbResp.data.length > 0) wbWithWords = wbResp.data;
+      } catch(e) {}
+    }
+
+    if (wbWithWords.length > 0) {
+      var wb = wbWithWords[0];
+      html += '<div class="glass-card hero-glass-card" style="padding:24px;display:flex;align-items:center;justify-content:space-between;cursor:pointer" onclick="var nav=document.querySelector(\'[data-panel=wordbanks]\');if(nav)nav.click()">'+
+        '<div style="flex:1;min-width:0">'+
+        '<p style="font-size:10px;font-weight:700;color:var(--text-soft);opacity:.5;text-transform:uppercase;letter-spacing:.15em;font-family:\'Inter\',sans-serif;margin:0 0 4px"><span data-i18n="hero_word_bank">Banca Parole</span></p>'+
+        '<p class="hero-glass-title" style="font-size:20px;font-weight:500;color:var(--text);margin:0;font-family:\'Inter\',sans-serif;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+escHtml(wb.name)+'</p>'+
+        '<p style="font-size:13px;color:var(--text-soft);opacity:.5;margin:4px 0 0">'+(wb.word_count||0)+' <span data-i18n="hero_terms">termini</span></p>'+
+        '</div>'+
+        '<div class="gc-icon-box gc-teal" style="width:44px;height:44px;border-radius:50%;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.05);display:flex;align-items:center;justify-content:center;flex-shrink:0;color:var(--teal)">'+
+        '<span class="material-symbols-outlined" style="font-size:22px">menu_book</span></div>'+
+        '</div>';
+    } else {
+      html += '<div class="glass-card hero-glass-card" style="padding:24px;display:flex;align-items:center;justify-content:space-between;cursor:pointer;opacity:.7" onclick="var nav=document.querySelector(\'[data-panel=wordbanks]\');if(nav)nav.click();setTimeout(function(){if(window.wbShowCreate)wbShowCreate()},400)">'+
+        '<div style="flex:1;min-width:0">'+
+        '<p style="font-size:10px;font-weight:700;color:var(--text-soft);opacity:.5;text-transform:uppercase;letter-spacing:.15em;font-family:\'Inter\',sans-serif;margin:0 0 4px"><span data-i18n="hero_word_bank">Banca Parole</span></p>'+
+        '<p class="hero-glass-title" style="font-size:20px;font-weight:500;color:var(--text);margin:0;font-family:\'Inter\',sans-serif"><span data-i18n="hero_new_bank_title">Crea una nuova banca parole</span></p>'+
+        '<p style="font-size:13px;color:var(--text-soft);opacity:.5;margin:4px 0 0"><span data-i18n="hero_new_bank_desc">Raccogli e organizza il tuo vocabolario</span></p>'+
+        '</div>'+
+        '<div class="gc-icon-box gc-teal" style="width:44px;height:44px;border-radius:50%;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.05);display:flex;align-items:center;justify-content:center;flex-shrink:0;color:var(--teal)">'+
+        '<span class="material-symbols-outlined" style="font-size:22px">style</span></div>'+
+        '</div>';
+    }
+
+    container.innerHTML = html;
+  } catch(e) { /* best effort — keep Caricamento placeholders */ }
 }
 
 async function refreshChart() {
@@ -249,6 +386,6 @@ async function refreshChart() {
   } catch(e) { console.warn('Chart failed:', e.message); }
 }
 
-async function refreshMetrics() {
+function refreshMetrics() {
   // Metric cards already updated in refreshHero
 }
