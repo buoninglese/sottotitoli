@@ -43,14 +43,14 @@ window.showPanel = function (name) {
     var retries = 0;
     var check = setInterval(function () {
       wrap = document.getElementById('panel-' + name);
-      if (wrap || ++retries > 50) { clearInterval(check); if (wrap) showPanelNow(name); }
+      if (wrap || ++retries > 50) { clearInterval(check); if (wrap) showPanelNow(name, wrap); }
     }, 100);
     return;
   }
-  showPanelNow(name);
+  showPanelNow(name, wrap);
 };
 
-function showPanelNow(name) {
+function showPanelNow(name, wrap) {
   var previousPanel = currentPanel;
 
   // Hide ALL wrappers, show target
