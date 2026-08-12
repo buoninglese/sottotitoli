@@ -62,92 +62,77 @@ function updateDropdown(meta, profile, credits, tokens) {
   if (ddTokens) ddTokens.textContent = tokens != null ? tokens : '—';
 }
 
-// ── Preload all panels at once (no lazy loading) ──
-async function preloadAllPanels() {
-  var names = Object.keys(panels);
-  var total = names.length;
-  var done = 0;
+// ── Build ONE panel: wrapper + render + script injection + subtab wiring + init ──
+// Panels are built progressively: init() builds the initial panel first (fast,
+// loader gone in <100ms), then the rest in the background. If a panel finishes
+// while it is the queued request (user clicked it before it existed), show it
+// immediately.
+async function buildPanel(name) {
+  var entry = panels[name];
+  if (!entry || !entry.module) return;
 
-  // Render all panels — per-panel error isolation (one failure doesn't block others)
-  var results = await Promise.allSettled(names.map(async function (name) {
-    var entry = panels[name];
-    if (!entry || !entry.module) return;
+  var wrap = document.getElementById('panel-' + name);
+  if (wrap) return; // already built
 
-    var wrapId = 'panel-' + name;
-    var wrap = document.getElementById(wrapId);
-    if (wrap) return; // already rendered
+  wrap = document.createElement('div');
+  wrap.id = 'panel-' + name;
+  wrap.style.display = 'none';
+  if (panelContainer) panelContainer.appendChild(wrap);
 
-    wrap = document.createElement('div');
-    wrap.id = wrapId;
-    wrap.style.display = 'none';
-    if (panelContainer) panelContainer.appendChild(wrap);
+  if (entry.module.render) {
+    await entry.module.render(wrap);
+    entry.loaded = true;
+  }
 
-    if (entry.module.render) {
-      await entry.module.render(wrap);
-      entry.loaded = true;
-    }
+  // ── Universal script injection (innerHTML scripts don't execute) ──
+  var deadScripts = wrap.querySelectorAll('script');
+  for (var i = 0; i < deadScripts.length; i++) {
+    var dead = deadScripts[i];
+    var live = document.createElement('script');
+    live.textContent = dead.textContent;
+    dead.parentNode.replaceChild(live, dead);
+  }
 
-    // ── Universal script injection ──
-    var deadScripts = wrap.querySelectorAll('script');
-    for (var i = 0; i < deadScripts.length; i++) {
-      var dead = deadScripts[i];
-      var live = document.createElement('script');
-      live.textContent = dead.textContent;
-      dead.parentNode.replaceChild(live, dead);
-    }
+  // Add active class
+  var panelEl = wrap.querySelector('.content-panel');
+  if (panelEl) panelEl.classList.add('active');
 
-    // Add active class
-    var panelEl = wrap.querySelector('.content-panel');
-    if (panelEl) panelEl.classList.add('active');
-
-    // ── Wire subtab onclick handlers ──
-    // Skipped for vocabulary-builder (has its own delegation in panoramica.html line 1510)
-    if (name !== 'vocabulary-builder') {
-      var subtabs = wrap.querySelectorAll('.tab-link[data-subtab]');
-      for (var j = 0; j < subtabs.length; j++) {
-        subtabs[j].onclick = function () {
-          var tab = this;
-          var parentPanel = tab.closest('.content-panel');
-          if (!parentPanel) return;
-          var subId = tab.getAttribute('data-subtab');
-          parentPanel.querySelectorAll('.tab-link').forEach(function (t) {
-            t.classList.remove('active');
-            t.setAttribute('aria-selected', 'false');
-          });
-          tab.classList.add('active');
-          tab.setAttribute('aria-selected', 'true');
-          parentPanel.querySelectorAll('.subtab-pane').forEach(function (p) {
-            p.classList.remove('active');
-          });
-          var target = document.getElementById('sub-' + subId);
-          if (target) target.classList.add('active');
-          return false;
-        };
-      }
-    }
-
-    // Init
-    if (entry.module.init) {
-      await entry.module.init();
-    }
-
-    done++;
-  }));
-
-  // Report failures
-  var failed = results.filter(function(r) { return r.status === 'rejected'; });
-  if (failed.length > 0) {
-    console.error(failed.length + ' panel(s) failed to load:');
-    failed.forEach(function(r) { console.error('  ', r.reason); });
-    // Show error in first panel wrapper
-    var firstWrap = document.querySelector('[id^="panel-"]');
-    if (firstWrap) {
-      firstWrap.style.display = '';
-      firstWrap.innerHTML = '<div class="content-panel active" style="padding:60px 40px;text-align:center"><p style="font-size:18px;color:var(--red);font-weight:700;margin:0">Alcuni pannelli non sono riusciti a caricare (' + failed.length + ')</p><p style="font-size:13px;color:var(--text-soft);margin:8px 0 0">Ricarica la pagina o controlla la console per i dettagli.</p></div>';
+  // ── Wire subtab onclick handlers ──
+  // Skipped for vocabulary-builder (has its own delegation in panoramica.html line 1510)
+  if (name !== 'vocabulary-builder') {
+    var subtabs = wrap.querySelectorAll('.tab-link[data-subtab]');
+    for (var j = 0; j < subtabs.length; j++) {
+      subtabs[j].onclick = function () {
+        var tab = this;
+        var parentPanel = tab.closest('.content-panel');
+        if (!parentPanel) return;
+        var subId = tab.getAttribute('data-subtab');
+        parentPanel.querySelectorAll('.tab-link').forEach(function (t) {
+          t.classList.remove('active');
+          t.setAttribute('aria-selected', 'false');
+        });
+        tab.classList.add('active');
+        tab.setAttribute('aria-selected', 'true');
+        parentPanel.querySelectorAll('.subtab-pane').forEach(function (p) {
+          p.classList.remove('active');
+        });
+        var target = document.getElementById('sub-' + subId);
+        if (target) target.classList.add('active');
+        return false;
+      };
     }
   }
 
-  console.log('Preloaded ' + done + '/' + total + ' panels');
+  // Init (failures isolated — one bad panel never blocks the page)
+  if (entry.module.init) {
+    try { await entry.module.init(); } catch (e) { console.warn('Panel ' + name + ' init failed:', e); }
+  }
+
+  // If the user requested this panel before it existed, reveal it now
+  if (window._pendingPanel === name) {
+    window._pendingPanel = null;
+    window.showPanel(name);
+  }
 }
 
 // ── Main initialization ──
@@ -158,23 +143,32 @@ async function init() {
   var mp = document.querySelector('.main-panel');
   if (mp) mp.classList.add('js-loading');
 
-  // ═══ STEP 1: Render panels IMMEDIATELY (static HTML — no user data needed) ═══
-  await preloadAllPanels();
+  // Decide which panel to show first (honor queued click + URL hash)
+  var hash = window.location.hash.replace('#', '');
+  var initialPanel = window._pendingPanel || (hash && panels[hash] ? hash : null) || 'panoramica';
+  window._pendingPanel = null;
 
-  // Hide loading screen
+  // ═══ STEP 1: Build ONLY the initial panel (~50ms), then reveal the page ═══
+  // The loader disappears as soon as the first panel exists — clicks after this
+  // point always have a visible target. Remaining panels build in the background.
+  try { await buildPanel(initialPanel); } catch (e) { console.error('Panel ' + initialPanel + ' failed:', e); }
+
   var loader = document.getElementById('pageLoader');
   if (loader) loader.style.display = 'none';
   if (mp) {
     mp.classList.remove('js-loading');
     mp.classList.add('js-ready');
   }
-
-  // Route to initial panel (honor pending click + URL hash)
-  var hash = window.location.hash.replace('#', '');
-  var initialPanel = window._pendingPanel || (hash && panels[hash] ? hash : null) || 'panoramica';
   window.showPanel(initialPanel);
 
-  // ═══ STEP 2: Load user data ASYNCHRONOUSLY (non-blocking — panels update when ready) ═══
+  // ═══ STEP 2: Build the other 7 panels in the background (non-blocking) ═══
+  // A queued click on a not-yet-built panel is revealed the moment it finishes.
+  Object.keys(panels).forEach(function (name) {
+    if (name === initialPanel) return;
+    buildPanel(name).catch(function (e) { console.error('Panel ' + name + ' failed:', e); });
+  });
+
+  // ═══ STEP 3: Load user data ASYNCHRONOUSLY (non-blocking — panels update when ready) ═══
   loadUserData().then(function (meta) {
     // Data arrived — refresh current panel if it supports rerender
     if (currentPanel && panels[currentPanel] && panels[currentPanel].module.rerender) {
