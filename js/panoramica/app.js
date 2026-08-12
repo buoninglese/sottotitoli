@@ -194,9 +194,47 @@ async function init() {
   var mp = document.querySelector('.main-panel');
   if (mp) mp.classList.add('js-loading');
 
+  // ═══ STEP 1: Render panels IMMEDIATELY (static HTML — no user data needed) ═══
+  await preloadAllPanels();
+
+  // Hide loading screen
+  var loader = document.getElementById('pageLoader');
+  if (loader) loader.style.display = 'none';
+  if (mp) {
+    mp.classList.remove('js-loading');
+    mp.classList.add('js-ready');
+  }
+
+  // Route to initial panel (honor pending click + URL hash)
+  var hash = window.location.hash.replace('#', '');
+  var initialPanel = pendingPanel || (hash && panels[hash] ? hash : null) || 'panoramica';
+  window.showPanel(initialPanel);
+
+  // ═══ STEP 2: Load user data ASYNCHRONOUSLY (non-blocking — panels update when ready) ═══
+  loadUserData().then(function (meta) {
+    // Data arrived — refresh current panel if it supports rerender
+    if (currentPanel && panels[currentPanel] && panels[currentPanel].module.rerender) {
+      try { panels[currentPanel].module.rerender(); } catch (e) {}
+    }
+  });
+
+  // Listen for i18n changes to update panels
+  window.addEventListener('i18n-changed', function (e) {
+    // Re-render current panel if it supports it
+    if (currentPanel && panels[currentPanel] && panels[currentPanel].module.rerender) {
+      try { panels[currentPanel].module.rerender(); } catch (e) {}
+    }
+  });
+
+  console.log('Panoramica router initialized. Active panel:', currentPanel);
+}
+
+// ── Load all user data in the background. Panels render without it and
+//    refresh when it arrives (via rerender + panel:switch listeners). ──
+async function loadUserData() {
   // Wait for Supabase
   var sb = await waitForSupabase();
-  if (!sb) { console.warn('Supabase not loaded — rendering offline'); }
+  if (!sb) { console.warn('Supabase not loaded — rendering offline'); return null; }
 
   // Wait for auth to settle
   var meta = null;
@@ -218,7 +256,7 @@ async function init() {
     if (returnPage && returnPage.indexOf('duo-s8t.html') !== -1) {
       localStorage.removeItem('sottotitoli_return_page');
       window.location.replace(returnPage);
-      return;
+      return meta;
     }
   }
 
@@ -242,11 +280,7 @@ async function init() {
     window._sottotitoliPrefs = null;
     window.cefrBreakdown = null;
   } else {
-    // Fetch all user data CONCURRENTLY. Each call resolves its own userId via
-    // getSession (no shared state, verified in data-service.js), so they are
-    // independent. Was 9 sequential awaits = 9 serialized round-trips, which
-    // delayed the whole dashboard on slow/cold backends. Per-call try/catch
-    // keeps the exact same fallback values as before.
+    // Fetch all user data CONCURRENTLY.
     var _data = await Promise.all([
       (async function () { try { return await SottotitoliData.getProfile(); } catch (e) { console.warn('getProfile failed:', e.message); return null; } })(),
       (async function () { try { return await SottotitoliData.getSessionStats('en'); } catch (e) { console.warn('statsEN failed:', e.message); return null; } })(),
@@ -295,33 +329,7 @@ async function init() {
 
   // Sync window globals to shared store
   syncWindowGlobals();
-
-  // ── Preload ALL panels (no lazy loading — everything renders upfront) ──
-  await preloadAllPanels();
-
-  // Hide loading screen (multiple methods for reliability)
-  var loader = document.getElementById('pageLoader');
-  if (loader) loader.style.display = 'none';
-  if (mp) {
-    mp.classList.remove('js-loading');
-    mp.classList.add('js-ready');
-  }
-
-  // Route to initial panel. If the user clicked a tab during load, honor that
-  // (pendingPanel was set by showPanel). Otherwise use the URL hash.
-  var hash = window.location.hash.replace('#', '');
-  var initialPanel = pendingPanel || (hash && panels[hash] ? hash : null) || 'panoramica';
-  window.showPanel(initialPanel);
-
-  // Listen for i18n changes to update panels
-  window.addEventListener('i18n-changed', function (e) {
-    // Re-render current panel if it supports it
-    if (currentPanel && panels[currentPanel] && panels[currentPanel].module.rerender) {
-      try { panels[currentPanel].module.rerender(); } catch (e) {}
-    }
-  });
-
-  console.log('Panoramica router initialized. Active panel:', currentPanel);
+  return meta;
 }
 
 // ── Start ──
