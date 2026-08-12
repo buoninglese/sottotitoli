@@ -1,5 +1,12 @@
 # Changelog
 
+## [2026-08-12] Fast-Click Fix — showPanel defined before the sidebar exists (v207)
+
+### Fixed
+- **panoramica.html** — `showPanel()` is now a ~25-line inline script in `<head>`, parsed before the sidebar buttons exist. Previously it was only defined when the ES module `app.js` finished executing, so a click in the first ~0.1–1.5s threw `ReferenceError: showPanel is not defined` and silently did nothing (proven via Playwright pageError capture). Early clicks now either work immediately or queue in `window._pendingPanel` and are applied by `init()` after preload.
+- **js/panoramica/app.js** — Removed the duplicate `showPanel`/`showPanelNow` definitions. The head script is now the single owner of switching logic; app.js only sets `window.__panelSwitchHook` to track `currentPanel` and emit `panel:switch`. Cache buster `?v=11` → `?v=12`.
+- Root-cause chain so far: 20s init delay (v206: panels render first, data loads in background) + early-click ReferenceError (v207: head-defined stub). After load, switching is pure `display` toggling and cannot fail.
+
 ## [2026-08-11] Panoramica Architecture Restructure — Monolith to ES Modules
 
 ### Changed
