@@ -23,7 +23,6 @@ Blocked paths return 403:
     /hugging-voice/     — Voice space source
     /voice-core/        — Voice core source
     /__pycache__/       — Python cache
-    /config.js          — Production config
     /config.secrets.js  — Production secrets
 
 Standard HTML/CSS/JS/asset files are served normally.
@@ -59,7 +58,10 @@ BLOCKED_PREFIXES = [
 ]
 
 BLOCKED_FILES = [
-    '/config.js',
+    # NOTE: config.js is intentionally NOT blocked — every page loads it via
+    # <script src="config.js">, it is committed and served publicly by GitHub
+    # Pages in production, and it holds only public keys. Real secrets live in
+    # config.secrets.js (blocked below). Blocking config.js broke local dev.
     '/config.secrets.js',
     '/actions.log',
     '/AGENTS.md',
