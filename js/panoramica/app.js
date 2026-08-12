@@ -37,75 +37,54 @@ var panels = {
 var currentPanel = null;
 var panelContainer = null;
 
-// ── Panel switching (CSS toggle — DOM stays, no destroy/re-render, like original) ──
+// ── Panel switching (CSS toggle — same approach as the original 12K version) ──
 function switchPanel(name) {
   if (currentPanel === name) return;
 
-  var next = panels[name];
-  if (!next || !next.module) { console.warn('Unknown panel:', name); return; }
-
-  if (!panelContainer) {
-    panelContainer = document.getElementById('panelContainer');
-    if (!panelContainer) { console.error('panelContainer not found'); return; }
+  // Hide ALL wrappers, show target — simpler and more reliable than prev/next tracking
+  var wrappers = document.querySelectorAll('[id^="panel-"]');
+  for (var i = 0; i < wrappers.length; i++) {
+    wrappers[i].style.display = 'none';
   }
-
-  // Hide current panel
-  if (currentPanel) {
-    var prevWrap = document.getElementById('panel-' + currentPanel);
-    if (prevWrap) prevWrap.style.display = 'none';
-  }
-
-  // Target panel wrapper (pre-rendered by preloadAllPanels)
-  var wrapId = 'panel-' + name;
-  var wrap = document.getElementById(wrapId);
-
-  // If panel not preloaded yet (clicked during loading), skip quietly
+  var wrap = document.getElementById('panel-' + name);
   if (!wrap) return;
-
-  // Show target panel
   wrap.style.display = '';
 
-  // Re-apply active class (theme-2.js removes it from ALL .content-panel on every click)
-  var panelEl = wrap.querySelector('.content-panel');
-  if (panelEl) panelEl.classList.add('active');
+  // Ensure active class on content-panel
+  var cp = wrap.querySelector('.content-panel');
+  if (cp) cp.classList.add('active');
 
-  var previousPanel = currentPanel;
   currentPanel = name;
   window._currentPanel = name;
 
   // Update sidebar active state
-  document.querySelectorAll('.sidebar-link').forEach(function (link) {
-    var panel = link.getAttribute('data-panel');
+  var links = document.querySelectorAll('.sidebar-link');
+  for (var j = 0; j < links.length; j++) {
+    var panel = links[j].getAttribute('data-panel');
     if (panel === name) {
-      link.classList.add('active');
-      link.setAttribute('aria-current', 'page');
+      links[j].classList.add('active');
+      links[j].setAttribute('aria-current', 'page');
     } else {
-      link.classList.remove('active');
-      link.removeAttribute('aria-current');
+      links[j].classList.remove('active');
+      links[j].removeAttribute('aria-current');
     }
-  });
-
-  // Update hash
-  if (window.location.hash !== '#' + name) {
-    history.replaceState(null, '', '#' + name);
   }
 
-  emit('panel:switch', { from: previousPanel, to: name });
+  emit('panel:switch', { from: currentPanel, to: name });
 }
 
-// ── Hash-based routing (native browser behavior — no JS click handlers needed) ──
-// Sidebar links use href="#panelname". The browser updates the URL hash on click.
-// hashchange event calls switchPanel(). No onclick, no return false, no addEventListener.
-function handleHash() {
-  var hash = window.location.hash.replace('#', '') || 'panoramica';
-  switchPanel(hash);
+// ── Wire sidebar clicks (onclick property — works everywhere, same as original) ──
+function setupSidebar() {
+  var links = document.querySelectorAll('.sidebar-link[data-panel]');
+  for (var i = 0; i < links.length; i++) {
+    links[i].onclick = function () {
+      switchPanel(this.getAttribute('data-panel'));
+      return false;
+    };
+  }
 }
 
-// ── No setupNavigation() needed. Sidebar links are plain <a href="#panel">.
-// The browser's native link behavior drives everything via hashchange.
-
-// ── Dropdown links now use window.location.hash= directly (see panoramica.html line 96-104).
-// No JavaScript handler needed — the browser's native hashchange handles everything.
+// ── Dropdown links use inline onclick with window.location.hash= (see panoramica.html) ──
 
 // ── Update topbar dropdown with user data ──
 function updateDropdown(meta, profile, credits, tokens) {
@@ -305,11 +284,11 @@ async function init() {
   // Sync window globals to shared store
   syncWindowGlobals();
 
-  // ── Listen for hash changes BEFORE any routing (native browser link behavior) ──
-  window.addEventListener('hashchange', handleHash);
-
   // ── Preload ALL panels (no lazy loading — everything renders upfront) ──
   await preloadAllPanels();
+
+  // ── Wire sidebar click handlers (must be after panels are in DOM) ──
+  setupSidebar();
 
   // Hide loading screen (multiple methods for reliability)
   var loader = document.getElementById('pageLoader');
@@ -319,8 +298,10 @@ async function init() {
     mp.classList.add('js-ready');
   }
 
-  // Route to initial panel (hashchange listener already registered)
-  handleHash();
+  // Route to initial panel (honor URL hash for bookmarkability)
+  var hash = window.location.hash.replace('#', '');
+  var initialPanel = hash && panels[hash] ? hash : 'panoramica';
+  switchPanel(initialPanel);
 
   // Listen for i18n changes to update panels
   window.addEventListener('i18n-changed', function (e) {
