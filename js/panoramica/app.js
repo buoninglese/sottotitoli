@@ -34,19 +34,19 @@ var currentPanel = null;
 var panelContainer = null;
 
 // ── Panel switching — dead simple. Called by inline onclick on sidebar buttons. ──
-// No hash, no delegation, no closest(), no pendingPanel. Just hide all, show one.
+// No hash, no delegation, no closest(), no retry queue. Hide all, show one.
+// Idempotent: always applies, even if already on the target — this prevents
+// "stuck" states where currentPanel is out of sync with what's visible.
+var pendingPanel = null; // panel requested before panels finished preloading
+
 window.showPanel = function (name) {
-  if (currentPanel === name) return;
   var wrap = document.getElementById('panel-' + name);
-  // If panels haven't finished loading yet, retry up to 5 seconds.
   if (!wrap) {
-    var retries = 0;
-    var check = setInterval(function () {
-      wrap = document.getElementById('panel-' + name);
-      if (wrap || ++retries > 50) { clearInterval(check); if (wrap) showPanelNow(name, wrap); }
-    }, 100);
+    // Panels still loading — remember the request. init() applies it after preload.
+    pendingPanel = name;
     return;
   }
+  pendingPanel = null;
   showPanelNow(name, wrap);
 };
 
@@ -307,9 +307,10 @@ async function init() {
     mp.classList.add('js-ready');
   }
 
-  // Route to initial panel (honor URL hash for bookmarkability)
+  // Route to initial panel. If the user clicked a tab during load, honor that
+  // (pendingPanel was set by showPanel). Otherwise use the URL hash.
   var hash = window.location.hash.replace('#', '');
-  var initialPanel = hash && panels[hash] ? hash : 'panoramica';
+  var initialPanel = pendingPanel || (hash && panels[hash] ? hash : null) || 'panoramica';
   window.showPanel(initialPanel);
 
   // Listen for i18n changes to update panels
