@@ -17,8 +17,6 @@ import * as vocabBuilderPanel from './panels/vocab-builder.js';
 import * as reportAiPanel from './panels/report-ai.js';
 import * as settingsPanel from './panels/settings.js';
 import * as helpPanel from './panels/help.js';
-import * as grammarHubPanel from './panels/grammar-hub.js';
-import * as aiVoicePanel from './panels/ai-voice.js';
 
 // ── Panel registry ──
 var panels = {
@@ -29,34 +27,23 @@ var panels = {
   'vocabulary-builder': { module: vocabBuilderPanel, loaded: false },
   'report-ai': { module: reportAiPanel, loaded: false },
   'impostazioni': { module: settingsPanel, loaded: false },
-  'aiuto': { module: helpPanel, loaded: false },
-  'grammar-hub': { module: grammarHubPanel, loaded: false },
-  'ai-voice': { module: aiVoicePanel, loaded: false }
+  'aiuto': { module: helpPanel, loaded: false }
 };
 
 var currentPanel = null;
 var panelContainer = null;
-var pendingPanel = null; // panel requested before panels finished preloading (applied later)
 
-// ── Panel switching (CSS toggle — same approach as the original 12K version) ──
-function switchPanel(name) {
+// ── Panel switching — dead simple. Called by inline onclick on sidebar buttons. ──
+// No hash, no delegation, no closest(), no pendingPanel. Just hide all, show one.
+window.showPanel = function (name) {
   if (currentPanel === name) return;
-
   var wrap = document.getElementById('panel-' + name);
-  if (!wrap) {
-    // Panels aren't in the DOM yet (dashboard still loading). Remember the
-    // request so the click isn't lost — init() applies it once panels render.
-    if (panels[name]) pendingPanel = name;
-    return;
-  }
+  if (!wrap) return;
+  var previousPanel = currentPanel;
 
-  var previousPanel = currentPanel; // capture before reassignment (used in panel:switch event)
-
-  // Hide ALL wrappers, show target — simpler and more reliable than prev/next tracking
+  // Hide ALL wrappers, show target
   var wrappers = document.querySelectorAll('[id^="panel-"]');
-  for (var i = 0; i < wrappers.length; i++) {
-    wrappers[i].style.display = 'none';
-  }
+  for (var i = 0; i < wrappers.length; i++) wrappers[i].style.display = 'none';
   wrap.style.display = '';
 
   // Ensure active class on content-panel
@@ -70,43 +57,16 @@ function switchPanel(name) {
   var links = document.querySelectorAll('.sidebar-link');
   for (var j = 0; j < links.length; j++) {
     var panel = links[j].getAttribute('data-panel');
-    if (panel === name) {
-      links[j].classList.add('active');
-      links[j].setAttribute('aria-current', 'page');
-    } else {
-      links[j].classList.remove('active');
-      links[j].removeAttribute('aria-current');
-    }
+    links[j].classList.toggle('active', panel === name);
+    if (panel === name) links[j].setAttribute('aria-current', 'page');
+    else links[j].removeAttribute('aria-current');
   }
 
   emit('panel:switch', { from: previousPanel, to: name });
-}
+};
 
-// ── Wire sidebar clicks via delegation on the static .sidebar element ──
-// Delegation keeps the nav responsive from first paint. Uses a manual DOM walk
-// instead of closest() — Safari sometimes gives a text node as e.target when
-// clicking on Material Icons ligature text, and textNode.closest is undefined.
-function setupSidebar() {
-  var sidebar = document.querySelector('.sidebar');
-  if (!sidebar || sidebar._navWired) return; // idempotent
-  sidebar._navWired = true;
-  sidebar.addEventListener('click', function (e) {
-    // Walk up from the click target to find the sidebar link (no closest()!)
-    var el = e.target;
-    var link = null;
-    while (el && el !== sidebar) {
-      if (el.getAttribute && el.getAttribute('data-panel')) {
-        link = el;
-        break;
-      }
-      el = el.parentElement;
-    }
-    if (!link) return;
-    e.preventDefault();
-    if ((link.getAttribute('style') || '').indexOf('not-allowed') !== -1) return; // disabled (e.g. AI Voice)
-    switchPanel(link.getAttribute('data-panel'));
-  });
-}
+// Keep backward compat — old code calls window.switchPanel
+window.switchPanel = window.showPanel;
 
 // ── Dropdown links call switchPanel(name) directly via inline onclick (see panoramica.html) ──
 
@@ -327,10 +287,6 @@ async function init() {
   // ── Preload ALL panels (no lazy loading — everything renders upfront) ──
   await preloadAllPanels();
 
-  // ── Sidebar clicks are already wired at module load (delegation). Re-assert
-  //    in case .sidebar wasn't present earlier — idempotent. ──
-  setupSidebar();
-
   // Hide loading screen (multiple methods for reliability)
   var loader = document.getElementById('pageLoader');
   if (loader) loader.style.display = 'none';
@@ -339,12 +295,10 @@ async function init() {
     mp.classList.add('js-ready');
   }
 
-  // Route to initial panel. If the user already clicked a tab during load,
-  // honor that choice; otherwise use the URL hash, else the default.
+  // Route to initial panel (honor URL hash for bookmarkability)
   var hash = window.location.hash.replace('#', '');
   var initialPanel = hash && panels[hash] ? hash : 'panoramica';
-  switchPanel(pendingPanel || initialPanel);
-  pendingPanel = null;
+  window.showPanel(initialPanel);
 
   // Listen for i18n changes to update panels
   window.addEventListener('i18n-changed', function (e) {
@@ -356,13 +310,6 @@ async function init() {
 
   console.log('Panoramica router initialized. Active panel:', currentPanel);
 }
-
-// ── Expose switchPanel globally for backward compat ──
-window.switchPanel = switchPanel;
-
-// ── Wire sidebar nav immediately (delegation), BEFORE init()'s async pipeline,
-//    so tabs respond from first paint even while data is still loading. ──
-setupSidebar();
 
 // ── Start ──
 init().catch(function (e) {
