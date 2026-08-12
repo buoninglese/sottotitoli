@@ -1,5 +1,9 @@
 # Changelog
 
+> ## ⚠️ ARCHIVED — ES-module refactor (2026-08-12)
+> The entries below from v206–v210 describe an **ES-module refactor** (`js/panoramica/app.js` + `panoramica/panels/*.js` + `panoramica/shared/*.js`) that **never shipped**. `panoramica.html` never imported `app.js`, so the deployed site always ran the ~10,700-line inline monolith. The refactor files were dead code and have been **moved to** `~/Desktop/sottotitoli-archived/dead-js/panoramica-v2-attempt/`.
+> **Real current state: monolith at v178.** These v2xx notes describe work that was never activated — treat them as historical, not as a description of the live code.
+
 ## [2026-08-12] Legacy Globals Restoration — every panel button works again (v210)
 
 ### Fixed
