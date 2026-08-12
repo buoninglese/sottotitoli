@@ -38,7 +38,19 @@ var panelContainer = null;
 window.showPanel = function (name) {
   if (currentPanel === name) return;
   var wrap = document.getElementById('panel-' + name);
-  if (!wrap) return;
+  // If panels haven't finished loading yet, retry up to 5 seconds.
+  if (!wrap) {
+    var retries = 0;
+    var check = setInterval(function () {
+      wrap = document.getElementById('panel-' + name);
+      if (wrap || ++retries > 50) { clearInterval(check); if (wrap) showPanelNow(name); }
+    }, 100);
+    return;
+  }
+  showPanelNow(name);
+};
+
+function showPanelNow(name) {
   var previousPanel = currentPanel;
 
   // Hide ALL wrappers, show target
