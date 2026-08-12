@@ -36,10 +36,20 @@ var panels = {
 
 var currentPanel = null;
 var panelContainer = null;
+var pendingPanel = null; // panel requested before panels finished preloading (applied later)
 
 // ── Panel switching (CSS toggle — same approach as the original 12K version) ──
 function switchPanel(name) {
   if (currentPanel === name) return;
+
+  var wrap = document.getElementById('panel-' + name);
+  if (!wrap) {
+    // Panels aren't in the DOM yet (dashboard still loading). Remember the
+    // request so the click isn't lost — init() applies it once panels render.
+    if (panels[name]) pendingPanel = name;
+    return;
+  }
+
   var previousPanel = currentPanel; // capture before reassignment (used in panel:switch event)
 
   // Hide ALL wrappers, show target — simpler and more reliable than prev/next tracking
@@ -47,8 +57,6 @@ function switchPanel(name) {
   for (var i = 0; i < wrappers.length; i++) {
     wrappers[i].style.display = 'none';
   }
-  var wrap = document.getElementById('panel-' + name);
-  if (!wrap) return;
   wrap.style.display = '';
 
   // Ensure active class on content-panel
@@ -74,15 +82,22 @@ function switchPanel(name) {
   emit('panel:switch', { from: previousPanel, to: name });
 }
 
-// ── Wire sidebar clicks (onclick property — works everywhere, same as original) ──
+// ── Wire sidebar clicks via delegation on the static .sidebar element ──
+// Delegation keeps the nav responsive from first paint, independent of when
+// init()'s async data pipeline finishes. Previously per-link handlers were
+// attached at the very END of init(), so tabs clicked during a slow load
+// (cold backend) silently did nothing.
 function setupSidebar() {
-  var links = document.querySelectorAll('.sidebar-link[data-panel]');
-  for (var i = 0; i < links.length; i++) {
-    links[i].onclick = function () {
-      switchPanel(this.getAttribute('data-panel'));
-      return false;
-    };
-  }
+  var sidebar = document.querySelector('.sidebar');
+  if (!sidebar || sidebar._navWired) return; // idempotent
+  sidebar._navWired = true;
+  sidebar.addEventListener('click', function (e) {
+    var link = e.target.closest && e.target.closest('.sidebar-link[data-panel]');
+    if (!link) return;
+    e.preventDefault();
+    if ((link.getAttribute('style') || '').indexOf('not-allowed') !== -1) return; // disabled (e.g. AI Voice)
+    switchPanel(link.getAttribute('data-panel'));
+  });
 }
 
 // ── Dropdown links call switchPanel(name) directly via inline onclick (see panoramica.html) ──
@@ -288,7 +303,8 @@ async function init() {
   // ── Preload ALL panels (no lazy loading — everything renders upfront) ──
   await preloadAllPanels();
 
-  // ── Wire sidebar click handlers (must be after panels are in DOM) ──
+  // ── Sidebar clicks are already wired at module load (delegation). Re-assert
+  //    in case .sidebar wasn't present earlier — idempotent. ──
   setupSidebar();
 
   // Hide loading screen (multiple methods for reliability)
@@ -299,10 +315,12 @@ async function init() {
     mp.classList.add('js-ready');
   }
 
-  // Route to initial panel (honor URL hash for bookmarkability)
+  // Route to initial panel. If the user already clicked a tab during load,
+  // honor that choice; otherwise use the URL hash, else the default.
   var hash = window.location.hash.replace('#', '');
   var initialPanel = hash && panels[hash] ? hash : 'panoramica';
-  switchPanel(initialPanel);
+  switchPanel(pendingPanel || initialPanel);
+  pendingPanel = null;
 
   // Listen for i18n changes to update panels
   window.addEventListener('i18n-changed', function (e) {
@@ -317,6 +335,10 @@ async function init() {
 
 // ── Expose switchPanel globally for backward compat ──
 window.switchPanel = switchPanel;
+
+// ── Wire sidebar nav immediately (delegation), BEFORE init()'s async pipeline,
+//    so tabs respond from first paint even while data is still loading. ──
+setupSidebar();
 
 // ── Start ──
 init().catch(function (e) {
