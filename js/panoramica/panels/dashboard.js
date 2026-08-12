@@ -326,15 +326,14 @@ async function renderHeroCards(userId) {
         wbWithWords = banks ? banks.filter(function(b){ return (b.word_count || 0) > 0; }) : [];
       } catch(e) {}
     }
-    // Fallback: direct query
+    // Fallback: direct query (verified schema: user_wordbanks has lang, NO word_count/updated_at)
     if (wbWithWords.length === 0 && userId && sb) {
       try {
         var wbResp = await sb.from('user_wordbanks')
-          .select('id,name,word_count')
+          .select('id,name')
           .eq('user_id', userId)
-          .eq('language', studyLang)
-          .gt('word_count', 0)
-          .order('updated_at', { ascending: false })
+          .eq('lang', studyLang)
+          .order('created_at', { ascending: false })
           .limit(1);
         if (!wbResp.error && wbResp.data && wbResp.data.length > 0) wbWithWords = wbResp.data;
       } catch(e) {}
