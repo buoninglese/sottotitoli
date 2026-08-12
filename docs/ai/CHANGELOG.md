@@ -4,6 +4,13 @@
 > The entries below from v206–v210 describe an **ES-module refactor** (`js/panoramica/app.js` + `panoramica/panels/*.js` + `panoramica/shared/*.js`) that **never shipped**. `panoramica.html` never imported `app.js`, so the deployed site always ran the ~10,700-line inline monolith. The refactor files were dead code and have been **moved to** `~/Desktop/sottotitoli-archived/dead-js/panoramica-v2-attempt/`.
 > **Real current state: monolith at v178.** These v2xx notes describe work that was never activated — treat them as historical, not as a description of the live code.
 
+## [2026-08-13] Gen-Z hero — vivid frosted glass (A+B) (v189)
+
+### Changed
+- **Gen-Z (bright) hero no longer renders grey.** The hardcoded `[data-theme="genz"] #heroBanner` background (`#667eea→#764ba2→#f093fb` — the mid-stop `#764ba2` is a desaturated grey-mauve) plus the 40%-opacity white/yellow `::before` wash washed the saturation out to grey.
+- Now it's the **vivid frosted glass** (option A colors + option B glass, chosen in `dev/genz-hero-mockup.html`): `background:linear-gradient(135deg,rgba(255,46,159,.42),rgba(123,47,247,.42) 55%,rgba(47,123,255,.42))` + `backdrop-filter:blur(26px)`, lighter `::before` wash (opacity .22), keeping the white border/34px radius/shadow.
+- `--hero-bg` token for genz updated to the same vivid stops (used by the generic layer / theme-studio). `css/theme-wrapped.css` cache-buster `?v=2`.
+
 ## [2026-08-13] Learner panel layout — fits the main box, no more long scroll (v187)
 
 ### Fixed
