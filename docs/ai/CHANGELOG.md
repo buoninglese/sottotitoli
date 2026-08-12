@@ -4,6 +4,14 @@
 > The entries below from v206–v210 describe an **ES-module refactor** (`js/panoramica/app.js` + `panoramica/panels/*.js` + `panoramica/shared/*.js`) that **never shipped**. `panoramica.html` never imported `app.js`, so the deployed site always ran the ~10,700-line inline monolith. The refactor files were dead code and have been **moved to** `~/Desktop/sottotitoli-archived/dead-js/panoramica-v2-attempt/`.
 > **Real current state: monolith at v178.** These v2xx notes describe work that was never activated — treat them as historical, not as a description of the live code.
 
+## [2026-08-13] Learner panel layout — fits the main box, no more long scroll (v187)
+
+### Fixed
+- **Learner now fits inside the main panel box** instead of growing into a very long page scroll. `#pnl-learner.active` becomes a flex column with `height:100%` + `overflow:hidden`; the hero and tabs stay pinned, and only the active sub-tab pane (`#sub-learner-*`) scrolls internally (`flex:1; overflow-y:auto`).
+- **Compact path:** smaller unit cards, lesson nodes (52px→44px), connectors (26px→16px) and reduced margins, so the internal scroll is much shorter.
+- **Lesson overlay fixed back to full-viewport.** The app's `.content-panel` `paneIn` animation persists `transform:translateY(0)`, which made the panel a containing block and trapped the `position:fixed` lesson overlay inside the panel (which, combined with the tall panel, contributed to the long-scroll feel inside lessons). `#pnl-learner` now uses a transform-free fade (`@keyframes learnerPaneIn`) so the overlay covers the whole viewport again.
+- `css/learner.css` cache-buster bumped to `?v=3`.
+
 ## [2026-08-13] Learner tab — Duolingo-style guided Italian course (v185)
 
 ### Added
