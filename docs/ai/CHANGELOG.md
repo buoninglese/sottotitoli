@@ -1,5 +1,13 @@
 # Changelog
 
+## [2026-08-12] Progressive Panel Build — interactive after one panel (v208)
+
+### Changed
+- **js/panoramica/app.js** — Replaced parallel `preloadAllPanels()` (all 8 panels before reveal, loader up ~400ms+) with `buildPanel(name)`. `init()` builds ONLY the initial panel, hides the loader, shows it, then builds the other 7 in the background. A queued click on a not-yet-built panel reveals it the moment it finishes building.
+- Closed the last dead window: clicks during preload used to register invisibly because `#panelContainer` is `display:none` while `.js-loading`. Now the page is interactive after ONE panel (~50–170ms).
+- Per-panel error isolation kept: `init()` failures log and continue. Cache buster `?v=12` → `?v=13`.
+- Root-cause chain so far: 20s init delay (v206: panels first, data in background) → early-click ReferenceError (v207: head-defined `showPanel` stub) → invisible preload window (v208: progressive build).
+
 ## [2026-08-12] Fast-Click Fix — showPanel defined before the sidebar exists (v207)
 
 ### Fixed
