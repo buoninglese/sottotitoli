@@ -7,6 +7,7 @@ import { waitForSupabase, getSupabase } from './shared/supabase.js';
 import { formatDate, formatDuration, formatNumber, statusBadge } from './shared/formatters.js';
 import { emit, on } from './shared/events.js';
 import { store, updateStore, syncWindowGlobals } from './shared/state.js';
+import './shared/legacy-globals.js'; // restores window.* handlers lost in the refactor
 
 // ── Panel imports (preloaded — all available instantly, no race conditions) ──
 import * as dashboardPanel from './panels/dashboard.js';

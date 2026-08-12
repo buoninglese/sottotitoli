@@ -1090,12 +1090,11 @@ export async function render(parentEl) {
                     });
                   }
 
-                  // ── Insert request ──
+                  // ── Insert request (prod table has family_key; module_id was never migrated) ──
                   var ins = await sb.from('ai_report_requests').insert({
                     user_id: uid,
                     session_ids: sessionIds,
-                    module_id: mapping.moduleId,
-                    module_key: mapping.moduleKey,
+                    family_key: mapping.moduleKey,
                     scope_type: sessionIds.length > 1 ? 'multi_session' : 'single_session',
                     status: 'queued'
                   });
@@ -1402,7 +1401,7 @@ async function loadReports() {
   var sb = window.sottotitoliSupabase;
   if (!sb) { window._raiReports = []; return; }
   try {
-    var resp = await sb.from('session_ai_reports').select('id, created_at, overall_score, summary, status, session_count').order('created_at',{ascending:false}).limit(50);
+    var resp = await sb.from('session_ai_reports').select('id, created_at, overall_score, summary, status').order('created_at',{ascending:false}).limit(50);
     window._raiReports = resp.data || [];
   } catch(e) { window._raiReports = []; }
 }

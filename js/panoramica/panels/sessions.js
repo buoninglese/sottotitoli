@@ -127,6 +127,10 @@ export async function render(parentEl) {
               var trSessionTags = JSON.parse(localStorage.getItem('s8t-session-tags')||'{}');
               var trEditingSession = null;
 
+              // Expose for inline handlers (module refactor lost these globals)
+              window.trAllSessions = trAllSessions;
+              window.trAllTags = trAllTags;
+
               function saveSessionTags(){ localStorage.setItem('s8t-session-tags', JSON.stringify(trSessionTags)); }
               function saveTags(){ localStorage.setItem('s8t-transcript-tags', JSON.stringify(trAllTags)); }
 
