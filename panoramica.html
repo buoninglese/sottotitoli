@@ -17,7 +17,7 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" crossorigin="anonymous">
   <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="css/theme-2.css">
-  <link rel="stylesheet" href="css/theme-wrapped.css?v=2">
+  <link rel="stylesheet" href="css/theme-wrapped.css?v=3">
   <link rel="stylesheet" href="css/review.css">
   <link rel="stylesheet" href="css/panoramica.css">
   <link rel="stylesheet" href="css/learner.css?v=3">
@@ -25,6 +25,7 @@
   <script src="https://unpkg.com/compromise@14.14.2" crossorigin="anonymous"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js" integrity="sha384-/1qUCSGwTur9vjf/z9lmu/eCUYbpOTgSjmpbMQZ1/CtX2v/WcAIKqRv+U1DUCG6e" crossorigin="anonymous"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js" integrity="sha384-nFoSjZIoH3CCp8W639jJyQkuPHinJ2NHe7on1xvlUA7SuGfJAfvMldrsoAVm6ECz" crossorigin="anonymous"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 </head>
 <body data-theme="light">
   <script>
@@ -56,7 +57,7 @@
   <div class="app-shell">
     <header class="topbar">
       <div style="display:flex;align-items:center;gap:0">
-        <a href="index.html" class="topbar-brand" style="font-size:31px;font-family:'Manrope',sans-serif;font-weight:700;text-decoration:none;letter-spacing:-0.02em;display:inline-flex;align-items:baseline;gap:0">sottotitoli<span style="font-family:'Manrope',sans-serif;font-weight:800;color:var(--accent-purple,#7c3aed);letter-spacing:-.5px">.pro</span><span class="topbar-version" style="font-size:10px;font-weight:600;font-family:'Manrope',sans-serif;color:var(--text-soft);margin-left:6px;opacity:.55;letter-spacing:.02em">v189</span></a>
+        <a href="index.html" class="topbar-brand" style="font-size:31px;font-family:'Manrope',sans-serif;font-weight:700;text-decoration:none;letter-spacing:-0.02em;display:inline-flex;align-items:baseline;gap:0">sottotitoli<span style="font-family:'Manrope',sans-serif;font-weight:800;color:var(--accent-purple,#7c3aed);letter-spacing:-.5px">.pro</span><span class="topbar-version" style="font-size:10px;font-weight:600;font-family:'Manrope',sans-serif;color:var(--text-soft);margin-left:6px;opacity:.55;letter-spacing:.02em">v190</span></a>
       </div>
       <div style="display:flex;align-items:center;gap:12px">
         <button class="btn-start-session" id="btnStartSession" onclick="toggleStartSession()" style="font-size:15px;height:42px;padding:0 20px;border-radius:12px;background:linear-gradient(135deg,rgba(192,132,252,.18),rgba(192,132,252,.06));color:#c084fc;border:1px solid rgba(192,132,252,.25);font-weight:700;font-family:'Manrope',sans-serif;display:inline-flex;align-items:center;gap:8px;box-shadow:0 0 20px rgba(192,132,252,.12),0 2px 8px rgba(0,0,0,.2);cursor:pointer;letter-spacing:-.01em;transition:all .2s ease" onmouseover="this.style.background='linear-gradient(135deg,rgba(192,132,252,.28),rgba(192,132,252,.12))';this.style.borderColor='rgba(192,132,252,.4)';this.style.boxShadow='0 0 28px rgba(192,132,252,.22),0 4px 12px rgba(0,0,0,.25)'" onmouseout="this.style.background='linear-gradient(135deg,rgba(192,132,252,.18),rgba(192,132,252,.06))';this.style.borderColor='rgba(192,132,252,.25)';this.style.boxShadow='0 0 20px rgba(192,132,252,.12),0 2px 8px rgba(0,0,0,.2)'">
@@ -499,22 +500,28 @@
               <div class="wsc-box wsc-hero">
                 <div class="wsc-blobs"><span class="wsc-blob wsc-blob-a"></span><span class="wsc-blob wsc-blob-b"></span></div>
                 <div class="wsc-hero-inner">
-                  <div class="wsc-pill"><span class="wsc-pill-emoji">✨</span><span data-i18n="wsc_hero_pill">Il tuo anno in numeri</span></div>
+                  <div class="wsc-pill"><span class="wsc-pill-emoji" id="wscHeroPillEmoji">✨</span><span id="wscHeroPill" data-i18n="wsc_hero_pill">Il tuo anno in numeri</span></div>
                   <div class="wsc-hero-title"><span id="wscHeroName" data-i18n="wsc_hero_title">Bentornato</span><span class="wsc-hero-dot">.</span></div>
                   <div class="wsc-hero-card"><p id="wscHeroMsg">Sei nel top 1% degli studenti più costanti quest'anno. Non hai solo studiato: hai costruito. 🚀</p></div>
                 </div>
               </div>
 
-              <!-- 2 · Totali (sessioni / tempo) -->
-              <div class="wsc-box wsc-grad-1">
+              <!-- 2 · Totali (sessioni / tempo) — toggle 📊 reali / 🎉 divertenti -->
+              <div class="wsc-box wsc-grad-1" id="wscBoxTotals">
                 <div>
-                  <div class="wsc-label" data-i18n="wsc_sessions">Sessioni totali</div>
+                  <div class="wsc-top">
+                    <div class="wsc-label" id="wscLbl1" data-i18n="wsc_sessions">Sessioni totali</div>
+                    <div class="wsc-toggle" id="wscToggle" role="group" aria-label="Stile riepilogo">
+                      <button type="button" data-wsc-mode="fact" class="active" title="Dati reali" onclick="wscToggleMode('fact')">📊</button>
+                      <button type="button" data-wsc-mode="fun" title="Confronti divertenti" onclick="wscToggleMode('fun')">🎉</button>
+                    </div>
+                  </div>
                   <div class="wsc-big"><span id="wscSessions">0</span></div>
                 </div>
                 <div class="wsc-mt">
-                  <div class="wsc-label" data-i18n="wsc_minutes">Tempo parlato</div>
-                  <div class="wsc-big2"><span id="wscMinutes">0</span><small>min</small></div>
-                  <div class="wsc-badge"><span class="wsc-badge-arrow">▲</span> <span id="wscTrend">+0% vs settimana scorsa</span></div>
+                  <div class="wsc-label" id="wscLbl2" data-i18n="wsc_minutes">Tempo parlato</div>
+                  <div class="wsc-big2"><span id="wscMinutes">0</span><small id="wscMinUnit">min</small></div>
+                  <div class="wsc-badge"><span class="wsc-badge-arrow" id="wscBadgeArrow">▲</span> <span id="wscTrend">+0% vs settimana scorsa</span></div>
                 </div>
               </div>
 
@@ -538,6 +545,7 @@
               <div class="wsc-box wsc-glass wsc-wide">
                 <div class="wsc-box-head"><h3 class="wsc-box-title" data-i18n="wsc_cefr_title">Top livelli CEFR 💻</h3><span class="wsc-box-hint" data-i18n="wsc_cefr_hint">Basato sul tuo vocabolario</span></div>
                 <div class="wsc-bars" id="wscCefrBars"></div>
+                <div class="wsc-quality" id="wscQualityLine"></div>
               </div>
 
               <!-- 5 · Categoria top + palette -->
@@ -545,6 +553,7 @@
                 <div>
                   <div class="wsc-pill-soft"><span class="wsc-pill-emoji">🏆</span> <span data-i18n="wsc_cat_pill">Categoria top</span></div>
                   <div class="wsc-cat-name" id="wscCategory">Conversazione</div>
+                  <div class="wsc-cat-count" id="wscCategoryCount"></div>
                 </div>
                 <div>
                   <div class="wsc-label" data-i18n="wsc_palette">Palette preferita 🎨</div>
@@ -562,6 +571,7 @@
                 <div class="wsc-peak" id="wscPeak">Martedì, 22:00</div>
                 <div class="wsc-peak-sub" id="wscPeakSub">Sei un nottambulo.</div>
                 <div class="wsc-heat" id="wscHeat"></div>
+                <div class="wsc-extra" id="wscExtra"></div>
               </div>
 
               <!-- 7 · Condividi -->
@@ -571,8 +581,8 @@
                   <p class="wsc-share-sub" data-i18n="wsc_share_sub">Mostra al mondo ciò che hai costruito con Sottotitoli 🚀</p>
                 </div>
                 <div class="wsc-actions">
-                  <button type="button" class="wsc-btn wsc-btn-glass" onclick="window.toast && window.toast('Demo: download riepilogo')" data-i18n="wsc_btn_download">Scarica riepilogo</button>
-                  <button type="button" class="wsc-btn wsc-btn-white" onclick="window.toast && window.toast('Demo: condividi')" data-i18n="wsc_btn_share">Condividi</button>
+                  <button type="button" class="wsc-btn wsc-btn-glass" onclick="wscDownloadImage()" data-i18n="wsc_btn_download">Scarica riepilogo</button>
+                  <button type="button" class="wsc-btn wsc-btn-white" onclick="wscShare()" data-i18n="wsc_btn_share">Condividi</button>
                 </div>
               </div>
             </div>
@@ -5284,55 +5294,78 @@
       }
 
       // ═══ RENDER: Wrapped showcase (year-dash gen-z boxes) ═══
+      function wscT(key, fallback) {
+        try {
+          if (typeof I18n !== 'undefined' && I18n.t) {
+            var t = I18n.t(key);
+            if (t && t !== key) return t;
+          }
+        } catch(e) { /* fall through */ }
+        return fallback;
+      }
+
       function renderWrappedShowcase() {
         var box = document.getElementById('wrappedShowcase');
         if (!box) return;
         var s = currentStats() || {};
+        var allSess = (s && s._allSessions) || [];
+        var streak = parseInt(localStorage.getItem('s8t-streak') || '0');
+        var totalMinutes = s.totalMinutes || 0;
+        var totalWords = s.totalWords || 0;
+        var totalSessions = s.totalSessions || 0;
+        // ═══ Box 2 · Totals (store raw data for the toggle) ═══
+        window._wscTotals = {
+          sessions: totalSessions,
+          minutes: totalMinutes,
+          words: totalWords,
+          trend: (s.sessionsTrend || 0)
+        };
+        wscRenderTotals('fact');
 
-        // ── Box 2 · Totals ──
-        var sessEl = document.getElementById('wscSessions');
-        if (sessEl) sessEl.textContent = (s.totalSessions || 0).toLocaleString('it-IT');
-        var minEl = document.getElementById('wscMinutes');
-        if (minEl) minEl.textContent = String(s.totalMinutes || 0).toLocaleString('it-IT');
-        var trendEl = document.getElementById('wscTrend');
-        if (trendEl) {
-          var trend = (s.sessionsTrend || 0);
-          var sign = trend > 0 ? '+' : '';
-          trendEl.textContent = sign + trend + '% vs settimana scorsa';
-        }
-
-        // ── Box 1 · Hero message (reuse dashboard message engine) ──
+        // ═══ Box 1 · Hero headline (data-driven, wrapped style) ═══
         var heroMsg = document.getElementById('wscHeroMsg');
+        var heroPill = document.getElementById('wscHeroPill');
+        var heroPillEmoji = document.getElementById('wscHeroPillEmoji');
         if (heroMsg) {
-          try {
-            var metrics = computeDashboardMetrics();
-            var rule = chooseDashboardMessage(metrics);
-            var msg = rule.t;
-            if (rule.k && typeof I18n !== 'undefined' && I18n.t) {
-              var translated = I18n.t(rule.k);
-              if (translated && translated !== rule.k) msg = translated;
-            }
-            heroMsg.textContent = msg;
-          } catch(e) { /* keep default */ }
+          var headline = '';
+          if (streak >= 21) { headline = '21+ giorni di fila: il tuo ritmo è diventato un superpotere. 🔥'; }
+          else if (streak >= 7) { headline = streak + ' giorni di fila: la costanza è la tua forza. Non fermarti ora! 🔥'; }
+          else if (totalMinutes >= 600) { headline = 'Hai parlato per ' + Math.round(totalMinutes/60) + ' ore totali. Stai costruendo un vocabolario vero. 🎤'; }
+          else if (totalWords >= 1000) { headline = totalWords.toLocaleString('it-IT') + ' parole uniche raccolte: un vocabolario che cresce ogni giorno. 📚'; }
+          else if (totalSessions >= 3) { headline = totalSessions + ' sessioni completate: il tuo progresso sta prendendo forma. 🚀'; }
+          else { headline = 'Completa una sessione per vedere il tuo anno in numeri. Ogni minuto conta. 🚀'; }
+          heroMsg.textContent = headline;
+        }
+        if (heroPill) {
+          if (streak >= 7) { heroPill.textContent = 'Serie di apprendimento'; heroPillEmoji.textContent = '🔥'; }
+          else if (totalMinutes >= 600) { heroPill.textContent = 'Grande parlatore'; heroPillEmoji.textContent = '🎤'; }
+          else if (totalWords >= 1000) { heroPill.textContent = 'Collezionista di parole'; heroPillEmoji.textContent = '📚'; }
+          else { heroPill.textContent = 'Il tuo anno in numeri'; heroPillEmoji.textContent = '✨'; }
         }
 
-        // ── Box 3 · Persona ──
+        // ═══ Box 3 · Persona (derived from real behavior) ═══
         var personaEl = document.getElementById('wscPersona');
         var noteEl = document.getElementById('wscPersonaNote');
-        var streak = parseInt(localStorage.getItem('s8t-streak') || '0');
-        if (personaEl) {
-          personaEl.textContent = streak >= 21 ? 'Maratoneta della costanza' :
-            streak >= 7 ? 'Ritmo costruito' :
-            (s.totalSessions || 0) >= 10 ? 'Costante Instancabile' :
-            (s.totalSessions || 0) >= 3 ? 'Costruttore di abitudini' : 'Esploratore Curioso';
-        }
-        if (noteEl) {
-          if (streak >= 7) noteEl.textContent = streak + ' giorni di fila: la costanza è la tua forza. Torni ogni giorno e costruisci progresso reale. 💎';
-          else noteEl.textContent = 'Ogni sessione è un mattoncino. Continua a costruire il tuo vocabolario, un giorno alla volta. 💎';
-        }
+        // Compute peak hour from sessions
+        var hours = {};
+        allSess.forEach(function(x){ var h = new Date(x.started_at).getHours(); hours[h] = (hours[h]||0)+1; });
+        var bestH = 0, bestHC = 0;
+        for (var h in hours) { if (hours[h] > bestHC) { bestHC = hours[h]; bestH = +h; } }
+        var avgSessionMin = totalSessions ? Math.round(totalMinutes / totalSessions) : 0;
+        var persona = 'Esploratore Curioso', note = 'Ogni sessione è un mattoncino. Continua a costruire il tuo vocabolario, un giorno alla volta. 💎';
+        if (streak >= 21) { persona = '🏆 Maratoneta della costanza'; note = streak + ' giorni di fila: sei nel top 1% della costanza. Nessuno ti ferma. 🏆'; }
+        else if (streak >= 7) { persona = '🔥 Ritmo inarrestabile'; note = streak + ' giorni di fila: la tua costanza è la tua superpotenza. 💎'; }
+        else if (bestHC >= 2 && (bestH >= 20 || bestH < 5)) { persona = '🦉 Gufo notturno'; note = 'Il tuo picco è alle ' + String(bestH).padStart(2,'0') + ':00. Lavori meglio quando gli altri dormono.'; }
+        else if (bestHC >= 2 && bestH < 12) { persona = '🌅 Allodola mattutina'; note = 'Il tuo picco è alle ' + String(bestH).padStart(2,'0') + ':00. Sfrutti al meglio le prime ore.'; }
+        else if (avgSessionMin > 0 && avgSessionMin < 15) { persona = '⚡ Sprinter'; note = 'Media di ' + avgSessionMin + ' min a sessione: brevi ma intensi. La costanza batte la durata.'; }
+        else if (avgSessionMin >= 30) { persona = '🏃 Maratoneta'; note = 'Media di ' + avgSessionMin + ' min a sessione: ami le sessioni lunghe e profonde.'; }
+        else if (totalSessions > 0) { persona = '🧱 Costruttore'; note = avgSessionMin + ' min a sessione in media: ogni sessione aggiunge un mattone al tuo edificio linguistico.'; }
+        if (personaEl) personaEl.textContent = persona;
+        if (noteEl) noteEl.textContent = note;
 
-        // ── Box 4 · CEFR bars ──
+        // ═══ Box 4 · CEFR bars (with %) + quality line ═══
         var barsEl = document.getElementById('wscCefrBars');
+        var qEl = document.getElementById('wscQualityLine');
         if (barsEl) {
           var br = window.cefrBreakdown;
           if (br && br.total > 0) {
@@ -5346,69 +5379,185 @@
             ];
             lv.sort(function(a,b){ return b.v - a.v; });
             var top = lv.slice(0,3);
-            var maxV = Math.max.apply(null, top.map(function(l){return l.v;})) || 1;
+            var total = br.total || 1;
             barsEl.innerHTML = top.map(function(l){
-              var pct = Math.max(6, Math.round(l.v / maxV * 100));
+              var pct = Math.max(6, Math.round(l.v / total * 100));
               return '<div class="wsc-bar-row">' +
                 '<div class="wsc-bar-icon" style="background:linear-gradient(135deg,'+l.c+',#764ba2)">'+l.k+'</div>' +
-                '<div class="wsc-bar"><div class="wsc-bar-top"><b>Livello '+l.k+'</b><span>'+l.v+' parole</span></div>' +
+                '<div class="wsc-bar"><div class="wsc-bar-top"><b>Livello '+l.k+'</b><span>'+pct+'%</span></div>' +
                 '<div class="wsc-bar-track"><div class="wsc-bar-fill" style="width:'+pct+'%;background:linear-gradient(90deg,'+l.c+',#f093fb)"></div></div></div></div>';
             }).join('');
+            if (qEl) {
+              var wpm = s.avgWpm || '—';
+              var acc = s.avgQuality ? Math.round(s.avgQuality * 10) + '%' : '—';
+              var lex = totalWords ? totalWords.toLocaleString('it-IT') + ' parole' : '—';
+              var tFlu = wscT('wsc_fluency','Fluidità');
+              var tAcc = wscT('wsc_accuracy','Precisione');
+              var tLex = wscT('wsc_lexicon','Lessico');
+              qEl.innerHTML =
+                '<div class="q"><span>'+tFlu+'</span><b>'+wpm+' wpm</b></div>' +
+                '<div class="q"><span>'+tAcc+'</span><b>'+acc+'</b></div>' +
+                '<div class="q"><span>'+tLex+'</span><b>'+lex+'</b></div>';
+            }
           } else {
             barsEl.innerHTML = '<div style="font-size:13px;color:var(--text-faint);padding:12px 4px">Completa alcune sessioni per vedere la distribuzione CEFR del tuo vocabolario.</div>';
+            if (qEl) qEl.innerHTML = '';
           }
         }
 
-        // ── Box 5 · Top category ──
+        // ═══ Box 5 · Top category (most-used language pair) ═══
         var catEl = document.getElementById('wscCategory');
+        var catCount = document.getElementById('wscCategoryCount');
         if (catEl) {
-          catEl.textContent = (window.SOTTOTITOLI_STUDY_LANG || 'en') === 'it' ? 'Italiano' : 'Inglese';
+          var pairs = {};
+          allSess.forEach(function(x){ var p = x.language_pair || 'en'; pairs[p] = (pairs[p]||0) + 1; });
+          var bestPair = '', bestPairC = 0;
+          for (var p in pairs) { if (pairs[p] > bestPairC) { bestPairC = pairs[p]; bestPair = p; } }
+          if (bestPair) {
+            catEl.textContent = bestPair.toUpperCase();
+            if (catCount) catCount.textContent = bestPairC + ' ' + wscT('wsc_cat_count','sessioni');
+          } else {
+            catEl.textContent = (window.SOTTOTITOLI_STUDY_LANG || 'en') === 'it' ? 'Italiano' : 'Inglese';
+            if (catCount) catCount.textContent = '';
+          }
         }
 
-        // ── Box 6 · Peak productivity + heatmap ──
+        // ═══ Box 6 · Peak productivity + heatmap + extra chips ═══
         var peakEl = document.getElementById('wscPeak');
         var peakSub = document.getElementById('wscPeakSub');
         var heatEl = document.getElementById('wscHeat');
-        var allSess = (s && s._allSessions) || [];
+        var extraEl = document.getElementById('wscExtra');
         if (allSess.length) {
-          var hours = {}; var days = {};
-          allSess.forEach(function(x){
-            var d = new Date(x.started_at);
-            var h = d.getHours();
-            var dow = d.getDay();
-            hours[h] = (hours[h]||0)+1;
-            days[dow] = (days[dow]||0)+1;
-          });
-          var bestH = 0, bestHC = 0;
-          for (var h in hours) { if (hours[h] > bestHC) { bestHC = hours[h]; bestH = +h; } }
+          var days = {};
+          allSess.forEach(function(x){ var d = new Date(x.started_at).getDay(); days[d] = (days[d]||0)+1; });
           var bestD = 0, bestDC = 0;
           for (var d in days) { if (days[d] > bestDC) { bestDC = days[d]; bestD = +d; } }
           var daysIt = ['Domenica','Lunedì','Martedì','Mercoledì','Giovedì','Venerdì','Sabato'];
           if (peakEl) peakEl.textContent = daysIt[bestD] + ', ' + String(bestH).padStart(2,'0') + ':00';
           if (peakSub) peakSub.textContent = bestH >= 20 || bestH < 5 ? 'Sei un nottambulo.' : 'Sei una persona mattiniera.';
-          // ── Heatmap: last 28 days, 7 cols x 4 rows (Mon-first) ──
+          // Heatmap: last 28 days, 7 cols x 4 rows (Mon-first)
           if (heatEl) {
             var active = {};
             allSess.forEach(function(x){ var d = new Date(x.started_at).toDateString(); active[d] = true; });
             var today = new Date(); today.setHours(0,0,0,0);
-            // align to Monday
             var offset = (today.getDay() + 6) % 7;
             var start = new Date(today); start.setDate(today.getDate() - offset - 27);
             var cells = '';
             for (var i = 0; i < 28; i++) {
-              var d = new Date(start); d.setDate(start.getDate() + i);
-              var on = active[d.toDateString()] ? ' on' : '';
-              cells += '<div class="wsc-heat-cell'+on+'" title="'+d.toLocaleDateString('it-IT')+'"></div>';
+              var dd = new Date(start); dd.setDate(start.getDate() + i);
+              var on = active[dd.toDateString()] ? ' on' : '';
+              cells += '<div class="wsc-heat-cell'+on+'" title="'+dd.toLocaleDateString('it-IT')+'"></div>';
             }
             heatEl.innerHTML = cells;
+          }
+          // Extra chips: best streak + longest session
+          if (extraEl) {
+            var bestStreak = 0, curStreak = 0, prevDay = null;
+            var daySet = {};
+            allSess.forEach(function(x){ var d = new Date(x.started_at); d.setHours(0,0,0,0); daySet[d.toDateString()] = true; });
+            var dayKeys = Object.keys(daySet).sort();
+            dayKeys.forEach(function(k, i){
+              var cur = new Date(k);
+              if (prevDay) {
+                var diff = Math.round((cur.getTime() - prevDay.getTime()) / 86400000);
+                curStreak = diff === 1 ? curStreak + 1 : 1;
+              } else { curStreak = 1; }
+              if (curStreak > bestStreak) bestStreak = curStreak;
+              prevDay = cur;
+            });
+            var longestMin = Math.round(Math.max.apply(null, allSess.map(function(x){ return x.duration_seconds || 0; })) / 60);
+            var chips = '';
+            if (bestStreak >= 2) chips += '<span class="x">🔥 Miglior serie: ' + bestStreak + ' gg</span>';
+            if (longestMin > 0) chips += '<span class="x">⏱ Sessione più lunga: ' + longestMin + ' min</span>';
+            extraEl.innerHTML = chips;
           }
         } else {
           if (peakEl) peakEl.textContent = '—';
           if (peakSub) peakSub.textContent = 'Completa una sessione per scoprire il tuo orario di picco.';
           if (heatEl) { var cells=''; for (var i=0;i<28;i++) cells += '<div class="wsc-heat-cell"></div>'; heatEl.innerHTML = cells; }
+          if (extraEl) extraEl.innerHTML = '';
         }
       }
       window.renderWrappedShowcase = renderWrappedShowcase;
+
+      // ═══ Box 2 toggle — 📊 reali ↔ 🎉 divertenti (film / pagine / caffè) ═══
+      function wscRenderTotals(mode) {
+        var d = window._wscTotals || { sessions:0, minutes:0, words:0, trend:0 };
+        var lbl1 = document.getElementById('wscLbl1');
+        var lbl2 = document.getElementById('wscLbl2');
+        var v1 = document.getElementById('wscSessions');
+        var v2 = document.getElementById('wscMinutes');
+        var unit = document.getElementById('wscMinUnit');
+        var badge = document.getElementById('wscTrend');
+        var arrow = document.getElementById('wscBadgeArrow');
+        if (mode === 'fun') {
+          var films = Math.max(1, Math.round(d.minutes / 90));   // ~1 film = 90 min
+          var pages = Math.max(1, Math.round(d.words / 250));    // ~1 pagina = 250 parole
+          var coffees = Math.max(1, Math.round(d.sessions / 1)); // ~1 caffè = 1 sessione
+          if (lbl1) { lbl1.textContent = wscT('wsc_fun_coffee','Caffè ☕'); lbl1.removeAttribute('data-i18n'); }
+          if (lbl2) { lbl2.textContent = wscT('wsc_fun_films','Film 🍿'); lbl2.removeAttribute('data-i18n'); }
+          if (v1) v1.textContent = coffees.toLocaleString('it-IT');
+          if (v2) v2.textContent = films.toLocaleString('it-IT');
+          if (unit) unit.textContent = '';
+          if (badge) badge.textContent = '≈ ' + pages + ' ' + wscT('wsc_fun_pages','pagine 📖');
+          if (arrow) arrow.textContent = '📖';
+        } else {
+          var trend = d.trend || 0;
+          var sign = trend > 0 ? '+' : '';
+          if (lbl1) { lbl1.textContent = wscT('wsc_sessions','Sessioni totali'); lbl1.setAttribute('data-i18n','wsc_sessions'); }
+          if (lbl2) { lbl2.textContent = wscT('wsc_minutes','Tempo parlato'); lbl2.setAttribute('data-i18n','wsc_minutes'); }
+          if (v1) v1.textContent = (d.sessions||0).toLocaleString('it-IT');
+          if (v2) v2.textContent = (d.minutes||0).toLocaleString('it-IT');
+          if (unit) unit.textContent = wscT('wsc_min_unit','min');
+          if (badge) badge.textContent = sign + trend + '% ' + wscT('wsc_vs_last_week','vs settimana scorsa');
+          if (arrow) arrow.textContent = '▲';
+        }
+      }
+      window.wscRenderTotals = wscRenderTotals;
+
+      function wscToggleMode(mode) {
+        document.querySelectorAll('#wscToggle button').forEach(function(b){
+          b.classList.toggle('active', b.getAttribute('data-wsc-mode') === mode);
+        });
+        wscRenderTotals(mode);
+      }
+      window.wscToggleMode = wscToggleMode;
+
+      // ═══ Box 7 · Scarica riepilogo come PNG (wrapped shareable image) ═══
+      function wscDownloadImage() {
+        var el = document.getElementById('wrappedShowcase');
+        if (!el) { if (window.toast) toast('Nessun riepilogo da scaricare'); return; }
+        if (typeof html2canvas === 'undefined') { if (window.toast) toast('Libreria non caricata'); return; }
+        html2canvas(el, { scale: 2, useCORS: true, backgroundColor: null, logging: false, windowWidth: el.scrollWidth })
+          .then(function(canvas){
+            var a = document.createElement('a');
+            a.download = 'sottotitoli-wrapped.png';
+            a.href = canvas.toDataURL('image/png');
+            a.click();
+            if (window.toast) toast('✅ Riepilogo scaricato!');
+          })
+          .catch(function(e){ console.warn('wscDownload:', e); if (window.toast) toast('⚠️ Errore nel download'); });
+      }
+      window.wscDownloadImage = wscDownloadImage;
+
+      function wscShare() {
+        var el = document.getElementById('wrappedShowcase');
+        if (!el) { if (window.toast) toast('Nessun riepilogo da condividere'); return; }
+        if (navigator.share) {
+          html2canvas(el, { scale: 2, useCORS: true, backgroundColor: null, logging: false, windowWidth: el.scrollWidth })
+            .then(function(canvas){
+              return new Promise(function(res){ canvas.toBlob(res, 'image/png'); });
+            })
+            .then(function(blob){
+              var file = new File([blob], 'sottotitoli-wrapped.png', { type: 'image/png' });
+              return navigator.share({ title: 'I miei progressi Sottotitoli', text: 'Il mio riepilogo stile wrapped su Sottotitoli! 🚀', files: [file] });
+            })
+            .catch(function(e){ if (e && e.name !== 'AbortError') { console.warn('wscShare:', e); wscDownloadImage(); } });
+        } else {
+          wscDownloadImage();
+        }
+      }
+      window.wscShare = wscShare;
 
       // ═══ Metric card selection — switches the big chart ═══
       function selectMetricCard(card) {
