@@ -160,7 +160,45 @@
         c.classList.toggle('active', c.getAttribute('data-lang') === lang);
       });
     })();
-    /* ── Sidebar + Sub-tab navigation REMOVED — handled by app.js (hash routing + onclick) ── */
+    /* ── Sidebar nav: switch content panels ── */
+    (function(){
+      var navItems = document.querySelectorAll('.side-nav .nav-item[data-panel]');
+      var panels = document.querySelectorAll('.content-panel');
+      navItems.forEach(function(item){
+        item.addEventListener('click', function(e){
+          e.preventDefault();
+          var panelId = this.getAttribute('data-panel');
+          // If Start Session is open, close it first
+          var ss=document.getElementById('startSplit');
+          if(ss&&ss.classList.contains('active')){
+            ss.classList.remove('active');
+            document.body.style.overflow='';
+            panels.forEach(function(p){ p.style.display = ''; });
+          }
+          navItems.forEach(function(n){ n.classList.remove('active'); n.removeAttribute('aria-current'); });
+          this.classList.add('active');
+          this.setAttribute('aria-current','page');
+          panels.forEach(function(p){ p.classList.remove('active'); });
+          var target = document.getElementById('pnl-' + panelId);
+          if(target){ target.classList.add('active'); }
+        });
+      });
+    })();
+    /* ── Sub-tab switching within content panels ── */
+    document.addEventListener('click', function(e){
+      var tab = e.target.closest('.tab-link[data-subtab]');
+      if(!tab) return;
+      e.preventDefault();
+      var panel = tab.closest('.content-panel');
+      if(!panel) return;
+      var subId = tab.getAttribute('data-subtab');
+      panel.querySelectorAll('.tab-link').forEach(function(t){ t.classList.remove('active'); t.setAttribute('aria-selected','false'); });
+      tab.classList.add('active');
+      tab.setAttribute('aria-selected','true');
+      panel.querySelectorAll('.subtab-pane').forEach(function(p){ p.classList.remove('active'); });
+      var target = document.getElementById('sub-' + subId);
+      if(target) target.classList.add('active');
+    });
 
     function toggleStartSession(){
       var ss=document.getElementById('startSplit');
