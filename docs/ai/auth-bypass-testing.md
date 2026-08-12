@@ -57,13 +57,21 @@ This persists across page reloads but doesn't modify the actual file.
 
 ---
 
-## Solution 3: `?bypass-auth=1` Query Parameter (Recommended)
+## Solution 3: `?bypass_auth=1` Query Parameter (Recommended)
 
-Add a bypass check to `js/auth.js`:
+**✅ Already implemented in `js/auth.js`** — no code change needed. Just append
+`?bypass_auth=1` to any authenticated page URL. It installs a mock session so
+data calls fail gracefully (mock token → Supabase 401) while the UI renders.
+
+Also supported by the same check:
+- `?mock=1` — allow any page without auth
+- `window.SOTTOTITOLI_BYPASS_AUTH = true` — programmatic toggle
+
+For reference, the implemented check is equivalent to:
 
 ```javascript
 // At the top of the auth check, before the redirect:
-if (window.location.search.includes('bypass-auth=1')) {
+if (window.location.search.includes('bypass_auth=1')) {
   console.warn('⚠️ Auth bypass active — using mock session');
   window.sottotitoliSupabase = null;  // Prevent real API calls
   return;  // Skip auth check entirely
@@ -73,13 +81,13 @@ if (window.location.search.includes('bypass-auth=1')) {
 Then test with:
 
 ```
-http://localhost:8000/panoramica.html?bypass-auth=1
-http://localhost:8000/grammarhub.html?bypass-auth=1
+http://localhost:8000/panoramica.html?bypass_auth=1
+http://localhost:8000/grammarhub.html?bypass_auth=1
 ```
 
 ### When to use
 - Permanent solution (commit the bypass check, never commit the parameter)
-- Automated testing (Playwright scripts can add `?bypass-auth=1`)
+- Automated testing (Playwright scripts can add `?bypass_auth=1`)
 - The `serve.py` dev server can auto-append this parameter
 
 ---
@@ -98,9 +106,9 @@ class AuthBypassHandler(http.server.SimpleHTTPRequestHandler):
         # Auto-add bypass for local dev on authenticated pages
         auth_pages = ['panoramica', 'caption-s8t', 'duo-s8t', 'grammarhub', 'ai-s8t', 'traduzione-s8t']
         if any(p in parsed.path for p in auth_pages):
-            if 'bypass-auth' not in parsed.query:
+            if 'bypass_auth' not in parsed.query:
                 # Redirect to bypass version
-                new_query = parsed.query + ('&' if parsed.query else '') + 'bypass-auth=1'
+                new_query = parsed.query + ('&' if parsed.query else '') + 'bypass_auth=1'
                 new_path = parsed.path + '?' + new_query
                 self.send_response(302)
                 self.send_header('Location', new_path)
