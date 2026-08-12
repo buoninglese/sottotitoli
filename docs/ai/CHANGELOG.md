@@ -4,6 +4,18 @@
 > The entries below from v206–v210 describe an **ES-module refactor** (`js/panoramica/app.js` + `panoramica/panels/*.js` + `panoramica/shared/*.js`) that **never shipped**. `panoramica.html` never imported `app.js`, so the deployed site always ran the ~10,700-line inline monolith. The refactor files were dead code and have been **moved to** `~/Desktop/sottotitoli-archived/dead-js/panoramica-v2-attempt/`.
 > **Real current state: monolith at v178.** These v2xx notes describe work that was never activated — treat them as historical, not as a description of the live code.
 
+## [2026-08-13] Learner tab — Duolingo-style guided Italian course (v185)
+
+### Added
+- **New sidebar tab "Learner"** (Learning section, `school` icon) — port of the `language-learning-app` (LinguaLeap) concept into the app, adapted to teach **Italian** (target language).
+- **New files:** `js/learner-data.js` (Italian course data: 7 units / 21 lessons across Principiante · Intermedio · Avanzato, each with vocabulary + phrases + conversations), `js/learner.js` (engine), `css/learner.css` (themed via app CSS vars).
+- **Path view:** daily goal, XP, streak hero + unit cards with lesson nodes (locked / available / done) and a 🏆 unit test node.
+- **Lesson player** (full-screen overlay): listen (TTS it-IT) → speak (Web Speech it-IT) → matching → multiple choice → conversation, with progress bar, instant feedback and confetti on completion.
+- **Practice tab:** quick quiz / pronunciation / matching drawn from learned words.
+- **Progress tab:** XP, streak, lessons/units completed, per-level bars, mistake review list.
+- Progress persists in `localStorage["sottotitoli-learner"]` (XP, streak, daily goal, completed lessons, unit test results, mistakes).
+- i18n: `sidebar_learner` + ~40 `learner_*` keys in IT/EN; injected chrome translated via per-element `translateElement` (avoids the app's `I18n.apply` `_isTranslating` race). `#learner` hash deep-link supported.
+
 ## [2026-08-12] Legacy Globals Restoration — every panel button works again (v210)
 
 ### Fixed
