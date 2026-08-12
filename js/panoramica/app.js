@@ -40,6 +40,7 @@ var panelContainer = null;
 // ── Panel switching (CSS toggle — same approach as the original 12K version) ──
 function switchPanel(name) {
   if (currentPanel === name) return;
+  var previousPanel = currentPanel; // capture before reassignment (used in panel:switch event)
 
   // Hide ALL wrappers, show target — simpler and more reliable than prev/next tracking
   var wrappers = document.querySelectorAll('[id^="panel-"]');
@@ -70,7 +71,7 @@ function switchPanel(name) {
     }
   }
 
-  emit('panel:switch', { from: currentPanel, to: name });
+  emit('panel:switch', { from: previousPanel, to: name });
 }
 
 // ── Wire sidebar clicks (onclick property — works everywhere, same as original) ──
@@ -84,7 +85,7 @@ function setupSidebar() {
   }
 }
 
-// ── Dropdown links use inline onclick with window.location.hash= (see panoramica.html) ──
+// ── Dropdown links call switchPanel(name) directly via inline onclick (see panoramica.html) ──
 
 // ── Update topbar dropdown with user data ──
 function updateDropdown(meta, profile, credits, tokens) {
