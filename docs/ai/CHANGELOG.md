@@ -1,5 +1,13 @@
 # Changelog
 
+## [2026-08-12] Legacy Globals Restoration — every panel button works again (v210)
+
+### Fixed
+- **js/panoramica/shared/legacy-globals.js** (new) — restores all `window.*` functions the panel HTML inline handlers expect. The ES-module refactor had extracted the panel HTML but left the implementations in the old `panoramica-v1.html` mega-script → dozens of `Uncaught ReferenceError` on click. Restored: profile referral/avatar set, `selectMetricCard` + per-metric chart, vocab expand search (Datamuse), bank selector/create, CEFR topic DOM actions, wordbank review bulk set, `newWordbank`, `showToastMsg`, and recreated the `wbImportPopup`/`wbCreatePopup` markup that was lost entirely.
+- Supabase 400s fixed against verified schema: `user_wordbanks` (`language`→`lang`, no `word_count`/`updated_at`), `session_ai_reports` (no `session_count`), `ai_report_requests` insert (`module_id`/`module_key`→`family_key`).
+- CSP `connect-src` extended with `api.datamuse.com` + `api.dictionaryapi.dev`.
+- Verified in browser: all metric cards switch + chart redraws, import popup opens, Datamuse returns suggestions, zero page errors. Cache buster `?v=13`→`?v=14`.
+
 ## [2026-08-12] Progressive Panel Build — interactive after one panel (v208)
 
 ### Changed
