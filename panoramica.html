@@ -83,6 +83,42 @@
       var r = e.reason;
       showJsError('Unhandled promise: ' + ((r && r.message) || String(r)));
     });
+
+    // ═══ Click diagnostics (beta) — live pointer counter, top-right ═══
+    // down/up/click counts reveal WHERE clicks die:
+    //   click < up  → browser refused to fire click (moving target / selection)
+    //   click == up → handler ran; issue is elsewhere
+    window.__clickStats = { down: 0, up: 0, click: 0, last: '—' };
+    function updClickBadge() {
+      var b = document.getElementById('clickDiagBadge');
+      if (!b) return;
+      var s = window.__clickStats;
+      b.textContent = 'down:' + s.down + '  up:' + s.up + '  click:' + s.click + '  |  ' + s.last;
+    }
+    document.addEventListener('pointerdown', function () { window.__clickStats.down++; updClickBadge(); }, true);
+    document.addEventListener('pointerup', function () { window.__clickStats.up++; updClickBadge(); }, true);
+    document.addEventListener('click', function (e) {
+      var s = window.__clickStats;
+      s.click++;
+      var t = e.target;
+      var el = t && t.closest ? t.closest('.sidebar-link, .btn-start-session, .ss-btn, .tab-link, .fchip, .trial-btn') : null;
+      if (el) {
+        var panel = el.getAttribute('data-panel');
+        s.last = panel ? (panel + ' → ' + (window._currentPanel || '')) : (el.className || el.tagName);
+      }
+      updClickBadge();
+    }, true);
+    (function () {
+      function mkClickBadge() {
+        var b = document.createElement('div');
+        b.id = 'clickDiagBadge';
+        b.style.cssText = 'position:fixed;top:8px;right:8px;background:rgba(0,0,0,.78);color:#4ade80;font:11px/1.6 ui-monospace,monospace;padding:6px 10px;border-radius:8px;z-index:2147483000;opacity:.92;pointer-events:none';
+        document.body.appendChild(b);
+        updClickBadge();
+      }
+      if (document.body) mkClickBadge();
+      else document.addEventListener('DOMContentLoaded', mkClickBadge);
+    })();
   </script>
 </head>
 <body data-theme="light">
@@ -123,7 +159,7 @@
   <div class="app-shell">
     <header class="topbar">
       <div style="display:flex;align-items:center;gap:0">
-        <a href="index.html" class="topbar-brand" style="font-size:31px;font-family:'Manrope',sans-serif;font-weight:700;text-decoration:none;letter-spacing:-0.02em;display:inline-flex;align-items:baseline;gap:0">sottotitoli<span style="font-family:'Manrope',sans-serif;font-weight:800;color:var(--accent-purple,#7c3aed);letter-spacing:-.5px">.pro</span><span class="topbar-version" style="font-size:10px;font-weight:600;font-family:'Manrope',sans-serif;color:var(--text-soft);margin-left:6px;opacity:.55;letter-spacing:.02em">v211</span></a>
+        <a href="index.html" class="topbar-brand" style="font-size:31px;font-family:'Manrope',sans-serif;font-weight:700;text-decoration:none;letter-spacing:-0.02em;display:inline-flex;align-items:baseline;gap:0">sottotitoli<span style="font-family:'Manrope',sans-serif;font-weight:800;color:var(--accent-purple,#7c3aed);letter-spacing:-.5px">.pro</span><span class="topbar-version" style="font-size:10px;font-weight:600;font-family:'Manrope',sans-serif;color:var(--text-soft);margin-left:6px;opacity:.55;letter-spacing:.02em">v212</span></a>
       </div>
       <div style="display:flex;align-items:center;gap:12px">
         <button class="btn-start-session" id="btnStartSession" onclick="toggleStartSession()" style="font-size:15px;height:42px;padding:0 20px;border-radius:12px;background:linear-gradient(135deg,rgba(192,132,252,.18),rgba(192,132,252,.06));color:#c084fc;border:1px solid rgba(192,132,252,.25);font-weight:700;font-family:'Manrope',sans-serif;display:inline-flex;align-items:center;gap:8px;box-shadow:0 0 20px rgba(192,132,252,.12),0 2px 8px rgba(0,0,0,.2);cursor:pointer;letter-spacing:-.01em;transition:all .2s ease" onmouseover="this.style.background='linear-gradient(135deg,rgba(192,132,252,.28),rgba(192,132,252,.12))';this.style.borderColor='rgba(192,132,252,.4)';this.style.boxShadow='0 0 28px rgba(192,132,252,.22),0 4px 12px rgba(0,0,0,.25)'" onmouseout="this.style.background='linear-gradient(135deg,rgba(192,132,252,.18),rgba(192,132,252,.06))';this.style.borderColor='rgba(192,132,252,.25)';this.style.boxShadow='0 0 20px rgba(192,132,252,.12),0 2px 8px rgba(0,0,0,.2)'">
@@ -183,6 +219,14 @@
         .nav-item.sidebar-link:hover { transform: none; }
         .sidebar-link.active { color:var(--cyan); }
         .sidebar-link.active .bg-pill { opacity:1; transform:scale(1); background:rgba(6,182,212,.12); box-shadow:0 0 16px rgba(6,182,212,.08); }
+        /* ── Click-loss hardening: buttons must never move or select text ──
+           No transform on ANY state, no transition on transform, no text
+           selection on rapid clicks, no double-tap zoom on touch. */
+        .sidebar-link, .sidebar-link:hover, .sidebar-link:active, .sidebar-link:focus { transform:none !important; }
+        .sidebar-link { transition: background .25s ease, color .25s ease; -webkit-user-select:none; user-select:none; -webkit-tap-highlight-color:transparent; }
+        .sidebar-link .bg-pill { pointer-events:none; }
+        #btnStartSession, .ss-btn, .ss-lang-chip, .tab-link, .fchip, .dropdown-item, .trial-btn { -webkit-user-select:none; user-select:none; -webkit-tap-highlight-color:transparent; }
+        button { touch-action:manipulation; }
         .sidebar-section-title { font-size:10px; font-weight:700; color:var(--text-soft); opacity:.5; text-transform:uppercase; letter-spacing:.25em; font-family:'JetBrains Mono',monospace; padding:0 12px; margin-bottom:8px; margin-top:4px; }
         [data-theme="dark"] .sidebar-link .bg-pill { background:rgba(208,188,255,.1); }
         [data-theme="dark"] .sidebar-link.active .bg-pill { background:rgba(208,188,255,.15); box-shadow:0 0 20px rgba(208,188,255,.05); }
