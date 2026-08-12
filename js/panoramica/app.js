@@ -262,16 +262,32 @@ async function init() {
     window._sottotitoliPrefs = null;
     window.cefrBreakdown = null;
   } else {
-    try { window._sottotitoliProfile = await SottotitoliData.getProfile(); } catch (e) { console.warn('getProfile failed:', e.message); window._sottotitoliProfile = null; }
+    // Fetch all user data CONCURRENTLY. Each call resolves its own userId via
+    // getSession (no shared state, verified in data-service.js), so they are
+    // independent. Was 9 sequential awaits = 9 serialized round-trips, which
+    // delayed the whole dashboard on slow/cold backends. Per-call try/catch
+    // keeps the exact same fallback values as before.
+    var _data = await Promise.all([
+      (async function () { try { return await SottotitoliData.getProfile(); } catch (e) { console.warn('getProfile failed:', e.message); return null; } })(),
+      (async function () { try { return await SottotitoliData.getSessionStats('en'); } catch (e) { console.warn('statsEN failed:', e.message); return null; } })(),
+      (async function () { try { return await SottotitoliData.getSessionStats('it'); } catch (e) { console.warn('statsIT failed:', e.message); return null; } })(),
+      (async function () { try { return await SottotitoliData.getReferralStats(); } catch (e) { console.warn('refs failed:', e.message); return null; } })(),
+      (async function () { try { return await SottotitoliData.getAIReports(); } catch (e) { console.warn('reports failed:', e.message); return []; } })(),
+      (async function () { try { return await SottotitoliData.getAITokens(); } catch (e) { console.warn('tokens failed:', e.message); return 0; } })(),
+      (async function () { try { return await SottotitoliData.getCredits(); } catch (e) { console.warn('credits failed:', e.message); return null; } })(),
+      (async function () { try { return await SottotitoliData.getPreferences(); } catch (e) { console.warn('prefs failed:', e.message); return null; } })(),
+      (async function () { try { return await SottotitoliData.getCEFRBreakdown(); } catch (e) { console.warn('cefr failed:', e.message); return null; } })()
+    ]);
+    window._sottotitoliProfile = _data[0];
     window.profile = window._sottotitoliProfile;
-    try { window.statsEN = await SottotitoliData.getSessionStats('en'); } catch (e) { console.warn('statsEN failed:', e.message); window.statsEN = null; }
-    try { window.statsIT = await SottotitoliData.getSessionStats('it'); } catch (e) { console.warn('statsIT failed:', e.message); window.statsIT = null; }
-    try { window.refs = await SottotitoliData.getReferralStats(); } catch (e) { console.warn('refs failed:', e.message); window.refs = null; }
-    try { window.reports = await SottotitoliData.getAIReports(); } catch (e) { console.warn('reports failed:', e.message); window.reports = []; }
-    try { window.tokens = await SottotitoliData.getAITokens(); } catch (e) { console.warn('tokens failed:', e.message); window.tokens = 0; }
-    try { window.credits = await SottotitoliData.getCredits(); } catch (e) { console.warn('credits failed:', e.message); window.credits = null; }
-    try { window._sottotitoliPrefs = await SottotitoliData.getPreferences(); } catch (e) { console.warn('prefs failed:', e.message); window._sottotitoliPrefs = null; }
-    try { window.cefrBreakdown = await SottotitoliData.getCEFRBreakdown(); } catch (e) { console.warn('cefr failed:', e.message); window.cefrBreakdown = null; }
+    window.statsEN = _data[1];
+    window.statsIT = _data[2];
+    window.refs = _data[3];
+    window.reports = _data[4];
+    window.tokens = _data[5];
+    window.credits = _data[6];
+    window._sottotitoliPrefs = _data[7];
+    window.cefrBreakdown = _data[8];
 
     // Update dropdown
     updateDropdown(meta, window.profile, window.credits, window.tokens);
