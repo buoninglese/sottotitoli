@@ -27,6 +27,40 @@
   <script src="https://unpkg.com/compromise@14.14.2" crossorigin="anonymous" defer></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js" integrity="sha384-/1qUCSGwTur9vjf/z9lmu/eCUYbpOTgSjmpbMQZ1/CtX2v/WcAIKqRv+U1DUCG6e" crossorigin="anonymous" defer></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js" integrity="sha384-nFoSjZIoH3CCp8W639jJyQkuPHinJ2NHe7on1xvlUA7SuGfJAfvMldrsoAVm6ECz" crossorigin="anonymous" defer></script>
+
+  <!-- ═══ Foolproof panel switching — defined BEFORE the sidebar exists ═══
+       Sidebar buttons use inline onclick="showPanel(...)". app.js is an ES
+       module and executes AFTER parsing — a click in that window used to
+       throw "ReferenceError: showPanel is not defined" and do nothing.
+       This stub runs during HTML parse, so clicks work from first paint.
+       Requests made before panels exist are queued in _pendingPanel;
+       app.js's init() applies the last one after preload. -->
+  <script>
+    window._pendingPanel = null;
+    window._currentPanel = null;
+    window.showPanel = function (name) {
+      var wrap = document.getElementById('panel-' + name);
+      if (!wrap) { window._pendingPanel = name; return; } // panels still assembling — queue it
+      window._pendingPanel = null;
+      var wrappers = document.querySelectorAll('[id^="panel-"]');
+      for (var i = 0; i < wrappers.length; i++) wrappers[i].style.display = 'none';
+      wrap.style.display = '';
+      var cp = wrap.querySelector('.content-panel');
+      if (cp) cp.classList.add('active');
+      var prev = window._currentPanel;
+      window._currentPanel = name;
+      var links = document.querySelectorAll('.sidebar-link');
+      for (var j = 0; j < links.length; j++) {
+        var p = links[j].getAttribute('data-panel');
+        var on = p === name;
+        links[j].classList.toggle('active', on);
+        if (on) links[j].setAttribute('aria-current', 'page');
+        else links[j].removeAttribute('aria-current');
+      }
+      if (window.__panelSwitchHook) { try { window.__panelSwitchHook(prev, name); } catch (e) {} }
+    };
+    window.switchPanel = window.showPanel; // backward compat
+  </script>
 </head>
 <body data-theme="light">
 
@@ -66,7 +100,7 @@
   <div class="app-shell">
     <header class="topbar">
       <div style="display:flex;align-items:center;gap:0">
-        <a href="index.html" class="topbar-brand" style="font-size:31px;font-family:'Manrope',sans-serif;font-weight:700;text-decoration:none;letter-spacing:-0.02em;display:inline-flex;align-items:baseline;gap:0">sottotitoli<span style="font-family:'Manrope',sans-serif;font-weight:800;color:var(--accent-purple,#7c3aed);letter-spacing:-.5px">.pro</span><span class="topbar-version" style="font-size:10px;font-weight:600;font-family:'Manrope',sans-serif;color:var(--text-soft);margin-left:6px;opacity:.55;letter-spacing:.02em">v206</span></a>
+        <a href="index.html" class="topbar-brand" style="font-size:31px;font-family:'Manrope',sans-serif;font-weight:700;text-decoration:none;letter-spacing:-0.02em;display:inline-flex;align-items:baseline;gap:0">sottotitoli<span style="font-family:'Manrope',sans-serif;font-weight:800;color:var(--accent-purple,#7c3aed);letter-spacing:-.5px">.pro</span><span class="topbar-version" style="font-size:10px;font-weight:600;font-family:'Manrope',sans-serif;color:var(--text-soft);margin-left:6px;opacity:.55;letter-spacing:.02em">v207</span></a>
       </div>
       <div style="display:flex;align-items:center;gap:12px">
         <button class="btn-start-session" id="btnStartSession" onclick="toggleStartSession()" style="font-size:15px;height:42px;padding:0 20px;border-radius:12px;background:linear-gradient(135deg,rgba(192,132,252,.18),rgba(192,132,252,.06));color:#c084fc;border:1px solid rgba(192,132,252,.25);font-weight:700;font-family:'Manrope',sans-serif;display:inline-flex;align-items:center;gap:8px;box-shadow:0 0 20px rgba(192,132,252,.12),0 2px 8px rgba(0,0,0,.2);cursor:pointer;letter-spacing:-.01em;transition:all .2s ease" onmouseover="this.style.background='linear-gradient(135deg,rgba(192,132,252,.28),rgba(192,132,252,.12))';this.style.borderColor='rgba(192,132,252,.4)';this.style.boxShadow='0 0 28px rgba(192,132,252,.22),0 4px 12px rgba(0,0,0,.25)'" onmouseout="this.style.background='linear-gradient(135deg,rgba(192,132,252,.18),rgba(192,132,252,.06))';this.style.borderColor='rgba(192,132,252,.25)';this.style.boxShadow='0 0 20px rgba(192,132,252,.12),0 2px 8px rgba(0,0,0,.2)'">
@@ -478,7 +512,7 @@
   </script>
 
   <!-- Panel router + initialization (replaces mega-script) -->
-  <script type="module" src="js/panoramica/app.js?v=11"></script>
+  <script type="module" src="js/panoramica/app.js?v=12"></script>
 
 
 <!-- 🎯 SETTINGS SAVE — single unified handler 🎯 -->

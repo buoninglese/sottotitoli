@@ -33,52 +33,16 @@ var panels = {
 var currentPanel = null;
 var panelContainer = null;
 
-// ── Panel switching — dead simple. Called by inline onclick on sidebar buttons. ──
-// No hash, no delegation, no closest(), no retry queue. Hide all, show one.
-// Idempotent: always applies, even if already on the target — this prevents
-// "stuck" states where currentPanel is out of sync with what's visible.
-var pendingPanel = null; // panel requested before panels finished preloading
-
-window.showPanel = function (name) {
-  var wrap = document.getElementById('panel-' + name);
-  if (!wrap) {
-    // Panels still loading — remember the request. init() applies it after preload.
-    pendingPanel = name;
-    return;
-  }
-  pendingPanel = null;
-  showPanelNow(name, wrap);
+// ── Panel switching ──
+// The REAL showPanel() is defined in an inline script in panoramica.html
+// <head>, so it exists before the sidebar buttons are parsed — early clicks
+// can never throw "ReferenceError: showPanel is not defined". It queues
+// pre-preload requests in window._pendingPanel.
+// Here we only hook it to track currentPanel + emit panel:switch.
+window.__panelSwitchHook = function (from, to) {
+  currentPanel = to;
+  emit('panel:switch', { from: from, to: to });
 };
-
-function showPanelNow(name, wrap) {
-  var previousPanel = currentPanel;
-
-  // Hide ALL wrappers, show target
-  var wrappers = document.querySelectorAll('[id^="panel-"]');
-  for (var i = 0; i < wrappers.length; i++) wrappers[i].style.display = 'none';
-  wrap.style.display = '';
-
-  // Ensure active class on content-panel
-  var cp = wrap.querySelector('.content-panel');
-  if (cp) cp.classList.add('active');
-
-  currentPanel = name;
-  window._currentPanel = name;
-
-  // Update sidebar active state
-  var links = document.querySelectorAll('.sidebar-link');
-  for (var j = 0; j < links.length; j++) {
-    var panel = links[j].getAttribute('data-panel');
-    links[j].classList.toggle('active', panel === name);
-    if (panel === name) links[j].setAttribute('aria-current', 'page');
-    else links[j].removeAttribute('aria-current');
-  }
-
-  emit('panel:switch', { from: previousPanel, to: name });
-};
-
-// Keep backward compat — old code calls window.switchPanel
-window.switchPanel = window.showPanel;
 
 // ── Dropdown links call switchPanel(name) directly via inline onclick (see panoramica.html) ──
 
@@ -207,7 +171,7 @@ async function init() {
 
   // Route to initial panel (honor pending click + URL hash)
   var hash = window.location.hash.replace('#', '');
-  var initialPanel = pendingPanel || (hash && panels[hash] ? hash : null) || 'panoramica';
+  var initialPanel = window._pendingPanel || (hash && panels[hash] ? hash : null) || 'panoramica';
   window.showPanel(initialPanel);
 
   // ═══ STEP 2: Load user data ASYNCHRONOUSLY (non-blocking — panels update when ready) ═══
