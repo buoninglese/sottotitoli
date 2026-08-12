@@ -83,16 +83,24 @@ function switchPanel(name) {
 }
 
 // ── Wire sidebar clicks via delegation on the static .sidebar element ──
-// Delegation keeps the nav responsive from first paint, independent of when
-// init()'s async data pipeline finishes. Previously per-link handlers were
-// attached at the very END of init(), so tabs clicked during a slow load
-// (cold backend) silently did nothing.
+// Delegation keeps the nav responsive from first paint. Uses a manual DOM walk
+// instead of closest() — Safari sometimes gives a text node as e.target when
+// clicking on Material Icons ligature text, and textNode.closest is undefined.
 function setupSidebar() {
   var sidebar = document.querySelector('.sidebar');
   if (!sidebar || sidebar._navWired) return; // idempotent
   sidebar._navWired = true;
   sidebar.addEventListener('click', function (e) {
-    var link = e.target.closest && e.target.closest('.sidebar-link[data-panel]');
+    // Walk up from the click target to find the sidebar link (no closest()!)
+    var el = e.target;
+    var link = null;
+    while (el && el !== sidebar) {
+      if (el.getAttribute && el.getAttribute('data-panel')) {
+        link = el;
+        break;
+      }
+      el = el.parentElement;
+    }
     if (!link) return;
     e.preventDefault();
     if ((link.getAttribute('style') || '').indexOf('not-allowed') !== -1) return; // disabled (e.g. AI Voice)
