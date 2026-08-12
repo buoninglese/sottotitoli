@@ -1936,22 +1936,9 @@
     } finally {
       // MutationObserver callbacks are microtasks; rAF fires after they drain.
       if (typeof requestAnimationFrame !== 'undefined') {
-        requestAnimationFrame(function() {
-          _isTranslating = false;
-          // If mutations arrived while we were translating, process them now
-          if (_pendingApply) {
-            _pendingApply = false;
-            apply();
-          }
-        });
+        requestAnimationFrame(function() { _isTranslating = false; });
       } else {
-        setTimeout(function() {
-          _isTranslating = false;
-          if (_pendingApply) {
-            _pendingApply = false;
-            apply();
-          }
-        }, 0);
+        setTimeout(function() { _isTranslating = false; }, 0);
       }
     }
   }
@@ -1983,10 +1970,11 @@
   /* ─── MUTATION OBSERVER (childList + characterData) ─── */
   var _observer = null;
   var _debounceTimer = null;
-  var _pendingApply = false;  // set when mutations arrive during active translation
 
   function observe(container) {
     _observer = new MutationObserver(function(mutations) {
+      if (_isTranslating) return;
+
       var relevant = false;
       for (var i = 0; i < mutations.length; i++) {
         var m = mutations[i];
@@ -1994,17 +1982,9 @@
       }
       if (!relevant) return;
 
-      // If a translation is already in progress, flag a pending re-apply
-      // instead of silently dropping the mutations (which would leave
-      // dynamically injected panels with raw i18n keys).
-      if (_isTranslating) {
-        _pendingApply = true;
-        return;
-      }
-
       clearTimeout(_debounceTimer);
       _debounceTimer = setTimeout(function() {
-        if (_isTranslating) { _pendingApply = true; return; }
+        if (_isTranslating) return;
         apply();
         // Inject lang toggle into any newly-added user dropdowns
         if (typeof injectLangToggle === 'function') injectLangToggle();
