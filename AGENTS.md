@@ -252,6 +252,7 @@ git push origin main                 # ALWAYS push after commit
 12. ❌ Use `status` as a variable name in zsh — it's read-only.
 13. ❌ Add SRI integrity hashes to CDN links — they silently break when the CDN updates. (See `docs/ai/DECISIONS.md` ADR-009)
 14. ❌ Skip div-balance check after HTML edits — a missing `</div>` on a `display:none` element can hide multiple panels with zero console errors. (See `docs/ai/DECISIONS.md` ADR-007)
+15. ❌ Edit `js/panoramica/app.js` without bumping its cache buster `?v=N` in `panoramica.html` — browsers cache ES modules by URL and users silently keep running stale code. This caused days of phantom "still not working" bugs (2026-08-12, v201→v204).
 
 ---
 
@@ -263,6 +264,7 @@ git push origin main                 # ALWAYS push after commit
 - [ ] No console errors
 - [ ] `config.js` NOT staged
 - [ ] Version bumped (if editing `panoramica.html`)
+- [ ] **app.js cache buster `?v=N` bumped** (if editing `js/panoramica/app.js`)
 - [ ] Committed AND pushed
 - [ ] `docs/ai/CHANGELOG.md` updated
 
