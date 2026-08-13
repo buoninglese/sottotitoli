@@ -4,6 +4,17 @@
 > The entries below from v206–v210 describe an **ES-module refactor** (`js/panoramica/app.js` + `panoramica/panels/*.js` + `panoramica/shared/*.js`) that **never shipped**. `panoramica.html` never imported `app.js`, so the deployed site always ran the ~10,700-line inline monolith. The refactor files were dead code and have been **moved to** `~/Desktop/sottotitoli-archived/dead-js/panoramica-v2-attempt/`.
 > **Real current state: monolith at v178.** These v2xx notes describe work that was never activated — treat them as historical, not as a description of the live code.
 
+## [2026-08-13] Learner — real-data Phase 1: word banks + spaced review + site-style redesign (v193)
+
+### Added — Learner now trains on YOUR words, not a fixed course
+- **Word-bank bento (path tab):** when signed in, the path shows a card grid of every `user_wordbanks` row ("Le tue word bank"), each card = a trainable session (`openBankTest`). Cards show 🇮🇹/🇬🇧 lang badge + live word count (exact count query on `user_wordbank_words`) + a ✓ when trained. Clicking samples ≤12 words, enriches them (MyMemory translation + dictionary-proxy definition, cached), builds listen → speak → match → multiple-choice steps, and plays them through the existing lesson engine.
+- **Spaced review cards:** the same path shows `review_words` breakdowns — ⏰ **Due now** (`next_review_at.lte.now` OR `is_new`), 🧩 **Fragile** (`mastery_score<40` OR `lapses>=2`), ✨ **New** (`is_new=true`) — each opens `openReview(kind)` with real review words as the source.
+- **Real distractor pool:** multiple-choice options are now drawn from `realPool()` — the union of all the user's actual Italian words (banks + review) instead of the bundled course vocab.
+- **Data layer:** `js/learner.js` gains `srcSb/srcUid/srcIsAuthed/learnerStudyLang/srcBanks/srcBankWords/srcReview/enrichWord/realPool` (all lazy + cached under `SRC`/`ENR`, reset on every `refresh()` via `srcReset()`).
+- **Bundled course demoted to logged-out preview:** `renderBundledPath` only shows when no session (with a "Sign in to train with your real progress" hint); logged-in users with no banks/review see an empty state prompting them to build a word bank.
+- **Layout redesign to fit the site:** new `lr-*` bento styles in `css/learner.css` (section heads with gradient tick, bank grid cards, review cards with count pills, dashed preview note) — card/panel aesthetic driven by the theme tokens, matching the rest of the app. cache-buster `?v=4` (css) / `?v=2` (js).
+- **i18n:** new `learner_*` keys (wordbanks, review_due/fragile/new + subs, train, word_count, no_banks, login_hint, empty_path, bank_done, review_done…) in it + en.
+
 ## [2026-08-13] Gen-Z hero — vivid frosted glass (A+B) (v189)
 
 ### Changed

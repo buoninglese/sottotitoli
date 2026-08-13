@@ -85,6 +85,114 @@
   function recordMistake(itWord) { var s = load(); s.mistakes[itWord] = (s.mistakes[itWord] || 0) + 1; save(s); return s; }
   function clearMistake(itWord) { var s = load(); delete s.mistakes[itWord]; save(s); return s; }
 
+  /* ── Real data sources: user word banks + SRS review words (Phase 1) ──
+   * The bundled course stays only as a not-logged-in fallback.
+   * Words are enriched with the same APIs the word boxes use:
+   *   MyMemory translation, dictionary-proxy definitions, local CEFR_LEVELS.
+   * All lazy + cached. */
+  var SRC = { banks: null, bankWords: {}, review: {}, pool: null };
+  var ENR = {}; // enrichment cache: 'lang:word' -> { translation, definition }
+
+  // Drop cached source data so the next render re-queries fresh values.
+  function srcReset() { SRC.banks = null; SRC.bankWords = {}; SRC.review = {}; SRC.pool = null; }
+
+  function srcSb() { return w.sottotitoliSupabase; }
+  async function srcUid() {
+    try { var sb = srcSb(); if (!sb) return null; var r = await sb.auth.getSession(); return (r.data && r.data.session) ? r.data.session.user.id : null; }
+    catch (e) { return null; }
+  }
+  async function srcIsAuthed() { return !!(await srcUid()); }
+  function learnerStudyLang() { return w.SOTTOTITOLI_STUDY_LANG || 'en'; }
+
+  async function srcBanks() {
+    if (SRC.banks) return SRC.banks;
+    var sb = srcSb(); if (!sb) return (SRC.banks = []);
+    var uid = await srcUid(); if (!uid) return (SRC.banks = []);
+    try {
+      var r = await sb.from('user_wordbanks').select('id,name,lang').eq('user_id', uid).order('created_at', { ascending: true });
+      SRC.banks = (r.data || []).map(function (b) { return { id: b.id, name: b.name, lang: (b.lang || 'it'), wordCount: 0 }; });
+      SRC.banks.forEach(function (b) {
+        sb.from('user_wordbank_words').select('id', { count: 'exact', head: true }).eq('wordbank_id', b.id).then(function (r2) { if (r2 && r2.count != null) b.wordCount = r2.count; });
+      });
+    } catch (e) { SRC.banks = []; }
+    return SRC.banks;
+  }
+
+  async function srcBankWords(bankId, lang) {
+    if (SRC.bankWords[bankId]) return SRC.bankWords[bankId];
+    var words = [];
+    try { if (w.SottotitoliData && w.SottotitoliData.getWordbankWords) words = (await w.SottotitoliData.getWordbankWords(bankId)) || []; } catch (e) { words = []; }
+    SRC.bankWords[bankId] = words.map(function (ww) {
+      var cefr = ww.cefr || ww.cefr_level || '';
+      if (!cefr && w.CEFR_LEVELS) cefr = w.CEFR_LEVELS[String(ww.word || '').toLowerCase()] || '';
+      return { word: ww.word, lang: lang || 'it', pos: ww.pos || '', cefr: cefr, usage: ww.usage_count || 0, translation: '', definition: '' };
+    });
+    return SRC.bankWords[bankId];
+  }
+
+  async function srcReview(kind) {
+    if (SRC.review[kind]) return SRC.review[kind];
+    var out = [];
+    var sb = srcSb();
+    if (sb) {
+      var uid = await srcUid();
+      if (uid) {
+        try {
+          var lang = 'it';
+          var q = sb.from('review_words').select('*').eq('user_id', uid).eq('lang', lang).limit(200);
+          var nowISO = new Date().toISOString();
+          if (kind === 'due') q = q.or('next_review_at.lte.' + nowISO + ',is_new.eq.true');
+          else if (kind === 'fragile') q = q.or('mastery_score.lt.40,lapses.gte.2');
+          else q = q.eq('is_new', true);
+          var r = await q;
+          out = (r.data || []).map(function (rw) {
+            var cefr = rw.cefr || '';
+            return { word: rw.lemma || rw.word, lang: lang, pos: rw.pos || '', cefr: cefr, definition: rw.translation_primary || '', translation: rw.translation_primary || '', usage: rw.personal_frequency || 0, reps: rw.reps || 0 };
+          });
+        } catch (e) { out = []; }
+      }
+    }
+    SRC.review[kind] = out;
+    return out;
+  }
+
+  // Lazy enrichment: translation (MyMemory) + definition (dictionary-proxy). Cached in-memory.
+  async function enrichWord(word, lang) {
+    var key = (lang || 'it') + ':' + String(word || '').toLowerCase();
+    if (ENR[key]) return ENR[key];
+    var out = { translation: '', definition: '' };
+    ENR[key] = out;
+    var pair = (lang === 'en') ? ('en|it') : ('it|' + learnerStudyLang());
+    try {
+      var tr = await fetch('https://api.mymemory.translated.net/get?q=' + encodeURIComponent(word) + '&langpair=' + pair);
+      var tj = await tr.json();
+      if (tj && tj.responseData && tj.responseData.translatedText) out.translation = tj.responseData.translatedText;
+    } catch (e) {}
+    if (lang === 'en') {
+      try {
+        var d = await fetch('https://qzqmuegbpmvqrjrlfbgk.supabase.co/functions/v1/dictionary-proxy?word=' + encodeURIComponent(String(word).toLowerCase()));
+        var dj = await d.json();
+        if (dj && !dj.notFound && dj.definition) out.definition = dj.definition;
+      } catch (e) {}
+    }
+    return out;
+  }
+
+  // Real distractor pool: every Italian word the user actually has (banks + review words).
+  async function realPool() {
+    if (SRC.pool) return SRC.pool;
+    var itWords = [];
+    await srcReview('due'); await srcReview('fragile'); await srcReview('new');
+    var banks = await srcBanks();
+    for (var i = 0; i < banks.length; i++) {
+      var ws = await srcBankWords(banks[i].id, banks[i].lang);
+      itWords = itWords.concat(ws.filter(function (x) { return x.lang !== 'en'; }).map(function (x) { return x.word; }));
+    }
+    ['due', 'fragile', 'new'].forEach(function (k) { itWords = itWords.concat((SRC.review[k] || []).map(function (x) { return x.word; })); });
+    SRC.pool = itWords.filter(Boolean);
+    return SRC.pool;
+  }
+
   /* ── Course helpers ── */
   function unitsFlat() {
     var out = [];
@@ -250,14 +358,15 @@
     return steps;
   }
 
-  function optionsFor(answerIt) {
+  function optionsFor(answerIt, pool) {
     var opts = [answerIt];
-    var all = w.LEARNER_ALL_WORDS();
+    var all = pool || (w.LEARNER_ALL_WORDS ? w.LEARNER_ALL_WORDS() : []);
     var tries = 0;
-    while (opts.length < 4 && tries < 200) {
+    while (opts.length < 4 && tries < 300) {
       tries++;
-      var cand = all[Math.floor(Math.random() * all.length)].it;
-      if (opts.indexOf(cand) === -1) opts.push(cand);
+      var c = all[Math.floor(Math.random() * all.length)];
+      var cand = (typeof c === 'string') ? c : (c && c.it);
+      if (cand && opts.indexOf(cand) === -1) opts.push(cand);
     }
     return shuffle(opts);
   }
@@ -326,14 +435,84 @@
     else if (name === 'learner-progress') renderProgress();
   }
 
-  /* ── PATH ── */
+  /* ── PATH (real data: word banks + spaced review) ── */
   function renderPath() {
     var pane = $('#sub-learner-path', rootEl);
     if (!pane) return;
+    pane.innerHTML = '<div class="learner-empty"><div class="le-emoji">⏳</div><div class="le-title">' + t('learner_loading') + '</div></div>';
+    loadPath(pane);
+  }
+
+  async function loadPath(pane) {
+    var authed = await srcIsAuthed();
+    if (!authed) { renderBundledPath(pane); return; }
+    var banks = await srcBanks();
+    var due = await srcReview('due');
+    var fragile = await srcReview('fragile');
+    var fresh = await srcReview('new');
+    if (!banks.length && !due.length && !fragile.length) { renderEmptyPath(pane); return; }
+    renderRealPath(pane, banks, due, fragile, fresh);
+  }
+
+  function renderEmptyPath(pane) {
+    pane.innerHTML = '<div class="learner-empty"><div class="le-emoji">🗂️</div><div class="le-title">' + t('learner_empty_path') + '</div>' +
+      '<div class="le-sub">' + t('learner_empty_path_sub') + '</div></div>';
+    i18nScope(pane);
+  }
+
+  function renderRealPath(pane, banks, due, fragile, fresh) {
+    var s = load();
     var html = '';
+    // Word banks
+    html += '<div class="lr-section-head"><span class="lr-section-title">' + t('learner_wordbanks') + '</span>' +
+      '<span class="lr-section-sub">' + t('learner_wordbanks_sub') + '</span></div>';
+    if (banks.length) {
+      html += '<div class="lr-bank-grid">';
+      banks.forEach(function (b) {
+        var done = !!s.lessons['bank:' + b.id];
+        var langTag = b.lang === 'en' ? 'EN' : 'IT';
+        html += '<div class="lr-bank-card' + (done ? ' done' : '') + '" tabindex="0" onclick="Learner.openBankTest(' + b.id + ')">' +
+          '<div class="lr-bank-top"><span class="lr-bank-icon">' + (b.lang === 'en' ? '🇬🇧' : '🇮🇹') + '</span>' +
+            '<span class="lr-bank-lang">' + langTag + '</span></div>' +
+          '<div class="lr-bank-name">' + esc(b.name) + '</div>' +
+          '<div class="lr-bank-meta">' + b.wordCount + ' ' + t('learner_word_count') + (done ? ' · <span style="color:var(--green)">✓</span>' : '') + '</div>' +
+          '<button type="button" class="primary-btn lr-bank-cta">' + t('learner_train') + '</button>' +
+        '</div>';
+      });
+      html += '</div>';
+    } else {
+      html += '<div class="learner-empty" style="padding:30px"><div class="le-emoji">🗂️</div><div class="le-title">' + t('learner_no_banks') + '</div>' +
+        '<div class="le-sub">' + t('learner_no_banks_sub') + '</div></div>';
+    }
+    // Spaced review
+    var reviewCards = [
+      { kind: 'due', icon: '⏰', title: t('learner_review_due'), sub: t('learner_review_due_sub'), count: due.length },
+      { kind: 'fragile', icon: '🧩', title: t('learner_review_fragile'), sub: t('learner_review_fragile_sub'), count: fragile.length },
+      { kind: 'new', icon: '✨', title: t('learner_review_new'), sub: t('learner_review_new_sub'), count: fresh.length }
+    ].filter(function (c) { return c.count > 0; });
+    if (reviewCards.length) {
+      html += '<div class="lr-section-head lr-sec-mt"><span class="lr-section-title">' + t('learner_review') + '</span>' +
+        '<span class="lr-section-sub">' + t('learner_review_sub') + '</span></div>';
+      html += '<div class="lr-review-grid">';
+      reviewCards.forEach(function (c) {
+        html += '<div class="lr-review-card" tabindex="0" onclick="Learner.openReview(\'' + c.kind + '\')">' +
+          '<span class="lr-review-icon">' + c.icon + '</span>' +
+          '<div class="lr-review-body"><div class="lr-review-title">' + c.title + '</div><div class="lr-review-sub">' + c.sub + '</div></div>' +
+          '<span class="lr-review-count">' + c.count + '</span>' +
+        '</div>';
+      });
+      html += '</div>';
+    }
+    pane.innerHTML = html;
+    i18nScope(pane);
+  }
+
+  /* ── Bundled course — not-logged-in preview only ── */
+  function renderBundledPath(pane) {
+    var html = '<div class="lr-preview-note">' + t('learner_login_hint') + '</div>';
     var s = load();
     COURSE.levels.forEach(function (lv) {
-      html += '<div style="margin:26px 0 14px"><span style="font-size:13px;font-weight:800;color:' + lv.color + ';text-transform:uppercase;letter-spacing:.1em">' + esc(lv.icon + ' ' + lv.label) + '</span></div>';
+      html += '<div style="margin:22px 0 12px"><span style="font-size:13px;font-weight:800;color:' + lv.color + ';text-transform:uppercase;letter-spacing:.1em">' + esc(lv.icon + ' ' + lv.label) + '</span></div>';
       lv.units.forEach(function (u) {
         var done = unitLessonsDone(u);
         var total = u.lessons.length;
@@ -359,7 +538,6 @@
           '</div>' +
           '<div class="connector ' + (isDone ? 'done' : '') + '"></div>';
         });
-        // Test node
         var testAvail = isTestAvailable(u);
         var testState = s.tests[u.id] && s.tests[u.id].passed ? 'done' : (testAvail ? 'available' : '');
         html += '<div class="lesson-node-row">' +
@@ -477,6 +655,56 @@
     var steps = buildStepsForPractice(mode, words);
     if (!steps.length) { toast(t('learner_no_words_yet')); return; }
     openSession('practice' + (mode === 'speak' ? '-speak' : ''), null, null, steps);
+  }
+
+  /* ── Real-data sessions: word banks + spaced review ── */
+  // Normalize raw bank/review words into lesson items {it,en,pos,cefr,...}
+  async function toItems(rawWords) {
+    var items = [];
+    for (var i = 0; i < rawWords.length; i++) {
+      var rw = rawWords[i];
+      var e = rw.translation ? { translation: rw.translation, definition: rw.definition } : await enrichWord(rw.word, rw.lang);
+      var it = rw.lang === 'en' ? (e.translation || rw.word) : rw.word;
+      var en = rw.lang === 'en' ? rw.word : (e.translation || rw.word);
+      items.push({ it: it, en: en, word: rw.word, lang: rw.lang, pos: rw.pos || '', cefr: rw.cefr || '', definition: e.definition || rw.definition || '' });
+    }
+    return items;
+  }
+
+  function buildWordSteps(items, lang, pool) {
+    var steps = [];
+    sample(items, Math.min(6, items.length)).forEach(function (v) { steps.push({ type: 'listen', item: v }); });
+    sample(items, Math.min(4, items.length)).forEach(function (v) { steps.push({ type: 'speak', item: v }); });
+    var mp = sample(items, Math.min(5, items.length));
+    if (mp.length >= 3) steps.push({ type: 'match', pairs: shuffle(mp.map(function (v) { return { it: v.it, en: v.en }; })) });
+    var qp = sample(items, Math.min(6, items.length));
+    if (qp.length) steps.push({ type: 'mc', questions: qp.map(function (v) { return { prompt: v.en, answer: v.it, options: optionsFor(v.it, pool) }; }) });
+    return steps;
+  }
+
+  async function openBankTest(bankId) {
+    var banks = await srcBanks();
+    var bank = null;
+    banks.forEach(function (b) { if (b.id === bankId) bank = b; });
+    if (!bank) return;
+    var raw = await srcBankWords(bankId, bank.lang);
+    if (!raw.length) { toast(t('learner_no_words_yet')); return; }
+    var pool = await realPool();
+    var items = await toItems(sample(raw, Math.min(12, raw.length)));
+    var steps = buildWordSteps(items, bank.lang, pool);
+    if (!steps.length) { toast(t('learner_no_words_yet')); return; }
+    openSession('bank', { id: bankId, name: bank.name, lang: bank.lang }, null, steps);
+  }
+
+  async function openReview(kind) {
+    var raw = await srcReview(kind);
+    if (!raw.length) { toast(t('learner_no_words_yet')); return; }
+    var pool = await realPool();
+    var items = await toItems(sample(raw, Math.min(12, raw.length)));
+    var steps = buildWordSteps(items, 'it', pool);
+    if (!steps.length) { toast(t('learner_no_words_yet')); return; }
+    var name = kind === 'due' ? t('learner_review_due') : (kind === 'fragile' ? t('learner_review_fragile') : t('learner_review_new'));
+    openSession('review', { id: kind, name: name, lang: 'it' }, null, steps);
   }
 
   function renderOverlay() {
@@ -751,6 +979,14 @@
       title = passed ? t('learner_test_passed') : t('learner_test_failed');
       body = t('learner_you_scored') + ' ' + score + '/10';
       confettiFlag = passed;
+    } else if (mode === 'bank' || mode === 'review') {
+      if (earned > 0) addXp(earned);
+      bonus = 5; addXp(5);
+      markLessonDone('bank', unit.id);
+      emoji = mode === 'bank' ? '📚' : '🧠';
+      title = mode === 'bank' ? t('learner_bank_done') : t('learner_review_done');
+      body = t('learner_you_scored') + ' ' + earned + ' XP' + ' · ' + esc(unit.name);
+      confettiFlag = earned > 0;
     } else {
       if (earned > 0) addXp(earned);
       emoji = '⚡'; title = t('learner_practice_done');
@@ -783,6 +1019,7 @@
     rootEl = $('#learnerRoot');
     if (!rootEl) return;
     if (session) { renderOverlay(); return; }
+    srcReset(); // always re-query real word-bank / review data on open
     renderShell();
     showPane(lastPane);
   }
@@ -822,6 +1059,8 @@
     openLesson: openLesson,
     openTest: openTest,
     openPractice: openPractice,
+    openBankTest: openBankTest,
+    openReview: openReview,
     closeSession: closeSession,
     nextStep: nextStep,
     listenAgain: listenAgain,
