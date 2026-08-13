@@ -253,7 +253,7 @@
       if (!sb || !sb.auth) { resolve(null); return; }
       Promise.resolve(sb.auth.getSession()).then(function (r) {
         var s = r && ((r.data && r.data.session) || r.session);
-        resolve(s && s.user ? s.user : null);
+        resolve(s && s.user ? { user: s.user, token: s.access_token } : null);
       }).catch(function () { resolve(null); });
     });
   }
@@ -271,10 +271,17 @@
     applyI18n(payBtn);
 
     var base = window.location.origin + window.location.pathname;
-    getSessionUser().then(function (user) {
+    getSessionUser().then(function (auth) {
+      if (!auth || !auth.token) {
+        throw new Error('NO_SESSION');
+      }
+      var user = auth.user;
       return fetch(fnUrl, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ' + auth.token
+        },
         body: JSON.stringify({
           product: PRICES[selected].key,
           userId: user ? user.id : undefined,
@@ -291,7 +298,11 @@
       paying = false;
       if (payBtn) { payBtn.disabled = false; payBtn.innerHTML = orig; }
       applyI18n(payBtn);
-      toast(tt('purchase_error', 'Errore durante il pagamento. Riprova.'));
+      if (err && err.message === 'NO_SESSION') {
+        toast(tt('purchase_login', 'Effettua il login per acquistare.'));
+      } else {
+        toast(tt('purchase_error', 'Errore durante il pagamento. Riprova.'));
+      }
     });
   }
 
