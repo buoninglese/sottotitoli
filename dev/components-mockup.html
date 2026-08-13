@@ -75,7 +75,7 @@ h1{font-family:var(--font-disp);font-size:clamp(26px,3.4vw,38px);font-weight:800
 .s-cardtitle{font-family:var(--fam-ui);font-size:18px;font-weight:700;letter-spacing:-.01em;color:var(--fam-text)}
 .s-secttitle{font-family:var(--fam-disp);font-size:22px;font-weight:800;letter-spacing:-.03em;color:var(--fam-text)}
 .s-stat{font-family:var(--fam-disp);font-size:28px;font-weight:800;letter-spacing:-.02em;color:var(--fam-accent);font-variant-numeric:tabular-nums;line-height:1}
-.s-primary{font-family:var(--fam-ui);font-size:15px;font-weight:700;padding:11px 24px;border-radius:var(--fam-btn-r);background:var(--fam-accent);color:var(--fam-accent-text);border:none;display:inline-flex;align-items:center;gap:8px}
+.s-primary{font-family:var(--fam-ui);font-size:15px;font-weight:700;padding:11px 24px;border-radius:var(--fam-btn-r);background:var(--fam-btn-bg,var(--fam-accent));color:var(--fam-btn-text,var(--fam-accent-text));border:none;display:inline-flex;align-items:center;gap:8px}
 .s-ghost{font-family:var(--fam-ui);font-size:13px;font-weight:600;padding:9px 18px;border-radius:var(--fam-btn-r);background:transparent;border:1px solid var(--fam-chip-border);color:var(--fam-chip-text);display:inline-flex;align-items:center;gap:7px}
 .s-input{font-family:var(--fam-ui);font-size:15px;font-weight:400;padding:9px 14px;border-radius:var(--fam-input-r);background:var(--fam-input-bg);border:1px solid var(--fam-chip-border);color:var(--fam-text);min-width:180px}
 
@@ -85,6 +85,23 @@ h1{font-family:var(--font-disp);font-size:clamp(26px,3.4vw,38px);font-weight:800
 .summary .sep{color:var(--text-faint);font-size:20px}
 .summary .txt{font-size:13px;color:var(--text-soft);line-height:1.5;flex:1;min-width:220px}
 .summary .txt b{color:var(--text)}
+
+/* ═══ colour panel ═══ */
+.col-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:30px 0 12px;flex-wrap:wrap}
+.col-head h2{font-family:var(--font-disp);font-size:19px;font-weight:800;letter-spacing:-.02em}
+.col-head .sav{font-family:var(--mono);font-size:11.5px;color:var(--amber)}
+.pal-switch{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px}
+.pal-btn{border:1px solid var(--line2);background:var(--card);border-radius:12px;padding:9px 16px;cursor:pointer;color:var(--text-soft);font-family:var(--font-ui);font-size:12.5px;font-weight:700;transition:all .15s}
+.pal-btn:hover{border-color:#4a4a58;background:var(--card2)}
+.pal-btn.active{border-color:var(--cyan);background:rgba(34,211,238,.08);color:var(--text);box-shadow:0 0 0 1px rgba(34,211,238,.3)}
+.pal-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:10px;margin-bottom:12px}
+.chip{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px 12px;display:flex;align-items:center;gap:10px}
+.chip .sw{width:30px;height:30px;border-radius:8px;flex-shrink:0;border:1px solid rgba(255,255,255,.18)}
+.chip .ci{min-width:0}
+.chip .ci .cl{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:var(--text-faint)}
+.chip .ci .cv{font-family:var(--mono);font-size:10.5px;color:var(--text-soft);word-break:break-all}
+.pal-note{font-size:12px;color:var(--text-soft);line-height:1.5;background:var(--panel);border:1px solid var(--line2);border-radius:12px;padding:10px 14px}
+.pal-note b{color:var(--text)}
 
 .foot{font-size:11px;color:var(--text-faint);margin-top:40px;text-align:center}
 @media(max-width:760px){.proof-row{flex-direction:column;align-items:flex-start}}
@@ -135,7 +152,16 @@ h1{font-family:var(--font-disp);font-size:clamp(26px,3.4vw,38px);font-weight:800
     <span class="txt"><b>classi ridondanti → componenti condivisi.</b> I font NON cambiano: Modern e Genz tengono la loro identità (stessa coppia Space Grotesk + Plus Jakarta Sans, stessa forma/colore dei loro token). Cambia solo che non servono più 10 classi per la stessa cosa — un componente, un token, N usi.</span>
   </div>
 
-  <div class="foot">Sottotitoli · component unification mockup · v1 · 2026-08-13</div>
+  <!-- ═══ COLOUR PANEL ═══ -->
+  <div class="col-head">
+    <h2>Colori · pulsanti e testo</h2>
+    <span class="sav">solo bottoni + font · alterna per confrontare</span>
+  </div>
+  <div class="pal-switch" id="palSwitch"></div>
+  <div class="pal-grid fam" id="palGrid"></div>
+  <div class="pal-note" id="palNote"></div>
+
+  <div class="foot">Sottotitoli · component unification mockup · v1.1 (colori) · 2026-08-13</div>
 </div>
 
 <script>
@@ -218,7 +244,64 @@ var COMPS = [
     sample:'<input class="s-input" placeholder="Cerca nel vocabolario…">' }
 ];
 
-var state = { fam:'modern' };
+var state = { fam:'modern', pal:'attuale' };
+
+/* ═══════════════════════════════════════════════════════════
+   COLOURS — button + font colours per family.
+   'attuale' = today. A/B/C = researched alternatives:
+   Modern: A lime CTA (Duolingo: action = accent) · B blue trust
+   (Busuu/Rosetta) · C green growth. Genz: A yellow CTA (active
+   pill colour) · B pink gen-z (gradient) · C violet premium.
+   ═══════════════════════════════════════════════════════════ */
+var COLOR = {
+  modern: {
+    attuale:{ name:'Attuale', desc:'Oggi: bottone primario bianco, accento lime.',
+      btnBg:'#ffffff', btnText:'#0a0a0a', accent:'#ccf381', activeText:'#0a0a0a',
+      text:'#ffffff', soft:'#a1a1aa', faint:'#71717a', tagText:'#ccf381',
+      tagBg:'rgba(204,243,129,.14)', tagBorder:'rgba(204,243,129,.3)' },
+    A:{ name:'A · Lime CTA', desc:'Bottone primario = accento lime con testo scuro. CTA inconfondibile — stile Duolingo (azione = colore d\'accento).',
+      btnBg:'#ccf381', btnText:'#0a0a0a', accent:'#ccf381', activeText:'#0a0a0a',
+      text:'#ffffff', soft:'#a1a1aa', faint:'#71717a', tagText:'#ccf381',
+      tagBg:'rgba(204,243,129,.14)', tagBorder:'rgba(204,243,129,.3)' },
+    B:{ name:'B · Blu fiducia', desc:'Bottone primario blu #3b82f6 con testo bianco; lime resta per highlight. Separa azione da evidenza (Busuu/Rosetta Stone).',
+      btnBg:'#3b82f6', btnText:'#ffffff', accent:'#ccf381', activeText:'#0a0a0a',
+      text:'#ffffff', soft:'#a1a1aa', faint:'#71717a', tagText:'#ccf381',
+      tagBg:'rgba(204,243,129,.14)', tagBorder:'rgba(204,243,129,.3)' },
+    C:{ name:'C · Verde crescita', desc:'Bottone primario verde #22c55e con testo scuro = progresso/apprendimento; lime per highlight.',
+      btnBg:'#22c55e', btnText:'#052e16', accent:'#ccf381', activeText:'#0a0a0a',
+      text:'#ffffff', soft:'#a1a1aa', faint:'#71717a', tagText:'#ccf381',
+      tagBg:'rgba(204,243,129,.14)', tagBorder:'rgba(204,243,129,.3)' }
+  },
+  genz: {
+    attuale:{ name:'Attuale', desc:'Oggi: bottone primario bianco con testo viola.',
+      btnBg:'#ffffff', btnText:'#7b2ff7', accent:'#ffeb3b', activeText:'#7b2ff7',
+      text:'#ffffff', soft:'rgba(255,255,255,.93)', faint:'rgba(255,255,255,.75)', tagText:'#ffeb3b',
+      tagBg:'rgba(255,235,59,.2)', tagBorder:'rgba(255,235,59,.5)' },
+    A:{ name:'A · Giallo CTA', desc:'Bottone primario = giallo #ffeb3b con testo viola (come la pill active). Massima energia, coerenza totale.',
+      btnBg:'#ffeb3b', btnText:'#7b2ff7', accent:'#ffeb3b', activeText:'#7b2ff7',
+      text:'#ffffff', soft:'rgba(255,255,255,.93)', faint:'rgba(255,255,255,.75)', tagText:'#ffeb3b',
+      tagBg:'rgba(255,235,59,.2)', tagBorder:'rgba(255,235,59,.5)' },
+    B:{ name:'B · Pink Gen-Z', desc:'Bottone primario rosa #ff2e9f con testo bianco — il rosa del gradiente. Più gen-z, meno giallo.',
+      btnBg:'#ff2e9f', btnText:'#ffffff', accent:'#ffeb3b', activeText:'#7b2ff7',
+      text:'#ffffff', soft:'rgba(255,255,255,.93)', faint:'rgba(255,255,255,.75)', tagText:'#ffeb3b',
+      tagBg:'rgba(255,235,59,.2)', tagBorder:'rgba(255,235,59,.5)' },
+    C:{ name:'C · Viola premium', desc:'Bottone primario viola #7b2ff7 con testo bianco — CTA calma/premium; giallo resta per highlight.',
+      btnBg:'#7b2ff7', btnText:'#ffffff', accent:'#ffeb3b', activeText:'#7b2ff7',
+      text:'#ffffff', soft:'rgba(255,255,255,.93)', faint:'rgba(255,255,255,.75)', tagText:'#ffeb3b',
+      tagBg:'rgba(255,235,59,.2)', tagBorder:'rgba(255,235,59,.5)' }
+  }
+};
+
+var COLKEYS = [
+  { k:'btnBg', l:'Bottone primario (bg)' },
+  { k:'btnText', l:'Testo sul bottone' },
+  { k:'accent', l:'Accento / pill active' },
+  { k:'activeText', l:'Testo su accento' },
+  { k:'text', l:'Testo base' },
+  { k:'soft', l:'Testo secondario' },
+  { k:'faint', l:'Testo terziario' },
+  { k:'tagText', l:'Tag / badge' }
+];
 
 function sum(){ var t=0; COMPS.forEach(function(c){ t+=c.n; }); return t; }
 
@@ -245,6 +328,47 @@ function compCard(c){
   '</div>';
 }
 
+function palHTML(){
+  var fam = COLOR[state.fam];
+  var out = [];
+  for (var key in fam){
+    var p = fam[key];
+    out.push('<button class="pal-btn'+(key===state.pal?' active':'')+'" data-pal="'+key+'">'+p.name+'</button>');
+  }
+  return out.join('');
+}
+
+function chipsHTML(){
+  var p = COLOR[state.fam][state.pal];
+  return COLKEYS.map(function(c){
+    return '<div class="chip"><div class="sw" style="background:'+p[c.k]+'"></div>'+
+      '<div class="ci"><div class="cl">'+c.l+'</div><div class="cv">'+p[c.k]+'</div></div></div>';
+  }).join('');
+}
+
+function applyPal(){
+  var p = COLOR[state.fam][state.pal] || COLOR[state.fam].attuale;
+  var nodes = [document.getElementById('proof'), document.getElementById('grid'), document.getElementById('palGrid')];
+  nodes.forEach(function(node){
+    if(!node) return;
+    node.style.setProperty('--fam-btn-bg', p.btnBg);
+    node.style.setProperty('--fam-btn-text', p.btnText);
+    node.style.setProperty('--fam-accent', p.accent);
+    node.style.setProperty('--fam-accent-text', p.activeText);
+    node.style.setProperty('--fam-text', p.text);
+    node.style.setProperty('--fam-soft', p.soft);
+    node.style.setProperty('--fam-faint', p.faint);
+    node.style.setProperty('--fam-tag-text', p.tagText);
+    node.style.setProperty('--fam-tag-bg', p.tagBg);
+    node.style.setProperty('--fam-tag-border', p.tagBorder);
+  });
+  document.getElementById('palGrid').innerHTML = chipsHTML();
+  document.getElementById('palNote').innerHTML = '<b>'+p.name+'</b> — '+p.desc;
+  var btns = document.querySelectorAll('.pal-btn');
+  for(var i=0;i<btns.length;i++){ btns[i].classList.toggle('active', btns[i].getAttribute('data-pal')===state.pal); }
+  document.getElementById('palSwitch').innerHTML = palHTML();
+}
+
 function applyFam(){
   var f = FAM[state.fam];
   var el = document.getElementById('proof');
@@ -261,13 +385,14 @@ function applyFam(){
   var btns = document.querySelectorAll('.fam-btn');
   for(var i=0;i<btns.length;i++){ btns[i].classList.toggle('active', btns[i].getAttribute('data-fam')===state.fam); }
   document.getElementById('savBar').textContent = sum()+' classi oggi → 10 componenti · font invariati';
+  applyPal();
 }
 
 document.addEventListener('click', function(e){
-  var btn = e.target.closest ? e.target.closest('.fam-btn') : null;
-  if(!btn) return;
-  state.fam = btn.getAttribute('data-fam');
-  applyFam();
+  var famBtn = e.target.closest ? e.target.closest('.fam-btn') : null;
+  if(famBtn){ state.fam = famBtn.getAttribute('data-fam'); applyFam(); return; }
+  var palBtn = e.target.closest ? e.target.closest('.pal-btn') : null;
+  if(palBtn){ state.pal = palBtn.getAttribute('data-pal'); applyPal(); }
 });
 
 document.getElementById('grid').innerHTML = COMPS.map(compCard).join('');
