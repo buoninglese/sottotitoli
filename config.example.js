@@ -80,6 +80,11 @@ window.SOTTOTITOLI_CONFIG = {
    *  Requires secret: supabase secrets set OPENAI_API_KEY=sk-... */
   generateLearnerContentUrl: "https://qzqmuegbpmvqrjrlfbgk.supabase.co/functions/v1/generate-learner-content",
 
+  /** AI Word-bank generation (Folders → "New Project / Generate AI Clips").
+   *  Deploy with: supabase functions deploy generate-word-bank
+   *  Requires secret: supabase secrets set OPENAI_API_KEY=sk-... */
+  generateWordBankUrl: "https://qzqmuegbpmvqrjrlfbgk.supabase.co/functions/v1/generate-word-bank",
+
   /** Language and translation mode definitions */
   modes: {
     // Caption-only modes
