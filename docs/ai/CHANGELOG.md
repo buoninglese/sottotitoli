@@ -4,6 +4,17 @@
 > The entries below from v206–v210 describe an **ES-module refactor** (`js/panoramica/app.js` + `panoramica/panels/*.js` + `panoramica/shared/*.js`) that **never shipped**. `panoramica.html` never imported `app.js`, so the deployed site always ran the ~10,700-line inline monolith. The refactor files were dead code and have been **moved to** `~/Desktop/sottotitoli-archived/dead-js/panoramica-v2-attempt/`.
 > **Real current state: monolith at v178.** These v2xx notes describe work that was never activated — treat them as historical, not as a description of the live code.
 
+## [2026-08-13] Learner — Phase 2: AI "Mission" path (v195)
+
+### Added — objectives-driven, AI-generated lessons
+- **Mission card at the top of the real path.** Logged-in users see a 🎯 "La tua missione" hero card: generates a personalized lesson with OpenAI **gpt-4o-mini**, seeded with the user's **real words** (word banks + spaced review) and adapted to their profile (`goal_primary`, `domain`, `native_lang`, `learning_profile`) and an **estimated CEFR band** (weighted average of their words' CEFR). A cached mission shows its title + SMART objective + Start; a ↻ button regenerates.
+- **New edge function** `supabase/functions/generate-learner-content/index.ts` (JWT-authenticated like `vocab-lookup`, persists via service role). Reads profile + seed words server-side, builds the lesson (title/subtitle/objective + 6–10 words with examples + 4–6 turn dialogue), **persists to `learner_lessons`** and returns the row. Cost/speed: gpt-4o-mini.
+- **New table** `supabase/migrations/20260813_learner_lessons.sql` — `learner_lessons(id, user_id, lesson_type, focus, title, subtitle, objective, content JSONB, source_profile, status, created_at, updated_at)` + RLS (own rows only).
+- **Client flow** in `js/learner.js`: `missionCached/missionSave/generateMission/openMission/newMission` — caches the last lesson in `localStorage['sottotitoli-learner-mission']` so replay is free; plays through the existing engine (listen → speak → match → MC → **conversation**), `+10 XP` bonus, marks `mission:<id>` done.
+- **Config**: `generateLearnerContentUrl` in `config.example.js` + `config.js`.
+- **i18n**: `learner_mission*` keys (it + en). **CSS**: `.lr-mission-*` card styles. learner.css `?v=5`, learner.js `?v=3`.
+- ⚠️ The edge function + table are **not yet deployed** — the card shows the error toast until `supabase functions deploy generate-learner-content` + the migration are applied. Until then the (cached) flow is fully testable with a stubbed fetch.
+
 ## [2026-08-13] Learner — real-data Phase 1: word banks + spaced review + site-style redesign (v193)
 
 ### Added — Learner now trains on YOUR words, not a fixed course

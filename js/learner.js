@@ -193,6 +193,41 @@
     return SRC.pool;
   }
 
+  /* ── Mission (Phase 2): objectives-driven AI lesson ── */
+  function learnerMissionUrl() {
+    return (w.SOTTOTITOLI_CONFIG && w.SOTTOTITOLI_CONFIG.generateLearnerContentUrl) ||
+      'https://qzqmuegbpmvqrjrlfbgk.supabase.co/functions/v1/generate-learner-content';
+  }
+  function missionCacheKey() { return 'sottotitoli-learner-mission'; }
+  function missionCached() {
+    try { return JSON.parse(localStorage.getItem(missionCacheKey()) || 'null'); } catch (e) { return null; }
+  }
+  function missionSave(lesson) {
+    try { localStorage.setItem(missionCacheKey(), JSON.stringify(lesson)); } catch (e) {}
+  }
+  function missionClear() {
+    try { localStorage.removeItem(missionCacheKey()); } catch (e) {}
+  }
+  async function generateMission(focus) {
+    var sb = srcSb();
+    if (!sb) return null;
+    try {
+      var sess = await sb.auth.getSession();
+      var token = (sess && sess.data && sess.data.session) ? sess.data.session.access_token : null;
+      if (!token) return null;
+      var resp = await fetch(learnerMissionUrl(), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+        body: JSON.stringify({ focus: focus || null })
+      });
+      if (!resp.ok) return null;
+      var j = await resp.json();
+      if (!j || j.error || !j.lesson) return null;
+      missionSave(j.lesson);
+      return j.lesson;
+    } catch (e) { return null; }
+  }
+
   /* ── Course helpers ── */
   function unitsFlat() {
     var out = [];
@@ -463,6 +498,25 @@
   function renderRealPath(pane, banks, due, fragile, fresh) {
     var s = load();
     var html = '';
+    // Mission (objectives-driven AI lesson)
+    var mission = missionCached();
+    html += '<div class="lr-section-head"><span class="lr-section-title">' + t('learner_mission') + '</span>' +
+      '<span class="lr-section-sub">' + t('learner_mission_sub') + '</span></div>';
+    html += '<div class="lr-mission-card' + (mission ? ' ready' : '') + '">' +
+      '<div class="lr-mission-glow">🎯</div>' +
+      '<div class="lr-mission-body">' +
+        (mission
+          ? '<div class="lr-mission-title">' + esc(mission.title || '') + '</div>' +
+            (mission.objective ? '<div class="lr-mission-obj">' + esc(mission.objective) + '</div>' : '') +
+            '<div class="lr-mission-sub">' + esc(mission.subtitle || '') + '</div>'
+          : '<div class="lr-mission-title">' + t('learner_mission_cta') + '</div>' +
+            '<div class="lr-mission-obj">' + t('learner_mission_cta_sub') + '</div>') +
+      '</div>' +
+      '<div class="lr-mission-actions">' +
+        '<button type="button" class="primary-btn lr-mission-go" onclick="Learner.openMission()">' + (mission ? t('learner_mission_start') : t('learner_mission_generate')) + '</button>' +
+        '<button type="button" class="lesson-link lr-mission-new" onclick="Learner.newMission()" title="' + t('learner_mission_new') + '">↻</button>' +
+      '</div>' +
+    '</div>';
     // Word banks
     html += '<div class="lr-section-head"><span class="lr-section-title">' + t('learner_wordbanks') + '</span>' +
       '<span class="lr-section-sub">' + t('learner_wordbanks_sub') + '</span></div>';
@@ -707,13 +761,64 @@
     openSession('review', { id: kind, name: name, lang: 'it' }, null, steps);
   }
 
+  /* ── Mission sessions (objectives-driven AI lesson) ── */
+  function missionItems(lesson) {
+    var c = (lesson && lesson.content) || lesson || {};
+    var words = Array.isArray(c.words) ? c.words : [];
+    return words.map(function (wd) {
+      return { it: wd.it, en: wd.en || wd.translation || '', word: wd.it, lang: 'it', pos: wd.pos || '', cefr: wd.cefr || '', definition: wd.example_en || wd.example_it || '' };
+    });
+  }
+
+  function missionSteps(lesson, pool) {
+    var c = (lesson && lesson.content) || lesson || {};
+    var words = missionItems(lesson);
+    var convo = Array.isArray(c.convo) ? c.convo : [];
+    var steps = [];
+    sample(words, Math.min(5, words.length)).forEach(function (v) { steps.push({ type: 'listen', item: v }); });
+    sample(words, Math.min(3, words.length)).forEach(function (v) { steps.push({ type: 'speak', item: v }); });
+    var mp = sample(words, Math.min(5, words.length));
+    if (mp.length >= 3) steps.push({ type: 'match', pairs: shuffle(mp.map(function (v) { return { it: v.it, en: v.en }; })) });
+    var qp = sample(words, Math.min(5, words.length));
+    if (qp.length) steps.push({ type: 'mc', questions: qp.map(function (v) { return { prompt: v.en, answer: v.it, options: optionsFor(v.it, pool) }; }) });
+    if (convo.length >= 2) {
+      steps.push({ type: 'convo', convo: { title: c.subtitle || c.title || 'Conversazione', speakers: convo.map(function (ln) {
+        var role = ln.role === 'learner' ? 'Tu' : (ln.role === 'native' ? 'A' : (ln.role || 'A'));
+        return { role: role, text: ln.text, translation: ln.translation || '' };
+      }) } });
+    }
+    return steps;
+  }
+
+  async function openMission(focus) {
+    var lesson = missionCached();
+    if (!lesson) lesson = await generateMission(focus);
+    if (!lesson) { toast(t('learner_mission_error')); return; }
+    var pool = await realPool();
+    var steps = missionSteps(lesson, pool);
+    if (!steps.length) { toast(t('learner_mission_error')); return; }
+    openSession('mission', { id: lesson.id || 'mission', name: lesson.title || 'Missione', lang: 'it' }, null, steps);
+  }
+
+  async function newMission(focus) {
+    missionClear();
+    var lesson = await generateMission(focus);
+    if (!lesson) { toast(t('learner_mission_error')); return; }
+    var pool = await realPool();
+    var steps = missionSteps(lesson, pool);
+    if (!steps.length) { toast(t('learner_mission_error')); return; }
+    openSession('mission', { id: lesson.id || 'mission', name: lesson.title || 'Missione', lang: 'it' }, null, steps);
+  }
+
   function renderOverlay() {
     if (!session) return;
     var step = session.steps[session.idx];
     var total = session.steps.length;
     var pct = Math.round((session.idx / total) * 100);
     var title = session.mode === 'lesson' ? (session.lesson ? session.lesson.title : '') :
-      session.mode === 'test' ? t('learner_unit_test') : t('learner_practice');
+      session.mode === 'test' ? t('learner_unit_test') :
+      session.mode === 'mission' ? (session.unit ? session.unit.name : t('learner_mission')) :
+      t('learner_practice');
 
     // Remove any previous overlay
     var old = $('#learnerOverlay');
@@ -987,6 +1092,13 @@
       title = mode === 'bank' ? t('learner_bank_done') : t('learner_review_done');
       body = t('learner_you_scored') + ' ' + earned + ' XP' + ' · ' + esc(unit.name);
       confettiFlag = earned > 0;
+    } else if (mode === 'mission') {
+      if (earned > 0) addXp(earned);
+      bonus = 10; addXp(10);
+      markLessonDone('mission', unit.id);
+      emoji = '🎯'; title = t('learner_mission_done');
+      body = t('learner_you_scored') + ' ' + earned + ' XP' + ' · ' + esc(unit.name);
+      confettiFlag = true;
     } else {
       if (earned > 0) addXp(earned);
       emoji = '⚡'; title = t('learner_practice_done');
@@ -1061,6 +1173,8 @@
     openPractice: openPractice,
     openBankTest: openBankTest,
     openReview: openReview,
+    openMission: openMission,
+    newMission: newMission,
     closeSession: closeSession,
     nextStep: nextStep,
     listenAgain: listenAgain,

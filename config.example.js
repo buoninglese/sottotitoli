@@ -75,6 +75,11 @@ window.SOTTOTITOLI_CONFIG = {
    *  Requires secret: supabase secrets set OPENAI_API_KEY=sk-... */
   starterReportUrl: "https://qzqmuegbpmvqrjrlfbgk.supabase.co/functions/v1/starter-report",
 
+  /** Learner Mission AI endpoint (Phase 2).
+   *  Deploy with: supabase functions deploy generate-learner-content
+   *  Requires secret: supabase secrets set OPENAI_API_KEY=sk-... */
+  generateLearnerContentUrl: "https://qzqmuegbpmvqrjrlfbgk.supabase.co/functions/v1/generate-learner-content",
+
   /** Language and translation mode definitions */
   modes: {
     // Caption-only modes
