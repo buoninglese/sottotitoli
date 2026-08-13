@@ -11,9 +11,9 @@
 ### POS — English
 | # | Source | Where | Notes |
 |---|--------|-------|-------|
-| 1 | `js/lemma-pos-map.js` (`LEMMA_POS_MAP`) | local, 50 KB curated | primary; built in sottotitoli-learning repo |
-| 2 | Compromise Penn Treebank (`tagWordPenn`) | local lib | second |
-| 3 | API response POS (Datamuse `tags`, Free Dictionary `partOfSpeech`, Wordnik) | live | enrichment of cards |
+| 1 | Datamuse `tags` + dictionary `partOfSpeech` (Free Dictionary / WordsAPI / Wordnik) | live API responses | **de-facto primary** — wired in enrichOneCard (fills `'—'` POS) |
+| 2 | Compromise Penn Treebank (`tagWordPenn`) | local lib | reliable for common words, weak on rare/multi-POS |
+| 3 | `js/lemma-pos-map.js` | local | **⚠️ BROKEN — verified 2026-08-14: all 2,354 values are `"other"`** (build pipeline bug in sottotitoli-learning). Do not rely on it until rebuilt. |
 | 4 | Suffix heuristics (caption-s8t `tagWord` fallback) | local | last resort |
 | 5 | `'—'` / `OTHER` | — | honest unknown |
 
@@ -21,17 +21,18 @@
 | # | Source | Where | Notes |
 |---|--------|-------|-------|
 | 1 | **KELLY wordlist** (`js/it-kelly.js` — 6,369 words) | local, SHIPPED | **primary** — user-provided it_m3.numbers → scripts/build-it-kelly.py |
-| 2 | Wiktionary IT parse (`=== Sostantivo ===` header) | live, VB Italian only | enrich when a live definition page exists |
-| 3 | `js/it-lexicon.js` — curated core map + `itPosGuess()` suffix rules | local | Italian morphology is highly regular (`-are/-ere/-ire` → VERB, `-zione/-mento/-ità` → NOUN, `-mente` → ADV, `-oso/-ico/-ivo` → ADJ) |
-| 4 | `review_words.pos` (stored at save time) | Supabase | shown in Word Banks table |
-| 5 | `'—'` | — | honest unknown |
+| 2 | **IT_HARD** — curated C1/C2 vocabulary (~70 words) | `js/it-lexicon.js` | fills level gaps KELLY doesn't rate (arcigno, biasimare, turpiloquio…) |
+| 3 | Wiktionary IT parse (`=== Sostantivo ===` header) | live, VB Italian only | enrich when a live definition page exists |
+| 4 | `js/it-lexicon.js` — curated core map + `itPosGuess()` suffix rules | local | Italian morphology is highly regular |
+| 5 | `review_words.pos` (stored at save time) | Supabase | shown in Word Banks table |
+| 6 | `'—'` | — | honest unknown |
 
 ### CEFR — English
 | # | Source | Where | Notes |
 |---|--------|-------|-------|
 | 1 | `js/cefr-levels.js` (`CEFR_LEVELS`, EVP-derived) | local | primary |
-| 2 | Render backend `POST /api/cefr/batch` (words-CEFR-dataset) | live | for new words in caption sessions |
-| 3 | Length heuristic (`estimateCEFR`) | local | fallback |
+| 2 | Render backend `POST /api/cefr/batch` (words-CEFR-dataset) | live | **verified LIVE 2026-08-14** (HTTP 200, returns `{word:{level,pos}}`); caption-s8t caches it in `_sessionWordCache` (levels are numbers 1-6 → A1-C2) |
+| 3 | `'—'` | — | **length heuristic REMOVED** — no fabricated levels |
 
 ### CEFR — Italian
 | # | Source | Where | Notes |

@@ -121,6 +121,32 @@
     "dopo":"B1","prima":"B1","insieme":"B1","solo":"B1"
   };
 
+  /* ── Advanced Italian vocabulary (C1/C2) — fills gaps KELLY doesn't rate ──
+     Format identical to KELLY: "word": "pos|level" (pos codes: n v adj adv) */
+  var IT_HARD = {
+    // C1
+    "asserire":"v|C1","attuare":"v|C1","auspicare":"v|C1","avveduto":"adj|C1",
+    "biasimare":"v|C1","celere":"adj|C1","cospicuo":"adj|C1","deferente":"adj|C1",
+    "diatriba":"n|C1","esacerbare":"v|C1","esimere":"v|C1","faceto":"adj|C1",
+    "frugale":"adj|C1","gagliardo":"adj|C1","idiosincrasia":"n|C1","impellente":"adj|C1",
+    "ineluttabile":"adj|C1","inerme":"adj|C1","intransigente":"adj|C1","labile":"adj|C1",
+    "lenire":"v|C1","mordace":"adj|C1","pernicioso":"adj|C1","perspicace":"adj|C1",
+    "prodromo":"n|C1","prosaico":"adj|C1","quiescente":"adj|C1","redarguire":"v|C1",
+    "sagace":"adj|C1","sollecito":"adj|C1","stremare":"v|C1","taciturno":"adj|C1",
+    "tracotante":"adj|C1","vaglio":"n|C1","vessare":"v|C1","vilipendio":"n|C1","zelante":"adj|C1",
+    // C2
+    "abnegazione":"n|C2","alacrità":"n|C2","ambascia":"n|C2","arcigno":"adj|C2",
+    "belligerante":"adj|C2","caparbio":"adj|C2","cesellare":"v|C2","elucubrare":"v|C2",
+    "empito":"n|C2","esiziale":"adj|C2","ghermire":"v|C2","imperscrutabile":"adj|C2",
+    "inerpicarsi":"v|C2","inopinato":"adj|C2","lambiccato":"adj|C2","mellifluo":"adj|C2",
+    "ostracismo":"n|C2","pervicace":"adj|C2","piccineria":"n|C2","pleonastico":"adj|C2",
+    "retrogrado":"adj|C2","sicofante":"n|C2","spregiudicato":"adj|C2","tergiversare":"v|C2",
+    "vacuo":"adj|C2","vetusto":"adj|C2","abiura":"n|C2","acquiescenza":"n|C2",
+    "diuturno":"adj|C2","fatuo":"adj|C2","ignominia":"n|C2","ieratico":"adj|C2",
+    "ineffabile":"adj|C2","obnubilare":"v|C2","perorare":"v|C2","recondito":"adj|C2",
+    "turpiloquio":"n|C2"
+  };
+
   /* ── KELLY lookup (primary). Loaded from js/it-kelly.js. ── */
   function kellyLookup(w) {
     var map = window.IT_KELLY;
@@ -135,6 +161,14 @@
     var k = kellyLookup(w);
     if (!k) return null;
     return KELLY_POS_MAP[k.pos] || null;
+  }
+
+  /* ── Advanced vocabulary lookup (IT_HARD — fills KELLY level gaps) ── */
+  function hardLookup(w) {
+    var v = IT_HARD[w];
+    if (v === undefined) return null;
+    var sep = v.indexOf('|');
+    return { pos: v.substring(0, sep), level: v.substring(sep + 1) };
   }
 
   /* ── Italian suffix rules — very reliable for Italian morphology ── */
@@ -187,6 +221,7 @@
     if (window.IT_KELLY) { for (var k in window.IT_KELLY) pool[k] = true; }
     for (var k2 in IT_POS) pool[k2] = true;
     for (var k3 in IT_CEFR) pool[k3] = true;
+    for (var k4 in IT_HARD) pool[k4] = true;
     var prefix2 = q.substring(0, 3);
     var prefix3 = q.substring(0, 4);
     var results = [], seen = {};
@@ -210,9 +245,11 @@
   function getPOS(word, lang) {
     var key = (word || '').toLowerCase();
     if (lang === 'it') {
-      // 1. KELLY (primary)  2. curated map  3. suffix rules  4. '—'
+      // 1. KELLY (primary)  2. hard-map  3. curated map  4. suffix rules  5. '—'
       var kp = kellyPosLabel(key);
       if (kp) return kp;
+      var hp = hardLookup(key);
+      if (hp && KELLY_POS_MAP[hp.pos]) return KELLY_POS_MAP[hp.pos];
       var p = itPosGuess(key);
       return p === '—' ? '—' : p;
     }
@@ -224,19 +261,16 @@
   function getCEFR(word, lang) {
     var key = (word || '').toLowerCase();
     if (lang === 'it') {
-      // 1. KELLY level (primary)  2. curated map  3. suffix bands  4. length
+      // 1. KELLY level (primary)  2. hard-map  3. curated map  4. suffix bands  5. length
       var k = kellyLookup(key);
       if (k && k.level) return k.level;
+      var h = hardLookup(key);
+      if (h && h.level) return h.level;
       return itCefrGuess(key);
     }
-    // English: CEFR_LEVELS → caller adds /api/cefr/batch → length heuristic
+    // English: CEFR_LEVELS → caller adds /api/cefr/batch → null (NO length heuristic)
     if (window.CEFR_LEVELS && window.CEFR_LEVELS[key]) return window.CEFR_LEVELS[key];
-    var len = key.length;
-    if (len <= 4) return 'A1';
-    if (len <= 6) return 'A2';
-    if (len <= 8) return 'B1';
-    if (len <= 10) return 'B2';
-    return 'C1';
+    return null;
   }
 
   /* ── Source attribution (for tooltips / debugging) ── */
@@ -244,6 +278,7 @@
     if (lang !== 'it') return '—';
     var key = (word || '').toLowerCase();
     if (kellyPosLabel(key)) return 'KELLY';
+    if (hardLookup(key)) return 'hard-map';
     if (IT_POS[key]) return 'core-map';
     if (itPosGuess(key) !== '—') return 'suffix-rules';
     return '—';
@@ -253,6 +288,7 @@
     var key = (word || '').toLowerCase();
     var k = kellyLookup(key);
     if (k && k.level) return 'KELLY';
+    if (hardLookup(key)) return 'hard-map';
     if (IT_CEFR[key]) return 'core-map';
     return 'suffix-rules';
   }
@@ -260,8 +296,10 @@
   window.S8T_IT_LEXICON = {
     IT_POS: IT_POS,
     IT_CEFR: IT_CEFR,
+    IT_HARD: IT_HARD,
     KELLY_POS_MAP: KELLY_POS_MAP,
     kellyLookup: kellyLookup,
+    hardLookup: hardLookup,
     itPosGuess: itPosGuess,
     itCefrGuess: itCefrGuess,
     relatedItalian: relatedItalian,
