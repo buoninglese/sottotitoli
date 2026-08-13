@@ -1521,6 +1521,7 @@ button[onclick*="addToWordBank"]:hover{background:rgba(52,211,153,.15)!important
 <script src="js/speech-icons.js"></script>
 <script src="js/cefr-gse.js"></script>
 <script src="js/cefr-info.js"></script>
+<script src="js/it-lexicon.js"></script>
 <script src="translation-providers.js?v=1"></script>
 <!-- Apply saved theme (from panoramica settings or localStorage) -->
 <script>
@@ -3292,6 +3293,9 @@ var _cefrApiQueue = [];
 
 function _getCEFR(w){
   var c=w.toLowerCase().replace(/[^a-z]/g,'');
+  // Italian captions: local IT lexicon chain (map → suffix rules → length)
+  var capLang = (typeof currentCaptionLang === 'string') ? currentCaptionLang.split('-')[0] : 'en';
+  if (capLang === 'it' && window.S8T_IT_LEXICON) return window.S8T_IT_LEXICON.getCEFR(c, 'it');
   if(window.CEFR_LEVELS&&window.CEFR_LEVELS[c])return window.CEFR_LEVELS[c];
   if(c.length<=3)return'A1';if(c.length<=5)return'A2';if(c.length<=7)return'B1';if(c.length<=9)return'B2';if(c.length<=11)return'C1';return'C2';
 }
@@ -6110,6 +6114,10 @@ function downloadGrammarPDF() {
     if (w.endsWith('ing')) return 'VERB';
     if (w.endsWith('ed') && w.length>4) return 'VERB';
     if (w.endsWith('en') && w.length>4 && !w.endsWith('een') && !w.endsWith('ien')) return 'VERB';
+    // Italian verbs — infinitive + gerund (check before noun suffixes)
+    if (w.endsWith('are')||w.endsWith('ere')||w.endsWith('ire')) return 'VERB';
+    if (w.endsWith('ando')||w.endsWith('endo')) return 'VERB';
+    if (w.endsWith('zione')||w.endsWith('zioni')||w.endsWith('mento')||w.endsWith('menti')||w.endsWith('ezza')||w.endsWith('anza')||w.endsWith('enza')) return 'NOUN';
     if (w.endsWith('tion')||w.endsWith('sion')||w.endsWith('ment')||w.endsWith('ness')||w.endsWith('ity')||w.endsWith('ance')||w.endsWith('ence')) return 'NOUN';
     if (w.endsWith('heid')||w.endsWith('tà')||w.endsWith('tù')) return 'NOUN';
     if (w.endsWith('ly')||w.endsWith('mente')||w.endsWith('lijk')) return 'ADV';
@@ -6117,6 +6125,9 @@ function downloadGrammarPDF() {
     if (w.endsWith('er')||w.endsWith('est')) return 'ADJ';
     if (w.endsWith('y') && w.length>3 && !w.endsWith('ly')) return 'ADJ';
     if (w.endsWith('oso')||w.endsWith('ale')||w.endsWith('ico')||w.endsWith('isch')||w.endsWith('baar')) return 'ADJ';
+    // Italian participles / adjectival suffixes
+    if (w.endsWith('ato')||w.endsWith('uta')||w.endsWith('uto')||w.endsWith('ito')||w.endsWith('ita')) return 'ADJ';
+    if (w.endsWith('abile')||w.endsWith('ibile')||w.endsWith('evole')||w.endsWith('istica')) return 'ADJ';
     if (w.endsWith('je')||w.endsWith('tje')) return 'NOUN';
     if (/^(the|a|an|de|het|een|il|la|lo|gli|le|un|una|in|on|at|op|aan|to|for|of|di|da|con|su|per|tra|fra|with|met|by|door|from|van|into|about|over|under|tussen|between|through|during|before|after|above|below|up|down|out|off|or|and|but|en|e|o|so|if|als|where|how|why|who|this|that|these|those|my|your|his|her|its|our|their|i|we|you|he|she|it|they|me|us|him|them|not|non|no|yes|very|just|only|also|even|still|yet|more|most|some|any|all|each|every|both|few|many|much|such|than|too|as|like|here|there|now|then|well)$/.test(w)) return 'FUNC';
     if (w.endsWith('s') && w.length>4) return 'NOUN';
