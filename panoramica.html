@@ -4239,6 +4239,18 @@
 
     /* ── Main init ── */
     (async function () {
+      // Word-bank Folders: render trigger registered EARLY (before the awaits below)
+      // so clicking the Folders tab always renders even if async init is still stalling.
+      document.addEventListener('click', function (e) {
+        var ft = e.target.closest ? e.target.closest('[data-subtab="wb-folders"]') : null;
+        if (!ft) return;
+        var tries = 0;
+        (function tryRenderFolders() {
+          if (window.renderWbFolders) { window.renderWbFolders(); return; }
+          if (tries++ < 50) setTimeout(tryRenderFolders, 150);
+        })();
+      });
+
       var sb = await waitForSB();
       if (!sb) { console.warn('Supabase not loaded — rendering offline'); }
       // Always proceed with renders — never return early
