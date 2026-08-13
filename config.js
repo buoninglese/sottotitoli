@@ -143,3 +143,13 @@ window.SOTTOTITOLI_CONFIG = {
     }
   }
 };
+
+// ═══ Load config.secrets.js if present (gitignored — local dev only) ═══
+// Overrides placeholder values above with real secrets. Silently skipped
+// on production where the file does not exist.
+(function(){
+  var s = document.createElement('script');
+  s.src = 'config.secrets.js';
+  s.onerror = function(){ /* no secrets file — fine */ };
+  document.head.appendChild(s);
+})();
