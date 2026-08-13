@@ -19,11 +19,6 @@ window.SOTTOTITOLI_CONFIG = {
 
   posthogKey: "phc_tVHWvFyYxModWrjFp7NeAX72SfYthjTGo5JdBJGoV8DY",
 
-  /** Wordnik proxy URL (Supabase Edge Function). Key is server-side only.
-      Deploy with: supabase functions deploy wordnik-proxy
-      Set secret: supabase secrets set WORDNIK_API_KEY=your_key */
-  wordnikProxyUrl: "https://qzqmuegbpmvqrjrlfbgk.supabase.co/functions/v1/wordnik-proxy",
-
   /** Translation provider settings */
   translation: {
     /** Translation provider: "proxy" = server-side with caching + fallback.

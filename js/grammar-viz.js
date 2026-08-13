@@ -224,7 +224,7 @@ function _gvUpdateGrammarExamples() {
   });
   html += '</div>';
   container.innerHTML = html;
-  // Fetch Wordnik data for each word
+  // Fetch definition data for each word (NGSL → cache → Datamuse → Free Dictionary)
   words.forEach(function(word) {
     var cardId = 'gvex-' + word.replace(/[^a-z]/g,'');
     // Small delay to avoid rate limiting

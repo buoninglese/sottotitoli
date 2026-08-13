@@ -20,11 +20,6 @@ window.SOTTOTITOLI_CONFIG = {
   /** PostHog project API key (find in PostHog → Project Settings → API key) */
   posthogKey: "phc_YOUR_POSTHOG_KEY",
 
-  /** Wordnik proxy URL (Supabase Edge Function). Key is server-side only.
-      Deploy with: supabase functions deploy wordnik-proxy
-      Set secret: supabase secrets set WORDNIK_API_KEY=your_key */
-  wordnikProxyUrl: "https://qzqmuegbpmvqrjrlfbgk.supabase.co/functions/v1/wordnik-proxy",
-
   /** WordsAPI via RapidAPI — English definitions upgrade (real key in config.secrets.js) */
   rapidApi: {
     key: "RAPIDAPI_KEY_PLACEHOLDER",

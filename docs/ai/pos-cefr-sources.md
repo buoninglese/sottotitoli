@@ -13,7 +13,7 @@
 |---|--------|-------|-------|
 | 1 | **LEMMA_POS_MAP** (rebuilt 2026-08-14 — 3,782 words, NGSL-curated > WordNet vote > Penn tagger) | local | `scripts/build-lemma-pos-map.py` |
 | 2 | **NGSL** (`js/en-ngsl.js` — 2,809 words, curated POS + rank + learner definition) | local | also feeds definitions |
-| 3 | Datamuse `tags` + dictionary `partOfSpeech` (Free Dictionary / WordsAPI / Wordnik) | live API responses | fills `'—'` POS in enrichOneCard |
+| 3 | Datamuse `tags` + dictionary `partOfSpeech` (Free Dictionary / WordsAPI) | live API responses | fills `'—'` POS in enrichOneCard |
 | 4 | Compromise Penn Treebank (`tagWordPenn` / caption `tagWord`) | local lib | reliable for common words, weak on rare/multi-POS |
 | 5 | Suffix heuristics (caption-s8t `tagWord` fallback) | local | last resort |
 | 6 | `'—'` / `OTHER` | — | honest unknown |
@@ -81,7 +81,7 @@ Fixed while settling this: `saveItalianWordToBank`, `enrichBankStatus`, `bookmar
 
 - `js/en-ngsl.js` — 2,809 words, each `[rank, pos, ipa, definition]` — built by `scripts/build-en-ngsl.py` from the NGSL 1.2 Learning Dictionary.
 - POS feeds LEMMA_POS_MAP build (curated override) + caption `tagWord` + popup POS.
-- Definitions act as the **FIRST** (instant, offline) source: VB chain = **NGSL → Free Dictionary (direct → proxy) → WordsAPI**; caption lookup = **NGSL → Datamuse → Free Dictionary**; caption popup = WORD_DEFS → **NGSL** → Free Dictionary.
+- Definitions act as the **FIRST** (instant, offline) source: VB chain = **NGSL → Free Dictionary (direct → proxy) → WordsAPI**; caption lookup = **NGSL → Datamuse → Free Dictionary**; caption popup = **NGSL → Free Dictionary**.
 - Rank is stored for future frequency-based features (not used for CEFR — no fabrication).
 
 ## 7. Dictionary API benchmark (2026-08-14, 20 words incl. rare/slang/multi-POS)
