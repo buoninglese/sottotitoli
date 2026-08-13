@@ -18,7 +18,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300;14..32,400;14..32,500;14..32,600;14..32,700;14..32,800;14..32,900&family=JetBrains+Mono:wght@300;400;500;600;700&family=Manrope:wght@300;400;500;600;700;800&family=Geist+Mono:wght@300;400;500;600;700&family=DM+Serif+Display&family=Bebas+Neue&family=Work+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="css/theme-2.css">
-<link rel="stylesheet" href="css/components.css?v=6">
+<link rel="stylesheet" href="css/components.css?v=7">
 <link rel="stylesheet" href="css/toast.css?v=2">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
 <style>
@@ -2286,9 +2286,23 @@ function _addTTSButton(el, text, lang) {
   el.appendChild(btn);
 }
 
-// ── English: existing Datamuse + Free Dictionary path ──
+// ── English: NGSL (local) → Datamuse → Free Dictionary path ──
 function _fetchWordEnglish(word, cardId, defEl, relEl, posEl) {
-  // 1. Try Datamuse (definitions — fast, free, no auth)
+  // 1. Local NGSL first — instant, curated (def + POS), zero network
+  var ng = (window.EN_NGSL || {})[word.toLowerCase()];
+  if (ng && ng[3]) {
+    var ngPosMap = { v:'VERB', n:'NOUN', adj:'ADJ', adv:'ADV' };
+    var ngPosLabel = ngPosMap[ng[1]] || '';
+    if (defEl) { defEl.textContent = ng[3]; _addTTSButton(defEl, ng[3], 'en'); }
+    if (posEl && ngPosLabel) posEl.textContent = ngPosLabel;
+    _updateCardState(cardId, 'loaded');
+    _cacheSet(word.toLowerCase(), { def: ng[3], pos: ngPosLabel });
+    _fetchDatamusePills(word, cardId, ngPosLabel);
+    var card0 = document.getElementById(cardId);
+    if (card0) { var wEl0 = card0.querySelector('.wc-word') || card0.querySelector('.syn-base-word'); _addTTSButton(wEl0, word, 'en'); }
+    return;
+  }
+  // 2. Try Datamuse (definitions — fast, free, no auth)
   var dmUrl = 'https://api.datamuse.com/words?sp=' + encodeURIComponent(word) + '&md=d&max=1';
   try {
     var xhr = new XMLHttpRequest();
@@ -2325,17 +2339,17 @@ function _fetchWordEnglish(word, cardId, defEl, relEl, posEl) {
 // ── Local NGSL fallback (instant, offline, curated learner definitions) ──
 function _fetchNGSLFallback(word, cardId) {
   var ng = (window.EN_NGSL || {})[word.toLowerCase()];
-  if (!ng || !ng[2]) { _fetchWordnikFallback(word, cardId); return; }
+  if (!ng || !ng[3]) { _fetchFreeDictFallback(word, cardId); return; }
   var card = document.getElementById(cardId);
   if (!card) return;
   var defEl = card.querySelector('.syn-def');
   var posEl = card.querySelector('.syn-pos-tag');
   var ngPosMap = { v:'VERB', n:'NOUN', adj:'ADJ', adv:'ADV' };
   var posLabel = ngPosMap[ng[1]] || '';
-  if (defEl) { defEl.textContent = ng[2]; _addTTSButton(defEl, ng[2], 'en'); }
+  if (defEl) { defEl.textContent = ng[3]; _addTTSButton(defEl, ng[3], 'en'); }
   if (posEl && posLabel) posEl.textContent = posLabel;
   _updateCardState(cardId, 'loaded');
-  _cacheSet(word.toLowerCase(), { def: ng[2], pos: posLabel });
+  _cacheSet(word.toLowerCase(), { def: ng[3], pos: posLabel });
   _fetchDatamusePills(word, cardId, posLabel);
   var wordEl = card.querySelector('.wc-word') || card.querySelector('.syn-base-word');
   if (wordEl) _addTTSButton(wordEl, word, 'en');
@@ -2430,42 +2444,28 @@ function _dmFetch(queries, ctx) {
     return all;
   });
 }
-function _fetchWordnikFallback(word, cardId) {
+// ── Free Dictionary direct fallback (18/20 coverage, ~230ms — Wordnik is dead, removed) ──
+function _fetchFreeDictFallback(word, cardId) {
   var card = document.getElementById(cardId);
   if (!card) return;
   var defEl = card.querySelector('.syn-def');
-  var relEl = card.querySelector('.syn-rel');
   var posEl = card.querySelector('.syn-pos-tag');
-
-  var wnUrl = WORDNIK_PROXY + '?word=' + encodeURIComponent(word) + '&type=definitions';
-  try {
-    var xhr = new XMLHttpRequest();
-    xhr.open('GET', wnUrl, true);
-    xhr.timeout = 5000;
-    xhr.onload = function() {
-      if (xhr.status === 200) {
-        try {
-          var defs = JSON.parse(xhr.responseText);
-          if (defs && defs.length > 0) {
-            var definition = defs[0].text || '';
-            if (defEl) defEl.textContent = definition;
-            _addTTSButton(defEl, definition, 'en');
-            var posTag = defs[0].partOfSpeech || '';
-            if (posEl && posTag) posEl.textContent = posTag;
-            _updateCardState(cardId, 'loaded');
-            _cacheSet(word.toLowerCase(), { def: definition, pos: posTag });
-            _fetchDatamusePills(word, cardId, posTag);
-            var wordEl = card.querySelector('.wc-word') || card.querySelector('.syn-base-word'); _addTTSButton(wordEl, word, 'en');
-            return;
-          }
-        } catch(e) {}
-      }
-      _finalFallback(word, cardId);
-    };
-    xhr.onerror = function() { _finalFallback(word, cardId); };
-    xhr.ontimeout = function() { _finalFallback(word, cardId); };
-    xhr.send();
-  } catch(e) { _finalFallback(word, cardId); }
+  fetch('https://api.dictionaryapi.dev/api/v2/entries/en/' + encodeURIComponent(word))
+    .then(function(r) { return r.ok ? r.json() : null; })
+    .then(function(data) {
+      if (!data || !data[0] || !data[0].meanings) return;
+      var m = data[0].meanings[0];
+      var definition = (m.definitions && m.definitions[0] && m.definitions[0].definition) || '';
+      var posTag = m.partOfSpeech || '';
+      if (defEl) { defEl.textContent = definition; _addTTSButton(defEl, definition, 'en'); }
+      if (posEl && posTag) posEl.textContent = posTag.toUpperCase();
+      _updateCardState(cardId, 'loaded');
+      _cacheSet(word.toLowerCase(), { def: definition, pos: posTag });
+      _fetchDatamusePills(word, cardId, posTag);
+      var wordEl = card.querySelector('.wc-word') || card.querySelector('.syn-base-word');
+      if (wordEl) _addTTSButton(wordEl, word, 'en');
+    })
+    .catch(function() {});
 }
 
 // ── Wordnik synonyms (only called from Wordnik fallback path) ──
@@ -5675,8 +5675,8 @@ function showWordDefinition(word) {
   } else {
     // Local NGSL (instant, offline, curated learner definitions)
     var ngEntry = (window.EN_NGSL || {})[word.toLowerCase()];
-    if (ngEntry && ngEntry[2]) {
-      tEl.textContent = ngEntry[2];
+    if (ngEntry && ngEntry[3]) {
+      tEl.textContent = ngEntry[3];
       if (!pos && ngEntry[1]) {
         var ngPosMap = { v:'VERB', n:'NOUN', adj:'ADJ', adv:'ADV' };
         pEl.textContent = ngPosMap[ngEntry[1]] || '';
