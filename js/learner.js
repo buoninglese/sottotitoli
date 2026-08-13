@@ -893,11 +893,236 @@
     if (!bank) return;
     var raw = await srcBankWords(bankId, bank.lang);
     if (!raw.length) { toast(t('learner_no_words_yet')); return; }
-    var pool = await realPool(bank.lang);
-    var items = await toItems(sample(raw, Math.min(12, raw.length)), bank.lang);
-    var steps = buildWordSteps(items, bank.lang, pool);
-    if (!steps.length) { toast(t('learner_no_words_yet')); return; }
-    openSession('bank', { id: bankId, name: bank.name, lang: bank.lang }, null, steps);
+    var items = await toItems(sample(raw, Math.min(20, raw.length)), bank.lang);
+    if (!items.length) { toast(t('learner_no_words_yet')); return; }
+    openSession('bank', { id: bankId, name: bank.name, lang: bank.lang }, null, []);
+    session.cards = items;
+    session.cardIdx = 0;
+    session.graded = {}; // item.word -> SM-2 quality (1/3/4/5) for write-back
+    renderOverlay(); // re-render with the card queue populated
+  }
+
+  /* ── Infinite card stack (bank-test "Allena" session) ──
+   * Three stacked cards, front one flips (rotateY) to reveal the translation,
+   * then is graded with SM-2. The stack recycles its 3 DOM cards so the
+   * spring-like cascade (mid → front, back → mid, new → back) animates. */
+  function cardFaceHtml(item, ci, level) {
+    if (!item) {
+      return '<div class="ics-face ics-front"><span class="ics-ghost-dot">·</span></div><div class="ics-face ics-back"><span class="ics-ghost-dot">·</span></div>';
+    }
+    var badges = '';
+    if (item.pos) badges += '<span class="ics-badge">' + esc(item.pos) + '</span>';
+    if (item.cefr) badges += '<span class="ics-badge ics-cefr">' + esc(item.cefr) + '</span>';
+    var hint = level === 0 ? '<div class="ics-hint"><span class="flip-icon">🔄</span><span data-i18n="learner_ics_flip">Tocca per girare</span></div>' : '';
+    return '<div class="ics-face ics-front">' +
+        '<div class="ics-word">' + esc(item.it) + '</div>' +
+        '<div class="ics-badges">' + badges + '</div>' +
+        hint +
+      '</div>' +
+      '<div class="ics-face ics-back">' +
+        '<div class="ics-back-label" data-i18n="learner_ics_answer">Traduzione</div>' +
+        '<div class="ics-trans">' + esc(item.en || '') + '</div>' +
+        (item.definition ? '<div class="ics-def">' + esc(item.definition) + '</div>' : '') +
+        '<button type="button" class="ics-replay" data-ci="' + ci + '" onclick="event.stopPropagation();Learner.replayCard(this)">🔊 <span data-i18n="learner_ics_replay">Riascolta</span></button>' +
+      '</div>';
+  }
+
+  function gradeBtnHtml(cls, q, i18nKey, label, emoji) {
+    return '<button type="button" class="ics-grade ' + cls + '" data-q="' + q + '" disabled onclick="Learner.gradeCard(this)">' +
+      '<span data-i18n="' + i18nKey + '">' + label + '</span><span class="gq">' + emoji + '</span></button>';
+  }
+
+  function renderCardStack() {
+    if (!session) return;
+    var stage = $('#learnerStage');
+    if (!stage) return;
+    var cards = session.cards || [];
+    var idx = session.cardIdx || 0;
+    var html = '<div class="ics-wrap">' +
+      '<div class="ics-stage" id="icsStage">';
+    for (var i = 0; i < 3; i++) {
+      var ci = idx + i;
+      var item = cards[ci];
+      var cls = 'ics-card' + (item ? '' : ' ghost');
+      html += '<div class="' + cls + '" data-level="' + i + '" data-ci="' + ci + '" onclick="Learner.flipCard(this)">' +
+        '<div class="ics-inner">' + cardFaceHtml(item, ci, i) + '</div></div>';
+    }
+    html += '</div>' +
+      '<div class="ics-remaining" id="icsRemaining"></div>' +
+      '<div class="ics-grades" id="icsGrades">' +
+        gradeBtnHtml('again', 1, 'learner_grade_again', 'Ancora', '😵') +
+        gradeBtnHtml('hard', 3, 'learner_grade_hard', 'Difficile', '😬') +
+        gradeBtnHtml('good', 4, 'learner_grade_good', 'Buono', '🙂') +
+        gradeBtnHtml('easy', 5, 'learner_grade_easy', 'Facile', '😎') +
+      '</div></div>';
+    stage.innerHTML = html;
+    i18nScope(stage);
+    updateIcsRemaining();
+    var front = cards[idx];
+    if (front) setTimeout(function () { speak(front.it); }, 350);
+  }
+
+  function updateIcsRemaining() {
+    if (!session || !session.cards) return;
+    var el = $('#icsRemaining');
+    if (!el) return;
+    var left = Math.max(0, (session.cards.length - session.cardIdx));
+    el.textContent = left + ' ' + t('learner_ics_remaining');
+  }
+
+  function flipCard(el) {
+    if (!session || !el) return;
+    if (el.getAttribute('data-level') !== '0') return;
+    if (el.classList.contains('exiting')) return;
+    el.classList.add('flip');
+    var stage = $('#learnerStage');
+    if (stage) $all('.ics-grade', stage).forEach(function (b) { b.disabled = false; });
+  }
+
+  function replayCard(btn) {
+    if (!session || !btn) return;
+    var card = btn.closest ? btn.closest('.ics-card') : null;
+    var ci = card ? parseInt(card.getAttribute('data-ci'), 10) : session.cardIdx;
+    var item = session.cards[ci];
+    if (item) speak(item.it);
+  }
+
+  function icsCard(stage, level) {
+    var el = null;
+    $all('.ics-card', stage).forEach(function (c) { if (c.getAttribute('data-level') === String(level)) el = c; });
+    return el;
+  }
+
+  function gradeCard(btn) {
+    if (!session || !btn || btn.disabled) return;
+    var q = parseInt(btn.getAttribute('data-q'), 10) || 4;
+    var stage = $('#learnerStage');
+    var frontEl = stage ? icsCard(stage, 0) : null;
+    if (!frontEl) return;
+    var ci = parseInt(frontEl.getAttribute('data-ci'), 10);
+    var item = session.cards[ci];
+    if (!item) return;
+    if (!frontEl.classList.contains('flip')) frontEl.classList.add('flip');
+    // Record grade + XP / mistake
+    session.graded[item.word] = q;
+    if (q >= 3) { session.earned += 1; addXp(1); } else { recordMistake(item.word); }
+    writeGrade(item, q); // fire-and-forget SM-2 write-back to review_words
+    $all('.ics-grade', stage).forEach(function (b) { b.disabled = true; });
+    // Fly the front card off, then cascade the stack
+    frontEl.classList.add('exiting');
+    setTimeout(advanceStack, 600);
+  }
+
+  function advanceStack() {
+    if (!session) return;
+    var stage = $('#learnerStage');
+    if (!stage) return;
+    var frontEl = icsCard(stage, 0), midEl = icsCard(stage, 1), backEl = icsCard(stage, 2);
+    if (!frontEl || !midEl || !backEl) { // safety fallback: full re-render
+      session.cardIdx += 1;
+      if (session.cardIdx >= session.cards.length) { endSession(); return; }
+      renderCardStack();
+      return;
+    }
+    var ci = session.cardIdx;
+    var nextBackIdx = ci + 3;
+    var nextItem = session.cards[nextBackIdx];
+    // A: old front → recycled as the new back card (new content, snaps in)
+    frontEl.classList.add('no-anim');
+    frontEl.classList.remove('exiting', 'flip');
+    frontEl.setAttribute('data-level', '2');
+    frontEl.setAttribute('data-ci', String(nextBackIdx));
+    frontEl.querySelector('.ics-inner').innerHTML = cardFaceHtml(nextItem, nextBackIdx, 2);
+    frontEl.classList.add('entering');
+    void frontEl.offsetWidth; // reflow → settle transition
+    frontEl.classList.remove('no-anim', 'entering');
+    // B: old mid → new front, C: old back → new mid (cascade via data-level)
+    midEl.setAttribute('data-level', '0');
+    midEl.classList.remove('flip');
+    backEl.setAttribute('data-level', '1');
+    session.cardIdx = ci + 1;
+    if (session.cardIdx >= session.cards.length) { endSession(); return; }
+    updateIcsRemaining();
+    var newFront = session.cards[session.cardIdx];
+    if (newFront) setTimeout(function () { speak(newFront.it); }, 320);
+  }
+
+  /* ── SM-2 (Anki-style) scheduling ──
+   * quality: 1=Again 3=Hard 4=Good 5=Easy. Returns the next SRS state. */
+  function sm2(q, prev) {
+    prev = prev || {};
+    var ease = (typeof prev.ease === 'number' && prev.ease) ? prev.ease : 2.5;
+    var interval = prev.interval || 0;
+    var reps = prev.reps || 0;
+    var lapses = prev.lapses || 0;
+    var mastery = (typeof prev.mastery === 'number') ? prev.mastery : 0;
+    var newReps, newInterval, newEase, newLapses, newMastery, state;
+    if (q <= 1) {
+      newReps = 0; newInterval = 0; newLapses = lapses + 1;
+      newEase = Math.max(1.3, +(ease - 0.2).toFixed(2));
+      newMastery = Math.max(0, mastery - 20);
+      state = 'relearning';
+    } else if (q === 3) {
+      newReps = reps + 1; newInterval = reps === 0 ? 1 : Math.max(1, Math.round(interval * 1.2));
+      newEase = Math.max(1.3, +(ease - 0.15).toFixed(2));
+      newMastery = Math.min(100, mastery + 8);
+      state = 'learning';
+    } else if (q === 4) {
+      newReps = reps + 1; newInterval = reps === 0 ? 1 : (reps === 1 ? 6 : Math.round(interval * ease));
+      newEase = ease;
+      newMastery = Math.min(100, mastery + 12);
+      state = 'review';
+    } else {
+      newReps = reps + 1; newInterval = reps === 0 ? 4 : (reps === 1 ? 10 : Math.round(interval * ease * 1.3));
+      newEase = +(ease + 0.15).toFixed(2);
+      newMastery = Math.min(100, mastery + 16);
+      state = 'review';
+    }
+    newLapses = lapses;
+    if (newReps >= 5 && q >= 4) state = 'mastered';
+    return {
+      interval: newInterval, ease: newEase, reps: newReps, lapses: newLapses,
+      mastery: newMastery, reviewState: state,
+      nextAt: new Date(Date.now() + newInterval * 86400000).toISOString()
+    };
+  }
+
+  // SM-2 write-back to review_words (direct update/insert, mirrors vtMarkFatto).
+  async function writeGrade(item, q) {
+    var sb = srcSb(); if (!sb) return;
+    var uid = await srcUid(); if (!uid) return;
+    var lang = session ? session.lang : learnerLang();
+    var lemma = item.word;
+    var normalized = norm(lemma);
+    try {
+      var r = await sb.from('review_words')
+        .select('id,interval_days,ease_factor,reps,lapses,mastery_score')
+        .eq('user_id', uid).eq('lang', lang).eq('normalized', normalized).limit(1);
+      var row = (r.data && r.data[0]) ? r.data[0] : null;
+      var prev = row ? {
+        interval: row.interval_days || 0, ease: row.ease_factor || 2.5,
+        reps: row.reps || 0, lapses: row.lapses || 0, mastery: row.mastery_score || 0
+      } : {};
+      var s = sm2(q, prev);
+      var nowISO = new Date().toISOString();
+      var result = q <= 1 ? 'again' : (q === 3 ? 'hard' : (q === 4 ? 'good' : 'easy'));
+      if (row) {
+        await sb.from('review_words').update({
+          review_state: s.reviewState, interval_days: s.interval, ease_factor: s.ease,
+          reps: s.reps, lapses: s.lapses, mastery_score: s.mastery,
+          last_result: result, last_reviewed_at: nowISO, next_review_at: s.nextAt, is_new: false
+        }).eq('id', row.id);
+      } else {
+        await sb.from('review_words').insert({
+          user_id: uid, lemma: lemma, normalized: normalized,
+          translation_primary: item.en || '', translation_variants: item.en ? [item.en] : [],
+          accepted_answers: [], pos: item.pos || null, cefr: item.cefr || null, lang: lang,
+          is_new: false, review_state: s.reviewState, interval_days: s.interval, ease_factor: s.ease,
+          reps: s.reps, lapses: s.lapses, mastery_score: s.mastery, last_result: result,
+          last_reviewed_at: nowISO, next_review_at: s.nextAt, personal_frequency: 1
+        });
+      }
+    } catch (e) { if (w.console) w.console.warn('writeGrade:', e); }
   }
 
   async function openReview(kind, lang) {
@@ -967,12 +1192,15 @@
 
   function renderOverlay() {
     if (!session) return;
+    var isBank = session.mode === 'bank';
     var step = session.steps[session.idx];
-    var total = session.steps.length;
-    var pct = Math.round((session.idx / total) * 100);
+    var total = isBank ? (session.cards ? session.cards.length : 0) : (session.steps ? session.steps.length : 0);
+    var cur = isBank ? (session.cardIdx || 0) : session.idx;
+    var pct = total ? Math.round((cur / total) * 100) : 0;
     var title = session.mode === 'lesson' ? (session.lesson ? session.lesson.title : '') :
       session.mode === 'test' ? t('learner_unit_test') :
       session.mode === 'mission' ? (session.unit ? session.unit.name : t('learner_mission')) :
+      session.mode === 'bank' ? (session.unit ? session.unit.name : t('learner_wordbanks')) :
       t('learner_practice');
 
     // Remove any previous overlay
@@ -997,6 +1225,7 @@
     if (!session) return;
     var stage = $('#learnerStage');
     if (!stage) return;
+    if (session.mode === 'bank') { renderCardStack(); return; }
     var step = session.steps[session.idx];
     session.matchState = null; session.mcIndex = 0;
     var html = '';
@@ -1348,6 +1577,9 @@
     matchTap: matchTap,
     answerMc: answerMc,
     clearMistake: clearMistake,
+    flipCard: flipCard,
+    replayCard: replayCard,
+    gradeCard: gradeCard,
   };
 
   // Boot when the DOM is ready
