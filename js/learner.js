@@ -400,7 +400,7 @@
 
   /* ── Session engine (lesson / test / practice) ── */
   var session = null; // { mode, unit?, lesson?, steps, idx, earned, matchState?, mcIndex?, convoPhase? }
-  var rootEl = null;  var lastPane = 'learner-path';
+  var rootEl = null;  var lastPane = 'learner-en';
   function buildStepsForLesson(lesson) {
     var steps = [];
     (lesson.vocabulary || []).forEach(function (v) { steps.push({ type: 'listen', item: v }); });
@@ -487,9 +487,8 @@
           '</div>' +
           '<div class="lh-streak"><span class="flame">🔥</span><span>' + s.streak + ' <span data-i18n="learner_streak">Serie</span></span></div>' +
         '</div>' +
-        '<div role="tabpanel" class="subtab-pane active" id="sub-learner-path"></div>' +
-        '<div role="tabpanel" class="subtab-pane" id="sub-learner-practice"></div>' +
-        '<div role="tabpanel" class="subtab-pane" id="sub-learner-progress"></div>' +
+        '<div role="tabpanel" class="subtab-pane active" id="sub-learner-overview"></div>' +
+        '<div role="tabpanel" class="subtab-pane" id="sub-learner-path"></div>' +
       '</div>';
     // i18n for injected chrome
     i18nScope(rootEl);
@@ -498,19 +497,31 @@
   function showPane(name) {
     if (!rootEl) return;
     lastPane = name;
-    $all('.tab-link[data-subtab]', rootEl).forEach(function (b) {
+    // Sync the segmented tabs in the static panel-head (Overview / English / Italiano)
+    $all('#pnl-learner .tab-link[data-subtab]').forEach(function (b) {
       var on = b.getAttribute('data-subtab') === name;
       b.classList.toggle('active', on);
       b.setAttribute('aria-selected', on ? 'true' : 'false');
     });
+    var paneId = paneIdFor(name);
     $all('.subtab-pane', rootEl).forEach(function (p) {
-      p.classList.toggle('active', p.id === 'sub-' + name);
+      p.classList.toggle('active', p.id === paneId);
     });
     renderPane(name);
   }
 
+  // English/Italiano are the language switch for the shared path pane;
+  // Overview hosts the progress dashboard.
+  function paneIdFor(name) {
+    if (name === 'learner-overview') return 'sub-learner-overview';
+    return 'sub-learner-path'; // learner-en / learner-it / learner-path (legacy)
+  }
+
   function renderPane(name) {
-    if (name === 'learner-path') renderPath();
+    if (name === 'learner-overview') renderProgress();
+    else if (name === 'learner-en') { learnerSetLang('en'); renderPath(); }
+    else if (name === 'learner-it') { learnerSetLang('it'); renderPath(); }
+    else if (name === 'learner-path') renderPath();
     else if (name === 'learner-practice') renderPractice();
     else if (name === 'learner-progress') renderProgress();
   }
@@ -527,12 +538,13 @@
     var authed = await srcIsAuthed();
     if (!authed) { renderBundledPath(pane); return; }
     var lang = learnerLang();
-    var banks = await srcBanks(lang);
     var due = await srcReview('due', lang);
     var fragile = await srcReview('fragile', lang);
     var fresh = await srcReview('new', lang);
-    if (!banks.length && !due.length && !fragile.length) { renderEmptyPath(pane); return; }
-    renderRealPath(pane, banks, due, fragile, fresh, lang);
+    // Word banks live on the Word-banks tab (each box now has its own Allena
+    // button) — the path keeps the AI mission + spaced review only.
+    if (!due.length && !fragile.length && !fresh.length && !missionCached()) { renderEmptyPath(pane); return; }
+    renderRealPath(pane, due, fragile, fresh, lang);
   }
 
   function renderEmptyPath(pane) {
@@ -541,8 +553,7 @@
     i18nScope(pane);
   }
 
-  function renderRealPath(pane, banks, due, fragile, fresh, lang) {
-    var s = load();
+  function renderRealPath(pane, due, fragile, fresh, lang) {
     var html = '';
     // Mission (objectives-driven AI lesson)
     var mission = missionCached();
@@ -563,27 +574,6 @@
         '<button type="button" class="lesson-link lr-mission-new" onclick="Learner.newMission()" title="' + t('learner_mission_new') + '">↻</button>' +
       '</div>' +
     '</div>';
-    // Word banks (ids are UUIDs → must be quoted in the inline handler)
-    html += '<div class="lr-section-head"><span class="lr-section-title">' + t('learner_wordbanks') + '</span>' +
-      '<span class="lr-section-sub">' + t('learner_wordbanks_sub') + '</span></div>';
-    if (banks.length) {
-      html += '<div class="lr-bank-grid">';
-      banks.forEach(function (b) {
-        var done = !!s.lessons['bank:' + b.id];
-        var langTag = b.lang === 'en' ? 'EN' : 'IT';
-        html += '<div class="lr-bank-card' + (done ? ' done' : '') + '" tabindex="0" onclick="Learner.openBankTest(' + jsArg(b.id) + ')">' +
-          '<div class="lr-bank-top"><span class="lr-bank-icon">' + (b.lang === 'en' ? '🇬🇧' : '🇮🇹') + '</span>' +
-            '<span class="lr-bank-lang">' + langTag + '</span></div>' +
-          '<div class="lr-bank-name">' + esc(b.name) + '</div>' +
-          '<div class="lr-bank-meta">' + b.wordCount + ' ' + t('learner_word_count') + (done ? ' · <span style="color:var(--green)">✓</span>' : '') + '</div>' +
-          '<button type="button" class="primary-btn lr-bank-cta">' + t('learner_train') + '</button>' +
-        '</div>';
-      });
-      html += '</div>';
-    } else {
-      html += '<div class="learner-empty" style="padding:30px"><div class="le-emoji">🗂️</div><div class="le-title">' + t('learner_no_banks') + '</div>' +
-        '<div class="le-sub">' + t('learner_no_banks_sub') + '</div></div>';
-    }
     // Spaced review
     var reviewCards = [
       { kind: 'due', icon: '⏰', title: t('learner_review_due'), sub: t('learner_review_due_sub'), count: due.length },
@@ -714,7 +704,7 @@
 
   /* ── PROGRESS (fleshed-out dashboard from real data) ── */
   function renderProgress() {
-    var pane = $('#sub-learner-progress', rootEl);
+    var pane = $('#sub-learner-overview', rootEl);
     if (!pane) return;
     pane.innerHTML = '<div class="learner-empty"><div class="le-emoji">⏳</div><div class="le-title">' + t('learner_loading') + '</div></div>';
     loadProgress(pane);
@@ -876,13 +866,77 @@
     return steps;
   }
 
+  // Pinned/system bank display names (Allena launched from the Word-banks tab).
+  var BANK_NAMES = {
+    review_due_now: 'Ripasso immediato', saved_from_sessions: 'Saved From Sessions',
+    fragile_words: 'Fragile Words', vocab_builder_en: 'English Vocabulary Builder',
+    it_review_due: 'Ripasso immediato', it_saved_sessions: 'Salvate da sessioni',
+    it_vocab_builder: 'Italian Vocabulary Builder', it_fragile: 'Parole Fragili',
+    it_new_weekly: 'Nuove questa settimana'
+  };
+  function bankNameFor(id) { return BANK_NAMES[id] || id; }
+
+  // Words for pinned/system banks when Allena is launched on a bank that isn't in
+  // user_wordbanks. Mirrors the openWordbankView fetch logic (review-based + mapped
+  // real banks). Smart/AI banks have no persistent word set → empty (toast).
+  async function srcBankFallbackWords(bankId, lang) {
+    var sb = srcSb(); if (!sb) return [];
+    var uid = await srcUid(); if (!uid) return [];
+    var out = [];
+    try {
+      if (bankId === 'review_due_now' || bankId === 'it_review_due' || bankId === 'fragile_words' || bankId === 'it_fragile') {
+        var nowISO = new Date().toISOString();
+        var q = sb.from('review_words')
+          .select('lemma,pos,cefr,translation_primary,next_review_at,is_new,lapses,mastery_score,personal_frequency')
+          .eq('user_id', uid).eq('lang', lang).limit(200);
+        if (bankId === 'review_due_now' || bankId === 'it_review_due') q = q.or('next_review_at.lte.' + nowISO + ',is_new.eq.true');
+        else q = q.or('mastery_score.lt.40,lapses.gte.2');
+        var r = await q;
+        out = (r.data || []).map(function (rw) {
+          return { word: rw.lemma || rw.word, lang: lang, pos: rw.pos || '', cefr: rw.cefr || '', translation: rw.translation_primary || '', definition: rw.translation_primary || '', usage: rw.personal_frequency || 0 };
+        });
+      } else if (bankId === 'it_new_weekly') {
+        var q2 = sb.from('review_words').select('lemma,pos,cefr,translation_primary').eq('user_id', uid).eq('lang', 'it').eq('is_new', true).limit(200);
+        var r2 = await q2;
+        out = (r2.data || []).map(function (rw) {
+          return { word: rw.lemma || rw.word, lang: 'it', pos: rw.pos || '', cefr: rw.cefr || '', translation: rw.translation_primary || '', definition: rw.translation_primary || '', usage: 0 };
+        });
+      } else if (bankId === 'saved_from_sessions' || bankId === 'it_saved_sessions') {
+        var banks = await srcBanks(lang);
+        var sf = null;
+        banks.forEach(function (b) { if (b.name === 'Saved from sessions') sf = b; });
+        if (sf) out = await srcBankWords(sf.id, lang);
+      } else if (bankId === 'vocab_builder_en') {
+        var banks2 = await srcBanks('en');
+        var vb = null;
+        banks2.forEach(function (b) { if (b.name === 'English Vocabulary Builder') vb = b; });
+        if (vb) out = await srcBankWords(vb.id, 'en');
+      } else if (bankId === 'it_vocab_builder') {
+        try {
+          var stored = JSON.parse(localStorage.getItem('sottotitoli_wb_it_pinned') || '{"words":[]}');
+          out = (stored.words || []).map(function (wd) { return { word: wd, lang: 'it', pos: '', cefr: '', usage: 1 }; });
+        } catch (e) {}
+      }
+    } catch (e) {}
+    return out;
+  }
+
   async function openBankTest(bankId) {
-    var banks = await srcBanks(learnerLang());
+    // Allena can be launched from the Word-banks tab, so resolve the bank in either
+    // learner language (the bank's lang may differ from the learner's active lang).
+    var banksEn = await srcBanks('en');
+    var banksIt = await srcBanks('it');
     var bank = null;
-    banks.forEach(function (b) { if (b.id === bankId) bank = b; });
-    if (!bank) return;
-    var raw = await srcBankWords(bankId, bank.lang);
-    if (!raw.length) { toast(t('learner_no_words_yet')); return; }
+    banksEn.concat(banksIt).forEach(function (b) { if (!bank && b.id === bankId) bank = b; });
+    var raw;
+    if (bank) {
+      raw = await srcBankWords(bankId, bank.lang);
+    } else {
+      var fbLang = bankId.indexOf('it_') === 0 ? 'it' : 'en';
+      raw = await srcBankFallbackWords(bankId, fbLang);
+      if (raw.length) bank = { id: bankId, name: bankNameFor(bankId) || bankId, lang: fbLang };
+    }
+    if (!bank || !raw.length) { toast(t('learner_no_words_yet')); return; }
     // Skip words already done in earlier (possibly interrupted) Allena runs.
     var bp = bankProgress();
     var entry = bp[bankId] || { total: 0, done: [] };
@@ -895,6 +949,7 @@
     session.cardIdx = 0;
     session.graded = {}; // item.word -> SM-2 quality (1/3/4/5) for write-back
     session.bankId = bankId;
+    session.lang = bank.lang; // session TTS/recognition must follow the bank's language
     session.bankTotal = raw.length;              // full bank size (progress denominator)
     session.bankPrevDone = (entry.done || []).length; // already done before this run
     if (!items.length) {
@@ -1567,7 +1622,7 @@
     rootEl = $('#learnerRoot');
     if (!rootEl) return;
     renderShell();
-    showPane('learner-path');
+    showPane(learnerLang() === 'it' ? 'learner-it' : 'learner-en');
 
     // Re-render when the Learner sidebar item is clicked
     document.addEventListener('click', function (e) {
