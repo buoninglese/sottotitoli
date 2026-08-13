@@ -364,14 +364,16 @@
 #pnl-learner .complete-card .cc-sub { font-size: 14px; color: var(--text-soft); }
 #pnl-learner .complete-card .cc-xp { display: inline-block; margin-top: 16px; padding: 8px 18px; border-radius: 999px; background: rgba(6,182,212,.1); color: var(--cyan); font-weight: 800; font-size: 15px; }
 
-/* ── Toast ── */
+/* ── Toast — Apple-style pill (matches css/toast.css) ── */
 #pnl-learner .learner-toast {
-  position: fixed; bottom: 28px; left: 50%; transform: translateX(-50%) translateY(16px);
-  background: var(--text); color: var(--bg); font-weight: 700; font-size: 13.5px;
-  padding: 11px 20px; border-radius: 999px; opacity: 0; pointer-events: none;
-  transition: all .25s ease; z-index: 9500; box-shadow: 0 8px 24px rgba(0,0,0,.2);
+  position: fixed; bottom: 28px; left: 50%; transform: translateX(-50%) translateY(12px) scale(.96);
+  background: #131316; color: #fff; font-weight: 500; font-size: 13px;
+  height: 40px; padding: 0 18px; display: inline-flex; align-items: center; justify-content: center; white-space: nowrap;
+  border-radius: 999px; opacity: 0; pointer-events: none;
+  transition: all .35s cubic-bezier(.34,1.56,.64,1); z-index: 9500;
+  box-shadow: 0px 32px 64px -16px rgba(0,0,0,.30),0px 16px 32px -8px rgba(0,0,0,.30),0px 8px 16px -4px rgba(0,0,0,.24),0px 4px 8px -2px rgba(0,0,0,.24),0px -8px 16px -1px rgba(0,0,0,.16),0px 2px 4px -1px rgba(0,0,0,.24),0px 0px 0px 1px rgba(0,0,0,1),inset 0px 0px 0px 1px rgba(255,255,255,.08),inset 0px 1px 0px 0px rgba(255,255,255,.20);
 }
-#pnl-learner .learner-toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+#pnl-learner .learner-toast.show { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); }
 
 /* ── Empty states ── */
 #pnl-learner .learner-empty { text-align: center; padding: 60px 20px; color: var(--text-faint); }
@@ -379,9 +381,128 @@
 #pnl-learner .learner-empty .le-title { font-size: 18px; font-weight: 800; color: var(--text); margin-bottom: 6px; }
 #pnl-learner .learner-empty .le-sub { font-size: 13.5px; max-width: 420px; margin: 0 auto; line-height: 1.6; }
 
+/* ═══ Infinite card stack ("Allena" word-bank session) ═══
+ * Faithful re-creation of the desktop infinite-card-stack (framer-motion
+ * spring) using native CSS transitions + a rotateY flip. The front card
+ * shows the word; tapping flips it to the translation; the 4 grade buttons
+ * run SM-2 (Again / Hard / Good / Easy) and write back to review_words.
+ */
+#pnl-learner .ics-wrap {
+  width: 100%; max-width: 560px; margin: 0 auto;
+  display: flex; flex-direction: column; align-items: center; gap: 16px;
+}
+#pnl-learner .ics-stage { position: relative; width: min(92vw, 480px); height: 348px; }
+#pnl-learner .ics-card {
+  position: absolute; bottom: 0; left: 50%;
+  width: 100%; height: 340px;
+  --scale: 1; --y: 12px; --z: 3;
+  transform: translateX(-50%) translateY(var(--y)) scale(var(--scale));
+  z-index: var(--z);
+  perspective: 1400px;
+  transition: transform .55s cubic-bezier(.16,1,.3,1), opacity .38s ease;
+  cursor: pointer; will-change: transform;
+}
+#pnl-learner .ics-card[data-level="1"] { --scale: .95; --y: -16px; --z: 2; }
+#pnl-learner .ics-card[data-level="2"] { --scale: .9; --y: -44px; --z: 1; }
+#pnl-learner .ics-card[data-level="1"],
+#pnl-learner .ics-card[data-level="2"] { cursor: default; }
+/* Snap state (no transition) used when a card is recycled to the back */
+#pnl-learner .ics-card.no-anim { transition: none !important; }
+/* New back card: starts slightly low + faded, settles into the stack */
+#pnl-learner .ics-card.entering {
+  --scale: .9; --y: -16px; --z: 1;
+  opacity: 0;
+}
+/* Front card flying off the top of the deck */
+#pnl-learner .ics-card.exiting {
+  --scale: 1; --y: 340px; --z: 10;
+  opacity: 0; pointer-events: none;
+}
+
+/* Flip mechanism */
+#pnl-learner .ics-inner {
+  position: absolute; inset: 0;
+  transform-style: preserve-3d;
+  transition: transform .5s cubic-bezier(.16,1,.3,1);
+}
+#pnl-learner .ics-card.flip .ics-inner { transform: rotateY(180deg); }
+#pnl-learner .ics-face {
+  position: absolute; inset: 0;
+  -webkit-backface-visibility: hidden; backface-visibility: hidden;
+  border-radius: 22px;
+  border: 1.5px solid var(--line-strong);
+  background: linear-gradient(165deg, var(--card), var(--panel-2));
+  box-shadow: 0 18px 44px rgba(0,0,0,.22);
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  padding: 28px 22px; text-align: center; overflow: hidden;
+}
+#pnl-learner .ics-back { transform: rotateY(180deg); }
+#pnl-learner .ics-card.ghost .ics-face { border-style: dashed; background: var(--panel); opacity: .5; }
+
+/* Front face */
+#pnl-learner .ics-front::before {
+  content: ''; position: absolute; top: -70px; right: -70px; width: 200px; height: 200px;
+  background: radial-gradient(circle, rgba(6,182,212,.16), transparent 70%);
+  border-radius: 50%; pointer-events: none;
+}
+#pnl-learner .ics-word {
+  position: relative; font-size: 44px; font-weight: 900; color: var(--text);
+  letter-spacing: -.02em; line-height: 1.15; max-width: 100%; word-break: break-word;
+}
+#pnl-learner .ics-badges { position: relative; display: flex; gap: 8px; margin-top: 16px; flex-wrap: wrap; justify-content: center; }
+#pnl-learner .ics-badge {
+  font-size: 10.5px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase;
+  padding: 4px 10px; border-radius: 999px; color: var(--text-soft);
+  background: var(--panel-2); border: 1px solid var(--line);
+}
+#pnl-learner .ics-badge.ics-cefr { color: var(--cyan); border-color: rgba(6,182,212,.4); background: rgba(6,182,212,.08); }
+#pnl-learner .ics-hint {
+  position: absolute; bottom: 16px; left: 0; right: 0;
+  font-size: 11px; font-weight: 600; color: var(--text-faint); letter-spacing: .03em;
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+}
+#pnl-learner .ics-ghost-dot { font-size: 40px; color: var(--text-faint); }
+
+/* Back face */
+#pnl-learner .ics-back-label {
+  position: absolute; top: 18px; left: 0; right: 0;
+  font-size: 10.5px; font-weight: 800; letter-spacing: .18em; text-transform: uppercase; color: var(--text-faint);
+}
+#pnl-learner .ics-trans { font-size: 30px; font-weight: 800; color: var(--cyan); letter-spacing: -.01em; line-height: 1.25; word-break: break-word; }
+#pnl-learner .ics-def { font-size: 13.5px; color: var(--text-soft); margin-top: 14px; max-width: 340px; line-height: 1.55; }
+#pnl-learner .ics-replay {
+  margin-top: 24px; display: inline-flex; align-items: center; gap: 8px;
+  border: 1.5px solid var(--line); background: var(--panel-2); color: var(--text);
+  border-radius: 999px; padding: 10px 20px; font-size: 15px; cursor: pointer; transition: all .15s;
+}
+#pnl-learner .ics-replay:hover { border-color: var(--cyan); color: var(--cyan); transform: translateY(-1px); }
+
+/* SM-2 grade buttons */
+#pnl-learner .ics-grades { display: flex; gap: 8px; width: 100%; max-width: 480px; }
+#pnl-learner .ics-grade {
+  flex: 1; border: none; border-radius: 14px; padding: 12px 6px; cursor: pointer;
+  font-family: var(--font-ui, 'Inter', sans-serif); font-size: 12.5px; font-weight: 800;
+  color: #fff; letter-spacing: .02em; line-height: 1.2;
+  transition: transform .12s ease, filter .15s ease, opacity .15s;
+}
+#pnl-learner .ics-grade:hover { transform: translateY(-2px); filter: brightness(1.08); }
+#pnl-learner .ics-grade:disabled { opacity: .45; cursor: not-allowed; transform: none; filter: none; }
+#pnl-learner .ics-grade .gq { display: block; font-size: 11px; line-height: 1; margin-top: 3px; opacity: .8; }
+#pnl-learner .ics-grade.again { background: #ef4444; box-shadow: 0 4px 14px rgba(239,68,68,.3); }
+#pnl-learner .ics-grade.hard  { background: #f59e0b; box-shadow: 0 4px 14px rgba(245,158,11,.3); }
+#pnl-learner .ics-grade.good  { background: #22c55e; box-shadow: 0 4px 14px rgba(34,197,94,.3); }
+#pnl-learner .ics-grade.easy  { background: #06b6d4; box-shadow: 0 4px 14px rgba(6,182,212,.3); }
+#pnl-learner .ics-remaining { font-size: 11.5px; font-weight: 700; color: var(--text-faint); letter-spacing: .04em; }
+
 /* Responsive */
 @media (max-width: 640px) {
   #pnl-learner .lesson-stage .step-prompt { font-size: 26px; }
   #pnl-learner .match-wrap, #pnl-learner .choices { grid-template-columns: 1fr; }
   #pnl-learner .lesson-node { width: 44px; height: 44px; font-size: 18px; }
+  #pnl-learner .ics-stage { height: 300px; }
+  #pnl-learner .ics-card { height: 292px; }
+  #pnl-learner .ics-word { font-size: 33px; }
+  #pnl-learner .ics-trans { font-size: 24px; }
+  #pnl-learner .ics-def { font-size: 12.5px; }
+  #pnl-learner .ics-grade { font-size: 11.5px; padding: 11px 3px; }
 }
