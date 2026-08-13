@@ -4187,6 +4187,7 @@
   <script src="js/cefr-levels.js"></script>
   <script src="js/cefr-gse.js"></script>
   <script src="js/lemma-pos-map.js"></script>
+  <script src="js/it-lexicon.js"></script>
   <script src="js/toast.js?v=2"></script>
   <script src="js/theme-2.js?v=5"></script>
   <script>
@@ -9123,9 +9124,17 @@
           var words = [];
           boxes.forEach(function(b){ var w = b.getAttribute('data-word'); if (w) words.push(w.toLowerCase()); });
           if (!words.length) return;
+        // Fix: user_wordbank_words has no user_id/lang columns — filter through
+        // user_wordbanks (which owns user_id + lang) then query words by bank ids.
+        var { data: langBanks } = await sb.from('user_wordbanks')
+          .select('id').eq('user_id', userId).eq('lang', lang);
+        var bankIds = (langBanks || []).map(function(b){ return b.id; });
+        var bankSet = new Set();
+        if (bankIds.length) {
           var { data: bankData } = await sb.from('user_wordbank_words')
-            .select('word').eq('user_id', userId).eq('lang', lang).in('word', words);
-          var bankSet = new Set((bankData||[]).map(function(w){ return w.word.toLowerCase(); }));
+            .select('wordbank_id,word').in('wordbank_id', bankIds).in('word', words);
+          (bankData||[]).forEach(function(w){ bankSet.add(w.word.toLowerCase()); });
+        }
           var { data: reviewData } = await sb.from('review_words')
             .select('word,personal_frequency,mastery_score').eq('user_id', userId).in('word', words);
           var reviewMap = {};
@@ -9768,8 +9777,7 @@
           targetBank = createRes.data;
         }
         var insertRes = await sb.from('user_wordbank_words').insert({
-          wordbank_id: targetBank.id, word: word, pos: pos, cefr_level: level,
-          user_id: userId, status: 'new', added_at: new Date().toISOString()
+          wordbank_id: targetBank.id, word: word, pos: pos, usage_count: 1, status: 'learning'
         });
         if (insertRes.error) { console.warn('bookmark word:', insertRes.error.message); return; }
         SottotitoliData.cacheClear();
@@ -9813,8 +9821,10 @@
                 if (createRes.data) targetBank = createRes.data;
               }
               if (targetBank) {
+                // user_wordbank_words only has: wordbank_id, word, pos, usage_count, last_used, created_at, status
+                var itPos = (window.S8T_IT_LEXICON && window.S8T_IT_LEXICON.getPOS(word, 'it')) || null;
                 await sb.from('user_wordbank_words').upsert({
-                  wordbank_id: targetBank.id, word: word, user_id: userId, lang: 'it', status: 'new', usage_count: 1
+                  wordbank_id: targetBank.id, word: word, pos: itPos, usage_count: 1
                 }, { onConflict: 'wordbank_id,word' });
               }
             }
@@ -10024,26 +10034,26 @@
         } catch(e) { return null; }
       }
 
-      // Italian related words via CEFR_LEVELS prefix matching
+      // ── Italian related words via local Italian lexicon (IT_POS + IT_CEFR) ──
       function findItalianRelated(queryWord) {
         var q = queryWord.toLowerCase().trim();
         if (q.length < 3) return [];
+        var lex = window.S8T_IT_LEXICON;
+        if (!lex) return [];
         var results = [];
         var seen = {};
-        if (window.CEFR_LEVELS) {
-          var prefix2 = q.substring(0, 3);
-          var prefix3 = q.substring(0, 4);
-          Object.keys(window.CEFR_LEVELS).forEach(function(w) {
-            if (w === q || seen[w]) return;
-            var lw = w.toLowerCase();
-            if (lw.indexOf('zione') > 0 || lw.indexOf('are') === lw.length - 3 || lw.indexOf('ere') === lw.length - 3 || lw.indexOf('ire') === lw.length - 3 || lw.indexOf('ita') > 0 || lw.indexOf('mento') > 0) {
-              if (lw.indexOf(prefix3) === 0 || lw.indexOf(prefix2) === 0) {
-                seen[w] = true;
-                results.push({ word: w, level: window.CEFR_LEVELS[w], score: lw.indexOf(prefix3) === 0 ? 10 : 5 });
-              }
-            }
-          });
-        }
+        var pool = {};
+        Object.keys(lex.IT_POS).forEach(function(w){ pool[w] = true; });
+        Object.keys(lex.IT_CEFR).forEach(function(w){ pool[w] = true; });
+        var prefix2 = q.substring(0, 3);
+        var prefix3 = q.substring(0, 4);
+        Object.keys(pool).forEach(function(w) {
+          if (w === q || seen[w]) return;
+          if (w.indexOf(prefix3) === 0 || w.indexOf(prefix2) === 0) {
+            seen[w] = true;
+            results.push({ word: w, level: lex.getCEFR(w, 'it'), pos: lex.getPOS(w, 'it'), score: w.indexOf(prefix3) === 0 ? 10 : 5 });
+          }
+        });
         results.sort(function(a,b){ return b.score - a.score; });
         return results.slice(0, 15);
       }
@@ -10065,10 +10075,12 @@
         var transData = _a[1].status === 'fulfilled' ? _a[1].value : null;
         var related = findItalianRelated(query);
 
-        var wordLevel = 'B1';
-        if (window.CEFR_LEVELS && window.CEFR_LEVELS[query.toLowerCase()]) wordLevel = window.CEFR_LEVELS[query.toLowerCase()];
+        // CEFR chain for Italian: local IT lexicon → suffix rules → length (no more flat B1)
+        var lex = window.S8T_IT_LEXICON;
+        var wordLevel = lex ? lex.getCEFR(query, 'it') : 'B1';
         var defText = defData && defData.definition ? defData.definition : '—';
-        var posLabel = defData && defData.pos ? defData.pos.toUpperCase() : '—';
+        // POS chain for Italian: Wiktionary parse → IT lexicon suffix rules → '—'
+        var posLabel = defData && defData.pos ? defData.pos.toUpperCase() : (lex ? lex.getPOS(query, 'it') : '—');
         var transText = transData && transData.length ? transData.slice(0,3).join(' · ') : '—';
 
         var exactCardHtml = '<article class="wbx-box wbx-exact" data-pos="' + posLabel + '" data-cefr="' + wordLevel + '" data-word="' + query + '">' +
@@ -10086,9 +10098,8 @@
 
         var cardsHtml = '';
         related.forEach(function(r) {
-          var rPos = '—';
-          if (window.LEMMA_POS_MAP && window.LEMMA_POS_MAP[r.word]) rPos = window.LEMMA_POS_MAP[r.word];
-          var rPosLabel = typeof mapPos === 'function' ? mapPos(rPos) : rPos.toUpperCase();
+          var rPosLabel = r.pos || '—';
+          if (rPosLabel === '—' && lex) rPosLabel = lex.getPOS(r.word, 'it');
           cardsHtml += '<article class="wbx-box" data-pos="' + rPosLabel + '" data-cefr="' + r.level + '" data-word="' + r.word + '">' +
             '<div class="wbx-main-col"><div class="wbx-word-zone">' +
             '<div class="wbx-head"><span class="wbx-w">' + r.word + '</span><span class="wbx-cefr">' + r.level + '</span><span class="wbx-pos">' + rPosLabel + '</span></div>' +
