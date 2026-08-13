@@ -17,6 +17,7 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" crossorigin="anonymous">
   <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="css/theme-2.css">
+  <link rel="stylesheet" href="css/toast.css">
   <link rel="stylesheet" href="css/cta-fluid.css?v=2">
   <link rel="stylesheet" href="css/theme-wrapped.css?v=10">
   <link rel="stylesheet" href="css/review.css">
@@ -58,7 +59,7 @@
   <div class="app-shell">
     <header class="topbar">
       <div style="display:flex;align-items:center;gap:0">
-        <a href="index.html" class="topbar-brand" style="font-size:31px;font-family:'Manrope',sans-serif;font-weight:700;text-decoration:none;letter-spacing:-0.02em;display:inline-flex;align-items:baseline;gap:0">sottotitoli<span style="font-family:'Manrope',sans-serif;font-weight:800;color:var(--accent-purple,#7c3aed);letter-spacing:-.5px">.pro</span><span class="topbar-version" style="font-size:10px;font-weight:600;font-family:'Manrope',sans-serif;color:var(--text-soft);margin-left:6px;opacity:.55;letter-spacing:.02em">v203</span></a>
+        <a href="index.html" class="topbar-brand" style="font-size:31px;font-family:'Manrope',sans-serif;font-weight:700;text-decoration:none;letter-spacing:-0.02em;display:inline-flex;align-items:baseline;gap:0">sottotitoli<span style="font-family:'Manrope',sans-serif;font-weight:800;color:var(--accent-purple,#7c3aed);letter-spacing:-.5px">.pro</span><span class="topbar-version" style="font-size:10px;font-weight:600;font-family:'Manrope',sans-serif;color:var(--text-soft);margin-left:6px;opacity:.55;letter-spacing:.02em">v204</span></a>
       </div>
       <div style="display:flex;align-items:center;gap:12px">
         <button class="btn-start-session" id="btnStartSession" onclick="toggleStartSession()" style="font-size:15px;height:42px;padding:0 20px;border-radius:12px;background:linear-gradient(135deg,rgba(192,132,252,.18),rgba(192,132,252,.06));color:#c084fc;border:1px solid rgba(192,132,252,.25);font-weight:700;font-family:'Manrope',sans-serif;display:inline-flex;align-items:center;gap:8px;box-shadow:0 0 20px rgba(192,132,252,.12),0 2px 8px rgba(0,0,0,.2);cursor:pointer;letter-spacing:-.01em;transition:all .2s ease" onmouseover="this.style.background='linear-gradient(135deg,rgba(192,132,252,.28),rgba(192,132,252,.12))';this.style.borderColor='rgba(192,132,252,.4)';this.style.boxShadow='0 0 28px rgba(192,132,252,.22),0 4px 12px rgba(0,0,0,.25)'" onmouseout="this.style.background='linear-gradient(135deg,rgba(192,132,252,.18),rgba(192,132,252,.06))';this.style.borderColor='rgba(192,132,252,.25)';this.style.boxShadow='0 0 20px rgba(192,132,252,.12),0 2px 8px rgba(0,0,0,.2)'">
@@ -4170,6 +4171,7 @@
   <script src="js/cefr-levels.js"></script>
   <script src="js/cefr-gse.js"></script>
   <script src="js/lemma-pos-map.js"></script>
+  <script src="js/toast.js"></script>
   <script src="js/theme-2.js?v=5"></script>
   <script>
   /* ── Wrapped theme switcher (Modern / Retro / Gen-Z) ── */
@@ -9727,8 +9729,9 @@
       }
 
       function showWbxToast(msg) {
+        if (typeof window.showToast === 'function') { window.showToast(msg); return; }
         var t = document.createElement('div');
-        t.style.cssText = 'position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#059669;color:#fff;font-size:13px;font-weight:700;padding:10px 24px;border-radius:99px;z-index:99999;opacity:0;transition:opacity .3s;pointer-events:none;font-family:var(--font-body)';
+        t.style.cssText = 'position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#131316;color:#fff;font-size:13px;font-weight:700;padding:10px 24px;border-radius:99px;z-index:99999;opacity:0;transition:opacity .3s;pointer-events:none;font-family:var(--font-body);box-shadow:0 8px 24px rgba(0,0,0,.4)';
         t.textContent = msg;
         document.body.appendChild(t);
         requestAnimationFrame(function(){ t.style.opacity = '1'; });
@@ -10673,27 +10676,22 @@
 
     // Save via unified API → returns { ok, errors }
     var result = { ok: false, errors: ['Nessuna connessione'] };
+    if (typeof window.showToast === 'function') { window.showToast('Salvataggio…', 'loading'); }
     try {
       if (typeof SottotitoliData !== 'undefined' && SottotitoliData.saveSettings) {
         result = await SottotitoliData.saveSettings(settings);
       }
     } catch(e) { result = { ok: false, errors: [e.message] }; }
 
-    // Toast with clear feedback
-    var toast = document.getElementById('toastMsg');
-    if (toast) {
+    // Toast with clear feedback (Apple-style pill via js/toast.js)
+    if (typeof window.showToast === 'function') {
       if (result.ok) {
-        toast.textContent = '✓ Salvato su Supabase';
-        toast.style.background = 'var(--green, #059669)';
+        window.showToast('✓ Salvato su Supabase', 'success');
       } else if (result.errors && result.errors[0] && result.errors[0].indexOf('locally') !== -1) {
-        toast.textContent = '⚠️ Salvato in locale (accedi per sync)';
-        toast.style.background = 'var(--amber, #d97706)';
+        window.showToast('⚠️ Salvato in locale (accedi per sync)', 'warning');
       } else {
-        toast.textContent = '⚠️ ' + (result.errors ? result.errors[0] : 'Errore sconosciuto');
-        toast.style.background = 'var(--red, #dc2626)';
+        window.showToast('⚠️ ' + (result.errors ? result.errors[0] : 'Errore sconosciuto'), 'error');
       }
-      toast.classList.add('show');
-      setTimeout(function(){ toast.classList.remove('show'); toast.style.background = ''; }, 3500);
     }
 
     // Update hero + dropdown name
