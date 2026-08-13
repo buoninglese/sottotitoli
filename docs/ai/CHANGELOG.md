@@ -16,6 +16,15 @@
 - Everything else in the audit is already responsive (tables scroll via `overflow-x:auto` wrappers — Trascrizioni, Report AI, Vocabulary Builder `.wb-table-wrap` `min-width:600px`; grids collapse via existing media queries in `theme-2.css`/`panoramica.css`; modals scale with `max-width` + `width:90%/100%`).
 - Version `v210 → v211`.
 
+## [2026-08-13] Word banks & Vocabulary Builder — subtabs as a top-right pill toggle (Modern/Gen-Z/☾ style)
+
+### Changed
+- The subtabs in **Word banks** (Overview / English / Italiano) and **Vocabulary Builder** (🇬🇧 English / 🇮🇹 Italian / 🔄 Review) no longer use the full-width underline tab bars — they now sit in the **panel head, top-right**, as a compact **segmented pill control** matching the Modern/Gen-Z/☾ theme-switcher style (pill container on `--panel-2` + `--line` border, active button = white pill + dark text + shadow).
+- Saves horizontal space: the old `.panel-tabs` bars (bottom border + 28px margin) are removed from both panels.
+- New reusable `.seg-control` / `.seg-btn` CSS in theme-2.css (theme-token-driven). The buttons keep the `tab-link[data-subtab]` class, so all existing subtab JS (switching, re-renders, programmatic clicks) works unchanged — no JS edits needed.
+- Responsive: ≤760px the panel-head stacks and the pill wraps below the title.
+- Cache-buster: theme-2.css v4→v5. Verified in browser (1440×900): pill top-right in both panel heads, switching works (incl. Italiano + Review panes); `get_errors` clean.
+
 ## [2026-08-13] Dashboard — metric-card hover & selected states now unmistakable (v212)
 
 ### Changed
