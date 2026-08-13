@@ -79,10 +79,20 @@ Fixed while settling this: `saveItalianWordToBank`, `enrichBankStatus`, `bookmar
 
 ## 6. NGSL (New General Service List) — English high-frequency layer
 
-- `js/en-ngsl.js` — 2,809 words, each `[rank, pos, learner definition]` — built by `scripts/build-en-ngsl.py` from the NGSL 1.2 Learning Dictionary.
+- `js/en-ngsl.js` — 2,809 words, each `[rank, pos, ipa, definition]` — built by `scripts/build-en-ngsl.py` from the NGSL 1.2 Learning Dictionary.
 - POS feeds LEMMA_POS_MAP build (curated override) + caption `tagWord` + popup POS.
-- Definitions act as an instant **offline** fallback: VB chain = Free Dictionary → WordsAPI → **NGSL** → Wordnik; caption lookup = Datamuse → **NGSL** → Wordnik; caption popup = WORD_DEFS → **NGSL** → Free Dictionary.
+- Definitions act as the **FIRST** (instant, offline) source: VB chain = **NGSL → Free Dictionary (direct → proxy) → WordsAPI**; caption lookup = **NGSL → Datamuse → Free Dictionary**; caption popup = WORD_DEFS → **NGSL** → Free Dictionary.
 - Rank is stored for future frequency-based features (not used for CEFR — no fabrication).
+
+## 7. Dictionary API benchmark (2026-08-14, 20 words incl. rare/slang/multi-POS)
+
+| Source | Coverage | Avg latency | Verdict |
+|--------|----------|-------------|---------|
+| NGSL (local) | 6/20 (the 2,809 most frequent only) | ~3ms | FIRST — instant certainty |
+| Free Dictionary DIRECT | 18/20 | 233ms | #2 — best live source |
+| Free Dictionary via proxy | 15/20 | 658ms | backup only (slower + thinner) |
+| WordsAPI (RapidAPI) | 18/20 | 300ms | #3 — backup, quota-aware |
+| **Wordnik proxy** | **0/20** | 106ms | **DEAD — removed from all chains** |
 
 ## 5. Fallback policy (always)
 
