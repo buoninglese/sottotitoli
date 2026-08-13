@@ -7,7 +7,7 @@
   <title>Panoramica · sottotitoli.pro</title>
 
   <!-- ═══ Security ═══ -->
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net https://unpkg.com https://cdnjs.cloudflare.com https://qzqmuegbpmvqrjrlfbgk.supabase.co https://www.gstatic.com https://eu-assets.i.posthog.com; style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com https://cdnjs.cloudflare.com; img-src 'self' data: https:; connect-src 'self' https://qzqmuegbpmvqrjrlfbgk.supabase.co wss://qzqmuegbpmvqrjrlfbgk.supabase.co wss://sottotitoli-websocket.onrender.com https://sottotitoli-websocket.onrender.com https://api.mymemory.translated.net https://translate.googleapis.com https://api.datamuse.com https://api.dictionaryapi.dev https://eu.i.posthog.com https://eu-assets.i.posthog.com; frame-src 'self' https://*.huggingface.co; media-src 'self' blob:; worker-src 'self' blob:">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net https://unpkg.com https://cdnjs.cloudflare.com https://qzqmuegbpmvqrjrlfbgk.supabase.co https://www.gstatic.com https://eu-assets.i.posthog.com; style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com https://cdnjs.cloudflare.com; img-src 'self' data: https:; connect-src 'self' https://qzqmuegbpmvqrjrlfbgk.supabase.co wss://qzqmuegbpmvqrjrlfbgk.supabase.co wss://sottotitoli-websocket.onrender.com https://sottotitoli-websocket.onrender.com https://api.mymemory.translated.net https://translate.googleapis.com https://api.datamuse.com https://api.dictionaryapi.dev https://wordsapiv1.p.rapidapi.com https://eu.i.posthog.com https://eu-assets.i.posthog.com; frame-src 'self' https://*.huggingface.co; media-src 'self' blob:; worker-src 'self' blob:">
   <meta http-equiv="X-Content-Type-Options" content="nosniff">
   <meta name="referrer" content="strict-origin-when-cross-origin">
   <link rel="icon" href="favicon.svg" type="image/svg+xml">
@@ -4161,7 +4161,7 @@
 
   <!-- Dependencies (order matters) -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="config.js?v=2"></script>
+  <script src="config.js?v=3"></script>
 
   <!-- ═══ PostHog Analytics (EU cloud — key from config.js, git-ignored) ═══ -->
   <script>
@@ -9437,11 +9437,33 @@
         } catch(e) { return null; }
       }
 
-      // ── Combined: Free Dictionary → Wordnik fallback ──
+      // ── WordsAPI (RapidAPI) — English definitions upgrade ──
+      async function fetchWordsApi(word) {
+        var cfg = (window.SOTTOTITOLI_CONFIG && window.SOTTOTITOLI_CONFIG.rapidApi) || {};
+        var key = cfg.key || '';
+        var host = cfg.wordsApiHost || 'wordsapiv1.p.rapidapi.com';
+        if (!key || key === 'RAPIDAPI_KEY_PLACEHOLDER') return null;
+        try {
+          var resp = await fetch('https://' + host + '/words/' + encodeURIComponent(word.toLowerCase()) + '/definitions', {
+            headers: { 'X-RapidAPI-Key': key, 'X-RapidAPI-Host': host }
+          });
+          if (!resp.ok) return null;
+          var data = await resp.json();
+          if (data && data.definitions && data.definitions.length) {
+            return { definition: data.definitions[0].definition, ipa: null };
+          }
+          return null;
+        } catch(e) { return null; }
+      }
+
+      // ── Combined: Free Dictionary → WordsAPI → Wordnik fallback ──
       async function fetchDictionary(word, preferredPos) {
         // Try Free Dictionary first (has IPA + definitions, POS-aware)
         var fd = await fetchFreeDict(word, preferredPos);
         if (fd && fd.definition) return fd;
+        // Try WordsAPI (RapidAPI) — better coverage than Free Dictionary
+        var wa = await fetchWordsApi(word);
+        if (wa && wa.definition) return wa;
         // Fall back to Wordnik
         var w = await fetchWordnik(word);
         if (w && w.definition) return w;

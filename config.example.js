@@ -25,6 +25,12 @@ window.SOTTOTITOLI_CONFIG = {
       Set secret: supabase secrets set WORDNIK_API_KEY=your_key */
   wordnikProxyUrl: "https://qzqmuegbpmvqrjrlfbgk.supabase.co/functions/v1/wordnik-proxy",
 
+  /** WordsAPI via RapidAPI — English definitions upgrade (real key in config.secrets.js) */
+  rapidApi: {
+    key: "RAPIDAPI_KEY_PLACEHOLDER",
+    wordsApiHost: "wordsapiv1.p.rapidapi.com"
+  },
+
   /** HuggingFace API token for Kokoro-82M TTS (text-to-speech).
       Get your free token at https://huggingface.co/settings/tokens */
   kokoroToken: "hf_your_token_here",
