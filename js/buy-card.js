@@ -265,8 +265,10 @@
   function goToCheckout() {
     if (paying || !payBtn) return;
     var cfg = window.SOTTOTITOLI_CONFIG;
-    var fnUrl = cfg && cfg.stripe && cfg.stripe.checkoutFunctionUrl;
-    if (!fnUrl) { toast(tt('purchase_error', 'Errore durante il pagamento. Riprova.')); return; }
+    /* Fallback so checkout never depends on config.js (gitignored; production
+       copies may lack checkoutFunctionUrl). */
+    var fnUrl = (cfg && cfg.stripe && cfg.stripe.checkoutFunctionUrl) ||
+      'https://qzqmuegbpmvqrjrlfbgk.supabase.co/functions/v1/create-checkout-session';
 
     paying = true;
     payBtn.disabled = true;
