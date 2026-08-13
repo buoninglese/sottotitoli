@@ -18,7 +18,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300;14..32,400;14..32,500;14..32,600;14..32,700;14..32,800;14..32,900&family=JetBrains+Mono:wght@300;400;500;600;700&family=Manrope:wght@300;400;500;600;700;800&family=Geist+Mono:wght@300;400;500;600;700&family=DM+Serif+Display&family=Bebas+Neue&family=Work+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="css/theme-2.css">
-<link rel="stylesheet" href="css/components.css?v=3">
+<link rel="stylesheet" href="css/components.css?v=4">
 <link rel="stylesheet" href="css/toast.css?v=2">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
 <style>
@@ -3294,11 +3294,17 @@ var _cefrApiQueue = [];
 
 function _getCEFR(w){
   var c=w.toLowerCase().replace(/[^a-z]/g,'');
-  // Italian captions: local IT lexicon chain (map → suffix rules → length)
+  // Italian captions: local IT lexicon chain (KELLY → core → suffix → length)
   var capLang = (typeof currentCaptionLang === 'string') ? currentCaptionLang.split('-')[0] : 'en';
   if (capLang === 'it' && window.S8T_IT_LEXICON) return window.S8T_IT_LEXICON.getCEFR(c, 'it');
+  // Live Render batch cache — the authoritative English source (levels are numbers 1-6)
+  if (_sessionWordCache[c] && _sessionWordCache[c].level) {
+    var lmap = {1:'A1',2:'A2',3:'B1',4:'B2',5:'C1',6:'C2'};
+    var lv = lmap[Number(_sessionWordCache[c].level)];
+    if (lv) return lv;
+  }
   if(window.CEFR_LEVELS&&window.CEFR_LEVELS[c])return window.CEFR_LEVELS[c];
-  if(c.length<=3)return'A1';if(c.length<=5)return'A2';if(c.length<=7)return'B1';if(c.length<=9)return'B2';if(c.length<=11)return'C1';return'C2';
+  return '—'; // no length heuristic — unknown words stay honest
 }
 
 /** Call CEFR batch API for new words, merge into cache, then re-analyze. */
