@@ -4,6 +4,28 @@
 > The entries below from v206–v210 describe an **ES-module refactor** (`js/panoramica/app.js` + `panoramica/panels/*.js` + `panoramica/shared/*.js`) that **never shipped**. `panoramica.html` never imported `app.js`, so the deployed site always ran the ~10,700-line inline monolith. The refactor files were dead code and have been **moved to** `~/Desktop/sottotitoli-archived/dead-js/panoramica-v2-attempt/`.
 > **Real current state: monolith at v178.** These v2xx notes describe work that was never activated — treat them as historical, not as a description of the live code.
 
+## [2026-08-13] Mobile flush + responsiveness audit fixes (v211)
+
+### Fixed
+- **Sidebar flush on mobile:** at ≤1160px the inline mobile style set the icon rail to `66px` wide but left the `.app-shell` grid column at the `theme-2.css` value (58/48px) — the rail **overlapped the rounded main panel by ~10px**. The inline rule now sets `grid-template-columns:66px 1fr` so the rail and panel align with the intended 8px gap (verified: `gap -10 → +8`, no overlap, panel `mpRight=357` inside 375px viewport, no border).
+- **Mobile responsiveness audit — 4 overflow gaps fixed** (all at 375px, panel usable width ≈247px):
+  1. **Trascrizioni toolbar** (search 200px + Download + view toggle) had no `flex-wrap` → now wraps, search input is fluid (`flex:1 1 150px; width:100%; max-width:200px`).
+  2. **Trascrizioni cards grid** `minmax(280px,1fr)` exceeded the panel → `minmax(min(100%,260px),1fr)`.
+  3. **Report AI "I miei Report" action header** (title + Generate button) no wrap → `flex-wrap:wrap;gap:12px`.
+  4. **Report AI stats row** `repeat(3,1fr)` crammed 3 cards into ~247px → `repeat(auto-fit,minmax(180px,1fr))` (stacks on mobile).
+- Everything else in the audit is already responsive (tables scroll via `overflow-x:auto` wrappers — Trascrizioni, Report AI, Vocabulary Builder `.wb-table-wrap` `min-width:600px`; grids collapse via existing media queries in `theme-2.css`/`panoramica.css`; modals scale with `max-width` + `width:90%/100%`).
+- Version `v210 → v211`.
+
+## [2026-08-13] Wrapped recap — C · Minimal voice shipped to production (v211)
+
+### Changed
+- Shipped the **C · Minimal** copy (picked from the Copy Desk) as the live voice for the "Il tuo anno in numeri" recap — all 7 blocks + dynamic strings.
+- **Static labels (IT + EN):** subtitle → "Riepilogo stile wrapped" (dropped "· solo per il tema Gen-Z"); "Sessioni" / "Tempo" (dropped "totali"/"parlato"); "Profilo di apprendimento"; CEFR "Livelli CEFR" + "Dal tuo vocabolario"; "Palette"; "Picco di produttività"; "Condividi il tuo anno" + "Quello che hai costruito con Sottotitoli."; hero "Bentornato/a".
+- **Dynamic strings:** hero branches rewritten ("21+ giorni di fila. Un ritmo che parla da solo.", "{n} giorni di fila. La costanza, come sempre, vince.", "{n} ore di conversazione. Il tuo vocabolario è vivo.", "{n} parole uniche. Un vocabolario che cresce, ogni giorno.", "{n} sessioni. Il progresso si costruisce così.", "Inizia una sessione. I numeri si costruiscono da soli."); pills "Serie in corso"/"Ore di voce"/"Parole raccolte"; personas → "🏆 Costanza / 🔥 Ritmo / 🦉 Notturno / 🌅 Mattutino / ⚡ Sprint / 🏃 Resistenza / 🧱 Costruzione / 🧭 Esplorazione" with short notes; CEFR level prefix "Livello " → "LVL "; peak sub "Nottambulo."/"Mattiniero."; chips without emoji ("Miglior serie: N gg", "Sessione più lunga: N min"); fun badge no longer prefixed with "≈ ".
+- **Emoji removed from titles** (CEFR, peak, share, palette) for the minimal/premium register.
+- `js/i18n.js` cache-buster `?v=3 → ?v=4` in panoramica.html. Topbar version left at **v211** (the parallel agent owns the badge).
+- Verified in browser (bypass_auth): subtitle, hero, persona, CEFR, peak, share all render the Minimal copy; empty states correct.
+
 ## [2026-08-13] Wrapped Copy Desk — 4 copy voices for the year recap (dev tool)
 
 ### Added
