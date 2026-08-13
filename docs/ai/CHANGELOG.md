@@ -4,6 +4,18 @@
 > The entries below from v206–v210 describe an **ES-module refactor** (`js/panoramica/app.js` + `panoramica/panels/*.js` + `panoramica/shared/*.js`) that **never shipped**. `panoramica.html` never imported `app.js`, so the deployed site always ran the ~10,700-line inline monolith. The refactor files were dead code and have been **moved to** `~/Desktop/sottotitoli-archived/dead-js/panoramica-v2-attempt/`.
 > **Real current state: monolith at v178.** These v2xx notes describe work that was never activated — treat them as historical, not as a description of the live code.
 
+## [2026-08-13] Panoramica — full mobile redesign (≤760px): drawer + bottom nav + center FAB
+
+### Changed
+- **App shell goes full-width on phones** (≤760px): the 274px sidebar column is dropped (`grid-template-columns:1fr`), so the main panel uses **every pixel** (375px viewport: panel was ~277px → now full 375px, rounded 34px box → square full-bleed, border/shadow removed).
+- **Sidebar → left drawer**: the sidebar becomes a `position:fixed` 282px drawer that slides in (`translateX(-105%) → 0`) behind a blur backdrop; hamburger button (`#topbarMenu`, new, hidden on desktop) opens it; tapping a nav item or the backdrop closes it. Body locks scroll while open (`body.drawer-open`).
+- **Bottom navigation** (new `.mobile-nav`, fixed, 5-col grid): **Panoramica · Banche parole · [FAB] · Learner · Report** — reuses `.side-nav .nav-item[data-panel]` so the existing panel switcher handles switching + active-sync automatically (no JS edits). Report AI stays in the bar; Profilo lives in the drawer (trade-off to keep 4 core tabs + FAB).
+- **Center FAB** (new `.mobile-fab`, 58px circle, mic icon, thumb-reachable, raised above the nav) opens Start Session (`toggleStartSession()` → `#startSplit`) — the single most important action stays one tap away and always visible. Gen-Z/Gen-Z Dark pin dark-purple icon on the yellow gradient (`#6d28d9 !important`).
+- **Topbar → minimal**: 56px, logo + start button hidden, only the hamburger + right-hand tools remain.
+- **Safe-area**: bottom nav and main-panel padding use `env(safe-area-inset-bottom)` for notched phones; ≤500px gets tighter chrome (52px bar, smaller headings).
+- **Desktop untouched**: ≥760px shows the same two-column layout as before (verified at 1440×900: sidebar static, mobile-nav/FAB/hamburger hidden, logo + Avvia sessione back).
+- All mobile CSS lives in an inline `<style>` block + small inline `<script>` (drawer logic) at the end of `panoramica.html` — no cache-buster needed (HTML-only change).
+
 ## [2026-08-13] Mobile flush + responsiveness audit fixes (v211)
 
 ### Fixed
