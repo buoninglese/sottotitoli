@@ -140,10 +140,12 @@
 
     showToast(notif) {
       const toast = document.createElement('div');
-      toast.className = 'notif-toast';
+      toast.className = 'sd-toast sd-toast--top-right';
       toast.innerHTML =
-        '<strong>' + this._esc(notif.title) + '</strong>' +
-        (notif.message ? '<span>' + this._esc(notif.message) + '</span>' : '');
+        '<span class="sd-toast__icon">' + this._esc(this._icon(notif.type)) + '</span>' +
+        '<span><strong>' + this._esc(notif.title) + '</strong>' +
+        (notif.message ? ' <span class="sd-toast__msg">' + this._esc(notif.message) + '</span>' : '') +
+        '</span>';
       document.body.appendChild(toast);
 
       requestAnimationFrame(() => toast.classList.add('show'));

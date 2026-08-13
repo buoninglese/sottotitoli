@@ -29,6 +29,9 @@
   var CHECK_SVG =
     '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>';
 
+  var INFO_SVG =
+    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="9" r="7.25"></circle><line x1="9" y1="12.819" x2="9" y2="8.25"></line><path d="M9,6.75c-.552,0-1-.449-1-1s.448-1,1-1,1,.449,1,1-.448,1-1,1Z" fill="currentColor" stroke="none"></path></svg>';
+
   function spinnerHTML() {
     var blades = '';
     for (var i = 0; i < 12; i++) blades += '<div class="ispinner-blade"></div>';
@@ -41,6 +44,17 @@
     if (/^(⚠️|⚠)/.test(s)) return 'warning';
     if (/^(❌|🚫|⛔)/.test(s)) return 'error';
     return 'info';
+  }
+
+  // The pill already shows the state (check chip / color / info icon), so
+  // drop the leading emoji from the message to avoid a duplicate icon.
+  function stripIndicator(msg, type) {
+    var s = String(msg || '').replace(/^\s+/, '');
+    if (type === 'success') return s.replace(/^(✅|✔|✓)\s*/, '');
+    if (type === 'warning') return s.replace(/^(⚠️|⚠)\s*/, '');
+    if (type === 'error')   return s.replace(/^(❌|🚫|⛔)\s*/, '');
+    if (type === 'info')    return s.replace(/^(🔖|💾|⚡|📥|🗑️|🔁|🔄|⏳|📌|✏️|📝|✨|🔔|🚀|👋|📊|💡|🧠|🎯|📚|🏆|🎉)\s*/, '');
+    return s;
   }
 
   function getEl() {
@@ -66,13 +80,16 @@
 
     // Rebuild content
     node.className = 'sd-toast sd-toast--bottom sd-toast--' + type;
+    var text = esc(stripIndicator(msg, type));
     var inner = '';
 
     if (type === 'loading') {
-      inner = spinnerHTML() + '<span>' + esc(msg) + '</span>';
+      inner = spinnerHTML() + '<span>' + text + '</span>';
+    } else if (type === 'info') {
+      inner = '<span class="sd-toast__info">' + INFO_SVG + '</span><span>' + text + '</span>';
     } else {
       var check = (type === 'success') ? '<span class="sd-toast__check">' + CHECK_SVG + '</span>' : '';
-      inner = check + '<span>' + esc(msg) + '</span>';
+      inner = check + '<span>' + text + '</span>';
     }
     node.innerHTML = inner;
 
