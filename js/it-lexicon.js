@@ -1,19 +1,39 @@
 /* ═══════════════════════════════════════════════════════════════
-   js/it-lexicon.js — Italian POS + CEFR (local, no network)
+   js/it-lexicon.js — Italian POS + CEFR resolver (local, no network)
    ───────────────────────────────────────────────────────────────
-   Settled source chain for Italian (see docs/ai/pos-cefr-sources.md):
+   Settled source chain for Italian (docs/ai/pos-cefr-sources.md):
 
-   POS  : IT_POS map → suffix rules (itPosGuess) → Wiktionary parse → '—'
-   CEFR : IT_CEFR map → suffix rules (itCefrGuess) → length fallback
+   POS:
+     1. KELLY wordlist (js/it-kelly.js — 6,369 words, user-provided)  ← PRIMARY
+     2. Curated core map (IT_POS below)
+     3. Suffix rules (itPosGuess) — Italian morphology is very regular
+     4. '—' (honest unknown)
 
-   Italian morphology is far more regular than English, so suffix rules
-   are genuinely reliable. English stays on CEFR_LEVELS + LEMMA_POS_MAP
-   + /api/cefr/batch as before.
+   CEFR:
+     1. KELLY level (it-kelly.js)                                    ← PRIMARY
+     2. Curated core map (IT_CEFR below)
+     3. Suffix bands (itCefrGuess)
+     4. Length fallback (Italian-tuned)
+
+   Call sites wire Wiktionary IT parse before this module when the
+   word has a live definition page (see panoramica renderItExpandSuggestions).
+
+   Single entry point for the whole app:
+       window.S8T_IT_LEXICON.getPOS(word, 'it')
+       window.S8T_IT_LEXICON.getCEFR(word, 'it')
    ═══════════════════════════════════════════════════════════════ */
 (function(){
   'use strict';
 
-  /* ── Curated core lexicon (most frequent Italian words) ── */
+  /* ── KELLY POS code → app label ── */
+  var KELLY_POS_MAP = {
+    'v': 'VERB', 'n': 'NOUN', 'adj': 'ADJ', 'adv': 'ADV',
+    'prep': 'FUNC', 'conj': 'FUNC', 'det': 'FUNC', 'pron': 'FUNC',
+    'num': 'FUNC', 'int': 'FUNC', 'abb': 'FUNC', 'for': 'FUNC',
+    'np': 'NOUN' // proper noun → NOUN for display
+  };
+
+  /* ── Curated core lexicon (backup layer + coverage for words KELLY lacks) ── */
   var IT_POS = {
     // function words
     "il":"FUNC","lo":"FUNC","la":"FUNC","i":"FUNC","gli":"FUNC","le":"FUNC","un":"FUNC","uno":"FUNC","una":"FUNC",
@@ -101,6 +121,22 @@
     "dopo":"B1","prima":"B1","insieme":"B1","solo":"B1"
   };
 
+  /* ── KELLY lookup (primary). Loaded from js/it-kelly.js. ── */
+  function kellyLookup(w) {
+    var map = window.IT_KELLY;
+    if (!map) return null;
+    var v = map[w];
+    if (v === undefined) return null;
+    var sep = v.indexOf('|');
+    return { pos: v.substring(0, sep), level: v.substring(sep + 1) };
+  }
+
+  function kellyPosLabel(w) {
+    var k = kellyLookup(w);
+    if (!k) return null;
+    return KELLY_POS_MAP[k.pos] || null;
+  }
+
   /* ── Italian suffix rules — very reliable for Italian morphology ── */
   function itPosGuess(w) {
     w = (w || '').toLowerCase().replace(/[^a-zàèéìòù]/g, '');
@@ -142,22 +178,58 @@
     return 'C1';
   }
 
-  /* ── Unified helpers (single entry point for the whole app) ── */
+  /* ── Related words: KELLY + curated prefix families ── */
+  function relatedItalian(queryWord, limit) {
+    limit = limit || 15;
+    var q = (queryWord || '').toLowerCase().trim();
+    if (q.length < 3) return [];
+    var pool = {};
+    if (window.IT_KELLY) { for (var k in window.IT_KELLY) pool[k] = true; }
+    for (var k2 in IT_POS) pool[k2] = true;
+    for (var k3 in IT_CEFR) pool[k3] = true;
+    var prefix2 = q.substring(0, 3);
+    var prefix3 = q.substring(0, 4);
+    var results = [], seen = {};
+    for (var w in pool) {
+      if (w === q || seen[w]) continue;
+      if (w.indexOf(prefix3) === 0 || w.indexOf(prefix2) === 0) {
+        seen[w] = true;
+        results.push({
+          word: w,
+          pos: getPOS(w, 'it'),
+          level: getCEFR(w, 'it'),
+          score: w.indexOf(prefix3) === 0 ? 10 : 5
+        });
+      }
+    }
+    results.sort(function(a, b){ return b.score - a.score; });
+    return results.slice(0, limit);
+  }
+
+  /* ── Unified entry points ── */
   function getPOS(word, lang) {
+    var key = (word || '').toLowerCase();
     if (lang === 'it') {
-      var p = itPosGuess(word);
+      // 1. KELLY (primary)  2. curated map  3. suffix rules  4. '—'
+      var kp = kellyPosLabel(key);
+      if (kp) return kp;
+      var p = itPosGuess(key);
       return p === '—' ? '—' : p;
     }
-    // English chain: LEMMA_POS_MAP → callers add Penn/Datamuse/API enrichment
-    var key = (word || '').toLowerCase();
+    // English: LEMMA_POS_MAP → callers add Penn/Datamuse/API enrichment
     if (window.LEMMA_POS_MAP && window.LEMMA_POS_MAP[key]) return window.LEMMA_POS_MAP[key];
     return '—';
   }
 
   function getCEFR(word, lang) {
     var key = (word || '').toLowerCase();
-    if (lang === 'it') return itCefrGuess(key);
-    // English chain: CEFR_LEVELS → caller adds /api/cefr/batch → length heuristic
+    if (lang === 'it') {
+      // 1. KELLY level (primary)  2. curated map  3. suffix bands  4. length
+      var k = kellyLookup(key);
+      if (k && k.level) return k.level;
+      return itCefrGuess(key);
+    }
+    // English: CEFR_LEVELS → caller adds /api/cefr/batch → length heuristic
     if (window.CEFR_LEVELS && window.CEFR_LEVELS[key]) return window.CEFR_LEVELS[key];
     var len = key.length;
     if (len <= 4) return 'A1';
@@ -167,12 +239,35 @@
     return 'C1';
   }
 
+  /* ── Source attribution (for tooltips / debugging) ── */
+  function posSource(word, lang) {
+    if (lang !== 'it') return '—';
+    var key = (word || '').toLowerCase();
+    if (kellyPosLabel(key)) return 'KELLY';
+    if (IT_POS[key]) return 'core-map';
+    if (itPosGuess(key) !== '—') return 'suffix-rules';
+    return '—';
+  }
+  function cefrSource(word, lang) {
+    if (lang !== 'it') return '—';
+    var key = (word || '').toLowerCase();
+    var k = kellyLookup(key);
+    if (k && k.level) return 'KELLY';
+    if (IT_CEFR[key]) return 'core-map';
+    return 'suffix-rules';
+  }
+
   window.S8T_IT_LEXICON = {
     IT_POS: IT_POS,
     IT_CEFR: IT_CEFR,
+    KELLY_POS_MAP: KELLY_POS_MAP,
+    kellyLookup: kellyLookup,
     itPosGuess: itPosGuess,
     itCefrGuess: itCefrGuess,
+    relatedItalian: relatedItalian,
     getPOS: getPOS,
-    getCEFR: getCEFR
+    getCEFR: getCEFR,
+    posSource: posSource,
+    cefrSource: cefrSource
   };
 })();
