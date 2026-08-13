@@ -4,6 +4,21 @@
 > The entries below from v206–v210 describe an **ES-module refactor** (`js/panoramica/app.js` + `panoramica/panels/*.js` + `panoramica/shared/*.js`) that **never shipped**. `panoramica.html` never imported `app.js`, so the deployed site always ran the ~10,700-line inline monolith. The refactor files were dead code and have been **moved to** `~/Desktop/sottotitoli-archived/dead-js/panoramica-v2-attempt/`.
 > **Real current state: monolith at v178.** These v2xx notes describe work that was never activated — treat them as historical, not as a description of the live code.
 
+## [2026-08-13] Learner — reoriented for Italians learning English + EN/IT subtabs + Progress dashboard (v197)
+
+### Changed — this site is for Italians learning English
+- **Two language subtabs** 🇬🇧 English / 🇮🇹 Italian on top of the Learner (persisted per-user, defaults to the app's study lang). Every pane (Path, Practice, Progress) + the Mission is now **per-language**:
+  - **English tab** (primary): trains English words from `user_wordbanks lang='en'` + `review_words lang='en'`, translations/explanations in Italian, TTS + speech recognition use **en-US**.
+  - **Italian tab** (reverse): trains Italian words, translations in English, TTS/recognition **it-IT**.
+- **Engine is now direction-aware**: the player keeps its `it`/`en` slots (target word / translation) but each session carries `session.lang`, and `speak()`/`makeRecognition()`/speak-hint/match-description follow it. Language-specific copy ("Premi e parla in inglese", "Tocca la parola inglese…") via new i18n keys.
+- **Fixed "Allena doesn't open the quiz":** word-bank ids are UUIDs, and the inline handler emitted `openBankTest(<uuid>)` as a bare identifier → `ReferenceError`. Bank cards now emit `openBankTest('<uuid>')` (quoted). Verified: clicking the card opens the session with no error.
+- **Data layer is per-language**: `srcBanks(lang)`, `srcReview(kind, lang)`, `srcReviewAll(lang)` (full set for stats), `realPool(lang)`. `toItems` puts the target word in `it` and its translation in `en`. `openReview`/`openMission`/`newMission` take the active lang; mission cache key is per-language.
+- **Practice uses real words** of the active language when signed in (falls back to the bundled course for logged-out preview).
+- **Progress tab redesigned** (no more "childish"): real-data dashboard — XP/streak/today/sessions/missions stats, **per-language cards** (word-bank count + words, review words, avg mastery, due/fragile/new/mastered queue, **CEFR distribution bars**), a quick-open review queue, and recent-mistakes chips. `endSession` now marks `bank:<id>`/`review:<id>`/`mission:<id>` separately so session counts are correct.
+- **Edge function `generate-learner-content`** now takes `target` ('en'|'it'): seeds from the target language's banks/review, generates content in the target language with translations in the explanation language (EN→Italian, IT→English), title/objective in Italian. Output schema is language-neutral (`word`/`translation`/`example_word`/`example_translation`).
+- **i18n**: `learner_lang_en/it`, `learner_tap_mic_en`, `learner_match_desc_en`, `learner_review_mastered`, `learner_pr_*`, `learner_mistakes`. **CSS**: `.learner-langtabs`/`.learner-langtab`, `.pr-*` dashboard styles. learner.css `?v=6`, learner.js `?v=4`.
+- ⚠️ Still not deployed (as of v195): the `learner_lessons` migration + `generate-learner-content` function.
+
 ## [2026-08-13] Learner — Phase 2: AI "Mission" path (v195)
 
 ### Added — objectives-driven, AI-generated lessons

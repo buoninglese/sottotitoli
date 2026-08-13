@@ -60,6 +60,11 @@ Deno.serve(async (req: Request) => {
 
     const body = await req.json().catch(() => ({}));
     const focus = typeof body.focus === 'string' && body.focus ? body.focus : null;
+    // target = the language being taught ('en' primary for Italians, 'it' reverse)
+    const target = body.target === 'it' ? 'it' : 'en';
+    const explain = target === 'it' ? 'en' : 'it'; // translation/explanation language
+    const CONTENT_NAME = target === 'it' ? 'italiano' : 'inglese';
+    const EXPLAIN_NAME = explain === 'it' ? 'italiano' : 'inglese';
 
     // ── 1. Profile ──
     const { data: profile } = await supabase
@@ -72,14 +77,14 @@ Deno.serve(async (req: Request) => {
       .select('level,native_lang')
       .eq('user_id', user.id)
       .maybeSingle();
-    const nativeLang = profile?.native_lang || prefs?.native_lang || 'en';
+    const nativeLang = profile?.native_lang || prefs?.native_lang || 'it';
 
-    // ── 2. Seed words — Italian from word banks + spaced review ──
+    // ── 2. Seed words — in the TARGET language, from word banks + spaced review ──
     const words: any[] = [];
     try {
       const { data: wbs } = await supabase.from('user_wordbanks').select('id,lang').eq('user_id', user.id);
       for (const b of (wbs || [])) {
-        if (b.lang === 'en') continue;
+        if (b.lang !== target) continue;
         const { data: wws } = await supabase
           .from('user_wordbank_words')
           .select('word,pos,usage_count,created_at')
@@ -93,7 +98,7 @@ Deno.serve(async (req: Request) => {
         .from('review_words')
         .select('lemma,pos,cefr,translation_primary,reps,personal_frequency')
         .eq('user_id', user.id)
-        .eq('lang', 'it')
+        .eq('lang', target)
         .limit(60);
       (rw || []).forEach((w: any) =>
         words.push({ word: w.lemma, pos: w.pos || '', cefr: w.cefr || '', translation: w.translation_primary || '' }));
@@ -111,9 +116,11 @@ Deno.serve(async (req: Request) => {
 
     // ── 3. Prompt ──
     const focusText = focus || profile?.domain || 'generale';
-    const objectiveText = profile?.goal_primary || 'migliorare l\u2019italiano nella vita quotidiana e professionale';
+    const objectiveText = profile?.goal_primary ||
+      (target === 'it' ? 'migliorare l\u2019italiano nella vita quotidiana e professionale' : 'migliorare l\u2019inglese nella vita quotidiana e professionale');
     const lp = profile?.learning_profile || {};
     const profileDesc = [
+      `Target: ${CONTENT_NAME} (spiegazioni in ${EXPLAIN_NAME})`,
       focus ? `Focus richiesto dall'utente: ${focus}` : null,
       `Dominio: ${profile?.domain || 'generale'}`,
       `Obiettivo: ${objectiveText}`,
@@ -122,18 +129,18 @@ Deno.serve(async (req: Request) => {
       Array.isArray(profile?.use_cases) && profile.use_cases.length ? `Casi d'uso: ${profile.use_cases.join(', ')}` : null,
     ].filter(Boolean).join('\n');
 
-    const SYSTEM_PROMPT = `Sei un coach di italiano come lingua straniera. Genera una "missione" di allenamento breve e mirata.
+    const SYSTEM_PROMPT = `Sei un coach di ${CONTENT_NAME} come lingua straniera. Genera una "missione" di allenamento breve e mirata.
 Rispondi SOLO con JSON valido (senza markdown, senza commenti), con esattamente questa struttura:
 {
   "title": "Titolo breve della missione in italiano (2-6 parole)",
   "subtitle": "Sottotitolo di 1 frase in italiano",
   "objective": "Obiettivo SMART in italiano (1-2 frasi)",
   "words": [
-    {"it":"parola in italiano","en":"traduzione in ${nativeLang}","pos":"n|v|adj|adv","cefr":"B1","example_it":"frase d'esempio in italiano che usa la parola","example_en":"frase d'esempio tradotta in ${nativeLang}"}
+    {"word":"parola in ${CONTENT_NAME}","translation":"traduzione in ${EXPLAIN_NAME}","pos":"n|v|adj|adv","cefr":"B1","example_word":"frase d'esempio in ${CONTENT_NAME} che usa la parola","example_translation":"frase d'esempio tradotta in ${EXPLAIN_NAME}"}
   ],
   "convo": [
-    {"role":"A","text":"frase in italiano","translation":"traduzione in ${nativeLang}"},
-    {"role":"B","text":"frase in italiano","translation":"traduzione in ${nativeLang}"}
+    {"role":"A","text":"frase in ${CONTENT_NAME}","translation":"traduzione in ${EXPLAIN_NAME}"},
+    {"role":"B","text":"frase in ${CONTENT_NAME}","translation":"traduzione in ${EXPLAIN_NAME}"}
   ]
 }`;
 
@@ -151,7 +158,9 @@ REGOLE:
 - Genera 6-10 parole nuove O collegate alle parole reali, coerenti col tema "${focusText}" e il livello ${level}.
 - Le frasi d'esempio DEVONO usare le parole generate.
 - convo: 4-6 turni brevi di dialogo realistico sul tema.
-- Tutto il contenuto (title, subtitle, objective, words.it, convo.text) è in ITALIANO. Le traduzioni in ${nativeLang}.
+- Tutto il contenuto (words.word, words.example_word, convo.text) è in ${CONTENT_NAME}.
+- Le traduzioni (words.translation, words.example_translation, convo.translation) sono in ${EXPLAIN_NAME}.
+- title, subtitle, objective sono SEMPRE in italiano (è la lingua dell'interfaccia).
 - Non superare di molto il livello: resta nel range ${bandRange(level)}.
 - Output compatto: massimo ~700 token.`;
 
