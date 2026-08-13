@@ -2153,9 +2153,7 @@ function _ensureLinesClickable() {
   });
 }
 
-// ── Wordnik API key (fallback only) ──
-// Wordnik API proxy URL — key is server-side only, never in client code
-// ── Wordnik removed (proxy dead — 0/20 coverage in Aug 2026 tests). ──
+// ── Local dictionaries: NGSL (en) + KELLY/it-lexicon (it). ──
 
 // ── HTML escape utility (shared across all word-definition renders) ──
 function _esc(str) {
@@ -2180,23 +2178,23 @@ function _updateCardState(cardId, state, detail) {
   if (state === 'error') { card.classList.add('wc-error'); if (detail) { var defEl = card.querySelector('.syn-def'); if (defEl) defEl.textContent = detail; } }
 }
 
-// ── Fetch all data for a word: WORD_DEFS → Cache → Datamuse/Wordnik/LLM ──
+// ── Fetch all data for a word: NGSL → Cache → Datamuse → Free Dictionary ──
 function _fetchWordData(word, cardId) {
   var card = document.getElementById(cardId);
   if (!card) return;
 
-  // L1: Check seeded WORD_DEFS dictionary (0ms)
+  // L1: Local NGSL dictionary (0ms, 2,809 most frequent words)
   var defLower = word.toLowerCase();
-  var localDef = WORD_DEFS[word] || WORD_DEFS[defLower];
-  if (localDef) {
+  var ngEntry = (window.EN_NGSL || {})[defLower];
+  if (ngEntry && ngEntry[3]) {
     var defEl = card.querySelector('.syn-def');
     var posEl = card.querySelector('.syn-pos-tag');
-    if (defEl) defEl.textContent = localDef;
-    // Parse POS from definition prefix (e.g., "verb — ...")
-    var posMatch = localDef.match(/^(\w+)\s*—/);
-    if (posEl && posMatch) posEl.textContent = posMatch[1].toUpperCase();
+    var ngPosMap = { v:'VERB', n:'NOUN', adj:'ADJ', adv:'ADV' };
+    var posLabel = ngPosMap[ngEntry[1]] || '';
+    if (defEl) defEl.textContent = ngEntry[3];
+    if (posEl && posLabel) posEl.textContent = posLabel;
     _updateCardState(cardId, 'loaded');
-    _cacheSet(defLower, { def: localDef, pos: posMatch ? posMatch[1].toUpperCase() : '' });
+    _cacheSet(defLower, { def: ngEntry[3], pos: posLabel });
     return;
   }
 
@@ -2444,7 +2442,7 @@ function _dmFetch(queries, ctx) {
     return all;
   });
 }
-// ── Free Dictionary direct fallback (18/20 coverage, ~230ms — Wordnik is dead, removed) ──
+// ── Free Dictionary direct fallback (18/20 coverage, ~230ms) ──
 function _fetchFreeDictFallback(word, cardId) {
   var card = document.getElementById(cardId);
   if (!card) return;
@@ -5393,185 +5391,7 @@ function renderWordBank() {
   }
 }
 
-// ═══ Word Definition Dictionary (~200 high-frequency words) ═══
-// CEFR A1-B1 overlap — eliminates API calls for 80% of beginner-session lookups
-var WORD_DEFS = {
-  // A1 — basic
-  the:"determiner — used before nouns to refer to particular things",a:"determiner — one; used before nouns",an:"determiner — one (before vowel sound)",
-  be:"verb — exist; occur; take place",is:"verb — third-person singular of 'be'",are:"verb — second-person singular/plural of 'be'",was:"verb — past tense of 'be'",were:"verb — past tense of 'be' (plural)",been:"verb — past participle of 'be'",being:"verb — present participle of 'be'",
-  have:"verb — possess, own, or hold",has:"verb — third-person singular of 'have'",had:"verb — past tense of 'have'",having:"verb — present participle of 'have'",
-  do:"verb — perform an action",does:"verb — third-person singular of 'do'",did:"verb — past tense of 'do'",doing:"verb — present participle of 'do'",
-  say:"verb — utter words; speak",said:"verb — past tense of 'say'",saying:"verb — present participle of 'say'",
-  go:"verb — move from one place to another",went:"verb — past tense of 'go'",gone:"verb — past participle of 'go'",going:"verb — present participle of 'go'",
-  get:"verb — come to have; receive",got:"verb — past tense of 'get'",gotten:"verb — past participle of 'get'",getting:"verb — present participle of 'get'",
-  make:"verb — form by putting parts together",made:"verb — past tense of 'make'",making:"verb — present participle of 'make'",
-  know:"verb — be aware of through observation or information",knew:"verb — past tense of 'know'",known:"verb — past participle of 'know'",
-  think:"verb — have a particular belief or idea",thought:"verb — past tense of 'think'",thinking:"verb — present participle of 'think'",
-  see:"verb — perceive with the eyes",saw:"verb — past tense of 'see'",seen:"verb — past participle of 'see'",
-  come:"verb — move toward or arrive",came:"verb — past tense of 'come'",coming:"verb — present participle of 'come'",
-  want:"verb — have a desire for",wanted:"verb — past tense of 'want'",
-  look:"verb — direct one's gaze",looked:"verb — past tense of 'look'",looking:"verb — present participle of 'look'",
-  use:"verb — take or employ for a purpose",used:"verb/adjective — past tense of 'use'; accustomed to",
-  find:"verb — discover or perceive",found:"verb — past tense of 'find'",
-  give:"verb — freely transfer possession of",gave:"verb — past tense of 'give'",given:"verb — past participle of 'give'",
-  tell:"verb — communicate information",told:"verb — past tense of 'tell'",
-  work:"verb/noun — activity involving effort, done to achieve a purpose",worked:"verb — past tense of 'work'",working:"verb — present participle of 'work'",
-  call:"verb — cry out; give a name to",called:"verb — past tense of 'call'",
-  try:"verb — make an attempt",tried:"verb — past tense of 'try'",trying:"verb — present participle of 'try'",
-  ask:"verb — say something to obtain an answer",asked:"verb — past tense of 'ask'",
-  need:"verb — require something essential",needed:"verb — past tense of 'need'",
-  feel:"verb — be aware of through touch or emotion",felt:"verb — past tense of 'feel'",
-  become:"verb — begin to be",became:"verb — past tense of 'become'",
-  leave:"verb — go away from",left:"verb/adjective — past tense of 'leave'; on the side",
-  put:"verb — move to a specified position",
-  mean:"verb — intend to convey",meant:"verb — past tense of 'mean'",
-  keep:"verb — have or retain possession of",kept:"verb — past tense of 'keep'",
-  let:"verb — allow to; permit",
-  begin:"verb — start",began:"verb — past tense of 'begin'",begun:"verb — past participle of 'begin'",
-  seem:"verb — give the impression of being",
-  help:"verb — make it easier for someone to do something",
-  talk:"verb — speak in order to give information",
-  turn:"verb — move in a circular direction",
-  start:"verb — begin or cause to begin",
-  show:"verb — allow or cause to be visible",
-  hear:"verb — perceive with the ear",heard:"verb — past tense of 'hear'",
-  play:"verb — engage in activity for enjoyment",
-  run:"verb — move at a speed faster than a walk",ran:"verb — past tense of 'run'",
-  move:"verb — go in a specified direction",
-  live:"verb — remain alive; reside",
-  believe:"verb — accept as true",
-  hold:"verb — grasp or support",held:"verb — past tense of 'hold'",
-  bring:"verb — carry toward the speaker",brought:"verb — past tense of 'bring'",
-  happen:"verb — take place; occur",
-  write:"verb — mark letters or words on a surface",wrote:"verb — past tense of 'write'",written:"verb — past participle of 'write'",
-  provide:"verb — make available for use",
-  sit:"verb — adopt a position resting on one's buttocks",sat:"verb — past tense of 'sit'",
-  stand:"verb — have or maintain an upright position",stood:"verb — past tense of 'stand'",
-  lose:"verb — be deprived of; cease to have",lost:"verb/adjective — past tense of 'lose'",
-  pay:"verb — give money in exchange for goods or services",paid:"verb — past tense of 'pay'",
-  meet:"verb — come into the presence of",met:"verb — past tense of 'meet'",
-  include:"verb — comprise or contain as part of a whole",
-  continue:"verb — persist in an activity",
-  set:"verb — put or lay in a specified place",
-  learn:"verb — gain knowledge or skill",learned:"verb — past tense of 'learn'",
-  change:"verb — make or become different",
-  lead:"verb — cause to go with one; guide",led:"verb — past tense of 'lead'",
-  understand:"verb — perceive the intended meaning",understood:"verb — past tense of 'understand'",
-  watch:"verb — look at attentively",
-  follow:"verb — come after; go after",
-  stop:"verb — cease to perform an action",
-  create:"verb — bring into existence",
-  speak:"verb — say something; talk",spoke:"verb — past tense of 'speak'",spoken:"verb — past participle of 'speak'",
-  read:"verb — look at and comprehend written words",
-  allow:"verb — permit; let",
-  add:"verb — join to something else",
-  spend:"verb — use or give out",
-  grow:"verb — increase in size",grew:"verb — past tense of 'grow'",grown:"verb — past participle of 'grow'",
-  open:"verb/adjective — move so as to leave an opening; not closed",
-  walk:"verb — move at a regular pace",
-  win:"verb — be successful in a contest",won:"verb — past tense of 'win'",
-  offer:"verb — present for acceptance or rejection",
-  remember:"verb — recall to mind",
-  love:"verb — feel deep affection for",
-  consider:"verb — think carefully about",
-  appear:"verb — come into sight; seem",
-  buy:"verb — obtain in exchange for payment",bought:"verb — past tense of 'buy'",
-  wait:"verb — stay where one is until something happens",
-  serve:"verb — perform duties for",
-  die:"verb — cease to live",
-  send:"verb — cause to go or be taken",sent:"verb — past tense of 'send'",
-  expect:"verb — regard as likely to happen",
-  build:"verb — construct by putting parts together",built:"verb — past tense of 'build'",
-  stay:"verb — remain in the same place",
-  fall:"verb — move downward",fell:"verb — past tense of 'fall'",
-  cut:"verb — make an opening or incision",
-  reach:"verb — stretch out an arm; arrive at",
-  kill:"verb — cause the death of",
-  remain:"verb — continue to exist",
-  suggest:"verb — put forward for consideration",
-  raise:"verb — lift or move to a higher position",
-  pass:"verb — move or cause to move in a specified direction",
-  sell:"verb — give in exchange for money",sold:"verb — past tense of 'sell'",
-  require:"verb — need for a particular purpose",
-  report:"verb/noun — give a spoken or written account",
-  decide:"verb — come to a resolution",
-  pull:"verb — exert force so as to cause movement toward",
-  // A2 — common
-  important:"adjective — of great significance or value",
-  different:"adjective — not the same as another",
-  possible:"adjective — able to be done; within reach",
-  difficult:"adjective — needing much effort or skill",
-  beautiful:"adjective — pleasing the senses or mind aesthetically",
-  interesting:"adjective — arousing curiosity or interest",
-  comfortable:"adjective — providing physical ease and relaxation",
-  necessary:"adjective — required to be done; essential",
-  popular:"adjective — liked by many people",
-  available:"adjective — able to be used or obtained",
-  experience:"noun/verb — practical contact with and observation of facts or events",
-  information:"noun — facts provided or learned about something",
-  opportunity:"noun — a set of circumstances making something possible",
-  situation:"noun — a set of circumstances in which one finds oneself",
-  environment:"noun — the surroundings or conditions in which one lives",
-  government:"noun — the governing body of a nation or state",
-  education:"noun — the process of receiving or giving systematic instruction",
-  community:"noun — a group of people living in the same place",
-  relationship:"noun — the way in which two or more people or things are connected",
-  development:"noun — the process of developing or being developed",
-  conversation:"noun — a talk between two or more people",
-  actually:"adverb — as the truth or facts of a situation",
-  especially:"adverb — to a great extent; very much",
-  exactly:"adverb — used to emphasize the accuracy of a statement",
-  probably:"adverb — almost certainly; as far as one knows",
-  suddenly:"adverb — quickly and unexpectedly",
-  completely:"adverb — totally; utterly",
-  recently:"adverb — at a recent time; not long ago",
-  together:"adverb — with or in proximity to another person",
-  already:"adverb — before or by a specified time",
-  always:"adverb — at all times; on every occasion",
-  usually:"adverb — under normal conditions; generally",
-  sometimes:"adverb — occasionally; at times",
-  perhaps:"adverb — used to express uncertainty",
-  certainly:"adverb — undoubtedly; definitely",
-  absolutely:"adverb — with no qualification or limitation",
-  language:"noun — the method of human communication",
-  culture:"noun — the ideas, customs, and social behavior of a particular society",
-  technology:"noun — the application of scientific knowledge for practical purposes",
-  knowledge:"noun — facts, information, and skills acquired through experience",
-  quality:"noun — the standard of something as measured against other things",
-  performance:"noun — an act of staging or presenting a form of entertainment",
-  attention:"noun — notice taken of someone or something",
-  advantage:"noun — a condition giving a greater chance of success",
-  benefit:"noun/verb — an advantage or profit; receive an advantage",
-  challenge:"noun/verb — a call to take part in a contest; dispute the truth",
-  purpose:"noun — the reason for which something is done",
-  result:"noun/verb — a consequence or outcome; occur as a consequence",
-  support:"verb/noun — bear all or part of the weight; give assistance",
-  improve:"verb — make or become better",improved:"verb — past tense of 'improve'",
-  increase:"verb/noun — become or make greater in size or amount",increased:"verb — past tense of 'increase'",
-  reduce:"verb — make smaller or less in amount",reduced:"verb — past tense of 'reduce'",
-  achieve:"verb — reach or attain by effort",achieved:"verb — past tense of 'achieve'",
-  explain:"verb — make an idea clear by describing it",explained:"verb — past tense of 'explain'",
-  describe:"verb — give an account in words",described:"verb — past tense of 'describe'",
-  develop:"verb — grow or cause to grow",developed:"verb — past tense of 'develop'",
-  discuss:"verb — talk about in detail",discussed:"verb — past tense of 'discuss'",
-  discover:"verb — find unexpectedly or during a search",discovered:"verb — past tense of 'discover'",
-  imagine:"verb — form a mental image of",imagined:"verb — past tense of 'imagine'",
-  notice:"verb/noun — become aware of; attention",
-  realize:"verb — become fully aware of as a fact",realized:"verb — past tense of 'realize'",
-  recognize:"verb — identify from previous encounters",recognized:"verb — past tense of 'recognize'",
-  wonder:"verb — desire to know something",
-  agree:"verb — have the same opinion",agreed:"verb — past tense of 'agree'",
-  depend:"verb — be controlled or determined by",
-  enjoy:"verb — take delight in",enjoyed:"verb — past tense of 'enjoy'",
-  forget:"verb — fail to remember",forgot:"verb — past tense of 'forget'",forgotten:"verb — past participle of 'forget'",
-  hope:"verb/noun — want something to happen; expectation",
-  prefer:"verb — like one thing better than another",
-  promise:"verb/noun — assure that one will do something",
-  suppose:"verb — assume that something is the case",
-  share:"verb — have a portion with another",
-  accept:"verb — consent to receive",accepted:"verb — past tense of 'accept'",
-  compare:"verb — estimate similarities or differences",compared:"verb — past tense of 'compare'"
-};
+// ═══ WORD_DEFS removed — NGSL (js/en-ngsl.js) supersedes it everywhere ═══
 
 // ═══ Word Cache — LRU, in-memory, session-scoped ═══
 var WORD_CACHE = {};
@@ -5635,20 +5455,15 @@ function showWordDefinition(word) {
   if (pos === 'OTHER' || pos === 'FUNC' || pos === 'WORD') pos = '';
   pEl.textContent = pos || '';
   
-  // Definition lookup
-  var def = WORD_DEFS[word] || WORD_DEFS[word.toLowerCase()];
-  if (def) {
-    tEl.textContent = def;
+  // Definition lookup — NGSL first (instant, offline, curated)
+  var ngEntry = (window.EN_NGSL || {})[word.toLowerCase()];
+  if (ngEntry && ngEntry[3]) {
+    tEl.textContent = ngEntry[3];
+    if (!pos && ngEntry[1]) {
+      var ngPosMap = { v:'VERB', n:'NOUN', adj:'ADJ', adv:'ADV' };
+      pEl.textContent = ngPosMap[ngEntry[1]] || '';
+    }
   } else {
-    // Local NGSL (instant, offline, curated learner definitions)
-    var ngEntry = (window.EN_NGSL || {})[word.toLowerCase()];
-    if (ngEntry && ngEntry[3]) {
-      tEl.textContent = ngEntry[3];
-      if (!pos && ngEntry[1]) {
-        var ngPosMap = { v:'VERB', n:'NOUN', adj:'ADJ', adv:'ADV' };
-        pEl.textContent = ngPosMap[ngEntry[1]] || '';
-      }
-    } else {
     tEl.innerHTML = '<em style="opacity:.6">Definition not in dictionary</em>';
     // Try Free Dictionary API — skip proper noun entries
     try {
@@ -5682,8 +5497,6 @@ function showWordDefinition(word) {
           }
         }).catch(function(){});
     } catch(e) {}
-  
-    }
   }
   // Update Add button state
   var inBank = wordBank.indexOf(word) >= 0;
@@ -5808,8 +5621,9 @@ window.showVocabDefinition = function(word){
   if(!panel||!wEl||!tEl) return;
   panel.style.display='block';
   wEl.textContent = word + ': ';
-  var def = WORD_DEFS[word];
-  tEl.textContent = def || '(definition not available)';
+  // NGSL local definition (instant, offline)
+  var ngE = (window.EN_NGSL || {})[word.toLowerCase()];
+  tEl.textContent = (ngE && ngE[3]) ? ngE[3] : '(definition not available)';
 };
 
 window.removeFromVocabBank = function(word){
