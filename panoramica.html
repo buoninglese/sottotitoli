@@ -4310,6 +4310,7 @@
   <script src="js/cefr-levels.js"></script>
   <script src="js/cefr-gse.js"></script>
   <script src="js/lemma-pos-map.js"></script>
+  <script src="js/en-ngsl.js"></script>
   <script src="js/it-kelly.js"></script>
   <script src="js/it-lexicon.js"></script>
   <script src="js/toast.js?v=2"></script>
@@ -9601,7 +9602,7 @@
         } catch(e) { return null; }
       }
 
-      // ── Combined: Free Dictionary → WordsAPI → Wordnik fallback ──
+      // ── Combined: Free Dictionary → WordsAPI → NGSL (local) → Wordnik fallback ──
       async function fetchDictionary(word, preferredPos) {
         // Try Free Dictionary first (has IPA + definitions, POS-aware)
         var fd = await fetchFreeDict(word, preferredPos);
@@ -9609,6 +9610,12 @@
         // Try WordsAPI (RapidAPI) — better coverage than Free Dictionary
         var wa = await fetchWordsApi(word);
         if (wa && wa.definition) return wa;
+        // Local NGSL (2,800 most frequent words — instant, offline, curated)
+        var ng = (window.EN_NGSL || {})[word.toLowerCase()];
+        if (ng && ng[2]) {
+          var ngPosMap = { v:'verb', n:'noun', adj:'adjective', adv:'adverb' };
+          return { definition: ng[2], ipa: null, pos: ngPosMap[ng[1]] || '' };
+        }
         // Fall back to Wordnik
         var w = await fetchWordnik(word);
         if (w && w.definition) return w;

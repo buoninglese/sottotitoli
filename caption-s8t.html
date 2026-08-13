@@ -1521,6 +1521,7 @@ button[onclick*="addToWordBank"]:hover{background:rgba(52,211,153,.15)!important
 <script src="js/speech-icons.js"></script>
 <script src="js/cefr-gse.js"></script>
 <script src="js/cefr-info.js"></script>
+<script src="js/en-ngsl.js"></script>
 <script src="js/it-kelly.js"></script>
 <script src="js/it-lexicon.js"></script>
 <script src="translation-providers.js?v=1"></script>
@@ -2313,12 +2314,31 @@ function _fetchWordEnglish(word, cardId, defEl, relEl, posEl) {
           }
         } catch(e) { console.warn('Datamuse parse error:', e); }
       }
-      _fetchWordnikFallback(word, cardId);
+      _fetchNGSLFallback(word, cardId);
     };
-    xhr.onerror = function() { _fetchWordnikFallback(word, cardId); };
-    xhr.ontimeout = function() { _fetchWordnikFallback(word, cardId); };
+    xhr.onerror = function() { _fetchNGSLFallback(word, cardId); };
+    xhr.ontimeout = function() { _fetchNGSLFallback(word, cardId); };
     xhr.send();
-  } catch(e) { _fetchWordnikFallback(word, cardId); }
+  } catch(e) { _fetchNGSLFallback(word, cardId); }
+}
+
+// ── Local NGSL fallback (instant, offline, curated learner definitions) ──
+function _fetchNGSLFallback(word, cardId) {
+  var ng = (window.EN_NGSL || {})[word.toLowerCase()];
+  if (!ng || !ng[2]) { _fetchWordnikFallback(word, cardId); return; }
+  var card = document.getElementById(cardId);
+  if (!card) return;
+  var defEl = card.querySelector('.syn-def');
+  var posEl = card.querySelector('.syn-pos-tag');
+  var ngPosMap = { v:'VERB', n:'NOUN', adj:'ADJ', adv:'ADV' };
+  var posLabel = ngPosMap[ng[1]] || '';
+  if (defEl) { defEl.textContent = ng[2]; _addTTSButton(defEl, ng[2], 'en'); }
+  if (posEl && posLabel) posEl.textContent = posLabel;
+  _updateCardState(cardId, 'loaded');
+  _cacheSet(word.toLowerCase(), { def: ng[2], pos: posLabel });
+  _fetchDatamusePills(word, cardId, posLabel);
+  var wordEl = card.querySelector('.wc-word') || card.querySelector('.syn-base-word');
+  if (wordEl) _addTTSButton(wordEl, word, 'en');
 }
 
 // ── Datamuse POS-aware pills — different endpoints per part of speech ──
@@ -5653,6 +5673,15 @@ function showWordDefinition(word) {
   if (def) {
     tEl.textContent = def;
   } else {
+    // Local NGSL (instant, offline, curated learner definitions)
+    var ngEntry = (window.EN_NGSL || {})[word.toLowerCase()];
+    if (ngEntry && ngEntry[2]) {
+      tEl.textContent = ngEntry[2];
+      if (!pos && ngEntry[1]) {
+        var ngPosMap = { v:'VERB', n:'NOUN', adj:'ADJ', adv:'ADV' };
+        pEl.textContent = ngPosMap[ngEntry[1]] || '';
+      }
+    } else {
     tEl.innerHTML = '<em style="opacity:.6">Definition not in dictionary</em>';
     // Try Free Dictionary API — skip proper noun entries
     try {
@@ -5687,6 +5716,7 @@ function showWordDefinition(word) {
         }).catch(function(){});
     } catch(e) {}
   
+    }
   }
   // Update Add button state
   var inBank = wordBank.indexOf(word) >= 0;
@@ -6123,6 +6153,12 @@ function downloadGrammarPDF() {
         if (doc.conjunctions().found) return 'CONJ';
         if (doc.pronouns().found) return 'PRON';
       } catch(e) {}
+    }
+    // ── NGSL curated POS (English, 2,800 most frequent words) ──
+    var ng = (window.EN_NGSL || {})[w];
+    if (ng && ng[1]) {
+      var ngMap = { v:'VERB', n:'NOUN', adj:'ADJ', adv:'ADV' };
+      if (ngMap[ng[1]]) return ngMap[ng[1]];
     }
     // ── Fallback suffix patterns (English + Dutch + Italian) ──
     if (w.endsWith('ing')) return 'VERB';
