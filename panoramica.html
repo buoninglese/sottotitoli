@@ -1654,6 +1654,130 @@
               </div>
             </div>
           </div>
+          <div role="tabpanel" class="subtab-pane" id="sub-wb-folders" style="overflow-y:auto;max-height:calc(100vh - 160px)">
+            <style>
+              /* ═══ Folders subtab — ported from folders-ui (v0 "AI clips" project folders) ═══ */
+              #sub-wb-folders, #sub-wb-folders * { box-sizing:border-box }
+              #sub-wb-folders { font-family:var(--font-ui) }
+
+              /* ── Head ── */
+              #sub-wb-folders .wbf-head { max-width:1040px; margin:0 auto 26px }
+              #sub-wb-folders .wbf-eyebrow { font-size:11px; font-weight:700; color:var(--cyan); text-transform:uppercase; letter-spacing:.1em; display:flex; align-items:center; gap:8px }
+              #sub-wb-folders .wbf-title { font-size:28px; font-weight:700; color:var(--text); margin:4px 0 6px; letter-spacing:-.03em; line-height:1.1 }
+              #sub-wb-folders .wbf-desc { font-size:13px; color:var(--text-soft); margin:0; max-width:640px; line-height:1.55 }
+
+              /* ── Sections ── */
+              #sub-wb-folders .wbf-section { max-width:1040px; margin:0 auto }
+              #sub-wb-folders .wbf-section + .wbf-section { margin-top:32px }
+              #sub-wb-folders .wbf-section-label { font-size:11px; font-weight:700; color:var(--text-soft); text-transform:uppercase; letter-spacing:.08em; margin:0 0 14px; display:flex; align-items:center; gap:8px }
+              #sub-wb-folders .wbf-section-label .wbf-dot { width:8px; height:8px; border-radius:50% }
+
+              /* ── Grid ── */
+              #sub-wb-folders .wbf-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:28px 24px }
+              @media (max-width:1100px){ #sub-wb-folders .wbf-grid { grid-template-columns:repeat(2,1fr) } }
+              @media (max-width:660px){ #sub-wb-folders .wbf-grid { grid-template-columns:1fr } }
+
+              /* ── Folder card ── */
+              #sub-wb-folders .wbf-folder { position:relative; cursor:pointer; perspective:1400px; min-height:232px }
+              #sub-wb-folders .wbf-folder-inner { position:relative; height:232px; transform-style:preserve-3d }
+
+              /* Back panel (holds the fanned-out word cards) */
+              #sub-wb-folders .wbf-back {
+                position:absolute; inset:0; z-index:0; height:232px; border-radius:18px;
+                background:linear-gradient(168deg,var(--panel-2) 0%,var(--panel) 55%,var(--panel-2) 100%);
+                border:1px solid var(--line); box-shadow:var(--shadow-card);
+                transform-origin:center bottom; transform:rotateX(0deg); transform-style:preserve-3d;
+                transition:transform .55s cubic-bezier(.16,1,.3,1),border-color .3s,box-shadow .3s
+              }
+              #sub-wb-folders .wbf-folder:hover .wbf-back { transform:rotateX(16deg); border-color:var(--cyan); box-shadow:0 18px 42px rgba(6,182,212,.13) }
+
+              /* Cards layer — counter-rotates so the words stay readable */
+              #sub-wb-folders .wbf-cards { position:absolute; inset:0; z-index:1; transform-style:preserve-3d; transform-origin:center bottom; transition:transform .55s cubic-bezier(.16,1,.3,1) }
+              #sub-wb-folders .wbf-folder:hover .wbf-cards { transform:rotateX(-16deg) }
+
+              /* Word card */
+              #sub-wb-folders .wbf-card {
+                position:absolute; left:50%; top:0; width:80px; height:114px; border-radius:10px; overflow:hidden;
+                display:flex; align-items:center; justify-content:center;
+                border:1px solid rgba(255,255,255,.14);
+                background:linear-gradient(160deg,#123047 0%,#1d3f55 60%,#28536b 100%);
+                box-shadow:0 10px 22px rgba(0,0,0,.28);
+                transform:translateX(calc(-50% + var(--x0))) translateY(var(--y0)) rotate(var(--r0)) scale(var(--s0));
+                opacity:.96; filter:blur(var(--b0)) brightness(.82);
+                transition:transform .55s cubic-bezier(.16,1,.3,1),opacity .4s,filter .55s;
+                will-change:transform
+              }
+              #sub-wb-folders .wbf-folder:hover .wbf-card {
+                transform:translateX(calc(-50% + var(--x1))) translateY(var(--y1)) rotate(var(--r1)) scale(var(--s1));
+                opacity:1; filter:blur(0) brightness(1)
+              }
+              #sub-wb-folders .wbf-card .wbf-word { font-size:12px; font-weight:700; color:#eef7fb; text-align:center; line-height:1.15; padding:16px 8px 8px; word-break:break-word; font-family:var(--font-ui) }
+              #sub-wb-folders .wbf-card .wbf-cefr { position:absolute; top:6px; right:6px; font-size:8px; font-weight:800; color:#0f2027; background:rgba(255,255,255,.85); border-radius:99px; padding:1px 5px; letter-spacing:.02em }
+
+              /* Front label panel */
+              #sub-wb-folders .wbf-front {
+                position:absolute; left:0; right:0; bottom:0; z-index:10; border-radius:18px; overflow:hidden;
+                background:var(--panel); backdrop-filter:blur(14px); -webkit-backdrop-filter:blur(14px);
+                border:1px solid var(--line); padding:14px 16px 12px;
+                transform-origin:center bottom; transform:rotateX(0deg); transform-style:preserve-3d;
+                transition:transform .55s cubic-bezier(.16,1,.3,1),border-color .3s
+              }
+              #sub-wb-folders .wbf-folder:hover .wbf-front { transform:rotateX(-30deg); border-color:var(--cyan) }
+              #sub-wb-folders .wbf-badge { display:inline-flex; align-items:center; font-size:9px; font-weight:800; text-transform:uppercase; letter-spacing:.08em; padding:2px 8px; border-radius:99px }
+              #sub-wb-folders .wbf-badge-pin { color:var(--amber); background:rgba(217,119,6,.12) }
+              #sub-wb-folders .wbf-badge-smart { color:var(--cyan); background:rgba(6,182,212,.12) }
+              #sub-wb-folders .wbf-badge-yours { color:#059669; background:rgba(5,150,105,.12) }
+              #sub-wb-folders .wbf-front-title { font-size:15px; font-weight:700; color:var(--text); margin:8px 0 0; line-height:1.25; display:-webkit-box; -webkit-line-clamp:2; line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; min-height:38px; padding-right:26px }
+              #sub-wb-folders .wbf-front-sub { font-size:11px; color:var(--text-faint); margin:3px 0 0; line-height:1.35; display:-webkit-box; -webkit-line-clamp:2; line-clamp:2; -webkit-box-orient:vertical; overflow:hidden }
+              #sub-wb-folders .wbf-front-foot { display:flex; align-items:center; justify-content:space-between; margin-top:10px; padding-top:10px; border-top:1px solid var(--line) }
+              #sub-wb-folders .wbf-count { font-size:12px; color:var(--text-soft); display:inline-flex; align-items:baseline; gap:4px }
+              #sub-wb-folders .wbf-count b { font-size:14px; font-weight:800; color:var(--text); font-variant-numeric:tabular-nums }
+
+              /* Menu button + dropdown */
+              #sub-wb-folders .wbf-menu { width:28px; height:28px; border-radius:8px; display:inline-flex; align-items:center; justify-content:center; color:var(--text-soft); transition:background .15s,color .15s }
+              #sub-wb-folders .wbf-menu:hover, #sub-wb-folders .wbf-menu-open { background:rgba(128,128,128,.16); color:var(--text) }
+              #sub-wb-folders .wbf-dd { position:absolute; right:10px; top:70px; z-index:60; min-width:156px; background:var(--panel); border:1px solid var(--line-strong); border-radius:12px; box-shadow:0 12px 30px rgba(0,0,0,.18); padding:6px; display:none; animation:wbfPop .18s cubic-bezier(.34,1.56,.64,1) }
+              #sub-wb-folders .wbf-dd.open { display:block }
+              @keyframes wbfPop { from{opacity:0; transform:translateY(-6px) scale(.96)} to{opacity:1; transform:none} }
+              #sub-wb-folders .wbf-dd button { display:flex; align-items:center; gap:9px; width:100%; padding:8px 10px; border-radius:8px; font-size:13px; font-weight:500; color:var(--text-soft); text-align:left; transition:background .12s,color .12s }
+              #sub-wb-folders .wbf-dd button i { width:14px; text-align:center; font-size:12px }
+              #sub-wb-folders .wbf-dd button:hover { background:var(--active-nav); color:var(--text) }
+              #sub-wb-folders .wbf-dd button.danger { color:#e05b5b }
+              #sub-wb-folders .wbf-dd button.danger:hover { background:rgba(224,91,91,.12); color:#ff6b6b }
+
+              /* New bank slot */
+              #sub-wb-folders .wbf-new {
+                position:relative; cursor:pointer; perspective:1400px; min-height:232px; border-radius:18px;
+                border:1.5px dashed var(--line-strong); background:transparent;
+                display:flex; flex-direction:column; align-items:center; justify-content:center; gap:12px;
+                color:var(--text-faint);
+                transition:border-color .25s,color .25s,transform .25s,background .25s
+              }
+              #sub-wb-folders .wbf-new:hover { border-color:var(--cyan); color:var(--cyan); background:rgba(6,182,212,.05); transform:translateY(-2px) }
+              #sub-wb-folders .wbf-new-plus { width:46px; height:46px; border-radius:14px; background:rgba(6,182,212,.1); display:flex; align-items:center; justify-content:center; font-size:22px; font-weight:300; color:var(--cyan); transition:transform .25s }
+              #sub-wb-folders .wbf-new:hover .wbf-new-plus { transform:scale(1.08) rotate(90deg) }
+              #sub-wb-folders .wbf-new-label { font-size:13px; font-weight:600 }
+
+              /* Loading / empty */
+              #sub-wb-folders .wbf-loading { max-width:1040px; margin:48px auto; display:flex; flex-direction:column; align-items:center; gap:14px; color:var(--text-faint); font-size:13px }
+              #sub-wb-folders .wbf-spinner { width:34px; height:34px; border-radius:50%; border:3px solid var(--line); border-top-color:var(--cyan); animation:wbfSpin .8s linear infinite }
+              @keyframes wbfSpin { to { transform:rotate(360deg) } }
+              #sub-wb-folders .wbf-skel { min-height:232px; border-radius:18px; border:1px solid var(--line); background:linear-gradient(100deg,var(--panel) 30%,var(--panel-2) 50%,var(--panel) 70%); background-size:200% 100%; animation:wbfShimmer 1.4s linear infinite }
+              @keyframes wbfShimmer { to { background-position:-200% 0 } }
+            </style>
+            <div id="wbFoldersRoot">
+              <div class="wbf-head">
+                <div>
+                  <div class="wbf-eyebrow"><span class="material-symbols-outlined" style="font-size:15px">folder</span> <span data-i18n="wb_folders_eyebrow">Collezioni</span></div>
+                  <h2 class="wbf-title" data-i18n="wb_folders_title">Cartelle parole</h2>
+                  <p class="wbf-desc" data-i18n="wb_folders_desc">Ogni cartella è una banca parole. Passa il mouse per aprirla e vedere le parole in anteprima; clicca per aprire la banca completa.</p>
+                </div>
+              </div>
+              <div id="wbFoldersGrid">
+                <div class="wbf-loading"><div class="wbf-spinner"></div><span data-i18n="wb_folders_loading">Caricamento cartelle…</span></div>
+              </div>
+            </div>
+          </div>
           <div role="tabpanel" class="subtab-pane" id="sub-wb-overview" data-wb-lang="en">
             <div id="wbEnContent" style="display:none"></div>
             <div id="wordbanksOverview"></div>
@@ -6423,6 +6547,281 @@
           '</article>';
       }
 
+      // ═══ RENDER: Wordbank Folders — ported from folders-ui (v0 "AI clips" project folders) ═══
+      function wbEsc(s) {
+        return String(s == null ? '' : s).replace(/[&<>"']/g, function(c){
+          return { '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c];
+        });
+      }
+      function wbFldT(key) { return (window.I18n && I18n.t) ? I18n.t(key) : key; }
+
+      // Race a data call against a timeout so the grid never hangs on a stalled request
+      function wbTimeout(p, ms, fb) {
+        var safe = Promise.resolve(p).catch(function(){ return fb; });
+        var timer = new Promise(function(res){ setTimeout(function(){ res(fb); }, ms); });
+        return Promise.race([safe, timer]);
+      }
+
+      function wbFolderCard(bk, L) {
+        var type = bk.type;
+        var typeLabel = type === 'pinned' ? L.pinned : type === 'smart' ? L.smart : L.yours;
+        var badgeCls = type === 'pinned' ? 'wbf-badge-pin' : type === 'smart' ? 'wbf-badge-smart' : 'wbf-badge-yours';
+        var preview = (bk.words || []).slice(0, 5);
+        var cards = '';
+        var positions = [-2, -1, 0, 1, 2];
+        for (var i = 0; i < 5; i++) {
+          var pos = positions[i];
+          var w = preview[i];
+          var x1 = pos * 54, r1 = pos * 9, s1 = 1 - Math.abs(pos) * 0.06, y1 = 6 + Math.abs(pos) * 4;
+          var x0 = pos * 18, r0 = pos * 4, s0 = 0.52, y0 = 50 + Math.abs(pos) * 4;
+          var inner;
+          if (w && w.word) {
+            inner = (w.cefr ? '<span class="wbf-cefr">'+wbEsc(w.cefr)+'</span>' : '') + '<div class="wbf-word">'+wbEsc(w.word)+'</div>';
+          } else {
+            inner = '<div class="wbf-word" style="opacity:.35;font-size:20px;padding:16px 8px">·</div>';
+          }
+          cards += '<div class="wbf-card" style="--x0:'+x0+'px;--y0:'+y0+'px;--r0:'+r0+'deg;--s0:'+s0+';--x1:'+x1+'px;--y1:'+y1+'px;--r1:'+r1+'deg;--s1:'+s1+';--b0:1.8px">'+inner+'</div>';
+        }
+
+        var menuItems = '<button data-act="open" data-bank="'+wbEsc(bk.id)+'"><i class="fa-solid fa-arrow-right"></i>'+L.open+'</button>';
+        if (type === 'custom') {
+          menuItems +=
+            '<button data-act="rename" data-bank="'+wbEsc(bk.id)+'" data-name="'+wbEsc(bk.title)+'"><i class="fa-solid fa-pen"></i>'+L.rename+'</button>'+
+            '<button data-act="duplicate" data-bank="'+wbEsc(bk.id)+'"><i class="fa-solid fa-copy"></i>'+L.duplicate+'</button>'+
+            '<button data-act="delete" data-bank="'+wbEsc(bk.id)+'" data-name="'+wbEsc(bk.title)+'" class="danger"><i class="fa-solid fa-trash"></i>'+L.delete+'</button>';
+        }
+
+        return '<article class="wbf-folder" data-bank-id="'+wbEsc(bk.id)+'" data-type="'+type+'">'+
+          '<div class="wbf-folder-inner">'+
+            '<div class="wbf-back"><div class="wbf-cards">'+cards+'</div></div>'+
+            '<div class="wbf-front">'+
+              '<span class="wbf-badge '+badgeCls+'">'+typeLabel+'</span>'+
+              '<h3 class="wbf-front-title">'+wbEsc(bk.title)+'</h3>'+
+              (bk.subtitle ? '<p class="wbf-front-sub">'+wbEsc(bk.subtitle)+'</p>' : '')+
+              '<div class="wbf-front-foot">'+
+                '<span class="wbf-count"><b>'+bk.count+'</b> '+L.words+'</span>'+
+                '<button class="wbf-menu" data-menu="'+wbEsc(bk.id)+'" title="Options"><i class="fa-solid fa-ellipsis-vertical"></i></button>'+
+              '</div>'+
+            '</div>'+
+          '</div>'+
+          '<div class="wbf-dd" data-dd="'+wbEsc(bk.id)+'">'+menuItems+'</div>'+
+        '</article>';
+      }
+
+      function wbFoldersLabels() {
+        return {
+          pinned: wbFldT('wb_folders_pinned'),
+          smart: wbFldT('wb_folders_smart'),
+          yours: wbFldT('wb_folders_yours'),
+          words: wbFldT('wb_folders_words'),
+          open: wbFldT('wb_folders_open'),
+          rename: wbFldT('wb_folders_rename'),
+          duplicate: wbFldT('wb_folders_duplicate'),
+          delete: wbFldT('wb_folders_delete'),
+          new: wbFldT('wb_folders_new')
+        };
+      }
+
+      function wbSmartSectionHtml(smartArr, L) {
+        return '<section class="wbf-section" data-wbf-sec="smart">'+
+          '<h4 class="wbf-section-label"><span class="wbf-dot" style="background:#06b6d4"></span>'+L.smart+'</h4>'+
+          '<div class="wbf-grid">'+smartArr.map(function(bk){ return wbFolderCard(bk, L); }).join('')+'</div>'+
+        '</section>';
+      }
+
+      function wbFoldersHtml(folders, smartHtml) {
+        var L = wbFoldersLabels();
+        var html = '';
+        function section(key, label, dot, items) {
+          if (!items || !items.length) return '';
+          var gridHtml = items.map(function(bk){ return wbFolderCard(bk, L); }).join('');
+          return '<section class="wbf-section" data-wbf-sec="'+key+'">'+
+            '<h4 class="wbf-section-label"><span class="wbf-dot" style="background:'+dot+'"></span>'+label+'</h4>'+
+            '<div class="wbf-grid">'+gridHtml+'</div></section>';
+        }
+        if (folders.pinned && folders.pinned.length) html += section('pinned', L.pinned, '#d97706', folders.pinned);
+        if (smartHtml) html += smartHtml;
+        // Custom section — always shown (hosts the "new bank" slot)
+        var customGrid = (folders.custom || []).map(function(bk){ return wbFolderCard(bk, L); }).join('');
+        customGrid += '<div class="wbf-new" onclick="wbFolderNew()"><div class="wbf-new-plus">+</div><div class="wbf-new-label">'+L.new+'</div></div>';
+        html += '<section class="wbf-section" data-wbf-sec="custom">'+
+          '<h4 class="wbf-section-label"><span class="wbf-dot" style="background:#059669"></span>'+L.yours+'</h4>'+
+          '<div class="wbf-grid">'+customGrid+'</div></section>';
+        return html;
+      }
+
+      async function renderWbFolders() {
+        var grid = document.getElementById('wbFoldersGrid');
+        if (!grid) return;
+        var lang = window.SOTTOTITOLI_STUDY_LANG || 'en';
+        grid.innerHTML = '<div class="wbf-loading"><div class="wbf-spinner"></div>'+wbFldT('wb_folders_loading')+'</div>';
+
+        // Start smart refresh early (async) so pinned/custom render fast
+        var smartPromise = (window.SMART_SUGGESTIONS && window.SMART_SUGGESTIONS.refreshAll)
+          ? wbTimeout(window.SMART_SUGGESTIONS.refreshAll(lang), 8000, null)
+          : Promise.resolve(null);
+
+        var folders = { pinned: [], smart: null, custom: [] };
+        try {
+          var sb = window.sottotitoliSupabase;
+          var nowISO = new Date().toISOString();
+          // ── Pinned + banks — all independent, fetch in parallel ──
+          var statsP = wbTimeout(SottotitoliData.getWordbankStats(lang), 2000, null);
+          var banksP = wbTimeout(SottotitoliData.getWordbanks(lang), 2500, []);
+          var dueCP = sb ? wbTimeout(sb.from('review_words').select('*', { count:'exact', head:true }).or('next_review_at.lte.'+nowISO+',is_new.eq.true'), 2000, { count: 0 }) : Promise.resolve({ count: 0 });
+          var fragCP = sb ? wbTimeout(sb.from('review_words').select('*', { count:'exact', head:true }).or('mastery_score.lt.40,lapses.gte.2'), 2000, { count: 0 }) : Promise.resolve({ count: 0 });
+          var sessP = sb ? wbTimeout(sb.auth.getSession(), 2000, { data: null }) : Promise.resolve({ data: null });
+
+          var all = await Promise.all([statsP, banksP, dueCP, fragCP, sessP]);
+          var stats = all[0], banks = all[1], dueC = all[2], fragC = all[3], sess = all[4];
+
+          var pinCounts = { review_due_now: 0, saved_from_sessions: 0, fragile_words: 0, vocab_builder_en: 0 };
+          if (dueC && dueC.count != null) pinCounts.review_due_now = dueC.count;
+          if (fragC && fragC.count != null) pinCounts.fragile_words = fragC.count;
+          if (stats && stats.totalWords > 0) pinCounts.saved_from_sessions = stats.totalWords;
+
+          var uid = sess && sess.data && sess.data.session ? sess.data.session.user.id : null;
+          var pinWords = { review_due_now: [], saved_from_sessions: [], fragile_words: [], vocab_builder_en: [] };
+
+          // ── Preview words — parallel ──
+          async function wbPv(bankId) {
+            var ws = await wbTimeout(SottotitoliData.getWordbankWords(bankId), 1800, []);
+            return (ws || []).slice(0,5).map(function(w){ return { word:w.word || w.lemma || '', cefr:w.cefr || w.cefr_level || '' }; });
+          }
+          var dueWP = uid ? wbTimeout(sb.from('review_words').select('lemma,cefr').eq('user_id',uid).eq('lang',lang).or('next_review_at.lte.'+nowISO+',is_new.eq.true').limit(5), 1800, { data: [] }) : Promise.resolve({ data: [] });
+          var fragWP = uid ? wbTimeout(sb.from('review_words').select('lemma,cefr').eq('user_id',uid).eq('lang',lang).or('mastery_score.lt.40,lapses.gte.2').limit(5), 1800, { data: [] }) : Promise.resolve({ data: [] });
+
+          var systemNames = ['Saved from sessions','Build From Known','New Words','Saved For Later','All Looked-Up Words','English Vocabulary Builder','Italian Vocabulary Builder'];
+          var customBanks = (banks || []).filter(function(b){ return systemNames.indexOf(b.name) === -1; });
+          var sfBank = null, vbBank = null;
+          (banks || []).forEach(function(b){
+            if (b.name === 'Saved from sessions') sfBank = b;
+            if (b.name === 'English Vocabulary Builder') vbBank = b;
+          });
+          var sfP = sfBank ? wbPv(sfBank.id) : Promise.resolve([]);
+          var vbP = vbBank ? wbPv(vbBank.id) : Promise.resolve([]);
+          var customP = customBanks.map(function(b){ return wbPv(b.id); });
+
+          var prevAll = await Promise.all([dueWP, fragWP, sfP, vbP].concat(customP));
+          pinWords.review_due_now = (prevAll[0].data || []).map(function(r){ return { word:r.lemma, cefr:r.cefr }; });
+          pinWords.fragile_words = (prevAll[1].data || []).map(function(r){ return { word:r.lemma, cefr:r.cefr }; });
+          pinWords.saved_from_sessions = prevAll[2] || [];
+          if (sfBank) pinCounts.saved_from_sessions = Math.max(pinCounts.saved_from_sessions, (prevAll[2]||[]).length);
+          pinWords.vocab_builder_en = prevAll[3] || [];
+          if (vbBank) pinCounts.vocab_builder_en = (prevAll[3]||[]).length;
+
+          folders.pinned = [
+            { id:'review_due_now', title:'Ripasso immediato', subtitle:'Parole da ripassare ora o in ritardo', count:pinCounts.review_due_now, words:pinWords.review_due_now, type:'pinned' },
+            { id:'saved_from_sessions', title:'Saved From Sessions', subtitle:'Words you saved during live sessions', count:pinCounts.saved_from_sessions, words:pinWords.saved_from_sessions, type:'pinned' },
+            { id:'vocab_builder_en', title:'English Vocabulary Builder', subtitle:'Words saved from Vocabulary Builder search', count:pinCounts.vocab_builder_en, words:pinWords.vocab_builder_en, type:'pinned' },
+            { id:'fragile_words', title:'Fragile Words', subtitle:'Weak words at risk of being forgotten', count:pinCounts.fragile_words, words:pinWords.fragile_words, type:'pinned' }
+          ];
+
+          // ── Custom ──
+          for (var i=0;i<customBanks.length;i++) {
+            var cw = prevAll[4+i] || [];
+            folders.custom.push({ id:customBanks[i].id, title:customBanks[i].name || 'Banca', subtitle:customBanks[i].description || '', count:cw.length, words:cw, type:'custom' });
+          }
+        } catch(err) { console.warn('Folders (pinned/custom) error:', err); }
+
+        // Render pinned + custom now, smart as skeleton
+        var L = wbFoldersLabels();
+        var skel = '<section class="wbf-section" data-wbf-sec="smart"><h4 class="wbf-section-label"><span class="wbf-dot" style="background:#06b6d4"></span>'+L.smart+'</h4><div class="wbf-grid">'+new Array(7).join('<div class="wbf-skel"></div>')+'</div></section>';
+        grid.innerHTML = wbFoldersHtml(folders, skel);
+        wbFoldersBind(grid);
+
+        // ── Smart (async fill-in) ──
+        try {
+          var smartAll = await smartPromise;
+          var smartDefs = [
+            { id:'goal_next_step', title:'Next Step For Your Goal', subtitle:'Goal-aligned vocabulary for your profile' },
+            { id:'build_from_known', title:'Build From What You Know', subtitle:'Higher-level replacements for words you know' },
+            { id:'activate_recognized', title:'Activate What You Recognize', subtitle:'Passive vocabulary — words seen but not claimed' },
+            { id:'upcoming_useful_vocab', title:'Goal-Based Upcoming Vocab', subtitle:'Words for your declared short-term goals' },
+            { id:'upcoming_session_driven', title:'Session-Detected Themes', subtitle:'Predicted needs from your recent session topics' },
+            { id:'upcoming_roadmap', title:'Your Learning Roadmap', subtitle:'Staged vocabulary for your goal journey' }
+          ];
+          var smartArr = [];
+          if (smartAll) {
+            smartDefs.forEach(function(d){
+              var list = smartAll[d.id] || [];
+              smartArr.push({ id:d.id, title:d.title, subtitle:d.subtitle, count:list.length, words:list.slice(0,5).map(function(w){ return { word:w.word||'', cefr:w.cefr||'' }; }), type:'smart' });
+            });
+          }
+          if (smartArr.length) {
+            var oldSmart = grid.querySelector('[data-wbf-sec="smart"]');
+            if (oldSmart) oldSmart.outerHTML = wbSmartSectionHtml(smartArr, L);
+          }
+        } catch(err) { console.warn('Folders (smart) error:', err); }
+      }
+      window.renderWbFolders = renderWbFolders;
+
+      function wbFolderOpen(id) {
+        if (id === 'build_from_known') {
+          var vocNav = document.querySelector('[data-panel="vocabulary-builder"]');
+          if (vocNav) vocNav.click();
+          setTimeout(function(){ var wbTab = document.querySelector('[data-subtab="wb-expand"]'); if (wbTab) wbTab.click(); }, 150);
+          return;
+        }
+        var enTab = document.querySelector('[data-subtab="wb-overview"]');
+        if (enTab) enTab.click();
+        setTimeout(function(){ if (window.openWordbankView) openWordbankView(id); }, 260);
+      }
+      window.wbFolderOpen = wbFolderOpen;
+
+      function wbFolderNew() {
+        if (window.newWordbank) window.newWordbank();
+        setTimeout(renderWbFolders, 1200);
+      }
+      window.wbFolderNew = wbFolderNew;
+
+      function wbFoldersCloseMenus() {
+        var grid = document.getElementById('wbFoldersGrid');
+        if (!grid) return;
+        grid.querySelectorAll('.wbf-dd.open').forEach(function(o){ o.classList.remove('open'); });
+        grid.querySelectorAll('.wbf-menu-open').forEach(function(m){ m.classList.remove('wbf-menu-open'); });
+      }
+
+      function wbFoldersBind(grid) {
+        if (!grid || grid.__wbfBound) return;
+        grid.__wbfBound = true; // bind delegated listener once — re-renders reuse it
+        grid.addEventListener('click', function(e){
+          var menuBtn = e.target.closest('.wbf-menu');
+          var actBtn = e.target.closest('.wbf-dd button');
+          var dd = e.target.closest('.wbf-dd');
+          var folder = e.target.closest('.wbf-folder');
+          if (menuBtn) {
+            e.stopPropagation();
+            var id = menuBtn.getAttribute('data-menu');
+            var target = grid.querySelector('[data-dd="'+id+'"]');
+            var wasOpen = target && target.classList.contains('open');
+            wbFoldersCloseMenus();
+            if (target && !wasOpen) { target.classList.add('open'); menuBtn.classList.add('wbf-menu-open'); }
+            return;
+          }
+          if (actBtn) {
+            e.stopPropagation();
+            var act = actBtn.getAttribute('data-act');
+            var bid = actBtn.getAttribute('data-bank');
+            var bname = actBtn.getAttribute('data-name') || '';
+            wbFoldersCloseMenus();
+            if (act === 'open') { wbFolderOpen(bid); return; }
+            if (act === 'rename') { if (window.wbRenameBank) wbRenameBank(bid, bname); setTimeout(renderWbFolders, 900); return; }
+            if (act === 'duplicate') { if (window.wbDuplicateBank) wbDuplicateBank(bid); setTimeout(renderWbFolders, 1200); return; }
+            if (act === 'delete') { if (window.wbDeleteBank) wbDeleteBank(bid, bname); setTimeout(renderWbFolders, 1000); return; }
+            return;
+          }
+          if (dd) { e.stopPropagation(); wbFoldersCloseMenus(); return; }
+          if (folder) { wbFolderOpen(folder.getAttribute('data-bank-id')); return; }
+          wbFoldersCloseMenus();
+        });
+      }
+
+      // Close folder menus when clicking anywhere else
+      document.addEventListener('click', function(e){
+        if (!e.target.closest('#wbFoldersGrid')) wbFoldersCloseMenus();
+      });
+
       // ── Open inside-bank view (replaces overview content) ──
       async function openWordbankView(bankId) {
         // Detect which collection tab is active
@@ -9876,6 +10275,8 @@
       if (wbExpandTab) { wbExpandTab.addEventListener('click', function () { setTimeout(function(){ renderExpandQuickChips(); loadBankSelector('en'); }, 150); }); }
       var wbExpandItTab = document.querySelector('[data-subtab="wb-expand-it"]');
       if (wbExpandItTab) { wbExpandItTab.addEventListener('click', function () { setTimeout(function(){ loadBankSelector('it'); }, 150); }); }
+      var wbFoldersTab = document.querySelector('[data-subtab="wb-folders"]');
+      if (wbFoldersTab) { wbFoldersTab.addEventListener('click', function () { setTimeout(renderWbFolders, 100); }); }
       // Initial render for Review Due (Build From expands on demand)
       setTimeout(renderReviewDue, 500);
       var vocNav = document.querySelector('[data-panel="vocabulary-builder"]');
