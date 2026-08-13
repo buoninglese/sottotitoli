@@ -476,7 +476,6 @@
   function renderShell() {
     if (!rootEl) return;
     var s = load();
-    var lang = learnerLang();
     var goalPct = Math.min(100, Math.round((s.todayXp / (s.dailyGoal || 1)) * 100));
     rootEl.innerHTML =
       '<div class="learner-wrap">' +
@@ -488,15 +487,6 @@
           '</div>' +
           '<div class="lh-streak"><span class="flame">🔥</span><span>' + s.streak + ' <span data-i18n="learner_streak">Serie</span></span></div>' +
         '</div>' +
-        '<div class="learner-langtabs" role="tablist" aria-label="Lingua">' +
-          '<button type="button" role="tab" aria-selected="' + (lang === 'en' ? 'true' : 'false') + '" class="learner-langtab' + (lang === 'en' ? ' active' : '') + '" data-lang="en" onclick="Learner.setLang(\'en\')"><span class="ll-flag">🇬🇧</span><span data-i18n="learner_lang_en">Inglese</span></button>' +
-          '<button type="button" role="tab" aria-selected="' + (lang === 'it' ? 'true' : 'false') + '" class="learner-langtab' + (lang === 'it' ? ' active' : '') + '" data-lang="it" onclick="Learner.setLang(\'it\')"><span class="ll-flag">🇮🇹</span><span data-i18n="learner_lang_it">Italiano</span></button>' +
-        '</div>' +
-        '<div class="panel-tabs"><div class="tabs" role="tablist">' +
-          '<button role="tab" aria-selected="true" class="tab-link active" data-subtab="learner-path" data-i18n="learner_path">Percorso</button>' +
-          '<button role="tab" aria-selected="false" class="tab-link" data-subtab="learner-practice" data-i18n="learner_practice">Allenamento</button>' +
-          '<button role="tab" aria-selected="false" class="tab-link" data-subtab="learner-progress" data-i18n="learner_progress">Progressi</button>' +
-        '</div></div>' +
         '<div role="tabpanel" class="subtab-pane active" id="sub-learner-path"></div>' +
         '<div role="tabpanel" class="subtab-pane" id="sub-learner-practice"></div>' +
         '<div role="tabpanel" class="subtab-pane" id="sub-learner-progress"></div>' +
@@ -893,13 +883,27 @@
     if (!bank) return;
     var raw = await srcBankWords(bankId, bank.lang);
     if (!raw.length) { toast(t('learner_no_words_yet')); return; }
-    var items = await toItems(sample(raw, Math.min(20, raw.length)), bank.lang);
-    if (!items.length) { toast(t('learner_no_words_yet')); return; }
+    // Skip words already done in earlier (possibly interrupted) Allena runs.
+    var bp = bankProgress();
+    var entry = bp[bankId] || { total: 0, done: [] };
+    var doneSet = {};
+    (entry.done || []).forEach(function (w) { doneSet[w] = true; });
+    var avail = raw.filter(function (rw) { return !doneSet[norm(rw.word)]; });
+    var items = await toItems(sample(avail, Math.min(20, avail.length)), bank.lang);
     openSession('bank', { id: bankId, name: bank.name, lang: bank.lang }, null, []);
     session.cards = items;
     session.cardIdx = 0;
     session.graded = {}; // item.word -> SM-2 quality (1/3/4/5) for write-back
+    session.bankId = bankId;
+    session.bankTotal = raw.length;              // full bank size (progress denominator)
+    session.bankPrevDone = (entry.done || []).length; // already done before this run
+    if (!items.length) {
+      // Every word already done → treat the bank as complete; next Allena = fresh pass.
+      var bp2 = bankProgress();
+      if (bp2[bankId]) { delete bp2[bankId]; saveBankProgress(bp2); }
+    }
     renderOverlay(); // re-render with the card queue populated
+    if (!session.cards.length) endSession();     // all-done case → completion card
   }
 
   /* ── Infinite card stack (bank-test "Allena" session) ──
@@ -968,6 +972,38 @@
     if (!el) return;
     var left = Math.max(0, (session.cards.length - session.cardIdx));
     el.textContent = left + ' ' + t('learner_ics_remaining');
+  }
+
+  /* ── Per-bank Allena session progress (persisted) ──
+   * Each word graded in a bank's "Allena" run is recorded under the bank id,
+   * so if the user leaves mid-run (back button or tab switch) the bank card
+   * can show "done / total" and a resume re-opens only the not-yet-done words.
+   * A fully completed run clears the entry so the next Allena is a fresh pass. */
+  var BANKPROG_KEY = 'sottotitoli-learner-bank-progress';
+  function bankProgress() {
+    try { return JSON.parse(localStorage.getItem(BANKPROG_KEY) || '{}') || {}; } catch (e) { return {}; }
+  }
+  function saveBankProgress(bp) { try { localStorage.setItem(BANKPROG_KEY, JSON.stringify(bp)); } catch (e) {} }
+  // Record one word as "done" for the active bank run.
+  function markBankWordDone(word) {
+    if (!session || !session.bankId) return;
+    var bp = bankProgress();
+    var entry = bp[session.bankId] || { total: session.bankTotal || 0, done: [], updatedAt: null };
+    var n = norm(word);
+    if (entry.done.indexOf(n) === -1) entry.done.push(n);
+    entry.updatedAt = new Date().toISOString();
+    bp[session.bankId] = entry;
+    saveBankProgress(bp);
+    updateIcsSessionProgress();
+  }
+  // Update the in-panel session top bar: (prev done + this run) / bank total.
+  function updateIcsSessionProgress() {
+    if (!session) return;
+    var el = $('#icsSessionProgress');
+    if (!el) return;
+    var done = (session.bankPrevDone || 0) + (session.cardIdx || 0);
+    var total = session.bankTotal || (session.cards ? session.cards.length : 0);
+    el.textContent = done + ' / ' + total;
   }
 
   function flipCard(el) {
