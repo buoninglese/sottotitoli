@@ -11,11 +11,12 @@
 ### POS — English
 | # | Source | Where | Notes |
 |---|--------|-------|-------|
-| 1 | Datamuse `tags` + dictionary `partOfSpeech` (Free Dictionary / WordsAPI / Wordnik) | live API responses | **de-facto primary** — wired in enrichOneCard (fills `'—'` POS) |
-| 2 | Compromise Penn Treebank (`tagWordPenn`) | local lib | reliable for common words, weak on rare/multi-POS |
-| 3 | `js/lemma-pos-map.js` | local | **⚠️ BROKEN — verified 2026-08-14: all 2,354 values are `"other"`** (build pipeline bug in sottotitoli-learning). Do not rely on it until rebuilt. |
-| 4 | Suffix heuristics (caption-s8t `tagWord` fallback) | local | last resort |
-| 5 | `'—'` / `OTHER` | — | honest unknown |
+| 1 | **LEMMA_POS_MAP** (rebuilt 2026-08-14 — 3,782 words, NGSL-curated > WordNet vote > Penn tagger) | local | `scripts/build-lemma-pos-map.py` |
+| 2 | **NGSL** (`js/en-ngsl.js` — 2,809 words, curated POS + rank + learner definition) | local | also feeds definitions |
+| 3 | Datamuse `tags` + dictionary `partOfSpeech` (Free Dictionary / WordsAPI / Wordnik) | live API responses | fills `'—'` POS in enrichOneCard |
+| 4 | Compromise Penn Treebank (`tagWordPenn` / caption `tagWord`) | local lib | reliable for common words, weak on rare/multi-POS |
+| 5 | Suffix heuristics (caption-s8t `tagWord` fallback) | local | last resort |
+| 6 | `'—'` / `OTHER` | — | honest unknown |
 
 ### POS — Italian
 | # | Source | Where | Notes |
@@ -75,6 +76,13 @@ Fixed while settling this: `saveItalianWordToBank`, `enrichBankStatus`, `bookmar
 - caption-s8t `tagWord` — Italian captions resolve POS through KELLY first.
 - caption-s8t `_getCEFR` — Italian captions use the IT chain.
 - Any future caller: use `window.S8T_IT_LEXICON.getPOS(word, lang)` / `.getCEFR(word, lang)` / `.relatedItalian(word)` — single entry point. `.posSource()/.cefrSource()` expose which layer answered (KELLY / core-map / suffix-rules) for tooltips.
+
+## 6. NGSL (New General Service List) — English high-frequency layer
+
+- `js/en-ngsl.js` — 2,809 words, each `[rank, pos, learner definition]` — built by `scripts/build-en-ngsl.py` from the NGSL 1.2 Learning Dictionary.
+- POS feeds LEMMA_POS_MAP build (curated override) + caption `tagWord` + popup POS.
+- Definitions act as an instant **offline** fallback: VB chain = Free Dictionary → WordsAPI → **NGSL** → Wordnik; caption lookup = Datamuse → **NGSL** → Wordnik; caption popup = WORD_DEFS → **NGSL** → Free Dictionary.
+- Rank is stored for future frequency-based features (not used for CEFR — no fabrication).
 
 ## 5. Fallback policy (always)
 
