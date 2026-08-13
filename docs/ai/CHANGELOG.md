@@ -16,6 +16,15 @@
 - Everything else in the audit is already responsive (tables scroll via `overflow-x:auto` wrappers — Trascrizioni, Report AI, Vocabulary Builder `.wb-table-wrap` `min-width:600px`; grids collapse via existing media queries in `theme-2.css`/`panoramica.css`; modals scale with `max-width` + `width:90%/100%`).
 - Version `v210 → v211`.
 
+## [2026-08-13] Gen-Z / Gen-Z Dark — yellow buttons now use dark text (readability)
+
+### Fixed
+- In Gen-Z (and Gen-Z Dark) `--cyan`/`--teal` = `#ffeb3b` (yellow), but many buttons paired it with hardcoded `color:#fff` → white text on yellow was unreadable. Now **all yellow-background buttons use dark text** (matching the "Acquista minuti" CTA).
+- Covered: inline-styled buttons (`[style*="background:var(--cyan);color:#fff"]` catches all of them), `.ss-btn-cap` (Avvia Caption), `.ssconfirm` (Conferma), `.wb-btn` (Import File), and the report-AI peer-checked pill. Dark text = `#6d28d9` (genz) / `#3b0764` (genz-dark).
+- **Segmented subtab pill** (Word banks / Vocabulary Builder): the active pill text was yellow (`[data-theme="genz"] .tab-link.active` hard-pin) on the white pill — now **near-black on white**; inactive pills use dark purple in Gen-Z (readable on the light frosted pill). `.seg-btn.active` text/bg forced with `!important`.
+- Cache-busters: theme-2.css v5→v6, theme-wrapped.css v14→v15.
+- Verified in browser (Gen-Z): **0** yellow buttons with light text remaining; active pill = white bg + `#0a0a0a` text; inactive = `#3b0764`. `get_errors` clean.
+
 ## [2026-08-13] Word banks & Vocabulary Builder — subtabs as a top-right pill toggle (Modern/Gen-Z/☾ style)
 
 ### Changed
