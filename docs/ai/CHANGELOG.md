@@ -4,6 +4,14 @@
 > The entries below from v206–v210 describe an **ES-module refactor** (`js/panoramica/app.js` + `panoramica/panels/*.js` + `panoramica/shared/*.js`) that **never shipped**. `panoramica.html` never imported `app.js`, so the deployed site always ran the ~10,700-line inline monolith. The refactor files were dead code and have been **moved to** `~/Desktop/sottotitoli-archived/dead-js/panoramica-v2-attempt/`.
 > **Real current state: monolith at v178.** These v2xx notes describe work that was never activated — treat them as historical, not as a description of the live code.
 
+## [2026-08-13] Sidebar — removed right border line on wrapped themes (v209)
+
+### Fixed
+- The left sidebar had a **1px right border** in all four wrapped themes (Modern / Modern Light / Gen-Z / Gen-Z Dark), which sat right next to the rounded `.main-panel` and broke the "rounded box" look the user wanted.
+- Cause: `css/theme-wrapped.css` — the generic wrapped layer set `.sidebar { border-right: var(--sidebar-border-w) solid var(--sidebar-border-c) }` (tokens defaulted to `1px` per theme) plus a hardcoded `[data-theme="genz"] .sidebar { border-right: 1px solid rgba(255,255,255,.15) !important }`.
+- Fix: zeroed `--sidebar-border-w` (1px → 0) in all four wrapped theme token blocks and changed the Gen-Z hardcoded rule to `border-right: 0 !important`. Base light/dark themes were unaffected (they never had the border).
+- Verified in browser: `getComputedStyle(.sidebar).borderRightWidth === 0px` for all four wrapped themes. `theme-wrapped.css` cache-buster `?v=10 → ?v=11`.
+
 ## [2026-08-13] Learner — reoriented for Italians learning English + EN/IT subtabs + Progress dashboard (v197)
 
 ### Changed — this site is for Italians learning English
