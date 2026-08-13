@@ -1,0 +1,241 @@
+/* ═══════════════════════════════════════════════════════════════
+   cta-fluid.css — Fluid "Acquista minuti" CTA (panoramica.html)
+   CSS approximation of the @paper-design/shaders look used in the
+   fluid-cta-animation-template:
+     · GodRays      → .fluid-rays   (animated light rays behind page)
+     · MeshGradient → .fluid-mesh   (drifting blurred blobs in card)
+   Per-theme palettes are defined in theme-wrapped.css (--cta-* tokens);
+   the fallbacks below are the default (blue) palette.
+   ═══════════════════════════════════════════════════════════════ */
+
+:root{
+  /* Card (≈ MeshGradient default blue palette) */
+  --cta-card-bg:#001f63;
+  --cta-card-bg2:#04103a;
+  --cta-blob-1:#2452f1;
+  --cta-blob-2:#022474;
+  --cta-blob-3:#163db9;
+  --cta-blob-4:#0b1d99;
+  --cta-blob-5:#3b6bff;
+  --cta-blob-6:#061c66;
+  --cta-accent:#22d3ee;
+  --cta-text:#ffffff;
+  --cta-text-soft:rgba(255,255,255,.82);
+  --cta-muted:rgba(255,255,255,.62);
+  --cta-panel:rgba(255,255,255,.1);
+  --cta-panel-border:rgba(255,255,255,.22);
+  --cta-panel-hover:rgba(255,255,255,.17);
+  --cta-chip:rgba(255,255,255,.12);
+  --cta-btn-bg:#ffffff;
+  --cta-btn-text:#001f63;
+  --cta-btn-hover:rgba(255,255,255,.88);
+  /* Page rays (≈ GodRays) */
+  --cta-ray-color:rgba(14,165,233,.11);
+  --cta-ray-bloom:rgba(34,211,238,.2);
+  --cta-ray-blend:normal;
+  --cta-ray-opacity:1;
+}
+
+/* ── Page background: animated light rays (≈ GodRays) ───────────
+   Injected as the first child of .main-panel. The panel gets
+   z-index:0 so this negative-z child paints ABOVE the panel's own
+   background but BELOW all dashboard content. Scrolls with content
+   (like a hero background). */
+.main-panel{position:relative;z-index:0}
+.fluid-rays{
+  position:absolute; inset:0; z-index:-1;
+  pointer-events:none; overflow:hidden;
+  opacity:var(--cta-ray-opacity);
+  mix-blend-mode:var(--cta-ray-blend);
+}
+.fluid-rays::before{ /* radial streaks, light source off top-right */
+  content:""; position:absolute; inset:-35%;
+  background:repeating-conic-gradient(from 0deg at 85% -12%,
+    var(--cta-ray-color) 0deg 3deg,
+    transparent 3deg 11deg);
+  animation:rays-rotate 90s linear infinite;
+  will-change:transform;
+}
+.fluid-rays::after{ /* central bloom */
+  content:""; position:absolute; top:-14%; right:-8%;
+  width:72vw; height:72vw;
+  background:radial-gradient(circle at center,var(--cta-ray-bloom),transparent 62%);
+  filter:blur(34px);
+  animation:rays-breathe 13s ease-in-out infinite alternate;
+}
+@keyframes rays-rotate{
+  0%{transform:rotate(0deg) scale(1)}
+  100%{transform:rotate(360deg) scale(1.12)}
+}
+@keyframes rays-breathe{
+  0%{opacity:.5; transform:scale(1)}
+  100%{opacity:1; transform:scale(1.08)}
+}
+
+/* ── Expandable buy overlay + FLIP card ───────────────────────── */
+.buy-overlay{
+  position:fixed; inset:0; z-index:10001;
+  display:none; align-items:center; justify-content:center;
+  padding:12px;
+}
+.buy-overlay.open{display:flex}
+.buy-card{
+  position:fixed;           /* geometry set by JS (top/left/width/height) */
+  transform-origin:0 0;
+  border-radius:24px;
+  background:
+    radial-gradient(120% 120% at 18% 8%, var(--cta-card-bg2), transparent 55%),
+    linear-gradient(160deg, var(--cta-card-bg), var(--cta-card-bg2) 78%);
+  color:var(--cta-text);
+  overflow:hidden;
+  box-shadow:0 40px 120px rgba(0,0,0,.5),0 0 0 1px rgba(255,255,255,.06);
+  will-change:transform,border-radius;
+  font-family:var(--font-ui,'Plus Jakarta Sans','Inter',system-ui,sans-serif);
+}
+
+/* ── Fluid blobs inside card (≈ MeshGradient) ─────────────────── */
+.fluid-mesh{position:absolute; inset:0; overflow:hidden; z-index:0}
+.fluid-mesh .mesh-blob{
+  position:absolute; border-radius:50%;
+  filter:blur(70px); opacity:.85; will-change:transform;
+}
+.fluid-mesh .mesh-blob.m1{width:52vmin;height:52vmin;top:-8%;left:-6%;background:radial-gradient(circle at 40% 40%,var(--cta-blob-1),transparent 70%);animation:mesh-a 26s ease-in-out infinite}
+.fluid-mesh .mesh-blob.m2{width:58vmin;height:58vmin;bottom:-14%;right:-8%;background:radial-gradient(circle at 60% 60%,var(--cta-blob-2),transparent 70%);animation:mesh-b 30s ease-in-out infinite;animation-delay:-6s}
+.fluid-mesh .mesh-blob.m3{width:44vmin;height:44vmin;top:30%;right:4%;background:radial-gradient(circle at 50% 50%,var(--cta-blob-3),transparent 70%);animation:mesh-c 22s ease-in-out infinite;animation-delay:-11s}
+.fluid-mesh .mesh-blob.m4{width:48vmin;height:48vmin;bottom:14%;left:8%;background:radial-gradient(circle at 50% 50%,var(--cta-blob-4),transparent 70%);animation:mesh-d 28s ease-in-out infinite;animation-delay:-16s}
+.fluid-mesh .mesh-blob.m5{width:36vmin;height:36vmin;top:-4%;right:18%;background:radial-gradient(circle at 50% 50%,var(--cta-blob-5),transparent 70%);animation:mesh-c 24s ease-in-out infinite;animation-delay:-4s}
+.fluid-mesh .mesh-blob.m6{width:40vmin;height:40vmin;bottom:-4%;left:32%;background:radial-gradient(circle at 50% 50%,var(--cta-blob-6),transparent 70%);animation:mesh-b 26s ease-in-out infinite;animation-delay:-9s}
+.fluid-mesh::after{ /* subtle grain (≈ shader grain) */
+  content:""; position:absolute; inset:0; pointer-events:none;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)' opacity='0.4'/%3E%3C/svg%3E");
+  opacity:.05; mix-blend-mode:overlay;
+}
+@keyframes mesh-a{0%,100%{transform:translate(0,0) scale(1)}25%{transform:translate(10%,6%) scale(1.12)}50%{transform:translate(-4%,14%) scale(.94)}75%{transform:translate(8%,-6%) scale(1.08)}}
+@keyframes mesh-b{0%,100%{transform:translate(0,0) scale(1)}25%{transform:translate(-10%,-8%) scale(1.1)}50%{transform:translate(6%,-14%) scale(.96)}75%{transform:translate(-8%,6%) scale(1.06)}}
+@keyframes mesh-c{0%,100%{transform:translate(0,0) scale(1)}25%{transform:translate(12%,-6%) scale(1.08)}50%{transform:translate(-6%,-10%) scale(1.14)}75%{transform:translate(6%,8%) scale(.95)}}
+@keyframes mesh-d{0%,100%{transform:translate(0,0) scale(1)}25%{transform:translate(-12%,8%) scale(.94)}50%{transform:translate(8%,10%) scale(1.12)}75%{transform:translate(-6%,-8%) scale(1.05)}}
+
+/* ── Card content shell ───────────────────────────────────────── */
+.buy-card-content{
+  position:relative; z-index:1;
+  height:100%; overflow-y:auto; overflow-x:hidden;
+  opacity:0; transition:opacity .35s ease;
+  scrollbar-width:none;
+}
+.buy-card-content::-webkit-scrollbar{display:none}
+.buy-overlay.open .buy-card-content{opacity:1}
+.buy-inner{max-width:1060px; margin:0 auto; padding:64px 40px 56px}
+.buy-close{
+  position:absolute; top:18px; right:18px; z-index:3;
+  width:40px; height:40px; border-radius:50%;
+  border:1px solid rgba(255,255,255,.28);
+  background:rgba(255,255,255,.12);
+  color:#fff; font-size:18px; line-height:1; cursor:pointer;
+  display:flex; align-items:center; justify-content:center;
+  transition:background .2s,transform .2s;
+}
+.buy-close:hover{background:rgba(255,255,255,.24); transform:scale(1.06)}
+.buy-close:active{transform:scale(.96)}
+
+/* Hero */
+.buy-hero{text-align:center; margin-bottom:36px}
+.buy-tag{
+  display:inline-flex; align-items:center; gap:6px;
+  font-size:13px; font-weight:600; letter-spacing:.02em;
+  color:var(--cta-accent); background:rgba(255,255,255,.08);
+  border:1px solid rgba(255,255,255,.18);
+  padding:6px 14px; border-radius:999px; margin-bottom:18px;
+}
+.buy-title{font-size:clamp(30px,5vw,46px); font-weight:800; letter-spacing:-.03em; margin:0; color:#fff}
+.buy-trust{display:flex; flex-wrap:wrap; gap:8px; justify-content:center; margin-top:18px}
+.buy-trust-item{
+  display:inline-flex; align-items:center; gap:7px;
+  font-size:12px; font-weight:500; color:var(--cta-text-soft);
+  background:var(--cta-chip); border:1px solid var(--cta-panel-border);
+  padding:7px 13px; border-radius:999px;
+}
+.buy-dot{width:7px; height:7px; border-radius:50%; background:var(--cta-accent); box-shadow:0 0 8px var(--cta-accent)}
+
+/* Product grid */
+.buy-grid{display:grid; grid-template-columns:repeat(2,1fr); gap:14px; margin-bottom:28px}
+.buy-product{
+  position:relative; cursor:pointer;
+  background:var(--cta-panel); border:1px solid var(--cta-panel-border);
+  border-radius:20px; padding:22px 20px 18px;
+  transition:transform .22s cubic-bezier(.2,.8,.2,1),background .22s,border-color .22s,box-shadow .22s;
+}
+.buy-product:hover{transform:translateY(-3px); background:var(--cta-panel-hover)}
+.buy-product.selected{
+  background:#fff; border-color:#fff;
+  box-shadow:0 14px 40px rgba(0,0,0,.35);
+}
+.buy-product.selected .buy-pname,
+.buy-product.selected .buy-price,
+.buy-product.selected .buy-pinfo{color:var(--cta-btn-text)}
+.buy-product.selected .buy-feats li{color:rgba(0,31,99,.85)}
+.buy-product.selected .buy-feats li::before{color:var(--cta-accent)}
+.buy-badge{
+  position:absolute; top:-10px; right:14px;
+  font-size:10px; font-weight:700; letter-spacing:.04em; text-transform:uppercase;
+  color:#3b0764; background:#ffeb3b;
+  padding:4px 10px; border-radius:999px;
+  box-shadow:0 4px 12px rgba(0,0,0,.28);
+}
+.buy-pname{font-size:17px; font-weight:700; margin:0 0 4px; color:#fff}
+.buy-price{font-size:28px; font-weight:800; letter-spacing:-.02em; margin:0 0 2px; color:#fff}
+.buy-pinfo{font-size:12.5px; color:var(--cta-muted); margin:0 0 12px}
+.buy-feats{list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:6px}
+.buy-feats li{font-size:13px; color:var(--cta-text-soft)}
+.buy-feats li::before{content:"✓"; color:var(--cta-accent); font-weight:700; margin-right:7px}
+
+/* How it works + summary */
+.buy-bottom{display:grid; grid-template-columns:1.2fr 1fr; gap:16px; align-items:stretch}
+.buy-panel{
+  background:rgba(255,255,255,.07); border:1px solid var(--cta-panel-border);
+  border-radius:20px; padding:22px 22px 20px;
+}
+.buy-sub{font-size:15px; font-weight:700; margin:0 0 8px; color:#fff}
+.buy-info-text{font-size:13.5px; line-height:1.7; color:var(--cta-text-soft); margin:0}
+.buy-sumline{display:flex; align-items:center; justify-content:space-between; padding:6px 0; font-size:14px}
+.buy-sumline .lbl{color:var(--cta-muted)}
+.buy-sumline .val{font-weight:600; color:#fff; text-align:right}
+.buy-total-row{
+  display:flex; align-items:center; justify-content:space-between;
+  margin-top:10px; padding-top:14px; border-top:1px solid rgba(255,255,255,.18);
+}
+.buy-total{font-size:24px; font-weight:800; letter-spacing:-.02em}
+.buy-btn{
+  display:inline-flex; align-items:center; justify-content:center; gap:8px;
+  background:var(--cta-btn-bg); color:var(--cta-btn-text);
+  border:none; border-radius:999px; padding:13px 24px;
+  font-size:14.5px; font-weight:700; font-family:inherit; cursor:pointer;
+  box-shadow:0 12px 30px rgba(0,0,0,.3);
+  transition:transform .2s,box-shadow .2s,opacity .2s;
+}
+.buy-btn:hover{transform:translateY(-2px); box-shadow:0 16px 38px rgba(0,0,0,.36); background:var(--cta-btn-hover)}
+.buy-btn:active{transform:translateY(0)}
+.buy-btn:disabled{opacity:.7; cursor:default; transform:none}
+
+/* Legal */
+.buy-legal{display:grid; grid-template-columns:repeat(3,1fr); gap:14px; margin-top:28px}
+.buy-legal-card{background:rgba(255,255,255,.05); border:1px solid rgba(255,255,255,.14); border-radius:16px; padding:16px}
+.buy-legal-card h4{font-size:13.5px; font-weight:700; margin:0 0 6px; color:#fff}
+.buy-legal-card p{font-size:12px; line-height:1.65; color:var(--cta-muted); margin:0}
+
+/* Responsive */
+@media(max-width:760px){
+  .buy-grid{grid-template-columns:1fr}
+  .buy-bottom{grid-template-columns:1fr}
+  .buy-legal{grid-template-columns:1fr}
+  .buy-inner{padding:56px 20px 40px}
+}
+@media(max-width:520px){
+  .buy-overlay{padding:0}
+  .buy-card{border-radius:0}
+}
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce){
+  .fluid-rays::before,.fluid-rays::after,
+  .fluid-mesh .mesh-blob{animation:none !important}
+}
