@@ -974,7 +974,8 @@
     if (!session || !el) return;
     if (el.getAttribute('data-level') !== '0') return;
     if (el.classList.contains('exiting')) return;
-    el.classList.add('flip');
+    // Toggle so a second tap flips the card back to the word.
+    el.classList.toggle('flip');
     var stage = $('#learnerStage');
     if (stage) $all('.ics-grade', stage).forEach(function (b) { b.disabled = false; });
   }
