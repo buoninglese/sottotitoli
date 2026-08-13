@@ -4,6 +4,19 @@
 > The entries below from v206–v210 describe an **ES-module refactor** (`js/panoramica/app.js` + `panoramica/panels/*.js` + `panoramica/shared/*.js`) that **never shipped**. `panoramica.html` never imported `app.js`, so the deployed site always ran the ~10,700-line inline monolith. The refactor files were dead code and have been **moved to** `~/Desktop/sottotitoli-archived/dead-js/panoramica-v2-attempt/`.
 > **Real current state: monolith at v178.** These v2xx notes describe work that was never activated — treat them as historical, not as a description of the live code.
 
+## [2026-08-13] Wrapped Copy Desk — 4 copy voices for the year recap (dev tool)
+
+### Added
+- New dev tool `dev/wrapped-copy-desk.html` (linked from `dev/dashboards.html` as card #14): an **option desk** for the copy of the "Il tuo anno in numeri" Wrapped recap — the "meh" copy now has real alternatives to choose from.
+- **4 full-recap copy voices**, every string covered (hero + dynamic branches, totals fact/fun, all 7 personas, CEFR, category/palette, peak + chips, share):
+  - **Current** — production baseline (verbatim).
+  - **A · Gen-Z / Wrapped** — slang, meme-forward, "main character" energy (Spotify-Wrapped-like).
+  - **B · Coach / Motivational** — warm second person, "you built this".
+  - **C · Minimal / Data-poetic** — understated, numbers first, few emojis.
+- **Live preview** renders the selected voice into the real `wsc` mockup (reuses `theme-wrapped.css`), with theme pills (Gen-Z default), 📊/🎉 toggle and a data simulator; the **desk** shows all 4 voices side-by-side per field, click a cell (or a voice tab) to apply it to the preview.
+- **Export** produces `wrapped-content-<voice>.json` (`{ wrappedContent }` shape, compatible with `wrapped-studio.html`) so a picked winner can be ported straight into the studio/production.
+- Dev-only: production copy in `panoramica.html` / `js/i18n.js` untouched — pick winners here first, then port them.
+
 ## [2026-08-13] Sidebar — removed right border line on wrapped themes (v209)
 
 ### Fixed
