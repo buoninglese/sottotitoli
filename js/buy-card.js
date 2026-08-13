@@ -107,7 +107,7 @@
         '<div class="fluid-mesh" aria-hidden="true">' +
           '<span class="mesh-blob m1"></span><span class="mesh-blob m2"></span>' +
           '<span class="mesh-blob m3"></span><span class="mesh-blob m4"></span>' +
-          '<span class="mesh-blob m5"></span><span class="mesh-blob m6"></span>' +
+
         '</div>' +
         '<button type="button" class="buy-close" aria-label="Chiudi">✕</button>' +
         '<div class="buy-card-content" id="buyCardContent">' +
@@ -337,12 +337,21 @@
     host.insertBefore(div, host.firstChild);
   }
 
+  function bindVisibilityPause() {
+    var apply = function () {
+      document.documentElement.classList.toggle('fluid-paused', !!document.hidden);
+    };
+    document.addEventListener('visibilitychange', apply);
+    apply();
+  }
+
   function init() {
     if (document.readyState === 'loading') {
-      document.addEventListener('DOMContentLoaded', function () { bindTriggers(); mountRays(); });
+      document.addEventListener('DOMContentLoaded', function () { bindTriggers(); mountRays(); bindVisibilityPause(); });
     } else {
       bindTriggers();
       mountRays();
+      bindVisibilityPause();
     }
   }
 
