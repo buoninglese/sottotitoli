@@ -9513,41 +9513,16 @@
         return m[label] || null;
       }
 
-      // ── Wordnik definition (primary, via Supabase Edge Function proxy) ──
-      async function fetchWordnik(word) {
-        try {
-          var proxyUrl = (window.SOTTOTITOLI_CONFIG && window.SOTTOTITOLI_CONFIG.wordnikProxyUrl) || '';
-          if (!proxyUrl) return null;
-          var resp = await fetch(proxyUrl + '?word=' + encodeURIComponent(word));
-          if (!resp.ok) return null;
-          var data = await resp.json();
-          if (!data || !data.length) return null;
-          // Wordnik returns array of definitions; pick the first with text
-          var def = '';
-          var pos = '';
-          for (var i = 0; i < data.length; i++) {
-            if (data[i].text) { def = data[i].text; pos = data[i].partOfSpeech || ''; break; }
-          }
-          return { definition: def, ipa: null, pos: pos }; // Wordnik doesn't reliably give IPA
-        } catch(e) { return null; }
-      }
+      // ── Wordnik removed from chains (proxy dead — 0/20 coverage, Aug 2026 tests) ──
 
-      // ── Free Dictionary API (with optional POS preference) ──
+      // ── Free Dictionary API (direct first — 18/20 coverage, ~230ms; proxy is slower + thinner) ──
       async function fetchFreeDict(word, preferredPos) {
+        // Direct API
         try {
-          var resp = await fetch('https://qzqmuegbpmvqrjrlfbgk.supabase.co/functions/v1/dictionary-proxy?word=' + encodeURIComponent(word));
-          if (!resp.ok) return null;
+          var resp = await fetch('https://api.dictionaryapi.dev/api/v2/entries/en/' + encodeURIComponent(word));
+          if (!resp.ok) throw new Error('direct miss');
           var data = await resp.json();
-          if (!data) return null;
-
-          // Handle simplified proxy format: { definition, ipa, notFound }
-          if (data.definition !== undefined) {
-            if (data.notFound) return null; // Negative cache hit
-            return { definition: data.definition, ipa: data.ipa || '' };
-          }
-
-          // Handle raw Free Dictionary API format: [{ meanings, phonetics }]
-          if (!data.length) return null;
+          if (!data || !data.length) throw new Error('empty');
           var entry = data[0];
           var def = '';
           var ipa = '';
@@ -9563,9 +9538,9 @@
               }
             }
             if (!def) {
-              for (var i = 0; i < entry.meanings.length; i++) {
-                var m = entry.meanings[i];
-                if (m.definitions && m.definitions.length) { def = m.definitions[0].definition; break; }
+              for (var i2 = 0; i2 < entry.meanings.length; i2++) {
+                var m2 = entry.meanings[i2];
+                if (m2.definitions && m2.definitions.length) { def = m2.definitions[0].definition; break; }
               }
             }
           }
@@ -9574,12 +9549,31 @@
               if (entry.phonetics[j].text) { ipa = entry.phonetics[j].text; break; }
             }
           }
-          // Capture partOfSpeech from the meaning we used (POS enrichment)
-          var fdPos = '';
-          if (entry.meanings && entry.meanings.length) {
-            fdPos = entry.meanings[0].partOfSpeech || '';
+          var fdPos = (entry.meanings && entry.meanings.length) ? (entry.meanings[0].partOfSpeech || '') : '';
+          if (def) return { definition: def, ipa: ipa, pos: fdPos };
+        } catch(e) { /* fall through to proxy */ }
+
+        // Proxy fallback (cached, server-side — simplified {definition, ipa, notFound} format)
+        try {
+          var resp2 = await fetch('https://qzqmuegbpmvqrjrlfbgk.supabase.co/functions/v1/dictionary-proxy?word=' + encodeURIComponent(word));
+          if (!resp2.ok) return null;
+          var pdata = await resp2.json();
+          if (!pdata) return null;
+          if (pdata.definition !== undefined) {
+            if (pdata.notFound) return null;
+            return { definition: pdata.definition, ipa: pdata.ipa || '' };
           }
-          return { definition: def, ipa: ipa, pos: fdPos };
+          if (!pdata.length) return null;
+          var pentry = pdata[0];
+          if (!pentry || !pentry.meanings || !pentry.meanings.length) return null;
+          var pdef = pentry.meanings[0].definitions && pentry.meanings[0].definitions.length ? pentry.meanings[0].definitions[0].definition : '';
+          var pipa = '';
+          if (pentry.phonetics && pentry.phonetics.length) {
+            for (var pj = 0; pj < pentry.phonetics.length; pj++) {
+              if (pentry.phonetics[pj].text) { pipa = pentry.phonetics[pj].text; break; }
+            }
+          }
+          return pdef ? { definition: pdef, ipa: pipa, pos: pentry.meanings[0].partOfSpeech || '' } : null;
         } catch(e) { return null; }
       }
 
@@ -9602,24 +9596,21 @@
         } catch(e) { return null; }
       }
 
-      // ── Combined: Free Dictionary → WordsAPI → NGSL (local) → Wordnik fallback ──
+      // ── Combined: NGSL (local) → Free Dictionary (direct → proxy) → WordsAPI ──
       async function fetchDictionary(word, preferredPos) {
-        // Try Free Dictionary first (has IPA + definitions, POS-aware)
+        // 1. Local NGSL first — instant, offline, curated (def + pos + IPA)
+        var ng = (window.EN_NGSL || {})[word.toLowerCase()];
+        if (ng && ng[3]) {
+          var ngPosMap = { v:'verb', n:'noun', adj:'adjective', adv:'adverb' };
+          return { definition: ng[3], ipa: ng[2] || '', pos: ngPosMap[ng[1]] || '' };
+        }
+        // 2. Free Dictionary (direct API first, proxy fallback) — IPA + POS-aware
         var fd = await fetchFreeDict(word, preferredPos);
         if (fd && fd.definition) return fd;
-        // Try WordsAPI (RapidAPI) — better coverage than Free Dictionary
+        // 3. WordsAPI (RapidAPI) — wider coverage than Free Dictionary
         var wa = await fetchWordsApi(word);
         if (wa && wa.definition) return wa;
-        // Local NGSL (2,800 most frequent words — instant, offline, curated)
-        var ng = (window.EN_NGSL || {})[word.toLowerCase()];
-        if (ng && ng[2]) {
-          var ngPosMap = { v:'verb', n:'noun', adj:'adjective', adv:'adverb' };
-          return { definition: ng[2], ipa: null, pos: ngPosMap[ng[1]] || '' };
-        }
-        // Fall back to Wordnik
-        var w = await fetchWordnik(word);
-        if (w && w.definition) return w;
-        // Neither worked
+        // Nothing found
         return null;
       }
 
