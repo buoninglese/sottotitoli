@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VB API Map — What feeds what in the Vocabulary Builder</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,400;14..32,500;14..32,600;14..32,700;14..32,800;14..32,900&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:Inter,system-ui,sans-serif;background:#08090d;color:#e2e8f0;padding:40px 20px;min-height:100vh}
+.wrap{max-width:1400px;margin:0 auto}
+h1{font-size:36px;font-weight:900;letter-spacing:-.02em;margin-bottom:6px}
+h1 span{background:linear-gradient(135deg,#a78bfa,#06b6d4,#10b981);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.subtitle{color:rgba(255,255,255,.35);margin-bottom:16px;font-size:15px}
+.legend{display:flex;gap:18px;flex-wrap:wrap;margin-bottom:40px;font-size:12px;color:rgba(255,255,255,.6)}
+.legend span{display:inline-flex;align-items:center;gap:6px}
+.badge{display:inline-block;padding:2px 8px;border-radius:6px;font-size:10px;font-weight:700}
+.b-free{background:rgba(34,197,94,.12);color:#4ade80;border:1px solid rgba(34,197,94,.25)}
+.b-freemium{background:rgba(251,191,36,.12);color:#facc15;border:1px solid rgba(251,191,36,.25)}
+.b-paid{background:rgba(239,68,68,.12);color:#f87171;border:1px solid rgba(239,68,68,.25)}
+.b-local{background:rgba(59,130,246,.12);color:#60a5fa;border:1px solid rgba(59,130,246,.25)}
+
+.stars{color:#facc15;letter-spacing:1px;font-size:11px;white-space:nowrap}
+.stars .off{color:rgba(255,255,255,.15)}
+
+/* ── Flow map ── */
+.flowmap{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;margin-bottom:48px}
+@media(max-width:1000px){.flowmap{grid-template-columns:1fr}}
+.flow-col{border:1px solid rgba(255,255,255,.08);border-radius:16px;padding:20px;background:rgba(255,255,255,.015)}
+.flow-col h2{font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin-bottom:14px;display:flex;align-items:center;gap:8px}
+.flow-tab-en{color:#06b6d4}
+.flow-tab-it{color:#10b981}
+.flow-tab-rv{color:#f59e0b}
+.flow-arrow{text-align:center;color:rgba(255,255,255,.25);font-size:13px;padding:6px 0}
+.flow-arrow i{animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:.3}50%{opacity:1}}
+
+/* word card mock */
+.wcard{border:2px solid rgba(255,255,255,.08);border-radius:12px;padding:16px;background:rgba(10,12,18,.6)}
+.wcard .wordline{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+.wcard .word{font-size:26px;font-weight:900;letter-spacing:-.01em}
+.wcard .tag{padding:3px 10px;border-radius:100px;font-size:10px;font-weight:700;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12)}
+.wcard .def{font-size:13px;color:rgba(255,255,255,.65);line-height:1.55;margin-top:10px}
+.wcard .trans{font-size:13px;color:#22d3ee;margin-top:6px}
+.wcard .syns{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+.wcard .syn{font-size:11px;padding:3px 8px;border-radius:100px;background:rgba(6,182,212,.08);color:#22d3ee}
+
+.feed{display:flex;align-items:center;gap:8px;font-size:11px;margin-top:10px;color:rgba(255,255,255,.45)}
+.feed .src{font-weight:600}
+.hl{border:2px solid #a78bfa;border-radius:6px;background:rgba(167,139,250,.06)}
+.hl-cyan{border-color:#06b6d4;background:rgba(6,182,212,.06)}
+.hl-green{border-color:#10b981;background:rgba(16,185,129,.06)}
+.hl-amber{border-color:#f59e0b;background:rgba(245,158,11,.06)}
+.hl-blue{border-color:#3b82f6;background:rgba(59,130,246,.06)}
+
+/* API detail cards */
+.section-title{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.12em;color:rgba(255,255,255,.3);margin:44px 0 16px;padding-bottom:8px;border-bottom:1px solid rgba(255,255,255,.06)}
+.section-title .num{color:rgba(167,139,250,.7);margin-right:8px}
+.api-grid{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+@media(max-width:1000px){.api-grid{grid-template-columns:1fr}}
+.api-card{border:1px solid rgba(255,255,255,.08);border-radius:16px;padding:24px;background:rgba(255,255,255,.015)}
+.api-card.current{border-color:rgba(6,182,212,.35)}
+.api-card .api-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:6px}
+.api-card h3{font-size:18px;font-weight:800;letter-spacing:-.01em}
+.api-card .api-url{font-family:'JetBrains Mono',monospace;font-size:10.5px;color:rgba(255,255,255,.35);margin-bottom:10px;word-break:break-all}
+.api-card .roles{font-size:12px;color:rgba(255,255,255,.55);line-height:1.6;margin-bottom:14px}
+.api-card .roles b{color:#a78bfa;font-weight:700}
+
+.verdict{display:flex;gap:16px;align-items:center;padding:10px 14px;border-radius:10px;background:rgba(255,255,255,.03);margin-bottom:14px;flex-wrap:wrap}
+.verdict .vlabel{font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:rgba(255,255,255,.4);font-weight:700}
+.verdict .vscore{font-size:20px;font-weight:900}
+
+pre.sample{font-family:'JetBrains Mono',monospace;font-size:10.5px;background:#0c0e14;border:1px solid rgba(255,255,255,.06);border-radius:10px;padding:12px;overflow-x:auto;color:#9ca3af;line-height:1.6;margin-bottom:14px}
+pre.sample .k{color:#a78bfa}
+pre.sample .s{color:#4ade80}
+
+/* alternatives table */
+.alt-wrap{overflow-x:auto}
+.alt-table{width:100%;border-collapse:collapse;font-size:12px;min-width:560px}
+.alt-table th{text-align:left;padding:9px 12px;background:rgba(255,255,255,.03);border-bottom:2px solid rgba(255,255,255,.08);font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:rgba(255,255,255,.45)}
+.alt-table td{padding:10px 12px;border-bottom:1px solid rgba(255,255,255,.05);line-height:1.45;vertical-align:top}
+.alt-table tr.cur td{background:rgba(6,182,212,.05)}
+.alt-table .name{font-weight:700}
+.alt-table .cur-tag{font-size:9px;color:#06b6d4;font-weight:700;text-transform:uppercase;letter-spacing:.05em}
+.alt-table .note{color:rgba(255,255,255,.4);font-size:11px}
+
+.foot{margin-top:48px;padding-top:20px;border-top:1px solid rgba(255,255,255,.06);font-size:11px;color:rgba(255,255,255,.3);line-height:1.7}
+.foot b{color:rgba(255,255,255,.6)}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<h1>Vocabulary Builder — <span>API Map</span></h1>
+<p class="subtitle">Every element in the VB, what API feeds it, what the payload looks like — and every realistic alternative with rating + cost. Mockup · dev-only · mirrors panoramica.html (v212).</p>
+<div class="legend">
+  <span><i class="fa-solid fa-circle" style="color:#4ade80;font-size:8px"></i> Free — no key</span>
+  <span><i class="fa-solid fa-circle" style="color:#facc15;font-size:8px"></i> Freemium — free tier / free key</span>
+  <span><i class="fa-solid fa-circle" style="color:#f87171;font-size:8px"></i> Paid — subscription / per-call</span>
+  <span><i class="fa-solid fa-circle" style="color:#60a5fa;font-size:8px"></i> Local — bundled file, no network</span>
+</div>
+
+<!-- ═══════════════ FLOW MAP ═══════════════ -->
+<h2 class="section-title">Flow map — who feeds which pixel</h2>
+<div class="flowmap">
+
+  <!-- EN tab -->
+  <div class="flow-col">
+    <h2><i class="fa-solid fa-globe flow-tab-en"></i> 🇬🇧 English tab</h2>
+    <div class="wcard">
+      <div class="wordline"><span class="word">celebrate</span><span class="tag hl-blue">VERB · B1</span><span class="tag">/ˈsɛləˌbɹeɪt/</span></div>
+      <div class="def hl">To extol or honour in a solemn manner.</div>
+      <div class="trans hl-cyan">→ celebrare · festeggiare · commemorare</div>
+      <div class="syns"><span class="syn">commemorate</span><span class="syn">honor</span><span class="syn">party</span><span class="syn">rejoice</span></div>
+      <div class="feed"><span class="src hl-blue">POS+CEFR:</span> local files CEFR_LEVELS / LEMMA_POS_MAP</div>
+      <div class="feed"><span class="src hl">IPA+def:</span> Free Dictionary API → Wordnik (fallback)</div>
+      <div class="feed"><span class="src hl-cyan">Translation:</span> MyMemory en|it</div>
+      <div class="feed"><span class="src hl-cyan">Synonyms:</span> Datamuse ml=</div>
+    </div>
+    <div class="flow-arrow"><i class="fa-solid fa-arrow-down"></i></div>
+    <div class="feed" style="justify-content:center"><span class="src">Save + → Supabase</span> user_wordbank_words (lang=en)</div>
+  </div>
+
+  <!-- IT tab -->
+  <div class="flow-col">
+    <h2><i class="fa-solid fa-language flow-tab-it"></i> 🇮🇹 Italian tab</h2>
+    <div class="wcard">
+      <div class="wordline"><span class="word">casa</span><span class="tag hl-blue">SOSTANTIVO · B1*</span><span class="tag">f sing</span></div>
+      <div class="def hl-green">Edificio costruito per ospitare persone, o luogo dove si abita.</div>
+      <div class="trans hl-cyan">→ house · home · dwelling</div>
+      <div class="syns"><span class="syn hl-blue">casale</span><span class="syn hl-blue">casata</span><span class="syn hl-blue">casalinga</span></div>
+      <div class="feed"><span class="src hl-green">Def:</span> Wiktionary IT (MediaWiki API)</div>
+      <div class="feed"><span class="src hl-cyan">Translation:</span> MyMemory it|en</div>
+      <div class="feed"><span class="src hl-blue">Related*:</span> local CEFR_LEVELS prefix match (hack)</div>
+      <div class="feed"><span class="src hl-amber">POS+CEFR*:</span> parsed from Wiktionary / default B1</div>
+    </div>
+    <div class="flow-arrow"><i class="fa-solid fa-arrow-down"></i></div>
+    <div class="feed" style="justify-content:center"><span class="src">Save + → Supabase</span> "Italian Vocabulary Builder" (lang=it) + localStorage</div>
+  </div>
+
+  <!-- Review tab -->
+  <div class="flow-col">
+    <h2><i class="fa-solid fa-clock-rotate-left flow-tab-rv"></i> 🔄 Review tab</h2>
+    <div class="wcard">
+      <div class="wordline"><span class="word">attendere</span><span class="tag hl-amber">B2 · VERB</span><span class="tag">due</span></div>
+      <div class="def" style="color:rgba(255,255,255,.5)">next_review_at ≤ now · 3 lapses · mastery 38%</div>
+      <div class="syns"><span class="syn">is_new=true</span><span class="syn">SRS row</span></div>
+      <div class="feed"><span class="src hl-amber">Queue:</span> Supabase review_words table</div>
+      <div class="feed"><span class="src hl-amber">Sort:</span> client-side (priority/CEFR/POS)</div>
+      <div class="feed"><span class="src hl-amber">✓ Fatto:</span> update review_words (SRS bump)</div>
+    </div>
+    <div class="flow-arrow"><i class="fa-solid fa-arrow-down"></i></div>
+    <div class="feed" style="justify-content:center"><span class="src">Stats bar → Supabase</span> getWordbankStats(lang)</div>
+  </div>
+</div>
+
+<!-- ═══════════════ API 1: EN SUGGESTIONS ═══════════════ -->
+<h2 class="section-title"><span class="num">01</span>EN word suggestions (synonyms · antonyms · word-family · related · rhymes)</h2>
+<div class="api-grid">
+  <div class="api-card current">
+    <div class="api-head"><h3>Datamuse</h3><span class="badge b-free">FREE</span></div>
+    <div class="api-url">https://api.datamuse.com/words?ml=celebrate&amp;max=20&amp;md=p</div>
+    <div class="roles">Feeds: <b>suggestion cards</b> (all 5 relations), <b>synonym chips</b> inside cards, <b>related words</b> (rel_jjb), <b>rhymes</b> (lc=). Called client-side, up to ~25 requests per search session.</div>
+    <div class="verdict"><span class="vlabel">Rating</span><span class="vscore"><span class="stars">★★★★<span class="off">★</span></span></span><span class="vlabel">4 / 5</span><span class="vlabel">Cost</span><span class="badge b-free">$0 · no key</span></div>
+    <pre class="sample">GET /words?ml=celebrate&amp;max=20&amp;md=p
+[
+  { <span class="s">"word":"commemorate"</span>, <span class="k">"score"</span>:33972, "tags":[<span class="s">"syn","v"</span>] },
+  { <span class="s">"word":"observe"</span>,      <span class="k">"score"</span>:15846, "tags":[<span class="s">"syn","v"</span>] },
+  { <span class="s">"word":"fete"</span>,          <span class="k">"score"</span>:8432,  "tags":[<span class="s">"syn","v"</span>] }
+]</pre>
+    <div style="font-size:11px;color:rgba(255,255,255,.4)">Strengths: instant, no auth, tags carry POS + frequency. Limits: <b>English only</b>, no definitions, quality degrades on rare words.</div>
+  </div>
+  <div class="api-card">
+    <h3 style="margin-bottom:8px">Alternatives</h3>
+    <div class="alt-wrap"><table class="alt-table">
+      <tr><th>Option</th><th>What it gives</th><th>Rating</th><th>Cost</th><th>Notes</th></tr>
+      <tr class="cur"><td class="name">Datamuse <span class="cur-tag">current</span></td><td>syn/ant/related/rhymes + freq tags</td><td><span class="stars">★★★★<span class="off">★</span></span></td><td><span class="badge b-free">FREE</span></td><td class="note">No key. English-only.</td></tr>
+      <tr><td class="name">WordNet (Princeton)</td><td>true sense-level synsets, hyper/hyponyms</td><td><span class="stars">★★★★<span class="off">★</span></span></td><td><span class="badge b-free">FREE</span></td><td class="note">Most accurate relations, but you must host it (or pay a wrapper).</td></tr>
+      <tr><td class="name">ConceptNet 5</td><td>multilingual relations incl. Italian</td><td><span class="stars">★★★<span class="off">★★</span></span></td><td><span class="badge b-free">FREE</span></td><td class="note">Only one that speaks Italian — but relations are noisy.</td></tr>
+      <tr><td class="name">Merriam-Webster Thesaurus</td><td>curated thesaurus + usage</td><td><span class="stars">★★★★<span class="off">★</span></span></td><td><span class="badge b-paid">PAID</span></td><td class="note">Top quality. Free non-commercial tier 1000/day.</td></tr>
+      <tr><td class="name">WordsAPI</td><td>WordNet + frequency + definitions</td><td><span class="stars">★★★★<span class="off">★</span></span></td><td><span class="badge b-paid">PAID</span></td><td class="note">One API replaces Datamuse+FreeDict. ~$25+/mo.</td></tr>
+      <tr><td class="name">Big Huge Thesaurus</td><td>simple synonym/antonym JSON</td><td><span class="stars">★★★<span class="off">★★</span></span></td><td><span class="badge b-free">FREE</span></td><td class="note">Keyless but smaller coverage.</td></tr>
+    </table></div>
+  </div>
+</div>
+
+<!-- ═══════════════ API 2: EN DEFINITIONS ═══════════════ -->
+<h2 class="section-title"><span class="num">02</span>EN definitions + IPA (dictionary card)</h2>
+<div class="api-grid">
+  <div class="api-card current">
+    <div class="api-head"><h3>Free Dictionary API → Wordnik (fallback)</h3><span class="badge b-free">FREE</span></div>
+    <div class="api-url">https://api.dictionaryapi.dev/api/v2/entries/en/celebrate</div>
+    <div class="roles">Feeds: <b>.wbx-def</b> (definition text), <b>.wbx-ipa</b> (phonetic), <b>POS label</b>. Primary = Free Dictionary; on miss → Wordnik via Supabase edge proxy (key server-side).</div>
+    <div class="verdict"><span class="vlabel">Rating</span><span class="vscore"><span class="stars">★★★<span class="off">★★</span></span></span><span class="vlabel">3 / 5</span><span class="vlabel">Cost</span><span class="badge b-freemium">FREE + key for Wordnik</span></div>
+    <pre class="sample">GET /api/v2/entries/en/celebrate
+[{ "word":"celebrate",
+   <span class="k">"phonetic"</span>:"/ˈsɛləˌbɹeɪt/",
+   "meanings":[{ <span class="k">"partOfSpeech"</span>:"verb",
+     "definitions":[{ <span class="s">"definition"</span>:"To extol or honour
+       in a solemn manner." }] }] }]</pre>
+    <div style="font-size:11px;color:rgba(255,255,255,.4)">Strengths: keyless, clean JSON, IPA present. Weakness: phonetics missing on many words, thin on rare/domain terms → Wordnik covers gaps.</div>
+  </div>
+  <div class="api-card">
+    <h3 style="margin-bottom:8px">Alternatives</h3>
+    <div class="alt-wrap"><table class="alt-table">
+      <tr><th>Option</th><th>What it gives</th><th>Rating</th><th>Cost</th><th>Notes</th></tr>
+      <tr class="cur"><td class="name">Free Dictionary <span class="cur-tag">current</span></td><td>def + IPA + POS</td><td><span class="stars">★★★<span class="off">★★</span></span></td><td><span class="badge b-free">FREE</span></td><td class="note">Keyless. Sparse IPA.</td></tr>
+      <tr><td class="name">Wordnik <span class="cur-tag">fallback</span></td><td>rich defs, examples, frequency</td><td><span class="stars">★★★★<span class="off">★</span></span></td><td><span class="badge b-freemium">FREE KEY</span></td><td class="note">Already proxied. No reliable IPA.</td></tr>
+      <tr><td class="name">Wiktionary EN</td><td>huge coverage incl. slang</td><td><span class="stars">★★★<span class="off">★★</span></span></td><td><span class="badge b-free">FREE</span></td><td class="note">Same API as Italian tab already uses — free consolidation.</td></tr>
+      <tr><td class="name">Merriam-Webster Collegiate</td><td>premium definitions, audio</td><td><span class="stars">★★★★<span class="off">★</span></span></td><td><span class="badge b-paid">PAID</span></td><td class="note">Gold standard US. ~$60+/mo.</td></tr>
+      <tr><td class="name">Oxford Dictionaries</td><td>premium defs + audio + example sentences</td><td><span class="stars">★★★★★</span></td><td><span class="badge b-paid">PAID</span></td><td class="note">Best-in-class but licensing is restrictive.</td></tr>
+      <tr><td class="name">WordsAPI</td><td>def + synonyms + frequency in one call</td><td><span class="stars">★★★★<span class="off">★</span></span></td><td><span class="badge b-paid">PAID</span></td><td class="note">Consolidation play.</td></tr>
+    </table></div>
+  </div>
+</div>
+
+<!-- ═══════════════ API 3: IT DEFINITIONS ═══════════════ -->
+<h2 class="section-title"><span class="num">03</span>IT definitions (Italian tab card)</h2>
+<div class="api-grid">
+  <div class="api-card current">
+    <div class="api-head"><h3>Wiktionary IT (MediaWiki API)</h3><span class="badge b-free">FREE</span></div>
+    <div class="api-url">https://it.wiktionary.org/w/api.php?action=query&amp;prop=extracts&amp;explaintext=1&amp;titles=casa</div>
+    <div class="roles">Feeds: <b>.wbx-def</b> (first real definition line), <b>POS label</b> (parsed from <code>=== Sostantivo ===</code>), <b>grammar</b> (m/f sing/pl).</div>
+    <div class="verdict"><span class="vlabel">Rating</span><span class="vscore"><span class="stars">★★★<span class="off">★★</span></span></span><span class="vlabel">3 / 5</span><span class="vlabel">Cost</span><span class="badge b-free">FREE</span></div>
+    <pre class="sample">GET it.wiktionary.org/w/api.php?prop=extracts&amp;explaintext=1&amp;titles=casa
+
+== Sostantivo ==
+casa f sing
+1. <span class="s">edificio costruito per ospitare persone</span>
+2. luogo dove si abita
+== Sinonimi ==
+abitazione · dimora</pre>
+    <div style="font-size:11px;color:rgba(255,255,255,.4)">Strengths: free, CORS-friendly, real coverage incl. regional. Weakness: extract parsing is fragile (template noise, multi-POS pages), no structured POS/grammar.</div>
+  </div>
+  <div class="api-card">
+    <h3 style="margin-bottom:8px">Alternatives</h3>
+    <div class="alt-wrap"><table class="alt-table">
+      <tr><th>Option</th><th>What it gives</th><th>Rating</th><th>Cost</th><th>Notes</th></tr>
+      <tr class="cur"><td class="name">Wiktionary IT <span class="cur-tag">current</span></td><td>def + POS header + grammar</td><td><span class="stars">★★★<span class="off">★★</span></span></td><td><span class="badge b-free">FREE</span></td><td class="note">Fragile parsing, but works today.</td></tr>
+      <tr><td class="name">Il Nuovo De Mauro</td><td>structured dictionary data, downloadable</td><td><span class="stars">★★★★<span class="off">★</span></span></td><td><span class="badge b-free">FREE</span></td><td class="note">Best structured IT dataset — could self-host. Licensing: non-commercial.</td></tr>
+      <tr><td class="name">Treccani</td><td>authoritative definitions + etymology</td><td><span class="stars">★★★★★</span></td><td><span class="badge b-free">FREE (site)</span></td><td class="note">No API — scraping only, ToS risk, page changes break it.</td></tr>
+      <tr><td class="name">Google Translate dict (gtx)</td><td>def + POS + examples + synonyms</td><td><span class="stars">★★★<span class="off">★★</span></span></td><td><span class="badge b-free">FREE</span></td><td class="note">Unofficial endpoint, can vanish. Already in CSP for translate.</td></tr>
+      <tr><td class="name">Glosbe IT</td><td>community defs + examples</td><td><span class="stars">★★<span class="off">★★★</span></span></td><td><span class="badge b-freemium">FREEMIUM</span></td><td class="note">Quality varies wildly.</td></tr>
+      <tr><td class="name">DeepL (word lookups)</td><td>no dictionary endpoint</td><td><span class="stars"><span class="off">★★★★★</span></span></td><td><span class="badge b-paid">PAID</span></td><td class="note">Not viable — translation only.</td></tr>
+    </table></div>
+  </div>
+</div>
+
+<!-- ═══════════════ API 4: TRANSLATIONS ═══════════════ -->
+<h2 class="section-title"><span class="num">04</span>Translations EN→IT and IT→EN (translation chips)</h2>
+<div class="api-grid">
+  <div class="api-card current">
+    <div class="api-head"><h3>MyMemory (both directions)</h3><span class="badge b-freemium">FREEMIUM</span></div>
+    <div class="api-url">https://api.mymemory.translated.net/get?q=celebrate&amp;langpair=en|it</div>
+    <div class="roles">Feeds: <b>.wbx-trans</b> chips on every card — English tab uses <code>en|it</code>, Italian tab uses <code>it|en</code>. Chips are clickable (+ saves to the right bank).</div>
+    <div class="verdict"><span class="vlabel">Rating</span><span class="vscore"><span class="stars">★★★<span class="off">★★</span></span></span><span class="vlabel">3 / 5</span><span class="vlabel">Cost</span><span class="badge b-freemium">FREE 5000 w/day anon</span></div>
+    <pre class="sample">GET /get?q=celebrate&amp;langpair=en|it
+{ "responseData":{ <span class="s">"translatedText"</span>:"celebrare,
+  festeggiare, commemorare" }, "responseStatus":200 }</pre>
+    <div style="font-size:11px;color:rgba(255,255,255,.4)">Strengths: easy, free, IT covered. Weakness: crowdsourced segments → literal or wrong on idioms/context, daily anonymous quota. Production translation proxy already exists in config.</div>
+  </div>
+  <div class="api-card">
+    <h3 style="margin-bottom:8px">Alternatives</h3>
+    <div class="alt-wrap"><table class="alt-table">
+      <tr><th>Option</th><th>What it gives</th><th>Rating</th><th>Cost</th><th>Notes</th></tr>
+      <tr class="cur"><td class="name">MyMemory <span class="cur-tag">current</span></td><td>word-level translation pairs</td><td><span class="stars">★★★<span class="off">★★</span></span></td><td><span class="badge b-freemium">FREEMIUM</span></td><td class="note">Fine for single words.</td></tr>
+      <tr><td class="name">Google Translate (web endpoint)</td><td>best IT quality, dict data too</td><td><span class="stars">★★★★<span class="off">★</span></span></td><td><span class="badge b-free">FREE</span></td><td class="note">Unofficial/ToS-gray. Already used elsewhere on site.</td></tr>
+      <tr><td class="name">DeepL API</td><td>top-quality IT translation</td><td><span class="stars">★★★★★</span></td><td><span class="badge b-freemium">FREEMIUM</span></td><td class="note">500k chars/mo free, then paid. Italian is a DeepL strength.</td></tr>
+      <tr><td class="name">Microsoft Translator</td><td>solid quality, generous tier</td><td><span class="stars">★★★★<span class="off">★</span></span></td><td><span class="badge b-freemium">FREEMIUM</span></td><td class="note">2M chars/mo free via Azure.</td></tr>
+      <tr><td class="name">LibreTranslate</td><td>open-source, self-hostable</td><td><span class="stars">★★★<span class="off">★★</span></span></td><td><span class="badge b-freemium">FREE SELF-HOST</span></td><td class="note">Quality below Google/DeepL for IT.</td></tr>
+    </table></div>
+  </div>
+</div>
+
+<!-- ═══════════════ API 5: LOCAL DICTIONARIES ═══════════════ -->
+<h2 class="section-title"><span class="num">05</span>Local dictionaries — CEFR level · POS · GSE validation</h2>
+<div class="api-grid">
+  <div class="api-card current">
+    <div class="api-head"><h3>CEFR_LEVELS + LEMMA_POS_MAP + CEFR_GSE</h3><span class="badge b-local">LOCAL · NO NETWORK</span></div>
+    <div class="api-url">js/cefr-levels.js · js/lemma-pos-map.js · js/cefr-gse.js</div>
+    <div class="roles">Feeds: <b>CEFR badge</b> on every card (both tabs), <b>POS tag</b> (English), <b>word validation</b> filter (GSE), and — critically — <b>Italian "related words"</b> via prefix matching.</div>
+    <div class="verdict"><span class="vlabel">EN rating</span><span class="vscore"><span class="stars">★★★★<span class="off">★</span></span></span><span class="vlabel">4 / 5</span><span class="vlabel">IT rating</span><span class="vscore"><span class="stars">★★<span class="off">★★★</span></span></span><span class="vlabel">2 / 5</span><span class="vlabel">Cost</span><span class="badge b-free">$0</span></div>
+    <pre class="sample">window.CEFR_LEVELS[<span class="s">"celebrate"</span>]  → <span class="k">"B1"</span>
+window.LEMMA_POS_MAP[<span class="s">"celebrate"</span>] → <span class="k">"VB"</span>
+findItalianRelated("casa") — no network:
+  match CEFR_LEVELS keys with suffixes
+  <span class="k">-zione · -are · -ere · -ire · -ita · -mento</span></pre>
+    <div style="font-size:11px;color:rgba(255,255,255,.4)">English side is solid (real curated datasets). Italian side is a <b>hack</b>: it prefix-matches an English dictionary for Italian-looking suffixes, with no Italian CEFR source.</div>
+  </div>
+  <div class="api-card">
+    <h3 style="margin-bottom:8px">Alternatives (Italian gap specifically)</h3>
+    <div class="alt-wrap"><table class="alt-table">
+      <tr><th>Option</th><th>What it gives</th><th>Rating</th><th>Cost</th><th>Notes</th></tr>
+      <tr><td class="name">KELLY wordlist</td><td>~9k words per language with CEFR-ish levels</td><td><span class="stars">★★★★<span class="off">★</span></span></td><td><span class="badge b-free">FREE</span></td><td class="note">Covers Italian. Can be bundled like cefr-levels.js.</td></tr>
+      <tr><td class="name">PAISÀ corpus</td><td>frequency lists (not CEFR)</td><td><span class="stars">★★★<span class="off">★★</span></span></td><td><span class="badge b-free">FREE</span></td><td class="note">Frequency → level via percentile, needs preprocessing.</td></tr>
+      <tr><td class="name">itWaC / CoLFIS</td><td>frequency data</td><td><span class="stars">★★★<span class="off">★★</span></span></td><td><span class="badge b-free">FREE</span></td><td class="note">Same approach as PAISÀ.</td></tr>
+      <tr><td class="name">Morfix/DBpedia Wiktionary dumps</td><td>structured IT POS (via Wiktionary dump)</td><td><span class="stars">★★★<span class="off">★★</span></span></td><td><span class="badge b-free">FREE</span></td><td class="note">One-time build, better than live parsing.</td></tr>
+    </table></div>
+  </div>
+</div>
+
+<!-- ═══════════════ API 6: PERSISTENCE ═══════════════ -->
+<h2 class="section-title"><span class="num">06</span>Persistence — saves, bank membership, SRS</h2>
+<div class="api-grid">
+  <div class="api-card current">
+    <div class="api-head"><h3>Supabase (own backend)</h3><span class="badge b-freemium">FREE TIER</span></div>
+    <div class="api-url">user_wordbanks · user_wordbank_words · review_words (PostgREST + RLS)</div>
+    <div class="roles">Feeds: <b>Save +</b> (insert into bank + upsert review_words), <b>saved-checkmark</b> (enrichBankStatus reads bank membership by lang), <b>Review queue</b> (SRS rows), <b>bank detail drawer</b>, <b>stats bars</b>.</div>
+    <div class="verdict"><span class="vlabel">Rating</span><span class="vscore"><span class="stars">★★★★<span class="off">★</span></span></span><span class="vlabel">4 / 5</span><span class="vlabel">Cost</span><span class="badge b-freemium">FREE TIER → paid scale</span></div>
+    <pre class="sample">POST user_wordbank_words
+{ <span class="k">"wordbank_id"</span>:"…", <span class="s">"word"</span>:"celebrare",
+  <span class="k">"lang"</span>:"it", <span class="k">"status"</span>:"new", "usage_count":1 }
+
+GET review_words ?is_new=eq.true
+  { "lemma":"attendere","cefr":"B2","mastery_score":38,
+    "next_review_at":"2026-08-14T09:00Z" }</pre>
+    <div style="font-size:11px;color:rgba(255,255,255,.4)">Strengths: RLS keeps users isolated, Realtime available, free tier generous. Watch-outs: no server logic without edge functions; review_words schema still missing some SRS columns.</div>
+  </div>
+  <div class="api-card">
+    <h3 style="margin-bottom:8px">Alternatives</h3>
+    <div class="alt-wrap"><table class="alt-table">
+      <tr><th>Option</th><th>What it gives</th><th>Rating</th><th>Cost</th><th>Notes</th></tr>
+      <tr class="cur"><td class="name">Supabase <span class="cur-tag">current</span></td><td>Postgres + auth + RLS + Realtime</td><td><span class="stars">★★★★<span class="off">★</span></span></td><td><span class="badge b-freemium">FREEMIUM</span></td><td class="note">Already wired end-to-end.</td></tr>
+      <tr><td class="name">Firebase</td><td>Firestore + auth</td><td><span class="stars">★★★★<span class="off">★</span></span></td><td><span class="badge b-freemium">FREEMIUM</span></td><td class="note">Good, but migration cost is high for zero gain.</td></tr>
+      <tr><td class="name">PocketBase</td><td>self-hosted Postgres-lite</td><td><span class="stars">★★★<span class="off">★★</span></span></td><td><span class="badge b-free">FREE SELF-HOST</span></td><td class="note">Data ownership, but you run ops.</td></tr>
+      <tr><td class="name">localStorage only</td><td>no accounts, no sync</td><td><span class="stars">★<span class="off">★★★★</span></span></td><td><span class="badge b-free">FREE</span></td><td class="note">Used today only as offline fallback for IT saves.</td></tr>
+    </table></div>
+  </div>
+</div>
+
+<div class="foot">
+  <b>Legend:</b> ★ = quality fit for this product. Cost badges: <b>FREE</b> no key · <b>FREEMIUM</b> free tier/key · <b>PAID</b> subscription · <b>LOCAL</b> bundled file.<br>
+  <b>Biggest opportunities</b> from this map: ① replace the Italian related-words hack with KELLY/De Mauro data, ② route translations through the existing translate proxy instead of raw MyMemory, ③ consolidate EN+IT definitions onto the Wiktionary MediaWiki API (one code path).<br>
+  Generated from panoramica.html v212 code paths — mockup only, not production.
+</div>
+
+</div>
+</body>
+</html>
