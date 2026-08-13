@@ -16,6 +16,17 @@
 - Everything else in the audit is already responsive (tables scroll via `overflow-x:auto` wrappers — Trascrizioni, Report AI, Vocabulary Builder `.wb-table-wrap` `min-width:600px`; grids collapse via existing media queries in `theme-2.css`/`panoramica.css`; modals scale with `max-width` + `width:90%/100%`).
 - Version `v210 → v211`.
 
+## [2026-08-13] Dashboard — metric-card hover & selected states now unmistakable (v212)
+
+### Changed
+- The 4 dashboard metric cards (Sessioni / Tempo / Parole uniche / Div. lessicale) now clearly show both **hover** and **selected** ("this card is what drives the chart") in **all 6 themes** (light, dark, modern, modern-light, genz, genz-dark).
+- **Selected indicator (new):** a corner badge `✓ Nel grafico` / `✓ In the chart` (localized via new `metric_active` i18n key) appears only on the active card, plus a **2px colored ring + glow** per theme: cyan (light) / violet (dark) / lime (modern) / cyan (modern-light) / yellow (genz & genz-dark). Border stays 1px → **no layout shift** (ring is a box-shadow; replaces the old `border-width:2px` approach).
+- **Hover:** clearer border tint (contrast bumped in panoramica.css) + existing lift/scale; deliberately lighter than selected (hover has no badge/ring).
+- **Instant feedback:** removed `box-shadow`/`border-color` from the metric-card transitions (base + wrapped generic + the genz/genz-dark `!important` hard-pins) so the ring/border apply immediately on click — no dependency on transition completion (which can freeze in background tabs).
+- **i18n:** new `metric_active` (it "Nel grafico" / en "In the chart"); `mcSetActiveLabel()` sets the `--mc-active` CSS var (called on init, on `i18n-changed`, and inside `selectMetricCard`).
+- Cache-busters: theme-2.css v3→v4, theme-wrapped.css v13→v14, panoramica.css v3→v4, i18n.js v4→v5. Topbar version left at **v212** (parallel agent owns the badge).
+- Verified in browser: after clicking any card, badge + ring + border render instantly in all 6 themes; chart title/total switch correctly; `get_errors` + `node --check` clean.
+
 ## [2026-08-13] Wrapped recap — C · Minimal voice shipped to production (v211)
 
 ### Changed
