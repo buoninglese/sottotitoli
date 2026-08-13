@@ -32,6 +32,10 @@
   var EASE = 'cubic-bezier(.32,.72,0,1)';
   var PAD = 12;
   var reducedMotion = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+  /* Public Supabase anon/publishable key (same as js/auth.js). The localhost
+     auth bypass returns a mock token that the gateway rejects, so when the
+     session token isn't a real JWT we fall back to this key. */
+  var ANON_KEY = 'sb_publishable_l-PG1wsO1FMWADK9GVBqoQ_0EtPA2K7';
 
   var overlay, card, content, gridEl, sumProduct, sumDetail, sumTotal, payBtn;
   var selected = 'standard';
@@ -272,20 +276,25 @@
 
     var base = window.location.origin + window.location.pathname;
     getSessionUser().then(function (auth) {
-      if (!auth || !auth.token) {
+      if (!auth || !auth.user) {
         throw new Error('NO_SESSION');
       }
       var user = auth.user;
+      /* Real Supabase access tokens are JWTs (start with "eyJ"); the localhost
+         bypass's mock token is not, and the gateway rejects it. Fall back to
+         the public anon key in that case so dev bypass still reaches the
+         (JWT-verified) function. */
+      var token = (auth.token && auth.token.indexOf('ey') === 0) ? auth.token : ANON_KEY;
       return fetch(fnUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': 'Bearer ' + auth.token
+          'Authorization': 'Bearer ' + token
         },
         body: JSON.stringify({
           product: PRICES[selected].key,
-          userId: user ? user.id : undefined,
-          email: user ? user.email : undefined,
+          userId: user.id,
+          email: user.email,
           successUrl: base + '?payment=success',
           cancelUrl: base + '?payment=cancelled'
         })
