@@ -87,6 +87,8 @@ svg .vlab{opacity:0;transition:opacity .22s ease,transform .22s ease;pointer-eve
 svg .vg:hover .dot{transform:scale(1.8);filter:brightness(1.35) drop-shadow(0 0 9px rgba(52,211,153,.85))}
 svg .vg:hover .vlab{opacity:1;transform:translateY(0)}
 @keyframes fadeIn{from{opacity:0}to{opacity:1}}
+svg .line-draw.draw{animation:draw 2.2s cubic-bezier(.4,0,.2,1) forwards}
+@keyframes draw{to{stroke-dashoffset:0}}
 .foot{margin-top:24px;font:500 10.5px var(--font-ui);color:var(--faint);border-top:1px solid var(--line);padding-top:14px;display:flex;gap:8px;flex-wrap:wrap;align-items:center}
 .foot code{font:500 9.5px var(--font-mono);color:#67e8f9;background:#0a1018;border:1px solid var(--line);padding:2px 7px;border-radius:6px}
 /* responsive: sidebar stacks above chart */
@@ -361,14 +363,11 @@ function dashPeriodLabel(tl){return tl==='week'?'Ultima settimana':tl==='2week'?
 function animateLineDraw(){
   document.querySelectorAll('#ccChart svg .line-draw').forEach(function(p){
     var len=Math.max(1,p.getTotalLength());
-    p.style.strokeDasharray=len;
-    p.style.strokeDashoffset=len;
-    p.style.transition='stroke-dashoffset 2.2s cubic-bezier(.4,0,.2,1)';
-    void p.getBoundingClientRect(); // registra il valore di partenza
-    requestAnimationFrame(function(){requestAnimationFrame(function(){p.style.strokeDashoffset='0';});});
-    // failsafe: la linea deve SEMPRE arrivare fino all'ultimo punto
-    clearTimeout(p._ldt);
-    p._ldt=setTimeout(function(){p.style.transition='none';p.style.strokeDashoffset='0';},2600);
+    p.setAttribute('stroke-dasharray',len);
+    p.setAttribute('stroke-dashoffset',len);
+    p.classList.remove('draw');
+    void p.getBoundingClientRect(); // registra il valore di partenza (lunghezza reale)
+    p.classList.add('draw');
   });
 }
 function renderDash(){
