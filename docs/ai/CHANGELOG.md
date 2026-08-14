@@ -4,18 +4,6 @@
 > The entries below from v206–v210 describe an **ES-module refactor** (`js/panoramica/app.js` + `panoramica/panels/*.js` + `panoramica/shared/*.js`) that **never shipped**. `panoramica.html` never imported `app.js`, so the deployed site always ran the ~10,700-line inline monolith. The refactor files were dead code and have been **moved to** `~/Desktop/sottotitoli-archived/dead-js/panoramica-v2-attempt/`.
 > **Real current state: monolith at v178.** These v2xx notes describe work that was never activated — treat them as historical, not as a description of the live code.
 
-## [2026-08-13] Panoramica — full mobile redesign (≤760px): drawer + bottom nav + center FAB
-
-### Changed
-- **App shell goes full-width on phones** (≤760px): the 274px sidebar column is dropped (`grid-template-columns:1fr`), so the main panel uses **every pixel** (375px viewport: panel was ~277px → now full 375px, rounded 34px box → square full-bleed, border/shadow removed).
-- **Sidebar → left drawer**: the sidebar becomes a `position:fixed` 282px drawer that slides in (`translateX(-105%) → 0`) behind a blur backdrop; hamburger button (`#topbarMenu`, new, hidden on desktop) opens it; tapping a nav item or the backdrop closes it. Body locks scroll while open (`body.drawer-open`).
-- **Bottom navigation** (new `.mobile-nav`, fixed, 5-col grid): **Panoramica · Banche parole · [FAB] · Learner · Report** — reuses `.side-nav .nav-item[data-panel]` so the existing panel switcher handles switching + active-sync automatically (no JS edits). Report AI stays in the bar; Profilo lives in the drawer (trade-off to keep 4 core tabs + FAB).
-- **Center FAB** (new `.mobile-fab`, 58px circle, mic icon, thumb-reachable, raised above the nav) opens Start Session (`toggleStartSession()` → `#startSplit`) — the single most important action stays one tap away and always visible. Gen-Z/Gen-Z Dark pin dark-purple icon on the yellow gradient (`#6d28d9 !important`).
-- **Topbar → minimal**: 56px, logo + start button hidden, only the hamburger + right-hand tools remain.
-- **Safe-area**: bottom nav and main-panel padding use `env(safe-area-inset-bottom)` for notched phones; ≤500px gets tighter chrome (52px bar, smaller headings).
-- **Desktop untouched**: ≥760px shows the same two-column layout as before (verified at 1440×900: sidebar static, mobile-nav/FAB/hamburger hidden, logo + Avvia sessione back).
-- All mobile CSS lives in an inline `<style>` block + small inline `<script>` (drawer logic) at the end of `panoramica.html` — no cache-buster needed (HTML-only change).
-
 ## [2026-08-13] Mobile flush + responsiveness audit fixes (v211)
 
 ### Fixed
@@ -27,45 +15,6 @@
   4. **Report AI stats row** `repeat(3,1fr)` crammed 3 cards into ~247px → `repeat(auto-fit,minmax(180px,1fr))` (stacks on mobile).
 - Everything else in the audit is already responsive (tables scroll via `overflow-x:auto` wrappers — Trascrizioni, Report AI, Vocabulary Builder `.wb-table-wrap` `min-width:600px`; grids collapse via existing media queries in `theme-2.css`/`panoramica.css`; modals scale with `max-width` + `width:90%/100%`).
 - Version `v210 → v211`.
-
-## [2026-08-13] Gen-Z / Gen-Z Dark — yellow buttons now use dark text (readability)
-
-### Fixed
-- In Gen-Z (and Gen-Z Dark) `--cyan`/`--teal` = `#ffeb3b` (yellow), but many buttons paired it with hardcoded `color:#fff` → white text on yellow was unreadable. Now **all yellow-background buttons use dark text** (matching the "Acquista minuti" CTA).
-- Covered: inline-styled buttons (`[style*="background:var(--cyan);color:#fff"]` catches all of them), `.ss-btn-cap` (Avvia Caption), `.ssconfirm` (Conferma), `.wb-btn` (Import File), and the report-AI peer-checked pill. Dark text = `#6d28d9` (genz) / `#3b0764` (genz-dark).
-- **Segmented subtab pill** (Word banks / Vocabulary Builder): the active pill text was yellow (`[data-theme="genz"] .tab-link.active` hard-pin) on the white pill — now **near-black on white**; inactive pills use dark purple in Gen-Z (readable on the light frosted pill). `.seg-btn.active` text/bg forced with `!important`.
-- Cache-busters: theme-2.css v5→v6, theme-wrapped.css v14→v15.
-- Verified in browser (Gen-Z): **0** yellow buttons with light text remaining; active pill = white bg + `#0a0a0a` text; inactive = `#3b0764`. `get_errors` clean.
-
-## [2026-08-13] Word banks & Vocabulary Builder — subtabs as a top-right pill toggle (Modern/Gen-Z/☾ style)
-
-### Changed
-- The subtabs in **Word banks** (Overview / English / Italiano) and **Vocabulary Builder** (🇬🇧 English / 🇮🇹 Italian / 🔄 Review) no longer use the full-width underline tab bars — they now sit in the **panel head, top-right**, as a compact **segmented pill control** matching the Modern/Gen-Z/☾ theme-switcher style (pill container on `--panel-2` + `--line` border, active button = white pill + dark text + shadow).
-- Saves horizontal space: the old `.panel-tabs` bars (bottom border + 28px margin) are removed from both panels.
-- New reusable `.seg-control` / `.seg-btn` CSS in theme-2.css (theme-token-driven). The buttons keep the `tab-link[data-subtab]` class, so all existing subtab JS (switching, re-renders, programmatic clicks) works unchanged — no JS edits needed.
-- Responsive: ≤760px the panel-head stacks and the pill wraps below the title.
-- Cache-buster: theme-2.css v4→v5. Verified in browser (1440×900): pill top-right in both panel heads, switching works (incl. Italiano + Review panes); `get_errors` clean.
-
-## [2026-08-13] Dashboard — metric-card hover & selected states now unmistakable (v212)
-
-### Changed
-- The 4 dashboard metric cards (Sessioni / Tempo / Parole uniche / Div. lessicale) now clearly show both **hover** and **selected** ("this card is what drives the chart") in **all 6 themes** (light, dark, modern, modern-light, genz, genz-dark).
-- **Selected indicator (new):** a corner badge `✓ Nel grafico` / `✓ In the chart` (localized via new `metric_active` i18n key) appears only on the active card, plus a **2px colored ring + glow** per theme: cyan (light) / violet (dark) / lime (modern) / cyan (modern-light) / yellow (genz & genz-dark). Border stays 1px → **no layout shift** (ring is a box-shadow; replaces the old `border-width:2px` approach).
-- **Hover:** clearer border tint (contrast bumped in panoramica.css) + existing lift/scale; deliberately lighter than selected (hover has no badge/ring).
-- **Instant feedback:** removed `box-shadow`/`border-color` from the metric-card transitions (base + wrapped generic + the genz/genz-dark `!important` hard-pins) so the ring/border apply immediately on click — no dependency on transition completion (which can freeze in background tabs).
-- **i18n:** new `metric_active` (it "Nel grafico" / en "In the chart"); `mcSetActiveLabel()` sets the `--mc-active` CSS var (called on init, on `i18n-changed`, and inside `selectMetricCard`).
-- Cache-busters: theme-2.css v3→v4, theme-wrapped.css v13→v14, panoramica.css v3→v4, i18n.js v4→v5. Topbar version left at **v212** (parallel agent owns the badge).
-- Verified in browser: after clicking any card, badge + ring + border render instantly in all 6 themes; chart title/total switch correctly; `get_errors` + `node --check` clean.
-
-## [2026-08-13] Wrapped recap — C · Minimal voice shipped to production (v211)
-
-### Changed
-- Shipped the **C · Minimal** copy (picked from the Copy Desk) as the live voice for the "Il tuo anno in numeri" recap — all 7 blocks + dynamic strings.
-- **Static labels (IT + EN):** subtitle → "Riepilogo stile wrapped" (dropped "· solo per il tema Gen-Z"); "Sessioni" / "Tempo" (dropped "totali"/"parlato"); "Profilo di apprendimento"; CEFR "Livelli CEFR" + "Dal tuo vocabolario"; "Palette"; "Picco di produttività"; "Condividi il tuo anno" + "Quello che hai costruito con Sottotitoli."; hero "Bentornato/a".
-- **Dynamic strings:** hero branches rewritten ("21+ giorni di fila. Un ritmo che parla da solo.", "{n} giorni di fila. La costanza, come sempre, vince.", "{n} ore di conversazione. Il tuo vocabolario è vivo.", "{n} parole uniche. Un vocabolario che cresce, ogni giorno.", "{n} sessioni. Il progresso si costruisce così.", "Inizia una sessione. I numeri si costruiscono da soli."); pills "Serie in corso"/"Ore di voce"/"Parole raccolte"; personas → "🏆 Costanza / 🔥 Ritmo / 🦉 Notturno / 🌅 Mattutino / ⚡ Sprint / 🏃 Resistenza / 🧱 Costruzione / 🧭 Esplorazione" with short notes; CEFR level prefix "Livello " → "LVL "; peak sub "Nottambulo."/"Mattiniero."; chips without emoji ("Miglior serie: N gg", "Sessione più lunga: N min"); fun badge no longer prefixed with "≈ ".
-- **Emoji removed from titles** (CEFR, peak, share, palette) for the minimal/premium register.
-- `js/i18n.js` cache-buster `?v=3 → ?v=4` in panoramica.html. Topbar version left at **v211** (the parallel agent owns the badge).
-- Verified in browser (bypass_auth): subtitle, hero, persona, CEFR, peak, share all render the Minimal copy; empty states correct.
 
 ## [2026-08-13] Wrapped Copy Desk — 4 copy voices for the year recap (dev tool)
 
