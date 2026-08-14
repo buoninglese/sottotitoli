@@ -106,7 +106,7 @@ h1 span{background:linear-gradient(135deg,#a78bfa,#06b6d4,#10b981);-webkit-backg
   <span class="lg"><span class="dot c-wordsapi"></span> WordsAPI / RapidAPI (EN defs)</span>
   <span class="lg"><span class="dot c-mymemory"></span> MyMemory (translations)</span>
   <span class="lg"><span class="dot c-wikitionary"></span> Wiktionary IT (IT defs)</span>
-  <span class="lg"><span class="dot c-google"></span> Google Translate (caption chips)</span>
+  <span class="lg"><span class="dot c-google"></span> Google Translate (caption chips, auto mode)</span>
   <span class="lg"><span class="dot c-local"></span> Local files (CEFR/POS/GSE/NGSL/KELLY)</span>
   <span class="lg"><span class="dot c-supabase"></span> Supabase (saves, SRS, edge fns)</span>
   <span class="lg"><span class="dot c-cefr"></span> Render /api/cefr (levels + topics)</span>
@@ -146,11 +146,11 @@ h1 span{background:linear-gradient(135deg,#a78bfa,#06b6d4,#10b981);-webkit-backg
   <div class="hookup">
     <div class="label"><i class="fa-solid fa-plug"></i> Hooked up to</div>
     <div class="line"><span class="elem">Word card itself</span><span class="dot c-datamuse"></span><div><span class="src">Datamuse</span> — the suggestion list comes from relation queries: <code>ml=</code> synonyms, <code>rel_ant</code> antonyms, <code>sp=prefix*</code> word-family, <code>rel_jjb</code> related, <code>lc=</code> rhymes<div class="detail">~25 calls per search session, no key, English only</div></div></div>
-    <div class="line"><span class="elem">POS + CEFR tags</span><span class="dot c-local"></span><div><span class="src">Local files</span> — <code>js/cefr-levels.js</code> (word→level) + <code>js/lemma-pos-map.js</code> (word→POS, NLTK-rebuilt) + Penn tagger<div class="detail">No network. Unknown CEFR stays '—' (no length heuristic — honest, no fabrication).</div></div></div>
+    <div class="line"><span class="elem">POS + CEFR tags</span><span class="dot c-datamuse"></span><div><span class="src">POS: Datamuse tags</span> → <span class="inline-dot c-local"></span> <span class="src">lemma-pos-map.js</span> → Penn tagger<div class="detail">CEFR: local <code>cefr-levels.js</code> → '—' for unknown (no length heuristic — honest, no fabrication).</div></div></div>
     <div class="line"><span class="elem">Definition + IPA</span><span class="dot c-freedict"></span><div><span class="src">NGSL (local) first</span> → <span class="inline-dot c-freedict"></span> <span class="src">Free Dictionary direct</span> → <span class="inline-dot c-supabase"></span> <span class="src">dictionary-proxy</span> → <span class="inline-dot c-wordsapi"></span> <span class="src">WordsAPI (RapidAPI)</span><div class="detail">NGSL = 2,809 most frequent words, instant + offline. Proxy fires only when direct fails (slower + thinner). WordsAPI key in gitignored config.secrets.js.</div></div></div>
     <div class="line"><span class="elem">→ translation line</span><span class="dot c-mymemory"></span><div><span class="src">MyMemory</span> — <code>langpair=en|it</code><div class="detail">Chips are clickable — each saves to the bank.</div></div></div>
     <div class="line"><span class="elem">Synonym chips</span><span class="dot c-datamuse"></span><div><span class="src">Datamuse</span> — <code>ml=word</code> per card</div></div>
-    <div class="line"><span class="elem">+ save button</span><span class="dot c-supabase"></span><div><span class="src">Supabase</span> — insert into <code>user_wordbank_words</code> (bank "English Vocabulary Builder", <code>lang=en</code>) + upsert <code>review_words</code> for SRS</div></div>
+    <div class="line"><span class="elem">+ save button</span><span class="dot c-supabase"></span><div><span class="src">Supabase</span> — <code>insert {wordbank_id, word, pos, usage_count}</code> into <code>user_wordbank_words</code> (bank "English Vocabulary Builder") + upsert <code>review_words</code> (Ripasso immediato)<div class="detail"><code>lang</code> lives on <code>user_wordbanks</code> — not on the words table.</div></div></div>
   </div>
 </div>
 
@@ -175,7 +175,7 @@ h1 span{background:linear-gradient(135deg,#a78bfa,#06b6d4,#10b981);-webkit-backg
     <div class="line"><span class="elem">POS/CEFR fallback</span><span class="dot c-local"></span><div><span class="src">js/it-lexicon.js</span> — curated core map + suffix rules (<code>-are/-ere/-ire</code>→VERB, <code>-zione/-mento</code>→NOUN, <code>-mente</code>→ADV, <code>-oso/-ico</code>→ADJ) + length. No more flat B1.</div></div>
     <div class="line"><span class="elem">→ translation line</span><span class="dot c-mymemory"></span><div><span class="src">MyMemory</span> — <code>langpair=it|en</code></div></div>
     <div class="line"><span class="elem">Related chips</span><span class="dot c-local"></span><div><span class="src">KELLY + core prefix families</span> — <code>S8T_IT_LEXICON.relatedItalian()</code> (real Italian words with real levels)</div></div>
-    <div class="line"><span class="elem">+ save button</span><span class="dot c-supabase"></span><div><span class="src">Supabase</span> — upsert into bank "Italian Vocabulary Builder" (<code>lang=it</code>) with <code>pos</code> column + <span class="src">localStorage</span> <code>sottotitoli_wb_it_pinned</code> as offline fallback</div></div>
+    <div class="line"><span class="elem">+ save button</span><span class="dot c-supabase"></span><div><span class="src">Supabase</span> — <code>upsert {wordbank_id, word, pos, usage_count}</code> (<code>pos</code> from <code>S8T_IT_LEXICON</code>, onConflict <code>wordbank_id,word</code>) into bank "Italian Vocabulary Builder" + <span class="src">localStorage</span> <code>sottotitoli_wb_it_pinned</code> for offline/immediate feedback</div></div>
   </div>
 </div>
 
@@ -188,7 +188,7 @@ h1 span{background:linear-gradient(135deg,#a78bfa,#06b6d4,#10b981);-webkit-backg
         <span class="mtag">VERB</span><span class="mtag">B2</span><span class="mtag" style="border-color:rgba(245,158,11,.4);color:#fbbf24">due</span>
       </div>
       <div class="mdef">3 lapses · mastery 38% · next review was 2 days ago</div>
-      <div class="mchips"><span class="mchip">✓ Fatto</span><span class="mchip">sort: priority / CEFR / POS</span></div>
+      <div class="mchips"><span class="mchip">✓ Fatto</span><span class="mchip">sort: Parola / CEFR / POS</span></div>
       <div class="mmeta">No definition here — this tab only shows SRS state</div>
     </div>
   </div>
@@ -205,7 +205,7 @@ h1 span{background:linear-gradient(135deg,#a78bfa,#06b6d4,#10b981);-webkit-backg
 <div class="part">
   <span class="app">App A · Panoramica</span>
   <h2>Word Banks panel</h2>
-  <div class="where"><code>#pnl-wordbanks</code> — sidebar "style" icon · tabs: Overview · English · Italiano · Review Due</div>
+  <div class="where"><code>#pnl-wordbanks</code> — sidebar "style" icon · tabs: Overview · English · Italiano</div>
 </div>
 
 <div class="element">
@@ -221,7 +221,7 @@ h1 span{background:linear-gradient(135deg,#a78bfa,#06b6d4,#10b981);-webkit-backg
   <div class="hookup">
     <div class="label"><i class="fa-solid fa-plug"></i> Hooked up to</div>
     <div class="line"><span class="elem">Bank list + stats</span><span class="dot c-supabase"></span><div><span class="src">Supabase</span> — <code>user_wordbanks</code> (per <code>lang</code>) + <code>user_wordbank_words</code><div class="detail">English tab queries <code>lang=en</code>, Italian tab <code>lang=it</code> — verified no cross-contamination.</div></div></div>
-    <div class="line"><span class="elem">Ripasso / Fragili counts</span><span class="dot c-supabase"></span><div><span class="src">Supabase</span> — <code>review_words</code> counts (due: <code>next_review_at ≤ now</code> · fragile: <code>mastery&lt;40</code>)</div></div>
+    <div class="line"><span class="elem">Ripasso / Fragili counts</span><span class="dot c-supabase"></span><div><span class="src">Supabase</span> — <code>review_words</code> counts (due: <code>next_review_at ≤ now</code> OR <code>is_new=true</code> · fragile: <code>mastery_score&lt;40</code> OR <code>lapses≥2</code>)</div></div>
     <div class="line"><span class="elem">⚡ Allena button</span><span class="dot c-supabase"></span><div><span class="src">Local bank words + Supabase</span> — <code>openBankTest(bank)</code> starts an SRS session from the bank's words; pinned boxes fall back to <code>review_words</code><div class="detail">On every folder card + inside each word box (next to 'Aggiungi parola').</div></div></div>
     <div class="line"><span class="elem">Smart (BETA) cards</span><span class="dot c-datamuse"></span><div><span class="src">Datamuse + Supabase</span> — <code>js/smart-suggestions.js</code>: topics / <code>ml=</code> for suggestions, Supabase diff for "activate what you recognize"<div class="detail">English only — Datamuse has no Italian.</div></div></div>
     <div class="line"><span class="elem">Inside a bank (table)</span><span class="dot c-supabase"></span><div><span class="src">Supabase</span> — <code>getWordbankWords(bankId)</code>; CEFR column filled from local <code>CEFR_LEVELS</code> where available</div></div>
@@ -250,8 +250,8 @@ h1 span{background:linear-gradient(135deg,#a78bfa,#06b6d4,#10b981);-webkit-backg
   </div>
   <div class="hookup">
     <div class="label"><i class="fa-solid fa-plug"></i> Hooked up to</div>
-    <div class="line"><span class="elem">Speech → text</span><span class="dot c-ws"></span><div><span class="src">WebSocket relay</span> — <code>wss://sottotitoli-websocket.onrender.com/ws</code><div class="detail">Messages: <code>{msg, final, interm, id, label}</code> — do not change format.</div></div></div>
-    <div class="line"><span class="elem">Translation chips</span><span class="dot c-google"></span><div><span class="src">Google Translate</span> (gtx endpoint) → <span class="inline-dot c-mymemory"></span> <span class="src">MyMemory</span> fallback — via <code>translation-providers.js</code><div class="detail">Config provider mode can also route through the Supabase <code>/functions/v1/translate</code> proxy (caching).</div></div></div>
+    <div class="line"><span class="elem">Speech → text</span><span class="dot c-ws"></span><div><span class="src">WebSocket relay</span> — <code>wss://sottotitoli-websocket.onrender.com</code><div class="detail">Messages: <code>{msg, final, interm, id, label}</code> — do not change format.</div></div></div>
+    <div class="line"><span class="elem">Translation chips</span><span class="dot c-supabase"></span><div><span class="src">Supabase translate proxy</span> — <code>/functions/v1/translate</code>, server-side + caching. This is the <b>default</b> (<code>translation.provider: 'proxy'</code>) → <span class="inline-dot c-google"></span> <span class="src">Google (gtx)</span> → <span class="inline-dot c-mymemory"></span> <span class="src">MyMemory</span> in <code>auto</code> mode<div class="detail">via <code>translation-providers.js</code>. Config also accepts <code>google</code> / <code>mymemory</code> single-provider modes.</div></div></div>
     <div class="line"><span class="elem">Word save (+)</span><span class="dot c-supabase"></span><div><span class="src">Supabase</span> — saves into word banks (same tables as Panoramica)</div></div>
   </div>
 </div>
@@ -300,9 +300,9 @@ h1 span{background:linear-gradient(135deg,#a78bfa,#06b6d4,#10b981);-webkit-backg
   </div>
   <div class="hookup">
     <div class="label"><i class="fa-solid fa-plug"></i> Hooked up to</div>
-    <div class="line"><span class="elem">Known words</span><span class="dot c-local"></span><div><span class="src">Local CEFR_LEVELS file</span> → unknown stays '—' (no length heuristic)</div></div>
+    <div class="line"><span class="elem">Lookup chain (EN)</span><span class="dot c-cefr"></span><div><span class="src">Render batch cache</span> (session words, levels 1-6) → <span class="inline-dot c-local"></span> <span class="src">local CEFR_LEVELS</span> → '—'<div class="detail">No length heuristic — unknown words stay honest.</div></div></div>
     <div class="line"><span class="elem">New words</span><span class="dot c-cefr"></span><div><span class="src">Render backend</span> — <code>POST /api/cefr/batch</code> (queued, debounced, merged into session cache)</div></div>
-    <div class="line"><span class="elem">Italian captions</span><span class="dot c-local"></span><div><span class="src">js/it-lexicon.js</span> — Italian captions use the IT chain (map → suffix rules → length) instead of the English dictionary</div></div>
+    <div class="line"><span class="elem">Italian captions</span><span class="dot c-local"></span><div><span class="src">js/it-lexicon.js</span> — IT chain (KELLY → curated core → suffix → length) instead of the English dictionary</div></div>
   </div>
 </div>
 
@@ -393,8 +393,8 @@ h1 span{background:linear-gradient(135deg,#a78bfa,#06b6d4,#10b981);-webkit-backg
   <tr><td><span class="dot c-freedict"></span>Free Dictionary API</td><td>EN definitions + IPA (direct first, proxy backup)</td><td>Panoramica VB (EN) · caption-s8t lookup + popup</td><td>Free, no key</td></tr>
   <tr><td><span class="dot c-wordsapi"></span>WordsAPI (RapidAPI)</td><td>EN definitions (3rd in chain)</td><td>Panoramica VB (EN)</td><td>Freemium (≈2500/day)</td></tr>
   <tr><td><span class="dot c-local"></span>KELLY wordlist (local)</td><td>IT POS + CEFR (primary, 6,369 words) via <code>it-lexicon.js</code></td><td>Panoramica VB (IT) · caption-s8t IT captions</td><td>Free, bundled</td></tr>
-  <tr><td><span class="dot c-mymemory"></span>MyMemory</td><td>Translations en↔it + caption fallback</td><td>Panoramica VB (EN+IT) · caption-s8t fallback</td><td>Freemium (5000 w/day)</td></tr>
-  <tr><td><span class="dot c-google"></span>Google Translate (gtx)</td><td>Caption translation chips</td><td>caption-s8t · index.html (via translation-providers.js)</td><td>Free, unofficial</td></tr>
+  <tr><td><span class="dot c-mymemory"></span>MyMemory</td><td>Translations en↔it (VB cards) + caption fallback (auto mode)</td><td>Panoramica VB (EN+IT) · caption-s8t</td><td>Freemium (5000 w/day)</td></tr>
+  <tr><td><span class="dot c-google"></span>Google Translate (gtx)</td><td>Caption translation chips (auto mode primary)</td><td>caption-s8t · index.html (via translation-providers.js)</td><td>Free, unofficial</td></tr>
   <tr><td><span class="dot c-wikitionary"></span>Wiktionary IT</td><td>IT definitions + POS header</td><td>Panoramica VB (IT)</td><td>Free</td></tr>
   <tr><td><span class="dot c-cefr"></span>Render /api/cefr</td><td>CEFR batch levels · topic analysis</td><td>caption-s8t badges + topic panel</td><td>Own backend</td></tr>
   <tr><td><span class="dot c-languagetool"></span>LanguageTool</td><td>Grammar check</td><td>caption-s8t</td><td>Free (public API)</td></tr>
@@ -463,7 +463,7 @@ h1 span{background:linear-gradient(135deg,#a78bfa,#06b6d4,#10b981);-webkit-backg
 
 <div class="foot">
   Colour dots match the legend at the top. "current" = what the code calls today. Ratings are fit-for-this-product, not absolute quality.<br>
-  Built from the actual code paths in <b>panoramica.html</b> (v223) and <b>caption-s8t.html</b> — mockup only.
+  Built from the actual code paths in <b>panoramica.html</b> (v224) and <b>caption-s8t.html</b> — mockup only.
 </div>
 
 </div>
