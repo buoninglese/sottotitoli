@@ -214,7 +214,7 @@ function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;');}
 
 /* ═══ formattazione ═══ */
 function fmtMin(m){if(m<=0)return '0m';if(m<60)return m+'m';var h=Math.floor(m/60),r=m%60;return r?h+'h '+r+'m':h+'h';}
-function fmtK(n){n=Math.round(n);if(n>=1000)return (n/1000).toFixed(1).replace('.0','')+'k';return ''+n;}
+function fmtK(n){n=Math.round(n);if(n>=1000){var k=Math.floor(n/100)/10;return k.toFixed(1).replace('.',',').replace(',0','')+'k';}return ''+n;}
 
 /* ═══ stato ═══ */
 var dashState={metric:'activity',tl:'week'};
@@ -258,12 +258,18 @@ function ringPath(cx,cy,rO,rI,a0,a1){var p0=polar(cx,cy,rO,a0),p1=polar(cx,cy,rO
 
 /* 23 · RADIAL BAR — corona quotidiana */
 function radialChart(m,lo,hi,color,unit,center){
-  var vals=series(m,lo,hi),n=hi-lo,cx=W/2,cy=H/2+6,r0=24,step=360/n,max=Math.max.apply(null,vals.concat([1])),g='';
-  for(var ring=1;ring<=4;ring++){g+='<circle cx="'+cx+'" cy="'+cy+'" r="'+(r0+ring*10)+'" fill="none" stroke="rgba(148,163,184,.08)"/>';}
-  for(var i=0;i<n;i++){var v=vals[i],a0=i*step,a1=(i+1)*step-4,rr=r0+(v/max)*40;
+  var vals=series(m,lo,hi),n=hi-lo,cx=W/2,cy=H/2,step=360/n,max=Math.max.apply(null,vals.concat([1]));
+  // raggio interno + font dinamici: c'è sempre spazio per il numero dentro la corona
+  var est=String(center).length;
+  var r0=Math.max(34,Math.min(50,12+est*4));
+  var span=Math.min(r0+40,90),ringH=(span-r0)/4;
+  var fs=Math.max(13,Math.min(26,Math.floor((2*r0-14)/(est*0.62))));
+  var g='';
+  for(var ring=1;ring<=4;ring++){g+='<circle cx="'+cx+'" cy="'+cy+'" r="'+(r0+ring*ringH)+'" fill="none" stroke="rgba(148,163,184,.08)"/>';}
+  for(var i=0;i<n;i++){var v=vals[i],a0=i*step,a1=(i+1)*step-4,rr=r0+(v/max)*(span-r0);
     g+='<path class="ring seg" d="'+ringPath(cx,cy,rr,r0,a0,a1)+'" fill="'+(i===n-1?'#f59e0b':color)+'" opacity=".95"><title>'+DAYS[lo+i].d+' — '+unit(v)+'</title></path>';}
-  g+='<text x="'+cx+'" y="'+(cy+4)+'" text-anchor="middle" fill="#e8f0f7" font-size="28" font-weight="800" font-family="Space Grotesk">'+center+'</text>';
-  g+='<text x="'+cx+'" y="'+(cy+20)+'" text-anchor="middle" fill="#6f8398" font-size="8.5" font-family="JetBrains Mono" letter-spacing=".1em">OGGI IN EVIDENZA</text>';
+  g+='<text x="'+cx+'" y="'+(cy+fs*0.35)+'" text-anchor="middle" fill="#e8f0f7" font-size="'+fs+'" font-weight="800" font-family="Space Grotesk" letter-spacing="-.02em">'+center+'</text>';
+  g+='<text x="'+cx+'" y="'+(cy+15)+'" text-anchor="middle" fill="#6f8398" font-size="8" font-family="JetBrains Mono" letter-spacing=".1em">OGGI</text>';
   return '<svg viewBox="0 0 '+W+' '+H+'">'+g+'</svg>';}
 
 /* 10 · CUMULATIVO — linea che sale */
