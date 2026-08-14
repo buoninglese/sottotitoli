@@ -581,9 +581,28 @@
   function renderRealPath(pane, due, fragile, fresh, lang) {
     var s = load();
     var html = '';
+    // ── Spaced review (always visible on both English & Italiano) ──
+    html += '<div class="lr-section-head"><span class="lr-section-title">' + t('learner_review') + '</span>' +
+      '<span class="lr-section-sub">' + t('learner_review_sub') + '</span></div>';
+    var reviewCards = [
+      { kind: 'due', icon: '⏰', title: t('learner_review_due'), sub: t('learner_review_due_sub'), count: due.length },
+      { kind: 'fragile', icon: '🧩', title: t('learner_review_fragile'), sub: t('learner_review_fragile_sub'), count: fragile.length },
+      { kind: 'new', icon: '✨', title: t('learner_review_new'), sub: t('learner_review_new_sub'), count: fresh.length }
+    ];
+    // Always render the three cards with their counts (0 included) so both
+    // English and Italiano show the review section, hooked to their language.
+    html += '<div class="lr-review-grid">';
+    reviewCards.forEach(function (c) {
+      html += '<div class="lr-review-card' + (c.count > 0 ? '' : ' empty') + '" tabindex="0" onclick="Learner.openReview(\'' + c.kind + '\')">' +
+        '<span class="lr-review-icon">' + c.icon + '</span>' +
+        '<div class="lr-review-body"><div class="lr-review-title">' + c.title + '</div><div class="lr-review-sub">' + c.sub + '</div></div>' +
+        '<span class="lr-review-count">' + c.count + '</span>' +
+      '</div>';
+    });
+    html += '</div>';
     // ── Missions: one around the user's goals, one on essential thematic vocab ──
     var mission = missionCached();
-    html += '<div class="lr-section-head"><span class="lr-section-title">' + t('learner_missions') + '</span>' +
+    html += '<div class="lr-section-head lr-sec-mt"><span class="lr-section-title">' + t('learner_missions') + '</span>' +
       '<span class="lr-section-sub">' + t('learner_missions_sub') + '</span></div>';
     html += '<div class="lr-missions-grid">';
     // Card 1 — objectives-driven AI mission (from the user's goals)
@@ -618,25 +637,6 @@
         '<button type="button" class="primary-btn" onclick="var c=this.closest(\'.lr-mission-card\');var s=c.querySelector(\'.lr-theme-select\');var l=c.querySelector(\'.len-btn.active\');Learner.openThemeMission(s.getAttribute(\'data-theme\')||s.value, l?l.getAttribute(\'data-len\'):\'short\')">' + t('learner_mission_start') + '</button>' +
       '</div>' +
     '</div>';
-    html += '</div>';
-    // ── Spaced review (always visible on both English & Italiano) ──
-    html += '<div class="lr-section-head lr-sec-mt"><span class="lr-section-title">' + t('learner_review') + '</span>' +
-      '<span class="lr-section-sub">' + t('learner_review_sub') + '</span></div>';
-    var reviewCards = [
-      { kind: 'due', icon: '⏰', title: t('learner_review_due'), sub: t('learner_review_due_sub'), count: due.length },
-      { kind: 'fragile', icon: '🧩', title: t('learner_review_fragile'), sub: t('learner_review_fragile_sub'), count: fragile.length },
-      { kind: 'new', icon: '✨', title: t('learner_review_new'), sub: t('learner_review_new_sub'), count: fresh.length }
-    ];
-    // Always render the three cards with their counts (0 included) so both
-    // English and Italiano show the review section, hooked to their language.
-    html += '<div class="lr-review-grid">';
-    reviewCards.forEach(function (c) {
-      html += '<div class="lr-review-card' + (c.count > 0 ? '' : ' empty') + '" tabindex="0" onclick="Learner.openReview(\'' + c.kind + '\')">' +
-        '<span class="lr-review-icon">' + c.icon + '</span>' +
-        '<div class="lr-review-body"><div class="lr-review-title">' + c.title + '</div><div class="lr-review-sub">' + c.sub + '</div></div>' +
-        '<span class="lr-review-count">' + c.count + '</span>' +
-      '</div>';
-    });
     html += '</div>';
     // ── Recent mistakes (per language) ──
     var prefix = lang + ':';
