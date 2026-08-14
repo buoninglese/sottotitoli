@@ -608,10 +608,14 @@
       '<div class="lr-mission-body">' +
         '<div class="lr-mission-title">' + t('learner_theme_mission') + '</div>' +
         '<div class="lr-mission-obj">' + t('learner_theme_mission_sub') + '</div>' +
-        '<select class="lr-theme-select" aria-label="' + t('learner_theme_choose') + '">' + themeOptions() + '</select>' +
+        '<select class="lr-theme-select" data-theme="linking" onchange="this.setAttribute(\'data-theme\',this.value)" aria-label="' + t('learner_theme_choose') + '">' + themeOptions() + '</select>' +
+        '<div class="lr-mission-len" role="group" aria-label="' + t('learner_len') + '">' +
+          '<button type="button" class="len-btn active" data-len="short" onclick="Learner.setThemeLen(this)">' + t('learner_len_short') + '</button>' +
+          '<button type="button" class="len-btn" data-len="medium" onclick="Learner.setThemeLen(this)">' + t('learner_len_medium') + '</button>' +
+        '</div>' +
       '</div>' +
       '<div class="lr-mission-actions">' +
-        '<button type="button" class="primary-btn" onclick="Learner.openThemeMission(this.closest(\'.lr-mission-card\').querySelector(\'.lr-theme-select\').value)">' + t('learner_mission_start') + '</button>' +
+        '<button type="button" class="primary-btn" onclick="var c=this.closest(\'.lr-mission-card\');var s=c.querySelector(\'.lr-theme-select\');var l=c.querySelector(\'.len-btn.active\');Learner.openThemeMission(s.getAttribute(\'data-theme\')||s.value, l?l.getAttribute(\'data-len\'):\'short\')">' + t('learner_mission_start') + '</button>' +
       '</div>' +
     '</div>';
     html += '</div>';
@@ -1300,8 +1304,24 @@
     return steps;
   }
 
+  /* ── Mission session persistence (save on exit → resume on return) ── */
+  var MISSION_PROG_KEY = 'sottotitoli-learner-mission-progress';
+  function missionProg() { try { return JSON.parse(localStorage.getItem(MISSION_PROG_KEY) || 'null'); } catch (e) { return null; } }
+  function saveMissionProg(p) { try { localStorage.setItem(MISSION_PROG_KEY, JSON.stringify(p)); } catch (e) {} }
+  function clearMissionProg() { try { localStorage.removeItem(MISSION_PROG_KEY); } catch (e) {} }
+  function resumeMissionSession(saved) {
+    if (!saved || saved.mode !== 'mission' || !saved.steps || !saved.steps.length) return false;
+    if (saved.idx >= saved.steps.length) { clearMissionProg(); return false; }
+    openSession('mission', saved.unit, null, saved.steps);
+    session.idx = saved.idx || 0;
+    session.earned = saved.earned || 0;
+    renderOverlay();
+    return true;
+  }
   async function openMission(focus) {
     var lang = learnerLang();
+    var saved = missionProg();
+    if (saved && resumeMissionSession(saved)) return;
     var lesson = missionCached();
     if (!lesson) lesson = await generateMission(focus, lang);
     if (!lesson) { toast(t('learner_mission_error')); return; }
@@ -1365,21 +1385,35 @@
       return { it: t, en: x, word: t, lang: lang, pos: '', cefr: '', definition: '' };
     });
   }
-  function openThemeMission(themeKey) {
+  function buildThemeSteps(items, lang, len) {
+    var steps = [];
+    var medium = len === 'medium';
+    sample(items, Math.min(medium ? 5 : 3, items.length)).forEach(function (v) { steps.push({ type: 'listen', item: v }); });
+    sample(items, Math.min(medium ? 3 : 2, items.length)).forEach(function (v) { steps.push({ type: 'speak', item: v }); });
+    var mp = sample(items, Math.min(medium ? 5 : 3, items.length));
+    if (mp.length >= 3) steps.push({ type: 'match', pairs: shuffle(mp.map(function (v) { return { it: v.it, en: v.en }; })) });
+    var qp = sample(items, Math.min(medium ? 5 : 3, items.length));
+    if (qp.length) steps.push({ type: 'mc', questions: qp.map(function (v) { return { prompt: v.en, answer: v.it, options: optionsFor(v.it) }; }) });
+    return steps;
+  }
+  function openThemeMission(themeKey, len) {
     var lang = learnerLang();
     var theme = THEME_LESSONS[themeKey];
     if (!theme) return;
+    var sessionId = 'theme:' + themeKey;
+    var saved = missionProg();
+    if (saved && saved.unit && saved.unit.id === sessionId && resumeMissionSession(saved)) return;
     var items = themeItems(theme, lang);
     if (!items.length) { toast(t('learner_no_words_yet')); return; }
-    var steps = [];
-    sample(items, Math.min(5, items.length)).forEach(function (v) { steps.push({ type: 'listen', item: v }); });
-    sample(items, Math.min(3, items.length)).forEach(function (v) { steps.push({ type: 'speak', item: v }); });
-    var mp = sample(items, Math.min(5, items.length));
-    if (mp.length >= 3) steps.push({ type: 'match', pairs: shuffle(mp.map(function (v) { return { it: v.it, en: v.en }; })) });
-    var qp = sample(items, Math.min(5, items.length));
-    if (qp.length) steps.push({ type: 'mc', questions: qp.map(function (v) { return { prompt: v.en, answer: v.it, options: optionsFor(v.it) }; }) });
+    var steps = buildThemeSteps(items, lang, len);
     if (!steps.length) { toast(t('learner_no_words_yet')); return; }
-    openSession('mission', { id: 'theme:' + themeKey, name: theme.title, lang: lang }, null, steps);
+    openSession('mission', { id: sessionId, name: theme.title, lang: lang }, null, steps);
+  }
+  function setThemeLen(btn) {
+    var wrap = btn.parentElement;
+    if (!wrap) return;
+    Array.prototype.forEach.call(wrap.children, function (b) { b.classList.remove('active'); });
+    btn.classList.add('active');
   }
 
   function renderOverlay() {
@@ -1614,6 +1648,9 @@
     if (!session) return;
     session.idx += 1;
     if (session.idx >= session.steps.length) { endSession(); return; }
+    if (session.mode === 'mission') {
+      saveMissionProg({ mode: 'mission', unit: session.unit, steps: session.steps, idx: session.idx, earned: session.earned, updatedAt: new Date().toISOString() });
+    }
     renderStep();
   }
 
@@ -1669,6 +1706,7 @@
       body = t('learner_you_scored') + ' ' + earned + ' XP' + ' · ' + esc(unit.name);
       confettiFlag = earned > 0;
     } else if (mode === 'mission') {
+      clearMissionProg();
       if (earned > 0) addXp(earned);
       bonus = 10; addXp(10);
       markLessonDone('mission', unit.id);
@@ -1695,6 +1733,10 @@
   }
 
   function closeSession() {
+    // Save mission progress so the learner can continue where they left off.
+    if (session && session.mode === 'mission' && session.idx < session.steps.length) {
+      saveMissionProg({ mode: 'mission', unit: session.unit, steps: session.steps, idx: session.idx, earned: session.earned, updatedAt: new Date().toISOString() });
+    }
     var ov = $('#learnerOverlay');
     if (ov) ov.remove();
     session = null;
@@ -1759,6 +1801,7 @@
     openReview: openReview,
     openMission: openMission,
     openThemeMission: openThemeMission,
+    setThemeLen: setThemeLen,
     newMission: newMission,
     closeSession: closeSession,
     nextStep: nextStep,
