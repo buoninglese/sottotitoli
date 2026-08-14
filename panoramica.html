@@ -21,7 +21,7 @@
   <link rel="stylesheet" href="css/cta-fluid.css?v=2">
   <link rel="stylesheet" href="css/theme-wrapped.css?v=16">
   <link rel="stylesheet" href="css/review.css">
-  <link rel="stylesheet" href="css/panoramica.css?v=5">
+  <link rel="stylesheet" href="css/panoramica.css?v=6">
   <link rel="stylesheet" href="css/learner.css?v=13">
   <link rel="stylesheet" href="css/components.css?v=8">
   <link rel="stylesheet" href="css/tailwind.min.css">
@@ -4134,10 +4134,12 @@
         <div class="drawer-overlay" id="wbDrawerOverlay" onclick="closeWbDrawer()"></div>
         <div class="drawer" id="wbDrawer" onclick="event.stopPropagation()">
           <button class="drawer-close" onclick="closeWbDrawer()"><i class="fa-solid fa-xmark"></i></button>
-          <h3 id="wbDrawerWord">—</h3>
-          <div class="drawer-ipa" id="wbDrawerIPA"></div>
-          <div class="drawer-meta" id="wbDrawerMeta"></div>
-          <div class="drawer-section"><h4>Meaning</h4><p id="wbDrawerMeaning">—</p></div>
+          <div class="dw-head">
+            <h3 id="wbDrawerWord">—</h3>
+            <div class="dw-ipa" id="wbDrawerIPA"></div>
+            <div class="dw-meta" id="wbDrawerMeta"></div>
+          </div>
+          <div class="drawer-section dw-meaning"><h4>Meaning</h4><p id="wbDrawerMeaning">—</p></div>
           <div class="drawer-section"><h4>Bank membership</h4><div class="membership-list" id="wbDrawerBanks"></div></div>
           <div class="drawer-section"><h4>Add to bank</h4><div class="membership-list" id="wbDrawerAddBanks" style="margin-top:4px"></div></div>
           <div class="drawer-section"><h4>Signals</h4><div class="drawer-signals" id="wbDrawerSignals"></div></div>
@@ -8321,7 +8323,8 @@
         if (posVal) metaHtml += '<span class="badge badge-pos">'+posVal+'</span>';
         document.getElementById('wbDrawerMeta').innerHTML = metaHtml || '<span style="font-size:11px;color:var(--text-faint)">—</span>';
 
-        // ── Definition + IPA from Free Dictionary API ──
+        // ── Definition + IPA (dictionary-proxy: normalized { definition, ipa },
+        //     legacy Free-Dictionary array shape also supported) ──
         var definition = w.definition || w.translation_primary || '';
         var meaningEl = document.getElementById('wbDrawerMeaning');
         var ipaEl = document.getElementById('wbDrawerIPA');
@@ -8331,63 +8334,73 @@
             var resp = await fetch('https://qzqmuegbpmvqrjrlfbgk.supabase.co/functions/v1/dictionary-proxy?word=' + encodeURIComponent(wordText.toLowerCase()));
             if (resp.ok) {
               var defData = await resp.json();
-              if (defData && defData[0]) {
-                // IPA
-                if (defData[0].phonetic) {
-                  var ipa = typeof defData[0].phonetic === 'string' ? defData[0].phonetic : (defData[0].phonetic.text || '');
-                  if (ipa) ipaEl.textContent = '/' + ipa + '/';
-                } else if (defData[0].phonetics && defData[0].phonetics.length) {
-                  var ph = defData[0].phonetics.find(function(p){ return p.text; });
-                  if (ph) ipaEl.textContent = '/' + ph.text + '/';
+              var entry = Array.isArray(defData) ? defData[0] : (defData && defData.definition !== undefined ? defData : null);
+              if (entry) {
+                // IPA — normalized { ipa } or Free-Dictionary { phonetic / phonetics }
+                var ipa = entry.ipa || '';
+                if (!ipa && typeof entry.phonetic === 'string') ipa = entry.phonetic;
+                else if (!ipa && entry.phonetic && entry.phonetic.text) ipa = entry.phonetic.text;
+                else if (!ipa && entry.phonetics && entry.phonetics.length) {
+                  var ph = entry.phonetics.find(function(p){ return p.text; });
+                  if (ph) ipa = ph.text;
                 }
-                // Definition + POS backfill
-                if (defData[0].meanings && defData[0].meanings[0]) {
-                  var m = defData[0].meanings[0];
-                  if (!definition && m.definitions && m.definitions[0]) {
-                    definition = m.definitions[0].definition || '';
-                  }
+                if (ipa) ipaEl.textContent = '/' + String(ipa).replace(/^\/|\/$/g, '') + '/';
+                // Definition — normalized { definition } or meanings[]
+                var newDef = '';
+                if (entry.definition) newDef = entry.definition;
+                else if (entry.meanings && entry.meanings[0]) {
+                  var m = entry.meanings[0];
+                  if (m.definitions && m.definitions[0]) newDef = m.definitions[0].definition || '';
                   if (!posVal && m.partOfSpeech) {
                     posVal = m.partOfSpeech.toUpperCase();
-                    metaHtml += '<span class="badge badge-pos">'+posVal+'</span>';
+                    metaHtml += '<span class="badge badge-pos">' + posVal + '</span>';
                     document.getElementById('wbDrawerMeta').innerHTML = metaHtml;
                   }
                 }
+                if (newDef) definition = newDef;
               }
             }
           } catch(e) { /* API unavailable */ }
         }
         meaningEl.textContent = definition || (I18n && I18n.t ? I18n.t('word_definition_unavailable') : 'Definizione non ancora disponibile.');
 
-        // ── Bank membership (current banks) ──
+        // ── Bank membership (real: which of the user's banks contain this word) ──
         var lang = window.SOTTOTITOLI_STUDY_LANG || 'en';
         var banks = await SottotitoliData.getWordbanks(lang);
         var membershipHTML = '';
-        var currentBankIds = [];
-        if (banks && banks.length) {
-          for (var i = 0; i < banks.length; i++) {
-            // Check if word is in this bank by looking at current bank context
-            if (_wbState.currentBankUUID === banks[i].id || _wbState.currentBank === banks[i].id) {
-              currentBankIds.push(banks[i].id);
-            }
-          }
-          if (currentBankIds.length > 0) {
-            banks.forEach(function(b) {
-              if (currentBankIds.indexOf(b.id) !== -1) {
-                membershipHTML += '<span class="membership-chip">'+b.name+'</span>';
-              }
+        var memberBankIds = [];
+        var bankIds = (banks || []).map(function (b) { return b.id; });
+        try {
+          var sb = window.sottotitoliSupabase;
+          if (sb && bankIds.length) {
+            var { data: membershipRows } = await sb.from('user_wordbank_words')
+              .select('wordbank_id')
+              .in('wordbank_id', bankIds)
+              .eq('word', wordText);
+            (membershipRows || []).forEach(function (mr) {
+              if (memberBankIds.indexOf(mr.wordbank_id) === -1) memberBankIds.push(mr.wordbank_id);
             });
-          } else {
-            membershipHTML = '<span class="membership-chip">Current bank</span>';
           }
+        } catch (e) {}
+        // Fallback when the query can't run (offline): at least flag the current bank
+        if (!memberBankIds.length && banks && banks.length) {
+          banks.forEach(function (b) {
+            if (_wbState.currentBankUUID === b.id || _wbState.currentBank === b.id) memberBankIds.push(b.id);
+          });
+        }
+        if (banks && banks.length) {
+          banks.forEach(function (b) {
+            if (memberBankIds.indexOf(b.id) !== -1) membershipHTML += '<span class="membership-chip">' + b.name + '</span>';
+          });
         }
         document.getElementById('wbDrawerBanks').innerHTML = membershipHTML || '<span style="font-size:13px;color:var(--text-faint)">Non presente in nessuna word bank.</span>';
 
-        // ── Add to other banks ──
+        // ── Add to other banks (skip banks the word is already in) ──
         var addBankHTML = '';
         if (banks && banks.length) {
           for (var j = 0; j < banks.length; j++) {
             var b = banks[j];
-            if (currentBankIds.indexOf(b.id) !== -1) continue; // skip current bank
+            if (memberBankIds.indexOf(b.id) !== -1) continue; // skip banks that already contain it
             addBankHTML += '<span class="membership-chip add-chip" onclick="event.stopPropagation();wbAddWordToOtherBank(\''+wordId+'\',\''+b.id+'\',\''+b.name.replace(/'/g,"\\'")+'\',this)" title="Add to '+b.name+'">+ '+b.name+'</span>';
           }
         }
