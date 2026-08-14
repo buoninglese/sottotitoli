@@ -7499,12 +7499,16 @@
             }
           } catch(e) { /* leave empty */ }
         }
-        // ── Enrich all words with CEFR from local lookup ──
+        // ── Enrich all words with CEFR + POS from local lookups ──
+        var posLabels = { n:'noun', v:'verb', adj:'adjective', adv:'adverb', pron:'pronoun', prep:'preposition', conj:'conjunction', det:'determiner', num:'numeral', interj:'interjection' };
         words.forEach(function(w) {
           var wordKey = (w.word || w.lemma || '').toLowerCase();
           if (wordKey && window.CEFR_LEVELS && window.CEFR_LEVELS[wordKey] && !w.cefr && !w.cefr_level) {
             w.cefr = window.CEFR_LEVELS[wordKey];
             w.cefr_level = window.CEFR_LEVELS[wordKey];
+          }
+          if (wordKey && window.LEMMA_POS_MAP && window.LEMMA_POS_MAP[wordKey] && !w.pos && !w.part_of_speech) {
+            w.pos = posLabels[window.LEMMA_POS_MAP[wordKey]] || window.LEMMA_POS_MAP[wordKey];
           }
         });
         _wbState.currentWords = words;
@@ -7535,7 +7539,7 @@
               (words.length === 0 ?
                 '<div style="text-align:center;padding:60px 20px;color:var(--text-faint);flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center"><div style="font-size:48px;margin-bottom:12px">📭</div><p style="font-size:15px">'+emptyMsg+'</p></div>'
                 :
-                '<div style="overflow-x:auto;flex:1"><table class="wb-table" style="width:100%;border-collapse:collapse;min-width:600px"><thead><tr style="border-bottom:1px solid var(--line)"><th class="hv-cyan" onclick=\"wbSortTable(\'word\')\" style="padding:14px 16px;font-size:11px;font-weight:700;color:var(--text-soft);text-transform:uppercase;letter-spacing:.08em;font-family:\'Manrope\',sans-serif;text-align:left;cursor:pointer;user-select:none">Parola <span class="wb-sort-arrow" data-col="word"></span></th><th onclick=\"wbSortTable(\'pos\')\" style="padding:14px 16px;font-size:11px;font-weigclass="hv-cyan" onclick=\"wbSortTable(\'pos\')\" style="padding:14px 16px;font-size:11px;font-weight:700;color:var(--text-soft);text-transform:uppercase;letter-spacing:.08em;font-family:\'Manrope\',sans-serif;text-align:left;cursor:pointer;user-select:nonetTable(\'cefr\')\" style="padding:14px 16px;font-size:11px;font-weight:700;color:var(--text-soft);text-transform:uppercase;letter-spacing:.08em;font-class="hv-cyan" onclick=\"wbSortTable(\'cefr\')\" style="padding:14px 16px;font-size:11px;font-weight:700;color:var(--text-soft);text-transform:uppercase;letter-spacing:.08em;font-family:\'Manrope\',sans-serif;text-align:left;cursor:pointer;user-select:nonevar(--text-soft);text-transform:uppercase;letter-spacing:.08em;font-family:\'Manrope\',sans-serif;text-align:left;cursor:pointer;user-select:none" onmclass="hv-cyan" onclick=\"wbSortTable(\'freq\')\" style="padding:14px 16px;font-size:11px;font-weight:700;color:var(--text-soft);text-transform:uppercase;letter-spacing:.08em;font-family:\'Manrope\',sans-serif;text-align:left;cursor:pointer;user-select:noneht">Azioni</th></tr></thead><tbody id="wbTableBody" style="font-size:15px"></tbody></table></div>')+
+                '<div style="overflow-x:auto;flex:1"><table class="wb-table" style="width:100%;border-collapse:collapse;min-width:600px"><thead><tr style="border-bottom:1px solid var(--line)"><th class="hv-cyan" onclick="wbSortTable(\'word\')" style="padding:14px 16px;font-size:11px;font-weight:700;color:var(--text-soft);text-transform:uppercase;letter-spacing:.08em;font-family:\'Manrope\',sans-serif;text-align:left;cursor:pointer;user-select:none">Parola <span class="wb-sort-arrow" data-col="word"></span></th><th class="hv-cyan" onclick="wbSortTable(\'pos\')" style="padding:14px 16px;font-size:11px;font-weight:700;color:var(--text-soft);text-transform:uppercase;letter-spacing:.08em;font-family:\'Manrope\',sans-serif;text-align:left;cursor:pointer;user-select:none">POS <span class="wb-sort-arrow" data-col="pos"></span></th><th class="hv-cyan" onclick="wbSortTable(\'cefr\')" style="padding:14px 16px;font-size:11px;font-weight:700;color:var(--text-soft);text-transform:uppercase;letter-spacing:.08em;font-family:\'Manrope\',sans-serif;text-align:left;cursor:pointer;user-select:none">CEFR <span class="wb-sort-arrow" data-col="cefr"></span></th><th class="hv-cyan" onclick="wbSortTable(\'freq\')" style="padding:14px 16px;font-size:11px;font-weight:700;color:var(--text-soft);text-transform:uppercase;letter-spacing:.08em;font-family:\'Manrope\',sans-serif;text-align:left;cursor:pointer;user-select:none">Frequenza <span class="wb-sort-arrow" data-col="freq"></span></th><th style="padding:14px 16px;font-size:11px;font-weight:700;color:var(--text-soft);text-transform:uppercase;letter-spacing:.08em;font-family:\'Manrope\',sans-serif;text-align:right;user-select:none">Azioni</th></tr></thead><tbody id="wbTableBody" style="font-size:15px"></tbody></table></div>')+
             '</div>'+
           '</div>';
         renderWbTable(words);      }
@@ -7579,10 +7583,39 @@
           } catch(e) {}
         }
         inp.value = '';
-        // Reload the bank view
-        if (typeof openWordbankView === 'function') openWordbankView(bankId);
+        // Reload the bank view, then reveal the new row with animations
+        if (typeof openWordbankView === 'function') {
+          var wbReloadP = openWordbankView(bankId);
+          if (wbReloadP && wbReloadP.then) wbReloadP.then(function () { animateNewRow(word); });
+        }
         showWbxToast('✓ ' + word + ' aggiunto');
       };
+
+      // Reveal the just-added word's row in front of the user: scroll to it,
+      // flash-highlight it, then stagger in its POS and CEFR cells.
+      function animateNewRow(word) {
+        var tbody = document.getElementById('wbTableBody');
+        if (!tbody) return;
+        var key = String(word || '').toLowerCase();
+        var row = null;
+        Array.prototype.slice.call(tbody.querySelectorAll('tr')).forEach(function (tr) {
+          // The word lives in the first cell of each row
+          var cell = tr.children[0];
+          if (!row && cell && String(cell.textContent || '').trim().toLowerCase() === key) row = tr;
+        });
+        if (!row) return;
+        try { row.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch (e) { row.scrollIntoView(); }
+        row.classList.add('wb-added-row');
+        var posTd = row.children[1];
+        var cefrTd = row.children[2];
+        if (posTd) posTd.classList.add('wb-reveal');
+        setTimeout(function () { if (cefrTd) cefrTd.classList.add('wb-reveal'); }, 320);
+        setTimeout(function () {
+          row.classList.remove('wb-added-row');
+          if (posTd) posTd.classList.remove('wb-reveal');
+          if (cefrTd) cefrTd.classList.remove('wb-reveal');
+        }, 2000);
+      }
 
       function closeWordbankView() {
         var itTab = document.querySelector('[data-subtab="wb-overview-it"][aria-selected="true"]');
@@ -7833,7 +7866,12 @@
         arrows[col] = dir==='asc'?' ▲':' ▼';
         // Show action buttons on row hover via CSS
         tbody.innerHTML = (html || '<tr><td colspan="5" style="padding:40px;text-align:center;color:var(--text-faint)">' + (I18n && I18n.t ? I18n.t('wordbank_no_words') : 'Nessuna parola ancora. Inizia una sessione o aggiungi parole.') + '</td></tr>') +
-          '<style>#wbTableBody tr:hover td button{opacity:1!important}</style>';
+          '<style>#wbTableBody tr:hover td button{opacity:1!important}' +
+            '@keyframes wbRowAdded{0%{background:rgba(6,182,212,.18)}100%{background:transparent}}' +
+            '#wbTableBody tr.wb-added-row{animation:wbRowAdded 1.6s ease-out forwards}' +
+            '@keyframes wbCellReveal{from{opacity:0;transform:translateY(8px) scale(.92)}to{opacity:1;transform:none}}' +
+            '#wbTableBody td.wb-reveal{opacity:0;animation:wbCellReveal .55s cubic-bezier(.22,1,.36,1) forwards}' +
+          '</style>';
         // Update sort arrows in headers
         setTimeout(function(){
           document.querySelectorAll('.wb-sort-arrow').forEach(function(s){ s.textContent = ''; });
