@@ -44,11 +44,17 @@ window.SMART_SUGGESTIONS = (function() {
 
   // ── Datamuse helper (reuses existing cache pattern from panoramica) ──
   var _dmCache = {};
+  var _activeLang = 'en';   // set by refreshAll(lang) — drives v=it + Italian fallbacks
   async function _datamuse(params) {
-    var ck = JSON.stringify(params);
+    // Datamuse supports Italian via v=it (verified). Other langs use the default (en).
+    var effective = params;
+    if (_activeLang === 'it') {
+      effective = Object.assign({}, params, { v: 'it' });
+    }
+    var ck = JSON.stringify(effective);
     if (_dmCache[ck]) return _dmCache[ck];
-    var qs = Object.keys(params).map(function(k) {
-      return encodeURIComponent(k) + '=' + encodeURIComponent(params[k]);
+    var qs = Object.keys(effective).map(function(k) {
+      return encodeURIComponent(k) + '=' + encodeURIComponent(effective[k]);
     }).join('&');
     try {
       var resp = await fetch('https://api.datamuse.com/words?' + qs + '&max=25');
@@ -61,6 +67,9 @@ window.SMART_SUGGESTIONS = (function() {
         else if (tags.indexOf('v') >= 0) pos = 'v';
         else if (tags.indexOf('adj') >= 0) pos = 'adj';
         else if (tags.indexOf('adv') >= 0) pos = 'adv';
+        if (pos === '—' && window.IT_KELLY && _activeLang === 'it' && window.IT_KELLY[d.word.toLowerCase()]) {
+          pos = String(window.IT_KELLY[d.word.toLowerCase()]).split('|')[0] || '—';
+        }
         if (pos === '—' && window.LEMMA_POS_MAP && window.LEMMA_POS_MAP[d.word.toLowerCase()]) {
           pos = window.LEMMA_POS_MAP[d.word.toLowerCase()];
         }
@@ -77,12 +86,41 @@ window.SMART_SUGGESTIONS = (function() {
     var w = word.toLowerCase();
     if (window.CEFR_LEVELS && window.CEFR_LEVELS[w]) return window.CEFR_LEVELS[w];
     if (window.CEFR_GSE && window.CEFR_GSE[w]) return window.CEFR_GSE[w];
+    if (window.IT_KELLY && window.IT_KELLY[w]) {
+      var parts = String(window.IT_KELLY[w]).split('|');
+      if (parts[1]) return parts[1];
+    }
     return null;
   }
   function _cefrLevel(cefr) { return CEFR_ORDER[cefr] || 0; }
   function _isHigherLevel(wordCefr, userLevel) {
     if (!wordCefr || !userLevel) return false;
     return _cefrLevel(wordCefr) > _cefrLevel(userLevel);
+  }
+
+  // ── Italian fallback: seed from bundled KELLY list when Datamuse yields too few ──
+  function _seedItalianFallback(allCandidates, seen, knownWords, userLevel, max) {
+    if (_activeLang !== 'it' || !window.IT_KELLY) return;
+    if (allCandidates.length >= 8) return;
+    var knownSet = new Set((knownWords || []).map(function(k){ return k.word.toLowerCase(); }));
+    var pool = Object.keys(window.IT_KELLY);
+    var start = Math.floor(Math.random() * pool.length);
+    for (var s = 0; s < pool.length && allCandidates.length < max; s++) {
+      var idx = (start + s) % pool.length;
+      var wIt = pool[idx];
+      var lw = wIt.toLowerCase();
+      if (seen.has(lw) || knownSet.has(lw)) continue;
+      var cefrIt = _getCefr(wIt);
+      if (cefrIt && !_isHigherLevel(cefrIt, userLevel)) continue;
+      seen.add(lw);
+      allCandidates.push({
+        word: wIt,
+        pos: String(window.IT_KELLY[wIt]).split('|')[0] || '—',
+        cefr: cefrIt || '—',
+        reason: 'Dal tuo livello — parola utile in italiano',
+        score: 10 + (CEFR_ORDER[cefrIt] || 0) * 5
+      });
+    }
   }
 
   // ── Supabase helpers ──
@@ -304,6 +342,9 @@ window.SMART_SUGGESTIONS = (function() {
         });
       } catch(e) { /* skip */ }
     }
+
+    // Italian: guarantee content from the bundled KELLY list if Datamuse came up short
+    _seedItalianFallback(allCandidates, seen, knownWords, userLevel, 15);
 
     // Sort by score desc, take top 15
     allCandidates.sort(function(a, b) { return b.score - a.score; });
@@ -607,6 +648,7 @@ window.SMART_SUGGESTIONS = (function() {
   // ═══════════════════════════════════════════════
   async function refreshAll(lang) {
     lang = lang || 'en';
+    _activeLang = lang;
     var results = {
       goal_next_step: [],
       build_from_known: [],
