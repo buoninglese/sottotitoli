@@ -86,8 +86,6 @@ svg .vg{cursor:pointer}
 svg .vlab{opacity:0;transition:opacity .22s ease,transform .22s ease;pointer-events:none;transform:translateY(2px)}
 svg .vg:hover .dot{transform:scale(1.8);filter:brightness(1.35) drop-shadow(0 0 9px rgba(52,211,153,.85))}
 svg .vg:hover .vlab{opacity:1;transform:translateY(0)}
-svg .line-draw{stroke-dasharray:1500;stroke-dashoffset:1500;animation:draw 1.4s cubic-bezier(.4,0,.2,1) forwards}
-@keyframes draw{to{stroke-dashoffset:0}}
 @keyframes fadeIn{from{opacity:0}to{opacity:1}}
 .foot{margin-top:24px;font:500 10.5px var(--font-ui);color:var(--faint);border-top:1px solid var(--line);padding-top:14px;display:flex;gap:8px;flex-wrap:wrap;align-items:center}
 .foot code{font:500 9.5px var(--font-mono);color:#67e8f9;background:#0a1018;border:1px solid var(--line);padding:2px 7px;border-radius:6px}
@@ -109,7 +107,7 @@ svg .line-draw{stroke-dasharray:1500;stroke-dashoffset:1500;animation:draw 1.4s 
 </div>
 
 <div class="body">
-  <p class="intro"><b>Funzionante</b>: 62 giorni di dati mock. La <b>sidebar</b> cambia il <b>Periodo</b> (Ultima settimana · Ultime 2 settimane · Ultimo mese · Tutto); il grafico mostra sempre il <b>totale</b> (grande, con il periodo scritto per esteso sotto) e la <b>media per giorno</b> ancora più sotto, in un colore diverso. I 5 box metrici hanno <b>valore + confronto ("vs") + mini barra</b> e si ricalcolano sul periodo. Clicca un box per cambiare grafico: <b>23 radial</b> (sessioni brevi, attività) · <b>10 cumulativo</b> (sessioni mese/tutto, diversità) · <b>11 spline animata</b> (parole) · <b>9 stacked</b> a fasce (orari).</p>
+  <p class="intro"><b>Funzionante</b>: 62 giorni di dati mock. La <b>sidebar</b> cambia il <b>Periodo</b> (Ultima settimana · Ultime 2 settimane · Ultimo mese · Tutto); il grafico mostra sempre il <b>totale</b> (grande, con il periodo scritto per esteso sotto) e la <b>media per giorno</b> ancora più sotto, in un colore diverso. I 5 box metrici hanno <b>valore + confronto ("vs") + mini barra</b> e si ricalcolano sul periodo. Clicca un box per cambiare grafico: <b>23 radial</b> (sessioni, attività, fasce orarie) · <b>11 spline animata</b> (parole uniche, diversità).</p>
 
   <div class="metrics" id="metrics">
     <div class="metric" data-m="sessions">
@@ -176,7 +174,7 @@ svg .line-draw{stroke-dasharray:1500;stroke-dashoffset:1500;animation:draw 1.4s 
   <div class="foot">
     <code>stesso layout del bento dashboard</code>
     <code>periodo · totale grande + media sotto</code>
-    <code>grafici: 23 radial · 10 cumulativo · 11 spline · 9 stacked</code>
+    <code>grafici: 23 radial · 11 spline</code>
     <span style="flex:1"></span>
     <span>mockup funzionante · dati 62 giorni · clicca tutto.</span>
   </div>
@@ -296,16 +294,17 @@ function cumTwo(lo,hi){
   return '<svg viewBox="0 0 '+W+' '+H+'">'+g+'</svg>';}
 
 /* 11 · SPLINE — uniche vs totali, valori che appaiono sulla linea (hover animato) */
-function splineTwo(lo,hi){
+function splineTwo(lo,hi,color,glow){
+  color=color||'#34d399';glow=glow||'rgba(52,211,153,.45)';
   var n=hi-lo,u=[],t=[],i;
   for(i=lo;i<hi;i++){var d=DAYS[i];u.push(d.rec>0?Math.round(d.tt*d.ld):0);t.push(d.tt);}
   var max=Math.max.apply(null,t.concat([1]));
   function sm(vals){var pts=vals.map(function(v,i){return [px(i,n),py(v,0,max)];}),d='M'+pts[0][0]+' '+pts[0][1];for(var i=0;i<pts.length-1;i++){var p0=pts[Math.max(0,i-1)],p1=pts[i],p2=pts[i+1],p3=pts[Math.min(pts.length-1,i+2)],c1x=p1[0]+(p2[0]-p0[0])/6,c1y=p1[1]+(p2[1]-p0[1])/6,c2x=p2[0]-(p3[0]-p1[0])/6,c2y=p2[1]-(p3[1]-p1[1])/6;d+=' C'+c1x+' '+c1y+', '+c2x+' '+c2y+', '+p2[0]+' '+p2[1];}return d;}
   var g=gridLines(max);
   g+='<path class="line" d="'+sm(t)+'" fill="none" stroke="#64748b" stroke-width="2.2" opacity=".7"/>';
-  g+='<path class="line line-draw" d="'+sm(u)+'" fill="none" stroke="#34d399" stroke-width="2.8" stroke-linecap="round" style="filter:drop-shadow(0 0 8px rgba(52,211,153,.45))"/>';
-  u.forEach(function(v,i){g+='<g class="vg"><circle class="dot" cx="'+px(i,n)+'" cy="'+py(v,0,max)+'" r="4.2" fill="#0d141d" stroke="#34d399" stroke-width="2"><title>'+DAYS[lo+i].d+' — '+v+' uniche</title></circle><text class="vlab" x="'+px(i,n)+'" y="'+(py(v,0,max)-11)+'" text-anchor="middle" fill="#34d399" font-size="10.5" font-weight="800" font-family="Space Grotesk">'+v+'</text></g>';});
-  g+='<rect x="'+(PL+8)+'" y="'+(H-18)+'" width="10" height="10" rx="3" fill="#34d399"/><text x="'+(PL+22)+'" y="'+(H-9)+'" fill="#8fa4ba" font-size="9" font-family="Inter">uniche</text>';
+  g+='<path class="line line-draw" d="'+sm(u)+'" fill="none" stroke="'+color+'" stroke-width="2.8" stroke-linecap="round" style="filter:drop-shadow(0 0 8px '+glow+')"/>';
+  u.forEach(function(v,i){g+='<g class="vg"><circle class="dot" cx="'+px(i,n)+'" cy="'+py(v,0,max)+'" r="4.2" fill="#0d141d" stroke="'+color+'" stroke-width="2"><title>'+DAYS[lo+i].d+' — '+v+' uniche</title></circle><text class="vlab" x="'+px(i,n)+'" y="'+(py(v,0,max)-11)+'" text-anchor="middle" fill="'+color+'" font-size="10.5" font-weight="800" font-family="Space Grotesk">'+v+'</text></g>';});
+  g+='<rect x="'+(PL+8)+'" y="'+(H-18)+'" width="10" height="10" rx="3" fill="'+color+'"/><text x="'+(PL+22)+'" y="'+(H-9)+'" fill="#8fa4ba" font-size="9" font-family="Inter">uniche</text>';
   g+='<rect x="'+(PL+80)+'" y="'+(H-18)+'" width="10" height="10" rx="3" fill="#64748b"/><text x="'+(PL+94)+'" y="'+(H-9)+'" fill="#8fa4ba" font-size="9" font-family="Inter">totali</text>';
   g+=xLabelsRange(lo,hi);
   return '<svg viewBox="0 0 '+W+' '+H+'">'+g+'</svg>';}
@@ -323,11 +322,11 @@ function stackedBands(lo,hi){
   return '<svg viewBox="0 0 '+W+' '+H+'">'+g+'</svg>';}
 
 function renderChartFor(m,tl,lo,hi,o){
-  if(m==='sessions') return (tl==='week'||tl==='2week')?radialChart(m,lo,hi,'#22d3ee',function(v){return v+' sess';},''+o.sess):cumChart(lo,hi,'#22d3ee',function(v){return v+' sessioni';});
+  if(m==='sessions') return radialChart(m,lo,hi,'#22d3ee',function(v){return v+' sess';},''+o.sess);
   if(m==='activity') return radialChart(m,lo,hi,'#22d3ee',function(v){return v+' min';},fmtMin(o.site));
-  if(m==='timebands') return stackedBands(lo,hi);
-  if(m==='words') return splineTwo(lo,hi);
-  return cumTwo(lo,hi);
+  if(m==='timebands') return radialChart(m,lo,hi,'#8b5cf6',function(v){return v+' min';},fmtMin(o.rec));
+  if(m==='words') return splineTwo(lo,hi,'#34d399','rgba(52,211,153,.45)');
+  return splineTwo(lo,hi,'#8b5cf6','rgba(139,92,246,.45)');
 }
 
 /* ═══ box "vs" multi-segmento (fasce orarie) ═══ */
@@ -344,15 +343,28 @@ function setBoxMulti(m,primary,secondary,secLabel,segs){
 
 /* ═══ meta per metrica ═══ */
 var META={
-  sessions:{title:'Sessioni',sub:'Sessioni di allenamento per giorno. Settimana e 2 settimane: corona (23); mese e tutto: cumulativo (10).',big:function(o){return ''+o.sess;},media:function(o){return (o.sess/o.days).toFixed(1);},mediaLabel:'media/giorno',color:'#22d3ee',legend:'sessione'},
+  sessions:{title:'Sessioni',sub:'Sessioni di allenamento per giorno — corona (23) per ogni periodo.',big:function(o){return ''+o.sess;},media:function(o){return (o.sess/o.days).toFixed(1);},mediaLabel:'media/giorno',color:'#22d3ee',legend:'sessione'},
   activity:{title:'Attività',sub:'Minuti sul sito per giorno (corona 23): presenza + registrazione (tempo parlato).',big:function(o){return fmtMin(o.site);},media:function(o){return fmtMin(Math.round(o.site/o.days));},mediaLabel:'media/giorno',color:'#22d3ee',legend:'min sul sito'},
-  timebands:{title:'Fasce orarie',sub:'Quando pratichi: minuti di registrazione divisi in mattina / giorno / sera / notte (stacked 9).',big:function(o){return fmtMin(o.rec);},media:function(o){return fmtMin(Math.round(o.rec/o.days));},mediaLabel:'media/giorno',color:'#8b5cf6',legend:'min per fascia'},
+  timebands:{title:'Fasce orarie',sub:'Minuti di registrazione per giorno — corona (23), con la fascia di picco nel box.',big:function(o){return fmtMin(o.rec);},media:function(o){return fmtMin(Math.round(o.rec/o.days));},mediaLabel:'media/giorno',color:'#8b5cf6',legend:'min per fascia'},
   words:{title:'Parole uniche',sub:'Spline (11) delle parole uniche contro le totali, con i valori che appaiono sulla linea al passaggio del mouse.',big:function(o){return fmtK(o.uniq);},media:function(o){return fmtK(o.uniq/o.days);},mediaLabel:'media/giorno',color:'#34d399',legend:'parole uniche'},
-  lexdiv:{title:'Div. lessicale vs WPM',sub:'Cumulativo (10) delle parole uniche vs totali — il loro rapporto è la diversità lessicale. Il numero sotto è la media WPM.',big:function(o){return o.ldN?(o.ldS/o.ldN).toFixed(2):'—';},media:function(o){return o.wpmN?''+Math.round(o.wpmS/o.wpmN):'—';},mediaLabel:'media parole/min',color:'#8b5cf6',legend:'diversità lessicale'}
+  lexdiv:{title:'Div. lessicale vs WPM',sub:'Spline (11) come parole uniche: uniche vs totali — il loro rapporto è la diversità lessicale. Sotto: media WPM.',big:function(o){return o.ldN?(o.ldS/o.ldN).toFixed(2):'—';},media:function(o){return o.wpmN?''+Math.round(o.wpmS/o.wpmN):'—';},mediaLabel:'media parole/min',color:'#8b5cf6',legend:'diversità lessicale'}
 };
 function dashPeriodLabel(tl){return tl==='week'?'Ultima settimana':tl==='2week'?'Ultime 2 settimane':tl==='month'?'Ultimo mese':'Tutto';}
 
 /* ═══ render ═══ */
+function animateLineDraw(){
+  document.querySelectorAll('#ccChart svg .line-draw').forEach(function(p){
+    var len=Math.max(1,p.getTotalLength());
+    p.style.strokeDasharray=len;
+    p.style.strokeDashoffset=len;
+    p.style.transition='stroke-dashoffset 2.2s cubic-bezier(.4,0,.2,1)';
+    void p.getBoundingClientRect(); // registra il valore di partenza
+    requestAnimationFrame(function(){requestAnimationFrame(function(){p.style.strokeDashoffset='0';});});
+    // failsafe: la linea deve SEMPRE arrivare fino all'ultimo punto
+    clearTimeout(p._ldt);
+    p._ldt=setTimeout(function(){p.style.transition='none';p.style.strokeDashoffset='0';},2600);
+  });
+}
 function renderDash(){
   var t=dashState, rng=rangeIdx(t.tl), lo=rng[0], hi=rng[1], o=agg(lo,hi), days=o.days;
   var tot=o.site+o.rec||1, wtot=o.tt||1;
@@ -379,6 +391,7 @@ function renderDash(){
   document.getElementById('ccMedia').textContent=meta.media(o);
   document.getElementById('ccMediaLabel').textContent=meta.mediaLabel;
   document.getElementById('ccChart').innerHTML=renderChartFor(t.metric,t.tl,lo,hi,o);
+  animateLineDraw();
   document.getElementById('ccLegend').innerHTML='<span class="lg"><i style="background:'+meta.color+'"></i>'+meta.legend+'</span>'+(t.metric==='activity'?'<span class="lg"><i style="background:#f59e0b"></i>registrazione</span>':'')+(t.metric==='words'?'<span class="lg"><i style="background:#64748b"></i>totali</span>':'')+(t.metric==='timebands'?'<span class="lg"><i style="background:#fbbf24"></i>mattina</span><span class="lg"><i style="background:#6366f1"></i>notte</span>':'')+(t.metric==='lexdiv'?'<span class="lg"><i style="background:#64748b"></i>totali</span>':'');
   document.querySelectorAll('.metric').forEach(function(el){el.classList.toggle('selected',el.getAttribute('data-m')===t.metric);});
 }
