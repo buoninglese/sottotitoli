@@ -1338,15 +1338,17 @@
   function learnerMissionsState() { try { return JSON.parse(localStorage.getItem(LEARNER_MISSIONS_KEY) || '{}'); } catch (e) { return {}; } }
   function saveLearnerMissionsState(s) { try { localStorage.setItem(LEARNER_MISSIONS_KEY, JSON.stringify(s)); } catch (e) {} }
   function missionTypeOf(id) { return String(id || '').indexOf('theme:') === 0 ? 'theme' : 'ai'; }
-  function trackMission(lang, type, pct, done) {
+  function trackMission(lang, type, pct, done, title) {
     if (!lang || !type) return;
     var s = learnerMissionsState();
-    s[lang + ':' + type] = { pct: Math.max(0, Math.min(100, Math.round(pct))), done: !!done, started: true, updatedAt: new Date().toISOString() };
+    var prev = s[lang + ':' + type] || {};
+    s[lang + ':' + type] = { pct: Math.max(0, Math.min(100, Math.round(pct))), done: !!done, started: true, title: title || prev.title || '', updatedAt: new Date().toISOString() };
     saveLearnerMissionsState(s);
   }
   function trackMissionForSession(pct, done) {
     if (!session || session.mode !== 'mission') return;
-    trackMission(session.lang, missionTypeOf(session.unit && session.unit.id), pct, done);
+    var title = (session.unit && session.unit.name) || '';
+    trackMission(session.lang, missionTypeOf(session.unit && session.unit.id), pct, done, title);
   }
   function resumeMissionSession(saved) {
     if (!saved || saved.mode !== 'mission' || !saved.steps || !saved.steps.length) return false;
