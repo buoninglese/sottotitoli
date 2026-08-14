@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Dashboard Charts · 10 modi · Sottotitoli</title>
+<title>Dashboard Charts · 25 modi · Sottotitoli</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Manrope:wght@500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
@@ -80,7 +80,7 @@ body{margin:0;font-family:var(--font-ui);background:var(--bg);color:var(--text);
 <body>
 
 <div class="head">
-  <h1><span class="dot"></span> Dashboard · 10 modi di visualizzare le tue sessioni</h1>
+  <h1><span class="dot"></span> Dashboard · 25 modi di visualizzare le tue sessioni</h1>
   <span class="badge">MOCKUP</span>
   <div class="spacer"></div>
   <span class="mock-tag">esplorazione design · non in produzione</span>
@@ -96,7 +96,7 @@ body{margin:0;font-family:var(--font-ui);background:var(--bg);color:var(--text);
     <div class="data-chip"><div class="k">Diversità lessicale</div><div class="v">0.70</div><div class="sub">uniche / totali</div></div>
   </div>
 
-  <p class="intro"><span class="sdot"></span> La stessa storia, dieci visuali</p>
+  <p class="intro"><span class="sdot"></span> La stessa storia, venticinque visuali</p>
   <p class="intro-desc">Ognuna mostra le <b style="color:#e8f0f7">sessioni quotidiane</b> degli ultimi 14 giorni (01/08 → oggi, 35 totali). Ogni carta spiega il punto di vista e quando conviene usarla.</p>
 
   <div class="grid" id="grid">
@@ -424,6 +424,315 @@ charts.push({
       '<path d="'+area+'" fill="url(#gCum)"/>'+
       '<path d="'+line+'" fill="none" stroke="#34d399" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="filter:drop-shadow(0 0 6px rgba(52,211,153,.3))"/>'+dots+xLabels()+
       '<text x="'+(W-PR)+'" y="'+(PT-2)+'" text-anchor="end" fill="#6f8398" font-size="8.5" font-family="JetBrains Mono">totale sessioni</text></svg>';
+  }
+});
+
+/* 11 · SPLINE — smoothed curve */
+charts.push({
+  name:'Spline (curva morbida)', icon:'smooth', desc:'La stessa linea ma levigata: mostra la direzione generale senza i “denti” del poligono. Ideale quando il rumore quotidiano disturba.',
+  use:'Tendenza senza rumore', svg:function(){
+    function smooth(points){
+      var d='M'+points[0][0]+' '+points[0][1];
+      for(var i=0;i<points.length-1;i++){
+        var p0=points[Math.max(0,i-1)],p1=points[i],p2=points[i+1],p3=points[Math.min(points.length-1,i+2)];
+        var c1x=p1[0]+(p2[0]-p0[0])/6,c1y=p1[1]+(p2[1]-p0[1])/6;
+        var c2x=p2[0]-(p3[0]-p1[0])/6,c2y=p2[1]-(p3[1]-p1[1])/6;
+        d+=' C'+c1x+' '+c1y+', '+c2x+' '+c2y+', '+p2[0]+' '+p2[1];
+      }
+      return d;
+    }
+    var pts=DAYS.map(function(d,i){ return [px(i),py(d.s,0,MAX_S)]; });
+    var dots='';
+    DAYS.forEach(function(d,i){ dots+='<circle cx="'+px(i)+'" cy="'+py(d.s,0,MAX_S)+'" r="3" fill="#0d141d" stroke="#22d3ee" stroke-width="1.8"><title>'+d.d+' — '+d.s+' sessioni</title></circle>'; });
+    return '<svg viewBox="0 0 '+W+' '+H+'">'+gridLines(MAX_S,'')+
+      '<path d="'+smooth(pts)+'" fill="none" stroke="#22d3ee" stroke-width="2.4" stroke-linecap="round" style="filter:drop-shadow(0 0 6px rgba(34,211,238,.3))"/>'+dots+xLabels()+
+      '<text x="'+(W-PR)+'" y="'+(PT-2)+'" text-anchor="end" fill="#6f8398" font-size="8.5" font-family="JetBrains Mono">sessioni/giorno</text></svg>';
+  }
+});
+
+/* 12 · CLASSIC PIE — weekday share */
+charts.push({
+  name:'Classic pie', icon:'pie_chart', desc:'La versione “torta” della distribuzione per giorno della settimana. Dom e Mar si dividono la fetta più grande.',
+  use:'Quota semplice', svg:function(){
+    const cx=W/2-16,cy=H/2+8,R=62;
+    const cols=['#22d3ee','#14b8a6','#8b5cf6','#f472b6','#f59e0b','#34d399','#e2e8f0'];
+    let a0=0,g='';
+    WD.forEach(function(w,i){
+      const a1=a0+(w.v/TOTAL)*360;
+      g+='<path d="'+arcPath(cx,cy,R,a0,a1)+' L'+cx+' '+cy+' Z" fill="'+cols[i]+'" opacity=".92"><title>'+w.k+' — '+w.v+' sessioni</title></path>';
+      a0=a1;
+    });
+    g+='<circle cx="'+cx+'" cy="'+cy+'" r="'+(R*0.34)+'" fill="#0d141d"/>';
+    g+='<text x="'+cx+'" y="'+(cy+4)+'" text-anchor="middle" fill="#e8f0f7" font-size="16" font-weight="800" font-family="Space Grotesk">35</text>';
+    return '<svg viewBox="0 0 '+W+' '+H+'">'+g+'</svg>';
+  }
+});
+
+/* 13 · SCATTER — sessions × minutes */
+charts.push({
+  name:'Scatter plot', icon:'scatter_plot', desc:'Ogni punto è un giorno: a destra le sessioni, in alto i minuti. I giorni brevi ma frequenti si distinguono da quelli lunghi e rari.',
+  use:'Correlazione tra due variabili', svg:function(){
+    let g='';
+    g+='<line x1="'+PL+'" y1="'+PT+IH+'" x2="'+PL+IW+'" y2="'+PT+IH+'" stroke="rgba(148,163,184,.2)"/>';
+    g+='<line x1="'+PL+'" y1="'+PT+'" x2="'+PL+'" y2="'+PT+IH+'" stroke="rgba(148,163,184,.2)"/>';
+    DAYS.forEach(function(d,i){
+      const x=PL+4+(IW-8)*(d.s/MAX_S), y=py(d.m,0,MAX_M);
+      g+='<circle cx="'+x+'" cy="'+y+'" r="4" fill="rgba(34,211,238,.5)" stroke="#22d3ee" stroke-width="1.2"><title>'+d.d+' — '+d.s+' sessioni · '+d.m+' min</title></circle>';
+    });
+    g+='<text x="'+(W-PR)+'" y="'+(PT-2)+'" text-anchor="end" fill="#6f8398" font-size="8" font-family="JetBrains Mono">sessioni →</text>';
+    g+='<text x="'+(PL+2)+'" y="'+(PT-2)+'" fill="#6f8398" font-size="8" font-family="JetBrains Mono">↑ minuti</text>';
+    return '<svg viewBox="0 0 '+W+' '+H+'">'+g+'</svg>';
+  }
+});
+
+/* 14 · WATERFALL — daily deltas */
+charts.push({
+  name:'Waterfall', icon:'waterfall_chart', desc:'Ogni barra è la differenza rispetto al giorno prima: sale quando cresci, scende quando cali. La somma finale è 35.',
+  use:'Variazioni giorno per giorno', svg:function(){
+    const bw=14,gap=(IW-DAYS.length*bw)/(DAYS.length-1);
+    let g='',prev=0;
+    DAYS.forEach(function(d,i){
+      const x=PL+i*(bw+gap),delta=d.s-prev;
+      const h=IH*(Math.abs(delta)/MAX_S);
+      const yTop=delta>=0?py(prev,0,MAX_S):py(prev-delta,0,MAX_S);
+      const c=delta>0?'#22d3ee':(delta===0?'rgba(148,163,184,.25)':'#f472b6');
+      g+='<rect x="'+x+'" y="'+yTop+'" width="'+bw+'" height="'+Math.max(2,h)+'" rx="3" fill="'+c+'" opacity=".9"><title>'+d.d+' — '+(delta>=0?'+':'')+delta+' vs ieri</title></rect>';
+      prev=d.s;
+    });
+    prev=0;
+    DAYS.forEach(function(d,i){
+      const x=PL+i*(bw+gap)+bw/2;
+      if(i>0){ g+='<line x1="'+x+'" y1="'+py(prev,0,MAX_S)+'" x2="'+x+'" y2="'+py(d.s,0,MAX_S)+'" stroke="rgba(148,163,184,.3)" stroke-dasharray="2 2"/>'; }
+      prev=d.s;
+    });
+    g+='<rect x="'+(PL+14)+'" y="'+(H-16)+'" width="10" height="8" rx="2" fill="#22d3ee"/><text x="'+(PL+28)+'" y="'+(H-9)+'" fill="#6f8398" font-size="8" font-family="Inter">crescita</text>';
+    g+='<rect x="'+(PL+78)+'" y="'+(H-16)+'" width="10" height="8" rx="2" fill="#f472b6"/><text x="'+(PL+92)+'" y="'+(H-9)+'" fill="#6f8398" font-size="8" font-family="Inter">calo</text>';
+    return '<svg viewBox="0 0 '+W+' '+H+'">'+g+xLabels()+'</svg>';
+  }
+});
+
+/* 15 · FUNNEL — weekday drop-off */
+charts.push({
+  name:'Funnel', icon:'filter_alt', desc:'Le sessioni per giorno della settimana, dal giorno più prolifico al meno. Il collo del funnel mostra dove perdi slancio.',
+  use:'Canalizzazione / drop-off', svg:function(){
+    const sorted=[...WD].sort((a,b)=>b.v-a.v);
+    const maxW=IW-30,bw=26,gap=18,x0=PL+30;
+    const cols=['#22d3ee','#14b8a6','#8b5cf6','#f472b6','#f59e0b','#34d399','#64748b'];
+    let g='';
+    sorted.forEach(function(w,i){
+      const y=PT+10+i*gap,wpx=(w.v/maxW)*maxW,half=(maxW-wpx)/2;
+      g+='<path d="M'+(x0+half)+' '+y+' L'+(x0+maxW-half)+' '+y+' L'+(x0+maxW-half-6)+' '+(y+bw)+' L'+(x0+half+6)+' '+(y+bw)+' Z" fill="'+cols[i]+'" opacity=".9"><title>'+w.k+' — '+w.v+' sessioni</title></path>';
+      g+='<text x="'+(x0-8)+'" y="'+(y+bw/2+3)+'" text-anchor="end" fill="#8fa4ba" font-size="8.5" font-family="Inter">'+w.k+'</text>';
+      g+='<text x="'+(x0+maxW-half+10)+'" y="'+(y+bw/2+3)+'" fill="#e8f0f7" font-size="9.5" font-weight="800" font-family="Space Grotesk">'+w.v+'</text>';
+    });
+    return '<svg viewBox="0 0 '+W+' '+H+'">'+g+'</svg>';
+  }
+});
+
+/* 16 · POLAR ROSE — weekday */
+charts.push({
+  name:'Polar bar (rosa)', icon:'speed', desc:'Le barre disposte in cerchio: la forma mostra quali giorni della settimana spiccano davvero.',
+  use:'Pattern ciclico settimanale', svg:function(){
+    const cx=W/2-14,cy=H/2+6,R=62,step=360/WD.length;
+    const maxW=Math.max(...WD.map(w=>w.v));
+    let g='';
+    for(let ring=1;ring<=4;ring++){ g+='<circle cx="'+cx+'" cy="'+cy+'" r="'+(R*ring/4)+'" fill="none" stroke="rgba(148,163,184,.12)"/>'; }
+    WD.forEach(function(w,i){
+      const a0=i*step,a1=(i+1)*step-4,rr=Math.max(5,(w.v/maxW)*R);
+      g+='<path d="'+ringPath(cx,cy,rr,R*0.16,a0,a1)+'" fill="rgba(34,211,238,.5)" stroke="#22d3ee" stroke-width=".5"><title>'+w.k+' — '+w.v+' sessioni</title></path>';
+      const lp=polar(cx,cy,R+12,a0+step/2);
+      g+='<text x="'+lp[0]+'" y="'+(lp[1]+3)+'" text-anchor="middle" fill="#8fa4ba" font-size="8" font-family="Inter">'+w.k+'</text>';
+    });
+    return '<svg viewBox="0 0 '+W+' '+H+'">'+g+'</svg>';
+  }
+});
+
+/* 17 · SLOPE — week 1 vs week 2 */
+charts.push({
+  name:'Slope chart', icon:'swap_vert', desc:'Confronta la prima settimana (S1) con la seconda (S2) per ogni giorno: le linee in salita = stai migliorando.',
+  use:'Confronto tra due periodi', svg:function(){
+    const w1=DAYS.slice(0,7),w2=DAYS.slice(7);
+    const x1=PL+40,x2=W-PR-40,top=PT+8,bot=PT+IH-8;
+    const cols=['#22d3ee','#14b8a6','#8b5cf6','#f472b6','#f59e0b','#34d399','#e2e8f0'];
+    let g='';
+    g+='<text x="'+x1+'" y="'+(PT-2)+'" text-anchor="middle" fill="#6f8398" font-size="8.5" font-family="JetBrains Mono">S1 (01–07)</text>';
+    g+='<text x="'+x2+'" y="'+(PT-2)+'" text-anchor="middle" fill="#6f8398" font-size="8.5" font-family="JetBrains Mono">S2 (08–14)</text>';
+    w1.forEach(function(d,i){
+      const y1=top+(1-(d.s/MAX_S))*(bot-top),y2=top+(1-(w2[i].s/MAX_S))*(bot-top);
+      g+='<line x1="'+x1+'" y1="'+y1+'" x2="'+x2+'" y2="'+y2+'" stroke="'+cols[i]+'" stroke-width="2"><title>'+d.wd+' — '+d.s+' → '+w2[i].s+'</title></line>';
+      g+='<circle cx="'+x1+'" cy="'+y1+'" r="3" fill="'+cols[i]+'"/>';
+      g+='<circle cx="'+x2+'" cy="'+y2+'" r="3" fill="'+cols[i]+'"/>';
+      g+='<text x="'+(x1-6)+'" y="'+(y1+3)+'" text-anchor="end" fill="#8fa4ba" font-size="7.5" font-family="Inter">'+d.wd+'</text>';
+      g+='<text x="'+(x2+6)+'" y="'+(y2+3)+'" fill="#e8f0f7" font-size="8" font-family="Space Grotesk">'+w2[i].s+'</text>';
+    });
+    return '<svg viewBox="0 0 '+W+' '+H+'">'+g+'</svg>';
+  }
+});
+
+/* 18 · HISTOGRAM — frequency of daily sessions */
+charts.push({
+  name:'Histogram', icon:'bar_chart_rounded', desc:'Quante volte hai fatto 0, 1, 2… sessioni al giorno? La forma ti dice se sei costante o a scatti.',
+  use:'Frequenza dei valori', svg:function(){
+    const bins=[]; for(let v=0;v<=MAX_S;v++){ bins.push({v:v,c:DAYS.filter(d=>d.s===v).length}); }
+    const maxC=Math.max(...bins.map(b=>b.c));
+    const bw=Math.min(30,(IW-10)/bins.length),gap=8;
+    let g='';
+    bins.forEach(function(b,i){
+      const x=PL+4+i*(bw+gap),h=(b.c/maxC)*IH;
+      g+='<rect x="'+x+'" y="'+(PT+IH-h)+'" width="'+bw+'" height="'+h+'" rx="4" fill="'+(b.v===0?'rgba(148,163,184,.25)':'#22d3ee')+'" opacity=".9"><title>'+b.c+' giorni con '+b.v+' sessioni</title></rect>';
+      g+='<text x="'+(x+bw/2)+'" y="'+(PT+IH-h-4)+'" text-anchor="middle" fill="#e8f0f7" font-size="8.5" font-weight="700" font-family="Space Grotesk">'+b.c+'</text>';
+      g+='<text x="'+(x+bw/2)+'" y="'+(H-6)+'" text-anchor="middle" fill="#6f8398" font-size="8" font-family="JetBrains Mono">'+b.v+'</text>';
+    });
+    g+='<text x="'+(W-PR)+'" y="'+(PT-2)+'" text-anchor="end" fill="#6f8398" font-size="8" font-family="JetBrains Mono">sessioni/giorno</text>';
+    return '<svg viewBox="0 0 '+W+' '+H+'">'+g+'</svg>';
+  }
+});
+
+/* 19 · TIMELINE — active days */
+charts.push({
+  name:'Timeline (giorni attivi)', icon:'event_note', desc:'I 14 giorni su una riga: i punti grandi = giornate piene, i vuoti = giorni senza sessioni. La costanza si legge in un attimo.',
+  use:'Sequenza nel tempo', svg:function(){
+    const y=H/2,x0=PL+6,x1=W-PR-6;
+    let g='';
+    g+='<line x1="'+x0+'" y1="'+y+'" x2="'+x1+'" y2="'+y+'" stroke="rgba(148,163,184,.25)" stroke-width="2" stroke-linecap="round"/>';
+    DAYS.forEach(function(d,i){
+      const x=x0+(x1-x0)*(i/(DAYS.length-1)),r=d.s===0?3:(4+d.s*2);
+      g+='<circle cx="'+x+'" cy="'+y+'" r="'+r+'" fill="'+(d.s===0?'rgba(148,163,184,.18)':'#22d3ee')+'" stroke="'+(d.s===0?'rgba(148,163,184,.4)':'#fff')+'" stroke-width="1.2"><title>'+d.d+' — '+d.s+' sessioni</title></circle>';
+    });
+    g+='<text x="'+x0+'" y="'+(y-14)+'" fill="#6f8398" font-size="8" font-family="JetBrains Mono">01/08</text>';
+    g+='<text x="'+x1+'" y="'+(y-14)+'" text-anchor="end" fill="#6f8398" font-size="8" font-family="JetBrains Mono">Oggi (14/08)</text>';
+    g+='<text x="'+(W/2)+'" y="'+(y+26)+'" text-anchor="middle" fill="#6f8398" font-size="8" font-family="JetBrains Mono">bolla = n. sessioni</text>';
+    return '<svg viewBox="0 0 '+W+' '+H+'">'+g+'</svg>';
+  }
+});
+
+/* 20 · PROGRESS RINGS — weekday goal */
+charts.push({
+  name:'Progress rings', icon:'radar', desc:'Un anello per ogni giorno della settimana, riempito rispetto al tuo massimo. Sab e Dom al 100% spiccano subito.',
+  use:'Obiettivo per categoria', svg:function(){
+    const maxW=Math.max(...WD.map(w=>w.v));
+    const cx0=PL+18,cy0=PT+IH-8,r=26,stepX=42;
+    let g='';
+    WD.forEach(function(w,i){
+      const cx=cx0+i*stepX,frac=w.v/maxW;
+      g+='<circle cx="'+cx+'" cy="'+cy0+'" r="'+r+'" fill="none" stroke="rgba(148,163,184,.15)" stroke-width="9"/>';
+      g+='<path d="'+arcPath(cx,cy0,r,-90,-90+frac*360)+'" fill="none" stroke="#22d3ee" stroke-width="9" stroke-linecap="round" style="filter:drop-shadow(0 0 5px rgba(34,211,238,.4))"><title>'+w.k+' — '+w.v+' sessioni</title></path>';
+      g+='<text x="'+cx+'" y="'+(cy0+4)+'" text-anchor="middle" fill="#e8f0f7" font-size="11" font-weight="800" font-family="Space Grotesk">'+w.v+'</text>';
+      g+='<text x="'+cx+'" y="'+(cy0+r+14)+'" text-anchor="middle" fill="#6f8398" font-size="7.5" font-family="Inter">'+w.k+'</text>';
+    });
+    g+='<text x="'+(cx0+7*stepX+6)+'" y="'+(cy0+4)+'" fill="#6f8398" font-size="8" font-family="JetBrains Mono">=max</text>';
+    return '<svg viewBox="0 0 '+W+' '+H+'">'+g+'</svg>';
+  }
+});
+
+/* 21 · MARIMEKKO — weekday × time of day */
+charts.push({
+  name:'Marimekko (settimana × fascia)', icon:'bubble_chart', desc:'Larghezza = quota della settimana, altezza = sessioni, colori = mattina/pomeriggio/sera. Quando e quanto studi in un solo blocco.',
+  use:'Composizione con due dimensioni', svg:function(){
+    const segs=[{k:'Sera',c:'#8b5cf6'},{k:'Pomeriggio',c:'#22d3ee'},{k:'Mattina',c:'#14b8a6'}];
+    const splits={ Lun:[1,1,1],Mar:[3,2,2],Mer:[1,1,1],Gio:[2,1,1],Ven:[3,1,0],Sab:[3,2,2],Dom:[3,2,2] };
+    const totalW=IW-6,x0=PL+3,y0=PT,maxH=IH-20;
+    let g='',x=0;
+    WD.forEach(function(w,i){
+      const wpx=(w.v/TOTAL)*totalW,sp=splits[w.k];let yTop=y0;
+      segs.forEach(function(s,si){
+        const cnt=sp[si],h=(cnt/MAX_S)*maxH;
+        if(cnt===0)return;
+        g+='<rect x="'+(x0+x)+'" y="'+yTop+'" width="'+(wpx-1)+'" height="'+h+'" fill="'+s.c+'" opacity=".9"><title>'+w.k+' — '+cnt+' '+s.k.toLowerCase()+'</title></rect>';
+        yTop+=h;
+      });
+      g+='<text x="'+(x0+x+(wpx-1)/2)+'" y="'+(y0+maxH+13)+'" text-anchor="middle" fill="#8fa4ba" font-size="7.5" font-family="Inter">'+w.k+'</text>';
+      x+=wpx;
+    });
+    let lx=PL;
+    segs.forEach(function(s){
+      g+='<rect x="'+lx+'" y="'+(H-16)+'" width="9" height="9" rx="2" fill="'+s.c+'"/><text x="'+(lx+13)+'" y="'+(H-8)+'" fill="#8fa4ba" font-size="8" font-family="Inter">'+s.k+'</text>';
+      lx+=13+(s.k==='Pomeriggio'?56:44);
+    });
+    return '<svg viewBox="0 0 '+W+' '+H+'">'+g+'</svg>';
+  }
+});
+
+/* 22 · DOT STRIP — one dot per session */
+charts.push({
+  name:'Dot strip', icon:'more_horiz', desc:'Un puntino per ogni sessione lungo 14 giorni. Conta i punti: 35. Il modo più diretto e leggero di raccontare il totale.',
+  use:'Conteggio semplice e leggero', svg:function(){
+    const y=H/2-6,x0=PL+8,x1=W-PR-8;
+    let g='';
+    g+='<line x1="'+x0+'" y1="'+y+'" x2="'+x1+'" y2="'+y+'" stroke="rgba(148,163,184,.2)" stroke-width="1"/>';
+    DAYS.forEach(function(d,i){
+      for(let k=0;k<d.s;k++){
+        const xx=x0+(x1-x0)*((i+(d.s>1?k/(d.s-1):0.5))/DAYS.length);
+        const yy=y-(k%2)*8;
+        g+='<circle cx="'+xx+'" cy="'+yy+'" r="3.5" fill="'+(d.d==='14/08'?'#f59e0b':'#22d3ee')+'" opacity=".9"><title>'+d.d+' — sessione '+(k+1)+'</title></circle>';
+      }
+    });
+    g+='<text x="'+x0+'" y="'+(y+24)+'" fill="#6f8398" font-size="8" font-family="JetBrains Mono">01/08</text>';
+    g+='<text x="'+x1+'" y="'+(y+24)+'" text-anchor="end" fill="#6f8398" font-size="8" font-family="JetBrains Mono">Oggi</text>';
+    g+='<text x="'+(W/2)+'" y="'+(y-20)+'" text-anchor="middle" fill="#e8f0f7" font-size="20" font-weight="800" font-family="Space Grotesk">35</text>';
+    g+='<text x="'+(W/2)+'" y="'+(y-8)+'" text-anchor="middle" fill="#6f8398" font-size="7.5" font-family="JetBrains Mono" letter-spacing=".1em">SESSIONI</text>';
+    return '<svg viewBox="0 0 '+W+' '+H+'">'+g+'</svg>';
+  }
+});
+
+/* 23 · RADIAL BAR — daily ring */
+charts.push({
+  name:'Radial bar (giorni)', icon:'donut_large', desc:'Le sessioni di ogni giorno disposte a cerchio: la corona più alta è la tua giornata migliore.',
+  use:'Vista circolare del mese', svg:function(){
+    const cx=W/2-14,cy=H/2+6,r0=34,step=360/DAYS.length;
+    let g='';
+    for(let ring=1;ring<=4;ring++){ g+='<circle cx="'+cx+'" cy="'+cy+'" r="'+(r0+ring*10)+'" fill="none" stroke="rgba(148,163,184,.1)"/>'; }
+    DAYS.forEach(function(d,i){
+      const a0=i*step,a1=(i+1)*step-5,rr=r0+(d.s/MAX_S)*42;
+      g+='<path d="'+ringPath(cx,cy,rr,r0,a0,a1)+'" fill="'+(d.d==='14/08'?'#f59e0b':'#22d3ee')+'" opacity=".9"><title>'+d.d+' — '+d.s+' sessioni</title></path>';
+    });
+    g+='<text x="'+cx+'" y="'+(cy+4)+'" text-anchor="middle" fill="#e8f0f7" font-size="22" font-weight="800" font-family="Space Grotesk">35</text>';
+    g+='<text x="'+cx+'" y="'+(cy+16)+'" text-anchor="middle" fill="#6f8398" font-size="7.5" font-family="JetBrains Mono" letter-spacing=".1em">SESSIONI</text>';
+    return '<svg viewBox="0 0 '+W+' '+H+'">'+g+'</svg>';
+  }
+});
+
+/* 24 · HALF-DONUT — day vs evening */
+charts.push({
+  name:'Half-donut (quando studi)', icon:'dark_mode', desc:'Metà del totale di sera? L’anello a metà divide giorno e sera per farti scoprire il tuo orario d’oro.',
+  use:'Ripartizione binaria', svg:function(){
+    const cx=W/2-14,cy=H/2+26,rOut=58,evening=17,morning=18;
+    let g='';
+    g+='<path d="'+arcPath(cx,cy,rOut,-90,90)+'" fill="none" stroke="rgba(148,163,184,.15)" stroke-width="20" stroke-linecap="round"/>';
+    g+='<path d="'+arcPath(cx,cy,rOut,-90,-90+(morning/35)*180)+'" fill="none" stroke="#f59e0b" stroke-width="20" stroke-linecap="round" style="filter:drop-shadow(0 0 8px rgba(245,158,11,.35))"/>';
+    g+='<path d="'+arcPath(cx,cy,rOut,-90+(morning/35)*180,90)+'" fill="none" stroke="#8b5cf6" stroke-width="20" stroke-linecap="round"/>';
+    g+='<text x="'+(cx-58)+'" y="'+(cy-8)+'" text-anchor="middle" fill="#f59e0b" font-size="15" font-weight="800" font-family="Space Grotesk">'+morning+'</text>';
+    g+='<text x="'+(cx-58)+'" y="'+(cy+8)+'" text-anchor="middle" fill="#6f8398" font-size="7.5" font-family="Inter">giorno</text>';
+    g+='<text x="'+(cx+58)+'" y="'+(cy-8)+'" text-anchor="middle" fill="#8b5cf6" font-size="15" font-weight="800" font-family="Space Grotesk">'+evening+'</text>';
+    g+='<text x="'+(cx+58)+'" y="'+(cy+8)+'" text-anchor="middle" fill="#6f8398" font-size="7.5" font-family="Inter">sera</text>';
+    g+='<text x="'+cx+'" y="'+(cy+rOut+20)+'" text-anchor="middle" fill="#6f8398" font-size="8" font-family="JetBrains Mono">35 sessioni · quando parli di più</text>';
+    return '<svg viewBox="0 0 '+W+' '+H+'">'+g+'</svg>';
+  }
+});
+
+/* 25 · BUMP — weekday rank shift */
+charts.push({
+  name:'Bump chart (classifica)', icon:'format_line_spacing', desc:'Come cambia la classifica dei giorni tra la prima e la seconda settimana: chi sale, chi scende.',
+  use:'Variazione di posizione', svg:function(){
+    const w1=DAYS.slice(0,7),w2=DAYS.slice(7);
+    const x1=PL+30,x2=W-PR-30,top=PT+6,bot=PT+IH-6;
+    const cols=['#22d3ee','#14b8a6','#8b5cf6','#f472b6','#f59e0b','#34d399','#e2e8f0'];
+    function rank(week){ const a=week.map(function(d,i){ return {i:i,d:d}; }); a.sort(function(a,b){ return b.d.s-a.d.s||a.i-b.i; }); return a; }
+    const r1=rank(w1),r2=rank(w2);
+    function yAt(ra,dayI){ const p=ra.findIndex(function(x){ return x.i===dayI; }); return top+(p/(ra.length-1))*(bot-top); }
+    let g='';
+    g+='<text x="'+x1+'" y="'+(PT-2)+'" text-anchor="middle" fill="#6f8398" font-size="8.5" font-family="JetBrains Mono">S1</text>';
+    g+='<text x="'+x2+'" y="'+(PT-2)+'" text-anchor="middle" fill="#6f8398" font-size="8.5" font-family="JetBrains Mono">S2</text>';
+    for(let i=0;i<7;i++){
+      const y1=yAt(r1,i),y2=yAt(r2,i);
+      g+='<path d="M'+x1+' '+y1+' C'+(x1+(x2-x1)/2)+' '+y1+', '+(x1+(x2-x1)/2)+' '+y2+', '+x2+' '+y2+'" fill="none" stroke="'+cols[i]+'" stroke-width="2" opacity=".85"><title>'+w1[i].wd+' — '+w1[i].s+' → '+w2[i].s+'</title></path>';
+      g+='<circle cx="'+x1+'" cy="'+y1+'" r="3.2" fill="'+cols[i]+'"/>';
+      g+='<circle cx="'+x2+'" cy="'+y2+'" r="3.2" fill="'+cols[i]+'"/>';
+      g+='<text x="'+(x1-6)+'" y="'+(y1+3)+'" text-anchor="end" fill="#8fa4ba" font-size="8" font-family="Inter">'+w1[i].wd+'</text>';
+      g+='<text x="'+(x2+6)+'" y="'+(y2+3)+'" fill="#e8f0f7" font-size="8.5" font-weight="700" font-family="Space Grotesk">'+(r2.findIndex(function(x){ return x.i===i; })+1)+'</text>';
+    }
+    g+='<text x="'+(W/2)+'" y="'+(H-6)+'" text-anchor="middle" fill="#6f8398" font-size="8" font-family="JetBrains Mono">posizione in classifica</text>';
+    return '<svg viewBox="0 0 '+W+' '+H+'">'+g+'</svg>';
   }
 });
 
