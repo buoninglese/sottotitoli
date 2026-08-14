@@ -35,28 +35,52 @@
   (function(){try{var t=localStorage.getItem('sottotitoli-theme');if(t){if(t==='auto'||t==='light'||t==='dark'){t='modern';try{localStorage.setItem('sottotitoli-theme','modern')}catch(e){}}document.documentElement.setAttribute('data-theme',t);document.body.setAttribute('data-theme',t);}}catch(e){}})();
   </script>
   <script>
-  /* ── Site-presence tracker — records when the site is OPEN (not sessions).
-     Feeds the dashboard "Picco di produttività" time-block heatmap: one entry
-     per (day, hour) so it reflects the hours the learner is on the site. ── */
+  /* ── Site-activity tracker — records when the site is OPEN (not sessions).
+     Feeds the dashboard "Picco di produttività" box:
+     · 'sottotitoli-site-activity' → one {t,h,dh} per day-hour (peak day/hour)
+     · 'sottotitoli-site-minutes'  → { 'YYYY-MM-DD': minutesOnSite } (day heatmap)
+     Accumulates ~1 min/tick while the tab is visible; hidden time is not counted. ── */
   (function(){
     var KEY = 'sottotitoli-site-activity';
+    var MINKEY = 'sottotitoli-site-minutes';
     var MAX = 4000;
-    function rec(){
+    var DAY_CAP = 24 * 60;
+    var lastSeen = Date.now();
+    function dayKey(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+    function addSiteMinutes(m){
+      if (!(m > 0)) return;
       try {
-        var now = new Date();
-        var dayHour = now.toDateString() + ':' + now.getHours();
+        var o = JSON.parse(localStorage.getItem(MINKEY) || '{}');
+        var k = dayKey(new Date());
+        o[k] = Math.min(DAY_CAP, (o[k] || 0) + Math.round(m));
+        var keys = Object.keys(o).sort();
+        while (keys.length > 90) delete o[keys.shift()]; // keep ~3 months
+        localStorage.setItem(MINKEY, JSON.stringify(o));
+      } catch (e) {}
+    }
+    function rec(){
+      var now = Date.now();
+      var gap = Math.floor((now - lastSeen) / 60000);
+      if (gap > 0 && gap <= 15) addSiteMinutes(gap); // guard vs sleep/throttle gaps
+      lastSeen = now;
+      try {
+        var d = new Date(now);
+        var dayHour = d.toDateString() + ':' + d.getHours();
         var arr = JSON.parse(localStorage.getItem(KEY) || '[]');
         if (arr.length && arr[arr.length - 1].dh === dayHour) return; // once per day-hour
-        arr.push({ t: Date.now(), h: now.getHours(), dh: dayHour });
+        arr.push({ t: now, h: d.getHours(), dh: dayHour });
         if (arr.length > MAX) arr = arr.slice(-MAX);
         localStorage.setItem(KEY, JSON.stringify(arr));
       } catch (e) {}
     }
     if (document.readyState === 'complete') rec();
     else window.addEventListener('load', rec);
-    document.addEventListener('visibilitychange', function(){ if (document.visibilityState === 'visible') rec(); });
-    // catch hour/day boundaries while the tab stays open
-    setInterval(function(){ if (document.visibilityState !== 'hidden') rec(); }, 15 * 60 * 1000);
+    document.addEventListener('visibilitychange', function(){
+      if (document.visibilityState === 'visible') rec();
+      else lastSeen = Date.now(); // don't count hidden time
+    });
+    // accumulate minutes while the tab stays open (once per minute)
+    setInterval(function(){ if (document.visibilityState !== 'hidden') rec(); }, 60 * 1000);
   })();
   </script>
 
@@ -478,37 +502,30 @@
 
           <!-- ═══════ WRAPPED SHOWCASE — year-dash gen-z boxes (new additions) ═══════ -->
           <style>
-            /* ── Peak box: 24h time-block activity heatmap (site-presence, not sessions) ── */
-            .wsc-timeheat-label{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--text-faint);margin:14px 0 6px}
-            .wsc-timeheat{display:grid;grid-template-columns:repeat(12,1fr);gap:4px;margin-bottom:12px}
-            .wsc-timeheat .th-cell{height:14px;border-radius:4px;background:rgba(128,128,128,.10);cursor:pointer;transition:transform .15s ease,filter .15s ease,box-shadow .15s ease;animation:wscTHIn .5s cubic-bezier(.16,1,.3,1) both;position:relative}
-            .wsc-timeheat .th-cell:hover{transform:scale(1.4);filter:brightness(1.25);box-shadow:0 2px 8px rgba(0,0,0,.25);z-index:2}
-            .wsc-timeheat .th-cell.th-lv1{background:rgba(6,182,212,.22)}
-            .wsc-timeheat .th-cell.th-lv2{background:rgba(6,182,212,.45)}
-            .wsc-timeheat .th-cell.th-lv3{background:linear-gradient(135deg,#0891b2,#06b6d4)}
-            .wsc-timeheat .th-cell.th-lv4{background:linear-gradient(135deg,#f0abfc,#06b6d4)}
+            /* ── 28-day activity heat: lights up by minutes-on-site per day ── */
+            .wsc-heat{display:grid;grid-template-columns:repeat(7,1fr);gap:4px}
+            .wsc-heat .wsc-heat-cell{height:14px;border-radius:4px;background:rgba(128,128,128,.10);cursor:pointer;transition:transform .15s ease,filter .15s ease,box-shadow .15s ease;animation:wscTHIn .5s cubic-bezier(.16,1,.3,1) both;position:relative}
+            .wsc-heat .wsc-heat-cell:hover{transform:scale(1.4);filter:brightness(1.25);box-shadow:0 2px 8px rgba(0,0,0,.25);z-index:2}
+            .wsc-heat .wsc-heat-cell.l1{background:rgba(6,182,212,.22)}
+            .wsc-heat .wsc-heat-cell.l2{background:rgba(6,182,212,.45)}
+            .wsc-heat .wsc-heat-cell.l3{background:linear-gradient(135deg,#0891b2,#06b6d4)}
+            .wsc-heat .wsc-heat-cell.l4{background:linear-gradient(135deg,#f0abfc,#06b6d4)}
             @keyframes wscTHIn{from{opacity:0;transform:scale(.55)}to{opacity:1;transform:scale(1)}}
-            .wsc-timeheat .th-cap{display:flex;justify-content:space-between;font-size:9px;color:var(--text-faint);letter-spacing:.05em;margin-top:4px}
-            /* ── Existing 28-day heat: make it interactive too ── */
-            .wsc-heat .wsc-heat-cell{transition:transform .15s ease,filter .15s ease}
-            .wsc-heat .wsc-heat-cell:hover{transform:scale(1.35);filter:brightness(1.25);z-index:2;position:relative}
 
-            /* ── CEFR box: mission progress (EN/IT × mission 1/2) ── */
-            .wsc-missions{margin-top:18px;padding-top:14px;border-top:1px solid var(--line)}
-            .wsc-missions .wm-title{font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--text-soft);margin:0 0 10px}
-            .wsc-missions .wm-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:8px}
-            .wsc-missions .wm-row{background:var(--bg,rgba(128,128,128,.06));border:1px solid var(--line);border-radius:12px;padding:8px 10px;transition:border-color .2s,transform .2s}
-            .wsc-missions .wm-row:hover{border-color:var(--cyan);transform:translateY(-1px)}
-            .wsc-missions .wm-top{display:flex;justify-content:space-between;align-items:center;gap:8px}
-            .wsc-missions .wm-name{font-size:12px;font-weight:700;color:var(--text);line-height:1.15}
-            .wsc-missions .wm-lang{font-size:9px;font-weight:800;color:var(--text-faint);text-transform:uppercase;letter-spacing:.06em}
-            .wsc-missions .wm-pct{font-size:13px;font-weight:800;color:var(--cyan);font-variant-numeric:tabular-nums}
-            .wsc-missions .wm-track{height:6px;background:var(--bg);border-radius:99px;margin-top:7px;overflow:hidden}
+            /* ── Missions box: learning-mission progress (EN/IT × AI/theme) ── */
+            .wsc-missions .wm-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}
+            .wsc-missions .wm-row{background:var(--bg,rgba(128,128,128,.06));border:1px solid var(--line);border-radius:12px;padding:10px 12px;transition:border-color .2s,transform .2s,box-shadow .2s}
+            .wsc-missions .wm-row:hover{border-color:var(--cyan);transform:translateY(-1px);box-shadow:0 6px 16px -10px rgba(0,0,0,.35)}
+            .wsc-missions .wm-top{display:flex;justify-content:space-between;align-items:center;gap:10px}
+            .wsc-missions .wm-name{font-size:13px;font-weight:700;color:var(--text);line-height:1.2;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+            .wsc-missions .wm-lang{font-size:9px;font-weight:800;color:var(--text-faint);text-transform:uppercase;letter-spacing:.08em;margin-top:2px}
+            .wsc-missions .wm-pct{font-size:15px;font-weight:800;color:var(--cyan);font-variant-numeric:tabular-nums}
+            .wsc-missions .wm-track{height:6px;background:var(--bg);border-radius:99px;margin-top:8px;overflow:hidden}
             .wsc-missions .wm-fill{height:100%;border-radius:99px;background:linear-gradient(90deg,#06b6d4,#22d3ee);width:0;transition:width .9s cubic-bezier(.16,1,.3,1)}
-            .wsc-missions .wm-status{font-size:10px;color:var(--text-faint);margin-top:5px}
+            .wsc-missions .wm-status{font-size:10px;font-weight:600;color:var(--text-faint);margin-top:6px}
             .wsc-missions .wm-row.wm-done .wm-fill{background:linear-gradient(90deg,#34d399,#6ee7b7)}
             .wsc-missions .wm-row.wm-done .wm-pct{color:#34d399}
-            .wsc-missions .wm-row.wm-todo{opacity:.75}
+            .wsc-missions .wm-row.wm-todo{opacity:.7}
           </style>
           <section class="wsc" id="wrappedShowcase" aria-label="Riepilogo in stile wrapped">
             <div class="wsc-head">
@@ -532,11 +549,9 @@
                 </div>
               </div>
 
-              <!-- 4 · Top livelli CEFR -->
+              <!-- 4 · Missioni — progresso nei tuoi obiettivi di apprendimento -->
               <div class="wsc-box wsc-glass wsc-wide">
-                <div class="wsc-box-head"><h3 class="wsc-box-title" data-i18n="wsc_cefr_title">Livelli CEFR</h3><span class="wsc-box-hint" data-i18n="wsc_cefr_hint">Dal tuo vocabolario</span></div>
-                <div class="wsc-bars" id="wscCefrBars"></div>
-                <div class="wsc-quality" id="wscQualityLine"></div>
+                <div class="wsc-box-head"><h3 class="wsc-box-title" data-i18n="wsc_missions_title">Missioni</h3><span class="wsc-box-hint" data-i18n="wsc_missions_hint">I tuoi obiettivi di apprendimento</span></div>
                 <div class="wsc-missions" id="wscMissions"></div>
               </div>
 
@@ -545,8 +560,6 @@
                 <div class="wsc-label" data-i18n="wsc_peak">Picco di produttività</div>
                 <div class="wsc-peak" id="wscPeak">Martedì, 22:00</div>
                 <div class="wsc-peak-sub" id="wscPeakSub">Nottambulo.</div>
-                <div class="wsc-timeheat-label" data-i18n="wsc_timeheat">Orari di attività</div>
-                <div class="wsc-timeheat" id="wscTimeHeat"></div>
                 <div class="wsc-heat" id="wscHeat"></div>
                 <div class="wsc-extra" id="wscExtra"></div>
               </div>
@@ -4556,11 +4569,11 @@
   </script>
   <script src="js/data-service.js?v=2"></script>
   <script src="js/smart-suggestions.js"></script>
-  <script src="js/i18n.js?v=12"></script>
+  <script src="js/i18n.js?v=13"></script>
   <script src="js/buy-card.js?v=5"></script>
   <script src="js/notifications.js"></script>
   <script src="js/learner-data.js?v=1"></script>
-  <script src="js/learner.js?v=13"></script>
+  <script src="js/learner.js?v=14"></script>
 
   <!-- Page-specific: Supabase data fetching -->
   <script>
@@ -5845,57 +5858,13 @@
         if (personaEl) personaEl.textContent = persona;
         if (noteEl) noteEl.textContent = note;
 
-        // ═══ Box 4 · CEFR bars (with %) + quality line ═══
-        var barsEl = document.getElementById('wscCefrBars');
-        var qEl = document.getElementById('wscQualityLine');
-        if (barsEl) {
-          var br = window.cefrBreakdown;
-          if (br && br.total > 0) {
-            var lv = [
-              {k:'C2',v:br.C2||0,c:'#8b5cf6'},
-              {k:'C1',v:br.C1||0,c:'#f59e0b'},
-              {k:'B2',v:br.B2||0,c:'#22c55e'},
-              {k:'B1',v:br.B1||0,c:'#06b6d4'},
-              {k:'A2',v:br.A2||0,c:'#22d3ee'},
-              {k:'A1',v:br.A1||0,c:'#3b82f6'}
-            ];
-            lv.sort(function(a,b){ return b.v - a.v; });
-            var top = lv.slice(0,3);
-            var total = br.total || 1;
-            barsEl.innerHTML = top.map(function(l){
-              var pct = Math.max(6, Math.round(l.v / total * 100));
-              return '<div class="wsc-bar-row">' +
-                '<div class="wsc-bar-icon" style="background:linear-gradient(135deg,'+l.c+',#764ba2)">'+l.k+'</div>' +
-                '<div class="wsc-bar"><div class="wsc-bar-top"><b>LVL '+l.k+'</b><span>'+pct+'%</span></div>' +
-                '<div class="wsc-bar-track"><div class="wsc-bar-fill" style="width:'+pct+'%;background:linear-gradient(90deg,'+l.c+',#f093fb)"></div></div></div></div>';
-            }).join('');
-            if (qEl) {
-              var wpm = s.avgWpm || '—';
-              var acc = s.avgQuality ? Math.round(s.avgQuality * 10) + '%' : '—';
-              var lex = totalWords ? totalWords.toLocaleString('it-IT') + ' parole' : '—';
-              var tFlu = wscT('wsc_fluency','Fluidità');
-              var tAcc = wscT('wsc_accuracy','Precisione');
-              var tLex = wscT('wsc_lexicon','Lessico');
-              qEl.innerHTML =
-                '<div class="q"><span>'+tFlu+'</span><b>'+wpm+' wpm</b></div>' +
-                '<div class="q"><span>'+tAcc+'</span><b>'+acc+'</b></div>' +
-                '<div class="q"><span>'+tLex+'</span><b>'+lex+'</b></div>';
-            }
-          } else {
-            barsEl.innerHTML = '<div style="font-size:13px;color:var(--text-faint);padding:12px 4px">Completa alcune sessioni per vedere la tua distribuzione CEFR.</div>';
-            if (qEl) qEl.innerHTML = '';
-          }
-        }
-
-        // ═══ Box 6 · Peak productivity — SITE ACTIVITY (presence), not sessions ═══
+        // ═══ Box 6 · Peak productivity — SITE ACTIVITY (minutes on site) ═══
         var peakEl = document.getElementById('wscPeak');
         var peakSub = document.getElementById('wscPeakSub');
-        var timeEl = document.getElementById('wscTimeHeat');
         var heatEl = document.getElementById('wscHeat');
         var extraEl = document.getElementById('wscExtra');
         var act = siteActivityEntries();
         var hasAct = act.length > 0;
-        var actWord = wscT('wsc_activity','attività');
         if (hasAct) {
           // Peak day + peak hour from presence data
           var dCount = {}, hCount = {};
@@ -5912,34 +5881,27 @@
           var daysIt = ['Domenica','Lunedì','Martedì','Mercoledì','Giovedì','Venerdì','Sabato'];
           if (peakEl) peakEl.textContent = daysIt[bestD] + ', ' + String(bestPH).padStart(2,'0') + ':00';
           if (peakSub) peakSub.textContent = bestPH >= 20 || bestPH < 5 ? 'Nottambulo.' : 'Mattiniero.';
-          // 24h time-block heatmap (last 28 days of presence) — 12 cols x 2 rows
-          if (timeEl) {
-            var cutoff = Date.now() - 28 * 86400000;
-            var counts = new Array(24).fill(0);
-            act.forEach(function(e){ if (e.t >= cutoff) { var hh = (e.h != null) ? e.h : new Date(e.t).getHours(); counts[hh] = (counts[hh] || 0) + 1; } });
-            var maxC = Math.max.apply(null, counts.concat([1]));
-            var cells = '';
-            for (var i = 0; i < 24; i++) {
-              var c = counts[i] || 0;
-              var lv = c === 0 ? 0 : Math.min(4, 1 + Math.floor(c / maxC * 3.9));
-              cells += '<div class="th-cell th-lv'+lv+'" title="'+String(i).padStart(2,'0')+':00 — '+c+' '+actWord+'" style="animation-delay:'+(i*25)+'ms"></div>';
-            }
-            timeEl.innerHTML = cells + '<div class="th-cap"><span>00:00</span><span>12:00</span><span>24:00</span></div>';
-          }
-          // 28-day heatmap from SITE ACTIVITY (presence + counts)
+          // 28-day heatmap: intensity = minutes on site per day, hover = date + minutes
           if (heatEl) {
-            var active = {}, dayCnt = {};
-            act.forEach(function(e){ var k = new Date(e.t).toDateString(); active[k] = true; dayCnt[k] = (dayCnt[k] || 0) + 1; });
+            var minMap = {};
+            try { minMap = JSON.parse(localStorage.getItem('sottotitoli-site-minutes') || '{}'); } catch(e) { minMap = {}; }
+            function dayKey(dd){ return dd.getFullYear()+'-'+String(dd.getMonth()+1).padStart(2,'0')+'-'+String(dd.getDate()).padStart(2,'0'); }
             var today = new Date(); today.setHours(0,0,0,0);
             var offset = (today.getDay() + 6) % 7;
             var start = new Date(today); start.setDate(today.getDate() - offset - 27);
+            var vals = [];
+            for (var i = 0; i < 28; i++) {
+              var dd = new Date(start); dd.setDate(start.getDate() + i);
+              vals.push(minMap[dayKey(dd)] || 0);
+            }
+            var maxM = Math.max.apply(null, vals.concat([1]));
             var cells = '';
             for (var i = 0; i < 28; i++) {
               var dd = new Date(start); dd.setDate(start.getDate() + i);
-              var k = dd.toDateString();
-              var on = active[k] ? ' on' : '';
-              var tip = dd.toLocaleDateString('it-IT') + (dayCnt[k] ? ' — ' + dayCnt[k] + ' ' + actWord : '');
-              cells += '<div class="wsc-heat-cell'+on+'" title="'+tip+'" style="animation-delay:'+(i*15)+'ms"></div>';
+              var m = vals[i];
+              var lvl = m <= 0 ? '' : ' l' + Math.min(4, 1 + Math.floor(m / maxM * 3.9));
+              var tip = dd.toLocaleDateString('it-IT') + (m > 0 ? ' — ' + m + ' min' : '');
+              cells += '<div class="wsc-heat-cell'+lvl+'" title="'+tip+'" style="animation-delay:'+(i*15)+'ms"></div>';
             }
             heatEl.innerHTML = cells;
           }
@@ -5969,42 +5931,47 @@
         } else {
           if (peakEl) peakEl.textContent = '—';
           if (peakSub) peakSub.textContent = 'Apri l\'app per iniziare a tracciare i tuoi orari di attività.';
-          if (timeEl) { var cells=''; for (var i=0;i<24;i++) cells += '<div class="th-cell th-lv0"></div>'; timeEl.innerHTML = cells + '<div class="th-cap"><span>00:00</span><span>12:00</span><span>24:00</span></div>'; }
           if (heatEl) { var cells=''; for (var i=0;i<28;i++) cells += '<div class="wsc-heat-cell"></div>'; heatEl.innerHTML = cells; }
           if (extraEl) extraEl.innerHTML = '';
         }
 
-        // ═══ Box 7 · Mission progress (from learner mission tracker) ═══
+        // ═══ Box 4 · Mission progress (learning missions, EN/IT × AI/theme) ═══
         var misEl = document.getElementById('wscMissions');
         if (misEl) {
           var mst = {};
           try { mst = JSON.parse(localStorage.getItem('sottotitoli-learner-missions') || '{}'); } catch(e) {}
-          var tM1 = wscT('wsc_mission_1','Missione 1');
-          var tM2 = wscT('wsc_mission_2','Missione 2');
+          function aiLessonTitle(lang){
+            try { var l = JSON.parse(localStorage.getItem('sottotitoli-learner-mission-' + lang) || 'null'); return (l && l.title) ? l.title : ''; } catch(e){ return ''; }
+          }
+          var tAi = wscT('wsc_mission_ai','Missione AI');
+          var tTheme = wscT('wsc_mission_theme','Missione a tema');
           var tIn = wscT('wsc_mission_inprogress','In corso');
           var tDone = wscT('wsc_mission_done','Completata');
           var tTodo = wscT('wsc_mission_todo','Non iniziata');
-          var langs = [['en','🇬🇧 EN'],['it','🇮🇹 IT']];
-          var defs = [['ai','🎯 '+tM1],['theme','📚 '+tM2]];
+          var tEn = wscT('wsc_lang_en','Inglese');
+          var tIt = wscT('wsc_lang_it','Italiano');
+          var langs = [['en', tEn], ['it', tIt]];
+          var defs = [['ai', tAi], ['theme', tTheme]];
           var rows = '';
           langs.forEach(function(L){
             defs.forEach(function(M){
               var key = L[0] + ':' + M[0];
               var st = mst[key];
+              var title = (st && st.title) ? st.title : (M[0] === 'ai' ? aiLessonTitle(L[0]) : '');
+              title = title || M[1];
               var pct = st && st.done ? 100 : (st ? (st.pct || 0) : 0);
               var done = !!(st && st.done);
               var started = !!(st && st.started);
-              var status = done ? tDone : started ? tIn : tTodo;
+              var status = done ? tDone + ' · 100%' : started ? tIn + ' · ' + pct + '%' : tTodo;
               var cls = done ? ' wm-done' : started ? '' : ' wm-todo';
               rows += '<div class="wm-row'+cls+'">'+
-                '<div class="wm-top"><div><div class="wm-name">'+M[1]+'</div><div class="wm-lang">'+L[1]+'</div></div>'+
+                '<div class="wm-top"><div style="min-width:0"><div class="wm-name" title="'+escHtml(title)+'">'+escHtml(title)+'</div><div class="wm-lang">'+L[1]+'</div></div>'+
                 '<div class="wm-pct">'+pct+'%</div></div>'+
                 '<div class="wm-track"><div class="wm-fill" style="width:'+pct+'%"></div></div>'+
                 '<div class="wm-status">'+status+'</div></div>';
             });
           });
-          var tTitle = wscT('wsc_missions_title','Missioni — progresso');
-          misEl.innerHTML = '<div class="wm-title">'+tTitle+'</div><div class="wm-grid">'+rows+'</div>';
+          misEl.innerHTML = '<div class="wm-grid">'+rows+'</div>';
         }
       }
       window.renderWrappedShowcase = renderWrappedShowcase;
