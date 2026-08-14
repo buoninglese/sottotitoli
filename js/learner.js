@@ -593,7 +593,7 @@
     // English and Italiano show the review section, hooked to their language.
     html += '<div class="lr-review-grid">';
     reviewCards.forEach(function (c) {
-      html += '<div class="lr-review-card' + (c.count > 0 ? '' : ' empty') + '" tabindex="0" onclick="Learner.openReview(\'' + c.kind + '\')">' +
+      html += '<div class="lr-review-card' + (c.count > 0 ? '' : ' empty') + '" tabindex="0" onclick="Learner.confirmReview(\'' + c.kind + '\',' + c.count + ')">' +
         '<span class="lr-review-icon">' + c.icon + '</span>' +
         '<div class="lr-review-body"><div class="lr-review-title">' + c.title + '</div><div class="lr-review-sub">' + c.sub + '</div></div>' +
         '<span class="lr-review-count">' + c.count + '</span>' +
@@ -617,8 +617,8 @@
             '<div class="lr-mission-obj">' + t('learner_mission_cta_sub') + '</div>') +
       '</div>' +
       '<div class="lr-mission-actions">' +
-        '<button type="button" class="primary-btn lr-mission-go" onclick="Learner.openMission()">' + (mission ? t('learner_mission_start') : t('learner_mission_generate')) + '</button>' +
-        (mission ? '<button type="button" class="lesson-link lr-mission-new" onclick="Learner.newMission()" title="' + t('learner_mission_new') + '">↻</button>' : '') +
+        '<button type="button" class="primary-btn lr-mission-go" onclick="Learner.confirmMission()">' + (mission ? t('learner_mission_start') : t('learner_mission_generate')) + '</button>' +
+        (mission ? '<button type="button" class="lesson-link lr-mission-new" onclick="Learner.confirmNewMission()" title="' + t('learner_mission_new') + '">↻</button>' : '') +
       '</div>' +
     '</div>';
     // Card 2 — always-available thematic mission (essential, thematic vocab)
@@ -634,7 +634,7 @@
         '</div>' +
       '</div>' +
       '<div class="lr-mission-actions">' +
-        '<button type="button" class="primary-btn" onclick="var c=this.closest(\'.lr-mission-card\');var s=c.querySelector(\'.lr-theme-select\');var l=c.querySelector(\'.len-btn.active\');Learner.openThemeMission(s.getAttribute(\'data-theme\')||s.value, l?l.getAttribute(\'data-len\'):\'short\')">' + t('learner_mission_start') + '</button>' +
+        '<button type="button" class="primary-btn" onclick="Learner.confirmThemeMission(this)">' + t('learner_mission_start') + '</button>' +
       '</div>' +
     '</div>';
     html += '</div>';
@@ -1467,6 +1467,48 @@
     btn.classList.add('active');
   }
 
+  /* ── Start confirmations: every Allena/mission launch asks first, and a busy
+     guard prevents double-starts while the session is still loading. ── */
+  var _learnerStartBusy = false;
+  function runGuarded(fn, loadingMsg) {
+    if (_learnerStartBusy) return;
+    _learnerStartBusy = true;
+    if (loadingMsg) toast(loadingMsg);
+    var done = function () { _learnerStartBusy = false; };
+    try {
+      var r = fn();
+      if (r && typeof r.then === 'function') r.then(done, done);
+      else done();
+    } catch (e) { done(); }
+  }
+  function confirmReview(kind, count) {
+    var lang = learnerLang();
+    var title = kind === 'due' ? t('learner_review_due') : (kind === 'fragile' ? t('learner_review_fragile') : t('learner_review_new'));
+    var icon = kind === 'due' ? '⏰' : (kind === 'fragile' ? '🧩' : '✨');
+    var msg = t('learner_confirm_review').replace('{name}', title) + (count != null ? ' (' + count + ')' : '');
+    appConfirm(msg, function () { runGuarded(function () { return openReview(kind, lang); }, t('learner_loading')); }, t('learner_confirm_title'), icon);
+  }
+  function confirmMission() {
+    var mission = missionCached();
+    var msg = mission
+      ? t('learner_confirm_mission_start').replace('{name}', mission.title || '')
+      : t('learner_confirm_mission_generate');
+    appConfirm(msg, function () { runGuarded(function () { return openMission(); }, t('learner_loading')); }, t('learner_confirm_title'), '🎯');
+  }
+  function confirmNewMission() {
+    appConfirm(t('learner_confirm_mission_new'), function () { runGuarded(function () { return newMission(); }, t('learner_loading')); }, t('learner_confirm_title'), '↻');
+  }
+  function confirmThemeMission(btn) {
+    var card = btn && btn.closest ? btn.closest('.lr-mission-card') : null;
+    var s = card ? card.querySelector('.lr-theme-select') : null;
+    var l = card ? card.querySelector('.len-btn.active') : null;
+    var theme = s ? (s.getAttribute('data-theme') || s.value || 'linking') : 'linking';
+    var len = l ? l.getAttribute('data-len') : 'short';
+    var themeTitle = (THEME_LESSONS[theme] && THEME_LESSONS[theme].title) || theme;
+    var msg = t('learner_confirm_theme').replace('{name}', themeTitle) + (len === 'medium' ? ' · ' + t('learner_len_medium') : '');
+    appConfirm(msg, function () { runGuarded(function () { return openThemeMission(theme, len); }, t('learner_loading')); }, t('learner_confirm_title'), '📚');
+  }
+
   function renderOverlay() {
     if (!session) return;
     var isBank = session.mode === 'bank';
@@ -1852,6 +1894,10 @@
     openPractice: openPractice,
     openBankTest: openBankTest,
     openReview: openReview,
+    confirmReview: confirmReview,
+    confirmMission: confirmMission,
+    confirmNewMission: confirmNewMission,
+    confirmThemeMission: confirmThemeMission,
     openMission: openMission,
     openThemeMission: openThemeMission,
     setThemeLen: setThemeLen,
