@@ -1663,6 +1663,13 @@
               .wbf-view .wbf-folder { position:relative; cursor:pointer; perspective:1400px; min-height:232px }
               .wbf-view .wbf-folder-inner { position:relative; height:232px; transform-style:preserve-3d }
 
+              /* Deleting a bank: box fades/scales out in place (no full refresh) */
+              .wbf-view .wbf-folder.wbf-leaving {
+                animation: wbfLeave .4s cubic-bezier(.4,0,.6,1) forwards;
+                pointer-events: none;
+              }
+              @keyframes wbfLeave { to { opacity: 0; transform: scale(.9) translateY(-8px); } }
+
               /* Back panel (holds the fanned-out word cards) — stock image + gradient so cards stay readable.
                  NOTE: no overflow:hidden here — cards extend above the panel top like the original folders-ui. */
               .wbf-view .wbf-back {
@@ -4441,7 +4448,7 @@
   <script src="js/buy-card.js?v=5"></script>
   <script src="js/notifications.js"></script>
   <script src="js/learner-data.js?v=1"></script>
-  <script src="js/learner.js?v=9"></script>
+  <script src="js/learner.js?v=10"></script>
 
   <!-- Page-specific: Supabase data fetching -->
   <script>
@@ -4775,8 +4782,10 @@
             var r = await sb.auth.getSession();
             if (r.data && r.data.session) {
               var { data: known } = await sb.from('review_words')
-                .select('cefr').eq('user_id', r.data.session.user.id)
-                .eq('review_state', 'mastered');
+                .select('cefr,mastery_score,review_state')
+                .eq('user_id', r.data.session.user.id)
+                .or('review_state.eq.mastered,mastery_score.gte.80')
+                .limit(1000);
               if (known) {
                 known.forEach(function(w) {
                   var lvl = w.cefr;
@@ -4901,8 +4910,10 @@
         if (!libEl) return;
         try {
           if (window.SottotitoliData && window.SottotitoliData.getWordbanks) {
-            var allBanks = await window.SottotitoliData.getWordbanks('en');
-            allBanks = (allBanks || []).slice(0, 8);
+            var libEn = (await window.SottotitoliData.getWordbanks('en')) || [];
+            var libIt = [];
+            try { libIt = (await window.SottotitoliData.getWordbanks('it')) || []; } catch(e) {}
+            var allBanks = libEn.concat(libIt).slice(0, 8);
             if (allBanks.length) {
               var colors = ['#059669','#d97706','#0891b2','#5de6ff','#2563eb','#8b5cf6'];
               libEl.innerHTML = allBanks.map(function(b,i){
@@ -7275,7 +7286,7 @@
             if (act === 'allena') { if (window.Learner && Learner.openBankTest) Learner.openBankTest(bid); return; }
             if (act === 'rename') { if (window.wbRenameBank) wbRenameBank(bid, bname); setTimeout(wbRenderActive, 900); return; }
             if (act === 'duplicate') { if (window.wbDuplicateBank) wbDuplicateBank(bid); setTimeout(wbRenderActive, 1200); return; }
-            if (act === 'delete') { if (window.wbDeleteBank) wbDeleteBank(bid, bname); setTimeout(wbRenderActive, 1000); return; }
+            if (act === 'delete') { if (window.wbDeleteBank) wbDeleteBank(bid, bname); return; }
             return;
           }
           if (dd) { e.stopPropagation(); wbFoldersCloseMenus(); return; }
@@ -10662,7 +10673,15 @@
           var { error } = await sb.from('user_wordbanks').delete().eq('id', bankId);
           if (error) { alert('Errore: ' + error.message); return; }
           SottotitoliData.cacheClear();
-          renderWordbanks();
+          // Animate the box out in place — no full-grid refresh / no jump to top.
+          ['wbFoldersGrid','wbFoldersGridEn','wbFoldersGridIt'].forEach(function(gid){
+            var g = document.getElementById(gid);
+            if (!g) return;
+            var card = g.querySelector('.wbf-folder[data-bank-id="' + bankId + '"]');
+            if (!card) return;
+            card.classList.add('wbf-leaving');
+            setTimeout(function(){ if (card.parentNode) card.parentNode.removeChild(card); }, 400);
+          });
         } catch(e) { alert('Errore: ' + e.message); }
       };
 

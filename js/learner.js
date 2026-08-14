@@ -599,7 +599,7 @@
       '</div>' +
       '<div class="lr-mission-actions">' +
         '<button type="button" class="primary-btn lr-mission-go" onclick="Learner.openMission()">' + (mission ? t('learner_mission_start') : t('learner_mission_generate')) + '</button>' +
-        '<button type="button" class="lesson-link lr-mission-new" onclick="Learner.newMission()" title="' + t('learner_mission_new') + '">↻</button>' +
+        (mission ? '<button type="button" class="lesson-link lr-mission-new" onclick="Learner.newMission()" title="' + t('learner_mission_new') + '">↻</button>' : '') +
       '</div>' +
     '</div>';
     // Card 2 — always-available thematic mission (essential, thematic vocab)
@@ -623,19 +623,17 @@
       { kind: 'fragile', icon: '🧩', title: t('learner_review_fragile'), sub: t('learner_review_fragile_sub'), count: fragile.length },
       { kind: 'new', icon: '✨', title: t('learner_review_new'), sub: t('learner_review_new_sub'), count: fresh.length }
     ];
-    if (reviewCards.some(function (c) { return c.count > 0; })) {
-      html += '<div class="lr-review-grid">';
-      reviewCards.forEach(function (c) {
-        html += '<div class="lr-review-card" tabindex="0" onclick="Learner.openReview(\'' + c.kind + '\')">' +
-          '<span class="lr-review-icon">' + c.icon + '</span>' +
-          '<div class="lr-review-body"><div class="lr-review-title">' + c.title + '</div><div class="lr-review-sub">' + c.sub + '</div></div>' +
-          '<span class="lr-review-count">' + c.count + '</span>' +
-        '</div>';
-      });
-      html += '</div>';
-    } else {
-      html += '<div class="lr-review-empty">' + t('learner_review_empty') + '</div>';
-    }
+    // Always render the three cards with their counts (0 included) so both
+    // English and Italiano show the review section, hooked to their language.
+    html += '<div class="lr-review-grid">';
+    reviewCards.forEach(function (c) {
+      html += '<div class="lr-review-card' + (c.count > 0 ? '' : ' empty') + '" tabindex="0" onclick="Learner.openReview(\'' + c.kind + '\')">' +
+        '<span class="lr-review-icon">' + c.icon + '</span>' +
+        '<div class="lr-review-body"><div class="lr-review-title">' + c.title + '</div><div class="lr-review-sub">' + c.sub + '</div></div>' +
+        '<span class="lr-review-count">' + c.count + '</span>' +
+      '</div>';
+    });
+    html += '</div>';
     // ── Recent mistakes (per language) ──
     var prefix = lang + ':';
     var mistakes = Object.keys(s.mistakes || {}).filter(function (k) { return k.indexOf(prefix) === 0; });
