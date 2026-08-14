@@ -850,6 +850,7 @@
   /* ═══════════════════ LESSON / TEST / PRACTICE sessions ═══════════════════ */
   function openSession(mode, unit, lesson, steps) {
     session = { mode: mode, unit: unit || null, lesson: lesson || null, steps: steps, idx: 0, earned: 0, lang: learnerLang() };
+    if (mode === 'mission' && session.unit) trackMissionForSession(0, false);
     renderOverlay();
   }
 
@@ -1041,7 +1042,19 @@
     if (!stage) return;
     var cards = session.cards || [];
     var idx = session.cardIdx || 0;
+    var total = cards.length;
+    var bankName = session.unit ? session.unit.name : (session.bankId || t('learner_wordbanks'));
     var html = '<div class="ics-wrap">' +
+      '<div class="ics-meta">' +
+        '<div class="ics-meta-left">' +
+          '<span class="ics-kicker">' + t('learner_ics_session') + '</span>' +
+          '<span class="ics-bankname">' + esc(bankName) + '</span>' +
+        '</div>' +
+        '<div class="ics-meta-right">' +
+          '<span class="ics-chip ics-pos" id="icsPos">' + (idx + 1) + ' / ' + total + '</span>' +
+          '<span class="ics-chip ics-xp" id="icsXp">⭐ 0</span>' +
+        '</div>' +
+      '</div>' +
       '<div class="ics-stage" id="icsStage">';
     for (var i = 0; i < 3; i++) {
       var ci = idx + i;
@@ -1051,7 +1064,10 @@
         '<div class="ics-inner">' + cardFaceHtml(item, ci, i) + '</div></div>';
     }
     html += '</div>' +
-      '<div class="ics-remaining" id="icsRemaining"></div>' +
+      '<div class="ics-foot">' +
+        '<span class="ics-remaining" id="icsRemaining"></span>' +
+      '</div>' +
+      '<div class="ics-grade-label">' + t('learner_ics_grade_label') + '</div>' +
       '<div class="ics-grades" id="icsGrades">' +
         gradeBtnHtml('again', 1, 'learner_grade_again', 'Ancora', '😵') +
         gradeBtnHtml('hard', 3, 'learner_grade_hard', 'Difficile', '😬') +
@@ -1071,6 +1087,10 @@
     if (!el) return;
     var left = Math.max(0, (session.cards.length - session.cardIdx));
     el.textContent = left + ' ' + t('learner_ics_remaining');
+    var posEl = $('#icsPos');
+    if (posEl) posEl.textContent = Math.min(session.cardIdx + 1, session.cards.length) + ' / ' + session.cards.length;
+    var xpEl = $('#icsXp');
+    if (xpEl) xpEl.textContent = '⭐ ' + (session.earned || 0);
   }
 
   /* ── Per-bank Allena session progress (persisted) ──
@@ -1309,12 +1329,32 @@
   function missionProg() { try { return JSON.parse(localStorage.getItem(MISSION_PROG_KEY) || 'null'); } catch (e) { return null; } }
   function saveMissionProg(p) { try { localStorage.setItem(MISSION_PROG_KEY, JSON.stringify(p)); } catch (e) {} }
   function clearMissionProg() { try { localStorage.removeItem(MISSION_PROG_KEY); } catch (e) {} }
+
+  /* ── Mission progress per (language, type) — feeds the dashboard CEFR/mission box ──
+   * Keys are '<lang>:ai' (mission 1, goals-driven AI lesson) and '<lang>:theme'
+   * (mission 2, essential thematic vocab). Persisted so the dashboard can show
+   * started / in-progress % / completed for each mission in each language. */
+  var LEARNER_MISSIONS_KEY = 'sottotitoli-learner-missions';
+  function learnerMissionsState() { try { return JSON.parse(localStorage.getItem(LEARNER_MISSIONS_KEY) || '{}'); } catch (e) { return {}; } }
+  function saveLearnerMissionsState(s) { try { localStorage.setItem(LEARNER_MISSIONS_KEY, JSON.stringify(s)); } catch (e) {} }
+  function missionTypeOf(id) { return String(id || '').indexOf('theme:') === 0 ? 'theme' : 'ai'; }
+  function trackMission(lang, type, pct, done) {
+    if (!lang || !type) return;
+    var s = learnerMissionsState();
+    s[lang + ':' + type] = { pct: Math.max(0, Math.min(100, Math.round(pct))), done: !!done, started: true, updatedAt: new Date().toISOString() };
+    saveLearnerMissionsState(s);
+  }
+  function trackMissionForSession(pct, done) {
+    if (!session || session.mode !== 'mission') return;
+    trackMission(session.lang, missionTypeOf(session.unit && session.unit.id), pct, done);
+  }
   function resumeMissionSession(saved) {
     if (!saved || saved.mode !== 'mission' || !saved.steps || !saved.steps.length) return false;
     if (saved.idx >= saved.steps.length) { clearMissionProg(); return false; }
     openSession('mission', saved.unit, null, saved.steps);
     session.idx = saved.idx || 0;
     session.earned = saved.earned || 0;
+    trackMissionForSession((session.idx / session.steps.length) * 100, false);
     renderOverlay();
     return true;
   }
@@ -1650,6 +1690,7 @@
     if (session.idx >= session.steps.length) { endSession(); return; }
     if (session.mode === 'mission') {
       saveMissionProg({ mode: 'mission', unit: session.unit, steps: session.steps, idx: session.idx, earned: session.earned, updatedAt: new Date().toISOString() });
+      trackMissionForSession((session.idx / session.steps.length) * 100, false);
     }
     renderStep();
   }
@@ -1707,6 +1748,7 @@
       confettiFlag = earned > 0;
     } else if (mode === 'mission') {
       clearMissionProg();
+      trackMissionForSession(100, true);
       if (earned > 0) addXp(earned);
       bonus = 10; addXp(10);
       markLessonDone('mission', unit.id);
