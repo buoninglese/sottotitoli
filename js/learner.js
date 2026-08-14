@@ -618,7 +618,7 @@
       '</div>' +
       '<div class="lr-mission-actions">' +
         '<button type="button" class="primary-btn lr-mission-go" onclick="Learner.confirmMission()">' + (mission ? t('learner_mission_start') : t('learner_mission_generate')) + '</button>' +
-        (mission ? '<button type="button" class="lesson-link lr-mission-new" onclick="Learner.confirmNewMission()" title="' + t('learner_mission_new') + '">↻</button>' : '') +
+        (mission ? '<button type="button" class="lesson-link lr-mission-new" onclick="Learner.confirmNewMission()" title="' + t('learner_mission_new') + (regenRemaining() > 0 ? ' · ' + regenRemaining() + ' ' + t('learner_regen_left') : '') + '">↻</button>' : '') +
       '</div>' +
     '</div>';
     // Card 2 — always-available thematic mission (essential, thematic vocab)
@@ -1383,6 +1383,8 @@
   }
 
   async function newMission(focus) {
+    if (regenRemaining() <= 0) { toast(t('learner_regen_limit')); return; }
+    regenIncrement();
     var lang = learnerLang();
     missionClear();
     var lesson = await generateMission(focus, lang);
@@ -1496,6 +1498,7 @@
     appConfirm(msg, function () { runGuarded(function () { return openMission(); }, t('learner_loading')); }, t('learner_confirm_title'), '🎯');
   }
   function confirmNewMission() {
+    if (regenRemaining() <= 0) { appAlert(t('learner_regen_limit'), t('learner_confirm_title'), '↻'); return; }
     appConfirm(t('learner_confirm_mission_new'), function () { runGuarded(function () { return newMission(); }, t('learner_loading')); }, t('learner_confirm_title'), '↻');
   }
   function confirmThemeMission(btn) {
@@ -1508,6 +1511,19 @@
     var msg = t('learner_confirm_theme').replace('{name}', themeTitle) + (len === 'medium' ? ' · ' + t('learner_len_medium') : '');
     appConfirm(msg, function () { runGuarded(function () { return openThemeMission(theme, len); }, t('learner_loading')); }, t('learner_confirm_title'), '📚');
   }
+
+  /* ── Daily regenerate quota (↻ button): max 3 AI mission regenerations/day ── */
+  var REGEN_KEY = 'sottotitoli-learner-regens';
+  var REGEN_DAILY_MAX = 3;
+  function regenState() {
+    var today = new Date().toDateString();
+    var s = {}; try { s = JSON.parse(localStorage.getItem(REGEN_KEY) || '{}'); } catch (e) {}
+    if (!s || s.day !== today) s = { day: today, n: 0 };
+    return s;
+  }
+  function regenRemaining() { return Math.max(0, REGEN_DAILY_MAX - regenState().n); }
+  function regenUsed() { return regenState().n; }
+  function regenIncrement() { var s = regenState(); s.n += 1; try { localStorage.setItem(REGEN_KEY, JSON.stringify(s)); } catch (e) {} }
 
   function renderOverlay() {
     if (!session) return;
