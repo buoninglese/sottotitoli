@@ -55,6 +55,15 @@
     try { s = JSON.parse(localStorage.getItem(KEY) || 'null'); } catch (e) { s = null; }
     if (!s || typeof s !== 'object') s = defaultState();
     s = Object.assign(defaultState(), s);
+    // Migrate legacy flat mistakes { word: n } → { 'en:word': n } so recent
+    // mistakes can be shown per language (English/Italiano tabs).
+    var mk = s.mistakes || {};
+    var hasComposite = Object.keys(mk).some(function (k) { return k.indexOf('en:') === 0 || k.indexOf('it:') === 0; });
+    if (!hasComposite && Object.keys(mk).length) {
+      var migrated = {};
+      Object.keys(mk).forEach(function (k) { migrated['en:' + k] = mk[k]; });
+      s.mistakes = migrated;
+    }
     // Daily rollover
     var today = todayStr();
     if (s.lastDay !== today) { s.todayXp = 0; }
@@ -82,8 +91,11 @@
     cur.date = todayStr();
     s.tests[unitId] = cur; save(s); return s;
   }
-  function recordMistake(itWord) { var s = load(); s.mistakes[itWord] = (s.mistakes[itWord] || 0) + 1; save(s); return s; }
-  function clearMistake(itWord) { var s = load(); delete s.mistakes[itWord]; save(s); return s; }
+  // Recent mistakes are keyed by language so English and Italiano each show
+  // their own list (e.g. 'en:house', 'it:casa').
+  function mistakeKey(lang, itWord) { return (lang || learnerLang()) + ':' + String(itWord); }
+  function recordMistake(itWord, lang) { var s = load(); var k = mistakeKey(lang, itWord); s.mistakes[k] = (s.mistakes[k] || 0) + 1; save(s); return s; }
+  function clearMistake(key) { var s = load(); delete s.mistakes[key]; save(s); return s; }
 
   /* ── Real data sources: user word banks + SRS review words (Phase 1) ──
    * The bundled course stays only as a not-logged-in fallback.
@@ -480,6 +492,7 @@
     rootEl.innerHTML =
       '<div class="learner-wrap">' +
         '<div class="learner-hero">' +
+          '<span class="lh-lang"><span class="lh-lang-flag">' + (learnerLang() === 'it' ? '🇮🇹' : '🇬🇧') + '</span><span>' + (learnerLang() === 'it' ? t('learner_lang_it') : t('learner_lang_en')) + '</span></span>' +
           '<div><div class="lh-xp">' + s.xp + '<small data-i18n="learner_xp">XP</small></div></div>' +
           '<div class="lh-goal">' +
             '<div class="goal-top"><span data-i18n="learner_daily_goal">Obiettivo giornaliero</span><span>' + s.todayXp + ' / ' + s.dailyGoal + '</span></div>' +
@@ -507,6 +520,10 @@
     $all('.subtab-pane', rootEl).forEach(function (p) {
       p.classList.toggle('active', p.id === paneId);
     });
+    // The fixed tracking bar (XP / goal / streak) belongs to the language tabs,
+    // not to the Overview dashboard (which has its own stats).
+    var hero = $('.learner-hero', rootEl);
+    if (hero) hero.style.display = (name === 'learner-overview') ? 'none' : '';
     renderPane(name);
   }
 
@@ -517,10 +534,19 @@
     return 'sub-learner-path'; // learner-en / learner-it / learner-path (legacy)
   }
 
+  // Keep the hero's language chip in sync when English/Italiano is selected.
+  function updateHeroLang() {
+    if (!rootEl) return;
+    var chip = $('.lh-lang', rootEl);
+    if (!chip) return;
+    var l = learnerLang();
+    chip.innerHTML = '<span class="lh-lang-flag">' + (l === 'it' ? '🇮🇹' : '🇬🇧') + '</span><span>' + (l === 'it' ? t('learner_lang_it') : t('learner_lang_en')) + '</span>';
+  }
+
   function renderPane(name) {
     if (name === 'learner-overview') renderProgress();
-    else if (name === 'learner-en') { learnerSetLang('en'); renderPath(); }
-    else if (name === 'learner-it') { learnerSetLang('it'); renderPath(); }
+    else if (name === 'learner-en') { learnerSetLang('en'); updateHeroLang(); renderPath(); }
+    else if (name === 'learner-it') { learnerSetLang('it'); updateHeroLang(); renderPath(); }
     else if (name === 'learner-path') renderPath();
     else if (name === 'learner-practice') renderPractice();
     else if (name === 'learner-progress') renderProgress();
@@ -541,9 +567,8 @@
     var due = await srcReview('due', lang);
     var fragile = await srcReview('fragile', lang);
     var fresh = await srcReview('new', lang);
-    // Word banks live on the Word-banks tab (each box now has its own Allena
-    // button) — the path keeps the AI mission + spaced review only.
-    if (!due.length && !fragile.length && !fresh.length && !missionCached()) { renderEmptyPath(pane); return; }
+    // Word banks live on the Word-banks tab; the path always shows the two
+    // missions + spaced review (per language) + recent mistakes.
     renderRealPath(pane, due, fragile, fresh, lang);
   }
 
@@ -554,11 +579,14 @@
   }
 
   function renderRealPath(pane, due, fragile, fresh, lang) {
+    var s = load();
     var html = '';
-    // Mission (objectives-driven AI lesson)
+    // ── Missions: one around the user's goals, one on essential thematic vocab ──
     var mission = missionCached();
-    html += '<div class="lr-section-head"><span class="lr-section-title">' + t('learner_mission') + '</span>' +
-      '<span class="lr-section-sub">' + t('learner_mission_sub') + '</span></div>';
+    html += '<div class="lr-section-head"><span class="lr-section-title">' + t('learner_missions') + '</span>' +
+      '<span class="lr-section-sub">' + t('learner_missions_sub') + '</span></div>';
+    html += '<div class="lr-missions-grid">';
+    // Card 1 — objectives-driven AI mission (from the user's goals)
     html += '<div class="lr-mission-card' + (mission ? ' ready' : '') + '">' +
       '<div class="lr-mission-glow">🎯</div>' +
       '<div class="lr-mission-body">' +
@@ -574,15 +602,28 @@
         '<button type="button" class="lesson-link lr-mission-new" onclick="Learner.newMission()" title="' + t('learner_mission_new') + '">↻</button>' +
       '</div>' +
     '</div>';
-    // Spaced review
+    // Card 2 — always-available thematic mission (essential, thematic vocab)
+    html += '<div class="lr-mission-card theme">' +
+      '<div class="lr-mission-glow">📚</div>' +
+      '<div class="lr-mission-body">' +
+        '<div class="lr-mission-title">' + t('learner_theme_mission') + '</div>' +
+        '<div class="lr-mission-obj">' + t('learner_theme_mission_sub') + '</div>' +
+        '<select class="lr-theme-select" aria-label="' + t('learner_theme_choose') + '">' + themeOptions() + '</select>' +
+      '</div>' +
+      '<div class="lr-mission-actions">' +
+        '<button type="button" class="primary-btn" onclick="Learner.openThemeMission(this.closest(\'.lr-mission-card\').querySelector(\'.lr-theme-select\').value)">' + t('learner_mission_start') + '</button>' +
+      '</div>' +
+    '</div>';
+    html += '</div>';
+    // ── Spaced review (always visible on both English & Italiano) ──
+    html += '<div class="lr-section-head lr-sec-mt"><span class="lr-section-title">' + t('learner_review') + '</span>' +
+      '<span class="lr-section-sub">' + t('learner_review_sub') + '</span></div>';
     var reviewCards = [
       { kind: 'due', icon: '⏰', title: t('learner_review_due'), sub: t('learner_review_due_sub'), count: due.length },
       { kind: 'fragile', icon: '🧩', title: t('learner_review_fragile'), sub: t('learner_review_fragile_sub'), count: fragile.length },
       { kind: 'new', icon: '✨', title: t('learner_review_new'), sub: t('learner_review_new_sub'), count: fresh.length }
-    ].filter(function (c) { return c.count > 0; });
-    if (reviewCards.length) {
-      html += '<div class="lr-section-head lr-sec-mt"><span class="lr-section-title">' + t('learner_review') + '</span>' +
-        '<span class="lr-section-sub">' + t('learner_review_sub') + '</span></div>';
+    ];
+    if (reviewCards.some(function (c) { return c.count > 0; })) {
       html += '<div class="lr-review-grid">';
       reviewCards.forEach(function (c) {
         html += '<div class="lr-review-card" tabindex="0" onclick="Learner.openReview(\'' + c.kind + '\')">' +
@@ -592,6 +633,20 @@
         '</div>';
       });
       html += '</div>';
+    } else {
+      html += '<div class="lr-review-empty">' + t('learner_review_empty') + '</div>';
+    }
+    // ── Recent mistakes (per language) ──
+    var prefix = lang + ':';
+    var mistakes = Object.keys(s.mistakes || {}).filter(function (k) { return k.indexOf(prefix) === 0; });
+    if (mistakes.length) {
+      html += '<div class="lr-section-head lr-sec-mt"><span class="lr-section-title">' + t('learner_mistakes') + '</span></div>' +
+        '<div class="lr-mistakes"><div style="display:flex;flex-wrap:wrap;gap:8px">' +
+        mistakes.map(function (key) {
+          var wrd = key.slice(prefix.length);
+          return '<span style="display:inline-flex;align-items:center;gap:8px;padding:6px 12px;border:1px solid var(--line);border-radius:999px;background:var(--panel-2);font-size:12.5px;font-weight:600;color:var(--text)">' + esc(wrd) +
+            '<button type="button" onclick="Learner.clearMistake(' + jsArg(key) + ')" style="border:none;background:rgba(239,68,68,.1);color:#ef4444;border-radius:50%;width:18px;height:18px;font-size:11px;cursor:pointer">✕</button></span>';
+        }).join('') + '</div></div>';
     }
     pane.innerHTML = html;
     i18nScope(pane);
@@ -753,13 +808,8 @@
         '<div class="pr-ls"><span class="pr-ls-v">' + h.total + '</span><span class="pr-ls-l">' + t('learner_pr_review') + '</span></div>' +
         '<div class="pr-ls"><span class="pr-ls-v">' + h.avgMastery + '%</span><span class="pr-ls-l">' + t('learner_pr_mastery') + '</span></div>' +
       '</div>' +
-      '<div class="pr-lang-queue">' +
-        '<span class="pr-q pr-q-due">⏰ ' + t('learner_review_due') + ' <b>' + h.due + '</b></span>' +
-        '<span class="pr-q pr-q-fragile">🧩 ' + t('learner_review_fragile') + ' <b>' + h.fragile + '</b></span>' +
-        '<span class="pr-q pr-q-new">✨ ' + t('learner_review_new') + ' <b>' + h.fresh + '</b></span>' +
-        '<span class="pr-q pr-q-mastered">✅ ' + t('learner_review_mastered') + ' <b>' + h.mastered + '</b></span>' +
-      '</div>' +
-      (active ? '<div class="pr-cefr-block"><div class="pr-cefr-title">CEFR · ' + name + '</div>' + cefrBars(h) + '</div>' : '') +
+      // CEFR distribution for BOTH languages (English and Italiano alike)
+      '<div class="pr-cefr-block"><div class="pr-cefr-title">CEFR · ' + name + '</div>' + cefrBars(h) + '</div>' +
     '</div>';
   }
 
@@ -790,24 +840,7 @@
       '</div>' +
       '<div class="lr-section-head lr-sec-mt"><span class="lr-section-title">' + t('learner_pr_languages') + '</span>' +
         '<span class="lr-section-sub">' + t('learner_pr_languages_sub') + '</span></div>' +
-      '<div class="pr-lang-grid">' + langCard(lang, banks, h, true) + langCard(other, banksOther, hOther, false) + '</div>' +
-      '<div class="lr-section-head lr-sec-mt"><span class="lr-section-title">' + t('learner_review') + '</span>' +
-        '<span class="lr-section-sub">' + t('learner_review_sub') + '</span></div>' +
-      '<div class="pr-card"><div class="pr-queue-actions">' +
-        '<button class="lesson-link" onclick="Learner.openReview(\'due\')">⏰ ' + t('learner_review_due') + ' (' + h.due + ')</button>' +
-        '<button class="lesson-link" onclick="Learner.openReview(\'fragile\')">🧩 ' + t('learner_review_fragile') + ' (' + h.fragile + ')</button>' +
-        '<button class="lesson-link" onclick="Learner.openReview(\'new\')">✨ ' + t('learner_review_new') + ' (' + h.fresh + ')</button>' +
-      '</div></div>';
-
-    var mistakes = Object.keys(s.mistakes);
-    if (mistakes.length) {
-      html += '<div class="lr-section-head lr-sec-mt"><span class="lr-section-title">' + t('learner_mistakes') + '</span></div>' +
-        '<div class="pr-card"><div style="display:flex;flex-wrap:wrap;gap:8px">' +
-        mistakes.map(function (wrd) {
-          return '<span style="display:inline-flex;align-items:center;gap:8px;padding:6px 12px;border:1px solid var(--line);border-radius:999px;background:var(--panel-2);font-size:12.5px;font-weight:600;color:var(--text)">' + esc(wrd) +
-            '<button type="button" onclick="Learner.clearMistake(' + jsArg(wrd) + ')" style="border:none;background:rgba(239,68,68,.1);color:#ef4444;border-radius:50%;width:18px;height:18px;font-size:11px;cursor:pointer">✕</button></span>';
-        }).join('') + '</div></div>';
-    }
+      '<div class="pr-lang-grid">' + langCard(lang, banks, h, true) + langCard(other, banksOther, hOther, false) + '</div>';
     pane.innerHTML = html;
     i18nScope(pane);
   }
@@ -1097,7 +1130,7 @@
     if (!frontEl.classList.contains('flip')) frontEl.classList.add('flip');
     // Record grade + XP / mistake
     session.graded[item.word] = q;
-    if (q >= 3) { session.earned += 1; addXp(1); } else { recordMistake(item.word); }
+    if (q >= 3) { session.earned += 1; addXp(1); } else { recordMistake(item.word, session.lang); }
     writeGrade(item, q); // fire-and-forget SM-2 write-back to review_words
     $all('.ics-grade', stage).forEach(function (b) { b.disabled = true; });
     // Fly the front card off, then cascade the stack
@@ -1282,6 +1315,66 @@
     openSession('mission', { id: lesson.id || 'mission', name: lesson.title || 'Missione', lang: lang }, null, steps);
   }
 
+  /* ── Thematic mission (always available, essential vocabulary) ──
+   * Complements the goals-driven AI mission with fixed themes every learner
+   * needs: linking words, essential verbs, modals, time, prepositions. The
+   * pairs are stored EN↔IT and oriented by the active learner language. */
+  var THEME_LESSONS = {
+    linking: { icon: '🔗', title: 'Connettivi', desc: 'Parole per collegare le idee', pairs: [
+      { en: 'however', it: 'tuttavia' }, { en: 'therefore', it: 'perciò' }, { en: 'moreover', it: 'inoltre' },
+      { en: 'because', it: 'perché' }, { en: 'although', it: 'sebbene' }, { en: 'instead', it: 'invece' },
+      { en: 'finally', it: 'infine' }, { en: 'meanwhile', it: 'nel frattempo' }, { en: 'otherwise', it: 'altrimenti' }, { en: 'besides', it: 'oltre a ciò' }
+    ] },
+    verbs: { icon: '⚡', title: 'Verbi essenziali', desc: 'I verbi più usati nella vita quotidiana', pairs: [
+      { en: 'to be', it: 'essere' }, { en: 'to have', it: 'avere' }, { en: 'to do', it: 'fare' },
+      { en: 'to go', it: 'andare' }, { en: 'to come', it: 'venire' }, { en: 'to see', it: 'vedere' },
+      { en: 'to know', it: 'sapere' }, { en: 'to think', it: 'pensare' }, { en: 'to say', it: 'dire' }, { en: 'to want', it: 'volere' }
+    ] },
+    modals: { icon: '🎯', title: 'Verbi modali', desc: 'Possibilità, obblighi e permessi', pairs: [
+      { en: 'can', it: 'posso' }, { en: 'must', it: 'devo' }, { en: 'should', it: 'dovrei' },
+      { en: 'may', it: 'posso (permesso)' }, { en: 'might', it: 'potrei' }, { en: 'could', it: 'potrei (cond.)' },
+      { en: 'would', it: 'vorrei' }, { en: 'need to', it: 'devo (bisogno di)' }, { en: 'have to', it: 'sono costretto a' }, { en: 'be able to', it: 'riesco a' }
+    ] },
+    time: { icon: '🕐', title: 'Parole di tempo', desc: 'Quando succede qualcosa', pairs: [
+      { en: 'today', it: 'oggi' }, { en: 'tomorrow', it: 'domani' }, { en: 'yesterday', it: 'ieri' },
+      { en: 'now', it: 'adesso' }, { en: 'later', it: 'più tardi' }, { en: 'early', it: 'presto' },
+      { en: 'late', it: 'tardi' }, { en: 'always', it: 'sempre' }, { en: 'never', it: 'mai' }, { en: 'sometimes', it: 'a volte' }
+    ] },
+    prepositions: { icon: '📍', title: 'Preposizioni', desc: 'Dove e a chi', pairs: [
+      { en: 'in', it: 'in' }, { en: 'on', it: 'su' }, { en: 'at', it: 'a' },
+      { en: 'with', it: 'con' }, { en: 'without', it: 'senza' }, { en: 'from', it: 'da' },
+      { en: 'for', it: 'per' }, { en: 'under', it: 'sotto' }, { en: 'over', it: 'sopra' }, { en: 'between', it: 'tra' }
+    ] }
+  };
+  function themeOptions() {
+    return Object.keys(THEME_LESSONS).map(function (k) {
+      return '<option value="' + k + '">' + esc(THEME_LESSONS[k].title) + '</option>';
+    }).join('');
+  }
+  function themeItems(theme, lang) {
+    return theme.pairs.map(function (p) {
+      var t = lang === 'it' ? p.it : p.en;
+      var x = lang === 'it' ? p.en : p.it;
+      return { it: t, en: x, word: t, lang: lang, pos: '', cefr: '', definition: '' };
+    });
+  }
+  function openThemeMission(themeKey) {
+    var lang = learnerLang();
+    var theme = THEME_LESSONS[themeKey];
+    if (!theme) return;
+    var items = themeItems(theme, lang);
+    if (!items.length) { toast(t('learner_no_words_yet')); return; }
+    var steps = [];
+    sample(items, Math.min(5, items.length)).forEach(function (v) { steps.push({ type: 'listen', item: v }); });
+    sample(items, Math.min(3, items.length)).forEach(function (v) { steps.push({ type: 'speak', item: v }); });
+    var mp = sample(items, Math.min(5, items.length));
+    if (mp.length >= 3) steps.push({ type: 'match', pairs: shuffle(mp.map(function (v) { return { it: v.it, en: v.en }; })) });
+    var qp = sample(items, Math.min(5, items.length));
+    if (qp.length) steps.push({ type: 'mc', questions: qp.map(function (v) { return { prompt: v.en, answer: v.it, options: optionsFor(v.it) }; }) });
+    if (!steps.length) { toast(t('learner_no_words_yet')); return; }
+    openSession('mission', { id: 'theme:' + themeKey, name: theme.title, lang: lang }, null, steps);
+  }
+
   function renderOverlay() {
     if (!session) return;
     var isBank = session.mode === 'bank';
@@ -1409,7 +1502,7 @@
       session.earned += 1; addXp(1);
       if (session.mode === 'lesson') { /* fine */ }
     } else {
-      recordMistake(q.answer);
+      recordMistake(q.answer, session.lang);
       // highlight correct
       $all('.choice', btn.parentElement).forEach(function (c) {
         if (c.textContent === q.answer) c.classList.add('correct');
@@ -1505,7 +1598,7 @@
     var checkBtn = $('#learnerCheck');
     if (checkBtn) checkBtn.disabled = true;
     if (correct) { session.earned += 1; addXp(1); }
-    else { recordMistake(expected); }
+    else { recordMistake(expected, session.lang); }
     setTimeout(nextStep, correct ? 900 : 1600);
   }
 
@@ -1658,6 +1751,7 @@
     openBankTest: openBankTest,
     openReview: openReview,
     openMission: openMission,
+    openThemeMission: openThemeMission,
     newMission: newMission,
     closeSession: closeSession,
     nextStep: nextStep,
