@@ -1338,17 +1338,26 @@
   function learnerMissionsState() { try { return JSON.parse(localStorage.getItem(LEARNER_MISSIONS_KEY) || '{}'); } catch (e) { return {}; } }
   function saveLearnerMissionsState(s) { try { localStorage.setItem(LEARNER_MISSIONS_KEY, JSON.stringify(s)); } catch (e) {} }
   function missionTypeOf(id) { return String(id || '').indexOf('theme:') === 0 ? 'theme' : 'ai'; }
-  function trackMission(lang, type, pct, done, title) {
+  function trackMission(lang, type, pct, done, title, desc) {
     if (!lang || !type) return;
     var s = learnerMissionsState();
     var prev = s[lang + ':' + type] || {};
-    s[lang + ':' + type] = { pct: Math.max(0, Math.min(100, Math.round(pct))), done: !!done, started: true, title: title || prev.title || '', updatedAt: new Date().toISOString() };
+    s[lang + ':' + type] = { pct: Math.max(0, Math.min(100, Math.round(pct))), done: !!done, started: true, title: title || prev.title || '', desc: desc || prev.desc || '', updatedAt: new Date().toISOString() };
     saveLearnerMissionsState(s);
   }
   function trackMissionForSession(pct, done) {
     if (!session || session.mode !== 'mission') return;
-    var title = (session.unit && session.unit.name) || '';
-    trackMission(session.lang, missionTypeOf(session.unit && session.unit.id), pct, done, title);
+    var unit = session.unit || {};
+    var title = unit.name || '';
+    var desc = '';
+    if (missionTypeOf(unit.id) === 'theme') {
+      var tk = String(unit.id).replace('theme:', '');
+      if (THEME_LESSONS[tk]) desc = THEME_LESSONS[tk].desc;
+    } else {
+      var lesson = missionCached();
+      if (lesson) desc = lesson.subtitle || lesson.objective || '';
+    }
+    trackMission(session.lang, missionTypeOf(unit.id), pct, done, title, desc);
   }
   function resumeMissionSession(saved) {
     if (!saved || saved.mode !== 'mission' || !saved.steps || !saved.steps.length) return false;
