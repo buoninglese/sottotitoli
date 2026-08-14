@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="it" data-theme="modern">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dashboard · Chart Box v2 · funzionante · Sottotitoli</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Manrope:wght@500;600;700;800&family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet">
+<style>
+:root{
+  --font-ui:"Inter",ui-sans-serif,system-ui,sans-serif;
+  --font-display:"Space Grotesk",var(--font-ui);
+  --font-mono:"JetBrains Mono",ui-monospace,monospace;
+  --bg:#0a0f16;--panel:#0d141d;--panel2:#0f1722;--line:#1b2836;--line2:#263647;
+  --text:#e8f0f7;--soft:#8fa4ba;--faint:#6f8398;
+  --cyan:#06b6d4;--cyan2:#22d3ee;--teal:#14b8a6;--amber:#f59e0b;--blue:#3b82f6;--violet:#8b5cf6;--green:#34d399;
+}
+*{box-sizing:border-box}
+body{margin:0;font-family:var(--font-ui);background:var(--bg);color:var(--text);min-height:100vh}
+::-webkit-scrollbar{width:10px}::-webkit-scrollbar-thumb{background:#223244;border-radius:8px}
+.head{display:flex;align-items:center;gap:14px;padding:12px 24px;background:linear-gradient(180deg,#0f1822,#0c131c);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:10;flex-wrap:wrap}
+.head::after{content:"";position:absolute;left:0;right:0;bottom:-1px;height:1px;background:linear-gradient(90deg,transparent,var(--cyan) 30%,var(--violet) 70%,transparent);opacity:.5}
+.head h1{font-size:15px;font-weight:800;margin:0;letter-spacing:-.02em;display:flex;align-items:center;gap:10px}
+.head h1 .dot{width:10px;height:10px;border-radius:50%;background:var(--cyan2);box-shadow:0 0 14px var(--cyan2);animation:b 2.4s ease-in-out infinite}
+@keyframes b{0%,100%{opacity:1}50%{opacity:.55}}
+.head .badge{font:600 10px var(--font-mono);color:#67e8f9;background:#0a1018;border:1px solid var(--line);padding:3px 10px;border-radius:999px}
+.head .spacer{flex:1}
+.head .tag{font:700 9.5px var(--font-ui);letter-spacing:.14em;text-transform:uppercase;color:#8fa4ba;border:1px dashed #33455c;padding:5px 12px;border-radius:999px}
+.body{max-width:1080px;margin:0 auto;padding:28px 24px 80px}
+.intro{font:500 11.5px var(--font-ui);color:var(--soft);margin:0 0 22px;line-height:1.6;max-width:800px}
+.intro b{color:#e8f0f7}
+/* ── Metric "vs" boxes row ── */
+.metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px}
+@media(max-width:920px){.metrics{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:520px){.metrics{grid-template-columns:1fr}}
+.metric{background:linear-gradient(180deg,#0e1720,#0a1119);border:1px solid var(--line);border-radius:18px;padding:16px 16px;cursor:pointer;position:relative;overflow:hidden;transition:border-color .25s,transform .25s,box-shadow .25s;animation:cardIn .5s cubic-bezier(.2,.8,.2,1) both}
+.metric:nth-child(1){animation-delay:.02s}.metric:nth-child(2){animation-delay:.08s}.metric:nth-child(3){animation-delay:.14s}.metric:nth-child(4){animation-delay:.2s}
+@keyframes cardIn{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+.metric::before{content:'';position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,rgba(34,211,238,.5),transparent);opacity:.5}
+.metric:hover{transform:translateY(-3px);border-color:var(--line2)}
+.metric.selected{border-color:var(--cyan);box-shadow:0 0 0 2px rgba(6,182,212,.4),0 10px 26px rgba(6,182,212,.12)}
+.metric.pressed{animation:cardPress .3s cubic-bezier(.2,.8,.2,1)}
+@keyframes cardPress{0%{transform:scale(1)}40%{transform:scale(.96)}100%{transform:scale(1)}}
+.metric .mk{font:700 9.5px var(--font-ui);letter-spacing:.16em;text-transform:uppercase;color:var(--faint);margin-bottom:8px}
+.metric .mv{font:800 26px var(--font-display);letter-spacing:-.03em;font-variant-numeric:tabular-nums;line-height:1.05;white-space:nowrap}
+.metric .mc-vs{margin-top:8px;display:flex;align-items:baseline;gap:6px;font-size:11px;color:var(--soft);flex-wrap:wrap}
+.metric .mc-vs b{color:var(--text);font-weight:800;font-variant-numeric:tabular-nums}
+.metric .mc-vs .mc-vs-l{opacity:.85}
+.metric .mc-bar{margin-top:9px;height:5px;border-radius:99px;background:rgba(148,163,184,.14);overflow:hidden;display:flex;gap:2px}
+.metric .mc-bar .mc-seg{height:100%;border-radius:99px;min-width:0;transition:width .6s cubic-bezier(.16,1,.3,1)}
+.metric .mc-bar .mc-fill{height:100%;border-radius:99px;min-width:2px;transition:width .6s cubic-bezier(.16,1,.3,1)}
+/* ── Chart card: horizontal — sidebar toggles + chart ── */
+.chartcard{background:linear-gradient(180deg,#0e1720,#0a1119);border:1px solid var(--line);border-radius:28px;display:flex;flex-direction:row;padding:0;overflow:hidden;animation:cardIn .55s .26s cubic-bezier(.2,.8,.2,1) both}
+.dash-sidebar{width:188px;flex-shrink:0;padding:22px 16px;background:#0b131c;border-right:1px solid var(--line);display:flex;flex-direction:column;gap:22px}
+.ds-group{display:flex;flex-direction:column;gap:9px}
+.ds-label{font:800 9.5px var(--font-ui);text-transform:uppercase;letter-spacing:.14em;color:var(--faint)}
+.ds-seg{display:flex;gap:4px}
+.ds-seg.ds-col{flex-direction:column}
+.ds-btn{flex:1;border:1px solid var(--line);background:#0d1620;color:var(--soft);border-radius:10px;padding:8px 10px;font:700 12px var(--font-ui);cursor:pointer;text-align:left;transition:all .15s;white-space:nowrap}
+.ds-btn:hover{border-color:var(--cyan);color:var(--text)}
+.ds-btn.active{background:var(--cyan);border-color:var(--cyan);color:#062b33}
+.dash-chart{flex:1;min-width:0;display:flex;flex-direction:column;padding:28px 30px 24px}
+.chartcard .cc-head{display:flex;align-items:flex-end;justify-content:space-between;gap:20px;flex-wrap:wrap;margin-bottom:20px}
+.chartcard h3{font-size:24px;font-weight:900;color:var(--text);margin:0 0 8px;letter-spacing:-.02em;font-family:'Inter',sans-serif}
+.chartcard .cc-sub{font-size:12.5px;color:var(--soft);margin:0;max-width:440px;line-height:1.55}
+.chartcard .cc-total{text-align:right;flex-shrink:0}
+.chartcard .cc-total .tv{font-size:42px;font-weight:900;color:var(--cyan);line-height:1;letter-spacing:-.03em;font-family:'Inter',sans-serif;font-variant-numeric:tabular-nums}
+.chartcard .cc-total .tl{font-size:10px;font-weight:700;color:var(--soft);text-transform:uppercase;letter-spacing:.2em;margin-top:6px}
+.chartcard svg{width:100%;height:auto}
+.chartcard .legend{display:flex;gap:16px;flex-wrap:wrap;margin-top:12px}
+.chartcard .lg{display:inline-flex;align-items:center;gap:7px;font:500 10.5px var(--font-ui);color:var(--soft)}
+.chartcard .lg i{width:12px;height:12px;border-radius:4px;flex-shrink:0}
+/* chart animations */
+svg .fade-in{animation:fadeIn .7s ease both}
+svg .dot{transition:transform .25s,filter .25s;transform-box:fill-box;transform-origin:center;cursor:pointer}
+svg .dot:hover{transform:scale(1.6);filter:brightness(1.25) drop-shadow(0 0 6px rgba(34,211,238,.6))}
+svg .bar{transition:transform .25s,filter .25s;transform-box:fill-box;transform-origin:bottom;cursor:pointer}
+svg .bar:hover{transform:scaleY(1.06);filter:brightness(1.2)}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+.foot{margin-top:24px;font:500 10.5px var(--font-ui);color:var(--faint);border-top:1px solid var(--line);padding-top:14px;display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.foot code{font:500 9.5px var(--font-mono);color:#67e8f9;background:#0a1018;border:1px solid var(--line);padding:2px 7px;border-radius:6px}
+/* responsive: sidebar stacks above chart */
+@media(max-width:760px){
+  .chartcard{flex-direction:column}
+  .dash-sidebar{width:100%;border-right:none;border-bottom:1px solid var(--line);flex-direction:row;flex-wrap:wrap;gap:16px}
+  .ds-group{flex:1;min-width:150px}
+  .dash-chart{padding:22px 18px}
+}
+</style>
+</head>
+<body>
+<div class="head">
+  <h1><span class="dot"></span> Dashboard · Chart Box v2 · funzionante</h1>
+  <span class="badge">MOCKUP</span>
+  <div class="spacer"></div>
+  <span class="tag">sidebar toggles + box "vs"</span>
+</div>
+
+<div class="body">
+  <p class="intro"><b>Funzionante</b>: 62 giorni di dati mock. La <b>sidebar a sinistra</b> cambia <b>Modalità</b> (Totale / Media per giorno) e <b>Periodo</b> (Ieri · Ultima settimana · Ultimo mese · Tutto); i 4 box metrici hanno <b>valore + confronto ("vs") + mini barra</b> e si ricalcolano sul periodo selezionato. Clicca una carta per cambiare il grafico.</p>
+
+  <div class="metrics" id="metrics">
+    <div class="metric" data-m="sessions">
+      <div class="mk">Sessioni</div>
+      <div class="mv"><span id="mcA_sessions">—</span></div>
+      <div class="mc-vs"><b id="mcVs_sessions">—</b><span class="mc-vs-l" id="mcVsL_sessions">min/sessione</span></div>
+      <div class="mc-bar"><div class="mc-fill" id="mcBar_sessions"></div><div class="mc-seg" id="mcSegA_sessions" style="display:none"></div><div class="mc-seg" id="mcSegB_sessions" style="display:none"></div></div>
+    </div>
+    <div class="metric selected" data-m="activity">
+      <div class="mk">Attività</div>
+      <div class="mv"><span id="mcA_activity">—</span></div>
+      <div class="mc-vs"><b id="mcVs_activity">—</b><span class="mc-vs-l" id="mcVsL_activity">registrazione</span></div>
+      <div class="mc-bar"><div class="mc-fill" id="mcBar_activity" style="display:none"></div><div class="mc-seg" id="mcSegA_activity"></div><div class="mc-seg" id="mcSegB_activity"></div></div>
+    </div>
+    <div class="metric" data-m="words">
+      <div class="mk">Parole uniche</div>
+      <div class="mv"><span id="mcA_words">—</span></div>
+      <div class="mc-vs"><b id="mcVs_words">—</b><span class="mc-vs-l" id="mcVsL_words">trascritte</span></div>
+      <div class="mc-bar"><div class="mc-fill" id="mcBar_words" style="display:none"></div><div class="mc-seg" id="mcSegA_words"></div><div class="mc-seg" id="mcSegB_words"></div></div>
+    </div>
+    <div class="metric" data-m="lexdiv">
+      <div class="mk">Div. lessicale</div>
+      <div class="mv"><span id="mcA_lexdiv">—</span></div>
+      <div class="mc-vs"><b id="mcVs_lexdiv">—</b><span class="mc-vs-l" id="mcVsL_lexdiv">parole/min</span></div>
+      <div class="mc-bar"><div class="mc-fill" id="mcBar_lexdiv"></div><div class="mc-seg" id="mcSegA_lexdiv" style="display:none"></div><div class="mc-seg" id="mcSegB_lexdiv" style="display:none"></div></div>
+    </div>
+  </div>
+
+  <div class="chartcard" id="chartcard">
+    <aside class="dash-sidebar" id="dashSidebar">
+      <div class="ds-group">
+        <span class="ds-label">Modalità</span>
+        <div class="ds-seg">
+          <button type="button" class="ds-btn active" data-mode="total" onclick="dashSetMode(this)">Totale</button>
+          <button type="button" class="ds-btn" data-mode="avg" onclick="dashSetMode(this)">Media</button>
+        </div>
+      </div>
+      <div class="ds-group">
+        <span class="ds-label">Periodo</span>
+        <div class="ds-seg ds-col">
+          <button type="button" class="ds-btn active" data-tl="week" onclick="dashSetTl(this)">Ultima settimana</button>
+          <button type="button" class="ds-btn" data-tl="yesterday" onclick="dashSetTl(this)">Ieri</button>
+          <button type="button" class="ds-btn" data-tl="month" onclick="dashSetTl(this)">Ultimo mese</button>
+          <button type="button" class="ds-btn" data-tl="all" onclick="dashSetTl(this)">Tutto</button>
+        </div>
+      </div>
+    </aside>
+    <div class="dash-chart">
+      <div class="cc-head">
+        <div>
+          <h3 id="ccTitle">Attività</h3>
+          <p class="cc-sub" id="ccSub">Minuti sul sito per giorno, nel periodo selezionato.</p>
+        </div>
+        <div class="cc-total">
+          <div class="tv" id="ccTotal">—</div>
+          <div class="tl" id="ccTotalLabel">Minuti sul sito</div>
+        </div>
+      </div>
+      <div id="ccChart"></div>
+      <div class="legend" id="ccLegend"></div>
+    </div>
+  </div>
+
+  <div class="foot">
+    <code>stesso layout del bento dashboard</code>
+    <code>sidebar · toggle Totale/Media + Periodo</code>
+    <code>box "vs" · valore + confronto + mini barra</code>
+    <span style="flex:1"></span>
+    <span>mockup funzionante · dati 62 giorni · clicca tutto.</span>
+  </div>
+</div>
+
+<script>
+'use strict';
+/* ═══ dati mock deterministici: 62 giorni fino a oggi ═══ */
+function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;var t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
+var rnd=mulberry32(20260814);
+var N=62, DAYS=[];
+var now=new Date();
+for(var i=N-1;i>=0;i--){
+  var dt=new Date(now); dt.setDate(now.getDate()-i);
+  var dd=('0'+dt.getDate()).slice(-2), mm=('0'+(dt.getMonth()+1)).slice(-2);
+  var dow=dt.getDay(), weekend=(dow===0||dow===6);
+  var sess=weekend?Math.floor(rnd()*3):Math.floor(rnd()*6);
+  if(i===0) sess=Math.min(sess,2);                       // oggi: parziale
+  var rec=sess>0?Math.round(sess*(18+rnd()*30)):0;        // min di registrazione
+  var tt=rec>0?Math.round(rec*(95+rnd()*40)):0;           // parole trascritte
+  var ld=rec>0?+(0.55+rnd()*0.23).toFixed(2):0;           // diversità lessicale
+  var wpm=rec>0?Math.round(90+rnd()*50):0;                // parole al minuto
+  var site=rec>0?Math.round(rec*(1.6+rnd()*1.6)):Math.round(4+rnd()*12); // min sul sito
+  DAYS.push({d:dd+'/'+mm,sess:sess,rec:rec,tt:tt,ld:ld,wpm:wpm,site:site});
+}
+
+/* ═══ svg helpers ═══ */
+var W=760,H=240,PL=44,PR=18,PT=16,PB=30,IW=W-PL-PR,IH=H-PT-PB;
+function px(i,n){return PL+(IW*(i/(n-1)));}
+function py(v,lo,hi){return PT+IH-((v-lo)/(hi-lo))*IH;}
+function gridLines(max){var g='';for(var i=0;i<=4;i++){var v=Math.round(max*i/4),y=py(v,0,max);g+='<line x1="'+PL+'" y1="'+y+'" x2="'+(W-PR)+'" y2="'+y+'" stroke="rgba(148,163,184,.07)"/><text x="'+(PL-6)+'" y="'+(y+3)+'" text-anchor="end" fill="#6f8398" font-size="9" font-family="JetBrains Mono">'+v+'</text>';}return g;}
+function xLabelsRange(lo,hi){var n=hi-lo,g='';if(n===1){g+='<text x="'+(W/2)+'" y="'+(H-6)+'" text-anchor="middle" fill="#6f8398" font-size="9" font-family="JetBrains Mono">Ieri</text>';return g;}var idxs=[0,Math.floor((n-1)/2),n-1];idxs.forEach(function(i){g+='<text x="'+px(i,n)+'" y="'+(H-6)+'" text-anchor="middle" fill="#6f8398" font-size="9" font-family="JetBrains Mono">'+(i===n-1?'Oggi':DAYS[lo+i].d)+'</text>';});return g;}
+function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;');}
+
+/* ═══ formattazione ═══ */
+function fmtMin(m){if(m<=0)return '0m';if(m<60)return m+'m';var h=Math.floor(m/60),r=m%60;return r?h+'h '+r+'m':h+'h';}
+function fmtK(n){n=Math.round(n);if(n>=1000)return (n/1000).toFixed(1).replace('.0','')+'k';return ''+n;}
+
+/* ═══ stato ═══ */
+var dashState={metric:'activity',mode:'total',tl:'week'};
+
+/* ═══ aggregazione sul periodo ═══ */
+function rangeIdx(tl){var n=N;if(tl==='yesterday')return [n-2,n-1];if(tl==='week')return [n-7,n];if(tl==='month')return [n-30,n];return [0,n];}
+function agg(lo,hi){
+  var o={days:0,active:0,sess:0,rec:0,tt:0,site:0,ldS:0,ldN:0,wpmS:0,wpmN:0,uniq:0};
+  for(var i=lo;i<hi;i++){var d=DAYS[i];o.days++;
+    if(d.sess>0)o.active++;
+    o.sess+=d.sess;o.rec+=d.rec;o.tt+=d.tt;o.site+=d.site;
+    if(d.rec>0){o.ldS+=d.ld;o.ldN++;o.wpmS+=d.wpm;o.wpmN++;o.uniq+=d.tt*d.ld;}
+  }
+  return o;
+}
+
+/* ═══ box "vs" ═══ */
+function setBox(m,primary,secondary,secLabel,kind,a,b,ca,cb){
+  document.getElementById('mcA_'+m).textContent=primary;
+  document.getElementById('mcVs_'+m).textContent=secondary;
+  document.getElementById('mcVsL_'+m).textContent=secLabel;
+  var fill=document.getElementById('mcBar_'+m),segA=document.getElementById('mcSegA_'+m),segB=document.getElementById('mcSegB_'+m);
+  if(kind==='fill'){
+    fill.style.display='block';fill.style.background=ca;fill.style.width=Math.max(2,Math.min(100,a))+'%';
+    segA.style.display='none';segB.style.display='none';
+  }else{
+    fill.style.display='none';
+    segA.style.display='block';segA.style.background=ca;segA.style.width=Math.max(0,Math.min(100,a))+'%';
+    segB.style.display='block';segB.style.background=cb;segB.style.width=Math.max(0,Math.min(100,b))+'%';
+  }
+}
+
+/* ═══ grafico a barre per il periodo ═══ */
+function series(m,lo,hi){var a=[];for(var i=lo;i<hi;i++){var d=DAYS[i];a.push(m==='sessions'?d.sess:m==='activity'?d.site:m==='words'?(d.rec>0?Math.round(d.tt*d.ld):0):(d.rec>0?d.ld:0));}return a;}
+function chartSvg(m,lo,hi){
+  var vals=series(m,lo,hi),n=hi-lo;
+  var max=Math.max.apply(null,vals.concat([1]));
+  var color=m==='sessions'?'#22d3ee':m==='activity'?'#22d3ee':m==='words'?'#34d399':'#8b5cf6';
+  var bw=(IW-8)/n,gap=n>1?2:0,g='';
+  for(var i=0;i<n;i++){
+    var v=vals[i];if(v<=0)continue;
+    var x,h;
+    if(n===1){x=PL+IW*0.3;h=(v/max)*IH;}else{x=PL+4+i*bw;h=(v/max)*IH;}
+    var y=py(v,0,max),c=(i===n-1?'#fbbf24':color);
+    g+='<rect class="bar" x="'+x+'" y="'+y+'" width="'+(n===1?IW*0.4:bw-gap)+'" height="'+Math.max(2,h)+'" rx="'+(n>20?2:3)+'" fill="'+c+'" opacity=".92"><title>'+esc(DAYS[lo+i].d)+' — '+(m==='lexdiv'?v.toFixed(2):Math.round(v))+(m==='activity'?' min':(m==='sessions'?(v===1?' sessione':' sessioni'):' parole'))+'</title></rect>';
+  }
+  if(m==='lexdiv'){
+    var my=py(0.70,0,1);
+    g+='<line x1="'+PL+'" y1="'+my+'" x2="'+(W-PR)+'" y2="'+my+'" stroke="#f59e0b" stroke-dasharray="4 4" stroke-width="1.5"/>';
+    g+='<text x="'+(W-PR)+'" y="'+(my-6)+'" text-anchor="end" fill="#f59e0b" font-size="9" font-weight="800" font-family="Space Grotesk">media 0.70</text>';
+  }
+  g+=gridLines(m==='lexdiv'?1:Math.ceil(max))+xLabelsRange(lo,hi);
+  return '<svg viewBox="0 0 '+W+' '+H+'">'+g+'</svg>';
+}
+
+/* ═══ meta per metrica ═══ */
+var META={
+  sessions:{title:'Sessioni',sub:'Numero di sessioni di allenamento per giorno nel periodo.',label:function(a){return a?'Sessioni medie/giorno':'Sessioni totali';},big:function(o,a){return a?(o.sess/o.days).toFixed(1):''+o.sess;},legend:'sessione'},
+  activity:{title:'Attività',sub:'Minuti sul sito per giorno: presenza + registrazione (tempo parlato).',label:function(a){return a?'Media min sul sito/giorno':'Minuti sul sito';},big:function(o,a){return fmtMin(a?Math.round(o.site/o.days):o.site);},legend:'min sul sito'},
+  words:{title:'Parole uniche',sub:'Parole uniche per giorno (trascritte × diversità lessicale).',label:function(a){return a?'Media uniche/giorno':'Parole uniche';},big:function(o,a){return fmtK(a?o.uniq/o.days:o.uniq);},legend:'parole uniche'},
+  lexdiv:{title:'Diversità lessicale',sub:'Rapporto parole uniche/trascritte per giorno, con la media di riferimento a 0.70.',label:function(){return 'Diversità media';},big:function(o){return o.ldN?(o.ldS/o.ldN).toFixed(2):'—';},legend:'diversità lessicale'}
+};
+
+/* ═══ render ═══ */
+function renderDash(){
+  var t=dashState, rng=rangeIdx(t.tl), lo=rng[0], hi=rng[1], o=agg(lo,hi), a=t.mode==='avg', days=o.days;
+  var tot=o.site+o.rec||1, wtot=o.tt||1;
+  var avgLD=o.ldN?o.ldS/o.ldN:0, avgW=o.wpmN?Math.round(o.wpmS/o.wpmN):0;
+  // box 1 · sessioni
+  setBox('sessions', a?(o.sess/days).toFixed(1):''+o.sess, o.sess>0?Math.round(o.rec/o.sess):0, 'min/sessione','fill', days?o.active/days*100:0,0,'#22d3ee','#22d3ee');
+  // box 2 · attività (sul sito | registrazione)
+  setBox('activity', fmtMin(a?Math.round(o.site/days):o.site), fmtMin(a?Math.round(o.rec/days):o.rec), 'registrazione','seg', o.site/tot*100, o.rec/tot*100, '#22d3ee','#f59e0b');
+  // box 3 · parole uniche (uniche | resto)
+  setBox('words', fmtK(a?o.uniq/days:o.uniq), fmtK(a?o.tt/days:o.tt), 'trascritte','seg', o.uniq/wtot*100, Math.max(0,o.tt-o.uniq)/wtot*100, '#34d399','rgba(148,163,184,.5)');
+  // box 4 · diversità + wpm
+  setBox('lexdiv', avgLD?avgLD.toFixed(2):'—', avgW?avgW:0, 'parole/min','fill', avgLD*100,0,'#8b5cf6','#8b5cf6');
+  // grafico + totale
+  var meta=META[t.metric];
+  document.getElementById('ccTitle').textContent=meta.title;
+  document.getElementById('ccSub').textContent=meta.sub;
+  document.getElementById('ccTotal').textContent=meta.big(o,a);
+  document.getElementById('ccTotalLabel').textContent=meta.label(a);
+  document.getElementById('ccChart').innerHTML=chartSvg(t.metric,lo,hi);
+  document.getElementById('ccLegend').innerHTML='<span class="lg"><i style="background:'+(t.metric==='words'?'#34d399':t.metric==='lexdiv'?'#8b5cf6':'#22d3ee')+'"></i>'+meta.legend+'</span>'+(t.metric==='activity'?'<span class="lg"><i style="background:#f59e0b"></i>registrazione</span>':'')+(t.metric==='words'?'<span class="lg"><i style="background:rgba(148,163,184,.5)"></i>altre trascritte</span>':'');
+  document.querySelectorAll('.metric').forEach(function(el){el.classList.toggle('selected',el.getAttribute('data-m')===t.metric);});
+}
+function dashSetMode(btn){
+  dashState.mode=btn.getAttribute('data-mode');
+  btn.parentNode.querySelectorAll('.ds-btn').forEach(function(b){b.classList.toggle('active',b===btn);});
+  renderDash();
+}
+function dashSetTl(btn){
+  dashState.tl=btn.getAttribute('data-tl');
+  btn.parentNode.querySelectorAll('.ds-btn').forEach(function(b){b.classList.toggle('active',b===btn);});
+  renderDash();
+}
+document.getElementById('metrics').addEventListener('click',function(e){
+  var el=e.target.closest('.metric');if(!el)return;
+  var m=el.getAttribute('data-m');
+  el.classList.add('pressed');
+  setTimeout(function(){el.classList.remove('pressed');},280);
+  dashState.metric=m;
+  renderDash();
+});
+renderDash();
+</script>
+</body>
+</html>
