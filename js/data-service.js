@@ -81,7 +81,7 @@
 
     // Fetch all sessions for this user (no language filter — stats are global)
     var r = await sb().from('sessions')
-      .select('id,duration_seconds,words_count,started_at,language_pair,wpm,lexical_diversity,quality_score')
+      .select('id,name,duration_seconds,words_count,started_at,language_pair,wpm,lexical_diversity,quality_score')
       .eq('user_id', userId)
       .order('started_at', { ascending: false });
 
