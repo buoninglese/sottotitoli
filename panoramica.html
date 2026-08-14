@@ -5028,7 +5028,26 @@
         var favIt = [];
         try { favIt = JSON.parse(localStorage.getItem('sottotitoli-fav-banks-it') || '[]'); } catch(e) {}
         var favIds = favEn.concat(favIt);
-        
+
+        // Pinned/Smart SYSTEM collections resolve by id (they are not rows in
+        // user_wordbanks), so favouring ANY folder card shows up in this box.
+        var SYSTEM_BANK_META = {
+          review_due_now:     { name:'Ripasso immediato', sub:'Parole da ripassare ora o in ritardo' },
+          saved_from_sessions:{ name:'Saved From Sessions', sub:'Words you saved during live sessions' },
+          vocab_builder_en:  { name:'English Vocabulary Builder', sub:'Words saved from Vocabulary Builder search' },
+          fragile_words:     { name:'Fragile Words', sub:'Weak words at risk of being forgotten' },
+          goal_next_step:     { name:'Next Step For Your Goal', sub:'Goal-aligned vocabulary for your profile' },
+          build_from_known:  { name:'Build From What You Know', sub:'Higher-level replacements for words you know' },
+          activate_recognized:{ name:'Activate What You Recognize', sub:'Passive vocabulary — words seen but not claimed' },
+          upcoming_useful_vocab:{ name:'Goal-Based Upcoming Vocab', sub:'Words for your declared short-term goals' },
+          upcoming_session_driven:{ name:'Session-Detected Themes', sub:'Predicted needs from your recent session topics' },
+          upcoming_roadmap:  { name:'Your Learning Roadmap', sub:'Staged vocabulary for your goal journey' }
+        };
+        function systemCard(id, lang) {
+          var m = SYSTEM_BANK_META[id];
+          return m ? { b: { id: id, name: m.name, sub: m.sub, word_count: null }, lang: lang, system: true } : null;
+        }
+
         // Try loading real bank data
         var favBanks = [];
         var banksLoaded = false;
@@ -5044,23 +5063,32 @@
             banksLoaded = true;
           }
         } catch(e) {}
+        // System collections always resolve by id (even if getWordbanks fails).
+        favEn.forEach(function(id){ var c = systemCard(id, 'en'); if (c) favBanks.push(c); });
+        favIt.forEach(function(id){ var c = systemCard(id, 'it'); if (c) favBanks.push(c); });
+        // De-dupe: a system bank favourited in both languages yields one card.
+        var seen = {};
+        favBanks = favBanks.filter(function(f){ var k = f.system ? ('sys:'+f.b.id) : ('bank:'+f.b.id+':'+f.lang); if (seen[k]) return false; return (seen[k] = true); });
 
-        if (!banksLoaded && favIds.length > 0) {
-          // Offline: show favorites from localStorage only
-          pinnedGrid.innerHTML = '<div class="wb-pin-card" style="grid-column:1/-1;text-align:center;padding:24px;color:rgba(224,230,230,.4)"><span class="material-symbols-outlined" style="font-size:36px;margin-bottom:8px;display:block;opacity:.3">wifi_off</span><p style="font-size:13px;margin:0">Accedi per visualizzare le tue collezioni.</p></div>';
-        } else if (favBanks.length === 0) {
-          pinnedGrid.innerHTML = '<div class="wb-pin-card" style="grid-column:1/-1;text-align:center;padding:24px;color:rgba(224,230,230,.4)"><span class="material-symbols-outlined" style="font-size:36px;margin-bottom:8px;display:block;opacity:.3">star</span><p style="font-size:13px;margin:0">No favorites yet. Click the ★ icon on any word bank to add it here.</p></div>';
+        if (favBanks.length === 0) {
+          pinnedGrid.innerHTML = (favIds.length > 0 && !banksLoaded)
+            ? '<div class="wb-pin-card" style="grid-column:1/-1;text-align:center;padding:24px;color:rgba(224,230,230,.4)"><span class="material-symbols-outlined" style="font-size:36px;margin-bottom:8px;display:block;opacity:.3">wifi_off</span><p style="font-size:13px;margin:0">Accedi per visualizzare le tue collezioni.</p></div>'
+            : '<div class="wb-pin-card" style="grid-column:1/-1;text-align:center;padding:24px;color:rgba(224,230,230,.4)"><span class="material-symbols-outlined" style="font-size:36px;margin-bottom:8px;display:block;opacity:.3">star</span><p style="font-size:13px;margin:0">No favorites yet. Click the ★ icon on any word bank to add it here.</p></div>';
         } else {
           var pinColors = ['#5de6ff','#d97706','#059669','#ef4444','#8b5cf6','#0891b2'];
           pinnedGrid.innerHTML = favBanks.map(function(f,i){
             var b = f.b; var c = pinColors[i % pinColors.length];
-            var openFn = f.lang === 'it' ? 'wbOpenBankIt' : 'wbOpenBank';
+            var openFn = f.system ? 'wbFolderOpen' : (f.lang === 'it' ? 'wbOpenBankIt' : 'wbOpenBank');
             var favT = (window.I18n && window.I18n.t) ? window.I18n.t('wb_folders_unfav') : 'Remove from favorites';
+            var subHtml = (b.word_count != null)
+              ? '<div class="wb-pin-sub">'+(b.word_count||0)+' words</div>'
+              : (b.sub ? '<div class="wb-pin-sub">'+b.sub+'</div>' : '');
             return '<div class="wb-glass wb-pin-card" onclick="'+openFn+'(\''+b.id+'\')">'+
               '<button type="button" class="wb-pin-star on" data-bank="'+b.id+'" data-lang="'+f.lang+'" title="'+favT+'" onclick="event.stopPropagation();toggleWbFav(this)"><span class="material-symbols-outlined">star</span></button>'+
               '<div class="wb-pin-icon" style="background:'+c+'15;color:'+c+'"><span class="material-symbols-outlined">star</span></div>'+
               '<div class="wb-pin-name">'+(b.name||'Bank')+'</div>'+
-              '<div class="wb-pin-sub">'+(b.word_count||0)+' words</div></div>';
+              subHtml+
+            '</div>';
           }).join('');
         }
 
