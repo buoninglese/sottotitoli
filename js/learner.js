@@ -947,6 +947,15 @@
           var stored = JSON.parse(localStorage.getItem('sottotitoli_wb_it_pinned') || '{"words":[]}');
           out = (stored.words || []).map(function (wd) { return { word: wd, lang: 'it', pos: '', cefr: '', usage: 1 }; });
         } catch (e) {}
+      } else {
+        // Smart/AI suggestion banks — words are synced to review_bank_words
+        var bwRes = await sb.from('review_bank_words')
+          .select('word_id, review_words(*)')
+          .eq('user_id', uid).eq('bank_key', bankId).eq('status', 'active').limit(20);
+        out = (bwRes.data || []).map(function (r) {
+          var rw = r.review_words;
+          return rw ? { word: rw.lemma || rw.word, lang: lang, pos: rw.pos || '', cefr: rw.cefr || '', translation: rw.translation_primary || '', definition: rw.translation_primary || '', usage: rw.personal_frequency || 0 } : null;
+        }).filter(Boolean);
       }
     } catch (e) {}
     return out;

@@ -22,7 +22,7 @@
   <link rel="stylesheet" href="css/theme-wrapped.css?v=16">
   <link rel="stylesheet" href="css/review.css">
   <link rel="stylesheet" href="css/panoramica.css?v=6">
-  <link rel="stylesheet" href="css/learner.css?v=13">
+  <link rel="stylesheet" href="css/learner.css?v=14">
   <link rel="stylesheet" href="css/components.css?v=8">
   <link rel="stylesheet" href="css/tailwind.min.css">
   <script src="https://unpkg.com/compromise@14.14.2" crossorigin="anonymous"></script>
@@ -1517,7 +1517,7 @@
               #sub-wb-overview-panel .wb-cta h4 { font-size:15px;font-weight:700;color:var(--text);margin:0 0 4px;font-family:"Inter",sans-serif }
               #sub-wb-overview-panel .wb-cta p { font-size:13px;color:var(--text-soft);max-width:400px;line-height:1.4;margin:0 }
               #sub-wb-overview-panel .wb-btn {
-                background:var(--cyan);color:#fff;border:none;border-radius:99px;
+                background:var(--cyan);color:var(--chip-active-text,#fff);border:none;border-radius:99px;
                 padding:12px 24px;font-size:13px;font-weight:700;cursor:pointer;
                 white-space:nowrap;font-family:"Inter",sans-serif;
                 transition:filter .15s,transform .15s
@@ -1890,7 +1890,7 @@
                     } else {
                       statsHtml+='<p style="text-align:center;color:var(--text-faint);padding:16px;font-size:13px">No imports yet. Upload a file to get started.</p>';
                     }
-                    statsHtml+='<div style="border-top:1px solid var(--line);margin-top:16px;padding-top:16px"><button onclick="wbShowImport()" style="width:100%;padding:10px;background:var(--cyan);color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:11px;font-weight:700;font-family:\'Manrope\',sans-serif;display:flex;align-items:center;justify-content:center;gap:6px"><span class="material-symbols-outlined" style="font-size:18px">upload_file</span> Import File</button></div></div></div>';
+                    statsHtml+='<div style="border-top:1px solid var(--line);margin-top:16px;padding-top:16px"><button onclick="wbShowImport()" style="width:100%;padding:10px;background:var(--cyan);color:var(--chip-active-text,#fff);border:none;border-radius:8px;cursor:pointer;font-size:11px;font-weight:700;font-family:\'Manrope\',sans-serif;display:flex;align-items:center;justify-content:center;gap:6px"><span class="material-symbols-outlined" style="font-size:18px">upload_file</span> Import File</button></div></div></div>';
                     // Full library
                     statsHtml+='<div><h3 style="font-size:13px;font-weight:700;font-family:\'Manrope\',sans-serif;text-transform:uppercase;letter-spacing:.03em;color:var(--text-soft);margin:0 0 16px">Full Library</h3><div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px">';
                     banks.slice(0,8).forEach(function(b){
@@ -1942,7 +1942,29 @@
                   // Refresh overview if visible
                   if (typeof renderWbOverviewSections === 'function') setTimeout(renderWbOverviewSections, 200);
                 };
-                window.wbShowImport=function(){ document.getElementById('wbAiPopup').style.display='none'; document.getElementById('wbCreatePopup').style.display='none'; document.getElementById('wbImportPopup').style.display='flex'; };
+                window.wbShowImport=function(){
+                  document.getElementById('wbAiPopup').style.display='none';
+                  document.getElementById('wbCreatePopup').style.display='none';
+                  document.getElementById('wbImportPopup').style.display='flex';
+                  var itTab = document.querySelector('[data-subtab="wb-overview-it"][aria-selected="true"]');
+                  if (window.wbImpLang) window.wbImpLang(itTab ? 'it' : 'en');
+                };
+                // Import language toggle (🇬🇧 English / 🇮🇹 Italiano)
+                window.wbImpLang=function(l){
+                  window._wbImpLang = l;
+                  var en=document.getElementById('wbImpLangEn'), it=document.getElementById('wbImpLangIt');
+                  var act=function(btn,on){ if(!btn)return; btn.style.background = on ? 'var(--chip-active-bg, var(--cyan))' : 'transparent'; btn.style.color = on ? 'var(--chip-active-text, #fff)' : 'var(--text-soft)'; };
+                  act(en, l==='en'); act(it, l==='it');
+                };
+                // ALL toggles the POS filters; unchecking a POS clears ALL
+                window.wbImpAllToggle=function(allEl){
+                  ['wbImpNouns','wbImpVerbs','wbImpAdj'].forEach(function(id){ var el=document.getElementById(id); if(el) el.checked = allEl.checked; });
+                };
+                window.wbImpSync=function(){
+                  var all=document.getElementById('wbImpAll'); if(!all) return;
+                  var ids=['wbImpNouns','wbImpVerbs','wbImpAdj'];
+                  all.checked = ids.every(function(id){ var e=document.getElementById(id); return e && e.checked; });
+                };
                 window.wbCloseImport=function(){ document.getElementById('wbImportPopup').style.display='none'; };
                 window.wbShowCreate=function(){ document.getElementById('wbAiPopup').style.display='none'; document.getElementById('wbImportPopup').style.display='none'; document.getElementById('wbCreatePopup').style.display='flex'; };
                 window.wbCloseCreate=function(){ document.getElementById('wbCreatePopup').style.display='none'; };
@@ -1968,12 +1990,43 @@
                     else { alert('Creato: '+name); wbCloseCreate(); }
                   }
                 };
-                function processWords(text,name){
-                  var words=text.split(/[\\s,;:|!?.\\-\\[\\]\\(\\)\\{\\}"'<>\\n\\r\\t]+/).filter(function(w){return w.length>1&&!/^\\d+$/.test(w);});
-                  if(!words.length){alert('No words found in file.');return;}
-                  // Detect which language tab is active
-                  var itTab = document.querySelector('[data-subtab="wb-overview-it"][aria-selected="true"]');
-                  var lang = itTab ? 'it' : 'en';
+                async function processWords(text,name){
+                  var raw=text.split(/[\\s,;:|!?.\\-\\[\\]\\(\\)\\{\\}"'<>\\n\\r\\t]+/).filter(function(w){return w.length>1&&!/^\\d+$/.test(w);});
+                  if(!raw.length){alert('No words found in file.');return;}
+                  var lang = window._wbImpLang || (document.querySelector('[data-subtab="wb-overview-it"][aria-selected="true"]') ? 'it' : 'en');
+                  // ── Apply import filters (ALL / POS / CEFR) ──
+                  var allOn = !document.getElementById('wbImpAll') || document.getElementById('wbImpAll').checked;
+                  var wantN = !document.getElementById('wbImpNouns') || document.getElementById('wbImpNouns').checked;
+                  var wantV = !document.getElementById('wbImpVerbs') || document.getElementById('wbImpVerbs').checked;
+                  var wantAdj = !document.getElementById('wbImpAdj') || document.getElementById('wbImpAdj').checked;
+                  var wantB2 = document.getElementById('wbImpB2') ? document.getElementById('wbImpB2').checked : false;
+                  var wantC1 = document.getElementById('wbImpC1') ? document.getElementById('wbImpC1').checked : false;
+                  var wantC2 = document.getElementById('wbImpC2') ? document.getElementById('wbImpC2').checked : false;
+                  var words = raw.filter(function(wd){
+                    if (allOn) return true;
+                    var lw = wd.toLowerCase();
+                    var pos = (window.LEMMA_POS_MAP||{})[lw] || '';
+                    var cefr = (window.CEFR_LEVELS||{})[lw] || '';
+                    var posOk = (wantN && pos==='n') || (wantV && pos==='v') || (wantAdj && pos==='adj');
+                    if (!posOk) return false;
+                    if (wantB2 && cefr !== 'B2') return false;
+                    if (wantC1 && cefr !== 'C1') return false;
+                    if (wantC2 && cefr !== 'C2') return false;
+                    return true;
+                  });
+                  // ── Skip words the user already has in a word bank ──
+                  if (document.getElementById('wbImpSkip') && document.getElementById('wbImpSkip').checked) {
+                    try {
+                      var sBanks = (await SottotitoliData.getWordbanks(lang)) || [];
+                      var existing = {};
+                      for (var sbi=0; sbi<sBanks.length; sbi++) {
+                        var sWs = (await SottotitoliData.getWordbankWords(sBanks[sbi].id)) || [];
+                        sWs.forEach(function(w){ existing[String(w.word||'').toLowerCase()] = true; });
+                      }
+                      words = words.filter(function(w){ return !existing[String(w).toLowerCase()]; });
+                    } catch(e) {}
+                  }
+                  if (!words.length) { alert('Nessuna parola corrisponde ai filtri selezionati.'); return; }
                   var storageKey = lang === 'it' ? 'sottotitoli-recent-imports-it' : 'sottotitoli-recent-imports';
                   var recent=[];
                   try{recent=JSON.parse(localStorage.getItem(storageKey)||'[]');}catch(e){}
@@ -2137,7 +2190,7 @@
                     } else {
                       statsHtml+='<p style="text-align:center;color:var(--text-faint);padding:16px;font-size:13px">Nessuna importazione. Carica un file per iniziare.</p>';
                     }
-                    statsHtml+='<div style="border-top:1px solid var(--line);margin-top:16px;padding-top:16px"><button onclick="wbShowImport()" style="width:100%;padding:10px;background:var(--accent-green);color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:11px;font-weight:700;font-family:\'Manrope\',sans-serif;display:flex;align-items:center;justify-content:center;gap:6px"><span class="material-symbols-outlined" style="font-size:18px">upload_file</span> Importa File</button></div></div></div>';
+                    statsHtml+='<div style="border-top:1px solid var(--line);margin-top:16px;padding-top:16px"><button onclick="wbShowImport()" style="width:100%;padding:10px;background:var(--accent-green);color:var(--chip-active-text,#fff);border:none;border-radius:8px;cursor:pointer;font-size:11px;font-weight:700;font-family:\'Manrope\',sans-serif;display:flex;align-items:center;justify-content:center;gap:6px"><span class="material-symbols-outlined" style="font-size:18px">upload_file</span> Importa File</button></div></div></div>';
 
                     // Full library
                     statsHtml+='<div><h3 style="font-size:13px;font-weight:700;font-family:\'Manrope\',sans-serif;text-transform:uppercase;letter-spacing:.03em;color:var(--text-soft);margin:0 0 16px">Libreria Completa</h3><div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px">';
@@ -2224,6 +2277,11 @@
           <div style="background:var(--panel);border:1px solid var(--line-strong);border-radius:22px;padding:32px;max-width:500px;width:90%;box-shadow:0 16px 48px rgba(0,0,0,.25)" onclick="event.stopPropagation()">
             <h3 style="font-size:18px;font-weight:700;margin:0 0 8px;color:var(--text)">Import Vocabulary Bank</h3>
             <p style="font-size:13px;color:var(--text-soft);margin:0 0 16px">Upload a file — words will be extracted automatically.</p>
+            <label style="font-size:11px;font-weight:700;font-family:'Manrope',sans-serif;text-transform:uppercase;color:var(--text-soft);display:block;margin-bottom:6px">Language</label>
+            <div style="display:inline-flex;gap:4px;background:var(--panel-2);border:1px solid var(--line);border-radius:100px;padding:4px;margin-bottom:14px">
+              <button type="button" id="wbImpLangEn" onclick="wbImpLang('en')" style="border:none;background:transparent;color:var(--text-soft);font-family:'Manrope',sans-serif;font-size:13px;font-weight:700;padding:6px 14px;border-radius:100px;cursor:pointer;transition:all .15s">🇬🇧 English</button>
+              <button type="button" id="wbImpLangIt" onclick="wbImpLang('it')" style="border:none;background:transparent;color:var(--text-soft);font-family:'Manrope',sans-serif;font-size:13px;font-weight:700;padding:6px 14px;border-radius:100px;cursor:pointer;transition:all .15s">🇮🇹 Italiano</button>
+            </div>
             <label style="font-size:11px;font-weight:700;font-family:'Manrope',sans-serif;text-transform:uppercase;color:var(--text-soft);display:block;margin-bottom:4px">Bank Name</label>
             <input id="wbImportName" placeholder="e.g. Medical Terms" style="width:100%;padding:8px 12px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--text);font-size:15px;font-family:inherit;margin-bottom:12px;box-sizing:border-box">
             <label style="font-size:11px;font-weight:700;font-family:'Manrope',sans-serif;text-transform:uppercase;color:var(--text-soft);display:block;margin-bottom:4px">Tag (optional)</label>
@@ -2234,16 +2292,19 @@
               <p id="wbImportFileName" style="font-size:11px;color:var(--text-soft);margin-top:4px">No file selected</p>
               <input type="file" id="wbImportFile" accept=".txt,.csv,.doc,.docx,.pdf" style="display:none" onchange="document.getElementById('wbImportFileName').textContent=this.files[0]?this.files[0].name:'No file selected'">
             </div>
-            <div style="margin-bottom:20px" id="wbImportFilters">
+            <div style="margin-bottom:16px" id="wbImportFilters">
               <p style="font-size:11px;font-weight:700;font-family:'Manrope',sans-serif;color:var(--text-soft);text-transform:uppercase;margin:0 0 8px">Filter words to import</p>
-              <div style="display:flex;flex-wrap:wrap;gap:8px">
-                <label style="font-size:13px;display:flex;align-items:center;gap:4px;cursor:pointer"><input type="checkbox" checked onchange="this.style.opacity=this.checked?'1':'.4'"> Nouns</label>
-                <label style="font-size:13px;display:flex;align-items:center;gap:4px;cursor:pointer"><input type="checkbox" checked onchange="this.style.opacity=this.checked?'1':'.4'"> Verbs</label>
-                <label style="font-size:13px;display:flex;align-items:center;gap:4px;cursor:pointer"><input type="checkbox" checked onchange="this.style.opacity=this.checked?'1':'.4'"> Adjectives</label>
-                <label style="font-size:13px;display:flex;align-items:center;gap:4px;cursor:pointer"><input type="checkbox"> B2 only</label>
-                <label style="font-size:13px;display:flex;align-items:center;gap:4px;cursor:pointer"><input type="checkbox"> C1 only</label>
-                <label style="font-size:13px;display:flex;align-items:center;gap:4px;cursor:pointer"><input type="checkbox"> C2 only</label>
+              <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px">
+                <label style="font-size:13px;display:flex;align-items:center;gap:4px;cursor:pointer;font-weight:700;color:var(--text)"><input type="checkbox" id="wbImpAll" checked onchange="wbImpAllToggle(this)"> ALL</label>
+                <span style="width:1px;height:18px;background:var(--line);margin:0 2px"></span>
+                <label style="font-size:13px;display:flex;align-items:center;gap:4px;cursor:pointer;color:var(--text-soft)"><input type="checkbox" id="wbImpNouns" checked onchange="wbImpSync()"> Nouns</label>
+                <label style="font-size:13px;display:flex;align-items:center;gap:4px;cursor:pointer;color:var(--text-soft)"><input type="checkbox" id="wbImpVerbs" checked onchange="wbImpSync()"> Verbs</label>
+                <label style="font-size:13px;display:flex;align-items:center;gap:4px;cursor:pointer;color:var(--text-soft)"><input type="checkbox" id="wbImpAdj" checked onchange="wbImpSync()"> Adjectives</label>
+                <label style="font-size:13px;display:flex;align-items:center;gap:4px;cursor:pointer;color:var(--text-soft)"><input type="checkbox" id="wbImpB2" onchange="wbImpSync()"> B2 only</label>
+                <label style="font-size:13px;display:flex;align-items:center;gap:4px;cursor:pointer;color:var(--text-soft)"><input type="checkbox" id="wbImpC1" onchange="wbImpSync()"> C1 only</label>
+                <label style="font-size:13px;display:flex;align-items:center;gap:4px;cursor:pointer;color:var(--text-soft)"><input type="checkbox" id="wbImpC2" onchange="wbImpSync()"> C2 only</label>
               </div>
+              <label style="font-size:13px;display:flex;align-items:center;gap:6px;cursor:pointer;color:var(--text);background:var(--panel-2);border:1px solid var(--line);border-radius:10px;padding:10px 12px"><input type="checkbox" id="wbImpSkip"> Skip words you already have in a word bank</label>
             </div>
             <div style="display:flex;gap:8px;justify-content:flex-end">
               <button onclick="wbCloseImport()" style="padding:10px 20px;border:1px solid var(--line);border-radius:8px;background:transparent;cursor:pointer;font-size:13px;font-weight:600;font-family:'Manrope',sans-serif;color:var(--text-soft)">Cancel</button>
@@ -2303,6 +2364,18 @@
                   <span style="font-size:15px">✦</span> <span data-i18n="wb_ai_gen">Generate with AI</span>
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+        <!-- Generic styled confirm (replaces the native confirm()) -->
+        <div id="appConfirmOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);backdrop-filter:blur(4px);z-index:11000;align-items:center;justify-content:center" onclick="appConfirmClose()">
+          <div style="background:var(--panel);border:1px solid var(--line-strong);border-radius:22px;padding:28px 32px;max-width:420px;width:90%;box-shadow:0 16px 48px rgba(0,0,0,.25);text-align:center;animation:wbfPop .18s cubic-bezier(.34,1.56,.64,1)" onclick="event.stopPropagation()">
+            <div style="font-size:34px;margin-bottom:10px" id="appConfirmIcon">🗑️</div>
+            <h3 id="appConfirmTitle" style="font-size:18px;font-weight:700;margin:0 0 8px;color:var(--text);font-family:'Manrope',sans-serif">Conferma</h3>
+            <p id="appConfirmMsg" style="font-size:14px;color:var(--text-soft);margin:0 0 22px;line-height:1.55"></p>
+            <div style="display:flex;gap:8px;justify-content:center">
+              <button onclick="appConfirmClose()" style="padding:10px 20px;border:1px solid var(--line);border-radius:12px;background:transparent;cursor:pointer;font-size:13px;font-weight:600;font-family:'Manrope',sans-serif;color:var(--text-soft)">Cancel</button>
+              <button id="appConfirmYes" onclick="appConfirmYes()" style="padding:10px 24px;border:none;border-radius:12px;cursor:pointer;font-size:13px;font-weight:700;font-family:'Manrope',sans-serif;background:#ef4444;color:#fff">Delete</button>
             </div>
           </div>
         </div>
@@ -4447,7 +4520,7 @@
   <script src="js/buy-card.js?v=5"></script>
   <script src="js/notifications.js"></script>
   <script src="js/learner-data.js?v=1"></script>
-  <script src="js/learner.js?v=10"></script>
+  <script src="js/learner.js?v=11"></script>
 
   <!-- Page-specific: Supabase data fetching -->
   <script>
@@ -6906,7 +6979,7 @@
         }
 
         var menuItems = '<button data-act="open" data-bank="'+wbEsc(bk.id)+'"><i class="fa-solid fa-arrow-right"></i>'+L.open+'</button>'+
-          (type !== 'smart' ? '<button data-act="allena" data-bank="'+wbEsc(bk.id)+'"><i class="fa-solid fa-bolt"></i>'+L.allena+'</button>' : '');
+          '<button data-act="allena" data-bank="'+wbEsc(bk.id)+'"><i class="fa-solid fa-bolt"></i>'+L.allena+'</button>';
         if (type === 'custom') {
           menuItems +=
             '<button data-act="rename" data-bank="'+wbEsc(bk.id)+'" data-name="'+wbEsc(bk.title)+'"><i class="fa-solid fa-pen"></i>'+L.rename+'</button>'+
@@ -6924,9 +6997,9 @@
               '<div class="wbf-front-foot">'+
                 '<span class="wbf-count"><b>'+bk.count+'</b> '+L.words+'</span>'+
                 '<span class="wbf-front-actions">'+
-                  (type !== 'smart' ? '<button class="wbf-allena" data-bank="'+wbEsc(bk.id)+'" data-act="allena" title="'+L.allena+'"><i class="fa-solid fa-bolt"></i> '+L.allena+'</button>' : '')+
+                  '<button class="wbf-allena" data-bank="'+wbEsc(bk.id)+'" data-act="allena" title="'+L.allena+'"><i class="fa-solid fa-bolt"></i> '+L.allena+'</button>'+
                   '<button class="wbf-menu" data-menu="'+wbEsc(bk.id)+'" title="Options"><i class="fa-solid fa-ellipsis-vertical"></i></button>'+
-                '</span>'+
+                '</span>'
               '</div>'+
             '</div>'+
           '</div>'+
@@ -7538,7 +7611,7 @@
                   '<p style="font-size:11px;font-weight:700;color:var(--text-soft);opacity:.6;text-transform:uppercase;letter-spacing:.15em;font-family:\'Inter\',sans-serif;margin:0">'+(subtitle||'')+'</p>'+
                 '</div>'+
                 '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">'+
-                  (type !== 'smart' ? '<button class="hv-lift" onclick="event.stopPropagation();if(window.Learner&&window.Learner.openBankTest)Learner.openBankTest(\''+bankId+'\')" style="display:inline-flex;align-items:center;gap:8px;padding:10px 22px;border-radius:100px;background:rgba(6,182,212,.12);color:var(--cyan);border:1px solid rgba(6,182,212,.35);font-size:11px;font-weight:700;font-family:\'Manrope\',sans-serif;text-transform:uppercase;letter-spacing:.06em;cursor:pointer;transition:all .2s;white-space:nowrap"><span class="material-symbols-outlined" style="font-size:18px">bolt</span> Allena</button>' : '')+
+                  '<button class="hv-lift" onclick="event.stopPropagation();if(window.Learner&&window.Learner.openBankTest)Learner.openBankTest(\''+bankId+'\')" style="display:inline-flex;align-items:center;gap:8px;padding:10px 22px;border-radius:100px;background:rgba(6,182,212,.12);color:var(--cyan);border:1px solid rgba(6,182,212,.35);font-size:11px;font-weight:700;font-family:\'Manrope\',sans-serif;text-transform:uppercase;letter-spacing:.06em;cursor:pointer;transition:all .2s;white-space:nowrap"><span class="material-symbols-outlined" style="font-size:18px">bolt</span> Allena</button>'+
                   '<button class="hv-bg-cyan" onclick="document.getElementById(\'wbAddWordInput\').focus()" style="display:inline-flex;align-items:center;gap:8px;padding:10px 22px;border-radius:100px;background:rgba(6,182,212,.1);color:var(--cyan);border:1px solid rgba(6,182,212,.3);font-size:11px;font-weight:700;font-family:\'Manrope\',sans-serif;text-transform:uppercase;letter-spacing:.06em;cursor:pointer;transition:all .2s;white-space:nowrap"><span class="material-symbols-outlined" style="font-size:18px">add</span> Aggiungi parola</button>'+
                 '</div>'+
               '</div>'+
@@ -10703,9 +10776,29 @@
         } catch(e) { alert('Errore: ' + e.message); }
       };
 
-      // ── Delete bank ──
-      window.wbDeleteBank = async function(bankId, name) {
-        if (!confirm('Eliminare la banca "' + name + '" e tutte le sue parole?')) return;
+      // ── Generic styled confirm (replaces the native confirm()) ──
+      window._appConfirmCb = null;
+      window.appConfirm = function(msg, onYes, title, icon) {
+        window._appConfirmCb = onYes;
+        var t = document.getElementById('appConfirmTitle'); if (t) t.textContent = title || 'Conferma';
+        var m = document.getElementById('appConfirmMsg'); if (m) m.textContent = msg;
+        var i = document.getElementById('appConfirmIcon'); if (i) i.textContent = icon || '🗑️';
+        var o = document.getElementById('appConfirmOverlay'); if (o) o.style.display = 'flex';
+      };
+      window.appConfirmClose = function() {
+        var o = document.getElementById('appConfirmOverlay'); if (o) o.style.display = 'none'; window._appConfirmCb = null;
+      };
+      window.appConfirmYes = function() {
+        var cb = window._appConfirmCb;
+        var o = document.getElementById('appConfirmOverlay'); if (o) o.style.display = 'none'; window._appConfirmCb = null;
+        if (cb) cb();
+      };
+
+      // ── Delete bank (styled confirm + animated card removal) ──
+      window.wbDeleteBank = function(bankId, name) {
+        appConfirm('Eliminare la banca "' + name + '" e tutte le sue parole? Questa azione non può essere annullata.', function(){ doWbDeleteBank(bankId); }, 'Elimina banca', '🗑️');
+      };
+      async function doWbDeleteBank(bankId) {
         try {
           var sb = window.sottotitoliSupabase;
           if (!sb) return;
@@ -10724,7 +10817,7 @@
             setTimeout(function(){ if (card.parentNode) card.parentNode.removeChild(card); }, 400);
           });
         } catch(e) { alert('Errore: ' + e.message); }
-      };
+      }
 
       // ── Close dropdowns when clicking elsewhere ──
       document.addEventListener('click', function(e) {
