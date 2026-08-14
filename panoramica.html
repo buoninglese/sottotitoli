@@ -136,7 +136,7 @@
     <header class="topbar">
       <button class="topbar-menu" id="topbarMenu" onclick="toggleSidebarDrawer()" aria-label="Menu" title="Menu"><span class="material-symbols-outlined">menu</span></button>
       <div style="display:flex;align-items:center;gap:0">
-        <a href="index.html" class="topbar-brand" style="font-size:36px;font-family:'Manrope',sans-serif;font-weight:700;text-decoration:none;letter-spacing:-0.02em;display:inline-flex;align-items:baseline;gap:0"><span class="topbar-brand-name">sottotitoli</span><span class="topbar-brand-pro" style="font-family:'Manrope',sans-serif;font-weight:800;letter-spacing:-.5px">.pro</span><span class="topbar-version" style="font-size:11px;font-weight:600;font-family:'Manrope',sans-serif;color:var(--text-soft);margin-left:6px;opacity:.55;letter-spacing:.02em">v229</span></a>
+        <a href="index.html" class="topbar-brand" style="font-size:36px;font-family:'Manrope',sans-serif;font-weight:700;text-decoration:none;letter-spacing:-0.02em;display:inline-flex;align-items:baseline;gap:0"><span class="topbar-brand-name">sottotitoli</span><span class="topbar-brand-pro" style="font-family:'Manrope',sans-serif;font-weight:800;letter-spacing:-.5px">.pro</span><span class="topbar-version" style="font-size:11px;font-weight:600;font-family:'Manrope',sans-serif;color:var(--text-soft);margin-left:6px;opacity:.55;letter-spacing:.02em">v230</span></a>
       </div>
       <div style="display:flex;align-items:center;gap:12px">
         <button class="btn-start-session hv-start" id="btnStartSession" onclick="toggleStartSession()" style="font-size:15px;height:42px;padding:0 20px;border-radius:12px;background:linear-gradient(135deg,rgba(192,132,252,.18),rgba(192,132,252,.06));color:#c084fc;border:1px solid rgba(192,132,252,.25);font-weight:700;font-family:'Manrope',sans-serif;display:inline-flex;align-items:center;gap:8px;box-shadow:0 0 20px rgba(192,132,252,.12),0 2px 8px rgba(0,0,0,.2);cursor:pointer;letter-spacing:-.01em;transition:all .2s ease">
@@ -598,7 +598,7 @@
             <div class="wsc-grid">
               <!-- 1 · Attività recente — feed delle ultime sessioni -->
               <div class="wsc-box wsc-glass wsc-activity">
-                <div class="wsc-box-head"><h3 class="wsc-box-title">Ultime sessioni</h3><span class="wsc-box-hint">Le tue 4 attività più recenti</span></div>
+                <div class="wsc-box-head"><h3 class="wsc-box-title">Ultime sessioni</h3></div>
                 <div class="wsc-feed" id="wscActivityFeed"><div class="wsc-feed-empty">Nessuna sessione ancora. Avvia la prima.</div></div>
               </div>
 
@@ -6023,7 +6023,7 @@
         // ═══ Box 1 · Attività recente — feed delle ultime 4 sessioni ═══
         var feedEl = document.getElementById('wscActivityFeed');
         if (feedEl) {
-          var recent = (allSess || []).slice().sort(function(a,b){ return new Date(b.started_at) - new Date(a.started_at); }).slice(0,4);
+          var recent = (allSess || []).slice().sort(function(a,b){ return new Date(b.started_at) - new Date(a.started_at); }).slice(0,5);
           if (!recent.length) {
             feedEl.innerHTML = '<div class="wsc-feed-empty">Nessuna sessione ancora. Avvia la prima.</div>';
           } else {
@@ -6031,14 +6031,17 @@
               var wc = x.words_count || 0;
               var lex = x.lexical_diversity || 0;
               var uniq = lex > 0 ? Math.round(lex * wc) : '—';
+              var minutes = Math.max(1, Math.round((x.duration_seconds || 0) / 60));
               var date = x.started_at ? new Date(x.started_at).toLocaleDateString('it-IT',{day:'2-digit',month:'short'}) : '—';
               var lang = (x.language_pair || 'en').toUpperCase();
-              var name = x.name || 'Sessione';
+              var name = (x.name && String(x.name).trim()) ? String(x.name).trim() : 'Sessione del ' + date;
               var lexTxt = lex > 0 ? lex.toFixed(2) : '—';
-              return '<div class="wsc-feed-item">'+
+              var openFn = "var n=document.querySelector('[data-panel=trascrizioni]');if(n)n.click();setTimeout(function(){if(window.trOpenEditor)trOpenEditor('"+x.id+"')},350)";
+              return '<div class="wsc-feed-item" onclick="'+openFn+'">'+
                 '<div style="min-width:0"><div class="wsc-feed-name" title="'+escHtml(name)+'">'+escHtml(name)+'</div>'+
                 '<div class="wsc-feed-date">'+date+' · '+lang+'</div></div>'+
                 '<div class="wsc-feed-stats">'+
+                  '<div class="wsc-feed-stat"><b>'+minutes+'</b><span>min</span></div>'+
                   '<div class="wsc-feed-stat"><b>'+wc+'</b><span>parole</span></div>'+
                   '<div class="wsc-feed-stat"><b>'+uniq+'</b><span>uniche</span></div>'+
                   '<div class="wsc-feed-stat"><b>'+lexTxt+'</b><span>div. lessicale</span></div>'+
