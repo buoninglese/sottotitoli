@@ -138,7 +138,7 @@
     <header class="topbar">
       <button class="topbar-menu" id="topbarMenu" onclick="toggleSidebarDrawer()" aria-label="Menu" title="Menu"><span class="material-symbols-outlined">menu</span></button>
       <div style="display:flex;align-items:center;gap:0">
-        <a href="index.html" class="topbar-brand" style="font-size:36px;font-family:'Manrope',sans-serif;font-weight:700;text-decoration:none;letter-spacing:-0.02em;display:inline-flex;align-items:baseline;gap:0"><span class="topbar-brand-name">sottotitoli</span><span class="topbar-brand-pro" style="font-family:'Manrope',sans-serif;font-weight:800;letter-spacing:-.5px">.pro</span><span class="topbar-version" style="font-size:11px;font-weight:600;font-family:'Manrope',sans-serif;color:var(--text-soft);margin-left:6px;opacity:.55;letter-spacing:.02em">v249</span></a>
+        <a href="index.html" class="topbar-brand" style="font-size:36px;font-family:'Manrope',sans-serif;font-weight:700;text-decoration:none;letter-spacing:-0.02em;display:inline-flex;align-items:baseline;gap:0"><span class="topbar-brand-name">sottotitoli</span><span class="topbar-brand-pro" style="font-family:'Manrope',sans-serif;font-weight:800;letter-spacing:-.5px">.pro</span><span class="topbar-version" style="font-size:11px;font-weight:600;font-family:'Manrope',sans-serif;color:var(--text-soft);margin-left:6px;opacity:.55;letter-spacing:.02em">v250</span></a>
       </div>
       <div style="display:flex;align-items:center;gap:12px">
         <button class="btn-start-session hv-start" id="btnStartSession" onclick="toggleStartSession()" style="font-size:15px;height:42px;padding:0 20px;border-radius:12px;background:linear-gradient(135deg,rgba(192,132,252,.18),rgba(192,132,252,.06));color:#c084fc;border:1px solid rgba(192,132,252,.25);font-weight:700;font-family:'Manrope',sans-serif;display:inline-flex;align-items:center;gap:8px;box-shadow:0 0 20px rgba(192,132,252,.12),0 2px 8px rgba(0,0,0,.2);cursor:pointer;letter-spacing:-.01em;transition:all .2s ease">
@@ -4677,7 +4677,7 @@
   <script src="js/buy-card.js?v=5"></script>
   <script src="js/notifications.js"></script>
   <script src="js/learner-data.js?v=1"></script>
-  <script src="js/learner.js?v=19"></script>
+  <script src="js/learner.js?v=20"></script>
 
   <!-- Page-specific: Supabase data fetching -->
   <script>
@@ -6074,84 +6074,6 @@
         } catch (e) { return []; }
       }
 
-      // ── Shared renderers: Peak productivity + Missions boxes ──
-      // Hosted in the Learner Overview tab; also callable from the dashboard.
-      function renderLearnerPeak() {
-        var peakEl = document.getElementById('wscPeak');
-        var peakSub = document.getElementById('wscPeakSub');
-        var heatEl = document.getElementById('wscHeat');
-        var extraEl = document.getElementById('wscExtra');
-        if (!peakEl && !peakSub && !heatEl && !extraEl) return;
-        var s = currentStats() || {};
-        var allSess = (s && s._allSessions) || [];
-        var act = siteActivityEntries();
-        var hasAct = act.length > 0;
-        if (hasAct) {
-          // Peak day + peak hour from presence data
-          var dCount = {}, hCount = {};
-          act.forEach(function(e){
-            var t = new Date(e.t);
-            dCount[t.getDay()] = (dCount[t.getDay()] || 0) + 1;
-            var hh = (e.h != null) ? e.h : t.getHours();
-            hCount[hh] = (hCount[hh] || 0) + 1;
-          });
-          var bestD = 0, bestDC = 0;
-          for (var dd in dCount) { if (dCount[dd] > bestDC) { bestDC = dCount[dd]; bestD = +dd; } }
-          var bestPH = 0, bestPHC = 0;
-          for (var hh in hCount) { if (hCount[hh] > bestPHC) { bestPHC = hCount[hh]; bestPH = +hh; } }
-          var daysIt = ['Domenica','Lunedì','Martedì','Mercoledì','Giovedì','Venerdì','Sabato'];
-          if (peakEl) peakEl.textContent = daysIt[bestD] + ', ' + String(bestPH).padStart(2,'0') + ':00';
-          if (peakSub) peakSub.textContent = bestPH >= 20 || bestPH < 5 ? 'Nottambulo.' : 'Mattiniero.';
-          // 28-day heatmap: big pink cells for days with minutes on site, hover = date + minutes
-          if (heatEl) {
-            var minMap = {};
-            try { minMap = JSON.parse(localStorage.getItem('sottotitoli-site-minutes') || '{}'); } catch(e) { minMap = {}; }
-            function dayKey(dd){ return dd.getFullYear()+'-'+String(dd.getMonth()+1).padStart(2,'0')+'-'+String(dd.getDate()).padStart(2,'0'); }
-            var today = new Date(); today.setHours(0,0,0,0);
-            var offset = (today.getDay() + 6) % 7;
-            var start = new Date(today); start.setDate(today.getDate() - offset - 27);
-            var cells = '';
-            for (var i = 0; i < 28; i++) {
-              var dd = new Date(start); dd.setDate(start.getDate() + i);
-              var m = minMap[dayKey(dd)] || 0;
-              var on = m > 0 ? ' on' : '';
-              var tip = dd.toLocaleDateString('it-IT') + (m > 0 ? ' — ' + m + ' min' : '');
-              cells += '<div class="wsc-heat-cell'+on+'" title="'+tip+'" style="animation-delay:'+(i*15)+'ms"></div>';
-            }
-            heatEl.innerHTML = cells;
-          }
-          // Extra chips: still session-based (best streak + longest session)
-          if (extraEl) {
-            var chips = '';
-            if (allSess.length) {
-              var bestStreak = 0, curStreak = 0, prevDay = null;
-              var daySet = {};
-              allSess.forEach(function(x){ var d = new Date(x.started_at); d.setHours(0,0,0,0); daySet[d.toDateString()] = true; });
-              var dayKeys = Object.keys(daySet).sort();
-              dayKeys.forEach(function(k, i){
-                var cur = new Date(k);
-                if (prevDay) {
-                  var diff = Math.round((cur.getTime() - prevDay.getTime()) / 86400000);
-                  curStreak = diff === 1 ? curStreak + 1 : 1;
-                } else { curStreak = 1; }
-                if (curStreak > bestStreak) bestStreak = curStreak;
-                prevDay = cur;
-              });
-              var longestMin = Math.round(Math.max.apply(null, allSess.map(function(x){ return x.duration_seconds || 0; })) / 60);
-              if (bestStreak >= 2) chips += '<span class="x">Miglior serie: ' + bestStreak + ' gg</span>';
-              if (longestMin > 0) chips += '<span class="x">Sessione più lunga: ' + longestMin + ' min</span>';
-            }
-            extraEl.innerHTML = chips;
-          }
-        } else {
-          if (peakEl) peakEl.textContent = '—';
-          if (peakSub) peakSub.textContent = 'Apri l\'app per iniziare a tracciare i tuoi orari di attività.';
-          if (heatEl) { var cells=''; for (var i=0;i<28;i++) cells += '<div class="wsc-heat-cell"></div>'; heatEl.innerHTML = cells; }
-          if (extraEl) extraEl.innerHTML = '';
-        }
-      }
-      window.renderLearnerPeak = renderLearnerPeak;
-
       function renderLearnerMissions() {
         var misEl = document.getElementById('wscMissions');
         if (!misEl) return;
@@ -6238,9 +6160,8 @@
           }
         }
 
-        // ═══ Box 6 + Box 4 · Peak productivity + Mission progress ═══
-        // Now hosted in the Learner Overview tab — shared renderers below.
-        renderLearnerPeak();
+        // ═══ Box 4 · Mission progress ═══
+        // Now hosted in the Learner Overview tab — shared renderer below.
         renderLearnerMissions();
       }
       window.renderWrappedShowcase = renderWrappedShowcase;
