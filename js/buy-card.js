@@ -321,6 +321,9 @@
   function bindTriggers() {
     var els = document.querySelectorAll('[data-buy-trigger]');
     for (var i = 0; i < els.length; i++) {
+      // On desktop the .trial-card is not a trigger — only its inner button is.
+      // On mobile (<=760px) the card collapses into a single "Buy minutes" button.
+      if (els[i].classList.contains('trial-card') && window.innerWidth > 760) continue;
       els[i].addEventListener('click', function (e) {
         e.preventDefault();
         var ud = document.getElementById('userDropdown');
