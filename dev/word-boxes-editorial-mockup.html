@@ -260,42 +260,49 @@
     function rgba(col, a){ var c = String(col).charAt(0)==='#' ? hex2rgb(col) : String(col).match(/\d+/g); return 'rgba('+c[0]+','+c[1]+','+c[2]+','+a+')'; }
     function lum(col){ var m=String(col).match(/\d+/g); return 0.299*(+m[0])+0.587*(+m[1])+0.114*(+m[2]); }
     function contrastText(col){ return lum(col) > 150 ? '#0b1020' : '#ffffff'; }
+    // HSL helpers — lighten a hex to a target LIGHTNESS while keeping hue+saturation,
+    // so dark-theme accents stay vivid & distinguishable (white-mix washes them to grey).
+    function rgb2hsl(r,g,b){ r/=255; g/=255; b/=255; var mx=Math.max(r,g,b), mn=Math.min(r,g,b), d=mx-mn, h=0, l=(mx+mn)/2, s=d ? (l<.5 ? d/(2*l) : d/(2-2*l)) : 0; if(d){ if(mx===r) h=((g-b)/d)%6; else if(mx===g) h=(b-r)/d+2; else h=(r-g)/d+4; h*=60; if(h<0) h+=360; } return [h, s, l]; }
+    function hsl2rgb(h,s,l){ h/=360; var c=(1-Math.abs(2*l-1))*s, x=c*(1-Math.abs((h*6)%2-1)), m=l-c/2, r=0,g=0,b=0; if(h<1/6){r=c;g=x;}else if(h<2/6){r=x;g=c;}else if(h<3/6){g=c;b=x;}else if(h<4/6){g=x;b=c;}else if(h<5/6){r=x;b=c;}else{r=c;b=x;} return 'rgb('+Math.round((r+m)*255)+','+Math.round((g+m)*255)+','+Math.round((b+m)*255)+')'; }
+    function lighten(hex, L){ var a=hex2rgb(hex), h=rgb2hsl(a[0],a[1],a[2]); return hsl2rgb(h[0], h[1], L); }
 
-    // Build a full vars object for a POS/CEFR mode colour, legible on every theme:
-    // on dark themes the dark mode colour is lightened (accent + word + band) so
-    // text and buttons never sit on a too-similar background.
-    function modeVars(theme, acc){
+    // Build a full vars object for a POS/CEFR mode colour, legible on every theme.
+    // On dark themes the accent is VIVID-lightened via HSL (hue+saturation kept, lightness
+    // raised to L) so each card keeps its own clearly-distinct colour; buttons and the
+    // word-zone divider are tinted with that same accent to reinforce per-card identity.
+    function modeVars(theme, acc, L){
       var dark = (theme==='modern'||theme==='genz-dark');
-      var accUse = dark ? mix(acc, '#ffffff', .62) : acc;   // accent — light enough to read on dark
-      var word = dark ? mix(acc, '#ffffff', .82) : acc;     // big word — very light on dark
+      var accUse = dark ? lighten(acc, L || .58) : acc;   // vivid accent, readable on dark
+      var word = dark ? lighten(acc, Math.min(1, (L||.58)+.14)) : acc; // slightly lighter big word
       var body = dark ? '#151515' : (theme==='genz' ? 'rgba(255,255,255,.24)' : '#fff');
       var bdr = theme==='genz-dark' ? 'rgba(196,181,253,.24)' : (theme==='genz' ? 'rgba(255,255,255,.48)' : (theme==='modern' ? 'rgba(255,255,255,.08)' : '#d7e7f2'));
       return {
         '--w-acc': accUse,
         '--w-word': word,
         '--w-sub': dark ? 'rgba(255,255,255,.66)' : '#35586c',
-        '--w-hd1': dark ? rgba(accUse, .22) : mix(acc, '#ffffff', .9),
+        '--w-hd1': dark ? rgba(accUse, .26) : mix(acc, '#ffffff', .9),
         '--w-hd2': dark ? rgba(accUse, .08) : mix(acc, '#ffffff', .96),
-        '--w-hdline': dark ? 'rgba(255,255,255,.16)' : rgba(acc, .35),
+        '--w-hdline': dark ? rgba(accUse, .4) : rgba(acc, .35),
         '--w-body': body, '--w-border': bdr,
-        '--w-bar': dark ? 'rgba(255,255,255,.05)' : mix(acc, '#ffffff', .92),
-        '--w-barline': dark ? 'rgba(255,255,255,.18)' : rgba(acc, .4),
-        '--w-bartext': dark ? 'rgba(255,255,255,.7)' : acc,
+        '--w-bar': dark ? rgba(accUse, .10) : mix(acc, '#ffffff', .92),
+        '--w-barline': dark ? rgba(accUse, .55) : rgba(acc, .4),
+        '--w-bartext': dark ? accUse : acc,
         '--w-acc-text': contrastText(accUse)
       };
     }
 
     // Section 2 — Modo POS in editorial style
+    // Well-separated hues (blue / cyan / violet / pink) so the 4 cards read apart on EVERY theme.
     var h2 = '';
     var pos = [
-      {tag:'NOUN', c:'#0c4a6e'},
-      {tag:'VERB', c:'#0f766e'},
-      {tag:'ADJ',  c:'#0e7490'},
-      {tag:'ADV',  c:'#9d174d'}
+      {tag:'NOUN', c:'#2563eb', L:.60},
+      {tag:'VERB', c:'#0891b2', L:.60},
+      {tag:'ADJ',  c:'#7c3aed', L:.62},
+      {tag:'ADV',  c:'#db2777', L:.62}
     ];
     pos.forEach(function(p){
-      var v = modeVars(t, p.c);
-      var badgeBg = dark ? mix(p.c, '#ffffff', .62) : p.c;
+      var v = modeVars(t, p.c, p.L);
+      var badgeBg = dark ? lighten(p.c, p.L) : p.c;
       var label = '<div class="wbox-label"><span class="n" style="background:'+badgeBg+';color:'+contrastText(badgeBg)+'">'+p.tag+'</span>POS '+p.tag+' · <span class="swatch" style="background:'+p.c+'"></span>'+p.c+'</div>';
       h2 += spotItem(spotlightArticle(v, {
         w:'speak', cefr:'B1', pos:p.tag, ipa:'/spiːk/',
@@ -306,18 +313,20 @@
     document.getElementById('posGrid').innerHTML = h2;
 
     // Section 3 — Modo CEFR in editorial style
+    // Pure emerald ramp (A1 lightest → C2 deepest) — no teal, so it can't be confused with the
+    // POS section. On dark the L values step down so the ramp still reads as a gradient.
     var h3 = '';
     var cefrLevels = [
-      {k:'A1', c:'#34d399'},
-      {k:'A2', c:'#10b981'},
-      {k:'B1', c:'#059669'},
-      {k:'B2', c:'#047857'},
-      {k:'C1', c:'#064e3b'},
-      {k:'C2', c:'#0e7490'}
+      {k:'A1', c:'#34d399', L:.68},
+      {k:'A2', c:'#10b981', L:.60},
+      {k:'B1', c:'#059669', L:.52},
+      {k:'B2', c:'#047857', L:.45},
+      {k:'C1', c:'#065f46', L:.40},
+      {k:'C2', c:'#064e3b', L:.36}
     ];
     cefrLevels.forEach(function(lv){
-      var v = modeVars(t, lv.c);
-      var badgeBg = dark ? mix(lv.c, '#ffffff', .62) : lv.c;
+      var v = modeVars(t, lv.c, lv.L);
+      var badgeBg = dark ? lighten(lv.c, lv.L) : lv.c;
       var label = '<div class="wbox-label"><span class="n" style="background:'+badgeBg+';color:'+contrastText(badgeBg)+'">'+lv.k+'</span>CEFR '+lv.k+' · <span class="swatch" style="background:'+lv.c+'"></span>'+lv.c+'</div>';
       h3 += spotItem(spotlightArticle(v, {
         w:'convince', cefr:lv.k, pos:'VERB', ipa:'/kənˈvɪns/',
