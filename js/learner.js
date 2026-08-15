@@ -603,8 +603,12 @@
     var s = load();
     var html = pathIntroHtml();
     // ── Spaced review (always visible on both English & Italiano) ──
-    html += '<div class="lr-section-head"><span class="lr-section-title">' + t('learner_review') + '</span>' +
-      '<span class="lr-section-sub">' + t('learner_review_sub') + '</span></div>';
+    // Profilo-style section: title + short text on the left, content on the right
+    // (1fr / 2.2fr on desktop, stacked on mobile).
+    html += '<div class="lr-section-grid"><div class="lr-prof-label">' +
+      '<h3 class="c-section-h3">' + t('learner_review') + '</h3>' +
+      '<p class="c-section-sub">' + t('learner_review_sub') + '</p></div>' +
+      '<div class="lr-review-grid">';
     var reviewCards = [
       { kind: 'due', icon: '⏰', title: t('learner_review_due'), sub: t('learner_review_due_sub'), count: due.length },
       { kind: 'fragile', icon: '🧩', title: t('learner_review_fragile'), sub: t('learner_review_fragile_sub'), count: fragile.length },
@@ -620,12 +624,13 @@
         '<span class="lr-review-count">' + c.count + '</span>' +
       '</div>';
     });
-    html += '</div>';
+    html += '</div></div>';
     // ── Missions: one around the user's goals, one on essential thematic vocab ──
     var mission = missionCached();
-    html += '<div class="lr-section-head lr-sec-mt"><span class="lr-section-title">' + t('learner_missions') + '</span>' +
-      '<span class="lr-section-sub">' + t('learner_missions_sub') + '</span></div>';
-    html += '<div class="lr-missions-grid">';
+    html += '<div class="lr-section-grid lr-sec-mt"><div class="lr-prof-label">' +
+      '<h3 class="c-section-h3">' + t('learner_missions') + '</h3>' +
+      '<p class="c-section-sub">' + t('learner_missions_sub') + '</p></div>' +
+      '<div class="lr-missions-grid">';
     // Card 1 — objectives-driven AI mission (from the user's goals)
     html += '<div class="lr-mission-card' + (mission ? ' ready' : '') + '">' +
       '<div class="lr-mission-glow">🎯</div>' +
@@ -658,18 +663,18 @@
         '<button type="button" class="primary-btn" onclick="Learner.confirmThemeMission(this)">' + t('learner_mission_start') + '</button>' +
       '</div>' +
     '</div>';
-    html += '</div>';
+    html += '</div></div>';
     // ── Recent mistakes (per language) ──
     var prefix = lang + ':';
     var mistakes = Object.keys(s.mistakes || {}).filter(function (k) { return k.indexOf(prefix) === 0; });
     if (mistakes.length) {
-      html += '<div class="lr-section-head lr-sec-mt"><span class="lr-section-title">' + t('learner_mistakes') + '</span></div>' +
+      html += '<div class="lr-section-grid lr-sec-mt"><div class="lr-prof-label"><h3 class="c-section-h3">' + t('learner_mistakes') + '</h3></div>' +
         '<div class="lr-mistakes"><div style="display:flex;flex-wrap:wrap;gap:8px">' +
         mistakes.map(function (key) {
           var wrd = key.slice(prefix.length);
           return '<span style="display:inline-flex;align-items:center;gap:8px;padding:6px 12px;border:1px solid var(--line);border-radius:999px;background:var(--panel-2);font-size:12.5px;font-weight:600;color:var(--text)">' + esc(wrd) +
             '<button type="button" onclick="Learner.clearMistake(' + jsArg(key) + ')" style="border:none;background:rgba(239,68,68,.1);color:#ef4444;border-radius:50%;width:18px;height:18px;font-size:11px;cursor:pointer">✕</button></span>';
-        }).join('') + '</div></div>';
+        }).join('') + '</div></div></div>';
     }
     pane.innerHTML = html;
     i18nScope(pane);
