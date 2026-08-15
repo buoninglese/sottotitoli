@@ -838,7 +838,8 @@
         '#sub-learner-overview .lvov-step{position:relative;display:flex;flex-direction:column;gap:10px;padding:20px;border-radius:20px;background:var(--card);border:1px solid var(--line);transition:border-color .2s,transform .2s}' +
         '#sub-learner-overview .lvov-step:hover{border-color:var(--cyan);transform:translateY(-3px)}' +
         '#sub-learner-overview .lvov-step-num{position:absolute;top:14px;right:16px;font-size:11px;font-weight:800;color:var(--text-faint);letter-spacing:.05em}' +
-        '#sub-learner-overview .lvov-step-icon{width:46px;height:46px;border-radius:14px;background:rgba(6,182,212,.1);color:var(--cyan);display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0}' +
+        '#sub-learner-overview .lvov-step-head{display:flex;align-items:center;gap:12px}' +
+        '#sub-learner-overview .lvov-step-icon{width:44px;height:44px;border-radius:13px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:17px;color:#fff;background:linear-gradient(135deg,#06b6d4 0%,#8b5cf6 100%);box-shadow:0 6px 16px rgba(6,182,212,.28)}' +
         '#sub-learner-overview .lvov-step h4{font-size:15px;font-weight:800;color:var(--text);margin:0;letter-spacing:-.01em}' +
         '#sub-learner-overview .lvov-step p{font-size:13px;color:var(--text-soft);line-height:1.55;margin:0}' +
         '#sub-learner-overview .lvov-cta{display:flex;gap:12px;flex-wrap:wrap;margin-top:24px}' +
@@ -852,10 +853,10 @@
         '<p data-i18n="learnerov_intro">Ascolta, parla e ripassa con lezioni, missioni e ripasso programmato. Ogni sessione ti avvicina alla fluidità.</p>' +
       '</div>' +
       '<div class="lvov-steps">' +
-        '<div class="lvov-step"><span class="lvov-step-num">1</span><div class="lvov-step-icon">🎧</div><h4 data-i18n="learnerov_s1_t">Ascolta</h4><p data-i18n="learnerov_s1_d">Scegli una lezione o un tema e ascolta le parole nella lingua che stai imparando.</p></div>' +
-        '<div class="lvov-step"><span class="lvov-step-num">2</span><div class="lvov-step-icon">🗣️</div><h4 data-i18n="learnerov_s2_t">Parla</h4><p data-i18n="learnerov_s2_d">Ripeti a voce alta: il riconoscimento controlla la tua pronuncia e ti dà feedback.</p></div>' +
-        '<div class="lvov-step"><span class="lvov-step-num">3</span><div class="lvov-step-icon">🎯</div><h4 data-i18n="learnerov_s3_t">Missioni</h4><p data-i18n="learnerov_s3_d">Missioni AI e a tema costruite sui tuoi obiettivi e sulle tue parole reali.</p></div>' +
-        '<div class="lvov-step"><span class="lvov-step-num">4</span><div class="lvov-step-icon">🔁</div><h4 data-i18n="learnerov_s4_t">Ripassa</h4><p data-i18n="learnerov_s4_d">Il ripasso programmato consolida le parole e le rende automatiche.</p></div>' +
+        '<div class="lvov-step"><span class="lvov-step-num">1</span><div class="lvov-step-head"><div class="lvov-step-icon"><i class="fa-solid fa-headphones"></i></div><h4 data-i18n="learnerov_s1_t">Ascolta</h4></div><p data-i18n="learnerov_s1_d">Scegli una lezione o un tema e ascolta le parole nella lingua che stai imparando.</p></div>' +
+        '<div class="lvov-step"><span class="lvov-step-num">2</span><div class="lvov-step-head"><div class="lvov-step-icon"><i class="fa-solid fa-microphone"></i></div><h4 data-i18n="learnerov_s2_t">Parla</h4></div><p data-i18n="learnerov_s2_d">Ripeti a voce alta: il riconoscimento controlla la tua pronuncia e ti dà feedback.</p></div>' +
+        '<div class="lvov-step"><span class="lvov-step-num">3</span><div class="lvov-step-head"><div class="lvov-step-icon"><i class="fa-solid fa-bullseye"></i></div><h4 data-i18n="learnerov_s3_t">Missioni</h4></div><p data-i18n="learnerov_s3_d">Missioni AI e a tema costruite sui tuoi obiettivi e sulle tue parole reali.</p></div>' +
+        '<div class="lvov-step"><span class="lvov-step-num">4</span><div class="lvov-step-head"><div class="lvov-step-icon"><i class="fa-solid fa-rotate"></i></div><h4 data-i18n="learnerov_s4_t">Ripassa</h4></div><p data-i18n="learnerov_s4_d">Il ripasso programmato consolida le parole e le rende automatiche.</p></div>' +
       '</div>' +
       '<div class="lvov-cta" style="justify-content:center">' +
         '<button type="button" class="c-main" onclick="Learner.showPane(\'learner-en\')" data-i18n="learnerov_cta_en">🇬🇧 Apri il Vocabulary Trainer inglese</button>' +
