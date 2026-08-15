@@ -12067,14 +12067,17 @@
         if (typeof SottotitoliData !== 'undefined' && SottotitoliData.saveProfileField) {
           SottotitoliData.saveProfileField('display_name', newName);
         }
-        // Update settings cache
+        // Update settings + profile caches (so dashboard/hero re-reads pick it up)
         if (window._settingsData) window._settingsData.display_name = newName;
-        // Update hero
-        var heroEm = document.querySelector('.hero-content h2 em');
-        if (heroEm) heroEm.textContent = newName;
+        if (window._sottotitoliProfile) { window._sottotitoliProfile.display_name = newName; window._sottotitoliProfile.full_name = newName; }
+        // Dashboard hero — reflect immediately (renderHero also refreshes streak/goal)
+        if (typeof renderHero === 'function') renderHero(newName);
+        var hn = document.getElementById('heroName');
+        if (hn) hn.textContent = newName;
         // Update dropdown
         var ddName = document.getElementById('ddName');
         if (ddName) ddName.textContent = newName;
+        if (typeof window.showToast === 'function') window.showToast('✓ Nome salvato', 'success');
       }, 'Modifica nome', '✏️', 'Nome…', currentName);
     };
 
@@ -12147,7 +12150,10 @@
     sb.auth.getSession().then(async function(r) {
       var user = r.data?.session?.user;
       if (!user) return;
-      var name = user.user_metadata?.full_name || user.email?.split('@')[0] || '';
+      // Prefer the user's SAVED display name (edited in profile) over the OAuth metadata name,
+      // so the edit sticks after re-opening the panel / re-logging in.
+      var savedName = (window._settingsData && window._settingsData.display_name) || (window._sottotitoliProfile && window._sottotitoliProfile.display_name) || '';
+      var name = savedName || user.user_metadata?.full_name || user.email?.split('@')[0] || '';
       if (nameEl) nameEl.textContent = name || 'Utente';
       if (emailEl) emailEl.textContent = user.email || '';
 
