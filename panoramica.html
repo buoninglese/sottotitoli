@@ -138,7 +138,7 @@
     <header class="topbar">
       <button class="topbar-menu" id="topbarMenu" onclick="toggleSidebarDrawer()" aria-label="Menu" title="Menu"><span class="material-symbols-outlined">menu</span></button>
       <div style="display:flex;align-items:center;gap:0">
-        <a href="index.html" class="topbar-brand" style="font-size:36px;font-family:'Manrope',sans-serif;font-weight:700;text-decoration:none;letter-spacing:-0.02em;display:inline-flex;align-items:baseline;gap:0"><span class="topbar-brand-name">sottotitoli</span><span class="topbar-brand-pro" style="font-family:'Manrope',sans-serif;font-weight:800;letter-spacing:-.5px">.pro</span><span class="topbar-version" style="font-size:11px;font-weight:600;font-family:'Manrope',sans-serif;color:var(--text-soft);margin-left:6px;opacity:.55;letter-spacing:.02em">v237</span></a>
+        <a href="index.html" class="topbar-brand" style="font-size:36px;font-family:'Manrope',sans-serif;font-weight:700;text-decoration:none;letter-spacing:-0.02em;display:inline-flex;align-items:baseline;gap:0"><span class="topbar-brand-name">sottotitoli</span><span class="topbar-brand-pro" style="font-family:'Manrope',sans-serif;font-weight:800;letter-spacing:-.5px">.pro</span><span class="topbar-version" style="font-size:11px;font-weight:600;font-family:'Manrope',sans-serif;color:var(--text-soft);margin-left:6px;opacity:.55;letter-spacing:.02em">v238</span></a>
       </div>
       <div style="display:flex;align-items:center;gap:12px">
         <button class="btn-start-session hv-start" id="btnStartSession" onclick="toggleStartSession()" style="font-size:15px;height:42px;padding:0 20px;border-radius:12px;background:linear-gradient(135deg,rgba(192,132,252,.18),rgba(192,132,252,.06));color:#c084fc;border:1px solid rgba(192,132,252,.25);font-weight:700;font-family:'Manrope',sans-serif;display:inline-flex;align-items:center;gap:8px;box-shadow:0 0 20px rgba(192,132,252,.12),0 2px 8px rgba(0,0,0,.2);cursor:pointer;letter-spacing:-.01em;transition:all .2s ease">
@@ -560,6 +560,7 @@
               <div id="dailyChart" style="flex:1;min-height:200px;display:flex;align-items:center;justify-content:center;position:relative">
                 <span style="color:var(--text-faint);font-size:15px">Caricamento…</span>
               </div>
+              <div id="dailyChartLegend" style="display:flex;justify-content:center;padding:4px 0 2px;min-height:16px"></div>
             </div>
           </article>
           </article><!-- /dashStatsBento -->
@@ -6296,7 +6297,7 @@
       function isoDaysAgo(n){ var d = new Date(Date.now() - n*86400000); return d.toISOString().substring(0,10); }
       function chartIds(scope){ return scope === 'wb'
         ? { chart:'wbChart', title:'wbChartTitle', sub:'wbChartSubtitle', total:'wbChartTotal', pl:'wbChartPeriodLabel', media:'wbChartMedia', ml:'wbChartMediaLabel' }
-        : { chart:'dailyChart', title:'dailyChartTitle', sub:'dailyChartSubtitle', total:'dailyChartTotal', pl:'dailyChartPeriodLabel', media:'dailyChartMedia', ml:'dailyChartMediaLabel' }; }
+        : { chart:'dailyChart', title:'dailyChartTitle', sub:'dailyChartSubtitle', total:'dailyChartTotal', pl:'dailyChartPeriodLabel', media:'dailyChartMedia', ml:'dailyChartMediaLabel', legend:'dailyChartLegend' }; }
       async function loadDashChartData(){
         if (dashChartData) return dashChartData;
         var out = { sessions:[], siteMap:{} };
@@ -6519,15 +6520,84 @@
         var p0=polarC(cx,cy,rO,a0), p1=polarC(cx,cy,rO,a1), p2=polarC(cx,cy,rI,a1), p3=polarC(cx,cy,rI,a0), la=(a1-a0)>180?1:0;
         return 'M'+p0[0]+' '+p0[1]+' A'+rO+' '+rO+' 0 '+la+' 1 '+p1[0]+' '+p1[1]+' L'+p2[0]+' '+p2[1]+' A'+rI+' '+rI+' 0 '+la+' 0 '+p3[0]+' '+p3[1]+' Z';
       }
-      function coronaHtml(vals, center, color, unit){
+      function fmtDate(iso, isEn){
+        if (!iso) return '';
+        try { var d = new Date(iso + 'T00:00:00'); return d.toLocaleDateString(isEn ? 'en-GB' : 'it-IT', { weekday:'short', day:'numeric', month:'short' }); } catch(e){ return iso; }
+      }
+      function escAttr(s){ return String(s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;'); }
+      function dashDay(iso, data){
+        var o = { count:0, rec:0, bands:[0,0,0,0] };
+        for (var i=0;i<data.sessions.length;i++){ var s=data.sessions[i]; if (s.iso === iso){ o.count++; o.rec += s.m; var h=s.h; if (h<6) o.bands[3]+=s.m; else if (h<12) o.bands[0]+=s.m; else if (h<18) o.bands[1]+=s.m; else o.bands[2]+=s.m; } }
+        var site = (data.siteMap && data.siteMap[iso]) || 0;
+        o.site = Math.round(site);
+        o.extra = Math.max(0, o.site - o.rec);
+        return o;
+      }
+      function dashLegendHtml(items, isEn){
+        return '<div style="display:flex;flex-wrap:wrap;gap:14px;justify-content:center;align-items:center">' + items.map(function(l){
+          return '<span style="display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:600;color:var(--text-soft);font-family:Inter,sans-serif;line-height:1"><span style="width:10px;height:10px;border-radius:3px;background:'+l[0]+';display:inline-block;flex-shrink:0"></span>'+l[1]+'</span>';
+        }).join('') + '</div>';
+      }
+      function bindDashChartTip(chartEl){
+        if (!chartEl) return;
+        var tip = chartEl.querySelector('#dashTip');
+        if (!tip) { tip = document.createElement('div'); tip.id='dashTip'; tip.style.cssText='position:absolute;pointer-events:none;opacity:0;transition:opacity .15s;background:var(--panel-2);border:1px solid var(--line);border-radius:10px;padding:7px 11px;font-size:11px;color:var(--text);font-family:Inter,sans-serif;font-weight:600;box-shadow:0 8px 24px rgba(0,0,0,.18);z-index:50;white-space:nowrap'; chartEl.appendChild(tip); }
+        chartEl.onmousemove = function(e){
+          var t = e.target && e.target.closest ? e.target.closest('[data-tip]') : null;
+          if (t && t.getAttribute && t.getAttribute('data-tip')) {
+            var r = chartEl.getBoundingClientRect();
+            tip.innerHTML = t.getAttribute('data-tip');
+            tip.style.opacity = '1';
+            tip.style.left = Math.max(0, Math.min(r.width - tip.offsetWidth - 8, (e.clientX - r.left) + 14)) + 'px';
+            tip.style.top = Math.max(0, Math.min(r.height - tip.offsetHeight - 8, (e.clientY - r.top) + 16)) + 'px';
+          } else { tip.style.opacity = '0'; }
+        };
+        chartEl.onmouseleave = function(){ if (tip) tip.style.opacity = '0'; };
+      }
+      // ═══ CORONA — single colour (sessions), enlarged to fill the box ═══
+      function coronaHtml(vals, center, color, unit, days){
         var W=760,H=240,cx=W/2,cy=H/2,n=vals.length||1,max=Math.max.apply(null,vals.concat([1]));
-        var est=String(center).length, r0=Math.max(34,Math.min(50,12+est*4)), span=Math.min(r0+40,90), ringH=(span-r0)/4;
-        var fs=Math.max(13,Math.min(30,Math.floor((2*r0-14)/(est*0.62)))), step=360/n, g='';
+        var est=String(center).length, r0=Math.max(38,Math.min(64,14+est*4)), span=Math.min(H/2-10, r0+95), ringH=(span-r0)/4;
+        var fs=Math.max(15,Math.min(34,Math.floor((2*r0-16)/(est*0.62)))), step=360/n, g='';
         for (var ring=1;ring<=4;ring++) g+='<circle cx="'+cx+'" cy="'+cy+'" r="'+(r0+ring*ringH)+'" fill="none" stroke="var(--line)"/>';
-        for (var i=0;i<n;i++){ var v=vals[i], a0=i*step, a1=(i+1)*step-4, rr=r0+(v/max)*(span-r0);
-          g+='<path d="'+ringPath(cx,cy,rr,r0,a0,a1)+'" fill="'+(i===n-1?'var(--amber)':color)+'" opacity=".95"><title>'+(v||0)+' '+unit+'</title></path>'; }
+        for (var i=0;i<n;i++){ var v=vals[i], a0=i*step, a1=(i+1)*step-4, rr=r0+(v/max)*(span-r0), d=days&&days[i]?days[i]:'';
+          g+='<path data-tip="'+escAttr(fmtDate(d)+' — '+(v||0)+' '+(unit||''))+'" d="'+ringPath(cx,cy,rr,r0,a0,a1)+'" fill="'+(i===n-1?'var(--amber)':color)+'" opacity=".95"></path>'; }
         g+='<text x="'+cx+'" y="'+(cy+fs*0.35)+'" text-anchor="middle" fill="var(--text)" font-size="'+fs+'" font-weight="800" font-family="Inter, sans-serif" letter-spacing="-0.02em">'+center+'</text>';
-        return '<svg viewBox="0 0 '+W+' '+H+'" style="width:100%;max-width:520px;height:auto">'+g+'</svg>';
+        return '<svg viewBox="0 0 '+W+' '+H+'" style="width:100%;max-width:680px;height:auto">'+g+'</svg>';
+      }
+      // ═══ CORONA DUAL — activity: recording (cyan) + extra site time (amber) ═══
+      function coronaDualHtml(recVals, extraVals, center, unit, days){
+        var W=760,H=240,cx=W/2,cy=H/2,n=recVals.length||1,max=0,i;
+        for(i=0;i<n;i++){ var tt=recVals[i]+extraVals[i]; if(tt>max)max=tt; } max=max||1;
+        var est=String(center).length, r0=Math.max(38,Math.min(64,14+est*4)), span=Math.min(H/2-10, r0+95), ringH=(span-r0)/4;
+        var fs=Math.max(15,Math.min(34,Math.floor((2*r0-16)/(est*0.62)))), step=360/n, g='';
+        for (var ring=1;ring<=4;ring++) g+='<circle cx="'+cx+'" cy="'+cy+'" r="'+(r0+ring*ringH)+'" fill="none" stroke="var(--line)"/>';
+        for(i=0;i<n;i++){
+          var rec=recVals[i], ex=extraVals[i], site=rec+ex, a0=i*step, a1=(i+1)*step-4, d=days&&days[i]?days[i]:'';
+          var rRec=r0+(rec/max)*(span-r0), rSite=r0+(site/max)*(span-r0), isT=(i===n-1);
+          var tip=escAttr(fmtDate(d)+' · registrazione '+fmtMinutes(Math.round(rec))+' · altro '+fmtMinutes(Math.round(ex))+' · totale '+fmtMinutes(Math.round(site)));
+          g+='<path data-tip="'+tip+'" d="'+ringPath(cx,cy,rRec,r0,a0,a1)+'" fill="'+(isT?'#22d3ee':'var(--cyan)')+'" opacity=".95"></path>';
+          if (ex>0) g+='<path data-tip="'+tip+'" d="'+ringPath(cx,cy,rSite,rRec,a0,a1)+'" fill="'+(isT?'#fbbf24':'var(--amber)')+'" opacity=".95"></path>';
+        }
+        g+='<text x="'+cx+'" y="'+(cy+fs*0.35)+'" text-anchor="middle" fill="var(--text)" font-size="'+fs+'" font-weight="800" font-family="Inter, sans-serif" letter-spacing="-0.02em">'+center+'</text>';
+        return '<svg viewBox="0 0 '+W+' '+H+'" style="width:100%;max-width:680px;height:auto">'+g+'</svg>';
+      }
+      // ═══ STACKED BANDS — time of day: morning/day/evening/night per day ═══
+      function stackedBandsHtml(bandsArr, days){
+        var W=CHT.W,H=CHT.H,PL=CHT.PL,PR=CHT.PR,PT=CHT.PT,PB=CHT.PB,IW=W-PL-PR,IH=H-PT-PB,n=bandsArr.length;
+        var segs=[['#fbbf24','Mattina'],['#22d3ee','Giorno'],['#8b5cf6','Sera'],['#6366f1','Notte']];
+        var max=0,i,s; for(i=0;i<n;i++)for(s=0;s<4;s++)if(bandsArr[i][s]>max)max=bandsArr[i][s]; max=max||1;
+        var bw=Math.max(3,(IW-8)/n),gap=n>1?3:0,g='';
+        for(i=0;i<n;i++){
+          var d=days&&days[i]?days[i]:'', yTop=PT+IH, x=PL+4+(i*bw);
+          var tip=escAttr(fmtDate(d)+' · Mattina '+fmtMinutes(Math.round(bandsArr[i][0]))+' · Giorno '+fmtMinutes(Math.round(bandsArr[i][1]))+' · Sera '+fmtMinutes(Math.round(bandsArr[i][2]))+' · Notte '+fmtMinutes(Math.round(bandsArr[i][3])));
+          for(s=0;s<4;s++){
+            var v=bandsArr[i][s], h=v?Math.round((v/max)*IH):0; if(h<=0)continue;
+            g+='<rect data-tip="'+tip+'" x="'+(x+gap/2)+'" y="'+(yTop-h)+'" width="'+(bw-gap)+'" height="'+h+'" rx="2" fill="'+segs[s][0]+'" opacity=".92"></rect>'; yTop-=h;
+          }
+        }
+        g+=svgXLbl(days);
+        return '<svg viewBox="0 0 '+W+' '+H+'" style="width:100%;max-width:680px;height:auto">'+g+'</svg>';
       }
       async function renderChartBox(scope){
         var st = scope === 'wb' ? wbChart : dashChart;
@@ -6554,21 +6624,46 @@
         }
         var meta = {
           totalSessions:{ title: isEn?'Sessions':'Sessioni', sub: isEn?'Training sessions per day — corona for every period.':'Sessioni di allenamento per giorno — corona per ogni periodo.', color:'var(--cyan)', unit: isEn?'sessions':'sessioni', fmt:function(v){ return ''+v; } },
-          totalMinutes:{ title: isEn?'Activity':'Attività', sub: isEn?'Minutes on site per day: presence + recording (spoken time).':'Minuti sul sito per giorno: presenza + registrazione (tempo parlato).', color:'var(--cyan)', unit: isEn?'min':'min', fmt:fmtMinutes },
-          timebands:{ title: isEn?'Time of day':'Fasce orarie', sub: isEn?'Recording minutes per day, split by time of day.':'Minuti di registrazione per giorno, divisi per fascia oraria.', color:'var(--accent-purple)', unit: isEn?'min':'min', fmt:fmtMinutes }
+          totalMinutes:{ title: isEn?'Activity':'Attività', sub: isEn?'Minutes on site per day: recording (spoken time) + extra time on the site.':'Minuti sul sito per giorno: registrazione (tempo parlato) + altro tempo sul sito.', color:'var(--cyan)', unit: isEn?'min':'min', fmt:fmtMinutes },
+          timebands:{ title: isEn?'Time of day':'Fasce orarie', sub: isEn?'Recording minutes per day, split by time of day (morning / day / evening / night).':'Minuti di registrazione per giorno, divisi per fascia oraria (mattina / giorno / sera / notte).', color:'var(--accent-purple)', unit: isEn?'min':'min', fmt:fmtMinutes }
         }[st.metric] || {};
         if (titleEl) titleEl.textContent = meta.title || '';
         if (subEl) subEl.textContent = meta.sub || '';
         var data = await loadDashChartData();
         var days = chartBoxDays(st.tl, data);
-        var vals = days.map(function(iso){ return chartBoxValue(st.metric, iso, data); });
-        var total = vals.reduce(function(s,v){ return s+v; }, 0);
-        var media = days.length ? total/days.length : 0;
-        if (totalEl) totalEl.textContent = meta.fmt ? meta.fmt(total) : total;
+        var dayData = days.map(function(iso){ return dashDay(iso, data); });
+        var chartSvg = '', legendItems = [], total = 0, media = 0;
+        if (st.metric === 'totalSessions') {
+          var vals = dayData.map(function(d){ return d.count; });
+          total = vals.reduce(function(s,v){ return s+v; }, 0);
+          media = days.length ? total/days.length : 0;
+          if (totalEl) totalEl.textContent = '' + total;
+          if (mediaEl) mediaEl.textContent = media.toFixed(1);
+          chartSvg = coronaHtml(vals, ''+total, 'var(--cyan)', isEn?'sessions':'sessioni', days);
+          legendItems = [['var(--cyan)', isEn?'sessions':'sessioni']];
+        } else if (st.metric === 'totalMinutes') {
+          var recVals = dayData.map(function(d){ return d.rec; });
+          var extraVals = dayData.map(function(d){ return d.extra; });
+          total = 0; for (var i=0;i<dayData.length;i++) total += (dayData[i].site||0);
+          media = days.length ? total/days.length : 0;
+          if (totalEl) totalEl.textContent = fmtMinutes(total);
+          if (mediaEl) mediaEl.textContent = fmtMinutes(Math.round(media));
+          chartSvg = coronaDualHtml(recVals, extraVals, fmtMinutes(total), 'min', days);
+          legendItems = [['var(--cyan)', isEn?'recording':'registrazione'], ['var(--amber)', isEn?'extra time on site':'altro tempo sul sito']];
+        } else {
+          var bandsArr = dayData.map(function(d){ return d.bands; });
+          total = 0; for (var j=0;j<dayData.length;j++) total += (dayData[j].rec||0);
+          media = days.length ? total/days.length : 0;
+          if (totalEl) totalEl.textContent = fmtMinutes(total);
+          if (mediaEl) mediaEl.textContent = fmtMinutes(Math.round(media));
+          chartSvg = stackedBandsHtml(bandsArr, days);
+          legendItems = [['#fbbf24', isEn?'Morning':'Mattina'], ['#22d3ee', isEn?'Day':'Giorno'], ['#8b5cf6', isEn?'Evening':'Sera'], ['#6366f1', isEn?'Night':'Notte']];
+        }
         if (plEl) plEl.textContent = dashPeriodLabel(st.tl, isEn);
-        if (mediaEl) mediaEl.textContent = (st.metric==='totalMinutes'||st.metric==='timebands') ? fmtMinutes(Math.round(media)) : media.toFixed(1);
         if (mlEl) mlEl.textContent = isEn ? 'avg / day' : 'media/giorno';
-        chartEl.innerHTML = '<div style="width:100%;display:flex;justify-content:center">'+coronaHtml(vals, (meta.fmt?meta.fmt(total):total), meta.color||'var(--cyan)', meta.unit||'')+'</div>';
+        chartEl.innerHTML = '<div style="width:100%;display:flex;justify-content:center">' + chartSvg + '</div>';
+        bindDashChartTip(chartEl);
+        if (ids.legend) { var legendEl = document.getElementById(ids.legend); if (legendEl) legendEl.innerHTML = dashLegendHtml(legendItems, isEn); }
       }
       function dashSetTl(btn, scope){
         var st = scope === 'wb' ? wbChart : dashChart;
