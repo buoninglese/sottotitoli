@@ -578,9 +578,18 @@
     i18nScope(pane);
   }
 
+  // Intro hero (Report AI style) shown above the English/Italiano path pane.
+  function pathIntroHtml() {
+    var it = learnerLang() === 'it';
+    return '<div style="position:relative;overflow:hidden;border-radius:28px;padding:30px 34px;background:linear-gradient(135deg,rgba(6,182,212,.16),rgba(139,92,246,.13));border:1px solid var(--line);margin-bottom:28px">' +
+      '<h3 style="font-size:clamp(22px,3vw,30px);font-weight:800;letter-spacing:-.02em;color:var(--text);margin:0 0 8px">' + (it ? t('ler_it_title') : t('ler_en_title')) + '</h3>' +
+      '<p style="font-size:15px;color:var(--text-soft);line-height:1.6;margin:0;max-width:680px">' + (it ? t('ler_it_intro') : t('ler_en_intro')) + '</p>' +
+    '</div>';
+  }
+
   function renderRealPath(pane, due, fragile, fresh, lang) {
     var s = load();
-    var html = '';
+    var html = pathIntroHtml();
     // ── Spaced review (always visible on both English & Italiano) ──
     html += '<div class="lr-section-head"><span class="lr-section-title">' + t('learner_review') + '</span>' +
       '<span class="lr-section-sub">' + t('learner_review_sub') + '</span></div>';
@@ -656,7 +665,7 @@
 
   /* ── Bundled course — not-logged-in preview only ── */
   function renderBundledPath(pane) {
-    var html = '<div class="lr-preview-note">' + t('learner_login_hint') + '</div>';
+    var html = pathIntroHtml() + '<div class="lr-preview-note">' + t('learner_login_hint') + '</div>';
     var s = load();
     COURSE.levels.forEach(function (lv) {
       html += '<div style="margin:22px 0 12px"><span style="font-size:13px;font-weight:800;color:' + lv.color + ';text-transform:uppercase;letter-spacing:.1em">' + esc(lv.icon + ' ' + lv.label) + '</span></div>';
