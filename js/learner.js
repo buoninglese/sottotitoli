@@ -79,6 +79,18 @@
     s.lastDay = today; s.xp += n;
     save(s); return s;
   }
+  // ── Configurable XP (js/xp.js): per-correct answer + completion bonuses. ──
+  // The trainer is the "Allena" word-bank card-stack (openBankTest).
+  function awardCorrect() {
+    session.earned += 1;
+    if (XP && XP.award) { session.xpPoints = (session.xpPoints || 0) + XP.cfg.val('correct_answer'); XP.award('correct_answer'); }
+    else { session.xpPoints = (session.xpPoints || 0) + 1; addXp(1); }
+  }
+  function awardBonus(action, fallback) {
+    var v = (XP && XP.cfg) ? XP.cfg.val(action) : fallback;
+    if (XP && XP.award) XP.award(action); else addXp(v);
+    return v;
+  }
   function markLessonDone(unitId, lessonId) {
     var s = load(); s.lessons[unitId + ':' + lessonId] = todayStr(); save(s); return s;
   }
@@ -1180,7 +1192,7 @@
     if (!frontEl.classList.contains('flip')) frontEl.classList.add('flip');
     // Record grade + XP / mistake
     session.graded[item.word] = q;
-    if (q >= 3) { session.earned += 1; addXp(1); } else { recordMistake(item.word, session.lang); }
+    if (q >= 3) { awardCorrect(); } else { recordMistake(item.word, session.lang); }
     writeGrade(item, q); // fire-and-forget SM-2 write-back to review_words
     $all('.ics-grade', stage).forEach(function (b) { b.disabled = true; });
     // Fly the front card off, then cascade the stack
@@ -1668,7 +1680,7 @@
     $all('.choice', btn.parentElement).forEach(function (c) { c.disabled = true; });
     btn.classList.add(correct ? 'correct' : 'incorrect');
     if (correct) {
-      session.earned += 1; addXp(1);
+      awardCorrect();
       if (session.mode === 'lesson') { /* fine */ }
     } else {
       recordMistake(q.answer, session.lang);
@@ -1712,7 +1724,7 @@
         st.selIt.classList.remove('selected'); st.selIt.classList.add('matched');
         st.selEn.classList.remove('selected'); st.selEn.classList.add('matched');
         st.matched[it] = true;
-        session.earned += 1; addXp(1);
+        awardCorrect();
         st.selIt = null; st.selEn = null;
         if (Object.keys(st.matched).length === st.pairs.length) toast(t('learner_all_matched'));
       } else {
@@ -1766,7 +1778,7 @@
     if (heardEl && heardEl.parentElement) heardEl.parentElement.appendChild(fb);
     var checkBtn = $('#learnerCheck');
     if (checkBtn) checkBtn.disabled = true;
-    if (correct) { session.earned += 1; addXp(1); }
+    if (correct) { awardCorrect(); }
     else { recordMistake(expected, session.lang); }
     setTimeout(nextStep, correct ? 900 : 1600);
   }
@@ -1805,6 +1817,7 @@
     var mode = session.mode;
     var unit = session.unit, lesson = session.lesson;
     var earned = session.earned;
+    var points = session.xpPoints || earned;
     var s = load();
 
     // Remove overlay, render result inside stage
@@ -1813,7 +1826,7 @@
 
     if (mode === 'lesson') {
       markLessonDone(unit.id, lesson.id);
-      bonus = 10; addXp(10);
+      bonus = awardBonus('lesson_complete', 10);
       emoji = '🎉'; title = t('learner_lesson_complete');
       body = t('learner_lesson_complete_sub');
       confettiFlag = true;
@@ -1821,32 +1834,30 @@
       var score = earned;
       var passed = score >= 8;
       markTestResult(unit.id, passed, score);
-      if (passed) { bonus = 20; addXp(20); }
+      if (passed) { bonus = awardBonus('test_passed', 20); }
       emoji = passed ? '🏆' : '💪';
       title = passed ? t('learner_test_passed') : t('learner_test_failed');
       body = t('learner_you_scored') + ' ' + score + '/10';
       confettiFlag = passed;
     } else if (mode === 'bank' || mode === 'review') {
-      if (earned > 0) addXp(earned);
-      bonus = 5; addXp(5);
+      bonus = awardBonus('allena_complete', 5);
       markLessonDone(mode, unit.id); // 'bank:<id>' or 'review:<id>'
       emoji = mode === 'bank' ? '📚' : '🧠';
       title = mode === 'bank' ? t('learner_bank_done') : t('learner_review_done');
-      body = t('learner_you_scored') + ' ' + earned + ' XP' + ' · ' + esc(unit.name);
+      body = t('learner_you_scored') + ' ' + points + ' XP' + ' · ' + esc(unit.name);
       confettiFlag = earned > 0;
     } else if (mode === 'mission') {
       clearMissionProg();
       trackMissionForSession(100, true);
-      if (earned > 0) addXp(earned);
-      bonus = 10; addXp(10);
+      bonus = awardBonus('mission_complete', 10);
       markLessonDone('mission', unit.id);
       emoji = '🎯'; title = t('learner_mission_done');
-      body = t('learner_you_scored') + ' ' + earned + ' XP' + ' · ' + esc(unit.name);
+      body = t('learner_you_scored') + ' ' + points + ' XP' + ' · ' + esc(unit.name);
       confettiFlag = true;
     } else {
-      if (earned > 0) addXp(earned);
+      awardBonus('allena_complete', 5);
       emoji = '⚡'; title = t('learner_practice_done');
-      body = t('learner_you_scored') + ' ' + earned + ' XP';
+      body = t('learner_you_scored') + ' ' + points + ' XP';
     }
 
     if (stage) {
