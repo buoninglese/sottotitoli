@@ -11871,16 +11871,62 @@
       } catch(e) {}
       // Insights → Overview → Focus areas
       if (focusEl && difficulties.length > 0) {
+        // Raw onboarding difficulty keys (e.g. "taking_notes") → readable labels.
+        var DIFF_LABELS = {
+          it: {
+            reading_docs: 'Leggere documenti',
+            writing_messages: 'Scrivere messaggi / email',
+            taking_notes: 'Prendere appunti',
+            understanding_questions: 'Capire le domande',
+            speaking_fluently: 'Parlare fluentemente',
+            listening_native: 'Capire madrelingua veloci',
+            grammar: 'Grammatica',
+            pronunciation: 'Pronuncia',
+            vocabulary: 'Vocabolario',
+            meetings: 'Riunioni / Conference call',
+            presentations: 'Presentazioni',
+            other_diff: 'Altro'
+          },
+          en: {
+            reading_docs: 'Reading documents',
+            writing_messages: 'Writing messages / emails',
+            taking_notes: 'Taking notes',
+            understanding_questions: 'Understanding questions',
+            speaking_fluently: 'Speaking fluently',
+            listening_native: 'Understanding fast native speakers',
+            grammar: 'Grammar',
+            pronunciation: 'Pronunciation',
+            vocabulary: 'Vocabulary',
+            meetings: 'Meetings / Conference calls',
+            presentations: 'Presentations',
+            other_diff: 'Other'
+          }
+        };
+        function escTag(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+        function focusLabel(v) {
+          if (!v) return '';
+          var lang = (window.I18n && I18n.getLang) ? I18n.getLang() : 'it';
+          var m = DIFF_LABELS[lang] || DIFF_LABELS.it;
+          if (v === 'other_diff') {
+            var otherText = '';
+            try { var obT = JSON.parse(localStorage.getItem('sottotitoli_onboarding') || '{}'); otherText = obT['difficulties_other'] || ''; } catch(e) {}
+            return otherText || m.other_diff;
+          }
+          if (m[v]) return m[v];
+          // Unknown key — prettify snake_case → Title Case
+          return String(v).split('_').map(function(w){ return w ? w.charAt(0).toUpperCase() + w.slice(1) : w; }).join(' ');
+        }
         var chips = '';
         difficulties.forEach(function(d) {
-          var label = typeof d === 'string' ? d : (d && d.title ? d.title : (d && d.name ? d.name : ''));
-          if (!label) return;
-          chips += '<button class=\"q-chip active\" style=\"pointer-events:none\">' + label + '</button>';
+          var raw = typeof d === 'string' ? d : (d && d.title ? d.title : (d && d.name ? d.name : ''));
+          if (!raw) return;
+          chips += '<button class=\"q-chip active\" style=\"pointer-events:none\">' + escTag(focusLabel(raw)) + '</button>';
         });
         // Fallback: if all items were objects without titles, show raw data
         if (!chips) {
           chips = difficulties.map(function(d) {
-            return '<button class=\"q-chip active\" style=\"pointer-events:none\">' + (typeof d === 'string' ? d : JSON.stringify(d)) + '</button>';
+            var raw = typeof d === 'string' ? d : JSON.stringify(d);
+            return '<button class=\"q-chip active\" style=\"pointer-events:none\">' + escTag(focusLabel(raw)) + '</button>';
           }).join('');
         }
         focusEl.innerHTML = chips || '<span style=\"font-size:13px;color:var(--text-faint)\">Completa l\'onboarding per vedere le tue aree di miglioramento.</span>';
