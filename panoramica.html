@@ -615,21 +615,6 @@
                 <div class="wsc-feed" id="wscActivityFeed"><div class="wsc-feed-empty">Nessuna sessione ancora. Avvia la prima.</div></div>
               </div>
 
-              <!-- 4 · Missioni — progresso nei tuoi obiettivi di apprendimento -->
-              <div class="wsc-box wsc-glass wsc-wide">
-                <div class="wsc-box-head"><h3 class="wsc-box-title" data-i18n="wsc_missions_title">Missioni</h3><span class="wsc-box-hint" data-i18n="wsc_missions_hint">I tuoi obiettivi di apprendimento</span></div>
-                <div class="wsc-missions" id="wscMissions"></div>
-              </div>
-
-              <!-- 6 · Picco di produttività -->
-              <div class="wsc-box wsc-glass wsc-peak">
-                <div class="wsc-label" data-i18n="wsc_peak">Picco di produttività</div>
-                <div class="wsc-peak" id="wscPeak">Martedì, 22:00</div>
-                <div class="wsc-peak-sub" id="wscPeakSub">Nottambulo.</div>
-                <div class="wsc-heat" id="wscHeat"></div>
-                <div class="wsc-extra" id="wscExtra"></div>
-              </div>
-
               <!-- 7 · Invita amici -->
               <div class="wsc-box wsc-glass wsc-full">
                 <div>
@@ -4615,7 +4600,7 @@
   <script src="js/buy-card.js?v=5"></script>
   <script src="js/notifications.js"></script>
   <script src="js/learner-data.js?v=1"></script>
-  <script src="js/learner.js?v=18"></script>
+  <script src="js/learner.js?v=19"></script>
 
   <!-- Page-specific: Supabase data fetching -->
   <script>
@@ -6046,50 +6031,16 @@
         } catch (e) { return []; }
       }
 
-      function renderWrappedShowcase() {
-        var box = document.getElementById('wrappedShowcase');
-        if (!box) return;
-        var s = currentStats() || {};
-        var allSess = (s && s._allSessions) || [];
-        var streak = parseInt(localStorage.getItem('s8t-streak') || '0');
-        var totalMinutes = s.totalMinutes || 0;
-        var totalWords = s.totalWords || 0;
-        var totalSessions = s.totalSessions || 0;
-        // ═══ Box 1 · Attività recente — feed delle ultime 4 sessioni ═══
-        var feedEl = document.getElementById('wscActivityFeed');
-        if (feedEl) {
-          var recent = (allSess || []).slice().sort(function(a,b){ return new Date(b.started_at) - new Date(a.started_at); }).slice(0,5);
-          if (!recent.length) {
-            feedEl.innerHTML = '<div class="wsc-feed-empty">Nessuna sessione ancora. Avvia la prima.</div>';
-          } else {
-            feedEl.innerHTML = recent.map(function(x){
-              var wc = x.words_count || 0;
-              var lex = x.lexical_diversity || 0;
-              var uniq = lex > 0 ? Math.round(lex * wc) : '—';
-              var minutes = Math.max(1, Math.round((x.duration_seconds || 0) / 60));
-              var date = x.started_at ? new Date(x.started_at).toLocaleDateString('it-IT',{day:'2-digit',month:'short'}) : '—';
-              var lang = (x.language_pair || 'en').toUpperCase();
-              var name = (x.name && String(x.name).trim()) ? String(x.name).trim() : 'Sessione del ' + date;
-              var lexTxt = lex > 0 ? lex.toFixed(2) : '—';
-              var openFn = "var n=document.querySelector('[data-panel=trascrizioni]');if(n)n.click();setTimeout(function(){if(window.trOpenEditor)trOpenEditor('"+x.id+"')},350)";
-              return '<div class="wsc-feed-item" onclick="'+openFn+'">'+
-                '<div style="min-width:0"><div class="wsc-feed-name" title="'+escHtml(name)+'">'+escHtml(name)+'</div>'+
-                '<div class="wsc-feed-date">'+date+' · '+lang+'</div></div>'+
-                '<div class="wsc-feed-stats">'+
-                  '<div class="wsc-feed-stat"><b>'+minutes+'</b><span>min</span></div>'+
-                  '<div class="wsc-feed-stat"><b>'+wc+'</b><span>parole</span></div>'+
-                  '<div class="wsc-feed-stat"><b>'+uniq+'</b><span>uniche</span></div>'+
-                  '<div class="wsc-feed-stat"><b>'+lexTxt+'</b><span>div. lessicale</span></div>'+
-                '</div></div>';
-            }).join('');
-          }
-        }
-
-        // ═══ Box 6 · Peak productivity — SITE ACTIVITY (minutes on site) ═══
+      // ── Shared renderers: Peak productivity + Missions boxes ──
+      // Hosted in the Learner Overview tab; also callable from the dashboard.
+      function renderLearnerPeak() {
         var peakEl = document.getElementById('wscPeak');
         var peakSub = document.getElementById('wscPeakSub');
         var heatEl = document.getElementById('wscHeat');
         var extraEl = document.getElementById('wscExtra');
+        if (!peakEl && !peakSub && !heatEl && !extraEl) return;
+        var s = currentStats() || {};
+        var allSess = (s && s._allSessions) || [];
         var act = siteActivityEntries();
         var hasAct = act.length > 0;
         if (hasAct) {
@@ -6155,52 +6106,99 @@
           if (heatEl) { var cells=''; for (var i=0;i<28;i++) cells += '<div class="wsc-heat-cell"></div>'; heatEl.innerHTML = cells; }
           if (extraEl) extraEl.innerHTML = '';
         }
+      }
+      window.renderLearnerPeak = renderLearnerPeak;
 
-        // ═══ Box 4 · Mission progress (learning missions, EN/IT × AI/theme) ═══
+      function renderLearnerMissions() {
         var misEl = document.getElementById('wscMissions');
-        if (misEl) {
-          var mst = {};
-          try { mst = JSON.parse(localStorage.getItem('sottotitoli-learner-missions') || '{}'); } catch(e) {}
-          function aiLessonMeta(lang){
-            try {
-              var l = JSON.parse(localStorage.getItem('sottotitoli-learner-mission-' + lang) || 'null');
-              return l ? { title: l.title || '', sub: l.subtitle || l.objective || '' } : { title: '', sub: '' };
-            } catch(e){ return { title: '', sub: '' }; }
-          }
-          var tAi = wscT('wsc_mission_ai','Missione AI');
-          var tTheme = wscT('wsc_mission_theme','Missione a tema');
-          var tThemeSub = wscT('wsc_mission_theme_sub','Vocabolario essenziale per l\'uso quotidiano.');
-          var tIn = wscT('wsc_mission_inprogress','In corso');
-          var tDone = wscT('wsc_mission_done','Completata');
-          var tTodo = wscT('wsc_mission_todo','Non iniziata');
-          var tEn = wscT('wsc_lang_en','Inglese');
-          var tIt = wscT('wsc_lang_it','Italiano');
-          var langs = [['en', tEn], ['it', tIt]];
-          var defs = [['ai', tAi], ['theme', tTheme]];
-          var rows = '';
-          langs.forEach(function(L){
-            defs.forEach(function(M){
-              var key = L[0] + ':' + M[0];
-              var st = mst[key];
-              var meta = (M[0] === 'ai') ? aiLessonMeta(L[0]) : { title: '', sub: '' };
-              var title = (st && st.title) ? st.title : (meta.title || M[1]);
-              var desc = (st && st.desc) ? st.desc : meta.sub;
-              if (!desc && M[0] === 'theme') desc = tThemeSub;
-              var pct = st && st.done ? 100 : (st ? (st.pct || 0) : 0);
-              var done = !!(st && st.done);
-              var started = !!(st && st.started);
-              var status = done ? tDone + ' · 100%' : started ? tIn + ' · ' + pct + '%' : tTodo;
-              var cls = done ? ' wm-done' : started ? '' : ' wm-todo';
-              rows += '<div class="wm-row'+cls+'">'+
-                '<div class="wm-top"><div style="min-width:0"><div class="wm-name" title="'+escHtml(title)+'">'+escHtml(title)+'</div><div class="wm-lang">'+L[1]+'</div></div>'+
-                '<div class="wm-pct">'+pct+'%</div></div>'+
-                (desc ? '<div class="wm-desc">'+escHtml(desc)+'</div>' : '')+
-                '<div class="wm-track"><div class="wm-fill" style="width:'+pct+'%"></div></div>'+
-                '<div class="wm-status">'+status+'</div></div>';
-            });
-          });
-          misEl.innerHTML = '<div class="wm-grid">'+rows+'</div>';
+        if (!misEl) return;
+        var mst = {};
+        try { mst = JSON.parse(localStorage.getItem('sottotitoli-learner-missions') || '{}'); } catch(e) {}
+        function aiLessonMeta(lang){
+          try {
+            var l = JSON.parse(localStorage.getItem('sottotitoli-learner-mission-' + lang) || 'null');
+            return l ? { title: l.title || '', sub: l.subtitle || l.objective || '' } : { title: '', sub: '' };
+          } catch(e){ return { title: '', sub: '' }; }
         }
+        var tAi = wscT('wsc_mission_ai','Missione AI');
+        var tTheme = wscT('wsc_mission_theme','Missione a tema');
+        var tThemeSub = wscT('wsc_mission_theme_sub','Vocabolario essenziale per l\'uso quotidiano.');
+        var tIn = wscT('wsc_mission_inprogress','In corso');
+        var tDone = wscT('wsc_mission_done','Completata');
+        var tTodo = wscT('wsc_mission_todo','Non iniziata');
+        var tEn = wscT('wsc_lang_en','Inglese');
+        var tIt = wscT('wsc_lang_it','Italiano');
+        var langs = [['en', tEn], ['it', tIt]];
+        var defs = [['ai', tAi], ['theme', tTheme]];
+        var rows = '';
+        langs.forEach(function(L){
+          defs.forEach(function(M){
+            var key = L[0] + ':' + M[0];
+            var st = mst[key];
+            var meta = (M[0] === 'ai') ? aiLessonMeta(L[0]) : { title: '', sub: '' };
+            var title = (st && st.title) ? st.title : (meta.title || M[1]);
+            var desc = (st && st.desc) ? st.desc : meta.sub;
+            if (!desc && M[0] === 'theme') desc = tThemeSub;
+            var pct = st && st.done ? 100 : (st ? (st.pct || 0) : 0);
+            var done = !!(st && st.done);
+            var started = !!(st && st.started);
+            var status = done ? tDone + ' · 100%' : started ? tIn + ' · ' + pct + '%' : tTodo;
+            var cls = done ? ' wm-done' : started ? '' : ' wm-todo';
+            rows += '<div class="wm-row'+cls+'">'+
+              '<div class="wm-top"><div style="min-width:0"><div class="wm-name" title="'+escHtml(title)+'">'+escHtml(title)+'</div><div class="wm-lang">'+L[1]+'</div></div>'+
+              '<div class="wm-pct">'+pct+'%</div></div>'+
+              (desc ? '<div class="wm-desc">'+escHtml(desc)+'</div>' : '')+
+              '<div class="wm-track"><div class="wm-fill" style="width:'+pct+'%"></div></div>'+
+              '<div class="wm-status">'+status+'</div></div>';
+          });
+        });
+        misEl.innerHTML = '<div class="wm-grid">'+rows+'</div>';
+      }
+      window.renderLearnerMissions = renderLearnerMissions;
+
+      function renderWrappedShowcase() {
+        var box = document.getElementById('wrappedShowcase');
+        if (!box) return;
+        var s = currentStats() || {};
+        var allSess = (s && s._allSessions) || [];
+        var streak = parseInt(localStorage.getItem('s8t-streak') || '0');
+        var totalMinutes = s.totalMinutes || 0;
+        var totalWords = s.totalWords || 0;
+        var totalSessions = s.totalSessions || 0;
+        // ═══ Box 1 · Attività recente — feed delle ultime 4 sessioni ═══
+        var feedEl = document.getElementById('wscActivityFeed');
+        if (feedEl) {
+          var recent = (allSess || []).slice().sort(function(a,b){ return new Date(b.started_at) - new Date(a.started_at); }).slice(0,5);
+          if (!recent.length) {
+            feedEl.innerHTML = '<div class="wsc-feed-empty">Nessuna sessione ancora. Avvia la prima.</div>';
+          } else {
+            feedEl.innerHTML = recent.map(function(x){
+              var wc = x.words_count || 0;
+              var lex = x.lexical_diversity || 0;
+              var uniq = lex > 0 ? Math.round(lex * wc) : '—';
+              var minutes = Math.max(1, Math.round((x.duration_seconds || 0) / 60));
+              var date = x.started_at ? new Date(x.started_at).toLocaleDateString('it-IT',{day:'2-digit',month:'short'}) : '—';
+              var lang = (x.language_pair || 'en').toUpperCase();
+              var name = (x.name && String(x.name).trim()) ? String(x.name).trim() : 'Sessione del ' + date;
+              var lexTxt = lex > 0 ? lex.toFixed(2) : '—';
+              var openFn = "var n=document.querySelector('[data-panel=trascrizioni]');if(n)n.click();setTimeout(function(){if(window.trOpenEditor)trOpenEditor('"+x.id+"')},350)";
+              return '<div class="wsc-feed-item" onclick="'+openFn+'">'+
+                '<div style="min-width:0"><div class="wsc-feed-name" title="'+escHtml(name)+'">'+escHtml(name)+'</div>'+
+                '<div class="wsc-feed-date">'+date+' · '+lang+'</div></div>'+
+                '<div class="wsc-feed-stats">'+
+                  '<div class="wsc-feed-stat"><b>'+minutes+'</b><span>min</span></div>'+
+                  '<div class="wsc-feed-stat"><b>'+wc+'</b><span>parole</span></div>'+
+                  '<div class="wsc-feed-stat"><b>'+uniq+'</b><span>uniche</span></div>'+
+                  '<div class="wsc-feed-stat"><b>'+lexTxt+'</b><span>div. lessicale</span></div>'+
+                '</div></div>';
+            }).join('');
+          }
+        }
+
+        // ═══ Box 6 + Box 4 · Peak productivity + Mission progress ═══
+        // Now hosted in the Learner Overview tab — shared renderers below.
+        renderLearnerPeak();
+        renderLearnerMissions();
       }
       window.renderWrappedShowcase = renderWrappedShowcase;
 
