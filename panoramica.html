@@ -49,7 +49,7 @@
   <link rel="stylesheet" href="css/cta-fluid.css?v=2">
   <link rel="stylesheet" href="css/theme-wrapped.css?v=20">
   <link rel="stylesheet" href="css/review.css">
-  <link rel="stylesheet" href="css/panoramica.css?v=11">
+  <link rel="stylesheet" href="css/panoramica.css?v=12">
   <link rel="stylesheet" href="css/learner.css?v=17">
   <link rel="stylesheet" href="css/components.css?v=8">
   <link rel="stylesheet" href="css/tailwind.min.css">
@@ -138,7 +138,7 @@
     <header class="topbar">
       <button class="topbar-menu" id="topbarMenu" onclick="toggleSidebarDrawer()" aria-label="Menu" title="Menu"><span class="material-symbols-outlined">menu</span></button>
       <div style="display:flex;align-items:center;gap:0">
-        <a href="index.html" class="topbar-brand" style="font-size:36px;font-family:'Manrope',sans-serif;font-weight:700;text-decoration:none;letter-spacing:-0.02em;display:inline-flex;align-items:baseline;gap:0"><span class="topbar-brand-name">sottotitoli</span><span class="topbar-brand-pro" style="font-family:'Manrope',sans-serif;font-weight:800;letter-spacing:-.5px">.pro</span><span class="topbar-version" style="font-size:11px;font-weight:600;font-family:'Manrope',sans-serif;color:var(--text-soft);margin-left:6px;opacity:.55;letter-spacing:.02em">v278</span></a>
+        <a href="index.html" class="topbar-brand" style="font-size:36px;font-family:'Manrope',sans-serif;font-weight:700;text-decoration:none;letter-spacing:-0.02em;display:inline-flex;align-items:baseline;gap:0"><span class="topbar-brand-name">sottotitoli</span><span class="topbar-brand-pro" style="font-family:'Manrope',sans-serif;font-weight:800;letter-spacing:-.5px">.pro</span><span class="topbar-version" style="font-size:11px;font-weight:600;font-family:'Manrope',sans-serif;color:var(--text-soft);margin-left:6px;opacity:.55;letter-spacing:.02em">v279</span></a>
       </div>
       <div style="display:flex;align-items:center;gap:12px">
         <button class="btn-start-session hv-start" id="btnStartSession" onclick="toggleStartSession()" style="font-size:15px;height:42px;padding:0 20px;border-radius:12px;background:linear-gradient(135deg,rgba(192,132,252,.18),rgba(192,132,252,.06));color:#c084fc;border:1px solid rgba(192,132,252,.25);font-weight:700;font-family:'Manrope',sans-serif;display:inline-flex;align-items:center;gap:8px;box-shadow:0 0 20px rgba(192,132,252,.12),0 2px 8px rgba(0,0,0,.2);cursor:pointer;letter-spacing:-.01em;transition:all .2s ease">
@@ -4767,6 +4767,145 @@
   <script src="js/it-lexicon.js"></script>
   <script src="js/toast.js?v=2"></script>
   <script src="js/theme-2.js?v=5"></script>
+  <script src="js/speech-icons.js?v=1"></script>
+  <script>
+  /* ── Word-box editorial tokens ──
+     Port of dev/word-boxes-editorial-mockup.html: drives the 12 --w-* CSS vars on
+     #sub-wb-expand / #sub-wb-expand-it / #vtReviewGrid so the word boxes match the
+     approved editorial "Spotlight" design in all 4 themes (modern · modern-light ·
+     genz · genz-dark). Recomputes on theme change + data-wb-scheme/data-wb-accent
+     change (MutationObservers below), and on load. */
+  window.WBToken = (function(){
+    'use strict';
+    var RAW = {
+      '2':{light:{acc:'#0369a1',soft:'#e0f2fe',soft2:'#f0f9ff',text:'#0c2d48',border:'#bae6fd'}, dark:{acc:'#38bdf8',soft:'rgba(56,189,248,.18)',soft2:'rgba(56,189,248,.06)',text:'#7dd3fc',border:'rgba(56,189,248,.40)'}},
+      '4':{light:{acc:'#047857',soft:'#d1fae5',soft2:'#ecfdf5',text:'#0f2a1a',border:'#a7f3d0'}, dark:{acc:'#34d399',soft:'rgba(52,211,153,.18)',soft2:'rgba(52,211,153,.06)',text:'#6ee7b7',border:'rgba(52,211,153,.40)'}},
+      '5':{light:{acc:'#6d28d9',soft:'#ede9fe',soft2:'#f5f3ff',text:'#1a0f2e',border:'#ddd6fe'}, dark:{acc:'#c4b5fd',soft:'rgba(196,181,253,.18)',soft2:'rgba(196,181,253,.06)',text:'#ddd6fe',border:'rgba(196,181,253,.40)'}},
+      '6':{light:{acc:'#b45309',soft:'#fef3c7',soft2:'#fffbeb',text:'#2e2410',border:'#fde68a'}, dark:{acc:'#fbbf24',soft:'rgba(251,191,36,.18)',soft2:'rgba(251,191,36,.06)',text:'#fcd34d',border:'rgba(251,191,36,.40)'}},
+      '7':{light:{acc:'#be185d',soft:'#ffe4e6',soft2:'#fff1f2',text:'#2a0f24',border:'#fecdd3'}, dark:{acc:'#fda4af',soft:'rgba(253,164,175,.18)',soft2:'rgba(253,164,175,.06)',text:'#fecdd3',border:'rgba(253,164,175,.40)'}}
+    };
+    var POS = { 'NOUN':{c:'#2563eb',L:.60}, 'VERB':{c:'#0891b2',L:.60}, 'ADJ':{c:'#7c3aed',L:.62}, 'ADV':{c:'#db2777',L:.62} };
+    var CEFR = { 'A1':{c:'#34d399',L:.70}, 'A2':{c:'#2dd4bf',L:.68}, 'B1':{c:'#38bdf8',L:.66}, 'B2':{c:'#818cf8',L:.60}, 'C1':{c:'#a78bfa',L:.62}, 'C2':{c:'#e879f9',L:.64} };
+    var TOKENS = ['--w-acc','--w-word','--w-sub','--w-hd1','--w-hd2','--w-hdline','--w-body','--w-border','--w-bar','--w-barline','--w-bartext','--w-acc-text'];
+
+    function hex2rgb(h){ h = String(h).replace('#',''); return [parseInt(h.substr(0,2),16), parseInt(h.substr(2,2),16), parseInt(h.substr(4,2),16)]; }
+    function mix(hex, other, t){ var a=hex2rgb(hex), b=hex2rgb(other); return 'rgb('+Math.round(a[0]+(b[0]-a[0])*t)+','+Math.round(a[1]+(b[1]-a[1])*t)+','+Math.round(a[2]+(b[2]-a[2])*t)+')'; }
+    function rgba(col, a){ var c = String(col).charAt(0)==='#' ? hex2rgb(col) : String(col).match(/\d+/g); return 'rgba('+c[0]+','+c[1]+','+c[2]+','+a+')'; }
+    function lum(col){ var m=String(col).match(/\d+/g); return 0.299*(+m[0])+0.587*(+m[1])+0.114*(+m[2]); }
+    function contrastText(col){ return lum(col) > 150 ? '#0b1020' : '#ffffff'; }
+    function rgb2hsl(r,g,b){ r/=255; g/=255; b/=255; var mx=Math.max(r,g,b), mn=Math.min(r,g,b), d=mx-mn, h=0, l=(mx+mn)/2, s=d ? (l<.5 ? d/(2*l) : d/(2-2*l)) : 0; if(d){ if(mx===r) h=((g-b)/d)%6; else if(mx===g) h=(b-r)/d+2; else h=(r-g)/d+4; h*=60; if(h<0) h+=360; } return [h, s, l]; }
+    function hsl2rgb(h,s,l){ h/=360; var c=(1-Math.abs(2*l-1))*s, x=c*(1-Math.abs((h*6)%2-1)), m=l-c/2, r=0,g=0,b=0; if(h<1/6){r=c;g=x;}else if(h<2/6){r=x;g=c;}else if(h<3/6){g=c;b=x;}else if(h<4/6){g=x;b=c;}else if(h<5/6){r=x;b=c;}else{r=c;b=x;} return 'rgb('+Math.round((r+m)*255)+','+Math.round((g+m)*255)+','+Math.round((b+m)*255)+')'; }
+    function lighten(hex, L){ var a=hex2rgb(hex), h=rgb2hsl(a[0],a[1],a[2]); return hsl2rgb(h[0], h[1], L); }
+
+    function wboxVars(theme, raw){
+      var t = (theme==='modern'||theme==='genz-dark') ? 'dark' : 'light';
+      var p = t==='dark' ? raw.dark : raw.light;
+      var v = {
+        '--w-acc': p.acc,
+        '--w-word': t==='dark' ? p.text : p.acc,
+        '--w-sub': t==='dark' ? 'rgba(255,255,255,.62)' : '#35586c',
+        '--w-hd1': p.soft, '--w-hd2': p.soft2,
+        '--w-hdline': p.border
+      };
+      if (theme==='modern'){
+        v['--w-body']='#151515'; v['--w-border']='rgba(255,255,255,.08)';
+        v['--w-bar']='rgba(255,255,255,.03)'; v['--w-barline']='rgba(255,255,255,.12)';
+        v['--w-bartext']='rgba(255,255,255,.55)'; v['--w-acc-text']='#06131a';
+      } else if (theme==='modern-light'){
+        v['--w-body']='#ffffff'; v['--w-border']='#d7e7f2';
+        v['--w-bar']=p.soft; v['--w-barline']=p.border; v['--w-bartext']=p.acc;
+        v['--w-acc-text']='#ffffff';
+      } else if (theme==='genz'){
+        v['--w-body']='rgba(255,255,255,.82)'; v['--w-border']='rgba(255,255,255,.6)';
+        v['--w-bar']='rgba(255,255,255,.5)'; v['--w-barline']='rgba(255,255,255,.55)';
+        v['--w-bartext']=p.acc; v['--w-acc-text']='#ffffff';
+      } else {
+        v['--w-body']='rgba(30,14,58,.66)'; v['--w-border']='rgba(196,181,253,.24)';
+        v['--w-bar']='rgba(255,255,255,.05)'; v['--w-barline']='rgba(196,181,253,.28)';
+        v['--w-bartext']='rgba(255,255,255,.6)'; v['--w-acc-text']='#12081f';
+      }
+      return v;
+    }
+    function modeVars(theme, acc, L){
+      var dark = (theme==='modern'||theme==='genz-dark');
+      var accUse = dark ? lighten(acc, L || .58) : acc;
+      var word = dark ? lighten(acc, Math.min(1, (L||.58)+.14)) : acc;
+      var body = dark ? '#151515' : (theme==='genz' ? 'rgba(255,255,255,.82)' : '#fff');
+      var bdr = theme==='genz-dark' ? 'rgba(196,181,253,.24)' : (theme==='genz' ? 'rgba(255,255,255,.6)' : (theme==='modern' ? 'rgba(255,255,255,.08)' : '#d7e7f2'));
+      return {
+        '--w-acc': accUse,
+        '--w-word': word,
+        '--w-sub': dark ? 'rgba(255,255,255,.66)' : '#35586c',
+        '--w-hd1': dark ? rgba(accUse, .26) : mix(acc, '#ffffff', .9),
+        '--w-hd2': dark ? rgba(accUse, .08) : mix(acc, '#ffffff', .96),
+        '--w-hdline': dark ? rgba(accUse, .4) : rgba(acc, .35),
+        '--w-body': body, '--w-border': bdr,
+        '--w-bar': dark ? rgba(accUse, .10) : mix(acc, '#ffffff', .92),
+        '--w-barline': dark ? rgba(accUse, .55) : rgba(acc, .4),
+        '--w-bartext': dark ? accUse : acc,
+        '--w-acc-text': contrastText(accUse)
+      };
+    }
+    function setVars(el, vars){ for (var k in vars) el.style.setProperty(k, vars[k]); }
+    function clearVars(el){ for (var i = 0; i < TOKENS.length; i++) el.style.removeProperty(TOKENS[i]); }
+
+    function applyTo(container){
+      if (!container) return;
+      var theme = document.documentElement.getAttribute('data-theme') || 'modern';
+      var scheme = container.getAttribute('data-wb-scheme');
+      var mode = container.getAttribute('data-wb-accent');
+      var cards = container.querySelectorAll('.wbx-box');
+      var i, box;
+      for (i = 0; i < cards.length; i++) clearVars(cards[i]);
+      if (mode === 'pos' || mode === 'cefr') {
+        var table = mode === 'pos' ? POS : CEFR;
+        for (i = 0; i < cards.length; i++) {
+          box = cards[i];
+          var tag = mode === 'pos' ? box.getAttribute('data-pos') : box.getAttribute('data-cefr');
+          var def = table[tag];
+          setVars(box, def ? modeVars(theme, def.c, def.L) : wboxVars(theme, RAW[scheme] || RAW['2']));
+        }
+      } else {
+        setVars(container, wboxVars(theme, RAW[scheme] || RAW['2']));
+      }
+    }
+
+    var REFRESH_SELS = ['#sub-wb-expand','#sub-wb-expand-it','#vtReviewGrid'];
+    function refreshAll(){
+      for (var i = 0; i < REFRESH_SELS.length; i++) {
+        var el = document.querySelector(REFRESH_SELS[i]);
+        if (el) applyTo(el);
+      }
+    }
+    function watch(el){
+      new MutationObserver(function(){ applyTo(el); }).observe(el, { attributes:true, attributeFilter:['data-wb-scheme','data-wb-accent'] });
+    }
+    function init(){
+      refreshAll();
+      if (typeof MutationObserver !== 'undefined') {
+        new MutationObserver(refreshAll).observe(document.documentElement, { attributes:true, attributeFilter:['data-theme'] });
+        for (var i = 0; i < REFRESH_SELS.length; i++) {
+          var el = document.querySelector(REFRESH_SELS[i]);
+          if (el) watch(el);
+        }
+      }
+    }
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
+    else init();
+    return { refreshAll: refreshAll, applyTo: applyTo };
+  })();
+  /* ── Word-box voice buttons (UK/US/IT) — reuse SpeechIcons (browser TTS) ── */
+  window.wbxSpeak = function(btn){
+    var box = btn.closest('.wbx-box');
+    if (!box || !window.SpeechIcons) return;
+    var word = box.getAttribute('data-word');
+    if (!word) return;
+    var v = btn.getAttribute('data-voice');
+    if (v === 'it') { window.SpeechIcons.speak(word, { lang:'it-IT', voice:'Google italiano' }); return; }
+    if (v === 'us') { window.SpeechIcons.speak(word, { lang:'en-US', voice:'Google US English' }); return; }
+    window.SpeechIcons.speak(word, { lang:'en-GB', voice:'Google UK English Male' });
+  };
+  </script>
   <script>
   /* ── Wrapped theme switcher (Modern / Retro / Gen-Z) ── */
   (function(){
@@ -9625,6 +9764,62 @@
       };
 
       // Review Due — renders words as wbx-box cards with fatto/più tardi
+      // ── Shared editorial "Spotlight" word-box template (matches dev/word-boxes-editorial-mockup.html) ──
+      // o: {word, cefr, pos, ipa, def, trans, transOp, syns, lang('en'|'it'), exact, dismissible,
+      //     saveTitle, bar('std'|'vt'), wid, ring, wfont}
+      window.wbxCard = function(o){
+        var word = o.word || '';
+        var cefr = o.cefr || '';
+        var pos = o.pos || '';
+        var ipa = o.ipa || '—';
+        var def = o.def || 'Caricamento…';
+        var trans = o.trans || '';
+        var transOp = (o.transOp !== undefined) ? o.transOp : (trans ? 1 : 0);
+        var syns = o.syns || '';
+        var lang = o.lang || 'en';
+        var exact = o.exact ? ' wbx-exact' : '';
+        var voiceBtns, cefrHtml, posHtml, barHtml, transStyle, widAttr;
+
+        if (lang === 'it') {
+          voiceBtns = '<button class="wbx-voice" data-voice="it" title="Ascolta" onclick="event.stopPropagation();wbxSpeak(this)"><i class="fa-solid fa-volume-high"></i></button>';
+        } else {
+          voiceBtns = '<button class="wbx-voice" data-voice="uk" title="Pronuncia britannica" onclick="event.stopPropagation();wbxSpeak(this)"><i class="fa-solid fa-volume-high"></i> UK</button>' +
+                      '<button class="wbx-voice" data-voice="us" title="Pronuncia americana" onclick="event.stopPropagation();wbxSpeak(this)"><i class="fa-solid fa-volume-high"></i> US</button>';
+        }
+        cefrHtml = (cefr && cefr !== '—') ? '<span class="wbx-cefr">' + cefr + '</span>' : '';
+        posHtml = (pos && pos !== '—') ? '<span class="wbx-pos">' + pos + '</span>' : '';
+        transStyle = transOp ? ' style="opacity:1"' : ' style="opacity:0"';
+        widAttr = o.wid ? ' data-wid="' + o.wid + '"' : '';
+
+        if (o.bar === 'vt') {
+          barHtml =
+            '<button class="wbx-save-btn vt-fatto-btn" data-wid="' + o.wid + '" data-word="' + word + '" title="Fatto — la conosco" onclick="event.stopPropagation();vtMarkFatto(this)" style="font-size:22px">✓</button>' +
+            '<button class="wbx-bookmark-btn vt-piutardi-btn" data-wid="' + o.wid + '" data-word="' + word + '" title="Più tardi — saltala per ora" onclick="event.stopPropagation();vtMarkPiuTardi(this)" style="font-size:18px">⏭</button>';
+        } else {
+          barHtml =
+            '<button class="wbx-save-btn" data-word="' + word + '" data-level="' + cefr + '" data-pos="' + pos + '" title="' + (o.saveTitle || 'Aggiungi') + '">+</button>' +
+            '<button class="wbx-dict-btn" data-word="' + word + '" data-level="' + cefr + '" data-pos="' + pos + '" title="Cerca in un dizionario"><i class="fa-solid fa-magnifying-glass"></i></button>' +
+            (o.dismissible ? '<button class="wbx-close-btn" title="Rimuovi" onclick="event.stopPropagation();wbxDismissBox(this)">×</button>' : '');
+        }
+
+        return '<article class="wbx-box' + exact + '" data-word="' + word + '" data-pos="' + pos + '" data-cefr="' + cefr + '"' + widAttr + (o.ring ? ' style="border-left:3px solid ' + o.ring + '"' : '') + '>' +
+          '<div class="wbx-main-col">' +
+            '<div class="wbx-head"><div class="wbx-voices">' + voiceBtns + '</div>' + cefrHtml + '</div>' +
+            '<div class="wbx-word-zone">' +
+              '<div class="wbx-glow"></div>' +
+              '<div class="wbx-w"' + (o.wfont || '') + '>' + word + '</div>' +
+              '<div class="wbx-posipa">' + posHtml + '<span class="wbx-ipa">' + ipa + '</span></div>' +
+            '</div>' +
+            '<div class="wbx-meta-zone">' +
+              '<div class="wbx-def">' + def + '</div>' +
+              '<div class="wbx-trans"' + transStyle + '>' + (trans || '—') + '</div>' +
+              '<div class="wbx-syns">' + syns + '</div>' +
+            '</div>' +
+          '</div>' +
+          '<div class="wbx-save-col">' + barHtml + '</div>' +
+        '</article>';
+      };
+
       async function renderVTReviewDue() {
         var cardsEl = document.getElementById('vtReviewGrid');
         var emptyEl = document.getElementById('vtReviewEmpty');
@@ -9708,25 +9903,16 @@
               (w.last_reviewed_at ? ' · Ultimo ripasso: '+fmtDate(w.last_reviewed_at) : '') +
               (w.mastery_score ? ' · Mastery '+w.mastery_score+'%' : '');
 
-          html += '<article class="wbx-box" data-word="'+word+'" data-wid="'+w.id+'" data-pos="'+posLabel+'" style="border-left:3px solid '+ringColor+'">'+
-            '<div class="wbx-main-col">'+
-            '<div class="wbx-word-zone">'+
-            '<div class="wbx-head"><span class="wbx-w" style="font-size:'+wordFontSize+'">'+word+'</span>'+(cefr?'<span class="wbx-cefr">'+cefr+'</span>':'')+(posLabel!=='—'?'<span class="wbx-pos">'+posLabel+'</span>':'')+'</div>'+
-            '<div class="wbx-ipa"><span class="wbx-status-tag" style="font-size:11px;color:'+(isOverdue?'var(--amber)':'var(--text-faint)')+'">'+statusLine+'</span> · <span style="font-size:11px;color:var(--text-faint)">'+freqLine+'</span></div>'+
-            '</div>'+
-            '<div class="wbx-meta-zone">'+
-            '<div class="wbx-def" style="font-size:13px;color:var(--text-soft);line-height:1.5;min-height:20px">Caricamento…</div>'+
-            '<div class="wbx-trans" style="font-size:13px;color:var(--text-faint);min-height:18px"></div>'+
-            '<div class="wbx-syns"></div>'+
-            '</div>'+
-            '</div>'+
-            '<div class="wbx-save-col">'+
-            '<button class="wbx-save-btn vt-fatto-btn" data-wid="'+w.id+'" data-word="'+word+'" title="Fatto — la conosco" onclick="event.stopPropagation();vtMarkFatto(this)" style="font-size:22px">✓</button>'+
-            '<button class="wbx-bookmark-btn vt-piutardi-btn" data-wid="'+w.id+'" data-word="'+word+'" title="Più tardi — saltala per ora" onclick="event.stopPropagation();vtMarkPiuTardi(this)" style="font-size:18px">⏭</button>'+
-            '</div>'+
-            '</article>';
+          html += window.wbxCard({
+            word: word, cefr: cefr, pos: posLabel,
+            ipa: '<span class="wbx-status-tag" style="font-size:11px;color:'+(isOverdue?'var(--amber)':'var(--text-faint)')+'">'+statusLine+'</span> · <span style="font-size:11px;color:var(--text-faint)">'+freqLine+'</span>',
+            def: 'Caricamento…', trans: '', transOp: 0, syns: '',
+            lang: 'en', exact: false, dismissible: false,
+            bar: 'vt', wid: w.id, ring: ringColor, wfont: 'style="font-size:'+wordFontSize+'"'
+          });
         });
         cardsEl.innerHTML = html;
+        if (window.WBToken) window.WBToken.refreshAll();
 
         // Enrich ALL cards with definitions (batch with stagger to avoid rate limits)
         var boxes = document.querySelectorAll('#vtReviewGrid .wbx-box');
@@ -9894,10 +10080,13 @@
       ];
 
       function vtApplyScheme() {
-        var isDark = document.documentElement.getAttribute('data-theme') === 'dark';
-        var s = isDark ? _vtSchemesDark[_vtAccentIdx] : _vtSchemes[_vtAccentIdx];
         var container = document.getElementById('vtReviewGrid');
         if (!container) return;
+        // Set the scheme key so WBToken drives the editorial --w-* tokens (the legacy 'dark'
+        // check below doesn't know modern/genz-dark, so WBToken is the source of truth).
+        container.setAttribute('data-wb-scheme', ['2','4','5','6','7'][_vtAccentIdx]);
+        var isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+        var s = isDark ? _vtSchemesDark[_vtAccentIdx] : _vtSchemes[_vtAccentIdx];
         container.style.setProperty('--sz-dark', s.dark);
         container.style.setProperty('--sz-dark-border', s.border);
         container.style.setProperty('--sz-darktext', s.text);
@@ -10116,49 +10305,25 @@
             exactPos = tagWordPenn(query.toLowerCase()) || exactPos;
           }
           var exactPosLabel = mapPos(exactPos);
-          var exactCardHtml = '<article class="wbx-box wbx-exact" data-pos="' + exactPosLabel + '" data-cefr="' + exactLevel + '" data-word="' + query + '">' +
-            '<div class="wbx-main-col">' +
-            '<div class="wbx-word-zone">' +
-            '<div class="wbx-head"><span class="wbx-w">' + query + '</span><span class="wbx-cefr">' + exactLevel + '</span><span class="wbx-pos">' + exactPosLabel + '</span></div>' +
-            '<div class="wbx-ipa">—</div>' +
-            '</div>' +
-            '<div class="wbx-meta-zone">' +
-            '<div class="wbx-def">Caricamento…</div>' +
-            '<div class="wbx-trans" style="opacity:0">—</div>' +
-            '<div class="wbx-syns"></div>' +
-            '</div>' +
-            '</div>' +
-            '<div class="wbx-save-col">' +
-            '<button class="wbx-save-btn" data-word="' + query + '" data-level="' + exactLevel + '" data-pos="' + exactPosLabel + '" title="Aggiungi a Build From Known">+</button>' +
-            '<button class="wbx-dict-btn" data-word="' + query + '" data-level="' + exactLevel + '" data-pos="' + exactPosLabel + '" title="Cerca in un dizionario"><i class="fa-solid fa-magnifying-glass"></i></button>' +
-            '</div>' +
-            '</article>';
+          var exactCardHtml = window.wbxCard({
+            word: query, cefr: exactLevel, pos: exactPosLabel, ipa: '—',
+            def: 'Caricamento…', trans: '', transOp: 0, syns: '',
+            lang: 'en', exact: true, dismissible: false, saveTitle: 'Aggiungi a Build From Known'
+          });
 
           var cardsHtml = '';
           suggestions.forEach(function(s) {
             var posLabel = mapPos(s.pos);
             var displayWord = s.word;
-            cardsHtml += '<article class="wbx-box" data-pos="' + posLabel + '" data-cefr="' + s.level + '" data-word="' + s.word + '">' +
-              '<div class="wbx-main-col">' +
-              '<div class="wbx-word-zone">' +
-              '<div class="wbx-head"><span class="wbx-w">' + displayWord + '</span><span class="wbx-cefr">' + s.level + '</span><span class="wbx-pos">' + posLabel + '</span></div>' +
-              '<div class="wbx-ipa">—</div>' +
-              '</div>' +
-              '<div class="wbx-meta-zone">' +
-              '<div class="wbx-def">Caricamento…</div>' +
-              '<div class="wbx-trans" style="opacity:0">—</div>' +
-              '<div class="wbx-syns"></div>' +
-              '</div>' +
-              '</div>' +
-              '<div class="wbx-save-col">' +
-              '<button class="wbx-save-btn" data-word="' + s.word + '" data-level="' + s.level + '" data-pos="' + posLabel + '" title="Aggiungi a Build From Known">+</button>' +
-              '<button class="wbx-dict-btn" data-word="' + s.word + '" data-level="' + s.level + '" data-pos="' + posLabel + '" title="Cerca in un dizionario"><i class="fa-solid fa-magnifying-glass"></i></button>' +
-              '<button class="wbx-close-btn" title="Rimuovi" onclick="event.stopPropagation();wbxDismissBox(this)">×</button>' +
-              '</div>' +
-              '</article>';
+            cardsHtml += window.wbxCard({
+              word: displayWord, cefr: s.level, pos: posLabel, ipa: '—',
+              def: 'Caricamento…', trans: '', transOp: 0, syns: '',
+              lang: 'en', exact: false, dismissible: true, saveTitle: 'Aggiungi a Build From Known'
+            });
           });
           results.innerHTML = '<div class="wbx-grid">' + exactCardHtml + cardsHtml + '</div>' +
             (suggestions.length > 5 ? '<div style="text-align:center;margin-top:16px"><button class="fchip" onclick="window.wbxShowMore(this)" style="font-size:15px;padding:10px 22px;font-family:var(--font-ui)"><i class="fa-solid fa-chevron-down"></i> Mostra di più (' + (suggestions.length - 5) + ')</button></div>' : '');
+          if (window.WBToken) window.WBToken.refreshAll();
           // Auto-size long words
           setTimeout(window.autoSizeExpandWords, 100);
           // Check bank membership before enriching definitions
@@ -10472,14 +10637,14 @@
                 var cardsHtml = '';
                 newSuggestions.forEach(function(s){
                   var posLabel = mapPos(s.pos);
-                  cardsHtml += '<article class="wbx-box" data-pos="' + posLabel + '" data-cefr="' + s.level + '" data-word="' + s.word + '">' +
-                    '<div class="wbx-main-col"><div class="wbx-word-zone"><div class="wbx-head"><span class="wbx-w">' + s.word + '</span><span class="wbx-cefr">' + s.level + '</span><span class="wbx-pos">' + posLabel + '</span></div><div class="wbx-ipa">—</div></div>' +
-                    '<div class="wbx-meta-zone"><div class="wbx-def">Caricamento…</div><div class="wbx-trans" style="opacity:0">—</div><div class="wbx-syns"></div></div></div>' +
-                    '<div class="wbx-save-col"><button class="wbx-save-btn" data-word="' + s.word + '" data-level="' + s.level + '" data-pos="' + posLabel + '" title="Aggiungi a Build From Known">+</button>' +
-                    '<button class="wbx-dict-btn" data-word="' + s.word + '" data-level="' + s.level + '" data-pos="' + posLabel + '" title="Cerca in un dizionario"><i class="fa-solid fa-magnifying-glass"></i></button>' +
-                    '<button class="wbx-close-btn" title="Rimuovi" onclick="event.stopPropagation();wbxDismissBox(this)">×</button></div></article>';
+                  cardsHtml += window.wbxCard({
+                    word: s.word, cefr: s.level, pos: posLabel, ipa: '—',
+                    def: 'Caricamento…', trans: '', transOp: 0, syns: '',
+                    lang: 'en', exact: false, dismissible: true, saveTitle: 'Aggiungi a Build From Known'
+                  });
                 });
                 grid.insertAdjacentHTML('beforeend', cardsHtml);
+                if (window.WBToken) window.WBToken.refreshAll();
                 // Re-enrich new cards and check bank status
                 enrichBankStatus();
                 enrichExpandCards(queryWord);
@@ -10872,7 +11037,8 @@
         var loadingHtml = '<article class="wbx-box expanded" data-word="' + word + '" style="opacity:0.65">' +
           '<button class="wbx-close-exp" title="Chiudi">×</button>' +
           '<div class="wbx-main-col">' +
-          '<div class="wbx-word-zone"><div class="wbx-head"><span class="wbx-w">' + word + '</span><span class="wbx-cefr">…</span><span class="wbx-pos">…</span></div><div class="wbx-ipa">—</div></div>' +
+          '<div class="wbx-head"><div class="wbx-voices"><button class="wbx-voice" data-voice="uk" title="Pronuncia britannica" onclick="event.stopPropagation();wbxSpeak(this)"><i class="fa-solid fa-volume-high"></i> UK</button><button class="wbx-voice" data-voice="us" title="Pronuncia americana" onclick="event.stopPropagation();wbxSpeak(this)"><i class="fa-solid fa-volume-high"></i> US</button></div><span class="wbx-cefr">…</span></div>' +
+          '<div class="wbx-word-zone"><div class="wbx-glow"></div><div class="wbx-w">' + word + '</div><div class="wbx-posipa"><span class="wbx-pos">…</span><span class="wbx-ipa">—</span></div></div>' +
           '<div class="wbx-meta-zone"><div class="wbx-def">Caricamento…</div><div class="wbx-trans" style="opacity:0">—</div><div class="wbx-syns"></div></div>' +
           '</div>' +
           '<div class="wbx-save-col"><button class="wbx-save-btn" data-word="' + word + '">+</button><button class="wbx-dict-btn" data-word="' + word + '" title="Cerca in un dizionario"><i class="fa-solid fa-magnifying-glass"></i></button><button class="wbx-close-btn">×</button></div>' +
@@ -10906,6 +11072,7 @@
           var posEl = newBox.querySelector('.wbx-pos'); if (posEl) posEl.textContent = posLabel;
           newBox.setAttribute('data-pos', posLabel);
           newBox.setAttribute('data-cefr', level);
+          if (window.WBToken) window.WBToken.refreshAll();
           // Update save/bookmark data attributes
           var svBtn = newBox.querySelector('.wbx-save-btn'); if (svBtn) { svBtn.setAttribute('data-level', level); svBtn.setAttribute('data-pos', posLabel); }
           var bmBtn = newBox.querySelector('.wbx-dict-btn'); if (bmBtn) { bmBtn.setAttribute('data-level', level); bmBtn.setAttribute('data-pos', posLabel); }
@@ -11350,36 +11517,26 @@
         var posLabel = defData && defData.pos ? defData.pos.toUpperCase() : (lex ? lex.getPOS(query, 'it') : '—');
         var transText = transData && transData.length ? transData.slice(0,3).join(' · ') : '—';
 
-        var exactCardHtml = '<article class="wbx-box wbx-exact" data-pos="' + posLabel + '" data-cefr="' + wordLevel + '" data-word="' + query + '">' +
-          '<div class="wbx-main-col"><div class="wbx-word-zone">' +
-          '<div class="wbx-head"><span class="wbx-w">' + query + '</span><span class="wbx-cefr">' + wordLevel + '</span><span class="wbx-pos">' + posLabel + '</span></div>' +
-          '<div class="wbx-ipa">' + (defData && defData.pos ? defData.pos : '') + '</div>' +
-          '</div><div class="wbx-meta-zone">' +
-          '<div class="wbx-def">' + defText + '</div>' +
-          '<div class="wbx-trans" style="opacity:1">→ ' + transText + '</div>' +
-          '<div class="wbx-syns"></div></div></div>' +
-          '<div class="wbx-save-col">' +
-          '<button class="wbx-save-btn" data-word="' + query + '" data-level="' + wordLevel + '" data-pos="' + posLabel + '" title="Salva">+</button>' +
-          '<button class="wbx-dict-btn" data-word="' + query + '" data-level="' + wordLevel + '" data-pos="' + posLabel + '" title="Cerca in un dizionario"><i class="fa-solid fa-magnifying-glass"></i></button>' +
-          '</div></article>';
+        var exactCardHtml = window.wbxCard({
+          word: query, cefr: wordLevel, pos: posLabel,
+          ipa: (defData && defData.pos ? defData.pos : ''),
+          def: defText, trans: '→ ' + transText, transOp: 1, syns: '',
+          lang: 'it', exact: true, dismissible: false, saveTitle: 'Salva'
+        });
 
         var cardsHtml = '';
         related.forEach(function(r) {
           var rPosLabel = r.pos || '—';
           if (rPosLabel === '—' && lex) rPosLabel = lex.getPOS(r.word, 'it');
-          cardsHtml += '<article class="wbx-box" data-pos="' + rPosLabel + '" data-cefr="' + r.level + '" data-word="' + r.word + '">' +
-            '<div class="wbx-main-col"><div class="wbx-word-zone">' +
-            '<div class="wbx-head"><span class="wbx-w">' + r.word + '</span><span class="wbx-cefr">' + r.level + '</span><span class="wbx-pos">' + rPosLabel + '</span></div>' +
-            '<div class="wbx-ipa">—</div></div>' +
-            '<div class="wbx-meta-zone"><div class="wbx-def">Caricamento...</div>' +
-            '<div class="wbx-trans" style="opacity:0">—</div><div class="wbx-syns"></div></div></div>' +
-            '<div class="wbx-save-col">' +
-            '<button class="wbx-save-btn" data-word="' + r.word + '" data-level="' + r.level + '" data-pos="' + rPosLabel + '" title="Salva">+</button>' +
-            '<button class="wbx-dict-btn" data-word="' + r.word + '" data-level="' + r.level + '" data-pos="' + rPosLabel + '" title="Cerca in un dizionario"><i class="fa-solid fa-magnifying-glass"></i></button>' +
-            '</div></article>';
+          cardsHtml += window.wbxCard({
+            word: r.word, cefr: r.level, pos: rPosLabel, ipa: '—',
+            def: 'Caricamento...', trans: '', transOp: 0, syns: '',
+            lang: 'it', exact: false, dismissible: false, saveTitle: 'Salva'
+          });
         });
 
         results.innerHTML = '<div class="wbx-grid">' + exactCardHtml + cardsHtml + '</div>';
+        if (window.WBToken) window.WBToken.refreshAll();
 
         // Check bank membership for Italian builder
         enrichBankStatus('#wbItExpandResults');
