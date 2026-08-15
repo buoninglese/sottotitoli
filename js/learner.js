@@ -848,10 +848,9 @@
         '<div class="lvov-step"><span class="lvov-step-num">3</span><div class="lvov-step-icon">🎯</div><h4 data-i18n="learnerov_s3_t">Missioni</h4><p data-i18n="learnerov_s3_d">Missioni AI e a tema costruite sui tuoi obiettivi e sulle tue parole reali.</p></div>' +
         '<div class="lvov-step"><span class="lvov-step-num">4</span><div class="lvov-step-icon">🔁</div><h4 data-i18n="learnerov_s4_t">Ripassa</h4><p data-i18n="learnerov_s4_d">Il ripasso programmato consolida le parole e le rende automatiche.</p></div>' +
       '</div>' +
-      '<div class="lvov-cta">' +
-        '<button type="button" class="c-main" onclick="Learner.openPractice(\'speak\')" data-i18n="learnerov_cta_speak">🎙️ Allenati a parlare</button>' +
-        '<button type="button" class="c-ghost" onclick="Learner.confirmMission()" data-i18n="learnerov_cta_mission">🎯 Genera una missione</button>' +
-        '<button type="button" class="c-ghost" onclick="Learner.openPractice(\'quiz\')" data-i18n="learnerov_cta_review">🔁 Ripassa le parole</button>' +
+      '<div class="lvov-cta" style="justify-content:center">' +
+        '<button type="button" class="c-main" onclick="Learner.showPane(\'learner-en\')" data-i18n="learnerov_cta_en">🇬🇧 Apri il Vocabulary Trainer inglese</button>' +
+        '<button type="button" class="c-ghost" onclick="Learner.showPane(\'learner-it\')" data-i18n="learnerov_cta_it">🇮🇹 Apri il Vocabulary Trainer italiano</button>' +
       '</div>';
     pane.innerHTML = html;
     i18nScope(pane);
@@ -1914,6 +1913,7 @@
     refresh: refresh,
     boot: boot,
     setLang: setLang,
+    showPane: showPane,
     lang: learnerLang,
     openLesson: openLesson,
     openTest: openTest,
