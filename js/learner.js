@@ -485,21 +485,25 @@
   }
 
   /* ═══════════════════ RENDER: shell + tabs ═══════════════════ */
-  function renderShell() {
-    if (!rootEl) return;
+  // XP / goal / streak bar — rendered INSIDE the path pane, right under the intro banner.
+  function heroHtml() {
     var s = load();
     var goalPct = Math.min(100, Math.round((s.todayXp / (s.dailyGoal || 1)) * 100));
+    return '<div class="learner-hero">' +
+      '<span class="lh-lang"><span class="lh-lang-flag">' + (learnerLang() === 'it' ? '🇮🇹' : '🇬🇧') + '</span><span>' + (learnerLang() === 'it' ? t('learner_lang_it') : t('learner_lang_en')) + '</span></span>' +
+      '<div><div class="lh-xp">' + s.xp + '<small data-i18n="learner_xp">XP</small></div></div>' +
+      '<div class="lh-goal">' +
+        '<div class="goal-top"><span data-i18n="learner_daily_goal">Obiettivo giornaliero</span><span>' + s.todayXp + ' / ' + s.dailyGoal + '</span></div>' +
+        '<div class="progress-track"><div class="progress-fill" style="width:' + goalPct + '%"></div></div>' +
+      '</div>' +
+      '<div class="lh-streak"><span class="flame">🔥</span><span>' + s.streak + ' <span data-i18n="learner_streak">Serie</span></span></div>' +
+    '</div>';
+  }
+
+  function renderShell() {
+    if (!rootEl) return;
     rootEl.innerHTML =
       '<div class="learner-wrap">' +
-        '<div class="learner-hero">' +
-          '<span class="lh-lang"><span class="lh-lang-flag">' + (learnerLang() === 'it' ? '🇮🇹' : '🇬🇧') + '</span><span>' + (learnerLang() === 'it' ? t('learner_lang_it') : t('learner_lang_en')) + '</span></span>' +
-          '<div><div class="lh-xp">' + s.xp + '<small data-i18n="learner_xp">XP</small></div></div>' +
-          '<div class="lh-goal">' +
-            '<div class="goal-top"><span data-i18n="learner_daily_goal">Obiettivo giornaliero</span><span>' + s.todayXp + ' / ' + s.dailyGoal + '</span></div>' +
-            '<div class="progress-track"><div class="progress-fill" style="width:' + goalPct + '%"></div></div>' +
-          '</div>' +
-          '<div class="lh-streak"><span class="flame">🔥</span><span>' + s.streak + ' <span data-i18n="learner_streak">Serie</span></span></div>' +
-        '</div>' +
         '<div role="tabpanel" class="subtab-pane active" id="sub-learner-overview"></div>' +
         '<div role="tabpanel" class="subtab-pane" id="sub-learner-path"></div>' +
       '</div>';
@@ -520,10 +524,6 @@
     $all('.subtab-pane', rootEl).forEach(function (p) {
       p.classList.toggle('active', p.id === paneId);
     });
-    // The fixed tracking bar (XP / goal / streak) belongs to the language tabs,
-    // not to the Overview dashboard (which has its own stats).
-    var hero = $('.learner-hero', rootEl);
-    if (hero) hero.style.display = (name === 'learner-overview') ? 'none' : '';
     renderPane(name);
   }
 
@@ -573,7 +573,7 @@
   }
 
   function renderEmptyPath(pane) {
-    pane.innerHTML = '<div class="learner-empty"><div class="le-emoji">🗂️</div><div class="le-title">' + t('learner_empty_path') + '</div>' +
+    pane.innerHTML = pathIntroHtml() + heroHtml() + '<div class="learner-empty"><div class="le-emoji">🗂️</div><div class="le-title">' + t('learner_empty_path') + '</div>' +
       '<div class="le-sub">' + t('learner_empty_path_sub') + '</div></div>';
     i18nScope(pane);
   }
@@ -589,7 +589,7 @@
 
   function renderRealPath(pane, due, fragile, fresh, lang) {
     var s = load();
-    var html = pathIntroHtml();
+    var html = pathIntroHtml() + heroHtml();
     // ── Spaced review (always visible on both English & Italiano) ──
     html += '<div class="lr-section-head"><span class="lr-section-title">' + t('learner_review') + '</span>' +
       '<span class="lr-section-sub">' + t('learner_review_sub') + '</span></div>';
@@ -665,7 +665,7 @@
 
   /* ── Bundled course — not-logged-in preview only ── */
   function renderBundledPath(pane) {
-    var html = pathIntroHtml() + '<div class="lr-preview-note">' + t('learner_login_hint') + '</div>';
+    var html = pathIntroHtml() + heroHtml() + '<div class="lr-preview-note">' + t('learner_login_hint') + '</div>';
     var s = load();
     COURSE.levels.forEach(function (lv) {
       html += '<div style="margin:22px 0 12px"><span style="font-size:13px;font-weight:800;color:' + lv.color + ';text-transform:uppercase;letter-spacing:.1em">' + esc(lv.icon + ' ' + lv.label) + '</span></div>';
