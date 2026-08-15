@@ -2570,8 +2570,13 @@
         '<span style="color:var(--text-faint, #9ca3af)">|</span> '+
         '<button onclick="I18n.setLang(\'en\')" style="border:none;background:none;cursor:pointer;font-weight:600;font-size:13px;font-family:inherit;padding:2px 6px;color:'+(_lang==='en'?'var(--teal, #059669)':'var(--text-faint, #9ca3af)')+'" class="i18n-btn-en">EN</button>'+
         '</span>';
-      // Insert before logout/exit button or at end
-      var exitBtn = dd.querySelector('[onclick*="signOut"], .ud-link.danger, button:last-of-type');
+      // Insert before logout/exit button or at end.
+      // NOTE: use a direct-child fallback, NOT `button:last-of-type` — nested
+      // buttons (e.g. the theme switcher now inside the dropdown) can match
+      // that, and since their parent isn't the dropdown the old code silently
+      // fell through to appendChild (Lingua ended up after Esci).
+      var exitBtn = dd.querySelector('[onclick*="signOut"], .ud-link.danger') ||
+                    Array.prototype.filter.call(dd.children, function(c){ return c.tagName === 'BUTTON' || c.tagName === 'A'; }).pop();
       if (exitBtn && exitBtn.parentElement === dd) {
         dd.insertBefore(div, exitBtn.closest('button, a, .dropdown-item'));
       } else {
