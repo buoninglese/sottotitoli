@@ -557,8 +557,8 @@
 
   function renderPane(name) {
     if (name === 'learner-overview') renderProgress();
-    else if (name === 'learner-en') { learnerSetLang('en'); updateHeroLang(); renderPath(); }
-    else if (name === 'learner-it') { learnerSetLang('it'); updateHeroLang(); renderPath(); }
+    else if (name === 'learner-en') { learnerSetLang('en'); renderPath(); }
+    else if (name === 'learner-it') { learnerSetLang('it'); renderPath(); }
     else if (name === 'learner-path') renderPath();
     else if (name === 'learner-practice') renderPractice();
     else if (name === 'learner-progress') renderProgress();
@@ -585,7 +585,7 @@
   }
 
   function renderEmptyPath(pane) {
-    pane.innerHTML = pathIntroHtml() + heroHtml() + '<div class="learner-empty"><div class="le-emoji">🗂️</div><div class="le-title">' + t('learner_empty_path') + '</div>' +
+    pane.innerHTML = pathIntroHtml() + '<div class="learner-empty"><div class="le-emoji">🗂️</div><div class="le-title">' + t('learner_empty_path') + '</div>' +
       '<div class="le-sub">' + t('learner_empty_path_sub') + '</div></div>';
     i18nScope(pane);
   }
@@ -601,7 +601,7 @@
 
   function renderRealPath(pane, due, fragile, fresh, lang) {
     var s = load();
-    var html = pathIntroHtml() + heroHtml();
+    var html = pathIntroHtml();
     // ── Spaced review (always visible on both English & Italiano) ──
     html += '<div class="lr-section-head"><span class="lr-section-title">' + t('learner_review') + '</span>' +
       '<span class="lr-section-sub">' + t('learner_review_sub') + '</span></div>';
@@ -677,7 +677,7 @@
 
   /* ── Bundled course — not-logged-in preview only ── */
   function renderBundledPath(pane) {
-    var html = pathIntroHtml() + heroHtml() + '<div class="lr-preview-note">' + t('learner_login_hint') + '</div>';
+    var html = pathIntroHtml() + '<div class="lr-preview-note">' + t('learner_login_hint') + '</div>';
     var s = load();
     COURSE.levels.forEach(function (lv) {
       html += '<div style="margin:22px 0 12px"><span style="font-size:13px;font-weight:800;color:' + lv.color + ';text-transform:uppercase;letter-spacing:.1em">' + esc(lv.icon + ' ' + lv.label) + '</span></div>';
