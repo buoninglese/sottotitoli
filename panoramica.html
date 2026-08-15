@@ -138,7 +138,7 @@
     <header class="topbar">
       <button class="topbar-menu" id="topbarMenu" onclick="toggleSidebarDrawer()" aria-label="Menu" title="Menu"><span class="material-symbols-outlined">menu</span></button>
       <div style="display:flex;align-items:center;gap:0">
-        <a href="index.html" class="topbar-brand" style="font-size:36px;font-family:'Manrope',sans-serif;font-weight:700;text-decoration:none;letter-spacing:-0.02em;display:inline-flex;align-items:baseline;gap:0"><span class="topbar-brand-name">sottotitoli</span><span class="topbar-brand-pro" style="font-family:'Manrope',sans-serif;font-weight:800;letter-spacing:-.5px">.pro</span><span class="topbar-version" style="font-size:11px;font-weight:600;font-family:'Manrope',sans-serif;color:var(--text-soft);margin-left:6px;opacity:.55;letter-spacing:.02em">v268</span></a>
+        <a href="index.html" class="topbar-brand" style="font-size:36px;font-family:'Manrope',sans-serif;font-weight:700;text-decoration:none;letter-spacing:-0.02em;display:inline-flex;align-items:baseline;gap:0"><span class="topbar-brand-name">sottotitoli</span><span class="topbar-brand-pro" style="font-family:'Manrope',sans-serif;font-weight:800;letter-spacing:-.5px">.pro</span><span class="topbar-version" style="font-size:11px;font-weight:600;font-family:'Manrope',sans-serif;color:var(--text-soft);margin-left:6px;opacity:.55;letter-spacing:.02em">v269</span></a>
       </div>
       <div style="display:flex;align-items:center;gap:12px">
         <button class="btn-start-session hv-start" id="btnStartSession" onclick="toggleStartSession()" style="font-size:15px;height:42px;padding:0 20px;border-radius:12px;background:linear-gradient(135deg,rgba(192,132,252,.18),rgba(192,132,252,.06));color:#c084fc;border:1px solid rgba(192,132,252,.25);font-weight:700;font-family:'Manrope',sans-serif;display:inline-flex;align-items:center;gap:8px;box-shadow:0 0 20px rgba(192,132,252,.12),0 2px 8px rgba(0,0,0,.2);cursor:pointer;letter-spacing:-.01em;transition:all .2s ease">
@@ -6187,7 +6187,9 @@
         if (cvs) cvs.textContent = d.bandMaxName + ' ' + fmtMinutes(d.bandMax);
         setVsBar(base, 'sessions', 'fill', d.activeShare*100, 0, 'var(--cyan)', 'var(--cyan)');
         var sbtot = Math.max(1, d.siteMin + d.recMin);
-        setVsBar(base, 'totalMinutes', 'seg', d.siteMin/sbtot*100, d.recMin/sbtot*100, 'var(--cyan)', 'var(--amber)');
+        // Match the Activity corona chart colours exactly: recording = cyan (#06b6d4), extra site time = amber (#f59e0b).
+        // (theme tokens --cyan/--amber collapse to the same pink in genz/genz-dark → the bar showed two identical segments)
+        setVsBar(base, 'totalMinutes', 'seg', d.recMin/sbtot*100, d.siteMin/sbtot*100, '#06b6d4', '#f59e0b');
         var btot = Math.max(1, d.bands[0]+d.bands[1]+d.bands[2]+d.bands[3]);
         setVsBands(base, 'timebands', [d.bands[0]/btot*100, d.bands[1]/btot*100, d.bands[2]/btot*100, d.bands[3]/btot*100], d.bandColors);
       }
@@ -6531,9 +6533,14 @@
       // Axis label formatter: decimals for small values (no duplicate labels when data is tiny), fmtK above 10.
       function fmtAxis(v){ if (v < 10) { return (Math.round(v*10)/10).toFixed(1).replace('.',',').replace(',0',''); } return fmtK(v); }
       function svgGrid2(max){
+        // max = plot ceiling (data max × headroom). Gridlines at NICE steps so the labels stay clean
+        // and the top value sits near the top of the chart (no big empty headroom from coarse rounding).
         var W=CHT.W,H=WBH,PL=CHT.PL,PR=CHT.PR,PT=CHT.PT,PB=CHT.PB,IH=H-PT-PB,g='',AX='#94a3b8'; max = max||1;
-        for (var i=0;i<=4;i++){ var v=max*i/4, y=PT+IH-(v/max)*IH;
-          g+='<line x1="'+PL+'" y1="'+y+'" x2="'+(W-PR)+'" y2="'+y+'" stroke="var(--line)" opacity=".6"/><text x="'+(PL-6)+'" y="'+(y+3)+'" text-anchor="end" fill="var(--text-faint)" font-size="9">'+fmtAxis(v)+'</text>'; }
+        var step = niceCeil(max/4), v;
+        for (v=0; v <= max + step*1e-6; v += step){
+          var y = PT+IH-(v/max)*IH, lbl = fmtAxis(Math.round(v*1000)/1000);
+          g+='<line x1="'+PL+'" y1="'+y+'" x2="'+(W-PR)+'" y2="'+y+'" stroke="var(--line)" opacity=".6"/><text x="'+(PL-6)+'" y="'+(y+3)+'" text-anchor="end" fill="var(--text-faint)" font-size="9">'+lbl+'</text>';
+        }
         g+='<line x1="'+PL+'" y1="'+PT+'" x2="'+PL+'" y2="'+(PT+IH)+'" stroke="'+AX+'" stroke-width="1.4" opacity=".8"/>';
         g+='<line x1="'+PL+'" y1="'+(PT+IH)+'" x2="'+(W-PR)+'" y2="'+(PT+IH)+'" stroke="'+AX+'" stroke-width="1.4" opacity=".8"/>';
         return g;
@@ -6554,14 +6561,14 @@
       function splineWords3Html(days, data){
         var W=CHT.W,H=WBH,PL=CHT.PL,PR=CHT.PR,PT=CHT.PT,PB=CHT.PB,IW=W-PL-PR,IH=H-PT-PB,n=days.length;
         var u=[],t=[],sv=[]; days.forEach(function(iso){ var v=wordDayValue(days,data,iso); u.push(v.uniq); t.push(v.tt); sv.push(v.sv); });
-        var gridMax=niceCeil(Math.max.apply(null,t.concat([1]))), max=gridMax*1.12;
+        var dataMax=Math.max.apply(null,t.concat([1])), max=dataMax*1.08; // 8% headroom → top value near the top, never clipped
         function px(i){ return PL+(IW*(i/(Math.max(1,n-1)))); } function py(v){ return PT+IH-((v)/(max))*IH; }
         function sm(vals){ var pts=vals.map(function(v,i){ return [px(i),py(v)]; }),d='M'+pts[0][0]+' '+pts[0][1]; for(var i=0;i<pts.length-1;i++){ var p0=pts[Math.max(0,i-1)],p1=pts[i],p2=pts[i+1],p3=pts[Math.min(pts.length-1,i+2)],c1x=p1[0]+(p2[0]-p0[0])/6,c1y=p1[1]+(p2[1]-p0[1])/6,c2x=p2[0]-(p3[0]-p1[0])/6,c2y=p2[1]-(p3[1]-p1[1])/6; d+=' C'+c1x+' '+c1y+', '+c2x+' '+c2y+', '+p2[0]+' '+p2[1]; } return d; }
-        var g=svgGrid2(gridMax);
+        var g=svgGrid2(max);
         g+='<path class="chart-line" d="'+sm(t)+'" fill="none" stroke="#64748b" stroke-width="2.2" opacity=".5"/>';
         g+='<path class="line-draw" d="'+sm(u)+'" fill="none" stroke="#34d399" stroke-width="2.6" stroke-linecap="round"/>';
         g+='<path class="line-draw" d="'+sm(sv)+'" fill="none" stroke="#fbbf24" stroke-width="3.2" stroke-linecap="round" style="filter:drop-shadow(0 0 10px rgba(251,191,36,.95))"/>';
-        u.forEach(function(v,i){ var yy=py(v), ly=(yy-11<4)?yy+15:yy-11; g+='<g class="vg"><circle class="dot" cx="'+px(i)+'" cy="'+yy+'" r="3.6" fill="var(--bg)" stroke="#34d399" stroke-width="2"><title>'+days[i]+' — '+v+' uniche</title></circle><text class="vlab" x="'+px(i)+'" y="'+ly+'" text-anchor="middle" fill="#34d399" font-size="10.5" font-weight="800">'+fmtK(v)+'</text></g>'; });
+        u.forEach(function(v,i){ var yy=py(v), ly=(yy-11<16)?yy+15:yy-11; g+='<g class="vg"><circle class="dot" cx="'+px(i)+'" cy="'+yy+'" r="3.6" fill="var(--bg)" stroke="#34d399" stroke-width="2"><title>'+days[i]+' — '+v+' uniche</title></circle><text class="vlab" x="'+px(i)+'" y="'+ly+'" text-anchor="middle" fill="#34d399" font-size="10.5" font-weight="800">'+fmtK(v)+'</text></g>'; });
         sv.forEach(function(v,i){ g+='<g class="vg"><circle class="dot dotN" cx="'+px(i)+'" cy="'+py(v)+'" r="3.2" fill="var(--bg)" stroke="#fbbf24" stroke-width="2"><title>'+days[i]+' — '+v+' salvate</title></circle></g>'; });
         g+=svgXLbl(days);
         return '<svg viewBox="0 0 '+W+' '+H+'" style="width:100%;max-width:560px;height:auto">'+g+'</svg>';
@@ -6586,13 +6593,13 @@
       function splineTwoHtml(days, data){
         var W=CHT.W,H=WBH,PL=CHT.PL,PR=CHT.PR,PT=CHT.PT,PB=CHT.PB,IW=W-PL-PR,IH=H-PT-PB,n=days.length;
         var u=[],t=[]; days.forEach(function(iso){ var v=wordDayValue(days,data,iso); u.push(v.uniq); t.push(v.tt); });
-        var gridMax=niceCeil(Math.max.apply(null,t.concat([1]))), max=gridMax*1.12;
+        var dataMax=Math.max.apply(null,t.concat([1])), max=dataMax*1.08; // 8% headroom → top value near the top, never clipped
         function px(i){ return PL+(IW*(i/(Math.max(1,n-1)))); } function py(v){ return PT+IH-((v)/(max))*IH; }
         function sm(vals){ var pts=vals.map(function(v,i){ return [px(i),py(v)]; }),d='M'+pts[0][0]+' '+pts[0][1]; for(var i=0;i<pts.length-1;i++){ var p0=pts[Math.max(0,i-1)],p1=pts[i],p2=pts[i+1],p3=pts[Math.min(pts.length-1,i+2)],c1x=p1[0]+(p2[0]-p0[0])/6,c1y=p1[1]+(p2[1]-p0[1])/6,c2x=p2[0]-(p3[0]-p1[0])/6,c2y=p2[1]-(p3[1]-p1[1])/6; d+=' C'+c1x+' '+c1y+', '+c2x+' '+c2y+', '+p2[0]+' '+p2[1]; } return d; }
-        var g=svgGrid2(gridMax);
+        var g=svgGrid2(max);
         g+='<path class="chart-line" d="'+sm(t)+'" fill="none" stroke="#64748b" stroke-width="2.2" opacity=".6"/>';
         g+='<path class="line-draw" d="'+sm(u)+'" fill="none" stroke="#8b5cf6" stroke-width="2.8" stroke-linecap="round" style="filter:drop-shadow(0 0 8px rgba(139,92,246,.45))"/>';
-        u.forEach(function(v,i){ var yy=py(v), ly=(yy-11<4)?yy+15:yy-11; g+='<g class="vg"><circle class="dot" cx="'+px(i)+'" cy="'+yy+'" r="4.2" fill="var(--bg)" stroke="#8b5cf6" stroke-width="2"><title>'+days[i]+' — '+v+' uniche</title></circle><text class="vlab" x="'+px(i)+'" y="'+ly+'" text-anchor="middle" fill="#8b5cf6" font-size="10.5" font-weight="800">'+fmtK(v)+'</text></g>'; });
+        u.forEach(function(v,i){ var yy=py(v), ly=(yy-11<16)?yy+15:yy-11; g+='<g class="vg"><circle class="dot" cx="'+px(i)+'" cy="'+yy+'" r="4.2" fill="var(--bg)" stroke="#8b5cf6" stroke-width="2"><title>'+days[i]+' — '+v+' uniche</title></circle><text class="vlab" x="'+px(i)+'" y="'+ly+'" text-anchor="middle" fill="#8b5cf6" font-size="10.5" font-weight="800">'+fmtK(v)+'</text></g>'; });
         g+=svgXLbl(days);
         return '<svg viewBox="0 0 '+W+' '+H+'" style="width:100%;max-width:560px;height:auto">'+g+'</svg>';
       }
