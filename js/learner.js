@@ -849,19 +849,11 @@
           '<div class="wsc-box-head"><h3 class="wsc-box-title">' + t('wsc_missions_title') + '</h3><span class="wsc-box-hint">' + t('wsc_missions_hint') + '</span></div>' +
           '<div class="wsc-missions" id="wscMissions"></div>' +
         '</div>' +
-        '<div class="wsc-box wsc-glass wsc-peak">' +
-          '<div class="wsc-label">' + t('wsc_peak') + '</div>' +
-          '<div class="wsc-peak" id="wscPeak">—</div>' +
-          '<div class="wsc-peak-sub" id="wscPeakSub"></div>' +
-          '<div class="wsc-heat" id="wscHeat"></div>' +
-          '<div class="wsc-extra" id="wscExtra"></div>' +
-        '</div>' +
       '</div>';
     pane.innerHTML = html;
     i18nScope(pane);
     // Populate the moved boxes (shared renderers live in panoramica.html)
     if (w.renderLearnerMissions) w.renderLearnerMissions();
-    if (w.renderLearnerPeak) w.renderLearnerPeak();
   }
 
   /* ═══════════════════ LESSON / TEST / PRACTICE sessions ═══════════════════ */
