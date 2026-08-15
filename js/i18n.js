@@ -972,8 +972,10 @@
       "wb_it_intro": "Le parole italiane che hai incontrato, organizzate in banche. Apri una banca per esplorarla, aggiungere parole e ripassare.",
       "vbe_title": "Espandi il tuo vocabolario inglese",
       "vbe_intro": "Scrivi una parola che conosci: Sottotitoli ti mostra sinonimi, contrari, collocazioni e parole correlate al tuo livello.",
+      "vbe_intro_extra": "Più sessioni fai, più suggerimenti saranno precisi.",
       "vbi_title": "Esplora il vocabolario italiano",
       "vbi_intro": "Cerca una parola italiana e scopri la definizione, la traduzione in inglese e le parole correlate per arricchire il tuo lessico.",
+      "vbi_intro_extra": "Più sessioni fai, più suggerimenti saranno precisi.",
       "ler_en_title": "Allenatore di vocabolario inglese",
       "ler_en_intro": "Ripassa le parole, completa missioni e consolida il tuo inglese con la ripetizione spaziata.",
       "ler_it_title": "Allenatore di vocabolario italiano",
@@ -2146,8 +2148,10 @@
       "wb_it_intro": "The Italian words you've met, organised into banks. Open a bank to explore it, add words and review.",
       "vbe_title": "Expand your English vocabulary",
       "vbe_intro": "Type a word you know and Sottotitoli shows synonyms, antonyms, collocations and related words at your level.",
+      "vbe_intro_extra": "The more sessions you do, the more accurate the suggestions.",
       "vbi_title": "Explore Italian vocabulary",
       "vbi_intro": "Search an Italian word and discover the definition, the English translation and related words to enrich your lexicon.",
+      "vbi_intro_extra": "The more sessions you do, the more accurate the suggestions.",
       "ler_en_title": "English Vocabulary Trainer",
       "ler_en_intro": "Review words, complete missions and consolidate your English with spaced repetition.",
       "ler_it_title": "Italian Vocabulary Trainer",
@@ -2585,10 +2589,10 @@
       var div = document.createElement('div');
       div.className = 'i18n-toggle';
       div.style.cssText = 'padding:10px 14px;display:flex;align-items:center;justify-content:space-between;font-size:13px;border-top:1px solid var(--line, #e2e5ea)';
-      div.innerHTML = '<span>'+t('language')+'</span><span>'+
-        '<button onclick="I18n.setLang(\'it\')" style="border:none;background:none;cursor:pointer;font-weight:600;font-size:13px;font-family:inherit;padding:2px 6px;color:'+(_lang==='it'?'var(--teal, #059669)':'var(--text-faint, #9ca3af)')+'" class="i18n-btn-it">IT</button> '+
-        '<span style="color:var(--text-faint, #9ca3af)">|</span> '+
-        '<button onclick="I18n.setLang(\'en\')" style="border:none;background:none;cursor:pointer;font-weight:600;font-size:13px;font-family:inherit;padding:2px 6px;color:'+(_lang==='en'?'var(--teal, #059669)':'var(--text-faint, #9ca3af)')+'" class="i18n-btn-en">EN</button>'+
+      // Same pill style as the Modern | Play theme switcher above it
+      div.innerHTML = '<span>'+t('language')+'</span><span style="display:inline-flex;align-items:center;gap:4px;background:var(--panel-2, rgba(127,127,127,.08));border:1px solid var(--line, #e2e5ea);border-radius:999px;padding:4px">'+
+        '<button onclick="I18n.setLang(\'it\')" style="border:none;background:transparent;color:var(--text-soft,#6b7280);font:inherit;font-size:13px;font-weight:600;padding:6px 12px;border-radius:999px;cursor:pointer;transition:all .2s" class="i18n-btn-it">IT</button>'+
+        '<button onclick="I18n.setLang(\'en\')" style="border:none;background:transparent;color:var(--text-soft,#6b7280);font:inherit;font-size:13px;font-weight:600;padding:6px 12px;border-radius:999px;cursor:pointer;transition:all .2s" class="i18n-btn-en">EN</button>'+
         '</span>';
       // Insert before logout/exit button or at end.
       // NOTE: use a direct-child fallback, NOT `button:last-of-type` — nested
@@ -2608,8 +2612,9 @@
   }
 
   function updateToggleBtns() {
-    document.querySelectorAll('.i18n-btn-it').forEach(function(b){ b.style.color = _lang==='it' ? 'var(--teal, #059669)' : 'var(--text-faint, #9ca3af)'; });
-    document.querySelectorAll('.i18n-btn-en').forEach(function(b){ b.style.color = _lang==='en' ? 'var(--teal, #059669)' : 'var(--text-faint, #9ca3af)'; });
+    // Active = solid white pill + dark text (same as the Modern | Play switcher)
+    document.querySelectorAll('.i18n-btn-it').forEach(function(b){ b.style.color = _lang==='it' ? '#0a0a0a' : 'var(--text-soft, #6b7280)'; b.style.background = _lang==='it' ? '#fff' : 'transparent'; b.style.boxShadow = _lang==='it' ? '0 2px 8px rgba(0,0,0,.18)' : 'none'; });
+    document.querySelectorAll('.i18n-btn-en').forEach(function(b){ b.style.color = _lang==='en' ? '#0a0a0a' : 'var(--text-soft, #6b7280)'; b.style.background = _lang==='en' ? '#fff' : 'transparent'; b.style.boxShadow = _lang==='en' ? '0 2px 8px rgba(0,0,0,.18)' : 'none'; });
   }
 
   /* ═══════════════════════════════════════════════════════
