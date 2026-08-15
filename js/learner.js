@@ -815,45 +815,46 @@
     '</div>';
   }
 
-  async function loadProgress(pane) {
-    var s = load();
-    var authed = await srcIsAuthed();
-    var lang = learnerLang();
-    var other = lang === 'it' ? 'en' : 'it';
-    var banks = authed ? await srcBanks(lang) : [];
-    var banksOther = authed ? await srcBanks(other) : [];
-    var all = authed ? await srcReviewAll(lang) : [];
-    var allOther = authed ? await srcReviewAll(other) : [];
-    var h = reviewHealth(all), hOther = reviewHealth(allOther);
-
-    var keys = Object.keys(s.lessons || {});
-    var banksDone = keys.filter(function (k) { return k.indexOf('bank:') === 0; }).length;
-    var reviewsDone = keys.filter(function (k) { return k.indexOf('review:') === 0; }).length;
-    var missionsDone = keys.filter(function (k) { return k.indexOf('mission:') === 0; }).length;
-    var sessionsDone = banksDone + reviewsDone + missionsDone;
-
+  function loadProgress(pane) {
+    // Learner Overview: intro + how-it-works manual (mirrors the Vocabulary Builder overview).
     var html =
-      '<div class="stats-grid">' +
-        '<div class="stat-tile"><div class="st-value">' + s.xp + '</div><div class="st-label" data-i18n="learner_xp">XP</div></div>' +
-        '<div class="stat-tile"><div class="st-value">🔥 ' + s.streak + '</div><div class="st-label" data-i18n="learner_streak">Serie</div></div>' +
-        '<div class="stat-tile"><div class="st-value">' + s.todayXp + ' / ' + s.dailyGoal + '</div><div class="st-label" data-i18n="learner_daily_goal">Oggi</div></div>' +
-        '<div class="stat-tile"><div class="st-value">' + sessionsDone + '</div><div class="st-label" data-i18n="learner_pr_sessions">Sessioni</div></div>' +
-        '<div class="stat-tile"><div class="st-value">' + missionsDone + '</div><div class="st-label" data-i18n="learner_pr_missions">Missioni</div></div>' +
+      '<style>' +
+        '#sub-learner-overview .lvov-hero{position:relative;overflow:hidden;border-radius:28px;padding:34px 36px;background:linear-gradient(135deg,rgba(6,182,212,.16),rgba(139,92,246,.13));border:1px solid var(--line);display:flex;flex-direction:column;gap:12px;margin-bottom:24px}' +
+        '#sub-learner-overview .lvov-hero::after{content:\'\';position:absolute;right:-70px;top:-70px;width:220px;height:220px;border-radius:50%;background:radial-gradient(circle,rgba(6,182,212,.18),transparent 70%);pointer-events:none}' +
+        '#sub-learner-overview .lvov-hero h3{font-size:clamp(22px,3vw,30px);font-weight:800;letter-spacing:-.02em;color:var(--text);margin:0;font-family:var(--font-ui)}' +
+        '#sub-learner-overview .lvov-hero p{font-size:15px;color:var(--text-soft);line-height:1.6;margin:0;max-width:660px}' +
+        '#sub-learner-overview .lvov-steps{display:grid;grid-template-columns:repeat(4,1fr);gap:16px}' +
+        '@media(max-width:1100px){#sub-learner-overview .lvov-steps{grid-template-columns:repeat(2,1fr)}}' +
+        '@media(max-width:560px){#sub-learner-overview .lvov-steps{grid-template-columns:1fr}}' +
+        '#sub-learner-overview .lvov-step{position:relative;display:flex;flex-direction:column;gap:10px;padding:20px;border-radius:20px;background:var(--card);border:1px solid var(--line);transition:border-color .2s,transform .2s}' +
+        '#sub-learner-overview .lvov-step:hover{border-color:var(--cyan);transform:translateY(-3px)}' +
+        '#sub-learner-overview .lvov-step-num{position:absolute;top:14px;right:16px;font-size:11px;font-weight:800;color:var(--text-faint);letter-spacing:.05em}' +
+        '#sub-learner-overview .lvov-step-icon{width:46px;height:46px;border-radius:14px;background:rgba(6,182,212,.1);color:var(--cyan);display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0}' +
+        '#sub-learner-overview .lvov-step h4{font-size:15px;font-weight:800;color:var(--text);margin:0;letter-spacing:-.01em}' +
+        '#sub-learner-overview .lvov-step p{font-size:13px;color:var(--text-soft);line-height:1.55;margin:0}' +
+        '#sub-learner-overview .lvov-cta{display:flex;gap:12px;flex-wrap:wrap;margin-top:24px}' +
+        '#sub-learner-overview .lvov-cta button{padding:13px 22px;border-radius:999px;border:none;font-weight:700;font-size:14px;cursor:pointer;font-family:var(--font-ui);transition:transform .15s,box-shadow .15s}' +
+        '#sub-learner-overview .lvov-cta button:hover{transform:translateY(-2px)}' +
+        '#sub-learner-overview .lvov-cta .c-main{background:var(--cyan);color:#fff;box-shadow:0 6px 18px rgba(6,182,212,.3)}' +
+        '#sub-learner-overview .lvov-cta .c-ghost{background:var(--panel-2);color:var(--text);border:1px solid var(--line)}' +
+      '</style>' +
+      '<div class="lvov-hero">' +
+        '<h3 data-i18n="learnerov_title">Il tuo Learner, passo dopo passo</h3>' +
+        '<p data-i18n="learnerov_intro">Ascolta, parla e ripassa con lezioni, missioni e ripasso programmato. Ogni sessione ti avvicina alla fluidità.</p>' +
       '</div>' +
-      '<div class="lr-section-head lr-sec-mt"><span class="lr-section-title">' + t('learner_pr_languages') + '</span>' +
-        '<span class="lr-section-sub">' + t('learner_pr_languages_sub') + '</span></div>' +
-      '<div class="pr-lang-grid">' + langCard(lang, banks, h, true) + langCard(other, banksOther, hOther, false) + '</div>' +
-      // ── Missions + Peak productivity (moved from the dashboard) ──
-      '<div style="display:flex;flex-direction:column;gap:22px;margin-top:26px">' +
-        '<div class="wsc-box wsc-glass wsc-wide">' +
-          '<div class="wsc-box-head"><h3 class="wsc-box-title">' + t('wsc_missions_title') + '</h3><span class="wsc-box-hint">' + t('wsc_missions_hint') + '</span></div>' +
-          '<div class="wsc-missions" id="wscMissions"></div>' +
-        '</div>' +
+      '<div class="lvov-steps">' +
+        '<div class="lvov-step"><span class="lvov-step-num">1</span><div class="lvov-step-icon">🎧</div><h4 data-i18n="learnerov_s1_t">Ascolta</h4><p data-i18n="learnerov_s1_d">Scegli una lezione o un tema e ascolta le parole nella lingua che stai imparando.</p></div>' +
+        '<div class="lvov-step"><span class="lvov-step-num">2</span><div class="lvov-step-icon">🗣️</div><h4 data-i18n="learnerov_s2_t">Parla</h4><p data-i18n="learnerov_s2_d">Ripeti a voce alta: il riconoscimento controlla la tua pronuncia e ti dà feedback.</p></div>' +
+        '<div class="lvov-step"><span class="lvov-step-num">3</span><div class="lvov-step-icon">🎯</div><h4 data-i18n="learnerov_s3_t">Missioni</h4><p data-i18n="learnerov_s3_d">Missioni AI e a tema costruite sui tuoi obiettivi e sulle tue parole reali.</p></div>' +
+        '<div class="lvov-step"><span class="lvov-step-num">4</span><div class="lvov-step-icon">🔁</div><h4 data-i18n="learnerov_s4_t">Ripassa</h4><p data-i18n="learnerov_s4_d">Il ripasso programmato consolida le parole e le rende automatiche.</p></div>' +
+      '</div>' +
+      '<div class="lvov-cta">' +
+        '<button type="button" class="c-main" onclick="Learner.openPractice(\'speak\')" data-i18n="learnerov_cta_speak">🎙️ Allenati a parlare</button>' +
+        '<button type="button" class="c-ghost" onclick="Learner.confirmMission()" data-i18n="learnerov_cta_mission">🎯 Genera una missione</button>' +
+        '<button type="button" class="c-ghost" onclick="Learner.openPractice(\'quiz\')" data-i18n="learnerov_cta_review">🔁 Ripassa le parole</button>' +
       '</div>';
     pane.innerHTML = html;
     i18nScope(pane);
-    // Populate the moved boxes (shared renderers live in panoramica.html)
-    if (w.renderLearnerMissions) w.renderLearnerMissions();
   }
 
   /* ═══════════════════ LESSON / TEST / PRACTICE sessions ═══════════════════ */
