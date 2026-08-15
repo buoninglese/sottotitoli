@@ -72,7 +72,7 @@
   .wboxn-spot .spot-voice:hover{background:var(--w-acc);color:var(--w-acc-text)}
   .wboxn-spot .spot-pos{font-size:10.5px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--w-acc-text);background:var(--w-acc);padding:2px 7px;border-radius:6px;white-space:nowrap}
   .wboxn-spot .spot-cefr{font-size:11px;font-weight:800;letter-spacing:.04em;padding:3px 9px;border-radius:999px;background:var(--w-acc);color:var(--w-acc-text);white-space:nowrap}
-  .wboxn-spot .spot-wordzone{position:relative;overflow:hidden;margin:14px -20px 0 0;padding:16px 20px;background:linear-gradient(135deg,var(--w-hd1) 0%,var(--w-hd2) 55%,transparent 100%);border-bottom:1px solid var(--w-hdline)}
+  .wboxn-spot .spot-wordzone{position:relative;overflow:hidden;margin:14px -20px 0 -16px;padding:16px 20px;background:linear-gradient(135deg,var(--w-hd1) 0%,var(--w-hd2) 55%,transparent 100%);border-bottom:1px solid var(--w-hdline)}
   .wboxn-spot .spot-posipa{display:flex;align-items:center;gap:8px;margin-top:8px}
   .wboxn-spot .spot-glow{position:absolute;top:-60px;right:-40px;width:180px;height:180px;border-radius:50%;background:radial-gradient(circle,var(--w-acc),transparent 70%);opacity:.20;pointer-events:none}
   .wboxn-spot .spot-big{position:relative;font-family:var(--font-display,var(--font-ui));font-size:40px;font-weight:900;letter-spacing:-.03em;text-transform:uppercase;color:var(--w-acc);line-height:1}
@@ -253,31 +253,49 @@
     });
     document.getElementById('stileGrid').innerHTML = h1;
 
-    // Base (theme-only) vars shared by the POS/CEFR sections
-    var body = dark ? '#151515' : (t==='genz' ? 'rgba(255,255,255,.24)' : '#fff');
-    var bdr = t==='genz-dark' ? 'rgba(196,181,253,.24)' : (t==='genz' ? 'rgba(255,255,255,.48)' : (t==='modern' ? 'rgba(255,255,255,.08)' : '#d7e7f2'));
-    var baseV = {
-      '--w-sub': dark ? 'rgba(255,255,255,.62)' : '#35586c',
-      '--w-hdline':'rgba(255,255,255,.18)',
-      '--w-body': body, '--w-border': bdr,
-      '--w-bar':'rgba(255,255,255,.05)','--w-barline':'rgba(255,255,255,.14)','--w-bartext':'rgba(255,255,255,.6)',
-      '--w-acc-text': dark ? '#06131a' : '#ffffff'
-    };
+    // ── Colour helpers for POS/CEFR (keeps text & buttons legible in all 4 themes) ──
+    function hex2rgb(h){ h = String(h).replace('#',''); return [parseInt(h.substr(0,2),16), parseInt(h.substr(2,2),16), parseInt(h.substr(4,2),16)]; }
+    function mix(hex, other, t){ var a=hex2rgb(hex), b=hex2rgb(other); return 'rgb('+Math.round(a[0]+(b[0]-a[0])*t)+','+Math.round(a[1]+(b[1]-a[1])*t)+','+Math.round(a[2]+(b[2]-a[2])*t)+')'; }
+    function rgba(col, a){ var m=String(col).match(/\d+/g); return 'rgba('+m[0]+','+m[1]+','+m[2]+','+a+')'; }
+    function lum(col){ var m=String(col).match(/\d+/g); return 0.299*(+m[0])+0.587*(+m[1])+0.114*(+m[2]); }
+    function contrastText(col){ return lum(col) > 150 ? '#0b1020' : '#ffffff'; }
+
+    // Build a full vars object for a POS/CEFR mode colour, legible on every theme:
+    // on dark themes the dark mode colour is lightened (accent + word + band) so
+    // text and buttons never sit on a too-similar background.
+    function modeVars(theme, acc){
+      var dark = (theme==='modern'||theme==='genz-dark');
+      var accUse = dark ? mix(acc, '#ffffff', .62) : acc;   // accent — light enough to read on dark
+      var word = dark ? mix(acc, '#ffffff', .82) : acc;     // big word — very light on dark
+      var body = dark ? '#151515' : (theme==='genz' ? 'rgba(255,255,255,.24)' : '#fff');
+      var bdr = theme==='genz-dark' ? 'rgba(196,181,253,.24)' : (theme==='genz' ? 'rgba(255,255,255,.48)' : (theme==='modern' ? 'rgba(255,255,255,.08)' : '#d7e7f2'));
+      return {
+        '--w-acc': accUse,
+        '--w-word': word,
+        '--w-sub': dark ? 'rgba(255,255,255,.66)' : '#35586c',
+        '--w-hd1': dark ? rgba(accUse, .22) : mix(acc, '#ffffff', .9),
+        '--w-hd2': dark ? rgba(accUse, .08) : mix(acc, '#ffffff', .96),
+        '--w-hdline': dark ? 'rgba(255,255,255,.16)' : rgba(acc, .35),
+        '--w-body': body, '--w-border': bdr,
+        '--w-bar': dark ? 'rgba(255,255,255,.05)' : mix(acc, '#ffffff', .92),
+        '--w-barline': dark ? 'rgba(255,255,255,.18)' : rgba(acc, .4),
+        '--w-bartext': dark ? 'rgba(255,255,255,.7)' : acc,
+        '--w-acc-text': contrastText(accUse)
+      };
+    }
 
     // Section 2 — Modo POS in editorial style
     var h2 = '';
     var pos = [
-      {tag:'NOUN', c:'#0c4a6e', c2:'#0a3a5c'},
-      {tag:'VERB', c:'#0f766e', c2:'#0d5f59'},
-      {tag:'ADJ',  c:'#0e7490', c2:'#0c6078'},
-      {tag:'ADV',  c:'#9d174d', c2:'#7e1240'}
+      {tag:'NOUN', c:'#0c4a6e'},
+      {tag:'VERB', c:'#0f766e'},
+      {tag:'ADJ',  c:'#0e7490'},
+      {tag:'ADV',  c:'#9d174d'}
     ];
-    pos.forEach(function(p, i){
-      var v = Object.assign({}, baseV, {
-        '--w-acc': p.c, '--w-word': p.c,
-        '--w-hd1': p.c, '--w-hd2': p.c2
-      });
-      var label = '<div class="wbox-label"><span class="n" style="background:'+p.c+'">'+p.tag+'</span>POS '+p.tag+' · <span class="swatch" style="background:'+p.c+'"></span>'+p.c+'</div>';
+    pos.forEach(function(p){
+      var v = modeVars(t, p.c);
+      var badgeBg = dark ? mix(p.c, '#ffffff', .62) : p.c;
+      var label = '<div class="wbox-label"><span class="n" style="background:'+badgeBg+';color:'+contrastText(badgeBg)+'">'+p.tag+'</span>POS '+p.tag+' · <span class="swatch" style="background:'+p.c+'"></span>'+p.c+'</div>';
       h2 += spotItem(spotlightArticle(v, {
         w:'speak', cefr:'B1', pos:p.tag, ipa:'/spiːk/',
         def:'Parlare — pronunciare parole.',
@@ -289,19 +307,17 @@
     // Section 3 — Modo CEFR in editorial style
     var h3 = '';
     var cefrLevels = [
-      {k:'A1', c:['#34d399','#10b981']},
-      {k:'A2', c:['#10b981','#059669']},
-      {k:'B1', c:['#059669','#047857']},
-      {k:'B2', c:['#047857','#065f46']},
-      {k:'C1', c:['#064e3b','#022c22']},
-      {k:'C2', c:['#0e7490','#0c5a70']}
+      {k:'A1', c:'#34d399'},
+      {k:'A2', c:'#10b981'},
+      {k:'B1', c:'#059669'},
+      {k:'B2', c:'#047857'},
+      {k:'C1', c:'#064e3b'},
+      {k:'C2', c:'#0e7490'}
     ];
-    cefrLevels.forEach(function(lv, i){
-      var v = Object.assign({}, baseV, {
-        '--w-acc': lv.c[0], '--w-word': lv.c[0],
-        '--w-hd1': lv.c[0], '--w-hd2': lv.c[1]
-      });
-      var label = '<div class="wbox-label"><span class="n" style="background:'+lv.c[0]+'">'+lv.k+'</span>CEFR '+lv.k+' · <span class="swatch" style="background:'+lv.c[0]+'"></span>'+lv.c[0]+'</div>';
+    cefrLevels.forEach(function(lv){
+      var v = modeVars(t, lv.c);
+      var badgeBg = dark ? mix(lv.c, '#ffffff', .62) : lv.c;
+      var label = '<div class="wbox-label"><span class="n" style="background:'+badgeBg+';color:'+contrastText(badgeBg)+'">'+lv.k+'</span>CEFR '+lv.k+' · <span class="swatch" style="background:'+lv.c+'"></span>'+lv.c+'</div>';
       h3 += spotItem(spotlightArticle(v, {
         w:'convince', cefr:lv.k, pos:'VERB', ipa:'/kənˈvɪns/',
         def:'Convincere — portare qualcuno a credere.',
