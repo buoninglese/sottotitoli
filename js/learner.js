@@ -842,9 +842,26 @@
       '</div>' +
       '<div class="lr-section-head lr-sec-mt"><span class="lr-section-title">' + t('learner_pr_languages') + '</span>' +
         '<span class="lr-section-sub">' + t('learner_pr_languages_sub') + '</span></div>' +
-      '<div class="pr-lang-grid">' + langCard(lang, banks, h, true) + langCard(other, banksOther, hOther, false) + '</div>';
+      '<div class="pr-lang-grid">' + langCard(lang, banks, h, true) + langCard(other, banksOther, hOther, false) + '</div>' +
+      // ── Missions + Peak productivity (moved from the dashboard) ──
+      '<div style="display:flex;flex-direction:column;gap:22px;margin-top:26px">' +
+        '<div class="wsc-box wsc-glass wsc-wide">' +
+          '<div class="wsc-box-head"><h3 class="wsc-box-title">' + t('wsc_missions_title') + '</h3><span class="wsc-box-hint">' + t('wsc_missions_hint') + '</span></div>' +
+          '<div class="wsc-missions" id="wscMissions"></div>' +
+        '</div>' +
+        '<div class="wsc-box wsc-glass wsc-peak">' +
+          '<div class="wsc-label">' + t('wsc_peak') + '</div>' +
+          '<div class="wsc-peak" id="wscPeak">—</div>' +
+          '<div class="wsc-peak-sub" id="wscPeakSub"></div>' +
+          '<div class="wsc-heat" id="wscHeat"></div>' +
+          '<div class="wsc-extra" id="wscExtra"></div>' +
+        '</div>' +
+      '</div>';
     pane.innerHTML = html;
     i18nScope(pane);
+    // Populate the moved boxes (shared renderers live in panoramica.html)
+    if (w.renderLearnerMissions) w.renderLearnerMissions();
+    if (w.renderLearnerPeak) w.renderLearnerPeak();
   }
 
   /* ═══════════════════ LESSON / TEST / PRACTICE sessions ═══════════════════ */
