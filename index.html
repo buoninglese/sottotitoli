@@ -300,11 +300,11 @@
     /* ── Typography ── */
     .eyebrow{font-family:var(--font-mono);font-size:12px;letter-spacing:.24em;
       color:var(--c-accent-bright);text-transform:uppercase;text-shadow:0 0 18px rgba(34,211,238,.35)}
-    .slide-hero h1.headline{font-size:clamp(44px,7vw + 12px,92px);line-height:.98;letter-spacing:-.035em}
+    .slide-hero h1.headline{font-size:clamp(38px,5.8vw + 8px,76px);line-height:.98;letter-spacing:-.035em}
     .headline-main{text-shadow:0 0 30px rgba(138,235,255,.12)}
     .headline-accent{background:linear-gradient(115deg,#8aebff,#22d3ee);
       -webkit-background-clip:text;background-clip:text;color:transparent;
-      text-shadow:0 0 34px rgba(34,211,238,.32)}
+      white-space:nowrap;text-shadow:0 0 34px rgba(34,211,238,.32)}
     @supports not (-webkit-background-clip:text){.headline-accent{color:#8aebff;background:none}}
     .body-text{color:rgba(226,232,240,.78)}
     /* ── Buttons (buttery) ── */
@@ -886,6 +886,22 @@
         if(e.key === 'ArrowLeft'){ var t = current - 1; if(t < 0) t = total - 1; performTransition(t, current); }
         if(e.key === 'ArrowRight'){ var t = current + 1; if(t >= total) t = 0; performTransition(t, current); }
       });
+
+      // Mouse scroll / trackpad → navigate slides (accumulate small deltas, throttle)
+      var wheelAcc = 0, wheelBusy = false;
+      window.addEventListener('wheel', function(e){
+        if(transitioning || wheelBusy) return;
+        wheelAcc += e.deltaY;
+        if(Math.abs(wheelAcc) < 45) return;
+        var dir = wheelAcc > 0 ? 1 : -1;
+        wheelAcc = 0;
+        wheelBusy = true;
+        setTimeout(function(){ wheelBusy = false; }, 1200);
+        var t = current + dir;
+        if(t < 0) t = total - 1;
+        if(t >= total) t = 0;
+        performTransition(t, current);
+      }, { passive: true });
 
       var stageRoot = document.querySelector('.stage-root');
       var touchStartX = 0;
