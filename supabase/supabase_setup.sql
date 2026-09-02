@@ -25,19 +25,21 @@ CREATE TABLE IF NOT EXISTS ai_report_modules (
 
 CREATE TABLE IF NOT EXISTS ai_report_requests (
   id BIGSERIAL PRIMARY KEY, user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
-  module_id INTEGER REFERENCES ai_report_modules(id), family_key TEXT,
+  module_key TEXT, family_key TEXT,
   session_ids UUID[] DEFAULT '{}', scope_type TEXT DEFAULT 'single_session',
   status TEXT DEFAULT 'queued' CHECK (status IN ('queued','processing','completed','failed')),
-  created_at TIMESTAMPTZ DEFAULT now(), processed_at TIMESTAMPTZ
+  error_message TEXT, prompt_version TEXT,
+  created_at TIMESTAMPTZ DEFAULT now(), completed_at TIMESTAMPTZ
 );
 
 CREATE TABLE IF NOT EXISTS session_ai_reports (
-  id BIGSERIAL PRIMARY KEY, request_id INTEGER REFERENCES ai_report_requests(id),
+  id BIGSERIAL PRIMARY KEY,
   user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE, module_id INTEGER REFERENCES ai_report_modules(id),
   session_id UUID, summary TEXT, summary_text TEXT, overall_score NUMERIC(3,1),
   confidence NUMERIC(3,1), strengths TEXT[], issues TEXT[], recommendations TEXT[],
   status TEXT DEFAULT 'completed', error_message TEXT, provider TEXT DEFAULT 'openai',
-  model TEXT DEFAULT 'gpt-4o', created_at TIMESTAMPTZ DEFAULT now()
+  model TEXT DEFAULT 'gpt-4o', prompt_version TEXT, raw_json JSONB,
+  created_at TIMESTAMPTZ DEFAULT now(), updated_at TIMESTAMPTZ DEFAULT now()
 );
 
 -- 2. CREDIT & TOKEN SYSTEM

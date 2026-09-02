@@ -291,7 +291,6 @@ async function processRequest(request: any) {
     .from('session_ai_reports')
     .insert({
       session_id: sessionIds[0],
-      request_id: request.id,
       user_id: request.user_id,
       module_id: moduleId,
       provider: 'openai',
