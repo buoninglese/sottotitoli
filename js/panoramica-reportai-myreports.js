@@ -121,11 +121,23 @@
                     sb.auth.getSession().then(async function(r){
                       if (!r.data?.session) return;
                       var uid = r.data.session.user.id;
-                      // Reset the request status to queued
-                      await sb.from('ai_report_requests').update({ status: 'queued' }).eq('id', id).eq('user_id', uid);
-                      // Delete the old report
-                      await sb.from('session_ai_reports').delete().eq('request_id', id);
-                      showToastMsg('🔄 Report re-queued. Controlla tra poco.');
+                      // Live schema has no request_id on session_ai_reports —
+                      // re-queue via a fresh request keyed off the failed report.
+                      var rep = await sb.from('session_ai_reports')
+                        .select('id,module_id,session_id')
+                        .eq('id', id).eq('user_id', uid).maybeSingle();
+                      if (rep.data) {
+                        var mid = rep.data.module_id || 1;
+                        await sb.from('ai_report_requests').insert({
+                          user_id: uid,
+                          session_ids: rep.data.session_id ? [rep.data.session_id] : [],
+                          module_key: String(mid),
+                          scope_type: 'single_session',
+                          status: 'queued'
+                        });
+                        await sb.from('session_ai_reports').delete().eq('id', id).eq('user_id', uid);
+                        showToastMsg('🔄 Report re-queued. Controlla tra poco.');
+                      }
                       loadReports();
                     }).catch(function(e){ console.warn('retryReport:', e); });
                   }, 'Riprova report', '🔄');

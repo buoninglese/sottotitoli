@@ -1223,7 +1223,6 @@
           var ins = await sb.from('ai_report_requests').insert({
             user_id: uid,
             session_ids: [sessionId],
-            module_id: 0,
             module_key: '0',
             scope_type: 'single_session',
             status: 'queued'
@@ -1252,7 +1251,6 @@
           var ins = await sb.from('ai_report_requests').insert({
             user_id: uid,
             session_ids: [sessionId],
-            module_id: 1,
             module_key: '1',
             scope_type: 'single_session',
             status: 'queued'
