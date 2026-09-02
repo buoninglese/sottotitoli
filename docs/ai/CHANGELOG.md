@@ -1,5 +1,19 @@
 # Changelog
 
+## [2026-09-02] Supabase schema audit (v293)
+
+Full audit of local SQL vs the live DB (PostgREST probing). See `docs/ai/supabase-audit-2026-09-02.md`.
+
+### Fixed
+- **Traduzione rooms — infinite RLS recursion** on `rooms`/`room_members`/`room_invites`/`transcript_segments`: new migration `20260902_fix_rooms_rls_recursion.sql` (SECURITY DEFINER helpers). **⚠️ Run `supabase db push`.**
+- **Report AI inserts**: `requestSnapshot`/`requestFullReport` no longer send the nonexistent `module_id` column.
+- **Report saving**: `process-ai-reports` no longer writes `session_ai_reports.request_id` (column doesn't exist — reports were never saved). **⚠️ Redeploy the edge function.**
+- **Retry flow**: `retryReport` rewritten for the live schema (fresh request + delete failed report by id).
+- **`supabase_setup.sql`** aligned to the live schema.
+
+### Decision needed
+- `analyze-session` expects a columnar `ai_configs`; live is key/value (`config_key`/`config_value`).
+
 ## [2026-09-02] Transcript tag editor + report AI schema (v292)
 
 ### Fixed
