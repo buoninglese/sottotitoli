@@ -1,5 +1,13 @@
 # Changelog
 
+## [2026-09-02] caption-s8t iOS record→transcribe fallback
+
+### Added
+- `supabase/functions/transcribe-audio` — JWT-verified edge function: MediaRecorder blob → OpenAI Whisper → text. **Deployed.**
+- `js/record-fallback.js` (`window.RecordFallback`) — tap to record, tap to stop; transcript replayed through the existing sentence pipeline.
+- `caption-s8t.html` — fallback branch in `toggleSession`, transcribing spinner, pause hidden in fallback, real error toasts instead of the silent failure.
+- Transcription requires login (matches other AI functions); Whisper ≈ $0.006/min.
+
 ## [2026-09-02] Live-schema drift round 2 (v294)
 
 ### Fixed
