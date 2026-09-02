@@ -1,5 +1,12 @@
 # Changelog
 
+## [2026-09-02] Live-schema drift round 2 (v294)
+
+### Fixed
+- **`review_words` 400**: live column is `lemma`, not `word` — `enrichBankStatus` now queries `.in('lemma', …)`.
+- **`user_wordbank_words` upsert 400**: live was missing `status`/`updated_at`/`cefr_level` and the `UNIQUE(wordbank_id, word)` constraint. Migration `20260902_fix_wordbank_words_schema.sql` applied to live (3 columns added, 6 duplicate groups deduped, unique index created).
+- Cache-buster `panoramica.js?v=4→5`.
+
 ## [2026-09-02] Supabase schema audit (v293)
 
 Full audit of local SQL vs the live DB (PostgREST probing). See `docs/ai/supabase-audit-2026-09-02.md`.
