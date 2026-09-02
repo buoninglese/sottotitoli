@@ -294,7 +294,7 @@
                     '<div style="padding:6px 12px;background:rgba(6,182,212,.1);color:var(--cyan);font-size:13px;font-weight:700;border-radius:4px;display:inline-block;font-family:\'Manrope\',sans-serif">'+lang+'</div>'+
                   '</div>';
 
-                footer.innerHTML = '<div style="display:flex;gap:8px"><button onclick="var es=trAllSessions.find(function(x){return x.id===\''+sid+'\'});if(es&&es.transcript_text){var txt=transcriptWithTimestamps(es.transcript_text,es.duration_seconds,es.words_count);var b=new Blob([txt],{type:\'text/plain;charset=utf-8\'});var a=document.createElement(\'a\');a.href=URL.createObjectURL(b);a.download=(es.name||\'transcript\').replace(/[^a-z0-9]/gi,\'_\')+\'.txt\';a.click()}else{appAlert(\'No transcript available.\',\'Trascrizione non disponibile\')}" style="flex:1;padding:14px;background:var(--cyan);color:#fff;border:none;border-radius:8px;font-weight:700;font-family:\'Manrope\',sans-serif;cursor:pointer;font-size:13px;text-transform:uppercase;letter-spacing:.03em;display:flex;align-items:center;justify-content:center;gap:8px"><span class="material-symbols-outlined" style="font-size:18px">download</span> TXT</button><button onclick="trViewSession(\''+sid+'\')" style="flex:1;padding:14px;background:var(--card);color:var(--cyan);border:2px solid var(--cyan);border-radius:8px;font-weight:700;font-family:\'Manrope\',sans-serif;cursor:pointer;font-size:13px;text-transform:uppercase;letter-spacing:.03em;display:flex;align-items:center;justify-content:center;gap:8px"><span class="material-symbols-outlined" style="font-size:18px">picture_as_pdf</span> PDF</button></div>';
+                footer.innerHTML = '<div style="display:flex;gap:8px"><button onclick="trDownloadTxt(\''+sid+'\')" style="flex:1;padding:14px;background:var(--cyan);color:#fff;border:none;border-radius:8px;font-weight:700;font-family:\'Manrope\',sans-serif;cursor:pointer;font-size:13px;text-transform:uppercase;letter-spacing:.03em;display:flex;align-items:center;justify-content:center;gap:8px"><span class="material-symbols-outlined" style="font-size:18px">download</span> TXT</button><button onclick="trViewSession(\''+sid+'\')" style="flex:1;padding:14px;background:var(--card);color:var(--cyan);border:2px solid var(--cyan);border-radius:8px;font-weight:700;font-family:\'Manrope\',sans-serif;cursor:pointer;font-size:13px;text-transform:uppercase;letter-spacing:.03em;display:flex;align-items:center;justify-content:center;gap:8px"><span class="material-symbols-outlined" style="font-size:18px">picture_as_pdf</span> PDF</button></div>';
 
                 panel.style.display = 'flex';
                 document.getElementById('trEditorBackdrop').style.display = 'block';
@@ -512,6 +512,19 @@
               }
 
               window.transcriptWithTimestamps = transcriptWithTimestamps;
+              window.trDownloadTxt = function(sid){
+                var es = trAllSessions.find(function(x){ return x.id === sid; });
+                if (es && es.transcript_text) {
+                  var txt = transcriptWithTimestamps(es.transcript_text, es.duration_seconds, es.words_count);
+                  var b = new Blob([txt], {type:'text/plain;charset=utf-8'});
+                  var a = document.createElement('a');
+                  a.href = URL.createObjectURL(b);
+                  a.download = (es.name || 'transcript').replace(/[^a-z0-9]/gi, '_') + '.txt';
+                  a.click();
+                } else {
+                  appAlert('No transcript available.', 'Trascrizione non disponibile');
+                }
+              };
               window.trViewSession = function(id){
                 // Find session directly from trAllSessions (not trEditingSession — that requires opening editor first)
                 var s = trAllSessions.find(function(x){ return x.id === id; });

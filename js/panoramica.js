@@ -1067,6 +1067,7 @@
           container.innerHTML = html;
         } catch(e) { /* best effort */ }
       }
+      window.renderHeroCards = renderHeroCards;
 
       function escHtml(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
       function timeAgo(dateStr) {
@@ -5552,7 +5553,16 @@
           var boxes = document.querySelectorAll(sel + ' .wbx-box');
           if (!boxes.length) return;
           var words = [];
-          boxes.forEach(function(b){ var w = b.getAttribute('data-word'); if (w) words.push(w.toLowerCase()); });
+          var seenW = {};
+          boxes.forEach(function(b){
+            var w = b.getAttribute('data-word');
+            if (!w) return;
+            w = w.toLowerCase().trim().replace(/^to\s+/, '');
+            var head = w.split(/\s+/)[0];
+            if (!head || head.length < 2 || !/^[a-z'-]+$/.test(head) || seenW[head]) return;
+            seenW[head] = true;
+            words.push(head);
+          });
           if (!words.length) return;
         // Fix: user_wordbank_words has no user_id/lang columns — filter through
         // user_wordbanks (which owns user_id + lang) then query words by bank ids.
@@ -5821,7 +5831,12 @@
       // ── Third dictionary source removed (see docs/ai/pos-cefr-sources.md benchmark). ──
 
       // ── Free Dictionary API (direct first — 18/20 coverage, ~230ms; proxy is slower + thinner) ──
+      var _fdCache = {};
       async function fetchFreeDict(word, preferredPos) {
+        var ck = word.toLowerCase() + '|' + (preferredPos || '');
+        var cached = _fdCache[ck];
+        if (cached && cached.t > Date.now() - 30000) return cached.v;
+        var store = function(v){ _fdCache[ck] = { t: Date.now(), v: v }; return v; };
         // Direct API
         try {
           var resp = await fetch('https://api.dictionaryapi.dev/api/v2/entries/en/' + encodeURIComponent(word));
@@ -5855,22 +5870,22 @@
             }
           }
           var fdPos = (entry.meanings && entry.meanings.length) ? (entry.meanings[0].partOfSpeech || '') : '';
-          if (def) return { definition: def, ipa: ipa, pos: fdPos };
+          if (def) return store({ definition: def, ipa: ipa, pos: fdPos });
         } catch(e) { /* fall through to proxy */ }
 
         // Proxy fallback (cached, server-side — simplified {definition, ipa, notFound} format)
         try {
           var resp2 = await fetch('https://qzqmuegbpmvqrjrlfbgk.supabase.co/functions/v1/dictionary-proxy?word=' + encodeURIComponent(word));
-          if (!resp2.ok) return null;
+          if (!resp2.ok) return store(null);
           var pdata = await resp2.json();
-          if (!pdata) return null;
+          if (!pdata) return store(null);
           if (pdata.definition !== undefined) {
-            if (pdata.notFound) return null;
-            return { definition: pdata.definition, ipa: pdata.ipa || '' };
+            if (pdata.notFound) return store(null);
+            return store({ definition: pdata.definition, ipa: pdata.ipa || '' });
           }
-          if (!pdata.length) return null;
+          if (!pdata.length) return store(null);
           var pentry = pdata[0];
-          if (!pentry || !pentry.meanings || !pentry.meanings.length) return null;
+          if (!pentry || !pentry.meanings || !pentry.meanings.length) return store(null);
           var pdef = pentry.meanings[0].definitions && pentry.meanings[0].definitions.length ? pentry.meanings[0].definitions[0].definition : '';
           var pipa = '';
           if (pentry.phonetics && pentry.phonetics.length) {
@@ -5878,8 +5893,8 @@
               if (pentry.phonetics[pj].text) { pipa = pentry.phonetics[pj].text; break; }
             }
           }
-          return pdef ? { definition: pdef, ipa: pipa, pos: pentry.meanings[0].partOfSpeech || '' } : null;
-        } catch(e) { return null; }
+          return store(pdef ? { definition: pdef, ipa: pipa, pos: pentry.meanings[0].partOfSpeech || '' } : null);
+        } catch(e) { return store(null); }
       }
 
       // ── WordsAPI (RapidAPI) — English definitions upgrade ──
