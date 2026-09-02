@@ -1,5 +1,12 @@
 # Changelog
 
+## [2026-09-02] Transcript tag editor + report AI schema (v292)
+
+### Fixed
+- **`trAllTags is not defined`:** the transcript inline tag editor's generated `onkeydown`/`onblur` handlers referenced the IIFE-scoped `trAllTags`. Exposed `window.trInlineTagCommit(el)` and rewired both handlers.
+- **`ai_report_requests` 400:** the insert sent `module_id`, which doesn't exist on the live table (live columns: `module_key`, `family_key`). Removed it — the `process-ai-reports` edge function parses `module_key` as the module id.
+- Cache-busters: `panoramica-trascrizioni.js?v=2→3`, `panoramica-reportai.js?v=1→2`.
+
 ## [2026-09-02] Panoramica monolith split + bug sweep (v289 → v291)
 
 ### v289 — Refactor: panoramica.html 13,298 → 1,870 lines (commits a1d1262, ec5f89c, 29c8e39)
