@@ -284,7 +284,7 @@
                       '<div style="display:flex;gap:4px">'+
                         '<select id="trEditorTagSelect" style="padding:4px 8px;border:1px solid var(--line);border-radius:6px;font-size:11px;font-family:inherit;background:var(--bg);color:var(--text)"><option value="">+ Assign tag</option>'+trAllTags.map(function(t){ return '<option value="'+t+'">'+t+'</option>'; }).join('')+'</select>'+
                         '<button onclick="trAssignTag()" style="padding:4px 10px;background:var(--cyan);color:#fff;border:none;border-radius:6px;font-size:11px;font-weight:600;font-family:\'Manrope\',sans-serif;cursor:pointer">Add</button>'+
-                        '<span id="trEditorInlineTag" style="display:none;padding:4px 10px;border:1px dashed var(--cyan);border-radius:99px;font-size:11px;font-weight:600;font-family:\'Manrope\',sans-serif;color:var(--cyan);cursor:text;min-width:60px;white-space:nowrap" contenteditable="true" onkeydown="if(event.key===\'Enter\'){event.preventDefault();var t=this.textContent.trim();if(t&&trAllTags.indexOf(t)===-1){trAllTags.push(t);saveTags();var sel=document.getElementById(\'trEditorTagSelect\');if(sel){var o=document.createElement(\'option\');o.value=t;o.textContent=t;sel.appendChild(o);sel.value=t;trAssignTag()}this.textContent=\'\';this.style.display=\'none\'}}" onblur="var t=this.textContent.trim();if(t&&trAllTags.indexOf(t)===-1){trAllTags.push(t);saveTags();var sel=document.getElementById(\'trEditorTagSelect\');if(sel){var o=document.createElement(\'option\');o.value=t;o.textContent=t;sel.appendChild(o);sel.value=t;trAssignTag()}this.textContent=\'\';this.style.display=\'none\'}" placeholder="New tag..."></span>'+                        '<button onclick="var el=document.getElementById(\'trEditorInlineTag\');el.style.display=\'inline-block\';el.focus()" style="padding:4px 8px;background:none;color:var(--cyan);border:1px solid var(--cyan);border-radius:6px;font-size:11px;font-weight:600;font-family:\'Manrope\',sans-serif;cursor:pointer">+ New</button>'+
+                        '<span id="trEditorInlineTag" style="display:none;padding:4px 10px;border:1px dashed var(--cyan);border-radius:99px;font-size:11px;font-weight:600;font-family:\'Manrope\',sans-serif;color:var(--cyan);cursor:text;min-width:60px;white-space:nowrap" contenteditable="true" onkeydown="if(event.key===\'Enter\'){event.preventDefault();trInlineTagCommit(this)}" onblur="trInlineTagCommit(this)" placeholder="New tag..."></span>'+                        '<button onclick="var el=document.getElementById(\'trEditorInlineTag\');el.style.display=\'inline-block\';el.focus()" style="padding:4px 8px;background:none;color:var(--cyan);border:1px solid var(--cyan);border-radius:6px;font-size:11px;font-weight:600;font-family:\'Manrope\',sans-serif;cursor:pointer">+ New</button>'+
                       '</div>'+
                     '</div>'+
                     '<div style="display:flex;flex-wrap:wrap;gap:6px">'+tagsHTML+'</div>'+
@@ -523,6 +523,23 @@
                   a.click();
                 } else {
                   appAlert('No transcript available.', 'Trascrizione non disponibile');
+                }
+              };
+              window.trInlineTagCommit = function(el){
+                var t = (el.textContent || '').trim();
+                if (t && trAllTags.indexOf(t) === -1) {
+                  trAllTags.push(t);
+                  saveTags();
+                  var sel = document.getElementById('trEditorTagSelect');
+                  if (sel) {
+                    var o = document.createElement('option');
+                    o.value = t; o.textContent = t;
+                    sel.appendChild(o);
+                    sel.value = t;
+                  }
+                  trAssignTag();
+                  el.textContent = '';
+                  el.style.display = 'none';
                 }
               };
               window.trViewSession = function(id){
