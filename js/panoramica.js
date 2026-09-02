@@ -2706,7 +2706,7 @@
           navigator.clipboard.writeText(text).then(function() {
             var btn = document.getElementById('profileCopyRefBtn');
             if (btn) { btn.textContent = '✓'; setTimeout(function(){ btn.textContent = 'Copia'; }, 2000); }
-          });
+          }).catch(function(){});
         }
       };
 
@@ -2751,7 +2751,7 @@
         if (inp && navigator.clipboard) navigator.clipboard.writeText(inp.value).then(function(){
           var b = document.getElementById('refQRCopy');
           if (b) { b.textContent = '✓'; setTimeout(function(){ b.textContent = 'Copia'; }, 1800); }
-        });
+        }).catch(function(){});
       };
 
       // ═══ Load/save Profilo Linguistico from Supabase profiles ═══
