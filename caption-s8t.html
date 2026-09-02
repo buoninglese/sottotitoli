@@ -1137,7 +1137,7 @@ button[onclick*="addToWordBank"]:hover{background:rgba(52,211,153,.15)!important
 @keyframes toastOut { from { opacity: 1; } to { opacity: 0; } }
 </style>
 </head>
-<body class="hb-start" style="display:flex;flex-direction:column;height:100vh;overflow:hidden">
+<body class="hb-start" style="display:flex;flex-direction:column;height:100dvh;overflow:hidden">
 <script>(function(){if(window.location.search.indexOf('join=1')!==-1){var ms=document.getElementById('modeScroll');var tt=document.getElementById('themeToggle');var rp=document.getElementById('rightPanel');var ac=document.getElementById('appCenter');if(ms)ms.style.display='none';if(tt)tt.style.display='none';if(rp)rp.style.display='none';if(ac){ac.style.left='0';ac.style.right='0';}}})();</script>
 
 <!-- ═══ UNIFIED TOP BAR ═══ -->
@@ -1907,7 +1907,7 @@ function _createCaptionRoom(langCode) {
         var linkEl = document.getElementById('capRoomLink');
         if (linkEl) {
           var shareUrl = window.location.origin + window.location.pathname + '?lang=' + langCode + '&mode=' + (currentCaptionMode || 'j7b') + '&room=' + roomId;
-          linkEl.innerHTML = '<a href="' + shareUrl + '" style="color:var(--accent);font-size:12px" onclick="navigator.clipboard.writeText(this.href);return false">📋 copy</a>';
+          linkEl.innerHTML = '<a href="' + shareUrl + '" style="color:var(--accent);font-size:12px" onclick="if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(this.href).catch(function(){});return false">📋 copy</a>';
         }
       }
     });
@@ -3778,7 +3778,25 @@ function downloadCEFRPDF(){
     h+='<h3>'+p.n+' ('+words.length+')</h3><div class="words">'+words.join(', ')+'</div>';
   });
   h+='</body></html>';
-  var w=window.open('','_blank','width=800,height=600');w.document.write(h);w.document.close();setTimeout(function(){w.print()},500);
+  _openPrintableHtml(h, 'sottotitoli-cefr-report.html');
+}
+
+// ── Printable-report helper: iOS Safari has no window.print() → blob download ──
+function _openPrintableHtml(h, filename){
+  var isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  if (isIOS) {
+    try {
+      var blob = new Blob([h], { type: 'text/html;charset=utf-8' });
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement('a');
+      a.href = url; a.download = filename || 'sottotitoli-report.html';
+      document.body.appendChild(a); a.click();
+      setTimeout(function(){ document.body.removeChild(a); URL.revokeObjectURL(url); }, 400);
+    } catch(e) { console.warn('blob download failed:', e); }
+    return;
+  }
+  var w = window.open('', '_blank', 'width=800,height=600');
+  if (w) { w.document.write(h); w.document.close(); setTimeout(function(){ w.print(); }, 500); }
 }
 
 // ── Vocab POS Stack ──
@@ -5785,8 +5803,8 @@ function downloadGrammarPDF() {
     h += '<div class="label">'+r.n+'</div><div class="sub">'+r.sub+'</div></div>';
   });
   h += '</div><div class="footer">Generato da Sottotitoli · '+new Date().toISOString().split('T')[0]+'</div>';
-  h += '<script>window.onload=function(){window.print()}<\/script></body></html>';
-  w.document.write(h);w.document.close();
+  h += '</body></html>';
+  _openPrintableHtml(h, 'sottotitoli-grammar-report.html');
 }
 
 // ═══ Extras Panel — Live Vocabulary / Grammar / Metrics (fully functional) ═══
@@ -7807,11 +7825,12 @@ window.fixExtrasPanelColors = function(){
     if (channel === 'whatsapp') window.open('https://wa.me/?text='+encodeURIComponent(text+' '+url), '_blank');
     else if (channel === 'email') window.open('mailto:?subject='+encodeURIComponent(text)+'&body='+encodeURIComponent(url), '_blank');
     else if (channel === 'copy') {
+      if (!navigator.clipboard || !navigator.clipboard.writeText) return;
       navigator.clipboard.writeText(url).then(function(){
         var t = document.getElementById('toast'); if (!t) return;
         t.textContent = '📋 Invite link copied!'; t.style.opacity='1';
         clearTimeout(t._tt); t._tt = setTimeout(function(){ t.style.opacity='0'; }, 2000);
-      });
+      }).catch(function(){});
     }
   };
 
@@ -8618,12 +8637,23 @@ window.fixExtrasPanelColors = function(){
   };
   // ── Copy to clipboard helper ──
   window.v20q_copyToClipboard = function(text, btn){
+    // Open TikTok synchronously — iOS blocks window.open inside async callbacks
+    window.open('https://www.tiktok.com/upload?lang=en','_blank');
+    var done = function(){
+      btn.innerHTML = '<i class="fa-solid fa-check"></i> Copied!';
+      setTimeout(function(){ btn.innerHTML = '<i class="fa-brands fa-tiktok"></i> Open TikTok'; }, 2000);
+    };
     if (navigator.clipboard && navigator.clipboard.writeText) {
-      navigator.clipboard.writeText(text).then(function(){
-        btn.innerHTML = '<i class="fa-solid fa-check"></i> Copied!';
-        setTimeout(function(){ btn.innerHTML = '<i class="fa-brands fa-tiktok"></i> Open TikTok'; }, 2000);
-        window.open('https://www.tiktok.com/upload?lang=en','_blank');
-      });
+      navigator.clipboard.writeText(text).then(done).catch(function(){ done(); });
+    } else {
+      var ta = document.createElement('textarea');
+      ta.value = text;
+      ta.style.cssText = 'position:fixed;left:-9999px';
+      document.body.appendChild(ta);
+      ta.select();
+      try { document.execCommand('copy'); } catch(e) {}
+      document.body.removeChild(ta);
+      done();
     }
   };
   window.v20q_escapeHtml = function(s){ var d=document.createElement('div');d.textContent=s;return d.innerHTML; };
