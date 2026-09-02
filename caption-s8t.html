@@ -4593,22 +4593,9 @@ async function toggleSession() {
     }
   } else {
     if (window.RecordFallback && window.RecordFallback._recorder) {
-      // iOS fallback: stop recorder → transcribe → feed sentences through onFinal
+      // iOS fallback: final flush — segments already streamed in during recording
       if (stopBtn) { stopBtn.disabled = true; stopBtn.innerHTML = '<i class="fas fa-spinner"></i> <span>Transcribing…</span>'; }
-      try {
-        var recBlob = await window.RecordFallback.stop();
-        if (recBlob && recBlob.size) {
-          try {
-            var recText = await window.RecordFallback.transcribe(recBlob, currentCaptionLang);
-            if (recText) window.RecordFallback.feedSentences(recText);
-            else if (typeof showToast === 'function') showToast('Nessuna voce rilevata.', 'warning');
-          } catch(te) {
-            console.warn('transcribe error:', te);
-            if (typeof showToast === 'function') showToast(String(te.message || te), 'error');
-            else alert(String(te.message || te));
-          }
-        }
-      } catch(e) { console.error('fallback stop error:', e); }
+      try { await window.RecordFallback.stop(); } catch(e) { console.error('fallback stop error:', e); }
       if (stopBtn) stopBtn.disabled = false;
     } else {
       stopRealMic();
