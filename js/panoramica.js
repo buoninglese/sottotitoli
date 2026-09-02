@@ -5574,9 +5574,9 @@
           (bankData||[]).forEach(function(w){ bankSet.add(w.word.toLowerCase()); });
         }
           var { data: reviewData } = await sb.from('review_words')
-            .select('word,personal_frequency,mastery_score').eq('user_id', userId).in('word', words);
+            .select('lemma,personal_frequency,mastery_score').eq('user_id', userId).in('lemma', words);
           var reviewMap = {};
-          (reviewData||[]).forEach(function(rw){ reviewMap[rw.word.toLowerCase()] = rw; });
+          (reviewData||[]).forEach(function(rw){ reviewMap[rw.lemma.toLowerCase()] = rw; });
           boxes.forEach(function(box){
             var w = (box.getAttribute('data-word')||'').toLowerCase();
             if (!bankSet.has(w)) return;
