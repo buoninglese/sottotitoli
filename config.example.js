@@ -33,6 +33,9 @@ window.SOTTOTITOLI_CONFIG = {
   /** CEFR vocabulary API (sottotitoli-websocket Render service + Words-CEFR-Dataset) */
   cefrApiUrl: "https://sottotitoli-websocket.onrender.com/api/cefr",
 
+  /** Transcribe-audio edge function (iOS record→transcribe fallback, OpenAI Whisper) */
+  transcribeAudioUrl: "https://qzqmuegbpmvqrjrlfbgk.supabase.co/functions/v1/transcribe-audio",
+
   /** Translation provider settings */
   translation: {
     /** Translation provider: "proxy" = server-side with caching + fallback.

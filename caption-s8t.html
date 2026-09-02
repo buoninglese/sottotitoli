@@ -1518,6 +1518,7 @@ button[onclick*="addToWordBank"]:hover{background:rgba(52,211,153,.15)!important
 <script src="js/notifications.js"></script>
 <script src="js/language-resolver.js?v=1"></script>
 <script src="js/real-mic.js?v=13"></script>
+<script src="js/record-fallback.js?v=1"></script>
 <script src="js/grammar-viz.js?v=2"></script>
 <script src="js/speech-icons.js"></script>
 <script src="js/cefr-gse.js"></script>
@@ -4552,14 +4553,20 @@ async function toggleSession() {
     }
     // Create Supabase room ONLY when user presses Start (not on page load)
     try { _createCaptionRoom(currentCaptionLang || 'en-US'); } catch(e) { console.error('_createCaptionRoom error:', e); }
-    // ── Start mic (await getUserMedia warm-up + rec.start — both during gesture) ──
-    var micOk = await startRealMic();
-    console.log('🎯 startRealMic returned:', micOk);
+    // ── Start mic: live SpeechRecognition on desktop, record→transcribe fallback on iOS ──
+    var useFallback = !!(window.RecordFallback && window.RecordFallback.isNeeded());
+    var micOk = useFallback ? await window.RecordFallback.start() : await startRealMic();
+    console.log('🎯 mic start returned:', micOk, 'fallback=', useFallback);
     if (!micOk) {
       sessionActive = false;
       if (startBtn) { startBtn.disabled = false; startBtn.classList.remove('loading'); startBtn.innerHTML = '<i class="fas fa-play"></i><span data-i18n="listen">Start</span>'; }
       startBtn.style.display = '';
       stopBtn.style.display = 'none';
+      var micFailMsg = null;
+      if (_realMic.state === 'blocked') micFailMsg = 'Microfono bloccato: consenti l\'accesso e riprova.';
+      else if (!useFallback) micFailMsg = 'Live captions are not supported in this browser. Use Chrome/Edge (desktop or Android).';
+      else micFailMsg = 'Impossibile avviare la registrazione. Riprova.';
+      if (micFailMsg) { if (typeof showToast === 'function') showToast(micFailMsg, 'warning'); else alert(micFailMsg); }
     } else {
       // ── Credit check (mic already running — will stop if no credits) ──
       console.log('🎯 Starting credit check...');
@@ -4585,7 +4592,27 @@ async function toggleSession() {
       });
     }
   } else {
-    stopRealMic();
+    if (window.RecordFallback && window.RecordFallback._recorder) {
+      // iOS fallback: stop recorder → transcribe → feed sentences through onFinal
+      if (stopBtn) { stopBtn.disabled = true; stopBtn.innerHTML = '<i class="fas fa-spinner"></i> <span>Transcribing…</span>'; }
+      try {
+        var recBlob = await window.RecordFallback.stop();
+        if (recBlob && recBlob.size) {
+          try {
+            var recText = await window.RecordFallback.transcribe(recBlob, currentCaptionLang);
+            if (recText) window.RecordFallback.feedSentences(recText);
+            else if (typeof showToast === 'function') showToast('Nessuna voce rilevata.', 'warning');
+          } catch(te) {
+            console.warn('transcribe error:', te);
+            if (typeof showToast === 'function') showToast(String(te.message || te), 'error');
+            else alert(String(te.message || te));
+          }
+        }
+      } catch(e) { console.error('fallback stop error:', e); }
+      if (stopBtn) stopBtn.disabled = false;
+    } else {
+      stopRealMic();
+    }
     // Save session with transcript + stats
     var transcriptEl = document.getElementById('captionTranscript');
     var fullText = transcriptEl ? (transcriptEl.textContent || '') : '';
@@ -4657,6 +4684,8 @@ function _applySessionLiveUI(startBtn, stopBtn) {
     console.log('🎯 _applySessionLiveUI called. sessionActive=', sessionActive, 'paused=', paused, 'realMic.state=', _realMic.state, 'timerInterval=', !!timerInterval);
     // Guard: user may have stopped while credit check was in flight
     if (!sessionActive) { stopRealMic(); return; }
+    // Fallback (iOS record) has no pause — keep it hidden
+    if (window.RecordFallback && window.RecordFallback._recorder && pauseBtn) pauseBtn.style.display = 'none';
     // Guard: user paused while credit check was in flight — mic was already
     // stopped by togglePause(), just keep the paused UI state
     if (paused) {
