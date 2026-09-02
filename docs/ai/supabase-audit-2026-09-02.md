@@ -113,4 +113,4 @@ A fresh environment built from setup.sql now matches what the code expects.
 
 ## 6. Deploy checklist
 1. ✅ Migration applied via Management API (2026-09-02).
-2. ⏳ Redeploy `process-ai-reports` (`supabase functions deploy process-ai-reports`).
+2. ✅ `process-ai-reports` redeployed (2026-09-02) — endpoint responds (GET 200, POST 401 unauthenticated).
