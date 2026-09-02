@@ -1976,9 +1976,11 @@
         var est=String(center).length, r0=Math.max(38,Math.min(64,14+est*4)), span=Math.min(H/2-10, r0+95), ringH=(span-r0)/4;
         var fs=Math.max(15,Math.min(34,Math.floor((2*r0-16)/(est*0.62)))), step=360/n, g='';
         for (var ring=1;ring<=4;ring++) g+='<circle cx="'+cx+'" cy="'+cy+'" r="'+(r0+ring*ringH)+'" fill="none" stroke="var(--line)"/>';
+        var tot=0;
         for (var i=0;i<n;i++){ var v=vals[i], a0=i*step, a1=(i+1)*step-4, rr=r0+(v/max)*(span-r0), d=days&&days[i]?days[i]:'';
+          tot+=(v||0);
           g+='<path data-tip="'+escAttr(fmtDate(d)+' — '+(v||0)+' '+(unit||''))+'" d="'+ringPath(cx,cy,rr,r0,a0,a1)+'" fill="'+(i===n-1?'#f59e0b':color)+'" opacity=".95"></path>'; }
-        g+='<text class="corona-val" data-num="'+total+'" data-fmt="int" x="'+cx+'" y="'+(cy+fs*0.35)+'" text-anchor="middle" fill="var(--text)" font-size="'+fs+'" font-weight="800" font-family="Inter, sans-serif" letter-spacing="-0.02em">'+center+'</text>';
+        g+='<text class="corona-val" data-num="'+tot+'" data-fmt="int" x="'+cx+'" y="'+(cy+fs*0.35)+'" text-anchor="middle" fill="var(--text)" font-size="'+fs+'" font-weight="800" font-family="Inter, sans-serif" letter-spacing="-0.02em">'+center+'</text>';
         return '<svg viewBox="0 0 '+W+' '+H+'" style="width:100%;max-width:680px;height:auto">'+g+'</svg>';
       }
       // ═══ CORONA DUAL — activity: recording (cyan) + extra site time (amber) ═══
@@ -1988,14 +1990,16 @@
         var est=String(center).length, r0=Math.max(38,Math.min(64,14+est*4)), span=Math.min(H/2-10, r0+95), ringH=(span-r0)/4;
         var fs=Math.max(15,Math.min(34,Math.floor((2*r0-16)/(est*0.62)))), step=360/n, g='';
         for (var ring=1;ring<=4;ring++) g+='<circle cx="'+cx+'" cy="'+cy+'" r="'+(r0+ring*ringH)+'" fill="none" stroke="var(--line)"/>';
+        var tot=0;
         for(i=0;i<n;i++){
           var rec=recVals[i], ex=extraVals[i], site=rec+ex, a0=i*step, a1=(i+1)*step-4, d=days&&days[i]?days[i]:'';
+          tot+=site;
           var rRec=r0+(rec/max)*(span-r0), rSite=r0+(site/max)*(span-r0), isT=(i===n-1);
           var tip=escAttr(fmtDate(d)+' · registrazione '+fmtMinutes(Math.round(rec))+' · altro '+fmtMinutes(Math.round(ex))+' · totale '+fmtMinutes(Math.round(site)));
           g+='<path data-tip="'+tip+'" d="'+ringPath(cx,cy,rRec,r0,a0,a1)+'" fill="'+(isT?'#22d3ee':'#06b6d4')+'" opacity=".95"></path>';
           if (ex>0) g+='<path data-tip="'+tip+'" d="'+ringPath(cx,cy,rSite,rRec,a0,a1)+'" fill="'+(isT?'#fbbf24':'#f59e0b')+'" opacity=".95"></path>';
         }
-        g+='<text class="corona-val" data-num="'+total+'" data-fmt="min" x="'+cx+'" y="'+(cy+fs*0.35)+'" text-anchor="middle" fill="var(--text)" font-size="'+fs+'" font-weight="800" font-family="Inter, sans-serif" letter-spacing="-0.02em">'+center+'</text>';
+        g+='<text class="corona-val" data-num="'+tot+'" data-fmt="min" x="'+cx+'" y="'+(cy+fs*0.35)+'" text-anchor="middle" fill="var(--text)" font-size="'+fs+'" font-weight="800" font-family="Inter, sans-serif" letter-spacing="-0.02em">'+center+'</text>';
         return '<svg viewBox="0 0 '+W+' '+H+'" style="width:100%;max-width:680px;height:auto">'+g+'</svg>';
       }
       // ═══ STACKED BANDS — time of day: morning/day/evening/night per day ═══
