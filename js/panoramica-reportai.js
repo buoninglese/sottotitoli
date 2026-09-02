@@ -171,7 +171,6 @@
                   var ins = await sb.from('ai_report_requests').insert({
                     user_id: uid,
                     session_ids: sessionIds,
-                    module_id: mapping.moduleId,
                     module_key: mapping.moduleKey,
                     scope_type: sessionIds.length > 1 ? 'multi_session' : 'single_session',
                     status: 'queued'
