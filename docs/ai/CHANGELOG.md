@@ -1,5 +1,23 @@
 # Changelog
 
+## [2026-09-02] Panoramica monolith split + bug sweep (v289 → v291)
+
+### v289 — Refactor: panoramica.html 13,298 → 1,870 lines (commits a1d1262, ec5f89c, 29c8e39)
+- Mega-script (7,283 lines) → `js/panoramica.js`, included at the same load position.
+- 15 further inline scripts → `js/panoramica-*.js` (trascrizioni, wordbanks-en/it, vb, reportai ×3, impostazioni, mobile, settings-save, profile, startoverride, grammar, wbtokens, wrapped-switcher). Every `<script src>` replaced its block in place — execution order untouched.
+- 15 body `<style>` blocks (971 CSS lines) → `css/panoramica-inline.css`, loaded last in `<head>` (after Tailwind) to preserve the old inline cascade position.
+- Zero behavior change; kept inline only the head icon-flash guard + small head/bento scripts.
+
+### v290 — Fix: dashboard charts crashed (`total is not defined`)
+- `coronaHtml`/`coronaDualHtml` referenced an undefined `total` → `ReferenceError` aborted `renderChartBox`, leaving the chart empty. Now computes the sum locally. Cache-buster `js/panoramica.js?v=1→2`.
+
+### v291 — Fix: console error sweep (commit 8085b6b)
+- **Transcript TXT download** (`trAllSessions is not defined`): generated `onclick` referenced an IIFE-private array → exposed `window.trDownloadTxt(sid)` and rewired the button.
+- **Settings save** (`renderHeroCards is not defined`): exposed `window.renderHeroCards`.
+- **`review_words` 400 Bad Request**: `enrichBankStatus` sent multi-word phrases ("blend in", "to travel") into `.in('word', …)` → now sanitized to lowercase head tokens, deduped.
+- **Dictionary API console spam**: `api.dictionaryapi.dev` outage caused per-keystroke fetch storms → `fetchFreeDict` now caches successes and failures with a 30s TTL.
+- Cache-busters: `panoramica.js?v=2→3`, `panoramica-trascrizioni.js?v=1→2`.
+
 > ## ⚠️ ARCHIVED — ES-module refactor (2026-08-12)
 > The entries below from v206–v210 describe an **ES-module refactor** (`js/panoramica/app.js` + `panoramica/panels/*.js` + `panoramica/shared/*.js`) that **never shipped**. `panoramica.html` never imported `app.js`, so the deployed site always ran the ~10,700-line inline monolith. The refactor files were dead code and have been **moved to** `~/Desktop/sottotitoli-archived/dead-js/panoramica-v2-attempt/`.
 > **Real current state: monolith at v178.** These v2xx notes describe work that was never activated — treat them as historical, not as a description of the live code.
