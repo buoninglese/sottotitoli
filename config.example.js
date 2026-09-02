@@ -36,6 +36,9 @@ window.SOTTOTITOLI_CONFIG = {
   /** Transcribe-audio edge function (iOS record→transcribe fallback, OpenAI Whisper) */
   transcribeAudioUrl: "https://qzqmuegbpmvqrjrlfbgk.supabase.co/functions/v1/transcribe-audio",
 
+  /** Interval (seconds) between iOS fallback transcription segments — semi-live captions */
+  recordIntervalSec: 12,
+
   /** Translation provider settings */
   translation: {
     /** Translation provider: "proxy" = server-side with caching + fallback.
