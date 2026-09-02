@@ -35,7 +35,9 @@ SECURITY DEFINER helpers (`is_room_member`, `is_room_owner`,
 `can_contribute_to_room`) that bypass RLS internally; all policies rewritten to
 use them. Same row-level semantics.
 
-**⚠️ Must be applied to live:** `supabase db push` or paste into SQL editor.
+**✅ APPLIED to live 2026-09-02 via Management API (migration history version
+20260902085817). Verified: anon probes on rooms/room_members/room_invites/
+transcript_segments all return 200 (previously 400 recursion).**
 
 ---
 
@@ -109,6 +111,6 @@ A fresh environment built from setup.sql now matches what the code expects.
 - The OpenAPI schema endpoint requires a secret key — the audit was done with
   the publishable key via per-column probing.
 
-## 6. Deploy checklist (requires Supabase credentials)
-1. `supabase db push` (applies `20260902_fix_rooms_rls_recursion.sql`).
-2. `supabase functions deploy process-ai-reports`.
+## 6. Deploy checklist
+1. ✅ Migration applied via Management API (2026-09-02).
+2. ⏳ Redeploy `process-ai-reports` (`supabase functions deploy process-ai-reports`).
