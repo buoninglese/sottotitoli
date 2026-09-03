@@ -51,21 +51,27 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const authHeader = req.headers.get("Authorization");
-    if (!authHeader) {
-      return new Response(JSON.stringify({ ok: false, error: "Missing Authorization header" }), {
-        status: 401,
-        headers: corsHeaders(origin)
-      });
-    }
-
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const openaiApiKey = Deno.env.get("OPENAI_API_KEY")!;
 
-    const admin = createClient(supabaseUrl, serviceRoleKey, {
-      global: { headers: { Authorization: authHeader } }
-    });
+    // Service-role client: DB requests must run with RLS bypassed because this
+    // function analyzes arbitrary sessions by id. Do NOT forward the caller's
+    // Authorization token into the client — that scopes every query to the
+    // caller's role (anon) and RLS would hide other users' sessions.
+    const admin = createClient(supabaseUrl, serviceRoleKey);
+
+    // Optional caller identity for ownership enforcement: a user token may only
+    // trigger analysis on that user's own session. Server/cron callers (service
+    // role bearer, or no token) may analyze any session.
+    const authHeader = req.headers.get("Authorization");
+    const bearer = (authHeader ?? "").replace(/^Bearer\s+/i, "").trim();
+    const isTrustedServer = !!bearer && bearer === serviceRoleKey;
+    let callerId: string | null = null;
+    if (!isTrustedServer && bearer) {
+      const { data: { user } } = await admin.auth.getUser(bearer);
+      callerId = user?.id ?? null;
+    }
 
     const { session_id } = await req.json();
     if (!session_id) {
@@ -84,6 +90,14 @@ Deno.serve(async (req) => {
     if (sessionError || !session) {
       return new Response(JSON.stringify({ ok: false, error: "Session not found" }), {
         status: 404,
+        headers: corsHeaders(origin)
+      });
+    }
+
+    // Ownership guard: a resolved user token may only analyze that user's session.
+    if (callerId && session.user_id !== callerId) {
+      return new Response(JSON.stringify({ ok: false, error: "Not authorized for this session" }), {
+        status: 403,
         headers: corsHeaders(origin)
       });
     }
