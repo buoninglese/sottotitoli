@@ -105,13 +105,30 @@ Deno.serve(async (req) => {
       .update({ ai_status: "processing", ai_last_error: null })
       .eq("id", session_id);
 
-    const { data: config, error: configError } = await admin
-      .from("ai_configs")
-      .select("id, provider, model, prompt_version, system_prompt, user_prompt_template, output_schema, options")
-      .eq("is_active", true)
-      .single<AIConfigRow>();
+    // Live ai_configs is a key/value store (id, config_key, config_value) — the
+    // same pattern process-ai-reports uses. The columnar session-analysis config
+    // lives JSON-serialized under config_key='session_analysis'.
+    let config: AIConfigRow | null = null;
+    try {
+      const { data: cfgRow, error: cfgError } = await admin
+        .from("ai_configs")
+        .select("id, config_value")
+        .eq("config_key", "session_analysis")
+        .maybeSingle<{ id: string; config_value: unknown }>();
 
-    if (configError || !config) {
+      if (!cfgError && cfgRow) {
+        const parsed = typeof cfgRow.config_value === "string"
+          ? JSON.parse(cfgRow.config_value)
+          : cfgRow.config_value;
+        if (parsed && parsed.is_active !== false && parsed.system_prompt && parsed.model) {
+          config = { id: cfgRow.id, ...(parsed as Omit<AIConfigRow, "id">) };
+        }
+      }
+    } catch (_) {
+      config = null;
+    }
+
+    if (!config) {
       await admin
         .from("sessions")
         .update({ ai_status: "failed", ai_last_error: "No active AI config found" })
