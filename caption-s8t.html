@@ -1998,7 +1998,7 @@ async function generateQuickSnapshot() {
   if (!r.data || !r.data.session) { window.location.href = 'panoramica.html'; return; }
   var today = new Date().toISOString().split('T')[0];
   if (localStorage.getItem('sottotitoli_last_snapshot_date') === today) {
-    alert('Hai già generato lo Snapshot gratuito oggi. Riprova domani!');
+    showAlertModal('Snapshot gratuito', 'Hai già generato lo Snapshot gratuito oggi. Riprova domani!');
     return;
   }
   var sid = localStorage.getItem('sottotitoli-caption-session');
@@ -3111,10 +3111,10 @@ window.saveGrammarError = async function() {
   if (!original || !corrected) return;
 
   var sb = window.sottotitoliSupabase;
-  if (!sb) { alert('Sign in to save errors.'); return; }
+  if (!sb) { showAlertModal('Accesso richiesto', 'Sign in to save errors.'); return; }
 
   var r = await sb.auth.getSession();
-  if (!r.data || !r.data.session) { alert('Sign in to save errors.'); return; }
+  if (!r.data || !r.data.session) { showAlertModal('Accesso richiesto', 'Sign in to save errors.'); return; }
 
   btn.disabled = true;
   btn.textContent = 'Saving…';
@@ -4541,7 +4541,7 @@ async function toggleSession() {
     // Invitee: just toggle their own mic
     if (!sessionActive) {
       startRealMic().then(function(ok){
-        if (!ok) { alert('⚠ Mic access denied'); return; }
+        if (!ok) { showAlertModal('Microfono', '⚠ Mic access denied'); return; }
         sessionActive = true;
         var startBtn = document.getElementById('startBtn');
         if (startBtn) { startBtn.innerHTML = '<i class="fas fa-stop"></i><span>Leave</span>'; startBtn.classList.add('danger'); }
@@ -4584,7 +4584,7 @@ async function toggleSession() {
       if (_realMic.state === 'blocked') micFailMsg = 'Microfono bloccato: consenti l\'accesso e riprova.';
       else if (!useFallback) micFailMsg = 'Live captions are not supported in this browser. Use Chrome/Edge (desktop or Android).';
       else micFailMsg = 'Impossibile avviare la registrazione. Riprova.';
-      if (micFailMsg) { if (typeof showToast === 'function') showToast(micFailMsg, 'warning'); else alert(micFailMsg); }
+      if (micFailMsg) { if (typeof showToast === 'function') showToast(micFailMsg, 'warning'); else showAlertModal('Microfono', micFailMsg); }
     } else {
       // ── Credit check (mic already running — will stop if no credits) ──
       console.log('🎯 Starting credit check...');
@@ -4598,7 +4598,7 @@ async function toggleSession() {
           stopBtn.style.display = 'none';
           if (pauseBtn) pauseBtn.style.display = 'none';
           startBtn.innerHTML = '<i class="fas fa-play"></i><span>Start</span>';
-          alert('⏰ Nessun credito. Acquista su Purchase.');
+          showAlertModal('Crediti esauriti', '⏰ Nessun credito. Acquista su Purchase.', function(){ window.location.href = 'purchase.html'; });
           return;
         }
         // ✅ Mic running + credits OK — restore button (gets hidden by _applySessionLiveUI)
@@ -5072,6 +5072,18 @@ function closeConfirmModal() {
   document.getElementById('confirmModal').style.display = 'none';
   _confirmCallback = null;
   if (_confirmKeyHandler) { document.removeEventListener('keydown', _confirmKeyHandler); _confirmKeyHandler = null; }
+  var _cancelBtn = document.getElementById('confirmModalCancel');
+  if (_cancelBtn) _cancelBtn.style.display = '';
+}
+
+// ── Styled alert modal (single OK button, reuses the confirm modal chrome) ──
+function showAlertModal(title, msg, onOk) {
+  var cancelBtn = document.getElementById('confirmModalCancel');
+  if (cancelBtn) cancelBtn.style.display = 'none';
+  showConfirmModal(title, msg, 'OK', function() {
+    if (cancelBtn) cancelBtn.style.display = '';
+    if (onOk) onOk();
+  });
 }
 
 // ═══ Audio source: always default mic ═══
@@ -5306,10 +5318,11 @@ function toggleSynonymWord(btn, word) {
 }
 
 function clearWordBank() {
-  if (!confirm('Clear all ' + wordBank.length + ' saved words?')) return;
-  wordBank = [];
-  saveWordBank();
-  renderWordBank();
+  showConfirmModal('Word Bank', 'Clear all ' + wordBank.length + ' saved words?', 'Clear', function(){
+    wordBank = [];
+    saveWordBank();
+    renderWordBank();
+  });
 }
 
 // Clear session-scoped synonyms tracking
@@ -5764,7 +5777,7 @@ var _listenBarInterval = setInterval(updateListenBar, 2000);
 // ═══ PDF Download for Grammar Report (#37) ═══
 function downloadGrammarPDF() {
   var report = window._grammarReport;
-  if (!report) { alert('No grammar data yet. Start a session first.'); return; }
+  if (!report) { showAlertModal('Report Grammatica', 'No grammar data yet. Start a session first.'); return; }
   var w = window.open('', '_blank', 'width=800,height=600');
   var totalWords = report.totalWords || 0;
   var totalTime = report.totalTime || 0;
@@ -7362,7 +7375,7 @@ window.lookupSynonym = function(el) {
 // ═══ AI Diarization — calls Supabase Edge Function ═══
 window.runDiarization = function(){
   var lines = window._diarizeLines;
-  if(!lines || lines.length===0){alert('No transcript lines to analyze. Start a session first.');return;}
+  if(!lines || lines.length===0){showAlertModal('Diarizzazione', 'No transcript lines to analyze. Start a session first.');return;}
   var btn=document.getElementById('btnDiarize');
   var status=document.getElementById('diarizeStatus');
   var output=document.getElementById('diarizeOutput');
@@ -7381,8 +7394,8 @@ window.runDiarization = function(){
   .then(function(data){
     if(btn){btn.disabled=false;btn.textContent='🔮 Diarize with AI';}
     if(status)status.style.display='none';
-    if(data.error){alert('Diarization error: '+data.error);return;}
-    if(!data.lines){alert('No speaker data returned');return;}
+    if(data.error){showAlertModal('Errore diarizzazione', 'Diarization error: '+data.error);return;}
+    if(!data.lines){showAlertModal('Diarizzazione', 'No speaker data returned');return;}
     
     // Re-render with AI-assigned speakers
     var speakerColors=['#5b7fc1','#c1665b','#5b9c6e','#c084fc','#fbbf24','#f472b6'];
@@ -7941,30 +7954,31 @@ window.fixExtrasPanelColors = function(){
 
   // ═══ New Room ═══
   window.duoNewRoom = function() {
-    if (!confirm('Create a new room? This will clear all captions and disconnect current speakers.')) return;
-    if (window._duoWs) { try { window._duoWs.close(); } catch(e){} window._duoWs = null; }
-    window._duoRoomId = 'cap-' + Date.now().toString(36) + '-' + Math.random().toString(36).substring(2,6);
-    localStorage.setItem('sottotitoli-duo-is-host-' + window._duoRoomId, '1');
-    var sb2 = window.sottotitoliSupabase;
-    if (sb2) {
-      sb2.auth.getSession().then(function(r){
-        if (r.data?.session) localStorage.setItem('sottotitoli-duo-host-' + window._duoRoomId, r.data.session.user.id);
-      });
-    }
-    window._duoSpeakerMap = {};
-    var transcript = document.getElementById('captionTranscript');
-    if (transcript) transcript.innerHTML = '';
-    var interim = document.getElementById('captionInterim');
-    if (interim) interim.textContent = '';
-    window._sessionLines = [];
-    _grammarLastLineCount = 0; // reset incremental grammar line tracker
-    ['statLines','statWords','liveWpm','liveLexDiv','liveFillersPerMin'].forEach(function(id){ var el=document.getElementById(id); if(el)el.textContent='0'; });
-    try { var el = document.getElementById('liveLexDiv'); if (el) el.textContent = '—'; } catch(e) {}
-    try { var el = document.getElementById('liveFillersPerMin'); if (el) el.textContent = '—'; } catch(e) {}
-    duoRenderSpeakers();
-    duoConnectWebSocket();
-    duoUpdateInviteUrl();
-    var t=document.getElementById('toast'); if(t){t.textContent='🔄 New room created';t.style.opacity='1';clearTimeout(t._tt);t._tt=setTimeout(function(){t.style.opacity='0'},2000);}
+    showConfirmModal('Nuova stanza', 'Create a new room? This will clear all captions and disconnect current speakers.', 'Create', function(){
+      if (window._duoWs) { try { window._duoWs.close(); } catch(e){} window._duoWs = null; }
+      window._duoRoomId = 'cap-' + Date.now().toString(36) + '-' + Math.random().toString(36).substring(2,6);
+      localStorage.setItem('sottotitoli-duo-is-host-' + window._duoRoomId, '1');
+      var sb2 = window.sottotitoliSupabase;
+      if (sb2) {
+        sb2.auth.getSession().then(function(r){
+          if (r.data?.session) localStorage.setItem('sottotitoli-duo-host-' + window._duoRoomId, r.data.session.user.id);
+        });
+      }
+      window._duoSpeakerMap = {};
+      var transcript = document.getElementById('captionTranscript');
+      if (transcript) transcript.innerHTML = '';
+      var interim = document.getElementById('captionInterim');
+      if (interim) interim.textContent = '';
+      window._sessionLines = [];
+      _grammarLastLineCount = 0; // reset incremental grammar line tracker
+      ['statLines','statWords','liveWpm','liveLexDiv','liveFillersPerMin'].forEach(function(id){ var el=document.getElementById(id); if(el)el.textContent='0'; });
+      try { var el = document.getElementById('liveLexDiv'); if (el) el.textContent = '—'; } catch(e) {}
+      try { var el = document.getElementById('liveFillersPerMin'); if (el) el.textContent = '—'; } catch(e) {}
+      duoRenderSpeakers();
+      duoConnectWebSocket();
+      duoUpdateInviteUrl();
+      var t=document.getElementById('toast'); if(t){t.textContent='🔄 New room created';t.style.opacity='1';clearTimeout(t._tt);t._tt=setTimeout(function(){t.style.opacity='0'},2000);}
+    });
   };
 
   // ═══ Refresh room (for invitees) ═══
@@ -8025,18 +8039,19 @@ window.fixExtrasPanelColors = function(){
     if (!spk) return;
     // Never allow kicking the host (yourself)
     var isSelf = (spk.name === window._duoSpeakerName) || (spk.name === window._duoHostName);
-    if (isSelf) { alert('You cannot remove yourself from the room. Switch to SOLO mode instead.'); return; }
-    if (!confirm('Remove ' + spk.name + ' from the room?')) return;
-    // Send kick message via WebSocket
-    if (window._duoWs && window._duoWs.readyState === WebSocket.OPEN) {
-      window._duoWs.send(JSON.stringify({ type:'duo-kick', label:label, name:spk.name }));
-    }
-    delete window._duoSpeakerMap[label];
-    duoRenderSpeakers();
-    // Close modal
-    var modal = document.querySelector('.duo-modal-overlay');
-    if (modal) modal.remove();
-    var t=document.getElementById('toast'); if(t){t.textContent='🚫 '+spk.name+' removed';t.style.opacity='1';clearTimeout(t._tt);t._tt=setTimeout(function(){t.style.opacity='0'},2000);}
+    if (isSelf) { showAlertModal('Manage Speakers', 'You cannot remove yourself from the room. Switch to SOLO mode instead.'); return; }
+    showConfirmModal('Manage Speakers', 'Remove ' + spk.name + ' from the room?', 'Remove', function(){
+      // Send kick message via WebSocket
+      if (window._duoWs && window._duoWs.readyState === WebSocket.OPEN) {
+        window._duoWs.send(JSON.stringify({ type:'duo-kick', label:label, name:spk.name }));
+      }
+      delete window._duoSpeakerMap[label];
+      duoRenderSpeakers();
+      // Close modal
+      var modal = document.querySelector('.duo-modal-overlay');
+      if (modal) modal.remove();
+      var t=document.getElementById('toast'); if(t){t.textContent='🚫 '+spk.name+' removed';t.style.opacity='1';clearTimeout(t._tt);t._tt=setTimeout(function(){t.style.opacity='0'},2000);}
+    });
   };
 
   // Handle incoming kick message
@@ -8044,7 +8059,7 @@ window.fixExtrasPanelColors = function(){
   function duoHandleKick(data) {
     // If we're the one being kicked
     if (data.name === window._duoSpeakerName || (window._duoSpeakerMap[data.label] && window._duoSpeakerMap[data.label].name === window._duoSpeakerName)) {
-      alert('You have been removed from the room by the host.');
+      showAlertModal('Rimosso dalla stanza', 'You have been removed from the room by the host.');
       // Disconnect and return to solo mode
       if (window._duoWs) { try { window._duoWs.close(); } catch(e){} window._duoWs = null; }
       window._duoMode = false;
@@ -8102,25 +8117,28 @@ window.fixExtrasPanelColors = function(){
       var currentMode = window._duoMode ? 'duo' : 'solo';
       if (mode !== currentMode) {
         var msg = mode === 'duo' ? 'Switch to DUO+? This will clear your captions and start a new room.' : 'Switch to SOLO? This will clear your captions and disconnect speakers.';
-        if (!confirm(msg)) return;
-        // Clear captions
-        var transcript = document.getElementById('captionTranscript');
-        if (transcript) transcript.innerHTML = '';
-        var interim = document.getElementById('captionInterim');
-        if (interim) interim.textContent = '';
-        window._sessionLines = [];
-        ['statLines','statWords','liveWpm','liveLexDiv','liveFillersPerMin'].forEach(function(id){ var el=document.getElementById(id); if(el)el.textContent='0'; });
-        try { var el = document.getElementById('liveLexDiv'); if (el) el.textContent = '—'; } catch(e) {}
-        try { var el = document.getElementById('liveFillersPerMin'); if (el) el.textContent = '—'; } catch(e) {}
-        // Reset DUO when switching to solo
-        if (mode === 'solo') {
-          if (window._duoWs) { try { window._duoWs.close(); } catch(e){} window._duoWs = null; }
-          window._duoRoomId = '';
-          window._duoSpeakerMap = {};
-          duoRenderSpeakers();
-        }
+        showConfirmModal('Cambio modalità', msg, 'Switch', function(){
+          // Clear captions
+          var transcript = document.getElementById('captionTranscript');
+          if (transcript) transcript.innerHTML = '';
+          var interim = document.getElementById('captionInterim');
+          if (interim) interim.textContent = '';
+          window._sessionLines = [];
+          ['statLines','statWords','liveWpm','liveLexDiv','liveFillersPerMin'].forEach(function(id){ var el=document.getElementById(id); if(el)el.textContent='0'; });
+          try { var el = document.getElementById('liveLexDiv'); if (el) el.textContent = '—'; } catch(e) {}
+          try { var el = document.getElementById('liveFillersPerMin'); if (el) el.textContent = '—'; } catch(e) {}
+          // Reset DUO when switching to solo
+          if (mode === 'solo') {
+            if (window._duoWs) { try { window._duoWs.close(); } catch(e){} window._duoWs = null; }
+            window._duoRoomId = '';
+            window._duoSpeakerMap = {};
+            duoRenderSpeakers();
+          }
+          _origSetSpeakerMode(mode);
+        });
+      } else {
+        _origSetSpeakerMode(mode);
       }
-      _origSetSpeakerMode(mode);
     };
   }
 
@@ -8798,7 +8816,7 @@ window.fixExtrasPanelColors = function(){
     <h2 id="confirmModalTitle" style="font-size:24px;font-weight:900;margin:0 0 12px;color:var(--text)"></h2>
     <p id="confirmModalMsg" style="font-size:16px;color:var(--t2);margin:0 0 24px;line-height:1.5"></p>
     <div style="display:flex;gap:12px;justify-content:center">
-      <button onclick="closeConfirmModal()" style="padding:12px 28px;border-radius:100px;border:1px solid var(--line);background:transparent;color:var(--muted);font-size:14px;font-weight:600;cursor:pointer;font-family:Inter,sans-serif;transition:all .2s" onmouseover="this.style.borderColor='var(--muted2)';this.style.color='var(--text)'" onmouseout="this.style.borderColor='';this.style.color=''">Annulla</button>
+      <button id="confirmModalCancel" onclick="closeConfirmModal()" style="padding:12px 28px;border-radius:100px;border:1px solid var(--line);background:transparent;color:var(--muted);font-size:14px;font-weight:600;cursor:pointer;font-family:Inter,sans-serif;transition:all .2s" onmouseover="this.style.borderColor='var(--muted2)';this.style.color='var(--text)'" onmouseout="this.style.borderColor='';this.style.color=''">Annulla</button>
       <button id="confirmModalBtn" style="padding:12px 28px;border-radius:100px;border:none;background:var(--accent);color:#fff;font-size:14px;font-weight:700;cursor:pointer;font-family:Inter,sans-serif;transition:filter .2s" onmouseover="this.style.filter='brightness(1.1)'" onmouseout="this.style.filter=''"></button>
     </div>
   </div>
