@@ -276,6 +276,7 @@ function _endSupabaseSession(data) {
               localStorage.removeItem('sottotitoli-active-session');
               localStorage.removeItem('sottotitoli-caption-session');
               localStorage.removeItem('sottotitoli-translate-session');
+              localStorage.removeItem('sottotitoli-pending-session');
               _deductSessionMinutes(data.durationSeconds || 0);
             });
         }
@@ -285,10 +286,12 @@ function _endSupabaseSession(data) {
       var durLabel = ds < 60 ? ds + 's' : Math.round(ds / 60) + 'min';
       console.log('✅ Session saved:', sessionId, '| words:', updateObj.words_count, '| duration:', durLabel);
       
-      // Clear all session keys
+      // Clear all session keys — including any unload snapshot, so recovery
+      // cannot re-save (and re-deduct minutes for) a session that completed.
       localStorage.removeItem('sottotitoli-active-session');
       localStorage.removeItem('sottotitoli-caption-session');
       localStorage.removeItem('sottotitoli-translate-session');
+      localStorage.removeItem('sottotitoli-pending-session');
       
       // ── Deduct minutes from user_credits ──
       _deductSessionMinutes(data.durationSeconds || 0);
@@ -434,11 +437,18 @@ function _refreshCreditDisplays(newMinutesBalance) {
   }
 }
 
-// ═══ Page-unload cleanup — stop mic + save session when user leaves ═══
-// beforeunload: fires on tab close / navigation. We use fetch+keepalive
-// to save the session AND deduct credits synchronously via Supabase REST API.
-// Falls back to localStorage recovery if the fetch can't complete.
-window.addEventListener('beforeunload', function() {
+// ═══ Page-unload cleanup — stop mic + save session when the page goes away ═══
+// iOS Safari routinely does NOT fire beforeunload (closing a tab, switching
+// apps, the OS killing the PWA) — that is why sessions were still lost on
+// iPhone while desktop worked. The same work is therefore bound to three
+// events, with deliberately different aggressiveness:
+//   • beforeunload / pagehide → real exit: snapshot + keepalive save
+//   • visibilitychange(hidden) → iOS fires this on tab close, app switch and
+//     screen lock. SNAPSHOT ONLY: hiding is not closing, and ending the session
+//     here would truncate one the user intends to resume.
+// A snapshot left behind is consumed by _recoverPendingSession() on next load,
+// so the transcript survives even when the keepalive request never lands.
+function _snapshotSessionState() {
   // Stop mic synchronously
   if (_realMic.recognition) {
     try { _realMic.recognition.stop(); } catch(e) {}
@@ -479,10 +489,22 @@ window.addEventListener('beforeunload', function() {
     }
   } catch(e) {}
 
-  // If we have a session ID, try direct Supabase REST save + credit deduction
-  if (activeSessionId && window.sottotitoliSupabase) {
-    _emergencySaveViaFetch(activeSessionId, lines, secs);
-  }
+  return { sessionId: activeSessionId, lines: lines, durationSeconds: secs };
+}
+
+// Real exit — snapshot, then best-effort keepalive save so the session appears
+// immediately. A bfcache transition (evt.persisted) is not a real exit.
+function _saveSessionOnUnload(evt) {
+  var state = _snapshotSessionState();
+  if (!state || !state.sessionId || !window.sottotitoliSupabase) return;
+  if (evt && evt.persisted) return;
+  _emergencySaveViaFetch(state.sessionId, state.lines, state.durationSeconds);
+}
+
+window.addEventListener('beforeunload', _saveSessionOnUnload);
+window.addEventListener('pagehide', _saveSessionOnUnload);
+document.addEventListener('visibilitychange', function() {
+  if (document.visibilityState === 'hidden') _snapshotSessionState();
 });
 
 // Direct Supabase REST API save — uses fetch+keepalive for beforeunload reliability.
