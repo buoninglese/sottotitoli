@@ -31,7 +31,10 @@
                 var engineCostEl = document.getElementById('raiEngineConfirmCost');
                 if (selectedPreset) {
                   var lbl = selectedPreset.getAttribute('data-label');
-                  var cst = parseInt(selectedPreset.getAttribute('data-cost'));
+                  // Credits come from PRESET_MAP (the billing source of truth) —
+                  // never from the HTML data-cost attribute, so what we show is
+                  // exactly what we deduct. See the sync loop after PRESET_MAP.
+                  var cst = (PRESET_MAP[selectedPreset.value] && PRESET_MAP[selectedPreset.value].credits) || 0;
                   var pIconEl = selectedPreset.parentElement.querySelector('.material-symbols-outlined');
                   if (typeNameEl) typeNameEl.textContent = lbl;
                   if (typeCostEl) typeCostEl.textContent = cst + ' CR';
@@ -53,7 +56,7 @@
                 if (!selectedPreset) return;
                 var label = selectedPreset.getAttribute('data-label');
                 var desc = selectedPreset.getAttribute('data-desc');
-                var cost = parseInt(selectedPreset.getAttribute('data-cost'));
+                var cost = (PRESET_MAP[selectedPreset.value] && PRESET_MAP[selectedPreset.value].credits) || 0;
                 var metrics = JSON.parse(selectedPreset.getAttribute('data-metrics'));
                 if (selectedDescription) selectedDescription.textContent = desc;
                 metricsList.innerHTML = '';
@@ -84,6 +87,20 @@
                 speech:       { moduleId: 4, moduleKey: '4', credits: 4 },
                 drills:       { moduleId: 2, moduleKey: '2', credits: 2 }
               };
+
+              // ═══ PRESET_MAP is the SINGLE SOURCE OF TRUTH for report credits ═══
+              // The price on the cards / button and the amount deducted on generate
+              // both come from here. Rewrite the static "NNcr" badges (and the
+              // data-cost attributes) from it at init so the UI can never drift
+              // from the billing again — it did: the cards showed 10–25 CR while
+              // the deduction was 2–4 CR.
+              reportRadios.forEach(function(r){
+                var m = PRESET_MAP[r.value];
+                if (!m) return;
+                var badge = r.parentElement.querySelector('.text-label-mono.rai-font-bold');
+                if (badge) badge.textContent = m.credits + 'cr';
+                r.setAttribute('data-cost', String(m.credits));
+              });
 
               generateBtn.addEventListener('click', async function(){
                 // ── Validation ──
