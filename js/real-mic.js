@@ -230,15 +230,19 @@ function _endSupabaseSession(data) {
     // Metrics version — v2 = MATTR, v1 = raw TTR (deprecated)
     updateObj.metrics_version = 2;
     
-    // POS counts — matches sessions table columns: pos_nouns, pos_verbs, pos_adjectives, pos_adverbs
+    // POS counts — the live sessions columns are nouns_count / verbs_count /
+    // adjectives_count / adverbs_count (there are no pos_* columns).
     var posCounts = data.posCounts || {};
-    if (posCounts.NOUN) updateObj.pos_nouns = posCounts.NOUN;
-    if (posCounts.VERB) updateObj.pos_verbs = posCounts.VERB;
-    if (posCounts.ADJ) updateObj.pos_adjectives = posCounts.ADJ;
-    if (posCounts.ADV) updateObj.pos_adverbs = posCounts.ADV;
+    if (posCounts.NOUN) updateObj.nouns_count = posCounts.NOUN;
+    if (posCounts.VERB) updateObj.verbs_count = posCounts.VERB;
+    if (posCounts.ADJ) updateObj.adjectives_count = posCounts.ADJ;
+    if (posCounts.ADV) updateObj.adverbs_count = posCounts.ADV;
     
     // Additional stats — passed pre-computed from caption-s8t.html
-    if (data.fillerCount != null) updateObj.filler_count = data.fillerCount;
+    // ⚠️ The live column is fillers_count (PLURAL). PostgREST rejects the ENTIRE
+    // update with a 400 if any single key is unknown — that silently dropped
+    // transcript_text / ended_at / words_count on every caption session.
+    if (data.fillerCount != null) updateObj.fillers_count = data.fillerCount;
     if (data.turnCount != null) updateObj.turn_count = data.turnCount;
     if (data.sentenceMetrics && data.sentenceMetrics.length > 0) updateObj.sentence_metrics = data.sentenceMetrics.slice(0, 50);
     if (data.connectors) updateObj.connectors = data.connectors;
@@ -252,6 +256,29 @@ function _endSupabaseSession(data) {
     .eq('id', sessionId).then(function(upd) {
       if (upd.error) {
         console.error('Session save failed:', upd.error.message);
+        // Safety net: PostgREST 400s the WHOLE update when any single key is
+        // unknown, which would silently drop the transcript. Retry with core
+        // fields only (all verified live columns) so the session is not lost.
+        var core = {
+          ended_at: updateObj.ended_at,
+          transcript_text: updateObj.transcript_text,
+          words_count: updateObj.words_count,
+          duration_seconds: updateObj.duration_seconds,
+          wpm: updateObj.wpm
+        };
+        Object.keys(core).forEach(function(k){ if (core[k] === undefined) delete core[k]; });
+        if (core.transcript_text !== undefined) {
+          console.warn('⚠ Retrying session save with core fields only — check updateObj for unknown columns');
+          window.sottotitoliSupabase.from('sessions').update(core)
+            .eq('id', sessionId).then(function(retry) {
+              if (retry.error) { console.error('Core session save failed:', retry.error.message); return; }
+              console.warn('✅ Session saved with core fields only:', sessionId);
+              localStorage.removeItem('sottotitoli-active-session');
+              localStorage.removeItem('sottotitoli-caption-session');
+              localStorage.removeItem('sottotitoli-translate-session');
+              _deductSessionMinutes(data.durationSeconds || 0);
+            });
+        }
         return;
       }
       var ds = updateObj.duration_seconds || 0;
