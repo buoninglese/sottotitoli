@@ -207,11 +207,17 @@
             native_contexts: getMultiSelected('nativeContexts'),
             native_improve: getMultiSelected('nativeImprove'),
             native_goals: document.getElementById('nativeGoalsInput')?.value?.trim() || null,
-            target_purpose: getSelected('targetPurpose'),
-            target_situations: getMultiSelected('targetSituations'),
-            target_sector: getSelected('targetSector'),
-            target_level: getSelected('targetLevel'),
-            goal_primary: document.getElementById('targetGoalInput')?.value?.trim() || null
+            // ⚠️ These four keys MUST be real `profiles` columns. They used to be
+            // target_purpose / target_situations / target_sector / target_level —
+            // none of which exist — and because PostgREST rejects the WHOLE upsert
+            // when any single key is unknown, EVERY profile save silently lost all
+            // of these fields while still showing "✓ Profilo salvato".
+            // The names below are what the form loader reads back (see
+            // selectChipByVal('#targetPurpose …') further down this file).
+            goal_primary: document.getElementById('targetGoalInput')?.value?.trim() || getSelected('targetPurpose'),
+            use_cases: getMultiSelected('targetSituations'),
+            domain: getSelected('targetSector'),
+            feedback_preference: getSelected('targetLevel')
           };
           // Save to Supabase
           var sb = window.sottotitoliSupabase;
@@ -226,9 +232,9 @@
                   user_id: uid,
                   target_language: window.SOTTOTITOLI_STUDY_LANG || 'en',
                   long_term_goal: profile.goal_primary || null,
-                  target_role: profile.target_purpose || null,
-                  target_domain: profile.target_sector || null,
-                  target_contexts: profile.target_situations || [],
+                  target_role: profile.goal_primary || null,
+                  target_domain: profile.domain || null,
+                  target_contexts: profile.use_cases || [],
                   preferences: profile,
                   updated_at: new Date().toISOString()
                 }, { onConflict: 'user_id' });
@@ -7016,8 +7022,12 @@
           // Copy words
           var { data: words } = await sb.from('user_wordbank_words').select('*').eq('wordbank_id', bankId);
           if (words && words.length) {
-            var inserts = words.map(function(w){ return { wordbank_id: copy.id, word: w.word, pos: w.pos, cefr_level: w.cefr_level, user_id: bank.user_id, status: w.status, usage_count: w.usage_count }; });
-            await sb.from('user_wordbank_words').insert(inserts);
+            // NB: user_wordbank_words has NO user_id column — sending it rejected
+            // the whole batch, so the copy was created EMPTY while we still
+            // showed a success alert.
+            var inserts = words.map(function(w){ return { wordbank_id: copy.id, word: w.word, pos: w.pos, cefr_level: w.cefr_level, status: w.status, usage_count: w.usage_count }; });
+            var cpRes = await sb.from('user_wordbank_words').insert(inserts);
+            if (cpRes.error) { renderWordbanks(); appAlert('Banca creata ma la copia delle parole è fallita: ' + cpRes.error.message, 'Errore', '❌'); return; }
           }
           appAlert('Banca "' + bank.name + '" duplicata!', 'Operazione completata', '📋');
           SottotitoliData.cacheClear();
