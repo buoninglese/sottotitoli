@@ -870,14 +870,10 @@
       // ═══ Dashboard message rules — priority-ordered ═══
       // Load from localStorage overrides if available, else use hardcoded defaults
       function buildMessageRules() {
-        try {
-          var saved = JSON.parse(localStorage.getItem('dashboard-messages-overrides') || 'null');
-          if (saved && Array.isArray(saved) && saved.length > 0) {
-            return saved.map(function(r){
-              return {p: r.p, k: r.k || '', f: new Function('m', 'return (' + r.f + ');'), t: r.t};
-            });
-          }
-        } catch(e) { /* use defaults */ }
+        // NOTE: the former localStorage "dashboard-messages-overrides" path built
+        // functions with new Function() from stored strings — a code-execution sink
+        // that also had no writer in the app. Removed 2026-09-23; the hardcoded
+        // defaults below are the single source of truth.
         // Hardcoded defaults — all have i18n keys (k:) for translation
         return [
         // ── Return / recovery (priority 100) ──
@@ -4738,7 +4734,7 @@
         }
         if (banks && banks.length) {
           banks.forEach(function (b) {
-            if (memberBankIds.indexOf(b.id) !== -1) membershipHTML += '<span class="membership-chip">' + b.name + '</span>';
+            if (memberBankIds.indexOf(b.id) !== -1) membershipHTML += '<span class="membership-chip">' + escHtml(b.name) + '</span>';
           });
         }
         document.getElementById('wbDrawerBanks').innerHTML = membershipHTML || '<span style="font-size:13px;color:var(--text-faint)">Non presente in nessuna word bank.</span>';
@@ -4749,7 +4745,7 @@
           for (var j = 0; j < banks.length; j++) {
             var b = banks[j];
             if (memberBankIds.indexOf(b.id) !== -1) continue; // skip banks that already contain it
-            addBankHTML += '<span class="membership-chip add-chip" onclick="event.stopPropagation();wbAddWordToOtherBank(\''+wordId+'\',\''+b.id+'\',\''+b.name.replace(/'/g,"\\'")+'\',this)" title="Add to '+b.name+'">+ '+b.name+'</span>';
+            addBankHTML += '<span class="membership-chip add-chip" onclick="event.stopPropagation();wbAddWordToOtherBank(\''+escAttr(String(wordId).replace(/[^a-zA-Z0-9_:-]/g,''))+'\',\''+escAttr(String(b.id).replace(/[^a-zA-Z0-9_-]/g,''))+'\',\''+String(b.name).replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/[\r\n]+/g,' ').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;')+'\',this)" title="Add to '+escAttr(b.name)+'">+ '+escHtml(b.name)+'</span>';
           }
         }
         if (!addBankHTML) addBankHTML = '<span style="font-size:11px;color:var(--text-faint)">Create another bank first</span>';
@@ -5115,15 +5111,15 @@
               else if (hrs > 0) timeSpent = hrs + 'h ' + (mins % 60) + 'm';
               else timeSpent = mins + 'm';
             }
-            doneHtml += '<div style="display:flex;justify-content:space-between;align-items:center"><span>' + t.title + '</span><span style="color:var(--text-faint);font-size:11px">' + fmtDate(t.created_at) + (timeSpent ? ' · ' + timeSpent : '') + '</span></div>';
+            doneHtml += '<div style="display:flex;justify-content:space-between;align-items:center"><span>' + escHtml(t.title) + '</span><span style="color:var(--text-faint);font-size:11px">' + fmtDate(t.created_at) + (timeSpent ? ' · ' + timeSpent : '') + '</span></div>';
           } else {
-            activeHtml += '<tr class="task-row"><td style="padding:8px 10px"><span>' + t.title + '</span></td>' +
-              '<td style="padding:8px 10px"><select style="padding:4px 8px;border-radius:8px;border:1px solid var(--line);background:var(--bg);font-size:11px;font-family:var(--font-ui);font-weight:600;color:' + sc + ';cursor:pointer" onchange="var v=this.value;var m={doing:\'var(--amber)\',todo:\'var(--teal)\',done:\'var(--green)\'};this.style.color=m[v];var upd={status:v};if(v===\'done\')upd.completed_at=new Date().toISOString();else upd.completed_at=null;SottotitoliData.updateTask(\'' + t.id + '\',upd).then(function(){renderVTTasks()})">' +
+            activeHtml += '<tr class="task-row"><td style="padding:8px 10px"><span>' + escHtml(t.title) + '</span></td>' +
+              '<td style="padding:8px 10px"><select style="padding:4px 8px;border-radius:8px;border:1px solid var(--line);background:var(--bg);font-size:11px;font-family:var(--font-ui);font-weight:600;color:' + sc + ';cursor:pointer" onchange="var v=this.value;var m={doing:\'var(--amber)\',todo:\'var(--teal)\',done:\'var(--green)\'};this.style.color=m[v];var upd={status:v};if(v===\'done\')upd.completed_at=new Date().toISOString();else upd.completed_at=null;SottotitoliData.updateTask(\'' + escAttr(String(t.id).replace(/[^a-zA-Z0-9_-]/g,'')) + '\',upd).then(function(){renderVTTasks()})">' +
               '<option value="doing" style="color:var(--amber)"' + (t.status === 'doing' ? ' selected' : '') + '>In corso</option>' +
               '<option value="todo" style="color:var(--teal)"' + (t.status === 'todo' ? ' selected' : '') + '>Da fare</option>' +
               '<option value="done" style="color:var(--green)"' + (t.status === 'done' ? ' selected' : '') + '>Completato</option></select></td>' +
               '<td style="padding:8px 10px;font-size:11px;color:var(--text-faint)">' + fmtDate(t.created_at) + '</td>' +
-              '<td style="padding:8px 10px"><button class="hv-danger-bg" aria-label="Elimina compito" style="border:none;background:none;color:var(--text-faint);cursor:pointer;font-size:13px;padding:2px 6px;border-radius:6px;transition:all var(--transition)" onclick="SottotitoliData.deleteTask(\'' + t.id + '\').then(function(){renderVTTasks()})"><svg class="icon" style="width:12px;height:12px"><use href=\'#i-close\'></use></svg></button></td></tr>';
+              '<td style="padding:8px 10px"><button class="hv-danger-bg" aria-label="Elimina compito" style="border:none;background:none;color:var(--text-faint);cursor:pointer;font-size:13px;padding:2px 6px;border-radius:6px;transition:all var(--transition)" onclick="SottotitoliData.deleteTask(\'' + escAttr(String(t.id).replace(/[^a-zA-Z0-9_-]/g,'')) + '\').then(function(){renderVTTasks()})"><svg class="icon" style="width:12px;height:12px"><use href=\'#i-close\'></use></svg></button></td></tr>';
           }
         });
         tbody.innerHTML = activeHtml || '<tr><td colspan="4" style="padding:16px;text-align:center;color:var(--text-faint);font-size:13px">🎉 Tutti i compiti sono completati!</td></tr>';
@@ -6896,13 +6892,13 @@
         var html = '';
         tasks.forEach(function(t) {
           var sc = statusColors[t.status] || 'var(--teal)';
-          html += '<tr class="task-row"><td style="padding:8px 10px"><span>' + t.title + '</span></td>' +
-            '<td style="padding:8px 10px"><select style="padding:4px 8px;border-radius:8px;border:1px solid var(--line);background:var(--bg);font-size:11px;font-family:var(--font-ui);font-weight:600;color:' + sc + ';cursor:pointer" onchange="var v=this.value;var m={doing:\'var(--amber)\',todo:\'var(--teal)\',done:\'var(--green)\'};this.style.color=m[v];SottotitoliData.updateTask(\'' + t.id + '\',{status:v})">' +
+          html += '<tr class="task-row"><td style="padding:8px 10px"><span>' + escHtml(t.title) + '</span></td>' +
+            '<td style="padding:8px 10px"><select style="padding:4px 8px;border-radius:8px;border:1px solid var(--line);background:var(--bg);font-size:11px;font-family:var(--font-ui);font-weight:600;color:' + sc + ';cursor:pointer" onchange="var v=this.value;var m={doing:\'var(--amber)\',todo:\'var(--teal)\',done:\'var(--green)\'};this.style.color=m[v];SottotitoliData.updateTask(\'' + escAttr(String(t.id).replace(/[^a-zA-Z0-9_-]/g,'')) + '\',{status:v})">' +
             '<option value="doing" style="color:var(--amber)"' + (t.status === 'doing' ? ' selected' : '') + '>In corso</option>' +
             '<option value="todo" style="color:var(--teal)"' + (t.status === 'todo' ? ' selected' : '') + '>Da fare</option>' +
             '<option value="done" style="color:var(--green)"' + (t.status === 'done' ? ' selected' : '') + '>Completato</option></select></td>' +
             '<td style="padding:8px 10px;font-size:11px;color:var(--text-faint)">' + fmtDate(t.created_at) + '</td>' +
-            '<td style="padding:8px 10px"><button class="hv-danger-bg" aria-label="Elimina compito" style="border:none;background:none;color:var(--text-faint);cursor:pointer;font-size:13px;padding:2px 6px;border-radius:6px;transition:all var(--transition)" onclick="SottotitoliData.deleteTask(\'' + t.id + '\').then(function(){renderTasks()})"><svg class="icon" style="width:12px;height:12px"><use href=\'#i-close\'></use></svg></button></td></tr>';
+            '<td style="padding:8px 10px"><button class="hv-danger-bg" aria-label="Elimina compito" style="border:none;background:none;color:var(--text-faint);cursor:pointer;font-size:13px;padding:2px 6px;border-radius:6px;transition:all var(--transition)" onclick="SottotitoliData.deleteTask(\'' + escAttr(String(t.id).replace(/[^a-zA-Z0-9_-]/g,'')) + '\').then(function(){renderTasks()})"><svg class="icon" style="width:12px;height:12px"><use href=\'#i-close\'></use></svg></button></td></tr>';
         });
         tbody.innerHTML = html;
       }

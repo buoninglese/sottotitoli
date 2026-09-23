@@ -1,4 +1,11 @@
             (function(){
+              function escHtml(s) {
+                if (s === null || s === undefined) return '';
+                return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+              }
+              function safeId(x) {
+                return String(x === null || x === undefined ? '' : x).replace(/[^a-zA-Z0-9_-]/g,'');
+              }
               var trFilter = 'all';
               var trView = 'table';
               var trSelectedIds = [];
@@ -107,16 +114,16 @@
                     var favIcon = isFav ? '★' : '☆';
                     var favColor = isFav ? 'color:#e8b84b' : 'color:var(--text-faint)';
                     var tags = getSessionTags(s.id);
-                    var tagsHTML = tags.map(function(t){ return '<span style="display:inline-block;padding:2px 8px;background:rgba(6,182,212,.1);color:var(--cyan);font-size:11px;font-weight:700;border-radius:4px;margin-right:4px;font-family:\'Manrope\',sans-serif">'+t+'</span>'; }).join('') || '<span style="font-size:11px;color:var(--text-faint)">—</span>';
+                    var tagsHTML = tags.map(function(t){ return '<span style="display:inline-block;padding:2px 8px;background:rgba(6,182,212,.1);color:var(--cyan);font-size:11px;font-weight:700;border-radius:4px;margin-right:4px;font-family:\'Manrope\',sans-serif">'+escHtml(t)+'</span>'; }).join('') || '<span style="font-size:11px;color:var(--text-faint)">—</span>';
                     return '<tr class="hv-bg" style="border-bottom:1px solid var(--line)">'+
-                      '<td style="padding:14px 16px"><input type="checkbox" '+(checked?'checked':'')+' onchange="trToggleSession(\''+s.id+'\',this.checked)" style="accent-color:var(--cyan)"></td>'+
+                      '<td style="padding:14px 16px"><input type="checkbox" '+(checked?'checked':'')+' onchange="trToggleSession(\''+safeId(s.id)+'\',this.checked)" style="accent-color:var(--cyan)"></td>'+
                       '<td style="padding:14px 16px;font-size:13px;color:var(--text);white-space:nowrap">'+date+'</td>'+
-                      '<td style="padding:14px 16px"><span style="font-weight:600;color:var(--text)">'+name+'</span> <span class="material-symbols-outlined" onclick="event.stopPropagation();trEditName(this,\''+s.id+'\')" style="font-size:15px;color:var(--text-soft);cursor:pointer;vertical-align:-2px" title="Rename">edit</span></td>'+
+                      '<td style="padding:14px 16px"><span style="font-weight:600;color:var(--text)">'+escHtml(name)+'</span> <span class="material-symbols-outlined" onclick="event.stopPropagation();trEditName(this,\''+safeId(s.id)+'\')" style="font-size:15px;color:var(--text-soft);cursor:pointer;vertical-align:-2px" title="Rename">edit</span></td>'+
                       '<td style="padding:14px 16px">'+tagsHTML+'</td>'+
                       '<td style="padding:14px 16px;color:var(--text);font-size:13px">'+dur+'</td>'+
                       '<td style="padding:14px 16px;color:var(--text);font-size:13px">'+words+'</td>'+
                       '<td style="padding:14px 16px"><span style="padding:3px 10px;background:rgba(6,182,212,.1);color:var(--cyan);font-size:11px;font-weight:700;border-radius:4px;font-family:\'Manrope\',sans-serif">'+lang+'</span></td>'+
-                      '<td style="padding:14px 16px;text-align:right;white-space:nowrap"><span onclick="event.stopPropagation();trToggleFav(\''+s.id+'\')" style="font-size:18px;cursor:pointer;'+favColor+';margin-right:10px" title="Favorite">'+favIcon+'</span><button onclick="event.stopPropagation();trOpenEditor(\''+s.id+'\')" style="font-size:13px;font-weight:700;color:var(--cyan);background:none;border:none;cursor:pointer;font-family:\'Manrope\',sans-serif;margin-right:8px">Edit</button><button onclick="event.stopPropagation();trViewSession(\''+s.id+'\')" style="font-size:13px;font-weight:600;color:var(--text-soft);background:none;border:none;cursor:pointer">View</button></td>'+
+                      '<td style="padding:14px 16px;text-align:right;white-space:nowrap"><span onclick="event.stopPropagation();trToggleFav(\''+safeId(s.id)+'\')" style="font-size:18px;cursor:pointer;'+favColor+';margin-right:10px" title="Favorite">'+favIcon+'</span><button onclick="event.stopPropagation();trOpenEditor(\''+safeId(s.id)+'\')" style="font-size:13px;font-weight:700;color:var(--cyan);background:none;border:none;cursor:pointer;font-family:\'Manrope\',sans-serif;margin-right:8px">Edit</button><button onclick="event.stopPropagation();trViewSession(\''+safeId(s.id)+'\')" style="font-size:13px;font-weight:600;color:var(--text-soft);background:none;border:none;cursor:pointer">View</button></td>'+
                     '</tr>';
                   }).join('');
                 }
@@ -140,12 +147,12 @@
                       var favIcon = isFav ? '★' : '☆';
                       var favColor = isFav ? 'color:#e8b84b' : 'color:var(--text-faint)';
                       var tags = getSessionTags(s.id);
-                      var tagsHTML = tags.length ? '<div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:8px">'+tags.map(function(t){ return '<span style="padding:2px 8px;background:rgba(6,182,212,.1);color:var(--cyan);font-size:11px;font-weight:700;border-radius:4px;font-family:\'Manrope\',sans-serif">'+t+'</span>'; }).join('')+'</div>' : '';
+                      var tagsHTML = tags.length ? '<div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:8px">'+tags.map(function(t){ return '<span style="padding:2px 8px;background:rgba(6,182,212,.1);color:var(--cyan);font-size:11px;font-weight:700;border-radius:4px;font-family:\'Manrope\',sans-serif">'+escHtml(t)+'</span>'; }).join('')+'</div>' : '';
                       return '<div class="hv-border" style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:20px;cursor:pointer;transition:all .15s">'+
                         '<div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:12px">'+
-                          '<div style="font-weight:700;color:var(--text);font-size:15px;flex:1">'+name+'</div>'+
+                          '<div style="font-weight:700;color:var(--text);font-size:15px;flex:1">'+escHtml(name)+'</div>'+
                           '<div style="display:flex;align-items:center;gap:8px;flex-shrink:0">'+
-                            '<span onclick="event.stopPropagation();trToggleFav(\''+s.id+'\')" style="font-size:18px;cursor:pointer;'+favColor+'" title="Favorite">'+favIcon+'</span>'+
+                            '<span onclick="event.stopPropagation();trToggleFav(\''+safeId(s.id)+'\')" style="font-size:18px;cursor:pointer;'+favColor+'" title="Favorite">'+favIcon+'</span>'+
                             '<span style="padding:3px 8px;background:rgba(6,182,212,.1);color:var(--cyan);font-size:11px;font-weight:700;border-radius:4px;font-family:\'Manrope\',sans-serif;white-space:nowrap">'+lang+'</span>'+
                           '</div>'+
                         '</div>'+
@@ -154,8 +161,8 @@
                         '<div style="display:flex;gap:16px;font-size:13px;color:var(--text-soft);margin-top:10px">'+
                           '<span><span class="material-symbols-outlined" style="font-size:15px;vertical-align:-2px">schedule</span> '+dur+'</span>'+
                           '<span style="font-weight:500">Words: '+words+'</span>'+﻿
-                          '<span onclick="event.stopPropagation();trOpenEditor(\''+s.id+'\')" style="margin-left:auto;font-size:13px;font-weight:700;color:var(--cyan);cursor:pointer;font-family:\'Manrope\',sans-serif">Edit</span>'+
-                          '<span onclick="event.stopPropagation();trViewSession(\''+s.id+'\')" style="font-size:13px;font-weight:600;color:var(--text-soft);cursor:pointer;font-family:\'Manrope\',sans-serif">View</span>'+
+                          '<span onclick="event.stopPropagation();trOpenEditor(\''+safeId(s.id)+'\')" style="margin-left:auto;font-size:13px;font-weight:700;color:var(--cyan);cursor:pointer;font-family:\'Manrope\',sans-serif">Edit</span>'+
+                          '<span onclick="event.stopPropagation();trViewSession(\''+safeId(s.id)+'\')" style="font-size:13px;font-weight:600;color:var(--text-soft);cursor:pointer;font-family:\'Manrope\',sans-serif">View</span>'+
                         '</div>'+
                       '</div>';
                     }).join('');
@@ -556,7 +563,7 @@
                 var tsText = transcriptWithTimestamps(s.transcript_text, s.duration_seconds, s.words_count);
                 // Wrap [MM:SS] timestamps in styled spans for visual distinction
                 var text = tsText.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\[(\d{2}:\d{2})\]/g,'<span class="ts">[$1]</span>').replace(/\n/g,'<br>');
-                var html = '<!DOCTYPE html><html lang="it"><head><meta charset="utf-8"><title>'+name+' \u2014 Sottotitoli.pro</title>'+
+                  var html = '<!DOCTYPE html><html lang="it"><head><meta charset="utf-8"><title>'+escHtml(name)+' \u2014 Sottotitoli.pro</title>'+
                   '<style>body{font-family:Inter,sans-serif;max-width:720px;margin:60px auto;padding:0 24px;color:#111;line-height:1.7}'+
                   '.header{text-align:center;margin-bottom:48px;padding-bottom:32px;border-bottom:2px solid #06b6d4}'+
                   '.logo{font-size:28px;font-weight:800;letter-spacing:-.03em;color:#0891b2;margin:0 0 8px}'+
@@ -567,12 +574,13 @@
                   '.footer{text-align:center;margin-top:48px;padding-top:24px;border-top:1px solid #e5e7eb;font-size:11px;color:#9ca3af}'+
                   '@media print{body{margin:0;padding:20px}}</style></head><body>'+
                   '<div class="header"><h1 class="logo">sottotitoli<span>.pro</span></h1>'+
-                  '<h2 class="title">'+name+'</h2>'+
+                  '<h2 class="title">'+escHtml(name)+'</h2>'+
                   '<div class="meta"><span>'+date+'</span><span><strong>'+dur+'</strong></span><span><strong>'+words+'</strong> parole</span><span>'+lang+'</span></div></div>'+
                   '<div class="transcript">'+text+'</div>'+
                   '<div class="footer">Generated by sottotitoli.pro \u2014 '+new Date().toLocaleDateString('it-IT')+'</div>'+
                   '</body></html>';
                 var w = window.open('','_blank');
+                if (!w) { appAlert('Popup bloccato. Consenti i popup per scaricare il PDF.', 'Popup bloccato', '⚠️'); return; }
                 w.document.write(html);
                 w.document.close();
               };
@@ -586,7 +594,7 @@
                 var words = s.words_count || 0;
                 var lang = s.language_pair || '—';
                 var text = (s.transcript_text||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-                var html = '<!DOCTYPE html><html lang="it"><head><meta charset="utf-8"><title>'+name+' — Sottotitoli.pro</title>'+
+                  var html = '<!DOCTYPE html><html lang="it"><head><meta charset="utf-8"><title>'+escHtml(name)+' — Sottotitoli.pro</title>'+
                   '<style>body{font-family:Inter,sans-serif;max-width:720px;margin:60px auto;padding:0 24px;color:#111;line-height:1.7}'+
                   '.header{text-align:center;margin-bottom:48px;padding-bottom:32px;border-bottom:2px solid #06b6d4}'+
                   '.logo{font-size:28px;font-weight:800;letter-spacing:-.03em;color:#0891b2;margin:0 0 8px}'+
@@ -596,12 +604,13 @@
                   '.footer{text-align:center;margin-top:48px;padding-top:24px;border-top:1px solid #e5e7eb;font-size:11px;color:#9ca3af}'+
                   '@media print{body{margin:0;padding:20px}}</style></head><body>'+
                   '<div class="header"><h1 class="logo">sottotitoli<span>.pro</span></h1>'+
-                  '<h2 class="title">'+name+'</h2>'+
+                  '<h2 class="title">'+escHtml(name)+'</h2>'+
                   '<div class="meta"><span>'+date+'</span><span><strong>'+dur+'</strong></span><span><strong>'+words+'</strong> parole</span><span>'+lang+'</span></div></div>'+
                   '<div class="transcript">'+text+'</div>'+
                   '<div class="footer">Generated by sottotitoli.pro — '+new Date().toLocaleDateString('it-IT')+'</div>'+
                   '</body></html>';
                 var w = window.open('','_blank');
+                if (!w) { appAlert('Popup bloccato. Consenti i popup per scaricare il PDF.', 'Popup bloccato', '⚠️'); return; }
                 w.document.write(html);
                 w.document.close();
                 setTimeout(function(){ w.print(); }, 500);

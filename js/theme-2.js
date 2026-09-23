@@ -1,6 +1,13 @@
 /* ═══ Sotto Supreme Theme v2 — Shared JavaScript ═══ */
 /* Theme toggle, dropdowns, sidebar nav, sub-tabs, FAQ, word banks, tasks */
 
+    /* ── HTML escaping helper (use for any dynamic text placed in innerHTML) ── */
+    function t2Esc(s) {
+      return String(s === null || s === undefined ? '' : s)
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+    }
+
 /* ── q-chip toggle (for <button class="q-chip">) ── */
     document.addEventListener('click', function(e){
       var chip = e.target.closest('button.q-chip');
@@ -35,7 +42,7 @@
       tbody=tbody.querySelector('tbody');
       if(!tbody)return;
       var r=tbody.insertRow();r.className='task-row';
-      r.innerHTML='<td style="padding:8px 10px"><span contenteditable="true" style="outline:none;border-bottom:1px dashed transparent;padding:2px 0;transition:border var(--transition)" onfocus="this.style.borderColor=\'var(--teal)\'" onblur="this.style.borderColor=\'transparent\'">'+v+'</span></td><td style="padding:8px 10px"><select style="padding:4px 8px;border-radius:8px;border:1px solid var(--line);background:var(--bg);font-size:11px;font-family:var(--font-ui);font-weight:600;color:var(--teal);cursor:pointer" onchange="var m={doing:\'var(--amber)\',todo:\'var(--teal)\',done:\'var(--green)\'};this.style.color=m[this.value]||\'\'"><option value="doing" style="color:var(--amber)">In corso</option><option value="todo" style="color:var(--teal)" selected>Da fare</option><option value="done" style="color:var(--green)">Completato</option></select></td><td style="padding:8px 10px;font-size:11px;color:var(--text-faint)">oggi</td><td style="padding:8px 10px"><button aria-label="Elimina compito" style="border:none;background:none;color:var(--text-faint);cursor:pointer;font-size:13px;padding:2px 6px;border-radius:6px;transition:all var(--transition)" onmouseover="this.style.color=\'#dc2626\';this.style.background=\'rgba(220,38,38,.08)\'" onmouseout="this.style.color=\'\';this.style.background=\'\'" onclick="this.closest(\'tr\').remove()"><svg class="icon" style="width:12px;height:12px"><use href=\'#i-close\'></use></svg></button></td>';
+      r.innerHTML='<td style="padding:8px 10px"><span contenteditable="true" style="outline:none;border-bottom:1px dashed transparent;padding:2px 0;transition:border var(--transition)" onfocus="this.style.borderColor=\'var(--teal)\'" onblur="this.style.borderColor=\'transparent\'">'+t2Esc(v)+'</span></td><td style="padding:8px 10px"><select style="padding:4px 8px;border-radius:8px;border:1px solid var(--line);background:var(--bg);font-size:11px;font-family:var(--font-ui);font-weight:600;color:var(--teal);cursor:pointer" onchange="var m={doing:\'var(--amber)\',todo:\'var(--teal)\',done:\'var(--green)\'};this.style.color=m[this.value]||\'\'"><option value="doing" style="color:var(--amber)">In corso</option><option value="todo" style="color:var(--teal)" selected>Da fare</option><option value="done" style="color:var(--green)">Completato</option></select></td><td style="padding:8px 10px;font-size:11px;color:var(--text-faint)">oggi</td><td style="padding:8px 10px"><button aria-label="Elimina compito" style="border:none;background:none;color:var(--text-faint);cursor:pointer;font-size:13px;padding:2px 6px;border-radius:6px;transition:all var(--transition)" onmouseover="this.style.color=\'#dc2626\';this.style.background=\'rgba(220,38,38,.08)\'" onmouseout="this.style.color=\'\';this.style.background=\'\'" onclick="this.closest(\'tr\').remove()"><svg class="icon" style="width:12px;height:12px"><use href=\'#i-close\'></use></svg></button></td>';
       inp.value='';
       var ar=inp.closest('.addRow');if(ar)ar.style.display='none';
       var btn=document.querySelector('#sub-compiti article button');if(btn)btn.style.display='inline-flex';

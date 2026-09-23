@@ -33,14 +33,14 @@
                     var isDone = status === 'completed';
                     var isFailed = status === 'failed';
                     return '<tr class="hv-bg" style="border-bottom:1px solid var(--line)">' +
-                      '<td style="padding:16px 24px"><div style="font-weight:600">'+name+'</div>'+(score?'<div style="font-size:13px;color:var(--text-soft)">Score: '+score+'</div>':'')+'</td>' +
+                      '<td style="padding:16px 24px"><div style="font-weight:600">'+escapeHtml(name)+'</div>'+(score?'<div style="font-size:13px;color:var(--text-soft)">Score: '+escapeHtml(score)+'</div>':'')+'</td>' +
                       '<td style="padding:16px 24px;color:var(--text-soft);font-size:13px">'+date+'</td>' +
                       '<td style="padding:16px 24px">'+statusBadge(status)+'</td>' +
                       '<td style="padding:16px 24px;text-align:right">' +
                         '<div style="display:flex;justify-content:flex-end;gap:8px">' +
-                          (isDone ? '<button title="Download PDF" style="padding:8px;background:none;border:1px solid var(--line);border-radius:8px;cursor:pointer;color:var(--text-soft)" onclick="event.stopPropagation();downloadReportPDF(\''+(r.id||'')+'\')"><span class="material-symbols-outlined" style="font-size:18px">download</span></button>' : '<button disabled style="padding:8px;background:none;border:1px solid var(--line);border-radius:8px;opacity:.3;cursor:not-allowed"><span class="material-symbols-outlined" style="font-size:18px">download</span></button>') +
-                          (isDone ? '<button style="padding:6px 16px;background:var(--bg);color:var(--cyan);border:1px solid var(--cyan);border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;font-family:\'Manrope\',sans-serif" onclick="event.stopPropagation();viewReportDetail(\''+(r.id||'')+'\')">View</button>' :
-                           isFailed ? '<button style="padding:6px 16px;background:none;color:#E11D48;border:1px solid #E11D48;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;font-family:\'Manrope\',sans-serif" onclick="event.stopPropagation();retryReport(\''+(r.id||'')+'\')">Retry</button>' :
+                          (isDone ? '<button title="Download PDF" style="padding:8px;background:none;border:1px solid var(--line);border-radius:8px;cursor:pointer;color:var(--text-soft)" onclick="event.stopPropagation();downloadReportPDF(\''+safeId(r.id)+'\')"><span class="material-symbols-outlined" style="font-size:18px">download</span></button>' : '<button disabled style="padding:8px;background:none;border:1px solid var(--line);border-radius:8px;opacity:.3;cursor:not-allowed"><span class="material-symbols-outlined" style="font-size:18px">download</span></button>') +
+                          (isDone ? '<button style="padding:6px 16px;background:var(--bg);color:var(--cyan);border:1px solid var(--cyan);border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;font-family:\'Manrope\',sans-serif" onclick="event.stopPropagation();viewReportDetail(\''+safeId(r.id)+'\')">View</button>' :
+                           isFailed ? '<button style="padding:6px 16px;background:none;color:#E11D48;border:1px solid #E11D48;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;font-family:\'Manrope\',sans-serif" onclick="event.stopPropagation();retryReport(\''+safeId(r.id)+'\')">Retry</button>' :
                            '<button disabled style="padding:6px 16px;background:none;color:var(--text-soft);border:1px solid var(--line);border-radius:8px;font-size:13px;opacity:.5;cursor:not-allowed;font-family:\'Manrope\',sans-serif">Pending</button>') +
                         '</div>' +
                       '</td>' +
@@ -108,8 +108,8 @@
                   var date = report.created_at ? new Date(report.created_at).toLocaleString('it-IT') : '—';
                   var status = report.status || 'completed';
                   var content = '<div style="font-family:Inter,sans-serif;max-height:70vh;overflow-y:auto;padding:8px">' +
-                    '<p style="font-size:13px;color:var(--text-dim);margin:0 0 4px">Report ID: ' + id + ' · ' + date + '</p>' +
-                    '<p style="font-size:13px;color:var(--text-dim);margin:0 0 16px">Status: ' + status + ' · Score: ' + score + '</p>' +
+                    '<p style="font-size:13px;color:var(--text-dim);margin:0 0 4px">Report ID: ' + escapeHtml(id) + ' · ' + escapeHtml(date) + '</p>' +
+                    '<p style="font-size:13px;color:var(--text-dim);margin:0 0 16px">Status: ' + escapeHtml(status) + ' · Score: ' + escapeHtml(score) + '</p>' +
                     '<div style="white-space:pre-wrap;font-size:15px;line-height:1.7;color:var(--text);background:var(--bg);padding:16px;border-radius:12px;border:1px solid var(--line)">' + escapeHtml(summary) + '</div>' +
                   '</div>';
                   showModal('Report Detail', content);
@@ -162,8 +162,11 @@
                 };
 
                 function escapeHtml(str) {
-                  if (!str) return '';
-                  return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+                  if (str === null || str === undefined) return '';
+                  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+                }
+                function safeId(x) {
+                  return String(x === null || x === undefined ? '' : x).replace(/[^a-zA-Z0-9_-]/g,'');
                 }
 
                 // ── PDF Download ──
@@ -183,7 +186,7 @@
                     '@media print{body{margin:0;padding:20px}}</style>');
                   w.document.write('</head><body>');
                   w.document.write('<h1>🤖 Report AI</h1><h2>Sottotitoli — Analisi Linguistica</h2>');
-                  w.document.write('<div class="meta">Generato: ' + date + (score ? ' · Score: ' + score : '') + ' · ID: ' + id + '</div>');
+                  w.document.write('<div class="meta">Generato: ' + escapeHtml(date) + (score ? ' · Score: ' + escapeHtml(score) : '') + ' · ID: ' + escapeHtml(id) + '</div>');
                   w.document.write('<div class="content">' + escapeHtml(summary) + '</div>');
                   w.document.write('<p style="margin-top:40px;font-size:11px;color:#999;border-top:1px solid #ddd;padding-top:12px">Powered by Sottotitoli AI · sottotitoli.ai</p>');
                   w.document.write('</body></html>');

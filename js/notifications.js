@@ -202,7 +202,7 @@
         return;
       }
       this.panelEl.innerHTML = this.notifications.slice(0, 20).map((n) =>
-        '<div class="notif-item ' + (n.read ? 'read' : 'unread') + '" data-type="' + n.type + '">' +
+        '<div class="notif-item ' + (n.read ? 'read' : 'unread') + '" data-type="' + String(n.type || '').replace(/[^a-z0-9_-]/gi, '') + '">' +
           '<div class="notif-icon">' + this._icon(n.type) + '</div>' +
           '<div class="notif-body">' +
             '<div class="notif-title">' + this._esc(n.title) + '</div>' +

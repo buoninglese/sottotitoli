@@ -1,4 +1,11 @@
             (function(){
+              function escHtml(s) {
+                if (s === null || s === undefined) return '';
+                return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+              }
+              function safeId(x) {
+                return String(x === null || x === undefined ? '' : x).replace(/[^a-zA-Z0-9_-]/g,'');
+              }
               var generateBtn = document.getElementById('generateBtn');
               var loadingOverlay = document.getElementById('loadingOverlay');
               var cancelBtn = document.getElementById('cancelBtn');
@@ -294,10 +301,10 @@
                   var row = document.createElement('label');
                   row.setAttribute('data-sid', s.id);
                   row.style.cssText = 'display:flex;align-items:center;gap:12px;padding:14px 16px;border:1.5px solid ' + (checked ? 'var(--cyan)' : 'var(--line)') + ';border-radius:12px;cursor:pointer;background:' + (checked ? 'rgba(6,182,212,.06)' : 'var(--bg)') + ';transition:all .15s';
-                  row.innerHTML = '<span onclick="event.stopPropagation();trToggleFav(\'' + s.id + '\')" style="font-size:18px;cursor:pointer;' + favColor + ';flex-shrink:0" title="Toggle favorite">' + favIcon + '</span>' +
-                    '<input type="checkbox" value="' + s.id + '" ' + (checked ? 'checked' : '') + ' style="accent-color:var(--cyan);width:18px;height:18px;cursor:pointer;flex-shrink:0">' +
-                    '<span style="flex:1;font-size:15px;font-weight:600;color:var(--text)">' + name + '</span>' +
-                    '<span style="font-size:13px;color:var(--text-soft);white-space:nowrap">' + dateStr + '</span>';
+                  row.innerHTML = '<span onclick="event.stopPropagation();trToggleFav(\'' + safeId(s.id) + '\')" style="font-size:18px;cursor:pointer;' + favColor + ';flex-shrink:0" title="Toggle favorite">' + favIcon + '</span>' +
+                    '<input type="checkbox" value="' + safeId(s.id) + '" ' + (checked ? 'checked' : '') + ' style="accent-color:var(--cyan);width:18px;height:18px;cursor:pointer;flex-shrink:0">' +
+                    '<span style="flex:1;font-size:15px;font-weight:600;color:var(--text)">' + escHtml(name) + '</span>' +
+                    '<span style="font-size:13px;color:var(--text-soft);white-space:nowrap">' + escHtml(dateStr) + '</span>';
                   // Hover effects
                   row.addEventListener('mouseenter', function(){
                     var cb = this.querySelector('input');

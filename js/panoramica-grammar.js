@@ -204,7 +204,7 @@
       var pct = (n / max) * 100;
       var row = document.createElement('div');
       row.className = 'geb-bar-row';
-      row.innerHTML = '<div class="geb-bar-label">' + cat + '</div><div class="geb-bar-track"><div class="geb-bar-fill" style="width:' + pct + '%"></div></div><div class="geb-bar-count">' + n + '</div>';
+      row.innerHTML = '<div class="geb-bar-label">' + escapeHtml(cat) + '</div><div class="geb-bar-track"><div class="geb-bar-fill" style="width:' + pct + '%"></div></div><div class="geb-bar-count">' + n + '</div>';
       barsEl.appendChild(row);
     });
   }
@@ -221,7 +221,8 @@
       var pillsHtml = '<span style="color:var(--text-soft);font-size:15px;margin-right:8px">Filtra:</span>';
       pillsHtml += '<button class="geb-pill geb-pill--active" data-filter="all" onclick="filterErrors(\'all\')">Mostra tutti</button>';
       catList.forEach(function(c) {
-        pillsHtml += '<button class="geb-pill' + (filter === c ? ' geb-pill--active' : '') + '" data-filter="' + c + '" onclick="filterErrors(\'' + c.replace(/'/g, "\\'") + '\')">' + c + '</button>';
+        var cs = String(c).replace(/[^a-zA-Z0-9_ -]/g, '');
+        pillsHtml += '<button class="geb-pill' + (filter === c ? ' geb-pill--active' : '') + '" data-filter="' + cs + '" onclick="filterErrors(\'' + cs + '\')">' + escapeHtml(c) + '</button>';
       });
       filtersEl.innerHTML = pillsHtml;
       filtersEl.style.display = '';
@@ -239,7 +240,7 @@
       var dateStr = r.saved_at ? new Date(r.saved_at).toLocaleDateString('it-IT') : '';
       var card = document.createElement('div');
       card.className = 'geb-card';
-      card.innerHTML = '<div class="geb-card-header"><span class="geb-meta">' + dateStr + '</span><button class="geb-action" onclick="deleteGrammarError(\'' + r.id + '\', this)" title="Elimina">×</button></div>' +
+      card.innerHTML = '<div class="geb-card-header"><span class="geb-meta">' + escapeHtml(dateStr) + '</span><button class="geb-action" onclick="deleteGrammarError(\'' + safeId(r.id) + '\', this)" title="Elimina">×</button></div>' +
         '<div class="geb-phrase"><span class="geb-original">' + escapeHtml(r.original_text || '') + '</span><span class="geb-arrow">→</span><span class="geb-corrected">' + escapeHtml(r.corrected_text || '') + '</span></div>' +
         '<div class="geb-explanation">' + escapeHtml(r.explanation || '') + '</div>';
       listEl.appendChild(card);
@@ -271,8 +272,11 @@
   }
 
   function escapeHtml(str) {
-    if (!str) return '';
-    return str.replace(/[&<>"']/g, function(m) { return ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','\'':'&#39;' })[m]; });
+    if (str === null || str === undefined) return '';
+    return String(str).replace(/[&<>"']/g, function(m) { return ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','\'':'&#39;' })[m]; });
+  }
+  function safeId(x) {
+    return String(x === null || x === undefined ? '' : x).replace(/[^a-zA-Z0-9_-]/g, '');
   }
 
   // Hook into tab switching — when the "Errori" subtab under VT is activated
