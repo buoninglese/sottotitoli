@@ -377,42 +377,33 @@ async function populatePanoramicaDropdown(user) {
   });
 })();
 
-// ═══ Credit initialization — 15 min free for new users, weekly top-up ═══
+// ═══ Credit initialization — 25 min free, ONE TIME (no recurring top-up) ═══
+// The free allowance is granted once, at first sign-in. There is deliberately no
+// recurring weekly top-up: it used to add +15 min every 7 days unconditionally
+// and it stacked. On iOS, transcription is billed per minute (Whisper), so a
+// permanent weekly grant was an unbounded recurring cost (~€4.35/yr per active
+// free user). 25 min ≈ €0.14, once.
 function initUserCredits(userId) {
   if (!userId) return;
   var sb = window.sottotitoliSupabase;
   if (!sb) return;
-  sb.from('user_credits').select('balance_minutes, last_weekly_topup').eq('user_id', userId).maybeSingle().then(function(r){
+  sb.from('user_credits').select('balance_minutes').eq('user_id', userId).maybeSingle().then(function(r){
     if (r.error) { console.warn('Credit check failed:', r.error.message); return; }
     var now = new Date();
     if (!r.data) {
-      // New user — create credit row with 15 min free
+      // New user — create the credit row with the one-time 25 min free allowance
       sb.from('user_credits').insert({
         user_id: userId,
-        balance_minutes: 15,
-        balance_seconds: 900,
+        balance_minutes: 25,
+        balance_seconds: 1500,
         lifetime_seconds: 0,
         last_weekly_topup: now.toISOString(),
         updated_at: now.toISOString()
       }).then(function(ins){
-        if (!ins.error) console.log('🎁 New user: 15 min free credits granted');
+        if (!ins.error) console.log('🎁 New user: 25 min free credits granted (one-time)');
       });
-    } else {
-      // Existing user — check weekly top-up (7 days since last)
-      var lastTopup = r.data.last_weekly_topup ? new Date(r.data.last_weekly_topup) : null;
-      var needsTopup = !lastTopup || (now - lastTopup > 7 * 24 * 60 * 60 * 1000);
-      if (needsTopup) {
-        var newBalance = (r.data.balance_minutes || 0) + 15;
-        sb.from('user_credits').update({
-          balance_minutes: newBalance,
-          balance_seconds: newBalance * 60,
-          last_weekly_topup: now.toISOString(),
-          updated_at: now.toISOString()
-        }).eq('user_id', userId).then(function(upd){
-          if (!upd.error) console.log('🔄 Weekly top-up: +15 min (balance: ' + newBalance + ' min)');
-        });
-      }
     }
+    // Existing users receive nothing further — the weekly top-up was removed.
   });
 }
 

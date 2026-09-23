@@ -360,9 +360,10 @@ function _atomicDeductCredits(userId, minutesUsed, retries) {
 
       var currentBalance = cr.data?.balance_minutes;
       if (currentBalance === null || currentBalance === undefined) {
-        // No credit row yet — create one with initial 15 min minus this session.
-        // Only insert if row still doesn't exist (race-safe for new users).
-        var initialBalance = Math.max(0, 15 - minutesUsed);
+        // No credit row yet — create one with the one-time 25 min free allowance
+        // minus this session. Only insert if the row still doesn't exist
+        // (race-safe for new users).
+        var initialBalance = Math.max(0, 25 - minutesUsed);
         sb.from('user_credits')
           .insert({ user_id: userId, balance_minutes: initialBalance, updated_at: new Date().toISOString() })
           .select()
