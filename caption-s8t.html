@@ -7383,12 +7383,16 @@ window.runDiarization = function(){
   if(status)status.style.display='inline';
   
   var supabaseUrl = (typeof SUPABASE_URL !== 'undefined') ? SUPABASE_URL : 'https://qzqmuegbpmvqrjrlfbgk.supabase.co';
-  var supabaseKey = (typeof SUPABASE_ANON_KEY !== 'undefined') ? SUPABASE_ANON_KEY : '';
-  
-  fetch(supabaseUrl+'/functions/v1/diarize-speakers',{
-    method:'POST',
-    headers:{'Content-Type':'application/json','Authorization':'Bearer '+supabaseKey},
-    body:JSON.stringify({lines:lines.slice(-12)})
+
+  // Send the signed-in user's token — the edge function now requires auth.
+  window.sottotitoliSupabase.auth.getSession().then(function(sess){
+    var _tok = sess && sess.data && sess.data.session && sess.data.session.access_token;
+    if(!_tok){ throw new Error('NO_SESSION'); }
+    return fetch(supabaseUrl+'/functions/v1/diarize-speakers',{
+      method:'POST',
+      headers:{'Content-Type':'application/json','Authorization':'Bearer '+_tok},
+      body:JSON.stringify({lines:lines.slice(-12)})
+    });
   })
   .then(function(r){return r.json()})
   .then(function(data){
