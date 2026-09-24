@@ -172,8 +172,18 @@
       } catch(e) {}
       // The session id is what lets the server attribute the charge, so the
       // session save subtracts these minutes instead of billing them again.
+      //
+      // ⚠️ BOTH keys, and in this order. The caption room writes
+      // 'sottotitoli-caption-session' (caption-s8t.html → _createCaptionRoom).
+      // 'sottotitoli-active-session' is written only by _ensureSupabaseSession in
+      // real-mic.js, which has no caller — so reading only that key meant this
+      // header was ALWAYS empty on the iOS path, the one path it exists for.
+      // Mirrors the lookup real-mic.js already uses for its sessionId.
       var sessionId = null;
-      try { sessionId = localStorage.getItem('sottotitoli-active-session') || null; } catch(e) {}
+      try {
+        sessionId = localStorage.getItem('sottotitoli-caption-session')
+          || localStorage.getItem('sottotitoli-active-session') || null;
+      } catch(e) {}
       var headers = {
         'Content-Type': blob.type || 'audio/webm',
         'X-Lang': String(lang || 'en-US').split('-')[0],
