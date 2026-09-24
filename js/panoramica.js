@@ -3737,12 +3737,22 @@
           var sfBank = banks.find(function(b){ return b.name === 'Saved from sessions'; });
           if (sfBank) {
             words = await SottotitoliData.getWordbankWords(sfBank.id);
-            // Enrich with CEFR from local lookup
+            // Enrich with CEFR from local lookups — LANGUAGE-AWARE.
+            // English: window.CEFR_LEVELS. Italian: the IT lexicon (KELLY + hard
+            // map + suffix bands), mirroring the server-side port in
+            // process-session-analytics. Other languages stay ungraded on purpose
+            // — a guess would be worse than an honest "—".
             words.forEach(function(w) {
-              if (!w.cefr && !w.cefr_level && window.CEFR_LEVELS) {
-                var cefr = window.CEFR_LEVELS[w.word.toLowerCase()];
-                if (cefr) { w.cefr = cefr; w.cefr_level = cefr; }
+              if (w.cefr || w.cefr_level) return;
+              var wKey = (w.word || w.lemma || '').toLowerCase();
+              if (!wKey) return;
+              var lvl = null;
+              if (isItalian && window.S8T_IT_LEXICON && window.S8T_IT_LEXICON.getCEFR) {
+                lvl = window.S8T_IT_LEXICON.getCEFR(wKey, 'it');
+              } else if (!isItalian && window.CEFR_LEVELS) {
+                lvl = window.CEFR_LEVELS[wKey] || null;
               }
+              if (lvl && lvl !== '—') { w.cefr = lvl; w.cefr_level = lvl; }
             });
           }
         } else if (bankId === 'review_due_now' || bankId === 'fragile_words' || bankId === 'it_review_due' || bankId === 'it_fragile') {
@@ -3826,9 +3836,19 @@
         var posLabels = { n:'noun', v:'verb', adj:'adjective', adv:'adverb', pron:'pronoun', prep:'preposition', conj:'conjunction', det:'determiner', num:'numeral', interj:'interjection' };
         words.forEach(function(w) {
           var wordKey = (w.word || w.lemma || '').toLowerCase();
-          if (wordKey && window.CEFR_LEVELS && window.CEFR_LEVELS[wordKey] && !w.cefr && !w.cefr_level) {
-            w.cefr = window.CEFR_LEVELS[wordKey];
-            w.cefr_level = window.CEFR_LEVELS[wordKey];
+          // Language-aware CEFR: English from window.CEFR_LEVELS, Italian from the
+          // IT lexicon. The typeof guard is deliberate — this block also runs on
+          // paths where isItalian is not declared. Words in a language we have no
+          // lexicon for are left ungraded (null) and render as "—".
+          if (wordKey && !w.cefr && !w.cefr_level) {
+            var _isIt = (w.lang === 'it') || (typeof isItalian !== 'undefined' && isItalian);
+            var _lvl = null;
+            if (_isIt && window.S8T_IT_LEXICON && window.S8T_IT_LEXICON.getCEFR) {
+              _lvl = window.S8T_IT_LEXICON.getCEFR(wordKey, 'it');
+            } else if (!_isIt && window.CEFR_LEVELS) {
+              _lvl = window.CEFR_LEVELS[wordKey] || null;
+            }
+            if (_lvl && _lvl !== '—') { w.cefr = _lvl; w.cefr_level = _lvl; }
           }
           if (wordKey && window.LEMMA_POS_MAP && window.LEMMA_POS_MAP[wordKey] && !w.pos && !w.part_of_speech) {
             w.pos = posLabels[window.LEMMA_POS_MAP[wordKey]] || window.LEMMA_POS_MAP[wordKey];

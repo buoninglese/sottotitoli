@@ -142,21 +142,30 @@
     var STUDY_LANG_KEY = 'sottotitoli-study-lang';
     var currentLang = localStorage.getItem(STUDY_LANG_KEY) || 'en';
     function switchLang(lang, btn){
-      currentLang = lang;
-      localStorage.setItem(STUDY_LANG_KEY, lang);
-      window.SOTTOTITOLI_STUDY_LANG = lang;
+      // ⚠️ Coerce to a language the app actually has data for. The lexicon sets
+      // (Kelly IT / NGSL EN) and the DB CHECK on user_wordbanks.lang +
+      // user_vocabulary.lang allow ONLY 'en' and 'it'. Passing anything else makes
+      // every word-bank write 400 silently. If a non-en/it study language is ever
+      // added, ship its lexicon data and relax that CHECK first — don't just
+      // delete this coercion.
+      currentLang = (lang === 'it') ? 'it' : 'en';
+      localStorage.setItem(STUDY_LANG_KEY, currentLang);
+      window.SOTTOTITOLI_STUDY_LANG = currentLang;
       // Update sidebar lang-opt buttons
       document.querySelectorAll('.lang-opt').forEach(function(o){
-        o.classList.toggle('active', o.getAttribute('data-lang') === lang);
+        o.classList.toggle('active', o.getAttribute('data-lang') === currentLang);
       });
       // Update hero chips (visual only — they call switchLang themselves)
       document.querySelectorAll('.hero-chip[data-lang]').forEach(function(c){
-        c.classList.toggle('active', c.getAttribute('data-lang') === lang);
+        c.classList.toggle('active', c.getAttribute('data-lang') === currentLang);
       });
       // Trigger data refresh for language-dependent panels
-      document.dispatchEvent(new CustomEvent('studylang-changed', {detail:lang}));
+      document.dispatchEvent(new CustomEvent('studylang-changed', {detail: currentLang}));
     }
-    // Init on load
+    // Init on load — coerce AND normalise the stored value, so a stale non-en/it
+    // value from an older UI build self-heals instead of 400-ing every write.
+    currentLang = (currentLang === 'it') ? 'it' : 'en';
+    localStorage.setItem(STUDY_LANG_KEY, currentLang);
     window.SOTTOTITOLI_STUDY_LANG = currentLang;
     (function(){
       var lang = currentLang;

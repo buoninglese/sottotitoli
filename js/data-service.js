@@ -18,7 +18,12 @@
   function cacheClear() { cache = {}; }
 
   function getStudyLang() {
-    return window.SOTTOTITOLI_STUDY_LANG || localStorage.getItem('sottotitoli-study-lang') || 'en';
+    // Coerced on the read path too: only 'en' and 'it' have lexicon data
+    // (Kelly / NGSL) and the DB CHECK on user_wordbanks.lang and
+    // user_vocabulary.lang allows nothing else. Without this, a stale value in
+    // localStorage makes every word-bank read/write fail.
+    var raw = window.SOTTOTITOLI_STUDY_LANG || localStorage.getItem('sottotitoli-study-lang') || 'en';
+    return (raw === 'it') ? 'it' : 'en';
   }
 
   /* ── Supabase client (wait for auth.js) ── */
