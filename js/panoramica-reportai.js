@@ -228,7 +228,7 @@
                     pollCount++;
                     try {
                       var check = await sb.from('session_ai_reports')
-                        .select('id,summary,overall_score,status')
+                        .select('id,summary,overall_score,confidence,status')
                         .eq('user_id', uid)
                         .order('created_at', { ascending: false })
                         .limit(1);
@@ -237,7 +237,7 @@
                         loadingOverlay.style.display = 'none';
                         generateBtn.disabled = false;
                         var report = check.data[0];
-                        showToastMsg('✅ Report completato · Score: ' + (report.overall_score || 'N/A'));
+                        showToastMsg('✅ Report completato' + (report.confidence ? ' · Confidence: ' + report.confidence + '/100' : (report.overall_score ? ' · Confidence: ' + report.overall_score + '/100' : '')));
                         // Refresh "I miei Report" tab if visible
                         var mieiPanel = document.getElementById('sub-rai-miei');
                         if (mieiPanel) mieiPanel.dispatchEvent(new Event('reports-loaded'));

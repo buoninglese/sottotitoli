@@ -29,11 +29,12 @@
                     var name = r.summary || r.report_type || 'Report ' + (r.id || '').substring(0,8);
                     var date = r.created_at ? new Date(r.created_at).toLocaleDateString('it-IT', {day:'2-digit', month:'short', year:'numeric'}) : '—';
                     var status = r.status || 'completed';
-                    var score = r.overall_score ? r.overall_score + '/10' : '';
+                    var conf = r.confidence || r.overall_score;
+                    var score = conf ? conf + '/100' : '';
                     var isDone = status === 'completed';
                     var isFailed = status === 'failed';
                     return '<tr class="hv-bg" style="border-bottom:1px solid var(--line)">' +
-                      '<td style="padding:16px 24px"><div style="font-weight:600">'+escapeHtml(name)+'</div>'+(score?'<div style="font-size:13px;color:var(--text-soft)">Score: '+escapeHtml(score)+'</div>':'')+'</td>' +
+                      '<td style="padding:16px 24px"><div style="font-weight:600">'+escapeHtml(name)+'</div>'+(score?'<div style="font-size:13px;color:var(--text-soft)">Confidence: '+escapeHtml(score)+'</div>':'')+'</td>' +
                       '<td style="padding:16px 24px;color:var(--text-soft);font-size:13px">'+date+'</td>' +
                       '<td style="padding:16px 24px">'+statusBadge(status)+'</td>' +
                       '<td style="padding:16px 24px;text-align:right">' +
@@ -104,12 +105,12 @@
                   var report = allReports.find(function(r){ return r.id == id; });
                   if (!report) { appAlert('Report non trovato.', 'Report non trovato', '📄'); return; }
                   var summary = report.summary || report.summary_text || 'Nessun contenuto disponibile.';
-                  var score = report.overall_score || report.confidence || 'N/A';
+                  var score = report.confidence || report.overall_score || 'N/A';
                   var date = report.created_at ? new Date(report.created_at).toLocaleString('it-IT') : '—';
                   var status = report.status || 'completed';
                   var content = '<div style="font-family:Inter,sans-serif;max-height:70vh;overflow-y:auto;padding:8px">' +
                     '<p style="font-size:13px;color:var(--text-dim);margin:0 0 4px">Report ID: ' + escapeHtml(id) + ' · ' + escapeHtml(date) + '</p>' +
-                    '<p style="font-size:13px;color:var(--text-dim);margin:0 0 16px">Status: ' + escapeHtml(status) + ' · Score: ' + escapeHtml(score) + '</p>' +
+                    '<p style="font-size:13px;color:var(--text-dim);margin:0 0 16px">Status: ' + escapeHtml(status) + ' · Confidence: ' + escapeHtml(score) + '/100</p>' +
                     '<div style="white-space:pre-wrap;font-size:15px;line-height:1.7;color:var(--text);background:var(--bg);padding:16px;border-radius:12px;border:1px solid var(--line)">' + escapeHtml(summary) + '</div>' +
                   '</div>';
                   showModal('Report Detail', content);
@@ -174,7 +175,7 @@
                   var report = allReports.find(function(r){ return r.id == id; });
                   if (!report) { appAlert('Report non trovato.', 'Report non trovato', '📄'); return; }
                   var summary = report.summary || report.summary_text || '';
-                  var score = report.overall_score || '';
+                  var score = report.confidence || report.overall_score || '';
                   var date = report.created_at ? new Date(report.created_at).toLocaleDateString('it-IT') : '';
                   // Build a simple HTML doc and trigger print-to-PDF
                   var w = window.open('', '_blank', 'width=800,height=600');
@@ -186,7 +187,7 @@
                     '@media print{body{margin:0;padding:20px}}</style>');
                   w.document.write('</head><body>');
                   w.document.write('<h1>🤖 Report AI</h1><h2>Sottotitoli — Analisi Linguistica</h2>');
-                  w.document.write('<div class="meta">Generato: ' + escapeHtml(date) + (score ? ' · Score: ' + escapeHtml(score) : '') + ' · ID: ' + escapeHtml(id) + '</div>');
+                  w.document.write('<div class="meta">Generato: ' + escapeHtml(date) + (score ? ' · Confidence: ' + escapeHtml(score) + '/100' : '') + ' · ID: ' + escapeHtml(id) + '</div>');
                   w.document.write('<div class="content">' + escapeHtml(summary) + '</div>');
                   w.document.write('<p style="margin-top:40px;font-size:11px;color:#999;border-top:1px solid #ddd;padding-top:12px">Powered by Sottotitoli AI · sottotitoli.ai</p>');
                   w.document.write('</body></html>');
