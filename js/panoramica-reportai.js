@@ -434,40 +434,6 @@
                 }, 300);
               }
 
-              // Stub for legacy generateReport calls from grammar panel
-              window.generateReport = function(type) {
-                var sb = window.sottotitoliSupabase;
-                if (!sb) { appAlert('Accedi per generare report.', 'Accesso richiesto', '🔒'); return; }
-                sb.auth.getSession().then(async function(r) {
-                  if (!r.data?.session) { appAlert('Sessione scaduta. Rieffettua il login.', 'Sessione scaduta', '⚠️'); return; }
-                  var token = r.data.session.access_token;
-                  var sessionEl = document.getElementById('gramSessionSelect');
-                  var sessionId = sessionEl ? sessionEl.value : '';
-                  if (!sessionId) { appAlert('Seleziona una sessione.', 'Sessione richiesta', '📌'); return; }
-                  try {
-                    var funcUrl = type === 'grammar-full'
-                      ? 'https://qzqmuegbpmvqrjrlfbgk.supabase.co/functions/v1/generate-grammar-report'
-                      : 'https://qzqmuegbpmvqrjrlfbgk.supabase.co/functions/v1/process-ai-reports';
-                    var body = JSON.stringify({ sessionId: sessionId, contentLanguage: 'en', explanationLanguage: 'it' });
-                    var resp = await fetch(funcUrl, {
-                      method: 'POST',
-                      headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
-                      body: body
-                    });
-                    var result = await resp.json();
-                    if (resp.ok && !result.error) {
-                      showToastMsg('✅ Report generato');
-                    } else {
-                      showToastMsg('❌ ' + (result.error || 'Errore nella generazione.'));
-                    }
-                  } catch(e) {
-                    showToastMsg('❌ Errore di rete: ' + e.message);
-                  }
-                }).catch(function(e) {
-                  showToastMsg('❌ ' + e.message);
-                });
-              };
-
               // deleteAllReports kept for Impostazioni danger zone
               window.deleteAllReports = async function() {
                 var sb = window.sottotitoliSupabase;
