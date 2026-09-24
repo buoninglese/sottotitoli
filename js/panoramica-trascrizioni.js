@@ -123,7 +123,7 @@
                       '<td style="padding:14px 16px;color:var(--text);font-size:13px">'+dur+'</td>'+
                       '<td style="padding:14px 16px;color:var(--text);font-size:13px">'+words+'</td>'+
                       '<td style="padding:14px 16px"><span style="padding:3px 10px;background:rgba(6,182,212,.1);color:var(--cyan);font-size:11px;font-weight:700;border-radius:4px;font-family:\'Manrope\',sans-serif">'+lang+'</span></td>'+
-                      '<td style="padding:14px 16px;text-align:right;white-space:nowrap"><span onclick="event.stopPropagation();trToggleFav(\''+safeId(s.id)+'\')" style="font-size:18px;cursor:pointer;'+favColor+';margin-right:10px" title="Favorite">'+favIcon+'</span><button onclick="event.stopPropagation();trOpenEditor(\''+safeId(s.id)+'\')" style="font-size:13px;font-weight:700;color:var(--cyan);background:none;border:none;cursor:pointer;font-family:\'Manrope\',sans-serif;margin-right:8px">Edit</button><button onclick="event.stopPropagation();trViewSession(\''+safeId(s.id)+'\')" style="font-size:13px;font-weight:600;color:var(--text-soft);background:none;border:none;cursor:pointer">View</button></td>'+
+                      '<td style="padding:14px 16px;text-align:right;white-space:nowrap"><span onclick="event.stopPropagation();trToggleFav(\''+safeId(s.id)+'\')" style="font-size:18px;cursor:pointer;'+favColor+';margin-right:10px" title="Salva questa sessione: senza stella viene eliminata dopo 30 giorni">'+favIcon+'</span><button onclick="event.stopPropagation();trOpenEditor(\''+safeId(s.id)+'\')" style="font-size:13px;font-weight:700;color:var(--cyan);background:none;border:none;cursor:pointer;font-family:\'Manrope\',sans-serif;margin-right:8px">Edit</button><button onclick="event.stopPropagation();trViewSession(\''+safeId(s.id)+'\')" style="font-size:13px;font-weight:600;color:var(--text-soft);background:none;border:none;cursor:pointer">View</button></td>'+
                     '</tr>';
                   }).join('');
                 }
@@ -152,7 +152,7 @@
                         '<div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:12px">'+
                           '<div style="font-weight:700;color:var(--text);font-size:15px;flex:1">'+escHtml(name)+'</div>'+
                           '<div style="display:flex;align-items:center;gap:8px;flex-shrink:0">'+
-                            '<span onclick="event.stopPropagation();trToggleFav(\''+safeId(s.id)+'\')" style="font-size:18px;cursor:pointer;'+favColor+'" title="Favorite">'+favIcon+'</span>'+
+                            '<span onclick="event.stopPropagation();trToggleFav(\''+safeId(s.id)+'\')" style="font-size:18px;cursor:pointer;'+favColor+'" title="Salva questa sessione: senza stella viene eliminata dopo 30 giorni">'+favIcon+'</span>'+
                             '<span style="padding:3px 8px;background:rgba(6,182,212,.1);color:var(--cyan);font-size:11px;font-weight:700;border-radius:4px;font-family:\'Manrope\',sans-serif;white-space:nowrap">'+lang+'</span>'+
                           '</div>'+
                         '</div>'+
@@ -274,7 +274,7 @@
                     '<label style="font-size:11px;font-weight:700;font-family:\'Manrope\',sans-serif;text-transform:uppercase;letter-spacing:.05em;color:var(--text-soft);display:block;margin-bottom:6px">Transcript Title</label>'+
                     '<div style="display:flex;align-items:center;gap:8px">'+
                       '<input id="trEditorName" value="'+name.replace(/"/g,'&quot;')+'" style="flex:1;font-size:18px;font-weight:700;color:var(--cyan);border:none;border-bottom:2px solid rgba(6,182,212,.2);padding:4px 0;background:transparent;font-family:inherit;outline:none" onchange="trSaveEditorField(\'name\', this.value)">'+
-                      '<span onclick="trToggleFav(\''+sid+'\')" style="font-size:22px;cursor:pointer;color:'+favColor+';flex-shrink:0" title="Toggle favorite">'+favIcon+'</span>'+
+                      '<span class="tr-fav-star" onclick="trToggleFav(\''+sid+'\')" style="font-size:22px;cursor:pointer;color:'+favColor+';flex-shrink:0" title="Salva questa sessione: senza stella viene eliminata dopo 30 giorni">'+favIcon+'</span>'+
                       '<span class="material-symbols-outlined" onclick="trDeleteSession(\''+sid+'\')" style="font-size:18px;color:#E11D48;cursor:pointer;flex-shrink:0" title="Delete">delete</span>'+
                     '</div>'+
                   '</div>'+
@@ -427,7 +427,10 @@
                 // Update picker star icon inline (if picker modal is built)
                 var pickerRow = document.querySelector('#transcriptPickerList label[data-sid="' + sid + '"]');
                 if (pickerRow) {
-                  var starSpan = pickerRow.querySelector('span[title="Toggle favorite"]');
+                  // Select on a stable hook, NOT on the tooltip text. The title is
+                  // user-facing copy ("Salva questa sessione…"), and keying a lookup
+                  // off it means a copy change silently breaks this refresh.
+                  var starSpan = pickerRow.querySelector('.tr-fav-star');
                   if (starSpan) {
                     starSpan.textContent = session.favorite ? '★' : '☆';
                     starSpan.style.color = session.favorite ? '#f59e0b' : '';
