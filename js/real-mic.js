@@ -378,24 +378,24 @@ function _atomicDeductCredits(userId, minutesUsed, retries) {
         return;
       }
 
-      var newBalance = Math.max(0, currentBalance - minutesUsed);
-
-      // CAS: only update if balance hasn't changed since we read it
-      sb.from('user_credits')
-        .update({ balance_minutes: newBalance, updated_at: new Date().toISOString() })
-        .eq('user_id', userId)
-        .eq('balance_minutes', currentBalance)
-        .select()
-        .then(function(upd) {
-          if (upd.error) { console.error('Deduction update failed:', upd.error.message); return; }
-          if (!upd.data || upd.data.length === 0) {
-            // CAS conflict — balance was changed by another operation, retry
-            console.warn('⚠ Credit CAS conflict (retry ' + (retries + 1) + '/3)');
-            _atomicDeductCredits(userId, minutesUsed, retries + 1);
+      // Authoritative deduction: the server owns this number now.
+      //
+      // This replaces the read-modify-write CAS loop that used to live here. That
+      // loop worked for well-behaved clients but was bypassable in principle — a
+      // crafted client could simply never call it, and the balance would stay
+      // untouched. The RPC is SECURITY DEFINER (so the client cannot choose its
+      // own price), atomic (no CAS retry dance needed), and it writes the
+      // credit_transactions ledger row that this path never produced.
+      var secondsUsed = Math.round(minutesUsed * 60);
+      sb.rpc('consume_session_minutes', { p_seconds: secondsUsed })
+        .then(function(res) {
+          var row = Array.isArray(res.data) ? res.data[0] : res.data;
+          if (res.error || !row || !row.ok) {
+            console.error('Deduction RPC failed:', (res.error && res.error.message) || (row && row.reason) || 'unknown');
             return;
           }
-          console.log('💰 Deducted ' + minutesUsed + ' min — balance: ' + newBalance);
-          _refreshCreditDisplays(newBalance);
+          console.log('💰 Deducted ' + minutesUsed + ' min — balance: ' + row.new_balance_minutes);
+          _refreshCreditDisplays(row.new_balance_minutes);
         });
     }).catch(function(err) {
       console.error('Credit deduction error:', err);
