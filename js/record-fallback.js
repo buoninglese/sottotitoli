@@ -84,6 +84,7 @@
           : new MediaRecorder(this._stream);
       } catch(e) { this._recorder = null; return; }
       var self = this;
+      this._segStart = Date.now();
       this._recorder.ondataavailable = function(ev){ if (ev.data && ev.data.size) self._segment.push(ev.data); };
       try { this._recorder.start(1000); } catch(e) { this._recorder = null; }
     },
@@ -108,8 +109,15 @@
         var blob = null;
         try { blob = new Blob(seg, { type: self._mime || 'audio/webm' }); } catch(e) {}
         if (!blob) { self._busy = false; return; }
+        // Exact segment duration, measured at the source. The server needs this
+        // to meter and charge without inferring a bitrate from the byte count —
+        // an inference that was only ever a guess.
+        var segSeconds = self._segStart
+          ? Math.max(1, Math.round((Date.now() - self._segStart) / 1000))
+          : null;
+        self._segStart = null;
         self._showTranscribing(true);
-        return self.transcribe(blob, window.currentCaptionLang).then(function(text){
+        return self.transcribe(blob, window.currentCaptionLang, segSeconds).then(function(text){
           if (text) self.feedSentences(text);
           self._busy = false;
           if (!self._stopped) self._showTranscribing(false);
@@ -152,7 +160,7 @@
       if (interim) interim.textContent = '';
     },
 
-    transcribe: async function(blob, lang){
+    transcribe: async function(blob, lang, seconds){
       var url = (window.SOTTOTITOLI_CONFIG && window.SOTTOTITOLI_CONFIG.transcribeAudioUrl)
         || 'https://qzqmuegbpmvqrjrlfbgk.supabase.co/functions/v1/transcribe-audio';
       var token = null;
@@ -162,13 +170,20 @@
           token = (sr && sr.data && sr.data.session) ? sr.data.session.access_token : null;
         }
       } catch(e) {}
+      // The session id is what lets the server attribute the charge, so the
+      // session save subtracts these minutes instead of billing them again.
+      var sessionId = null;
+      try { sessionId = localStorage.getItem('sottotitoli-active-session') || null; } catch(e) {}
+      var headers = {
+        'Content-Type': blob.type || 'audio/webm',
+        'X-Lang': String(lang || 'en-US').split('-')[0],
+        'Authorization': 'Bearer ' + (token || '')
+      };
+      if (seconds) headers['X-Audio-Seconds'] = String(seconds);
+      if (sessionId) headers['X-Session-Id'] = sessionId;
       var resp = await fetch(url, {
         method: 'POST',
-        headers: {
-          'Content-Type': blob.type || 'audio/webm',
-          'X-Lang': String(lang || 'en-US').split('-')[0],
-          'Authorization': 'Bearer ' + (token || '')
-        },
+        headers: headers,
         body: blob
       });
       if (!resp.ok) {

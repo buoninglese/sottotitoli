@@ -277,7 +277,7 @@ function _endSupabaseSession(data) {
               localStorage.removeItem('sottotitoli-caption-session');
               localStorage.removeItem('sottotitoli-translate-session');
               localStorage.removeItem('sottotitoli-pending-session');
-              _deductSessionMinutes(data.durationSeconds || 0);
+              _deductSessionMinutes(data.durationSeconds || 0, sessionId);
             });
         }
         return;
@@ -293,8 +293,8 @@ function _endSupabaseSession(data) {
       localStorage.removeItem('sottotitoli-translate-session');
       localStorage.removeItem('sottotitoli-pending-session');
       
-      // ── Deduct minutes from user_credits ──
-      _deductSessionMinutes(data.durationSeconds || 0);
+      // ── Deduct minutes from user_credits (server-side, session-attributed) ──
+      _deductSessionMinutes(data.durationSeconds || 0, sessionId);
     }).catch(function(err) {
       console.error('Failed to save session to Supabase:', err);
       // Keep session keys so retry is possible on next session start
@@ -330,8 +330,10 @@ function _fallbackSaveSession(data) {
   });
 }
 
-// ═══ Minutes deduction from user_credits (atomic CAS with retry) ═══
-function _deductSessionMinutes(durationSeconds) {
+// ═══ Minutes deduction (server-authoritative, session-attributed) ═══
+// sessionId lets the server net off minutes already charged while transcribing,
+// so an iOS session is billed once rather than once per chunk AND once at save.
+function _deductSessionMinutes(durationSeconds, sessionId) {
   if (!window.sottotitoliSupabase || durationSeconds <= 0) return;
   
   var totalSeconds = Math.ceil(durationSeconds);
@@ -341,12 +343,14 @@ function _deductSessionMinutes(durationSeconds) {
   window.sottotitoliSupabase.auth.getSession().then(function(r) {
     if (!r.data?.session) return;
     var userId = r.data.session.user.id;
-    _atomicDeductCredits(userId, minutesUsed, 0);
+    _atomicDeductCredits(userId, minutesUsed, 0, sessionId);
   });
 }
 
-// CAS loop: read balance, subtract, write only if unchanged. Retry on conflict.
-function _atomicDeductCredits(userId, minutesUsed, retries) {
+// No longer a CAS loop against user_credits — the server owns that write now.
+// The `retries` argument is kept because the no-credit-row path still races on
+// INSERT for a brand-new user.
+function _atomicDeductCredits(userId, minutesUsed, retries, sessionId) {
   if (retries >= 3) { console.error('❌ Credit deduction failed after 3 CAS retries'); return; }
   var sb = window.sottotitoliSupabase;
   if (!sb) return;
@@ -370,7 +374,7 @@ function _atomicDeductCredits(userId, minutesUsed, retries) {
           .then(function(ins) {
             if (ins.error && ins.error.code === '23505') {
               // Row was created between our check and insert — retry
-              _atomicDeductCredits(userId, minutesUsed, retries + 1);
+              _atomicDeductCredits(userId, minutesUsed, retries + 1, sessionId);
               return;
             }
             if (!ins.error) _refreshCreditDisplays(initialBalance);
@@ -387,7 +391,7 @@ function _atomicDeductCredits(userId, minutesUsed, retries) {
       // own price), atomic (no CAS retry dance needed), and it writes the
       // credit_transactions ledger row that this path never produced.
       var secondsUsed = Math.round(minutesUsed * 60);
-      sb.rpc('consume_session_minutes', { p_seconds: secondsUsed })
+      sb.rpc('consume_session_minutes', { p_seconds: secondsUsed, p_session_id: sessionId || null })
         .then(function(res) {
           var row = Array.isArray(res.data) ? res.data[0] : res.data;
           if (res.error || !row || !row.ok) {
@@ -622,8 +626,9 @@ function _recoverPendingSession(supabaseClient) {
         .eq('id', payload.sessionId)
         .then(function() {
           console.log('🔄 Recovered session:', payload.sessionId);
-          // Deduct credits for the recovered session
-          _deductSessionMinutes(payload.durationSeconds || 0);
+          // Deduct credits for the recovered session, netting off anything already
+          // charged while it was being transcribed.
+          _deductSessionMinutes(payload.durationSeconds || 0, payload.sessionId);
         }).catch(function(e) {
           console.warn('Failed to recover session:', e.message);
         });
@@ -645,7 +650,7 @@ function _finalizeOrphanedSession(supabaseClient, payload) {
     .eq('id', payload.sessionId)
     .then(function() {
       console.log('🔄 Closed orphaned session:', payload.sessionId);
-      _deductSessionMinutes(payload.durationSeconds || 0);
+      _deductSessionMinutes(payload.durationSeconds || 0, payload.sessionId);
     }).catch(function(e) {
       console.warn('Failed to close orphaned session:', e.message);
     });
