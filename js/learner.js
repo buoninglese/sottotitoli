@@ -612,10 +612,16 @@
     // ── Spaced review (always visible on both English & Italiano) ──
     // Profilo-style section: title + short text on the left, content on the right
     // (1fr / 2.2fr on desktop, stacked on mobile).
+    // ⚠️ ONE <div class="lr-section-grid"> opened here and closed after the cards below.
+    // This used to open a second review-grid wrapper on the line after the label and
+    // leave the section-grid unclosed. The browser then auto-closed it at the end of the pane,
+    // which quietly made the NEXT section (Missions) a CHILD of this one — as a third grid item
+    // in a `1fr 2.2fr` grid it landed in the narrow 1fr column, so the mission cards rendered
+    // ~224px wide on any screen ≥1024px while looking fine below it. Balanced tags, and the
+    // Missions section stays a sibling.
     html += '<div class="lr-section-grid"><div class="lr-prof-label">' +
       '<h3 class="c-section-h3">' + t('learner_review') + '</h3>' +
-      '<p class="c-section-sub">' + t('learner_review_sub') + '</p></div>' +
-      '<div class="lr-review-grid">';
+      '<p class="c-section-sub">' + t('learner_review_sub') + '</p></div>';
     var reviewCards = [
       { kind: 'due', icon: '⏰', title: t('learner_review_due'), sub: t('learner_review_due_sub'), count: due.length },
       { kind: 'fragile', icon: '🧩', title: t('learner_review_fragile'), sub: t('learner_review_fragile_sub'), count: fragile.length },
