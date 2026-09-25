@@ -73,7 +73,9 @@ window.sottotitoliSupabase = window.supabase.createClient(
         var avatar = user.user_metadata?.avatar_url || user.user_metadata?.picture || '';
         var preset = localStorage.getItem('sottotitoli-avatar-preset') || '';
         window.dispatchEvent(new CustomEvent('sottotitoli-user-ready', {detail:{name:name,email:user.email,avatar:avatar,preset:preset}}));
-        // Initialize credits for new users (15 min free + 3 tokens)
+        // Server now grants the 25 min + the ledger row at signup (handle_new_user).
+        // These two remain only as an idempotent fallback for an account that somehow
+        // has no row yet — they insert nothing when a row already exists.
         initUserCredits(r.data.session.user.id);
         initUserTokens(r.data.session.user.id);
 
@@ -378,6 +380,9 @@ async function populatePanoramicaDropdown(user) {
 })();
 
 // ═══ Credit initialization — 25 min free, ONE TIME (no recurring top-up) ═══
+// Granted server-side by public.handle_new_user() since migration
+// 20260925270000_signup_bonus_server_side. This function is now only a fallback.
+//
 // The free allowance is granted once, at first sign-in. There is deliberately no
 // recurring weekly top-up: it used to add +15 min every 7 days unconditionally
 // and it stacked. On iOS, transcription is billed per minute (Whisper), so a
@@ -391,7 +396,11 @@ function initUserCredits(userId) {
     if (r.error) { console.warn('Credit check failed:', r.error.message); return; }
     var now = new Date();
     if (!r.data) {
-      // New user — create the credit row with the one-time 25 min free allowance
+      // Should be unreachable: public.handle_new_user() grants this row and its
+      // credit_transactions 'signup_bonus' entry in the same transaction that creates
+      // the account. Kept as a fallback, and it reports its own failure — the old
+      // version logged ONLY on success, so a user with 0 minutes looked like a
+      // user who simply had not earned any.
       sb.from('user_credits').insert({
         user_id: userId,
         balance_minutes: 25,
@@ -400,7 +409,8 @@ function initUserCredits(userId) {
         last_weekly_topup: now.toISOString(),
         updated_at: now.toISOString()
       }).then(function(ins){
-        if (!ins.error) console.log('🎁 New user: 25 min free credits granted (one-time)');
+        if (ins.error) console.error('Credit fallback FAILED — user may have no minutes:', ins.error.message);
+        else console.log('🎁 Fallback granted 25 min (no credits row existed)');
       });
     }
     // Existing users receive nothing further — the weekly top-up was removed.
