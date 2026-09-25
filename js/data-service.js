@@ -7,6 +7,12 @@
   var CACHE_TTL = 30000; // 30 seconds before refetch
   var cache = {};
 
+  // Console diagnostics are for local development only. Same blocklist as the
+  // config.secrets.js probe: silent on the two deployed hosts, verbose anywhere
+  // else (localhost, LAN IP, file://). Genuine errors still log via console.warn.
+  var DEBUG = !/(^|\.)sottotitoli\.pro$/i.test(location.hostname)
+           && !/(^|\.)buoninglese\.github\.io$/i.test(location.hostname);
+
   function cacheGet(key) {
     var entry = cache[key];
     if (entry && (Date.now() - entry.ts) < CACHE_TTL) return entry.data;
@@ -356,7 +362,7 @@
       if (local.hasOwnProperty('default_translation_pair') && local.default_translation_pair && !result.default_translation_pair) result.default_translation_pair = local.default_translation_pair;
     }
 
-    console.log('loadSettings:', JSON.stringify(result));
+    if (DEBUG) console.log('loadSettings:', JSON.stringify(result));
     return result;
   }
 
@@ -427,7 +433,7 @@
     saveLocalSettings(settings);
 
     var ok = errors.length === 0;
-    console.log('saveSettings:', { ok: ok, errors: errors });
+    if (DEBUG) console.log('saveSettings:', { ok: ok, errors: errors });
     return { ok: ok, errors: errors };
   }
 

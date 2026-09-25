@@ -140,9 +140,20 @@ window.SOTTOTITOLI_CONFIG = {
 };
 
 // ═══ Load config.secrets.js if present (gitignored — local dev only) ═══
-// Overrides placeholder values above with real secrets. Silently skipped
-// on production where the file does not exist.
+// Overrides placeholder values above with real secrets.
+//
+// ⚠️ Only requested on NON-deployed hosts. The file is gitignored, so on a
+// deployed host the request always 404s — and the browser logs that 404 itself,
+// because `onerror` silences the script's error EVENT, not the network log. Not
+// asking is the only way to keep the production console clean, and it also saves
+// one roundtrip per page load.
+//
+// Written as a blocklist of the two deployed hosts rather than an allowlist of
+// localhost, so it still loads on a LAN IP (iPhone testing) and on file://.
 (function(){
+  var host = location.hostname;
+  if (/(^|\.)sottotitoli\.pro$/i.test(host) || /(^|\.)buoninglese\.github\.io$/i.test(host)) return;
+
   var s = document.createElement('script');
   s.src = 'config.secrets.js';
   s.onerror = function(){ /* no secrets file — fine */ };
