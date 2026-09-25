@@ -536,8 +536,9 @@
       "website_language_short": "Lingua sito",
       "anonymous_sharing_label": "Condivisione anonima",
       "saved_check": "✓ Salvato",
-      "privacy_sessions_info": "Quando attivo, le tue sessioni (trascrizioni, parole, metriche) vengono salvate su Supabase e compaiono nella tab Trascrizioni. Disattiva se preferisci non conservare lo storico.",
-      "privacy_anon_info": "Se attivo, dati anonimi sulle tue sessioni (mai il contenuto delle trascrizioni) possono essere usati per migliorare i modelli di analisi. Nessun dato personale viene mai condiviso.",
+      "privacy_sessions_label": "Salva le sessioni",
+      "privacy_sessions_info": "Quando attivo, le tue sessioni (trascrizioni, parole, metriche) vengono salvate su Supabase e compaiono nella tab Trascrizioni. Se lo disattivi, la sessione resta registrata per il conteggio dei minuti ma il testo della trascrizione viene eliminato alla fine della sessione.",
+      "privacy_anon_info": "Se attivo, raccogliamo misure sulle tue sessioni (durata, numero di parole, fluidità, livello stimato) in forma anonima: nessun identificativo del tuo account, nessun contenuto della trascrizione e nessun orario preciso. Servono a migliorare i modelli di analisi. Puoi disattivarlo in qualsiasi momento.",
       "your_name": "Il tuo nome",
 
       // ── Start Session ──
@@ -1713,8 +1714,9 @@
       "website_language_short": "Website language",
       "anonymous_sharing_label": "Anonymous sharing",
       "saved_check": "✓ Saved",
-      "privacy_sessions_info": "When enabled, your sessions (transcripts, words, metrics) are saved to Supabase and appear in the Sessions tab. Disable if you prefer not to keep history.",
-      "privacy_anon_info": "When enabled, anonymous data about your sessions (never the transcript content) may be used to improve analysis models. No personal data is ever shared.",
+      "privacy_sessions_label": "Save sessions",
+      "privacy_sessions_info": "When enabled, your sessions (transcripts, words, metrics) are saved to Supabase and appear in the Sessions tab. If you turn this off, the session is still recorded for billing but the transcript text is deleted at the end of the session.",
+      "privacy_anon_info": "When enabled, we collect measurements about your sessions (duration, word counts, fluency, estimated level) in anonymous form: no account identifier, no transcript content and no precise timestamp. They are used to improve our analysis models. You can turn this off at any time.",
       "your_name": "Your name",
 
       // ── Start Session ──

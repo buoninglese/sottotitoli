@@ -36,6 +36,14 @@
     var dtpEl = document.getElementById('settingsDefaultTrPair');
     if (dtpEl && dtpEl.value) settings.default_translation_pair = dtpEl.value;
 
+    // Privacy toggles. These are the two controls whose copy promises a behaviour,
+    // so they are read as explicit booleans rather than gated on a value check:
+    // "off" is the meaningful state and must be sent, not skipped.
+    var saveSessionsEl = document.getElementById('settingsSaveSessions');
+    if (saveSessionsEl) settings.save_sessions = !!saveSessionsEl.checked;
+    var anonEl = document.getElementById('settingsAnonSharing');
+    if (anonEl) settings.anonymous_sharing = !!anonEl.checked;
+
     // Green flash
     var origBg = btn.style.background;
     btn.style.background = 'var(--green, #059669)';

@@ -2867,6 +2867,14 @@
           uiLang.value = s.ui_language || currentUi;
         }
 
+        // Privacy toggles — reflect the stored preference, using the COLUMN defaults
+        // (save_sessions true, anonymous_sharing false) when the row has no value,
+        // so the panel never shows a state the database would not agree with.
+        var saveSessionsTgl = document.getElementById('settingsSaveSessions');
+        if (saveSessionsTgl) saveSessionsTgl.checked = s.save_sessions !== false;
+        var anonTgl = document.getElementById('settingsAnonSharing');
+        if (anonTgl) anonTgl.checked = s.anonymous_sharing === true;
+
         // Aspetto — Theme (only set dropdown value; don't re-apply on every render)
         var themeEl = document.getElementById('settingsTheme');
         if (themeEl) {
