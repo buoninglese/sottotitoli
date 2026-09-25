@@ -538,6 +538,7 @@
       "saved_check": "✓ Salvato",
       "privacy_sessions_label": "Salva le sessioni",
       "privacy_sessions_info": "Quando attivo, le tue sessioni (trascrizioni, parole, metriche) vengono salvate su Supabase e compaiono nella tab Trascrizioni. Se lo disattivi, la sessione resta registrata per il conteggio dei minuti ma il testo della trascrizione viene eliminato alla fine della sessione: per quelle sessioni non saranno più disponibili né le analisi (vocabolario, CEFR, MATTR) né i Report AI, perché entrambi si costruiscono dal testo.",
+      "privacy_retention_note": "Le sessioni non contrassegnate con la stella vengono eliminate automaticamente dopo 30 giorni; quelle contrassegnate restano finché non le elimini tu. Puoi eliminare qualsiasi sessione in qualsiasi momento dalla pagina Trascrizioni.",
       "privacy_anon_info": "Se attivo, raccogliamo solo misure linguistiche aggregate sulle tue sessioni — durata, numero di parole, fluidità, livello stimato. Non raccogliamo il contenuto delle trascrizioni, non il tuo nome e non l'orario esatto. Ogni riga è pseudonima: contiene un'impronta, non il tuo identificativo, e viene eliminata quando elimini la sessione o l'account. Servono a migliorare i modelli di analisi e puoi disattivarle quando vuoi.",
       "your_name": "Il tuo nome",
 
@@ -1716,6 +1717,7 @@
       "saved_check": "✓ Saved",
       "privacy_sessions_label": "Save sessions",
       "privacy_sessions_info": "When enabled, your sessions (transcripts, words, metrics) are saved to Supabase and appear in the Sessions tab. If you turn this off, the session is still recorded for billing but the transcript text is deleted at the end of the session: those sessions then have no analytics (vocabulary, CEFR, MATTR) and no AI reports, because both are built from the text.",
+      "privacy_retention_note": "Sessions you have not starred are deleted automatically after 30 days; starred ones stay until you delete them. You can delete any session yourself at any time from the Sessions page.",
       "privacy_anon_info": "When enabled, we collect only aggregate linguistic measurements about your sessions — duration, word counts, fluency, estimated level. We do not collect transcript content, your name, or the exact time. Each row is pseudonymous: it holds a fingerprint, not your identifier, and it is deleted when you delete the session or the account. They are used to improve our analysis models and you can turn this off whenever you like.",
       "your_name": "Your name",
 
