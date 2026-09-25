@@ -609,6 +609,8 @@
   function renderRealPath(pane, due, fragile, fresh, lang) {
     var s = load();
     var html = pathIntroHtml();
+    // ── The guided course first: it IS the path, and it is what the pane is named after. ──
+    html += courseSectionHtml();
     // ── Spaced review (always visible on both English & Italiano) ──
     // Profilo-style section: title + short text on the left, content on the right
     // (1fr / 2.2fr on desktop, stacked on mobile).
@@ -694,8 +696,14 @@
   }
 
   /* ── Bundled course — not-logged-in preview only ── */
-  function renderBundledPath(pane) {
-    var html = pathIntroHtml() + '<div class="lr-preview-note">' + t('learner_login_hint') + '</div>';
+  // The guided course tree (7 units x 3 lessons + a unit test each).
+  // ⚠️ This markup is the ONLY place Learner.openLesson / Learner.openTest are wired up, so
+  // while it lived inside a renderer that only ran for logged-out visitors, a signed-in user
+  // had no way into the course at all: 21 lessons, the whole lesson player, the quizzes and the
+  // unit tests were unreachable. It is now shared by the signed-in path and the logged-out
+  // teaser, so the course is reachable from both.
+  function courseTreeHtml() {
+    var html = '';
     var s = load();
     COURSE.levels.forEach(function (lv) {
       html += '<div style="margin:22px 0 12px"><span style="font-size:13px;font-weight:800;color:' + lv.color + ';text-transform:uppercase;letter-spacing:.1em">' + esc(lv.icon + ' ' + lv.label) + '</span></div>';
@@ -738,7 +746,27 @@
         html += '</div></div>';
       });
     });
-    pane.innerHTML = html;
+    return html;
+  }
+
+  // The course as a titled section: "Percorso · 3/21 lezioni completate" above the tree.
+  // Reuses learner_path + learner_lessons_completed, so no new i18n keys were needed.
+  function courseSectionHtml() {
+    var total = 0, done = 0;
+    COURSE.levels.forEach(function (lv) {
+      lv.units.forEach(function (u) {
+        total += u.lessons.length;
+        done += unitLessonsDone(u);
+      });
+    });
+    return '<div class="lr-section-head lr-sec-mt"><span class="lr-section-title">' + t('learner_path') + '</span>' +
+      '<span class="lr-section-sub">' + done + '/' + total + ' ' + t('learner_lessons_completed') + '</span></div>' +
+      courseTreeHtml();
+  }
+
+  // Logged-out teaser: the same tree, with the sign-in note on top.
+  function renderBundledPath(pane) {
+    pane.innerHTML = pathIntroHtml() + '<div class="lr-preview-note">' + t('learner_login_hint') + '</div>' + courseTreeHtml();
     i18nScope(pane);
   }
 
@@ -1171,6 +1199,7 @@
     if (posEl) posEl.textContent = Math.min(session.cardIdx + 1, session.cards.length) + ' / ' + session.cards.length;
     var xpEl = $('#icsXp');
     if (xpEl) xpEl.textContent = '⭐ ' + (session.earned || 0);
+    updateProgress();
   }
 
   /* ── Per-bank Allena session progress (persisted) ──
@@ -1838,6 +1867,20 @@
   }
 
   /* ── Navigation ── */
+  /* The topbar — progress bar included — is built once by renderOverlay(). Step changes only
+   * re-render the STAGE, so the fill sat at 0% for the whole lesson. Update just the bar here
+   * rather than calling renderOverlay() again, which would rebuild the stage and restart the
+   * first card's audio. */
+  function updateProgress() {
+    if (!session) return;
+    var fill = $('#learnerOverlay .progress-fill');
+    if (!fill) return;
+    var isBank = session.mode === 'bank';
+    var total = isBank ? (session.cards ? session.cards.length : 0) : (session.steps ? session.steps.length : 0);
+    var cur = isBank ? (session.cardIdx || 0) : session.idx;
+    fill.style.width = (total ? Math.round((cur / total) * 100) : 0) + '%';
+  }
+
   function nextStep() {
     if (!session) return;
     session.idx += 1;
@@ -1847,6 +1890,7 @@
       trackMissionForSession((session.idx / session.steps.length) * 100, false);
     }
     renderStep();
+    updateProgress();
   }
 
   function listenAgain() {
