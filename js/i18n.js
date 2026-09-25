@@ -534,11 +534,11 @@
       "save_settings": "Salva impostazioni",
       "website_language": "Lingua e captions",
       "website_language_short": "Lingua sito",
-      "anonymous_sharing_label": "Condivisione anonima",
+      "anonymous_sharing_label": "Misure aggregate delle sessioni",
       "saved_check": "✓ Salvato",
       "privacy_sessions_label": "Salva le sessioni",
-      "privacy_sessions_info": "Quando attivo, le tue sessioni (trascrizioni, parole, metriche) vengono salvate su Supabase e compaiono nella tab Trascrizioni. Se lo disattivi, la sessione resta registrata per il conteggio dei minuti ma il testo della trascrizione viene eliminato alla fine della sessione.",
-      "privacy_anon_info": "Se attivo, raccogliamo misure sulle tue sessioni (durata, numero di parole, fluidità, livello stimato) in forma anonima: nessun identificativo del tuo account, nessun contenuto della trascrizione e nessun orario preciso. Servono a migliorare i modelli di analisi. Puoi disattivarlo in qualsiasi momento.",
+      "privacy_sessions_info": "Quando attivo, le tue sessioni (trascrizioni, parole, metriche) vengono salvate su Supabase e compaiono nella tab Trascrizioni. Se lo disattivi, la sessione resta registrata per il conteggio dei minuti ma il testo della trascrizione viene eliminato alla fine della sessione: per quelle sessioni non saranno più disponibili né le analisi (vocabolario, CEFR, MATTR) né i Report AI, perché entrambi si costruiscono dal testo.",
+      "privacy_anon_info": "Se attivo, raccogliamo solo misure linguistiche aggregate sulle tue sessioni — durata, numero di parole, fluidità, livello stimato. Non raccogliamo il contenuto delle trascrizioni, non il tuo nome, e nulla che sia collegato al tuo account; non registriamo l'orario esatto. Servono a migliorare i modelli di analisi e puoi disattivarle quando vuoi.",
       "your_name": "Il tuo nome",
 
       // ── Start Session ──
@@ -1712,11 +1712,11 @@
       "save_settings": "Save settings",
       "website_language": "Website language",
       "website_language_short": "Website language",
-      "anonymous_sharing_label": "Anonymous sharing",
+      "anonymous_sharing_label": "Aggregate session metrics",
       "saved_check": "✓ Saved",
       "privacy_sessions_label": "Save sessions",
-      "privacy_sessions_info": "When enabled, your sessions (transcripts, words, metrics) are saved to Supabase and appear in the Sessions tab. If you turn this off, the session is still recorded for billing but the transcript text is deleted at the end of the session.",
-      "privacy_anon_info": "When enabled, we collect measurements about your sessions (duration, word counts, fluency, estimated level) in anonymous form: no account identifier, no transcript content and no precise timestamp. They are used to improve our analysis models. You can turn this off at any time.",
+      "privacy_sessions_info": "When enabled, your sessions (transcripts, words, metrics) are saved to Supabase and appear in the Sessions tab. If you turn this off, the session is still recorded for billing but the transcript text is deleted at the end of the session: those sessions then have no analytics (vocabulary, CEFR, MATTR) and no AI reports, because both are built from the text.",
+      "privacy_anon_info": "When enabled, we collect only aggregate linguistic measurements about your sessions — duration, word counts, fluency, estimated level. We do not collect transcript content, your name, or anything linked to your account, and we do not record the exact time. They are used to improve our analysis models and you can turn this off whenever you like.",
       "your_name": "Your name",
 
       // ── Start Session ──
