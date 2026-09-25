@@ -675,9 +675,12 @@
     var due = await srcReview('due', lang);
     var fragile = await srcReview('fragile', lang);
     var fresh = await srcReview('new', lang);
-    // Word banks live on the Word-banks tab; the path always shows the two
-    // missions + spaced review (per language) + recent mistakes.
-    renderRealPath(pane, due, fragile, fresh, lang);
+    // The goal tracker counts the learner's OWN words by part of speech, so it needs the whole
+    // vocabulary, not just the review queues. srcReviewAll is cached — one query.
+    var vocab = await srcReviewAll(lang);
+    // Word banks live on the Word-banks tab; the path always shows the missions + spaced review
+    // (per language) + recent mistakes.
+    renderRealPath(pane, due, fragile, fresh, lang, vocab);
   }
 
   function renderEmptyPath(pane) {
@@ -695,7 +698,7 @@
     '</div>';
   }
 
-  function renderRealPath(pane, due, fragile, fresh, lang) {
+  function renderRealPath(pane, due, fragile, fresh, lang, vocab) {
     var s = load();
     var html = pathIntroHtml();
     // ── The guided course first: it IS the path, and it is what the pane is named after. ──
@@ -729,26 +732,32 @@
       '</div>';
     });
     html += '</div></div>';
-    // ── Missions: one around the user's goals, one on essential thematic vocab ──
-    var mission = missionCached();
+    // ── Missions: a generated GOAL, the fixed thematic mission, one daily suggestion ──
     html += '<div class="lr-section-grid lr-sec-mt"><div class="lr-prof-label">' +
       '<h3 class="c-section-h3">' + t('learner_missions') + '</h3>' +
       '<p class="c-section-sub">' + t('learner_missions_sub') + '</p></div>' +
       '<div class="lr-missions-grid">';
-    // Card 1 — objectives-driven AI mission (from the user's goals)
-    html += '<div class="lr-mission-card' + (mission ? ' ready' : '') + '">' +
+    // Card 1 — the goal, WITH its tracker. Generating no longer launches a session: the card fills
+    // in, and Start runs a session built from the goal's own words.
+    var goal = goalGet();
+    var gs = goalState(goal, vocab);
+    html += '<div class="lr-mission-card' + (goal ? ' ready' : '') + '">' +
       '<div class="lr-mission-glow">🎯</div>' +
       '<div class="lr-mission-body">' +
-        (mission
-          ? '<div class="lr-mission-title">' + esc(mission.title || '') + '</div>' +
-            (mission.objective ? '<div class="lr-mission-obj">' + esc(mission.objective) + '</div>' : '') +
-            '<div class="lr-mission-sub">' + esc(mission.subtitle || '') + '</div>'
-          : '<div class="lr-mission-title">' + t('learner_mission_cta') + '</div>' +
-            '<div class="lr-mission-obj">' + t('learner_mission_cta_sub') + '</div>') +
+        (goal
+          ? '<div class="lr-mission-title">' + esc(goalTitle(goal)) + '</div>' +
+            '<div class="lr-mission-obj">' + t('learner_goal_in_days').replace('{n}', goal.windowDays) + ' · ' +
+              (gs.done ? t('learner_goal_done') : t('learner_goal_left').replace('{n}', gs.daysLeft)) + '</div>' +
+            '<div class="lr-goal-track"><div class="lr-goal-fill' + (gs.done ? ' done' : '') + '" style="width:' + gs.pct + '%"></div></div>' +
+            '<div class="lr-mission-sub">' + gs.current + ' / ' + gs.target + ' · ' + gs.pct + '%</div>'
+          : '<div class="lr-mission-title">' + t('learner_goal_cta') + '</div>' +
+            '<div class="lr-mission-obj">' + t('learner_goal_cta_sub') + '</div>') +
       '</div>' +
       '<div class="lr-mission-actions">' +
-        '<button type="button" class="primary-btn lr-mission-go" onclick="Learner.confirmMission()">' + (mission ? t('learner_mission_start') : t('learner_mission_generate')) + '</button>' +
-        (mission ? '<button type="button" class="lesson-link lr-mission-new" onclick="Learner.confirmNewMission()" title="' + t('learner_mission_new') + (regenRemaining() > 0 ? ' · ' + regenRemaining() + ' ' + t('learner_regen_left') : '') + '">↻</button>' : '') +
+        (goal
+          ? '<button type="button" class="primary-btn lr-mission-go" onclick="Learner.confirmMission()">' + t('learner_mission_start') + '</button>' +
+            '<button type="button" class="lesson-link lr-mission-new" onclick="Learner.newGoal()" title="' + t('learner_goal_new') + '">↻</button>'
+          : '<button type="button" class="primary-btn lr-mission-go" onclick="Learner.newGoal()">' + t('learner_mission_generate') + '</button>') +
       '</div>' +
     '</div>';
     // Card 2 — always-available thematic mission (essential, thematic vocab)
@@ -765,6 +774,22 @@
       '</div>' +
       '<div class="lr-mission-actions">' +
         '<button type="button" class="primary-btn" onclick="Learner.confirmThemeMission(this)">' + t('learner_mission_start') + '</button>' +
+      '</div>' +
+    '</div>';
+    // Card 3 — the ONE suggested daily mission, tracked by today's XP against the daily goal.
+    var dailyGoalXp = s.dailyGoal || 10;
+    var todayPct = Math.min(100, Math.round((s.todayXp / dailyGoalXp) * 100));
+    var dailyDone = s.todayXp >= dailyGoalXp;
+    html += '<div class="lr-mission-card daily' + (dailyDone ? ' ready' : '') + '">' +
+      '<div class="lr-mission-glow">☀️</div>' +
+      '<div class="lr-mission-body">' +
+        '<div class="lr-mission-title">' + t('learner_daily_title') + '</div>' +
+        '<div class="lr-mission-obj">' + t('learner_daily_sub').replace('{n}', dailyGoalXp) + '</div>' +
+        '<div class="lr-goal-track"><div class="lr-goal-fill' + (dailyDone ? ' done' : '') + '" style="width:' + todayPct + '%"></div></div>' +
+        '<div class="lr-mission-sub">' + (dailyDone ? t('learner_daily_done') : s.todayXp + ' / ' + dailyGoalXp + ' XP') + '</div>' +
+      '</div>' +
+      '<div class="lr-mission-actions">' +
+        '<button type="button" class="primary-btn" onclick="Learner.startDaily()">' + t('learner_mission_start') + '</button>' +
       '</div>' +
     '</div>';
     html += '</div></div>';
@@ -1557,6 +1582,110 @@
     }
     trackMission(session.lang, missionTypeOf(unit.id), pct, done, title, desc);
   }
+  /* ══ Goal missions ══
+   * A mission is a GOAL with a tracker — "reach 100 verbs in a week" — not a session. Generating
+   * one used to drop you straight into training; now it fills the card and you start it from there.
+   * Three cards exist: the generated goal, the fixed thematic mission, one daily suggestion. */
+  var GOAL_KEY = 'sottotitoli-learner-goal';
+  function goalGet() { try { return JSON.parse(localStorage.getItem(GOAL_KEY) || 'null'); } catch (e) { return null; } }
+  function goalSet(g) { try { localStorage.setItem(GOAL_KEY, JSON.stringify(g)); } catch (e) {} }
+
+  /* Which words count toward a metric. The `pos` values in the wild are messier than the schema
+   * suggests — VERB/NOUN/ADJ dominate, plus 'v'/'n'/'adj', '—' and null — so match the first letter
+   * and let anything unrecognised fall through to "any word". */
+  function posMatch(kind, w) {
+    var p = String((w && w.pos) || '').toUpperCase();
+    if (kind === 'verbs') return p.charAt(0) === 'V';
+    if (kind === 'nouns') return p.charAt(0) === 'N';
+    return true;
+  }
+  function goalCount(goal, vocab) {
+    if (!goal) return 0;
+    if (goal.metric === 'lessons') {
+      var s = load(), from = goal.createdAt || '';
+      return Object.keys(s.lessons || {}).filter(function (k) { return String(s.lessons[k]) >= from; }).length;
+    }
+    return (vocab || []).filter(function (w) { return posMatch(goal.metric, w); }).length;
+  }
+  function goalState(goal, vocab) {
+    if (!goal) return null;
+    var cur = goalCount(goal, vocab);
+    var daysLeft = goal.expiresAt ? Math.max(0, Math.ceil((Date.parse(goal.expiresAt) - Date.now()) / 86400000)) : 0;
+    return {
+      current: cur, target: goal.target,
+      pct: goal.target ? Math.min(100, Math.round((cur / goal.target) * 100)) : 0,
+      daysLeft: daysLeft, done: cur >= goal.target
+    };
+  }
+  function goalTitle(goal) {
+    if (!goal) return t('learner_goal_cta');
+    var key = goal.metric === 'verbs' ? 'learner_goal_verbs'
+      : goal.metric === 'nouns' ? 'learner_goal_nouns'
+      : goal.metric === 'lessons' ? 'learner_goal_lessons' : 'learner_goal_words';
+    return t(key).replace('{n}', goal.target);
+  }
+  /* Build a goal from the learner's REAL words: pick a metric that has something to work on and set
+   * the target a reachable step above where they are, so "reach 100 verbs" means their next 100. */
+  function goalCreate(vocab) {
+    var metric = 'lessons';
+    if (goalCount({ metric: 'verbs' }, vocab) >= 5) metric = 'verbs';
+    else if (goalCount({ metric: 'nouns' }, vocab) >= 5) metric = 'nouns';
+    else if ((vocab || []).length >= 5) metric = 'words';
+    var base = goalCount({ metric: metric }, vocab);
+    var step = metric === 'lessons' ? 3 : Math.max(10, Math.round((base * 0.25) / 10) * 10);
+    var days = 7;
+    var g = {
+      metric: metric, target: base + step, base: base, windowDays: days,
+      createdAt: todayStr(), expiresAt: new Date(Date.now() + days * 86400000).toISOString()
+    };
+    goalSet(g);
+    return g;
+  }
+  // A session that actually works ON the goal: listen / speak / match / quiz over its own words.
+  function goalSteps(goal, vocab, lang) {
+    var words = (vocab || []).filter(function (w) { return posMatch(goal.metric, w); })
+      .map(function (w) { return { it: w.word, en: w.translation || '', word: w.word, lang: lang, pos: w.pos || '', cefr: w.cefr || '', definition: '' }; });
+    if (words.length < 3) return [];
+    var steps = [];
+    sample(words, Math.min(5, words.length)).forEach(function (v) { steps.push({ type: 'listen', item: v }); });
+    sample(words, Math.min(3, words.length)).forEach(function (v) { steps.push({ type: 'speak', item: v }); });
+    var mp = sample(words, Math.min(4, words.length));
+    if (mp.length >= 3) steps.push({ type: 'match', pairs: shuffle(mp.map(function (v) { return { it: v.it, en: v.en }; })) });
+    var qp = sample(words, Math.min(5, words.length));
+    if (qp.length) steps.push({ type: 'mc', questions: qp.map(function (v) { return { prompt: v.en, answer: v.it, options: optionsFor(v.it) }; }) });
+    return steps;
+  }
+  function nextOpenLesson() {
+    var gl = globalLessons();
+    for (var i = 0; i < gl.length; i++) {
+      if (!lessonDone(gl[i].unit.id, gl[i].lesson.id)) return gl[i];
+    }
+    return null;
+  }
+  function newGoal() {
+    return srcReviewAll(learnerLang()).then(function (vocab) {
+      var g = goalCreate(vocab);
+      refresh();
+      toast(t('learner_goal_new') + ' · ' + goalTitle(g));
+    });
+  }
+  function startGoal() {
+    var goal = goalGet();
+    if (!goal) return newGoal();
+    return srcReviewAll(learnerLang()).then(function (vocab) {
+      if (goal.metric === 'lessons') {
+        var nxt = nextOpenLesson();
+        if (!nxt) { toast(t('learner_no_words_yet')); return; }
+        openLesson(nxt.unit.id, nxt.lesson.id);
+        return;
+      }
+      var steps = goalSteps(goal, vocab, learnerLang());
+      if (!steps.length) { toast(t('learner_no_words_yet')); return; }
+      openSession('mission', { id: 'goal:' + goal.metric, name: goalTitle(goal), lang: learnerLang() }, null, steps);
+    });
+  }
+  function startDaily() { return openPractice('quiz'); }
+
   function resumeMissionSession(saved) {
     if (!saved || saved.mode !== 'mission' || !saved.steps || !saved.steps.length) return false;
     if (saved.idx >= saved.steps.length) { clearMissionProg(); return false; }
@@ -1689,11 +1818,13 @@
     appConfirm(msg, function () { runGuarded(function () { return openReview(kind, lang); }, t('learner_loading')); }, t('learner_confirm_title'), icon);
   }
   function confirmMission() {
-    var mission = missionCached();
-    var msg = mission
-      ? t('learner_confirm_mission_start').replace('{name}', mission.title || '')
-      : t('learner_confirm_mission_generate');
-    appConfirm(msg, function () { runGuarded(function () { return openMission(); }, t('learner_loading')); }, t('learner_confirm_title'), '🎯');
+    var goal = goalGet();
+    if (!goal) {
+      appConfirm(t('learner_confirm_mission_generate'), function () { runGuarded(function () { return newGoal(); }, t('learner_loading')); }, t('learner_confirm_title'), '🎯');
+      return;
+    }
+    var msg = t('learner_confirm_mission_start').replace('{name}', goalTitle(goal));
+    appConfirm(msg, function () { runGuarded(function () { return startGoal(); }, t('learner_loading')); }, t('learner_confirm_title'), '🎯');
   }
   function confirmNewMission() {
     if (regenRemaining() <= 0) { appAlert(t('learner_regen_limit'), t('learner_confirm_title'), '↻'); return; }
@@ -2192,6 +2323,9 @@
     openThemeMission: openThemeMission,
     setThemeLen: setThemeLen,
     newMission: newMission,
+    newGoal: newGoal,
+    startGoal: startGoal,
+    startDaily: startDaily,
     closeSession: closeSession,
     requestClose: requestClose,
     nextStep: nextStep,
