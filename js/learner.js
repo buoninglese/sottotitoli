@@ -1621,9 +1621,14 @@
     ov.className = 'lesson-overlay';
     ov.innerHTML =
       '<div class="lesson-topbar">' +
-        '<button type="button" class="lt-close" onclick="Learner.closeSession()" title="' + t('learner_close') + '">✕</button>' +
         '<div class="lt-title">' + esc(title) + '</div>' +
         '<div class="lt-progress"><div class="progress-track"><div class="progress-fill" style="width:' + pct + '%"></div></div></div>' +
+        // Last in the row, with .lt-progress taking flex:1, so the X lands at the right edge.
+        // requestClose() rather than closeSession(): an unfinished session is worth a
+        // question, since closing it throws the work away without it counting.
+        '<button type="button" class="lt-close" onclick="Learner.requestClose()" title="' + t('learner_close') + '" aria-label="' + t('learner_close') + '">' +
+          '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>' +
+        '</button>' +
       '</div>' +
       '<div class="lesson-stage" id="learnerStage"></div>';
     rootEl.appendChild(ov);
@@ -1856,7 +1861,33 @@
     lines.forEach(function (txt, i) { setTimeout(function () { speak(txt, 0.95); }, i * 2600); });
   }
 
+  /* ── Leaving a session early ──
+   * endSession() is the only path that awards XP — closeSession() is a plain abort. The
+   * sidebar paints ABOVE the overlay (its stacking context outranks the overlay's
+   * z-index:9000), verified with a hit test, so switching tab is a real way out: it used to
+   * reach the MutationObserver in boot() and abort silently, with no hint the session would
+   * not count.
+   *
+   * Not every abort loses something, so only the lossy ones get a question:
+   *   - after the completion card (session.finished) there is nothing left to lose;
+   *   - mission mode is resumable — closeSession() saves progress and reopens on the same step;
+   *   - before the first answer there is nothing to lose either. */
+  function sessionAtRisk() {
+    if (!session || session.finished) return false;
+    if (session.mode === 'mission') return false;
+    return (session.idx || 0) > 0;
+  }
+
+  function requestClose(after) {
+    if (!sessionAtRisk()) { closeSession(); if (after) after(); return; }
+    var go = function () { closeSession(); if (after) after(); };
+    if (typeof appConfirm === 'function') {
+      appConfirm(t('learner_quit_msg'), go, t('learner_quit_title'), '⚠️', t('learner_quit_ok'), true);
+    } else if (w.confirm(t('learner_quit_msg'))) { go(); }
+  }
+
   function endSession() {
+    session.finished = true; // the completion card is up: leaving now costs nothing
     var mode = session.mode;
     var unit = session.unit, lesson = session.lesson;
     var earned = session.earned;
@@ -1963,7 +1994,27 @@
       if (tab) setTimeout(function () { showPane(tab.getAttribute('data-subtab')); }, 20);
     });
 
-    // If the panel is deactivated (user switches tab) while a session is open, close it
+    /* Switching tab mid-session, which is possible because the sidebar sits above the overlay.
+     * Two things have to hold here:
+     *   - catch it in the CAPTURE phase. theme-2.js binds the panel switch directly on each
+     *     .nav-item (target phase), so a bubble-phase listener here would run only after the
+     *     panel had already changed;
+     *   - replay the click once the user confirms, because we cannot let the original one
+     *     through — it would switch the panel before we had a chance to ask.
+     * navAllowed permits exactly one replay. A programmatic nav.click() from elsewhere on the
+     * page (the hero cards do this) also travels the capture phase, so it gets asked too. */
+    var navAllowed = false;
+    document.addEventListener('click', function (e) {
+      var nav = e.target && e.target.closest ? e.target.closest('[data-panel]') : null;
+      if (!nav || !sessionAtRisk()) return;
+      if (nav.getAttribute('data-panel') === 'learner') return;
+      if (navAllowed) { navAllowed = false; return; }
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      requestClose(function () { navAllowed = true; nav.click(); });
+    }, true);
+
+    // Backstop for any other way the panel gets deactivated while a session is open
     var panelEl = $('#pnl-learner');
     if (panelEl && typeof MutationObserver !== 'undefined') {
       new MutationObserver(function () {
@@ -1993,6 +2044,7 @@
     setThemeLen: setThemeLen,
     newMission: newMission,
     closeSession: closeSession,
+    requestClose: requestClose,
     nextStep: nextStep,
     listenAgain: listenAgain,
     speakText: speakText,

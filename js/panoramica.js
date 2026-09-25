@@ -7077,48 +7077,10 @@
         } catch(e) { appAlert('Errore: ' + e.message, 'Errore', '❌'); }
       };
 
-      // ── Generic styled modal — replaces native alert() / confirm() / prompt() ──
-      window._appModal = { mode: null, cb: null };
-      function appModalOpen(opts) {
-        opts = opts || {};
-        window._appModal = { mode: opts.mode || 'alert', cb: opts.onOk || opts.onYes || null };
-        var t = document.getElementById('appModalTitle'); if (t) t.textContent = opts.title || 'Sottotitoli';
-        var m = document.getElementById('appModalMsg'); if (m) m.textContent = opts.msg || '';
-        var i = document.getElementById('appModalIcon'); if (i) i.textContent = opts.icon || 'ℹ️';
-        var inputWrap = document.getElementById('appModalInputWrap');
-        var input = document.getElementById('appModalInput');
-        var cancel = document.getElementById('appModalCancel');
-        var okBtn = document.getElementById('appModalOkBtn');
-        if (inputWrap) inputWrap.style.display = opts.mode === 'prompt' ? 'block' : 'none';
-        if (input) { input.value = opts.value || ''; if (opts.placeholder) input.placeholder = opts.placeholder; }
-        if (cancel) cancel.style.display = opts.mode === 'alert' ? 'none' : '';
-        if (okBtn) {
-          okBtn.textContent = opts.okLabel || (opts.mode === 'confirm' ? 'Conferma' : 'OK');
-          if (opts.danger) { okBtn.style.background = '#ef4444'; okBtn.style.color = '#fff'; }
-          else { okBtn.style.background = 'var(--cyan)'; okBtn.style.color = 'var(--chip-active-text,#fff)'; }
-        }
-        var o = document.getElementById('appModalOverlay'); if (o) o.style.display = 'flex';
-        if (opts.mode === 'prompt' && input) setTimeout(function(){ input.focus(); input.select(); }, 30);
-      }
-      window.appAlert = function(msg, title, icon) { appModalOpen({ mode: 'alert', msg: msg, title: title || 'Sottotitoli', icon: icon || 'ℹ️', okLabel: 'OK' }); };
-      window.appConfirm = function(msg, onYes, title, icon) { appModalOpen({ mode: 'confirm', msg: msg, onYes: onYes, title: title || 'Conferma', icon: icon || '❓', okLabel: 'Conferma' }); };
-      window.appPrompt = function(msg, onOk, title, icon, placeholder, value) { appModalOpen({ mode: 'prompt', msg: msg, onOk: onOk, title: title || 'Input', icon: icon || '✏️', okLabel: 'OK', placeholder: placeholder || '', value: value || '' }); };
-      window.appModalClose = function() {
-        var o = document.getElementById('appModalOverlay'); if (o) o.style.display = 'none';
-        window._appModal = { mode: null, cb: null };
-      };
-      window.appModalOk = function() {
-        var m = window._appModal; var cb = m.cb;
-        var val = '';
-        if (m.mode === 'prompt') val = (document.getElementById('appModalInput') || {}).value || '';
-        var o = document.getElementById('appModalOverlay'); if (o) o.style.display = 'none';
-        window._appModal = { mode: null, cb: null };
-        if (cb) { if (m.mode === 'prompt') cb(val); else cb(); }
-      };
-      // Esc closes the modal
-      document.addEventListener('keydown', function(e) {
-        if (e.key === 'Escape') { var o = document.getElementById('appModalOverlay'); if (o && o.style.display === 'flex') appModalClose(); }
-      });
+      // ── Styled modal (appAlert / appConfirm / appPrompt) ──
+      // Moved to js/app-modal.js and loaded from the page scripts, because this IIFE only
+      // runs once the Word banks panel first renders — which left window.appConfirm
+      // undefined for every other entry point, including the learner's exit warning.
 
       // ── Delete bank (styled confirm + animated card removal) ──
       window.wbDeleteBank = function(bankId, name) {
