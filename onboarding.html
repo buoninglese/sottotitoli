@@ -1148,7 +1148,7 @@
   <!-- 1. Dependencies -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <!-- 2. Config (must come before auth) -->
-  <script src="config.js?v=5"></script>
+  <script src="config.js?v=6"></script>
   <!-- 3. Auth (creates window.sottotitoliSupabase) -->
   <script src="js/auth.js?v=1"></script>
   <!-- 4. Theme -->
@@ -2587,6 +2587,14 @@
         return;
       }
 
+      // Whether a report exists at all — this drives the tail of this function.
+      // Declared OUTSIDE the guard below on purpose: a report cached from earlier
+      // in the session must also get the explicit "Vai alla Panoramica" button,
+      // otherwise it would take the auto-redirect branch and navigate away
+      // before the user could read it. `var` here is function-scoped, so the
+      // assignment inside the guard updates this same binding.
+      var reportGenerated = !!(onboardData['_ai_report'] || aiInsights);
+
       // Guard: if report hasn't been generated yet, try once with a timeout.
       // If the AI endpoint is down or slow, let the user proceed — the report
       // will be generated asynchronously and appear on their dashboard later.
@@ -2594,11 +2602,16 @@
         btnFinish.disabled = true;
         btnFinish.innerHTML = '<span class="spin" style="width:16px;height:16px;border:2px solid rgba(0,0,0,.3);border-top-color:#000;border-radius:50%;animation:spin .7s linear infinite;"></span> Generando report…';
 
-        var reportGenerated = false;
+        // Assignment, not a fresh declaration — see the note above the guard.
+        reportGenerated = false;
         try {
-          // Race: AI report generation vs 15-second timeout
+          // Race: AI report generation vs a timeout.
+          // 45s, not 15s — a real run exceeded 15s, which made the flow look
+          // broken and led the user to click again, starting a SECOND generation.
+          // The spinner covers the whole wait, so a longer ceiling costs nothing
+          // but a longer spin.
           var timeoutPromise = new Promise(function(_, reject) {
-            setTimeout(function() { reject(new Error('timeout')); }, 15000);
+            setTimeout(function() { reject(new Error('timeout')); }, 45000);
           });
           var result = await Promise.race([generateStarterReport(), timeoutPromise]);
           if (result) {
@@ -2609,13 +2622,21 @@
             if (rc && result.report_md) rc.innerHTML = markedToHtml(result.report_md);
             var rs = document.getElementById('starterReportSection');
             if (rs) rs.style.display = 'block';
+            // ⚠️ PERSIST IT. This was the missing call. saveAiInsightsToSupabase()
+            // was defined and invoked from NOWHERE, so the starter report existed
+            // only in localStorage and was lost on the next device or cache clear.
+            await saveAiInsightsToSupabase(result);
           }
         } catch(e) {
           console.warn('finishOnboarding: report generation failed or timed out (' + e.message + '), proceeding without it');
         }
 
         if (!reportGenerated) {
-          // Mark that the report should be generated async later
+          // ⚠️ This flag used to be set under a comment promising the report would
+          // be "generated asynchronously and appear on their dashboard later".
+          // NOTHING reads `_ai_report_pending`, so that promise was never kept.
+          // The dashboard has its own "Genera report" button and that is now the
+          // real retry path, because the report is persisted when it succeeds.
           onboardData['_ai_report_pending'] = true;
           persist();
         }
@@ -2640,7 +2661,21 @@
         return;
       }
 
-      // Navigate to Panoramica (report already generated — no re-generation)
+      // ⚠️ DO NOT auto-redirect when a report was just generated.
+      // This navigated 800ms after rendering the report, so it appeared and
+      // vanished before it could be read — reported as "I didn't have a chance to
+      // read my report". Show an explicit button and let the user leave when ready.
+      if (reportGenerated) {
+        btnFinish.disabled = false;
+        btnFinish.style.opacity = '1';
+        btnFinish.innerHTML = '<i class="fa-solid fa-arrow-right"></i> Vai alla Panoramica';
+        btnFinish.onclick = function() { window.location.href = 'panoramica.html'; };
+        var _rs = document.getElementById('starterReportSection');
+        if (_rs) _rs.scrollIntoView({ behavior: 'smooth' });
+        return;
+      }
+
+      // No report this time — the dashboard owns the retry, so just move on.
       btnFinish.innerHTML = 'Reindirizzamento… <span class="spin" style="display:inline-block;width:14px;height:14px;border:2px solid rgba(0,0,0,.3);border-top-color:#000;border-radius:50%;animation:spin .7s linear infinite;vertical-align:middle;margin-left:6px;"></span>';
       setTimeout(function() {
         window.location.href = 'panoramica.html';
@@ -2681,6 +2716,8 @@
         if (done) done.style.display = 'block';
         if (status) status.textContent = 'Il tuo report personalizzato è pronto!';
         aiInsights = result;
+        // Persist it here too — same missing call as the finish path.
+        await saveAiInsightsToSupabase(result);
         buildDashboard();
         // Update Completa button — report is ready, enable it
         updateUI();
@@ -2739,38 +2776,49 @@
     }
 
     // ── Save AI insights to Supabase ──
+    // ⚠️ THIS IS THE ONLY WRITER OF starter_report_md, AND IT WAS CALLED FROM
+    // NOWHERE. The starter report was rendered from localStorage and never
+    // persisted, so the profile's report card fell back to a stale July row.
+    //
+    // DELIBERATELY NARROW. Wiring it up "as written" would also have written:
+    //   * profiles.learning_profile = the AI's focus_areas — but the normal
+    //     onboarding save already puts the user's OWN `difficulties` there. One
+    //     column, two meanings; this would have silently redefined what the
+    //     profile shows.
+    //   * profiles.goal_primary = the AI's objectives, replacing the user's own
+    //     phrasing of their goals.
+    //   * short_term_goal / long_term_goal on onboarding_responses, overwriting
+    //     the raw answers the user actually gave.
+    // So it writes the REPORT only. If AI-refined goals should replace the user's
+    // own one day, that is a product decision deserving its own column rather than
+    // a silent overwrite of two others.
+    //
+    // Errors are CHECKED, not swallowed: supabase-js returns `{ error }` instead
+    // of throwing, so an unchecked await here fails invisibly — which is exactly
+    // how the report went missing in the first place.
     async function saveAiInsightsToSupabase(aiResult) {
-      if (!currentUserId || !aiResult) return;
+      if (!currentUserId || !aiResult || !aiResult.report_md) return false;
       try {
         var sb = window.sottotitoliSupabase;
-        if (!sb) return;
+        if (!sb) return false;
 
-        var obj = aiResult.objectives || {};
-        var focusAreas = aiResult.focus_areas || [];
-
-        // Update onboarding_responses with AI output
-        await sb.from('onboarding_responses').upsert({
+        // Upsert is safe against the full-row save that runs afterwards: an upsert
+        // only SETs the columns present in the payload, so starter_report_md is
+        // not wiped by the later onboardingRow write.
+        var _r = await sb.from('onboarding_responses').upsert({
           user_id: currentUserId,
-          short_term_goal: obj.short_term || null,
-          long_term_goal: obj.long_term || null,
-          starter_report_md: aiResult.report_md || null,
+          starter_report_md: aiResult.report_md,
           updated_at: new Date().toISOString()
         }, { onConflict: 'user_id' });
 
-        // Update profiles with AI-derived fields
-        var profileUpdate = {
-          id: currentUserId,
-          goal_primary: (obj.short_term || '') + (obj.long_term ? ' | LT: ' + obj.long_term : ''),
-          learning_profile: focusAreas.length > 0 ? JSON.stringify(focusAreas) : undefined,
-          updated_at: new Date().toISOString()
-        };
-        Object.keys(profileUpdate).forEach(function(k) {
-          if (profileUpdate[k] === undefined) delete profileUpdate[k];
-        });
-        await sb.from('profiles').upsert(profileUpdate, { onConflict: 'id' });
-
+        if (_r.error) {
+          console.error('saveAiInsights: starter_report_md NOT saved:', _r.error.message);
+          return false;
+        }
+        return true;
       } catch(e) {
-        console.warn('saveAiInsights error:', e.message);
+        console.error('saveAiInsights threw:', e);
+        return false;
       }
     }
 

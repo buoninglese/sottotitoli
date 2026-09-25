@@ -1,6 +1,27 @@
 (function(){
   'use strict';
 
+  // ═══ "Altre lingue" (Insights → Overview) ═══
+  // ⚠️ The element EXISTED AND NOTHING EVER WROTE IT. `insightsSecondLangs` was
+  // looked up in two functions and assigned in neither, so the static placeholder
+  // from panoramica.html ("Completa l'onboarding.") stayed on screen even for a
+  // user who had answered the question. The session-derived block further down
+  // only overwrites it once the user already has sessions in a second language —
+  // which is circular: it is blank exactly when a new user is looking at it.
+  var _LANG_NAMES = { it:'Italiano', en:'English', nl:'Nederlands', fr:'Français', de:'Deutsch', es:'Español', pt:'Português', pl:'Polski', ja:'日本語', zh:'中文', ru:'Русский', ar:'العربية' };
+  function _setSecondLangs(codes) {
+    var el = document.getElementById('insightsSecondLangs');
+    if (!el || !codes) return;
+    if (!Array.isArray(codes)) codes = [codes];
+    var names = codes.map(function(c){ return _LANG_NAMES[c] || c; }).filter(Boolean);
+    if (!names.length) return;
+    el.textContent = names.join(', ');
+    // ⚠️ Drop data-i18n, or the i18n walker re-applies "Completa l'onboarding." on
+    // the next language switch and silently reverts this. Same trap as the
+    // leaf-span rule: textContent belongs to whoever wrote it last.
+    el.removeAttribute('data-i18n');
+  }
+
   // ═══ Load onboarding objectives into Obiettivi subtab ═══
   function loadOnboardingObjectives() {
     var stEl = document.getElementById('goalBreveTesto');
@@ -52,6 +73,13 @@
                 }).filter(Boolean);
               }
             }
+            // "Altre lingue" lives on onboarding_responses, not profiles, so it
+            // needs its own read.
+            sb.from('onboarding_responses').select('interested_languages').eq('user_id', r.data.session.user.id).maybeSingle().then(function(orr) {
+              if (orr.data && orr.data.interested_languages && orr.data.interested_languages.length) {
+                _setSecondLangs(orr.data.interested_languages);
+              }
+            });
             // Populate Profilo → Lingue
             if (res.data.native_lang) {
               var natEl2 = document.getElementById('profileNativeLang');
@@ -88,6 +116,11 @@
         if (insNatEl) insNatEl.textContent = natN ? (langNamesN[natN] || natN) : (window._sottotitoliProfile && window._sottotitoliProfile.native_lang ? (langNamesN[window._sottotitoliProfile.native_lang] || window._sottotitoliProfile.native_lang) : '—');
         if (insGoalShortEl) insGoalShortEl.textContent = stGoal || '—';
         if (insGoalLongEl) insGoalLongEl.textContent = ltGoal || '—';
+      } catch(e) {}
+      // "Altre lingue" — instant from localStorage; a Supabase read may refine it.
+      try {
+        var obSL = JSON.parse(localStorage.getItem('sottotitoli_onboarding') || '{}');
+        if (obSL['spoken_languages']) _setSecondLangs(obSL['spoken_languages']);
       } catch(e) {}
       // Insights → Overview → Focus areas
       if (focusEl && difficulties.length > 0) {

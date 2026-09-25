@@ -26,20 +26,28 @@
                   var start = (currentPage - 1) * REPORTS_PER_PAGE;
                   var page = allReports.slice(start, start + REPORTS_PER_PAGE);
                   tbody.innerHTML = page.map(function(r){
-                    var name = r.summary || r.report_type || 'Report ' + (r.id || '').substring(0,8);
+                    // ⚠️ The starter report's `summary` IS the full report text, so it
+                    // must never be used as a title — it would render the entire report
+                    // inline in the table cell. Use its explicit type label instead.
+                    var isStarter = r._isStarter === true;
+                    var name = isStarter ? (r.report_type || 'Report iniziale')
+                                         : (r.summary || r.report_type || 'Report ' + (r.id || '').substring(0,8));
                     var date = r.created_at ? new Date(r.created_at).toLocaleDateString('it-IT', {day:'2-digit', month:'short', year:'numeric'}) : '—';
                     var status = r.status || 'completed';
                     var conf = r.confidence || r.overall_score;
                     var score = conf ? conf + '/100' : '';
                     var isDone = status === 'completed';
                     var isFailed = status === 'failed';
+                    // No session and no id in session_ai_reports, so PDF export can
+                    // never resolve it — View only.
+                    var canDownload = isDone && !isStarter;
                     return '<tr class="hv-bg" style="border-bottom:1px solid var(--line)">' +
                       '<td style="padding:16px 24px"><div style="font-weight:600">'+escapeHtml(name)+'</div>'+(score?'<div style="font-size:13px;color:var(--text-soft)">Confidence: '+escapeHtml(score)+'</div>':'')+'</td>' +
                       '<td style="padding:16px 24px;color:var(--text-soft);font-size:13px">'+date+'</td>' +
                       '<td style="padding:16px 24px">'+statusBadge(status)+'</td>' +
                       '<td style="padding:16px 24px;text-align:right">' +
                         '<div style="display:flex;justify-content:flex-end;gap:8px">' +
-                          (isDone ? '<button title="Download PDF" style="padding:8px;background:none;border:1px solid var(--line);border-radius:8px;cursor:pointer;color:var(--text-soft)" onclick="event.stopPropagation();downloadReportPDF(\''+safeId(r.id)+'\')"><span class="material-symbols-outlined" style="font-size:18px">download</span></button>' : '<button disabled style="padding:8px;background:none;border:1px solid var(--line);border-radius:8px;opacity:.3;cursor:not-allowed"><span class="material-symbols-outlined" style="font-size:18px">download</span></button>') +
+                          (canDownload ? '<button title="Download PDF" style="padding:8px;background:none;border:1px solid var(--line);border-radius:8px;cursor:pointer;color:var(--text-soft)" onclick="event.stopPropagation();downloadReportPDF(\''+safeId(r.id)+'\')"><span class="material-symbols-outlined" style="font-size:18px">download</span></button>' : '<button disabled style="padding:8px;background:none;border:1px solid var(--line);border-radius:8px;opacity:.3;cursor:not-allowed"><span class="material-symbols-outlined" style="font-size:18px">download</span></button>') +
                           (isDone ? '<button style="padding:6px 16px;background:var(--bg);color:var(--cyan);border:1px solid var(--cyan);border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;font-family:\'Manrope\',sans-serif" onclick="event.stopPropagation();viewReportDetail(\''+safeId(r.id)+'\')">View</button>' :
                            isFailed ? '<button style="padding:6px 16px;background:none;color:#E11D48;border:1px solid #E11D48;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;font-family:\'Manrope\',sans-serif" onclick="event.stopPropagation();retryReport(\''+safeId(r.id)+'\')">Retry</button>' :
                            '<button disabled style="padding:6px 16px;background:none;color:var(--text-soft);border:1px solid var(--line);border-radius:8px;font-size:13px;opacity:.5;cursor:not-allowed;font-family:\'Manrope\',sans-serif">Pending</button>') +

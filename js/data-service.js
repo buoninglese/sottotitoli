@@ -277,6 +277,31 @@
 
     if (r.error) { console.warn('ai reports:', r.error.message); return []; }
     var data = r.data || [];
+
+    // ⭐ The starter report is an ONBOARDING artifact, not a session report, so it
+    // lives in onboarding_responses.starter_report_md and can never appear in this
+    // list on its own. Shown FIRST because it is the first report a user receives.
+    // Fetched separately rather than joined: the two tables share only user_id.
+    try {
+      var o = await sb().from('onboarding_responses')
+        .select('starter_report_md,onboarding_completed_at,updated_at')
+        .eq('user_id', userId)
+        .maybeSingle();
+      if (o.data && o.data.starter_report_md) {
+        data = [{
+          id: 'starter-report',
+          summary: o.data.starter_report_md,
+          report_type: 'Report iniziale',
+          created_at: o.data.onboarding_completed_at || o.data.updated_at,
+          status: 'completed',
+          _isStarter: true
+        }].concat(data);
+      }
+    } catch (e) {
+      // Never break the report list because the starter report could not be read.
+      console.warn('starter report:', e && e.message);
+    }
+
     cacheSet('aiReports', data);
     return data;
   }

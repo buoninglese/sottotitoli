@@ -25,12 +25,30 @@
  *
  * ⚠️ Consequence: a console.log added later will be silent in production by
  * design. If a log is needed in production, use console.warn or append ?debug=1.
+ *
+ * It PERSISTS for the rest of the tab (sessionStorage), because a query parameter
+ * does not survive a redirect and the app redirects between pages constantly —
+ * onboarding → panoramica, caption ↔ panoramica. Turning it off: ?debug=0.
  */
 (function(){
   var host = location.hostname;
   var deployed = /(^|\.)sottotitoli\.pro$/i.test(host)
               || /(^|\.)buoninglese\.github\.io$/i.test(host);
-  var forced = /[?&]debug=1(&|$)/.test(location.search);
+
+  // ⚠️ A query parameter does NOT survive navigation. Observed on the iOS test:
+  // ?debug=1 came back as `lang=…&mode=…` because the app had redirected, so the
+  // escape hatch — built specifically to make logs available during a phone test
+  // — was switched off by the very navigation it was needed across.
+  // sessionStorage carries it between pages in the SAME tab and dies with the tab,
+  // which is the right lifetime for a debugging flag.
+  var forced  = /[?&]debug=1(&|$)/.test(location.search);
+  var cleared = /[?&]debug=0(&|$)/.test(location.search);
+  try {
+    if (cleared) sessionStorage.removeItem('sottotitoli-debug');
+    else if (forced) sessionStorage.setItem('sottotitoli-debug', '1');
+    else if (sessionStorage.getItem('sottotitoli-debug') === '1') forced = true;
+  } catch(e) { /* private mode or storage blocked — URL parameter still works */ }
+
   var verbose = !deployed || forced;
 
   window.SOTTOTITOLI_DEBUG = verbose;
