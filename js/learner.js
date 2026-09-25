@@ -891,7 +891,38 @@
   }
 
   /* ═══════════════════ LESSON / TEST / PRACTICE sessions ═══════════════════ */
+  /* The lesson overlay is appended into #learnerRoot, which is INSIDE #pnl-learner,
+   * and every style for it is scoped to that panel — #pnl-learner .lesson-overlay
+   * { position:fixed; inset:0; z-index:9000 } and all the .ics-* card-stack rules.
+   * A panel without .active is display:none (css/theme-2.css:216), and display:none
+   * is not something position:fixed can escape.
+   *
+   * So launching from any other panel — the "Allena" button lives in Word banks as
+   * well as here — built the entire session inside a hidden panel. The card stack
+   * still ran and speak() still fired 350 ms later, so you heard the first word with
+   * nothing on screen. The MutationObserver in boot() only closes a session when the
+   * panel's class CHANGES, and starting from a panel that was already inactive changes
+   * nothing, so it never fired either.
+   *
+   * This mirrors what the sidebar's own handler does, but without clicking it: that
+   * handler is anonymous, and a click would ALSO trip learner.js's own nav listener
+   * (boot() -> setTimeout(refresh, 30)), whose refresh() re-renders the overlay and
+   * would restart the first card's audio. One open, one render, one utterance. */
+  function activateLearnerPanel() {
+    var panel = document.getElementById('pnl-learner');
+    if (!panel || panel.classList.contains('active')) return;
+    document.querySelectorAll('.content-panel').forEach(function (p) { p.classList.remove('active'); });
+    panel.classList.add('active');
+    document.querySelectorAll('.nav-item[data-panel]').forEach(function (n) {
+      n.classList.remove('active');
+      n.removeAttribute('aria-current');
+    });
+    var nav = document.querySelector('.nav-item[data-panel="learner"]');
+    if (nav) { nav.classList.add('active'); nav.setAttribute('aria-current', 'page'); }
+  }
+
   function openSession(mode, unit, lesson, steps) {
+    activateLearnerPanel();
     session = { mode: mode, unit: unit || null, lesson: lesson || null, steps: steps, idx: 0, earned: 0, lang: learnerLang() };
     if (mode === 'mission' && session.unit) trackMissionForSession(0, false);
     renderOverlay();

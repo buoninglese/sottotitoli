@@ -131,7 +131,21 @@
     } catch (e) {}
   }
 
+  /* ── Current streak, in days ──
+   * The streak is OWNED here: award() is the only thing that increments it, and it
+   * lives in the learner store under LEARNER_KEY. Exposed so other panels read it
+   * instead of guessing a storage key — the dashboard used to read
+   * localStorage['s8t-streak'], which nothing has ever written, so the hero showed a
+   * permanent 0. A streak only counts while the last activity is today or yesterday
+   * (the same rollover award() applies), so an abandoned streak stops being shown. */
+  function currentStreak() {
+    var s = lLoad();
+    if (!s.lastDay) return 0;
+    if (s.lastDay !== todayStr() && s.lastDay !== dateOffsetStr(-1)) return 0;
+    return Math.max(0, parseInt(s.streak, 10) || 0);
+  }
+
   /* ── Public API ── */
   w.XPCfg = { load: cfgLoad, save: cfgSave, reset: cfgReset, val: cfgVal, defaults: DEFAULT_CONFIG, actions: ACTIONS };
-  w.XP = { award: award, sync: syncNow, restore: restore, cfg: w.XPCfg };
+  w.XP = { award: award, sync: syncNow, restore: restore, streak: currentStreak, cfg: w.XPCfg };
 })(window);

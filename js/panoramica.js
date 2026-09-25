@@ -795,8 +795,10 @@
           lastActiveDays = Math.floor((now.getTime() - latest.getTime()) / (24*60*60*1000));
         }
 
-        // Streak from localStorage
-        var streakDays = parseInt(localStorage.getItem('s8t-streak') || '0');
+        // Streak — read from the module that owns it (js/xp.js), never from a key of
+        // its own: localStorage['s8t-streak'] was never written by anything, so this
+        // was permanently 0.
+        var streakDays = (window.XP && XP.streak) ? XP.streak() : 0;
 
         // Consistency: active_days / days_in_window
         var activeDays7d = uniqueDays(sessions7d);
@@ -1086,8 +1088,8 @@
       }
 
       async function updateHeroStreakAndGoal() {
-        // ── Streak ──
-        var streakDays = parseInt(localStorage.getItem('s8t-streak') || '0');
+        // ── Streak ── (owned by js/xp.js — see XP.streak)
+        var streakDays = (window.XP && XP.streak) ? XP.streak() : 0;
         var streakEl = document.getElementById('heroStreakDays');
         var streakBox = document.getElementById('heroStreakBox');
         var streakGlow = document.getElementById('heroStreakGlow');
@@ -1448,7 +1450,7 @@
         if (!box) return;
         var s = currentStats() || {};
         var allSess = (s && s._allSessions) || [];
-        var streak = parseInt(localStorage.getItem('s8t-streak') || '0');
+        var streak = (window.XP && XP.streak) ? XP.streak() : 0;
         var totalMinutes = s.totalMinutes || 0;
         var totalWords = s.totalWords || 0;
         var totalSessions = s.totalSessions || 0;

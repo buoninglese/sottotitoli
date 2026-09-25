@@ -293,7 +293,8 @@
       '#learner': 'learner',
       '#report-ai': 'report-ai',
       '#impostazioni': 'impostazioni',
-      '#aiuto': 'aiuto'
+      '#aiuto': 'aiuto',
+      '#profilo': 'profilo'
     };
     var panel = panelMap[hash];
     if (panel) {

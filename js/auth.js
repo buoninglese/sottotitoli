@@ -187,8 +187,8 @@ document.addEventListener('DOMContentLoaded', async () => {
           <a href="index.html" class="ud-link" data-i18n="home"><i class="fa-solid fa-house" style="width:16px;text-align:center;margin-right:8px;font-size:13px"></i> Home</a>
           <a href="panoramica.html" class="ud-link" data-i18n="panoramica"><i class="fa-solid fa-table-cells" style="width:16px;text-align:center;margin-right:8px;font-size:13px"></i> Panoramica</a>
           <a href="panoramica.html" class="ud-link" data-i18n="start"><i class="fa-solid fa-microphone" style="width:16px;text-align:center;margin-right:8px;font-size:13px"></i> Start</a>
-          <a href="account.html" class="ud-link" data-i18n="profilo"><i class="fa-solid fa-user" style="width:16px;text-align:center;margin-right:8px;font-size:13px"></i> Profilo</a>
-          <a href="analysis.html" class="ud-link" data-i18n="report_ai"><i class="fa-solid fa-star" style="width:16px;text-align:center;margin-right:8px;font-size:13px"></i> Report AI</a>
+          <a href="panoramica.html#profilo" class="ud-link" data-i18n="profilo"><i class="fa-solid fa-user" style="width:16px;text-align:center;margin-right:8px;font-size:13px"></i> Profilo</a>
+          <a href="panoramica.html#report-ai" class="ud-link" data-i18n="report_ai"><i class="fa-solid fa-star" style="width:16px;text-align:center;margin-right:8px;font-size:13px"></i> Report AI</a>
           <hr class="ud-divider">
           <div class="ud-credits-section">
             <div class="ud-credit-row"><span data-i18n="minutes">Minuti</span><span id="udMinutes">—</span></div>
@@ -197,7 +197,7 @@ document.addEventListener('DOMContentLoaded', async () => {
           <hr class="ud-divider">
           <a href="purchase.html" class="ud-link" data-i18n="buy_credits" style="color:var(--blue);font-weight:600"><i class="fa-solid fa-gift" style="width:16px;text-align:center;margin-right:8px;font-size:13px"></i> Acquista crediti</a>
           <hr class="ud-divider">
-          <a href="account.html#cs-profile" class="ud-link" data-i18n="settings">Impostazioni</a>
+          <a href="panoramica.html#impostazioni" class="ud-link" data-i18n="settings">Impostazioni</a>
           <a href="panoramica.html#aiuto" class="ud-link" data-i18n="aiuto">Aiuto</a>
           <button class="ud-link danger" id="udLogoutBtn" data-i18n="logout">Esci</button>
         </div>
