@@ -2484,6 +2484,16 @@
         if (!sb) { isSaving = false; return false; }
 
         // 1) Upsert onboarding_responses
+        // ⚠️ EVERY KEY HERE MUST BE A REAL COLUMN. PostgREST rejects a payload
+        // containing an unknown column with a 400 and writes NOTHING — not just
+        // the bad field, the whole row. Seven names had drifted out of sync with
+        // the table (spoken_languages, spoken_languages_other, improve_languages,
+        // improve_languages_other, ui_language, longterm_transcript,
+        // shortterm_transcript), so this upsert failed silently on every
+        // onboarding while the SEPARATE profiles upsert below still succeeded —
+        // which is why a profile looked complete with no onboarding record behind
+        // it. Fixed by mapping to the real names and adding the columns that had
+        // no home (migration 20260925200000_onboarding_columns_reconcile).
         var onboardingRow = {
           user_id: currentUserId,
           heard_from: onboardData['heard_from'] || null,
@@ -2494,11 +2504,15 @@
           native_lang_other: onboardData['native_lang_other'] || null,
           why_english: onboardData['why_english'] || null,
           why_english_other: onboardData['why_english_other'] || null,
-          spoken_languages: onboardData['spoken_languages'] || null,
-          spoken_languages_other: onboardData['spoken_languages_other'] || null,
+          // 'spoken_languages' is the DB column name now; it holds the languages
+          // the user speaks. The column name is misleading but renaming is a
+          // wider change than this bug needs.
+          interested_languages: onboardData['spoken_languages'] || null,
+          interested_languages_other: onboardData['spoken_languages_other'] || null,
           improve_languages: onboardData['improve_languages'] || null,
           improve_languages_other: onboardData['improve_languages_other'] || null,
-          ui_language: onboardData['ui_language'] || 'it',
+          // ui_language deliberately NOT stored here: its home is
+          // user_preferences.ui_language, which the settings panel already writes.
           difficulties: onboardData['difficulties'] || null,
           difficulties_other: onboardData['difficulties_other'] || null,
           english_situations: onboardData['english_situations'] || null,
@@ -2507,7 +2521,7 @@
           short_term_goal: onboardData['short_term_goal'] || null,
           long_term_goal: onboardData['long_term_goal'] || null,
           intake_conversation_transcript: onboardData['intake_transcript'] || null,
-          longterm_transcript: onboardData['longterm_transcript'] || null,
+          ai_objectives_conversation_transcript: onboardData['longterm_transcript'] || null,
           shortterm_transcript: onboardData['shortterm_transcript'] || null,
           terms_consent: onboardData['terms_consent'] || false,
           terms_consent_at: onboardData['terms_consent_at'] || null,
@@ -2519,8 +2533,11 @@
 
         var _r = await sb.from('onboarding_responses').upsert(onboardingRow, { onConflict: 'user_id' });
         if (_r.error) {
-          console.warn('onboarding_responses upsert warning:', _r.error.message);
-          // Table might not exist yet — that's ok during development
+          // console.error, not warn: this is data loss, not a note. console.warn
+          // survives in production but reads as noise, and the old comment here
+          // ("Table might not exist yet — that's ok during development") is what
+          // let a hard failure look acceptable for two months.
+          console.error('onboarding_responses upsert FAILED — user answers not saved:', _r.error.message);
         }
 
         // 2) Update profiles table with derived fields
@@ -2545,11 +2562,15 @@
 
         var _p = await sb.from('profiles').upsert(profileUpdate, { onConflict: 'id' });
         if (_p.error) {
-          console.warn('profiles upsert warning:', _p.error.message);
+          console.error('profiles upsert FAILED:', _p.error.message);
         }
 
         if (isFinal) showSaved();
-        return true;
+        // ⚠️ This used to `return true` unconditionally. The two upserts ignored
+        // their own errors AND this function ignored both, so the caller's
+        // `if (!ok) alert(...)` could never fire and every failure looked like
+        // success. Report honestly instead.
+        return !_r.error && !_p.error;
       } catch(e) {
         console.error('saveToSupabase error:', e);
         return false;
