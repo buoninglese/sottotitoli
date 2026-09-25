@@ -417,7 +417,12 @@ function initUserCredits(userId) {
   });
 }
 
-// ═══ Token initialization — 3 free tokens for new users ═══
+// ═══ Report credits — 2 free, ONE TIME, granted server-side at signup ═══
+// public.handle_new_user() -> public.grant_signup_bonus() creates this row and its
+// token_transactions 'signup_bonus' entry in the same transaction as the account.
+// This function is now only a fallback for an account with no row, and it must agree
+// with the server: it used to grant 3 here while get_token_balance() also granted 3
+// with a different lifetime_tokens, which is how the amount drifted per user.
 function initUserTokens(userId) {
   if (!userId) return;
   var sb = window.sottotitoliSupabase;
@@ -427,11 +432,12 @@ function initUserTokens(userId) {
     if (!r.data) {
       sb.from('user_tokens').insert({
         user_id: userId,
-        balance: 3,
-        lifetime_tokens: 3,
+        balance: 2,
+        lifetime_tokens: 2,
         updated_at: new Date().toISOString()
       }).then(function(ins){
-        if (!ins.error) console.log('🎁 New user: 3 free report tokens granted');
+        if (ins.error) console.error('Token fallback FAILED — user may have no report credits:', ins.error.message);
+        else console.log('🎁 Fallback granted 2 report credits (no row existed)');
       });
     }
   });
