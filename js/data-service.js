@@ -338,7 +338,7 @@
 
   /* ═══════════════════════════════════════════
      LOAD ALL SETTINGS — single unified call
-     Returns { display_name, native_lang, ui_language, save_sessions, anonymous_sharing }
+     Returns { display_name, native_lang, ui_language, anonymous_sharing }
      Always fresh from Supabase, falls back to localStorage.
      ═══════════════════════════════════════════ */
   async function loadSettings() {
@@ -367,7 +367,6 @@
       display_name: displayName,
       native_lang: profile.native_lang || prefs.native_lang || '',
       ui_language: prefs.ui_language || 'it',
-      save_sessions: prefs.save_sessions !== undefined ? prefs.save_sessions : true,
       anonymous_sharing: prefs.anonymous_sharing !== undefined ? prefs.anonymous_sharing : false,
       theme: prefs.theme || prefs.dark_mode ? 'dark' : 'auto', // dark_mode is legacy column
       font_pref: prefs.font_pref || 'sans',
@@ -385,7 +384,6 @@
       if (local.ui_language && (result.ui_language === 'it' || !result.ui_language)) result.ui_language = local.ui_language;
       if (local.theme && (result.theme === 'auto' || !result.theme)) result.theme = local.theme;
       if (local.font_pref && (result.font_pref === 'sans' || !result.font_pref)) result.font_pref = local.font_pref;
-      if (local.save_sessions !== undefined) result.save_sessions = local.save_sessions;
       if (local.anonymous_sharing !== undefined) result.anonymous_sharing = local.anonymous_sharing;
       if (local.hasOwnProperty('default_caption_lang') && local.default_caption_lang && !result.default_caption_lang) result.default_caption_lang = local.default_caption_lang;
       if (local.hasOwnProperty('default_translation_pair') && local.default_translation_pair && !result.default_translation_pair) result.default_translation_pair = local.default_translation_pair;
@@ -444,13 +442,12 @@
     // ── Save to user_preferences ──
     var prefUpdate = { user_id: userId, updated_at: now };
     if (settings.ui_language !== undefined) prefUpdate.ui_language = settings.ui_language;
-    if (settings.save_sessions !== undefined) prefUpdate.save_sessions = settings.save_sessions;
     if (settings.anonymous_sharing !== undefined) prefUpdate.anonymous_sharing = settings.anonymous_sharing;
     if (settings.theme !== undefined) prefUpdate.theme = settings.theme;
     if (settings.font_pref !== undefined) prefUpdate.font_pref = settings.font_pref;
     if (settings.default_caption_lang !== undefined) prefUpdate.default_caption_lang = settings.default_caption_lang;
     if (settings.default_translation_pair !== undefined) prefUpdate.default_translation_pair = settings.default_translation_pair;
-    if (settings.ui_language !== undefined || settings.save_sessions !== undefined || settings.anonymous_sharing !== undefined || settings.theme !== undefined || settings.font_pref !== undefined || settings.default_caption_lang !== undefined || settings.default_translation_pair !== undefined) {
+    if (settings.ui_language !== undefined || settings.anonymous_sharing !== undefined || settings.theme !== undefined || settings.font_pref !== undefined || settings.default_caption_lang !== undefined || settings.default_translation_pair !== undefined) {
       var r2 = await sb().from('user_preferences').upsert(prefUpdate, { onConflict: 'user_id' });
       if (r2.error) {
         errors.push('preferences: ' + r2.error.message);
@@ -472,7 +469,6 @@
       if (settings.display_name !== undefined) existing.display_name = settings.display_name;
       if (settings.native_lang !== undefined) existing.native_lang = settings.native_lang;
       if (settings.ui_language !== undefined) existing.ui_language = settings.ui_language;
-      if (settings.save_sessions !== undefined) existing.save_sessions = settings.save_sessions;
       if (settings.anonymous_sharing !== undefined) existing.anonymous_sharing = settings.anonymous_sharing;
       if (settings.theme !== undefined) existing.theme = settings.theme;
       if (settings.font_pref !== undefined) existing.font_pref = settings.font_pref;
