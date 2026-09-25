@@ -67,6 +67,14 @@ window.SOTTOTITOLI_CONFIG = {
   /** Site display name */
   siteName: "Sottotitoli",
 
+  /** Terms of Service version accepted at sign-up.
+   *  MUST match the "In vigore dal" date in termini.html.
+   *  ⚠️ SINGLE SOURCE OF TRUTH — do not hardcode this date anywhere else.
+   *  Recorded consents store this exact string, and a mismatch between a stored
+   *  value and this one is what triggers the re-consent prompt (js/reconsent.js).
+   *  Bump it whenever the terms change. */
+  termsVersion: "2026-06-24",
+
   /** Auth redirect URL (after Google OAuth login) */
   AUTH_REDIRECT_URL: "https://www.sottotitoli.pro/panoramica.html",
 

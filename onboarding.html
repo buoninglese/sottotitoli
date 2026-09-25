@@ -1148,7 +1148,7 @@
   <!-- 1. Dependencies -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <!-- 2. Config (must come before auth) -->
-  <script src="config.js?v=6"></script>
+  <script src="config.js?v=7"></script>
   <!-- 3. Auth (creates window.sottotitoliSupabase) -->
   <script src="js/auth.js?v=1"></script>
   <!-- 4. Theme -->
@@ -1220,6 +1220,12 @@
 
     // AI-generated insights (populated after starter report)
     var aiInsights = null;
+
+    // Terms version accepted at sign-up. Read from config.js so the version lives
+    // in exactly ONE place — duplicating the string here and in js/reconsent.js is
+    // the same drift that let this payload diverge from the table and lose every
+    // answer. Bump it in config.js when the terms change.
+    var TERMS_VERSION = (window.SOTTOTITOLI_CONFIG && window.SOTTOTITOLI_CONFIG.termsVersion) || '2026-06-24';
 
     // Onboarding state (backed by localStorage + Supabase)
     var onboardData = JSON.parse(localStorage.getItem('sottotitoli_onboarding') || '{}');
@@ -2504,11 +2510,13 @@
           native_lang_other: onboardData['native_lang_other'] || null,
           why_english: onboardData['why_english'] || null,
           why_english_other: onboardData['why_english_other'] || null,
-          // 'spoken_languages' is the DB column name now; it holds the languages
-          // the user speaks. The column name is misleading but renaming is a
-          // wider change than this bug needs.
-          interested_languages: onboardData['spoken_languages'] || null,
-          interested_languages_other: onboardData['spoken_languages_other'] || null,
+          // Column renamed to match this key (migration 20260925210000). The name
+          // mismatch — the form said spoken_languages, the table said
+          // interested_languages — is what made PostgREST reject the whole row and
+          // lose every answer for two months. Both sides now use the same string,
+          // with no mapping in between to drift again.
+          spoken_languages: onboardData['spoken_languages'] || null,
+          spoken_languages_other: onboardData['spoken_languages_other'] || null,
           improve_languages: onboardData['improve_languages'] || null,
           improve_languages_other: onboardData['improve_languages_other'] || null,
           // ui_language deliberately NOT stored here: its home is
@@ -2525,6 +2533,9 @@
           shortterm_transcript: onboardData['shortterm_transcript'] || null,
           terms_consent: onboardData['terms_consent'] || false,
           terms_consent_at: onboardData['terms_consent_at'] || null,
+          // WHICH terms, not just when. Null unless consent was actually given, so
+          // a missing consent can never look like a versioned one.
+          terms_version: onboardData['terms_consent'] ? TERMS_VERSION : null,
           marketing_consent: onboardData['marketing_consent'] || false,
           onboarding_completed: isFinal,
           onboarding_completed_at: isFinal ? new Date().toISOString() : null,
@@ -2631,15 +2642,14 @@
           console.warn('finishOnboarding: report generation failed or timed out (' + e.message + '), proceeding without it');
         }
 
-        if (!reportGenerated) {
-          // ⚠️ This flag used to be set under a comment promising the report would
-          // be "generated asynchronously and appear on their dashboard later".
-          // NOTHING reads `_ai_report_pending`, so that promise was never kept.
-          // The dashboard has its own "Genera report" button and that is now the
-          // real retry path, because the report is persisted when it succeeds.
-          onboardData['_ai_report_pending'] = true;
-          persist();
-        }
+        // No report this time. The dashboard owns the retry path now, because the
+        // report IS persisted when generation succeeds.
+        //
+        // ⚠️ `_ai_report_pending` used to be set here under a comment promising the
+        // report would be "generated asynchronously and appear on their dashboard
+        // later". NOTHING ever read that flag, so the promise was never kept.
+        // Removed rather than left in place pretending to mean something still to
+        // come — the same shape as sessions.saved and save_sessions.
       }
 
       btnFinish.disabled = true;
@@ -2805,9 +2815,17 @@
         // Upsert is safe against the full-row save that runs afterwards: an upsert
         // only SETs the columns present in the payload, so starter_report_md is
         // not wiped by the later onboardingRow write.
+        var obj = aiResult.objectives || {};
         var _r = await sb.from('onboarding_responses').upsert({
           user_id: currentUserId,
           starter_report_md: aiResult.report_md,
+          // The AI's objectives get their OWN columns (migration 20260925210000).
+          // Deliberately NOT written over short_term_goal / long_term_goal, which
+          // hold what the user actually wrote, nor over profiles.learning_profile,
+          // which holds the user's own `difficulties`.
+          ai_short_term_goal: obj.short_term || null,
+          ai_long_term_goal: obj.long_term || null,
+          ai_focus_areas: (aiResult.focus_areas && aiResult.focus_areas.length) ? aiResult.focus_areas : null,
           updated_at: new Date().toISOString()
         }, { onConflict: 'user_id' });
 

@@ -75,9 +75,9 @@
             }
             // "Altre lingue" lives on onboarding_responses, not profiles, so it
             // needs its own read.
-            sb.from('onboarding_responses').select('interested_languages').eq('user_id', r.data.session.user.id).maybeSingle().then(function(orr) {
-              if (orr.data && orr.data.interested_languages && orr.data.interested_languages.length) {
-                _setSecondLangs(orr.data.interested_languages);
+            sb.from('onboarding_responses').select('spoken_languages').eq('user_id', r.data.session.user.id).maybeSingle().then(function(orr) {
+              if (orr.data && orr.data.spoken_languages && orr.data.spoken_languages.length) {
+                _setSecondLangs(orr.data.spoken_languages);
               }
             });
             // Populate Profilo → Lingue
