@@ -7,11 +7,15 @@
   var CACHE_TTL = 30000; // 30 seconds before refetch
   var cache = {};
 
-  // Console diagnostics are for local development only. Same blocklist as the
-  // config.secrets.js probe: silent on the two deployed hosts, verbose anywhere
-  // else (localhost, LAN IP, file://). Genuine errors still log via console.warn.
-  var DEBUG = !/(^|\.)sottotitoli\.pro$/i.test(location.hostname)
-           && !/(^|\.)buoninglese\.github\.io$/i.test(location.hostname);
+  // Verbose console on local dev, silent on the deployed hosts. config.js runs
+  // first on every page and publishes the authoritative flag (including the
+  // ?debug=1 override), so read it rather than re-deriving it. The fallback keeps
+  // this file working if it is ever loaded without config.js.
+  // console.warn on genuine failures is never suppressed.
+  var DEBUG = (window.SOTTOTITOLI_DEBUG !== undefined)
+    ? window.SOTTOTITOLI_DEBUG
+    : !/(^|\.)sottotitoli\.pro$/i.test(location.hostname)
+      && !/(^|\.)buoninglese\.github\.io$/i.test(location.hostname);
 
   function cacheGet(key) {
     var entry = cache[key];

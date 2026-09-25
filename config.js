@@ -7,6 +7,41 @@
  *   cp config.example.js config.js
  */
 
+/* ═══ Production console hygiene ═══
+ * The deployed console showed routine chatter from every script on the page, which
+ * buries real problems. This silences the VERBOSE channels on the deployed hosts:
+ * console.log / debug / info. console.warn and console.error are deliberately left
+ * alone — those report actual trouble and must never be hidden.
+ *
+ * To DEBUG ON A DEPLOYED HOST, append ?debug=1 to the URL, e.g.
+ *     https://www.sottotitoli.pro/panoramica.html?debug=1
+ * Everything logs normally again, which is what makes the iOS charging logs
+ * available during a phone test without shipping them to every visitor.
+ *
+ * Lives here because config.js is the first script loaded by every page, so one
+ * block covers all of them, including any library that logs. That is also why it
+ * is a global override rather than a guard on each call: there is no call site to
+ * forget and nothing that throws if a page omits a helper script.
+ *
+ * ⚠️ Consequence: a console.log added later will be silent in production by
+ * design. If a log is needed in production, use console.warn or append ?debug=1.
+ */
+(function(){
+  var host = location.hostname;
+  var deployed = /(^|\.)sottotitoli\.pro$/i.test(host)
+              || /(^|\.)buoninglese\.github\.io$/i.test(host);
+  var forced = /[?&]debug=1(&|$)/.test(location.search);
+  var verbose = !deployed || forced;
+
+  window.SOTTOTITOLI_DEBUG = verbose;
+  if (!verbose) {
+    var noop = function(){};
+    console.log = noop;
+    console.debug = noop;
+    console.info = noop;
+  }
+})();
+
 window.SOTTOTITOLI_CONFIG = {
   /** WebSocket relay server URL */
   websocketUrl: "wss://sottotitoli-websocket.onrender.com",
