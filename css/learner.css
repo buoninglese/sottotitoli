@@ -33,7 +33,6 @@
   max-width: 1020px; margin: 0 auto;
   display: flex; flex-direction: column;
 }
-#pnl-learner .learner-hero { flex-shrink: 0; }
 #pnl-learner .panel-tabs { flex-shrink: 0; }
 #pnl-learner .subtab-pane {
   flex: 1 1 auto; min-height: 0;
@@ -81,18 +80,8 @@
 [data-theme="genz"] #pnl-learner .panel-head .seg-btn.tab-link.active { color: #0a0a0a !important; }
 
 /* ── Hero / header ── */
-#pnl-learner .learner-hero {
-  display: flex; align-items: center; justify-content: space-between; gap: 16px;
-  flex-wrap: wrap; padding: 16px 20px; margin-bottom: 16px;
-  background: linear-gradient(135deg, var(--panel-2), var(--card));
-  border: 1px solid var(--line); border-radius: 20px;
-}
-#pnl-learner .learner-hero .lh-xp { font-size:28px; font-weight: 900; color: var(--cyan); font-variant-numeric: tabular-nums; letter-spacing: -.02em; }
-#pnl-learner .learner-hero .lh-xp small { display: block; font-size: 11px; font-weight: 600; color: var(--text-faint); text-transform: uppercase; letter-spacing: .14em; }
-#pnl-learner .learner-hero .lh-streak { display: flex; align-items: center; gap: 8px; color: var(--text); font-weight: 700; }
-#pnl-learner .learner-hero .lh-streak .flame { font-size: 22px; }
-#pnl-learner .learner-hero .lh-goal { flex: 1 1 220px; min-width: 200px; }
-#pnl-learner .learner-hero .lh-goal .goal-top { display: flex; justify-content: space-between; font-size:13px; color: var(--text-soft); margin-bottom: 6px; font-weight: 600; }
+/* The .learner-hero / .lh-* rules were removed together with heroHtml() — the markup they styled
+ * no longer exists. .progress-track below IS still used (the lesson overlay's top bar). */
 #pnl-learner .progress-track { height: 10px; background: var(--bg); border-radius: 999px; overflow: hidden; border: 1px solid var(--line); }
 #pnl-learner .progress-fill { height: 100%; border-radius: 999px; background: linear-gradient(90deg, var(--cyan), var(--green)); transition: width .5s cubic-bezier(.22,1,.36,1); }
 #pnl-learner .learner-hero .lh-lang {
@@ -621,4 +610,25 @@
   #pnl-learner .ics-trans { font-size:28px; }
   #pnl-learner .ics-def { font-size:13px; }
   #pnl-learner .ics-grade { font-size:13px; padding: 11px 3px; }
+}
+
+/* ══ Session overlay: own the whole viewport ══
+ * #pnl-learner sits inside .main-panel, and that ancestor broke the lesson overlay two ways:
+ *   1. css/cta-fluid.css gives .main-panel `position:relative; z-index:0`, which makes it a
+ *      STACKING CONTEXT, so the overlay's `z-index:9000` was capped at 0. theme-wrapped.css
+ *      deliberately puts the topbar at `z-index:100` (its dropdowns have to clear the panel), so
+ *      the topbar painted OVER the overlay's top 64px — hiding the title, the progress bar and
+ *      the close X. Measured on modern/modern-light: the topmost element at the X's own centre
+ *      was button.btn-start-session, so the X could not even be clicked.
+ *   2. theme-wrapped.css gives .main-panel a `backdrop-filter` in genz/genz-dark, which makes it
+ *      the CONTAINING BLOCK for fixed descendants — so `inset:0` resolved to the panel and not
+ *      the viewport: the overlay started at y=88 instead of y=0.
+ * Both only matter while a session is open, when an opaque overlay covers the panel anyway — so
+ * neutralise them for exactly that window instead of touching shared layout rules (dropping the
+ * topbar's z-index would break its dropdowns; dropping the panel's blur would change the theme).
+ * The body class is added in renderOverlay() and removed in closeSession(). */
+body.lesson-open .main-panel {
+  z-index: auto !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
 }

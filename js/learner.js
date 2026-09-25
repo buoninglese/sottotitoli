@@ -165,6 +165,16 @@
     if (hasProgress(load())) queuePush(0);
     return false;
   }
+  /* ── Single-writer bridge for js/xp.js ──
+   * xp.js owns the AWARD RULES (which action is worth how much, editable in dev/xp-config-mockup.html);
+   * this file owns the STORE. xp.js used to write localStorage directly, which skipped both the
+   * `_updatedAt` stamp and the Supabase mirror above — so XP awarded through xp.js (every correct
+   * answer in a session, every capture on the transcript page) could be silently replaced by the
+   * older server copy on the next syncPull(). xp.js now delegates here when this exists. On pages
+   * that do not load this file (caption-s8t.html) it stamps its own writes instead, so its copy
+   * still reads as newer and gets pushed up rather than overwritten. */
+  w.SottotitoliXPStore = { load: load, save: save };
+
   function addXp(n) {
     var s = load();
     var today = todayStr();
@@ -601,20 +611,8 @@
   }
 
   /* ═══════════════════ RENDER: shell + tabs ═══════════════════ */
-  // XP / goal / streak bar — rendered INSIDE the path pane, right under the intro banner.
-  function heroHtml() {
-    var s = load();
-    var goalPct = Math.min(100, Math.round((s.todayXp / (s.dailyGoal || 1)) * 100));
-    return '<div class="learner-hero">' +
-      '<span class="lh-lang"><span class="lh-lang-flag">' + (learnerLang() === 'it' ? '🇮🇹' : '🇬🇧') + '</span><span>' + (learnerLang() === 'it' ? t('learner_lang_it') : t('learner_lang_en')) + '</span></span>' +
-      '<div><div class="lh-xp">' + s.xp + '<small data-i18n="learner_xp">XP</small></div></div>' +
-      '<div class="lh-goal">' +
-        '<div class="goal-top"><span data-i18n="learner_daily_goal">Obiettivo giornaliero</span><span>' + s.todayXp + ' / ' + s.dailyGoal + '</span></div>' +
-        '<div class="progress-track"><div class="progress-fill" style="width:' + goalPct + '%"></div></div>' +
-      '</div>' +
-      '<div class="lh-streak"><span class="flame">🔥</span><span>' + s.streak + ' <span data-i18n="learner_streak">Serie</span></span></div>' +
-    '</div>';
-  }
+  // (heroHtml() + updateHeroLang() used to live here — the XP / daily-goal / streak bar. Removed
+  // as dead code: neither was ever called, and the profile is where total XP is shown.)
 
   function renderShell() {
     if (!rootEl) return;
@@ -651,13 +649,7 @@
   }
 
   // Keep the hero's language chip in sync when English/Italiano is selected.
-  function updateHeroLang() {
-    if (!rootEl) return;
-    var chip = $('.lh-lang', rootEl);
-    if (!chip) return;
-    var l = learnerLang();
-    chip.innerHTML = '<span class="lh-lang-flag">' + (l === 'it' ? '🇮🇹' : '🇬🇧') + '</span><span>' + (l === 'it' ? t('learner_lang_it') : t('learner_lang_en')) + '</span>';
-  }
+  // (Deleted with heroHtml — the chip it targeted no longer exists.)
 
   function renderPane(name) {
     if (name === 'learner-overview') renderProgress();
@@ -1763,6 +1755,10 @@
         '</button>' +
       '</div>' +
       '<div class="lesson-stage" id="learnerStage"></div>';
+    // body.lesson-open lets the overlay own the whole viewport while a session is open — see the
+    // rule in css/learner.css. It has to be removed again on close, not here, because the
+    // completion card lives inside the same overlay.
+    if (document.body) document.body.classList.add('lesson-open');
     rootEl.appendChild(ov);
     renderStep();
   }
@@ -2101,6 +2097,7 @@
     }
     var ov = $('#learnerOverlay');
     if (ov) ov.remove();
+    if (document.body) document.body.classList.remove('lesson-open');
     session = null;
     if (recog) { try { recog.stop(); } catch (e) {} recog = null; }
     refresh();

@@ -1,12 +1,13 @@
 /* ═══════════════════════════════════════════════════════════════
    XP ENGINE — single source of truth for how many XP each action awards.
-   - CONFIG  (js/xp.js): per-action XP values. Editable + copyable in
-     dev/xp-config-mockup.html; persisted to localStorage "sottotitoli-xp-config".
-   - STORE   : writes the trainer's "sottotitoli-learner" localStorage
-     (xp / todayXp / streak, same rollover logic as js/learner.js addXp) so the
-     Vocabulary Trainer hero reflects every XP source on every page.
-   - BACKUP  : debounced per-user upsert to Supabase "user_xp"
-     (migration: supabase/xp.sql). Restores on a fresh device via XP.restore().
+   - CONFIG  : per-action XP values, editable + copyable in dev/xp-config-mockup.html,
+     persisted to localStorage "sottotitoli-xp-config". Exposed as window.XPCfg.
+   - STORE   : delegated to js/learner.js via window.SottotitoliXPStore when that file is loaded,
+     so there is ONE writer of "sottotitoli-learner" (xp / todayXp / streak) — the same store the
+     trainer reads. Standalone pages stamp the write themselves. See bridge() below.
+   - BACKUP  : the durable copy is learner_progress, written by js/learner.js with this same store.
+     The old user_xp upsert here is retired (it would be a second, drifting backup); user_xp is
+     still READ by restore() as a one-time legacy source for devices that predate it.
    The trainer XP is the "Allena" word-bank card-stack session
    (Learner.openBankTest → ics → gradeCard), NOT any legacy course copy.
    ═══════════════════════════════════════════════════════════════ */
@@ -62,7 +63,20 @@
   function lDefaults() {
     return { xp: 0, streak: 0, lastDay: null, todayXp: 0, dailyGoal: 10, lessons: {}, tests: {}, mistakes: {}, practice: 0 };
   }
+  /* The learner store has exactly ONE writer. js/learner.js publishes window.SottotitoliXPStore
+   * when it is loaded (panoramica.html), and xp.js delegates to it so every write goes through its
+   * `_updatedAt` stamp and its Supabase mirror. On pages that do NOT load learner.js
+   * (caption-s8t.html) xp.js writes localStorage itself — but still stamps `_updatedAt`, so the
+   * next page that does have learner.js sees a NEWER local copy and pushes it up instead of
+   * overwriting it with the older server row. Without that stamp, XP earned on the transcript page
+   * was silently lost the moment panoramica synced. */
+  function bridge() {
+    var b = w.SottotitoliXPStore;
+    return (b && typeof b.load === 'function' && typeof b.save === 'function') ? b : null;
+  }
   function lLoad() {
+    var b = bridge();
+    if (b) return b.load();
     var s;
     try { s = JSON.parse(localStorage.getItem(LEARNER_KEY) || 'null'); } catch (e) { s = null; }
     if (!s || typeof s !== 'object') s = lDefaults();
@@ -71,7 +85,12 @@
     if (s.lastDay !== today) s.todayXp = 0;
     return s;
   }
-  function lSave(s) { try { localStorage.setItem(LEARNER_KEY, JSON.stringify(s)); } catch (e) {} }
+  function lSave(s) {
+    var b = bridge();
+    if (b) { b.save(s); return; }
+    s._updatedAt = Date.now();
+    try { localStorage.setItem(LEARNER_KEY, JSON.stringify(s)); } catch (e) {}
+  }
 
   /* ── Award XP for an action (points = config value × count) ──
    * Returns the points awarded (0/null if the action is disabled). */
@@ -100,6 +119,10 @@
   }
   async function syncNow() {
     syncTimer = null;
+    // With learner.js loaded, its store mirror already pushes these same fields to learner_progress —
+    // writing user_xp as well would be a second backup that can drift. user_xp stays readable as the
+    // legacy source restore() falls back to below; it is just no longer written from here.
+    if (bridge()) return;
     var sb = w.sottotitoliSupabase;
     if (!sb) return;
     try {
