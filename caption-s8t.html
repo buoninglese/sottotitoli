@@ -7331,9 +7331,16 @@ window.lookupSynonym = function(el) {
     });
   }, 100);
   
-  // Fetch definition via Supabase dictionary proxy (cached, more reliable)
-  fetch('https://qzqmuegbpmvqrjrlfbgk.supabase.co/functions/v1/dictionary-proxy?word=' + encodeURIComponent(word))
-    .then(function(r) { return r.json(); })
+  // Fetch definition via Supabase dictionary proxy (cached, more reliable).
+  // The endpoint requires a signed-in caller now, so the access token is attached;
+  // without one this resolves to null and the direct-API fallback below runs.
+  window.sottotitoliSupabase.auth.getSession().then(function(sess) {
+    var tk = sess && sess.data && sess.data.session ? sess.data.session.access_token : null;
+    if (!tk) return null;
+    return fetch('https://qzqmuegbpmvqrjrlfbgk.supabase.co/functions/v1/dictionary-proxy?word=' + encodeURIComponent(word),
+      { headers: { 'Authorization': 'Bearer ' + tk } });
+  })
+    .then(function(r) { return r ? r.json() : null; })
     .then(function(data) {
       var defEl = document.getElementById('synDefContent');
       if (!defEl) return;

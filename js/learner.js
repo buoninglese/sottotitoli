@@ -242,9 +242,16 @@
     } catch (e) {}
     if (lang === 'en') {
       try {
-        var d = await fetch('https://qzqmuegbpmvqrjrlfbgk.supabase.co/functions/v1/dictionary-proxy?word=' + encodeURIComponent(String(word).toLowerCase()));
-        var dj = await d.json();
-        if (dj && !dj.notFound && dj.definition) out.definition = dj.definition;
+        // The proxy requires a signed-in caller, so the token goes with the request.
+        var _sb = srcSb();
+        var _sess = _sb ? await _sb.auth.getSession() : null;
+        var _tk = _sess && _sess.data && _sess.data.session ? _sess.data.session.access_token : null;
+        if (_tk) {
+          var d = await fetch('https://qzqmuegbpmvqrjrlfbgk.supabase.co/functions/v1/dictionary-proxy?word=' + encodeURIComponent(String(word).toLowerCase()),
+            { headers: { 'Authorization': 'Bearer ' + _tk } });
+          var dj = await d.json();
+          if (dj && !dj.notFound && dj.definition) out.definition = dj.definition;
+        }
       } catch (e) {}
     }
     return out;

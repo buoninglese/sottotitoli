@@ -4671,9 +4671,13 @@
         }
         if (wordText !== '—') {
           meaningEl.textContent = definition || 'Caricamento…';
-          // 1. dictionary-proxy (works for English AND Italian)
+          // 1. dictionary-proxy (works for English AND Italian). Requires a
+          // signed-in caller now, so the access token is attached.
           try {
-            var resp = await fetch('https://qzqmuegbpmvqrjrlfbgk.supabase.co/functions/v1/dictionary-proxy?word=' + encodeURIComponent(wordText.toLowerCase()));
+            var _ps = await window.sottotitoliSupabase.auth.getSession();
+            var _ptk = _ps && _ps.data && _ps.data.session ? _ps.data.session.access_token : null;
+            var resp = await fetch('https://qzqmuegbpmvqrjrlfbgk.supabase.co/functions/v1/dictionary-proxy?word=' + encodeURIComponent(wordText.toLowerCase()),
+              { headers: { 'Authorization': 'Bearer ' + (_ptk || '') } });
             if (resp.ok) {
               var defData = await resp.json();
               var entry = Array.isArray(defData) ? defData[0] : (defData && defData.definition !== undefined ? defData : null);
@@ -5683,7 +5687,15 @@
       // Returns array of {code:'n', label:'NOUN'} or null
       async function fetchPosOptions(word) {
         try {
-          var resp = await fetch('https://qzqmuegbpmvqrjrlfbgk.supabase.co/functions/v1/dictionary-proxy?word=' + encodeURIComponent(word));
+          // NOTE: this proxy answer is discarded a few lines down, because POS data
+          // needs the raw format and the proxy returns a simplified one — so the call
+          // only gates the direct request below. It still carries a token because the
+          // endpoint now requires one. Deleting the call would be the better cleanup,
+          // but that changes behaviour and does not belong in this change.
+          var _fs = await window.sottotitoliSupabase.auth.getSession();
+          var _ftk = _fs && _fs.data && _fs.data.session ? _fs.data.session.access_token : null;
+          var resp = await fetch('https://qzqmuegbpmvqrjrlfbgk.supabase.co/functions/v1/dictionary-proxy?word=' + encodeURIComponent(word),
+            { headers: { 'Authorization': 'Bearer ' + (_ftk || '') } });
           if (!resp.ok) return null;
           var data = await resp.json();
           if (!data) return null;
@@ -5893,9 +5905,13 @@
           if (def) return store({ definition: def, ipa: ipa, pos: fdPos });
         } catch(e) { /* fall through to proxy */ }
 
-        // Proxy fallback (cached, server-side — simplified {definition, ipa, notFound} format)
+        // Proxy fallback (cached, server-side — simplified {definition, ipa, notFound} format).
+        // Requires a signed-in caller, so the access token is attached.
         try {
-          var resp2 = await fetch('https://qzqmuegbpmvqrjrlfbgk.supabase.co/functions/v1/dictionary-proxy?word=' + encodeURIComponent(word));
+          var _rs = await window.sottotitoliSupabase.auth.getSession();
+          var _rtk = _rs && _rs.data && _rs.data.session ? _rs.data.session.access_token : null;
+          var resp2 = await fetch('https://qzqmuegbpmvqrjrlfbgk.supabase.co/functions/v1/dictionary-proxy?word=' + encodeURIComponent(word),
+            { headers: { 'Authorization': 'Bearer ' + (_rtk || '') } });
           if (!resp2.ok) return store(null);
           var pdata = await resp2.json();
           if (!pdata) return store(null);
