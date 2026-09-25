@@ -10,8 +10,37 @@
 (function (w) {
   'use strict';
 
-  var COURSE = w.LEARNER_COURSE;
+  var COURSE = w.LEARNER_COURSE;              // Italian course (js/learner-data.js)
   if (!COURSE) { if (w.console) w.console.warn('Learner: js/learner-data.js not loaded'); return; }
+  var COURSE_EN = w.LEARNER_COURSE_EN || null; // English course (js/learner-data-en.js)
+
+  /* Which course is active. learnerLang() is the TARGET language: 'en' means the user is
+   * learning English (so the English course), 'it' means learning Italian. Falls back to the
+   * Italian course when the English file is missing, so a 404 degrades to the old single-course
+   * behaviour rather than an empty Learner tab. Progress is keyed `unitId:lessonId` and the two
+   * id spaces are disjoint (units b, i and a versus e), so a user keeps separate progress per
+   * course. NB: never write a glob like b-slash-star in a block comment — the star-slash ends the
+   * comment early and the rest of the line becomes code. */
+  function activeCourse() { return (learnerLang() === 'en' && COURSE_EN) ? COURSE_EN : COURSE; }
+  function activeAllWords() {
+    var fn = (learnerLang() === 'en' && w.LEARNER_ALL_WORDS_EN) ? w.LEARNER_ALL_WORDS_EN : w.LEARNER_ALL_WORDS;
+    return fn ? fn() : [];
+  }
+  function courseUnitById(id) {
+    var found = null;
+    activeCourse().levels.forEach(function (lv) {
+      lv.units.forEach(function (u) { if (u.id === id) found = u; });
+    });
+    return found;
+  }
+  function courseLessonById(unitId, lessonId) {
+    var u = courseUnitById(unitId);
+    if (!u) return null;
+    for (var i = 0; i < u.lessons.length; i++) {
+      if (u.lessons[i].id === lessonId) return u.lessons[i];
+    }
+    return null;
+  }
 
   /* ── Tiny helpers ── */
   function $(sel, root) { return (root || document).querySelector(sel); }
@@ -69,7 +98,73 @@
     if (s.lastDay !== today) { s.todayXp = 0; }
     return s;
   }
-  function save(s) { try { localStorage.setItem(KEY, JSON.stringify(s)); } catch (e) {} }
+  // Persist locally (synchronous: every render calls load()) and mirror to Supabase in the
+  // background. `_updatedAt` rides inside the blob as the cross-device tiebreak.
+  function save(s) {
+    s._updatedAt = Date.now();
+    try { localStorage.setItem(KEY, JSON.stringify(s)); } catch (e) {}
+    queuePush();
+    return s;
+  }
+
+  /* ── Supabase mirror ──
+   * localStorage stays the synchronous source of truth for RENDERING; the server row is the
+   * durable copy, so progress survives a logout, another device or cleared site data — which it
+   * did not before: the whole learner state lived only in this browser.
+   *   pull  — once at boot: if the server copy is newer (by _updatedAt) take it, otherwise push
+   *           the local copy up (covers progress earned while signed out).
+   *   push  — debounced after every save(), so a burst of XP writes one row instead of twenty.
+   * Deliberately dumb: one blob per user, last-write-wins on a timestamp. None of this is money,
+   * so losing a race costs a few XP rather than a purchase. */
+  var pushTimer = null;
+
+  function hasProgress(s) {
+    if (!s) return false;
+    return !!(Object.keys(s.lessons || {}).length || Object.keys(s.tests || {}).length ||
+      Object.keys(s.mistakes || {}).length || (s.xp || 0) > 0 || (s.streak || 0) > 0);
+  }
+
+  function queuePush(delay) {
+    if (pushTimer) clearTimeout(pushTimer);
+    pushTimer = setTimeout(pushNow, delay == null ? 1500 : delay);
+  }
+
+  async function pushNow() {
+    pushTimer = null;
+    var sb = srcSb(); if (!sb) return;
+    var uid = await srcUid(); if (!uid) return;
+    var s = load();
+    try {
+      await sb.from('learner_progress').upsert(
+        { user_id: uid, data: s, updated_at: new Date(s._updatedAt || Date.now()).toISOString() },
+        { onConflict: 'user_id' }
+      );
+    } catch (e) { /* offline or transient — the local copy is still correct */ }
+  }
+
+  // Returns true when a NEWER server copy replaced the local one (the caller should re-render).
+  async function syncPull() {
+    var sb = srcSb(); if (!sb) return false;
+    var uid = await srcUid(); if (!uid) return false;
+    var server = null, serverTs = 0;
+    try {
+      var r = await sb.from('learner_progress').select('data,updated_at').eq('user_id', uid).maybeSingle();
+      if (r.error) return false;
+      server = (r.data && r.data.data) ? r.data.data : null;
+      serverTs = (r.data && r.data.updated_at) ? Date.parse(r.data.updated_at) : 0;
+    } catch (e) { return false; }
+    var localTs = load()._updatedAt || 0;
+    if (server && serverTs > localTs) {
+      try { localStorage.setItem(KEY, JSON.stringify(server)); } catch (e) {}
+      return true;
+    }
+    // Local is the newer copy — or there is no server row yet (first run, or progress earned
+    // while signed out). Push it, so the server stops being behind. Without this the newer local
+    // state would only sync on the next user action, leaving the server stale for anyone signing
+    // in on another device meanwhile.
+    if (hasProgress(load())) queuePush(0);
+    return false;
+  }
   function addXp(n) {
     var s = load();
     var today = todayStr();
@@ -310,15 +405,17 @@
   }
 
   /* ── Course helpers ── */
+  // These read activeCourse(), so the tree, the availability gate and the distractor pool all
+  // follow the language tab rather than always using the Italian course.
   function unitsFlat() {
     var out = [];
-    COURSE.levels.forEach(function (lv) { lv.units.forEach(function (u) { out.push(u); }); });
+    activeCourse().levels.forEach(function (lv) { lv.units.forEach(function (u) { out.push(u); }); });
     return out;
   }
   // Global lesson order: [ { unit, lesson, ui, li } ... ]
   function globalLessons() {
     var out = [];
-    COURSE.levels.forEach(function (lv) {
+    activeCourse().levels.forEach(function (lv) {
       lv.units.forEach(function (u) {
         u.lessons.forEach(function (l) { out.push({ unit: u, lesson: l }); });
       });
@@ -476,7 +573,7 @@
 
   function optionsFor(answerIt, pool) {
     var opts = [answerIt];
-    var all = pool || (w.LEARNER_ALL_WORDS ? w.LEARNER_ALL_WORDS() : []);
+    var all = pool || activeAllWords();
     var tries = 0;
     while (opts.length < 4 && tries < 300) {
       tries++;
@@ -490,7 +587,7 @@
   function learnedWords() {
     var s = load();
     var words = [];
-    COURSE.levels.forEach(function (lv) {
+    activeCourse().levels.forEach(function (lv) {
       lv.units.forEach(function (u) {
         u.lessons.forEach(function (l) {
           if (s.lessons[u.id + ':' + l.id]) {
@@ -705,7 +802,7 @@
   function courseTreeHtml() {
     var html = '';
     var s = load();
-    COURSE.levels.forEach(function (lv) {
+    activeCourse().levels.forEach(function (lv) {
       html += '<div style="margin:22px 0 12px"><span style="font-size:13px;font-weight:800;color:' + lv.color + ';text-transform:uppercase;letter-spacing:.1em">' + esc(lv.icon + ' ' + lv.label) + '</span></div>';
       lv.units.forEach(function (u) {
         var done = unitLessonsDone(u);
@@ -739,8 +836,8 @@
             (testAvail ? 'onclick="Learner.openTest(\'' + u.id + '\')"' : 'disabled') + '>🏆</button>' +
           '<div class="lesson-label"><div class="ll-title">' + t('learner_unit_test') + '</div>' +
             '<div class="ll-sub">' + (s.tests[u.id] && s.tests[u.id].passed
-              ? ('Record: ' + s.tests[u.id].best + '/10')
-              : (testAvail ? t('learner_tap_mic') : (unitLessonsDone(u) + '/' + u.lessons.length + ' ' + t('learner_lessons_completed')))) + '</div></div>' +
+              ? (t('learner_test_best') + ' ' + s.tests[u.id].best + '/10')
+              : (testAvail ? t('learner_unit_test_ready') : (unitLessonsDone(u) + '/' + u.lessons.length + ' ' + t('learner_lessons_completed')))) + '</div></div>' +
           (testAvail ? '<button class="lesson-link" onclick="Learner.openTest(\'' + u.id + '\')">' + (s.tests[u.id] ? t('learner_try_again') : t('learner_continue')) + '</button>' : '') +
         '</div>';
         html += '</div></div>';
@@ -753,7 +850,7 @@
   // Reuses learner_path + learner_lessons_completed, so no new i18n keys were needed.
   function courseSectionHtml() {
     var total = 0, done = 0;
-    COURSE.levels.forEach(function (lv) {
+    activeCourse().levels.forEach(function (lv) {
       lv.units.forEach(function (u) {
         total += u.lessons.length;
         done += unitLessonsDone(u);
@@ -963,14 +1060,14 @@
   }
 
   function openLesson(unitId, lessonId) {
-    var u = w.LEARNER_UNIT_BY_ID(unitId);
-    var l = w.LEARNER_LESSON_BY_ID(unitId, lessonId);
+    var u = courseUnitById(unitId);
+    var l = courseLessonById(unitId, lessonId);
     if (!u || !l) return;
     openSession('lesson', u, l, buildStepsForLesson(l));
   }
 
   function openTest(unitId) {
-    var u = w.LEARNER_UNIT_BY_ID(unitId);
+    var u = courseUnitById(unitId);
     if (!u) return;
     openSession('test', u, null, buildStepsForTest(u));
   }
@@ -2071,6 +2168,11 @@
         if (!panelEl.classList.contains('active') && session) { closeSession(); }
       }).observe(panelEl, { attributes: true, attributeFilter: ['class'] });
     }
+
+    // Pull the durable copy from Supabase (no-op when signed out). If a newer copy came back
+    // from another device, re-render so the tree shows its real progress instead of a blank
+    // 0/21.
+    syncPull().then(function (replaced) { if (replaced) refresh(); });
   }
 
   // Expose public API
