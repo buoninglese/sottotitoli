@@ -760,7 +760,29 @@
           : '<button type="button" class="primary-btn lr-mission-go" onclick="Learner.newGoal()">' + t('learner_mission_generate') + '</button>') +
       '</div>' +
     '</div>';
-    // Card 2 — always-available thematic mission (essential, thematic vocab)
+    // Card 2 — the AI mission: a tailored lesson generated from the learner's own words.
+    // Same shape as the goal card above and for the same reason: generating FILLS the
+    // card, and Start is a separate, explicit action. It used to open the session the
+    // instant it generated, so the lesson was launched before it could be read.
+    var aiM = missionCached();
+    html += '<div class="lr-mission-card ai' + (aiM ? ' ready' : '') + '">' +
+      '<div class="lr-mission-glow">✨</div>' +
+      '<div class="lr-mission-body">' +
+        (aiM
+          ? '<div class="lr-mission-title">' + esc(aiMissionTitle(aiM)) + '</div>' +
+            '<div class="lr-mission-obj">' + esc(aiMissionDesc(aiM)) + '</div>' +
+            '<div class="lr-mission-sub">' + t('learner_ai_ready') + '</div>'
+          : '<div class="lr-mission-title">' + t('learner_mission_cta') + '</div>' +
+            '<div class="lr-mission-obj">' + t('learner_mission_cta_sub') + '</div>') +
+      '</div>' +
+      '<div class="lr-mission-actions">' +
+        (aiM
+          ? '<button type="button" class="primary-btn lr-mission-go" onclick="Learner.confirmAiMission()">' + t('learner_mission_start') + '</button>' +
+            '<button type="button" class="lesson-link lr-mission-new" onclick="Learner.confirmNewMission()" title="' + t('learner_mission_new') + ' · ' + regenRemaining() + ' ' + t('learner_regen_left') + '">↻</button>'
+          : '<button type="button" class="primary-btn lr-mission-go" onclick="Learner.confirmAiMission()">' + t('learner_mission_generate') + '</button>') +
+      '</div>' +
+    '</div>';
+    // Card 3 — always-available thematic mission (essential, thematic vocab)
     html += '<div class="lr-mission-card theme">' +
       '<div class="lr-mission-glow">📚</div>' +
       '<div class="lr-mission-body">' +
@@ -776,7 +798,7 @@
         '<button type="button" class="primary-btn" onclick="Learner.confirmThemeMission(this)">' + t('learner_mission_start') + '</button>' +
       '</div>' +
     '</div>';
-    // Card 3 — the ONE suggested daily mission, tracked by today's XP against the daily goal.
+    // Card 4 — the ONE suggested daily mission, tracked by today's XP against the daily goal.
     var dailyGoalXp = s.dailyGoal || 10;
     var todayPct = Math.min(100, Math.round((s.todayXp / dailyGoalXp) * 100));
     var dailyDone = s.todayXp >= dailyGoalXp;
@@ -1686,6 +1708,58 @@
   }
   function startDaily() { return openPractice('quiz'); }
 
+  /* ── The AI mission (the generated, personalised lesson) ──
+   * Reached from the second mission card. Generating no longer launches anything: it
+   * fills the card and lets the learner read the lesson before Starting it. */
+  function aiMissionTitle(m) {
+    var c = (m && m.content) || m || {};
+    return c.title || (m && m.title) || t('learner_mission');
+  }
+  function aiMissionDesc(m) {
+    var c = (m && m.content) || m || {};
+    return c.objective || c.subtitle || t('learner_mission_cta_sub');
+  }
+  // Generate the lesson and KEEP it in the card. `counted` spends one of the 3 daily
+  // regenerations (the first-ever generate is a create, and is not counted).
+  async function generateAiMission(counted) {
+    if (counted && regenRemaining() <= 0) { appAlert(t('learner_regen_limit'), t('learner_confirm_title'), '↻'); return null; }
+    // ⚠️ Generate FIRST, and only touch the cache once it succeeded. Clearing up front
+    // destroyed the learner's existing mission whenever a generation failed (offline, or
+    // the 3/day cap), leaving the card empty with nothing to fall back on. generateMission()
+    // overwrites the cache itself on success, so no clear is needed at all.
+    var lesson = await generateMission(null, learnerLang());
+    if (!lesson) { toast(t('learner_mission_error')); return null; }
+    if (counted) regenIncrement(); // a regeneration is only spent when it actually produced a mission
+    clearMissionProg();            // a NEW lesson must not resume the previous lesson's steps
+    refresh();
+    toast(t('learner_ai_ready'));
+    return lesson;
+  }
+  // Start the AI mission: resume it if it was left part-way, otherwise build it.
+  function startAiMission() {
+    var m = missionCached();
+    if (!m) return generateAiMission(false);
+    var saved = missionProg();
+    if (saved && resumeMissionSession(saved)) return;
+    var lang = learnerLang();
+    return realPool(lang).then(function (pool) {
+      var steps = missionSteps(m, pool, lang);
+      if (!steps.length) { toast(t('learner_no_words_yet')); return; }
+      openSession('mission', { id: m.id || 'mission', name: aiMissionTitle(m), lang: lang }, null, steps);
+    });
+  }
+  // Regenerate: kept separate from newMission() so the ↻ button refreshes the card
+  // instead of dropping the learner into a session.
+  function regenAiMission() { return generateAiMission(true); }
+  function confirmAiMission() {
+    var m = missionCached();
+    if (!m) {
+      appConfirm(t('learner_confirm_mission_generate'), function () { runGuarded(function () { return generateAiMission(false); }, t('learner_loading')); }, t('learner_confirm_title'), '✨');
+      return;
+    }
+    appConfirm(t('learner_confirm_mission_start').replace('{name}', aiMissionTitle(m)), function () { runGuarded(function () { return startAiMission(); }, t('learner_loading')); }, t('learner_confirm_title'), '✨');
+  }
+
   function resumeMissionSession(saved) {
     if (!saved || saved.mode !== 'mission' || !saved.steps || !saved.steps.length) return false;
     if (saved.idx >= saved.steps.length) { clearMissionProg(); return false; }
@@ -1711,11 +1785,13 @@
 
   async function newMission(focus) {
     if (regenRemaining() <= 0) { toast(t('learner_regen_limit')); return; }
-    regenIncrement();
     var lang = learnerLang();
-    missionClear();
+    // Generate first — never clear the cache up front, or a failed generation wipes the
+    // mission the learner already had (generateMission overwrites it on success).
     var lesson = await generateMission(focus, lang);
     if (!lesson) { toast(t('learner_mission_error')); return; }
+    regenIncrement();
+    clearMissionProg();
     var pool = await realPool(lang);
     var steps = missionSteps(lesson, pool, lang);
     if (!steps.length) { toast(t('learner_mission_error')); return; }
@@ -1828,7 +1904,7 @@
   }
   function confirmNewMission() {
     if (regenRemaining() <= 0) { appAlert(t('learner_regen_limit'), t('learner_confirm_title'), '↻'); return; }
-    appConfirm(t('learner_confirm_mission_new'), function () { runGuarded(function () { return newMission(); }, t('learner_loading')); }, t('learner_confirm_title'), '↻');
+    appConfirm(t('learner_confirm_mission_new'), function () { runGuarded(function () { return regenAiMission(); }, t('learner_loading')); }, t('learner_confirm_title'), '↻');
   }
   function confirmThemeMission(btn) {
     var card = btn && btn.closest ? btn.closest('.lr-mission-card') : null;
@@ -2325,6 +2401,7 @@
     newMission: newMission,
     newGoal: newGoal,
     startGoal: startGoal,
+    confirmAiMission: confirmAiMission,
     startDaily: startDaily,
     closeSession: closeSession,
     requestClose: requestClose,
