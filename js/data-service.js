@@ -575,12 +575,22 @@
 
       return {
         totalWords: total,
-        dueToday: 0,       // no SRS columns yet — will be wired when review_words integration happens
+        /* ⚠️ These SRS fields are deliberately ZERO, and it is a product gap, not a typo.
+         * review_bank_words (what this counts) carries NO spaced-repetition columns — its
+         * columns are bank_key/word_id/source_type/rank_score/status only — so "due today"
+         * cannot be derived from it. The SRS itself lives in review_words, which IS fully
+         * wired (sm2 + writeGrade in js/learner.js write it on every graded answer).
+         * Joining the two is unsolved: review_words.source_type holds expand/manual/session/
+         * null and is_saved is false on every row, so there is no bank link to join on.
+         * Inventing one would put plausible-but-wrong numbers in front of the user, which is
+         * worse than an honest zero. Needs a deliberate link column (or SRS columns on the
+         * bank row) before this can report anything real. */
+        dueToday: 0,
         overdue: 0,
         reviewedToday: 0,
         newThisWeek: newThisWeek,
         known: 0,
-        learning: total,   // all words are "learning" until SRS is wired
+        learning: total,   // every bank word counts as "learning" until the above is resolved
         mastered: 0
       };
     } catch(e) {
@@ -844,8 +854,14 @@
   }
 
   /* ═══════════════════════════════════════════
-     STREAK computation
-     ═══════════════════════════════════════════ */
+     STREAK computation — per language pair, from session history
+     ═══════════════════════════════════════════
+     ⚠️ CURRENTLY UNUSED (no call sites anywhere in the site — verified by grep across js/ and
+     every .html). Kept deliberately, because a practiced-per-language streak is a genuinely
+     different metric from the app's global streak — not a stale duplicate of it.
+     The streak the UI displays is owned by js/xp.js: `XP.streak()`, stored in the learner store.
+     Do NOT wire a third definition; if this is ever shown, label it per-language so the two
+     cannot be confused (reading an unwritten key is how the dashboard ended up stuck at 0). */
   async function getStreak(lang) {
     lang = lang || getStudyLang();
     var userId = await getUserId();

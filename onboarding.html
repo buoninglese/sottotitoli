@@ -1153,6 +1153,9 @@
   <script src="js/auth.js?v=4"></script>
   <!-- 4. Theme -->
   <script src="js/theme.js"></script>
+  <!-- 5. Shared styled modal (appAlert / appConfirm / appPrompt) — must load before the page's
+       own scripts so it is defined by the time any flow can prompt. -->
+  <script src="js/app-modal.js?v=1"></script>
 
   <!-- Feature detection: hide mic buttons if SpeechRecognition unavailable -->
   <script>
@@ -1238,8 +1241,13 @@
 
     // ── Marco mockup — fills every slide with rich preset data ──
     function marcoMockup() {
-      if (!confirm('Fill all slides with Marco\'s preset test data? This overwrites your current answers.')) return;
+      // Was a native confirm(): unstyled, untranslatable, and it blocked the page. appConfirm
+      // cannot block, so the fill itself lives in the callback below.
+      window.appConfirm('Fill all slides with Marco\'s preset test data? This overwrites your current answers.',
+        marcoMockupApply, 'Sottotitoli', '⚠️', 'Overwrite', true);
+    }
 
+    function marcoMockupApply() {
       // Slide 1: Heard from
       onboardData['heard_from'] = 'reddit';
 
@@ -1657,7 +1665,7 @@
     function startSpeechRecord(type) {
       var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
       if (!SR) {
-        alert('Riconoscimento vocale non supportato. Usa Chrome o Edge.');
+        window.appAlert('Riconoscimento vocale non supportato. Usa Chrome o Edge.', 'Sottotitoli', '🎤');
         return;
       }
 
@@ -2025,7 +2033,7 @@
           el.classList.remove('selected');
         } else {
           if (selected.length >= maxSelect) {
-            alert('Massimo ' + maxSelect + ' selezioni possibili.');
+            window.appAlert('Massimo ' + maxSelect + ' selezioni possibili.', 'Sottotitoli', '⚠️');
             return;
           }
           el.classList.add('selected');
@@ -2594,7 +2602,7 @@
     async function finishOnboarding() {
       // Guard: refuse if not 100% complete
       if (getCompletionPercent() < 100) {
-        alert('Completa tutte le domande richieste prima di finire.\n\nCampi mancanti:\n' + getMissingFields().join('\n'));
+        window.appAlert('Completa tutte le domande richieste prima di finire.\n\nCampi mancanti:\n' + getMissingFields().join('\n'), 'Sottotitoli', '⚠️');
         return;
       }
 
@@ -2667,7 +2675,7 @@
       if (!ok) {
         btnFinish.disabled = false;
         btnFinish.innerHTML = '<i class="fa-solid fa-check"></i> Completa';
-        alert('⚠️ Si è verificato un errore durante il salvataggio. Riprova o contatta il supporto.');
+        window.appAlert('Si è verificato un errore durante il salvataggio. Riprova o contatta il supporto.', 'Sottotitoli', '⚠️');
         return;
       }
 
@@ -2696,7 +2704,7 @@
     async function generateReportFromDashboard() {
       var comp = getCompletionPercent();
       if (comp < 100) {
-        alert('Completa tutte le domande prima di generare il report.\n\nCampi mancanti:\n' + getMissingFields().join('\n'));
+        window.appAlert('Completa tutte le domande prima di generare il report.\n\nCampi mancanti:\n' + getMissingFields().join('\n'), 'Sottotitoli', '⚠️');
         return;
       }
       var btn = document.getElementById('dashGenerateReportBtn');
@@ -3150,5 +3158,25 @@
       setTimeout(function() { setUiLanguage(_uiLang); }, 50);
     };
   </script>
+<style>@keyframes wbfPop{from{opacity:0;transform:translateY(-6px) scale(.96)}to{opacity:1;transform:none}}</style>
+<!-- Generic styled modal, driven by js/app-modal.js. This page carries its own palette under
+     different names than theme-2.css, so the shared helper's variables are ALIASED here onto
+     this page's own tokens (and they swap with [data-theme=dark] for free). -->
+<div id="appModalOverlay" style="--panel:var(--card,#fff);--line-strong:var(--input-border,#d1d5db);--text-soft:var(--text-dim,#6b7280);--cyan:var(--accent,#7c3aed);--chip-active-text:#fff;display:none;position:fixed;inset:0;background:var(--overlay-bg,rgba(0,0,0,.65));backdrop-filter:blur(4px);z-index:11000;align-items:center;justify-content:center;padding:20px" onclick="appModalClose()">
+  <div role="dialog" aria-modal="true" style="background:var(--panel);border:1px solid var(--line-strong);border-radius:22px;padding:28px 32px;max-width:440px;width:100%;box-shadow:var(--shadow,0 16px 48px rgba(0,0,0,.25));animation:wbfPop .18s cubic-bezier(.34,1.56,.64,1)" onclick="event.stopPropagation()">
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px">
+      <span id="appModalIcon" style="font-size:30px;line-height:1">ℹ️</span>
+      <h3 id="appModalTitle" style="font-size:18px;font-weight:700;margin:0;color:var(--text);line-height:1.2">Sottotitoli</h3>
+    </div>
+    <p id="appModalMsg" style="font-size:14px;color:var(--text-soft);margin:0 0 22px;line-height:1.55;word-break:break-word"></p>
+    <div id="appModalInputWrap" style="display:none;margin-bottom:18px">
+      <input id="appModalInput" style="width:100%;padding:10px 14px;border:1.5px solid var(--line-strong);border-radius:12px;background:var(--bg);color:var(--text);font-size:15px;font-family:inherit;outline:none;box-sizing:border-box" onfocus="this.style.borderColor='var(--cyan)'" onblur="this.style.borderColor='var(--line-strong)'" onkeydown="if(event.key==='Enter')appModalOk()">
+    </div>
+    <div style="display:flex;gap:8px;justify-content:flex-end">
+      <button id="appModalCancel" onclick="appModalClose()" style="padding:10px 20px;border:1px solid var(--line);border-radius:12px;background:transparent;cursor:pointer;font-size:13px;font-weight:600;color:var(--text-soft)">Cancel</button>
+      <button id="appModalOkBtn" onclick="appModalOk()" style="padding:10px 24px;border:none;border-radius:12px;cursor:pointer;font-size:13px;font-weight:700;background:var(--cyan);color:var(--chip-active-text,#fff)">OK</button>
+    </div>
+  </div>
+</div>
 </body>
 </html>
