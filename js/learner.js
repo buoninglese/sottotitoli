@@ -2053,8 +2053,10 @@
     if (!box) return;
     var q = step.questions[session.mcIndex];
     if (!q) { nextStep(); return; }
+    // ⚠️ No kicker here: the mc step already renders "Quiz" in the stage markup, and this
+    // function re-runs on every question, so emitting one too put a SECOND "Quiz" label on
+    // the screen.
     box.innerHTML =
-      '<div class="step-kicker" data-i18n="learner_quiz">Quiz</div>' +
       '<div class="step-prompt small">' + esc(q.prompt) + '</div>' +
       '<div class="choices">' +
         q.options.map(function (opt) {
