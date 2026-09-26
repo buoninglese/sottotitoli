@@ -122,8 +122,17 @@
           self._busy = false;
           if (!self._stopped) self._showTranscribing(false);
         }).catch(function(e){
-          console.warn('segment transcribe failed:', e);
           self._busy = false;
+          /* 402 = the server refused to spend because the balance is gone. This used to fall
+           * through to the console and KEEP RECORDING: every later segment was refused too,
+           * the audio was discarded, and captions simply stopped appearing with no explanation
+           * while the mic stayed live. End it instead — abort the recorder and let the page run
+           * its normal Stop path, so the session is saved and the UI returns to stopped. */
+          if (e && (e.status === 402 || e.code === 'NO_CREDITS')) {
+            if (typeof self._abortForCredits === 'function') self._abortForCredits();
+            return;
+          }
+          console.warn('segment transcribe failed:', e);
           if (!self._stopped) self._showTranscribing(false);
           if (final) {
             if (typeof showToast === 'function') showToast(String(e.message || e), 'error');
@@ -201,7 +210,12 @@
         try { err = await resp.json(); } catch(e) {}
         var msg = err && err.error ? err.error : ('HTTP ' + resp.status);
         if (resp.status === 401) msg = 'Accesso richiesto: accedi per trascrivere su questo dispositivo.';
-        throw new Error(msg);
+        // Carry the status + code so the caller can tell "this failed" from "you are out of
+        // minutes" — they need opposite handling (retry vs end the session).
+        var errObj = new Error(msg);
+        errObj.status = resp.status;
+        errObj.code = (err && err.code) || null;
+        throw errObj;
       }
       var data = await resp.json();
       return (data && data.text) ? data.text : '';
@@ -215,6 +229,21 @@
         var s = parts[i].replace(/\s+/g, ' ').trim();
         if (s.length > 1 && _realMic && typeof _realMic.onFinal === 'function') _realMic.onFinal(s);
       }
+    },
+
+    /* Tear the recorder down because the balance is spent. Deliberately NOT stop(): that would
+     * attempt a final flush, which the server would refuse again. Clearing _segment first means
+     * the page's later stop() finds nothing to send, so there is no second refused request. */
+    _abortForCredits: function(){
+      this._stopped = true;
+      if (this._interval) { clearInterval(this._interval); this._interval = null; }
+      if (this._recorder && this._recorder.state !== 'inactive') { try { this._recorder.stop(); } catch(e) {} }
+      this._recorder = null;
+      this._segment = [];
+      if (this._stream) { try { this._stream.getTracks().forEach(function(t){ t.stop(); }); } catch(e) {} this._stream = null; }
+      this._busy = false;
+      this._showTranscribing(false);
+      if (typeof window.onTranscriptionCreditsExhausted === 'function') window.onTranscriptionCreditsExhausted();
     }
   };
   window.RecordFallback = FB;
