@@ -188,16 +188,11 @@
   // The trainer is the "Allena" word-bank card-stack (openBankTest).
   function awardCorrect() {
     session.earned += 1;
-    session.attempts = (session.attempts || 0) + 1;
     var v = (XP && XP.cfg) ? XP.cfg.val('correct_answer') : 1;
     session.xpPoints = (session.xpPoints || 0) + v;
     if (XP && XP.award) XP.award('correct_answer'); else addXp(v);
     logXp('correct_answer', v);
   }
-  // One graded (but not correct) answer, for the score percentage. Kept separate from
-  // recordMistake() because a mis-tapped MATCH pair counts as an attempt but is deliberately
-  // NOT added to the mistakes list.
-  function noteAttempt() { if (session) session.attempts = (session.attempts || 0) + 1; }
   // Per-source XP tally for the reward overview on the completion card.
   function logXp(action, xp) {
     if (!session) return;
@@ -229,10 +224,11 @@
     if (mode === 'mission') return 'mission:' + unit.id;
     return null;
   }
-  function saveScore(key, pct, correct, attempts) {
+  function saveScore(key, pct, correct, total) {
     if (!key || pct === null || pct === undefined) return;
     var s = load(); s.scores = s.scores || {};
-    s.scores[key] = { pct: pct, correct: correct, attempts: attempts, at: todayStr() };
+    // `total` is the session's gradable ITEM count (fixed at build time), NOT a count of taps.
+    s.scores[key] = { pct: pct, correct: correct, total: total, at: todayStr() };
     save(s);
   }
   function scoreOf(key) { if (!key) return null; return (load().scores || {})[key] || null; }
@@ -613,7 +609,8 @@
     var mpool = sample(lesson.vocabulary || [], Math.min(5, (lesson.vocabulary || []).length));
     if (mpool.length >= 3) steps.push({ type: 'match', pairs: shuffle(mpool.map(function (v) { return { it: v.it, en: v.en }; })) });
     var qpool = sample((lesson.vocabulary || []).concat(lesson.phrases || []), 5);
-    if (qpool.length) steps.push({ type: 'mc', questions: qpool.map(function (item) { return { prompt: item.en, answer: item.it, options: optionsFor(item.it) }; }) });
+    var qs = mcQuestions(qpool);
+    if (qs.length) steps.push({ type: 'mc', questions: qs });
     if (lesson.conversations && lesson.conversations.length) steps.push({ type: 'convo', convo: lesson.conversations[0] });
     return steps;
   }
@@ -624,7 +621,8 @@
     var qpool = sample(pool, 6);
     var mpairs = sample(pool, 4);
     var steps = [];
-    if (qpool.length) steps.push({ type: 'mc', questions: qpool.map(function (item) { return { prompt: item.en, answer: item.it, options: optionsFor(item.it) }; }) });
+    var qs = mcQuestions(qpool);
+    if (qs.length) steps.push({ type: 'mc', questions: qs });
     if (mpairs.length >= 3) steps.push({ type: 'match', pairs: shuffle(mpairs.map(function (v) { return { it: v.it, en: v.en }; })) });
     return steps;
   }
@@ -643,14 +641,19 @@
     var qp = sample(learnedWords, 6);
     var mp2 = sample(learnedWords, 4);
     var steps = [];
-    if (qp.length) steps.push({ type: 'mc', questions: qp.map(function (item) { return { prompt: item.en, answer: item.it, options: optionsFor(item.it) }; }) });
+    var qs = mcQuestions(qp);
+    if (qs.length) steps.push({ type: 'mc', questions: qs });
     if (mp2.length >= 3) steps.push({ type: 'match', pairs: shuffle(mp2.map(function (v) { return { it: v.it, en: v.en }; })) });
     return steps;
   }
 
   function optionsFor(answerIt, pool) {
     var opts = [answerIt];
-    var all = pool || activeAllWords();
+    // ⚠️ `pool || activeAllWords()` never fell back for an EMPTY pool — `[]` is truthy — so a
+    // learner with no saved words (a new account generating an AI mission, where
+    // realPool(lang) is []) got quiz questions with a SINGLE option: the correct answer.
+    // Measured before the fix: all 5 questions had 1 option and every click scored.
+    var all = (pool && pool.length) ? pool : activeAllWords();
     var tries = 0;
     while (opts.length < 4 && tries < 300) {
       tries++;
@@ -659,6 +662,17 @@
       if (cand && opts.indexOf(cand) === -1) opts.push(cand);
     }
     return shuffle(opts);
+  }
+  /* A multiple-choice question needs at least 3 options (the answer + 2 distractors) to BE a
+   * question: with fewer, clicking the only button scores and the item measures nothing.
+   * Returns null when the pool is too small; the callers then DROP that question instead of
+   * scoring the learner on something they cannot get wrong. */
+  function mcQuestion(item, pool) {
+    var opts = optionsFor(item.it, pool);
+    return opts.length >= 3 ? { prompt: item.en, answer: item.it, options: opts } : null;
+  }
+  function mcQuestions(items, pool) {
+    return (items || []).map(function (it) { return mcQuestion(it, pool); }).filter(Boolean);
   }
 
   function learnedWords() {
@@ -1160,9 +1174,24 @@
     if (nav) { nav.classList.add('active'); nav.setAttribute('aria-current', 'page'); }
   }
 
+  /* How many items in this session can actually be got WRONG. Used as the score denominator,
+   * fixed once when the session opens. ⚠️ Scoring against the number of taps instead made the
+   * percentage meaningless: the same mission measured 10/53 (19%) then 10/13 (77%) purely
+   * because the match was mis-tapped more often in the first run. Listen steps are never graded
+   * so they are not counted — that is what stops innocent steps from deflating the score. */
+  function gradableCount(steps) {
+    var n = 0;
+    (steps || []).forEach(function (s) {
+      if (!s) return;
+      if (s.type === 'speak') n += 1;
+      else if (s.type === 'match') n += (s.pairs ? s.pairs.length : 1);
+      else if (s.type === 'mc') n += (s.questions ? s.questions.length : 0);
+    });
+    return n;
+  }
   function openSession(mode, unit, lesson, steps) {
     activateLearnerPanel();
-    session = { mode: mode, unit: unit || null, lesson: lesson || null, steps: steps, idx: 0, earned: 0, attempts: 0, xpLog: {}, lang: learnerLang() };
+    session = { mode: mode, unit: unit || null, lesson: lesson || null, steps: steps, idx: 0, earned: 0, total: gradableCount(steps), xpLog: {}, lang: learnerLang() };
     if (mode === 'mission' && session.unit) trackMissionForSession(0, false);
     renderOverlay();
   }
@@ -1211,7 +1240,8 @@
     var mp = sample(items, Math.min(5, items.length));
     if (mp.length >= 3) steps.push({ type: 'match', pairs: shuffle(mp.map(function (v) { return { it: v.it, en: v.en }; })) });
     var qp = sample(items, Math.min(6, items.length));
-    if (qp.length) steps.push({ type: 'mc', questions: qp.map(function (v) { return { prompt: v.en, answer: v.it, options: optionsFor(v.it, pool) }; }) });
+    var qs = mcQuestions(qp, pool);
+    if (qs.length) steps.push({ type: 'mc', questions: qs });
     return steps;
   }
 
@@ -1304,6 +1334,7 @@
     var items = await toItems(sample(avail, Math.min(20, avail.length)), bank.lang);
     openSession('bank', { id: bankId, name: bank.name, lang: bank.lang }, null, []);
     session.cards = items;
+    session.total = items.length; // score denominator for the Allena stack: one point per card
     session.cardIdx = 0;
     session.graded = {}; // item.word -> SM-2 quality (1/3/4/5) for write-back
     session.bankId = bankId;
@@ -1475,7 +1506,7 @@
     if (!frontEl.classList.contains('flip')) frontEl.classList.add('flip');
     // Record grade + XP / mistake
     session.graded[item.word] = q;
-    if (q >= 3) { awardCorrect(); } else { noteAttempt(); recordMistake(item.word, session.lang); }
+    if (q >= 3) { awardCorrect(); } else { recordMistake(item.word, session.lang); }
     writeGrade(item, q); // fire-and-forget SM-2 write-back to review_words
     $all('.ics-grade', stage).forEach(function (b) { b.disabled = true; });
     // Fly the front card off, then cascade the stack
@@ -1628,7 +1659,8 @@
     var mp = sample(words, Math.min(5, words.length));
     if (mp.length >= 3) steps.push({ type: 'match', pairs: shuffle(mp.map(function (v) { return { it: v.it, en: v.en }; })) });
     var qp = sample(words, Math.min(5, words.length));
-    if (qp.length) steps.push({ type: 'mc', questions: qp.map(function (v) { return { prompt: v.en, answer: v.it, options: optionsFor(v.it, pool) }; }) });
+    var qs = mcQuestions(qp, pool);
+    if (qs.length) steps.push({ type: 'mc', questions: qs });
     if (convo.length >= 2) {
       steps.push({ type: 'convo', convo: { title: c.subtitle || c.title || 'Conversazione', speakers: convo.map(function (ln) {
         var role = ln.role === 'learner' ? 'Tu' : (ln.role === 'native' ? 'A' : (ln.role || 'A'));
@@ -1743,7 +1775,8 @@
     var mp = sample(words, Math.min(4, words.length));
     if (mp.length >= 3) steps.push({ type: 'match', pairs: shuffle(mp.map(function (v) { return { it: v.it, en: v.en }; })) });
     var qp = sample(words, Math.min(5, words.length));
-    if (qp.length) steps.push({ type: 'mc', questions: qp.map(function (v) { return { prompt: v.en, answer: v.it, options: optionsFor(v.it) }; }) });
+    var qs2 = mcQuestions(qp);
+    if (qs2.length) steps.push({ type: 'mc', questions: qs2 });
     return steps;
   }
   function nextOpenLesson() {
@@ -1918,7 +1951,8 @@
     var mp = sample(items, Math.min(medium ? 5 : 3, items.length));
     if (mp.length >= 3) steps.push({ type: 'match', pairs: shuffle(mp.map(function (v) { return { it: v.it, en: v.en }; })) });
     var qp = sample(items, Math.min(medium ? 5 : 3, items.length));
-    if (qp.length) steps.push({ type: 'mc', questions: qp.map(function (v) { return { prompt: v.en, answer: v.it, options: optionsFor(v.it) }; }) });
+    var qs = mcQuestions(qp);
+    if (qs.length) steps.push({ type: 'mc', questions: qs });
     return steps;
   }
   function openThemeMission(themeKey, len) {
@@ -2146,7 +2180,6 @@
       awardCorrect();
       if (session.mode === 'lesson') { /* fine */ }
     } else {
-      noteAttempt();
       recordMistake(q.answer, session.lang);
       // highlight correct
       $all('.choice', btn.parentElement).forEach(function (c) {
@@ -2192,7 +2225,6 @@
         st.selIt = null; st.selEn = null;
         if (Object.keys(st.matched).length === st.pairs.length) toast(t('learner_all_matched'));
       } else {
-        noteAttempt(); // a mis-tapped pair is a wrong answer for the score…
         var badIt = st.selIt, badEn = st.selEn;
         badIt.classList.remove('selected'); badEn.classList.remove('selected');
         badIt.classList.add('incorrect'); badEn.classList.add('incorrect');
@@ -2263,7 +2295,7 @@
     if (checkBtn) checkBtn.disabled = true;
     session.speakChecked = true;
     if (correct) { awardCorrect(); }
-    else { noteAttempt(); recordMistake(expected, session.lang); }
+    else { recordMistake(expected, session.lang); }
     setTimeout(nextStep, correct ? 900 : 1600);
   }
 
@@ -2338,6 +2370,7 @@
   }
 
   function endSession() {
+    if (session.finished) return; // a second call must never re-award the completion bonus
     session.finished = true; // the completion card is up: leaving now costs nothing
     var mode = session.mode;
     var unit = session.unit, lesson = session.lesson;
@@ -2347,24 +2380,44 @@
     // Remove overlay, render result inside stage
     var stage = $('#learnerStage');
     var emoji = '', title = '', body = '', bonus = 0, confettiFlag = false;
+    /* Score, declared up here because the per-mode branches below need it (the test's pass mark).
+     * Denominator = the session's gradable item count, fixed when it opened — NOT the number of
+     * taps — so the same content always yields a comparable percentage. */
+    var total = session.total || 0;
+    var correct = session.earned || 0;
+    var pct = total ? Math.max(0, Math.min(100, Math.round((correct / total) * 100))) : null;
+    /* ⚠️ The completion bonus is a ONE-TIME milestone, not a per-run payout. It used to be
+     * awarded on every completion, which turned the new Redo button into an XP farm: measured,
+     * one redo took xp from 20 to 40 and awarded mission_complete a SECOND time for the same 10
+     * items. A repeat now earns only the per-answer XP, which still has to be worked for.
+     * `firstClear` is read from the pre-completion state `s`, ahead of the mark* call that
+     * records it. */
+    var firstClear = true;
 
     if (mode === 'lesson') {
+      firstClear = !s.lessons[unit.id + ':' + lesson.id];
       markLessonDone(unit.id, lesson.id);
-      bonus = awardBonus('lesson_complete', 10);
+      if (firstClear) bonus = awardBonus('lesson_complete', 10);
       emoji = '🎉'; title = t('learner_lesson_complete');
       body = t('learner_lesson_complete_sub');
       confettiFlag = true;
     } else if (mode === 'test') {
       var score = earned;
-      var passed = score >= 8;
+      // The pass mark is 80% of the items THIS test actually generated, not a hardcoded 8:
+      // a question that cannot produce 3 options is dropped, which would otherwise make the
+      // test silently harder than the "≥ 8/10" it promises (buildStepsForTest targets 10).
+      var need = Math.max(1, Math.ceil(total * 0.8));
+      var passed = score >= need;
+      firstClear = !(s.tests[unit.id] && s.tests[unit.id].passed); // the FIRST pass, not the first attempt
       markTestResult(unit.id, passed, score);
-      if (passed) { bonus = awardBonus('test_passed', 20); }
+      if (passed && firstClear) { bonus = awardBonus('test_passed', 20); }
       emoji = passed ? '🏆' : '💪';
       title = passed ? t('learner_test_passed') : t('learner_test_failed');
-      body = t('learner_you_scored') + ' ' + score + '/10';
+      body = t('learner_you_scored') + ' ' + score + '/' + total;
       confettiFlag = passed;
     } else if (mode === 'bank' || mode === 'review') {
-      bonus = awardBonus('allena_complete', 5);
+      firstClear = !s.lessons[mode + ':' + unit.id];
+      if (firstClear) bonus = awardBonus('allena_complete', 5);
       markLessonDone(mode, unit.id); // 'bank:<id>' or 'review:<id>'
       emoji = mode === 'bank' ? '📚' : '🧠';
       title = mode === 'bank' ? t('learner_bank_done') : t('learner_review_done');
@@ -2373,24 +2426,21 @@
     } else if (mode === 'mission') {
       clearMissionProg();
       trackMissionForSession(100, true);
-      bonus = awardBonus('mission_complete', 10);
+      firstClear = !s.lessons['mission:' + unit.id];
+      if (firstClear) bonus = awardBonus('mission_complete', 10);
       markLessonDone('mission', unit.id);
       emoji = '🎯'; title = t('learner_mission_done');
       body = esc(unit.name);
       confettiFlag = true;
     } else {
-      awardBonus('allena_complete', 5);
+      awardBonus('allena_complete', 5); // practice has no persistent item: always rewarded
       emoji = '⚡'; title = t('learner_practice_done');
     }
+    if (!firstClear) body = (body ? body + ' · ' : '') + t('learner_repeat_no_bonus');
 
-    // ── Score + rewards ──
-    // The percentage is correct / graded attempts, so it only counts items that were actually
-    // answered (Listen steps are never graded, so including them would deflate it).
-    var attempts = session.attempts || 0;
-    var correct = session.earned || 0;
-    var pct = attempts ? Math.max(0, Math.min(100, Math.round((correct / attempts) * 100))) : null;
+    // ── Score + rewards ── (score computed at the top of the function)
     var totalXp = (session.xpPoints || 0) + (bonus || 0);
-    saveScore(scoreKey(mode, unit, lesson), pct, correct, attempts); // a Redo overwrites this
+    saveScore(scoreKey(mode, unit, lesson), pct, correct, total); // a Redo overwrites this
     var log = session.xpLog || {};
     var rows = Object.keys(log).map(function (action) {
       var e = log[action];
@@ -2407,7 +2457,7 @@
         (body ? '<div class="cc-sub">' + esc(body) + '</div>' : '') +
         (pct !== null
           ? '<div class="cc-score"><span class="cc-score-pct">' + pct + '%</span>' +
-            '<span class="cc-score-sub">' + correct + ' / ' + attempts + ' ' + t('learner_correct_answers') + '</span></div>'
+            '<span class="cc-score-sub">' + correct + ' / ' + total + ' ' + t('learner_correct_answers') + '</span></div>'
           : '') +
         (rows
           ? '<div class="cc-rewards"><div class="cc-rewards-title">' + t('learner_reward_overview') + '</div>' +
