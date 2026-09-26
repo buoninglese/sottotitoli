@@ -1988,10 +1988,19 @@
         '<button class="primary-btn" onclick="Learner.nextStep()" data-i18n="learner_next">Avanti</button></div>';
       setTimeout(function () { speak(step.item.it); }, 250);
     } else if (step.type === 'speak') {
+      // Every speak step is answerable by TYPING as well as by voice. The browser's
+      // speech recognition is not available at all on iOS Safari, so without this the
+      // step could not be completed on an iPhone. The typed answer lands in the same
+      // `heardText` slot as the transcript, so checkSpeak() grades both identically.
+      heardText = '';
+      session.speakChecked = false;
+      var _sr = hasRecognition();
       html = '<div class="step-kicker" data-i18n="learner_speak">Parla</div>' +
         '<div class="step-prompt small">' + esc(step.item.en) + '</div>' +
         '<div class="step-sub">' + esc(t(session.lang === 'it' ? 'learner_tap_mic' : 'learner_tap_mic_en')) + '</div>' +
-        '<button type="button" class="mic-btn" id="learnerMic" onclick="Learner.startListen()">🎙️</button>' +
+        (_sr ? '<button type="button" class="mic-btn" id="learnerMic" onclick="Learner.startListen()">🎙️</button>' : '') +
+        '<div class="speak-type-wrap">' + (_sr ? '<span class="speak-or" data-i18n="learner_or">oppure</span>' : '') +
+        '<input type="text" id="learnerType" class="speak-type" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="' + esc(t('learner_type_here')) + '" oninput="Learner.typeSpeak(this.value)" onkeydown="Learner.typeKey(event)"></div>' +
         '<div class="heard-text" id="learnerHeard"></div>' +
         '<div class="btn-row"><button class="ghost-btn" onclick="Learner.listenAgain()" data-i18n="learner_listen_again">Riascolta</button>' +
         '<button class="primary-btn" id="learnerCheck" disabled onclick="Learner.checkSpeak()" data-i18n="learner_check">Controlla</button></div>';
@@ -2148,12 +2157,30 @@
     if (checkBtn && session && session.steps[session.idx].type === 'speak' && heardText) checkBtn.disabled = false;
     if (recog) { try { recog.stop(); } catch (e) {} }
   }
+  /* The typed answer for a speak step — the same slot as the microphone's transcript,
+   * so voice and typing are graded by exactly the same code path. */
+  function typeSpeak(v) {
+    if (!session) return;
+    heardText = String(v || '').trim();
+    var heardEl = $('#learnerHeard');
+    if (heardEl) heardEl.textContent = heardText ? '“' + heardText + '”' : '';
+    var checkBtn = $('#learnerCheck');
+    if (checkBtn) checkBtn.disabled = !heardText || !!session.speakChecked;
+  }
+  function typeKey(ev) { if (ev && ev.key === 'Enter') { ev.preventDefault(); checkSpeak(); } }
   function checkSpeak() {
     if (!session) return;
     var step = session.steps[session.idx];
+    if (!step || step.type !== 'speak') return;
+    if (session.speakChecked) return; // holding Enter must not grade — or award — twice
     if (!heardText) { toast(t('learner_tap_mic')); return; }
     var expected = step.item.it;
-    var correct = norm(heardText) === norm(expected) || norm(expected).indexOf(norm(heardText)) !== -1 || norm(heardText).indexOf(norm(expected)) !== -1;
+    // A partial answer only counts from 3 characters up. Speech transcripts legitimately
+    // arrive as prefixes while the user is still talking, but now that the step also
+    // accepts typing, "a" (or any single letter the word happens to contain) must not
+    // pass every step.
+    var nH = norm(heardText), nE = norm(expected);
+    var correct = nH === nE || nH.indexOf(nE) !== -1 || (nH.length >= 3 && nE.indexOf(nH) !== -1);
     var heardEl = $('#learnerHeard');
     var fb = document.createElement('div');
     fb.className = 'feedback ' + (correct ? 'correct' : 'incorrect');
@@ -2161,6 +2188,7 @@
     if (heardEl && heardEl.parentElement) heardEl.parentElement.appendChild(fb);
     var checkBtn = $('#learnerCheck');
     if (checkBtn) checkBtn.disabled = true;
+    session.speakChecked = true;
     if (correct) { awardCorrect(); }
     else { recordMistake(expected, session.lang); }
     setTimeout(nextStep, correct ? 900 : 1600);
@@ -2410,6 +2438,8 @@
     speakText: speakText,
     speakAll: speakAll,
     startListen: startListen,
+    typeSpeak: typeSpeak,
+    typeKey: typeKey,
     checkSpeak: checkSpeak,
     matchTap: matchTap,
     answerMc: answerMc,
