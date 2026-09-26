@@ -188,14 +188,54 @@
   // The trainer is the "Allena" word-bank card-stack (openBankTest).
   function awardCorrect() {
     session.earned += 1;
-    if (XP && XP.award) { session.xpPoints = (session.xpPoints || 0) + XP.cfg.val('correct_answer'); XP.award('correct_answer'); }
-    else { session.xpPoints = (session.xpPoints || 0) + 1; addXp(1); }
+    session.attempts = (session.attempts || 0) + 1;
+    var v = (XP && XP.cfg) ? XP.cfg.val('correct_answer') : 1;
+    session.xpPoints = (session.xpPoints || 0) + v;
+    if (XP && XP.award) XP.award('correct_answer'); else addXp(v);
+    logXp('correct_answer', v);
+  }
+  // One graded (but not correct) answer, for the score percentage. Kept separate from
+  // recordMistake() because a mis-tapped MATCH pair counts as an attempt but is deliberately
+  // NOT added to the mistakes list.
+  function noteAttempt() { if (session) session.attempts = (session.attempts || 0) + 1; }
+  // Per-source XP tally for the reward overview on the completion card.
+  function logXp(action, xp) {
+    if (!session) return;
+    session.xpLog = session.xpLog || {};
+    var e = session.xpLog[action] || { xp: 0, count: 0 };
+    e.xp += xp; e.count += 1;
+    session.xpLog[action] = e;
+  }
+  function xpLabel(action) {
+    var acts = (XP && XP.cfg && XP.cfg.actions) || [];
+    var lang = (w.I18n && w.I18n.getLang && w.I18n.getLang() === 'en') ? 'en' : 'it';
+    for (var i = 0; i < acts.length; i++) { if (acts[i].key === action) return acts[i][lang] || acts[i].en || action; }
+    return action;
   }
   function awardBonus(action, fallback) {
     var v = (XP && XP.cfg) ? XP.cfg.val(action) : fallback;
     if (XP && XP.award) XP.award(action); else addXp(v);
+    logXp(action, v);
     return v;
   }
+  /* ── Persisted score percentage, per completed item ──
+   * This is the number a Redo REPLACES (deliberately the last attempt, not a best-ever
+   * record — the confirm on the Redo button says so). */
+  function scoreKey(mode, unit, lesson) {
+    if (!unit) return null;
+    if (mode === 'lesson') return 'lesson:' + unit.id + ':' + (lesson && lesson.id);
+    if (mode === 'test') return 'test:' + unit.id;
+    if (mode === 'bank' || mode === 'review') return mode + ':' + unit.id;
+    if (mode === 'mission') return 'mission:' + unit.id;
+    return null;
+  }
+  function saveScore(key, pct, correct, attempts) {
+    if (!key || pct === null || pct === undefined) return;
+    var s = load(); s.scores = s.scores || {};
+    s.scores[key] = { pct: pct, correct: correct, attempts: attempts, at: todayStr() };
+    save(s);
+  }
+  function scoreOf(key) { if (!key) return null; return (load().scores || {})[key] || null; }
   function markLessonDone(unitId, lessonId) {
     var s = load(); s.lessons[unitId + ':' + lessonId] = todayStr(); save(s); return s;
   }
@@ -503,25 +543,52 @@
   /* ── Confetti (tiny canvas) ── */
   function confetti() {
     var c = document.createElement('canvas');
+    c.id = 'learnerConfetti';
     c.style.cssText = 'position:fixed;inset:0;width:100vw;height:100vh;pointer-events:none;z-index:99999';
     document.body.appendChild(c);
     var ctx = c.getContext('2d');
-    c.width = w.innerWidth; c.height = w.innerHeight;
+    var fit = function () { c.width = w.innerWidth; c.height = w.innerHeight; };
+    fit();
+    w.addEventListener('resize', fit);
     var colors = ['#22c55e', '#06b6d4', '#8b5cf6', '#f59e0b', '#ef4444', '#f472b6', '#14b8a6'];
     var parts = [], N = 150;
     for (var i = 0; i < N; i++) {
-      parts.push({ x: Math.random() * c.width, y: -20 - Math.random() * c.height * 0.3, w: 6 + Math.random() * 6, h: 8 + Math.random() * 8, vy: 2 + Math.random() * 3, vx: -1.5 + Math.random() * 3, rot: Math.random() * Math.PI, vr: -0.12 + Math.random() * 0.24, color: colors[Math.floor(Math.random() * colors.length)] });
+      parts.push({
+        x: Math.random() * c.width,
+        // Staggered over a tall range so they arrive as a continuous stream rather than
+        // all at once, which is what makes the fall last.
+        y: -20 - Math.random() * c.height * 0.9,
+        w: 6 + Math.random() * 6, h: 8 + Math.random() * 8,
+        vy: 2.4 + Math.random() * 2.8, vx: -1.2 + Math.random() * 2.4,
+        rot: Math.random() * Math.PI, vr: -0.12 + Math.random() * 0.24,
+        color: colors[Math.floor(Math.random() * colors.length)]
+      });
     }
+    /* ⚠️ The old version respawned every piece at the top (`if (p.y > c.height + 20) p.y = -20`)
+     * and then stopped after a fixed 230 frames — so it was cut off mid-fall with most of the
+     * confetti still in the air. Nothing respawns now: each piece falls all the way past the
+     * bottom edge and the canvas is removed only when the LAST one has gone, however long that
+     * takes. `dt` normalises the step to ~60fps so the fall lasts the same wall-clock time on a
+     * 120Hz screen, and MAX_FRAMES is a leak guard, not the stop condition. */
+    var FRAME_MS = 1000 / 60, MAX_FRAMES = 9000;
+    var last = (w.performance && w.performance.now) ? w.performance.now() : Date.now();
     var frames = 0;
-    (function tick() {
+    (function tick(now) {
+      var t2 = (now == null) ? last + FRAME_MS : now;
+      var dt = Math.max(0.25, Math.min(3, (t2 - last) / FRAME_MS)) || 1;
+      last = t2;
       ctx.clearRect(0, 0, c.width, c.height);
+      var alive = 0;
       parts.forEach(function (p) {
-        p.y += p.vy; p.x += p.vx; p.rot += p.vr;
-        if (p.y > c.height + 20) { p.y = -20; p.x = Math.random() * c.width; }
+        p.y += p.vy * dt; p.x += p.vx * dt; p.rot += p.vr * dt;
+        if (p.y - p.h / 2 > c.height) return; // fully past the bottom: this one is done
+        alive++;
         ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.rot);
         ctx.fillStyle = p.color; ctx.fillRect(-p.w / 2, -p.h / 2, p.w, p.h); ctx.restore();
       });
-      if (++frames < 230) requestAnimationFrame(tick); else c.remove();
+      frames++;
+      if (alive > 0 && frames < MAX_FRAMES) requestAnimationFrame(tick);
+      else { w.removeEventListener('resize', fit); c.remove(); }
     })();
   }
 
@@ -859,23 +926,25 @@
           var isDone = !!s.lessons[u.id + ':' + l.id];
           var avail = isDone || isLessonAvailable(u, l);
           var nodeIcon = isDone ? '✓' : esc(l.icon || '●');
+          var lessonScore = isDone ? scoreOf('lesson:' + u.id + ':' + l.id) : null;
           html += '<div class="lesson-node-row">' +
             '<button type="button" class="lesson-node ' + (isDone ? 'done' : (avail ? 'available' : '')) + '" ' +
               (avail ? 'onclick="Learner.openLesson(\'' + u.id + '\',\'' + l.id + '\')"' : 'disabled') + '>' + nodeIcon + '</button>' +
             '<div class="lesson-label"><div class="ll-title">' + esc(l.title) + '</div><div class="ll-sub">' + esc(l.description) + '</div></div>' +
-            (isDone ? '<span style="color:var(--green);font-size:12px;font-weight:800">✓</span>'
+            (isDone ? '<span class="lesson-score">✓' + (lessonScore ? ' ' + lessonScore.pct + '%' : '') + '</span>'
               : (avail ? '<button class="lesson-link" onclick="Learner.openLesson(\'' + u.id + '\',\'' + l.id + '\')">' + t('learner_continue') + '</button>' : '')) +
           '</div>' +
           '<div class="connector ' + (isDone ? 'done' : '') + '"></div>';
         });
         var testAvail = isTestAvailable(u);
         var testState = s.tests[u.id] && s.tests[u.id].passed ? 'done' : (testAvail ? 'available' : '');
+        var testScore = scoreOf('test:' + u.id);
         html += '<div class="lesson-node-row">' +
           '<button type="button" class="lesson-node test ' + testState + '" ' +
             (testAvail ? 'onclick="Learner.openTest(\'' + u.id + '\')"' : 'disabled') + '>🏆</button>' +
           '<div class="lesson-label"><div class="ll-title">' + t('learner_unit_test') + '</div>' +
             '<div class="ll-sub">' + (s.tests[u.id] && s.tests[u.id].passed
-              ? (t('learner_test_best') + ' ' + s.tests[u.id].best + '/10')
+              ? (t('learner_test_best') + ' ' + s.tests[u.id].best + '/10' + (testScore ? ' · ' + testScore.pct + '%' : ''))
               : (testAvail ? t('learner_unit_test_ready') : (unitLessonsDone(u) + '/' + u.lessons.length + ' ' + t('learner_lessons_completed')))) + '</div></div>' +
           (testAvail ? '<button class="lesson-link" onclick="Learner.openTest(\'' + u.id + '\')">' + (s.tests[u.id] ? t('learner_try_again') : t('learner_continue')) + '</button>' : '') +
         '</div>';
@@ -1093,7 +1162,7 @@
 
   function openSession(mode, unit, lesson, steps) {
     activateLearnerPanel();
-    session = { mode: mode, unit: unit || null, lesson: lesson || null, steps: steps, idx: 0, earned: 0, lang: learnerLang() };
+    session = { mode: mode, unit: unit || null, lesson: lesson || null, steps: steps, idx: 0, earned: 0, attempts: 0, xpLog: {}, lang: learnerLang() };
     if (mode === 'mission' && session.unit) trackMissionForSession(0, false);
     renderOverlay();
   }
@@ -1406,7 +1475,7 @@
     if (!frontEl.classList.contains('flip')) frontEl.classList.add('flip');
     // Record grade + XP / mistake
     session.graded[item.word] = q;
-    if (q >= 3) { awardCorrect(); } else { recordMistake(item.word, session.lang); }
+    if (q >= 3) { awardCorrect(); } else { noteAttempt(); recordMistake(item.word, session.lang); }
     writeGrade(item, q); // fire-and-forget SM-2 write-back to review_words
     $all('.ics-grade', stage).forEach(function (b) { b.disabled = true; });
     // Fly the front card off, then cascade the stack
@@ -2077,6 +2146,7 @@
       awardCorrect();
       if (session.mode === 'lesson') { /* fine */ }
     } else {
+      noteAttempt();
       recordMistake(q.answer, session.lang);
       // highlight correct
       $all('.choice', btn.parentElement).forEach(function (c) {
@@ -2122,6 +2192,7 @@
         st.selIt = null; st.selEn = null;
         if (Object.keys(st.matched).length === st.pairs.length) toast(t('learner_all_matched'));
       } else {
+        noteAttempt(); // a mis-tapped pair is a wrong answer for the score…
         var badIt = st.selIt, badEn = st.selEn;
         badIt.classList.remove('selected'); badEn.classList.remove('selected');
         badIt.classList.add('incorrect'); badEn.classList.add('incorrect');
@@ -2192,7 +2263,7 @@
     if (checkBtn) checkBtn.disabled = true;
     session.speakChecked = true;
     if (correct) { awardCorrect(); }
-    else { recordMistake(expected, session.lang); }
+    else { noteAttempt(); recordMistake(expected, session.lang); }
     setTimeout(nextStep, correct ? 900 : 1600);
   }
 
@@ -2271,7 +2342,6 @@
     var mode = session.mode;
     var unit = session.unit, lesson = session.lesson;
     var earned = session.earned;
-    var points = session.xpPoints || earned;
     var s = load();
 
     // Remove overlay, render result inside stage
@@ -2298,7 +2368,7 @@
       markLessonDone(mode, unit.id); // 'bank:<id>' or 'review:<id>'
       emoji = mode === 'bank' ? '📚' : '🧠';
       title = mode === 'bank' ? t('learner_bank_done') : t('learner_review_done');
-      body = t('learner_you_scored') + ' ' + points + ' XP' + ' · ' + esc(unit.name);
+      body = esc(unit.name);
       confettiFlag = earned > 0;
     } else if (mode === 'mission') {
       clearMissionProg();
@@ -2306,25 +2376,68 @@
       bonus = awardBonus('mission_complete', 10);
       markLessonDone('mission', unit.id);
       emoji = '🎯'; title = t('learner_mission_done');
-      body = t('learner_you_scored') + ' ' + points + ' XP' + ' · ' + esc(unit.name);
+      body = esc(unit.name);
       confettiFlag = true;
     } else {
       awardBonus('allena_complete', 5);
       emoji = '⚡'; title = t('learner_practice_done');
-      body = t('learner_you_scored') + ' ' + points + ' XP';
     }
+
+    // ── Score + rewards ──
+    // The percentage is correct / graded attempts, so it only counts items that were actually
+    // answered (Listen steps are never graded, so including them would deflate it).
+    var attempts = session.attempts || 0;
+    var correct = session.earned || 0;
+    var pct = attempts ? Math.max(0, Math.min(100, Math.round((correct / attempts) * 100))) : null;
+    var totalXp = (session.xpPoints || 0) + (bonus || 0);
+    saveScore(scoreKey(mode, unit, lesson), pct, correct, attempts); // a Redo overwrites this
+    var log = session.xpLog || {};
+    var rows = Object.keys(log).map(function (action) {
+      var e = log[action];
+      return '<li><span class="ccr-label">' + esc(xpLabel(action)) +
+        (e.count > 1 ? ' <b>×' + e.count + '</b>' : '') + '</span>' +
+        '<span class="ccr-xp">+ ' + e.xp + ' XP</span></li>';
+    }).join('');
+    var canRedo = !!((session.steps && session.steps.length) || (session.cards && session.cards.length));
 
     if (stage) {
       stage.innerHTML = '<div class="complete-card">' +
         '<div class="cc-emoji">' + emoji + '</div>' +
         '<div class="cc-title">' + esc(title) + '</div>' +
-        '<div class="cc-sub">' + esc(body) + '</div>' +
-        (bonus ? '<div class="cc-xp">+ ' + bonus + ' XP</div>' : '') +
-        '<div class="btn-row" style="margin-top:22px"><button class="primary-btn" onclick="Learner.closeSession()">' + t('learner_back_path') + '</button></div>' +
+        (body ? '<div class="cc-sub">' + esc(body) + '</div>' : '') +
+        (pct !== null
+          ? '<div class="cc-score"><span class="cc-score-pct">' + pct + '%</span>' +
+            '<span class="cc-score-sub">' + correct + ' / ' + attempts + ' ' + t('learner_correct_answers') + '</span></div>'
+          : '') +
+        (rows
+          ? '<div class="cc-rewards"><div class="cc-rewards-title">' + t('learner_reward_overview') + '</div>' +
+            '<ul class="cc-rewards-list">' + rows + '</ul>' +
+            '<div class="cc-rewards-total"><span>' + t('learner_total') + '</span><span>+ ' + totalXp + ' XP</span></div></div>'
+          : '') +
+        '<div class="btn-row" style="margin-top:22px">' +
+          '<button class="primary-btn" onclick="Learner.closeSession()">' + t('learner_back_path') + '</button>' +
+          (canRedo ? '<button class="ghost-btn" onclick="Learner.redoSession()">' + t('learner_redo') + '</button>' : '') +
+        '</div>' +
       '</div>';
       i18nScope(stage);
     }
     if (confettiFlag) setTimeout(confetti, 200);
+  }
+
+  /* Redo the session that just ended: the same content, as a fresh attempt whose percentage
+   * REPLACES the one on record — which is exactly what the confirm warns about. */
+  function redoSession() {
+    if (!session) return;
+    var go = function () {
+      var mode = session.mode, unit = session.unit, lesson = session.lesson, steps = session.steps;
+      closeSession();
+      // The Allena card-stack sessions are built by their own openers, not from `steps`.
+      if (mode === 'bank') { openBankTest(unit && unit.id); return; }
+      if (mode === 'review') { openReview(unit && unit.id, (unit && unit.lang) || undefined); return; }
+      openSession(mode, unit, lesson, steps);
+    };
+    if (typeof appConfirm === 'function') appConfirm(t('learner_redo_warn'), go, t('learner_redo_title'), '↻', t('learner_redo_ok'), true);
+    else if (w.confirm(t('learner_redo_warn'))) go();
   }
 
   function closeSession() {
@@ -2434,6 +2547,7 @@
     confirmAiMission: confirmAiMission,
     startDaily: startDaily,
     closeSession: closeSession,
+    redoSession: redoSession,
     requestClose: requestClose,
     nextStep: nextStep,
     listenAgain: listenAgain,
