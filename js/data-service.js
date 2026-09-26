@@ -543,11 +543,39 @@
 
   /* ═══════════════════════════════════════════
      WORD BANK STATS — aggregated counts
-     ═══════════════════════════════════════════ */
+     ═══════════════════════════════════════════
+     ⚠️ The bank and the spaced-repetition table share NO id — so these counts used to be
+     hardcoded zeros. They do share the WORD: `user_wordbank_words.word` matches
+     `review_words.normalized`/`.lemma`. Verified against the live database BEFORE relying on
+     it (231 rows matched on lemma, 224 on normalized), so this is a real join, not a hopeful one.
+
+     DESIGN: the `review_words` row stays the SINGLE source of truth for schedule and mastery.
+     The tempting alternative — copying interval/ease/mastery onto the bank row — creates a
+     second copy that must be updated on every graded answer, which is exactly how the
+     learner/eval drift bugs started. One extra read per stats render is cheaper than that.
+     If the SRS read fails (offline, RLS, no table) the map stays empty and the counts degrade
+     to the old honest zeros rather than inventing values. */
+
+  /* Same normalisation the learner writes into review_words.normalized (js/learner.js norm()).
+   * It must match exactly or lookups silently miss: accents stripped, punctuation to space. */
+  function srsKey(s) {
+    return String(s || '').toLowerCase()
+      .replace(/[àáâãäå]/g, 'a').replace(/[èéêë]/g, 'e').replace(/[ìíîï]/g, 'i')
+      .replace(/[òóôõö]/g, 'o').replace(/[ùúûü]/g, 'u').replace(/ç/g, 'c')
+      .replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim();
+  }
+
+  /* One shape for every failure path. These used to disagree — the fallbacks omitted
+   * `mastered`, so a caller reading it got undefined on an error but a number otherwise. */
+  function emptyWordbankStats() {
+    return { totalWords: 0, dueToday: 0, overdue: 0, reviewedToday: 0, newThisWeek: 0,
+             known: 0, learning: 0, mastered: 0 };
+  }
+
   async function getWordbankStats(lang) {
     lang = lang || getStudyLang();
     var userId = await getUserId();
-    if (!userId) return { totalWords: 0, dueToday: 0, overdue: 0, reviewedToday: 0, newThisWeek: 0, known: 0, learning: 0 };
+    if (!userId) return emptyWordbankStats();
 
     try {
       // Query through user_wordbanks to get user-scoped data, then join to words
@@ -555,7 +583,7 @@
       var { data: banks, error: bankErr } = await sb().from('user_wordbanks')
         .select('id').eq('user_id', userId).eq('lang', lang);
       if (bankErr || !banks || !banks.length) {
-        return { totalWords: 0, dueToday: 0, overdue: 0, reviewedToday: 0, newThisWeek: 0, known: 0, learning: 0 };
+        return emptyWordbankStats();
       }
       var bankIds = banks.map(function(b) { return b.id; });
 
@@ -563,7 +591,7 @@
         .select('id, word, pos, usage_count, last_used, created_at')
         .in('wordbank_id', bankIds)
         .order('usage_count', { ascending: false });
-      if (wordErr) { console.warn('wordbank stats:', wordErr.message); return { totalWords: 0, dueToday: 0, overdue: 0, reviewedToday: 0, newThisWeek: 0, known: 0, learning: 0 }; }
+      if (wordErr) { console.warn('wordbank stats:', wordErr.message); return emptyWordbankStats(); }
 
       words = words || [];
       var total = words.length;
@@ -573,29 +601,64 @@
         return w.created_at && new Date(w.created_at) >= weekAgo;
       }).length;
 
+      /* ── Overlay the real spaced-repetition state, matched on the word ──
+       * One query for the user, then a map lookup per bank word. Note `lang` is NOT filtered on:
+       * most review_words rows carry a null lang, so filtering would silently drop most matches.
+       * Instead, on a key collision the row whose lang matches wins (see below). */
+      var srs = {};
+      try {
+        var srsQ = await sb().from('review_words')
+          .select('lemma,normalized,lang,review_state,mastery_score,next_review_at,last_reviewed_at')
+          .eq('user_id', userId);
+        if (srsQ && !srsQ.error && srsQ.data) {
+          srsQ.data.forEach(function(r) {
+            var k = srsKey(r.lemma || r.normalized);
+            if (!k) return;
+            // Prefer a row in the language being asked about, so a same-spelled word in the
+            // other language cannot answer for this one.
+            if (!srs[k] || (r.lang === lang && srs[k].lang !== lang)) srs[k] = r;
+          });
+        }
+      } catch (e) { /* offline / no table: degrade to honest zeros rather than inventing values */ }
+
+      var startOfToday = new Date(); startOfToday.setHours(0, 0, 0, 0);
+      var endOfToday = new Date(startOfToday.getTime() + 86400000);
+      /* "Known" is decided by the SRS's OWN verdict (review_state), with mastery_score only as a
+       * backstop. Measured on the live table: the highest mastery_score anywhere is 44 and the
+       * average is 6, so a mastery-only threshold would peg this card at 0 for months — a number
+       * that can never move is no more honest than the old hardcoded one. review_state is set
+       * only by sm2(), so using it keeps ONE definition of mastery instead of inventing a third. */
+      var KNOWN_MASTERY_BACKSTOP = 80;
+      var dueToday = 0, overdue = 0, reviewedToday = 0, known = 0, mastered = 0;
+
+      words.forEach(function(wd) {
+        var r = srs[srsKey(wd.word)];
+        if (!r) return; // never graded: not scheduled yet, and counted as still learning below
+        var next = r.next_review_at ? new Date(r.next_review_at) : null;
+        var last = r.last_reviewed_at ? new Date(r.last_reviewed_at) : null;
+        if (next && next <= endOfToday) dueToday++;
+        if (next && next < now) overdue++;
+        if (last && last >= startOfToday) reviewedToday++;
+        if (r.review_state === 'mastered') { mastered++; known++; }
+        else if ((r.mastery_score || 0) >= KNOWN_MASTERY_BACKSTOP) known++;
+      });
+
       return {
         totalWords: total,
-        /* ⚠️ These SRS fields are deliberately ZERO, and it is a product gap, not a typo.
-         * review_bank_words (what this counts) carries NO spaced-repetition columns — its
-         * columns are bank_key/word_id/source_type/rank_score/status only — so "due today"
-         * cannot be derived from it. The SRS itself lives in review_words, which IS fully
-         * wired (sm2 + writeGrade in js/learner.js write it on every graded answer).
-         * Joining the two is unsolved: review_words.source_type holds expand/manual/session/
-         * null and is_saved is false on every row, so there is no bank link to join on.
-         * Inventing one would put plausible-but-wrong numbers in front of the user, which is
-         * worse than an honest zero. Needs a deliberate link column (or SRS columns on the
-         * bank row) before this can report anything real. */
-        dueToday: 0,
-        overdue: 0,
-        reviewedToday: 0,
+        dueToday: dueToday,
+        overdue: overdue,
+        reviewedToday: reviewedToday,
         newThisWeek: newThisWeek,
-        known: 0,
-        learning: total,   // every bank word counts as "learning" until the above is resolved
-        mastered: 0
+        known: known,
+        /* Everything saved that the user cannot yet recall reliably — including words never
+         * graded at all — so known + learning === totalWords and the two cards stay a partition
+         * of the list instead of leaving an invisible third bucket. */
+        learning: total - known,
+        mastered: mastered
       };
     } catch(e) {
       console.warn('getWordbankStats error:', e.message);
-      return { totalWords: 0, dueToday: 0, overdue: 0, reviewedToday: 0, newThisWeek: 0, known: 0, learning: 0 };
+      return emptyWordbankStats();
     }
   }
 
