@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Learner scoring invariants — Sottotitoli</title>
+<style>
+  body { font: 13px/1.6 ui-monospace, SFMono-Regular, Menlo, monospace; margin: 0; padding: 24px 28px; background: #0f172a; color: #e2e8f0; }
+  h1 { font-size: 17px; margin: 0 0 4px; }
+  p.sub { margin: 0 0 20px; color: #94a3b8; max-width: 78ch; }
+  .banner { display: inline-block; padding: 8px 16px; border-radius: 999px; font-weight: 700; margin: 0 0 20px; }
+  .pass { background: #064e3b; color: #6ee7b7; }
+  .fail { background: #7f1d1d; color: #fecaca; }
+  h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .08em; color: #94a3b8; margin: 26px 0 8px; border-top: 1px solid #1e293b; padding-top: 14px; }
+  table { border-collapse: collapse; width: 100%; }
+  td { padding: 3px 10px 3px 0; vertical-align: top; }
+  td.ok { color: #6ee7b7; width: 46px; }
+  td.no { color: #fca5a5; width: 46px; font-weight: 700; }
+  td.what { width: 260px; color: #cbd5e1; }
+  td.got { color: #fbbf24; }
+  code { color: #7dd3fc; }
+  #summary { margin-top: 22px; padding: 12px 16px; border-radius: 10px; background: #1e293b; }
+</style>
+</head>
+<body>
+<h1>Learner scoring invariants</h1>
+<p class="sub">
+  The rules that decide whether an item scores, what the percentage means and when a bonus is
+  paid. Three of these were real production bugs found by hand — a question with a single option
+  (the answer), a completion bonus paid on every redo, and a denominator that counted fumbles
+  instead of items. Each assertion below pins one of them so it cannot come back silently.
+</p>
+<div id="banner" class="banner">running…</div>
+<div id="out"></div>
+<div id="summary"></div>
+
+<!-- Same lexicon files the real page loads, in the same order, up to learner.js. -->
+<script src="../js/cefr-levels.js"></script>
+<script src="../js/en-ngsl.js"></script>
+<script src="../js/it-kelly.js"></script>
+<script src="../js/it-lexicon.js"></script>
+<script src="../js/learner-data.js"></script>
+<script src="../js/learner-data-en.js"></script>
+<!-- learner.js boots only when #learnerRoot exists, so it stays inert here and we just use its
+     __scoring hooks. -->
+<script src="../js/learner.js"></script>
+<script>
+(function () {
+  'use strict';
+  var out = document.getElementById('out');
+  var S = window.Learner && window.Learner.__scoring;
+  var pass = 0, fail = 0;
+
+  if (!S) {
+    document.getElementById('banner').className = 'banner fail';
+    document.getElementById('banner').textContent = 'FAIL — Learner.__scoring hooks missing';
+    out.innerHTML = '<p>learner.js did not expose __scoring. Did the export block change?</p>';
+    return;
+  }
+
+  function section(title) {
+    var h = document.createElement('h2');
+    h.textContent = title;
+    out.appendChild(h);
+    var t = document.createElement('table');
+    out.appendChild(t);
+    return t;
+  }
+  function ok(tbl, what, detail) { pass++; row(tbl, 'ok', 'PASS', what, detail); }
+  function no(tbl, what, detail) { fail++; row(tbl, 'no', 'FAIL', what, detail); }
+  function row(tbl, cls, label, what, detail) {
+    var tr = document.createElement('tr');
+    tr.innerHTML = '<td class="' + cls + '">' + label + '</td><td class="what">' + what +
+      '</td><td class="got">' + (detail == null ? '' : String(detail)) + '</td>';
+    tbl.appendChild(tr);
+  }
+  function check(tbl, cond, what, detail) { cond ? ok(tbl, what, detail) : no(tbl, what, detail); }
+
+  /* ── 1. A question must be answerable the wrong way ─────────────────────────────
+   * BUG PINNED: optionsFor() fell back on `pool || activeAllWords()`, and [] is truthy, so an
+   * empty pool produced ONE option — the correct answer — and every click scored. */
+  var mc = section('1 · Every question has ≥3 options and exactly one answer');
+  var answerWords = ['nationality', 'meeting', 'house', 'good morning', 'to attend', 'per favore'];
+  var POOLS = [
+    { name: 'empty pool (new account)', pool: [] },
+    { name: 'pool of 1', pool: ['house'] },
+    { name: 'pool of 3', pool: ['house', 'car', 'tree'] },
+    { name: 'no pool argument', pool: undefined },
+  ];
+  POOLS.forEach(function (P) {
+    var bad = 0, minOpts = 99, total = 0;
+    for (var i = 0; i < answerWords.length; i++) {
+      for (var rep = 0; rep < 6; rep++) {
+        var q = S.mcQuestion({ it: answerWords[i], en: 'x' }, P.pool);
+        if (!q) { bad++; continue; }
+        total++;
+        minOpts = Math.min(minOpts, q.options.length);
+        var hits = q.options.filter(function (o) { return o === q.answer; }).length;
+        if (q.options.length < 3 || hits !== 1) bad++;
+      }
+    }
+    check(mc, bad === 0, P.name + ' — ' + total + ' questions', bad === 0 ? ('min options ' + minOpts) : (bad + ' bad'));
+  });
+  // ~30% of a 4-option quiz is guessable, so the answer must never be the only option.
+  check(mc, S.mcQuestion({ it: 'x', en: 'y' }, []).options.length === 4,
+    'an empty pool still yields 4 options (falls back to the course list)',
+    S.mcQuestion({ it: 'x', en: 'y' }, []).options.length);
+  // A lesson passes its OWN pool (its vocabulary + phrases). That path is the one that used to be
+  // skipped, because `pool || courseList` never falls back when pool is []. Real lessons, real pools.
+  [['en', window.LEARNER_UNITS_EN], ['it', window.LEARNER_UNITS]].forEach(function (pair) {
+    var lang = pair[0], lesson = null;
+    (pair[1] || []).some(function (u) {
+      return (u.lessons || []).some(function (l) {
+        if ((l.vocabulary || []).length >= 6) { lesson = l; return true; }
+        return false;
+      });
+    });
+    if (!lesson) { no(mc, 'lesson pool path (' + lang + ')', 'no lesson with ≥6 words found'); return; }
+    var pool = (lesson.vocabulary || []).concat(lesson.phrases || []);
+    var poolStrs = pool.map(function (p) { return p.it; });
+    var item = lesson.vocabulary[0];
+    var bad = 0, allFromPool = 0, n = 0;
+    for (var i = 0; i < 40; i++) {
+      var q = S.mcQuestion(item, pool, lang);
+      if (!q) { bad++; continue; }
+      n++;
+      if (q.options.length !== 4) bad++;
+      if (q.options.filter(function (o) { return o === item.it; }).length !== 1) bad++;
+      var dist = q.options.filter(function (o) { return o !== item.it; });
+      if (dist.some(function (d) { return S.wordShape(d) !== S.wordShape(item.it); })) bad++;
+      if (dist.every(function (d) { return poolStrs.indexOf(d) !== -1; })) allFromPool++;
+    }
+    check(mc, bad === 0, 'lesson pool path (' + lang + ', pool of ' + pool.length + ') — ' + n + ' questions',
+      bad + ' bad');
+    check(mc, allFromPool / n >= 0.8, 'distractors come from the lesson’s own words, not the whole course',
+      Math.round((allFromPool / n) * 100) + '% of questions used only lesson words');
+  });
+
+  /* ── 2. Distractors must be plausible ────────────────────────────────────────
+   * BUG PINNED: distractors were random, so "nationality" was offered against unrelated words
+   * and whole sentences — winnable by shape alone. */
+  var dq = section('2 · Distractors are plausible: same shape, same part of speech, different stem');
+  // Answers are drawn from the REAL courses rather than a hand-picked list, so this measures the
+  // questions users actually see, and each assertion is a count over hundreds of rolls rather than
+  // a single lucky one.
+  function courseTargets(units) {
+    var out = [];
+    (units || []).forEach(function (u) {
+      (u.lessons || []).forEach(function (l) {
+        (l.vocabulary || []).forEach(function (v) { if (v && v.it) out.push(v.it); });
+      });
+    });
+    return out;
+  }
+  function sample(arr, n) {
+    var c = arr.slice(), out = [];
+    while (out.length < n && c.length) out.push(c.splice(Math.floor(Math.random() * c.length), 1)[0]);
+    return out;
+  }
+  // .it holds the TARGET, so it is English in the EN course and Italian in the IT course.
+  var WORDS_EN = courseTargets(window.LEARNER_UNITS_EN);
+  var WORDS_IT = courseTargets(window.LEARNER_UNITS);
+  var t = { n: 0, noQuestion: 0, under: 0, wide: 0, ansHits: 0, shape: 0, stem: 0, dup: 0,
+            posChecked: 0, pos: 0, sizeMin: 99, sizeMax: 0, worstShape: '', worstPos: '' };
+
+  function audit(answer, lang) {
+    for (var rep = 0; rep < 15; rep++) {
+      var q = S.mcQuestion({ it: answer, en: 'x' }, null, lang);
+      if (!q) { t.noQuestion++; continue; }
+      t.n++;
+      t.sizeMin = Math.min(t.sizeMin, q.options.length);
+      t.sizeMax = Math.max(t.sizeMax, q.options.length);
+      if (q.options.length < 3) t.under++;
+      if (q.options.length > 4) t.wide++;
+      if (q.options.filter(function (o) { return o === q.answer; }).length !== 1) t.ansHits++;
+      if (new Set(q.options).size !== q.options.length) t.dup++;
+      var dist = q.options.filter(function (o) { return o !== answer; });
+      var shape = S.wordShape(answer);
+      var badShape = dist.filter(function (d) { return S.wordShape(d) !== shape; });
+      if (badShape.length) { t.shape++; if (!t.worstShape) t.worstShape = answer + ' ← ' + badShape.join(', '); }
+      if (dist.some(function (d) { return S.wordStem(d) === S.wordStem(answer); })) t.stem++;
+      var ap = S.wordMeta(answer, lang).pos;
+      var poss = dist.map(function (d) { return S.wordMeta(d, lang).pos; });
+      if (ap && poss.every(Boolean)) {
+        t.posChecked++;
+        if (poss.some(function (p) { return p !== ap; })) {
+          t.pos++;
+          if (!t.worstPos) t.worstPos = answer + ' (' + ap + ') ← ' + dist.join(', ');
+        }
+      }
+    }
+  }
+  sample(WORDS_EN, 40).forEach(function (w) { audit(w, 'en'); });
+  sample(WORDS_IT, 40).forEach(function (w) { audit(w, 'it'); });
+
+  check(dq, t.n >= 1100, 'sampled both courses: EN ' + WORDS_EN.length + ' / IT ' + WORDS_IT.length + ' words',
+    t.n + ' questions');
+  check(dq, t.noQuestion === 0, 'every sampled course word produced a question', t.noQuestion + ' null');
+  check(dq, t.under === 0, 'no question was left with fewer than 3 options',
+    'options per question: ' + t.sizeMin + '–' + t.sizeMax);
+  check(dq, t.wide === 0, 'options never exceed 4 (a 5th option would be free information)', t.wide + ' too wide');
+  check(dq, t.ansHits === 0, 'the correct answer appears exactly once in its options');
+  check(dq, t.dup === 0, 'no two options in a question are the same string', t.dup + ' duplicates');
+  check(dq, t.shape === 0, 'no distractor differs in shape (word vs phrase) from the answer',
+    t.shape + ' of ' + t.n + ' questions' + (t.worstShape ? ' — e.g. ' + t.worstShape : ''));
+  check(dq, t.stem === 0, 'no distractor is a variant of the answer (same 4-letter stem)', t.stem + ' violations');
+  check(dq, t.posChecked >= 20, 'the part-of-speech rule is actually exercised (not vacuously green)',
+    t.posChecked + ' of ' + t.n + ' questions were POS-checkable');
+  check(dq, t.pos === 0, 'distractors share the answer’s part of speech when both are known',
+    t.pos + ' of ' + t.posChecked + (t.worstPos ? ' — e.g. ' + t.worstPos : ''));
+  var phrase = S.mcQuestion({ it: 'good morning', en: 'x' }, null, 'en');
+  check(dq, !!phrase && phrase.options.every(function (o) { return S.wordShape(o) === 'phrase'; }),
+    'a phrase answer gets only phrase distractors', phrase ? phrase.options.join(' / ') : 'no question');
+  var oneWord = S.mcQuestion({ it: 'house', en: 'x' }, null, 'en');
+  check(dq, !!oneWord && oneWord.options.every(function (o) { return S.wordShape(o) === 'word'; }),
+    'a one-word answer gets only one-word distractors', oneWord ? oneWord.options.join(' / ') : 'no question');
+
+  /* ── 3. The denominator is the item count, not the number of taps ────────────── */
+  var gc = section('3 · The score denominator is a fixed item count');
+  var steps = [
+    { type: 'listen', item: {} }, { type: 'listen', item: {} },        // never graded
+    { type: 'speak', item: {} }, { type: 'speak', item: {} },
+    { type: 'match', pairs: [1, 2, 3, 4] },                            // 1 per PAIR
+    { type: 'mc', questions: [1, 2, 3, 4, 5] }                         // 1 per question
+  ];
+  check(gc, S.gradableCount(steps) === 2 + 4 + 5, '2 speak + 4 pairs + 5 questions = 11',
+    S.gradableCount(steps));
+  check(gc, S.gradableCount([{ type: 'listen', item: {} }]) === 0,
+    'Listen-only session is worth 0 gradable items (so no percentage is shown)',
+    S.gradableCount([{ type: 'listen', item: {} }]));
+  check(gc, S.gradableCount(null) === 0, 'null steps are safe', S.gradableCount(null));
+  // Fumbling the match must not change the denominator.
+  check(gc, S.gradableCount(steps) === S.gradableCount(JSON.parse(JSON.stringify(steps))),
+    'the count is a property of the steps, not of how the learner performed');
+
+  /* ── 4. Score maths ───────────────────────────────────────────────────────── */
+  var sm = section('4 · Percentage and pass mark');
+  check(sm, S.scorePct(0, 0) === null, 'no gradable items → no percentage', S.scorePct(0, 0));
+  check(sm, S.scorePct(5, 10) === 50, '5 of 10 → 50%', S.scorePct(5, 10));
+  check(sm, S.scorePct(10, 10) === 100, '10 of 10 → 100%', S.scorePct(10, 10));
+  check(sm, S.scorePct(20, 10) === 100, 'cannot exceed 100% even if correct > total', S.scorePct(20, 10));
+  check(sm, S.scorePct(-5, 10) === 0, 'cannot go below 0%', S.scorePct(-5, 10));
+  check(sm, S.passNeed(10) === 8, 'pass mark for a 10-item test is 8', S.passNeed(10));
+  check(sm, S.passNeed(20) === 16, 'the pass mark scales with the item count', S.passNeed(20));
+  check(sm, S.passNeed(0) === 1, 'a zero-item test cannot be passed by scoring 0', S.passNeed(0));
+  // The scored percentage and the "x/10" record must share a denominator.
+  var pct10 = S.scorePct(9, 10);
+  check(sm, pct10 === 90, 'a 9/10 test reads 90% — the same denominator as its record', pct10 + '%');
+
+  /* ── 5. Score keys are unique per item ──────────────────────────────────────── */
+  var sk = section('5 · Score storage keys');
+  var keys = [
+    S.scoreKey('lesson', { id: 'e1' }, { id: 'e1-1' }),
+    S.scoreKey('test', { id: 'e1' }, null),
+    S.scoreKey('bank', { id: 'b1' }, null),
+    S.scoreKey('review', { id: 'due' }, null),
+    S.scoreKey('mission', { id: 'goal:verbs' }, null),
+  ];
+  check(sk, keys.every(function (k) { return typeof k === 'string' && k.length; }),
+    'every mode produces a key', keys.join(' · '));
+  check(sk, new Set(keys).size === keys.length, 'the keys never collide', new Set(keys).size + ' distinct');
+  check(sk, S.scoreKey('lesson', null, null) === null, 'a session with no unit has no key (nothing stored)');
+
+  var banner = document.getElementById('banner');
+  banner.className = 'banner ' + (fail ? 'fail' : 'pass');
+  banner.textContent = fail ? ('FAIL — ' + fail + ' of ' + (pass + fail) + ' assertions failed')
+                            : ('PASS — all ' + pass + ' assertions passed');
+  document.getElementById('summary').innerHTML =
+    '<b>' + pass + '</b> passed, <b>' + fail + '</b> failed. ' +
+    'Run again to re-roll the randomised pools.';
+  window.__scoringResult = { pass: pass, fail: fail };
+})();
+</script>
+</body>
+</html>

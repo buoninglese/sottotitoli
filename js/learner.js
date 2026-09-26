@@ -609,7 +609,9 @@
     var mpool = sample(lesson.vocabulary || [], Math.min(5, (lesson.vocabulary || []).length));
     if (mpool.length >= 3) steps.push({ type: 'match', pairs: shuffle(mpool.map(function (v) { return { it: v.it, en: v.en }; })) });
     var qpool = sample((lesson.vocabulary || []).concat(lesson.phrases || []), 5);
-    var qs = mcQuestions(qpool);
+    // Prefer THIS lesson's words as distractors: they belong to the same topic, so the question
+    // reads like it is about the lesson instead of "which of these four random course words".
+    var qs = mcQuestions(qpool, (lesson.vocabulary || []).concat(lesson.phrases || []));
     if (qs.length) steps.push({ type: 'mc', questions: qs });
     if (lesson.conversations && lesson.conversations.length) steps.push({ type: 'convo', convo: lesson.conversations[0] });
     return steps;
@@ -621,7 +623,7 @@
     var qpool = sample(pool, 6);
     var mpairs = sample(pool, 4);
     var steps = [];
-    var qs = mcQuestions(qpool);
+    var qs = mcQuestions(qpool, pool);   // distractors from this unit's own words
     if (qs.length) steps.push({ type: 'mc', questions: qs });
     if (mpairs.length >= 3) steps.push({ type: 'match', pairs: shuffle(mpairs.map(function (v) { return { it: v.it, en: v.en }; })) });
     return steps;
@@ -641,38 +643,94 @@
     var qp = sample(learnedWords, 6);
     var mp2 = sample(learnedWords, 4);
     var steps = [];
-    var qs = mcQuestions(qp);
+    var qs = mcQuestions(qp, learnedWords);   // distractors from the learner's own vocabulary
     if (qs.length) steps.push({ type: 'mc', questions: qs });
     if (mp2.length >= 3) steps.push({ type: 'match', pairs: shuffle(mp2.map(function (v) { return { it: v.it, en: v.en }; })) });
     return steps;
   }
 
-  function optionsFor(answerIt, pool) {
-    var opts = [answerIt];
-    // ⚠️ `pool || activeAllWords()` never fell back for an EMPTY pool — `[]` is truthy — so a
-    // learner with no saved words (a new account generating an AI mission, where
-    // realPool(lang) is []) got quiz questions with a SINGLE option: the correct answer.
-    // Measured before the fix: all 5 questions had 1 option and every click scored.
+  /* ── Distractor picking ──
+   * A multiple-choice question only measures something if the WRONG options are plausible. This
+   * used to take random words from the pool and reject only EXACT duplicates, so "nationality"
+   * was offered against "eventually", "price" and a whole SENTENCE — answerable by shape alone,
+   * which is how a 25% guess baseline becomes a free pass. Candidates are now matched to the
+   * answer on shape, part of speech, frequency band and stem, and the caller's own pool (a
+   * lesson's words, the learner's own words) is preferred over the whole course. The constraint
+   * ladder relaxes stage by stage, so a thin pool still produces a question rather than none. */
+  function wordShape(s) { return String(s || '').trim().split(/\s+/).length > 1 ? 'phrase' : 'word'; }
+  // First 4 letters, so "national"/"nationality" or "house"/"housing" count as one family: a
+  // distractor that is a VARIANT of the answer is not a distractor.
+  function wordStem(s) { return String(s || '').toLowerCase().replace(/[^a-zà-ÿ]/g, '').slice(0, 4); }
+  // POS and frequency come from the lexicons already loaded on the page: window.EN_NGSL is
+  // {word: [rank, pos, ipa, definition]} and window.S8T_IT_LEXICON exposes getPOS/getCEFR.
+  function wordMeta(word, lang) {
+    var out = { pos: null, rank: null };
+    var k = String(word || '').toLowerCase().replace(/^to /, '').replace(/[^a-zà-ÿ' ]/g, '').trim();
+    if (!k) return out;
+    try {
+      if (lang === 'en') {
+        var n = w.EN_NGSL && w.EN_NGSL[k];
+        if (n) { out.rank = n[0] || null; out.pos = n[1] || null; }
+      } else {
+        var L = w.S8T_IT_LEXICON;
+        if (L && L.getPOS) out.pos = L.getPOS(k) || null;
+      }
+    } catch (e) {}
+    return out;
+  }
+  function poolStrings(pool) {
     var all = (pool && pool.length) ? pool : activeAllWords();
-    var tries = 0;
-    while (opts.length < 4 && tries < 300) {
-      tries++;
-      var c = all[Math.floor(Math.random() * all.length)];
-      var cand = (typeof c === 'string') ? c : (c && c.it);
-      if (cand && opts.indexOf(cand) === -1) opts.push(cand);
+    var out = [], i, c, s;
+    for (i = 0; i < all.length; i++) {
+      c = all[i];
+      s = (typeof c === 'string') ? c : (c && (c.it || c.word));
+      if (s) out.push(String(s));
     }
-    return shuffle(opts);
+    return out;
+  }
+  function optionsFor(answerIt, pool, lang) {
+    lang = lang || learnerLang();
+    var answer = String(answerIt || '');
+    var shape = wordShape(answer), astem = wordStem(answer);
+    var mcache = {};
+    var meta = function (c) {
+      var k = String(c).toLowerCase();
+      if (!(k in mcache)) mcache[k] = wordMeta(c, lang);
+      return mcache[k];
+    };
+    var am = meta(answer);
+    // The caller's pool first (thematically coherent), then the whole course as a back-up.
+    var prefers = [poolStrings(pool), poolStrings(null)];
+    var taken = {}, picked = [];
+    taken[answer.toLowerCase()] = 1;
+    var ladder = [
+      function (c, m) { return wordShape(c) === shape && wordStem(c) !== astem && (!am.pos || !m.pos || m.pos === am.pos) && (am.rank == null || m.rank == null || Math.abs(m.rank - am.rank) <= 800); },
+      function (c, m) { return wordShape(c) === shape && wordStem(c) !== astem && (!am.pos || !m.pos || m.pos === am.pos); },
+      function (c) { return wordShape(c) === shape && wordStem(c) !== astem; },
+      function (c) { return wordStem(c) !== astem; }
+    ];
+    for (var p = 0; p < prefers.length && picked.length < 3; p++) {
+      var bag = shuffle(prefers[p]);
+      for (var s = 0; s < ladder.length && picked.length < 3; s++) {
+        for (var i = 0; i < bag.length && picked.length < 3; i++) {
+          var c2 = bag[i], key = c2.toLowerCase();
+          if (taken[key] || !ladder[s](c2, meta(c2))) continue;
+          taken[key] = 1; picked.push(c2);
+        }
+      }
+    }
+    return shuffle([answer].concat(picked));
   }
   /* A multiple-choice question needs at least 3 options (the answer + 2 distractors) to BE a
    * question: with fewer, clicking the only button scores and the item measures nothing.
    * Returns null when the pool is too small; the callers then DROP that question instead of
    * scoring the learner on something they cannot get wrong. */
-  function mcQuestion(item, pool) {
-    var opts = optionsFor(item.it, pool);
+  function mcQuestion(item, pool, lang) {
+    var opts = optionsFor(item.it, pool, lang);
     return opts.length >= 3 ? { prompt: item.en, answer: item.it, options: opts } : null;
   }
-  function mcQuestions(items, pool) {
-    return (items || []).map(function (it) { return mcQuestion(it, pool); }).filter(Boolean);
+  function mcQuestions(items, pool, lang) {
+    return (items || []).map(function (it) { return mcQuestion(it, pool, lang); }).filter(Boolean);
   }
 
   function learnedWords() {
@@ -1189,6 +1247,13 @@
     });
     return n;
   }
+  /* Score maths as PURE functions so tests/scoring.html can assert them directly — these are the
+   * rules most likely to be broken silently by a later change (they were: see the notes above). */
+  function scorePct(correct, total) {
+    if (!total) return null; // nothing gradable (an all-Listen lesson): show no percentage at all
+    return Math.max(0, Math.min(100, Math.round((correct / total) * 100)));
+  }
+  function passNeed(total) { return Math.max(1, Math.ceil((total || 0) * 0.8)); } // 80% pass mark
   function openSession(mode, unit, lesson, steps) {
     activateLearnerPanel();
     session = { mode: mode, unit: unit || null, lesson: lesson || null, steps: steps, idx: 0, earned: 0, total: gradableCount(steps), xpLog: {}, lang: learnerLang() };
@@ -1240,7 +1305,7 @@
     var mp = sample(items, Math.min(5, items.length));
     if (mp.length >= 3) steps.push({ type: 'match', pairs: shuffle(mp.map(function (v) { return { it: v.it, en: v.en }; })) });
     var qp = sample(items, Math.min(6, items.length));
-    var qs = mcQuestions(qp, pool);
+    var qs = mcQuestions(qp, pool, lang);
     if (qs.length) steps.push({ type: 'mc', questions: qs });
     return steps;
   }
@@ -1659,7 +1724,7 @@
     var mp = sample(words, Math.min(5, words.length));
     if (mp.length >= 3) steps.push({ type: 'match', pairs: shuffle(mp.map(function (v) { return { it: v.it, en: v.en }; })) });
     var qp = sample(words, Math.min(5, words.length));
-    var qs = mcQuestions(qp, pool);
+    var qs = mcQuestions(qp, pool, lang);
     if (qs.length) steps.push({ type: 'mc', questions: qs });
     if (convo.length >= 2) {
       steps.push({ type: 'convo', convo: { title: c.subtitle || c.title || 'Conversazione', speakers: convo.map(function (ln) {
@@ -1951,7 +2016,7 @@
     var mp = sample(items, Math.min(medium ? 5 : 3, items.length));
     if (mp.length >= 3) steps.push({ type: 'match', pairs: shuffle(mp.map(function (v) { return { it: v.it, en: v.en }; })) });
     var qp = sample(items, Math.min(medium ? 5 : 3, items.length));
-    var qs = mcQuestions(qp);
+    var qs = mcQuestions(qp, items, lang);   // distractors from the same theme
     if (qs.length) steps.push({ type: 'mc', questions: qs });
     return steps;
   }
@@ -2385,7 +2450,7 @@
      * taps — so the same content always yields a comparable percentage. */
     var total = session.total || 0;
     var correct = session.earned || 0;
-    var pct = total ? Math.max(0, Math.min(100, Math.round((correct / total) * 100))) : null;
+    var pct = scorePct(correct, total);
     /* ⚠️ The completion bonus is a ONE-TIME milestone, not a per-run payout. It used to be
      * awarded on every completion, which turned the new Redo button into an XP farm: measured,
      * one redo took xp from 20 to 40 and awarded mission_complete a SECOND time for the same 10
@@ -2406,7 +2471,7 @@
       // The pass mark is 80% of the items THIS test actually generated, not a hardcoded 8:
       // a question that cannot produce 3 options is dropped, which would otherwise make the
       // test silently harder than the "≥ 8/10" it promises (buildStepsForTest targets 10).
-      var need = Math.max(1, Math.ceil(total * 0.8));
+      var need = passNeed(total);
       var passed = score >= need;
       firstClear = !(s.tests[unit.id] && s.tests[unit.id].passed); // the FIRST pass, not the first attempt
       markTestResult(unit.id, passed, score);
@@ -2613,6 +2678,21 @@
     flipCard: flipCard,
     replayCard: replayCard,
     gradeCard: gradeCard,
+    /* ⚠️ TEST-ONLY hooks, used by tests/scoring.html. The scoring rules are the part most
+     * likely to be broken silently by a later change and there is no other way to reach them:
+     * they live inside this IIFE. Nothing in the app reads this. */
+    __scoring: {
+      gradableCount: gradableCount,
+      scorePct: scorePct,
+      passNeed: passNeed,
+      optionsFor: optionsFor,
+      mcQuestion: mcQuestion,
+      mcQuestions: mcQuestions,
+      wordMeta: wordMeta,
+      wordShape: wordShape,
+      wordStem: wordStem,
+      scoreKey: scoreKey,
+    },
   };
 
   // Boot when the DOM is ready
