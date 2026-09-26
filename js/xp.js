@@ -97,7 +97,10 @@
   function award(action, count) {
     var per = cfgVal(action);
     if (!per) return null;
-    var n = Math.max(0, Math.round(count || 1)) * per;
+    /* ⚠️ This was `count || 1`, which treats an EXPLICIT 0 as "no argument given" — so a caller
+     * passing 0 (caption-s8t.html awards per WORD, and a session can yield 0) got a full award
+     * for 1. Measured: award('word_spoken', 0) returned 1. Default only when genuinely absent. */
+    var n = Math.max(0, Math.round(count == null ? 1 : count)) * per;
     if (!n) return null;
     var s = lLoad();
     var today = todayStr();
