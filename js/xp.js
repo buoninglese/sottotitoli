@@ -105,6 +105,12 @@
     else if (s.lastDay === dateOffsetStr(-1)) { s.streak += 1; s.todayXp = n; }
     else { s.streak = 1; s.todayXp = n; }
     s.lastDay = today; s.xp += n;
+    // Per-day totals, mirrored into the learner blob. learner.js reads these for the adaptive
+    // daily goal (dailyGoalFor) — without them the goal can only ever be the flat default.
+    s.xpDays = s.xpDays || {};
+    s.xpDays[today] = (s.xpDays[today] || 0) + n;
+    var dayKeys = Object.keys(s.xpDays).sort();
+    while (dayKeys.length > 10) { delete s.xpDays[dayKeys.shift()]; }
     lSave(s);
     scheduleSync();
     if (w.dispatchEvent) { try { w.dispatchEvent(new CustomEvent('xp:changed', { detail: { action: action, n: n } })); } catch (e) {} }

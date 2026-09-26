@@ -260,6 +260,81 @@
   check(sk, new Set(keys).size === keys.length, 'the keys never collide', new Set(keys).size + ' distinct');
   check(sk, S.scoreKey('lesson', null, null) === null, 'a session with no unit has no key (nothing stored)');
 
+  /* ── 6. Grade banding ────────────────────────────────────────────────────── */
+  var sc = section('6 · Grade banding gives the percentage a verdict');
+  check(sc, S.scoreBand(100) === 'high', '100% is the top band', S.scoreBand(100));
+  check(sc, S.scoreBand(85) === 'high', '85% is still the top band (inclusive boundary)', S.scoreBand(85));
+  check(sc, S.scoreBand(84) === 'mid', '84% drops to the middle band', S.scoreBand(84));
+  check(sc, S.scoreBand(70) === 'mid', '70% is still the middle band (inclusive boundary)', S.scoreBand(70));
+  check(sc, S.scoreBand(69) === 'low', '69% drops to the bottom band', S.scoreBand(69));
+  check(sc, S.scoreBand(0) === 'low', '0% is the bottom band', S.scoreBand(0));
+  check(sc, S.scoreBandKey(90) === 'learner_band_high', 'each band maps to a translation key',
+    S.scoreBandKey(90));
+  // The band must agree with the test's own pass mark: passing is never "keep going".
+  check(sc, S.scoreBand(S.scorePct(S.passNeed(10), 10)) !== 'low',
+    'clearing the 80% pass mark can never land in the bottom band',
+    S.scorePct(S.passNeed(10), 10) + '% → ' + S.scoreBand(S.scorePct(S.passNeed(10), 10)));
+
+  /* ── 7. Adaptive daily goal ──────────────────────────────────────────────── */
+  var dg = section('7 · The daily goal adapts to the learner, within limits');
+  function dayStr(offset) {
+    var d = new Date(); d.setDate(d.getDate() + offset);
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' +
+      String(d.getDate()).padStart(2, '0');
+  }
+  function days(offsets, xp) {
+    var o = {};
+    offsets.forEach(function (k) { o[dayStr(k)] = xp; });
+    return o;
+  }
+  check(dg, S.dailyGoalFor({ dailyGoal: 10 }) === 10, 'no history → the base goal',
+    S.dailyGoalFor({ dailyGoal: 10 }));
+  check(dg, S.dailyGoalFor({ dailyGoal: 10, xpDays: days([-1, -2], 40) }) === 10,
+    '2 recorded days → still the base goal (no pattern to stretch yet)',
+    S.dailyGoalFor({ dailyGoal: 10, xpDays: days([-1, -2], 40) }));
+  check(dg, S.dailyGoalFor({ dailyGoal: 10, xpDays: days([-1, -2, -3], 20) }) === 22,
+    '3 days averaging 20 → 22 (a 10% stretch above the average)',
+    S.dailyGoalFor({ dailyGoal: 10, xpDays: days([-1, -2, -3], 20) }));
+  check(dg, S.dailyGoalFor({ dailyGoal: 10, xpDays: days([-1, -2, -3], 0) }) === 10,
+    'recorded days with no XP → base goal (never a zero target)',
+    S.dailyGoalFor({ dailyGoal: 10, xpDays: days([-1, -2, -3], 0) }));
+  check(dg, S.dailyGoalFor({ dailyGoal: 10, xpDays: days([-1, -2, -3], 500) }) === 30,
+    'a runaway average is clamped to 3× the base',
+    S.dailyGoalFor({ dailyGoal: 10, xpDays: days([-1, -2, -3], 500) }));
+  check(dg, S.dailyGoalFor({ dailyGoal: 10, xpDays: days([-1, -2, -3], 2) }) === 10,
+    'a slumping average never cuts the goal below the base',
+    S.dailyGoalFor({ dailyGoal: 10, xpDays: days([-1, -2, -3], 2) }));
+  var withToday = days([-1, -2, -3], 20); withToday[dayStr(0)] = 1000;
+  check(dg, S.dailyGoalFor({ dailyGoal: 10, xpDays: withToday }) === 22,
+    'today is excluded — a partial day must not drag the target down (22, not a clamped 30)',
+    S.dailyGoalFor({ dailyGoal: 10, xpDays: withToday }));
+  check(dg, S.dailyGoalFor(null) === 10, 'a null state is safe', S.dailyGoalFor(null));
+
+  /* ── 8. Per-day XP bookkeeping ───────────────────────────────────────────── */
+  var bd = section('8 · Per-day XP totals (what the adaptive goal reads)');
+  var d1 = S.bumpDay(null, dayStr(0), 5);
+  check(bd, d1[dayStr(0)] === 5, 'the first award records the day', JSON.stringify(d1));
+  // Evaluate once and hold the result: bumpDay mutates its argument, so calling it twice in one
+  // check would print a different number from the one that was actually asserted.
+  var d2 = S.bumpDay(d1, dayStr(0), 7);
+  check(bd, d2[dayStr(0)] === 12, 'a second award the same day accumulates', d2[dayStr(0)]);
+  var many = {};
+  for (var di = 1; di <= 30; di++) many = S.bumpDay(many, '2026-01-' + String(di).padStart(2, '0'), 1);
+  check(bd, Object.keys(many).length === 10, 'history is capped at 10 days', Object.keys(many).length);
+  check(bd, !many['2026-01-01'] && !!many['2026-01-30'], 'the cap drops the oldest days, keeps recent',
+    Object.keys(many).sort()[0] + ' … ' + Object.keys(many).sort().slice(-1)[0]);
+
+  /* ── 9. Questions carry the identity the review queue needs ─────────────── */
+  var idq = section('9 · A question carries what writeGrade needs');
+  var idQ = S.mcQuestion({ it: 'casa', en: 'house', pos: 'n', cefr: 'A1' }, null, 'it');
+  check(idq, !!idQ && idQ.word === 'casa', 'the lemma (without it the quiz could never be graded into review_words)',
+    idQ && idQ.word);
+  check(idq, !!idQ && idQ.en === 'house', 'the translation', idQ && idQ.en);
+  check(idq, !!idQ && idQ.pos === 'n' && idQ.cefr === 'A1', 'pos and cefr when the source has them');
+  var noWord = S.mcQuestion({ it: 'casa', en: 'house' }, null, 'it');
+  check(idq, !!noWord && noWord.word === 'casa', 'a source without .word still yields the target',
+    noWord && noWord.word);
+
   var banner = document.getElementById('banner');
   banner.className = 'banner ' + (fail ? 'fail' : 'pass');
   banner.textContent = fail ? ('FAIL — ' + fail + ' of ' + (pass + fail) + ' assertions failed')

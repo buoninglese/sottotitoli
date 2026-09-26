@@ -182,16 +182,30 @@
     else if (s.lastDay === dateOffsetStr(-1)) { s.streak += 1; s.todayXp = n; }
     else { s.streak = 1; s.todayXp = n; }
     s.lastDay = today; s.xp += n;
+    s.xpDays = bumpDay(s.xpDays, today, n); // feeds the adaptive daily goal
     save(s); return s;
   }
   // ── Configurable XP (js/xp.js): per-correct answer + completion bonuses. ──
   // The trainer is the "Allena" word-bank card-stack (openBankTest).
+  /* Repeating content that was already cleared pays HALF the per-answer XP (see openSession).
+   * XP is an integer everywhere — xp.js rounds each award — so half-points are BANKED and paid
+   * out as whole awards. With the default 1 XP per answer a 10-question repeat earns 5, instead of
+   * each individual answer's 0.5 rounding up to a full 1, which would make the rule a no-op. */
+  var REPEAT_XP = 0.5;
   function awardCorrect() {
-    session.earned += 1;
-    var v = (XP && XP.cfg) ? XP.cfg.val('correct_answer') : 1;
+    session.earned += 1; // correctness itself is never scaled: it is the learner's real record
+    var full = (XP && XP.cfg) ? XP.cfg.val('correct_answer') : 1;
+    var units = 1; // how many per-answer awards this correct answer pays
+    if (session.repeat) {
+      session.repeatCarry = (session.repeatCarry || 0) + REPEAT_XP;
+      units = Math.floor(session.repeatCarry);
+      session.repeatCarry -= units;
+    }
+    var v = units * full;
     session.xpPoints = (session.xpPoints || 0) + v;
-    if (XP && XP.award) XP.award('correct_answer'); else addXp(v);
-    logXp('correct_answer', v);
+    if (XP && XP.award) { if (units > 0) XP.award('correct_answer', units); }
+    else if (v > 0) { addXp(v); }
+    if (units > 0) logXp('correct_answer', v);
   }
   // Per-source XP tally for the reward overview on the completion card.
   function logXp(action, xp) {
@@ -727,7 +741,13 @@
    * scoring the learner on something they cannot get wrong. */
   function mcQuestion(item, pool, lang) {
     var opts = optionsFor(item.it, pool, lang);
-    return opts.length >= 3 ? { prompt: item.en, answer: item.it, options: opts } : null;
+    /* The question carries its own identity (`word`/`en`/`pos`/`cefr`) so a wrong answer can be
+     * written back to the spaced-repetition queue. It used to be just {prompt, answer, options},
+     * so the quiz path had nothing to hand writeGrade and could not update review_words at all. */
+    return opts.length >= 3
+      ? { prompt: item.en, answer: item.it, options: opts,
+          word: item.word || item.it, en: item.en || '', pos: item.pos || '', cefr: item.cefr || '' }
+      : null;
   }
   function mcQuestions(items, pool, lang) {
     return (items || []).map(function (it) { return mcQuestion(it, pool, lang); }).filter(Boolean);
@@ -938,7 +958,8 @@
       '</div>' +
     '</div>';
     // Card 4 — the ONE suggested daily mission, tracked by today's XP against the daily goal.
-    var dailyGoalXp = s.dailyGoal || 10;
+    // The goal is adaptive (see dailyGoalFor) rather than a fixed 10.
+    var dailyGoalXp = dailyGoalFor(s);
     var todayPct = Math.min(100, Math.round((s.todayXp / dailyGoalXp) * 100));
     var dailyDone = s.todayXp >= dailyGoalXp;
     html += '<div class="lr-mission-card daily' + (dailyDone ? ' ready' : '') + '">' +
@@ -1254,9 +1275,48 @@
     return Math.max(0, Math.min(100, Math.round((correct / total) * 100)));
   }
   function passNeed(total) { return Math.max(1, Math.ceil((total || 0) * 0.8)); } // 80% pass mark
+  /* A bare percentage says nothing about whether it was good. Band it so the number carries a
+   * verdict, and let the stylesheet colour it (.cc-score.high/.mid/.low). 85/70 are the usual
+   * mastery cut-offs, and they line up with the test's own 80% pass mark. */
+  function scoreBand(pct) { return pct >= 85 ? 'high' : (pct >= 70 ? 'mid' : 'low'); }
+  function scoreBandKey(pct) { return 'learner_band_' + scoreBand(pct); }
+  /* Per-day XP totals, kept for the adaptive daily goal. 10 entries is a week plus slack. */
+  function bumpDay(days, day, n) {
+    days = days || {};
+    days[day] = (days[day] || 0) + n;
+    var keys = Object.keys(days).sort();
+    while (keys.length > 10) { delete days[keys.shift()]; }
+    return days;
+  }
+  /* The daily goal was a fixed 10 XP, which ignores the learner entirely: someone averaging 60 XP
+   * a day saw the same bar as a beginner, and that bar is the only thing creating the
+   * goal-gradient pull to come back tomorrow. Stretch it slightly above the trailing week's
+   * average (+10%), clamped to [base, 3x base] so it can neither run away nor collapse.
+   * Fewer than 3 recorded days (or no XP at all) → the base goal: there is no pattern to stretch
+   * yet, and an early unachievable goal is worse than a flat one. */
+  function dailyGoalFor(s) {
+    var base = (s && s.dailyGoal) || 10;
+    var days = (s && s.xpDays) || {};
+    var today = todayStr();
+    var vals = Object.keys(days).sort().slice(-7)
+      .filter(function (d) { return d !== today; }) // today is still partial, it would drag the average down
+      .map(function (d) { return days[d] || 0; });
+    if (vals.length < 3) return base;
+    var avg = vals.reduce(function (a, b) { return a + b; }, 0) / vals.length;
+    if (avg <= 0) return base;
+    return Math.max(base, Math.min(base * 3, Math.round(avg * 1.1)));
+  }
   function openSession(mode, unit, lesson, steps) {
     activateLearnerPanel();
     session = { mode: mode, unit: unit || null, lesson: lesson || null, steps: steps, idx: 0, earned: 0, total: gradableCount(steps), xpLog: {}, lang: learnerLang() };
+    session.scoreKey = scoreKey(mode, unit, lesson);
+    /* Repeating content that was already cleared pays half the per-answer XP. The completion
+     * bonus is one-time either way (see endSession), so this only bounds the per-answer income
+     * from farming the same lesson over and over.
+     * Practice (Allena) and Review are excluded on purpose: they are the spaced-repetition
+     * surface, and paying them less would penalise exactly the behaviour we want to encourage. */
+    session.repeat = mode !== 'review' && mode !== 'practice' && mode !== 'practice-speak' &&
+      !!session.scoreKey && !!scoreOf(session.scoreKey);
     if (mode === 'mission' && session.unit) trackMissionForSession(0, false);
     renderOverlay();
   }
@@ -1658,7 +1718,7 @@
     var sb = srcSb(); if (!sb) return;
     var uid = await srcUid(); if (!uid) return;
     var lang = session ? session.lang : learnerLang();
-    var lemma = item.word;
+    var lemma = item.word || item.it;
     var normalized = norm(lemma);
     try {
       var r = await sb.from('review_words')
@@ -2251,6 +2311,11 @@
         if (c.textContent === q.answer) c.classList.add('correct');
       });
     }
+    /* Feed the quiz back into spaced repetition. This path never did, so a word you got wrong in
+     * a quiz — the most common step type — was recorded as a mistake but never queued: it could
+     * not come back under "Due now" or "Fragile". q=1 lapses it and makes it due again now,
+     * q=4 grows its interval and mastery. */
+    writeGrade(q, correct ? 4 : 1);
     // feedback line
     var fb = document.createElement('div');
     fb.className = 'feedback ' + (correct ? 'correct' : 'incorrect');
@@ -2361,6 +2426,9 @@
     session.speakChecked = true;
     if (correct) { awardCorrect(); }
     else { recordMistake(expected, session.lang); }
+    /* The same gap as the quiz: a word the learner could not say was never queued for review.
+     * step.item is the real course/review item, so it carries the lemma writeGrade needs. */
+    writeGrade(step.item, correct ? 4 : 1);
     setTimeout(nextStep, correct ? 900 : 1600);
   }
 
@@ -2521,8 +2589,10 @@
         '<div class="cc-title">' + esc(title) + '</div>' +
         (body ? '<div class="cc-sub">' + esc(body) + '</div>' : '') +
         (pct !== null
-          ? '<div class="cc-score"><span class="cc-score-pct">' + pct + '%</span>' +
-            '<span class="cc-score-sub">' + correct + ' / ' + total + ' ' + t('learner_correct_answers') + '</span></div>'
+          ? '<div class="cc-score ' + scoreBand(pct) + '">' +
+              '<span class="cc-score-pct">' + pct + '%</span>' +
+              '<span class="cc-score-band">' + t(scoreBandKey(pct)) + '</span>' +
+              '<span class="cc-score-sub">' + correct + ' / ' + total + ' ' + t('learner_correct_answers') + '</span></div>'
           : '') +
         (rows
           ? '<div class="cc-rewards"><div class="cc-rewards-title">' + t('learner_reward_overview') + '</div>' +
@@ -2685,6 +2755,10 @@
       gradableCount: gradableCount,
       scorePct: scorePct,
       passNeed: passNeed,
+      scoreBand: scoreBand,
+      scoreBandKey: scoreBandKey,
+      bumpDay: bumpDay,
+      dailyGoalFor: dailyGoalFor,
       optionsFor: optionsFor,
       mcQuestion: mcQuestion,
       mcQuestions: mcQuestions,
