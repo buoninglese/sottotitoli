@@ -4695,7 +4695,11 @@ function _setCreditBudget(minutes) {
     : null;
 }
 
-var _creditStopDone = false;
+/* One automatic end per session, however many triggers fire (credits spent, or the silence
+ * failsafe). Without a SHARED guard both could fire in the same tick, and the second
+ * toggleSession() would toggle back ON and start a fresh session. Re-armed by
+ * _startSessionTimer(). */
+var _autoEndDone = false;
 
 /* End the session when the credits are spent.
  * The balance cannot be relied on to stop this by itself: on the iOS/Whisper path it falls as
@@ -4705,8 +4709,8 @@ var _creditStopDone = false;
  * button uses, so the session is SAVED and the UI goes back to the stopped state; the start
  * guard (balance > 0) then blocks a restart until minutes are bought. */
 function _endSessionForCredits() {
-  if (_creditStopDone) return;  // one end per session, however many triggers fire
-  _creditStopDone = true;
+  if (_autoEndDone) return;  // one end per session, however many triggers fire
+  _autoEndDone = true;
   if (!sessionActive) return;
   try { toggleSession(); } catch (e) { console.error('credit stop failed:', e); }
   showAlertModal(
@@ -4728,7 +4732,12 @@ function _enforceCreditBudget() {
  * check, which is why it lives here rather than in two places. */
 function _startSessionTimer() {
   if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
-  _creditStopDone = false;
+  _autoEndDone = false;
+  // Silence is measured from the START of the session, not from the first word, so a mic
+  // that never works is caught too. _lastWordAt is refreshed every time a sentence lands.
+  _silenceLineCount = (window._sessionLines || []).length;
+  _lastWordAt = Date.now();
+  _loadAutoStopPref();
   timerInterval = setInterval(function () {
     sessionSeconds++;
     var m = Math.floor(sessionSeconds / 60);
@@ -4736,11 +4745,76 @@ function _startSessionTimer() {
     var rt = document.getElementById('recTimer');
     if (rt) rt.textContent = String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0');
     _enforceCreditBudget();
+    _enforceSilenceStop();
   }, 1000);
+}
+
+/* ── Silence failsafe ──────────────────────────────────────────────────────────
+ * End the session when nothing has been transcribed for 5 minutes.
+ *
+ * Charging is per SEGMENT, so a session that hears nothing — muted mic, silent room,
+ * recognition stalled — spends minutes and produces nothing at all. The Settings switch
+ * (Impostazioni → Sessione → "Interrompi la sessione in silenzio", default ON) turns it off.
+ *
+ * The window is ROLLING: it counts since the last committed sentence, so it also catches a
+ * session that goes quiet half-way through, not just one that never starts. The signal is
+ * _sessionLines, the same list the save uses — both mic paths append to it (native
+ * recognition directly, the Whisper fallback via feedSentences → _realMic.onFinal). */
+var SILENCE_STOP_MS = 5 * 60 * 1000;
+var _autoStopSilent = true;   // fail-safe default until the stored preference loads
+var _silenceLineCount = 0;
+var _lastWordAt = 0;
+
+/* Default ON; the local mirror first (instant, and it is what Settings writes), then the
+ * server row, which wins because it is what the panel saved last. Any failure keeps the
+ * current value rather than switching a failsafe off by accident. */
+async function _loadAutoStopPref() {
+  try {
+    var ls = JSON.parse(localStorage.getItem('sottotitoli-settings') || 'null');
+    if (ls && typeof ls.auto_stop_silent === 'boolean') _autoStopSilent = ls.auto_stop_silent;
+  } catch (e) {}
+  try {
+    var sb = window.sottotitoliSupabase;
+    if (!sb) return;
+    var resp = await sb.auth.getSession();
+    var uid = resp.data?.session?.user?.id;
+    if (!uid) return;
+    var q = await sb.from('user_preferences').select('auto_stop_silent').eq('user_id', uid).maybeSingle();
+    if (q && !q.error && q.data && typeof q.data.auto_stop_silent === 'boolean') {
+      _autoStopSilent = q.data.auto_stop_silent;
+    }
+  } catch (e) {}
+}
+
+function _enforceSilenceStop() {
+  if (!sessionActive || paused) return;   // paused time is not billed, so it must not fire
+  if (_autoStopSilent === false) return;  // the user turned the failsafe off
+  var lines = (window._sessionLines || []).length;
+  if (lines > _silenceLineCount) {
+    _silenceLineCount = lines;   // a sentence was committed on one of the two mic paths
+    _lastWordAt = Date.now();
+    return;
+  }
+  if (_lastWordAt && (Date.now() - _lastWordAt) >= SILENCE_STOP_MS) _endSessionForSilence();
+}
+
+function _endSessionForSilence() {
+  if (_autoEndDone) return;
+  _autoEndDone = true;
+  if (!sessionActive) return;
+  try { toggleSession(); } catch (e) { console.error('silence stop failed:', e); }
+  showAlertModal(
+    'Nessuna trascrizione',
+    '🔇 Nessuna parola trascritta per 5 minuti: la sessione è stata salvata per non consumare minuti inutilmente. Controlla il microfono, oppure disattiva questa protezione da Impostazioni → Sessione.',
+    function () {}
+  );
 }
 
 // record-fallback.js calls this when the server refuses a segment with 402.
 window.onTranscriptionCreditsExhausted = _endSessionForCredits;
+
+// Load the failsafe preference at page load; _startSessionTimer() refreshes it per session.
+_loadAutoStopPref();
 
 // ── Session UI setup (mic already running — called after credit check passes) ──
 function _applySessionLiveUI(startBtn, stopBtn) {

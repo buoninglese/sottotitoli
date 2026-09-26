@@ -372,6 +372,9 @@
       // capture trigger). Defaults here mirror the column defaults exactly.
       save_sessions: prefs.save_sessions !== undefined ? prefs.save_sessions : true,
       anonymous_sharing: prefs.anonymous_sharing !== undefined ? prefs.anonymous_sharing : false,
+      // Failsafe preference, default ON to match the column. Enforced in the client
+      // (caption-s8t.html → _enforceSilenceStop), not by a trigger.
+      auto_stop_silent: prefs.auto_stop_silent !== undefined ? prefs.auto_stop_silent : true,
       theme: prefs.theme || prefs.dark_mode ? 'dark' : 'auto', // dark_mode is legacy column
       font_pref: prefs.font_pref || 'sans',
       default_caption_lang: prefs.default_caption_lang || '',
@@ -390,6 +393,7 @@
       if (local.font_pref && (result.font_pref === 'sans' || !result.font_pref)) result.font_pref = local.font_pref;
       if (local.save_sessions !== undefined) result.save_sessions = local.save_sessions;
       if (local.anonymous_sharing !== undefined) result.anonymous_sharing = local.anonymous_sharing;
+      if (local.auto_stop_silent !== undefined) result.auto_stop_silent = local.auto_stop_silent;
       if (local.hasOwnProperty('default_caption_lang') && local.default_caption_lang && !result.default_caption_lang) result.default_caption_lang = local.default_caption_lang;
       if (local.hasOwnProperty('default_translation_pair') && local.default_translation_pair && !result.default_translation_pair) result.default_translation_pair = local.default_translation_pair;
     }
@@ -449,11 +453,12 @@
     if (settings.ui_language !== undefined) prefUpdate.ui_language = settings.ui_language;
     if (settings.save_sessions !== undefined) prefUpdate.save_sessions = settings.save_sessions;
     if (settings.anonymous_sharing !== undefined) prefUpdate.anonymous_sharing = settings.anonymous_sharing;
+    if (settings.auto_stop_silent !== undefined) prefUpdate.auto_stop_silent = settings.auto_stop_silent;
     if (settings.theme !== undefined) prefUpdate.theme = settings.theme;
     if (settings.font_pref !== undefined) prefUpdate.font_pref = settings.font_pref;
     if (settings.default_caption_lang !== undefined) prefUpdate.default_caption_lang = settings.default_caption_lang;
     if (settings.default_translation_pair !== undefined) prefUpdate.default_translation_pair = settings.default_translation_pair;
-    if (settings.ui_language !== undefined || settings.save_sessions !== undefined || settings.anonymous_sharing !== undefined || settings.theme !== undefined || settings.font_pref !== undefined || settings.default_caption_lang !== undefined || settings.default_translation_pair !== undefined) {
+    if (settings.ui_language !== undefined || settings.save_sessions !== undefined || settings.anonymous_sharing !== undefined || settings.auto_stop_silent !== undefined || settings.theme !== undefined || settings.font_pref !== undefined || settings.default_caption_lang !== undefined || settings.default_translation_pair !== undefined) {
       var r2 = await sb().from('user_preferences').upsert(prefUpdate, { onConflict: 'user_id' });
       if (r2.error) {
         errors.push('preferences: ' + r2.error.message);
@@ -477,6 +482,7 @@
       if (settings.ui_language !== undefined) existing.ui_language = settings.ui_language;
       if (settings.save_sessions !== undefined) existing.save_sessions = settings.save_sessions;
       if (settings.anonymous_sharing !== undefined) existing.anonymous_sharing = settings.anonymous_sharing;
+      if (settings.auto_stop_silent !== undefined) existing.auto_stop_silent = settings.auto_stop_silent;
       if (settings.theme !== undefined) existing.theme = settings.theme;
       if (settings.font_pref !== undefined) existing.font_pref = settings.font_pref;
       if (settings.default_caption_lang !== undefined && settings.default_caption_lang !== null) existing.default_caption_lang = settings.default_caption_lang;

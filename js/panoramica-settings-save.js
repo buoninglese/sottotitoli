@@ -43,6 +43,9 @@
     if (saveSessionsEl) settings.save_sessions = !!saveSessionsEl.checked;
     var anonEl = document.getElementById('settingsAnonSharing');
     if (anonEl) settings.anonymous_sharing = !!anonEl.checked;
+    // Failsafe switch, default ON — so "off" is the meaningful state and must be sent.
+    var autoStopEl = document.getElementById('settingsAutoStopSilent');
+    if (autoStopEl) settings.auto_stop_silent = !!autoStopEl.checked;
 
     // Green flash
     var origBg = btn.style.background;

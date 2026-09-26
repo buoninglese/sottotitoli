@@ -2876,6 +2876,9 @@
         if (saveSessionsTgl) saveSessionsTgl.checked = s.save_sessions !== false;
         var anonTgl = document.getElementById('settingsAnonSharing');
         if (anonTgl) anonTgl.checked = s.anonymous_sharing === true;
+        // Failsafe switch — default TRUE, so "on" unless the row explicitly says false.
+        var autoStopTgl = document.getElementById('settingsAutoStopSilent');
+        if (autoStopTgl) autoStopTgl.checked = s.auto_stop_silent !== false;
 
         // Aspetto — Theme (only set dropdown value; don't re-apply on every render)
         var themeEl = document.getElementById('settingsTheme');
