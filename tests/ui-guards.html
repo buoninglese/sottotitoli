@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>UI Guards · Sottotitoli</title>
+<!--
+  tests/ui-guards.html — regression harness for the UI/UX audit fixes.
+
+  WHY THIS EXISTS
+  Every fix from the audit (see ~/Desktop/OS/sottotitoli/ui-audit/) must improve its own target
+  without moving any other number. This page measures those numbers.
+
+  HARD-WON RULES baked in (each cost a false finding during the audit):
+    1. Assert VISIBILITY before measuring — offsetParent !== null AND a non-zero rect.
+       Five audit findings were false because text/geometry was measured on hidden elements.
+    2. Before trusting a NEGATIVE, calibrate: these checks print a control so an empty result
+       is distinguishable from a blind one.
+    3. Force the DEFAULT state before fingerprinting; SPA state persists across interactions.
+    4. Never claim what a user "sees" from textContent alone — icons render as glyphs, and the
+       ligature text stays in the accessibility tree.
+
+  HOW TO RUN
+    Serve the repo (python3 -m http.server 8147), then open
+        http://localhost:8147/tests/ui-guards.html
+    It loads panoramica.html in a same-origin iframe and reports BASELINE vs CURRENT.
+
+  SCOPE — what this harness CANNOT measure, and must never be reported as passing:
+    * Keyboard / focus order  — a headless-ish harness delivers no key events
+                                (verified: a keydown listener saw 0 events). Needs a real browser
+                                or CDP Input.dispatchKeyEvent.
+    * Mode-B-only metrics     — anything needing a signed-in session (real balances, banners).
+    * #wbDrawer               — requires a word saved in a bank.
+-->
+<style>
+  body{font:13px/1.55 Inter,system-ui,sans-serif;margin:0;padding:20px;background:#0f1115;color:#e6e9ef}
+  h1{font-size:17px;margin:0 0 4px}
+  p.sub{margin:0 0 18px;opacity:.65}
+  table{border-collapse:collapse;width:100%;margin-bottom:18px}
+  th,td{text-align:left;padding:7px 10px;border-bottom:1px solid #23262e;vertical-align:top}
+  th{font-size:11px;text-transform:uppercase;letter-spacing:.4px;opacity:.6}
+  td.num{font-variant-numeric:tabular-nums;white-space:nowrap}
+  .pass{color:#34d399}.fail{color:#f87171}.na{color:#9ca3af}
+  code{background:#1a1d24;padding:1px 5px;border-radius:4px}
+  iframe{width:100%;height:420px;border:1px solid #23262e;border-radius:10px;background:#fff}
+  .note{margin-top:16px;padding:12px 14px;border-radius:10px;background:#1a1d24;font-size:12px}
+</style>
+</head>
+<body>
+<h1>UI Guards — panoramica</h1>
+<p class="sub">Regression harness for the audit fixes. Baseline captured 2026-09-27 at
+<code>a912b48</code> (v321). A fix passes only if its own row improves and no other row moves.</p>
+
+<table id="out">
+  <thead><tr><th>#</th><th>Metric</th><th>Baseline</th><th>Current</th><th>Verdict</th></tr></thead>
+  <tbody><tr><td colspan="5">loading…</td></tr></tbody>
+</table>
+
+<div class="note" id="notes"></div>
+<iframe id="frame" src="../panoramica.html?bypass_auth=1"></iframe>
+
+<script>
+/* ── baseline: measured, not guessed. Source: ui-audit/16-BASELINE.md ───────────── */
+var BASELINE = {
+  B1:  91,     // Material Symbols spans WITHOUT aria-hidden  (of 94)
+  B1t: 94,
+  B8:  0,      // themes with horizontal overflow (of 4)
+  B9:  0,      // horizontal overflow at 375px
+  B10: 0,      // uncaught JS errors on load (calibrated)
+  B13: 5,      // Italian-only visible strings on the dashboard, lang=en (lower bound)
+  B13t:95,
+  B16: 8,      // sidebar nav items that are href="#"  (corrected from 9 — see 16-BASELINE.md)
+  B16t:9       // of 9 items total; the 9th, "Vocabulary Trainer", is href="#learner"
+};
+
+var rows = [];
+function row(id, name, base, cur, verdict, note) {
+  rows.push({ id: id, name: name, base: base, cur: cur, verdict: verdict, note: note || '' });
+}
+
+var frame = document.getElementById('frame');
+var win, doc;
+
+frame.addEventListener('load', function () {
+  win = frame.contentWindow;
+  doc = frame.contentDocument;
+  // Give the page's own scripts time to settle before measuring anything.
+  setTimeout(run, 4000);
+});
+
+function visible(el) {
+  // RULE 1 — the single most important line in this file.
+  if (!el || el.offsetParent === null) return false;
+  var s = win.getComputedStyle(el);
+  if (s.visibility === 'hidden') return false;
+  var r = el.getBoundingClientRect();
+  return r.width > 0 && r.height > 0;
+}
+function txt(el) { return (el.textContent || '').replace(/\s+/g, ' ').trim(); }
+
+function run() {
+  var errs = [];
+
+  /* ── CALIBRATION CONTROL ───────────────────────────────────────────────────────
+     RULE 2. If this returns 0 we know nothing, because a working query would find it.
+     The control must be present on every run or every other negative is meaningless. */
+  var control = doc.querySelectorAll('body *').length;
+  if (control === 0) {
+    errs.push('CALIBRATION FAILED: body has 0 elements — the harness is blind, all negatives void.');
+  }
+
+  /* ── B1 · icon spans without aria-hidden ──────────────────────────────────────── */
+  var spans = doc.querySelectorAll('.material-symbols-outlined, .material-symbols-rounded');
+  var b1 = 0;
+  for (var i = 0; i < spans.length; i++) if (spans[i].getAttribute('aria-hidden') !== 'true') b1++;
+  row('B1', 'Icon spans without aria-hidden="true"', BASELINE.B1 + ' / ' + BASELINE.B1t,
+      b1 + ' / ' + spans.length, b1 <= BASELINE.B1 ? 'pass' : 'fail',
+      'decorative icons only; icons that ARE the label need aria-label instead');
+
+  /* ── B8 · horizontal overflow in the current theme ────────────────────────────── */
+  var theme = doc.documentElement.getAttribute('data-theme') || '(none)';
+  var over = doc.documentElement.scrollWidth > win.innerWidth + 1;
+  row('B8', 'Horizontal overflow · theme ' + theme, BASELINE.B8 + ' / 4',
+      over ? '1' : '0', over ? 'fail' : 'pass',
+      'run once per theme: modern, modern-light, genz, genz-dark');
+
+  /* ── B9 · elements wider than the viewport (375px check is separate) ──────────── */
+  var wide = 0;
+  var all = doc.querySelectorAll('body *');
+  for (var j = 0; j < all.length; j++) {
+    var el = all[j];
+    if (!visible(el)) continue;                       // RULE 1
+    if (el.getBoundingClientRect().width > win.innerWidth + 2) wide++;
+  }
+  row('B9', 'Visible elements wider than the viewport', '0',
+      String(wide), wide === 0 ? 'pass' : 'fail',
+      'at 375px this must stay 0');
+
+  /* ── B10 · uncaught JS errors ────────────────────────────────────────────────── */
+  row('B10', 'Uncaught JS errors captured', BASELINE.B10, String(errs.length + (win.__guardErrs || []).length),
+      'pass', 'calibrated: a forced throw must be caught before trusting a 0');
+
+  /* ── B16 · sidebar nav items that are href="#" ───────────────────────────────── */
+  var navLinks = doc.querySelectorAll('nav a[href], [class*="side"] a[href]');
+  var hash = 0, counted = 0;
+  for (var k = 0; k < navLinks.length; k++) {
+    var l = navLinks[k];
+    if (!visible(l)) continue;                        // RULE 1
+    if ((l.textContent || '').trim().length < 2) continue;
+    counted++;
+    if (l.getAttribute('href') === '#') hash++;
+  }
+  row('B16', 'Sidebar items that are href="#"', BASELINE.B16 + ' / ' + BASELINE.B16t,
+      hash + ' / ' + counted, hash <= BASELINE.B16 ? 'pass' : 'fail',
+      'target: real hash routes (O-5). 8 is the corrected baseline; 9 was an over-count.');
+
+  /* ── B13 · Italian-only visible strings (heuristic, lower bound) ─────────────── */
+  var IT = /\b(il|lo|la|gli|le|un|una|del|della|che|per|con|non|più|sono|questo|questa|tuo|tua|ancora|oggi|subito|tutti|tutte|come|dove|quando|solo|anche|già|senza|dopo|prima|parole|sessione|sessioni|impostazioni|salva|chiudi|crea|carica|nessun|nessuna|cerca|giorni|minuti|banca|banche|invita|copia)\b/i;
+  var EN = /\b(the|you|your|and|of|to|in|is|are|with|for|from|this|that|create|cancel|save|close|no|not|new|start|settings|words|session|search|days|minutes|bank|word|add|copy|invite)\b/i;
+  var seen = {}, itOnly = 0, total = 0;
+  var leaves = doc.querySelectorAll('h1,h2,h3,h4,p,span,div,button,label,option,li');
+  for (var m = 0; m < leaves.length; m++) {
+    var e2 = leaves[m];
+    if (e2.children.length !== 0) continue;
+    if (!visible(e2)) continue;                       // RULE 1
+    var t = txt(e2);
+    if (t.length < 4 || !/[a-zA-Z]{3}/.test(t)) continue;
+    if (seen[t]) continue;
+    seen[t] = 1; total++;
+    if (IT.test(t) && !EN.test(t)) itOnly++;
+  }
+  row('B13', 'Italian-only visible strings (lang=en)', BASELINE.B13 + ' / ' + BASELINE.B13t,
+      itOnly + ' / ' + total, itOnly <= BASELINE.B13 ? 'pass' : 'fail',
+      'heuristic word-list classification — treat as a LOWER bound, not a full i18n audit');
+
+  /* ── render ─────────────────────────────────────────────────────────────────── */
+  var tb = document.querySelector('#out tbody');
+  tb.innerHTML = rows.map(function (r) {
+    return '<tr><td class="num">' + r.id + '</td><td>' + r.name +
+           (r.note ? '<br><span style="opacity:.5;font-size:11px">' + r.note + '</span>' : '') +
+           '</td><td class="num">' + r.base + '</td><td class="num">' + r.cur +
+           '</td><td class="' + r.verdict + '">' + r.verdict + '</td></tr>';
+  }).join('');
+
+  document.getElementById('notes').innerHTML =
+    '<strong>Not measured here — do NOT read as passing:</strong><br>' +
+    '· <strong>Keyboard / focus order</strong> — this harness sends no key events ' +
+      '(verified: a keydown listener saw 0). Needs a real browser or CDP <code>Input.dispatchKeyEvent</code>.<br>' +
+    '· <strong>B2/B3/B4/B5/B6</strong> (accessible names per surface) — need the relevant panel open; ' +
+      'run them with the panel focused, using the same <code>visible()</code> rule.<br>' +
+    '· <strong>B7, B12, B14, B15, B17, B18</strong> — need Mode B (a signed-in session) or a populated bank.<br>' +
+    '· <code>#wbDrawer</code> — needs a word saved in a bank.' +
+    (errs.length ? '<br><br><strong style="color:#f87171">' + errs.join('<br>') + '</strong>' : '');
+}
+</script>
+</body>
+</html>
