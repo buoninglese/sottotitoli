@@ -33,7 +33,12 @@
   'use strict';
 
   var ICON_SELECTOR = '.material-symbols-outlined,.material-symbols-rounded';
-  var CONTROL_SELECTOR = 'button,a,[role="button"],[role="link"]';
+  // [onclick] / [onkeydown] matter: this codebase uses <span onclick> and <div onclick> as
+  // controls instead of <button>. Without them such an element is not recognised as a
+  // control, so its icon looks "decorative" and would be hidden — quietly removing a
+  // CLICKABLE thing from the accessibility tree. Treating them as controls keeps the icon
+  // exposed, so the real problem (an unnamed control) stays visible instead of being masked.
+  var CONTROL_SELECTOR = 'button,a,[role="button"],[role="link"],[onclick],[onkeydown]';
 
   function hasText(el) {
     return (el.textContent || '').replace(/\s+/g, '').length > 0;
@@ -41,6 +46,9 @@
 
   // Walk up to the nearest interactive ancestor and ask: is this icon its only label?
   function isSoleLabel(span) {
+    // The icon may BE the control: this codebase uses `<span onclick>...` as a button.
+    // Checked on the span itself, because the walk below deliberately starts one level up.
+    if (span.hasAttribute('onclick') || span.hasAttribute('onkeydown')) return true;
     var p = span.parentElement;
     while (p && p !== document.body && p.nodeType === 1) {
       if (p.matches && p.matches(CONTROL_SELECTOR)) {
