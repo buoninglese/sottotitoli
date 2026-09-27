@@ -91,6 +91,13 @@ var BASELINE = {
 
 var rows = [];
 var errs = [];
+/* The actual strings behind the B13 family's counts.
+   Without these, a count like "B13x 35" is unactionable: you have to go and
+extract the
+   same thing by hand, with a DIFFERENT script, and mine had a bug that reported a bound
+   string as unannotated. The harness has working positives controls, so let the harness
+   say what it found. Kept in full so the numbers can be read rather than guessed at. */
+var lastHits = { x: [], a: [], z: [], zc: [] };
 function row(id, name, base, cur, verdict, note) {
   rows.push({ id: id, name: name, base: base, cur: cur, verdict: verdict, note: note || '' });
 }
@@ -322,7 +329,7 @@ function measure(compareWith) {
       var t = strings[i];
       if (!t || seen[t]) continue;
       seen[t] = 1; total++;
-      if (IT.test(t) && !EN.test(t)) { itOnly++; if (samples.length < 4) samples.push(t); }
+      if (IT.test(t) && !EN.test(t)) { itOnly++; if (samples.length < 60) samples.push(t); }
       // The MIRROR. Every B13 row asked one direction only — Italian leaking into
       // the English UI — so English leaking into the ITALIAN UI was structurally
       // invisible to this harness. Mode B then found seven real instances of it in
@@ -330,7 +337,7 @@ function measure(compareWith) {
       // "Signals" headings (no data-i18n at all), #ssPopup's aria-label="Close",
       // the report picker's "Toggle favorite", and onboarding's English data-it
       // values. Same defect, opposite direction — so it gets the same treatment.
-      else if (EN.test(t) && !IT.test(t)) { enOnly++; if (enSamples.length < 4) enSamples.push(t); }
+      else if (EN.test(t) && !IT.test(t)) { enOnly++; if (enSamples.length < 60) enSamples.push(t); }
     }
     return { itOnly: itOnly, enOnly: enOnly, total: total, samples: samples, enSamples: enSamples };
   }
@@ -393,12 +400,25 @@ function measure(compareWith) {
   var cText = classify(textNodeStrings());
   var cAttr = classify(attributeStrings());
   var lang = (win.I18n && win.I18n.getLang) ? win.I18n.getLang() : 'unknown';
+  // Record what was found so the notes can show it.
+  // ⚠️ GATED ON THE ENGLISH PASS. An earlier version populated these whenever the count was
+  // non-zero, which meant the ITALIAN pass — whose job is to find Italian, where Italian is
+  // correct — wrote 60 legitimate Italian labels into the "leaks" list. The English pass then
+  // had zero hits, so the `if` was false and the stale Italian list survived. Reading it
+  // produced a 60-string false leak report. Only the pass being READ may write these.
+  if (lang === 'en') {
+    lastHits.x = cText.samples;
+    lastHits.a = cAttr.samples;
+  }
 
   // Remember the Italian pass. This is the control, and it must not be overwritten by
   // the English pass that follows (or by the D6 second reading).
   if (lang === 'it') {
     itControl = { text: cText, attr: cAttr, leaf: cLeaf };
+    if (cText.enOnly) lastHits.z = cText.enSamples;
+    if (cAttr.enOnly) lastHits.z = lastHits.z.concat(cAttr.enSamples);
   } else {
+    if (cText.enOnly) lastHits.zc = cText.enSamples;
     row('B13x', 'Italian-only strings · ALL text nodes, no viewport limit (lang=en)',
         String(BASELINE.B13x), cText.itOnly + ' / ' + cText.total,
         cText.itOnly <= BASELINE.B13x ? 'pass' : 'fail',
@@ -507,6 +527,30 @@ function measure(compareWith) {
     '· <strong>B7, B12, B14, B15, B17, B18</strong> — need Mode B (a signed-in session) or a populated bank.<br>' +
     '· <code>#wbDrawer</code> — needs a word saved in a bank.' +
     (errs.length ? '<br><br><strong style="color:#f87171">' + errs.join('<br>') + '</strong>' : '');
+
+  /* The offending strings themselves. Collapsed by default so the notes stay readable,
+     but present, because a count alone is unactionable: acting on "B13x 35" previously
+     meant re-extracting by hand with a second script that had its own bug. The harness
+     has passing controls, so let the harness say what it found. */
+  (function () {
+    function block(label, arr, colour) {
+      if (!arr || !arr.length) return '';
+      var safe = arr.map(function (s) {
+        return '· ' + String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+      }).join('\n');
+      return '<details style="margin-top:10px"><summary style="cursor:pointer;color:' + colour + '">' +
+        '<strong>' + label + '</strong> — ' + arr.length + ' (click to expand)</summary>' +
+        '<pre style="max-height:280px;overflow:auto;background:#14161a;border:1px solid #23262e;' +
+        'border-radius:8px;padding:10px;font-size:11.5px;line-height:1.55;white-space:pre-wrap;' +
+        'margin:6px 0 0">' + safe + '</pre></details>';
+    }
+    var extra =
+      block('Italian shown in the English UI · text (B13x)', lastHits.x, '#f87171') +
+      block('Italian shown in the English UI · attributes (B13a)', lastHits.a, '#f87171') +
+      block('English shown in the Italian UI · mirror (B13z)', lastHits.z, '#fbbf24') +
+      block('control · English shown in the English UI (B13zc)', lastHits.zc, '#94a3b8');
+    if (extra) document.getElementById('notes').innerHTML += extra;
+  })();
 }
 </script>
 </body>
