@@ -73,6 +73,7 @@ var BASELINE = {
 };
 
 var rows = [];
+var errs = [];
 function row(id, name, base, cur, verdict, note) {
   rows.push({ id: id, name: name, base: base, cur: cur, verdict: verdict, note: note || '' });
 }
@@ -83,7 +84,8 @@ var win, doc;
 frame.addEventListener('load', function () {
   win = frame.contentWindow;
   doc = frame.contentDocument;
-  // Give the page's own scripts time to settle before measuring anything.
+  // First give the page's own scripts a head start, then let run() poll until the
+  // DOM actually stops changing, instead of trusting a single fixed wait (D6).
   setTimeout(run, 4000);
 });
 
@@ -97,6 +99,38 @@ function visible(el) {
 }
 function txt(el) { return (el.textContent || '').replace(/\s+/g, ' ').trim(); }
 
+/* ── D6 · settle BEFORE measuring ───────────────────────────────────────────────
+   The fixed 4000ms wait was not enough. Panels render lazily, so the SAME build
+   produced B13 denominators of 95, 52 and 55, and B1 of 93, 81 and 93. The
+   NUMERATORS were right every time (0), but a moving denominator twice cost real
+   time to rule out as a regression. So poll a cheap DOM signature and only
+   measure once it has been unchanged for STABLE_READS consecutive polls.
+   settleInfo records whether it actually settled, so a reader can tell a stable
+   reading from one taken at the cap without knowing to ask.                       */
+var STABLE_READS = 5, POLL_MS = 250, MAX_MS = 30000;
+var settleInfo = { ms: 0, settled: false };
+function domSignature() {
+  var allCount = doc.querySelectorAll('body *').length;
+  var leaves = doc.querySelectorAll('h1,h2,h3,h4,p,span,div,button,label,option,li');
+  var leafCount = 0;
+  for (var i = 0; i < leaves.length; i++) if (leaves[i].children.length === 0) leafCount++;
+  return allCount + ':' + leafCount + ':' + (doc.body.textContent || '').length;
+}
+function settleThenMeasure() {
+  var last = null, same = 0, waited = 0;
+  (function poll() {
+    var sig = domSignature();
+    if (sig === last) same++; else { same = 0; last = sig; }
+    if (same >= STABLE_READS || waited >= MAX_MS) {
+      settleInfo = { ms: waited, settled: waited < MAX_MS };
+      measure();
+      return;
+    }
+    waited += POLL_MS;
+    setTimeout(poll, POLL_MS);
+  })();
+}
+
 function run() {
   // PIN THE UI LANGUAGE FIRST. B13 asks "how many visible strings are Italian while the
   // UI is English?", which is meaningless unless the language is fixed. Without this the
@@ -106,18 +140,18 @@ function run() {
   // requestAnimationFrame, so give it a frame before measuring.
   if (win && win.I18n && win.I18n.setLang) {
     win.I18n.setLang('en');
-    setTimeout(measure, 600);
+    setTimeout(settleThenMeasure, 600);
     return;
   }
-  measure();
+  settleThenMeasure();
 }
 
-function measure() {
+function measure(compareWith) {
   // Reset first. measure() fires again on every iframe load, and because `rows` lives at
   // script scope it would otherwise ACCUMULATE — producing a table with every row
   // duplicated (seen: 12 rows instead of 6) and a misleading pass count.
   rows = [];
-  var errs = [];
+  errs = [];
 
   /* ── CALIBRATION CONTROL ───────────────────────────────────────────────────────
      RULE 2. If this returns 0 we know nothing, because a working query would find it.
@@ -191,6 +225,30 @@ function measure() {
       itOnly + ' / ' + total, itOnly <= BASELINE.B13 ? 'pass' : 'fail',
       'heuristic word-list classification — treat as a LOWER bound, not a full i18n audit');
 
+  /* ── D6 · two settled readings, and flag any row that moved ────────────────
+     Settling alone did NOT make this deterministic. Three runs on the same build
+     with the settle loop already in place: B13 held at 72 every time, but B1 still
+     moved 93 / 93 / 81 — AND still reported settled:true. The reason is that the
+     page being measured is HIDDEN, and a hidden page has its timers throttled, so
+     content keeps arriving long after any fixed settle window. No amount of waiting
+     can be proved sufficient, so measure twice and believe neither reading when the
+     two disagree. A row that moves is reported as 'unstable', not 'pass': a moving
+     count is not evidence of a regression, but it IS proof the number cannot be
+     trusted.                                                                */
+  if (!compareWith) {
+    var firstPass = rows;
+    setTimeout(function () { measure(firstPass); }, POLL_MS * 2);
+    return;
+  }
+  for (var ci = 0; ci < rows.length && ci < compareWith.length; ci++) {
+    if (rows[ci].cur !== compareWith[ci].cur) {
+      rows[ci].verdict = 'unstable';
+      rows[ci].note = 'count moved between two settled readings (' + compareWith[ci].cur +
+        ' → ' + rows[ci].cur + '); the measured page is hidden and its timers are ' +
+        'throttled — re-run with this tab visible before believing this row. ' + rows[ci].note;
+    }
+  }
+
   /* ── render ─────────────────────────────────────────────────────────────────── */
   var tb = document.querySelector('#out tbody');
   tb.innerHTML = rows.map(function (r) {
@@ -202,7 +260,13 @@ function measure() {
 
   document.getElementById('notes').innerHTML =
     '<strong>Measured with UI language:</strong> <code>' + (win.I18n && win.I18n.getLang ? win.I18n.getLang() : 'unknown') +
-    '</code> · page hidden: <code>' + (document.hidden || frame.contentDocument.hidden) + '</code><br><br>' +
+    '</code> · page hidden: <code>' + (document.hidden || frame.contentDocument.hidden) + '</code><br>' +
+    '<strong>DOM settled before measuring:</strong> <code>' + settleInfo.settled + '</code> after <code>' +
+      settleInfo.ms + 'ms</code>' +
+      (settleInfo.settled ? '' :
+        ' — <strong style="color:#f87171">hit the 20s cap: a denominator may still have been ' +
+        'moving when this ran, so treat the counts as UNVERIFIED</strong>') +
+    '<br><br>' +
     '<strong>Not measured here — do NOT read as passing:</strong><br>' +
     '· <strong>Keyboard / focus order</strong> — this harness sends no key events ' +
       '(verified: a keydown listener saw 0). Needs a real browser or CDP <code>Input.dispatchKeyEvent</code>.<br>' +
