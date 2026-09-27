@@ -73,7 +73,7 @@ window.SOTTOTITOLI_CONFIG = {
    *  Recorded consents store this exact string, and a mismatch between a stored
    *  value and this one is what triggers the re-consent prompt (js/reconsent.js).
    *  Bump it whenever the terms change. */
-  termsVersion: "2026-06-24",
+  termsVersion: "2026-09-27",
 
   /** Auth redirect URL (after Google OAuth login) */
   AUTH_REDIRECT_URL: "https://www.sottotitoli.pro/panoramica.html",

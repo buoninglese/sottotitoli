@@ -134,6 +134,8 @@
       "insights_your_ai_profile": "Il tuo profilo AI",
       "word_banks": "Banche parole",
       "wb_tab_overview": "Panoramica",
+      "wb_tab_english": "Inglese",
+      "wb_tab_italian": "Italiano",
       "vocabolario": "Vocabolario",
       "grammatica": "Grammatica",
       "trascrizioni": "Trascrizioni",
@@ -1491,6 +1493,8 @@
 
       "word_banks": "Word banks",
       "wb_tab_overview": "Overview",
+      "wb_tab_english": "English",
+      "wb_tab_italian": "Italian",
       "vocabolario": "Vocabulary",
       "grammatica": "Grammar",
       "trascrizioni": "Transcripts",
