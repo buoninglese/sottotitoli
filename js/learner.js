@@ -1381,21 +1381,17 @@
   }
 
   // Bank display names (Allena launched from the Word-banks tab).
-  // The ten system collections resolve through the shared registry exposed by
-  // panoramica.js so their names follow the active UI language. The 'it_*'
-  // entries are Italian-vocabulary tab collections: they are Italian banks, so
-  // their labels stay Italian in both UI languages.
-  var BANK_NAMES = {
-    it_review_due: 'Ripasso immediato', it_saved_sessions: 'Salvate da sessioni',
-    it_vocab_builder: 'Italian Vocabulary Builder', it_fragile: 'Parole Fragili',
-    it_new_weekly: 'Nuove questa settimana'
-  };
+  // Every system collection -- the Italian-vocabulary ones included -- resolves
+  // through the shared registry exposed by panoramica.js, so the name follows the
+  // active UI language. There is deliberately no second hardcoded table here: a
+  // duplicate list is exactly how the Italian collections stayed frozen in Italian
+  // while the English ones translated.
   function bankNameFor(id) {
     if (window.BANK_COLL && window.BANK_COLL.name) {
       var n = window.BANK_COLL.name(id);
       if (n && n !== id) return n;
     }
-    return BANK_NAMES[id] || id;
+    return id;
   }
 
   // Words for pinned/system banks when Allena is launched on a bank that isn't in

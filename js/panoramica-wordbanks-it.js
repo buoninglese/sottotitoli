@@ -1,5 +1,21 @@
               (function(){
                 var lang = 'it';
+                // Preset labels come from the shared registry exposed by panoramica.js
+                // so they follow the active UI language. This mirrors the helpers in
+                // panoramica-wordbanks-en.js, which already worked this way -- the
+                // Italian file kept hardcoded Italian and so stayed Italian even when
+                // the UI was English. Looked up lazily: this file may be parsed before
+                // panoramica.js, but the presets are only built once data has loaded.
+                function collName(id, fallback) {
+                  var c = window.BANK_COLL;
+                  if (c && c.name) { var v = c.name(id); if (v && v !== id) return v; }
+                  return fallback;
+                }
+                function collSub(id, fallback) {
+                  var c = window.BANK_COLL;
+                  if (c && c.sub) { var v = c.sub(id); if (v) return v; }
+                  return fallback;
+                }
                 function esc(s){ return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
                 function loadAllIt(){
                   if(!window.SottotitoliData||!window.SottotitoliData.getWordbanks){setTimeout(loadAllIt,300);return;}
@@ -9,15 +25,15 @@
                     // Italian preset banks
                     var presets = {
                       pinned: [
-                        {id:'it_review_due',name:'Ripasso immediato',desc:'Parole italiane da ripassare ogni giorno',icon:'history',words:0,newWords:0,due:0},
-                        {id:'it_saved_sessions',name:'Salvate da sessioni',desc:'Parole italiane salvate durante le sessioni live',icon:'mic',words:0,newWords:0,due:0},
-                        {id:'it_vocab_builder',name:'Italian Vocabulary Builder',desc:'Parole italiane salvate dal Vocabulary Builder',icon:'book',words:(function(){ try { var b=JSON.parse(localStorage.getItem('sottotitoli_wb_it_pinned')||'{"words":[]}'); return (b.words||[]).length; } catch(e){ return 0; } })(),newWords:0,due:0},
-                        {id:'it_fragile',name:'Parole Fragili',desc:'Parole italiane che necessitano rinforzo',icon:'warning',words:0,newWords:0,due:0}
+                        {id:'it_review_due',name:collName('it_review_due','Ripasso immediato'),desc:collSub('it_review_due','Parole italiane da ripassare ogni giorno'),icon:'history',words:0,newWords:0,due:0},
+                        {id:'it_saved_sessions',name:collName('it_saved_sessions','Salvate da sessioni'),desc:collSub('it_saved_sessions','Parole italiane salvate durante le sessioni live'),icon:'mic',words:0,newWords:0,due:0},
+                        {id:'it_vocab_builder',name:collName('it_vocab_builder','Italian Vocabulary Builder'),desc:collSub('it_vocab_builder','Parole italiane salvate dal Vocabulary Builder'),icon:'book',words:(function(){ try { var b=JSON.parse(localStorage.getItem('sottotitoli_wb_it_pinned')||'{"words":[]}'); return (b.words||[]).length; } catch(e){ return 0; } })(),newWords:0,due:0},
+                        {id:'it_fragile',name:collName('it_fragile','Parole Fragili'),desc:collSub('it_fragile','Parole italiane che necessitano rinforzo'),icon:'warning',words:0,newWords:0,due:0}
                       ],
                       discovery: [
-                        {id:'it_next_step',name:'Prossimo passo',desc:'Vocabolario italiano per i tuoi obiettivi',icon:'moving',type:'BETA',words:0},
-                        {id:'it_build_known',name:'Costruisci da ciò che sai',desc:'Progressione lessicale italiana',icon:'psychology',type:'BETA',words:0},
-                        {id:'it_activate',name:'Attiva ciò che riconosci',desc:'Da passivo ad attivo',icon:'visibility',type:'BETA',words:0}
+                        {id:'it_next_step',name:collName('it_next_step','Prossimo passo'),desc:collSub('it_next_step','Vocabolario italiano per i tuoi obiettivi'),icon:'moving',type:'BETA',words:0},
+                        {id:'it_build_known',name:collName('it_build_known','Costruisci da ciò che sai'),desc:collSub('it_build_known','Progressione lessicale italiana'),icon:'psychology',type:'BETA',words:0},
+                        {id:'it_activate',name:collName('it_activate','Attiva ciò che riconosci'),desc:collSub('it_activate','Da passivo ad attivo'),icon:'visibility',type:'BETA',words:0}
                       ]
                     };
                     var allPinned = presets.pinned;
@@ -96,7 +112,7 @@
                     wbfItRoot.setAttribute('data-wbf-lang', 'it');
                     wbfItRoot.innerHTML =
                       '<div class="wbf-toolbar">'+
-                        '<span class="wbf-toolbar-title">Collezioni</span>'+
+                        '<span class="wbf-toolbar-title" data-i18n="wb_folders_eyebrow">Collezioni</span>'+
                       '</div>'+
                       '<div id="wbFoldersGridIt"><div class="wbf-loading"><div class="wbf-spinner"></div><span data-i18n="wb_folders_loading">Caricamento cartelle…</span></div></div>';
                     // Render ONLY the stats bar (filled async by the #wbItStatsBar fetch above) + the folder view

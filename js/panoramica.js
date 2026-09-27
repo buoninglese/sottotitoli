@@ -489,7 +489,19 @@
         activate_recognized:       { nameKey: 'coll_activate_recognized',       subKey: 'coll_activate_recognized_sub' },
         upcoming_useful_vocab:     { nameKey: 'coll_upcoming_useful_vocab',     subKey: 'coll_upcoming_useful_vocab_sub' },
         upcoming_session_driven:   { nameKey: 'coll_upcoming_session_driven',   subKey: 'coll_upcoming_session_driven_sub' },
-        upcoming_roadmap:          { nameKey: 'coll_upcoming_roadmap',          subKey: 'coll_upcoming_roadmap_sub' }
+        upcoming_roadmap:          { nameKey: 'coll_upcoming_roadmap',          subKey: 'coll_upcoming_roadmap_sub' },
+        // Italian-vocabulary collections. These were three hardcoded Italian maps in
+        // the detail view ("they are Italian banks, so their labels stay Italian in
+        // both UI languages"). Now ordinary registry entries, so their labels follow
+        // the active UI language like every other collection.
+        it_review_due:             { nameKey: 'coll_it_review_due',             subKey: 'coll_it_review_due_sub' },
+        it_saved_sessions:         { nameKey: 'coll_it_saved_sessions',         subKey: 'coll_it_saved_sessions_sub' },
+        it_vocab_builder:          { nameKey: 'coll_it_vocab_builder',          subKey: 'coll_it_vocab_builder_sub' },
+        it_new_weekly:             { nameKey: 'coll_it_new_weekly',             subKey: 'coll_it_new_weekly_sub' },
+        it_fragile:                { nameKey: 'coll_it_fragile',                subKey: 'coll_it_fragile_sub' },
+        it_next_step:              { nameKey: 'coll_it_next_step',              subKey: 'coll_it_next_step_sub' },
+        it_build_known:            { nameKey: 'coll_it_build_known',            subKey: 'coll_it_build_known_sub' },
+        it_activate:               { nameKey: 'coll_it_activate',               subKey: 'coll_it_activate_sub' }
       };
       // Fall back to the id rather than to a hardcoded language: a missing key must be
       // visible in testing, not silently English in the Italian UI.
@@ -3756,18 +3768,10 @@
           if (itSfBank) _wbState.currentBankUUID = itSfBank.id;
         }
 
-        // The ten system collections resolve through the shared registry so the
-        // detail view, the cards, the folders view and the save-to menu all show
-        // the same wording in the active language. The 'it_*' entries are the
-        // Italian-vocabulary tab collections: they are Italian banks, so their
-        // labels stay Italian in both UI languages.
-        var itTabNames = {
-          'it_review_due':'Ripasso immediato','it_saved_sessions':'Salvate da sessioni',
-          'it_vocab_builder':'Italian Vocabulary Builder',
-          'it_new_weekly':'Nuove questa settimana','it_fragile':'Parole Fragili',
-          'it_next_step':'Prossimo passo','it_build_known':'Costruisci da ciò che sai',
-          'it_activate':'Attiva ciò che riconosci'
-        };
+        // The system collections resolve through the shared registry so the detail
+        // view, the cards, the folders view and the save-to menu all show the same
+        // wording in the active language. The Italian-vocabulary collections are
+        // registry entries too, so their labels follow the UI language as well.
         var bankTypes = {
           'review_due_now':'pinned',
           'saved_from_sessions':'pinned','fragile_words':'pinned',
@@ -3781,36 +3785,12 @@
           'it_next_step':'smart','it_build_known':'smart',
           'it_activate':'smart'
         };
-        var itTabSubs = {
-          'it_review_due':'Parole italiane pronte per il ripasso',
-          'it_saved_sessions':'Parole italiane salvate durante le sessioni',
-          'it_vocab_builder':'Parole italiane aggiunte con + dal Vocabulary Builder',
-          'it_new_weekly':'Parole italiane raccolte di recente',
-          'it_fragile':'Parole italiane a rischio',
-          'it_next_step':'Vocabolario italiano per i tuoi obiettivi',
-          'it_build_known':'Progressione lessicale italiana',
-          'it_activate':'Parole che capisci ma non usi ancora'
-        };
-        // Empty states for the system collections come from the dictionary so
-        // they follow the active language. The 'it_*' tab collections keep their
-        // Italian copy, consistent with itTabNames / itTabSubs.
-        var itTabEmpties = {
-          'it_review_due':'Tutto in ordine per ora.',
-          'it_saved_sessions':'Non hai ancora salvato parole italiane dalle sessioni.',
-          'it_vocab_builder':'Nessuna parola italiana salvata. Usa il + sui chip di traduzione nel Vocabulary Builder.',
-          'it_new_weekly':'Nessuna nuova parola italiana questa settimana.',
-          'it_fragile':'Nessuna parola italiana fragile al momento.',
-          'it_next_step':'Nessun suggerimento basato sugli obiettivi.',
-          'it_build_known':'Nessun vocabolo collegato disponibile.',
-          'it_activate':'Nessun candidato per l\'attivazione.'
-        };
-
         var isSystem = !!SYSTEM_COLLECTION_KEYS[bankId];
-        var name = bank ? bank.name : (isSystem ? collectionName(bankId) : (itTabNames[bankId] || bankId));
+        var name = bank ? bank.name : (isSystem ? collectionName(bankId) : bankId);
         var type = bank ? 'custom' : (bankTypes[bankId] || 'pinned');
         _wbState.currentBankType = type;  // store type for delete routing
-        var subtitle = bank ? (bank.description || '') : (isSystem ? collectionSub(bankId) : (itTabSubs[bankId] || ''));
-        var emptyMsg = isSystem ? I18n.t('coll_empty_' + bankId) : (itTabEmpties[bankId] || I18n.t('wb_empty_no_words'));
+        var subtitle = bank ? (bank.description || '') : (isSystem ? collectionSub(bankId) : '');
+        var emptyMsg = isSystem ? I18n.t('coll_empty_' + bankId) : I18n.t('wb_empty_no_words');
         var badgeClass = type === 'pinned' ? 'badge-pinned' : type === 'smart' ? 'badge-smart' : 'badge-custom';
         var typeLabel = type === 'pinned' ? 'PINNED' : type === 'smart' ? 'SMART' : 'YOURS';
         var primaryAction = type === 'pinned' ? 'Start review' : type === 'smart' ? 'Move selected to Yours' : 'Manage collection';

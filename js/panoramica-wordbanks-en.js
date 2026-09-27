@@ -116,7 +116,7 @@
                     wbfEnRoot.setAttribute('data-wbf-lang', 'en');
                     wbfEnRoot.innerHTML =
                       '<div class="wbf-toolbar">'+
-                        '<span class="wbf-toolbar-title">Collezioni</span>'+
+                        '<span class="wbf-toolbar-title" data-i18n="wb_folders_eyebrow">Collezioni</span>'+
                       '</div>'+
                       '<div id="wbFoldersGridEn"><div class="wbf-loading"><div class="wbf-spinner"></div><span data-i18n="wb_folders_loading">Caricamento cartelle…</span></div></div>';
                     // Render ONLY the stats bar (filled async by the #wbEnStatsBar fetch above) + the folder view
