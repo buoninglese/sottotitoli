@@ -3218,7 +3218,7 @@
                 '<span class="wbf-count"><b>'+bk.count+'</b> '+L.words+'</span>'+
                 '<span class="wbf-front-actions">'+
                   '<button class="wbf-allena" data-bank="'+wbEsc(bk.id)+'" data-act="allena" title="'+L.allena+'"><i class="fa-solid fa-bolt"></i> '+L.allena+'</button>'+
-                  '<button class="wbf-menu" data-menu="'+wbEsc(bk.id)+'" title="Options"><i class="fa-solid fa-ellipsis-vertical"></i></button>'+
+                  '<button class="wbf-menu" data-menu="'+wbEsc(bk.id)+'" title="'+L.options+'"><i class="fa-solid fa-ellipsis-vertical"></i></button>'+
                 '</span>'+
               '</div>'+
             '</div>'+
@@ -3245,6 +3245,7 @@
           words: wbFldT('wb_folders_words'),
           open: wbFldT('wb_folders_open'),
           allena: wbFldT('learner_train'),
+          options: wbFldT('wb_folders_options'),
           rename: wbFldT('wb_folders_rename'),
           duplicate: wbFldT('wb_folders_duplicate'),
           delete: wbFldT('wb_folders_delete'),
