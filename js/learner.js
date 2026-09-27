@@ -1418,12 +1418,12 @@
       } else if (bankId === 'saved_from_sessions' || bankId === 'it_saved_sessions') {
         var banks = await srcBanks(lang);
         var sf = null;
-        banks.forEach(function (b) { if (b.name === 'Saved from sessions') sf = b; });
+        banks.forEach(function (b) { if (b.name === BANK_ID.SAVED_FROM_SESSIONS) sf = b; });
         if (sf) out = await srcBankWords(sf.id, lang);
       } else if (bankId === 'vocab_builder_en') {
         var banks2 = await srcBanks('en');
         var vb = null;
-        banks2.forEach(function (b) { if (b.name === 'English Vocabulary Builder') vb = b; });
+        banks2.forEach(function (b) { if (b.name === BANK_ID.ENGLISH_VOCAB_BUILDER) vb = b; });
         if (vb) out = await srcBankWords(vb.id, 'en');
       } else if (bankId === 'it_vocab_builder') {
         try {

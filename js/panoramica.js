@@ -3065,7 +3065,7 @@
 
         // ── Custom banks from Supabase (exclude system banks already shown in Pinned/Smart) ──
         var banks = await SottotitoliData.getWordbanks(lang);
-        var systemBankNames = ['Saved from sessions', 'Build From Known', 'New Words', 'Saved For Later', 'All Looked-Up Words'];
+        var systemBankNames = [BANK_ID.SAVED_FROM_SESSIONS, BANK_ID.BUILD_FROM_KNOWN, BANK_ID.NEW_WORDS, BANK_ID.SAVED_FOR_LATER, BANK_ID.ALL_LOOKED_UP_WORDS];
         var customHtml = '';
         if (banks && banks.length) {
           for (var i = 0; i < banks.length; i++) {
@@ -3312,12 +3312,12 @@
           var dueWP = uid ? wbTimeout(sb.from('review_words').select('lemma,cefr').eq('user_id',uid).eq('lang',lang).or('next_review_at.lte.'+nowISO+',is_new.eq.true').limit(5), 1800, { data: [] }) : Promise.resolve({ data: [] });
           var fragWP = uid ? wbTimeout(sb.from('review_words').select('lemma,cefr').eq('user_id',uid).eq('lang',lang).or('mastery_score.lt.40,lapses.gte.2').limit(5), 1800, { data: [] }) : Promise.resolve({ data: [] });
 
-          var systemNames = ['Saved from sessions','Build From Known','New Words','Saved For Later','All Looked-Up Words','English Vocabulary Builder','Italian Vocabulary Builder'];
+          var systemNames = [BANK_ID.SAVED_FROM_SESSIONS,BANK_ID.BUILD_FROM_KNOWN,BANK_ID.NEW_WORDS,BANK_ID.SAVED_FOR_LATER,BANK_ID.ALL_LOOKED_UP_WORDS,BANK_ID.ENGLISH_VOCAB_BUILDER,BANK_ID.ITALIAN_VOCAB_BUILDER];
           var customBanks = (banks || []).filter(function(b){ return systemNames.indexOf(b.name) === -1; });
           var sfBank = null, vbBank = null;
           (banks || []).forEach(function(b){
-            if (b.name === 'Saved from sessions') sfBank = b;
-            if (b.name === 'English Vocabulary Builder') vbBank = b;
+            if (b.name === BANK_ID.SAVED_FROM_SESSIONS) sfBank = b;
+            if (b.name === BANK_ID.ENGLISH_VOCAB_BUILDER) vbBank = b;
           });
           var sfP = sfBank ? wbPv(sfBank.id) : Promise.resolve([]);
           var vbP = vbBank ? wbPv(vbBank.id) : Promise.resolve([]);
@@ -3703,11 +3703,11 @@
         // For pinned/smart banks, resolve the actual bank UUID for delete operations
         _wbState.currentBankUUID = bank ? bank.id : null;
         if (!_wbState.currentBankUUID && bankId === 'saved_from_sessions') {
-          var sfBank = banks.find(function(b){ return b.name === 'Saved from sessions'; });
+          var sfBank = banks.find(function(b){ return b.name === BANK_ID.SAVED_FROM_SESSIONS; });
           if (sfBank) _wbState.currentBankUUID = sfBank.id;
         }
         if (!_wbState.currentBankUUID && bankId === 'it_saved_sessions') {
-          var itSfBank = banks.find(function(b){ return b.name === 'Saved from sessions'; });
+          var itSfBank = banks.find(function(b){ return b.name === BANK_ID.SAVED_FROM_SESSIONS; });
           if (itSfBank) _wbState.currentBankUUID = itSfBank.id;
         }
 
@@ -3791,7 +3791,7 @@
           words = await SottotitoliData.getWordbankWords(bank.id);
         } else if (bankId === 'saved_from_sessions') {
           // Pinned "Saved From Sessions" — fetch from the actual user bank created by caption sync
-          var sfBank = banks.find(function(b){ return b.name === 'Saved from sessions'; });
+          var sfBank = banks.find(function(b){ return b.name === BANK_ID.SAVED_FROM_SESSIONS; });
           if (sfBank) {
             words = await SottotitoliData.getWordbankWords(sfBank.id);
             // Enrich with CEFR from local lookups — LANGUAGE-AWARE.
@@ -3863,12 +3863,12 @@
         } else if (bankId === 'vocab_builder_en') {
           // Pinned "English Vocabulary Builder" — fetch from Supabase user_wordbank_words
           try {
-            var vbBank = banks.find(function(b){ return b.name === 'English Vocabulary Builder'; });
+            var vbBank = banks.find(function(b){ return b.name === BANK_ID.ENGLISH_VOCAB_BUILDER; });
             if (vbBank) { words = await SottotitoliData.getWordbankWords(vbBank.id); }
           } catch(e) { /* leave empty */ }
         } else if (bankId === 'it_saved_sessions') {
           // Italian "Saved from sessions" — fetch from actual user bank
-          var itSfBank = banks.find(function(b){ return b.name === 'Saved from sessions' && b.lang === 'it'; });
+          var itSfBank = banks.find(function(b){ return b.name === BANK_ID.SAVED_FROM_SESSIONS && b.lang === 'it'; });
           if (itSfBank) {
             words = await SottotitoliData.getWordbankWords(itSfBank.id);
           }
@@ -6079,7 +6079,7 @@
         var targetBank;
         if (targetBankId) {
           // Logical pinned targets resolve to their real bank by name
-          var logicalNames = { saved_from_sessions: 'Saved from sessions', vocab_builder_en: 'English Vocabulary Builder', it_vocab_builder: 'Italian Vocabulary Builder' };
+          var logicalNames = { saved_from_sessions: BANK_ID.SAVED_FROM_SESSIONS, vocab_builder_en: BANK_ID.ENGLISH_VOCAB_BUILDER, it_vocab_builder: BANK_ID.ITALIAN_VOCAB_BUILDER };
           if (logicalNames[targetBankId]) {
             var allBanks = await SottotitoliData.getWordbanks(lang);
             targetBank = allBanks.find(function(b){ return b.name === logicalNames[targetBankId]; }) || null;
@@ -6091,9 +6091,9 @@
         if (!targetBank) {
           // Fallback: "English Vocabulary Builder" bank (default for VB saves)
           var banks = await SottotitoliData.getWordbanks(lang);
-          targetBank = banks.find(function(b) { return b.name === 'English Vocabulary Builder'; });
+          targetBank = banks.find(function(b) { return b.name === BANK_ID.ENGLISH_VOCAB_BUILDER; });
           if (!targetBank) {
-            var createRes = await sb.from('user_wordbanks').insert({ user_id: userId, name: 'English Vocabulary Builder', lang: lang }).select().single();
+            var createRes = await sb.from('user_wordbanks').insert({ user_id: userId, name: BANK_ID.ENGLISH_VOCAB_BUILDER, lang: lang }).select().single();
             if (createRes.error) { console.warn('create bank:', createRes.error.message); return; }
             targetBank = createRes.data;
           }
@@ -6348,9 +6348,9 @@
         var lang = window.SOTTOTITOLI_STUDY_LANG || 'en';
 
         var banks = await SottotitoliData.getWordbanks(lang);
-        var targetBank = banks.find(function(b) { return b.name === 'Saved for later'; });
+        var targetBank = banks.find(function(b) { return b.name === BANK_ID.SAVED_FOR_LATER; });
         if (!targetBank) {
-          var createRes = await sb.from('user_wordbanks').insert({ user_id: userId, name: 'Saved for later', lang: lang }).select().single();
+          var createRes = await sb.from('user_wordbanks').insert({ user_id: userId, name: BANK_ID.SAVED_FOR_LATER, lang: lang }).select().single();
           if (createRes.error) { console.warn('create bookmark bank:', createRes.error.message); return; }
           targetBank = createRes.data;
         }
@@ -6393,9 +6393,9 @@
               var userId = r.data.session.user.id;
               // Find or create "Italian Vocabulary Builder" bank
               var { data: banks } = await sb.from('user_wordbanks').select('id,name').eq('user_id', userId).eq('lang', 'it');
-              var targetBank = (banks||[]).find(function(b){ return b.name === 'Italian Vocabulary Builder'; });
+              var targetBank = (banks||[]).find(function(b){ return b.name === BANK_ID.ITALIAN_VOCAB_BUILDER; });
               if (!targetBank) {
-                var createRes = await sb.from('user_wordbanks').insert({ user_id: userId, name: 'Italian Vocabulary Builder', lang: 'it' }).select().single();
+                var createRes = await sb.from('user_wordbanks').insert({ user_id: userId, name: BANK_ID.ITALIAN_VOCAB_BUILDER, lang: 'it' }).select().single();
                 if (createRes.data) targetBank = createRes.data;
               }
               if (targetBank) {
@@ -6434,7 +6434,7 @@
         var groups = [
           { label: 'Pinned', items: [
             { v: '', t: defaultLabel },
-            { v: 'saved_from_sessions', t: 'Saved from sessions' },
+            { v: 'saved_from_sessions', t: BANK_ID.SAVED_FROM_SESSIONS },
             { v: isIt ? 'it_vocab_builder' : 'vocab_builder_en', t: isIt ? 'Italian Vocabulary Builder' : 'English Vocabulary Builder' }
           ] },
           { label: 'Smart', items: [
@@ -6456,7 +6456,7 @@
               var { data: banks } = await sb.from('user_wordbanks')
                 .select('id,name').eq('user_id', userId).eq('lang', lang).order('name');
               if (banks && banks.length) {
-                var systemNames = ['Saved from sessions','Build From Known','New Words','Saved For Later','All Looked-Up Words','English Vocabulary Builder','Italian Vocabulary Builder'];
+                var systemNames = [BANK_ID.SAVED_FROM_SESSIONS,BANK_ID.BUILD_FROM_KNOWN,BANK_ID.NEW_WORDS,BANK_ID.SAVED_FOR_LATER,BANK_ID.ALL_LOOKED_UP_WORDS,BANK_ID.ENGLISH_VOCAB_BUILDER,BANK_ID.ITALIAN_VOCAB_BUILDER];
                 banks.forEach(function(b){
                   if (systemNames.indexOf(b.name) === -1) custom.push({ id: b.id, name: b.name });
                 });
