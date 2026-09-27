@@ -1476,6 +1476,12 @@ button[onclick*="addToWordBank"]:hover{background:rgba(52,211,153,.15)!important
         <span class="transport-mic" id="transportMic">
           <i class="fas fa-microphone mic-icon idle" id="micIcon"></i>
           <span id="micStatus">Offline</span>
+          <!-- Microphone picker. getUserMedia({audio:true}) takes whatever the OS default input
+               is AT THAT MOMENT — during a Zoom call that can be Zoom's own virtual device, or a
+               Bluetooth headset in call mode. The browser then reports a working mic and
+               transcribes nothing, with no way to see or change which device was in use. -->
+          <select id="micSelect" title="Microfono in uso" aria-label="Scegli il microfono"
+                  style="flex:0 1 auto;min-width:0;max-width:170px;margin-left:6px;padding:5px 8px;border-radius:99px;border:1px solid var(--line);background:var(--card);color:var(--text);font-size:12px;font-family:Inter,sans-serif;cursor:pointer;outline:none;text-overflow:ellipsis"></select>
         </span>
       </div>
       <div style="position:absolute;right:0;display:flex;align-items:center;gap:6px">
@@ -1517,8 +1523,8 @@ button[onclick*="addToWordBank"]:hover{background:rgba(52,211,153,.15)!important
 <script src="js/toast.js?v=2"></script>
 <script src="js/notifications.js?v=1"></script>
 <script src="js/language-resolver.js?v=1"></script>
-<script src="js/real-mic.js?v=18"></script>
-<script src="js/record-fallback.js?v=4"></script>
+<script src="js/real-mic.js?v=19"></script>
+<script src="js/record-fallback.js?v=5"></script>
 <script src="js/grammar-viz.js?v=2"></script>
 <script src="js/speech-icons.js"></script>
 <script src="js/cefr-gse.js"></script>
@@ -4581,7 +4587,14 @@ async function toggleSession() {
       startBtn.style.display = '';
       stopBtn.style.display = 'none';
       var micFailMsg = null;
-      if (_realMic.state === 'blocked') micFailMsg = 'Microfono bloccato: consenti l\'accesso e riprova.';
+      if (_realMic.state === 'blocked') {
+        // A BUSY device is not a denied permission, and the old copy sent people to the wrong
+        // fix during a Zoom/Meet call. AbortError is deliberately NOT here: it also fires when
+        // the user dismisses the prompt, where "grant access" is the correct advice.
+        micFailMsg = (_realMic.lastError === 'NotReadableError' || _realMic.lastError === 'TrackStartError')
+          ? 'Il microfono è occupato da un\'altra app (Zoom, Teams…). Chiudi la chiamata, oppure scegli un altro microfono dal menu accanto alla spia del microfono.'
+          : 'Microfono bloccato: consenti l\'accesso e riprova.';
+      }
       else if (!useFallback) micFailMsg = 'Live captions are not supported in this browser. Use Chrome/Edge (desktop or Android).';
       else micFailMsg = 'Impossibile avviare la registrazione. Riprova.';
       if (micFailMsg) { if (typeof showToast === 'function') showToast(micFailMsg, 'warning'); else showAlertModal('Microfono', micFailMsg); }
@@ -4657,6 +4670,103 @@ async function toggleSession() {
 }
 
 // ── Credit pre-check before session start ──
+/* ── Microphone picker ───────────────────────────────────────────────────────
+ * Lists the real audio inputs and records which one to use.
+ *
+ * WHY: getUserMedia({audio:true}) takes whatever the OS default input is AT THAT MOMENT. In a
+ * Zoom call that can be Zoom's own virtual device, or a Bluetooth headset that switched into
+ * call mode — the browser reports a working microphone and transcribes nothing, which is
+ * unfalsifiable from the UI. Choosing the device explicitly is the fix.
+ *
+ * ⚠️ Device LABELS are blank until the page has been granted mic permission once — a browser
+ * privacy rule, not a bug. So we enumerate on load (labels may be blank) and again after the
+ * first successful capture, when they appear (BOTH capture paths call refreshMicList).
+ * ⚠️ A saved device can vanish (Bluetooth out of range, USB unplugged). The saved id is a
+ * PREFERENCE, never a requirement: BOTH capture paths drop it and retry the system default. */
+var MIC_KEY = 'sottotitoli-mic-device';
+
+window.SottotitoliMicId = function () {
+  try { return localStorage.getItem(MIC_KEY) || null; } catch (e) { return null; }
+};
+
+window.SottotitoliDropMicId = function () {
+  try { localStorage.removeItem(MIC_KEY); } catch (e) {}
+  var sel = document.getElementById('micSelect');
+  if (sel) sel.value = '';
+};
+
+/* Constraints used by EVERY capture on this page — real-mic.js (desktop/Android) and
+ * record-fallback.js (iOS) — instead of each hardcoding audio:true. */
+window.SottotitoliMicConstraints = function () {
+  var id = window.SottotitoliMicId();
+  return id ? { audio: { deviceId: { exact: id } } } : { audio: true };
+};
+
+async function refreshMicList() {
+  var sel = document.getElementById('micSelect');
+  if (!sel) return;
+  if (!navigator.mediaDevices || !navigator.mediaDevices.enumerateDevices) {
+    sel.style.display = 'none';   // cannot list inputs (older Safari) — stay out of the way
+    return;
+  }
+  try {
+    var devices = await navigator.mediaDevices.enumerateDevices();
+    var mics = devices.filter(function (d) { return d.kind === 'audioinput'; });
+    if (!mics.length) {
+      sel.innerHTML = '<option value="">Nessun microfono</option>';
+      return;
+    }
+    var saved = window.SottotitoliMicId();
+    var named = 0;
+    var html = '<option value="">Predefinito del sistema</option>';
+    mics.forEach(function (m, i) {
+      if (m.label) named++;
+      var label = m.label || ('Microfono ' + (i + 1));
+      html += '<option value="' + m.deviceId + '">' + label.replace(/</g, '&lt;').replace(/"/g, '&quot;') + '</option>';
+    });
+    sel.innerHTML = html;
+    var stillThere = saved && mics.some(function (m) { return m.deviceId === saved; });
+    sel.value = stillThere ? saved : '';
+    if (saved && !stillThere) window.SottotitoliDropMicId();   // it is gone — fall back explicitly
+    sel.title = named
+      ? 'Microfono in uso'
+      : 'Concedi l\'accesso al microfono per vedere i nomi dei dispositivi';
+  } catch (e) { console.warn('mic list:', e); }
+}
+
+function _initMicPicker() {
+  var sel = document.getElementById('micSelect');
+  if (!sel) return;
+  // Guard against a second #micSelect ever existing: two listeners would double-apply a change.
+  if (sel.dataset && sel.dataset.micInit === '1') return;
+  if (sel.dataset) sel.dataset.micInit = '1';
+  sel.addEventListener('change', function () {
+    var v = sel.value;
+    try { if (v) localStorage.setItem(MIC_KEY, v); else localStorage.removeItem(MIC_KEY); } catch (e) {}
+    if (sessionActive && !paused) {
+      var isFallback = !!(window.RecordFallback && window.RecordFallback.isNeeded && window.RecordFallback.isNeeded());
+      if (isFallback) {
+        // The iOS recorder is not swappable mid-session; be honest instead of pretending.
+        if (typeof showToast === 'function') showToast('Microfono cambiato: avrà effetto dalla prossima sessione', 'warning');
+      } else {
+        /* Swap the capture DIRECTLY instead of pause→resume. Pause is user-facing state — it
+         * flips the buttons and marks the session paused — and this must not touch it. It also
+         * avoids depending on togglePause()'s `if (!sessionActive) return` guard staying
+         * permissive, which is exactly what would silently break this. stopRealMic() nulls both
+         * recognition and stream, so startRealMic() re-opens on the newly chosen device. */
+        if (typeof showToast === 'function') showToast('Microfono cambiato — riavvio la cattura…', 'loading');
+        Promise.resolve()
+          .then(function () { stopRealMic(); return startRealMic(); })
+          .catch(function (e) { console.warn('mic switch restart failed:', e); });
+      }
+    }
+  });
+  if (navigator.mediaDevices && navigator.mediaDevices.addEventListener) {
+    navigator.mediaDevices.addEventListener('devicechange', refreshMicList);
+  }
+  refreshMicList();
+}
+
 async function _checkCreditsBeforeStart() {
   try {
     var sb = window.sottotitoliSupabase;
@@ -4815,6 +4925,8 @@ window.onTranscriptionCreditsExhausted = _endSessionForCredits;
 
 // Load the failsafe preference at page load; _startSessionTimer() refreshes it per session.
 _loadAutoStopPref();
+// Populate the microphone list (labels appear after the first permission grant).
+_initMicPicker();
 
 // ── Session UI setup (mic already running — called after credit check passes) ──
 function _applySessionLiveUI(startBtn, stopBtn) {

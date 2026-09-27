@@ -55,13 +55,38 @@
 
     start: async function(){
       if (this._recorder && this._recorder.state === 'recording') return true;
+      // Same device choice as the desktop path — and, critically, the SAME FALLBACK. On iOS a
+      // Bluetooth headset that walked out of range makes deviceId:{exact} throw, and without
+      // this retry the recording simply never starts on the one platform that uses this file.
+      var constraints = (typeof window.SottotitoliMicConstraints === 'function')
+        ? window.SottotitoliMicConstraints()
+        : { audio: true };
       try {
-        this._stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        this._stream = await navigator.mediaDevices.getUserMedia(constraints);
+        if (typeof _realMic !== 'undefined') _realMic.lastError = null;
       } catch(e) {
-        console.error('RecordFallback mic denied:', e);
-        if (typeof updateMicUI === 'function') updateMicUI('blocked');
-        return false;
+        if (constraints.audio && constraints.audio.deviceId) {
+          console.warn('RecordFallback: chosen mic unavailable, using the system default:', e && e.name);
+          if (typeof window.SottotitoliDropMicId === 'function') window.SottotitoliDropMicId();
+          try {
+            this._stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            if (typeof _realMic !== 'undefined') _realMic.lastError = null;
+          } catch(e2) {
+            console.error('RecordFallback mic denied:', e2);
+            // Populated here too, so the busy-vs-denied copy is as accurate on iOS as the
+            // platform allows. iOS reports contention differently — do not assume it fires.
+            if (typeof _realMic !== 'undefined') _realMic.lastError = (e2 && e2.name) || null;
+            if (typeof updateMicUI === 'function') updateMicUI('blocked');
+            return false;
+          }
+        } else {
+          console.error('RecordFallback mic denied:', e);
+          if (typeof _realMic !== 'undefined') _realMic.lastError = (e && e.name) || null;
+          if (typeof updateMicUI === 'function') updateMicUI('blocked');
+          return false;
+        }
       }
+      if (typeof window.refreshMicList === 'function') window.refreshMicList();
       this._mime = this._pickMime();
       this._segment = [];
       this._busy = false;

@@ -11,6 +11,8 @@ var _realMic = {
   onFinal: null,     // callback(finalText)
   onStateChange: null, // callback(state)
   forceFinalizeMs: 0, // silence before forcing finalization (0 = disabled)
+  lastError: null,   // name of the last getUserMedia failure, so the caller can tell
+                     // NotReadableError (device held by another app) from NotAllowedError
   _lastInterim: 0,
   _forceTimer: null
 };
@@ -43,14 +45,38 @@ async function startRealMic() {
   if (_realMic.recognition) return true; // already running
   updateMicUI('requesting');
   
-  // Always use default mic
+  // Use the device chosen in the picker when there is one, otherwise the system default.
+  // ⚠️ `exact` FAILS if that device no longer exists (Bluetooth out of range, USB unplugged),
+  // and a stale preference must never block a session: fall back to the default once and
+  // forget the choice, so the next attempt is clean. record-fallback.js mirrors this exactly.
+  var constraints = (typeof window.SottotitoliMicConstraints === 'function')
+    ? window.SottotitoliMicConstraints()
+    : { audio: true };
   try {
-    _realMic.stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    _realMic.stream = await navigator.mediaDevices.getUserMedia(constraints);
+    _realMic.lastError = null;   // clear, or a stale name mislabels the NEXT failure
   } catch(e) {
-    console.error('Mic permission denied:', e);
-    updateMicUI('blocked');
-    return false;
+    if (constraints.audio && constraints.audio.deviceId) {
+      console.warn('Chosen microphone unavailable, falling back to the system default:', e && e.name);
+      if (typeof window.SottotitoliDropMicId === 'function') window.SottotitoliDropMicId();
+      try {
+        _realMic.stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        _realMic.lastError = null;
+      } catch(e2) {
+        console.error('Mic unavailable:', e2);
+        _realMic.lastError = (e2 && e2.name) || null;
+        updateMicUI('blocked');
+        return false;
+      }
+    } else {
+      console.error('Mic unavailable:', e);
+      _realMic.lastError = (e && e.name) || null;
+      updateMicUI('blocked');
+      return false;
+    }
   }
+  // Permission is now granted, so device labels become readable — fill the picker properly.
+  if (typeof window.refreshMicList === 'function') window.refreshMicList();
   
   var SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
   if (!SpeechRecognition) {
