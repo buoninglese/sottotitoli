@@ -448,7 +448,7 @@ body.session-active .caption-transcript:empty::after { content: none; }
 }
 .mic-menu {
   position: absolute; bottom: calc(100% + 10px); right: 0; z-index: 60;
-  min-width: 200px; max-width: 280px; max-height: 250px; overflow-y: auto;
+  min-width: 200px; max-width: 280px; max-height: min(250px, 50vh); overflow-y: auto;
   padding: 6px; border-radius: 14px;
   background: var(--card); border: 1px solid var(--line);
   box-shadow: 0 14px 44px rgba(0,0,0,.3);
@@ -471,6 +471,19 @@ body.session-active .caption-transcript:empty::after { content: none; }
 .mic-item.sel { color: var(--accent); font-weight: 600; }
 [data-theme="light"] .t-micpick:hover { background: rgba(0,0,0,.05); }
 [data-theme="light"] .mic-item:hover { background: rgba(0,0,0,.05); }
+/* ⚠️ STACKING TRAP — do not remove this line.
+ * .transport-bar carries backdrop-filter, which creates a stacking context. Any z-index on a
+ * popup inside it is therefore scoped to that context and CANNOT escape above the page content.
+ * The transcript wrapper sits at position:relative;z-index:1, which painted straight over the
+ * mic menu's upward overflow: every item above the transport bar was visible but hit-tested to
+ * the transcript, so it had no hover and could not be clicked. Only the last item still worked,
+ * because it was the only one overlapping the bar itself.
+ * Lifting the caption panel puts the whole bar (and anything overflowing out of it) above the
+ * content planes. 20 beats the content plane (1-3) and #leftModeBar (10), and stays well below
+ * #slideDots (99), the topbar dropdowns (100), #duoJoinScreen (600), #wordDefPopup (5000),
+ * #postSessionOverlay (9999), #confirmModal (10000) and #toast (99999), so the bar can never
+ * cover a menu or a modal. */
+#captionPanel { z-index: 20; }
 /* Fullscreen hides transport */
 body.fullscreen-active .transport-bar { display: none !important; }
 /* Light mode */
