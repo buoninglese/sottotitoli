@@ -473,18 +473,28 @@
       window.setCefrLang = function(lang) { renderCEFRQuad(lang); };
 
       // ── Shared favourites helpers (Word-banks Overview + Vocabulary Builder Overview) ──
-      var SYSTEM_BANK_META = {
-        review_due_now:     { name:'Ripasso immediato', sub:'Parole da ripassare ora o in ritardo' },
-        saved_from_sessions:{ name:'Saved From Sessions', sub:'Words you saved during live sessions' },
-        vocab_builder_en:  { name:'English Vocabulary Builder', sub:'Words saved from Vocabulary Builder search' },
-        fragile_words:     { name:'Fragile Words', sub:'Weak words at risk of being forgotten' },
-        goal_next_step:     { name:'Next Step For Your Goal', sub:'Goal-aligned vocabulary for your profile' },
-        build_from_known:  { name:'Build From What You Know', sub:'Higher-level replacements for words you know' },
-        activate_recognized:{ name:'Activate What You Recognize', sub:'Passive vocabulary — words seen but not claimed' },
-        upcoming_useful_vocab:{ name:'Goal-Based Upcoming Vocab', sub:'Words for your declared short-term goals' },
-        upcoming_session_driven:{ name:'Session-Detected Themes', sub:'Predicted needs from your recent session topics' },
-        upcoming_roadmap:  { name:'Your Learning Roadmap', sub:'Staged vocabulary for your goal journey' }
+      // ── System-collection DISPLAY names ──
+      // DISPLAY ONLY. These are labels and they MUST be translated.
+      // The matching IDENTITY strings (matched against user_wordbanks.name) live in
+      // js/bank-identities.js and must NEVER be translated — the two concerns are
+      // deliberately kept apart so that changing a label can never break a bank lookup.
+      // Keys are resolved at CALL time, so a language switch is picked up on the next render.
+      var SYSTEM_COLLECTION_KEYS = {
+        review_due_now:            { nameKey: 'coll_review_due_now',            subKey: 'coll_review_due_now_sub' },
+        saved_from_sessions:       { nameKey: 'coll_saved_from_sessions',       subKey: 'coll_saved_from_sessions_sub' },
+        vocab_builder_en:          { nameKey: 'coll_vocab_builder_en',          subKey: 'coll_vocab_builder_en_sub' },
+        fragile_words:             { nameKey: 'coll_fragile_words',             subKey: 'coll_fragile_words_sub' },
+        goal_next_step:            { nameKey: 'coll_goal_next_step',            subKey: 'coll_goal_next_step_sub' },
+        build_from_known:          { nameKey: 'coll_build_from_known',          subKey: 'coll_build_from_known_sub' },
+        activate_recognized:       { nameKey: 'coll_activate_recognized',       subKey: 'coll_activate_recognized_sub' },
+        upcoming_useful_vocab:     { nameKey: 'coll_upcoming_useful_vocab',     subKey: 'coll_upcoming_useful_vocab_sub' },
+        upcoming_session_driven:   { nameKey: 'coll_upcoming_session_driven',   subKey: 'coll_upcoming_session_driven_sub' },
+        upcoming_roadmap:          { nameKey: 'coll_upcoming_roadmap',          subKey: 'coll_upcoming_roadmap_sub' }
       };
+      // Fall back to the id rather than to a hardcoded language: a missing key must be
+      // visible in testing, not silently English in the Italian UI.
+      function collectionName(id) { var m = SYSTEM_COLLECTION_KEYS[id]; return m ? I18n.t(m.nameKey) : id; }
+      function collectionSub(id)  { var m = SYSTEM_COLLECTION_KEYS[id]; return m ? I18n.t(m.subKey)  : ''; }
       // Resolve favourited bank ids → [{b, lang, system?}] (real banks + system collections).
       async function resolveFavBanks() {
         var favEn = []; try { favEn = JSON.parse(localStorage.getItem('sottotitoli-fav-banks') || '[]'); } catch(e) {}
@@ -498,8 +508,8 @@
             itBanks.forEach(function(b){ if (favIt.indexOf(b.id) >= 0) out.push({ b:b, lang:'it' }); });
           }
         } catch(e) {}
-        favEn.forEach(function(id){ var m = SYSTEM_BANK_META[id]; if (m) out.push({ b:{ id:id, name:m.name, sub:m.sub, word_count:null }, lang:'en', system:true }); });
-        favIt.forEach(function(id){ var m = SYSTEM_BANK_META[id]; if (m) out.push({ b:{ id:id, name:m.name, sub:m.sub, word_count:null }, lang:'it', system:true }); });
+        favEn.forEach(function(id){ if (SYSTEM_COLLECTION_KEYS[id]) out.push({ b:{ id:id, name:collectionName(id), sub:collectionSub(id), word_count:null }, lang:'en', system:true }); });
+        favIt.forEach(function(id){ if (SYSTEM_COLLECTION_KEYS[id]) out.push({ b:{ id:id, name:collectionName(id), sub:collectionSub(id), word_count:null }, lang:'it', system:true }); });
         var seen = {};
         return out.filter(function(f){ var k = f.system ? ('sys:'+f.b.id) : ('bank:'+f.b.id+':'+f.lang); if (seen[k]) return false; return (seen[k] = true); });
       }
