@@ -341,6 +341,15 @@
       "bfwk_at_level": "a livello",
       "bfwk_saved_to": "salvato in Build From Known",
       "bfwk_download_detail": "salva la parola per visualizzarla nel dettaglio.",
+      "bfwk_style": "Stile",
+      "bfwk_mode": "Modo",
+      "bfwk_search_btn": "Cerca",
+      "bfwk_did_you_mean": "Intendevi…",
+      "bfwk_close": "Chiudi",
+      "bfwk_accent_title": "Clicca per cambiare schema colore",
+      "bfwk_mode_none_title": "Nessuna colorazione speciale",
+      "bfwk_mode_pos_title": "Colora l'intestazione in base alla parte del discorso",
+      "bfwk_mode_cefr_title": "Colora l'intestazione in base al livello CEFR",
       "lexical_diversity": "Diversità lessicale",
       "buy_minutes_title": "Acquista minuti",
       "buy_minutes_btn": "Vai su Stripe",
@@ -1575,6 +1584,15 @@
       "bfwk_at_level": "at level",
       "bfwk_saved_to": "saved to Build From Known",
       "bfwk_download_detail": "save the word to see details.",
+      "bfwk_style": "Style",
+      "bfwk_mode": "Mode",
+      "bfwk_search_btn": "Search",
+      "bfwk_did_you_mean": "Did you mean…",
+      "bfwk_close": "Close",
+      "bfwk_accent_title": "Click to change the colour scheme",
+      "bfwk_mode_none_title": "No special colouring",
+      "bfwk_mode_pos_title": "Colour the heading by part of speech",
+      "bfwk_mode_cefr_title": "Colour the heading by CEFR level",
       "lexical_diversity": "Lexical diversity",
       "buy_minutes_title": "Buy minutes",
       "buy_minutes_btn": "Go to Stripe",
@@ -2548,6 +2566,13 @@
       if (el.hasAttribute('data-i18n-orig-title')) return;
       el.setAttribute('data-i18n-orig-title', el.getAttribute('title') || '');
     });
+
+    // Accessible names. Same snapshot-once discipline as titles above, so switching
+    // back to Italian restores the original string rather than re-deriving it.
+    scope.querySelectorAll('[data-i18n-aria-label]').forEach(function(el) {
+      if (el.hasAttribute('data-i18n-orig-aria-label')) return;
+      el.setAttribute('data-i18n-orig-aria-label', el.getAttribute('aria-label') || '');
+    });
   }
 
   /* ─── CORE APPLY (Guardless Architecture) ─── */
@@ -2598,6 +2623,11 @@
       /* 4. Titles */
       scope.querySelectorAll('[data-i18n-title]').forEach(function(el) {
         el.setAttribute('title', t(el.getAttribute('data-i18n-title')));
+      });
+
+      /* 5. Accessible names (aria-label) */
+      scope.querySelectorAll('[data-i18n-aria-label]').forEach(function(el) {
+        el.setAttribute('aria-label', t(el.getAttribute('data-i18n-aria-label')));
       });
 
     } finally {
