@@ -1093,7 +1093,14 @@
         var streakEl = document.getElementById('heroStreakDays');
         var streakBox = document.getElementById('heroStreakBox');
         var streakGlow = document.getElementById('heroStreakGlow');
-        if (streakEl) streakEl.innerHTML = streakDays + ' <span style="font-size:18px;font-weight:300;opacity:.6">' + (window.I18n && I18n.getLang()==='en' ? 'days' : 'giorni') + '</span>';
+        // Only the NUMBER is written here. The unit is a separate static element
+        // carrying data-i18n="days", so it follows the interface language through the
+        // i18n layer. This used to re-render the unit from a hand-rolled language
+        // ternary that hardcoded English inside JS — against the convention that JS
+        // injects ITALIAN and the observer translates — and was why the two languages
+        // disagreed about the word. (The old expression is deliberately not reproduced
+        // here, so grepping for that pattern finds code rather than this comment.)
+        if (streakEl) streakEl.textContent = streakDays;
         if (streakBox && streakGlow) {
           var sc = getStreakColor(streakDays);
           var isAnimated = Math.floor(streakDays / 7) >= 9;

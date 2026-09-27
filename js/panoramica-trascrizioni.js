@@ -170,7 +170,15 @@
                 }
 
                 // Pagination
-                document.getElementById('trPageInfo').textContent = 'Showing '+(filtered.length?((trCurrentPage-1)*trPerPage+1):0)+' to '+Math.min(trCurrentPage*trPerPage,filtered.length)+' of '+filtered.length+' sessions';
+                // Suppress the count entirely when there is nothing to count: "Showing 0 to
+                // 0 of 0 sessions" is noise stacked on top of the empty-state message that
+                // already tells the user what to do (O-22).
+                var trPageInfoEl = document.getElementById('trPageInfo');
+                if (trPageInfoEl) {
+                  trPageInfoEl.textContent = filtered.length
+                    ? 'Showing ' + ((trCurrentPage - 1) * trPerPage + 1) + ' to ' + Math.min(trCurrentPage * trPerPage, filtered.length) + ' of ' + filtered.length + ' sessions'
+                    : '';
+                }
                 var pgBtns = document.getElementById('trPageButtons');
                 if (totalPages <= 1) { pgBtns.innerHTML = ''; } else {
                   var h = '<button style="width:32px;height:32px;display:flex;align-items:center;justify-content:center;border:1px solid var(--line);border-radius:8px;background:none;cursor:pointer;color:var(--text-soft);font-family:inherit" '+(trCurrentPage===1?'disabled':'')+' onclick="trGoPage('+(trCurrentPage-1)+')"><span class="material-symbols-outlined" style="font-size:18px">chevron_left</span></button>';

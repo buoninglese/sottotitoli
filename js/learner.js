@@ -1205,7 +1205,7 @@
         '#sub-learner-overview .lvov-cta .c-ghost{background:var(--panel-2);color:var(--text);border:1px solid var(--line)}' +
       '</style>' +
       '<div class="lvov-hero">' +
-        '<h3 data-i18n="learnerov_title">Il tuo Learner, passo dopo passo</h3>' +
+        '<h3 data-i18n="learnerov_title">Il tuo apprendimento, passo dopo passo</h3>' +
         '<p data-i18n="learnerov_intro">Ascolta, parla e ripassa con lezioni, missioni e ripasso programmato. Ogni sessione ti avvicina alla fluidità.</p>' +
       '</div>' +
       '<div class="lvov-steps">' +
