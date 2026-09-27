@@ -169,7 +169,10 @@
       "tr_filter_it": "Solo italiano",
       "tr_filter_translated": "Con traduzione",
       "tr_view": "Vista:",
-      "tr_view_table": "Tabella",
+      // ("tr_view_table" used to be defined here as "Tabella". It was UNUSED — the only
+      //  references are the transcript view-toggle aria-labels defined further down — and a
+      //  duplicate object key means the LAST definition wins SILENTLY. Removed, not left to
+      //  shadow the one in use.)
       "tr_view_drawer": "Drawer",
       "tr_bulk_none": "0 selezionate",
       "tr_bulk_delete": "Elimina selezionate",
@@ -411,6 +414,10 @@
       "dash_mc_timebands_sub": "Minuti di registrazione per giorno, divisi per fascia oraria (mattina / giorno / sera / notte).",
       "dash_mc_timebands_label": "Minuti di registrazione",
       "dash_mc_info_title": "Come si calcola?",
+      "tr_view_table": "Vista tabella",
+      "tr_view_cards": "Vista schede",
+      "a11y_close": "Chiudi",
+      "a11y_close_menu": "Chiudi menu",
       "lexical_diversity": "Diversità lessicale",
       "buy_minutes_title": "Acquista minuti",
       "buy_minutes_btn": "Vai su Stripe",
@@ -1474,7 +1481,7 @@
       "tr_filter_it": "Italian only",
       "tr_filter_translated": "With translation",
       "tr_view": "View:",
-      "tr_view_table": "Table",
+      // (duplicate "tr_view_table" removed — see the it block for why.)
       "tr_view_drawer": "Drawer",
       "tr_bulk_none": "0 selected",
       "tr_bulk_delete": "Delete selected",
@@ -1712,6 +1719,10 @@
       "dash_mc_timebands_sub": "Recording minutes per day, split by time of day (morning / day / evening / night).",
       "dash_mc_timebands_label": "Recording minutes",
       "dash_mc_info_title": "How is this calculated?",
+      "tr_view_table": "Table view",
+      "tr_view_cards": "Card view",
+      "a11y_close": "Close",
+      "a11y_close_menu": "Close menu",
       "lexical_diversity": "Lexical diversity",
       "buy_minutes_title": "Buy minutes",
       "buy_minutes_btn": "Go to Stripe",
