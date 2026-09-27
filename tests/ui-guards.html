@@ -385,7 +385,20 @@ function measure(compareWith) {
     for (var i = 0; i < els.length; i++) {
       for (var j = 0; j < ATTRS.length; j++) {
         var v = els[i].getAttribute(ATTRS[j]);
-        if (v && v.length > 3) out.push(v.replace(/\s+/g, ' ').trim());
+        if (!v || v.length <= 3) continue;
+        // ⚠️ A BOUND ATTRIBUTE IS MANAGED, NOT A LEAK.
+        // The convention in this codebase is that JS injects the Italian SOURCE and a
+        // data-i18n-* binding supplies the translation at runtime. So the raw attribute
+        // legitimately holds Italian even while the UI is English, and the rendered
+        // value the user sees is correct.
+        // Counting the raw value reported "Aggiungi ai preferiti" and "Add to favorites"
+        // as two separate defects — the same control, both directions — when
+        // panoramica-wordbanks-en.js already had
+        //     aria-label="Aggiungi ai preferiti" data-i18n-aria-label="wb_fav_toggle"
+        // and wb_fav_toggle was correct in both blocks. Two false positives, and I very
+        // nearly "fixed" a binding that was already right.
+        if (els[i].getAttribute('data-i18n-' + ATTRS[j])) continue;
+        out.push(v.replace(/\s+/g, ' ').trim());
       }
     }
     return out;
