@@ -1999,6 +1999,13 @@
       }
       function fmtDate(iso, isEn){
         if (!iso) return '';
+        // NOTE: this shadows the earlier fmtDate(iso) in the outer scope, and most
+        // callers below pass only one argument. Without this default the parameter
+        // was undefined, the ternary fell to 'it-IT', and every chart tooltip showed
+        // Italian weekday/month names even with the UI in English.
+        if (typeof isEn === 'undefined') {
+          isEn = !!(window.I18n && typeof I18n.getLang === 'function' && I18n.getLang() === 'en');
+        }
         try { var d = new Date(iso + 'T00:00:00'); return d.toLocaleDateString(isEn ? 'en-GB' : 'it-IT', { weekday:'short', day:'numeric', month:'short' }); } catch(e){ return iso; }
       }
       function escAttr(s){ return String(s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;'); }
@@ -2056,7 +2063,7 @@
           var rec=recVals[i], ex=extraVals[i], site=rec+ex, a0=i*step, a1=(i+1)*step-4, d=days&&days[i]?days[i]:'';
           tot+=site;
           var rRec=r0+(rec/max)*(span-r0), rSite=r0+(site/max)*(span-r0), isT=(i===n-1);
-          var tip=escAttr(fmtDate(d)+' · registrazione '+fmtMinutes(Math.round(rec))+' · altro '+fmtMinutes(Math.round(ex))+' · totale '+fmtMinutes(Math.round(site)));
+          var tip=escAttr(fmtDate(d)+' · '+DT('mc_recording','registrazione')+' '+fmtMinutes(Math.round(rec))+' · '+DT('dash_tip_other','altro')+' '+fmtMinutes(Math.round(ex))+' · '+DT('dash_tip_total','totale')+' '+fmtMinutes(Math.round(site)));
           g+='<path data-tip="'+tip+'" d="'+ringPath(cx,cy,rRec,r0,a0,a1)+'" fill="'+(isT?'#22d3ee':'#06b6d4')+'" opacity=".95"></path>';
           if (ex>0) g+='<path data-tip="'+tip+'" d="'+ringPath(cx,cy,rSite,rRec,a0,a1)+'" fill="'+(isT?'#fbbf24':'#f59e0b')+'" opacity=".95"></path>';
         }
@@ -2079,7 +2086,7 @@
           var max=Math.max.apply(null,vals.concat([1]));
           for (var i2=0;i2<n;i2++){
             var v=vals[i2], a0=i2*step, a1=(i2+1)*step-4, rr=b.r0+(v/max)*(b.r1-b.r0), d=days&&days[i2]?days[i2]:'';
-            var tip=escAttr(fmtDate(d)+' · Mattina '+fmtMinutes(Math.round(bandsArr[i2][0]))+' · Giorno '+fmtMinutes(Math.round(bandsArr[i2][1]))+' · Sera '+fmtMinutes(Math.round(bandsArr[i2][2]))+' · Notte '+fmtMinutes(Math.round(bandsArr[i2][3])));
+            var tip=escAttr(fmtDate(d)+' · '+DT('dash_band_morning','Mattina')+' '+fmtMinutes(Math.round(bandsArr[i2][0]))+' · '+DT('dash_band_day','Giorno')+' '+fmtMinutes(Math.round(bandsArr[i2][1]))+' · '+DT('dash_band_evening','Sera')+' '+fmtMinutes(Math.round(bandsArr[i2][2]))+' · '+DT('dash_band_night','Notte')+' '+fmtMinutes(Math.round(bandsArr[i2][3])));
             if (v>0) g+='<path data-tip="'+tip+'" d="'+ringPath(cx,cy,rr,b.r0,a0,a1)+'" fill="'+(i2===n-1?b.hi:b.c)+'" opacity=".95"></path>';
           }
         }
