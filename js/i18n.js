@@ -155,6 +155,7 @@
       "insights_loading": "Caricamento…",
       "insights_your_ai_profile": "Il tuo profilo AI",
       "word_banks": "Banche parole",
+      "wb_tab_overview": "Panoramica",
       "vocabolario": "Vocabolario",
       "grammatica": "Grammatica",
       "trascrizioni": "Trascrizioni",
@@ -339,7 +340,7 @@
       "bfwk_relation_antonyms": "Contrari",
       "bfwk_relation_word_family": "Famiglia di parole",
       "bfwk_relation_collocations": "Collocazioni",
-      "bfwk_relation_next_level": "Livello superiore",
+      "bfwk_relation_next_level": "Livello superiore ↗",
       "bfwk_suggestions": "suggerimenti",
       "bfwk_at_level": "a livello",
       "bfwk_saved_to": "salvato in Build From Known",
@@ -1551,6 +1552,7 @@
       "gram_my_errors": "My Errors",
 
       "word_banks": "Word banks",
+      "wb_tab_overview": "Overview",
       "vocabolario": "Vocabulary",
       "grammatica": "Grammar",
       "trascrizioni": "Transcripts",
@@ -1731,7 +1733,7 @@
       "bfwk_relation_antonyms": "Antonyms",
       "bfwk_relation_word_family": "Word family",
       "bfwk_relation_collocations": "Collocations",
-      "bfwk_relation_next_level": "Next level",
+      "bfwk_relation_next_level": "Next level ↗",
       "bfwk_suggestions": "suggestions",
       "bfwk_at_level": "at level",
       "bfwk_saved_to": "saved to Build From Known",
@@ -2875,21 +2877,32 @@
   /* ─── CORE APPLY (Guardless Architecture) ─── */
   var _isTranslating = false;
   var _applyGen = 0;
+  // True only while apply() is on the stack, as opposed to merely inside the
+  // post-apply release window. Distinguishing those two is the C14 fix: a
+  // *synchronous* re-entry must still be refused (it would recurse through
+  // apply()'s own DOM writes), but a call arriving later must NOT be dropped.
+  var _inApply = false;
 
   function apply(root, lang) {
     // Smart-swap: apply('en') means lang='en', root=document
     if (typeof root === 'string') { lang = root; root = null; }
-    if (_isTranslating) return;
-    _isTranslating = true;
+    // C14: this used to be `if (_isTranslating) return;`, which dropped ANY call
+    // arriving during a previous apply's release window (up to 250ms). An external
+    // setLang() could therefore update _lang and then be silently swallowed —
+    // getLang() === 'en' with a stale Italian DOM. Only synchronous re-entry is
+    // refused now; a later call is allowed and supersedes the in-flight one via the
+    // generation counter, whose release already refuses to clear a newer apply's flag.
+    if (_inApply) return;
     var _gen = ++_applyGen;
+    _inApply = true;
+    _isTranslating = true;
     if (lang) _lang = lang;
 
-    var scope = getScope(root);
-
-    // Capture freshly injected Italian elements before translating
-    if (_lang === 'it') captureOriginals(scope);
-
     try {
+      var scope = getScope(root);
+
+      // Capture freshly injected Italian elements before translating
+      if (_lang === 'it') captureOriginals(scope);
       /* 1. data-i18n elements (handles <option> + leaf-safe HTML auto-detect) */
       scope.querySelectorAll('[data-i18n]').forEach(function(el) {
         var key = el.getAttribute('data-i18n');
@@ -2930,6 +2943,7 @@
       });
 
     } finally {
+      _inApply = false;
       // The flag must outlive this tick, because MutationObserver callbacks are
       // microtasks and would otherwise re-enter apply() and loop.
       //
