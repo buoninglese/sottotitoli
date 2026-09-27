@@ -514,6 +514,10 @@
         return out.filter(function(f){ var k = f.system ? ('sys:'+f.b.id) : ('bank:'+f.b.id+':'+f.lang); if (seen[k]) return false; return (seen[k] = true); });
       }
       window.resolveFavBanks = resolveFavBanks;
+      // Shared registry so other scripts can resolve the same collection names.
+      // learner.js loads before this file, but it only calls into this at run
+      // time (when a session launches), so the global is always set by then.
+      window.BANK_COLL = { keys: SYSTEM_COLLECTION_KEYS, name: collectionName, sub: collectionSub };
       // Pin-card markup for a resolved favourite (shared by both favourites boxes).
       function favPinHtml(f, i) {
         var b = f.b;
@@ -3758,21 +3762,14 @@
           'it_build_known':'Progressione lessicale italiana',
           'it_activate':'Parole che capisci ma non usi ancora'
         };
-        var bankEmptyStates = {
-          'review_due_now':'Tutto in ordine per ora.',
-          'saved_from_sessions':'Non hai ancora salvato parole dalle sessioni.',
-          'fragile_words':'Nessuna parola fragile al momento.',
-          'goal_next_step':'Nessun suggerimento basato sugli obiettivi.',
-          'build_from_known':'Nessun vocabolo collegato disponibile.',
-          'activate_recognized':'Nessun candidato per l\'attivazione.',
-          'upcoming_useful_vocab':'Nessun vocabolario in coda.',
-          'upcoming_session_driven':'Non abbastanza dati sulle sessioni per rilevare temi.',
-          'upcoming_roadmap':'Definisci le tappe del tuo obiettivo per sbloccare.',
+        // Empty states for the system collections come from the dictionary so
+        // they follow the active language. The 'it_*' tab collections keep their
+        // Italian copy, consistent with itTabNames / itTabSubs.
+        var itTabEmpties = {
           'it_review_due':'Tutto in ordine per ora.',
           'it_saved_sessions':'Non hai ancora salvato parole italiane dalle sessioni.',
           'it_vocab_builder':'Nessuna parola italiana salvata. Usa il + sui chip di traduzione nel Vocabulary Builder.',
           'it_new_weekly':'Nessuna nuova parola italiana questa settimana.',
-          'vocab_builder_en':'No words saved yet. Use + on cards in Vocabulary Builder > English.',
           'it_fragile':'Nessuna parola italiana fragile al momento.',
           'it_next_step':'Nessun suggerimento basato sugli obiettivi.',
           'it_build_known':'Nessun vocabolo collegato disponibile.',
@@ -3784,7 +3781,7 @@
         var type = bank ? 'custom' : (bankTypes[bankId] || 'pinned');
         _wbState.currentBankType = type;  // store type for delete routing
         var subtitle = bank ? (bank.description || '') : (isSystem ? collectionSub(bankId) : (itTabSubs[bankId] || ''));
-        var emptyMsg = bankEmptyStates[bankId] || 'No words yet.';
+        var emptyMsg = isSystem ? I18n.t('coll_empty_' + bankId) : (itTabEmpties[bankId] || I18n.t('wb_empty_no_words'));
         var badgeClass = type === 'pinned' ? 'badge-pinned' : type === 'smart' ? 'badge-smart' : 'badge-custom';
         var typeLabel = type === 'pinned' ? 'PINNED' : type === 'smart' ? 'SMART' : 'YOURS';
         var primaryAction = type === 'pinned' ? 'Start review' : type === 'smart' ? 'Move selected to Yours' : 'Manage collection';

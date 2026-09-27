@@ -1380,15 +1380,23 @@
     return steps;
   }
 
-  // Pinned/system bank display names (Allena launched from the Word-banks tab).
+  // Bank display names (Allena launched from the Word-banks tab).
+  // The ten system collections resolve through the shared registry exposed by
+  // panoramica.js so their names follow the active UI language. The 'it_*'
+  // entries are Italian-vocabulary tab collections: they are Italian banks, so
+  // their labels stay Italian in both UI languages.
   var BANK_NAMES = {
-    review_due_now: 'Ripasso immediato', saved_from_sessions: 'Saved From Sessions',
-    fragile_words: 'Fragile Words', vocab_builder_en: 'English Vocabulary Builder',
     it_review_due: 'Ripasso immediato', it_saved_sessions: 'Salvate da sessioni',
     it_vocab_builder: 'Italian Vocabulary Builder', it_fragile: 'Parole Fragili',
     it_new_weekly: 'Nuove questa settimana'
   };
-  function bankNameFor(id) { return BANK_NAMES[id] || id; }
+  function bankNameFor(id) {
+    if (window.BANK_COLL && window.BANK_COLL.name) {
+      var n = window.BANK_COLL.name(id);
+      if (n && n !== id) return n;
+    }
+    return BANK_NAMES[id] || id;
+  }
 
   // Words for pinned/system banks when Allena is launched on a bank that isn't in
   // user_wordbanks. Mirrors the openWordbankView fetch logic (review-based + mapped
