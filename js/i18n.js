@@ -2638,12 +2638,14 @@
 
   /* ─── CORE APPLY (Guardless Architecture) ─── */
   var _isTranslating = false;
+  var _applyGen = 0;
 
   function apply(root, lang) {
     // Smart-swap: apply('en') means lang='en', root=document
     if (typeof root === 'string') { lang = root; root = null; }
     if (_isTranslating) return;
     _isTranslating = true;
+    var _gen = ++_applyGen;
     if (lang) _lang = lang;
 
     var scope = getScope(root);
@@ -2692,11 +2694,22 @@
       });
 
     } finally {
-      // MutationObserver callbacks are microtasks; rAF fires after they drain.
+      // The flag must outlive this tick, because MutationObserver callbacks are
+      // microtasks and would otherwise re-enter apply() and loop.
+      //
+      // rAF is the clean "next frame" signal — but **rAF does not fire in a hidden
+      // page**. Relying on it alone can leave _isTranslating stuck true, which silently
+      // drops EVERY later apply(): a language switch made while the tab is backgrounded
+      // (or a page that loads in a background tab) would be lost for good, with nothing
+      // to retry it. setTimeout still fires when hidden (throttled), so release on
+      // whichever comes first. The generation check stops a late release from clearing
+      // the flag belonging to a NEWER apply.
+      var _release = function() { if (_applyGen === _gen) _isTranslating = false; };
       if (typeof requestAnimationFrame !== 'undefined') {
-        requestAnimationFrame(function() { _isTranslating = false; });
+        requestAnimationFrame(_release);
+        setTimeout(_release, 250);
       } else {
-        setTimeout(function() { _isTranslating = false; }, 0);
+        setTimeout(_release, 0);
       }
     }
   }
