@@ -1710,10 +1710,27 @@
         var cvs = q('mcVs_lexdiv'); if (cvs) cvs.textContent = avgW ? avgW : '—';
         setVsBar('wb', 'lexdiv', 'fill', Math.min(100, avgLD*100), 0, '#8b5cf6', '#8b5cf6');
       }
+      // ── Dashboard text helper (O-40) ──
+      // The dashboard used to pick its own strings with `isEn ? 'English' : 'Italian'
+      // ternaries — a SECOND translation system: invisible to the data-i18n dictionary,
+      // hardcoding English inside JS, and supporting exactly two languages (a third
+      // would silently fall through to the Italian branch). DT() routes those strings
+      // through the real dictionary so there is one source of truth.
+      // Italian is the fallback because it is the SOURCE language: a missing key
+      // degrades to Italian rather than to a raw key like "dash_wm_words_title".
+      function DT(key, italian) {
+        try {
+          if (window.I18n && typeof I18n.t === 'function') {
+            var v = I18n.t(key);
+            if (v && v !== key) return v;
+          }
+        } catch (e) { /* fall through to the Italian source string */ }
+        return italian;
+      }
       function wordMeta(m, isEn){
-        if (m === 'words') return { title:isEn?'Unique words':'Parole uniche', sub:isEn?'Unique vs total words per day, with the NEON line of words you saved.':'Parole uniche vs totali per giorno, più la linea NEON delle parole salvate.', big:function(o){return fmtK(o.uniq);}, media:function(o){return fmtK(Math.round(o.uniq/Math.max(1,o.days)));}, mediaLabel:isEn?'avg / day':'media/giorno', color:'#34d399' };
-        if (m === 'saved') return { title:isEn?'Saved words':'Parole salvate', sub:isEn?'Words you saved, practiced and confirmed — corona for every period.':'Parole salvate, praticate e confermate — corona per ogni periodo.', big:function(o){return fmtK(o.sv);}, media:function(o){return fmtK(Math.round(o.sv/Math.max(1,o.days)));}, mediaLabel:isEn?'avg / day':'media/giorno', color:'#fbbf24' };
-        return { title:isEn?'Lexical diversity':'Div. lessicale', sub:isEn?'Unique vs total words — their ratio is your lexical diversity. Below: average WPM.':'Parole uniche vs totali — il loro rapporto è la diversità lessicale. Sotto: media WPM.', big:function(o){return o.ldN ? (o.ldS/o.ldN).toFixed(2) : '—';}, media:function(o){return o.wpmN ? (''+Math.round(o.wpmS/o.wpmN)) : '—';}, mediaLabel:isEn?'avg words/min':'media parole/min', color:'#8b5cf6' };
+        if (m === 'words') return { title:DT('dash_wm_words_title','Parole uniche'), sub:DT('dash_wm_words_sub','Parole uniche vs totali per giorno, più la linea NEON delle parole salvate.'), big:function(o){return fmtK(o.uniq);}, media:function(o){return fmtK(Math.round(o.uniq/Math.max(1,o.days)));}, mediaLabel:DT('dash_avg_day','media/giorno'), color:'#34d399' };
+        if (m === 'saved') return { title:DT('dash_wm_saved_title','Parole salvate'), sub:DT('dash_wm_saved_sub','Parole salvate, praticate e confermate — corona per ogni periodo.'), big:function(o){return fmtK(o.sv);}, media:function(o){return fmtK(Math.round(o.sv/Math.max(1,o.days)));}, mediaLabel:DT('dash_avg_day','media/giorno'), color:'#fbbf24' };
+        return { title:DT('dash_wm_lexdiv_title','Div. lessicale'), sub:DT('dash_wm_lexdiv_sub','Parole uniche vs totali — il loro rapporto è la diversità lessicale. Sotto: media WPM.'), big:function(o){return o.ldN ? (o.ldS/o.ldN).toFixed(2) : '—';}, media:function(o){return o.wpmN ? (''+Math.round(o.wpmS/o.wpmN)) : '—';}, mediaLabel:DT('dash_avg_words_min','media parole/min'), color:'#8b5cf6' };
       }
       // ── Y-AXIS scale control for the chart boxes (gear menu: Auto / Top pulito / Fissa + play replay) ──
       // Persisted per user; only the line charts (word bank) respond — the dashboard uses corona (no y-axis).
@@ -1937,9 +1954,17 @@
           p.classList.add('draw');
         });
       }
+      // isEn is accepted but no longer used for text — the strings come from the
+      // dictionary now. Kept in the signature so the call sites did not have to move
+      // in this change; it can be dropped once the O-40 migration is complete.
       function dashPeriodLabel(tl, isEn){
-        var m = { week:['Ultima settimana','Last week'], '2week':['Ultime 2 settimane','Last 2 weeks'], month:['Ultimo mese','Last month'], all:['Tutto','All time'] };
-        return (m[tl]||m.week)[isEn?1:0];
+        var m = {
+          week:    DT('dash_period_week','Ultima settimana'),
+          '2week': DT('dash_period_2week','Ultime 2 settimane'),
+          month:   DT('dash_period_month','Ultimo mese'),
+          all:     DT('dash_period_all','Tutto')
+        };
+        return m[tl] || m.week;
       }
       function polarC(cx,cy,r,deg){ var a=(deg-90)*Math.PI/180; return [cx+r*Math.cos(a), cy+r*Math.sin(a)]; }
       function ringPath(cx,cy,rO,rI,a0,a1){
@@ -2063,10 +2088,10 @@
           var wbLgEl = document.getElementById('wbChartLegend');
           if (wbLgEl) {
             var wbLgItems = st.metric === 'words'
-              ? [['#fbbf24', isEn?'Saved':'Salvate'], ['#34d399', isEn?'Unique':'Uniche'], ['#64748b', isEn?'Total':'Totali']]
+              ? [['#fbbf24', DT('dash_legend_saved','Salvate')], ['#34d399', DT('dash_legend_unique','Uniche')], ['#64748b', DT('dash_legend_total','Totali')]]
               : st.metric === 'saved'
-                ? [['#fbbf24', isEn?'Saved':'Salvate'], ['#34d399', isEn?'Practiced':'Praticate'], ['#8b5cf6', isEn?'Confirmed':'Confermate']]
-                : [['#8b5cf6', isEn?'Unique':'Uniche'], ['#64748b', isEn?'Total':'Totali']];
+                ? [['#fbbf24', DT('dash_legend_saved','Salvate')], ['#34d399', DT('dash_legend_practiced','Praticate')], ['#8b5cf6', DT('dash_legend_confirmed','Confermate')]]
+                : [['#8b5cf6', DT('dash_legend_unique','Uniche')], ['#64748b', DT('dash_legend_total','Totali')]];
             wbLgEl.innerHTML = wbLgItems.map(function(l){
               return '<span style="display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;color:var(--text-soft)"><span style="width:10px;height:10px;border-radius:3px;background:'+l[0]+'"></span>'+l[1]+'</span>';
             }).join('');
@@ -2074,9 +2099,9 @@
           return;
         }
         var meta = {
-          totalSessions:{ title: isEn?'Sessions':'Sessioni', sub: isEn?'Training sessions per day — corona for every period.':'Sessioni di allenamento per giorno — corona per ogni periodo.', color:'var(--cyan)', unit: isEn?'sessions':'sessioni', fmt:function(v){ return ''+v; } },
-          totalMinutes:{ title: isEn?'Activity':'Attività', sub: isEn?'Minutes on site per day: recording (spoken time) + extra time on the site.':'Minuti sul sito per giorno: registrazione (tempo parlato) + altro tempo sul sito.', color:'var(--cyan)', unit: isEn?'min':'min', fmt:fmtMinutes },
-          timebands:{ title: isEn?'Time of day':'Fasce orarie', sub: isEn?'Recording minutes per day, split by time of day (morning / day / evening / night).':'Minuti di registrazione per giorno, divisi per fascia oraria (mattina / giorno / sera / notte).', color:'var(--accent-purple)', unit: isEn?'min':'min', fmt:fmtMinutes }
+          totalSessions:{ title: DT('dash_metric_sessions','Sessioni'), sub: DT('dash_metric_sessions_sub','Sessioni di allenamento per giorno — corona per ogni periodo.'), color:'var(--cyan)', unit: DT('dash_unit_sessions','sessioni'), fmt:function(v){ return ''+v; } },
+          totalMinutes:{ title: DT('metric_activity','Attività'), sub: DT('dash_metric_activity_sub','Minuti sul sito per giorno: registrazione (tempo parlato) + altro tempo sul sito.'), color:'var(--cyan)', unit:'min', fmt:fmtMinutes },
+          timebands:{ title: DT('metric_timebands','Fasce orarie'), sub: DT('dash_metric_timebands_sub','Minuti di registrazione per giorno, divisi per fascia oraria (mattina / giorno / sera / notte).'), color:'var(--accent-purple)', unit:'min', fmt:fmtMinutes }
         }[st.metric] || {};
         if (titleEl) titleEl.textContent = meta.title || '';
         if (subEl) subEl.textContent = meta.sub || '';
@@ -2090,8 +2115,8 @@
           media = days.length ? total/days.length : 0;
           if (totalEl) totalEl.textContent = '' + total;
           if (mediaEl) mediaEl.textContent = media.toFixed(1);
-          chartSvg = coronaHtml(vals, ''+total, 'var(--cyan)', isEn?'sessions':'sessioni', days);
-          legendItems = [['var(--cyan)', isEn?'sessions':'sessioni']];
+          chartSvg = coronaHtml(vals, ''+total, 'var(--cyan)', DT('dash_unit_sessions','sessioni'), days);
+          legendItems = [['var(--cyan)', DT('dash_unit_sessions','sessioni')]];
         } else if (st.metric === 'totalMinutes') {
           var recVals = dayData.map(function(d){ return d.rec; });
           var extraVals = dayData.map(function(d){ return d.extra; });
@@ -2100,7 +2125,7 @@
           if (totalEl) totalEl.textContent = fmtMinutes(total);
           if (mediaEl) mediaEl.textContent = fmtMinutes(Math.round(media));
           chartSvg = coronaDualHtml(recVals, extraVals, fmtMinutes(total), 'min', days);
-          legendItems = [['#06b6d4', isEn?'recording':'registrazione'], ['#f59e0b', isEn?'extra time on site':'altro tempo sul sito']];
+          legendItems = [['#06b6d4', DT('mc_recording','registrazione')], ['#f59e0b', DT('dash_legend_extra_time','altro tempo sul sito')]];
         } else {
           var bandsArr = dayData.map(function(d){ return d.bands; });
           total = 0; for (var j=0;j<dayData.length;j++) total += (dayData[j].rec||0);
@@ -2108,10 +2133,10 @@
           if (totalEl) totalEl.textContent = fmtMinutes(total);
           if (mediaEl) mediaEl.textContent = fmtMinutes(Math.round(media));
           chartSvg = coronaBandsHtml(bandsArr, days);
-          legendItems = [['#fbbf24', isEn?'Morning':'Mattina'], ['#22d3ee', isEn?'Day':'Giorno'], ['#8b5cf6', isEn?'Evening':'Sera'], ['#6366f1', isEn?'Night':'Notte']];
+          legendItems = [['#fbbf24', DT('dash_band_morning','Mattina')], ['#22d3ee', DT('dash_band_day','Giorno')], ['#8b5cf6', DT('dash_band_evening','Sera')], ['#6366f1', DT('dash_band_night','Notte')]];
         }
         if (plEl) plEl.textContent = dashPeriodLabel(st.tl, isEn);
-        if (mlEl) mlEl.textContent = isEn ? 'avg / day' : 'media/giorno';
+        if (mlEl) mlEl.textContent = DT('dash_avg_day', 'media/giorno');
         chartEl.innerHTML = '<div class="cc-wrap" style="width:100%;display:flex;justify-content:center">' + chartSvg + '</div>';
         bindDashChartTip(chartEl);
         CHARTCTL.afterRender('dash');
