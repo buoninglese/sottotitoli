@@ -40,6 +40,10 @@
   th{font-size:11px;text-transform:uppercase;letter-spacing:.4px;opacity:.6}
   td.num{font-variant-numeric:tabular-nums;white-space:nowrap}
   .pass{color:#34d399}.fail{color:#f87171}.na{color:#9ca3af}
+  /* 'unstable' and 'unreliable' both mean "do not trust this number". They were
+     rendering in default black, i.e. less alarming than a pass, which is backwards. */
+  .unstable{color:#fbbf24}
+  .unreliable{color:#c084fc;font-weight:600}
   code{background:#1a1d24;padding:1px 5px;border-radius:4px}
   iframe{width:100%;height:420px;border:1px solid #23262e;border-radius:10px;background:#fff}
   .note{margin-top:16px;padding:12px 14px;border-radius:10px;background:#1a1d24;font-size:12px}
@@ -542,6 +546,25 @@ function measure(compareWith) {
       rows[ci].note = 'count moved between two settled readings (' + compareWith[ci].cur +
         ' → ' + rows[ci].cur + '); the measured page is hidden and its timers are ' +
         'throttled — re-run with this tab visible before believing this row. ' + rows[ci].note;
+    }
+  }
+
+  /* ── Hidden-page gate ──────────────────────────────────────────────────────
+     document.hidden throttles timers, so content keeps arriving after ANY settle
+     window and the language sweeps read a partially-translated DOM. Measured on
+     IDENTICAL code: B13x read 21 in one run and 2 in the next, purely because the
+     tab was in the background — and the 21 was reported as a plain 'fail'.
+     The header already SAID "page hidden: true", but nothing stopped a reader from
+     believing the number, and a note is easy to skim past. So on a hidden page the
+     timing-sensitive rows are reported as 'unreliable' instead of pass/fail.
+     A count that cannot be reproduced is not evidence, in either direction. */
+  if (document.hidden || (frame.contentDocument && frame.contentDocument.hidden)) {
+    for (var hi = 0; hi < rows.length; hi++) {
+      if (/^B1\b|^B8\b|^B9\b|^B13/.test(rows[hi].id)) {
+        rows[hi].verdict = 'unreliable';
+        rows[hi].note = 'page hidden — timers throttled, content may still be arriving. ' +
+          'Open this tab in the foreground and re-run before believing this row. ' + rows[hi].note;
+      }
     }
   }
 
