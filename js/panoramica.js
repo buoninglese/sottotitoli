@@ -3031,11 +3031,13 @@
         // Saved From Sessions: count from the actual user bank
         if (stats.totalWords > 0) pinnedCounts.saved_from_sessions = stats.totalWords;
 
+        // Names/subs resolve through the shared registry so the cards follow the UI
+        // language; only the short card subtitle and the signal fragments need keys.
         var pinnedBanks = [
-          { id: 'review_due_now', name: 'Ripasso immediato', desc: 'Parole da ripassare ora o in ritardo', count: pinnedCounts.review_due_now, signal: pinnedCounts.review_due_now > 0 ? pinnedCounts.review_due_now + ' da fare' : 'Tutto in ordine!', subtitle: 'Parole pronte per il ripasso immediato' },
-          { id: 'saved_from_sessions', name: 'Saved From Sessions', desc: 'Words you saved during live sessions', count: pinnedCounts.saved_from_sessions, signal: pinnedCounts.saved_from_sessions > 0 ? pinnedCounts.saved_from_sessions + ' words' : 'Save words during sessions', subtitle: 'Saved words from live use' },
-          { id: 'vocab_builder_en', name: 'English Vocabulary Builder', desc: 'Words saved from Vocabulary Builder search', count: pinnedCounts.vocab_builder_en, signal: pinnedCounts.vocab_builder_en > 0 ? pinnedCounts.vocab_builder_en + ' words' : 'Save from VB', subtitle: 'Saved from Vocabulary Builder English' },
-          { id: 'fragile_words', name: 'Fragile Words', desc: 'Weak words at risk of being forgotten', count: pinnedCounts.fragile_words, signal: pinnedCounts.fragile_words > 0 ? pinnedCounts.fragile_words + ' need reinforcement' : 'None at risk', subtitle: 'Words that need reinforcement' }
+          { id: 'review_due_now', name: collectionName('review_due_now'), desc: collectionSub('review_due_now'), count: pinnedCounts.review_due_now, signal: pinnedCounts.review_due_now > 0 ? pinnedCounts.review_due_now + ' ' + I18n.t('coll_sig_to_do') : I18n.t('coll_sig_all_clear'), subtitle: I18n.t('coll_review_due_now_card') },
+          { id: 'saved_from_sessions', name: collectionName('saved_from_sessions'), desc: collectionSub('saved_from_sessions'), count: pinnedCounts.saved_from_sessions, signal: pinnedCounts.saved_from_sessions > 0 ? pinnedCounts.saved_from_sessions + ' ' + I18n.t('coll_sig_words') : I18n.t('coll_sig_save_words'), subtitle: I18n.t('coll_saved_from_sessions_card') },
+          { id: 'vocab_builder_en', name: collectionName('vocab_builder_en'), desc: collectionSub('vocab_builder_en'), count: pinnedCounts.vocab_builder_en, signal: pinnedCounts.vocab_builder_en > 0 ? pinnedCounts.vocab_builder_en + ' ' + I18n.t('coll_sig_words') : I18n.t('coll_sig_save_from_vb'), subtitle: I18n.t('coll_vocab_builder_en_card') },
+          { id: 'fragile_words', name: collectionName('fragile_words'), desc: collectionSub('fragile_words'), count: pinnedCounts.fragile_words, signal: pinnedCounts.fragile_words > 0 ? pinnedCounts.fragile_words + ' ' + I18n.t('coll_sig_need_reinforcement') : I18n.t('coll_sig_none_at_risk'), subtitle: I18n.t('coll_fragile_words_card') }
         ];
         var pinnedHtml = '';
         pinnedBanks.forEach(function(b) {
@@ -3060,12 +3062,12 @@
         };
 
         var smartBanks = [
-          { id: 'goal_next_step', name: 'Next Step For Your Goal', desc: 'Goal-aligned vocabulary for your profile', count: smartCounts.goal_next_step, signal: smartCounts.goal_next_step > 0 ? smartCounts.goal_next_step + ' suggestions' : 'Set your goals', preview: [], subtitle: 'For your current goal' + betaBadge + infoIcon('How: Uses your profile (role + domain) to find topic-relevant words via Datamuse. Bridges from known words to goal-domain vocabulary.') },
-          { id: 'build_from_known', name: 'Build From What You Know', desc: 'Higher-level replacements for words you know', count: smartCounts.build_from_known, signal: smartCounts.build_from_known > 0 ? smartCounts.build_from_known + ' suggestions' : 'From your vocabulary', preview: [], subtitle: 'Advance from known words' + betaBadge + infoIcon('How: Takes your top mastered words and finds higher-CEFR semantically related words via Datamuse. Only shows words above your current level. Boosted for your goal domain.') },
-          { id: 'activate_recognized', name: 'Activate What You Recognize', desc: 'Passive vocabulary — words seen but not claimed', count: smartCounts.activate_recognized, signal: smartCounts.activate_recognized > 0 ? smartCounts.activate_recognized + ' passive words' : 'No passive gap', preview: [], subtitle: 'Claim your passive vocab' + betaBadge + infoIcon('How: Subtracts all words you have explicitly saved from all words you have ever encountered. The difference is your passive vocabulary. Saving a word here moves it to active.') },
-          { id: 'upcoming_useful_vocab', name: 'Goal-Based Upcoming Vocab', desc: 'Words for your declared short-term goals', count: smartCounts.upcoming_useful_vocab, signal: smartCounts.upcoming_useful_vocab > 0 ? smartCounts.upcoming_useful_vocab + ' upcoming' : 'Declare a short-term goal', preview: [], subtitle: 'What you said you need next' + betaBadge + infoIcon('How: Reads your declared short-term goal (e.g. "Prepare for job interview") and uses Datamuse topics to find vocabulary. Filtered by your CEFR level. Set your short-term goal in Account > Goals.') },
-          { id: 'upcoming_session_driven', name: 'Session-Detected Themes', desc: 'Predicted needs from your recent session topics', count: smartCounts.upcoming_session_driven, signal: smartCounts.upcoming_session_driven > 0 ? smartCounts.upcoming_session_driven + ' detected' : 'Not enough session data', preview: [], subtitle: 'From your practice patterns' + betaBadge + infoIcon('How: Analyzes your last 20 session titles for recurring themes. If you have been practicing "meetings" a lot, we predict you will need more meeting vocabulary next.') },
-          { id: 'upcoming_roadmap', name: 'Your Learning Roadmap', desc: 'Staged vocabulary for your goal journey', count: smartCounts.upcoming_roadmap, signal: smartCounts.upcoming_roadmap > 0 ? smartCounts.upcoming_roadmap + ' staged' : 'Define goal stages', preview: [], subtitle: 'Stage-by-stage vocab plan' + betaBadge + infoIcon('How: Breaks your long-term goal into stages (e.g. interview → onboarding → daily work → meetings). Each stage has topic-specific vocabulary. Shows current and next stage words. Define stages in Account > Goals.') }
+          { id: 'goal_next_step', name: collectionName('goal_next_step'), desc: collectionSub('goal_next_step'), count: smartCounts.goal_next_step, signal: smartCounts.goal_next_step > 0 ? smartCounts.goal_next_step + ' ' + I18n.t('coll_sig_suggestions') : I18n.t('coll_sig_set_goals'), preview: [], subtitle: I18n.t('coll_goal_next_step_card') + betaBadge + infoIcon(I18n.t('coll_how_goal_next_step')) },
+          { id: 'build_from_known', name: collectionName('build_from_known'), desc: collectionSub('build_from_known'), count: smartCounts.build_from_known, signal: smartCounts.build_from_known > 0 ? smartCounts.build_from_known + ' ' + I18n.t('coll_sig_suggestions') : I18n.t('coll_sig_from_vocab'), preview: [], subtitle: I18n.t('coll_build_from_known_card') + betaBadge + infoIcon(I18n.t('coll_how_build_from_known')) },
+          { id: 'activate_recognized', name: collectionName('activate_recognized'), desc: collectionSub('activate_recognized'), count: smartCounts.activate_recognized, signal: smartCounts.activate_recognized > 0 ? smartCounts.activate_recognized + ' ' + I18n.t('coll_sig_passive_words') : I18n.t('coll_sig_no_passive_gap'), preview: [], subtitle: I18n.t('coll_activate_recognized_card') + betaBadge + infoIcon(I18n.t('coll_how_activate_recognized')) },
+          { id: 'upcoming_useful_vocab', name: collectionName('upcoming_useful_vocab'), desc: collectionSub('upcoming_useful_vocab'), count: smartCounts.upcoming_useful_vocab, signal: smartCounts.upcoming_useful_vocab > 0 ? smartCounts.upcoming_useful_vocab + ' ' + I18n.t('coll_sig_upcoming') : I18n.t('coll_sig_declare_goal'), preview: [], subtitle: I18n.t('coll_upcoming_useful_vocab_card') + betaBadge + infoIcon(I18n.t('coll_how_upcoming_useful_vocab')) },
+          { id: 'upcoming_session_driven', name: collectionName('upcoming_session_driven'), desc: collectionSub('upcoming_session_driven'), count: smartCounts.upcoming_session_driven, signal: smartCounts.upcoming_session_driven > 0 ? smartCounts.upcoming_session_driven + ' ' + I18n.t('coll_sig_detected') : I18n.t('coll_sig_not_enough_data'), preview: [], subtitle: I18n.t('coll_upcoming_session_driven_card') + betaBadge + infoIcon(I18n.t('coll_how_upcoming_session_driven')) },
+          { id: 'upcoming_roadmap', name: collectionName('upcoming_roadmap'), desc: collectionSub('upcoming_roadmap'), count: smartCounts.upcoming_roadmap, signal: smartCounts.upcoming_roadmap > 0 ? smartCounts.upcoming_roadmap + ' ' + I18n.t('coll_sig_staged') : I18n.t('coll_sig_define_stages'), preview: [], subtitle: I18n.t('coll_upcoming_roadmap_card') + betaBadge + infoIcon(I18n.t('coll_how_upcoming_roadmap')) }
         ];
         smartBanks.forEach(function(b) {
           smartHtml += wbCardHTML(b.id, b.name, 'smart', b.desc, b.count, b.signal, b.preview, b.subtitle);
@@ -3342,10 +3344,10 @@
           if (vbBank) pinCounts.vocab_builder_en = (prevAll[3]||[]).length;
 
           folders.pinned = [
-            { id:'review_due_now', title:'Ripasso immediato', subtitle:'Parole da ripassare ora o in ritardo', count:pinCounts.review_due_now, words:pinWords.review_due_now, type:'pinned' },
-            { id:'saved_from_sessions', title:'Saved From Sessions', subtitle:'Words you saved during live sessions', count:pinCounts.saved_from_sessions, words:pinWords.saved_from_sessions, type:'pinned' },
-            { id:'vocab_builder_en', title:'English Vocabulary Builder', subtitle:'Words saved from Vocabulary Builder search', count:pinCounts.vocab_builder_en, words:pinWords.vocab_builder_en, type:'pinned' },
-            { id:'fragile_words', title:'Fragile Words', subtitle:'Weak words at risk of being forgotten', count:pinCounts.fragile_words, words:pinWords.fragile_words, type:'pinned' }
+            { id:'review_due_now', title:collectionName('review_due_now'), subtitle:collectionSub('review_due_now'), count:pinCounts.review_due_now, words:pinWords.review_due_now, type:'pinned' },
+            { id:'saved_from_sessions', title:collectionName('saved_from_sessions'), subtitle:collectionSub('saved_from_sessions'), count:pinCounts.saved_from_sessions, words:pinWords.saved_from_sessions, type:'pinned' },
+            { id:'vocab_builder_en', title:collectionName('vocab_builder_en'), subtitle:collectionSub('vocab_builder_en'), count:pinCounts.vocab_builder_en, words:pinWords.vocab_builder_en, type:'pinned' },
+            { id:'fragile_words', title:collectionName('fragile_words'), subtitle:collectionSub('fragile_words'), count:pinCounts.fragile_words, words:pinWords.fragile_words, type:'pinned' }
           ];
 
           // ── Custom ──
@@ -3365,12 +3367,12 @@
         try {
           var smartAll = await smartPromise;
           var smartDefs = [
-            { id:'goal_next_step', title:'Next Step For Your Goal', subtitle:'Goal-aligned vocabulary for your profile' },
-            { id:'build_from_known', title:'Build From What You Know', subtitle:'Higher-level replacements for words you know' },
-            { id:'activate_recognized', title:'Activate What You Recognize', subtitle:'Passive vocabulary — words seen but not claimed' },
-            { id:'upcoming_useful_vocab', title:'Goal-Based Upcoming Vocab', subtitle:'Words for your declared short-term goals' },
-            { id:'upcoming_session_driven', title:'Session-Detected Themes', subtitle:'Predicted needs from your recent session topics' },
-            { id:'upcoming_roadmap', title:'Your Learning Roadmap', subtitle:'Staged vocabulary for your goal journey' }
+            { id:'goal_next_step', title:collectionName('goal_next_step'), subtitle:collectionSub('goal_next_step') },
+            { id:'build_from_known', title:collectionName('build_from_known'), subtitle:collectionSub('build_from_known') },
+            { id:'activate_recognized', title:collectionName('activate_recognized'), subtitle:collectionSub('activate_recognized') },
+            { id:'upcoming_useful_vocab', title:collectionName('upcoming_useful_vocab'), subtitle:collectionSub('upcoming_useful_vocab') },
+            { id:'upcoming_session_driven', title:collectionName('upcoming_session_driven'), subtitle:collectionSub('upcoming_session_driven') },
+            { id:'upcoming_roadmap', title:collectionName('upcoming_roadmap'), subtitle:collectionSub('upcoming_roadmap') }
           ];
           var smartArr = [];
           if (smartAll) {
