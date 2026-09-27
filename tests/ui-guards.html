@@ -320,7 +320,17 @@ function measure(compareWith) {
      (itTabNames / itTabSubs / itTabEmpties) are intentionally Italian in both languages,
      because they name an Italian-language surface. If this sweep flags them, they are
      not a defect.                                                                    */
-  var IT = /\b(il|lo|la|gli|le|un|una|del|della|che|per|con|non|più|sono|questo|questa|tuo|tua|ancora|oggi|subito|tutti|tutte|come|dove|quando|solo|anche|già|senza|dopo|prima|parole|sessione|sessioni|impostazioni|salva|chiudi|crea|carica|nessun|nessuna|cerca|giorni|minuti|banca|banche|invita|copia|breve|ordine|apprendimento|riepilogo|colora|colorazione|cattura|sottotitoli|sottotitolo|ricomincia|ripartire|guadagna|guadagni|genera|profilo|rivedere|ripasso|ripassa|missioni|missione|consolida|spaziata|preferiti|tema|argomento|nuova|nuovo|invia|scrivi|conosci|dettagli|anagrafici|visibili|pubblico|obiettivo|obiettivi|miglioramento|completa|inizia|seleziona|modificare|filtra|lingua|lingue|traduzione|totale|ultime|sicure|sicurezza|avvia|apri)\b/i;
+  /* ⚠️ \b IS ASCII-ONLY, so the accented alternates in the list above are INERT.
+     "ù" and "à" are not \w characters, so a word boundary immediately after one cannot
+     exist — /\bpiù\b/ never matches anything. "più" and "già" sat in that list looking
+     correct while doing nothing at all.
+
+     Caught live: "I motori Deep Dive possono richiedere fino a 45 secondi in più." is
+     Italian and was reported as English-only, which is how it reached the actionable
+     mirror list. Test accented words separately, WITHOUT boundaries. */
+  var IT_ACCENTED = /più|già|però|perché|è|può|deve|città|qualità|società|attività|più/i;
+  var IT = /\b(il|lo|la|gli|le|un|una|del|della|che|per|con|non|sono|questo|questa|tuo|tua|ancora|oggi|subito|tutti|tutte|come|dove|quando|solo|anche|senza|dopo|prima|parole|sessione|sessioni|impostazioni|salva|chiudi|crea|carica|nessun|nessuna|cerca|giorni|minuti|banca|banche|invita|copia|breve|ordine|apprendimento|riepilogo|colora|colorazione|cattura|sottotitoli|sottotitolo|ricomincia|ripartire|guadagna|guadagni|genera|profilo|rivedere|ripasso|ripassa|missioni|missione|consolida|spaziata|preferiti|tema|argomento|nuova|nuovo|invia|scrivi|conosci|dettagli|anagrafici|visibili|pubblico|obiettivo|obiettivi|miglioramento|completa|inizia|seleziona|modificare|filtra|lingua|lingue|traduzione|totale|ultime|sicure|sicurezza|avvia|apri)\b/i;
+  function looksItalian(s) { return IT.test(s) || IT_ACCENTED.test(s); }
   var EN = /\b(the|you|your|and|of|to|in|is|are|with|for|from|this|that|create|cancel|save|close|no|not|new|start|settings|words|session|search|days|minutes|bank|word|add|copy|invite)\b/i;
 
   function classify(strings) {
@@ -329,7 +339,7 @@ function measure(compareWith) {
       var t = strings[i];
       if (!t || seen[t]) continue;
       seen[t] = 1; total++;
-      if (IT.test(t) && !EN.test(t)) { itOnly++; if (samples.length < 400) samples.push(t); }
+      if (looksItalian(t) && !EN.test(t)) { itOnly++; if (samples.length < 400) samples.push(t); }
       // The MIRROR. Every B13 row asked one direction only — Italian leaking into
       // the English UI — so English leaking into the ITALIAN UI was structurally
       // invisible to this harness. Mode B then found seven real instances of it in
@@ -337,7 +347,7 @@ function measure(compareWith) {
       // "Signals" headings (no data-i18n at all), #ssPopup's aria-label="Close",
       // the report picker's "Toggle favorite", and onboarding's English data-it
       // values. Same defect, opposite direction — so it gets the same treatment.
-      else if (EN.test(t) && !IT.test(t)) { enOnly++; if (enSamples.length < 400) enSamples.push(t); }
+      else if (EN.test(t) && !looksItalian(t)) { enOnly++; if (enSamples.length < 400) enSamples.push(t); }
     }
     return { itOnly: itOnly, enOnly: enOnly, total: total, samples: samples, enSamples: enSamples };
   }
