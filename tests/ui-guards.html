@@ -320,7 +320,7 @@ function measure(compareWith) {
      (itTabNames / itTabSubs / itTabEmpties) are intentionally Italian in both languages,
      because they name an Italian-language surface. If this sweep flags them, they are
      not a defect.                                                                    */
-  var IT = /\b(il|lo|la|gli|le|un|una|del|della|che|per|con|non|più|sono|questo|questa|tuo|tua|ancora|oggi|subito|tutti|tutte|come|dove|quando|solo|anche|già|senza|dopo|prima|parole|sessione|sessioni|impostazioni|salva|chiudi|crea|carica|nessun|nessuna|cerca|giorni|minuti|banca|banche|invita|copia)\b/i;
+  var IT = /\b(il|lo|la|gli|le|un|una|del|della|che|per|con|non|più|sono|questo|questa|tuo|tua|ancora|oggi|subito|tutti|tutte|come|dove|quando|solo|anche|già|senza|dopo|prima|parole|sessione|sessioni|impostazioni|salva|chiudi|crea|carica|nessun|nessuna|cerca|giorni|minuti|banca|banche|invita|copia|breve|ordine|apprendimento|riepilogo|colora|colorazione|cattura|sottotitoli|sottotitolo|ricomincia|ripartire|guadagna|guadagni|genera|profilo|rivedere|ripasso|ripassa|missioni|missione|consolida|spaziata|preferiti|tema|argomento|nuova|nuovo|invia|scrivi|conosci|dettagli|anagrafici|visibili|pubblico|obiettivo|obiettivi|miglioramento|completa|inizia|seleziona|modificare|filtra|lingua|lingue|traduzione|totale|ultime|sicure|sicurezza|avvia|apri)\b/i;
   var EN = /\b(the|you|your|and|of|to|in|is|are|with|for|from|this|that|create|cancel|save|close|no|not|new|start|settings|words|session|search|days|minutes|bank|word|add|copy|invite)\b/i;
 
   function classify(strings) {
@@ -329,7 +329,7 @@ function measure(compareWith) {
       var t = strings[i];
       if (!t || seen[t]) continue;
       seen[t] = 1; total++;
-      if (IT.test(t) && !EN.test(t)) { itOnly++; if (samples.length < 60) samples.push(t); }
+      if (IT.test(t) && !EN.test(t)) { itOnly++; if (samples.length < 400) samples.push(t); }
       // The MIRROR. Every B13 row asked one direction only — Italian leaking into
       // the English UI — so English leaking into the ITALIAN UI was structurally
       // invisible to this harness. Mode B then found seven real instances of it in
@@ -337,7 +337,7 @@ function measure(compareWith) {
       // "Signals" headings (no data-i18n at all), #ssPopup's aria-label="Close",
       // the report picker's "Toggle favorite", and onboarding's English data-it
       // values. Same defect, opposite direction — so it gets the same treatment.
-      else if (EN.test(t) && !IT.test(t)) { enOnly++; if (enSamples.length < 60) enSamples.push(t); }
+      else if (EN.test(t) && !IT.test(t)) { enOnly++; if (enSamples.length < 400) enSamples.push(t); }
     }
     return { itOnly: itOnly, enOnly: enOnly, total: total, samples: samples, enSamples: enSamples };
   }
@@ -471,6 +471,30 @@ function measure(compareWith) {
           mirT ? 'first samples: ' + itControl.text.enSamples.join(' | ')
                : 'target is 0 — English in an Italian UI is the same defect, mirrored. ' +
                  'This row is what would have caught #wbDrawer and #ssPopup automatically.');
+
+      /* ── B13zr · the ACTIONABLE mirror ────────────────────────────────────────
+         B13z alone is not actionable: it counted 104, of which most were the vocabulary
+         the app TEACHES ("Greetings, introductions and numbers.") and brand terms —
+         correct as English in both languages — plus stale renders from the language
+         switch itself. Deciding which is which by hand is a keyword list that rots.
+
+         The two passes already answer it. A string that is English in the ITALIAN pass
+         AND English in the ENGLISH pass is deliberately language-independent (or stale),
+         because it does not change with the language. A string that is English ONLY in
+         the Italian pass is a genuine mirror leak.
+
+         So the allowlist IS the difference: no keywords to maintain, nothing to drift.
+         Confirmed against a real run — the teaching topics and the tagline appeared in
+         both lists; "Words to review", "Session", "No sessions found." and "Add to
+         favorites" appeared only in the Italian one, and those are the real defects. */
+      var zcSet = {};
+      for (var zi = 0; zi < lastHits.zc.length; zi++) zcSet[lastHits.zc[zi]] = 1;
+      lastHits.zr = lastHits.z.filter(function (s) { return !zcSet[s]; });
+      row('B13zr', 'MIRROR · excluding strings that are ALSO English in the English UI',
+          '0', String(lastHits.zr.length), lastHits.zr.length ? 'fail' : 'pass',
+          lastHits.zr.length
+            ? 'actionable: ' + lastHits.zr.slice(0, 8).join(' | ')
+            : 'nothing left once intentional English and stale renders are subtracted');
     }
   }
 
@@ -548,6 +572,7 @@ function measure(compareWith) {
       block('Italian shown in the English UI · text (B13x)', lastHits.x, '#f87171') +
       block('Italian shown in the English UI · attributes (B13a)', lastHits.a, '#f87171') +
       block('English shown in the Italian UI · mirror (B13z)', lastHits.z, '#fbbf24') +
+      block('ACTIONABLE mirror · B13z minus the control (B13zr)', lastHits.zr, '#f87171') +
       block('control · English shown in the English UI (B13zc)', lastHits.zc, '#94a3b8');
     if (extra) document.getElementById('notes').innerHTML += extra;
   })();
