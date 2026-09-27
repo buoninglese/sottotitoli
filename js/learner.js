@@ -1020,8 +1020,15 @@
           var avail = isDone || isLessonAvailable(u, l);
           var nodeIcon = isDone ? '✓' : esc(l.icon || '●');
           var lessonScore = isDone ? scoreOf('lesson:' + u.id + ':' + l.id) : null;
+          // The node button's ONLY content is a glyph (✓ / an emoji / ●), so it had no accessible
+          // name at all. Name it with the lesson title — the exact string the adjacent .ll-title
+          // shows — so the name matches the visible label. State is not repeated here: a locked
+          // node is `disabled` (announced as unavailable) and a done node is announced via the
+          // sibling .lesson-score. Used instead of aria-labelledby because BOTH the logged-in
+          // course tree and the logged-out teaser render this same markup, so ids would collide.
           html += '<div class="lesson-node-row">' +
             '<button type="button" class="lesson-node ' + (isDone ? 'done' : (avail ? 'available' : '')) + '" ' +
+              'aria-label="' + esc(l.title) + '" ' +
               (avail ? 'onclick="Learner.openLesson(\'' + u.id + '\',\'' + l.id + '\')"' : 'disabled') + '>' + nodeIcon + '</button>' +
             '<div class="lesson-label"><div class="ll-title">' + esc(l.title) + '</div><div class="ll-sub">' + esc(l.description) + '</div></div>' +
             (isDone ? '<span class="lesson-score">✓' + (lessonScore ? ' ' + lessonScore.pct + '%' : '') + '</span>'
@@ -1033,7 +1040,10 @@
         var testState = s.tests[u.id] && s.tests[u.id].passed ? 'done' : (testAvail ? 'available' : '');
         var testScore = scoreOf('test:' + u.id);
         html += '<div class="lesson-node-row">' +
+          // Icon-only control: the name comes from the existing learner_unit_test key, and
+          // data-i18n-aria-label keeps it in sync when the language is switched later.
           '<button type="button" class="lesson-node test ' + testState + '" ' +
+            'aria-label="' + esc(t('learner_unit_test')) + '" data-i18n-aria-label="learner_unit_test" ' +
             (testAvail ? 'onclick="Learner.openTest(\'' + u.id + '\')"' : 'disabled') + '>🏆</button>' +
           '<div class="lesson-label"><div class="ll-title">' + t('learner_unit_test') + '</div>' +
             '<div class="ll-sub">' + (s.tests[u.id] && s.tests[u.id].passed
