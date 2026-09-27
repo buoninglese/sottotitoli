@@ -1,6 +1,21 @@
               (function(){
                 var lang = 'en';
                 function esc(s){ return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
+                // Preset labels come from the shared registry exposed by
+                // panoramica.js so they follow the active UI language instead of
+                // always rendering English. Looked up lazily: this file may be
+                // parsed before panoramica.js, but the presets are only built
+                // once the wordbank data has loaded.
+                function collName(id, fallback) {
+                  var c = window.BANK_COLL;
+                  if (c && c.name) { var v = c.name(id); if (v && v !== id) return v; }
+                  return fallback;
+                }
+                function collSub(id, fallback) {
+                  var c = window.BANK_COLL;
+                  if (c && c.sub) { var v = c.sub(id); if (v) return v; }
+                  return fallback;
+                }
                 function loadAll(){
                   if(!window.SottotitoliData||!window.SottotitoliData.getWordbanks){setTimeout(loadAll,300);return;}
                   window.SottotitoliData.getWordbanks(lang).then(function(banks){
@@ -10,18 +25,18 @@
                     // Preset banks that show when user has no real banks
                     var presets = {
                       pinned: [
-                        {id:'preset-ripasso',name:'Ripasso immediato',desc:'Daily spaced-repetition for high-priority items',icon:'history',words:0,newWords:0,due:0},
-                        {id:'preset-saved',name:'Saved From Sessions',desc:'Automatically extracted from your video interactions',icon:'movie',words:0,newWords:0,due:0},
-                        {id:'preset-evb',name:'English Vocabulary Builder',desc:'Saved from Vocabulary Builder English',icon:'book',words:0,newWords:0,due:0},
-                        {id:'preset-fragile',name:'Fragile Words',desc:'Words that need reinforcement',icon:'warning',words:0,newWords:0,due:0}
+                        {id:'preset-ripasso',name:collName('review_due_now','Ripasso immediato'),desc:collSub('review_due_now','Daily spaced-repetition for high-priority items'),icon:'history',words:0,newWords:0,due:0},
+                        {id:'preset-saved',name:collName('saved_from_sessions','Saved From Sessions'),desc:collSub('saved_from_sessions','Automatically extracted from your video interactions'),icon:'movie',words:0,newWords:0,due:0},
+                        {id:'preset-evb',name:collName('vocab_builder_en','English Vocabulary Builder'),desc:collSub('vocab_builder_en','Saved from Vocabulary Builder English'),icon:'book',words:0,newWords:0,due:0},
+                        {id:'preset-fragile',name:collName('fragile_words','Fragile Words'),desc:collSub('fragile_words','Words that need reinforcement'),icon:'warning',words:0,newWords:0,due:0}
                       ],
                       discovery: [
-                        {id:'preset-next',name:'Next Step',desc:'Strategic additions for your level',icon:'moving',type:'SMART',words:0},
-                        {id:'preset-build',name:'Build From What You Know',desc:'Expanding related vocabulary clusters',icon:'psychology',type:'SMART',words:0},
-                        {id:'preset-activate',name:'Activate What You Recognize',desc:'Claim your passive vocab',icon:'visibility',type:'BETA',words:0},
-                        {id:'preset-goal',name:'Goal-Based Upcoming Vocab',desc:'What you said you need next',icon:'flag',type:'BETA',words:0},
-                        {id:'preset-themes',name:'Session-Detected Themes',desc:'From your practice patterns',icon:'analytics',type:'BETA',words:0},
-                        {id:'preset-roadmap',name:'Your Learning Roadmap',desc:'Stage-by-stage vocab plan',icon:'map',type:'BETA',words:0}
+                        {id:'preset-next',name:collName('goal_next_step','Next Step'),desc:collSub('goal_next_step','Strategic additions for your level'),icon:'moving',type:'SMART',words:0},
+                        {id:'preset-build',name:collName('build_from_known','Build From What You Know'),desc:collSub('build_from_known','Expanding related vocabulary clusters'),icon:'psychology',type:'SMART',words:0},
+                        {id:'preset-activate',name:collName('activate_recognized','Activate What You Recognize'),desc:collSub('activate_recognized','Claim your passive vocab'),icon:'visibility',type:'BETA',words:0},
+                        {id:'preset-goal',name:collName('upcoming_useful_vocab','Goal-Based Upcoming Vocab'),desc:collSub('upcoming_useful_vocab','What you said you need next'),icon:'flag',type:'BETA',words:0},
+                        {id:'preset-themes',name:collName('upcoming_session_driven','Session-Detected Themes'),desc:collSub('upcoming_session_driven','From your practice patterns'),icon:'analytics',type:'BETA',words:0},
+                        {id:'preset-roadmap',name:collName('upcoming_roadmap','Your Learning Roadmap'),desc:collSub('upcoming_roadmap','Stage-by-stage vocab plan'),icon:'map',type:'BETA',words:0}
                       ]
                     };
                     // Merge: real user banks first, then presets only if no real banks exist
