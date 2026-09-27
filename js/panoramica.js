@@ -4833,7 +4833,7 @@
             if (memberBankIds.indexOf(b.id) !== -1) membershipHTML += '<span class="membership-chip">' + escHtml(b.name) + '</span>';
           });
         }
-        document.getElementById('wbDrawerBanks').innerHTML = membershipHTML || '<span style="font-size:13px;color:var(--text-faint)">Non presente in nessuna word bank.</span>';
+        document.getElementById('wbDrawerBanks').innerHTML = membershipHTML || '<span style="font-size:13px;color:var(--text-faint)">' + DT('word_not_in_any_bank', 'Non presente in nessuna word bank.') + '</span>';
 
         // ── Add to other banks (skip banks the word is already in) ──
         var addBankHTML = '';

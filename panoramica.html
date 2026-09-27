@@ -477,8 +477,17 @@
                           function refreshProfileXp(){
                             var xp = 0;
                             try { var s = JSON.parse(localStorage.getItem('sottotitoli-learner') || 'null'); if (s && typeof s.xp === 'number') xp = s.xp; } catch(e){}
-                            var el = document.getElementById('profileXpNum'); if (el) el.textContent = xp.toLocaleString(I18n.locale());
-                            var dd = document.getElementById('ddXpNum'); if (dd) dd.textContent = xp.toLocaleString(I18n.locale());
+                            // ⚠️ GUARDED, unlike every other locale() call site. This inline
+                            // script runs long BEFORE <script src="js/i18n.js"> (defined ~line
+                            // 477, the tag is ~line 1919), and refreshProfileXp() fires early
+                            // enough to hit that window — the unguarded form threw
+                            // "ReferenceError: I18n is not defined" on every load. Being inside a
+                            // function only means it runs at CALL time, not after the script tag.
+                            // Every other site lives in js/*.js, which load after i18n.js, so a
+                            // bare I18n.locale() is correct there.
+                            var _loc = (window.I18n && I18n.locale) ? I18n.locale() : 'it-IT';
+                            var el = document.getElementById('profileXpNum'); if (el) el.textContent = xp.toLocaleString(_loc);
+                            var dd = document.getElementById('ddXpNum'); if (dd) dd.textContent = xp.toLocaleString(_loc);
                           }
                           refreshProfileXp();
                           window.addEventListener('xp:changed', refreshProfileXp);
@@ -1777,10 +1786,10 @@
             <div class="dw-ipa" id="wbDrawerIPA"></div>
             <div class="dw-meta" id="wbDrawerMeta"></div>
           </div>
-          <div class="drawer-section dw-meaning"><h4>Meaning</h4><p id="wbDrawerMeaning">—</p></div>
-          <div class="drawer-section"><h4>Bank membership</h4><div class="membership-list" id="wbDrawerBanks"></div></div>
-          <div class="drawer-section"><h4>Add to bank</h4><div class="membership-list" id="wbDrawerAddBanks" style="margin-top:4px"></div></div>
-          <div class="drawer-section"><h4>Signals</h4><div class="drawer-signals" id="wbDrawerSignals"></div></div>
+          <div class="drawer-section dw-meaning"><h4 data-i18n="wb_drawer_meaning">Meaning</h4><p id="wbDrawerMeaning">—</p></div>
+          <div class="drawer-section"><h4 data-i18n="wb_drawer_membership">Bank membership</h4><div class="membership-list" id="wbDrawerBanks"></div></div>
+          <div class="drawer-section"><h4 data-i18n="wb_drawer_add">Add to bank</h4><div class="membership-list" id="wbDrawerAddBanks" style="margin-top:4px"></div></div>
+          <div class="drawer-section"><h4 data-i18n="wb_drawer_signals">Signals</h4><div class="drawer-signals" id="wbDrawerSignals"></div></div>
         </div>
       </main>
     </div>
@@ -1819,7 +1828,7 @@
 
   <div class="start-split" id="startSplit">
     <div class="ss-popup" id="ssPopup">
-      <button class="ss-close" onclick="toggleStartSession()" aria-label="Close">✕</button>
+      <button class="ss-close" onclick="toggleStartSession()" aria-label="Close" data-i18n-aria-label="a11y_close">✕</button>
       <div class="ss-diagonal-container" id="ssDiagonal">
         <div class="ss-divider"></div>
         <!-- Left: Caption Mode -->
@@ -1916,7 +1925,7 @@
   <script src="js/panoramica-wrapped-switcher.js?v=1"></script>
   <script src="js/data-service.js?v=11"></script>
   <script src="js/smart-suggestions.js"></script>
-  <script src="js/i18n.js?v=77"></script>
+  <script src="js/i18n.js?v=78"></script>
   <script src="js/icon-a11y.js?v=2"></script>
   <script src="js/xp.js?v=5"></script>
   <script>if (window.XP) { setTimeout(function(){ try { XP.restore(); } catch(e){} }, 2500); }</script>
@@ -1928,7 +1937,7 @@
 
   <!-- Page-specific: Supabase data fetching -->
   <script src="js/bank-identities.js?v=1"></script>
-  <script src="js/panoramica.js?v=29"></script>
+  <script src="js/panoramica.js?v=30"></script>
 
 <!-- 🎯 SETTINGS SAVE — single unified handler 🎯 -->
 <script src="js/panoramica-settings-save.js?v=3"></script>
