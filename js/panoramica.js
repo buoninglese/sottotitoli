@@ -1333,7 +1333,7 @@
           sessions: s ? (s.totalSessions||0) : 0,
           recMin: s ? Math.round(s.totalMinutes||0) : 0,
           siteMin: 0, minsPerSess: 0, activeShare: 0,
-          bands:[0,0,0,0], bandNames:['Mattina','Giorno','Sera','Notte'], bandColors:['#fbbf24','#22d3ee','#8b5cf6','#6366f1'],
+          bands:[0,0,0,0], bandNames:[DT('dash_band_morning','Mattina'),DT('dash_band_day','Giorno'),DT('dash_band_evening','Sera'),DT('dash_band_night','Notte')], bandColors:['#fbbf24','#22d3ee','#8b5cf6','#6366f1'],
           bandMax:0, bandMaxName:'—'
         };
         try {
@@ -1509,9 +1509,9 @@
                 '<div class="wsc-feed-date">'+date+' · '+lang+'</div></div>'+
                 '<div class="wsc-feed-stats">'+
                   '<div class="wsc-feed-stat"><b>'+minutes+'</b><span>min</span></div>'+
-                  '<div class="wsc-feed-stat"><b>'+wc+'</b><span>parole</span></div>'+
-                  '<div class="wsc-feed-stat"><b>'+uniq+'</b><span>uniche</span></div>'+
-                  '<div class="wsc-feed-stat"><b>'+lexTxt+'</b><span>div. lessicale</span></div>'+
+                  '<div class="wsc-feed-stat"><b>'+wc+'</b><span data-i18n="hero_words">parole</span></div>'+
+                  '<div class="wsc-feed-stat"><b>'+uniq+'</b><span data-i18n="wsc_stat_unique">uniche</span></div>'+
+                  '<div class="wsc-feed-stat"><b>'+lexTxt+'</b><span data-i18n="wsc_stat_lexdiv">div. lessicale</span></div>'+
                 '</div></div>';
             }).join('');
           }
@@ -2068,10 +2068,10 @@
       function coronaBandsHtml(bandsArr, days){
         var W=CHT.W,H=CHT.H,PL=CHT.PL,PR=CHT.PR,PT=CHT.PT,PB=CHT.PB,cx=W/2,cy=H/2,n=bandsArr.length,step=n?360/n:1,g='';
         var bands=[
-          {name:'Mattina',c:'#fbbf24',hi:'#fcd34d',r0:20,r1:40},
-          {name:'Giorno', c:'#22d3ee',hi:'#67e8f9',r0:44,r1:64},
-          {name:'Sera',   c:'#8b5cf6',hi:'#a78bfa',r0:68,r1:88},
-          {name:'Notte',  c:'#6366f1',hi:'#818cf8',r0:92,r1:112}
+          {name:DT('dash_band_morning','Mattina'),c:'#fbbf24',hi:'#fcd34d',r0:20,r1:40},
+          {name:DT('dash_band_day','Giorno'), c:'#22d3ee',hi:'#67e8f9',r0:44,r1:64},
+          {name:DT('dash_band_evening','Sera'),   c:'#8b5cf6',hi:'#a78bfa',r0:68,r1:88},
+          {name:DT('dash_band_night','Notte'),  c:'#6366f1',hi:'#818cf8',r0:92,r1:112}
         ];
         for (var bi=0;bi<4;bi++){
           var b=bands[bi], vals=[];
