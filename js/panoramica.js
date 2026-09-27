@@ -562,7 +562,10 @@
             .limit(7);
           var sessions = (recent || []).filter(function(s){ return (s.duration_seconds||0) > 0 || (s.words_count||0) > 0; });
           if (!sessions.length) {
-            libEl.innerHTML = '<div class="wb-lib-row" style="justify-content:center"><span class="wb-lib-count">Nessuna sessione ancora. Avvia la prima.</span></div>';
+            // data-i18n is required here: JS-injected text is only translated if it carries the
+            // attribute — the characterData observer re-runs apply(), and apply() matches on
+            // [data-i18n], not on the string. Italian is the source of truth injected here.
+            libEl.innerHTML = '<div class="wb-lib-row" style="justify-content:center"><span class="wb-lib-count" data-i18n="dash_no_sessions">Nessuna sessione ancora. Avvia la prima.</span></div>';
           } else {
             libEl.innerHTML = sessions.map(function(s){
               var isIt = /it/i.test(s.language_pair || '');
@@ -1475,7 +1478,7 @@
         if (feedEl) {
           var recent = (allSess || []).slice().sort(function(a,b){ return new Date(b.started_at) - new Date(a.started_at); }).slice(0,5);
           if (!recent.length) {
-            feedEl.innerHTML = '<div class="wsc-feed-empty">Nessuna sessione ancora. Avvia la prima.</div>';
+            feedEl.innerHTML = '<div class="wsc-feed-empty" data-i18n="dash_no_sessions">Nessuna sessione ancora. Avvia la prima.</div>';
           } else {
             feedEl.innerHTML = recent.map(function(x){
               var wc = x.words_count || 0;
