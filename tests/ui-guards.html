@@ -98,9 +98,50 @@ function row(id, name, base, cur, verdict, note) {
 var frame = document.getElementById('frame');
 var win, doc;
 
+/* Real uncaught errors from the MEASURED page. Deliberately separate from `errs`, which
+   holds the harness's own findings about the page rather than things the page threw.
+   console.error is NOT counted: under ?bypass_auth=1 the mock user 401s on every
+   Supabase call, so a console count would be pure noise and would drown the signal.
+   "Uncaught JS errors" is what this row says, so uncaught is what it measures. */
+var pageErrors = [];
+var armedOnce = false;
+function armFrame() {
+  var w = frame.contentWindow;
+  if (!w) return;
+  w.addEventListener('error', function (e) {
+    pageErrors.push('error: ' + (e.message || '(no message)') +
+      (e.filename ? ' @ ' + String(e.filename).split('/').pop() + ':' + e.lineno : ''));
+  });
+  w.addEventListener('unhandledrejection', function (e) {
+    var r = e.reason;
+    pageErrors.push('unhandled rejection: ' + ((r && r.message) ? r.message : String(r)));
+  });
+}
+
 frame.addEventListener('load', function () {
   win = frame.contentWindow;
   doc = frame.contentDocument;
+
+  /* ⚠️ TWO LOADS, ON PURPOSE — this is the entire fix.
+
+     A listener can only be attached to a frame's window AFTER that window exists.
+     Anything the page throws while its own scripts run happens BEFORE the first load
+     event, so by the time we could attach, the evidence is gone. Not hypothetical: a
+     change of mine threw "ReferenceError: I18n is not defined" on EVERY load of
+     panoramica.html, and this row reported 0 the whole time.
+
+     So arm the fresh window, force one reload, and measure the SECOND load — by then
+     the listeners are in place before that load's scripts run. The first load is
+     thrown away. It also means the old `win.__guardErrs` dependence is gone: that
+     only ever counted errors the app volunteered to record, which is why this row
+     was hardcoded to 'pass' and could not fail. */
+  if (!armedOnce) {
+    armedOnce = true;
+    armFrame();
+    try { frame.contentWindow.location.reload(); } catch (e) { frame.setAttribute('src', frame.getAttribute('src')); }
+    return;
+  }
+  armFrame();
   // First give the page's own scripts a head start, then let run() poll until the
   // DOM actually stops changing, instead of trusting a single fixed wait (D6).
   setTimeout(run, 4000);
@@ -223,9 +264,19 @@ function measure(compareWith) {
       String(wide), wide === 0 ? 'pass' : 'fail',
       'at 375px this must stay 0');
 
-  /* ── B10 · uncaught JS errors ────────────────────────────────────────────────── */
-  row('B10', 'Uncaught JS errors captured', BASELINE.B10, String(errs.length + (win.__guardErrs || []).length),
-      'pass', 'calibrated: a forced throw must be caught before trusting a 0');
+  /* ── B10 · uncaught JS errors from the measured page ─────────────────────────────
+     This row used to read: String(errs.length + (win.__guardErrs || []).length)
+     with a HARDCODED verdict of 'pass'. So it could not fail, and it counted only
+     what the app chose to volunteer. A real uncaught error was invisible to it —
+     which is how a change of mine shipped a page that threw on every single load
+     while this row stayed green at 0. It now counts real error/unhandledrejection
+     events from the frame, on a load where the listeners were armed first. */
+  var _pe = pageErrors.length;
+  row('B10', 'Uncaught JS errors in the measured page', BASELINE.B10,
+      String(errs.length + _pe),
+      (errs.length + _pe) <= BASELINE.B10 ? 'pass' : 'fail',
+      _pe ? 'THROWN BY THE PAGE: ' + pageErrors.slice(0, 3).join('  |  ')
+          : 'armed before load, so a load-time throw would be caught here');
 
   /* ── B16 · sidebar nav items that are href="#" ───────────────────────────────── */
   var navLinks = doc.querySelectorAll('nav a[href], [class*="side"] a[href]');
