@@ -167,13 +167,43 @@
                 loadingOverlay.style.display = 'flex';
                 generateBtn.disabled = true;
 
+                // Give report credits back when no report can be produced.
+                // Idempotent server-side (keyed on the reference), so it is safe to
+                // call from here AND from the worker for the same request.
+                var refundReportCredits = async function(uidArg, amount, ref) {
+                  try {
+                    var r = await sb.rpc('refund_report_credits', {
+                      p_user_id: uidArg, p_amount: amount, p_reference: ref
+                    });
+                    if (r.error) { console.warn('Refund failed:', r.error.message); return false; }
+                    return !!(r.data && r.data.success);
+                  } catch (e) {
+                    console.warn('Refund threw:', e);
+                    return false;
+                  }
+                };
+
                 try {
                   // ── Atomic token deduction ──
+                  // chargeRef identifies THIS charge in the ledger. The same value is
+                  // reused as the refund key, so a re-credit can never double-apply —
+                  // no matter how many times a retry or a flaky network asks for it.
+                  var chargeRef = 'report_' + presetKey + '_' + Date.now();
                   var deductResult = await sb.rpc('deduct_tokens', {
                     p_user_id: uid,
                     p_amount: totalCredits,
-                    p_reference: 'report_' + presetKey + '_' + Date.now()
+                    p_reference: chargeRef
                   });
+                  // deduct_tokens reports a LOGICAL failure as a normal response
+                  // ({success:false, error:'Insufficient tokens'}), NOT as r.error.
+                  // The old code only inspected r.error, so that response sailed
+                  // through and a request was created WITHOUT being charged.
+                  if (!deductResult.error && (!deductResult.data || deductResult.data.success !== true)) {
+                    loadingOverlay.style.display = 'none';
+                    generateBtn.disabled = false;
+                    showToastMsg('⚠️ Crediti non scalati: ' + ((deductResult.data && deductResult.data.error) || 'errore sconosciuto') + '. Riprova.');
+                    return;
+                  }
                   if (deductResult.error) {
                     console.warn('Deduct error:', deductResult.error);
                     // Fallback: try direct update
@@ -192,18 +222,35 @@
                   }
 
                   // ── Insert request ──
+                  // scope_type MUST be one of ai_report_requests_scope_type_check:
+                  //   single_session | selected_sessions | last_7_days | last_30_days
+                  // This read 'multi_session', which is NOT in that list — so choosing
+                  // two or more sessions failed the insert DETERMINISTICALLY, after the
+                  // credits had already been taken. That is the billing bug.
                   var ins = await sb.from('ai_report_requests').insert({
                     user_id: uid,
                     session_ids: sessionIds,
                     module_key: mapping.moduleKey,
-                    scope_type: sessionIds.length > 1 ? 'multi_session' : 'single_session',
-                    status: 'queued'
+                    scope_type: sessionIds.length > 1 ? 'selected_sessions' : 'single_session',
+                    status: 'queued',
+                    // Record what was charged so a refund has a source of truth.
+                    // process-ai-reports overwrites this with real usage on success,
+                    // so the value a failure sees is exactly the amount to give back.
+                    tokens_spent: totalCredits
                   });
                   if (ins.error) {
                     console.warn('Insert error:', ins.error.message);
+                    // The charge is applied but no report will ever be produced.
+                    // Refund in full, with no administrative fee: restoring an internal
+                    // balance touches no payment processor, so there is no cost to pass
+                    // on (policy 2026-09-27). A processor fee is withheld only on a
+                    // money refund under the 14-day policy, which is Stripe-side.
+                    var refunded = await refundReportCredits(uid, totalCredits, chargeRef);
                     loadingOverlay.style.display = 'none';
                     generateBtn.disabled = false;
-                    showToastMsg('⚠️ Errore: ' + ins.error.message);
+                    showToastMsg(refunded
+                      ? '⚠️ Errore: ' + ins.error.message + ' — crediti riaccreditati.'
+                      : '⚠️ Errore: ' + ins.error.message + '. Crediti non riaccreditati: scrivi a support@sottotitoli.pro.');
                     return;
                   }
                   if (XP && XP.award) XP.award('ai_report');
