@@ -27,10 +27,19 @@
       document.querySelectorAll('.sparkline').forEach(function(sl){
         var card=sl.closest('.metric-card');
         var metric=card?card.getAttribute('data-metric'):'';
-        var isEn = window.I18n && I18n.getLang() === 'en';
-        var labels = isEn ? {'totalSessions':'sessions','totalMinutes':'minutes','totalWords':'words','avgWpm':'WPM','avgLexDiv':'diversity'} : {'totalSessions':'sessioni','totalMinutes':'minuti','totalWords':'parole','avgWpm':'WPM','avgLexDiv':'diversità'};
-        var label=labels[metric]||'valore';
-        var days= isEn ? ['6d ago','5d ago','4d ago','3d ago','2d ago','yesterday','today'] : ['6g fa','5g fa','4g fa','3g fa','2g fa','ieri','oggi'];
+        var labels = {
+          totalSessions: DT('dash_tip_sessions','sessioni'),
+          totalMinutes:  DT('dash_tip_minutes','minuti'),
+          totalWords:    DT('dash_tip_words','parole'),
+          avgWpm:        'WPM',
+          avgLexDiv:     DT('dash_tip_diversity','diversità')
+        };
+        var label = labels[metric] || DT('dash_tip_value','valore');
+        var days = [
+          DT('dash_tip_6d','6g fa'), DT('dash_tip_5d','5g fa'), DT('dash_tip_4d','4g fa'),
+          DT('dash_tip_3d','3g fa'), DT('dash_tip_2d','2g fa'),
+          DT('dash_tip_yesterday','ieri'), DT('dash_tip_today','oggi')
+        ];
         sl.querySelectorAll('.bar').forEach(function(b,i){b.setAttribute('data-tip',days[i]||label);});
       });
     }
@@ -2172,12 +2181,12 @@
         // Metric display config (bilingual)
         var isEn = window.I18n && I18n.getLang() === 'en';
         var mc = {};
-        mc.totalSessions = { title: isEn?'Total sessions':'Sessioni totali', subtitle: isEn?'Sessions completed in the last 14 days.':'Numero di sessioni completate negli ultimi 14 giorni.', label: isEn?'Total Sessions':'Sessioni Totali', unit:'' };
-        mc.totalMinutes  = { title: isEn?'Session minutes':'Minuti di sessione', subtitle: isEn?'Your speaking consistency over the last 14 days.':'Analisi della tua costanza verbale negli ultimi 14 giorni.', label: isEn?'Total Minutes':'Minuti Totali', unit:' min' };
-        mc.totalWords    = { title: isEn?'Unique words':'Parole uniche', subtitle: isEn?'Distinct words used in the last 14 days.':'Parole distinte usate nelle sessioni degli ultimi 14 giorni.', label: isEn?'Total Words':'Parole Totali', unit:'' };
-        mc.avgLexDiv     = { title: isEn?'Lexical diversity':'Diversit\u00E0 lessicale', subtitle: isEn?'Unique/total word ratio over the last 14 days.':'Rapporto parole uniche/totali negli ultimi 14 giorni.', label: isEn?'Avg Ratio':'Media Rapporto', unit:'',
-          info: isEn ? 'Lexical diversity measures how varied your vocabulary is. It\u2019s calculated as: unique words \u00F7 total words per session. A higher ratio means you used a wider range of vocabulary. Typical values range from 0.3 (repetitive) to 0.9 (highly varied). Tracking this over time shows whether your active vocabulary is expanding.' : 'La diversit\u00E0 lessicale misura quanto \u00E8 vario il tuo vocabolario. Si calcola come: parole uniche \u00F7 parole totali per sessione. Un rapporto pi\u00F9 alto significa che hai usato una gamma pi\u00F9 ampia di vocaboli. I valori tipici vanno da 0,3 (ripetitivo) a 0,9 (molto vario). Monitorarlo nel tempo mostra se il tuo vocabolario attivo si sta espandendo.' };
-        mc.timebands     = { title: isEn?'Recording by time of day':'Minuti per fascia oraria', subtitle: isEn?'Recording minutes per day, split by time of day (morning / day / evening / night).':'Minuti di registrazione per giorno, divisi per fascia oraria (mattina / giorno / sera / notte).', label: isEn?'Recording minutes':'Minuti di registrazione', unit:' min' };
+        mc.totalSessions = { title: DT('dash_mc_sessions_title','Sessioni totali'), subtitle: DT('dash_mc_sessions_sub','Numero di sessioni completate negli ultimi 14 giorni.'), label: DT('dash_mc_sessions_label','Sessioni Totali'), unit:'' };
+        mc.totalMinutes  = { title: DT('dash_mc_minutes_title','Minuti di sessione'), subtitle: DT('dash_mc_minutes_sub','Analisi della tua costanza verbale negli ultimi 14 giorni.'), label: DT('dash_mc_minutes_label','Minuti Totali'), unit:' min' };
+        mc.totalWords    = { title: DT('dash_mc_words_title','Parole uniche'), subtitle: DT('dash_mc_words_sub','Parole distinte usate nelle sessioni degli ultimi 14 giorni.'), label: DT('dash_mc_words_label','Parole Totali'), unit:'' };
+        mc.avgLexDiv     = { title: DT('dash_mc_lexdiv_title','Diversità lessicale'), subtitle: DT('dash_mc_lexdiv_sub','Rapporto parole uniche/totali negli ultimi 14 giorni.'), label: DT('dash_mc_lexdiv_label','Media Rapporto'), unit:'',
+          info: DT('dash_mc_lexdiv_info', 'La diversità lessicale misura quanto è vario il tuo vocabolario. Si calcola come: parole uniche ÷ parole totali per sessione. Un rapporto più alto significa che hai usato una gamma più ampia di vocaboli. I valori tipici vanno da 0,3 (ripetitivo) a 0,9 (molto vario). Monitorarlo nel tempo mostra se il tuo vocabolario attivo si sta espandendo.') };
+        mc.timebands     = { title: DT('dash_mc_timebands_title','Minuti per fascia oraria'), subtitle: DT('dash_mc_timebands_sub','Minuti di registrazione per giorno, divisi per fascia oraria (mattina / giorno / sera / notte).'), label: DT('dash_mc_timebands_label','Minuti di registrazione'), unit:' min' };
         var metricConfig = mc;
         var cfg = metricConfig[metric] || metricConfig.totalMinutes;
         if (titleEl) { titleEl.textContent = cfg.title; titleEl.setAttribute('data-i18n', ''); }
@@ -2199,7 +2208,7 @@
             infoIcon.id = 'dailyChartInfoIcon';
             infoIcon.style.cssText = 'display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:50%;border:1.5px solid var(--text-faint);color:var(--text-faint);font-size:11px;cursor:pointer;margin-left:10px;flex-shrink:0;transition:all .2s';
             infoIcon.innerHTML = '<i class="fa-solid fa-info" style="font-size:11px"></i>';
-            infoIcon.title = isEn ? 'How is this calculated?' : 'Come si calcola?';
+            infoIcon.title = DT('dash_mc_info_title', 'Come si calcola?');
             infoIcon.onmouseover = function(){ this.style.borderColor='var(--cyan)'; this.style.color='var(--cyan)'; };
             infoIcon.onmouseout = function(){ if (!infoBox.style.display||infoBox.style.display==='none'){ this.style.borderColor='var(--text-faint)'; this.style.color='var(--text-faint)'; } };
             infoIcon.onclick = function(e){ e.stopPropagation(); var ib = document.getElementById('dailyChartInfoBox'); if(ib){ var isOpen = ib.style.display==='block'; ib.style.display = isOpen ? 'none' : 'block'; this.style.borderColor = isOpen ? 'var(--text-faint)' : 'var(--cyan)'; this.style.color = isOpen ? 'var(--text-faint)' : 'var(--cyan)'; } };
