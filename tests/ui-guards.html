@@ -98,7 +98,22 @@ function visible(el) {
 function txt(el) { return (el.textContent || '').replace(/\s+/g, ' ').trim(); }
 
 function run() {
-  // Reset first. run() fires again on every iframe load, and because `rows` lives at
+  // PIN THE UI LANGUAGE FIRST. B13 asks "how many visible strings are Italian while the
+  // UI is English?", which is meaningless unless the language is fixed. Without this the
+  // value reflects whatever language the PREVIOUS page load happened to leave in
+  // localStorage — the SAME build measured 3 and then 16 purely from that, and the 16
+  // looked exactly like a regression. apply() releases its internal guard on
+  // requestAnimationFrame, so give it a frame before measuring.
+  if (win && win.I18n && win.I18n.setLang) {
+    win.I18n.setLang('en');
+    setTimeout(measure, 600);
+    return;
+  }
+  measure();
+}
+
+function measure() {
+  // Reset first. measure() fires again on every iframe load, and because `rows` lives at
   // script scope it would otherwise ACCUMULATE — producing a table with every row
   // duplicated (seen: 12 rows instead of 6) and a misleading pass count.
   rows = [];
@@ -186,6 +201,8 @@ function run() {
   }).join('');
 
   document.getElementById('notes').innerHTML =
+    '<strong>Measured with UI language:</strong> <code>' + (win.I18n && win.I18n.getLang ? win.I18n.getLang() : 'unknown') +
+    '</code> · page hidden: <code>' + (document.hidden || frame.contentDocument.hidden) + '</code><br><br>' +
     '<strong>Not measured here — do NOT read as passing:</strong><br>' +
     '· <strong>Keyboard / focus order</strong> — this harness sends no key events ' +
       '(verified: a keydown listener saw 0). Needs a real browser or CDP <code>Input.dispatchKeyEvent</code>.<br>' +
