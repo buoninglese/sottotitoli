@@ -1904,9 +1904,15 @@
       function shortDate(iso){ var p=(iso||'').split('-'); return p.length===3 ? p[2]+'/'+p[1] : iso; }
       function svgXLbl(days){
         var W=CHT.W,H=WBH,PL=CHT.PL,PR=CHT.PR,PT=CHT.PT,PB=CHT.PB,IW=W-PL-PR,n=days.length,g='';
-        if (n===1){ g+='<text x="'+(W/2)+'" y="'+(H-6)+'" text-anchor="middle" fill="var(--text-faint)" font-size="9">Ieri</text>'; return g; }
+        // These two labels are NOT dates to be formatted — they are relative words, so
+        // fmtDate cannot help. They were hardcoded Italian and rendered inside an English
+        // chart, which no text sweep found because the strings only appear once data
+        // exists. The identical fix already sat a few hundred lines below at svgXLbl's
+        // sibling: read the language, do not assume it.
+        var _en = !!(window.I18n && I18n.getLang() === 'en');
+        if (n===1){ g+='<text x="'+(W/2)+'" y="'+(H-6)+'" text-anchor="middle" fill="var(--text-faint)" font-size="9">'+(_en?'Yesterday':'Ieri')+'</text>'; return g; }
         var idxs=[0,Math.floor((n-1)/2),n-1];
-        idxs.forEach(function(i){ var lbl=(i===n-1)?'Oggi':shortDate(days[i]); g+='<text x="'+(PL+(IW*(i/(n-1))))+'" y="'+(H-6)+'" text-anchor="middle" fill="var(--text-faint)" font-size="9">'+lbl+'</text>'; });
+        idxs.forEach(function(i){ var lbl=(i===n-1)?(_en?'Today':'Oggi'):shortDate(days[i]); g+='<text x="'+(PL+(IW*(i/(n-1))))+'" y="'+(H-6)+'" text-anchor="middle" fill="var(--text-faint)" font-size="9">'+lbl+'</text>'; });
         return g;
       }
       function svgLegend(items, up){

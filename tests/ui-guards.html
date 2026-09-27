@@ -68,6 +68,8 @@ var BASELINE = {
   B10: 0,      // uncaught JS errors on load (calibrated)
   B13: 5,      // Italian-only visible strings on the dashboard, lang=en (lower bound)
   B13t:95,
+  B13x: 0,     // CORRECTED detector: all text nodes, no viewport limit. Target is 0.
+  B13a: 0,     // Italian-only ATTRIBUTE strings (data-tip/title/aria-label/placeholder)
   B16: 8,      // sidebar nav items that are href="#"  (corrected from 9 — see 16-BASELINE.md)
   B16t:9       // of 9 items total; the 9th, "Vocabulary Trainer", is href="#learner"
 };
@@ -109,6 +111,10 @@ function txt(el) { return (el.textContent || '').replace(/\s+/g, ' ').trim(); }
    reading from one taken at the cap without knowing to ask.                       */
 var STABLE_READS = 5, POLL_MS = 250, MAX_MS = 30000;
 var settleInfo = { ms: 0, settled: false };
+// Holds the Italian-pass readings, which are the POSITIVE CONTROLS for the B13 family.
+// Kept separate from `rows` because the Italian pass is not a result — it exists only to
+// prove the detectors can see Italian. Without it, a 0 is indistinguishable from a blind test.
+var itControl = null;
 function domSignature() {
   var allCount = doc.querySelectorAll('body *').length;
   var leaves = doc.querySelectorAll('h1,h2,h3,h4,p,span,div,button,label,option,li');
@@ -116,7 +122,7 @@ function domSignature() {
   for (var i = 0; i < leaves.length; i++) if (leaves[i].children.length === 0) leafCount++;
   return allCount + ':' + leafCount + ':' + (doc.body.textContent || '').length;
 }
-function settleThenMeasure() {
+function settleThenMeasure(cb) {
   var last = null, same = 0, waited = 0;
   (function poll() {
     var sig = domSignature();
@@ -124,6 +130,7 @@ function settleThenMeasure() {
     if (same >= STABLE_READS || waited >= MAX_MS) {
       settleInfo = { ms: waited, settled: waited < MAX_MS };
       measure();
+      if (cb) cb();
       return;
     }
     waited += POLL_MS;
@@ -138,9 +145,22 @@ function run() {
   // localStorage — the SAME build measured 3 and then 16 purely from that, and the 16
   // looked exactly like a regression. apply() releases its internal guard on
   // requestAnimationFrame, so give it a frame before measuring.
+  //
+  // ITALIAN FIRST — as a POSITIVE CONTROL, not as a reading. The most expensive lesson
+  // of this audit: a 0 from a detector that has never been shown to find anything is not
+  // evidence of anything. B13 reported a clean page for weeks while four Italian strings
+  // sat in it, because the detector skipped bare text nodes AND clipped to the viewport.
+  // So every language sweep now runs TWICE — once in Italian, to prove it can see
+  // Italian, and once in English, which is the actual reading. A sweep whose Italian pass
+  // finds nothing is reported as a failure of the TEST, not a pass of the page.
   if (win && win.I18n && win.I18n.setLang) {
-    win.I18n.setLang('en');
-    setTimeout(settleThenMeasure, 600);
+    win.I18n.setLang('it');
+    setTimeout(function () {
+      settleThenMeasure(function () {
+        win.I18n.setLang('en');
+        setTimeout(function () { settleThenMeasure(); }, 600);
+      });
+    }, 600);
     return;
   }
   settleThenMeasure();
@@ -206,24 +226,124 @@ function measure(compareWith) {
       hash + ' / ' + counted, hash <= BASELINE.B16 ? 'pass' : 'fail',
       'target: real hash routes (O-5). 8 is the corrected baseline; 9 was an over-count.');
 
-  /* ── B13 · Italian-only visible strings (heuristic, lower bound) ─────────────── */
+  /* ── B13 family · Italian leaked into an English UI ──────────────────────────────
+     Two detectors, because they fail in different ways, and each carries its own
+     POSITIVE CONTROL so that a 0 is falsifiable.
+
+     B13  — the ORIGINAL, kept for continuity with 16-BASELINE.md. Walks leaf ELEMENTS
+            and applies visible(). Both restrictions hid real leaks: a bare text node
+            (the word "parole" sitting directly in a span's parent) is not a leaf
+            element, and anything below the fold was skipped entirely. Its historical 0
+            was therefore not evidence of anything.
+     B13x — the CORRECTED detector. Every text node in the body, no viewport limit.
+            This is what a user's eye does. Baseline 0: any Italian in English mode is
+            a leak, so the target is zero and not "no worse than last time".
+     B13a — the ATTRIBUTE sweep. The chart-tooltip bug proved this is a separate survey:
+            its text lived in a data-tip attribute, invisible to EVERY text-node sweep,
+            so a page could score a perfect 0 and still show Italian tooltips. Attributes
+            are not text, so they need their own detector — and their own control.
+
+     Known DELIBERATE exception: the Italian-tab labels in the bank detail view
+     (itTabNames / itTabSubs / itTabEmpties) are intentionally Italian in both languages,
+     because they name an Italian-language surface. If this sweep flags them, they are
+     not a defect.                                                                    */
   var IT = /\b(il|lo|la|gli|le|un|una|del|della|che|per|con|non|più|sono|questo|questa|tuo|tua|ancora|oggi|subito|tutti|tutte|come|dove|quando|solo|anche|già|senza|dopo|prima|parole|sessione|sessioni|impostazioni|salva|chiudi|crea|carica|nessun|nessuna|cerca|giorni|minuti|banca|banche|invita|copia)\b/i;
   var EN = /\b(the|you|your|and|of|to|in|is|are|with|for|from|this|that|create|cancel|save|close|no|not|new|start|settings|words|session|search|days|minutes|bank|word|add|copy|invite)\b/i;
-  var seen = {}, itOnly = 0, total = 0;
+
+  function classify(strings) {
+    var seen = {}, itOnly = 0, total = 0, samples = [];
+    for (var i = 0; i < strings.length; i++) {
+      var t = strings[i];
+      if (!t || seen[t]) continue;
+      seen[t] = 1; total++;
+      if (IT.test(t) && !EN.test(t)) { itOnly++; if (samples.length < 4) samples.push(t); }
+    }
+    return { itOnly: itOnly, total: total, samples: samples };
+  }
+  // Every text node, including ones whose parent also holds other text. Script and
+  // style content is excluded so a regex literal or a CSS comment cannot be reported
+  // as a leak.
+  function textNodeStrings() {
+    var out = [], showText = (win.NodeFilter && win.NodeFilter.SHOW_TEXT) || 4;
+    var w = doc.createTreeWalker(doc.body, showText, null);
+    var n;
+    while ((n = w.nextNode())) {
+      var parent = n.parentElement;
+      if (!parent) continue;
+      var tag = parent.tagName;
+      if (tag === 'SCRIPT' || tag === 'STYLE' || tag === 'NOSCRIPT') continue;
+      var t = (n.nodeValue || '').replace(/\s+/g, ' ').trim();
+      if (t.length < 4 || !/[a-zA-Z]{3}/.test(t)) continue;
+      out.push(t);
+    }
+    return out;
+  }
+  function attributeStrings() {
+    var ATTRS = ['data-tip', 'title', 'aria-label', 'placeholder', 'alt'];
+    var out = [], els = doc.querySelectorAll('[data-tip],[title],[aria-label],[placeholder],[alt]');
+    for (var i = 0; i < els.length; i++) {
+      for (var j = 0; j < ATTRS.length; j++) {
+        var v = els[i].getAttribute(ATTRS[j]);
+        if (v && v.length > 3) out.push(v.replace(/\s+/g, ' ').trim());
+      }
+    }
+    return out;
+  }
+
+  // The original detector, preserved so its row keeps its meaning.
   var leaves = doc.querySelectorAll('h1,h2,h3,h4,p,span,div,button,label,option,li');
+  var leafStrings = [];
   for (var m = 0; m < leaves.length; m++) {
     var e2 = leaves[m];
     if (e2.children.length !== 0) continue;
     if (!visible(e2)) continue;                       // RULE 1
-    var t = txt(e2);
-    if (t.length < 4 || !/[a-zA-Z]{3}/.test(t)) continue;
-    if (seen[t]) continue;
-    seen[t] = 1; total++;
-    if (IT.test(t) && !EN.test(t)) itOnly++;
+    leafStrings.push(txt(e2));
   }
-  row('B13', 'Italian-only visible strings (lang=en)', BASELINE.B13 + ' / ' + BASELINE.B13t,
-      itOnly + ' / ' + total, itOnly <= BASELINE.B13 ? 'pass' : 'fail',
-      'heuristic word-list classification — treat as a LOWER bound, not a full i18n audit');
+  var cLeaf = classify(leafStrings);
+  row('B13', 'Italian-only strings · ORIGINAL detector (leaf elements, visible only)',
+      BASELINE.B13 + ' / ' + BASELINE.B13t,
+      cLeaf.itOnly + ' / ' + cLeaf.total, cLeaf.itOnly <= BASELINE.B13 ? 'pass' : 'fail',
+      'kept for continuity; known to skip bare text nodes and everything below the fold, ' +
+      'so its 0 is a weak signal. Read B13x instead.');
+
+  var cText = classify(textNodeStrings());
+  var cAttr = classify(attributeStrings());
+  var lang = (win.I18n && win.I18n.getLang) ? win.I18n.getLang() : 'unknown';
+
+  // Remember the Italian pass. This is the control, and it must not be overwritten by
+  // the English pass that follows (or by the D6 second reading).
+  if (lang === 'it') {
+    itControl = { text: cText, attr: cAttr, leaf: cLeaf };
+  } else {
+    row('B13x', 'Italian-only strings · ALL text nodes, no viewport limit (lang=en)',
+        String(BASELINE.B13x), cText.itOnly + ' / ' + cText.total,
+        cText.itOnly <= BASELINE.B13x ? 'pass' : 'fail',
+        cText.itOnly ? 'first samples: ' + cText.samples.join(' | ') :
+        'target is 0 — any Italian in an English UI is a leak, not a regression budget');
+    row('B13a', 'Italian-only ATTRIBUTE strings (data-tip/title/aria-label/placeholder/alt)',
+        String(BASELINE.B13a), cAttr.itOnly + ' / ' + cAttr.total,
+        cAttr.itOnly <= BASELINE.B13a ? 'pass' : 'fail',
+        cAttr.itOnly ? 'first samples: ' + cAttr.samples.join(' | ') :
+        'the chart-tooltip bug lived entirely in data-tip, invisible to every text sweep');
+
+    // ── the controls ──
+    if (!itControl) {
+      row('B13c', 'CONTROL · could the detectors see Italian at all?', 'pass',
+          'NOT RUN', 'fail',
+          'the Italian pass never completed, so B13/B13x/B13a cannot be trusted');
+    } else {
+      var okText = itControl.text.itOnly > 0, okAttr = itControl.attr.itOnly > 0;
+      row('B13c', 'CONTROL · text detector finds Italian when the UI IS Italian', '> 0',
+          itControl.text.itOnly + ' / ' + itControl.text.total, okText ? 'pass' : 'fail',
+          okText ? 'the detector is capable of seeing Italian, so a 0 above is meaningful'
+                 : 'DETECTOR BLIND — it found no Italian even in Italian. Every 0 in the ' +
+                   'B13 family is unfalsifiable until this passes.');
+      row('B13ac', 'CONTROL · attribute detector finds Italian when the UI IS Italian', '> 0',
+          itControl.attr.itOnly + ' / ' + itControl.attr.total, okAttr ? 'pass' : 'fail',
+          okAttr ? 'the attribute sweep can see Italian, so a 0 above is meaningful'
+                 : 'sweep found no Italian attributes in Italian mode — check it selects anything');
+    }
+  }
 
   /* ── D6 · two settled readings, and flag any row that moved ────────────────
      Settling alone did NOT make this deterministic. Three runs on the same build
@@ -261,6 +381,9 @@ function measure(compareWith) {
   document.getElementById('notes').innerHTML =
     '<strong>Measured with UI language:</strong> <code>' + (win.I18n && win.I18n.getLang ? win.I18n.getLang() : 'unknown') +
     '</code> · page hidden: <code>' + (document.hidden || frame.contentDocument.hidden) + '</code><br>' +
+    '<strong>Language passes:</strong> each sweep ran twice — Italian first as a POSITIVE ' +
+      'CONTROL (proves the detectors can see Italian), then English, which is the reading. ' +
+      'A control that fails invalidates every 0 in its family.<br>' +
     '<strong>DOM settled before measuring:</strong> <code>' + settleInfo.settled + '</code> after <code>' +
       settleInfo.ms + 'ms</code>' +
       (settleInfo.settled ? '' :
