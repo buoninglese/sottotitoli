@@ -3223,7 +3223,7 @@
           '<div class="wbf-folder-inner">'+
             '<div class="wbf-back" style="--wbf-img:url(\''+wbfStockUrl(bk.id)+'\')"><div class="wbf-cards">'+cards+'</div></div>'+
             '<div class="wbf-front">'+
-              '<button type="button" class="wbf-fav'+(isFav?' on':'')+'" data-bank="'+wbEsc(bk.id)+'" data-lang="'+(lang||'en')+'" title="'+(isFav?L.fav_remove:L.fav_add)+'" onclick="event.stopPropagation();toggleWbFav(this)"><span class="material-symbols-outlined">star</span></button>'+
+              '<button type="button" class="wbf-fav'+(isFav?' on':'')+'" data-bank="'+wbEsc(bk.id)+'" data-lang="'+(lang||'en')+'" data-i18n-title="'+(isFav?'wb_folders_unfav':'wb_folders_fav')+'" title="'+(isFav?L.fav_remove:L.fav_add)+'" onclick="event.stopPropagation();toggleWbFav(this)"><span class="material-symbols-outlined">star</span></button>'+
               '<span class="wbf-badge '+badgeCls+'">'+typeLabel+'</span>'+
               '<h3 class="wbf-front-title">'+wbEsc(bk.title)+'</h3>'+
               (bk.subtitle ? '<p class="wbf-front-sub">'+wbEsc(bk.subtitle)+'</p>' : '')+
@@ -3474,6 +3474,21 @@
         if (g && window.renderWbFolders) window.renderWbFolders(lang, g);
       }
       window.wbRenderActive = wbRenderActive;
+
+      // Re-render the folder grids when the UI language changes.
+      // The folders view is built as an HTML STRING with I18n.t() values baked in
+      // (wbFoldersLabels()), and it is only rendered on a sub-tab CLICK. So without
+      // this, switching language left the section labels and the card tooltips in
+      // the previous language until the tab was re-clicked. Measured live: 19
+      // button.wbf-fav rendered title="Add to favorites" while the UI was Italian.
+      // Only grids that already have content are re-rendered, so a tab the user has
+      // never opened is left alone.
+      window.addEventListener('i18n-changed', function(){
+        [['en','wbFoldersGridEn'], ['it','wbFoldersGridIt']].forEach(function(pair){
+          var g = document.getElementById(pair[1]);
+          if (g && g.childElementCount && window.renderWbFolders) window.renderWbFolders(pair[0], g);
+        });
+      });
 
       // ── AI word-bank generation ("New Project / Generate AI Clips") ──
       var wbAiLang = window.SOTTOTITOLI_STUDY_LANG || 'en';

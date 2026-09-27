@@ -618,6 +618,9 @@
       "theme_toggle_bright": "Attiva/disattiva chiaro / scuro",
       "profile_learning_title": "Profilo di apprendimento",
       "rai_synonyms_desc": "Suggerimento di sinonimi e termini più sofisticati o specifici.",
+      "rai_tone_academic_desc": "Correzioni formali e spiegazioni teoriche approfondite.",
+      "rai_tone_professional_desc": "Linguaggio business e focus sulla chiarezza comunicativa.",
+      "rai_tone_casual_desc": "Spiegazioni amichevoli e uso di espressioni idiomatiche.",
       "font_preference": "Preferenza font",
       "notifications": "Notifiche",
       "ai_report_ready": "Report AI pronto",
@@ -2011,6 +2014,9 @@
       "theme_toggle_bright": "Toggle bright / dark",
       "profile_learning_title": "Learning profile",
       "rai_synonyms_desc": "Suggests synonyms and more sophisticated or specific terms.",
+      "rai_tone_academic_desc": "Formal corrections and in-depth theoretical explanations.",
+      "rai_tone_professional_desc": "Business language focused on communicative clarity.",
+      "rai_tone_casual_desc": "Friendly explanations and idiomatic expressions.",
       "font_preference": "Font preference",
       "notifications": "Notifications",
       "ai_report_ready": "AI Report ready",
@@ -3095,7 +3101,13 @@
       div.className = 'i18n-toggle';
       div.style.cssText = 'padding:10px 14px;display:flex;align-items:center;justify-content:space-between;font-size:13px;border-top:1px solid var(--line, #e2e5ea)';
       // Same pill style as the Modern | Play theme switcher above it
-      div.innerHTML = '<span>'+t('language')+'</span><span style="display:inline-flex;align-items:center;gap:4px;background:var(--panel-2, rgba(127,127,127,.08));border:1px solid var(--line, #e2e5ea);border-radius:999px;padding:4px">'+
+      // NOTE: data-i18n on the label is load-bearing. t('language') bakes the
+      // value at INJECTION time, so without a binding the label froze at whatever
+      // the language was when injectLangToggle() first ran: a user starting in
+      // Italian and switching to English kept seeing "Lingua" until a reload.
+      // Confirmed live: #userDropdown .i18n-toggle > span rendered "Lingua" in
+      // the English UI with no data-i18n anywhere in its ancestry.
+      div.innerHTML = '<span data-i18n="language">'+t('language')+'</span>'+'<span style="display:inline-flex;align-items:center;gap:4px;background:var(--panel-2, rgba(127,127,127,.08));border:1px solid var(--line, #e2e5ea);border-radius:999px;padding:4px">'+
         '<button onclick="I18n.setLang(\'it\')" style="border:none;background:transparent;color:var(--text-soft,#6b7280);font:inherit;font-size:13px;font-weight:600;padding:6px 12px;border-radius:999px;cursor:pointer;transition:all .2s" class="i18n-btn-it">IT</button>'+
         '<button onclick="I18n.setLang(\'en\')" style="border:none;background:transparent;color:var(--text-soft,#6b7280);font:inherit;font-size:13px;font-weight:600;padding:6px 12px;border-radius:999px;cursor:pointer;transition:all .2s" class="i18n-btn-en">EN</button>'+
         '</span>';
