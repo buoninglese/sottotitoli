@@ -101,7 +101,11 @@
     var bar = document.createElement('div');
     bar.id = 'consentBar';
     bar.setAttribute('role', 'dialog');
+    // data-i18n-* rather than a translated string: this file loads BEFORE js/i18n.js,
+    // so I18n does not exist yet. The attributes let the first apply() translate the
+    // banner, and they keep it correct if the language changes while it is open.
     bar.setAttribute('aria-label', 'Consenso cookie');
+    bar.setAttribute('data-i18n-aria-label', 'consent_aria');
     bar.setAttribute('style',
       'position:fixed;left:16px;right:16px;bottom:16px;z-index:99999;max-width:760px;margin:0 auto;' +
       'background:var(--bg,#fff);color:var(--text,#111);border:1px solid var(--line,rgba(0,0,0,.15));' +
@@ -112,6 +116,7 @@
     var txt = document.createElement('p');
     txt.setAttribute('style', 'margin:0 0 14px;font-size:13px;line-height:1.6');
     txt.textContent = 'Usiamo un cookie di statistica (PostHog) per capire quali funzioni vengono usate. Non è necessario al funzionamento: l\u2019app resta completa se lo rifiuti. Non usiamo cookie pubblicitari e non vendiamo dati.';
+    txt.setAttribute('data-i18n', 'consent_txt');
     bar.appendChild(txt);
 
     var row = document.createElement('div');
@@ -124,18 +129,21 @@
     var accept = document.createElement('button');
     accept.type = 'button';
     accept.textContent = 'Accetta';
+    accept.setAttribute('data-i18n', 'consent_accept');
     accept.setAttribute('style', btnStyle + ';background:var(--cyan,#0891b2);color:#fff;border:1px solid var(--cyan,#0891b2)');
     row.appendChild(accept);
 
     var reject = document.createElement('button');
     reject.type = 'button';
     reject.textContent = 'Rifiuta';
+    reject.setAttribute('data-i18n', 'consent_reject');
     reject.setAttribute('style', btnStyle + ';background:transparent;color:var(--text,#111);border:1px solid var(--line,rgba(0,0,0,.25))');
     row.appendChild(reject);
 
     var more = document.createElement('a');
     more.href = 'privacy.html';
     more.textContent = 'Informativa';
+    more.setAttribute('data-i18n', 'consent_more');
     more.setAttribute('style', 'font-size:13px;color:var(--cyan,#0891b2);margin-left:4px');
     row.appendChild(more);
 

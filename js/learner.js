@@ -2076,7 +2076,7 @@
   };
   function themeOptions() {
     return Object.keys(THEME_LESSONS).map(function (k) {
-      return '<option value="' + k + '">' + esc(THEME_LESSONS[k].title) + '</option>';
+      return '<option value="' + k + '" data-i18n="learner_theme_' + k + '">' + esc(THEME_LESSONS[k].title) + '</option>';
     }).join('');
   }
   function themeItems(theme, lang) {

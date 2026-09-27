@@ -182,7 +182,7 @@
             return '<button class=\"q-chip active\" style=\"pointer-events:none\">' + escTag(focusLabel(raw)) + '</button>';
           }).join('');
         }
-        focusEl.innerHTML = chips || '<span style=\"font-size:13px;color:var(--text-faint)\">Completa l\'onboarding per vedere le tue aree di miglioramento.</span>';
+        focusEl.innerHTML = chips || '<span style="font-size:13px;color:var(--text-faint)" data-i18n="profile_focus_empty">Completa l\'onboarding per vedere le tue aree di miglioramento.</span>';
       }
       // Profilo → Lingue: native language + second languages with proficiency meters
       try {
@@ -262,9 +262,9 @@
             '</div>';
           }).join('');
         } else {
-          langHTML = '<span style="font-size:13px;color:var(--text-faint)">Nessuna seconda lingua registrata.</span>';
+          langHTML = '<span style="font-size:13px;color:var(--text-faint)" data-i18n="profile_no_second_lang">Nessuna seconda lingua registrata.</span>';
         }
-        if (slEl) slEl.innerHTML = secondLangs.length > 0 ? langHTML : '<span style="font-size:13px;color:var(--text-faint)">Nessuna seconda lingua registrata.</span>';
+        if (slEl) slEl.innerHTML = secondLangs.length > 0 ? langHTML : '<span style="font-size:13px;color:var(--text-faint)" data-i18n="profile_no_second_lang">Nessuna seconda lingua registrata.</span>';
         if (insSlEl) insSlEl.innerHTML = langHTML;
       } catch(e) {}
       // AI Starter Report
