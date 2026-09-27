@@ -57,10 +57,10 @@
 
       // ── Auth-dependent setup ──
       this.supabase = await this._getSupabase();
-      if (!this.supabase) { this._renderUnauth('Supabase non disponibile'); return; }
+      if (!this.supabase) { this._renderUnauth(this._t('notifications_unavailable', 'Supabase non disponibile')); return; }
 
       const { data: { user } } = await this.supabase.auth.getUser();
-      if (!user) { this._renderUnauth('Accedi per vedere le notifiche'); return; }
+      if (!user) { this._renderUnauth(this._t('notifications_login', 'Accedi per vedere le notifiche')); return; }
       this._userId = user.id;
 
       this._maybeSendWelcome();
@@ -198,7 +198,7 @@
       if (!this.panelEl) return;
       if (!this.notifications.length) {
         this.panelEl.innerHTML =
-          '<div class="dropdown-item" style="color:var(--text-faint);cursor:default;text-align:center;padding:20px">🔔 Nessuna notifica recente</div>';
+          '<div class="dropdown-item" style="color:var(--text-faint);cursor:default;text-align:center;padding:20px">🔔 ' + this._esc(this._t('notifications_empty', 'Nessuna notifica recente')) + '</div>';
         return;
       }
       this.panelEl.innerHTML = this.notifications.slice(0, 20).map((n) =>
@@ -211,6 +211,17 @@
           '</div>' +
         '</div>'
       ).join('');
+    }
+
+    // Dictionary lookup with an Italian fallback, so a missing key degrades to
+    // today's copy rather than to a raw key name. Notification TITLES and BODIES
+    // come from the `notifications` table and are server-authored -- only the
+    // chrome around them is translatable here.
+    _t(key, fallback) {
+      try {
+        const v = window.I18n && window.I18n.t ? window.I18n.t(key) : null;
+        return (v && v !== key) ? v : fallback;
+      } catch (e) { return fallback; }
     }
 
     _esc(text) {
@@ -226,13 +237,18 @@
 
     _ago(date) {
       if (!date) return '';
+      // Was hardcoded Italian ('ora' / 'm fa' / 'h fa' / 'g fa'), so English users
+      // saw "5m fa". Kept compact on purpose rather than switching to
+      // Intl.RelativeTimeFormat, which would render "5 minutes ago".
+      const suffix = this._t('notif_ago_suffix', 'fa');
+      const dayUnit = this._t('notif_ago_day', 'g');
       const diff = Date.now() - new Date(date).getTime();
       const min = Math.floor(diff / 60000);
-      if (min < 1) return 'ora';
-      if (min < 60) return min + 'm fa';
+      if (min < 1) return this._t('notif_ago_now', 'ora');
+      if (min < 60) return min + 'm ' + suffix;
       const hr = Math.floor(min / 60);
-      if (hr < 24) return hr + 'h fa';
-      return Math.floor(hr / 24) + 'g fa';
+      if (hr < 24) return hr + 'h ' + suffix;
+      return Math.floor(hr / 24) + dayUnit + ' ' + suffix;
     }
 
     async _maybeSendWelcome() {

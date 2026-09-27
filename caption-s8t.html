@@ -1585,10 +1585,10 @@ button[onclick*="addToWordBank"]:hover{background:rgba(52,211,153,.15)!important
 <script src="js/auth.js?v=23"></script>
 <script src="js/bank-identities.js?v=1"></script>
 <script src="js/xp.js?v=5"></script>
-<script src="js/i18n.js"></script>
+<script src="js/i18n.js?v=88"></script>
 <script src="js/theme-2.js?v=7"></script>
 <script src="js/toast.js?v=2"></script>
-<script src="js/notifications.js?v=1"></script>
+<script src="js/notifications.js?v=2"></script>
 <script src="js/language-resolver.js?v=1"></script>
 <script src="js/real-mic.js?v=19"></script>
 <script src="js/record-fallback.js?v=5"></script>
@@ -1621,6 +1621,17 @@ button[onclick*="addToWordBank"]:hover{background:rgba(52,211,153,.15)!important
 </script>
 <script>
 
+/* Translate a JS-injected string. This page builds its toasts and its button feedback
+   in JS, and had hardcoded BOTH an Italian toast ('✓ Sessione salvata') and English
+   button feedback ('✓ Saved') -- so each was wrong in one of the two languages.
+   Falls back to the Italian source if a key is missing, rather than showing a raw
+   key name to the user. */
+function S8T(key, fallback) {
+  try {
+    var v = window.I18n && window.I18n.t ? window.I18n.t(key) : null;
+    return (v && v !== key) ? v : fallback;
+  } catch (e) { return fallback; }
+}
 
 // ═══ Read URL params (from calling page) ═══
 (function() {
@@ -2027,7 +2038,7 @@ function showSessionSaved(durationSeconds) {
   }
   var toast = document.createElement('div');
   toast.style.cssText = 'position:fixed;bottom:20px;left:50%;transform:translateX(-50%);padding:8px 18px;border-radius:100px;background:var(--accent);color:#fff;font-weight:700;font-size:12px;z-index:99999;animation:toastIn .3s ease,toastOut .3s ease 2.5s forwards;pointer-events:none';
-  toast.textContent = '✓ Sessione salvata' + durText;
+  toast.textContent = S8T('toast_session_saved', '✓ Sessione salvata') + durText;
   document.body.appendChild(toast);
   setTimeout(function(){ toast.remove(); _sessionSavedShown = false; }, 3000);
 
@@ -2560,7 +2571,7 @@ function _addWordBankBtn(word, relEl) {
   wb.style.cssText = 'cursor:pointer;font-size:10px;font-weight:600;padding:3px 8px;border-radius:100px;border:1px solid rgba(255,255,255,.08);color:var(--muted2);margin-left:auto;flex-shrink:0;transition:all .15s';
   wb.onmouseover = function() { this.style.borderColor='var(--accent)'; this.style.color='var(--accent2)'; };
   wb.onmouseout = function() { this.style.borderColor='rgba(255,255,255,.08)'; this.style.color='var(--muted2)'; };
-  wb.onclick = function(e) { e.stopPropagation(); addToWordBank(word); this.textContent = '✓ Saved'; this.style.color = '#34d399'; this.style.borderColor = 'rgba(52,211,153,.3)'; };
+  wb.onclick = function(e) { e.stopPropagation(); addToWordBank(word); this.textContent = S8T('saved_check', '✓ Saved'); this.style.color = '#34d399'; this.style.borderColor = 'rgba(52,211,153,.3)'; };
   relEl.appendChild(wb);
 }
 
@@ -3211,7 +3222,7 @@ window.saveGrammarError = async function() {
     document.body.appendChild(errToast);
     setTimeout(function(){ errToast.remove(); }, 4000);
   } else {
-    btn.textContent = '✓ Saved';
+    btn.textContent = S8T('saved_check', '✓ Saved');
     btn.style.background = 'rgba(34,197,94,.15)';
     btn.style.color = '#22c55e';
     btn.style.borderColor = 'rgba(34,197,94,.3)';
