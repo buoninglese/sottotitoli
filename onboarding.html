@@ -3107,6 +3107,38 @@
     // ═══════════════════════════════════════════════════════
     var _uiLang = localStorage.getItem('sottotitoli-ui-lang') || 'it';
 
+    // Pill labels sit BESIDE an icon inside the button, so data-it/data-en cannot go on
+    // the button itself: the generic pass would set textContent and wipe the <i>. Keyed
+    // by the Italian label, which is read off the DOM once and cached in data-pill-it.
+    // Labels identical in both languages ("Email", "Marketing", "Social media", "IT")
+    // are deliberately absent -- an unmapped label is left untouched.
+    var _pillLabelsEn = {
+      'Altra': 'Other', 'Altro': 'Other', 'Amici': 'Friends',
+      'Amicizie / Social': 'Friendships / Social',
+      'Capire le domande': 'Understand questions',
+      'Capire madrelingua veloci': 'Understand fast native speakers',
+      'Certificazione': 'Certification', 'Colleghi': 'Colleagues',
+      'Famiglia / Partner': 'Family / Partner',
+      'Film e media': 'Film and media', 'Film / Serie / Media': 'Films / Series / Media',
+      'Finanza': 'Finance', 'Francese': 'French', 'Grammatica': 'Grammar',
+      'HR / Risorse umane': 'HR / Human resources', 'Inglese': 'English',
+      'Insegnante': 'Teacher', 'Italiano': 'Italian', 'Lavoro': 'Work',
+      'Legale': 'Legal', 'Leggere documenti': 'Read documents', 'Lettura': 'Reading',
+      'Logistica': 'Logistics', 'Motore di ricerca': 'Search engine',
+      'Olandese': 'Dutch', 'Ospitalità / Turismo': 'Hospitality / Tourism',
+      'Parlare fluentemente': 'Speak fluently', 'Polacco': 'Polish',
+      'Prendere appunti': 'Take notes', 'Presentazioni': 'Presentations',
+      'Pronuncia': 'Pronunciation', 'Pubblicità': 'Advertising',
+      'Riunioni': 'Meetings', 'Riunioni / Conference call': 'Meetings / Conference calls',
+      'Sanità': 'Healthcare', 'Scrittura': 'Writing',
+      'Scrivere messaggi / email': 'Write messages / emails',
+      'Scuola / università': 'School / university', 'Sociali': 'Social',
+      'Spagnolo': 'Spanish', 'Studente': 'Student', 'Studio': 'Study',
+      'Tecnologia / IT': 'Technology / IT', 'Tedesco': 'German',
+      'Telefonate': 'Phone calls', 'Trasferimento': 'Relocation',
+      'Viaggi': 'Travel', 'Vocabolario': 'Vocabulary'
+    };
+
     function setUiLanguage(lang) {
       _uiLang = lang;
       localStorage.setItem('sottotitoli-ui-lang', lang);
@@ -3144,6 +3176,24 @@
       // Update title attributes
       document.querySelectorAll('[data-it-title][data-en-title]').forEach(function(el) {
         el.title = el.getAttribute('data-' + lang + '-title');
+      });
+
+      // Pill labels (see _pillLabelsEn). The Italian is cached in data-pill-it the first
+      // time, so repeated language switches always return to the same source text.
+      document.querySelectorAll('button.pill').forEach(function(btn) {
+        var icon = btn.querySelector('i');
+        if (!icon) return;
+        var node = null;
+        for (var n = icon.nextSibling; n; n = n.nextSibling) {
+          if (n.nodeType === 3 && n.nodeValue.trim()) { node = n; break; }
+        }
+        if (!node) return;
+        if (!btn.hasAttribute('data-pill-it')) btn.setAttribute('data-pill-it', node.nodeValue.trim());
+        var itText = btn.getAttribute('data-pill-it');
+        var enText = _pillLabelsEn[itText];
+        if (!enText) return;
+        var want = (lang === 'en') ? enText : itText;
+        if (node.nodeValue.trim() !== want) node.nodeValue = ' ' + want;
       });
 
       // Re-render the JS-BUILT slide content. The passes above cannot reach it: it is
