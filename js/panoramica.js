@@ -550,7 +550,7 @@
         if (favBanks.length === 0) {
           pinnedGrid.innerHTML = (favCount > 0)
             ? '<div class="wb-pin-card" style="grid-column:1/-1;text-align:center;padding:24px;color:rgba(224,230,230,.4)"><span class="material-symbols-outlined" style="font-size:36px;margin-bottom:8px;display:block;opacity:.3">wifi_off</span><p style="font-size:13px;margin:0">Accedi per visualizzare le tue collezioni.</p></div>'
-            : '<div class="wb-pin-card" style="grid-column:1/-1;text-align:center;padding:24px;color:rgba(224,230,230,.4)"><span class="material-symbols-outlined" style="font-size:36px;margin-bottom:8px;display:block;opacity:.3">star</span><p style="font-size:13px;margin:0">No favorites yet. Click the ★ icon on any word bank to add it here.</p></div>';
+            : '<div class="wb-pin-card" style="grid-column:1/-1;text-align:center;padding:24px;color:rgba(224,230,230,.4)"><span class="material-symbols-outlined" style="font-size:36px;margin-bottom:8px;display:block;opacity:.3">star</span><p style="font-size:13px;margin:0" data-i18n="wb_favorites_desc">' + I18n.t('wb_favorites_desc') + '</p></div>';
         } else {
           pinnedGrid.innerHTML = favBanks.map(favPinHtml).join('');
         }
