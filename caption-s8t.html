@@ -427,6 +427,50 @@ body.session-active .caption-transcript:empty::after { content: none; }
 .mic-icon.warn { color: #f59e0b; }
 .mic-icon.live { color: #22c55e; }
 .mic-icon.blocked { color: #ef4444; }
+/* Mic device picker — a small icon button beside the mic indicator, opening a compact list.
+ * Replaces a wide inline <select>, which ate the whole transport bar. */
+.mic-picker { position: relative; display: inline-flex; align-items: center; }
+.t-micpick {
+  display: flex; align-items: center; justify-content: center;
+  width: 26px; height: 26px; padding: 0; border: 1px solid transparent;
+  border-radius: 8px; background: transparent; color: var(--muted2);
+  cursor: pointer; transition: all .2s; font-size: 11px;
+}
+.t-micpick i { transition: transform .2s; }
+.t-micpick:hover { color: var(--text); background: rgba(255,255,255,.04); }
+.t-micpick.open { color: var(--accent); background: rgba(34,211,238,.12); border-color: rgba(34,211,238,.25); }
+.t-micpick.open i { transform: rotate(180deg); }
+#micSelect {
+  /* Stays in the DOM as the source of truth + accessible control, but is never shown. */
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0 0 0 0); clip-path: inset(50%);
+  white-space: nowrap; border: 0;
+}
+.mic-menu {
+  position: absolute; bottom: calc(100% + 10px); right: 0; z-index: 60;
+  min-width: 200px; max-width: 280px; max-height: 250px; overflow-y: auto;
+  padding: 6px; border-radius: 14px;
+  background: var(--card); border: 1px solid var(--line);
+  box-shadow: 0 14px 44px rgba(0,0,0,.3);
+  font-family: Inter, sans-serif; text-align: left;
+}
+.mic-menu[hidden] { display: none; }
+.mic-menu-hd {
+  padding: 5px 8px 4px; font-size: 10px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: .5px; color: var(--muted2);
+}
+.mic-item {
+  display: flex; align-items: center; gap: 8px; width: 100%;
+  padding: 8px 10px; border: 0; border-radius: 9px; background: transparent;
+  color: var(--text); font-family: inherit; font-size: 12.5px;
+  text-align: left; cursor: pointer; transition: background .15s;
+}
+.mic-item:hover { background: rgba(127,127,127,.14); }
+.mic-item-tick { width: 12px; flex-shrink: 0; color: var(--accent); font-size: 10px; }
+.mic-item-lbl { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mic-item.sel { color: var(--accent); font-weight: 600; }
+[data-theme="light"] .t-micpick:hover { background: rgba(0,0,0,.05); }
+[data-theme="light"] .mic-item:hover { background: rgba(0,0,0,.05); }
 /* Fullscreen hides transport */
 body.fullscreen-active .transport-bar { display: none !important; }
 /* Light mode */
@@ -1476,12 +1520,21 @@ button[onclick*="addToWordBank"]:hover{background:rgba(52,211,153,.15)!important
         <span class="transport-mic" id="transportMic">
           <i class="fas fa-microphone mic-icon idle" id="micIcon"></i>
           <span id="micStatus">Offline</span>
-          <!-- Microphone picker. getUserMedia({audio:true}) takes whatever the OS default input
-               is AT THAT MOMENT — during a Zoom call that can be Zoom's own virtual device, or a
-               Bluetooth headset in call mode. The browser then reports a working mic and
-               transcribes nothing, with no way to see or change which device was in use. -->
-          <select id="micSelect" title="Microfono in uso" aria-label="Scegli il microfono"
-                  style="flex:0 1 auto;min-width:0;max-width:170px;margin-left:6px;padding:5px 8px;border-radius:99px;border:1px solid var(--line);background:var(--card);color:var(--text);font-size:12px;font-family:Inter,sans-serif;cursor:pointer;outline:none;text-overflow:ellipsis"></select>
+        </span>
+        <!-- Microphone picker. getUserMedia({audio:true}) takes whatever the OS default input
+             is AT THAT MOMENT — during a Zoom call that can be Zoom's own virtual device, or a
+             Bluetooth headset in call mode. The browser then reports a working mic and
+             transcribes nothing, with no way to see or change which device was in use.
+             A wide <select> here ate the entire transport bar, so the choice now lives behind a
+             small icon button like its neighbours. #micSelect is still the single source of
+             truth (and the accessible control) — the menu is only a compact view of its
+             options, which leaves every bit of the picker logic below unchanged. -->
+        <span class="mic-picker" id="micPicker" style="display:none">
+          <button type="button" class="t-micpick" id="micPickBtn" onclick="toggleMicMenu(event)"
+                  title="Scegli il microfono" aria-label="Scegli il microfono"
+                  aria-haspopup="listbox" aria-expanded="false"><i class="fas fa-chevron-down"></i></button>
+          <select id="micSelect" tabindex="-1" aria-hidden="true"></select>
+          <div class="mic-menu" id="micMenu" role="listbox" aria-label="Scegli il microfono" hidden></div>
         </span>
       </div>
       <div style="position:absolute;right:0;display:flex;align-items:center;gap:6px">
@@ -4702,18 +4755,64 @@ window.SottotitoliMicConstraints = function () {
   return id ? { audio: { deviceId: { exact: id } } } : { audio: true };
 };
 
+/* The menu is only a compact VIEW of #micSelect's options. The select stays the single source of
+ * truth (and the accessible control), so choosing an item just sets the select and fires its
+ * change event — persistence and the mid-session swap below run exactly as before, once. */
+function _renderMicMenu() {
+  var sel = document.getElementById('micSelect');
+  var menu = document.getElementById('micMenu');
+  var pick = document.getElementById('micPicker');
+  if (!sel || !menu) return;
+  if (!sel.options.length) { if (pick) pick.style.display = 'none'; return; }
+  if (pick) pick.style.display = '';
+  var cur = sel.value || '';
+  var html = '<div class="mic-menu-hd">Microfono</div>';
+  [].forEach.call(sel.options, function (o) {
+    var isSel = (o.value || '') === cur;
+    html += '<button type="button" class="mic-item' + (isSel ? ' sel' : '') + '"'
+         +  ' role="option" aria-selected="' + (isSel ? 'true' : 'false') + '"'
+         +  ' data-mic-id="' + String(o.value).replace(/"/g, '&quot;') + '">'
+         +  '<span class="mic-item-tick">' + (isSel ? '<i class="fas fa-check"></i>' : '') + '</span>'
+         +  '<span class="mic-item-lbl">' + o.textContent.replace(/</g, '&lt;') + '</span>'
+         +  '</button>';
+  });
+  menu.innerHTML = html;
+}
+
+function _setMicMenuOpen(on) {
+  var menu = document.getElementById('micMenu');
+  var btn = document.getElementById('micPickBtn');
+  if (!menu || !btn) return;
+  if (on) _renderMicMenu();   // the device list may have changed since it was last opened
+  menu.hidden = !on;
+  btn.classList.toggle('open', !!on);
+  btn.setAttribute('aria-expanded', on ? 'true' : 'false');
+}
+
+function toggleMicMenu(e) {
+  if (e && e.stopPropagation) e.stopPropagation();   // don't let the outside-click handler eat it
+  var menu = document.getElementById('micMenu');
+  _setMicMenuOpen(!!(menu && menu.hidden));
+}
+
+function closeMicMenu() { _setMicMenuOpen(false); }
+
 async function refreshMicList() {
   var sel = document.getElementById('micSelect');
   if (!sel) return;
   if (!navigator.mediaDevices || !navigator.mediaDevices.enumerateDevices) {
-    sel.style.display = 'none';   // cannot list inputs (older Safari) — stay out of the way
+    // Cannot list inputs (older Safari) — stay out of the way entirely.
+    var noPick = document.getElementById('micPicker');
+    if (noPick) noPick.style.display = 'none';
     return;
   }
   try {
     var devices = await navigator.mediaDevices.enumerateDevices();
     var mics = devices.filter(function (d) { return d.kind === 'audioinput'; });
     if (!mics.length) {
-      sel.innerHTML = '<option value="">Nessun microfono</option>';
+      // Nothing to choose between — hide the button rather than offer an empty menu.
+      var noMics = document.getElementById('micPicker');
+      if (noMics) noMics.style.display = 'none';
       return;
     }
     var saved = window.SottotitoliMicId();
@@ -4728,9 +4827,13 @@ async function refreshMicList() {
     var stillThere = saved && mics.some(function (m) { return m.deviceId === saved; });
     sel.value = stillThere ? saved : '';
     if (saved && !stillThere) window.SottotitoliDropMicId();   // it is gone — fall back explicitly
-    sel.title = named
-      ? 'Microfono in uso'
-      : 'Concedi l\'accesso al microfono per vedere i nomi dei dispositivi';
+    var pickBtn = document.getElementById('micPickBtn');
+    if (pickBtn) {
+      pickBtn.title = named
+        ? 'Scegli il microfono'
+        : 'Concedi l\'accesso al microfono per vedere i nomi dei dispositivi';
+    }
+    _renderMicMenu();
   } catch (e) { console.warn('mic list:', e); }
 }
 
@@ -4743,6 +4846,7 @@ function _initMicPicker() {
   sel.addEventListener('change', function () {
     var v = sel.value;
     try { if (v) localStorage.setItem(MIC_KEY, v); else localStorage.removeItem(MIC_KEY); } catch (e) {}
+    _renderMicMenu();   // move the tick to the newly chosen device
     if (sessionActive && !paused) {
       var isFallback = !!(window.RecordFallback && window.RecordFallback.isNeeded && window.RecordFallback.isNeeded());
       if (isFallback) {
@@ -4760,6 +4864,24 @@ function _initMicPicker() {
           .catch(function (e) { console.warn('mic switch restart failed:', e); });
       }
     }
+  });
+  // Choosing an item drives the select, so the single change handler above stays the ONLY path.
+  var menu = document.getElementById('micMenu');
+  if (menu) {
+    menu.addEventListener('click', function (e) {
+      var item = e.target && e.target.closest ? e.target.closest('.mic-item') : null;
+      if (!item) return;
+      sel.value = item.getAttribute('data-mic-id') || '';
+      sel.dispatchEvent(new Event('change'));
+      closeMicMenu();
+    });
+  }
+  document.addEventListener('click', function (e) {
+    var pick = document.getElementById('micPicker');
+    if (pick && e.target && !pick.contains(e.target)) closeMicMenu();
+  });
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape') closeMicMenu();
   });
   if (navigator.mediaDevices && navigator.mediaDevices.addEventListener) {
     navigator.mediaDevices.addEventListener('devicechange', refreshMicList);
