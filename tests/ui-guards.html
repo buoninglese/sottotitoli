@@ -57,6 +57,20 @@
 
 <div class="note" id="notes"></div>
 <iframe id="frame" src="../panoramica.html?bypass_auth=1"></iframe>
+  <!-- The measured page is a parameter so the whole B13 family can run against every
+       page, not just this one. It was hardcoded, which meant onboarding.html,
+       caption-s8t.html, index.html, purchase.html, termini.html and privacy.html were
+       never measured at all — and onboarding turned out to hold seven placeholders with
+       no English counterpart. This runs AFTER the iframe: placed before it,
+       getElementById('frame') returns null and the parameter is silently ignored.
+       Usage: ?page=../onboarding.html  -->
+  <script>
+    (function(){
+      var q = new URLSearchParams(location.search).get('page');
+      var f = document.getElementById('frame');
+      if (q && f) f.setAttribute('src', q);
+    })();
+  </script>
 
 <script>
 /* ── baseline: measured, not guessed. Source: ui-audit/16-BASELINE.md ───────────── */
@@ -70,6 +84,7 @@ var BASELINE = {
   B13t:95,
   B13x: 0,     // CORRECTED detector: all text nodes, no viewport limit. Target is 0.
   B13a: 0,     // Italian-only ATTRIBUTE strings (data-tip/title/aria-label/placeholder)
+  B13z: 0,     // MIRROR: English-only strings while the UI is ITALIAN. Target is 0.
   B16: 8,      // sidebar nav items that are href="#"  (corrected from 9 — see 16-BASELINE.md)
   B16t:9       // of 9 items total; the 9th, "Vocabulary Trainer", is href="#learner"
 };
@@ -251,14 +266,22 @@ function measure(compareWith) {
   var EN = /\b(the|you|your|and|of|to|in|is|are|with|for|from|this|that|create|cancel|save|close|no|not|new|start|settings|words|session|search|days|minutes|bank|word|add|copy|invite)\b/i;
 
   function classify(strings) {
-    var seen = {}, itOnly = 0, total = 0, samples = [];
+    var seen = {}, itOnly = 0, enOnly = 0, total = 0, samples = [], enSamples = [];
     for (var i = 0; i < strings.length; i++) {
       var t = strings[i];
       if (!t || seen[t]) continue;
       seen[t] = 1; total++;
       if (IT.test(t) && !EN.test(t)) { itOnly++; if (samples.length < 4) samples.push(t); }
+      // The MIRROR. Every B13 row asked one direction only — Italian leaking into
+      // the English UI — so English leaking into the ITALIAN UI was structurally
+      // invisible to this harness. Mode B then found seven real instances of it in
+      // minutes: #wbDrawer's "Meaning" / "Bank membership" / "Add to bank" /
+      // "Signals" headings (no data-i18n at all), #ssPopup's aria-label="Close",
+      // the report picker's "Toggle favorite", and onboarding's English data-it
+      // values. Same defect, opposite direction — so it gets the same treatment.
+      else if (EN.test(t) && !IT.test(t)) { enOnly++; if (enSamples.length < 4) enSamples.push(t); }
     }
-    return { itOnly: itOnly, total: total, samples: samples };
+    return { itOnly: itOnly, enOnly: enOnly, total: total, samples: samples, enSamples: enSamples };
   }
   // Every text node, including ones whose parent also holds other text. Script and
   // style content is excluded so a regex literal or a CSS comment cannot be reported
@@ -272,6 +295,16 @@ function measure(compareWith) {
       if (!parent) continue;
       var tag = parent.tagName;
       if (tag === 'SCRIPT' || tag === 'STYLE' || tag === 'NOSCRIPT') continue;
+      // ICON LIGATURES ARE NOT USER-VISIBLE TEXT.
+      // Material Symbols render an icon from its NAME: <span class="material-symbols-outlined">
+      // settings</span> contributes the text node "settings". The mirror sweep flagged
+      // close / settings / search as English leaks in the Italian UI before this guard,
+      // which is how 115 of the first 115 "leaks" were icon names. B13x never caught it
+      // because icon names are English-ish, so they never matched the ITALIAN word list —
+      // the asymmetry is exactly why the mirror needed its own tuning.
+      var cls = (parent.className || '').toString();
+      if (/material-symbols|material-icons|\bfa[sbr]?\b/.test(cls)) continue;
+      if (parent.closest && parent.closest('.material-symbols-outlined, .material-symbols-rounded, svg')) continue;
       var t = (n.nodeValue || '').replace(/\s+/g, ' ').trim();
       if (t.length < 4 || !/[a-zA-Z]{3}/.test(t)) continue;
       out.push(t);
@@ -342,6 +375,31 @@ function measure(compareWith) {
           itControl.attr.itOnly + ' / ' + itControl.attr.total, okAttr ? 'pass' : 'fail',
           okAttr ? 'the attribute sweep can see Italian, so a 0 above is meaningful'
                  : 'sweep found no Italian attributes in Italian mode — check it selects anything');
+    }
+
+    /* ── B13z · the MIRROR ────────────────────────────────────────────────────
+       English leaking into an Italian UI. The READING comes from the Italian pass
+       (stored in itControl); the CONTROL is the English pass, where English is
+       correct and the count must be large. Same two-pass structure, read backwards,
+       so the mirror costs one extra row and no extra page load.                     */
+    var okMirrorCtl = cText.enOnly > 0;
+    row('B13zc', 'CONTROL · does the mirror find English when the UI IS English?', '> 0',
+        cText.enOnly + ' / ' + cText.total, okMirrorCtl ? 'pass' : 'fail',
+        okMirrorCtl ? 'the mirror can see English, so B13z below is meaningful'
+                    : 'MIRROR BLIND — it found no English even in English mode. If this ' +
+                      'fails, B13z\'s 0 proves nothing and must not be read as clean.');
+    if (!itControl) {
+      row('B13z', 'MIRROR · English-only strings while the UI is Italian', String(BASELINE.B13z),
+          'NOT RUN', 'fail',
+          'the Italian pass never completed, so the mirror has no reading');
+    } else {
+      var mirT = itControl.text.enOnly, mirA = itControl.attr.enOnly;
+      row('B13z', 'MIRROR · English-only text + attributes while the UI is Italian',
+          String(BASELINE.B13z), (mirT + mirA) + ' = ' + mirT + ' text + ' + mirA + ' attr',
+          (mirT + mirA) <= BASELINE.B13z ? 'pass' : 'fail',
+          mirT ? 'first samples: ' + itControl.text.enSamples.join(' | ')
+               : 'target is 0 — English in an Italian UI is the same defect, mirrored. ' +
+                 'This row is what would have caught #wbDrawer and #ssPopup automatically.');
     }
   }
 

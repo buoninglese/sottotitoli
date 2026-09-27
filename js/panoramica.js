@@ -588,7 +588,7 @@
               var lex = s.lexical_diversity || 0;
               var unique = lex > 0 ? Math.round(words * lex) : '—';
               var d = s.started_at ? new Date(s.started_at) : null;
-              var label = (s.name && String(s.name).trim()) ? String(s.name).trim() : (d ? d.toLocaleDateString('it-IT',{day:'2-digit',month:'short'}) : 'Sessione');
+              var label = (s.name && String(s.name).trim()) ? String(s.name).trim() : (d ? d.toLocaleDateString(I18n.locale(),{day:'2-digit',month:'short'}) : 'Sessione');
               var mins = Math.max(1, Math.round((s.duration_seconds||0)/60));
               var openFn = "var n=document.querySelector('[data-panel=trascrizioni]');if(n)n.click();setTimeout(function(){if(window.trOpenEditor)trOpenEditor('"+s.id+"')},400)";
               return '<div class="wb-lib-row wb-lib-divider" onclick="'+openFn+'">'+
@@ -1045,7 +1045,7 @@
           // ── Most recent session ──
           if (sessions && sessions.length > 0) {
             var s = sessions[0];
-            var name = s.name || 'Session ' + new Date(s.started_at).toLocaleDateString('it-IT');
+            var name = s.name || 'Session ' + new Date(s.started_at).toLocaleDateString(I18n.locale());
             var ago = timeAgo(s.started_at);
             var words = s.words_count || 0;
             html += '<div class="glass-card hero-glass-card" style="padding:24px;display:flex;align-items:center;justify-content:space-between;cursor:pointer" onclick="var nav=document.querySelector(\'[data-panel=trascrizioni]\');if(nav)nav.click();setTimeout(function(){trOpenEditor(\''+s.id+'\')},300)">'+
@@ -1225,7 +1225,7 @@
           var opts = '<option value="">— Seleziona una sessione —</option>';
           sessions.forEach(function(s) {
             var d = new Date(s.started_at);
-            var dateStr = d.toLocaleDateString('it-IT', { day:'2-digit', month:'short', hour:'2-digit', minute:'2-digit' });
+            var dateStr = d.toLocaleDateString(I18n.locale(), { day:'2-digit', month:'short', hour:'2-digit', minute:'2-digit' });
             var mins = Math.round((s.duration_seconds || 0) / 60);
             opts += '<option value="'+s.id+'">'+dateStr+' · '+mins+'min · '+(s.language_pair||'en')+'</option>';
           });
@@ -1499,7 +1499,7 @@
               var lex = x.lexical_diversity || 0;
               var uniq = lex > 0 ? Math.round(lex * wc) : '—';
               var minutes = Math.max(1, Math.round((x.duration_seconds || 0) / 60));
-              var date = x.started_at ? new Date(x.started_at).toLocaleDateString('it-IT',{day:'2-digit',month:'short'}) : '—';
+              var date = x.started_at ? new Date(x.started_at).toLocaleDateString(I18n.locale(),{day:'2-digit',month:'short'}) : '—';
               var lang = (x.language_pair || 'en').toUpperCase();
               var name = (x.name && String(x.name).trim()) ? String(x.name).trim() : 'Sessione del ' + date;
               var lexTxt = lex > 0 ? lex.toFixed(2) : '—';
@@ -2603,7 +2603,7 @@
         var h = '';
         favs.slice(0,5).forEach(function(s){
           var name = s.name || 'Sessione ' + (s.id ? s.id.substring(0,8) : '—');
-          var dateStr = s.started_at ? new Date(s.started_at).toLocaleDateString('it-IT',{day:'numeric',month:'short'}) : '';
+          var dateStr = s.started_at ? new Date(s.started_at).toLocaleDateString(I18n.locale(),{day:'numeric',month:'short'}) : '';
           var quality = s.quality_score ? Math.round(s.quality_score * 100) + '%' : '—';
           h += '<div style="display:flex;justify-content:space-between;align-items:center;font-size:13px;padding:6px 0;border-bottom:1px solid var(--line)">' +
             '<span><strong style="cursor:pointer" onclick="document.querySelector(\'[data-sid=&quot;'+s.id+'&quot;]\').scrollIntoView({behavior:\'smooth\'})">' + name + '</strong> <span style="font-size:11px;color:var(--text-faint)">' + dateStr + '</span></span>' +
@@ -4136,7 +4136,7 @@
           // Populate
           var mins = Math.round((session.duration_seconds||0)/60);
           var durStr = mins >= 60 ? Math.floor(mins/60)+'h '+(mins%60)+'m' : mins+'m';
-          var dateStr = new Date(session.started_at).toLocaleDateString('it-IT', {day:'2-digit',month:'long',year:'numeric',hour:'2-digit',minute:'2-digit'});
+          var dateStr = new Date(session.started_at).toLocaleDateString(I18n.locale(), {day:'2-digit',month:'long',year:'numeric',hour:'2-digit',minute:'2-digit'});
           var words = session.words_count || 0;
           var wpm = session.wpm ? Math.round(session.wpm) : '—';
           var lexDiv = session.lexical_diversity ? session.lexical_diversity.toFixed(2) : '—';

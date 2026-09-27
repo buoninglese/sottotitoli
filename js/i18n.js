@@ -969,6 +969,13 @@
       "learner_theme_time": "Parole di tempo",
       "learner_theme_prepositions": "Preposizioni",
       "profile_focus_empty": "Completa l'onboarding per vedere le tue aree di miglioramento.",
+      "session_untitled": "Sessione",
+      "rai_picker_empty": "Nessuna sessione trovata. Registra prima qualche sessione.",
+      "rai_picker_fav": "Attiva/disattiva preferito",
+      "rai_picker_sel_one": "selezionata",
+      "rai_picker_sel_many": "selezionate",
+      "rai_picker_lbl_one": "sessione:",
+      "rai_picker_lbl_many": "sessioni:",
       "rai_focus_grammar": "Focus millimetrico sulla grammatica e la sintassi perfetta.",
       "rai_focus_speech": "Focus sul ritmo del parlato e sulla naturalezza dell'esposizione.",
       "chart_metric_time_words": "Parole di tempo",
@@ -2351,6 +2358,13 @@
       "learner_theme_time": "Time words",
       "learner_theme_prepositions": "Prepositions",
       "profile_focus_empty": "Complete onboarding to see your improvement areas.",
+      "session_untitled": "Session",
+      "rai_picker_empty": "No sessions found. Record some sessions first.",
+      "rai_picker_fav": "Toggle favorite",
+      "rai_picker_sel_one": "selected",
+      "rai_picker_sel_many": "selected",
+      "rai_picker_lbl_one": "session:",
+      "rai_picker_lbl_many": "sessions:",
       "rai_focus_grammar": "Millimetre-precise focus on grammar and perfect syntax.",
       "rai_focus_speech": "Focus on speech rhythm and naturalness of delivery.",
       "chart_metric_time_words": "Time words",
@@ -3083,6 +3097,27 @@
     t: t,
     apply: apply,
     getLang: function(){ return _lang; },
+
+    /** BCP-47 tag for date and number formatting in the ACTIVE language.
+     *
+     *  WHY THIS EXISTS. ~29 call sites passed a literal 'it-IT' to
+     *  toLocaleDateString / toLocaleTimeString / toLocaleString. That is the same
+     *  defect class as the chart tooltips, which read "lun 21 set" while the UI was
+     *  English: a DISPLAY locale hardcoded instead of derived, so the date does not
+     *  follow the interface language. Every site now calls this.
+     *
+     *  'en-GB' is deliberate, not 'en-US'. It renders "21 Sept", which is what
+     *  js/panoramica.js fmtDate() already produces for English, so the two paths
+     *  agree instead of showing "Sept" in one place and "Sep" in another.
+     *
+     *  DO NOT use this for language CODES. Speech synthesis, translation pairs,
+     *  flags and voice selection need 'it-IT' regardless of the UI language:
+     *  learner.js voiceOf(), caption-s8t.html codeMap/locMap, the onboarding speech
+     *  pills, panoramica-wbtokens.js TTS. Those are data about a language, not a
+     *  locale for display, and translating them would break the feature.
+     */
+    locale: function(){ return _lang === 'en' ? 'en-GB' : 'it-IT'; },
+
     DICT: DICT,
 
     /** Translate a single element manually (e.g. after dynamic injection). */

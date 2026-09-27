@@ -237,7 +237,7 @@
     }
 
     filtered.forEach(function(r) {
-      var dateStr = r.saved_at ? new Date(r.saved_at).toLocaleDateString('it-IT') : '';
+      var dateStr = r.saved_at ? new Date(r.saved_at).toLocaleDateString(I18n.locale()) : '';
       var card = document.createElement('div');
       card.className = 'geb-card';
       card.innerHTML = '<div class="geb-card-header"><span class="geb-meta">' + escapeHtml(dateStr) + '</span><button class="geb-action" onclick="deleteGrammarError(\'' + safeId(r.id) + '\', this)" title="Elimina">×</button></div>' +

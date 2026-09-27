@@ -32,7 +32,7 @@
                     var isStarter = r._isStarter === true;
                     var name = isStarter ? (r.report_type || 'Report iniziale')
                                          : (r.summary || r.report_type || 'Report ' + (r.id || '').substring(0,8));
-                    var date = r.created_at ? new Date(r.created_at).toLocaleDateString('it-IT', {day:'2-digit', month:'short', year:'numeric'}) : '—';
+                    var date = r.created_at ? new Date(r.created_at).toLocaleDateString(I18n.locale(), {day:'2-digit', month:'short', year:'numeric'}) : '—';
                     var status = r.status || 'completed';
                     var conf = r.confidence || r.overall_score;
                     var score = conf ? conf + '/100' : '';
@@ -114,7 +114,7 @@
                   if (!report) { appAlert('Report non trovato.', 'Report non trovato', '📄'); return; }
                   var summary = report.summary || report.summary_text || 'Nessun contenuto disponibile.';
                   var score = report.confidence || report.overall_score || 'N/A';
-                  var date = report.created_at ? new Date(report.created_at).toLocaleString('it-IT') : '—';
+                  var date = report.created_at ? new Date(report.created_at).toLocaleString(I18n.locale()) : '—';
                   var status = report.status || 'completed';
                   var content = '<div style="font-family:Inter,sans-serif;max-height:70vh;overflow-y:auto;padding:8px">' +
                     '<p style="font-size:13px;color:var(--text-dim);margin:0 0 4px">Report ID: ' + escapeHtml(id) + ' · ' + escapeHtml(date) + '</p>' +
@@ -184,7 +184,7 @@
                   if (!report) { appAlert('Report non trovato.', 'Report non trovato', '📄'); return; }
                   var summary = report.summary || report.summary_text || '';
                   var score = report.confidence || report.overall_score || '';
-                  var date = report.created_at ? new Date(report.created_at).toLocaleDateString('it-IT') : '';
+                  var date = report.created_at ? new Date(report.created_at).toLocaleDateString(I18n.locale()) : '';
                   // Build a simple HTML doc and trigger print-to-PDF
                   var w = window.open('', '_blank', 'width=800,height=600');
                   if (!w) { appAlert('Popup bloccato. Consenti i popup per scaricare il PDF.', 'Popup bloccato', '⚠️'); return; }

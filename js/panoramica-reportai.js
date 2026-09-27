@@ -6,6 +6,15 @@
               function safeId(x) {
                 return String(x === null || x === undefined ? '' : x).replace(/[^a-zA-Z0-9_-]/g,'');
               }
+              // File-level i18n helper.
+              // A raiT() helper already exists, but it is declared INSIDE updateView(),
+              // so the picker functions below cannot see it. That scoping is exactly how
+              // six user-facing strings ended up hardcoded (Italian in an English UI, and
+              // 'Toggle favorite' in Italian) while the surrounding UI translated fine.
+              function T(k, fb) {
+                try { if (typeof I18n !== 'undefined' && I18n.t) { var v = I18n.t(k); if (v && v !== k) return v; } } catch(e){}
+                return fb;
+              }
               var generateBtn = document.getElementById('generateBtn');
               var loadingOverlay = document.getElementById('loadingOverlay');
               var cancelBtn = document.getElementById('cancelBtn');
@@ -333,14 +342,14 @@
                 var listEl = document.getElementById('transcriptPickerList');
                 if (!listEl || pickerBuilt) return;
                 if (!allSessions.length) {
-                  listEl.innerHTML = '<p style="text-align:center;color:var(--text-faint);padding:20px">No sessions found. Record some sessions first.</p>';
+                  listEl.innerHTML = '<p style="text-align:center;color:var(--text-faint);padding:20px">' + escHtml(T('rai_picker_empty', 'No sessions found. Record some sessions first.')) + '</p>';
                   pickerBuilt = true;
                   return;
                 }
                 listEl.innerHTML = '';
                 allSessions.forEach(function(s){
-                  var name = s.name || ('Session ' + new Date(s.started_at).toLocaleDateString('it-IT'));
-                  var dateStr = s.started_at ? new Date(s.started_at).toLocaleDateString('it-IT', {day:'2-digit',month:'short',year:'numeric'}) : '';
+                  var name = s.name || (T('session_untitled', 'Session') + ' ' + new Date(s.started_at).toLocaleDateString(I18n.locale()));
+                  var dateStr = s.started_at ? new Date(s.started_at).toLocaleDateString(I18n.locale(), {day:'2-digit',month:'short',year:'numeric'}) : '';
                   var checked = selectedTranscriptIds.indexOf(s.id) !== -1;
                   var isFav = s.favorite;
                   var favIcon = isFav ? '★' : '☆';
@@ -348,7 +357,7 @@
                   var row = document.createElement('label');
                   row.setAttribute('data-sid', s.id);
                   row.style.cssText = 'display:flex;align-items:center;gap:12px;padding:14px 16px;border:1.5px solid ' + (checked ? 'var(--cyan)' : 'var(--line)') + ';border-radius:12px;cursor:pointer;background:' + (checked ? 'rgba(6,182,212,.06)' : 'var(--bg)') + ';transition:all .15s';
-                  row.innerHTML = '<span onclick="event.stopPropagation();trToggleFav(\'' + safeId(s.id) + '\')" style="font-size:18px;cursor:pointer;' + favColor + ';flex-shrink:0" title="Toggle favorite">' + favIcon + '</span>' +
+                  row.innerHTML = '<span onclick="event.stopPropagation();trToggleFav(\'' + safeId(s.id) + '\')" style="font-size:18px;cursor:pointer;' + favColor + ';flex-shrink:0" title="' + escHtml(T('rai_picker_fav', 'Toggle favorite')) + '">' + favIcon + '</span>' +
                     '<input type="checkbox" value="' + safeId(s.id) + '" ' + (checked ? 'checked' : '') + ' style="accent-color:var(--cyan);width:18px;height:18px;cursor:pointer;flex-shrink:0">' +
                     '<span style="flex:1;font-size:15px;font-weight:600;color:var(--text)">' + escHtml(name) + '</span>' +
                     '<span style="font-size:13px;color:var(--text-soft);white-space:nowrap">' + escHtml(dateStr) + '</span>';
@@ -382,21 +391,24 @@
 
               function refreshPickerCount() {
                 var countEl = document.getElementById('transcriptPickerCount');
-                if (countEl) countEl.textContent = selectedTranscriptIds.length + ' selezionati';
+                var _n = selectedTranscriptIds.length;
+                // One key per number, so Italian can agree with the count. Concatenating
+                // the number onto a single plural is how this rendered "1 sessioni".
+                if (countEl) countEl.textContent = _n + ' ' + T(_n === 1 ? 'rai_picker_sel_one' : 'rai_picker_sel_many', 'selected');
                 var label = document.getElementById('transcriptSelectionLabel');
                 if (label) {
-                  if (selectedTranscriptIds.length) {
+                  if (_n) {
                     // Show abbreviated session names
                     var names = [];
                     allSessions.forEach(function(s){
                       if (selectedTranscriptIds.indexOf(s.id) !== -1) {
-                        var n = s.name || new Date(s.started_at).toLocaleDateString('it-IT', {day:'2-digit',month:'short'});
+                        var n = s.name || new Date(s.started_at).toLocaleDateString(I18n.locale(), {day:'2-digit',month:'short'});
                         names.push(n);
                       }
                     });
-                    label.textContent = selectedTranscriptIds.length + ' sessioni: ' + names.join(', ');
+                    label.textContent = _n + ' ' + T(_n === 1 ? 'rai_picker_lbl_one' : 'rai_picker_lbl_many', 'sessions:') + ' ' + names.join(', ');
                   } else {
-                    label.textContent = 'Multi-select specific sessions';
+                    label.textContent = T('rai_multi_select', 'Multi-select specific sessions');
                   }
                 }
               }
