@@ -29,6 +29,26 @@
 
   var prompted = false;
 
+  // Translate through the app dictionary. Italian is the SOURCE language, so it is
+  // the correct fallback: if i18n.js is absent or a key is missing, the gate still
+  // reads as Italian rather than showing a raw key like "reconsent_title".
+  //
+  // (The app convention — "JS injects Italian, the data-i18n layer translates" — does
+  // not apply here. This overlay is built entirely by JS and carries NO data-i18n
+  // attributes, so nothing is ever snapshot as an "original" and there is no text for
+  // the observer to re-translate. Calling t() directly is therefore both safe and
+  // deterministic. Known trade-off: switching language WHILE the gate is open does not
+  // re-translate it — the gate is modal, so the switcher is behind it anyway.)
+  function T(key, italian) {
+    try {
+      if (window.I18n && typeof window.I18n.t === 'function') {
+        var v = window.I18n.t(key);
+        if (v && v !== key) return v;
+      }
+    } catch (e) { /* fall through to the Italian source string */ }
+    return italian;
+  }
+
   function check() {
     if (prompted) return;
     var sb = window.sottotitoliSupabase;
@@ -81,17 +101,17 @@
     // Built with textContent, not innerHTML — no untrusted string is ever parsed as
     // markup here, so this cannot introduce an injection point.
     var h = document.createElement('h2');
-    h.textContent = 'Conferma i Termini di Servizio';
+    h.textContent = T('reconsent_title', 'Conferma i Termini di Servizio');
     h.setAttribute('style','margin:0 0 12px;font-size:19px;font-weight:700');
     card.appendChild(h);
 
     var p1 = document.createElement('p');
-    p1.textContent = 'Abbiamo bisogno che tu confermi i Termini di Servizio per continuare a usare Sottotitoli. Questo è richiesto una sola volta.';
+    p1.textContent = T('reconsent_body1', 'Abbiamo bisogno che tu confermi i Termini di Servizio per continuare a usare Sottotitoli. Questo è richiesto una sola volta.');
     p1.setAttribute('style','margin:0 0 12px;font-size:14px;line-height:1.6');
     card.appendChild(p1);
 
     var p2 = document.createElement('p');
-    p2.textContent = 'Confermando, registriamo la data e la versione dei termini accettati (versione ' + VERSION + ').';
+    p2.textContent = T('reconsent_body2', 'Confermando, registriamo la data e la versione dei termini accettati (versione {VERSION}).').replace('{VERSION}', VERSION);
     p2.setAttribute('style','margin:0 0 20px;font-size:13px;line-height:1.6;opacity:.75');
     card.appendChild(p2);
 
@@ -99,7 +119,7 @@
     link.href = 'termini.html';
     link.target = '_blank';
     link.rel = 'noopener noreferrer';
-    link.textContent = 'Leggi i Termini →';
+    link.textContent = T('reconsent_read_terms', 'Leggi i Termini →');
     link.setAttribute('style','display:inline-block;margin-bottom:20px;font-size:13px;color:var(--cyan,#0891b2)');
     card.appendChild(link);
 
@@ -107,14 +127,14 @@
     row.setAttribute('style','display:flex;gap:10px;align-items:center;flex-wrap:wrap');
 
     var accept = document.createElement('button');
-    accept.textContent = 'Accetto i Termini';
+    accept.textContent = T('reconsent_accept', 'Accetto i Termini');
     accept.setAttribute('style',
       'padding:12px 22px;background:var(--cyan,#0891b2);color:#fff;border:0;' +
       'border-radius:10px;font-size:14px;font-weight:600;cursor:pointer');
     row.appendChild(accept);
 
     var decline = document.createElement('button');
-    decline.textContent = 'Esci';
+    decline.textContent = T('reconsent_decline', 'Esci');
     decline.setAttribute('style',
       'padding:12px 18px;background:none;color:var(--text,#111);border:1px solid var(--line,rgba(0,0,0,.15));' +
       'border-radius:10px;font-size:14px;cursor:pointer');
@@ -130,11 +150,11 @@
 
     accept.addEventListener('click', function(){
       accept.disabled = true; decline.disabled = true;
-      status.textContent = 'Salvataggio…';
+      status.textContent = T('reconsent_saving', 'Salvataggio…');
       var sb = window.sottotitoliSupabase;
       sb.auth.getSession().then(function(r){
         var session = r && r.data && r.data.session;
-        if (!session) { status.textContent = 'Sessione scaduta. Ricarica la pagina.'; accept.disabled = false; decline.disabled = false; return; }
+        if (!session) { status.textContent = T('reconsent_session_expired', 'Sessione scaduta. Ricarica la pagina.'); accept.disabled = false; decline.disabled = false; return; }
         return sb.from('onboarding_responses').upsert({
           user_id: session.user.id,
           terms_consent: true,
@@ -146,14 +166,14 @@
           // failed consent write would silently look accepted.
           if (res && res.error) {
             console.error('reconsent: consent NOT saved:', res.error.message);
-            status.textContent = 'Non è stato possibile registrare il consenso. Riprova.';
+            status.textContent = T('reconsent_save_failed', 'Non è stato possibile registrare il consenso. Riprova.');
             accept.disabled = false; decline.disabled = false;
             return;
           }
           overlay.remove();
         });
       }).catch(function(e){
-        status.textContent = 'Errore: ' + (e && e.message ? e.message : 'sconosciuto');
+        status.textContent = T('reconsent_error_pre', 'Errore: ') + (e && e.message ? e.message : T('reconsent_error_unknown', 'sconosciuto'));
         accept.disabled = false; decline.disabled = false;
       });
     });

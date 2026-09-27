@@ -191,6 +191,20 @@
       "aiuto": "Aiuto",
       "trial_ends": "Trial ends in",
       "days": "giorni",
+
+      // ── Re-consent gate (built by js/reconsent.js) ──
+      // {VERSION} is replaced at runtime with config.termsVersion.
+      "reconsent_title": "Conferma i Termini di Servizio",
+      "reconsent_body1": "Abbiamo bisogno che tu confermi i Termini di Servizio per continuare a usare Sottotitoli. Questo è richiesto una sola volta.",
+      "reconsent_body2": "Confermando, registriamo la data e la versione dei termini accettati (versione {VERSION}).",
+      "reconsent_read_terms": "Leggi i Termini →",
+      "reconsent_accept": "Accetto i Termini",
+      "reconsent_decline": "Esci",
+      "reconsent_saving": "Salvataggio…",
+      "reconsent_session_expired": "Sessione scaduta. Ricarica la pagina.",
+      "reconsent_save_failed": "Non è stato possibile registrare il consenso. Riprova.",
+      "reconsent_error_pre": "Errore: ",
+      "reconsent_error_unknown": "sconosciuto",
       "upgrade_pro": "Upgrade to Pro",
       "pro": "Pro",
 
@@ -1412,6 +1426,19 @@
       "aiuto": "Help",
       "trial_ends": "Trial ends in",
       "days": "days",
+
+      // ── Re-consent gate (built by js/reconsent.js) ──
+      "reconsent_title": "Confirm the Terms of Service",
+      "reconsent_body1": "We need you to confirm the Terms of Service to keep using Sottotitoli. This is asked only once.",
+      "reconsent_body2": "By confirming, we record the date and the version of the terms you accepted (version {VERSION}).",
+      "reconsent_read_terms": "Read the Terms →",
+      "reconsent_accept": "I accept the Terms",
+      "reconsent_decline": "Sign out",
+      "reconsent_saving": "Saving…",
+      "reconsent_session_expired": "Session expired. Reload the page.",
+      "reconsent_save_failed": "We could not record your consent. Please try again.",
+      "reconsent_error_pre": "Error: ",
+      "reconsent_error_unknown": "unknown",
       "upgrade_pro": "Upgrade to Pro",
       "pro": "Pro",
 
