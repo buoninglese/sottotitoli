@@ -3723,16 +3723,15 @@
           if (itSfBank) _wbState.currentBankUUID = itSfBank.id;
         }
 
-        var bankNames = {
-          'review_due_now':'Ripasso immediato',
-          'saved_from_sessions':'Salvate dalle sessioni','fragile_words':'Parole fragili',
-          'goal_next_step':'Prossimo passo per il tuo obiettivo','build_from_known':'Costruisci da ciò che conosci',
-          'activate_recognized':'Attiva ciò che riconosci','upcoming_useful_vocab':'Vocabolario utile in arrivo',
-          'upcoming_session_driven':'Temi rilevati dalle sessioni','upcoming_roadmap':'Il tuo percorso di apprendimento',
+        // The ten system collections resolve through the shared registry so the
+        // detail view, the cards, the folders view and the save-to menu all show
+        // the same wording in the active language. The 'it_*' entries are the
+        // Italian-vocabulary tab collections: they are Italian banks, so their
+        // labels stay Italian in both UI languages.
+        var itTabNames = {
           'it_review_due':'Ripasso immediato','it_saved_sessions':'Salvate da sessioni',
           'it_vocab_builder':'Italian Vocabulary Builder',
           'it_new_weekly':'Nuove questa settimana','it_fragile':'Parole Fragili',
-          'vocab_builder_en':'English Vocabulary Builder',
           'it_next_step':'Prossimo passo','it_build_known':'Costruisci da ciò che sai',
           'it_activate':'Attiva ciò che riconosci'
         };
@@ -3749,19 +3748,11 @@
           'it_next_step':'smart','it_build_known':'smart',
           'it_activate':'smart'
         };
-        var bankSubtitles = {
-          'review_due_now':'Parole pronte per il ripasso immediato',
-          'saved_from_sessions':'Parole salvate durante l\'uso',
-          'fragile_words':'Parole che hanno bisogno di rinforzo',
-          'goal_next_step':'Suggerite per il tuo obiettivo attuale',
-          'build_from_known':'Parole collegate al tuo vocabolario esistente',
-          'activate_recognized':'Trasforma il riconoscimento in uso attivo',
-          'upcoming_useful_vocab':'Suggerite per i prossimi passi',
+        var itTabSubs = {
           'it_review_due':'Parole italiane pronte per il ripasso',
           'it_saved_sessions':'Parole italiane salvate durante le sessioni',
           'it_vocab_builder':'Parole italiane aggiunte con + dal Vocabulary Builder',
           'it_new_weekly':'Parole italiane raccolte di recente',
-          'vocab_builder_en':'Parole inglesi salvate dal Vocabulary Builder',
           'it_fragile':'Parole italiane a rischio',
           'it_next_step':'Vocabolario italiano per i tuoi obiettivi',
           'it_build_known':'Progressione lessicale italiana',
@@ -3788,10 +3779,11 @@
           'it_activate':'Nessun candidato per l\'attivazione.'
         };
 
-        var name = bank ? bank.name : (bankNames[bankId] || bankId);
+        var isSystem = !!SYSTEM_COLLECTION_KEYS[bankId];
+        var name = bank ? bank.name : (isSystem ? collectionName(bankId) : (itTabNames[bankId] || bankId));
         var type = bank ? 'custom' : (bankTypes[bankId] || 'pinned');
         _wbState.currentBankType = type;  // store type for delete routing
-        var subtitle = bank ? (bank.description || '') : (bankSubtitles[bankId] || '');
+        var subtitle = bank ? (bank.description || '') : (isSystem ? collectionSub(bankId) : (itTabSubs[bankId] || ''));
         var emptyMsg = bankEmptyStates[bankId] || 'No words yet.';
         var badgeClass = type === 'pinned' ? 'badge-pinned' : type === 'smart' ? 'badge-smart' : 'badge-custom';
         var typeLabel = type === 'pinned' ? 'PINNED' : type === 'smart' ? 'SMART' : 'YOURS';
@@ -6444,18 +6436,18 @@
 
         // Groups mirror the Word Banks folders view: Pinned / Smart / Yours
         var groups = [
-          { label: 'Pinned', items: [
+          { label: wbFldT('wb_folders_pinned'), items: [
             { v: '', t: defaultLabel },
-            { v: 'saved_from_sessions', t: BANK_ID.SAVED_FROM_SESSIONS },
-            { v: isIt ? 'it_vocab_builder' : 'vocab_builder_en', t: isIt ? 'Italian Vocabulary Builder' : 'English Vocabulary Builder' }
+            { v: 'saved_from_sessions', t: collectionName('saved_from_sessions') },
+            { v: isIt ? 'it_vocab_builder' : 'vocab_builder_en', t: isIt ? 'Italian Vocabulary Builder' : collectionName('vocab_builder_en') }
           ] },
-          { label: 'Smart', items: [
-            { v: 'goal_next_step', t: 'Next Step For Your Goal' },
-            { v: 'build_from_known', t: 'Build From What You Know' },
-            { v: 'activate_recognized', t: 'Activate What You Recognize' },
-            { v: 'upcoming_useful_vocab', t: 'Goal-Based Upcoming Vocab' },
-            { v: 'upcoming_session_driven', t: 'Session-Detected Themes' },
-            { v: 'upcoming_roadmap', t: 'Your Learning Roadmap' }
+          { label: wbFldT('wb_folders_smart'), items: [
+            { v: 'goal_next_step', t: collectionName('goal_next_step') },
+            { v: 'build_from_known', t: collectionName('build_from_known') },
+            { v: 'activate_recognized', t: collectionName('activate_recognized') },
+            { v: 'upcoming_useful_vocab', t: collectionName('upcoming_useful_vocab') },
+            { v: 'upcoming_session_driven', t: collectionName('upcoming_session_driven') },
+            { v: 'upcoming_roadmap', t: collectionName('upcoming_roadmap') }
           ] }
         ];
         var custom = [];
