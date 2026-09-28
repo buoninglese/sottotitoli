@@ -222,6 +222,17 @@
           ladder +
         '</div>' +
 
+        '<div class="gi-card">' +
+          '<h3 class="gi-h">Genera il report di sintesi</h3>' +
+          '<p class="gi-sub">Un report multi-pagina che unisce il tuo profilo e il tuo piano. Scegli su cosa basarlo.</p>' +
+          '<div class="gi-basis">' +
+            '<label><input type="radio" name="giBasis" value="grammatica"> Solo Grammatica (intake, placement, obiettivi)</label>' +
+            '<label><input type="radio" name="giBasis" value="both" checked> Sessioni + Grammatica (fusione completa)</label>' +
+            '<label><input type="radio" name="giBasis" value="sessions"> Solo sessioni (trascrizioni live)</label>' +
+          '</div>' +
+          '<button class="gi-btn gi-btn-primary" data-act="gen-report">Genera il report</button>' +
+        '</div>' +
+
         '<div class="gi-nav gi-nav-end">' +
           '<button class="gi-btn gi-btn-ghost" data-act="retake">Rifai il test</button>' +
           '<button class="gi-btn gi-btn-primary" data-act="saved">Fatto</button>' +
@@ -313,6 +324,7 @@
     }
     else if (act === 'retake') { reset(); }
     else if (act === 'saved') { w.location.href = 'panoramica.html'; }
+    else if (act === 'gen-report') { generateReport(); }
     else if (act === 'open-concept') {
       var cid = t.getAttribute('data-concept');
       var drill = w.SottotitoliGrammarDrill;
@@ -351,6 +363,22 @@
   function reset() {
     answers = {}; placementAnswers = {}; l1 = ''; _profile = null; _plan = null;
     step = 'intro'; renderIntro();
+  }
+
+  /* Stage the chosen synthesis basis and hand off to the Report AI panel, where
+   * the (auth + billing) generation flow already lives. The basis is read there
+   * and folded into the report context. */
+  function generateReport() {
+    var basis = 'both';
+    var stage = el('giStage');
+    if (stage && stage.querySelector) {
+      var sel = stage.querySelector('input[name="giBasis"]:checked');
+      if (sel && (sel.value === 'sessions' || sel.value === 'both' || sel.value === 'grammatica')) {
+        basis = sel.value;
+      }
+    }
+    try { localStorage.setItem('sottotitoli_pending_synthesis_basis', basis); } catch (e) {}
+    w.location.href = 'panoramica.html';
   }
 
   /* After a drill, drop a missed concept from the review queue once the learner

@@ -88,8 +88,9 @@
                 btnPrice.textContent = (cost + engineCost) + ' CR';
               }
 
-              reportRadios.forEach(function(r){ r.addEventListener('change', updateView); });
-              engineRadios.forEach(function(r){ r.addEventListener('change', updateView); });
+               reportRadios.forEach(function(r){ r.addEventListener('change', function(){ updateView(); syncBasisVisibility(); }); });
+               engineRadios.forEach(function(r){ r.addEventListener('change', updateView); });
+               syncBasisVisibility();
 
               // ═══ Preset → Module mapping (sync with ai_configs preset_pricing) ═══
               var PRESET_MAP = {
@@ -102,7 +103,12 @@
                 cambridge:    { moduleId: 11, moduleKey: '11', credits: 4 },
                 speech:       { moduleId: 4, moduleKey: '4', credits: 4 },
                 drills:       { moduleId: 2, moduleKey: '2', credits: 2 },
-                synthesis:    { moduleId: 12, moduleKey: '12', credits: 6 }
+                // Synthesis = a NEW module id. 12 is already taken ("Syntax &
+                // Complexity" in ai_report_modules + prompts.ts), so the backend
+                // uses a fresh id. 15 is the recommended default — if the backend
+                // agent picks a different id, change moduleId/moduleKey here and
+                // bump this file's cache-buster in panoramica.html.
+                synthesis:    { moduleId: 15, moduleKey: '15', credits: 6 }
               };
 
               // ═══ PRESET_MAP is the SINGLE SOURCE OF TRUTH for report credits ═══
@@ -111,15 +117,52 @@
               // data-cost attributes) from it at init so the UI can never drift
               // from the billing again — it did: the cards showed 10–25 CR while
               // the deduction was 2–4 CR.
-              reportRadios.forEach(function(r){
-                var m = PRESET_MAP[r.value];
-                if (!m) return;
-                var badge = r.parentElement.querySelector('.text-label-mono.rai-font-bold');
-                if (badge) badge.textContent = m.credits + 'cr';
-                r.setAttribute('data-cost', String(m.credits));
-              });
+               reportRadios.forEach(function(r){
+                 var m = PRESET_MAP[r.value];
+                 if (!m) return;
+                 var badge = r.parentElement.querySelector('.text-label-mono.rai-font-bold');
+                 if (badge) badge.textContent = m.credits + 'cr';
+                 r.setAttribute('data-cost', String(m.credits));
+               });
 
-              generateBtn.addEventListener('click', async function(){
+               // ── Synthesis "basis" — what evidence the report may draw on ──
+               // Read from the selector when present, else a value staged by
+               // grammatica.html (localStorage), else default 'both'.
+               function synthesisBasis() {
+                 var sel = document.querySelector('#pnl-report-ai input[name="synthesisBasis"]:checked');
+                 if (sel && (sel.value === 'sessions' || sel.value === 'both' || sel.value === 'grammatica')) {
+                   return sel.value;
+                 }
+                 var staged = null;
+                 try { staged = localStorage.getItem('sottotitoli_pending_synthesis_basis'); } catch (e) {}
+                 if (staged === 'sessions' || staged === 'both' || staged === 'grammatica') return staged;
+                 return 'both';
+               }
+
+               // Show/hide the basis selector only for the synthesis preset.
+               function syncBasisVisibility() {
+                 var wrap = document.getElementById('synthesisBasisWrap');
+                 if (!wrap) return;
+                 var sel = null;
+                 reportRadios.forEach(function(r){ if (r.checked) sel = r; });
+                  wrap.style.display = (sel && sel.value === 'synthesis') ? '' : 'none';
+                }
+
+                // If grammatica.html staged a synthesis basis, preselect the
+                // synthesis preset + basis. A bottom-of-page script (after
+                // theme-2.js) opens the panel and clears the flag.
+                (function preselectStagedSynthesis(){
+                  var staged = null;
+                  try { staged = localStorage.getItem('sottotitoli_pending_synthesis_basis'); } catch (e) {}
+                  if (staged !== 'sessions' && staged !== 'both' && staged !== 'grammatica') return;
+                  reportRadios.forEach(function(r){ if (r.value === 'synthesis') r.checked = true; });
+                  var basisInputs = document.querySelectorAll('#pnl-report-ai input[name="synthesisBasis"]');
+                  basisInputs.forEach(function(b){ if (b.value === staged) b.checked = true; });
+                  updateView();
+                  syncBasisVisibility();
+                })();
+
+                generateBtn.addEventListener('click', async function(){
                 // ── Validation ──
                 var sb = window.sottotitoliSupabase;
                 if (!sb) { showToastMsg('⚠️ Effettua il login per generare report.'); return; }
@@ -238,22 +281,23 @@
                    // two or more sessions failed the insert DETERMINISTICALLY, after the
                    // credits had already been taken. That is the billing bug.
 
-                   // The synthesis module (module_key 12) needs the assembled
-                   // learner-profile context (report-context.json shape) so the
-                   // backend can write a personalised report, not a generic one.
-                   var reportContext = null;
-                   if (presetKey === 'synthesis' && window.SottotitoliGrammarReportContext) {
-                     try {
-                       var rcProfile = window.SottotitoliGrammarProfileStore
-                         ? await window.SottotitoliGrammarProfileStore.load()
-                         : null;
-                       var rcOnboarding = {};
-                       try { rcOnboarding = JSON.parse(localStorage.getItem('sottotitoli_onboarding') || '{}'); } catch (e) {}
-                       if (rcProfile && rcProfile.derived) {
-                         reportContext = window.SottotitoliGrammarReportContext.build(rcProfile, rcOnboarding);
-                       }
-                     } catch (e) { console.warn('Synthesis context build failed:', e && e.message); }
-                   }
+                    // The synthesis module needs the assembled learner-profile
+                    // context (report-context.json shape) + a `basis` telling the
+                    // backend which evidence to draw on, so it can write a
+                    // personalised report, not a generic one.
+                    var reportContext = null;
+                    if (presetKey === 'synthesis' && window.SottotitoliGrammarReportContext) {
+                      try {
+                        var rcProfile = window.SottotitoliGrammarProfileStore
+                          ? await window.SottotitoliGrammarProfileStore.load()
+                          : null;
+                        var rcOnboarding = {};
+                        try { rcOnboarding = JSON.parse(localStorage.getItem('sottotitoli_onboarding') || '{}'); } catch (e) {}
+                        reportContext = window.SottotitoliGrammarReportContext.build(
+                          rcProfile || {}, rcOnboarding, synthesisBasis()
+                        );
+                      } catch (e) { console.warn('Synthesis context build failed:', e && e.message); }
+                    }
 
                    var insertPayload = {
                      user_id: uid,

@@ -4,8 +4,9 @@
  * to the LLM. Deterministic, provenance-marked, and flat so it serialises
  * cleanly into the report request's `context` column.
  *
- *   SottotitoliGrammarReportContext.build(profile, onboarding) → payload
+ *   SottotitoliGrammarReportContext.build(profile, onboarding, basis) → payload
  *
+ * basis: 'sessions' | 'both' | 'grammatica' — which evidence the report may draw on.
  * onboarding: the sottotitoli_onboarding object (native_lang, why_english,
  * difficulties, english_situations, english_level, long_term_goal, short_term_goal).
  * Maps onboarding values into the profiling taxonomies via onboarding-map.yaml.
@@ -73,12 +74,14 @@
     return mapped;
   }
 
-  function build(profile, onboarding) {
+  function build(profile, onboarding, basis) {
     profile = profile || {};
     var planner = w.SottotitoliGrammarPlanner;
     var plan = planner ? planner.present(profile) : {};
     return {
       report_type: 'synthesis',
+      // What evidence the report may draw on: 'sessions' | 'both' | 'grammatica'.
+      basis: (basis === 'sessions' || basis === 'grammatica') ? basis : 'both',
       dimensions: profile.dimensions || {},
       context: profile.context || {},
       placement_missed: (profile.placement && profile.placement.missed) || [],
