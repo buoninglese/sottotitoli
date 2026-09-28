@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mic Harness · Sottotitoli</title>
+<style>
+  :root { --bg:#0b0b0f; --card:#131316; --line:#26262e; --text:#e7e7ea; --muted:#9a9aa4;
+          --pass:#34d399; --fail:#f87171; --warn:#fbbf24; }
+  body { margin:0; padding:24px; background:var(--bg); color:var(--text);
+         font:14px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; }
+  h1 { font-size:18px; margin:0 0 4px; }
+  .sub { color:var(--muted); font-size:12px; margin:0 0 16px; }
+  #summary { padding:10px 14px; border:1px solid var(--line); border-radius:8px;
+             background:var(--card); margin-bottom:16px; font-weight:600; }
+  #summary.ok { color:var(--pass); border-color:var(--pass); }
+  #summary.bad { color:var(--fail); border-color:var(--fail); }
+  #summary.broken { color:var(--warn); border-color:var(--warn); }
+  table { width:100%; border-collapse:collapse; font-size:13px; }
+  th, td { text-align:left; padding:6px 8px; border-bottom:1px solid var(--line); vertical-align:top; }
+  th { color:var(--muted); font-weight:600; font-size:11px; text-transform:uppercase; letter-spacing:.06em; }
+  td.id { font-family:ui-monospace,Menlo,monospace; color:var(--muted); white-space:nowrap; }
+  tr.pass td.res { color:var(--pass); font-weight:700; }
+  tr.fail td.res { color:var(--fail); font-weight:700; }
+  tr.ctrl td { background:rgba(251,191,36,.06); }
+  tr.unreliable { opacity:.45; }
+  code { background:#1c1c22; padding:1px 5px; border-radius:4px; font-size:12px; }
+</style>
+</head>
+<body>
+
+<h1>Microphone harness</h1>
+<p class="sub">
+  Regression gate for the mic area. Run a server at the repo root and open
+  <code>/tests/mic-harness.html</code>. Loads the real modules plus the real caption page in an
+  iframe, and inspects <code>window.__micHarness</code> so it can also be read by a script.
+  <br>The iframe emits a burst of <code>401</code>s and "Expected 3 parts in JWT" warnings on
+  localhost — that is the caption page talking to Supabase without a real session. Expected, and
+  not a harness failure.
+</p>
+
+<div id="summary">running…</div>
+<table id="rows">
+  <thead><tr><th>id</th><th>check</th><th>expected</th><th>actual</th><th>result</th></tr></thead>
+  <tbody></tbody>
+</table>
+
+<!-- The real caption page: S8tSource, the menu renderer, the mic regex and the updateMicUI
+     wrapper all live in its inline block, so they can only be tested through it. -->
+<iframe id="frame" src="../caption-s8t.html?bypass_auth=1&amp;lang=it-IT" style="display:none"></iframe>
+
+<script src="../config.js"></script>
+<script src="../js/i18n.js"></script>
+<script src="../js/real-mic.js"></script>
+<script src="../js/record-fallback.js"></script>
+<script src="../js/system-audio.js"></script>
+<script>
+(function () {
+  'use strict';
+
+  /* Every i18n key the mic code actually references. Derived from the source with:
+   *   grep -rhoE "(S8T|_realMicT|_label)\('[a-z0-9_]+'" js/real-mic.js js/record-fallback.js \
+   *     js/system-audio.js caption-s8t.html | sed -E "s/.*\('//" | tr -d "'" \
+   *     | grep -E "^(mic|src|rf|seg)_"
+   * A key that exists in the dictionary but is never used, or is used with a typo, is invisible
+   * to the node parity gate — which compares the two BLOCKS, not the call sites. */
+  var KEYS = ['learner_listening','learner_mic_error','learner_no_mic','learner_tap_mic',
+    'mic_device_recognition','mic_engine_default','mic_err_capture','mic_err_denied',
+    'mic_err_network','mic_generic_fail','mic_gum_timeout','mic_no_audio','mic_picker_names_hint',
+    'mic_picker_scope','mic_switch_failed','mic_switch_ok','mic_switch_timeout','mic_virtual_fix',
+    'mic_virtual_what','rf_listening','rf_listening_system','rf_transcribing','seg_failed',
+    'seg_no_speech','src_audio_title','src_mic','src_picker_title_mic','src_picker_title_system',
+    'src_share_ended','src_status_system','src_switch_mic','src_switch_system','src_system',
+    'src_system_cancelled','src_system_failed','src_system_hint','src_system_no_audio',
+    'src_system_ready'];
+
+  // The 16 label cases that were checked by hand on 2026-09-28 before this file existed.
+  var VIRTUAL = ['BlackHole 2ch', 'BlackHole 2ch (Virtual)', 'Loopback Audio',
+    'Soundflower (2ch)', 'ZoomAudioDevice', 'Krisp Audio', 'VB-Cable', 'Multi-Output Device',
+    'Existential Audio Loopback'];
+  var REAL = ['MacBook Air Microphone', 'MacBook Pro Microphone', 'Logitech BRIO', 'AirPods Pro',
+    'Blue Yeti', 'Microfono 1', 'iPhone Microphone'];
+
+  var results = [];
+  var tbody = document.querySelector('#rows tbody');
+
+  function row(id, what, expected, actual, ok) {
+    results.push({ id: id, what: what, expected: String(expected), actual: String(actual), ok: !!ok });
+    var tr = document.createElement('tr');
+    tr.className = (ok ? 'pass' : 'fail') + (id === 'CTRL' ? ' ctrl' : '');
+    tr.dataset.id = id;
+    tr.innerHTML = '<td class="id">' + id + '</td><td>' + what + '</td><td>' +
+      esc(expected) + '</td><td>' + esc(actual) + '</td><td class="res">' +
+      (ok ? 'pass' : 'FAIL') + '</td>';
+    tbody.appendChild(tr);
+    return ok;
+  }
+  function esc(v) {
+    return String(v == null ? '' : v).replace(/&/g, '&amp;').replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;').slice(0, 160);
+  }
+  /* Accepts EITHER a function returning [expected, actual, ok] OR that triple directly.
+   * An accidental `check(id, what, (function(){...})())` — an IIFE rather than a function
+   * reference — turned EVERY row into "threw: fn is not a function" and produced a fully-red
+   * table that read like catastrophic findings. A check runner must not be able to fail in a way
+   * that resembles a discovery. */
+  function check(id, what, v) {
+    var r;
+    try { r = (typeof v === 'function') ? v() : v; }
+    catch (e) { r = ['no throw', 'threw: ' + ((e && e.message) || e), false]; }
+    return row(id, what, r[0], r[1], r[2]);
+  }
+
+  function waitForFrame(cb) {
+    var f = document.getElementById('frame');
+    var t0 = Date.now();
+    (function poll() {
+      var w = null;
+      try { w = f.contentWindow; } catch (e) {}
+      var ready = false;
+      try {
+        ready = !!(w && typeof w.S8T === 'function' && w.S8tSource
+          && typeof w._s8tLooksVirtualMic === 'function');
+      } catch (e) {}
+      if (ready) return cb(w);
+      if (Date.now() - t0 > 25000) return cb(null);
+      setTimeout(poll, 200);
+    })();
+  }
+
+  /* Two async halves (the i18n source fetch, and the caption iframe) both contribute rows, so the
+   * summary must wait for BOTH — otherwise the i18n row can land after the verdict is printed. */
+  var pending = 2;
+  function step() { if (--pending === 0) finish(); }
+
+  waitForFrame(function (w) {
+    /* ── 1 · the modules the harness claims to test actually loaded ──────────────────────
+     * A module that failed to load must be a red row, not an absent one: otherwise every
+     * dependent check silently disappears and the run looks clean. */
+    check('M1', 'js/i18n.js loaded (window.I18n)', function () {
+      return ['window.I18n.t is a function', typeof (window.I18n && window.I18n.t),
+        !!(window.I18n && typeof window.I18n.t === 'function')];
+    });
+    check('M2', 'js/real-mic.js loaded (window.updateMicUI)', function () {
+      return ['function', typeof window.updateMicUI, typeof window.updateMicUI === 'function'];
+    });
+    check('M3', 'js/record-fallback.js loaded (window.RecordFallback)', function () {
+      return ['canRecord is a function', typeof (window.RecordFallback && window.RecordFallback.canRecord),
+        !!(window.RecordFallback && typeof window.RecordFallback.canRecord === 'function')];
+    });
+    check('M4', 'js/system-audio.js loaded (window.S8tSystemAudio)', function () {
+      return ['isSupported is a function', typeof (window.S8tSystemAudio && window.S8tSystemAudio.isSupported),
+        !!(window.S8tSystemAudio && typeof window.S8tSystemAudio.isSupported === 'function')];
+    });
+    check('M5', 'caption page exposed S8T + S8tSource + the mic regex', function () {
+      return ['all three available', w ? 'available' : 'TIMED OUT (25s)', !!w];
+    });
+
+    if (!w) return step();
+
+    /* Snapshot anything we are about to touch, so running the harness never changes settings. */
+    var saved = {};
+    try {
+      saved.source = w.localStorage.getItem('sottotitoli-caption-source');
+      saved.mic = w.localStorage.getItem('sottotitoli-mic-device');
+    } catch (e) {}
+
+    /* ── 2 · Phase 0: the computer-audio source is parked, and nobody is stranded in it ── */
+    check('P1', 'computer-audio source reports itself unsupported (PARKED)', function () {
+      var v = window.S8tSystemAudio.isSupported();
+      return ['false', String(v), v === false];
+    });
+    check('P2', 'recorder capability itself is intact (parking is not hiding a broken env)', function () {
+      var v = window.RecordFallback.canRecord();
+      return ['true', String(v), v === true];
+    });
+
+    check('P3', 'a stored "system" source is coerced back to "mic" AND rewritten in storage',
+      ['mic + storage=mic', 'x', (function () {
+        try { w.localStorage.setItem('sottotitoli-caption-source', 'system'); } catch (e) {}
+        var got = w.S8tSource.get();
+        var stored = null;
+        try { stored = w.localStorage.getItem('sottotitoli-caption-source'); } catch (e) {}
+        return ['mic + storage=mic', got + ' + storage=' + stored, got === 'mic' && stored === 'mic'];
+      })()]);
+
+    check('P4', 'the parked source is not offered in the menu', ['no data-src="system"',
+      'x', (function () {
+        try { w._renderMicMenu(); } catch (e) {}
+        var html = (w.document.getElementById('micMenu') || {}).innerHTML || '';
+        var has = html.indexOf('data-src="system"') >= 0;
+        return ['no data-src="system"', has ? 'found data-src="system"' : 'absent', !has];
+      })()]);
+
+    check('P5', 'the picker icon shows the chevron, not headphones', ['fas fa-chevron-down', 'x',
+      (function () {
+        try { w.S8tSource._reflect(); } catch (e) {}
+        var i = w.document.querySelector('#micPickBtn i');
+        var cls = i ? i.className : '(no icon)';
+        return ['fas fa-chevron-down', cls, cls === 'fas fa-chevron-down'];
+      })()]);
+
+    check('P6', 'canSystem() is false, so every UI path follows one gate', ['false',
+      String(w.S8tSource.canSystem()), w.S8tSource.canSystem() === false]);
+
+    /* ── 3 · virtual-device detection (was ad-hoc, now permanent) ── */
+    VIRTUAL.forEach(function (label, i) {
+      check('V' + (i + 1), 'virtual label detected: "' + label + '"', ['true', 'x',
+        (function () { var r = w._s8tLooksVirtualMic(label); return [String(true), String(r), r === true]; })()]);
+    });
+    REAL.forEach(function (label, i) {
+      check('V' + (VIRTUAL.length + i + 1), 'real mic NOT flagged: "' + label + '"', ['false', 'x',
+        (function () { var r = w._s8tLooksVirtualMic(label); return [String(false), String(r), r === false]; })()]);
+    });
+
+    /* ── 4 · updateMicUI must FORWARD its second argument ──
+     * The caption page wraps updateMicUI as function(state) and dropped the label, so a truthful
+     * "Audio PC" became "Mic Live". That wrapper is the bug this row exists to keep dead. */
+    check('U1', 'updateMicUI forwards an explicit label', ['Test Label', 'x', (function () {
+      w.updateMicUI('live', 'Test Label');
+      var t = (w.document.getElementById('micStatus') || {}).textContent;
+      return ['Test Label', t, t === 'Test Label'];
+    })()]);
+    check('U2', 'updateMicUI without a label still says "Mic Live"', ['Mic Live', 'x', (function () {
+      w.updateMicUI('live');
+      var t = (w.document.getElementById('micStatus') || {}).textContent;
+      return ['Mic Live', t, t === 'Mic Live'];
+    })()]);
+    check('U3', 'updateMicUI("idle") still says "Mic Off"', ['Mic Off', 'x', (function () {
+      w.updateMicUI('idle');
+      var t = (w.document.getElementById('micStatus') || {}).textContent;
+      return ['Mic Off', t, t === 'Mic Off'];
+    })()]);
+
+    /* ── 5 · the constraints shared by BOTH recorder paths ── */
+    check('C1', 'no saved device -> {audio:true} (system default)', ['{"audio":true}', 'x', (function () {
+      try { w.localStorage.removeItem('sottotitoli-mic-device'); } catch (e) {}
+      var s = JSON.stringify(w.SottotitoliMicConstraints());
+      return ['{"audio":true}', s, s === '{"audio":true}'];
+    })()]);
+    check('C2', 'saved device -> deviceId exact', ['exact id passed', 'x', (function () {
+      try { w.localStorage.setItem('sottotitoli-mic-device', 'dev-123'); } catch (e) {}
+      var c = w.SottotitoliMicConstraints();
+      var got = c && c.audio && c.audio.deviceId && c.audio.deviceId.exact;
+      try { w.localStorage.removeItem('sottotitoli-mic-device'); } catch (e) {}
+      return ['dev-123', String(got), got === 'dev-123'];
+    })()]);
+
+    step();
+  });
+
+  /* ── i18n: runs outside the iframe, against the SOURCE text ────────────────────── */
+  function keyChecks(done) {
+    fetch('../js/i18n.js').then(function (r) { return r.text(); }).then(function (src) {
+      var missing = [];
+      KEYS.forEach(function (k) {
+        var n = src.split('"' + k + '"').length - 1;
+        if (n < 2) missing.push(k + '(' + n + ')');
+      });
+      check('I1', KEYS.length + ' mic keys each appear in BOTH blocks', function () {
+        return ['0 missing', missing.length ? missing.slice(0, 6).join(', ') : '0 missing',
+          missing.length === 0];
+      });
+      done();
+    }).catch(function (e) {
+      check('I1', KEYS.length + ' mic keys each appear in BOTH blocks', ['0 missing',
+        'could not fetch js/i18n.js: ' + ((e && e.message) || e), false]);
+      done();
+    });
+  }
+
+  function finish() {
+    /* ── KNOWN-POSITIVE CONTROL (rule 24) ──
+     * A check that asserts something FALSE, on purpose. If the runner records it as a PASS then
+     * the runner is broken and every other row here is meaningless — so say that loudly instead of
+     * showing a green table. This is how a broken lookup once reported "no secrets found" three
+     * times against a folder the tool could not even see. */
+    check('CTRL', 'known-positive control: a false assertion is reported as FAIL', function () {
+      return ['detected (this row must be FAIL)', 'deliberately false: 1 === 2', 1 === 2];
+    });
+    var ctrlRow = results.filter(function (r) { return r.id === 'CTRL'; })[0];
+    var ctrlDetected = !!(ctrlRow && ctrlRow.ok === false);
+
+    var failed = results.filter(function (r) { return !r.ok; }).length - (ctrlDetected ? 1 : 0);
+    var passed = results.length - 1 - failed;
+    var s = document.getElementById('summary');
+
+    if (!ctrlDetected) {
+      Array.prototype.forEach.call(document.querySelectorAll('#rows tr'), function (tr) {
+        tr.classList.add('unreliable');
+      });
+      s.className = 'broken';
+      s.textContent = 'HARNESS BROKEN — the known-positive control did not fire, so the ' + passed +
+        ' "passes" in this table prove nothing. Fix the runner before trusting any row.';
+    } else {
+      s.className = failed ? 'bad' : 'ok';
+      s.textContent = failed
+        ? failed + ' FAILED / ' + (results.length - 1) + ' checks (control fired correctly)'
+        : 'all ' + passed + ' checks passed, including the known-positive control';
+    }
+
+    window.__micHarness = {
+      done: true, controlDetected: ctrlDetected, passed: passed, failed: failed, results: results
+    };
+  }
+
+  keyChecks(step);
+})();
+</script>
+</body>
+</html>

@@ -1614,7 +1614,7 @@ button[onclick*="addToWordBank"]:hover{background:rgba(52,211,153,.15)!important
 <script src="js/language-resolver.js?v=1"></script>
 <script src="js/real-mic.js?v=29"></script>
 <script src="js/record-fallback.js?v=8"></script>
-<script src="js/system-audio.js?v=1"></script>
+<script src="js/system-audio.js?v=2"></script>
 <script src="js/grammar-viz.js?v=2"></script>
 <script src="js/speech-icons.js"></script>
 <script src="js/cefr-gse.js"></script>
@@ -4844,7 +4844,17 @@ window.SottotitoliDropMicId = function () {
 var SOURCE_KEY = 'sottotitoli-caption-source';
 window.S8tSource = {
   get: function () {
-    try { return localStorage.getItem(SOURCE_KEY) === 'system' ? 'system' : 'mic'; } catch (e) { return 'mic'; }
+    try {
+      if (localStorage.getItem(SOURCE_KEY) !== 'system') return 'mic';
+      /* A source that can no longer be OFFERED must not be silently KEPT. Parking the feature
+         hides the menu entry — but if this still returned 'system' the picker would show the
+         chevron while toggleSession kept reaching for getDisplayMedia, leaving the user in a mode
+         they can neither see nor leave, and skipping the loopback warning on the way. Coerce the
+         STORED value, not just the returned one, so the persisted state is clean too. */
+      if (window.S8tSource.canSystem()) return 'system';
+      try { localStorage.setItem(SOURCE_KEY, 'mic'); } catch (e2) {}
+      return 'mic';
+    } catch (e) { return 'mic'; }
   },
   isSystem: function () { return window.S8tSource.get() === 'system'; },
   canSystem: function () { return !!(window.S8tSystemAudio && window.S8tSystemAudio.isSupported()); },

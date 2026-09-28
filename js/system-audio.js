@@ -10,10 +10,30 @@
 // Safari and Firefox return no audio track from getDisplayMedia, so isSupported() is the only
 // thing that decides whether the option is offered at all.
 (function () {
+  /* ⛔ PARKED 2026-09-28 — do not flip this to true without passing the re-entry criterion.
+   *
+   * The source works end to end locally (share → recorder → segments → upload), but the LIVE
+   * endpoint rejects the audio: OpenAI answers 400 and transcribe-audio maps that to 502. The
+   * prime suspect is the container — webm/Opus is the ONE format this endpoint has never handled,
+   * because the iOS path always recorded mp4/AAC and every tuning constant in the function was
+   * measured on m4a — but that is a hypothesis, not a diagnosis.
+   *
+   * RE-ENTRY CRITERION: a real tab share transcribes two consecutive sentences. The cheapest test
+   * is to have the desktop recorder emit mp4/AAC (Chrome supports 'audio/mp4;codecs=mp4a.40.2'),
+   * so the upload uses the container the endpoint has demonstrably handled. Passing that re-enables
+   * this; failing it means the cause lies elsewhere, and the client now surfaces the server's
+   * `detail` (OpenAI's own reason) to name it.
+   *
+   * Parking hides the menu entry — but hiding alone is NOT enough. S8tSource.get() coerces a
+   * stored 'system' back to 'mic' while this is false, so nobody is left stranded in a mode they
+   * can neither see nor leave, and toggleSession cannot keep reaching for getDisplayMedia. */
+  var FEATURE_ENABLED = false;
+
   var S = {
     _share: null,   // the FULL share stream; see _release() for why it is kept around
 
     isSupported: function () {
+      if (!FEATURE_ENABLED) return false;
       return !!(navigator.mediaDevices
         && typeof navigator.mediaDevices.getDisplayMedia === 'function'
         && window.RecordFallback
