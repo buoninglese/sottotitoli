@@ -1521,10 +1521,32 @@ button[onclick*="addToWordBank"]:hover{background:rgba(52,211,153,.15)!important
 <!-- ═══ BOTTOM CAPTION BAR — outside workspace, always visible ═══ -->
 <div style="flex-shrink:0;padding:0 14px 18px 14px;background:var(--bg)">
   <div id="captionPanel" style="background:var(--panel,var(--card));border:2px solid var(--line-strong,var(--line));border-radius:34px;padding:10px 20px 14px 20px;box-shadow:0 4px 32px rgba(0,0,0,.06);position:relative">
+    <!-- Start-button guard. toggleSession() is defined in the big inline block ~1600 lines
+         below, which does not execute until ~20 external scripts have loaded (supabase from
+         jsdelivr, compromise from unpkg). The button's onclick used to call it directly, so
+         clicking Start during that window threw an unhandled
+             Uncaught ReferenceError: toggleSession is not defined
+         and did nothing at all -- no session, no message. Reproduced on the live site.
+         This shim is parsed BEFORE the button exists, so an early click is explained.
+         Deliberately NOT a `disabled` attribute: if init ever failed, a disabled Start could
+         never recover, whereas this degrades to a message. -->
+    <script>
+      window.s8tStart = function () {
+        if (typeof window.toggleSession === 'function') { window.toggleSession(); return; }
+        var msg = 'Caricamento in corso… attendi un istante e riprova.';
+        try {
+          if (window.I18n && window.I18n.t) {
+            var v = window.I18n.t('loading_please_wait');
+            if (v && v !== 'loading_please_wait') msg = v;
+          }
+        } catch (e) {}
+        if (window.showToast) window.showToast(msg, 'info'); else console.warn(msg);
+      };
+    </script>
     <!-- Top row: transport bar (centered) + settings (top-right) -->
     <div style="display:flex;align-items:center;justify-content:center;margin-bottom:10px;position:relative">
       <div class="transport-bar" id="actionBar" style="margin:0">
-        <button type="button" class="t-btn t-start" id="startBtn" onclick="toggleSession()"><i class="fas fa-play"></i><span data-i18n="listen">Start</span></button>
+        <button type="button" class="t-btn t-start" id="startBtn" onclick="s8tStart()"><i class="fas fa-play"></i><span data-i18n="listen">Start</span></button>
         <button type="button" class="t-btn t-pause" id="pauseBtn" style="display:none" onclick="togglePause()"><i class="fas fa-pause"></i><span data-i18n="pause">Pause</span></button>
         <button type="button" class="t-btn t-stop" id="stopBtn" style="display:none"><i class="fas fa-stop"></i><span data-i18n="stop">Stop</span></button>
         <span class="transport-divider"></span>
@@ -1585,7 +1607,7 @@ button[onclick*="addToWordBank"]:hover{background:rgba(52,211,153,.15)!important
 <script src="js/auth.js?v=23"></script>
 <script src="js/bank-identities.js?v=1"></script>
 <script src="js/xp.js?v=5"></script>
-<script src="js/i18n.js?v=90"></script>
+<script src="js/i18n.js?v=91"></script>
 <script src="js/theme-2.js?v=7"></script>
 <script src="js/toast.js?v=2"></script>
 <script src="js/notifications.js?v=2"></script>
