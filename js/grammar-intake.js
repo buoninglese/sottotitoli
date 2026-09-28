@@ -353,7 +353,18 @@
     var stage = el('giStage');
     if (!stage) return;
     stage.addEventListener('click', onClick);
-    renderIntro();
+    // If a profile already exists (Supabase when signed in, else localStorage),
+    // show the plan directly instead of re-running the intake.
+    store.load().then(function (profile) {
+      if (profile && profile.derived) {
+        _profile = profile;
+        _plan = planner.present(profile);
+        step = 'result';
+        renderResult();
+      } else {
+        renderIntro();
+      }
+    }).catch(function () { renderIntro(); });
   }
 
   if (document.readyState === 'loading') {
