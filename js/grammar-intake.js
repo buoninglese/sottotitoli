@@ -317,7 +317,9 @@
       var cid = t.getAttribute('data-concept');
       var drill = w.SottotitoliGrammarDrill;
       if (drill && cid) {
-        drill.start(cid, el('giStage'), function () { renderResult(); });
+        drill.start(cid, el('giStage'), function (summary) {
+          maybeResolveMiss(cid, summary).then(function () { renderResult(); });
+        });
       }
     }
   }
@@ -347,6 +349,19 @@
   function reset() {
     answers = {}; placementAnswers = {}; l1 = ''; _profile = null; _plan = null;
     step = 'intro'; renderIntro();
+  }
+
+  /* After a drill, drop a missed concept from the review queue once the learner
+   * shows mastery (≥80% correct) — the review loop that makes the placement test
+   * a living "what I still get wrong" list rather than a one-off gate. */
+  function maybeResolveMiss(cid, summary) {
+    if (!_profile || !summary || !summary.total) return Promise.resolve();
+    var missed = (_profile.placement && _profile.placement.missed) || [];
+    var hit = missed.some(function (m) { return m.concept_id === cid; });
+    if (!hit) return Promise.resolve();
+    var ratio = summary.correct / summary.total;
+    if (ratio < 0.8) return Promise.resolve();
+    return store.removeMiss(_profile, cid).then(function (updated) { _profile = updated; });
   }
 
   function init() {
