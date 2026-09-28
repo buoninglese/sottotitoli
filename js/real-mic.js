@@ -13,6 +13,7 @@ var _realMic = {
   forceFinalizeMs: 0, // silence before forcing finalization (0 = disabled)
   lastError: null,   // name of the last getUserMedia failure, so the caller can tell
                      // NotReadableError (device held by another app) from NotAllowedError
+  _errNotified: null, // last mic/recognition error already shown to the user (one toast each)
   _lastInterim: 0,
   _forceTimer: null
 };
@@ -41,6 +42,52 @@ function updateMicUI(state) {
   if (_realMic.onStateChange) _realMic.onStateChange(state);
 }
 
+/* Tell the USER why the microphone or recognition failed. Every one of these paths used to
+ * end at console.log, which is invisible to anyone whose DevTools filter is on Errors -- the
+ * exact shape of "no error in the console, but no text either". The error NAME is included
+ * because the name is the diagnosis. Guarded lookup: this module may load before js/i18n.js. */
+function _realMicT(key, fallback) {
+  try {
+    var v = window.I18n && window.I18n.t ? window.I18n.t(key) : null;
+    return (v && v !== key) ? v : fallback;
+  } catch (e) { return fallback; }
+}
+
+function _notifyMicProblem(name) {
+  if (typeof window.showToast !== 'function') return;
+  var msg;
+  if (name === 'TimeoutError') {
+    msg = _realMicT('mic_gum_timeout', 'Il microfono non risponde: concedi il permesso o ricarica la pagina.');
+  } else if (name === 'recognition:network') {
+    msg = _realMicT('mic_err_network', 'Riconoscimento non raggiungibile (rete, VPN o proxy).');
+  } else if (name === 'recognition:audio-capture') {
+    msg = _realMicT('mic_err_capture', 'Nessun audio dal sistema: cambia il microfono predefinito di macOS.');
+  } else if (name === 'recognition:service-not-allowed' || name === 'NotAllowedError') {
+    msg = _realMicT('mic_err_denied', 'Permesso microfono negato per il riconoscimento.');
+  } else {
+    msg = _realMicT('mic_generic_fail', 'Microfono non disponibile.') + (name ? ' (' + name + ')' : '');
+  }
+  window.showToast(msg, 'error', 9000);
+}
+
+/* getUserMedia can hang FOREVER: an unanswered permission prompt, a wedged device, or a
+ * Bluetooth handoff in progress. Observed on the live site -- the UI sat at "Requesting…"
+ * with no recogniser created, no error, and nothing telling the user anything. A hang here
+ * is indistinguishable from a dead page, so bound it. The loser of the race may still
+ * resolve later (an orphan stream); that is the lesser evil than an unexplained freeze. */
+function _gumWithTimeout(constraints, ms) {
+  return Promise.race([
+    navigator.mediaDevices.getUserMedia(constraints),
+    new Promise(function (_, reject) {
+      setTimeout(function () {
+        var e = new Error('getUserMedia timed out after ' + ms + 'ms');
+        e.name = 'TimeoutError';
+        reject(e);
+      }, ms);
+    })
+  ]);
+}
+
 async function startRealMic() {
   if (_realMic.recognition) return true; // already running
   updateMicUI('requesting');
@@ -53,25 +100,36 @@ async function startRealMic() {
     ? window.SottotitoliMicConstraints()
     : { audio: true };
   try {
-    _realMic.stream = await navigator.mediaDevices.getUserMedia(constraints);
+    _realMic.stream = await _gumWithTimeout(constraints, 12000);
     _realMic.lastError = null;   // clear, or a stale name mislabels the NEXT failure
+    _realMic._errNotified = null; // a new capture may fail differently
   } catch(e) {
+    if (e && e.name === 'TimeoutError') {
+      console.error('Mic did not respond:', e.message);
+      _realMic.lastError = 'TimeoutError';
+      updateMicUI('error');
+      _notifyMicProblem('TimeoutError');
+      return false;
+    }
     if (constraints.audio && constraints.audio.deviceId) {
       console.warn('Chosen microphone unavailable, falling back to the system default:', e && e.name);
       if (typeof window.SottotitoliDropMicId === 'function') window.SottotitoliDropMicId();
       try {
-        _realMic.stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        _realMic.lastError = null;
+        _realMic.stream = await _gumWithTimeout({ audio: true }, 12000);
+        _realMic.lastError = null;   // clear, or a stale name mislabels the NEXT failure
+        _realMic._errNotified = null; // a new capture may fail differently
       } catch(e2) {
         console.error('Mic unavailable:', e2);
         _realMic.lastError = (e2 && e2.name) || null;
         updateMicUI('blocked');
+        _notifyMicProblem(e2 && e2.name);
         return false;
       }
     } else {
       console.error('Mic unavailable:', e);
       _realMic.lastError = (e && e.name) || null;
       updateMicUI('blocked');
+      _notifyMicProblem(e && e.name);
       return false;
     }
   }
@@ -109,11 +167,24 @@ async function startRealMic() {
   _realMic._onresult = rec.onresult;
   
   rec.onerror = function(event) {
+    var name = event && event.error;
     // Log ALL errors on mobile for debugging — 'no-speech' is common on Chrome Android
-    console.log('🎤 SpeechRecognition error:', event.error, event.message || '');
-    if (event.error === 'not-allowed') { updateMicUI('blocked'); }
-    else if (event.error === 'no-speech' || event.error === 'aborted') { /* normal — will auto-restart in onend */ }
+    console.log('🎤 SpeechRecognition error:', name, event.message || '');
+    if (name === 'not-allowed') { updateMicUI('blocked'); }
+    else if (name === 'no-speech' || name === 'aborted') { /* normal — will auto-restart in onend */ }
     else { updateMicUI('error'); }
+    // A recognition failure used to only console.log -- and a log is invisible to a user whose
+    // DevTools filter is on Errors, which is exactly how "no error in the console, but no text
+    // either" happens. Surface the error NAME, because the name IS the diagnosis:
+    //   network              -> the speech service is unreachable (VPN / proxy / offline)
+    //   audio-capture        -> the OS handed us nothing: it is the wrong DEFAULT input
+    //   not-allowed / service-not-allowed -> permission, not audio
+    // 'no-speech'/'aborted' stay silent on purpose: they are the normal silence path and
+    // would otherwise toast on every pause in speech. Once per name per capture.
+    if (name && name !== 'no-speech' && name !== 'aborted' && _realMic._errNotified !== name) {
+      _realMic._errNotified = name;
+      _notifyMicProblem('recognition:' + name);
+    }
   };
   _realMic._onerror = rec.onerror;
   
