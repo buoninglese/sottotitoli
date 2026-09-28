@@ -1,0 +1,944 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Caption S8T Harness · Sottotitoli</title>
+<!--
+  tests/caption-harness.html — what caption-s8t.html ACTUALLY does, proven by driving it.
+
+  WHY THIS EXISTS
+  tests/mic-harness.html proves the mic MODULES and a few page invariants. It cannot prove what
+  the caption PAGE does when something fails, because every one of those paths needs a device or a
+  human. This page drives the real page instead: it loads caption-s8t.html in a same-origin iframe,
+  substitutes the two capture seams, and asserts what the page then does.
+
+  WHY THAT IS POSSIBLE (the property this harness depends on)
+    * js/real-mic.js:133 reads `window.SpeechRecognition || window.webkitSpeechRecognition` AT CALL
+      TIME, so the engine can be replaced from the parent before Start.
+    * js/real-mic.js:78 routes every mic access through MicCore.gumWithTimeout, so
+      navigator.mediaDevices.getUserMedia is substituted in one place.
+    * caption-s8t.html:4650 toggleSession() is a top-level function, so the parent can drive a whole
+      session and watch it.
+    * js/real-mic.js:162-163 hands recognition text to the page via _realMic.onInterim/onFinal, so a
+      fake engine's onresult drives the REAL caption pipeline end to end.
+  NOTHING IN THE PAGE IS MODIFIED. Every seam is injected from here.
+
+  RUNNING IT
+    1. Serve the repo root:   python3 -m http.server 8149      (inside the repo)
+    2. Open:                  http://localhost:8149/tests/caption-harness.html
+    3. Read the summary line, or from a script read window.__captionHarness.
+  The iframe emits a burst of 401s and "Expected 3 parts in JWT" warnings — that is the caption
+  page talking to Supabase without a session. Expected, and classified as noise, not a failure.
+
+  THE FRAME IS DELIBERATELY VISIBLE. _realMic.onInterim force-finalises whenever
+  `interim.scrollHeight > interim.clientHeight`. On a display:none element both are 0 and
+  scrollHeight > 0, so every interim would finalise instantly and the pipeline rows would measure a
+  state the code never produces in a real window. A hidden frame cannot measure geometry.
+-->
+<style>
+  :root { --bg:#0b0b0f; --card:#131316; --line:#26262e; --text:#e7e7ea; --muted:#9a9aa4;
+          --pass:#34d399; --fail:#f87171; --warn:#fbbf24; }
+  body { margin:0; padding:24px; background:var(--bg); color:var(--text);
+         font:14px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; }
+  h1 { font-size:18px; margin:0 0 4px; }
+  h2 { font-size:14px; margin:26px 0 6px; color:var(--muted); text-transform:uppercase;
+       letter-spacing:.06em; }
+  .sub { color:var(--muted); font-size:12px; margin:0 0 16px; max-width:900px; }
+  #summary { padding:10px 14px; border:1px solid var(--line); border-radius:8px;
+             background:var(--card); margin-bottom:16px; font-weight:600; }
+  #summary.ok { color:var(--pass); border-color:var(--pass); }
+  #summary.bad { color:var(--fail); border-color:var(--fail); }
+  #summary.broken { color:var(--warn); border-color:var(--warn); }
+  #summary.running { color:var(--muted); }
+  table { width:100%; border-collapse:collapse; font-size:13px; }
+  th, td { text-align:left; padding:6px 8px; border-bottom:1px solid var(--line); vertical-align:top; }
+  th { color:var(--muted); font-weight:600; font-size:11px; text-transform:uppercase;
+       letter-spacing:.06em; }
+  td.id { font-family:ui-monospace,Menlo,monospace; color:var(--muted); white-space:nowrap; }
+  tr.pass td.res { color:var(--pass); font-weight:700; }
+  tr.fail td.res { color:var(--fail); font-weight:700; }
+  tr.ctrl td { background:rgba(251,191,36,.06); }
+  tr.finding td.res { color:var(--warn); font-weight:700; }
+  tr.unreliable { opacity:.45; }
+  code { background:#1c1c22; padding:1px 5px; border-radius:4px; font-size:12px; }
+  iframe { width:1280px; max-width:100%; height:720px; border:1px solid var(--line);
+           border-radius:10px; background:#fff; }
+</style>
+</head>
+<body>
+
+<h1>Caption S8T harness</h1>
+<p class="sub">
+  Drives the real <code>caption-s8t.html</code> in the frame below with a fake speech engine and a
+  fake microphone, so every failure path can be measured without a device or a human.
+  Exposes <code>window.__captionHarness</code> for scripted reading.
+  <br><b>What this cannot prove:</b> a real microphone, real speech, real credits, and the browser's
+  own speech engine. Those are labelled <code>unverified</code> in the report, never assumed.
+</p>
+
+<div id="summary" class="running">running…</div>
+<table id="rows">
+  <thead><tr><th>id</th><th>check</th><th>expected</th><th>actual</th><th>result</th></tr></thead>
+  <tbody></tbody>
+</table>
+
+<h2>The page under test</h2>
+<p class="sub">
+  Kept visible on purpose — a hidden frame has no geometry, and the interim-overflow path in
+  <code>_realMic.onInterim</code> branches on <code>scrollHeight &gt; clientHeight</code>.
+</p>
+<!-- src is set from script AFTER the module cache is refreshed — see refreshModules(). -->
+<iframe id="frame"></iframe>
+
+<script>
+(function () {
+  'use strict';
+
+  var results = [];
+  var tbody = document.querySelector('#rows tbody');
+  var findings = [];   // rows that DOCUMENT a real issue rather than assert agreement
+
+  function esc(v) {
+    return String(v == null ? '' : v).replace(/&/g, '&amp;').replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;').slice(0, 200);
+  }
+
+  function row(id, what, expected, actual, ok, kind) {
+    results.push({ id: id, what: what, expected: String(expected), actual: String(actual),
+      ok: !!ok, kind: kind || 'check' });
+    var tr = document.createElement('tr');
+    tr.className = (ok ? 'pass' : 'fail') + (id === 'CTRL' ? ' ctrl' : '') +
+      (kind === 'finding' ? ' finding' : '');
+    tr.dataset.id = id;
+    tr.innerHTML = '<td class="id">' + id + '</td><td>' + esc(what) + '</td><td>' +
+      esc(expected) + '</td><td>' + esc(actual) + '</td><td class="res">' +
+      (kind === 'finding' ? (ok ? 'recorded' : 'GONE') : (ok ? 'pass' : 'FAIL')) + '</td>';
+    tbody.appendChild(tr);
+    return ok;
+  }
+
+  /* Accepts EITHER a function returning [expected, actual, ok] OR that triple directly.
+   * An accidental `check(id, what, (function(){...})())` — an IIFE rather than a function
+   * reference — once turned EVERY row into "threw: fn is not a function" and produced a fully-red
+   * table that read like catastrophic findings. A check runner must not be able to fail in a way
+   * that resembles a discovery. */
+  function check(id, what, v) {
+    var r;
+    try { r = (typeof v === 'function') ? v() : v; }
+    catch (e) { r = ['no throw', 'threw: ' + ((e && e.message) || e), false]; }
+    return row(id, what, r[0], r[1], r[2]);
+  }
+
+  /* Documents a known issue. The row passes when the issue IS present, and says so in words, so
+   * that "fixed upstream" shows up as a change rather than silently. */
+  function finding(id, what, present, detail) {
+    findings.push(id);
+    return row(id, what, 'issue still present (documented)', detail, present, 'finding');
+  }
+
+  function delay(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
+
+  function until(fn, ms) {
+    ms = ms || 4000;
+    return new Promise(function (resolve) {
+      var t0 = Date.now();
+      (function poll() {
+        var v = false;
+        try { v = fn(); } catch (e) { v = false; }
+        if (v) return resolve(true);
+        if (Date.now() - t0 > ms) return resolve(false);
+        setTimeout(poll, 50);
+      })();
+    });
+  }
+
+  /* If the driver throws, every later row simply never appears and the summary sits on
+   * "running…" forever — an empty result that reads like a clean run. Say so instead. */
+  var finished = false;
+  window.addEventListener('unhandledrejection', function (ev) {
+    var r = ev && ev.reason;
+    var reason = (r && (r.message || r.name)) || String(r);
+    if (finished) return;
+    check('DRIVER', 'the driver ran to the end without an unhandled rejection',
+      ['no rejection', 'rejected: ' + reason, false]);
+    finish();
+  });
+
+  /* ───────────────────────── cache freshness ─────────────────────────
+   * The iframe loads its scripts through the HTTP cache. If a module changed on disk while its
+   * `?v=` pin stayed the same, the cache serves the OLD file — and this harness then measures code
+   * that is NOT on disk. It can report green against a bug that is sitting right there in the
+   * source, which makes the whole table worthless.
+   * MEASURED, not theorised: setting `rec.continuous = false` in js/real-mic.js and re-running
+   * still reported `continuous=true`. A plain fetch of js/real-mic.js?v=30 returned the old text
+   * while `{cache:'reload'}` returned the new text.
+   * So: refresh every module the page loads BEFORE the iframe starts, then verify nothing is left
+   * stale. After this, a green table means "the code on disk behaves like this". */
+  /* The page HTML itself is cache-busted per run. Without this, an edit to caption-s8t.html's own
+   * INLINE block is never loaded, and the harness silently measures the previous build of the page
+   * — while module edits ARE picked up by refreshModules(). Observed directly: a fix to the timeout
+   * message had no effect until this cache-buster was added, and F9 kept failing against old code. */
+  var IFRAME_SRC = '../caption-s8t.html?bypass_auth=1&lang=it-IT&cb=' + Date.now();
+  var fresh = { checked: 0, refreshed: [], stillStale: [] };
+
+  async function refreshModules() {
+    var urls = [];
+    try {
+      var pageSrc = await (await fetch('../caption-s8t.html', { cache: 'reload' })).text();
+      var re = /src="((?:js|css)\/[A-Za-z0-9._-]+\.(?:js|css))(\?v=\d+)?"/g;
+      var m;
+      while ((m = re.exec(pageSrc)) !== null) urls.push('../' + m[1] + (m[2] || ''));
+    } catch (e) { return; }
+    for (var i = 0; i < urls.length; i++) {
+      try {
+        var cached = await (await fetch(urls[i])).text();
+        var disk = await (await fetch(urls[i], { cache: 'reload' })).text();
+        fresh.checked++;
+        if (cached !== disk) fresh.refreshed.push(urls[i].replace('../', ''));
+        /* the reload fetch should have replaced the cache entry — confirm it sticks */
+        var after = await (await fetch(urls[i])).text();
+        if (after !== disk) fresh.stillStale.push(urls[i].replace('../', ''));
+      } catch (e) { /* unreadable modules are covered by the source checks */ }
+    }
+  }
+
+  var frame = document.getElementById('frame');
+
+  refreshModules().then(function () { frame.src = IFRAME_SRC; });
+
+  function waitForFrame(cb) {
+    var t0 = Date.now();
+    (function poll() {
+      var w = null;
+      try { w = frame.contentWindow; } catch (e) {}
+      var ready = false;
+      try {
+        ready = !!(w && typeof w.toggleSession === 'function' && w.S8tSource
+          && w.MicCore && w._realMic);
+      } catch (e) {}
+      if (ready) return cb(w);
+      /* The page needs supabase (jsdelivr) and compromise (unpkg) before its inline block runs, so
+       * a CDN outage leaves toggleSession undefined. Report that as a harness failure, NOT as 40
+       * broken rows — the distinction is the whole point of the control row below. */
+      if (Date.now() - t0 > 30000) return cb(null);
+      setTimeout(poll, 200);
+    })();
+  }
+
+  /* ───────────────────────── fakes ───────────────────────── */
+  var F = { recs: [], gumMode: 'ok', gumCalls: 0, track: null, sb: { saved: undefined } };
+
+  function mkStream(label) {
+    var track = {
+      kind: 'audio', label: label, enabled: true, readyState: 'live', _stopped: false,
+      stop: function () { this._stopped = true; this.readyState = 'ended'; },
+      getSettings: function () { return { deviceId: 'fake-device', sampleRate: 48000 }; }
+    };
+    F.track = track;
+    return {
+      getTracks: function () { return [track]; },
+      getAudioTracks: function () { return [track]; },
+      getVideoTracks: function () { return []; }
+    };
+  }
+
+  function installEngine(w) {
+    F.recs = [];
+    function Fake() {
+      var self = this;
+      this.continuous = false; this.interimResults = false; this.lang = '';
+      this.started = false; this.stopped = false;
+      this.onresult = null; this.onerror = null; this.onend = null;
+      this.start = function () { self.started = true; };
+      this.stop = function () { self.stopped = true; };
+      F.recs.push(this);
+    }
+    w.SpeechRecognition = Fake;
+    w.webkitSpeechRecognition = Fake;
+  }
+
+  function installGum(w) {
+    var md = {
+      getUserMedia: function (constraints) {
+        F.gumCalls++;
+        var mode = F.gumMode;
+        if (mode === 'hang') return new Promise(function () {});
+        if (mode === 'ok') return Promise.resolve(mkStream('Fake Microphone'));
+        var name = mode === 'timeout' ? 'TimeoutError'
+          : mode === 'denied' ? 'NotAllowedError'
+            : mode === 'busy' ? 'NotReadableError' : 'NotFoundError';
+        var e = new Error('injected ' + name);
+        e.name = name;
+        return Promise.reject(e);
+      },
+      enumerateDevices: function () {
+        return Promise.resolve([{ kind: 'audioinput', deviceId: 'fake-device',
+          label: 'Fake Microphone', groupId: 'g' }]);
+      }
+    };
+    try {
+      Object.defineProperty(w.navigator, 'mediaDevices', { value: md, configurable: true });
+    } catch (e) {
+      w.navigator.mediaDevices.getUserMedia = md.getUserMedia;
+    }
+  }
+
+  function fakeSb(spec) {
+    return {
+      auth: {
+        getSession: function () {
+          if (spec.throwSession) return Promise.reject(new Error('injected session failure'));
+          return Promise.resolve({ data: { session: spec.userId ? { user: { id: spec.userId } } : null } });
+        }
+      },
+      from: function () {
+        return {
+          select: function () {
+            return {
+              eq: function () {
+                return {
+                  maybeSingle: function () {
+                    if (spec.throwFrom) return Promise.reject(new Error('injected query failure'));
+                    return Promise.resolve({
+                      data: spec.balance === undefined ? null : { balance_minutes: spec.balance }
+                    });
+                  }
+                };
+              }
+            };
+          }
+        };
+      }
+    };
+  }
+
+  function setSb(w, spec) {
+    if (F.sb.saved === undefined) F.sb.saved = w.sottotitoliSupabase;
+    w.sottotitoliSupabase = spec;
+  }
+  function restoreSb(w) { w.sottotitoliSupabase = F.sb.saved; }
+
+  /* The toast element is REUSED and hide() only drops the class, so the text of a previous
+   * scenario stays in the DOM. Reading it without clearing first reports a stale message — a
+   * mistake this codebase has made before. */
+  function clearToast(w) {
+    try { if (typeof w.hideToast === 'function') w.hideToast(); } catch (e) {}
+    var t = w.document.querySelector('.sd-toast');
+    if (t) { t.innerHTML = ''; t.classList.remove('show'); }
+  }
+  function toastText(w) {
+    var t = w.document.querySelector('.sd-toast');
+    return t ? (t.textContent || '').trim() : '';
+  }
+
+  function startBtnState(w) {
+    var b = w.document.getElementById('startBtn');
+    if (!b) return { found: false };
+    return { found: true, disabled: !!b.disabled, display: b.style.display,
+      visible: b.style.display !== 'none' };
+  }
+
+  function lineCount(w) {
+    var t = w.document.getElementById('captionTranscript');
+    return t ? t.querySelectorAll('.line').length : -1;
+  }
+
+  async function endSessionIfActive(w) {
+    try { if (w.sessionActive) { await w.toggleSession(); await delay(250); } } catch (e) {}
+  }
+
+  /* ───────────────────────── source invariants ───────────────────────── */
+  function sourceChecks(done) {
+    var files = ['../caption-s8t.html', '../js/real-mic.js', '../js/mic-core.js',
+      '../js/system-audio.js', '../tests/caption-harness.html'];
+    Promise.all(files.map(function (f) {
+      return fetch(f).then(function (r) { return r.text(); })
+        .then(function (t) { return { f: f, t: t }; })
+        .catch(function () { return { f: f, t: null }; });
+    })).then(function (all) {
+      var by = {};
+      all.forEach(function (x) { by[x.f] = x.t; });
+      var unread = all.filter(function (x) { return x.t === null; }).map(function (x) { return x.f; });
+
+      /* A source check that could not READ the source must say so, not pass. Silence here would
+       * look identical to a clean result — the failure mode this file exists to prevent. */
+      check('S1', 'all ' + files.length + ' sources were readable', function () {
+        return ['0 unread', unread.length ? unread.join(', ') : '0 unread', unread.length === 0];
+      });
+
+      var page = by['../caption-s8t.html'] || '';
+
+      /* Matched on the SCRIPT TAG, not the bare filename: a comment naming real-mic.js above the
+       * mic-core tag once made the naive version report a false failure. */
+      check('S2', 'mic-core.js loads BEFORE real-mic.js in the page', function () {
+        var core = page.indexOf('src="js/mic-core.js');
+        var real = page.indexOf('src="js/real-mic.js');
+        var ok = core >= 0 && real >= 0 && core < real;
+        return ['core before real', 'core@' + core + ' real@' + real, ok];
+      });
+
+      /* The rule is BOUNDED, not "never direct". A direct call is fine when it races a timeout;
+       * an unbounded one is what the audit was about (a hang that never resolves).
+       * tests/mic-harness.html S2 only checked onboarding + learner, so this page was never
+       * covered — and it DOES have one direct call, in the loopback check (~:5011). */
+      check('S3', 'every direct getUserMedia in the page is BOUNDED by a timeout race', function () {
+        var re = /navigator\.mediaDevices\.getUserMedia\(/g;
+        var m, idxs = [];
+        while ((m = re.exec(page)) !== null) idxs.push(m.index);
+        var unbounded = idxs.filter(function (i) {
+          var win = page.slice(Math.max(0, i - 500), i + 500);
+          return !(/Promise\.race/.test(win) && /TimeoutError/.test(win));
+        });
+        return [idxs.length + ' direct call(s), all bounded',
+          idxs.length + ' found, ' + unbounded.length + ' unbounded', unbounded.length === 0];
+      });
+
+      check('S4', 'the removed X-Audio-Seconds header is gone from the page', function () {
+        var n = (page.match(/X-Audio-Seconds/g) || []).length;
+        return ['0 references', String(n), n === 0];
+      });
+
+      /* FINDING — recorded, not asserted-away. A socket error is currently invisible. */
+      var emptyErr = /_duoWs\.onerror\s*=\s*function\s*\(\s*\)\s*\{\s*\}/.test(page);
+      finding('W1', 'the duo WebSocket installs an EMPTY onerror handler (errors are swallowed)',
+        emptyErr, emptyErr ? 'window._duoWs.onerror = function () {} — no logging, no state change'
+          : 'handler is no longer empty');
+
+      var parked = /var\s+FEATURE_ENABLED\s*=\s*false/.test(by['../js/system-audio.js'] || '');
+      check('S5', 'the computer-audio source is still PARKED (parking is deliberate, not drift)',
+        ['FEATURE_ENABLED = false', String(parked), parked]);
+
+      done();
+    });
+  }
+
+  /* ───────────────────────── main ───────────────────────── */
+  waitForFrame(async function (w) {
+    if (!w) {
+      check('M0', 'the caption page exposed toggleSession within 30s', ['available',
+        'TIMED OUT — check that the CDN scripts (supabase, compromise) loaded', false]);
+      return finish();
+    }
+
+    /* Snapshot anything we are about to touch, so running the harness changes no user setting. */
+    var saved = {};
+    try {
+      saved.source = w.localStorage.getItem('sottotitoli-caption-source');
+      saved.mic = w.localStorage.getItem('sottotitoli-mic-device');
+    } catch (e) {}
+
+    installEngine(w);
+    installGum(w);
+    F.gumMode = 'ok';
+
+    /* ── 0 · the page under test IS the code on disk ──
+     * Without this, every row below can be a measurement of a cached older build. */
+    check('S0', 'every script the page loads matches the file on disk (none served stale)',
+      function () {
+        return [fresh.checked + ' modules checked, 0 still stale',
+          fresh.checked + ' checked; ' + fresh.refreshed.length + ' needed refreshing (' +
+            (fresh.refreshed.slice(0, 4).join(', ') || 'none') + '); ' +
+            fresh.stillStale.length + ' STILL stale',
+          fresh.checked > 0 && fresh.stillStale.length === 0];
+      });
+
+    /* ── 1 · the modules the harness claims to drive actually loaded ──
+     * A module that failed to load must be a red row, not an absent one: otherwise every
+     * dependent check silently disappears and the run looks clean. */
+    check('M1', 'js/mic-core.js loaded in the page (window.MicCore)', function () {
+      var c = w.MicCore;
+      return ['looksVirtual + gumWithTimeout + errorMessage', String(!!c), !!c
+        && typeof c.looksVirtual === 'function' && typeof c.gumWithTimeout === 'function'
+        && typeof c.errorMessage === 'function'];
+    });
+    check('M2', 'js/real-mic.js loaded (updateMicUI + startRealMic)', function () {
+      return ['both are functions', 'updateMicUI=' + typeof w.updateMicUI + ' startRealMic=' +
+        typeof w.startRealMic,
+      typeof w.updateMicUI === 'function' && typeof w.startRealMic === 'function'];
+    });
+    check('M3', 'js/record-fallback.js loaded (window.RecordFallback)', function () {
+      return ['isNeeded + canRecord are functions', String(!!w.RecordFallback),
+        !!(w.RecordFallback && typeof w.RecordFallback.isNeeded === 'function'
+          && typeof w.RecordFallback.canRecord === 'function')];
+    });
+    check('M4', 'js/system-audio.js loaded (window.S8tSystemAudio)', function () {
+      return ['isSupported is a function', String(!!w.S8tSystemAudio),
+        !!(w.S8tSystemAudio && typeof w.S8tSystemAudio.isSupported === 'function')];
+    });
+    check('M5', 'translation-providers.js loaded (window.SottotitoliTranslationProviders)',
+      function () {
+        var t = w.SottotitoliTranslationProviders;
+        return ['object present', String(!!t && typeof t === 'object'),
+          !!t && typeof t === 'object' && Object.keys(t).length > 0];
+      });
+    check('M6', 'js/toast.js loaded (window.showToast)', function () {
+      return ['function', typeof w.showToast, typeof w.showToast === 'function'];
+    });
+
+    /* ── 2 · the parked source, and nobody stranded in it ── */
+    check('P1', 'the computer-audio source reports itself unsupported (PARKED)',
+      ['false', String(w.S8tSystemAudio.isSupported()), w.S8tSystemAudio.isSupported() === false]);
+    check('P2', 'canSystem() is false, so every UI path follows one gate',
+      ['false', String(w.S8tSource.canSystem()), w.S8tSource.canSystem() === false]);
+    check('P3', 'a stored "system" source is coerced back to "mic" AND rewritten in storage',
+      function () {
+        try { w.localStorage.setItem('sottotitoli-caption-source', 'system'); } catch (e) {}
+        var got = w.S8tSource.get();
+        var stored = null;
+        try { stored = w.localStorage.getItem('sottotitoli-caption-source'); } catch (e) {}
+        return ['mic + storage=mic', got + ' + storage=' + stored,
+          got === 'mic' && stored === 'mic'];
+      });
+    check('P4', 'the picker icon shows the chevron, not headphones', function () {
+      try { w.S8tSource._reflect(); } catch (e) {}
+      var i = w.document.querySelector('#micPickBtn i');
+      var cls = i ? i.className : '(no icon)';
+      return ['fas fa-chevron-down', cls, cls === 'fas fa-chevron-down'];
+    });
+
+    /* ── 3 · the credit gate, called directly (no session needed) ──
+     * _checkCreditsBeforeStart reads window.sottotitoliSupabase and writes
+     * window._creditBudgetSeconds, so both the decision and its side effect are observable. */
+    async function creditCase(w2, spec, stubInit) {
+      setSb(w2, fakeSb(spec));
+      var savedInit = w2.initUserCredits;
+      if (stubInit) w2.initUserCredits = function () {};
+      var allowed = null;
+      try { allowed = await w2._checkCreditsBeforeStart(); } catch (e) { allowed = 'threw: ' + e.message; }
+      var budget = w2._creditBudgetSeconds;
+      if (stubInit) w2.initUserCredits = savedInit;
+      restoreSb(w2);
+      return { allowed: allowed, budget: budget };
+    }
+
+    var c1 = await creditCase(w, null);
+    check('CR1', 'no Supabase client -> fail-safe ALLOW, budget unknown (null)', function () {
+      return ['true + null', c1.allowed + ' + ' + c1.budget,
+        c1.allowed === true && c1.budget === null];
+    });
+
+    var c2 = await creditCase(w, { userId: 'u-test', balance: 12.5 });
+    check('CR2', 'balance 12.5 min -> allow, budget snapshotted as 750 SECONDS', function () {
+      return ['true + 750', c2.allowed + ' + ' + c2.budget,
+        c2.allowed === true && c2.budget === 750];
+    });
+
+    var c3 = await creditCase(w, { userId: 'u-test', balance: 0 });
+    check('CR3', 'balance 0 -> REFUSE, and the budget is armed at 0 (not null)', function () {
+      return ['false + 0', c3.allowed + ' + ' + c3.budget,
+        c3.allowed === false && c3.budget === 0];
+    });
+
+    var c4 = await creditCase(w, { userId: 'u-test', throwSession: true });
+    check('CR4', 'a Supabase failure -> fail-safe ALLOW (a query error must not lock the user out)',
+      function () {
+        return ['true', String(c4.allowed), c4.allowed === true];
+      });
+
+    var c5 = await creditCase(w, { userId: 'u-test', balance: null }, true);
+    check('CR5', 'no credit row -> fail-safe ALLOW after the initUserCredits backstop',
+      function () {
+        return ['true', String(c5.allowed), c5.allowed === true];
+      });
+
+    /* ── 4 · SCENARIO: a normal desktop session, driven end to end ── */
+    await endSessionIfActive(w);
+    setSb(w, null);                 // not signed in -> credit check allows
+    F.gumMode = 'ok';
+    clearToast(w);
+    var before = lineCount(w);
+    var recsBefore = F.recs.length;
+
+    await w.toggleSession();
+    var live = await until(function () {
+      return w.sessionActive && w.document.body.classList.contains('session-active');
+    }, 5000);
+    await delay(300);               // the stop button is attached on a 150ms defer
+
+    check('G1', 'Start reaches a live capture (engine running, _realMic.state = live)', function () {
+      return ['live', String(w._realMic.state), w._realMic.state === 'live'];
+    });
+    check('G2', 'a session is active and the page marks itself session-active', function () {
+      return ['true + true', String(w.sessionActive) + ' + ' +
+        w.document.body.classList.contains('session-active'), live === true];
+    });
+    check('G3', 'exactly one speech engine was created, and start() was called on it',
+      function () {
+        var made = F.recs.length - recsBefore;
+        var last = F.recs[F.recs.length - 1];
+        return ['1 created + started', made + ' created, started=' + (last && last.started),
+          made === 1 && !!(last && last.started)];
+      });
+    check('G4', 'the Start button is hidden while live', function () {
+      var s = startBtnState(w);
+      return ['display:none', s.display, s.found && s.display === 'none'];
+    });
+    check('G5', 'the Stop button is visible AND clickable (onclick attached)', function () {
+      var b = w.document.getElementById('stopBtn');
+      return ['visible + onclick is a function',
+        (b ? b.style.display : '(none)') + ' + ' + (b ? typeof b.onclick : 'n/a'),
+        !!b && b.style.display !== 'none' && typeof b.onclick === 'function'];
+    });
+    check('G6', 'the engine is fed the page language, and continuous+interim are on', function () {
+      var rec = F.recs[F.recs.length - 1];
+      return ['continuous + interimResults true', rec
+        ? ('continuous=' + rec.continuous + ' interimResults=' + rec.interimResults +
+           ' lang=' + rec.lang) : '(no engine)',
+      !!rec && rec.continuous === true && rec.interimResults === true];
+    });
+
+    /* ── 5 · the caption pipeline, driven by the fake engine ── */
+    var interimEl = w.document.getElementById('captionInterim');
+    check('E0', 'the interim box has REAL geometry (a hidden frame cannot measure this)',
+      function () {
+        if (!interimEl) return ['non-zero height', '(no #captionInterim)', false];
+        return ['non-zero height', 'h=' + interimEl.clientHeight,
+          interimEl.clientHeight > 0];
+      });
+
+    var linesBeforeEmit = lineCount(w);
+    var sessionBeforeEmit = (w._sessionLines || []).length;
+    var rec = F.recs[F.recs.length - 1];
+
+    function emit(text, isFinal) {
+      rec.onresult({ resultIndex: 0, results: [{ isFinal: isFinal, 0: { transcript: text } }] });
+    }
+
+    emit('the quick brown fox', false);
+    check('E1', 'an INTERIM result fills the live box and adds NO transcript line', function () {
+      var shown = (interimEl && interimEl.textContent || '').trim();
+      var lines = lineCount(w);
+      return ['box has text, line count unchanged',
+        'box="' + shown + '" lines=' + lines + ' (was ' + linesBeforeEmit + ')',
+        shown.length > 0 && lines === linesBeforeEmit];
+    });
+
+    emit('the quick brown fox', true);
+    check('E2', 'a FINAL result appends exactly ONE transcript line', function () {
+      var lines = lineCount(w);
+      return ['+' + 1 + ' line', lines + ' (was ' + linesBeforeEmit + ')',
+        lines === linesBeforeEmit + 1];
+    });
+    check('E3', 'the final result is buffered for the session save (_sessionLines)', function () {
+      var n = (w._sessionLines || []).length;
+      return ['+' + 1 + ' entry', n + ' (was ' + sessionBeforeEmit + ')',
+        n === sessionBeforeEmit + 1];
+    });
+    check('E4', 'the transcript line contains the spoken text', function () {
+      var t = w.document.getElementById('captionTranscript');
+      var txt = t ? (t.textContent || '') : '';
+      return ['contains "quick brown fox"', txt.slice(0, 80).replace(/\s+/g, ' '),
+        txt.indexOf('quick brown fox') >= 0];
+    });
+    check('E5', 'the interim box is CLEARED once the final lands (no duplicate text)',
+      function () {
+        var shown = (interimEl && interimEl.textContent || '').trim();
+        return ['empty', 'box="' + shown + '"', shown === ''];
+      });
+    check('E6', 'the stats counter agrees with the real number of lines', function () {
+      var el = w.document.getElementById('statLines');
+      var shown = el ? el.textContent : '(no #statLines)';
+      return [String(lineCount(w)), shown, String(lineCount(w)) === String(shown)];
+    });
+
+    /* ── 6 · the engine lifecycle: auto-restart, and the guard that must stop it ── */
+    var recsBeforeEnd = F.recs.length;
+    rec.onend();
+    var restarted = await until(function () { return F.recs.length > recsBeforeEnd; }, 2000);
+    check('G7', 'a dropped engine auto-restarts while the session is still live', function () {
+      return ['a new engine is created', F.recs.length - recsBeforeEnd + ' created',
+        restarted === true];
+    });
+
+    await w.toggleSession();
+    var stopped = await until(function () {
+      return !w.sessionActive && !w.document.body.classList.contains('session-active');
+    }, 5000);
+    await delay(300);
+
+    check('G8', 'Stop returns the page to a stopped state', function () {
+      return ['sessionActive false + class removed', String(w.sessionActive) + ' + ' +
+        w.document.body.classList.contains('session-active'), stopped === true];
+    });
+    check('G9', 'Stop detaches the Stop handler and restores the Start button', function () {
+      var b = w.document.getElementById('stopBtn');
+      var s = startBtnState(w);
+      return ['onclick null + Start visible',
+        'onclick=' + (b ? String(b.onclick) : 'n/a') + ' startDisplay=' + s.display,
+        !!b && b.onclick === null && s.found && s.display !== 'none'];
+    });
+    check('G10', 'Stop resets the timer to 00:00', function () {
+      var t = w.document.getElementById('recTimer');
+      return ['00:00', t ? t.textContent : '(no #recTimer)', !!t && t.textContent === '00:00'];
+    });
+    check('G11', 'Stop does NOT clear the transcript (the user scrolls back through it)',
+      function () {
+        var lines = lineCount(w);
+        return ['lines retained', lines + ' (before session ' + before + ')', lines > before];
+      });
+
+    /* The classic bug: stop() fires onend, onend sees a stale "live" state and restarts the mic,
+     * so the session never actually ends. stopRealMic() nulls recognition BEFORE onend runs, and
+     * this row keeps that ordering honest. */
+    var recsBeforeGhost = F.recs.length;
+    try { F.recs[F.recs.length - 1].onend(); } catch (e) {}
+    await delay(700);
+    check('G12', 'a late onend after Stop must NOT restart the microphone', function () {
+      return ['no new engine', (F.recs.length - recsBeforeGhost) + ' created',
+        F.recs.length === recsBeforeGhost];
+    });
+    check('G13', 'the capture track was actually released (no hot mic left behind)', function () {
+      return ['track stopped', F.track ? String(F.track._stopped) : '(no track)',
+        !!F.track && F.track._stopped === true];
+    });
+
+    /* ── 7 · failure modes: the message AND the button must both be right ── */
+    async function failCase(mode) {
+      await endSessionIfActive(w);
+      setSb(w, null);
+      clearToast(w);
+      F.gumMode = mode;
+      await w.toggleSession();
+      await until(function () { return w._realMic.state !== 'idle' &&
+        w._realMic.state !== 'requesting'; }, 4000);
+      await delay(150);
+      var out = { state: w._realMic.state, lastError: w._realMic.lastError,
+        toast: toastText(w), start: startBtnState(w), active: w.sessionActive };
+      F.gumMode = 'ok';
+      await endSessionIfActive(w);
+      return out;
+    }
+
+    var denied = await failCase('denied');
+    check('F1', 'NotAllowedError -> state blocked, and the name is preserved on _realMic',
+      function () {
+        return ['blocked + NotAllowedError', denied.state + ' + ' + denied.lastError,
+          denied.state === 'blocked' && denied.lastError === 'NotAllowedError'];
+      });
+    check('F2', 'a permission failure tells the user to grant access', function () {
+      return ['mentions access/permission', denied.toast,
+        /accesso|consenti/i.test(denied.toast)];
+    });
+    check('F3', 'a frozen Start button is a dead end -> it must be restored after the failure',
+      function () {
+        return ['enabled + visible', 'disabled=' + denied.start.disabled +
+          ' display=' + denied.start.display,
+        denied.start.found === true && denied.start.disabled === false
+          && denied.start.display !== 'none'];
+      });
+    check('F4', 'a failed start leaves no session behind', function () {
+      return ['sessionActive false + class removed', String(denied.active),
+        denied.active === false];
+    });
+
+    var busy = await failCase('busy');
+    check('F5', 'NotReadableError -> state blocked, name preserved', function () {
+      return ['blocked + NotReadableError', busy.state + ' + ' + busy.lastError,
+        busy.state === 'blocked' && busy.lastError === 'NotReadableError'];
+    });
+    check('F6', 'a BUSY device must not be described as a denied permission (Zoom/Teams case)',
+      function () {
+        var busyWord = /occupato/i.test(busy.toast);
+        var permWord = /consenti|accesso/i.test(busy.toast);
+        return ['says "occupato", does NOT say "consenti/accesso"',
+          busy.toast, busyWord && !permWord];
+      });
+    check('F7', 'a busy device also restores the Start button', function () {
+      return ['enabled + visible', 'disabled=' + busy.start.disabled,
+        busy.start.found === true && busy.start.disabled === false];
+    });
+
+    var timedOut = await failCase('timeout');
+    check('F8', 'a hanging device is bounded -> TimeoutError reaches the page', function () {
+      return ['blocked/error + TimeoutError',
+        timedOut.state + ' + ' + timedOut.lastError,
+        timedOut.lastError === 'TimeoutError' && timedOut.state !== 'live'];
+    });
+    /* The first version of this row only asked "is a message shown?" — and it PASSED on a message
+     * that told a Chrome user to "use Chrome/Edge", because a mic timeout reports state 'error'
+     * and fell through to the unsupported-browser branch. Assert the ADVICE, not its presence. */
+    check('F9', 'a mic TIMEOUT explains itself, is never called "not supported", and restores Start',
+      function () {
+        var wrong = /not supported|non supportat/i.test(timedOut.toast);
+        var explains = /microfono|micr[oó]fono|non ha risposto|device|respond/i.test(timedOut.toast);
+        return ['explains the mic did not respond, never says "not supported", Start enabled',
+          '"' + timedOut.toast.slice(0, 90) + '" disabled=' + timedOut.start.disabled,
+          !wrong && explains && timedOut.start.disabled === false];
+      });
+
+    var notFound = await failCase('notfound');
+    check('F10', 'NotFoundError -> still blocked, still recoverable, name preserved', function () {
+      return ['blocked + NotFoundError + Start enabled',
+        notFound.state + ' + ' + notFound.lastError + ' + disabled=' + notFound.start.disabled,
+        notFound.state === 'blocked' && notFound.lastError === 'NotFoundError'
+          && notFound.start.disabled === false];
+    });
+
+    /* ── 8a · no Web Speech engine, but a recorder exists ──
+     * isNeeded() is `!SpeechRecognition && MediaRecorder && getUserMedia`, so removing the engine
+     * is exactly the Firefox / engine-less-Chromium case: the page must switch to the recorder
+     * fallback rather than dead-end. (The first version of this row asserted an "unsupported"
+     * message here and failed — the page was right and the expectation was wrong.) */
+    await endSessionIfActive(w);
+    setSb(w, null);
+    clearToast(w);
+    var savedSR = w.SpeechRecognition, savedWk = w.webkitSpeechRecognition;
+    w.SpeechRecognition = undefined; w.webkitSpeechRecognition = undefined;
+    var neededWithoutEngine = w.RecordFallback.isNeeded();
+    await w.toggleSession();
+    await until(function () { return w._realMic.state === 'error' || w._realMic.state === 'blocked'; },
+      4000);
+    await delay(200);
+    var noEngineToast = toastText(w);
+    var noEngineRecs = F.recs.length;
+
+    check('F11', 'no Web Speech engine -> the page chooses the RECORDER fallback, not a dead end',
+      ['RecordFallback.isNeeded() === true', String(neededWithoutEngine),
+        neededWithoutEngine === true]);
+    check('F12', 'no engine -> the user is still told something (never a silent nothing)',
+      ['a message is shown', noEngineToast || '(nothing shown)', noEngineToast.length > 0]);
+    check('F13', 'no engine -> no phantom speech engine is created', function () {
+      return ['0 created', (F.recs.length - noEngineRecs) + ' created',
+        F.recs.length === noEngineRecs];
+    });
+
+    /* ── 8b · genuinely unsupported: no engine AND no recorder ── */
+    await endSessionIfActive(w);
+    clearToast(w);
+    var savedMR = w.MediaRecorder;
+    w.MediaRecorder = undefined;
+    var neededWithNothing = w.RecordFallback.isNeeded();
+    await w.toggleSession();
+    await until(function () { return w._realMic.state === 'error' || w._realMic.state === 'blocked'; },
+      4000);
+    await delay(200);
+    var deadToast = toastText(w);
+    var deadStart = startBtnState(w);
+    w.MediaRecorder = savedMR;
+    w.SpeechRecognition = savedSR; w.webkitSpeechRecognition = savedWk;
+    await endSessionIfActive(w);
+
+    check('F14', 'no engine and no recorder -> the page names the browser as unsupported',
+      function () {
+        return ['mentions Chrome/Edge support', '(isNeeded=' + neededWithNothing + ') ' +
+          (deadToast || '(nothing shown)'), /not supported|non supportat/i.test(deadToast)];
+      });
+    check('F15', 'a genuinely unsupported browser still recovers (Start enabled, not wedged)',
+      ['enabled + visible', 'disabled=' + deadStart.disabled,
+        deadStart.found === true && deadStart.disabled === false]);
+
+    /* ── 9 · credits exhausted: the run must STOP, not merely complain ──
+     * The defect this row exists to catch is a hot mic left running after the gate refuses. */
+    await endSessionIfActive(w);
+    F.gumMode = 'ok';
+    setSb(w, fakeSb({ userId: 'u-test', balance: 0 }));
+    clearToast(w);
+    var recsBeforeCredits = F.recs.length;
+    await w.toggleSession();
+    await until(function () { return w._creditBudgetSeconds === 0 && w.sessionActive === false; }, 5000);
+    await delay(400);
+    var credState = { active: w.sessionActive, budget: w._creditBudgetSeconds,
+      start: startBtnState(w), bodyText: (w.document.body.textContent || ''),
+      trackStopped: !!(F.track && F.track._stopped),
+      engineStopped: (function () { var r = F.recs[F.recs.length - 1];
+        return !!(r && r.stopped); })() };
+    restoreSb(w);
+
+    check('X1', 'balance 0 -> the session never becomes live and Start is restored', function () {
+      return ['sessionActive false + Start enabled',
+        String(credState.active) + ' + disabled=' + credState.start.disabled,
+        credState.active === false && credState.start.found === true
+          && credState.start.disabled === false];
+    });
+    check('X2', 'balance 0 -> the budget is armed at 0 seconds (enforcement is on)', function () {
+      return ['0', String(credState.budget), credState.budget === 0];
+    });
+    check('X3', 'balance 0 -> the capture is ACTUALLY stopped (no hot mic left recording)',
+      function () {
+        return ['capture released', 'trackStopped=' + credState.trackStopped +
+          ' engineStopped=' + credState.engineStopped,
+        credState.trackStopped === true || credState.engineStopped === true];
+      });
+    check('X4', 'balance 0 -> the user is told why, in words', function () {
+      return ['mentions exhausted credits', /Crediti esauriti|Nessun credito/i.test(credState.bodyText)
+        ? 'found' : 'not found', /Crediti esauriti|Nessun credito/i.test(credState.bodyText)];
+    });
+
+    /* ── 10 · translation surface (reachable parts only) ──
+     * A full translate round-trip needs a live provider, so these assert the CONTRACT the page
+     * documents (window._currentCaptionLang is exposed for providers) and that calling the
+     * retranslate entry point with a bad index cannot break the transcript. */
+    check('T1', 'the caption language is exposed to translation providers', function () {
+      var v = w._currentCaptionLang;
+      return ['a language string', String(v), typeof v === 'string' && /^[a-z]{2}/i.test(v)];
+    });
+    check('T2', 'v20q_retranslateLine exists and survives an out-of-range index', function () {
+      if (typeof w.v20q_retranslateLine !== 'function') {
+        return ['function', typeof w.v20q_retranslateLine, false];
+      }
+      var linesBefore2 = lineCount(w);
+      var threw = null;
+      try { w.v20q_retranslateLine(9999); } catch (e) { threw = (e && e.message) || String(e); }
+      return ['no throw + transcript intact',
+        threw ? ('threw: ' + threw) : 'no throw, lines=' + lineCount(w),
+        threw === null && lineCount(w) === linesBefore2];
+    });
+
+    /* restore anything we touched */
+    try {
+      if (saved.source === null) w.localStorage.removeItem('sottotitoli-caption-source');
+      else if (saved.source !== undefined) w.localStorage.setItem('sottotitoli-caption-source', saved.source);
+      if (saved.mic === null) w.localStorage.removeItem('sottotitoli-mic-device');
+      else if (saved.mic !== undefined) w.localStorage.setItem('sottotitoli-mic-device', saved.mic);
+    } catch (e) {}
+    await endSessionIfActive(w);
+
+    sourceChecks(function () { finish(); });
+  });
+
+  function finish() {
+    finished = true;
+    /* ── KNOWN-POSITIVE CONTROL ──
+     * A check that asserts something FALSE, on purpose. If the runner records it as a PASS then
+     * the runner is broken and every other row here is meaningless — so say that loudly instead of
+     * showing a green table. This is how a broken lookup once reported "no secrets found" three
+     * times against a folder the tool could not even see. */
+    check('CTRL', 'known-positive control: a false assertion is reported as FAIL', function () {
+      return ['detected (this row must be FAIL)', 'deliberately false: 1 === 2', 1 === 2];
+    });
+    var ctrlRow = results.filter(function (r) { return r.id === 'CTRL'; })[0];
+    var ctrlDetected = !!(ctrlRow && ctrlRow.ok === false);
+
+    var real = results.filter(function (r) { return r.id !== 'CTRL'; });
+    var failed = real.filter(function (r) { return !r.ok; });
+    var passed = real.length - failed.length;
+    var s = document.getElementById('summary');
+
+    if (!ctrlDetected) {
+      Array.prototype.forEach.call(document.querySelectorAll('#rows tr'), function (tr) {
+        tr.classList.add('unreliable');
+      });
+      s.className = 'broken';
+      s.textContent = 'HARNESS BROKEN — the known-positive control did not fire, so the ' + passed +
+        ' "passes" in this table prove nothing. Fix the runner before trusting any row.';
+    } else if (failed.length) {
+      s.className = 'bad';
+      s.textContent = failed.length + ' FAILED / ' + real.length + ' checks (control fired correctly) '
+        + '— failing: ' + failed.map(function (r) { return r.id; }).join(', ');
+    } else {
+      s.className = 'ok';
+      s.textContent = 'all ' + passed + ' checks passed, including the known-positive control' +
+        (findings.length ? ' (' + findings.length + ' documented finding' +
+          (findings.length === 1 ? '' : 's') + ': ' + findings.join(', ') + ')' : '');
+    }
+
+    window.__captionHarness = {
+      done: true, controlDetected: ctrlDetected, passed: passed, failed: failed.length,
+      findings: findings, results: results
+    };
+  }
+})();
+</script>
+</body>
+</html>

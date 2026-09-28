@@ -4722,6 +4722,13 @@ async function toggleSession() {
           ? 'Il microfono è occupato da un\'altra app (Zoom, Teams…). Chiudi la chiamata, oppure scegli un altro microfono dal menu accanto alla spia del microfono.'
           : 'Microfono bloccato: consenti l\'accesso e riprova.';
       }
+      /* A microphone that never ANSWERS is not an unsupported browser. startRealMic reports a
+       * timeout as state 'error' (not 'blocked'), so without this branch it fell through to the
+       * `!useFallback` line below and told a Chrome user to "use Chrome/Edge". Caught by
+       * tests/caption-harness.html row F9, which asserts the ADVICE, not just that a toast exists. */
+      else if (_realMic.lastError === 'TimeoutError') {
+        micFailMsg = S8T('mic_gum_timeout', 'Il microfono non ha risposto. Controlla che non sia occupato da un\'altra app e riprova.');
+      }
       else if (!useFallback) micFailMsg = 'Live captions are not supported in this browser. Use Chrome/Edge (desktop or Android).';
       else micFailMsg = 'Impossibile avviare la registrazione. Riprova.';
       if (micFailMsg) { if (typeof showToast === 'function') showToast(micFailMsg, 'warning'); else showAlertModal('Microfono', micFailMsg); }
