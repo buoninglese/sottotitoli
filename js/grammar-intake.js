@@ -317,7 +317,9 @@
       var cid = t.getAttribute('data-concept');
       var drill = w.SottotitoliGrammarDrill;
       if (drill && cid) {
+        step = 'drill';
         drill.start(cid, el('giStage'), function (summary) {
+          step = 'result';
           maybeResolveMiss(cid, summary).then(function () { renderResult(); });
         });
       }
@@ -364,6 +366,23 @@
     return store.removeMiss(_profile, cid).then(function (updated) { _profile = updated; });
   }
 
+  /* Fold passive signals (WPM, hesitation, pauses, code-switching, observed
+   * error categories) from recent live-caption sessions into the profile, so
+   * the plan reflects measured behaviour rather than only the intake snapshot.
+   * Guarded: only re-renders if the user is still on the result view. */
+  function maybeFoldPassive(profile) {
+    var ps = w.SottotitoliPassiveSignals;
+    if (!ps) return;
+    ps.applyFromRecentSessions(profile).then(function (updated) {
+      if (updated && updated.passive) {
+        _profile = updated;
+        _plan = planner.present(updated);
+        store.save(updated);
+        if (step === 'result') renderResult();
+      }
+    }).catch(function () {});
+  }
+
   function init() {
     var stage = el('giStage');
     if (!stage) return;
@@ -376,6 +395,7 @@
         _plan = planner.present(profile);
         step = 'result';
         renderResult();
+        maybeFoldPassive(profile);
       } else {
         renderIntro();
       }

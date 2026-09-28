@@ -101,7 +101,8 @@
                 homework:     { moduleId: 3, moduleKey: '3', credits: 2 },
                 cambridge:    { moduleId: 11, moduleKey: '11', credits: 4 },
                 speech:       { moduleId: 4, moduleKey: '4', credits: 4 },
-                drills:       { moduleId: 2, moduleKey: '2', credits: 2 }
+                drills:       { moduleId: 2, moduleKey: '2', credits: 2 },
+                synthesis:    { moduleId: 12, moduleKey: '12', credits: 6 }
               };
 
               // ═══ PRESET_MAP is the SINGLE SOURCE OF TRUTH for report credits ═══
@@ -230,23 +231,44 @@
                     });
                   }
 
-                  // ── Insert request ──
-                  // scope_type MUST be one of ai_report_requests_scope_type_check:
-                  //   single_session | selected_sessions | last_7_days | last_30_days
-                  // This read 'multi_session', which is NOT in that list — so choosing
-                  // two or more sessions failed the insert DETERMINISTICALLY, after the
-                  // credits had already been taken. That is the billing bug.
-                  var ins = await sb.from('ai_report_requests').insert({
-                    user_id: uid,
-                    session_ids: sessionIds,
-                    module_key: mapping.moduleKey,
-                    scope_type: sessionIds.length > 1 ? 'selected_sessions' : 'single_session',
-                    status: 'queued',
-                    // Record what was charged so a refund has a source of truth.
-                    // process-ai-reports overwrites this with real usage on success,
-                    // so the value a failure sees is exactly the amount to give back.
-                    tokens_spent: totalCredits
-                  });
+                   // ── Insert request ──
+                   // scope_type MUST be one of ai_report_requests_scope_type_check:
+                   //   single_session | selected_sessions | last_7_days | last_30_days
+                   // This read 'multi_session', which is NOT in that list — so choosing
+                   // two or more sessions failed the insert DETERMINISTICALLY, after the
+                   // credits had already been taken. That is the billing bug.
+
+                   // The synthesis module (module_key 12) needs the assembled
+                   // learner-profile context (report-context.json shape) so the
+                   // backend can write a personalised report, not a generic one.
+                   var reportContext = null;
+                   if (presetKey === 'synthesis' && window.SottotitoliGrammarReportContext) {
+                     try {
+                       var rcProfile = window.SottotitoliGrammarProfileStore
+                         ? await window.SottotitoliGrammarProfileStore.load()
+                         : null;
+                       var rcOnboarding = {};
+                       try { rcOnboarding = JSON.parse(localStorage.getItem('sottotitoli_onboarding') || '{}'); } catch (e) {}
+                       if (rcProfile && rcProfile.derived) {
+                         reportContext = window.SottotitoliGrammarReportContext.build(rcProfile, rcOnboarding);
+                       }
+                     } catch (e) { console.warn('Synthesis context build failed:', e && e.message); }
+                   }
+
+                   var insertPayload = {
+                     user_id: uid,
+                     session_ids: sessionIds,
+                     module_key: mapping.moduleKey,
+                     scope_type: sessionIds.length > 1 ? 'selected_sessions' : 'single_session',
+                     status: 'queued',
+                     // Record what was charged so a refund has a source of truth.
+                     // process-ai-reports overwrites this with real usage on success,
+                     // so the value a failure sees is exactly the amount to give back.
+                     tokens_spent: totalCredits
+                   };
+                   if (reportContext) insertPayload.context = reportContext;
+
+                   var ins = await sb.from('ai_report_requests').insert(insertPayload);
                   if (ins.error) {
                     console.warn('Insert error:', ins.error.message);
                     // The charge is applied but no report will ever be produced.
