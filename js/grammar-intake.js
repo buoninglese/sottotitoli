@@ -241,6 +241,7 @@
           '<div class="gi-ladder-head"><span class="gi-ladder-id">' + esc(cid) + '</span><span class="gi-ladder-cefr">' + esc(g.cefr || j.cefr || '') + '</span><span class="gi-ladder-dur">' + esc(j.duration_blocks || '') + '</span></div>' +
           (stones ? '<div class="gi-ladder-stones">' + stones + '</div>' : '') +
         '</div>' +
+        '<button class="gi-btn gi-btn-ghost gi-ladder-go" data-act="open-concept" data-concept="' + esc(cid) + '">Esercitati</button>' +
       '</div>';
     }).join('');
     if (!rows) rows = '<p class="gi-sub">Nessun concetto disponibile.</p>';
@@ -259,12 +260,14 @@
     var rows = Object.keys(byConcept).map(function (key) {
       var items = byConcept[key];
       var first = items[0];
+      var cid = first.concept_id || key;
       var examples = items.map(function (m) {
         return '<div class="gi-review-item"><span class="gi-review-wrong">' + esc(m.chosen || '—') + '</span><span class="gi-review-arrow">→</span><span class="gi-review-right">' + esc(m.answer || '—') + '</span></div>';
       }).join('');
       return '<div class="gi-review-row">' +
         '<div class="gi-review-head"><span class="gi-ladder-id">' + esc(key) + '</span><span class="gi-tag gi-tag-obs">' + esc(first.error_category || '') + '</span></div>' +
         examples +
+        '<button class="gi-btn gi-btn-ghost gi-review-go" data-act="open-concept" data-concept="' + esc(cid) + '">Ripassalo</button>' +
       '</div>';
     }).join('');
     return '<div class="gi-review">' + rows + '</div>';
@@ -310,6 +313,13 @@
     }
     else if (act === 'retake') { reset(); }
     else if (act === 'saved') { w.location.href = 'panoramica.html'; }
+    else if (act === 'open-concept') {
+      var cid = t.getAttribute('data-concept');
+      var drill = w.SottotitoliGrammarDrill;
+      if (drill && cid) {
+        drill.start(cid, el('giStage'), function () { renderResult(); });
+      }
+    }
   }
 
   function backQuestionnaire() {
