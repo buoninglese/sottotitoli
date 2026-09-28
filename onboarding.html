@@ -1156,6 +1156,10 @@
   <!-- 5. Shared styled modal (appAlert / appConfirm / appPrompt) — must load before the page's
        own scripts so it is defined by the time any flow can prompt. -->
   <script src="js/app-modal.js?v=1"></script>
+<!-- Shared mic rules: bounded getUserMedia + the virtual/loopback input detector. Onboarding had
+     its own unbounded getUserMedia calls and NO loopback warning at all, so a BlackHole-style
+     default input made this whole flow silently useless. -->
+<script src="js/mic-core.js?v=1"></script>
 
   <!-- Feature detection: hide mic buttons if SpeechRecognition unavailable -->
   <script>
@@ -1652,6 +1656,35 @@
     var _speechLang = { intake: 'it-IT', longterm: 'it-IT', shortterm: 'it-IT' };
     var _speechBaseText = {}; // preserve existing text when re-recording
 
+    /* ── Mic messages, localised THIS page's way ──────────────────────────────
+     * onboarding.html does not load js/i18n.js at all: it is a separate i18n island
+     * (data-it / data-en + _uiLang, persisted under its own key 'sottotitoli-ui-lang'). So
+     * MicCore's dictionary lookup would silently fall back to Italian for every English user —
+     * the bug, not the fix. These strings are localised here; everything else comes from MicCore. */
+    var MIC_MSG = {
+      consent: { it: '⚠️ Per favore, consenti l\'accesso al microfono per usare la registrazione vocale.',
+                 en: '⚠️ Please allow microphone access to use voice recording.' },
+      denied: { it: '⚠️ Microfono non consentito. Su iPhone/iPad, vai in <strong>Impostazioni → Safari → Microfono</strong>.',
+                en: '⚠️ Microphone not allowed. On iPhone/iPad go to <strong>Settings → Safari → Microphone</strong>.' },
+      deniedRetry: { it: '⚠️ Permesso microfono negato. Su iPhone/iPad, vai in <strong>Impostazioni → Safari → Microfono</strong> e riprova.',
+                     en: '⚠️ Microphone permission denied. On iPhone/iPad go to <strong>Settings → Safari → Microphone</strong> and try again.' },
+      timeout: { it: '⚠️ Il microfono non risponde. Concedi il permesso nelle impostazioni del browser (o ricarica la pagina) e riprova.',
+                 en: '⚠️ The microphone is not responding. Grant permission in your browser settings (or reload the page) and try again.' },
+      unavailable: { it: '⚠️ Microfono non disponibile: ', en: '⚠️ Microphone unavailable: ' },
+      granted: { it: '✅ Permesso microfono concesso! Ora puoi fare il test.',
+                 en: '✅ Microphone permission granted! You can run the test now.' },
+      active: { it: 'Microfono attivo — parla per testare!', en: 'Microphone live — speak to test it!' },
+      tested: { it: 'Microfono testato ✅', en: 'Microphone tested ✅' },
+      virtual: { it: '⚠️ Questo ingresso NON è un microfono: è un dispositivo virtuale («{d}») che riceve l\'audio del computer. Scegli il microfono vero in Impostazioni di Sistema → Suono → Ingresso.',
+                 en: '⚠️ This input is NOT a microphone: it is a virtual device ("{d}") carrying the computer\'s audio. Choose your real microphone in System Settings → Sound → Input.' }
+    };
+    function micMsg(k, d) {
+      var row = MIC_MSG[k];
+      if (!row) return '';
+      var lang = (typeof _uiLang !== 'undefined' && _uiLang === 'en') ? 'en' : 'it';
+      return String(row[lang] || row.it).replace('{d}', d == null ? '' : String(d));
+    }
+
     function setSpeechLang(type, lang, btn) {
       _speechLang[type] = lang;
       btn.parentElement.querySelectorAll('.lang-pill').forEach(function(p) { p.classList.remove('active'); });
@@ -1709,14 +1742,19 @@
         };
 
         _speechRecognition.onerror = function(event) {
-          console.warn('Speech error:', event.error);
-          if (event.error === 'no-speech') return;
-          if (event.error === 'not-allowed') {
-            if (status) {
-              status.innerHTML = '⚠️ Microfono non consentito. Su iPhone/iPad, vai in <strong>Impostazioni → Safari → Microfono</strong>.';
-              status.style.color = 'var(--amber)';
-              status.style.display = 'inline';
-            }
+          var name = event && event.error;
+          /* Silence, and a recognition the user stopped themselves, are not failures — never raise
+           * an alarm for them. EVERYTHING ELSE used to end at console.warn and a silent stop: the
+           * user tapped the mic, nothing happened, and nothing said why. Same class of bug as the
+           * one already fixed in real-mic.js. The error NAME is included because the name is the
+           * diagnosis. */
+          if (window.MicCore && MicCore.isSilentError(name)) return;
+          if (status) {
+            status.innerHTML = (name === 'not-allowed' || name === 'service-not-allowed')
+              ? micMsg('denied')
+              : micMsg('unavailable') + (name || '');
+            status.style.color = 'var(--amber)';
+            status.style.display = 'inline';
           }
           stopSpeechRecord();
         };
@@ -1749,7 +1787,11 @@
       } else {
         // Request mic permission first — this triggers the browser dialog if needed
         if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spin" style="display:inline-block;width:14px;height:14px;border:2px solid var(--line);border-top-color:var(--accent-purple);border-radius:50%;animation:spin .7s linear infinite;vertical-align:middle;"></span>'; }
-        navigator.mediaDevices.getUserMedia({ audio: true })
+        /* BOUNDED (was: bare getUserMedia). An unanswered prompt or a wedged device left this
+         * button disabled and spinning for ever, with nothing telling the user anything — the
+         * hang already fixed in real-mic.js, reproduced here. Rejects with name 'TimeoutError'
+         * after 12s. */
+        MicCore.gumWithTimeout({ audio: true }, 12000)
           .then(function(stream) {
             // Got permission — stop the test stream, mark as granted, start speech
             stream.getTracks().forEach(function(t) { t.stop(); });
@@ -1761,7 +1803,7 @@
           .catch(function(err) {
             if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-microphone"></i> Registra'; }
             if (status) {
-              status.innerHTML = '⚠️ Per favore, consenti l\'accesso al microfono per usare la registrazione vocale.';
+              status.innerHTML = (err && err.name === 'TimeoutError') ? micMsg('timeout') : micMsg('consent');
               status.style.color = 'var(--amber)';
               status.style.display = 'inline';
             }
@@ -2200,12 +2242,12 @@
         btn.innerHTML = '<span class="spin" style="width:12px;height:12px;border:2px solid var(--line);border-top-color:var(--accent-purple);border-radius:50%;animation:spin .7s linear infinite;display:inline-block;"></span> Richiedo permesso…';
       }
 
-      navigator.mediaDevices.getUserMedia({ audio: true })
+      MicCore.gumWithTimeout({ audio: true }, 12000)
         .then(function(stream) {
           // Permission granted! Stop the test stream immediately
           stream.getTracks().forEach(function(t) { t.stop(); });
           if (status) {
-            status.textContent = '✅ Permesso microfono concesso! Ora puoi fare il test.';
+            status.textContent = micMsg('granted');
             status.style.color = 'var(--accent-green)';
           }
           if (hint) hint.classList.remove('visible');
@@ -2225,11 +2267,14 @@
         })
         .catch(function(err) {
           if (status) {
-            if (err.name === 'NotAllowedError') {
-              status.innerHTML = '⚠️ Permesso microfono negato. Su iPhone/iPad, vai in <strong>Impostazioni → Safari → Microfono</strong> e riprova.';
+            if (err && err.name === 'TimeoutError') {
+              status.innerHTML = micMsg('timeout');
+              status.style.color = 'var(--amber)';
+            } else if (err && err.name === 'NotAllowedError') {
+              status.innerHTML = micMsg('deniedRetry');
               status.style.color = 'var(--amber)';
             } else {
-              status.textContent = '⚠️ Microfono non disponibile: ' + err.message;
+              status.textContent = micMsg('unavailable') + (err && err.message ? err.message : '');
               status.style.color = '#ef4444';
             }
           }
@@ -2276,18 +2321,32 @@
         btn.classList.remove('recording');
         btn.innerHTML = '<i class="fa-solid fa-microphone"></i>';
         levelFill.style.width = '0%';
-        status.textContent = 'Microfono testato ✅';
+        status.textContent = micMsg('tested');
         onboardData['mic_tested'] = true;
         persist();
         autoSaveToSupabase();
         return;
       }
 
-      navigator.mediaDevices.getUserMedia({ audio: true }).then(function(stream) {
+      /* BOUNDED (was: bare getUserMedia). */
+      MicCore.gumWithTimeout({ audio: true }, 12000).then(function(stream) {
         micStream = stream;
         btn.classList.add('recording');
         btn.innerHTML = '<i class="fa-solid fa-stop"></i>';
-        status.textContent = 'Microfono attivo — parla per testare!';
+        status.textContent = micMsg('active');
+        /* ── The ONLY warning this app has for a dead input ─────────────────────────
+         * A loopback device (BlackHole, ZoomAudioDevice, a Multi-Output…) carries the COMPUTER's
+         * audio: the meter below moves with the laptop's own sound and never with the user's
+         * voice, and every later capture transcribes nothing while looking perfectly healthy.
+         * Nothing in the Web Audio or Speech APIs can detect that — only the device NAME — which
+         * is why it is worth guessing at. This page had no such check at all. */
+        try {
+          var _lbl = (stream.getAudioTracks()[0] || {}).label || '';
+          if (window.MicCore && MicCore.looksVirtual(_lbl)) {
+            status.innerHTML = micMsg('virtual', _lbl);
+            status.style.color = 'var(--amber)';
+          }
+        } catch (e) {}
         onboardData['mic_tested'] = true;
         onboardData['mic_permission_granted'] = true;
         persist();
@@ -2307,13 +2366,15 @@
           levelFill.style.width = pct + '%';
         }, 50);
       }).catch(function(err) {
-        status.textContent = '⚠️ Microfono non disponibile: ' + err.message;
+        var _to = err && err.name === 'TimeoutError';
+        var _denied = err && err.name === 'NotAllowedError';
+        status.textContent = _to ? micMsg('timeout') : (micMsg('unavailable') + (err && err.message ? err.message : ''));
         status.style.color = '#ef4444';
         // Show iOS help hint if permission was denied
-        if (err.name === 'NotAllowedError') {
+        if (_denied) {
           var hint = document.getElementById('micPermHint');
           if (hint) hint.classList.add('visible');
-          status.innerHTML = '⚠️ Permesso microfono negato. Su iPhone/iPad, vai in <strong>Impostazioni → Safari → Microfono</strong> e riprova.';
+          status.innerHTML = micMsg('deniedRetry');
         }
       });
     }
