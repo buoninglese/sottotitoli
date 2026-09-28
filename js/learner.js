@@ -550,6 +550,39 @@
     return r;
   }
 
+  /* ── The loopback check this stack never had ─────────────────────────────
+   * SpeechRecognition always listens to the OS default input, and there is no API to ask which one
+   * that is — only the device NAME reveals it. If it is a loopback device (BlackHole,
+   * ZoomAudioDevice, a Multi-Output…), it carries the COMPUTER's audio: the mic looks live, the
+   * learner speaks, and nothing is ever recognised. That is the report that started the audit, and
+   * this was one of the three stacks with NO warning at all.
+   *
+   * Runs at most once, and ONLY when microphone permission is ALREADY granted: a background check
+   * must never be the thing that shows someone a permission prompt. That is stricter than the
+   * caption page's version, which requires an existing capture to infer the same thing. */
+  var _defaultInputChecked = false;
+  function checkDefaultInputOnce() {
+    if (_defaultInputChecked) return;
+    _defaultInputChecked = true;
+    if (!(window.MicCore && typeof MicCore.looksVirtual === 'function')) return;
+    if (!(navigator.permissions && navigator.permissions.query)) return;
+    navigator.permissions.query({ name: 'microphone' })
+      .then(function (st) {
+        if (!st || st.state !== 'granted') return;   // never prompt from a background check
+        return MicCore.gumWithTimeout({ audio: true }, 5000).then(function (s) {
+          var label = '';
+          try { label = (s.getAudioTracks()[0] || {}).label || ''; } catch (e) {}
+          try { s.getTracks().forEach(function (tk) { tk.stop(); }); } catch (e) {}
+          if (!MicCore.looksVirtual(label)) return;
+          toast('«' + label + '» ' + MicCore.t('mic_virtual_what',
+            'è un dispositivo virtuale (loopback): riceve l\'audio del computer, non la tua voce.')
+            + ' ' + MicCore.t('mic_virtual_fix',
+              'Chrome ricorda il microfono scelto: apri chrome://settings/content/microphone e seleziona quello vero (oppure Impostazioni di Sistema → Suono → Ingresso).'));
+        });
+      })
+      .catch(function () { /* permissions API unavailable (Safari) — stay quiet */ });
+  }
+
   /* ── Confetti (tiny canvas) ── */
   function confetti() {
     var c = document.createElement('canvas');
@@ -2392,11 +2425,25 @@
     recog = makeRecognition(
       function (txt) { heardText = txt; if (heardEl) heardEl.textContent = '“' + txt + '”'; },
       function () { stopListen(); },
-      function (err) { stopListen(); if (err && err !== 'no-speech' && err !== 'aborted') toast(t('learner_mic_error')); }
+      function (err) {
+        stopListen();
+        /* Silence, and a recognition the user stopped themselves, are not failures — never raise
+         * an alarm for them. EVERYTHING ELSE must say WHICH failure: one generic "mic error" toast
+         * told the learner nothing they could act on, which is the same collapse the caption page
+         * stopped doing (a blocked mic, a busy device and a network failure all need opposite
+         * actions). */
+        if (window.MicCore && MicCore.isSilentError(err)) return;
+        toast((window.MicCore && typeof MicCore.errorMessage === 'function')
+          ? MicCore.errorMessage(err)
+          : t('learner_mic_error'));
+      }
     );
     if (!recog) { stopListen(); toast(t('learner_no_mic')); return; }
     listening = true;
     try { recog.start(); } catch (e) { stopListen(); }
+    /* The check this stack never had. Called AFTER the mic is running, and it never prompts for
+     * permission itself — see checkDefaultInputOnce. */
+    checkDefaultInputOnce();
   }
   function stopListen() {
     listening = false;
