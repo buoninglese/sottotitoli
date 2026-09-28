@@ -131,7 +131,7 @@
 
   /* Two async halves (the i18n source fetch, and the caption iframe) both contribute rows, so the
    * summary must wait for BOTH — otherwise the i18n row can land after the verdict is printed. */
-  var pending = 3;
+  var pending = 4;
   function step() { if (--pending === 0) finish(); }
 
   waitForFrame(function (w) {
@@ -332,6 +332,81 @@
     function restore() { navigator.mediaDevices.getUserMedia = orig; done(); }
   }
 
+  /* ── SOURCE INVARIANTS ──────────────────────────────────────────────────────────
+   * The audit's central finding was DRIFT: one rule implemented four times, each copy free to
+   * diverge, and it did — the loopback detector existed on one stack of four. The behavioural rows
+   * above can only reach the caption page, so these assert the INVARIANT wherever it lives instead.
+   * They are prefixed S to be explicit that they read source text, not runtime behaviour. */
+  function sourceChecks(done) {
+    var files = ['../js/mic-core.js', '../js/real-mic.js', '../js/record-fallback.js',
+      '../js/system-audio.js', '../js/learner.js', '../caption-s8t.html',
+      '../onboarding.html', '../panoramica.html'];
+
+    Promise.all(files.map(function (f) {
+      return fetch(f).then(function (r) { return r.text(); })
+        .then(function (t) { return { f: f, t: t }; })
+        .catch(function () { return { f: f, t: null }; });
+    })).then(function (all) {
+      var by = {};
+      all.forEach(function (x) { by[x.f] = x.t; });
+      var unread = all.filter(function (x) { return x.t === null; }).map(function (x) { return x.f; });
+
+      /* A source check that could not READ the source must say so, not pass. Silence here would
+       * look identical to a clean result — the failure mode this whole file exists to prevent. */
+      check('S0', 'all ' + files.length + ' sources were readable', function () {
+        return ['0 unread', unread.length ? unread.join(', ') : '0 unread', unread.length === 0];
+      });
+
+      /* S1 — the anti-drift guard. A distinctive token from the regex, not the variable name,
+       * so a copy under a new name is still caught. */
+      check('S1', 'the loopback device regex exists ONLY in js/mic-core.js', function () {
+        var offenders = Object.keys(by).filter(function (f) {
+          return by[f] && f.indexOf('mic-core.js') < 0 && by[f].indexOf('soundflower') >= 0;
+        });
+        return ['0 offenders', offenders.length ? offenders.join(', ') : '0 offenders',
+          offenders.length === 0];
+      });
+
+      /* S2 — capture must go through the bounded helper. */
+      check('S2', 'no bare navigator.mediaDevices.getUserMedia in onboarding or learner', function () {
+        var targets = ['../onboarding.html', '../js/learner.js'];
+        var offenders = targets.filter(function (f) {
+          return by[f] && by[f].indexOf('navigator.mediaDevices.getUserMedia(') >= 0;
+        });
+        return ['0 offenders', offenders.length ? offenders.join(', ') : '0 offenders',
+          offenders.length === 0];
+      });
+
+      /* S3 — load order. Matched on the SCRIPT TAG, not the bare filename: a comment naming
+       * real-mic.js above the mic-core tag made the naive version report a false failure. */
+      check('S3', 'mic-core.js loads BEFORE every page that consumes it', function () {
+        var bad = [];
+        Object.keys(by).forEach(function (f) {
+          var src = by[f];
+          if (!src || f.indexOf('.html') < 0) return;
+          var core = src.indexOf('src="js/mic-core.js');
+          if (core < 0) return;
+          var cons = -1;
+          ['src="js/real-mic.js', 'src="js/learner.js'].forEach(function (n) {
+            var i = src.indexOf(n);
+            if (i >= 0 && (cons < 0 || i < cons)) cons = i;
+          });
+          if (cons >= 0 && core > cons) bad.push(f);
+        });
+        return ['mic-core first', bad.length ? bad.join(', ') : 'mic-core first', bad.length === 0];
+      });
+
+      /* S4 — onboarding is its own i18n island, so its mic messages must come from MIC_MSG. */
+      check('S4', 'onboarding.html has no hardcoded mic status strings', function () {
+        var src = by['../onboarding.html'] || '';
+        var n = (src.match(/status\.(innerHTML|textContent) = '⚠/g) || []).length;
+        return ['0', String(n), n === 0];
+      });
+
+      done();
+    });
+  }
+
   function finish() {
     /* ── KNOWN-POSITIVE CONTROL (rule 24) ──
      * A check that asserts something FALSE, on purpose. If the runner records it as a PASS then
@@ -369,6 +444,7 @@
 
   keyChecks(step);
   coreChecks(step);
+  sourceChecks(step);
 })();
 </script>
 </body>

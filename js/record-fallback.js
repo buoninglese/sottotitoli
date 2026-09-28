@@ -152,13 +152,12 @@
       }
       this._showListening();
       var self = this;
-      /* 12s for BOTH sources. An earlier version of this used 6s for computer audio, on the
-       * reasoning that the server meters by audio seconds (X-Audio-Seconds) so the smaller chunk
-       * would cost the same. That reasoning covered COST but not REQUEST RATE: 6s doubles the
-       * calls to transcribe-audio (10/min instead of 5/min), and that was changed without any
-       * evidence the endpoint tolerates it. Until a rate limit can be ruled out, the value
-       * already proven in production — the one the iOS path has always used — is the right
-       * default. Overridable via SOTTOTITOLI_CONFIG.recordIntervalSec. */
+      /* 12s for BOTH sources. An earlier version used 6s for computer audio, reasoning that the
+       * server meters by audio seconds so the smaller chunk would cost the same. That covered COST
+       * but not REQUEST RATE: 6s doubles the calls to transcribe-audio (10/min instead of 5/min),
+       * and it was changed with no evidence the endpoint tolerates that. Until a rate limit can be
+       * ruled out, the value already proven in production — the one the iOS path has always used —
+       * is the right default. Overridable via SOTTOTITOLI_CONFIG.recordIntervalSec. */
       var sec = Math.max(6, parseInt(this.intervalSec, 10) || 12);
       this._interval = setInterval(function(){ self._flushSegment(false); }, sec * 1000);
       return true;
@@ -330,7 +329,17 @@
         'X-Lang': String(lang || 'en-US').split('-')[0],
         'Authorization': 'Bearer ' + (token || '')
       };
-      if (seconds) headers['X-Audio-Seconds'] = String(seconds);
+      /* ⛔ REMOVED: `X-Audio-Seconds`. Nothing reads it. A full read of
+       * fonctions/transcribe-audio/index.ts shows it reads only Authorization, Content-Type,
+       * X-Lang and X-Session-Id — the RPC gets `p_seconds` computed server-side from the byte
+       * count, and the CHARGE comes from OpenAI's own `usage.seconds`. The header's only remaining
+       * trace in the backend is the CORS allow-list, which is what kept making it look live.
+       *
+       * Removing it is not just tidying: a client-declared duration travelling to a metering
+       * endpoint is exactly the shape of the holes rule 11 closed, and leaving it lying around
+       * invites someone to "fix" the server by reading it. It also carried a duration that was
+       * MIS-MEASURED until 2026-09-28 (every segment was clamped to 1s because _segStart was read
+       * after _restartRec had reset it), so anything that had read it would have under-charged 12x. */
       if (sessionId) headers['X-Session-Id'] = sessionId;
       /* Bounded wait. A fetch with no timeout can hang for ever, and _busy would then stay true for
        * the rest of the session: the recorder keeps running, no further segment is ever sent, and

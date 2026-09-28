@@ -1615,7 +1615,7 @@ button[onclick*="addToWordBank"]:hover{background:rgba(52,211,153,.15)!important
 <!-- mic-core.js MUST come first: real-mic.js and the inline block below both delegate to it. -->
 <script src="js/mic-core.js?v=1"></script>
 <script src="js/real-mic.js?v=30"></script>
-<script src="js/record-fallback.js?v=8"></script>
+<script src="js/record-fallback.js?v=9"></script>
 <script src="js/system-audio.js?v=2"></script>
 <script src="js/grammar-viz.js?v=2"></script>
 <script src="js/speech-icons.js"></script>
@@ -4672,7 +4672,6 @@ async function toggleSession() {
   pauseBtn = document.getElementById('pauseBtn');
   
   if (sessionActive) {
-    console.log('🎯 toggleSession: start path. Calling _createCaptionRoom + startRealMic...');
     _sessionSavedShown = false; // reset for new session — allow toast
     paused = false;
     // Disable + loading state during async startup (prevents double-clicks)
@@ -4696,11 +4695,9 @@ async function toggleSession() {
       var sysRes = await window.S8tSystemAudio.start();
       micOk = !!(sysRes && sysRes.ok);
       sysReason = (sysRes && sysRes.reason) || null;
-      console.log('🎯 system-audio start:', micOk, sysReason);
     } else {
       micOk = useFallback ? await window.RecordFallback.start() : await startRealMic();
     }
-    console.log('🎯 mic start returned:', micOk, 'fallback=', useFallback, 'system=', useSystem);
     if (!micOk) {
       sessionActive = false;
       if (startBtn) { startBtn.disabled = false; startBtn.classList.remove('loading'); startBtn.innerHTML = '<i class="fas fa-play"></i><span data-i18n="listen">Start</span>'; }
@@ -4730,9 +4727,7 @@ async function toggleSession() {
       if (micFailMsg) { if (typeof showToast === 'function') showToast(micFailMsg, 'warning'); else showAlertModal('Microfono', micFailMsg); }
     } else {
       // ── Credit check (mic already running — will stop if no credits) ──
-      console.log('🎯 Starting credit check...');
       _checkCreditsBeforeStart().then(function(hasCredits) {
-        console.log('🎯 Credit check resolved. hasCredits=', hasCredits);
         if (!hasCredits) {
           stopRealMic();
           sessionActive = false;
@@ -4773,7 +4768,6 @@ async function toggleSession() {
     };
     _endSupabaseSession(sessionData);
     // Show saved toast only if there was actual content
-    console.log('🎯 Stop path: lines.length=', (sessionData.lines||[]).length, 'fullText length=', fullText.length);
     if (sessionData.lines && sessionData.lines.length > 0) {
       showSessionSaved(sessionSeconds);
       // Show post-session panel with word count
@@ -5434,7 +5428,6 @@ _initMicPicker();
 
 // ── Session UI setup (mic already running — called after credit check passes) ──
 function _applySessionLiveUI(startBtn, stopBtn) {
-    console.log('🎯 _applySessionLiveUI called. sessionActive=', sessionActive, 'paused=', paused, 'realMic.state=', _realMic.state, 'timerInterval=', !!timerInterval);
     // Guard: user may have stopped while credit check was in flight
     if (!sessionActive) { stopRealMic(); return; }
     // Fallback (iOS record) has no pause — keep it hidden
