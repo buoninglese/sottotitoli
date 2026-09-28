@@ -30,6 +30,20 @@
       return !SR && !!(window.MediaRecorder && navigator.mediaDevices && navigator.mediaDevices.getUserMedia);
     },
 
+    /* Two different questions, and the system-audio source needs the second one:
+     *   isNeeded()  — MUST we use this instead of SpeechRecognition? (iOS/Safari: yes)
+     *   canRecord() — CAN we record at all?
+     * On desktop Chromium isNeeded() is false because SpeechRecognition exists, but that API can
+     * only ever read the microphone — there is no way to hand it a shared tab. So computer audio
+     * MUST come through here even on a browser that has an engine. Separating the two questions
+     * is what lets one recorder serve both sources. */
+    canRecord: function(){
+      return !!(window.MediaRecorder && navigator.mediaDevices && navigator.mediaDevices.getUserMedia);
+    },
+
+    // 'mic' (default) | 'system' — changes only how the UI describes itself.
+    _source: 'mic',
+
     _pickMime: function(){
       var cands = ['audio/webm;codecs=opus','audio/webm','audio/mp4;codecs=mp4a.40.2','audio/mp4'];
       for (var i = 0; i < cands.length; i++) {
@@ -38,16 +52,28 @@
       return '';
     },
 
+    /* Guarded lookup: this file loads before the page's inline block (where S8T lives) and
+     * js/i18n.js may not have loaded either. Falls back to the literal so the indicator can
+     * never render blank. */
+    _label: function(key, fallback){
+      try { return (typeof S8T === 'function') ? S8T(key, fallback) : fallback; } catch (e) { return fallback; }
+    },
+
     _showListening: function(){
       var it = document.getElementById('captionInterim');
-      if (it) it.innerHTML = '<span class="rf-wave"><i></i><i></i><i></i><i></i><i></i></span><span class="rf-label">Listening…</span>';
+      if (!it) return;
+      var text = (this._source === 'system')
+        ? this._label('rf_listening_system', 'Listening to computer audio…')
+        : this._label('rf_listening', 'Listening…');
+      it.innerHTML = '<span class="rf-wave"><i></i><i></i><i></i><i></i><i></i></span><span class="rf-label">' + text + '</span>';
     },
 
     _showTranscribing: function(on){
       var it = document.getElementById('captionInterim');
       if (!it) return;
       if (on) {
-        it.innerHTML = '<span class="rf-wave dim"><i></i><i></i><i></i><i></i><i></i></span><span class="rf-label">Transcribing…</span>';
+        it.innerHTML = '<span class="rf-wave dim"><i></i><i></i><i></i><i></i><i></i></span><span class="rf-label">'
+          + this._label('rf_transcribing', 'Transcribing…') + '</span>';
       } else if (!this._stopped) {
         this._showListening();
       }
@@ -87,16 +113,50 @@
         }
       }
       if (typeof window.refreshMicList === 'function') window.refreshMicList();
+      return this._begin(this._stream, 'mic');
+    },
+
+    /* Start from a stream the CALLER already owns. The system-audio source passes the audio track
+     * of a getDisplayMedia() share here, so the recorder, the 12s segments, the Whisper upload,
+     * the sentence replay and the session save are all reused untouched — the only difference is
+     * where the audio came from. That reuse is the whole reason this source is cheap to add. */
+    startWithStream: async function(stream, source){
+      if (!stream) return false;
+      if (this._recorder && this._recorder.state === 'recording') return true;
+      return this._begin(stream, source || 'system');
+    },
+
+    isRecording: function(){
+      return !!(this._recorder && this._recorder.state === 'recording');
+    },
+
+    /* The shared tail of both starts — everything that does not depend on where the audio
+     * came from. Keeping it in ONE place is what guarantees the system source cannot drift
+     * away from the mic source as this file changes. */
+    _begin: function(stream, source){
+      this._stream = stream;
+      this._source = source || 'mic';
       this._mime = this._pickMime();
       this._segment = [];
       this._busy = false;
       this._stopped = false;
       this._restartRec();
       if (!this._recorder) { this._cleanup(); return false; }
-      if (typeof updateMicUI === 'function') updateMicUI('live');
+      if (typeof updateMicUI === 'function') {
+        /* "Mic Live" is a lie on the computer-audio source. Pass the truthful label instead of
+         * adding a second state to updateMicUI, which every other caller depends on. */
+        updateMicUI('live', this._source === 'system'
+          ? this._label('src_status_system', 'Computer audio') : null);
+      }
       this._showListening();
       var self = this;
-      var sec = Math.max(6, parseInt(self.intervalSec, 10) || 12);
+      /* Computer audio is cut into SHORTER segments than the mic path. The server meters by
+       * audio seconds (X-Audio-Seconds), not by request, so the smaller chunk costs the same
+       * and the first words arrive about twice as fast — which matters when the user is
+       * watching a video rather than holding a phone. */
+      var sec = (this._source === 'system')
+        ? 6
+        : Math.max(6, parseInt(this.intervalSec, 10) || 12);
       this._interval = setInterval(function(){ self._flushSegment(false); }, sec * 1000);
       return true;
     },
@@ -189,6 +249,12 @@
       if (this._stream) { try { this._stream.getTracks().forEach(function(t){ t.stop(); }); } catch(e) {} this._stream = null; }
       this._recorder = null;
       this._segment = [];
+      /* Stopping this._stream stops the AUDIO track only. On the computer-audio source the video
+       * track lives in a separate share stream that is still open, and leaving it open would keep
+       * the browser's "sharing your screen" bar on screen forever. */
+      if (this._source === 'system' && window.S8tSystemAudio && typeof window.S8tSystemAudio._release === 'function') {
+        window.S8tSystemAudio._release();
+      }
       if (typeof updateMicUI === 'function') updateMicUI('idle');
       var interim = document.getElementById('captionInterim');
       if (interim) interim.textContent = '';
@@ -266,6 +332,11 @@
       this._recorder = null;
       this._segment = [];
       if (this._stream) { try { this._stream.getTracks().forEach(function(t){ t.stop(); }); } catch(e) {} this._stream = null; }
+      // This path ends the session WITHOUT a normal stop(), so it is its own exit path and has to
+      // close the screen share too — otherwise the browser keeps its sharing bar on screen.
+      if (this._source === 'system' && window.S8tSystemAudio && typeof window.S8tSystemAudio._release === 'function') {
+        window.S8tSystemAudio._release();
+      }
       this._busy = false;
       this._showTranscribing(false);
       if (typeof window.onTranscriptionCreditsExhausted === 'function') window.onTranscriptionCreditsExhausted();

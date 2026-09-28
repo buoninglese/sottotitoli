@@ -1607,13 +1607,14 @@ button[onclick*="addToWordBank"]:hover{background:rgba(52,211,153,.15)!important
 <script src="js/auth.js?v=23"></script>
 <script src="js/bank-identities.js?v=1"></script>
 <script src="js/xp.js?v=5"></script>
-<script src="js/i18n.js?v=99"></script>
+<script src="js/i18n.js?v=100"></script>
 <script src="js/theme-2.js?v=7"></script>
 <script src="js/toast.js?v=2"></script>
 <script src="js/notifications.js?v=2"></script>
 <script src="js/language-resolver.js?v=1"></script>
-<script src="js/real-mic.js?v=26"></script>
-<script src="js/record-fallback.js?v=5"></script>
+<script src="js/real-mic.js?v=27"></script>
+<script src="js/record-fallback.js?v=6"></script>
+<script src="js/system-audio.js?v=1"></script>
 <script src="js/grammar-viz.js?v=2"></script>
 <script src="js/speech-icons.js"></script>
 <script src="js/cefr-gse.js"></script>
@@ -1659,9 +1660,13 @@ function S8T(key, fallback) {
 (function() {
 
   // ── Override updateMicUI to use transport bar mic ──
+  // ⚠️ `label` MUST be forwarded to both the local write and _origUpdateMicUI. This wrapper
+  // originally took only (state) and dropped any second argument, so a caller that passed a
+  // truthful label had it silently replaced by the generic one on the way through — the
+  // computer-audio source asked for "Audio PC" and the transport bar said "Mic Live" instead.
   var _origUpdateMicUI = window.updateMicUI;
   var _overrideState = null;
-  window.updateMicUI = function(state) {
+  window.updateMicUI = function(state, label) {
     if (_overrideState) state = _overrideState;
     _realMic.state = state;
     var micIcon = document.getElementById('micIcon');
@@ -1675,14 +1680,15 @@ function S8T(key, fallback) {
       else micIcon.classList.add('idle');
     }
     if (micStatus) {
-      if (state === 'live') micStatus.textContent = 'Live';
+      if (label) micStatus.textContent = label;
+      else if (state === 'live') micStatus.textContent = 'Live';
       else if (state === 'paused') micStatus.textContent = 'Paused';
       else if (state === 'requesting') micStatus.textContent = 'Conn.';
       else if (state === 'blocked') micStatus.textContent = 'Blocked';
       else if (state === 'error') micStatus.textContent = 'Error';
       else micStatus.textContent = 'Offline';
     }
-    if (typeof _origUpdateMicUI === 'function') _origUpdateMicUI(state);
+    if (typeof _origUpdateMicUI === 'function') _origUpdateMicUI(state, label);
   };
   // Expose pause override
   window._setMicOverride = function(s) { _overrideState = s; if (s) updateMicUI(s); };
@@ -4677,17 +4683,41 @@ async function toggleSession() {
     }
     // Create Supabase room ONLY when user presses Start (not on page load)
     try { _createCaptionRoom(currentCaptionLang || 'en-US'); } catch(e) { console.error('_createCaptionRoom error:', e); }
-    // ── Start mic: live SpeechRecognition on desktop, record→transcribe fallback on iOS ──
+    /* ── Capture stack, chosen by SOURCE ──────────────────────────────
+     * 'system' — the computer's own audio. SpeechRecognition can never be used here: it only
+     *            reads the microphone and there is no way to hand it a shared tab. This source
+     *            therefore always goes through the recorder + Whisper.
+     * 'mic'    — unchanged: free live SpeechRecognition on desktop, the recorder on iOS. */
+    var useSystem = !!(window.S8tSource && window.S8tSource.isSystem()
+      && window.S8tSystemAudio && window.S8tSystemAudio.isSupported());
     var useFallback = !!(window.RecordFallback && window.RecordFallback.isNeeded());
-    var micOk = useFallback ? await window.RecordFallback.start() : await startRealMic();
-    console.log('🎯 mic start returned:', micOk, 'fallback=', useFallback);
+    var micOk = false, sysReason = null;
+    if (useSystem) {
+      var sysRes = await window.S8tSystemAudio.start();
+      micOk = !!(sysRes && sysRes.ok);
+      sysReason = (sysRes && sysRes.reason) || null;
+      console.log('🎯 system-audio start:', micOk, sysReason);
+    } else {
+      micOk = useFallback ? await window.RecordFallback.start() : await startRealMic();
+    }
+    console.log('🎯 mic start returned:', micOk, 'fallback=', useFallback, 'system=', useSystem);
     if (!micOk) {
       sessionActive = false;
       if (startBtn) { startBtn.disabled = false; startBtn.classList.remove('loading'); startBtn.innerHTML = '<i class="fas fa-play"></i><span data-i18n="listen">Start</span>'; }
       startBtn.style.display = '';
       stopBtn.style.display = 'none';
       var micFailMsg = null;
-      if (_realMic.state === 'blocked') {
+      /* The computer-audio source fails for reasons that have NOTHING to do with the microphone,
+       * so it gets its own messages. NotAllowedError here means the user closed the picker — that
+       * is a decision, and the wording must not imply the app broke. */
+      if (useSystem) {
+        micFailMsg = (sysReason === 'NotAllowedError')
+          ? S8T('src_system_cancelled', 'Condivisione annullata. Per trascrivere l\'audio del computer devi scegliere una scheda e attivare la condivisione dell\'audio.')
+          : (sysReason === 'no-audio')
+            ? S8T('src_system_no_audio', 'La condivisione scelta non ha audio. In Chrome scegli una SCHEDA e attiva «Condividi l\'audio della scheda».')
+            : S8T('src_system_failed', 'Impossibile avviare l\'audio del computer. Riprova.');
+      }
+      else if (_realMic.state === 'blocked') {
         // A BUSY device is not a denied permission, and the old copy sent people to the wrong
         // fix during a Zoom/Meet call. AbortError is deliberately NOT here: it also fires when
         // the user dismisses the prompt, where "grant access" is the correct advice.
@@ -4805,6 +4835,44 @@ window.SottotitoliDropMicId = function () {
   if (sel) sel.value = '';
 };
 
+/* ── Which audio the session listens to ──────────────────────────────
+ * 'mic'    — the microphone (default). Desktop then uses free, live SpeechRecognition.
+ * 'system' — what the COMPUTER is playing: a tab, a window or the whole screen. Chromium hands
+ *            the page that audio through getDisplayMedia, so there is nothing to install and no
+ *            driver to ask a user for. Because SpeechRecognition can only ever read the
+ *            microphone, this source always uses the MediaRecorder → Whisper path and therefore
+ *            spends server minutes — the one real cost of the feature.
+ * Persisted: it describes what the user is doing, not one session. */
+var SOURCE_KEY = 'sottotitoli-caption-source';
+window.S8tSource = {
+  get: function () {
+    try { return localStorage.getItem(SOURCE_KEY) === 'system' ? 'system' : 'mic'; } catch (e) { return 'mic'; }
+  },
+  isSystem: function () { return window.S8tSource.get() === 'system'; },
+  canSystem: function () { return !!(window.S8tSystemAudio && window.S8tSystemAudio.isSupported()); },
+  set: function (v) {
+    var next = (v === 'system' && window.S8tSource.canSystem()) ? 'system' : 'mic';
+    try { localStorage.setItem(SOURCE_KEY, next); } catch (e) {}
+    window.S8tSource._reflect();
+    return next;
+  },
+  /* ONE control answers "what should I listen to?", so its icon has to say which KIND of source
+     is active — otherwise the microphone list looks like it is in charge when it is not. */
+  _reflect: function () {
+    var system = window.S8tSource.isSystem();
+    var btn = document.getElementById('micPickBtn');
+    if (btn) {
+      var i = btn.querySelector('i');
+      if (i) i.className = system ? 'fas fa-headphones' : 'fas fa-chevron-down';
+      btn.title = system
+        ? S8T('src_picker_title_system', 'Sorgente: audio del computer — cambia')
+        : (btn.dataset.namesHint || S8T('src_picker_title_mic', 'Sorgente: microfono — cambia'));
+      btn.setAttribute('aria-label', btn.title);
+    }
+    _renderMicMenu();
+  }
+};
+
 /* Constraints used by EVERY capture on this page — real-mic.js (desktop/Android) and
  * record-fallback.js (iOS) — instead of each hardcoding audio:true. */
 window.SottotitoliMicConstraints = function () {
@@ -4820,27 +4888,37 @@ function _renderMicMenu() {
   var menu = document.getElementById('micMenu');
   var pick = document.getElementById('micPicker');
   if (!sel || !menu) return;
-  if (!sel.options.length) { if (pick) pick.style.display = 'none'; return; }
+  var canSys = !!(window.S8tSource && window.S8tSource.canSystem());
+  var isSys = canSys && window.S8tSource.isSystem();
+  /* The picker is worth showing when there is a CHOICE to make. It used to be hidden whenever no
+     device was selectable, which would now hide the only route to the computer-audio source. */
+  if (!sel.options.length && !canSys) { if (pick) pick.style.display = 'none'; return; }
   if (pick) pick.style.display = '';
   var cur = sel.value || '';
-  var html = '<div class="mic-menu-hd">Microfono</div>';
+  var html = '<div class="mic-menu-hd">'
+    + (canSys ? S8T('src_audio_title', 'Sorgente audio') : S8T('src_mic', 'Microfono'))
+    + '</div>';
   /* On the WEB SPEECH path this control cannot change what is TRANSCRIBED: SpeechRecognition
      has no device API and listens to the OS default. Saying this only AFTER a change is too
      late -- the user has already cycled through devices that all look fine on the level
-     meter, which is exactly the report that produced v319's wrong fix. Say it up front. */
-  if (window.SpeechRecognition || window.webkitSpeechRecognition) {
+     meter, which is exactly the report that produced v319's wrong fix. Say it up front.
+     Shown only for the MICROPHONE source: on computer audio nothing reads the default input,
+     so the note would be actively misleading. */
+  if (!isSys && (window.SpeechRecognition || window.webkitSpeechRecognition)) {
     html += '<div style="padding:6px 10px 8px;font-size:11px;line-height:1.5;color:var(--text-faint);max-width:270px">'
          +  S8T('mic_picker_scope', 'Nota: la trascrizione su questo browser usa il «Predefinito del sistema», non il dispositivo selezionato qui. Per cambiarlo: Impostazioni di Sistema → Suono → Ingresso.')
          +  '</div>';
   }
   var _srEngine = !!(window.SpeechRecognition || window.webkitSpeechRecognition);
   [].forEach.call(sel.options, function (o, oIdx) {
-    var isSel = (o.value || '') === cur;
+    // No device counts as selected while the source is the computer's audio — the tick belongs
+    // to the source item below, and leaving one here would show two active choices at once.
+    var isSel = !isSys && (o.value || '') === cur;
     /* Mark the option that recognition ACTUALLY listens to. Tagged by POSITION, not by an
        empty value: a device whose deviceId is blank also has value="", and tagging on that
        labelled "Microfono 1" as the recognition device too. Option 0 IS the system default
        by construction (it is the first option built in refreshMicList). */
-    var tag = (_srEngine && oIdx === 0)
+    var tag = (_srEngine && !isSys && oIdx === 0)
       ? ' <span style="opacity:.65">· ' + S8T('mic_device_recognition', 'usata dalla trascrizione') + '</span>'
       : '';
     html += '<button type="button" class="mic-item' + (isSel ? ' sel' : '') + '"'
@@ -4850,6 +4928,18 @@ function _renderMicMenu() {
          +  '<span class="mic-item-lbl">' + o.textContent.replace(/</g, '&lt;') + tag + '</span>'
          +  '</button>';
   });
+  /* The second source. Rendered from the SAME list so the two choices look like what they are:
+     one question with two answers, not a microphone list with a feature bolted on. */
+  if (canSys) {
+    html += '<div style="height:1px;background:var(--line);margin:6px 10px"></div>'
+         +  '<button type="button" class="mic-item' + (isSys ? ' sel' : '') + '"'
+         +  ' role="option" aria-selected="' + (isSys ? 'true' : 'false') + '"'
+         +  ' data-src="system">'
+         +  '<span class="mic-item-tick">' + (isSys ? '<i class="fas fa-check"></i>' : '') + '</span>'
+         +  '<span class="mic-item-lbl">' + S8T('src_system', 'Audio del computer')
+         +  ' <span style="opacity:.65">· ' + S8T('src_system_hint', 'scheda o schermo') + '</span></span>'
+         +  '</button>';
+  }
   menu.innerHTML = html;
 }
 
@@ -4891,6 +4981,9 @@ window._s8tLooksVirtualMic = function (label) {
 var _virtualMicChecked = false;
 async function _checkDefaultMic() {
   if (_virtualMicChecked) return;
+  /* Not the microphone: on the computer-audio source nothing reads the default input, so a
+   * loopback default is irrelevant here and warning about it would be pure noise. */
+  if (window.S8tSource && window.S8tSource.isSystem()) return;
   // Require an existing capture: getUserMedia({audio:true}) PROMPTS for permission when it is
   // not yet granted, and prompting on page load would be worse than the bug it detects.
   if (!(window._realMic && window._realMic.stream)) return;
@@ -4922,11 +5015,52 @@ async function _checkDefaultMic() {
   }
 }
 
+/* ── Choosing the audio SOURCE ──────────────────────────────────────────────────
+ * One control, two answers: 'mic' (the microphone) and 'system' (what the computer is playing).
+ * Switching mid-session is deliberately NOT supported. The two sources run on completely
+ * different capture stacks — SpeechRecognition versus a screen share feeding the recorder — and
+ * swapping them live would mean tearing the session's audio out from under a running transcript,
+ * mid-sentence. "Takes effect next session" is honest; half-doing it is not. */
+function _applySourceChoice(src) {
+  if (!window.S8tSource) return;
+  var now = window.S8tSource.get();
+  if (src === now) return;
+  var applied = window.S8tSource.set(src);
+  if (typeof showToast !== 'function') return;
+  if (sessionActive) {
+    showToast(applied === 'system'
+      ? S8T('src_switch_system', 'Sorgente: audio del computer — avrà effetto dalla prossima sessione')
+      : S8T('src_switch_mic', 'Sorgente: microfono — avrà effetto dalla prossima sessione'),
+      'warning', 6500);
+  } else if (applied === 'system') {
+    showToast(S8T('src_system_ready', 'Sorgente: audio del computer — premi Start e scegli la scheda da condividere'), 'info', 7000);
+  }
+}
+
+/* The user pressed the browser's own "Stop sharing" control. Nothing else tells the page, so
+ * without this the session would keep recording silence and still look live — the exact failure
+ * shape this whole area has been fighting. Run the ordinary Stop path, so the last segment is
+ * flushed and the session is saved like any other. */
+window.onSystemAudioEnded = function () {
+  if (!sessionActive) return;
+  if (typeof showToast === 'function') {
+    showToast(S8T('src_share_ended', 'Condivisione terminata — sessione salvata'), 'info', 5000);
+  }
+  try { toggleSession(); } catch (e) { console.error('share-ended stop failed:', e); }
+};
+
 async function refreshMicList() {
   var sel = document.getElementById('micSelect');
   if (!sel) return;
   if (!navigator.mediaDevices || !navigator.mediaDevices.enumerateDevices) {
-    // Cannot list inputs (older Safari) — stay out of the way entirely.
+    // Cannot list inputs (older Safari) — stay out of the way entirely, UNLESS the computer-audio
+    // source exists, in which case this button is the only way to reach it.
+    if (window.S8tSource && window.S8tSource.canSystem()) {
+      var keepPick = document.getElementById('micPicker');
+      if (keepPick) keepPick.style.display = '';
+      window.S8tSource._reflect();
+      return;
+    }
     var noPick = document.getElementById('micPicker');
     if (noPick) noPick.style.display = 'none';
     return;
@@ -4938,7 +5072,14 @@ async function refreshMicList() {
     // successful capture, which is the earliest moment the default device is knowable.
     try { _checkDefaultMic(); } catch (e) {}
     if (!mics.length) {
-      // Nothing to choose between — hide the button rather than offer an empty menu.
+      // Nothing to choose between — hide the button rather than offer an empty menu. The
+      // computer-audio source is still a real choice, so keep the picker when it exists.
+      if (window.S8tSource && window.S8tSource.canSystem()) {
+        var keepForSys = document.getElementById('micPicker');
+        if (keepForSys) keepForSys.style.display = '';
+        window.S8tSource._reflect();
+        return;
+      }
       var noMics = document.getElementById('micPicker');
       if (noMics) noMics.style.display = 'none';
       return;
@@ -4959,7 +5100,15 @@ async function refreshMicList() {
       html += '<option value="' + m.deviceId + '">' + label.replace(/</g, '&lt;').replace(/"/g, '&quot;') + '</option>';
     });
     if (!selectable) {
-      // Nothing identifiable to pick between -- just the default. Stay out of the way.
+      // Nothing identifiable to pick between -- just the default. Stay out of the way, unless
+      // the computer-audio source needs this button to stay reachable.
+      if (window.S8tSource && window.S8tSource.canSystem()) {
+        var keepForSys2 = document.getElementById('micPicker');
+        if (keepForSys2) keepForSys2.style.display = '';
+        sel.innerHTML = html;
+        window.S8tSource._reflect();
+        return;
+      }
       var noPick = document.getElementById('micPicker');
       if (noPick) noPick.style.display = 'none';
       return;
@@ -4970,11 +5119,14 @@ async function refreshMicList() {
     if (saved && !stillThere) window.SottotitoliDropMicId();   // it is gone — fall back explicitly
     var pickBtn = document.getElementById('micPickBtn');
     if (pickBtn) {
-      pickBtn.title = named
-        ? 'Scegli il microfono'
-        : 'Concedi l\'accesso al microfono per vedere i nomi dei dispositivi';
+      /* Keep the "names are hidden until access is granted" nuance as DATA, and let _reflect()
+       * compose the final title: the title also has to name the active SOURCE, and two places
+       * writing the same attribute is exactly how one of them silently loses. */
+      pickBtn.dataset.namesHint = named
+        ? ''
+        : S8T('mic_picker_names_hint', 'Concedi l\'accesso al microfono per vedere i nomi dei dispositivi');
     }
-    _renderMicMenu();
+    window.S8tSource._reflect();
   } catch (e) { console.warn('mic list:', e); }
 }
 
@@ -4988,6 +5140,16 @@ function _initMicPicker() {
     var v = sel.value;
     try { if (v) localStorage.setItem(MIC_KEY, v); else localStorage.removeItem(MIC_KEY); } catch (e) {}
     _renderMicMenu();   // move the tick to the newly chosen device
+    /* The device list only applies to the MICROPHONE source. While the computer's audio is being
+     * captured, the swap below would tear the microphone stack down underneath a running
+     * screen-share recording — and the microphone is not even what is being transcribed. Record
+     * the preference, say it takes effect next time, and touch nothing. */
+    if (window.S8tSource.isSystem()) {
+      if (sessionActive && typeof showToast === 'function') {
+        showToast(S8T('src_switch_mic', 'Sorgente: microfono — avrà effetto dalla prossima sessione'), 'warning', 6500);
+      }
+      return;
+    }
     if (sessionActive && !paused) {
       var isFallback = !!(window.RecordFallback && window.RecordFallback.isNeeded && window.RecordFallback.isNeeded());
       if (isFallback) {
@@ -5037,9 +5199,16 @@ function _initMicPicker() {
     menu.addEventListener('click', function (e) {
       var item = e.target && e.target.closest ? e.target.closest('.mic-item') : null;
       if (!item) return;
+      // Close FIRST: _applySourceChoice re-renders the menu, and doing that while it is still
+      // open would rebuild it under the pointer.
+      closeMicMenu();
+      var src = item.getAttribute('data-src');
+      if (src) { _applySourceChoice(src); return; }
+      // Picking a DEVICE means "use the microphone", otherwise the source item stays ticked and
+      // the click would look like it had been ignored.
+      if (window.S8tSource.isSystem()) window.S8tSource.set('mic');
       sel.value = item.getAttribute('data-mic-id') || '';
       sel.dispatchEvent(new Event('change'));
-      closeMicMenu();
     });
   }
   document.addEventListener('click', function (e) {

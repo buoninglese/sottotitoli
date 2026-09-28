@@ -18,7 +18,12 @@ var _realMic = {
   _forceTimer: null
 };
 
-function updateMicUI(state) {
+/* `label` is optional and only used when the state's default wording would be FALSE. The
+ * computer-audio source sets state 'live' like any other capture, but calling it "Mic Live"
+ * while the microphone is not being read is exactly the kind of confidently-wrong status text
+ * that made the original bug invisible. Every existing caller passes one argument and is
+ * unaffected. */
+function updateMicUI(state, label) {
   _realMic.state = state;
   var dot = document.getElementById('micDot');
   var status = document.getElementById('micStatus');
@@ -33,7 +38,7 @@ function updateMicUI(state) {
   }
   if (status) {
     var labels = { idle:'Mic Off', requesting:'Requesting…', live:'Mic Live', blocked:'Blocked', error:'Error' };
-    status.textContent = labels[state] || state;
+    status.textContent = label || labels[state] || state;
   }
   if (roomMic) {
     roomMic.textContent = state === 'live' ? '● Live' : (state === 'blocked' ? '● Blocked' : '● Off');
