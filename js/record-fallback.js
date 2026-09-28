@@ -139,6 +139,8 @@
       this._mime = this._pickMime();
       this._segment = [];
       this._busy = false;
+      this._txErrors = 0;   // consecutive failed segments — drives one-toast-per-run reporting
+      this._txEmpty = 0;    // consecutive segments that came back with no words at all
       this._stopped = false;
       this._restartRec();
       if (!this._recorder) { this._cleanup(); return false; }
@@ -150,13 +152,14 @@
       }
       this._showListening();
       var self = this;
-      /* Computer audio is cut into SHORTER segments than the mic path. The server meters by
-       * audio seconds (X-Audio-Seconds), not by request, so the smaller chunk costs the same
-       * and the first words arrive about twice as fast — which matters when the user is
-       * watching a video rather than holding a phone. */
-      var sec = (this._source === 'system')
-        ? 6
-        : Math.max(6, parseInt(this.intervalSec, 10) || 12);
+      /* 12s for BOTH sources. An earlier version of this used 6s for computer audio, on the
+       * reasoning that the server meters by audio seconds (X-Audio-Seconds) so the smaller chunk
+       * would cost the same. That reasoning covered COST but not REQUEST RATE: 6s doubles the
+       * calls to transcribe-audio (10/min instead of 5/min), and that was changed without any
+       * evidence the endpoint tolerates it. Until a rate limit can be ruled out, the value
+       * already proven in production — the one the iOS path has always used — is the right
+       * default. Overridable via SOTTOTITOLI_CONFIG.recordIntervalSec. */
+      var sec = Math.max(6, parseInt(this.intervalSec, 10) || 12);
       this._interval = setInterval(function(){ self._flushSegment(false); }, sec * 1000);
       return true;
     },
@@ -183,27 +186,50 @@
       var seg = self._segment.slice();
       self._segment = [];
       return new Promise(function(resolve){
+        var done = false;
+        var fin = function(){ if (!done) { done = true; resolve(); } };
         if (self._recorder && self._recorder.state !== 'inactive') {
-          self._recorder.onstop = function(){ resolve(); };
-          try { self._recorder.stop(); } catch(e) { resolve(); }
-        } else resolve();
+          self._recorder.onstop = function(){ fin(); };
+          try { self._recorder.stop(); } catch(e) { fin(); }
+          /* If onstop never fires, _busy stays TRUE for the rest of the session: every later tick
+           * returns early, audio keeps piling up, and the page sits there looking healthy while
+           * producing nothing at all. That is the same "everything looks fine, no text" shape as
+           * the getUserMedia hang fixed earlier, so it gets the same treatment — a bound on the
+           * wait. Without this, one missed event is an unrecoverable silent session. */
+          setTimeout(fin, 4000);
+        } else fin();
       }).then(function(){
         self._recorder = null;
+        /* Measure the segment BEFORE _restartRec(), which resets _segStart for the next one.
+         * Reading it afterwards meant the elapsed time was always ~0 and every segment was
+         * clamped to 1 — the server was told a 12-second segment was ONE second long, and
+         * metered and charged it as one. */
+        var segSeconds = self._segStart
+          ? Math.max(1, Math.round((Date.now() - self._segStart) / 1000))
+          : null;
+        self._segStart = null;
         if (!final && !self._stopped) self._restartRec();
         if (!seg.length) { self._busy = false; return; }
         var blob = null;
         try { blob = new Blob(seg, { type: self._mime || 'audio/webm' }); } catch(e) {}
         if (!blob) { self._busy = false; return; }
-        // Exact segment duration, measured at the source. The server needs this
-        // to meter and charge without inferring a bitrate from the byte count —
-        // an inference that was only ever a guess.
-        var segSeconds = self._segStart
-          ? Math.max(1, Math.round((Date.now() - self._segStart) / 1000))
-          : null;
-        self._segStart = null;
         self._showTranscribing(true);
         return self.transcribe(blob, window.currentCaptionLang, segSeconds).then(function(text){
-          if (text) self.feedSentences(text);
+          self._txErrors = 0;
+          if (text) {
+            self._txEmpty = 0;
+            self.feedSentences(text);
+          } else {
+            /* Whisper returns an EMPTY string for silence, music and unintelligible audio. That is
+             * not an error, so nothing was reported and nothing appeared. The microphone path
+             * hides this because SpeechRecognition emits interim words constantly and the user
+             * watches text move; here a silent segment looks exactly like a dead session. After
+             * three in a row, say which of the two it is instead of leaving it ambiguous. */
+            self._txEmpty = (self._txEmpty || 0) + 1;
+            if (self._txEmpty === 3 && typeof showToast === 'function') {
+              showToast(self._label('seg_no_speech', 'Arriva audio ma nessuna parola: controlla che la scheda condivida davvero l\'audio e che ci sia parlato.'), 'info', 11000);
+            }
+          }
           self._busy = false;
           if (!self._stopped) self._showTranscribing(false);
         }).catch(function(e){
@@ -218,6 +244,14 @@
             return;
           }
           console.warn('segment transcribe failed:', e);
+          /* This used to end at console.warn — invisible to anyone whose DevTools filter is on
+           * Errors, and the session carried on looking perfectly healthy while producing nothing.
+           * Report it, but only once per run, so a broken endpoint cannot toast every 12s. */
+          self._txErrors = (self._txErrors || 0) + 1;
+          if (self._txErrors === 2 && typeof showToast === 'function') {
+            showToast(self._label('seg_failed', 'Trascrizione interrotta: ')
+              + String((e && e.message) || e), 'error', 14000);
+          }
           if (!self._stopped) self._showTranscribing(false);
           if (final) {
             if (typeof showToast === 'function') showToast(String(e.message || e), 'error');
@@ -291,11 +325,34 @@
       };
       if (seconds) headers['X-Audio-Seconds'] = String(seconds);
       if (sessionId) headers['X-Session-Id'] = sessionId;
-      var resp = await fetch(url, {
-        method: 'POST',
-        headers: headers,
-        body: blob
-      });
+      /* Bounded wait. A fetch with no timeout can hang for ever, and _busy would then stay true for
+       * the rest of the session: the recorder keeps running, no further segment is ever sent, and
+       * the UI shows no error at all. 30s is far beyond a normal Whisper round-trip. */
+      var ctl = null, killTimer = null;
+      try {
+        if (typeof AbortController === 'function') {
+          ctl = new AbortController();
+          killTimer = setTimeout(function(){ try { ctl.abort(); } catch(e) {} }, 30000);
+        }
+      } catch(e) {}
+      var resp;
+      try {
+        resp = await fetch(url, {
+          method: 'POST',
+          headers: headers,
+          body: blob,
+          signal: ctl ? ctl.signal : undefined
+        });
+      } catch(e) {
+        if (e && e.name === 'AbortError') {
+          var to = new Error('Timeout: il server non ha risposto');
+          to.status = 0;
+          throw to;
+        }
+        throw e;
+      } finally {
+        if (killTimer) clearTimeout(killTimer);
+      }
       if (!resp.ok) {
         var err = null;
         try { err = await resp.json(); } catch(e) {}
