@@ -318,8 +318,15 @@
         sessionId = localStorage.getItem('sottotitoli-caption-session')
           || localStorage.getItem('sottotitoli-active-session') || null;
       } catch(e) {}
+      /* A BARE media type. MediaRecorder reports 'audio/webm;codecs=opus', and the server
+       * forwards this header VERBATIM into the multipart part it uploads to OpenAI
+       * (`new Blob([buf], { type: mime })`). A codec parameter that describes OUR encoder has no
+       * business travelling to a different service's parser — and note that the webm/opus
+       * combination is the one container this endpoint has never actually handled: the iOS path
+       * always recorded mp4/AAC, so this branch shipped unexercised. */
+      var bareMime = String(blob.type || 'audio/webm').split(';')[0].trim() || 'audio/webm';
       var headers = {
-        'Content-Type': blob.type || 'audio/webm',
+        'Content-Type': bareMime,
         'X-Lang': String(lang || 'en-US').split('-')[0],
         'Authorization': 'Bearer ' + (token || '')
       };
@@ -358,11 +365,18 @@
         try { err = await resp.json(); } catch(e) {}
         var msg = err && err.error ? err.error : ('HTTP ' + resp.status);
         if (resp.status === 401) msg = 'Accesso richiesto: accedi per trascrivere su questo dispositivo.';
+        /* `detail` is the UPSTREAM service's own message — OpenAI's verbatim reason for a 400
+         * (an unsupported file format, a rejected language, a rejected keyword). The server has
+         * ALWAYS returned it and the client has always thrown it away, which is why a 400 arrived
+         * here as a bare "Whisper request failed (400)" with nothing to act on — while the answer
+         * was sitting in the discarded field. Keep it: it is the diagnosis. */
+        if (err && err.detail) msg += ' — ' + String(err.detail).slice(0, 220);
         // Carry the status + code so the caller can tell "this failed" from "you are out of
         // minutes" — they need opposite handling (retry vs end the session).
         var errObj = new Error(msg);
         errObj.status = resp.status;
         errObj.code = (err && err.code) || null;
+        errObj.detail = (err && err.detail) || null;
         throw errObj;
       }
       var data = await resp.json();
