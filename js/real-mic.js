@@ -50,47 +50,36 @@ function updateMicUI(state, label) {
 /* Tell the USER why the microphone or recognition failed. Every one of these paths used to
  * end at console.log, which is invisible to anyone whose DevTools filter is on Errors -- the
  * exact shape of "no error in the console, but no text either". The error NAME is included
- * because the name is the diagnosis. Guarded lookup: this module may load before js/i18n.js. */
+ * because the name is the diagnosis.
+ *
+ * The lookup and the message table now live in js/mic-core.js, because onboarding.html and
+ * learner.js each grew their own copy of this same knowledge and drifted. */
 function _realMicT(key, fallback) {
-  try {
-    var v = window.I18n && window.I18n.t ? window.I18n.t(key) : null;
-    return (v && v !== key) ? v : fallback;
-  } catch (e) { return fallback; }
+  if (window.MicCore && typeof window.MicCore.t === 'function') return window.MicCore.t(key, fallback);
+  // mic-core.js must load BEFORE this file (see the script order in caption-s8t.html). Say so
+  // loudly rather than silently losing every message -- an unexplained silence is the exact bug
+  // this whole area kept producing.
+  console.error('real-mic.js: window.MicCore is missing — check the script order in the page.');
+  return fallback;
 }
 
 function _notifyMicProblem(name) {
   if (typeof window.showToast !== 'function') return;
-  var msg;
-  if (name === 'TimeoutError') {
-    msg = _realMicT('mic_gum_timeout', 'Il microfono non risponde: concedi il permesso o ricarica la pagina.');
-  } else if (name === 'recognition:network') {
-    msg = _realMicT('mic_err_network', 'Riconoscimento non raggiungibile (rete, VPN o proxy).');
-  } else if (name === 'recognition:audio-capture') {
-    msg = _realMicT('mic_err_capture', 'Nessun audio dal sistema: cambia il microfono predefinito di macOS.');
-  } else if (name === 'recognition:service-not-allowed' || name === 'NotAllowedError') {
-    msg = _realMicT('mic_err_denied', 'Permesso microfono negato per il riconoscimento.');
-  } else {
-    msg = _realMicT('mic_generic_fail', 'Microfono non disponibile.') + (name ? ' (' + name + ')' : '');
-  }
+  var msg = (window.MicCore && typeof window.MicCore.errorMessage === 'function')
+    ? window.MicCore.errorMessage(name)
+    : _realMicT('mic_generic_fail', 'Microfono non disponibile.') + (name ? ' (' + name + ')' : '');
   window.showToast(msg, 'error', 9000);
 }
 
-/* getUserMedia can hang FOREVER: an unanswered permission prompt, a wedged device, or a
- * Bluetooth handoff in progress. Observed on the live site -- the UI sat at "Requesting…"
- * with no recogniser created, no error, and nothing telling the user anything. A hang here
- * is indistinguishable from a dead page, so bound it. The loser of the race may still
- * resolve later (an orphan stream); that is the lesser evil than an unexplained freeze. */
+/* Bounded getUserMedia — see MicCore.gumWithTimeout for why it must be bounded. Kept as a local
+ * name because both call sites in this file read better for it, and because a missing dependency
+ * must fail LOUDLY rather than degrading to the unbounded call that caused the original hang. */
 function _gumWithTimeout(constraints, ms) {
-  return Promise.race([
-    navigator.mediaDevices.getUserMedia(constraints),
-    new Promise(function (_, reject) {
-      setTimeout(function () {
-        var e = new Error('getUserMedia timed out after ' + ms + 'ms');
-        e.name = 'TimeoutError';
-        reject(e);
-      }, ms);
-    })
-  ]);
+  if (!(window.MicCore && typeof window.MicCore.gumWithTimeout === 'function')) {
+    console.error('real-mic.js: window.MicCore is missing — check the script order in the page.');
+    return Promise.reject(new Error('mic-core.js is not loaded'));
+  }
+  return window.MicCore.gumWithTimeout(constraints, ms);
 }
 
 async function startRealMic() {

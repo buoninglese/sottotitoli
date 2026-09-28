@@ -1612,7 +1612,9 @@ button[onclick*="addToWordBank"]:hover{background:rgba(52,211,153,.15)!important
 <script src="js/toast.js?v=2"></script>
 <script src="js/notifications.js?v=2"></script>
 <script src="js/language-resolver.js?v=1"></script>
-<script src="js/real-mic.js?v=29"></script>
+<!-- mic-core.js MUST come first: real-mic.js and the inline block below both delegate to it. -->
+<script src="js/mic-core.js?v=1"></script>
+<script src="js/real-mic.js?v=30"></script>
 <script src="js/record-fallback.js?v=8"></script>
 <script src="js/system-audio.js?v=2"></script>
 <script src="js/grammar-viz.js?v=2"></script>
@@ -4980,10 +4982,21 @@ function closeMicMenu() { _setMicMenuOpen(false); }
  * far as the browser is concerned, so the page shows "Mic Live", emits no error, and never
  * transcribes. Nothing in the API can detect that the input is a loopback -- only the NAME can,
  * which is why this is worth guessing at. Whisper path (iOS/Safari) is exempt: it obeys the
- * picked device, so a loopback default does not matter there. */
-var _VIRTUAL_MIC_RE = /blackhole|loopback|soundflower|zoomaudio|krisp|sound siphon|vb-?cable|ndi|virtual|aggregate|multi-?output|obs|ecamm|existential/i;
+ * picked device, so a loopback default does not matter there.
+ *
+ * The predicate itself now lives in js/mic-core.js. The audit found this detector — the only thing
+ * that CAN explain the BlackHole report — present on ONE of the four capture stacks, so the other
+ * three fail silently in exactly the same way. Kept as a page-level alias because the call sites
+ * and tests/mic-harness.html address it by this name. */
 window._s8tLooksVirtualMic = function (label) {
-  return !!label && _VIRTUAL_MIC_RE.test(String(label));
+  if (window.MicCore && typeof window.MicCore.looksVirtual === 'function') {
+    return window.MicCore.looksVirtual(label);
+  }
+  /* Deliberately NOT a silent `false`: that would disable the only warning this app has for a dead
+   * input, and the page would look healthy while transcribing nothing. mic-core.js must load before
+   * this block; the harness turns red if it does not. */
+  console.error('caption-s8t: window.MicCore is missing — check the script order in this page.');
+  return false;
 };
 
 var _virtualMicChecked = false;

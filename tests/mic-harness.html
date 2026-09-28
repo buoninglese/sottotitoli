@@ -51,6 +51,7 @@
 
 <script src="../config.js"></script>
 <script src="../js/i18n.js"></script>
+<script src="../js/mic-core.js"></script>
 <script src="../js/real-mic.js"></script>
 <script src="../js/record-fallback.js"></script>
 <script src="../js/system-audio.js"></script>
@@ -130,7 +131,7 @@
 
   /* Two async halves (the i18n source fetch, and the caption iframe) both contribute rows, so the
    * summary must wait for BOTH — otherwise the i18n row can land after the verdict is printed. */
-  var pending = 2;
+  var pending = 3;
   function step() { if (--pending === 0) finish(); }
 
   waitForFrame(function (w) {
@@ -152,6 +153,14 @@
       return ['isSupported is a function', typeof (window.S8tSystemAudio && window.S8tSystemAudio.isSupported),
         !!(window.S8tSystemAudio && typeof window.S8tSystemAudio.isSupported === 'function')];
     });
+    check('M6', 'js/mic-core.js loaded (window.MicCore)', function () {
+      var c = window.MicCore;
+      var ok = !!(c && typeof c.looksVirtual === 'function'
+        && typeof c.gumWithTimeout === 'function'
+        && typeof c.errorMessage === 'function');
+      return ['looksVirtual + gumWithTimeout + errorMessage', String(ok), ok];
+    });
+
     check('M5', 'caption page exposed S8T + S8tSource + the mic regex', function () {
       return ['all three available', w ? 'available' : 'TIMED OUT (25s)', !!w];
     });
@@ -246,6 +255,19 @@
       return ['dev-123', String(got), got === 'dev-123'];
     })()]);
 
+    /* ── 6 · the page alias and the core must AGREE ──
+     * This is what proves the extraction is a delegation and not a second, drifting copy of the
+     * regex — the exact drift the audit found across the four stacks. */
+    check('MC2', 'page alias and MicCore agree on all ' + (VIRTUAL.length + REAL.length) + ' labels',
+      function () {
+        var all = VIRTUAL.concat(REAL);
+        var bad = all.filter(function (l) {
+          return w._s8tLooksVirtualMic(l) !== window.MicCore.looksVirtual(l);
+        });
+        return ['0 disagreements', bad.length ? ('disagree: ' + bad.slice(0, 3).join(', ')) : '0 disagreements',
+          bad.length === 0];
+      });
+
     step();
   });
 
@@ -267,6 +289,47 @@
         'could not fetch js/i18n.js: ' + ((e && e.message) || e), false]);
       done();
     });
+  }
+
+  /* ── mic-core.js, tested directly — no iframe needed ──────────────────────────── */
+  function coreChecks(done) {
+    /* The CONTRACT, not the wording: callers branch on these, and an unrecognised name must keep
+     * the name in the message because the name is the diagnosis. Testing the exact string would
+     * pin the active language, which is not what this module promises. */
+    check('MC3', 'errorMessage: known names explain, unknown names keep the name', function () {
+      var known = ['TimeoutError', 'recognition:network', 'recognition:audio-capture',
+        'recognition:service-not-allowed', 'NotAllowedError'];
+      var bad = known.filter(function (n) {
+        var m = window.MicCore.errorMessage(n);
+        return !(m && m.length > 10 && m.indexOf(n) < 0);
+      });
+      var unknown = window.MicCore.errorMessage('WeirdError');
+      var ok = bad.length === 0 && unknown.indexOf('(WeirdError)') >= 0;
+      return ['known names explained; unknown appends the name',
+        bad.length ? ('bad: ' + bad.join(', ')) : unknown, ok];
+    });
+
+    check('MC4', 'isSilentError: silence and a user-stopped recognition are NOT failures', function () {
+      var silent = ['no-speech', 'aborted'].every(function (n) { return window.MicCore.isSilentError(n); });
+      var loud = ['TimeoutError', 'NotAllowedError'].every(function (n) { return !window.MicCore.isSilentError(n); });
+      return ['no-speech + aborted are silent; errors are not', String(silent && loud), silent && loud];
+    });
+
+    /* MC1 must be ASYNC — the whole point is that the underlying call never settles, so a
+     * synchronous assertion could not test it. */
+    var orig = navigator.mediaDevices.getUserMedia;
+    navigator.mediaDevices.getUserMedia = function () { return new Promise(function () {}); };
+    window.MicCore.gumWithTimeout({ audio: true }, 60).then(function () {
+      row('MC1', 'gumWithTimeout rejects when getUserMedia never settles', 'TimeoutError',
+        'RESOLVED (the hang was not bounded)', false);
+      restore();
+    }).catch(function (e) {
+      var name = (e && e.name) || '(no name)';
+      row('MC1', 'gumWithTimeout rejects when getUserMedia never settles', 'TimeoutError', name,
+        name === 'TimeoutError');
+      restore();
+    });
+    function restore() { navigator.mediaDevices.getUserMedia = orig; done(); }
   }
 
   function finish() {
@@ -305,6 +368,7 @@
   }
 
   keyChecks(step);
+  coreChecks(step);
 })();
 </script>
 </body>
