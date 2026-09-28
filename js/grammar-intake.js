@@ -32,6 +32,13 @@
   var l1 = '';
   var step = 'intro';          // intro | q | p | l1 | result
 
+  // ── Synthesis gate ──
+  // Mirrors js/panoramica-reportai.js. False until the backend synthesis module
+  // (ai_report_modules id 15 + MODULE_PROMPTS[15] + processRequest branch) is live.
+  // While false the "Genera il report di sintesi" card is hidden. Flip to true in
+  // BOTH files together. grep SYNTHESIS_ENABLED to find every flip site.
+  var SYNTHESIS_ENABLED = false;
+
   var qmap = {};
   (PROFILE.questionnaire.questions || []).forEach(function (q) { qmap[q.id] = q; });
 
@@ -222,6 +229,7 @@
           ladder +
         '</div>' +
 
+        (SYNTHESIS_ENABLED ?
         '<div class="gi-card">' +
           '<h3 class="gi-h">Genera il report di sintesi</h3>' +
           '<p class="gi-sub">Un report multi-pagina che unisce il tuo profilo e il tuo piano. Scegli su cosa basarlo.</p>' +
@@ -231,7 +239,7 @@
             '<label><input type="radio" name="giBasis" value="sessions"> Solo sessioni (trascrizioni live)</label>' +
           '</div>' +
           '<button class="gi-btn gi-btn-primary" data-act="gen-report">Genera il report</button>' +
-        '</div>' +
+        '</div>' : '') +
 
         '<div class="gi-nav gi-nav-end">' +
           '<button class="gi-btn gi-btn-ghost" data-act="retake">Rifai il test</button>' +
@@ -369,6 +377,7 @@
    * the (auth + billing) generation flow already lives. The basis is read there
    * and folded into the report context. */
   function generateReport() {
+    if (!SYNTHESIS_ENABLED) return;
     var basis = 'both';
     var stage = el('giStage');
     if (stage && stage.querySelector) {

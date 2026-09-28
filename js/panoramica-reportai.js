@@ -31,10 +31,20 @@
                 '@keyframes loading { 0% { transform: translateX(-100%); } 100% { transform: translateX(300%); } }';
               document.head.appendChild(styleEl);
 
-              var reportRadios = document.querySelectorAll('#pnl-report-ai input[name="reportType"]');
-              var engineRadios = document.querySelectorAll('#pnl-report-ai input[name="engine"]');
+               var reportRadios = document.querySelectorAll('#pnl-report-ai input[name="reportType"]');
+               var engineRadios = document.querySelectorAll('#pnl-report-ai input[name="engine"]');
 
-              function updateView() {
+               // ── Synthesis gate ──
+               // False until the backend synthesis module (ai_report_modules id 15 +
+               // MODULE_PROMPTS[15] + the processRequest branch) is live. While false the
+               // preset is hidden, the generate handler refuses, and the staged deep-link
+               // key is discarded — so the preset can never charge for a report that
+               // cannot be produced. Flip to true (and bump this file's cache-buster)
+               // only after confirming id 15 exists on live. grep SYNTHESIS_ENABLED to
+               // find every flip site (this file + js/grammar-intake.js).
+               var SYNTHESIS_ENABLED = false;
+
+               function updateView() {
                 var selectedPreset;
                 reportRadios.forEach(function(r){ if(r.checked) selectedPreset = r; });
 
@@ -91,6 +101,16 @@
                reportRadios.forEach(function(r){ r.addEventListener('change', function(){ updateView(); syncBasisVisibility(); }); });
                engineRadios.forEach(function(r){ r.addEventListener('change', updateView); });
                syncBasisVisibility();
+
+               // Gate part 1 — hide the synthesis card while disabled, so it can't
+               // be selected (and therefore can't be bought) at all.
+               if (!SYNTHESIS_ENABLED) {
+                 var synRadio = document.querySelector('#pnl-report-ai input[name="reportType"][value="synthesis"]');
+                 if (synRadio) {
+                   var synLabel = synRadio.closest('label');
+                   if (synLabel) synLabel.style.display = 'none';
+                 }
+               }
 
               // ═══ Preset → Module mapping (sync with ai_configs preset_pricing) ═══
               var PRESET_MAP = {
@@ -152,6 +172,13 @@
                 // synthesis preset + basis. A bottom-of-page script (after
                 // theme-2.js) opens the panel and clears the flag.
                 (function preselectStagedSynthesis(){
+                  // Gate part 3 — while disabled, discard the one-shot staged key and
+                  // do NOT preselect, so a stale key can't check a hidden radio and
+                  // leave the panel thinking Synthesis is chosen.
+                  if (!SYNTHESIS_ENABLED) {
+                    try { localStorage.removeItem('sottotitoli_pending_synthesis_basis'); } catch (e) {}
+                    return;
+                  }
                   var staged = null;
                   try { staged = localStorage.getItem('sottotitoli_pending_synthesis_basis'); } catch (e) {}
                   if (staged !== 'sessions' && staged !== 'both' && staged !== 'grammatica') return;
@@ -175,6 +202,14 @@
                 reportRadios.forEach(function(rd){ if(rd.checked) selectedPreset = rd; });
                 if (!selectedPreset) { showToastMsg('⚠️ Seleziona un tipo di analisi.'); return; }
                 var presetKey = selectedPreset.value;
+
+                // Gate part 2 — refuse to charge for synthesis while the backend
+                // module is not live, even if the preset is reached programmatically.
+                if (presetKey === 'synthesis' && !SYNTHESIS_ENABLED) {
+                  showToastMsg('⚠️ Il report di sintesi sarà disponibile a breve.');
+                  return;
+                }
+
                 var mapping = PRESET_MAP[presetKey];
                 if (!mapping) { showToastMsg('⚠️ Tipo di analisi non riconosciuto.'); return; }
 
