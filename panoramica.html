@@ -1712,29 +1712,72 @@
     (function () {
       var btn = document.getElementById('purgeLearnerInputBtn');
       if (!btn) return;
+
+      // I18n.t() returns the key itself when a translation is missing, so a
+      // dropped key would put the literal text "purge_done" on screen. Fall back
+      // to the Italian source instead — the same defensive pattern used by
+      // js/learner.js and js/notifications.js.
+      function tr(key, fallback) {
+        try {
+          if (window.I18n && window.I18n.t) {
+            var v = window.I18n.t(key);
+            if (v && v !== key) return v;
+          }
+        } catch (e) {}
+        return fallback;
+      }
+
       btn.addEventListener('click', function () {
         var sb = window.sottotitoliSupabase;
-        if (!sb) { showToastMsg('⚠️ Effettua il login.'); return; }
+        if (!sb) {
+          showToastMsg('⚠️ ' + tr('purge_login', 'Effettua il login per gestire i tuoi dati.'));
+          return;
+        }
         // appConfirm, not a bare confirm: it is the pattern every other
         // destructive action on this page uses, and it is styled consistently.
         appConfirm(
-          'Verranno cancellati i testi che hai scritto o dettato durante l\'onboarding e i fatti strutturati ricavati da essi. Sessioni, report e word bank non vengono toccati. L\'operazione è definitiva e non può essere annullata.',
+          tr('purge_confirm', 'Verranno cancellati i testi che hai scritto o dettato durante l\'onboarding — nel database e nella copia salvata in questo browser — e i fatti strutturati ricavati da essi. Sessioni, report e word bank non vengono toccati. L\'operazione è definitiva e non può essere annullata.'),
           function () {
+            var errMsg = tr('purge_error', 'Non è stato possibile cancellare.');
             sb.rpc('purge_learner_input').then(function (r) {
               if (r.error) {
-                appAlert('Non è stato possibile cancellare: ' + r.error.message, 'Errore', '⚠️');
+                appAlert(errMsg + ' ' + r.error.message, 'Errore', '⚠️');
                 return;
               }
-              if (r.data && r.data.success) {
-                showToastMsg('🗑️ Risposte grezze cancellate.');
-              } else {
-                appAlert('Cancellazione non riuscita: ' + ((r.data && r.data.error) || 'errore sconosciuto'), 'Errore', '⚠️');
+              if (!(r.data && r.data.success)) {
+                appAlert(errMsg + ' ' + ((r.data && r.data.error) || ''), 'Errore', '⚠️');
+                return;
               }
+
+              // The database has a copy of the raw text and this browser has
+              // another. Clearing only the database would leave the text in the
+              // very place the synthesis report reads from — grammar-report.js
+              // builds its context out of `sottotitoli_onboarding` — so a learner
+              // who had just deleted their answers would still have sent them on
+              // their next Grammatica report. Both copies, or the promise is not
+              // true.
+              //
+              // `sottotitoli_onboarding_done` is deliberately NOT cleared: it is
+              // a gate flag, not learner content, and removing it would drop the
+              // learner back into onboarding.
+              try { localStorage.removeItem('sottotitoli_onboarding'); } catch (e) {}
+
+              showToastMsg('🗑️ ' + tr('purge_done', 'Risposte grezze cancellate, anche la copia salvata in questo browser.'));
+
+              // The Profile and Grammatica panels read that key when they render
+              // and hold what they read, so the deleted text would linger on
+              // screen until the next reload. Reload after the toast has been
+              // seen, so what is displayed matches what is stored.
+              setTimeout(function () {
+                try { window.location.reload(); } catch (e) {}
+              }, 900);
             }).catch(function (e) {
-              appAlert('Non è stato possibile cancellare: ' + (e && e.message ? e.message : 'errore'), 'Errore', '⚠️');
+              appAlert(errMsg + ' ' + (e && e.message ? e.message : ''), 'Errore', '⚠️');
             });
           },
-          'Cancella le mie risposte grezze',
+          // Reuses the label already on the button rather than adding a key for
+          // the same words.
+          tr('purge_label', 'Cancella le mie risposte grezze'),
           '🗑️'
         );
       });
@@ -1954,7 +1997,7 @@
   <script src="js/panoramica-wrapped-switcher.js?v=1"></script>
   <script src="js/data-service.js?v=11"></script>
   <script src="js/smart-suggestions.js"></script>
-  <script src="js/i18n.js?v=106"></script>
+  <script src="js/i18n.js?v=107"></script>
   <script src="js/icon-a11y.js?v=2"></script>
   <script src="js/xp.js?v=5"></script>
   <script>if (window.XP) { setTimeout(function(){ try { XP.restore(); } catch(e){} }, 2500); }</script>
@@ -1975,7 +2018,7 @@
   <script src="js/grammar-profile.js?v=2"></script>
   <script src="js/grammar-planner.js?v=1"></script>
   <script src="js/grammar-profile-store.js?v=2"></script>
-  <script src="js/grammar-report-context.js?v=2"></script>
+  <script src="js/grammar-report-context.js?v=3"></script>
   <script src="js/passive-signals.js?v=1"></script>
   <script src="js/grammar-drill.js?v=2"></script>
   <script src="js/grammar-report.js?v=4"></script>

@@ -75,10 +75,19 @@
    * pass `{ raw: onboarding }` — the entire localStorage object, unfiltered.
    *
    * This is an allow-list, not a filter with exceptions: add a field here only
-   * after checking what it contains, and update privacy.html to match. The one
-   * free text it keeps is `goal`, which the learner wrote about their learning
-   * rather than about themselves, and the prompt tells the model to address them
-   * as "you" and never to name them.
+   * after checking what it contains, and update privacy.html to match.
+   *
+   * It used to keep one free text — `goal`, taken from `short_term_goal` — on the
+   * reasoning that the learner wrote it about their learning rather than about
+   * themselves. That reasoning was not good enough. It is still the learner's own
+   * words, it is a column `purge_learner_input()` deletes, and a learner who
+   * typed a name into their goal would have sent the name. Goals now reach the
+   * synthesis report as structured facts merged server-side from
+   * learner_profile_extractions, so dropping it here costs no personalisation.
+   *
+   * `stripProse()` in process-ai-reports enforces the same rule server-side, so a
+   * browser holding a cached copy of this file cannot put prose back into the
+   * prompt by being out of date.
    */
   function mapOnboarding(onboarding) {
     onboarding = onboarding || {};
@@ -86,7 +95,6 @@
     return {
       native_language: onboarding.native_lang || null,
       self_assessed_cefr: (lvl && ONBOARDING_MAP.english_level[lvl]) || null,
-      goal: onboarding.short_term_goal || null,
       situations_to_scenarios: (onboarding.english_situations || [])
         .map(function (s) { return ONBOARDING_MAP.english_situations[s]; })
         .filter(Boolean),
