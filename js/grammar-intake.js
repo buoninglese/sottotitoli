@@ -200,6 +200,15 @@
           '<div class="gi-badges"><span class="gi-badge">Livello stimato · ' + esc(d.estimated_cefr || 'A1') + '</span></div>' +
         '</div>' +
 
+        (SYNTHESIS_ENABLED ?
+        '<div class="gi-card gi-report-card">' +
+          '<div class="gi-kicker">Il tuo report</div>' +
+          '<h3 class="gi-h">Ottieni il report completo</h3>' +
+          '<p class="gi-sub">Un report che unisce il tuo onboarding e il questionario, con una panoramica dei tuoi errori e i prossimi passi.</p>' +
+          '<div class="gi-report-cost">2 crediti</div>' +
+          '<button class="gi-btn gi-btn-primary" data-act="gen-report">Genera il report</button>' +
+        '</div>' : '') +
+
         '<div class="gi-grid">' +
           '<div class="gi-card">' +
             '<h3 class="gi-h">Come lavori</h3>' +
@@ -228,18 +237,6 @@
           '<p class="gi-sub">I concetti ordinati per te, dal più vicino al tuo livello a quelli più lontani.</p>' +
           ladder +
         '</div>' +
-
-        (SYNTHESIS_ENABLED ?
-        '<div class="gi-card">' +
-          '<h3 class="gi-h">Genera il report di sintesi</h3>' +
-          '<p class="gi-sub">Un report multi-pagina che unisce il tuo profilo e il tuo piano. Scegli su cosa basarlo.</p>' +
-          '<div class="gi-basis">' +
-            '<label><input type="radio" name="giBasis" value="grammatica"> Solo Grammatica (intake, placement, obiettivi)</label>' +
-            '<label><input type="radio" name="giBasis" value="both" checked> Sessioni + Grammatica (fusione completa)</label>' +
-            '<label><input type="radio" name="giBasis" value="sessions"> Solo sessioni (trascrizioni live)</label>' +
-          '</div>' +
-          '<button class="gi-btn gi-btn-primary" data-act="gen-report">Genera il report</button>' +
-        '</div>' : '') +
 
         '<div class="gi-nav gi-nav-end">' +
           '<button class="gi-btn gi-btn-ghost" data-act="retake">Rifai il test</button>' +
@@ -331,8 +328,12 @@
       compute();
     }
     else if (act === 'retake') { reset(); }
-    else if (act === 'saved') { w.location.href = 'panoramica.html'; }
+    else if (act === 'saved') {
+      var nav = document.querySelector('[data-panel="panoramica"]');
+      if (nav) nav.click();
+    }
     else if (act === 'gen-report') { generateReport(); }
+    else if (act === 'back-from-report') { renderResult(); }
     else if (act === 'open-concept') {
       var cid = t.getAttribute('data-concept');
       var drill = w.SottotitoliGrammarDrill;
@@ -373,21 +374,14 @@
     step = 'intro'; renderIntro();
   }
 
-  /* Stage the chosen synthesis basis and hand off to the Report AI panel, where
-   * the (auth + billing) generation flow already lives. The basis is read there
-   * and folded into the report context. */
+  /* Generate the 2-credit report (onboarding + questionnaire synthesis) directly
+   * in the Grammatica panel via js/grammar-report.js. The profile is already
+   * persisted, so the report context can be built from it. */
   function generateReport() {
     if (!SYNTHESIS_ENABLED) return;
-    var basis = 'both';
-    var stage = el('giStage');
-    if (stage && stage.querySelector) {
-      var sel = stage.querySelector('input[name="giBasis"]:checked');
-      if (sel && (sel.value === 'sessions' || sel.value === 'both' || sel.value === 'grammatica')) {
-        basis = sel.value;
-      }
-    }
-    try { localStorage.setItem('sottotitoli_pending_synthesis_basis', basis); } catch (e) {}
-    w.location.href = 'panoramica.html';
+    var report = w.SottotitoliGrammarReport;
+    if (!report) return;
+    report.generate(_profile, el('giStage'));
   }
 
   /* After a drill, drop a missed concept from the review queue once the learner

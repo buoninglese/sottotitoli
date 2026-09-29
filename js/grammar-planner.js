@@ -115,19 +115,29 @@
 
   /* ── Placement scorer (mirrors intake.score_placement) ──
    * Returns [estimatedCefr, missed[]]. `missed` is the observed-diagnostic
-   * signal: every item answered wrong, with concept + error category. */
+   * signal: every item answered wrong, with concept + error category.
+   *
+   * Level is accuracy-based, not "highest item answered correctly": a single
+   * lucky C1 answer while A1/A2/B1 have misses must NOT yield C1. The estimate is
+   * the highest level where this level AND every lower level are ≥70% correct.
+   * Missed items are sorted basic-first (A1/A2/B1) so the "revise first" queue
+   * leads with the fundamentals people slip on at any level. */
   function scorePlacement(answers) {
     var missed = [];
-    var best = 'A1';
-    if (!PROFILE || !PROFILE.placement) return { level: best, missed: missed };
+    if (!PROFILE || !PROFILE.placement) return { level: 'A1', missed: missed };
+
+    var perLevel = {};
     (PROFILE.placement.items || []).forEach(function (item) {
       var chosen = answers && answers[item.id];
+      var lv = item.level;
+      perLevel[lv] = perLevel[lv] || { correct: 0, total: 0 };
+      perLevel[lv].total++;
       if (chosen === item.answer) {
-        if ((CEFR_ORDER[item.level] || 0) > (CEFR_ORDER[best] || 0)) best = item.level;
+        perLevel[lv].correct++;
       } else {
         missed.push({
           item_id: item.id,
-          level: item.level,
+          level: lv,
           concept_id: item.concept_id,
           error_category: item.error_category,
           chosen: chosen,
@@ -135,7 +145,24 @@
         });
       }
     });
-    return { level: best, missed: missed };
+
+    var THRESHOLD = 0.7;
+    var levels = Object.keys(CEFR_ORDER).sort(function (a, b) { return CEFR_ORDER[a] - CEFR_ORDER[b]; });
+    var estimated = 'A1';
+    for (var i = 0; i < levels.length; i++) {
+      var lv = levels[i];
+      var s = perLevel[lv];
+      if (!s || s.total === 0) break;
+      if (s.correct / s.total < THRESHOLD) break;
+      estimated = lv;
+    }
+
+    // Basic-level mistakes first — the fundamentals worth revising before anything.
+    missed.sort(function (a, b) {
+      return (CEFR_ORDER[a.level] || 99) - (CEFR_ORDER[b.level] || 99);
+    });
+
+    return { level: estimated, missed: missed };
   }
 
   /* ── Error focus: observed vs predicted, kept SEPARATE (mirrors intake) ── */
