@@ -1,10 +1,13 @@
-/* ═══ Grammar Report — generate the 2-credit synthesis report ═══
+/* ═══ Grammar Report — generate the synthesis report ═══
  * Triggered from the Grammatica panel (pnl-grammatica). Builds the report context
  * from the learner's profile (onboarding + questionnaire, basis='grammatica'),
- * charges 2 credits, enqueues module_key='15', polls session_ai_reports for the
- * completed report, and renders it inline.
+ * charges the product's price, enqueues the product's id, polls session_ai_reports
+ * for that request's report, and renders it inline.
  *
  *   SottotitoliGrammarReport.generate(profile, container)
+ *
+ * Price and module id come from public.report_products — the single source of
+ * truth — with MODULE_KEY/CREDITS below as a fallback only.
  *
  * Billing mirrors js/panoramica-reportai.js: charge via deduct_tokens RPC first,
  * then insert; refund via refund_report_credits on failure.
@@ -12,10 +15,30 @@
 (function (w) {
   'use strict';
 
+  // Fallback only — the live values come from public.report_products, the single
+  // source of truth. Hardcoding them here meant a price or id change in the
+  // catalogue would never reach the charge on this path.
   var MODULE_KEY = '15';
   var CREDITS = 2;
 
   function sb() { return w.sottotitoliSupabase; }
+
+  // Resolve the profile-driven product (basis 'both' / 'grammatica') from the
+  // catalogue. Never throws: on any failure the fallback above stands.
+  async function resolveProduct(client) {
+    try {
+      var res = await client.from('report_products')
+        .select('id,credits')
+        .eq('is_active', true)
+        .in('basis', ['both', 'grammatica'])
+        .order('sort_order', { ascending: true })
+        .limit(1);
+      if (res && res.data && res.data.length) {
+        return { id: String(res.data[0].id), credits: res.data[0].credits };
+      }
+    } catch (e) { /* fallback */ }
+    return { id: MODULE_KEY, credits: CREDITS };
+  }
 
   function esc(s) {
     return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) {
@@ -86,6 +109,10 @@
     if (!r.data || !r.data.session) { renderError(container, 'Sessione scaduta. Rieffettua il login.'); return; }
     var uid = r.data.session.user.id;
 
+    // Price and module id come from the catalogue, not from a second copy here.
+    var product = await resolveProduct(client);
+    var credits = product.credits;
+
     // Build context from the persisted profile + onboarding, basis='grammatica'.
     var context = null;
     if (w.SottotitoliGrammarReportContext) {
@@ -106,15 +133,15 @@
         if (!tr.error && tr.data) balance = tr.data.balance;
       } catch (e2) {}
     }
-    if (balance < CREDITS) {
-      renderError(container, 'Crediti insufficienti. Hai ' + balance + ' crediti, servono ' + CREDITS + '.');
+    if (balance < credits) {
+      renderError(container, 'Crediti insufficienti. Hai ' + balance + ' crediti, servono ' + credits + '.');
       return;
     }
 
     // Charge.
     var chargeRef = 'report_synthesis_' + Date.now();
     try {
-      var deduct = await client.rpc('deduct_tokens', { p_user_id: uid, p_amount: CREDITS, p_reference: chargeRef });
+      var deduct = await client.rpc('deduct_tokens', { p_user_id: uid, p_amount: credits, p_reference: chargeRef });
       if (deduct.error || !deduct.data || deduct.data.success !== true) {
         renderError(container, 'Impossibile scalare i crediti. Riprova.');
         return;
@@ -132,15 +159,15 @@
     var ins = await client.from('ai_report_requests').insert({
       user_id: uid,
       session_ids: [],
-      module_key: MODULE_KEY,
+      module_key: product.id,
       scope_type: 'single_session',
       status: 'queued',
-      tokens_spent: CREDITS,
+      tokens_spent: credits,
       charge_reference: chargeRef,
       context: context
     }).select('id').single();
     if (ins.error) {
-      try { await client.rpc('refund_report_credits', { p_user_id: uid, p_amount: CREDITS, p_reference: chargeRef }); } catch (e) {}
+      try { await client.rpc('refund_report_credits', { p_user_id: uid, p_amount: credits, p_reference: chargeRef }); } catch (e) {}
       renderError(container, 'Errore durante la richiesta: ' + ins.error.message + '. Crediti riaccreditati.');
       return;
     }
@@ -164,7 +191,7 @@
           : await client.from('session_ai_reports')
               .select('id,summary,summary_text,status')
               .eq('user_id', uid)
-              .eq('module_id', 15)
+              .eq('module_id', Number(product.id) || 15)
               .eq('status', 'completed')
               .order('created_at', { ascending: false })
               .limit(1);
