@@ -162,7 +162,12 @@
       module_key: product.id,
       scope_type: 'single_session',
       status: 'queued',
-      tokens_spent: credits,
+      // credits_charged records the price; tokens_spent is tokens only, and no
+      // tokens exist until the model runs. Writing the price into tokens_spent
+      // made the column mean two things at once (see migration
+      // 20260929230000_report_request_payment_integrity.sql).
+      credits_charged: credits,
+      tokens_spent: 0,
       charge_reference: chargeRef,
       context: context
     }).select('id').single();

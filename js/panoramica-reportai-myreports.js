@@ -183,13 +183,49 @@
                         .eq('id', id).eq('user_id', uid).maybeSingle();
                       if (rep.data) {
                         var mid = rep.data.module_id || 1;
-                        await sb.from('ai_report_requests').insert({
+
+                        // ⚠️ This used to insert WITHOUT charging, while the confirm
+                        // above promises "i crediti verranno dedotti nuovamente". The
+                        // button handed out a report for free and said otherwise.
+                        // process-ai-reports now refuses any request with no charge in
+                        // the ledger, so the copy and the behaviour have to agree —
+                        // this is the charge the dialog was already promising. The
+                        // failed attempt was refunded in full, which is what makes a
+                        // retry cost-neutral rather than a second charge.
+                        var price = 0;
+                        try {
+                          var pr = await sb.from('report_products').select('credits').eq('id', mid).maybeSingle();
+                          if (pr.data && typeof pr.data.credits === 'number') price = pr.data.credits;
+                        } catch (e) {}
+
+                        var chargeRef = 'report_retry_' + Date.now();
+                        if (price > 0) {
+                          var ded = await sb.rpc('deduct_tokens', { p_user_id: uid, p_amount: price, p_reference: chargeRef });
+                          if (ded.error || !ded.data || ded.data.success !== true) {
+                            appAlert('Impossibile scalare i crediti. Riprova.', 'Crediti', '⚠️');
+                            loadReports();
+                            return;
+                          }
+                        }
+
+                        var ins = await sb.from('ai_report_requests').insert({
                           user_id: uid,
                           session_ids: rep.data.session_id ? [rep.data.session_id] : [],
                           module_key: String(mid),
                           scope_type: 'single_session',
-                          status: 'queued'
+                          status: 'queued',
+                          charge_reference: price > 0 ? chargeRef : null,
+                          credits_charged: price,
+                          tokens_spent: 0
                         });
+                        if (ins.error) {
+                          if (price > 0) {
+                            try { await sb.rpc('refund_report_credits', { p_user_id: uid, p_amount: price, p_reference: chargeRef }); } catch (e) {}
+                          }
+                          appAlert('Errore durante la richiesta: ' + ins.error.message + '. Crediti riaccreditati.', 'Errore', '⚠️');
+                          loadReports();
+                          return;
+                        }
                         await sb.from('session_ai_reports').delete().eq('id', id).eq('user_id', uid);
                         showToastMsg('🔄 Report rimesso in coda. Controlla tra poco.');
                       }

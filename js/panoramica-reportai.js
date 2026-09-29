@@ -326,10 +326,16 @@
                      module_key: String(product.id),
                      scope_type: sessionIds.length > 1 ? 'selected_sessions' : 'single_session',
                      status: 'queued',
-                     // Record what was charged so a refund has a source of truth.
-                     // process-ai-reports overwrites this with real usage on success,
-                     // so the value a failure sees is exactly the amount to give back.
-                     tokens_spent: totalCredits,
+                     // What was charged. The refund path reads the LEDGER, not this
+                     // row: `tokens_spent` used to carry the price so a failure knew
+                     // how much to give back, but the worker also overwrites it with
+                     // real usage — so for a request that had already run it held a
+                     // token count, and refunding that would have credited thousands.
+                     // It is also client-supplied on a client-inserted row, so it
+                     // could be set to anything. This column is the record; the
+                     // ledger is the authority.
+                     credits_charged: totalCredits,
+                     tokens_spent: 0,
                      // Ties this request to its charge. refund_report_credits uses it to tell
                      // "no report was delivered" (refundable) from "the report WAS delivered"
                      // (not refundable). Without it, a delivered report could be refunded once —
