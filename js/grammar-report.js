@@ -23,11 +23,6 @@
     });
   }
 
-  function toast(msg) {
-    try { if (w.showToastMsg) { w.showToastMsg(msg); return; } } catch (e) {}
-    if (w.alert) w.alert(msg);
-  }
-
   /* Minimal markdown → HTML. Good enough for the LLM's structured Italian report. */
   function mdToHtml(md) {
     var lines = String(md || '').split(/\r?\n/);
