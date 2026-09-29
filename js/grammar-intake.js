@@ -1,6 +1,6 @@
 /* ═══ Grammar Intake — questionnaire + placement → profile → plan ═══
- * Drives the Grammatica page (grammatica.html). Walks the branching
- * questionnaire and the 30-item placement, scores via
+ * Drives the Grammatica panel (pnl-grammatica in panoramica.html). Walks the
+ * branching questionnaire and the 30-item placement, scores via
  * window.SottotitoliGrammarPlanner, persists via
  * window.SottotitoliGrammarProfileStore, and renders the personalised plan:
  *   - the learner's archetype + estimated CEFR
@@ -8,6 +8,7 @@
  *   - objectives (from motivation)
  *   - the concept ladder (ordered by plan.ordering)
  *   - the "ripassa" review queue (placement.missed)
+ *   - the 2-credit report (delegated to window.SottotitoliGrammarReport)
  *
  * Adaptive walker mirrors grammar-planner.js scoreQuestionnaire's traversal so
  * the questions shown are exactly the ones the scorer will read back.
@@ -32,11 +33,10 @@
   var l1 = '';
   var step = 'intro';          // intro | q | p | l1 | result
 
-  // ── Synthesis gate ──
-  // Mirrors js/panoramica-reportai.js. False until the backend synthesis module
-  // (ai_report_modules id 15 + MODULE_PROMPTS[15] + processRequest branch) is live.
-  // While false the "Genera il report di sintesi" card is hidden. Flip to true in
-  // BOTH files together. grep SYNTHESIS_ENABLED to find every flip site.
+  // ── Report gate ──
+  // Kill-switch for the 2-credit report. False hides the report card and blocks
+  // generation. Backend module 15 is live; leave true unless it needs to be
+  // disabled in an emergency.
   var SYNTHESIS_ENABLED = true;
 
   var qmap = {};
