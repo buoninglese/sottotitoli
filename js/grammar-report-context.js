@@ -57,21 +57,46 @@
     }
   };
 
+  /* ── What may leave the browser ──
+   *
+   * ⚠️ PRIVACY: this payload is sent to OpenAI with the report prompt.
+   *
+   * The onboarding object is partly free prose written by the learner:
+   *
+   *   intake_transcript                       a spoken self-introduction — in
+   *                                           practice a name, a job, an
+   *                                           employer and a city
+   *   long_term_goal / short_term_goal /
+   *   longterm_transcript / shortterm_transcript    free text
+   *   difficulties_other                      free text
+   *   _ai_report / _last_slide                app bookkeeping, not learner data
+   *
+   * None of that is needed to write a report, so none of it is sent. This used to
+   * pass `{ raw: onboarding }` — the entire localStorage object, unfiltered.
+   *
+   * This is an allow-list, not a filter with exceptions: add a field here only
+   * after checking what it contains, and update privacy.html to match. The one
+   * free text it keeps is `goal`, which the learner wrote about their learning
+   * rather than about themselves, and the prompt tells the model to address them
+   * as "you" and never to name them.
+   */
   function mapOnboarding(onboarding) {
     onboarding = onboarding || {};
-    var mapped = { raw: onboarding };
-    mapped.difficulties_to_errors = (onboarding.difficulties || [])
-      .map(function (d) { return ONBOARDING_MAP.difficulties[d]; })
-      .filter(Boolean);
-    mapped.situations_to_scenarios = (onboarding.english_situations || [])
-      .map(function (s) { return ONBOARDING_MAP.english_situations[s]; })
-      .filter(Boolean);
-    mapped.why_to_motivation = (onboarding.why_english || [])
-      .map(function (v) { return ONBOARDING_MAP.why_english[v]; })
-      .filter(Boolean);
     var lvl = onboarding.english_level;
-    mapped.self_assessed_cefr = (lvl && ONBOARDING_MAP.english_level[lvl]) || null;
-    return mapped;
+    return {
+      native_language: onboarding.native_lang || null,
+      self_assessed_cefr: (lvl && ONBOARDING_MAP.english_level[lvl]) || null,
+      goal: onboarding.short_term_goal || null,
+      situations_to_scenarios: (onboarding.english_situations || [])
+        .map(function (s) { return ONBOARDING_MAP.english_situations[s]; })
+        .filter(Boolean),
+      why_to_motivation: (onboarding.why_english || [])
+        .map(function (v) { return ONBOARDING_MAP.why_english[v]; })
+        .filter(Boolean),
+      difficulties_to_errors: (onboarding.difficulties || [])
+        .map(function (d) { return ONBOARDING_MAP.difficulties[d]; })
+        .filter(Boolean)
+    };
   }
 
   function build(profile, onboarding, basis) {

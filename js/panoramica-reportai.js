@@ -63,7 +63,13 @@
                 var engineSel = null;
                 engineRadios.forEach(function(r){ if (r.checked) engineSel = r; });
                 if (engineSel) {
-                  if (engineNameEl) engineNameEl.textContent = (engineSel.value === '5') ? raiT('rai_neural', 'Neural Deep Dive') : raiT('rai_standard', 'Standard Synthesis');
+                  // Keyed, so it follows the active locale instead of freezing in
+                  // whichever one was current when the panel was last rendered.
+                  setCopy(engineNameEl,
+                          engineSel.value === '5' ? 'rai_neural' : 'rai_standard',
+                          engineSel.value === '5'
+                            ? 'Analisi neurale approfondita'
+                            : 'Sintesi standard');
                   if (engineCostEl) engineCostEl.textContent = '+' + engineSel.value + ' CR';
                 } else {
                   if (engineNameEl) engineNameEl.textContent = raiT('rai_make_choice', 'Fai prima una scelta');

@@ -205,6 +205,9 @@
           '<div class="gi-kicker">Il tuo report</div>' +
           '<h3 class="gi-h">Ottieni il report completo</h3>' +
           '<p class="gi-sub">Un report che unisce il tuo onboarding e il questionario, con una panoramica dei tuoi errori e i prossimi passi.</p>' +
+          // Point-of-collection disclosure. Must match what grammar-report-context.js
+          // actually sends; see the privacy note in that file.
+          '<p class="gi-sub" style="font-size:12px;opacity:.85;margin-top:10px" data-i18n="gi_privacy">Scritto da OpenAI (Stati Uniti) a partire dal tuo profilo di apprendimento: obiettivi, difficoltà dichiarate, livello stimato e risultati del test. Non inviamo il tuo nome, la tua posizione o i tuoi contatti. <a href="privacy.html" target="_blank" rel="noopener" style="color:inherit;text-decoration:underline">Informativa completa</a></p>' +
           '<div class="gi-report-cost">2 crediti</div>' +
           '<button class="gi-btn gi-btn-primary" data-act="gen-report">Genera il report</button>' +
         '</div>' : '') +

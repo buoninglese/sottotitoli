@@ -1,6 +1,14 @@
               (function(){
                 var tbody = document.getElementById('raiReportsTbody');
                 var paginationEl = document.getElementById('raiPagination');
+
+                // Current-locale lookup for strings that are not part of the DOM yet.
+                // Only used for imperative arguments (the modal title); row content is
+                // injected as Italian with data-i18n and translated by I18n.apply().
+                function T(k, itFallback) {
+                  try { if (typeof I18n !== 'undefined' && I18n.t) { var v = I18n.t(k); if (v && v !== k) return v; } } catch (e) {}
+                  return itFallback;
+                }
                 var REPORTS_PER_PAGE = 10;
                 var currentPage = 1;
                 var allReports = [];
@@ -29,23 +37,30 @@
                 })();
 
                 function statusBadge(status) {
+                  // Italian source with an i18n key, like the rest of the page. These
+                  // were English-only, so an Italian user read "Completed" and
+                  // "Pending" in an otherwise Italian table.
                   var map = {
-                    completed: { label:'Completed', bg:'rgba(16,185,129,.1)', color:'#10B981' },
-                    processing: { label:'Processing', bg:'rgba(245,158,11,.1)', color:'#F59E0B', pulse:true },
-                    pending: { label:'Pending', bg:'rgba(107,114,128,.1)', color:'var(--text-soft)' },
-                    failed: { label:'Failed', bg:'rgba(225,29,72,.1)', color:'#E11D48' }
+                    completed: { label:'Completato', key:'raim_status_completed', bg:'rgba(16,185,129,.1)', color:'#10B981' },
+                    processing: { label:'In elaborazione', key:'raim_status_processing', bg:'rgba(245,158,11,.1)', color:'#F59E0B', pulse:true },
+                    pending: { label:'In attesa', key:'raim_status_pending', bg:'rgba(107,114,128,.1)', color:'var(--text-soft)' },
+                    failed: { label:'Non riuscito', key:'raim_status_failed', bg:'rgba(225,29,72,.1)', color:'#E11D48' }
                   };
                   var s = map[status] || map.pending;
                   var dot = s.pulse ? '<span style="display:inline-block;width:6px;height:6px;background:'+s.color+';border-radius:50%;margin-right:6px;animation:pulse 2s infinite"></span>' : '';
-                  return '<span style="display:inline-flex;align-items:center;padding:4px 12px;background:'+s.bg+';color:'+s.color+';font-size:11px;font-weight:700;border-radius:99px;text-transform:uppercase;font-family:\'Manrope\',sans-serif">'+dot+s.label+'</span>';
+                  return '<span style="display:inline-flex;align-items:center;padding:4px 12px;background:'+s.bg+';color:'+s.color+';font-size:11px;font-weight:700;border-radius:99px;text-transform:uppercase;font-family:\'Manrope\',sans-serif">'+dot+'<span data-i18n="'+s.key+'">'+s.label+'</span></span>';
                 }
 
                  function renderTable() {
                    if (!allReports.length) {
-                     tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;padding:40px 20px;color:var(--text-faint);font-size:13px">No reports yet. <a href="javascript:void(0)" onclick="document.querySelector(\'[data-subtab=rai-crea]\').click()" style="color:var(--cyan);text-decoration:underline">Generate your first report</a>.</td></tr>';
+                     tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;padding:40px 20px;color:var(--text-faint);font-size:13px"><span data-i18n="raim_no_reports">Nessun report ancora.</span> <a href="javascript:void(0)" onclick="document.querySelector(\'[data-subtab=rai-crea]\').click()" style="color:var(--cyan);text-decoration:underline" data-i18n="raim_generate_first">Genera il tuo primo report</a>.</td></tr>';
                      paginationEl.innerHTML = '';
+                     // Same as the populated path: translate the rows we just injected.
+                     // Without this the empty state stayed Italian in English.
+                     if (window.I18n && I18n.apply) { try { I18n.apply(); } catch (e) {} }
                      return;
                    }
+
                    // Report names are the report TYPE, never the summary — the
                    // synthesis report's `summary` IS the full multi-page text, so
                    // using it as a name would dump the whole report into the cell.
@@ -68,19 +83,24 @@
                     // never resolve it — View only.
                     var canDownload = isDone && !isStarter;
                     return '<tr class="hv-bg" style="border-bottom:1px solid var(--line)">' +
-                      '<td style="padding:16px 24px"><div style="font-weight:600">'+escapeHtml(name)+'</div>'+(score?'<div style="font-size:13px;color:var(--text-soft)">Confidence: '+escapeHtml(score)+'</div>':'')+'</td>' +
+                      /* Confidence è un'etichetta, non un titolo: tradotta insieme alla riga. */
+                      '<td style="padding:16px 24px"><div style="font-weight:600">'+escapeHtml(name)+'</div>'+(score?'<div style="font-size:13px;color:var(--text-soft)"><span data-i18n="raim_confidence">Confidenza</span>: '+escapeHtml(score)+'</div>':'')+'</td>' +
                       '<td style="padding:16px 24px;color:var(--text-soft);font-size:13px">'+date+'</td>' +
                       '<td style="padding:16px 24px">'+statusBadge(status)+'</td>' +
                       '<td style="padding:16px 24px;text-align:right">' +
                         '<div style="display:flex;justify-content:flex-end;gap:8px">' +
-                          (canDownload ? '<button title="Download PDF" style="padding:8px;background:none;border:1px solid var(--line);border-radius:8px;cursor:pointer;color:var(--text-soft)" onclick="event.stopPropagation();downloadReportPDF(\''+safeId(r.id)+'\')"><span class="material-symbols-outlined" style="font-size:18px">download</span></button>' : '<button disabled style="padding:8px;background:none;border:1px solid var(--line);border-radius:8px;opacity:.3;cursor:not-allowed"><span class="material-symbols-outlined" style="font-size:18px">download</span></button>') +
-                          (isDone ? '<button style="padding:6px 16px;background:var(--bg);color:var(--cyan);border:1px solid var(--cyan);border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;font-family:\'Manrope\',sans-serif" onclick="event.stopPropagation();viewReportDetail(\''+safeId(r.id)+'\')">View</button>' :
-                           isFailed ? '<button style="padding:6px 16px;background:none;color:#E11D48;border:1px solid #E11D48;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;font-family:\'Manrope\',sans-serif" onclick="event.stopPropagation();retryReport(\''+safeId(r.id)+'\')">Retry</button>' :
-                           '<button disabled style="padding:6px 16px;background:none;color:var(--text-soft);border:1px solid var(--line);border-radius:8px;font-size:13px;opacity:.5;cursor:not-allowed;font-family:\'Manrope\',sans-serif">Pending</button>') +
+                          (canDownload ? '<button title="Scarica PDF" data-i18n-title="raim_download_pdf" style="padding:8px;background:none;border:1px solid var(--line);border-radius:8px;cursor:pointer;color:var(--text-soft)" onclick="event.stopPropagation();downloadReportPDF(\''+safeId(r.id)+'\')"><span class="material-symbols-outlined" style="font-size:18px">download</span></button>' : '<button disabled style="padding:8px;background:none;border:1px solid var(--line);border-radius:8px;opacity:.3;cursor:not-allowed"><span class="material-symbols-outlined" style="font-size:18px">download</span></button>') +
+                          (isDone ? '<button style="padding:6px 16px;background:var(--bg);color:var(--cyan);border:1px solid var(--cyan);border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;font-family:\'Manrope\',sans-serif" onclick="event.stopPropagation();viewReportDetail(\''+safeId(r.id)+'\')"><span data-i18n="raim_view">Apri</span></button>' :
+                           isFailed ? '<button style="padding:6px 16px;background:none;color:#E11D48;border:1px solid #E11D48;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;font-family:\'Manrope\',sans-serif" onclick="event.stopPropagation();retryReport(\''+safeId(r.id)+'\')"><span data-i18n="raim_retry">Riprova</span></button>' :
+                           '<button disabled style="padding:6px 16px;background:none;color:var(--text-soft);border:1px solid var(--line);border-radius:8px;font-size:13px;opacity:.5;cursor:not-allowed;font-family:\'Manrope\',sans-serif"><span data-i18n="raim_pending">In attesa</span></button>') +
                         '</div>' +
                       '</td>' +
                     '</tr>';
                   }).join('');
+
+                  // The rows above are built with Italian text plus data-i18n keys,
+                  // so translate them for the active locale now that they exist.
+                  if (window.I18n && I18n.apply) { try { I18n.apply(); } catch (e) {} }
 
                   // Pagination
                   var totalPages = Math.ceil(allReports.length / REPORTS_PER_PAGE);
@@ -144,10 +164,10 @@
                   var status = report.status || 'completed';
                   var content = '<div style="font-family:Inter,sans-serif;max-height:70vh;overflow-y:auto;padding:8px">' +
                     '<p style="font-size:13px;color:var(--text-dim);margin:0 0 4px">Report ID: ' + escapeHtml(id) + ' · ' + escapeHtml(date) + '</p>' +
-                    '<p style="font-size:13px;color:var(--text-dim);margin:0 0 16px">Status: ' + escapeHtml(status) + ' · Confidence: ' + escapeHtml(score) + '/100</p>' +
+                    '<p style="font-size:13px;color:var(--text-dim);margin:0 0 16px"><span data-i18n="raim_status_label">Stato</span>: ' + escapeHtml(status) + ' · <span data-i18n="raim_confidence">Confidenza</span>: ' + escapeHtml(score) + '/100</p>' +
                     '<div style="white-space:pre-wrap;font-size:15px;line-height:1.7;color:var(--text);background:var(--bg);padding:16px;border-radius:12px;border:1px solid var(--line)">' + escapeHtml(summary) + '</div>' +
                   '</div>';
-                  showModal('Report Detail', content);
+                  showModal(T('raim_report_detail', 'Dettaglio report'), content);
                 };
                 window.retryReport = function(id) {
                   appConfirm('Riprova questo report? I crediti verranno dedotti nuovamente.', function(){
@@ -171,7 +191,7 @@
                           status: 'queued'
                         });
                         await sb.from('session_ai_reports').delete().eq('id', id).eq('user_id', uid);
-                        showToastMsg('🔄 Report re-queued. Controlla tra poco.');
+                        showToastMsg('🔄 Report rimesso in coda. Controlla tra poco.');
                       }
                       loadReports();
                     }).catch(function(e){ console.warn('retryReport:', e); });
