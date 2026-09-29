@@ -5,6 +5,29 @@
                 var currentPage = 1;
                 var allReports = [];
 
+                // Report names come from public.report_products, the catalogue,
+                // rather than from a copy held here. The previous hardcoded map used
+                // the names of a product that was never built — module 4 is
+                // Pronunciation, not "Precisione CEFR"; module 11 is Discourse
+                // Analysis, not "Compagno Cambridge" — so this list described
+                // reports no user had ever received.
+                var MODULE_LABELS = {};
+                var MODULE_LABELS_FALLBACK = {
+                  0: 'Snapshot', 1: 'Comprehensive Report', 2: 'Vocabulary Range',
+                  3: 'Fluency & Coherence', 4: 'Pronunciation',
+                  11: 'Discourse Analysis', 15: 'Synthesis Report'
+                };
+                (async function loadModuleLabels(){
+                  try {
+                    var c = window.sottotitoliSupabase;
+                    if (!c) return;
+                    var res = await c.from('report_products').select('id,label');
+                    if (res.error || !res.data) return;
+                    res.data.forEach(function(p){ MODULE_LABELS[p.id] = p.label; });
+                    if (allReports.length) renderTable();
+                  } catch (e) { /* fallback stands */ }
+                })();
+
                 function statusBadge(status) {
                   var map = {
                     completed: { label:'Completed', bg:'rgba(16,185,129,.1)', color:'#10B981' },
@@ -26,18 +49,15 @@
                    // Report names are the report TYPE, never the summary — the
                    // synthesis report's `summary` IS the full multi-page text, so
                    // using it as a name would dump the whole report into the cell.
-                   var MODULE_LABELS = {
-                     0: 'Snapshot', 1: 'Report completo', 2: 'Errori ricorrenti',
-                     3: 'Vocabolario attivo', 4: 'Precisione CEFR',
-                     9: 'Transfer italiano-inglese', 11: 'Compagno Cambridge',
-                     15: 'Report di sintesi'
-                   };
+                   // Names are resolved from the catalogue (loaded above), with a
+                   // fallback for the first paint, and the module label as a last
+                   // resort for any id the catalogue does not know.
                    var start = (currentPage - 1) * REPORTS_PER_PAGE;
                    var page = allReports.slice(start, start + REPORTS_PER_PAGE);
                    tbody.innerHTML = page.map(function(r){
                      var isStarter = r._isStarter === true;
                      var name = isStarter ? (r.report_type || 'Report iniziale')
-                                          : (MODULE_LABELS[r.module_id] || r.report_type || 'Report');
+                                         : (MODULE_LABELS[r.module_id] || MODULE_LABELS_FALLBACK[r.module_id] || r.report_type || 'Report');
                     var date = r.created_at ? new Date(r.created_at).toLocaleDateString(I18n.locale(), {day:'2-digit', month:'short', year:'numeric'}) : '—';
                     var status = r.status || 'completed';
                     var conf = r.confidence || r.overall_score;

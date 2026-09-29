@@ -46,13 +46,14 @@
                 var engineNameEl = document.getElementById('raiEngineConfirmName');
                 var engineCostEl = document.getElementById('raiEngineConfirmCost');
                 if (selectedPreset) {
-                  var lbl = selectedPreset.getAttribute('data-label');
-                  // Credits come from PRESET_MAP (the billing source of truth) —
-                  // never from the HTML data-cost attribute, so what we show is
-                  // exactly what we deduct. See the sync loop after PRESET_MAP.
-                  var cst = (PRESET_MAP[selectedPreset.value] && PRESET_MAP[selectedPreset.value].credits) || 0;
+                  var lbl = cardLabel(selectedPreset);
+                  // Credits come from PRODUCT_MAP, which is loaded from
+                  // public.report_products — never from the HTML, so what we show is
+                  // exactly what we deduct.
+                  var cst = (PRODUCT_MAP[selectedPreset.value] && PRODUCT_MAP[selectedPreset.value].credits) || 0;
                   var pIconEl = selectedPreset.parentElement.querySelector('.material-symbols-outlined');
-                  if (typeNameEl) typeNameEl.textContent = lbl;
+                  // Keyed on the product, so the name follows the locale like the card does.
+                  setCopy(typeNameEl, 'rai_prod_' + selectedPreset.value, lbl);
                   if (typeCostEl) typeCostEl.textContent = cst + ' CR';
                   if (typeIconEl) typeIconEl.textContent = pIconEl ? pIconEl.textContent : 'auto_graph';
                 } else {
@@ -70,11 +71,11 @@
                 }
 
                 if (!selectedPreset) return;
-                var label = selectedPreset.getAttribute('data-label');
-                var desc = selectedPreset.getAttribute('data-desc');
-                var cost = (PRESET_MAP[selectedPreset.value] && PRESET_MAP[selectedPreset.value].credits) || 0;
-                var metrics = JSON.parse(selectedPreset.getAttribute('data-metrics'));
-                if (selectedDescription) selectedDescription.textContent = desc;
+                var label = cardLabel(selectedPreset);
+                var desc = cardDesc(selectedPreset);
+                var cost = (PRODUCT_MAP[selectedPreset.value] && PRODUCT_MAP[selectedPreset.value].credits) || 0;
+                var metrics = JSON.parse(selectedPreset.getAttribute('data-metrics') || '[]');
+                if (selectedDescription) setCopy(selectedDescription, 'rai_prod_' + selectedPreset.value + '_desc', desc);
                 metricsList.innerHTML = '';
                 metrics.forEach(function(m){
                   var li = document.createElement('li');
@@ -86,37 +87,111 @@
                 var engineCost = 0;
                 engineRadios.forEach(function(r){ if(r.checked) engineCost = parseInt(r.value); });
                 btnPrice.textContent = (cost + engineCost) + ' CR';
+
+                // Translate the strings we just injected for the active locale.
+                if (window.I18n && I18n.apply) { try { I18n.apply(); } catch (e) {} }
               }
 
                reportRadios.forEach(function(r){ r.addEventListener('change', updateView); });
                engineRadios.forEach(function(r){ r.addEventListener('change', updateView); });
 
-               // ═══ Preset → Module mapping (sync with ai_configs preset_pricing) ═══
-               var PRESET_MAP = {
-                 holistic:     { moduleId: 1, moduleKey: '1', credits: 3 },
-                 personalized: { moduleId: 1, moduleKey: '1', credits: 3 },
-                 growth:       { moduleId: 1, moduleKey: '1', credits: 3 },
-                 cefr:         { moduleId: 4, moduleKey: '4', credits: 4 },
-                 explorer:     { moduleId: 3, moduleKey: '3', credits: 2 },
-                 homework:     { moduleId: 3, moduleKey: '3', credits: 2 },
-                 cambridge:    { moduleId: 11, moduleKey: '11', credits: 4 },
-                 speech:       { moduleId: 4, moduleKey: '4', credits: 4 },
-                 drills:       { moduleId: 2, moduleKey: '2', credits: 2 }
-               };
+              // ═══ The report catalogue comes from the database ═══
+              // public.report_products is the single source of truth. A card's
+              // `value` IS product_key, and both the price shown and the id sent to
+              // the worker come from that row — the UI holds no copy of the numbers,
+              // so it cannot drift from billing.
+              //
+              // This used to be a hardcoded PRESET_MAP, and it drifted exactly as
+              // you would expect: it disagreed with the catalogue, three of its nine
+              // entries were the same prompt, and 'cefr' charged 4 credits for the
+              // Pronunciation report.
+              //
+              // The fallback below is used only until the fetch lands, or if it
+              // fails, so the panel is never unusable. It is a fallback, not a
+              // source: scripts/check-report-catalogue.sh checks the HTML cards
+              // against the live table, which is what keeps this honest.
+              var PRODUCT_FALLBACK = {
+                comprehensive: { id: 1,  credits: 3 },
+                fluency:       { id: 3,  credits: 2 },
+                vocabulary:    { id: 2,  credits: 2 },
+                pronunciation: { id: 4,  credits: 4 },
+                discourse:     { id: 11, credits: 4 }
+              };
+              var PRODUCT_MAP = PRODUCT_FALLBACK;
 
-              // ═══ PRESET_MAP is the SINGLE SOURCE OF TRUTH for report credits ═══
-              // The price on the cards / button and the amount deducted on generate
-              // both come from here. Rewrite the static "NNcr" badges (and the
-              // data-cost attributes) from it at init so the UI can never drift
-              // from the billing again — it did: the cards showed 10–25 CR while
-              // the deduction was 2–4 CR.
-               reportRadios.forEach(function(r){
-                 var m = PRESET_MAP[r.value];
-                 if (!m) return;
-                 var badge = r.parentElement.querySelector('.text-label-mono.rai-font-bold');
-                 if (badge) badge.textContent = m.credits + 'cr';
-                 r.setAttribute('data-cost', String(m.credits));
-               });
+              // Visible copy is read from the DOM, never from data-* attributes.
+              // The attributes held English strings that were injected verbatim by
+              // selectedDescription.textContent — which breaks the i18n contract:
+              // JS must inject Italian, or switching to IT captures the English as
+              // the "original" and corrupts it.
+              //
+              // data-i18n-orig-txt is the Italian original that I18n.captureOriginals()
+              // snapshots, so reading it means we always inject Italian and let the
+              // translation observer localise it — exactly like the rest of the page.
+              function cardCopy(el) {
+                if (!el) return '';
+                return (el.getAttribute('data-i18n-orig-txt') || el.textContent).trim();
+              }
+              function cardLabel(r) {
+                return cardCopy(r.parentElement.querySelector('p.rai-font-bold'));
+              }
+              function cardDesc(r) {
+                var ps = r.parentElement.querySelectorAll('p');
+                return ps.length > 1 ? cardCopy(ps[1]) : '';
+              }
+
+              // Make a JS-injected string translatable. The element gets the key and
+              // the Italian original, then I18n.apply() translates it — so the copy
+              // follows the active locale instead of freezing in whichever locale
+              // happened to be active when it was set. The previous code wrote the
+              // English data-label straight in, so this panel was English in both
+              // languages.
+              function setCopy(el, key, itText) {
+                if (!el) return;
+                el.setAttribute('data-i18n', key);
+                el.setAttribute('data-i18n-orig-txt', itText);
+                el.textContent = itText;
+              }
+
+              // Paint prices from the map we hold, and hide any card whose product
+              // the catalogue does not offer — a card that cannot be billed must not
+              // be selectable.
+              function applyProducts(products) {
+                reportRadios.forEach(function(r){
+                  var p = products[r.value];
+                  var card = r.closest('label');
+                  if (!p) {
+                    if (card) { card.style.display = 'none'; card.setAttribute('data-unavailable', '1'); }
+                    return;
+                  }
+                  if (card) { card.style.display = ''; card.removeAttribute('data-unavailable'); }
+                  var badge = r.parentElement.querySelector('[data-price]');
+                  if (badge) badge.textContent = p.credits + 'cr';
+                  r.setAttribute('data-cost', String(p.credits));
+                });
+                PRODUCT_MAP = products;
+                // If the selected preset is not offered, select the first that is.
+                var usable = document.querySelectorAll('#pnl-report-ai input[name="reportType"]:not([data-unavailable])');
+                var anyChecked = false;
+                usable.forEach(function(r){ if (r.checked) anyChecked = true; });
+                if (!anyChecked && usable.length) usable[0].checked = true;
+                updateView();
+              }
+
+              (async function loadProducts(){
+                try {
+                  var c = window.sottotitoliSupabase;
+                  if (!c) return;
+                  var res = await c.from('report_products')
+                    .select('id,product_key,credits,basis')
+                    .eq('is_active', true)
+                    .eq('basis', 'sessions');
+                  if (res.error || !res.data || !res.data.length) return;
+                  var map = {};
+                  res.data.forEach(function(p){ map[p.product_key] = { id: p.id, credits: p.credits }; });
+                  applyProducts(map);
+                } catch (e) { /* keep the fallback */ }
+              })();
 
                 generateBtn.addEventListener('click', async function(){
                 // ── Validation ──
@@ -132,8 +207,9 @@
                 if (!selectedPreset) { showToastMsg('⚠️ Seleziona un tipo di analisi.'); return; }
                 var presetKey = selectedPreset.value;
 
-                var mapping = PRESET_MAP[presetKey];
-                if (!mapping) { showToastMsg('⚠️ Tipo di analisi non riconosciuto.'); return; }
+                var product = PRODUCT_MAP[presetKey];
+                if (!product) { showToastMsg('⚠️ Tipo di analisi non riconosciuto.'); return; }
+                if (!product.id) { showToastMsg('⚠️ Tipo di analisi non disponibile. Ricarica la pagina.'); return; }
 
                 // Get selected sessions from transcript picker
                 var sessionIds = selectedTranscriptIds.slice();
@@ -148,7 +224,7 @@
                 // Get engine (0=standard, 5=neural deep dive)
                 var engineCost = 0;
                 engineRadios.forEach(function(er){ if(er.checked) engineCost = parseInt(er.value); });
-                var totalCredits = mapping.credits + engineCost;
+                var totalCredits = product.credits + engineCost;
 
                 // ── Credit Check ──
                 var balance = 0;
@@ -241,7 +317,7 @@
                    var insertPayload = {
                      user_id: uid,
                      session_ids: sessionIds,
-                     module_key: mapping.moduleKey,
+                     module_key: String(product.id),
                      scope_type: sessionIds.length > 1 ? 'selected_sessions' : 'single_session',
                      status: 'queued',
                      // Record what was charged so a refund has a source of truth.
