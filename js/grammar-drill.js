@@ -40,7 +40,7 @@
     var drills = (GRAMMAR.drills || {})[cid] || [];
     state = {
       cid: cid, concept: concept, drills: drills,
-      idx: 0, correct: 0, mcqOptions: null, lastResult: null,
+      idx: 0, correct: 0, mistakes: [], mcqOptions: null, lastResult: null,
       container: container, onExit: onExit || null
     };
     render();
@@ -132,6 +132,10 @@
     var d = state.drills[state.idx];
     var ok = norm(chosen) === norm(d.answer);
     if (ok) state.correct++;
+    else {
+      // Log the mistaken answer — the observed user context, not a prediction.
+      state.mistakes.push({ type: d.type, prompt: d.prompt, chosen: chosen, answer: d.answer });
+    }
     state.lastResult = { ok: ok, chosen: chosen };
     render();
   }
@@ -144,14 +148,14 @@
   }
 
   function exit() {
-    var summary = { cid: state.cid, correct: state.correct, total: state.drills.length };
+    var summary = { cid: state.cid, correct: state.correct, total: state.drills.length, mistakes: state.mistakes };
     var cb = state.onExit;
     state = null;
     if (cb) cb(summary);
   }
 
   function retry() {
-    state.idx = 0; state.correct = 0; state.lastResult = null; state.mcqOptions = null;
+    state.idx = 0; state.correct = 0; state.mistakes = []; state.lastResult = null; state.mcqOptions = null;
     render();
   }
 

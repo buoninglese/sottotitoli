@@ -341,7 +341,11 @@
         step = 'drill';
         drill.start(cid, el('giStage'), function (summary) {
           step = 'result';
-          maybeResolveMiss(cid, summary).then(function () { renderResult(); });
+          // Log the attempt (incl. mistakes) as observed context, then resolve
+          // the review queue, then re-render. Sequenced so each write lands.
+          maybeResolveMiss(cid, summary).then(function () {
+            return store.logExercise(_profile, summary);
+          }).then(function () { renderResult(); });
         });
       }
     }

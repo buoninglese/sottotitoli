@@ -93,11 +93,68 @@
     return updated;
   }
 
+  /* ── To-do list (the learner's self-selected concept queue) ── */
+  function getTodo(profile) {
+    return (profile && profile.todo) || [];
+  }
+
+  function setTodo(profile, todo) {
+    profile = profile || {};
+    profile.todo = todo || [];
+    return profile;
+  }
+
+  async function addTodo(profile, conceptId) {
+    var todo = getTodo(profile);
+    if (todo.indexOf(conceptId) === -1) todo.push(conceptId);
+    var updated = setTodo(profile, todo);
+    await save(updated);
+    return updated;
+  }
+
+  async function removeTodo(profile, conceptId) {
+    var todo = getTodo(profile).filter(function (c) { return c !== conceptId; });
+    var updated = setTodo(profile, todo);
+    await save(updated);
+    return updated;
+  }
+
+  /* ── Exercise log (observed mistakes from actual drills) ──
+   * Appends one attempt per drill session, including every mistaken answer, so
+   * the profile carries the user's real, observed errors — not just the placement
+   * snapshot. This is the continuous "observed beats predicted" signal. */
+  function getExercises(profile) {
+    return (profile && profile.exercises) || { attempts: [] };
+  }
+
+  async function logExercise(profile, result) {
+    profile = profile || {};
+    if (!result || !result.cid) return profile;
+    var ex = getExercises(profile);
+    var attempts = ex.attempts || [];
+    attempts.push({
+      concept_id: result.cid,
+      correct: result.correct,
+      total: result.total,
+      mistakes: result.mistakes || [],
+      at: new Date().toISOString()
+    });
+    if (attempts.length > 200) attempts = attempts.slice(-200);
+    profile.exercises = { attempts: attempts };
+    await save(profile);
+    return profile;
+  }
+
   w.SottotitoliGrammarProfileStore = {
     load: load,
     save: save,
     getMisses: getMisses,
     setMisses: setMisses,
-    removeMiss: removeMiss
+    removeMiss: removeMiss,
+    getTodo: getTodo,
+    addTodo: addTodo,
+    removeTodo: removeTodo,
+    getExercises: getExercises,
+    logExercise: logExercise
   };
 })(window);
