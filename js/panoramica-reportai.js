@@ -42,7 +42,7 @@
                // cannot be produced. Flip to true (and bump this file's cache-buster)
                // only after confirming id 15 exists on live. grep SYNTHESIS_ENABLED to
                // find every flip site (this file + js/grammar-intake.js).
-               var SYNTHESIS_ENABLED = false;
+               var SYNTHESIS_ENABLED = true;
 
                function updateView() {
                 var selectedPreset;

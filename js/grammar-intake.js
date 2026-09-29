@@ -37,7 +37,7 @@
   // (ai_report_modules id 15 + MODULE_PROMPTS[15] + processRequest branch) is live.
   // While false the "Genera il report di sintesi" card is hidden. Flip to true in
   // BOTH files together. grep SYNTHESIS_ENABLED to find every flip site.
-  var SYNTHESIS_ENABLED = false;
+  var SYNTHESIS_ENABLED = true;
 
   var qmap = {};
   (PROFILE.questionnaire.questions || []).forEach(function (q) { qmap[q.id] = q; });
