@@ -2653,6 +2653,33 @@
           console.error('profiles upsert FAILED:', _p.error.message);
         }
 
+        // Interpret the free text ONCE, asynchronously.
+        //
+        // Deliberately not awaited. Onboarding must not wait on a model call, and
+        // nothing downstream breaks if this has not landed yet: reports read
+        // `coverage: 'none'` until it does, which is an honest state rather than
+        // an error, and the prompt is told not to invent goals from that absence.
+        //
+        // What this buys: the learner's own words stop travelling to OpenAI.
+        // Every consumer — the report worker, the starter report — reads the
+        // structured interpretation instead, which contains no name, no employer
+        // and no quotation.
+        //
+        // Failure is swallowed on purpose. Both the starter-report path and the
+        // backfill sweep re-trigger extraction, so a failure here is a delay, not
+        // a loss.
+        try {
+          sb.auth.getSession().then(function (s) {
+            var tok = s && s.data && s.data.session ? s.data.session.access_token : null;
+            if (!tok) return;
+            return fetch('https://qzqmuegbpmvqrjrlfbgk.supabase.co/functions/v1/extract-learner-profile', {
+              method: 'POST',
+              headers: { 'Authorization': 'Bearer ' + tok, 'Content-Type': 'application/json' },
+              body: '{}'
+            });
+          }).catch(function () {});
+        } catch (e) { /* never block onboarding on this */ }
+
         if (isFinal) showSaved();
         // ⚠️ This used to `return true` unconditionally. The two upserts ignored
         // their own errors AND this function ignored both, so the caller's

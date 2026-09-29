@@ -1684,6 +1684,63 @@
     </div>
   </section>
 
+  <!-- Your data — data rights, in the place a user would look for them.
+       purge_learner_input() takes no user argument and resolves the caller from
+       the session, so this button cannot be pointed at anyone else's data. -->
+  <section style="padding:0 0 48px">
+    <div class="set-grid" style="display:grid;gap:32px">
+      <div>
+        <h3 style="font-size:28px;font-weight:700;color:var(--text);margin:0 0 8px;letter-spacing:-.02em" data-i18n="set_data_t">I tuoi dati</h3>
+        <p style="font-size:13px;color:var(--text-soft);line-height:1.5;margin:0" data-i18n="set_data_d">Cosa conserviamo delle tue risposte e come cancellarlo.</p>
+      </div>
+      <div style="background:var(--card);border:2px solid var(--line);border-radius:16px;overflow:hidden">
+        <div class="hv-bg" style="padding:22px 28px;display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap">
+          <div>
+            <label style="display:block;font-weight:700;color:var(--text);font-size:15px;margin-bottom:2px" data-i18n="purge_label">Cancella le mie risposte grezze</label>
+            <p style="font-size:11px;color:var(--text-soft);margin:0;max-width:560px;line-height:1.5" data-i18n="purge_info">Elimina i testi che hai scritto o dettato durante l'onboarding (presentazione, obiettivi, difficoltà) e i fatti strutturati ricavati da essi. Sessioni, report e word bank non vengono toccati. L'operazione è definitiva.</p>
+          </div>
+          <button id="purgeLearnerInputBtn" class="c-btn-pill" style="background:none;border:1px solid #E11D48;color:#E11D48;flex-shrink:0">
+            <span class="material-symbols-outlined" style="font-size:18px">delete_forever</span>
+            <span data-i18n="purge_btn">Cancella</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <script>
+    (function () {
+      var btn = document.getElementById('purgeLearnerInputBtn');
+      if (!btn) return;
+      btn.addEventListener('click', function () {
+        var sb = window.sottotitoliSupabase;
+        if (!sb) { showToastMsg('⚠️ Effettua il login.'); return; }
+        // appConfirm, not a bare confirm: it is the pattern every other
+        // destructive action on this page uses, and it is styled consistently.
+        appConfirm(
+          'Verranno cancellati i testi che hai scritto o dettato durante l\'onboarding e i fatti strutturati ricavati da essi. Sessioni, report e word bank non vengono toccati. L\'operazione è definitiva e non può essere annullata.',
+          function () {
+            sb.rpc('purge_learner_input').then(function (r) {
+              if (r.error) {
+                appAlert('Non è stato possibile cancellare: ' + r.error.message, 'Errore', '⚠️');
+                return;
+              }
+              if (r.data && r.data.success) {
+                showToastMsg('🗑️ Risposte grezze cancellate.');
+              } else {
+                appAlert('Cancellazione non riuscita: ' + ((r.data && r.data.error) || 'errore sconosciuto'), 'Errore', '⚠️');
+              }
+            }).catch(function (e) {
+              appAlert('Non è stato possibile cancellare: ' + (e && e.message ? e.message : 'errore'), 'Errore', '⚠️');
+            });
+          },
+          'Cancella le mie risposte grezze',
+          '🗑️'
+        );
+      });
+    })();
+  </script>
+
   <!-- Save -->
   <div style="display:flex;justify-content:flex-end;align-items:center;gap:16px">
     <span id="settingsSavedMsg" style="display:none;font-size:13px;color:var(--teal);font-weight:600" data-i18n="saved_check">&check; Salvato</span>
@@ -1897,7 +1954,7 @@
   <script src="js/panoramica-wrapped-switcher.js?v=1"></script>
   <script src="js/data-service.js?v=11"></script>
   <script src="js/smart-suggestions.js"></script>
-  <script src="js/i18n.js?v=104"></script>
+  <script src="js/i18n.js?v=105"></script>
   <script src="js/icon-a11y.js?v=2"></script>
   <script src="js/xp.js?v=5"></script>
   <script>if (window.XP) { setTimeout(function(){ try { XP.restore(); } catch(e){} }, 2500); }</script>
