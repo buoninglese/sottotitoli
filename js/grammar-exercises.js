@@ -204,6 +204,20 @@
     if (!c) return;
     c.addEventListener('click', onClick);
     render();
+
+    // Re-render whenever the Esercizi subtab becomes active, so it always reflects
+    // the latest profile (fresh intake, todo edits, exercise log).
+    var pane = document.getElementById('sub-grammatica-esercizi');
+    if (pane) {
+      var observer = new MutationObserver(function (mutations) {
+        mutations.forEach(function (m) {
+          if (m.target.id === 'sub-grammatica-esercizi' && m.target.classList.contains('active')) {
+            render();
+          }
+        });
+      });
+      observer.observe(pane, { attributes: true, attributeFilter: ['class'] });
+    }
   }
 
   if (document.readyState === 'loading') {
