@@ -292,11 +292,22 @@
                   var pollInterval = setInterval(async function(){
                     pollCount++;
                     try {
-                      var check = await sb.from('session_ai_reports')
-                        .select('id,summary,overall_score,confidence,status')
-                        .eq('user_id', uid)
-                        .order('created_at', { ascending: false })
-                        .limit(1);
+                      // Match THIS request, not the newest completed report for the
+                      // user. With two reports in flight the old query could pick up
+                      // the other request's text and show it as this one's.
+                      // request_id is written by process-ai-reports (migration
+                      // 20260929180000); rows from before it have null and simply
+                      // never match — a safe timeout rather than a wrong report.
+                      var check = requestId
+                        ? await sb.from('session_ai_reports')
+                            .select('id,summary,overall_score,confidence,status')
+                            .eq('request_id', requestId)
+                            .limit(1)
+                        : await sb.from('session_ai_reports')
+                            .select('id,summary,overall_score,confidence,status')
+                            .eq('user_id', uid)
+                            .order('created_at', { ascending: false })
+                            .limit(1);
                       if (check.data && check.data.length && check.data[0].status === 'completed') {
                         clearInterval(pollInterval);
                         loadingOverlay.style.display = 'none';

@@ -124,7 +124,11 @@
       return;
     }
 
-    // Enqueue.
+    // Enqueue. charge_reference ties this request to its charge so
+    // refund_report_credits can tell "nothing was delivered" (refundable) from
+    // "the report WAS delivered" (not refundable). Without it the 2-credit
+    // synthesis could be taken and then refunded — one free report per charge.
+    // The transcript path in js/panoramica-reportai.js already passes it.
     var ins = await client.from('ai_report_requests').insert({
       user_id: uid,
       session_ids: [],
@@ -132,26 +136,38 @@
       scope_type: 'single_session',
       status: 'queued',
       tokens_spent: CREDITS,
+      charge_reference: chargeRef,
       context: context
-    });
+    }).select('id').single();
     if (ins.error) {
       try { await client.rpc('refund_report_credits', { p_user_id: uid, p_amount: CREDITS, p_reference: chargeRef }); } catch (e) {}
       renderError(container, 'Errore durante la richiesta: ' + ins.error.message + '. Crediti riaccreditati.');
       return;
     }
+    var requestId = ins.data && ins.data.id;
 
-    // Poll for the completed report (module_id = 15).
+    // Poll for THIS request's report. Matching on request_id (written by
+    // process-ai-reports) instead of "newest completed report for this user"
+    // means a report generated in parallel can never be rendered as this one's.
+    // Rows predating migration 20260929180000 have request_id null and so never
+    // match: timing out is a safe failure, showing the wrong report is not.
     var polls = 0;
     var interval = setInterval(async function () {
       polls++;
       try {
-        var check = await client.from('session_ai_reports')
-          .select('id,summary,summary_text,status')
-          .eq('user_id', uid)
-          .eq('module_id', 15)
-          .eq('status', 'completed')
-          .order('created_at', { ascending: false })
-          .limit(1);
+        var check = requestId
+          ? await client.from('session_ai_reports')
+              .select('id,summary,summary_text,status')
+              .eq('request_id', requestId)
+              .eq('status', 'completed')
+              .limit(1)
+          : await client.from('session_ai_reports')
+              .select('id,summary,summary_text,status')
+              .eq('user_id', uid)
+              .eq('module_id', 15)
+              .eq('status', 'completed')
+              .order('created_at', { ascending: false })
+              .limit(1);
         if (check.data && check.data.length) {
           clearInterval(interval);
           renderReport(container, check.data[0].summary_text || check.data[0].summary || '');
