@@ -17,21 +17,27 @@
                   return '<span style="display:inline-flex;align-items:center;padding:4px 12px;background:'+s.bg+';color:'+s.color+';font-size:11px;font-weight:700;border-radius:99px;text-transform:uppercase;font-family:\'Manrope\',sans-serif">'+dot+s.label+'</span>';
                 }
 
-                function renderTable() {
-                  if (!allReports.length) {
-                    tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;padding:40px 20px;color:var(--text-faint);font-size:13px">No reports yet. <a href="javascript:void(0)" onclick="document.querySelector(\'[data-subtab=rai-crea]\').click()" style="color:var(--cyan);text-decoration:underline">Generate your first report</a>.</td></tr>';
-                    paginationEl.innerHTML = '';
-                    return;
-                  }
-                  var start = (currentPage - 1) * REPORTS_PER_PAGE;
-                  var page = allReports.slice(start, start + REPORTS_PER_PAGE);
-                  tbody.innerHTML = page.map(function(r){
-                    // ⚠️ The starter report's `summary` IS the full report text, so it
-                    // must never be used as a title — it would render the entire report
-                    // inline in the table cell. Use its explicit type label instead.
-                    var isStarter = r._isStarter === true;
-                    var name = isStarter ? (r.report_type || 'Report iniziale')
-                                         : (r.summary || r.report_type || 'Report ' + (r.id || '').substring(0,8));
+                 function renderTable() {
+                   if (!allReports.length) {
+                     tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;padding:40px 20px;color:var(--text-faint);font-size:13px">No reports yet. <a href="javascript:void(0)" onclick="document.querySelector(\'[data-subtab=rai-crea]\').click()" style="color:var(--cyan);text-decoration:underline">Generate your first report</a>.</td></tr>';
+                     paginationEl.innerHTML = '';
+                     return;
+                   }
+                   // Report names are the report TYPE, never the summary — the
+                   // synthesis report's `summary` IS the full multi-page text, so
+                   // using it as a name would dump the whole report into the cell.
+                   var MODULE_LABELS = {
+                     0: 'Snapshot', 1: 'Report completo', 2: 'Errori ricorrenti',
+                     3: 'Vocabolario attivo', 4: 'Precisione CEFR',
+                     9: 'Transfer italiano-inglese', 11: 'Compagno Cambridge',
+                     15: 'Report di sintesi'
+                   };
+                   var start = (currentPage - 1) * REPORTS_PER_PAGE;
+                   var page = allReports.slice(start, start + REPORTS_PER_PAGE);
+                   tbody.innerHTML = page.map(function(r){
+                     var isStarter = r._isStarter === true;
+                     var name = isStarter ? (r.report_type || 'Report iniziale')
+                                          : (MODULE_LABELS[r.module_id] || r.report_type || 'Report');
                     var date = r.created_at ? new Date(r.created_at).toLocaleDateString(I18n.locale(), {day:'2-digit', month:'short', year:'numeric'}) : '—';
                     var status = r.status || 'completed';
                     var conf = r.confidence || r.overall_score;
