@@ -247,7 +247,12 @@
                      // Record what was charged so a refund has a source of truth.
                      // process-ai-reports overwrites this with real usage on success,
                      // so the value a failure sees is exactly the amount to give back.
-                     tokens_spent: totalCredits
+                     tokens_spent: totalCredits,
+                     // Ties this request to its charge. refund_report_credits uses it to tell
+                     // "no report was delivered" (refundable) from "the report WAS delivered"
+                     // (not refundable). Without it, a delivered report could be refunded once —
+                     // one free report per real charge. See migration 20260929160000.
+                     charge_reference: chargeRef
                    };
 
                    var ins = await sb.from('ai_report_requests').insert(insertPayload);
