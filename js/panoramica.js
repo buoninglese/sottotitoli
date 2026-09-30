@@ -1418,7 +1418,11 @@
         setVsBands(base, 'timebands', [d.bands[0]/btot*100, d.bands[1]/btot*100, d.bands[2]/btot*100, d.bands[3]/btot*100], d.bandColors);
       }
       function updateDashVsBoxes() { loadDashBoxData().then(function(d){ applyVsBoxes('', d); }); }
-      function updateWbVsBoxes() { if (!document.getElementById('wbOvStatsRow')) return; loadWordChartData().then(applyWbWordBoxes); }
+      /* Note the wrapper: loadWordChartData() resolves with the 'all' dataset, and
+       * passing that straight into applyWbWordBoxes would satisfy its `data`
+       * parameter and silently override the language filter -- the chart would
+       * filter while the cards above it did not. */
+      function updateWbVsBoxes() { if (!document.getElementById('wbOvStatsRow')) return; loadWordChartData().then(function(){ applyWbWordBoxes(); }); }
       window.loadDashBoxData = loadDashBoxData;
       window.applyVsBoxes = applyVsBoxes;
       window.updateDashVsBoxes = updateDashVsBoxes;
@@ -2198,7 +2202,7 @@
 
       // ═══ CHART BOX — corona (radial) + Periodo sidebar (dashboard + word banks) ═══
       var dashChart = { metric:'totalMinutes', tl:'week' };
-      var wbChart = { metric:'words', tl:'week' };
+      var wbChart = { metric:'words', tl:'week', lang:'all' };
       var dashChartData = null;
       function isoDaysAgo(n){ var d = new Date(Date.now() - n*86400000); return d.toISOString().substring(0,10); }
       function chartIds(scope){ return scope === 'wb'
@@ -2249,33 +2253,84 @@
 
       // ═══ WORD DATA — Parole uniche / salvate / div. lessicale (real per-day) ═══
       var wbWordData = null;
+      // { all, en, it } — one fetch, three views. wbWordData stays as the 'all'
+      // bucket so existing callers keep working unchanged.
+      var wbWordDataByLang = null;
       var CHT = { W:760, H:240, PL:44, PR:18, PT:16, PB:30 };
       // In Breve chart height — taller so the splines/corona breathe (double the original 240).
       var WBH = 460;
       function fmtK(n){ n = Math.round(n||0); if (n >= 1000000) { var m = Math.floor(n/100000)/10; return m.toFixed(1).replace('.',',').replace(',0','') + 'M'; } if (n >= 1000) { var k = Math.floor(n/100)/10; return k.toFixed(1).replace('.',',').replace(',0','') + 'k'; } return '' + n; }
       // Round a value up to a clean axis ceiling (1/2/2.5/5 × 10^n) so the y-axis reads nicely even with outliers.
       function niceCeil(v){ if (v <= 0) return 1; var p = Math.pow(10, Math.floor(Math.log10(v))), f = v / p, nf; if (f <= 1) nf = 1; else if (f <= 2) nf = 2; else if (f <= 2.5) nf = 2.5; else if (f <= 5) nf = 5; else nf = 10; return nf * p; }
+      /* Which language a session was practised in.
+       *
+       * The PREFIX of language_pair is the STUDY language, not the source:
+       * data-service.js filters with `.like('language_pair', lang + '%')`, and the
+       * transcripts panel filters the same way. So 'en-it' is an English session.
+       * Both separators appear in real rows ('en-it' and 'EN→IT'), hence the
+       * normalisation -- a filter that only knew about the hyphen would silently
+       * drop every translated session. */
+      function wbLangOfPair(lp){
+        var s = String(lp == null ? '' : lp).toLowerCase().replace(/→/g, '-').trim();
+        if (s.indexOf('en') === 0) return 'en';
+        if (s.indexOf('it') === 0) return 'it';
+        return '';
+      }
+      function wbEmptyBucket(){ return { days:{}, savedByDay:{}, practicedByDay:{}, confirmedByDay:{} }; }
+      /* The dataset for a language filter. Unknown/absent falls back to everything
+       * rather than to empty -- an empty chart would read as "you have no data". */
+      function wbDataFor(lang){
+        if (!wbWordDataByLang) return null;
+        return wbWordDataByLang[lang] || wbWordDataByLang.all;
+      }
+
       async function loadWordChartData(){
-        if (wbWordData) return wbWordData;
-        var out = { days:{}, savedByDay:{}, practicedByDay:{}, confirmedByDay:{} };
+        if (wbWordDataByLang) return wbWordDataByLang.all;
+        var byLang = { all: wbEmptyBucket(), en: wbEmptyBucket(), it: wbEmptyBucket() };
+        // Fan each row into 'all' plus its own language bucket. One fetch feeds
+        // every filter, so switching language is instant instead of re-querying,
+        // and the three views can never disagree about the same session.
+        function addSess(s){
+          if (!s.started_at) return;
+          var iso = s.started_at.substring(0,10);
+          var wc = s.words_count || 0;
+          var uniq = s.unique_words_count;
+          if (uniq == null && (s.lexical_diversity||0) > 0) uniq = Math.round(wc * s.lexical_diversity);
+          [byLang.all, byLang[wbLangOfPair(s.language_pair)]].forEach(function(out){
+            if (!out) return;
+            var d = out.days[iso] || (out.days[iso] = { uniq:0, tt:0, ldS:0, ldN:0, wpmS:0, wpmN:0 });
+            d.tt += wc; d.uniq += (uniq || 0);
+            if ((s.lexical_diversity||0) > 0) { d.ldS += s.lexical_diversity; d.ldN++; }
+            if ((s.wpm||0) > 0) { d.wpmS += s.wpm; d.wpmN++; }
+          });
+        }
+        function addWord(w){
+          [byLang.all, byLang[String(w.lang == null ? '' : w.lang).toLowerCase()]].forEach(function(out){
+            if (!out) return;
+            if (w.created_at) { var k = w.created_at.substring(0,10); out.savedByDay[k] = (out.savedByDay[k]||0) + 1; }
+            if ((w.reps||0) > 0 && w.last_reviewed_at) { var k2 = w.last_reviewed_at.substring(0,10); out.practicedByDay[k2] = (out.practicedByDay[k2]||0) + 1; }
+            if (w.review_state === 'mastered' || (w.mastery_score||0) >= 80) { var k3 = (w.last_reviewed_at || w.updated_at || w.created_at); if (k3) { k3 = k3.substring(0,10); out.confirmedByDay[k3] = (out.confirmedByDay[k3]||0) + 1; } }
+          });
+        }
+        var ok = false;
         try {
           var sb = window.sottotitoliSupabase;
           if (sb) {
             var r = await sb.auth.getSession();
             if (r.data && r.data.session) {
               var uid = r.data.session.user.id;
-              var res = await sb.from('sessions').select('started_at,words_count,unique_words_count,lexical_diversity,wpm').eq('user_id', uid);
-              (res.data||[]).forEach(function(s){
-                if (!s.started_at) return;
-                var iso = s.started_at.substring(0,10);
-                var wc = s.words_count || 0;
-                var uniq = s.unique_words_count;
-                if (uniq == null && (s.lexical_diversity||0) > 0) uniq = Math.round(wc * s.lexical_diversity);
-                var d = out.days[iso] || (out.days[iso] = { uniq:0, tt:0, ldS:0, ldN:0, wpmS:0, wpmN:0 });
-                d.tt += wc; d.uniq += (uniq || 0);
-                if ((s.lexical_diversity||0) > 0) { d.ldS += s.lexical_diversity; d.ldN++; }
-                if ((s.wpm||0) > 0) { d.wpmS += s.wpm; d.wpmN++; }
-              });
+              // language_pair is in the select because it IS the filter key: without
+              // it every session would count as unknown and land only in 'all',
+              // which would look like the filter working while changing nothing.
+              var res = await sb.from('sessions').select('started_at,words_count,unique_words_count,lexical_diversity,wpm,language_pair').eq('user_id', uid);
+              // A session existing is NOT the same as the read succeeding. Without
+              // this, an auth/permission error returns no rows and gets cached as
+              // "this learner has no sessions" -- the chart then sits at zero for
+              // the rest of the page's life and looks like real data. Throwing lands
+              // in the catch, which leaves the cache empty so the next call retries.
+              if (!res || res.error || !res.data) throw new Error('sessions read failed');
+              res.data.forEach(addSess);
+              ok = true;
             }
           }
         } catch(e) {}
@@ -2285,17 +2340,19 @@
             var r2 = await sb2.auth.getSession();
             if (r2.data && r2.data.session) {
               var uid2 = r2.data.session.user.id;
-              var { data: words } = await sb2.from('review_words').select('created_at,last_reviewed_at,reps,review_state,mastery_score,updated_at').eq('user_id', uid2).limit(5000);
-              (words||[]).forEach(function(w){
-                if (w.created_at) { var k = w.created_at.substring(0,10); out.savedByDay[k] = (out.savedByDay[k]||0) + 1; }
-                if ((w.reps||0) > 0 && w.last_reviewed_at) { var k2 = w.last_reviewed_at.substring(0,10); out.practicedByDay[k2] = (out.practicedByDay[k2]||0) + 1; }
-                if (w.review_state === 'mastered' || (w.mastery_score||0) >= 80) { var k3 = (w.last_reviewed_at || w.updated_at || w.created_at); if (k3) { k3 = k3.substring(0,10); out.confirmedByDay[k3] = (out.confirmedByDay[k3]||0) + 1; } }
-              });
+              var { data: words } = await sb2.from('review_words').select('created_at,last_reviewed_at,reps,review_state,mastery_score,updated_at,lang').eq('user_id', uid2).limit(5000);
+              (words||[]).forEach(addWord);
             }
           }
         } catch(e) {}
-        wbWordData = out;
-        return out;
+        // Only cache a read that actually happened. Caching the empty buckets after
+        // a failed fetch pinned the chart at zero for the rest of the page's life,
+        // which reads as "you have no data" -- and on a slow or blocked connection
+        // it is simply false. Not caching means the next call retries.
+        if (!ok) return byLang.all;
+        wbWordDataByLang = byLang;
+        wbWordData = byLang.all;
+        return byLang.all;
       }
       function wordDays(tl, data){
         if (tl === 'week') { var a=[]; for (var i=6;i>=0;i--) a.push(isoDaysAgo(i)); return a; }
@@ -2318,7 +2375,9 @@
         return o;
       }
       function applyWbWordBoxes(data){
-        data = data || wbWordData;
+        // Respects the language filter too. Filtering the chart while the metric
+        // cards above it keep showing all-language totals is worse than no filter.
+        data = data || wbDataFor(wbChart.lang) || wbWordData;
         if (!data) return;
         var o = wordAggregate(wordDays(wbChart.tl, data), data);
         var q = function(id){ return document.getElementById('wb' + id); };
@@ -2717,7 +2776,10 @@
         if (!chartEl) return;
         var isEn = window.I18n && I18n.getLang() === 'en';
         if (scope === 'wb' && (st.metric === 'words' || st.metric === 'saved' || st.metric === 'lexdiv')) {
-          var wdata = await loadWordChartData();
+          // One fetch feeds every filter, so pick the selected language's dataset
+          // rather than re-querying on switch.
+          await loadWordChartData();
+          var wdata = wbDataFor(wbChart.lang) || wbWordData;
           var wdays = wordDays(st.tl, wdata);
           var wo = wordAggregate(wdays, wdata);
           var wm = wordMeta(st.metric, isEn);
@@ -2806,8 +2868,17 @@
         el.style.borderColor = 'var(--cyan)';
         renderChartBox('wb');
       }
+      function wbSetLang(btn){
+        wbChart.lang = btn.getAttribute('data-wlang') || 'all';
+        // Scoped to this control's own parent: the period buttons next to it also
+        // carry .wb-chart-btn, and an unscoped toggle would clear their selection.
+        btn.parentNode.querySelectorAll('.wb-lang-btn').forEach(function(b){ b.classList.toggle('active', b === btn); });
+        renderChartBox('wb');
+        updateWbVsBoxes();
+      }
       window.dashSetTl = dashSetTl;
       window.wbSelectBox = wbSelectBox;
+      window.wbSetLang = wbSetLang;
       window.renderChartBox = renderChartBox;
       window.loadDashChartData = loadDashChartData;
 
