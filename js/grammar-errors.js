@@ -165,6 +165,103 @@
       : '<p class="gx-empty">Nessun errore registrato finora.</p>';
   }
 
+  /* First drill concept for an error category (the "fix it" target). */
+  function firstConcept(cat) {
+    return (cat && GRAMMAR.error_map && GRAMMAR.error_map[cat] && GRAMMAR.error_map[cat][0]) || null;
+  }
+
+  /* Reverse error_map: concept id → error category (built once). */
+  var _reverseMap = null;
+  function conceptCategory(cid) {
+    if (!_reverseMap) {
+      _reverseMap = {};
+      Object.keys(GRAMMAR.error_map || {}).forEach(function (cat) {
+        (GRAMMAR.error_map[cat] || []).forEach(function (c) {
+          if (!_reverseMap[c]) _reverseMap[c] = cat;
+        });
+      });
+    }
+    return _reverseMap[cid] || null;
+  }
+
+  /* The most recent individual errors across all sources, newest first. */
+  function collectRecentErrors(liveRows, profile) {
+    var prof = profile || _profile || {};
+    var errors = [];
+
+    (liveRows || []).forEach(function (e) {
+      var cat = bridgeError(e);
+      errors.push({ cat: cat, label: label(cat) || 'Errore', wrong: e.original_text || '', right: e.corrected_text || '', at: e.saved_at || null, cid: firstConcept(cat) });
+    });
+
+    ((store.getExercises(prof).attempts) || []).forEach(function (a) {
+      (a.mistakes || []).forEach(function (mk) {
+        var cat = conceptCategory(a.concept_id);
+        errors.push({ cat: cat, label: label(cat) || humanize(a.concept_id), wrong: mk.chosen || '', right: mk.answer || '', at: a.at || null, cid: a.concept_id });
+      });
+    });
+
+    (((prof.placement || {}).missed) || []).forEach(function (m) {
+      errors.push({ cat: m.error_category, label: label(m.error_category) || 'Errore', wrong: m.chosen || '', right: m.answer || '', at: null, cid: m.concept_id });
+    });
+
+    errors.sort(function (a, b) {
+      var ta = a.at ? new Date(a.at).getTime() : 0;
+      var tb = b.at ? new Date(b.at).getTime() : 0;
+      return tb - ta;
+    });
+    return errors.slice(0, 5);
+  }
+
+  /* "Ultimi 5 errori" — bigger boxes: error type + the wrong→right pair + two
+   * actions (theory revision and exercise) for the mapped concept. */
+  function renderRecent(errors) {
+    if (!errors.length) return '';
+    var boxes = errors.map(function (e) {
+      var actions = '';
+      if (e.cid) {
+        actions =
+          '<div class="gx-errbox-actions">' +
+            '<button class="gi-btn gi-btn-ghost gx-go" data-act="err-theory" data-concept="' + esc(e.cid) + '">Teoria</button>' +
+            '<button class="gi-btn gi-btn-primary gx-go" data-act="err-drill" data-concept="' + esc(e.cid) + '">Esercizio</button>' +
+          '</div>';
+      }
+      var body = (e.wrong || e.right)
+        ? '<div class="gx-errbox-body">' +
+            (e.wrong ? '<span class="gx-errbox-wrong">' + esc(e.wrong) + '</span>' : '') +
+            '<span class="gx-errbox-arrow">→</span>' +
+            (e.right ? '<span class="gx-errbox-right">' + esc(e.right) + '</span>' : '') +
+          '</div>'
+        : '';
+      return '<div class="gx-errbox">' +
+        '<div class="gx-errbox-type">' + esc(e.label) + '</div>' +
+        body +
+        actions +
+      '</div>';
+    }).join('');
+    return '<div class="gx-section">' +
+      '<h3 class="gx-h">Ultimi errori</h3>' +
+      '<p class="gx-sub">Gli ultimi errori registrati, con il concetto da ripassare.</p>' +
+      '<div class="gx-recent">' + boxes + '</div>' +
+    '</div>';
+  }
+
+  /* Theory-only view for a concept, reached from "Teoria" on a recent error. */
+  function showTheory(cid) {
+    var c = document.getElementById('giErrors');
+    if (!c) return;
+    var concept = (GRAMMAR.concepts || {})[cid] || {};
+    c.innerHTML =
+      '<div class="gd-wrap">' +
+        '<button class="gd-back" data-act="err-back"><i class="fa-solid fa-arrow-left"></i> Torna agli errori</button>' +
+        '<div class="gd-card gd-theory">' +
+          '<div class="gd-head"><span class="gd-kicker">Grammatica</span><span class="gd-badge">' + esc(humanize(cid)) + '</span><span class="gd-cefr">' + esc(concept.cefr || '') + '</span></div>' +
+          '<div class="gd-explanation">' + esc(concept.explanation || '') + '</div>' +
+        '</div>' +
+        '<div class="gd-nav"><button class="gd-btn gd-btn-primary" data-act="err-drill" data-concept="' + esc(cid) + '">Esercitati</button></div>' +
+      '</div>';
+  }
+
   function render(container) {
     store.load().then(function (profile) {
       _profile = profile || {};
@@ -176,6 +273,7 @@
       // Live caption errors — optional, never blocks the placement-only view.
       readLiveErrors().then(function (live) {
         var cats = collect(live.rows);
+        var recent = collectRecentErrors(live.rows, _profile);
         var review = store.getGrammarReview(_profile);
         var dueConcepts = Object.keys(review).filter(function (cid) { return store.isDue(review[cid]); });
 
@@ -201,6 +299,7 @@
 
         container.innerHTML =
           '<div class="gx-wrap">' +
+            renderRecent(recent) +
             '<div class="gx-section">' +
               '<h3 class="gx-h">I tuoi errori ricorrenti</h3>' +
               '<p class="gx-sub">Dal test e dalle tue sessioni live, raggruppati per categoria e collegati ai concetti da allenare.</p>' +
@@ -230,9 +329,12 @@
   }
 
   function onClick(e) {
-    var t = e.target && e.target.closest ? e.target.closest('[data-act="err-drill"]') : null;
+    var t = e.target && e.target.closest ? e.target.closest('[data-act]') : null;
     if (!t) return;
-    startDrill(t.getAttribute('data-concept'));
+    var act = t.getAttribute('data-act');
+    if (act === 'err-drill') startDrill(t.getAttribute('data-concept'));
+    else if (act === 'err-theory') showTheory(t.getAttribute('data-concept'));
+    else if (act === 'err-back') { var c = document.getElementById('giErrors'); if (c) render(c); }
   }
 
   function init() {
