@@ -2529,11 +2529,17 @@
         function px(i){ return PL+(IW*(i/(Math.max(1,n-1)))); } function py(v){ return PT+IH-((v-d.min)/span)*IH; }
         function sm(vals){ var pts=vals.map(function(v,i){ return [px(i),py(v)]; }),d='M'+pts[0][0]+' '+pts[0][1]; for(var i=0;i<pts.length-1;i++){ var p0=pts[Math.max(0,i-1)],p1=pts[i],p2=pts[i+1],p3=pts[Math.min(pts.length-1,i+2)],c1x=p1[0]+(p2[0]-p0[0])/6,c1y=p1[1]+(p2[1]-p0[1])/6,c2x=p2[0]-(p3[0]-p1[0])/6,c2y=p2[1]-(p3[1]-p1[1])/6; d+=' C'+c1x+' '+c1y+', '+c2x+' '+c2y+', '+p2[0]+' '+p2[1]; } return d; }
         var g=svgGrid2(d);
-        g+='<path class="chart-line" d="'+sm(t)+'" fill="none" stroke="#64748b" stroke-width="2.2" opacity=".5"/>';
+        // Emphasis, not hue. TOTAL is the headline (spoken volume) and SAVED is a
+        // quiet cross-reference -- it is a different metric (words you banked)
+        // drawn on a speech axis, which is exactly why it should not compete for
+        // attention. The hues stay put on purpose: amber means saved and green
+        // means unique everywhere else in this dashboard, so only the weight and
+        // the glow move.
+        g+='<path class="line-draw" d="'+sm(t)+'" fill="none" stroke="#64748b" stroke-width="3.2" stroke-linecap="round" style="filter:drop-shadow(0 0 9px rgba(100,116,139,.55))"/>';
         g+='<path class="line-draw" d="'+sm(u)+'" fill="none" stroke="#34d399" stroke-width="2.6" stroke-linecap="round"/>';
-        g+='<path class="line-draw" d="'+sm(sv)+'" fill="none" stroke="#fbbf24" stroke-width="3.2" stroke-linecap="round" style="filter:drop-shadow(0 0 10px rgba(251,191,36,.95))"/>';
+        g+='<path class="chart-line" d="'+sm(sv)+'" fill="none" stroke="#fbbf24" stroke-width="2" opacity=".34"/>';
         u.forEach(function(v,i){ var yy=py(v), ly=(yy-11<16)?yy+15:yy-11; g+='<g class="vg"><circle class="dot" cx="'+px(i)+'" cy="'+yy+'" r="3.6" fill="var(--bg)" stroke="#34d399" stroke-width="2"><title>'+days[i]+' — '+v+' uniche</title></circle><text class="vlab" x="'+px(i)+'" y="'+ly+'" text-anchor="middle" fill="#34d399" font-size="10.5" font-weight="800">'+fmtK(v)+'</text></g>'; });
-        sv.forEach(function(v,i){ g+='<g class="vg"><circle class="dot dotN" cx="'+px(i)+'" cy="'+py(v)+'" r="3.2" fill="var(--bg)" stroke="#fbbf24" stroke-width="2"><title>'+days[i]+' — '+v+' salvate</title></circle></g>'; });
+        sv.forEach(function(v,i){ g+='<g class="vg"><circle class="dot dotN" cx="'+px(i)+'" cy="'+py(v)+'" r="2.8" fill="var(--bg)" stroke="#fbbf24" stroke-opacity=".4" stroke-width="1.8"><title>'+days[i]+' — '+v+' salvate</title></circle></g>'; });
         g+=svgXLbl(days);
         return '<svg viewBox="0 0 '+W+' '+H+'" style="width:100%;max-width:560px;height:auto">'+g+'</svg>';
       }
@@ -2727,13 +2733,19 @@
           var wbLgEl = document.getElementById('wbChartLegend');
           if (wbLgEl) {
             var wbLgItems = st.metric === 'words'
-              ? [['#fbbf24', DT('dash_legend_saved','Salvate')], ['#34d399', DT('dash_legend_unique','Uniche')], ['#64748b', DT('dash_legend_total','Totali')]]
+              ? [['#64748b', DT('dash_legend_total','Totali')], ['#34d399', DT('dash_legend_unique','Uniche')], ['#fbbf24', DT('dash_legend_saved','Salvate')]]
               : st.metric === 'saved'
                 ? [['#fbbf24', DT('dash_legend_saved','Salvate')], ['#34d399', DT('dash_legend_practiced','Praticate')], ['#8b5cf6', DT('dash_legend_confirmed','Padroneggiate')]]
                 : [['#8b5cf6', DT('dash_legend_unique','Uniche')], ['#64748b', DT('dash_legend_total','Totali')]];
+            // Legend order follows visual weight (total, unique, saved), and the
+            // words graph gets a footnote because two of its three series are
+            // called "words" while counting different things.
             wbLgEl.innerHTML = wbLgItems.map(function(l){
               return '<span style="display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;color:var(--text-soft)"><span style="width:10px;height:10px;border-radius:3px;background:'+l[0]+'"></span>'+l[1]+'</span>';
-            }).join('');
+            }).join('') +
+              (st.metric === 'words'
+                ? '<span style="display:block;margin-top:8px;font-size:11px;font-weight:600;color:var(--text-faint)">' + DT('dash_wm_sessions_only', 'Uniche e totali contano solo le parole parlate nelle sessioni; salvate sono quelle messe in banca.') + '</span>'
+                : '');
           }
           return;
         }
