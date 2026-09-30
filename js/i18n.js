@@ -1733,6 +1733,7 @@
       "wb_tab_italian": "Italian",
       "vocabolario": "Vocabulary",
       "grammatica": "Grammar",
+      "grammatica_errori": "Errors",
       "grammatica_esercizi": "Exercises",
       "grammatica_piano": "Your plan",
       "trascrizioni": "Transcripts",

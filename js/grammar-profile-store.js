@@ -145,6 +145,42 @@
     return profile;
   }
 
+  /* ── Grammar SRS (mastery + next-review per concept) ──
+   * The review state that turns "I saw an error" into "here's when it comes back".
+   * SM-2-lite: mastery is a blend of the latest result and the running score;
+   * next_review_at is a mastery-based interval. Stored on the profile so it
+   * travels with the learner across devices. */
+  function getGrammarReview(profile) {
+    return (profile && profile.grammar_review) || {};
+  }
+
+  function nextReviewAt(mastery) {
+    var days = mastery >= 90 ? 7 : mastery >= 70 ? 3 : mastery >= 50 ? 2 : 1;
+    return new Date(Date.now() + days * 86400000).toISOString();
+  }
+
+  async function recordGrammarReview(profile, conceptId, correct, total) {
+    profile = profile || {};
+    if (!conceptId) return profile;
+    var review = profile.grammar_review || {};
+    var r = review[conceptId] || { mastery: 0, lapses: 0, reviews: 0 };
+    r.reviews = (r.reviews || 0) + 1;
+    var ratio = total ? correct / total : 0;
+    r.mastery = Math.round(ratio * 100 * 0.6 + (r.mastery || 0) * 0.4);
+    if (ratio < 0.8) r.lapses = (r.lapses || 0) + 1;
+    r.last_reviewed_at = new Date().toISOString();
+    r.next_review_at = nextReviewAt(r.mastery);
+    review[conceptId] = r;
+    profile.grammar_review = review;
+    await save(profile);
+    return profile;
+  }
+
+  function isDue(review) {
+    if (!review || !review.next_review_at) return true;
+    return new Date(review.next_review_at).getTime() <= Date.now();
+  }
+
   w.SottotitoliGrammarProfileStore = {
     load: load,
     save: save,
@@ -155,6 +191,9 @@
     addTodo: addTodo,
     removeTodo: removeTodo,
     getExercises: getExercises,
-    logExercise: logExercise
+    logExercise: logExercise,
+    getGrammarReview: getGrammarReview,
+    recordGrammarReview: recordGrammarReview,
+    isDue: isDue
   };
 })(window);

@@ -7,17 +7,25 @@
  *   SottotitoliPassiveSignals.fold(profile, passive)          → updated profile
  *   SottotitoliPassiveSignals.applyFromRecentSessions(profile) → Promise<profile>
  *
- * Signals (see enrichment/taxonomy/passive-signals.yaml):
- *   wpm, hesitation_rate, pause_avg_seconds, code_switch_ratio, vocab_diversity,
- *   error_categories (external — from generate-grammar-report / grammar-viz).
+ * Reliability gate (composite — not just a session count): signals are only
+ * surfaced once the learner has enough *volume*, because WPM/hesitation/pause
+ * from one short session are noise. Three thresholds must ALL be met before
+ * `passive.reliable` is true, so "not enough data yet" is a real state.
  *
- * Philosophy: passive signals are EVIDENCE. fold() merges them into the profile
- * and adds measured error categories to error_focus.observed_missed, but does
- * not silently overwrite the placement-derived estimated_cefr — it records a
- * suggested level as `passive.suggested_cefr` for the planner/report to weigh.
+ * Philosophy: passive signals are EVIDENCE. fold() merges measured error
+ * categories into error_focus.observed_missed, but does not silently overwrite
+ * the placement-derived estimated_cefr — it records a suggested level as
+ * `passive.metrics.suggested_cefr` for the planner/report to weigh.
  */
 (function (w) {
   'use strict';
+
+  /* ── Reliability thresholds (composite) ──
+   * All three must be met before signals are shown. The defaults are conservative:
+   * ~3 completed sessions, ~10 minutes of speech, ~800 words. */
+  var MIN_SESSIONS = 3;
+  var MIN_MINUTES = 10;
+  var MIN_WORDS = 800;
 
   /* Small unambiguous Italian function-word list for code-switch detection
    * (target language English). Conservative by design — only function words a
@@ -31,6 +39,11 @@
 
   function tokens(text) {
     return String(text || '').toLowerCase().replace(/[^a-zàèéìòù'']+/g, ' ').split(/\s+/).filter(Boolean);
+  }
+
+  function wordCount(session, segments) {
+    var t = session.transcript_text || segments.map(function (s) { return s.original_text || ''; }).join(' ');
+    return tokens(t).length;
   }
 
   function extract(session, segments, opts) {
@@ -104,15 +117,26 @@
     return 'C1';
   }
 
+  /* Mean of each numeric metric across the history. */
+  function aggregate(history) {
+    if (!history || !history.length) return null;
+    var keys = ['wpm', 'hesitation_rate', 'pause_avg_seconds', 'code_switch_ratio', 'vocab_diversity'];
+    var out = {};
+    keys.forEach(function (k) {
+      var vals = history.map(function (h) { return h[k]; }).filter(function (v) { return typeof v === 'number' && !isNaN(v); });
+      if (vals.length) out[k] = Math.round((vals.reduce(function (a, b) { return a + b; }, 0) / vals.length) * 1000) / 1000;
+    });
+    out.suggested_cefr = wpmToCefr(out.wpm);
+    return out;
+  }
+
+  /* Merge measured error categories into observed_missed (deduplicated). */
   function fold(profile, passive) {
     profile = profile || {};
     if (!passive) return profile;
 
     profile.passive = passive;
 
-    // Fold measured error categories into observed_missed (deduplicated). These
-    // are observed evidence, so they join the placement misses — never the
-    // L1-predicted list.
     if (passive.error_categories && passive.error_categories.length) {
       profile.derived = profile.derived || {};
       profile.derived.error_focus = profile.derived.error_focus || { observed_missed: [], predicted_l1: [] };
@@ -126,11 +150,12 @@
     return profile;
   }
 
-  /* Read recent completed sessions + their segments and fold their signals into
-   * the profile. Auth convention mirrors the rest of the app. Non-breaking: any
-   * error returns the profile unchanged. */
+  /* Read recent completed sessions, build a per-session time series, and gate on
+   * the composite threshold. Non-breaking: any error returns the profile
+   * unchanged, and an empty/thin result leaves `passive` absent (never a
+   * fabricated metric). */
   async function applyFromRecentSessions(profile, limit) {
-    limit = limit || 5;
+    limit = limit || 10;
     try {
       var sb = w.sottotitoliSupabase;
       if (!sb) return profile;
@@ -139,25 +164,49 @@
       if (!uid) return profile;
 
       var r = await sb.from('sessions')
-        .select('id,transcript_text,wpm,duration_seconds')
+        .select('id,transcript_text,wpm,duration_seconds,created_at')
         .eq('user_id', uid)
         .eq('status', 'completed')
-        .order('created_at', { ascending: false })
+        .order('created_at', { ascending: true })  // oldest first — the graph is a time series
         .limit(limit);
       if (r.error || !r.data || !r.data.length) return profile;
 
-      // Fold across the most recent sessions, newest last so it wins.
-      for (var i = r.data.length - 1; i >= 0; i--) {
+      var history = [];
+      var totalMinutes = 0, totalWords = 0;
+      for (var i = 0; i < r.data.length; i++) {
         var s = r.data[i];
         var segR = await sb.from('session_segments')
           .select('original_text,start_time,end_time,confidence')
           .eq('session_id', s.id)
           .order('sequence', { ascending: true })
           .limit(500);
-        var segs = (segR.data || []);
-        var passive = extract(s, segs);
-        fold(profile, passive);
+        var segs = segR.data || [];
+        var p = extract(s, segs);
+        totalMinutes += (Number(s.duration_seconds) || 0) / 60;
+        totalWords += wordCount(s, segs);
+        history.push({
+          at: s.created_at,
+          wpm: p.wpm,
+          hesitation_rate: p.hesitation_rate,
+          pause_avg_seconds: p.pause_avg_seconds,
+          code_switch_ratio: p.code_switch_ratio,
+          vocab_diversity: p.vocab_diversity,
+          words: wordCount(s, segs)
+        });
       }
+
+      var reliable = r.data.length >= MIN_SESSIONS && totalMinutes >= MIN_MINUTES && totalWords >= MIN_WORDS;
+
+      profile.passive = {
+        reliable: reliable,
+        sessions_analyzed: r.data.length,
+        total_minutes: Math.round(totalMinutes),
+        total_words: totalWords,
+        thresholds: { sessions: MIN_SESSIONS, minutes: MIN_MINUTES, words: MIN_WORDS },
+        metrics: aggregate(history),
+        history: history
+      };
+
       return profile;
     } catch (e) {
       return profile;
@@ -167,6 +216,8 @@
   w.SottotitoliPassiveSignals = {
     extract: extract,
     fold: fold,
-    applyFromRecentSessions: applyFromRecentSessions
+    aggregate: aggregate,
+    applyFromRecentSessions: applyFromRecentSessions,
+    thresholds: { sessions: MIN_SESSIONS, minutes: MIN_MINUTES, words: MIN_WORDS }
   };
 })(window);

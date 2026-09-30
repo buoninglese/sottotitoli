@@ -241,6 +241,8 @@
           ladder +
         '</div>' +
 
+        signalsHtml() +
+
         '<div class="gi-nav gi-nav-end">' +
           '<button class="gi-btn gi-btn-ghost" data-act="retake">Rifai il test</button>' +
           '<button class="gi-btn gi-btn-primary" data-act="saved">Fatto</button>' +
@@ -290,6 +292,59 @@
       '</div>';
     }).join('');
     return '<div class="gi-review">' + rows + '</div>';
+  }
+
+  /* ── Passive signals: a small line graph of one metric over sessions ── */
+  function lineGraph(history, key, color) {
+    var vals = history.map(function (h) { return h[key]; });
+    var usable = vals.filter(function (v) { return typeof v === 'number' && !isNaN(v); });
+    if (usable.length < 2) return '';
+    var W = 340, H = 110, P = 14;
+    var min = Math.min.apply(null, usable), max = Math.max.apply(null, usable);
+    var range = (max - min) || 1;
+    function x(i) { return P + (W - 2 * P) * (i / (vals.length - 1)); }
+    function y(v) { return H - P - (H - 2 * P) * ((v - min) / range); }
+    var pts = vals.map(function (v, i) { return x(i).toFixed(1) + ',' + y(v).toFixed(1); }).join(' ');
+    var dots = vals.map(function (v, i) {
+      return '<circle cx="' + x(i).toFixed(1) + '" cy="' + y(v).toFixed(1) + '" r="2.5" fill="' + color + '"/>';
+    }).join('');
+    return '<svg class="gi-graph" viewBox="0 0 ' + W + ' ' + H + '">' +
+      '<polyline points="' + pts + '" fill="none" stroke="' + color + '" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>' +
+      dots +
+    '</svg>';
+  }
+
+  /* ── Passive signals card — surfaced only after the composite threshold ── */
+  function signalsHtml() {
+    var p = _profile && _profile.passive;
+    if (!p) {
+      return '<div class="gi-card">' +
+        '<h3 class="gi-h">I tuoi segnali</h3>' +
+        '<p class="gi-sub">Completa qualche sessione di conversazione e qui vedrai la tua fluenza: parole al minuto, esitazioni, pause e varietà lessicale.</p>' +
+        '</div>';
+    }
+    if (!p.reliable) {
+      var t = p.thresholds || { sessions: 3, minutes: 10, words: 800 };
+      return '<div class="gi-card">' +
+        '<h3 class="gi-h">I tuoi segnali</h3>' +
+        '<p class="gi-sub">Ancora pochi dati per un quadro affidabile: hai ' + p.sessions_analyzed + ' sessioni, ' + p.total_minutes + ' minuti, ' + p.total_words + ' parole. Servono almeno ' + t.sessions + ' sessioni, ' + t.minutes + ' minuti e ' + t.words + ' parole.</p>' +
+        '</div>';
+    }
+    var m = p.metrics || {};
+    function v(x, suffix) { return (x == null) ? '—' : (suffix ? x + suffix : x); }
+    var graph = lineGraph(p.history || [], 'wpm', 'var(--accent)');
+    return '<div class="gi-card">' +
+      '<h3 class="gi-h">I tuoi segnali</h3>' +
+      '<p class="gi-sub">Da ' + p.sessions_analyzed + ' sessioni (' + p.total_minutes + ' minuti, ' + p.total_words + ' parole).</p>' +
+      '<div class="gi-signals">' +
+        '<div class="gi-signal"><span>Fluenza (parole/min)</span><b>' + v(m.wpm) + '</b></div>' +
+        '<div class="gi-signal"><span>Esitazioni (per 100 parole)</span><b>' + v(m.hesitation_rate) + '</b></div>' +
+        '<div class="gi-signal"><span>Pausa media</span><b>' + v(m.pause_avg_seconds, 's') + '</b></div>' +
+        '<div class="gi-signal"><span>Code-switching</span><b>' + (m.code_switch_ratio != null ? Math.round(m.code_switch_ratio * 100) + '%' : '—') + '</b></div>' +
+        '<div class="gi-signal"><span>Varietà lessicale</span><b>' + v(m.vocab_diversity) + '</b></div>' +
+      '</div>' +
+      (graph ? '<div class="gi-graph-label">Fluenza (parole al minuto) nel tempo</div>' + graph : '') +
+      '</div>';
   }
 
   /* ── compute: score + persist + render result ── */
