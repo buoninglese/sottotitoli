@@ -95,8 +95,11 @@
     if (cached) return cached;
 
     // Fetch all sessions for this user (no language filter — stats are global)
+    // unique_words_count is a real column (written by real-mic.js). It is null
+    // for sessions created by other paths, so consumers must fall back to
+    // round(words_count * lexical_diversity) — never read it as 0.
     var r = await sb().from('sessions')
-      .select('id,name,duration_seconds,words_count,started_at,language_pair,wpm,lexical_diversity,quality_score')
+      .select('id,name,duration_seconds,words_count,unique_words_count,started_at,language_pair,wpm,lexical_diversity,quality_score')
       .eq('user_id', userId)
       .order('started_at', { ascending: false });
 

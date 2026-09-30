@@ -1532,8 +1532,226 @@
         // ═══ Box 4 · Mission progress ═══
         // Now hosted in the Learner Overview tab — shared renderer below.
         renderLearnerMissions();
+        // The feed built above is the all-time last 5. renderWrappedPanel is the
+        // period-aware writer and must run last so the Wrapped tab shows the
+        // SELECTED period rather than all time.
+        renderWrappedPanel(wscPeriod);
       }
       window.renderWrappedShowcase = renderWrappedShowcase;
+
+      // ═════════════════════════════════════════════════════════════════
+      // WRAPPED TAB — period recap (week / month / year)
+      //
+      // _allSessions is fetched WITHOUT a language filter ("stats are global",
+      // data-service.js), so this recap is deliberately ACCOUNT-WIDE: it is
+      // "your week", not "your week in English".
+      //
+      // Every aggregate is recomputed for the chosen period instead of reusing
+      // the cached all-time totals on the stats object.
+      // ═════════════════════════════════════════════════════════════════
+      var WSC_PERIODS = {
+        week:  { days: 7,   buckets: 7,  unit: 'day'   },
+        month: { days: 30,  buckets: 30, unit: 'day'   },
+        year:  { days: 365, buckets: 12, unit: 'month' }
+      };
+      var WSC_DEFAULT = { days: 7, buckets: 7, unit: 'day' };
+      var wscPeriod = 'week';
+
+      function wscSessions() {
+        var cands = [currentStats(), window.statsEN, window.statsIT];
+        for (var i = 0; i < cands.length; i++) {
+          var c = cands[i];
+          if (c && Array.isArray(c._allSessions)) return c._allSessions;
+        }
+        return [];
+      }
+
+      function wscAggregate(period) {
+        // Defensive: this can run before WSC_PERIODS is assigned if a caller
+        // fires early in the IIFE, and reading a property of undefined throws.
+        var P = (typeof WSC_PERIODS !== 'undefined' && WSC_PERIODS) || {};
+        var cfg = P[period] || WSC_DEFAULT;
+        var from = new Date(Date.now() - cfg.days * 864e5);
+        var rows = wscSessions().filter(function(s) {
+          if (!s || !s.started_at) return false;
+          var d = new Date(s.started_at);
+          return !isNaN(d.getTime()) && d >= from;
+        });
+        var seconds = 0, words = 0, unique = 0;
+        var wpmSum = 0, wpmN = 0, ldSum = 0, ldN = 0;
+        var days = {};
+        rows.forEach(function(s) {
+          seconds += (s.duration_seconds || 0);
+          var wc = s.words_count || 0;
+          words += wc;
+          // unique_words_count is a real column but only real-mic.js writes it;
+          // other creation paths leave it null. null is NOT zero — derive it.
+          unique += (s.unique_words_count == null)
+            ? Math.round(wc * (s.lexical_diversity || 0))
+            : s.unique_words_count;
+          if (s.wpm > 0) { wpmSum += s.wpm; wpmN++; }
+          if (s.lexical_diversity > 0) { ldSum += s.lexical_diversity; ldN++; }
+          var k = new Date(s.started_at).toDateString();
+          days[k] = (days[k] || 0) + (s.duration_seconds || 0);
+        });
+        return {
+          rows: rows,
+          cfg: cfg,
+          sessions: rows.length,
+          minutes: Math.round(seconds / 60),
+          words: words,
+          unique: unique,
+          wpm: wpmN ? Math.round(wpmSum / wpmN) : 0,
+          lexdiv: ldN ? Math.round(ldSum / ldN * 100) / 100 : 0,
+          activeDays: Object.keys(days).length,
+          byDay: days
+        };
+      }
+
+      function wscBuckets(agg) {
+        var now = new Date(), i, d, out = [];
+        if (agg.cfg.unit === 'day') {
+          for (i = agg.cfg.buckets - 1; i >= 0; i--) {
+            d = new Date(now.getTime() - i * 864e5);
+            out.push({ label: d.getDate() + '/' + (d.getMonth() + 1),
+                       value: (agg.byDay[d.toDateString()] || 0) / 60 });
+          }
+        } else {
+          for (i = agg.cfg.buckets - 1; i >= 0; i--) {
+            d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+            out.push({ label: d.toLocaleDateString(undefined, { month: 'short' }),
+                       value: 0, y: d.getFullYear(), m: d.getMonth() });
+          }
+          agg.rows.forEach(function(s) {
+            var sd = new Date(s.started_at);
+            out.forEach(function(b) {
+              if (b.y === sd.getFullYear() && b.m === sd.getMonth()) {
+                b.value += (s.duration_seconds || 0) / 60;
+              }
+            });
+          });
+        }
+        return out;
+      }
+
+      function renderWrappedPanel(period) {
+        if (!document.getElementById('wrappedShowcase')) return;
+        wscPeriod = period || wscPeriod;
+        var agg = wscAggregate(wscPeriod);
+
+        // Write VALUES only. The labels are static leaf spans so the i18n
+        // walker owns them and they re-translate on language switch.
+        function set(id, v) {
+          var el = document.getElementById(id);
+          if (el) el.textContent = v;
+        }
+        set('wscSessions', agg.sessions);
+        set('wscMinutes', agg.minutes);
+        set('wscWords', agg.words.toLocaleString());
+        set('wscUnique', agg.unique.toLocaleString());
+        set('wscLexdiv', agg.lexdiv > 0 ? agg.lexdiv.toFixed(2) : '—');
+        set('wscWpm', agg.wpm > 0 ? agg.wpm : '—');
+        set('wscDays', agg.activeDays);
+        var empty = document.getElementById('wscEmpty');
+        if (empty) empty.style.display = agg.sessions ? 'none' : '';
+
+        var chart = document.getElementById('wscChart');
+        if (chart) {
+          var buckets = wscBuckets(agg);
+          var max = Math.max.apply(null,
+            buckets.map(function(b) { return b.value; }).concat([1]));
+          chart.innerHTML = buckets.map(function(b) {
+            var h = Math.max(2, Math.round(b.value / max * 92));
+            var bar = b.value <= 0
+              ? 'background:var(--line)'
+              : 'background:var(--chart-bar-grad, var(--cyan))';
+            return '<div style="flex:1;min-width:0;display:flex;flex-direction:column;' +
+              'justify-content:flex-end;align-items:center;gap:4px">' +
+              '<div title="' + Math.round(b.value) + ' min" style="width:100%;height:' + h +
+              'px;border-radius:3px 3px 0 0;' + bar + '"></div>' +
+              '<span style="font-size:9px;color:var(--text-faint);white-space:nowrap">' +
+              (agg.cfg.buckets > 12 ? '' : b.label) + '</span></div>';
+          }).join('');
+        }
+
+        var feedEl = document.getElementById('wscActivityFeed');
+        if (feedEl) {
+          var recent = agg.rows.slice().sort(function(a, b) {
+            return new Date(b.started_at) - new Date(a.started_at);
+          }).slice(0, 8);
+          if (!recent.length) {
+            feedEl.innerHTML = '<div class="wsc-feed-empty" data-i18n="wrapped_empty">' +
+              'Nessuna sessione in questo periodo.</div>';
+          } else {
+            feedEl.innerHTML = recent.map(function(x) {
+              var wc = x.words_count || 0;
+              var lex = x.lexical_diversity || 0;
+              var uniq = (x.unique_words_count == null)
+                ? (lex > 0 ? Math.round(lex * wc) : '—')
+                : x.unique_words_count;
+              var minutes = Math.max(1, Math.round((x.duration_seconds || 0) / 60));
+              var date = x.started_at
+                ? new Date(x.started_at).toLocaleDateString(I18n.locale(),
+                    { day: '2-digit', month: 'short' })
+                : '—';
+              var lang = (x.language_pair || 'en').toUpperCase();
+              var name = (x.name && String(x.name).trim())
+                ? String(x.name).trim() : 'Sessione del ' + date;
+              var openFn = "var n=document.querySelector('[data-panel=trascrizioni]');" +
+                "if(n)n.click();setTimeout(function(){if(window.trOpenEditor)" +
+                "trOpenEditor('" + x.id + "')},350)";
+              return '<div class="wsc-feed-item" onclick="' + openFn + '">' +
+                '<div style="min-width:0"><div class="wsc-feed-name" title="' +
+                escHtml(name) + '">' + escHtml(name) + '</div>' +
+                '<div class="wsc-feed-date">' + date + ' · ' + lang + '</div></div>' +
+                '<div class="wsc-feed-stats">' +
+                  '<div class="wsc-feed-stat"><b>' + minutes + '</b><span>min</span></div>' +
+                  '<div class="wsc-feed-stat"><b>' + wc + '</b><span data-i18n="hero_words">parole</span></div>' +
+                  '<div class="wsc-feed-stat"><b>' + uniq + '</b><span data-i18n="wsc_stat_unique">uniche</span></div>' +
+                  '<div class="wsc-feed-stat"><b>' + (lex > 0 ? lex.toFixed(2) : '—') +
+                  '</b><span data-i18n="wsc_stat_lexdiv">div. lessicale</span></div>' +
+                '</div></div>';
+            }).join('');
+          }
+          if (window.I18n && typeof I18n.apply === 'function') {
+            try { I18n.apply(feedEl); } catch (e) {}
+          }
+        }
+      }
+      window.renderWrappedPanel = renderWrappedPanel;
+
+      // ── Wiring: period buttons, share/download, dashboard doorway ──
+      // Selectors are stable ids and data hooks, never user-facing copy.
+      document.addEventListener('click', function(e) {
+        var per = e.target.closest('[data-wrapped-period]');
+        if (per) {
+          document.querySelectorAll('.wrapped-period-btn').forEach(function(b) {
+            var on = (b === per);
+            b.classList.toggle('active', on);
+            b.setAttribute('aria-selected', on ? 'true' : 'false');
+          });
+          renderWrappedPanel(per.getAttribute('data-wrapped-period'));
+          return;
+        }
+        if (e.target.closest('[data-wrapped-open]')) {
+          var openNav = document.querySelector('.side-nav .nav-item[data-panel="wrapped"]');
+          if (openNav) openNav.click();
+          return;
+        }
+        if (e.target.closest('#wscDownloadBtn')) {
+          if (window.wscDownloadImage) window.wscDownloadImage();
+          return;
+        }
+        if (e.target.closest('#wscShareBtn')) {
+          if (window.wscShare) window.wscShare();
+          return;
+        }
+        // The sidebar router only toggles classes, so render on open. Deferred a
+        // tick so the panel is displayed before anything measures it.
+        if (e.target.closest('.side-nav .nav-item[data-panel="wrapped"]')) {
+          setTimeout(function() { renderWrappedPanel(wscPeriod); }, 0);
+        }
+      });
 
       // ── Keep the dashboard "Ultime sessioni" feed in sync when a session is renamed ──
       // The feed renders from statsEN/statsIT._allSessions, which are loaded once at
