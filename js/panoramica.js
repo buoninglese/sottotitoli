@@ -2355,7 +2355,7 @@
       }
       function wordMeta(m, isEn){
         if (m === 'words') return { title:DT('dash_wm_words_title','Parole uniche'), sub:DT('dash_wm_words_sub','Parole uniche vs totali per giorno, più la linea NEON delle parole salvate.'), big:function(o){return fmtK(o.uniq);}, media:function(o){return fmtK(Math.round(o.uniq/Math.max(1,o.days)));}, mediaLabel:DT('dash_avg_day','media/giorno'), color:'#34d399' };
-        if (m === 'saved') return { title:DT('dash_wm_saved_title','Parole salvate'), sub:DT('dash_wm_saved_sub','Parole salvate, praticate e confermate — corona per ogni periodo.'), big:function(o){return fmtK(o.sv);}, media:function(o){return fmtK(Math.round(o.sv/Math.max(1,o.days)));}, mediaLabel:DT('dash_avg_day','media/giorno'), color:'#fbbf24' };
+        if (m === 'saved') return { title:DT('dash_wm_saved_title','Parole salvate'), sub:DT('dash_wm_saved_sub','Parole salvate, praticate e padroneggiate — corona per ogni periodo.'), big:function(o){return fmtK(o.sv);}, media:function(o){return fmtK(Math.round(o.sv/Math.max(1,o.days)));}, mediaLabel:DT('dash_avg_day','media/giorno'), color:'#fbbf24' };
         return { title:DT('dash_wm_lexdiv_title','Div. lessicale'), sub:DT('dash_wm_lexdiv_sub','Parole uniche vs totali — il loro rapporto è la diversità lessicale. Sotto: media WPM.'), big:function(o){return o.ldN ? (o.ldS/o.ldN).toFixed(2) : '—';}, media:function(o){return o.wpmN ? (''+Math.round(o.wpmS/o.wpmN)) : '—';}, mediaLabel:DT('dash_avg_words_min','media parole/min'), color:'#8b5cf6' };
       }
       // ── Y-AXIS scale control for the chart boxes (gear menu: Auto / Top pulito / Fissa + play replay) ──
@@ -2539,7 +2539,7 @@
       }
       function radial3Html(days, data){
         var W=CHT.W,H=WBH,PL=CHT.PL,PR=CHT.PR,PT=CHT.PT,PB=CHT.PB,cx=W/2,cy=H/2,n=days.length,step=n?360/n:1,g='';
-        var names={sv:'salvate',pr:'praticate',cf:'confermate'};
+        var names={sv:'salvate',pr:'praticate',cf:'padroneggiate'};
         var bands=[{key:'sv',c:'#fbbf24',hi:'#fcd34d',r0:28,r1:48},{key:'pr',c:'#34d399',hi:'#6ee7b7',r0:52,r1:72},{key:'cf',c:'#8b5cf6',hi:'#a78bfa',r0:76,r1:100}];
         bands.forEach(function(b){
           var vals=days.map(function(iso){ return wordDayValue(days,data,iso)[b.key]; });
@@ -2729,7 +2729,7 @@
             var wbLgItems = st.metric === 'words'
               ? [['#fbbf24', DT('dash_legend_saved','Salvate')], ['#34d399', DT('dash_legend_unique','Uniche')], ['#64748b', DT('dash_legend_total','Totali')]]
               : st.metric === 'saved'
-                ? [['#fbbf24', DT('dash_legend_saved','Salvate')], ['#34d399', DT('dash_legend_practiced','Praticate')], ['#8b5cf6', DT('dash_legend_confirmed','Confermate')]]
+                ? [['#fbbf24', DT('dash_legend_saved','Salvate')], ['#34d399', DT('dash_legend_practiced','Praticate')], ['#8b5cf6', DT('dash_legend_confirmed','Padroneggiate')]]
                 : [['#8b5cf6', DT('dash_legend_unique','Uniche')], ['#64748b', DT('dash_legend_total','Totali')]];
             wbLgEl.innerHTML = wbLgItems.map(function(l){
               return '<span style="display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;color:var(--text-soft)"><span style="width:10px;height:10px;border-radius:3px;background:'+l[0]+'"></span>'+l[1]+'</span>';
