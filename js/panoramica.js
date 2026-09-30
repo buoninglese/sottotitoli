@@ -2609,7 +2609,9 @@
 
       // ── SVG builders (mockup-style charts: spline uniche/totali+neon salvate, corona 3 anelli, spline diversità) ──
       // Axis label formatter: decimals for small values (no duplicate labels when data is tiny), fmtK above 10.
-      function fmtAxis(v){ if (v < 10) { return (Math.round(v*10)/10).toFixed(1).replace('.',',').replace(',0',''); } return fmtK(v); }
+      // Decimal separator is a DOT, matching the data labels (toFixed) — the earlier
+      // locale comma made the same chart show '0,4' on the axis and '0.92' on a dot.
+      function fmtAxis(v){ if (v < 10) { var r = Math.round(v*100)/100; return (r === (r|0)) ? String(r|0) : String(r); } return fmtK(v); }
       function svgGrid2(d){
         // d = {min,max,step} y-axis domain (from YAXIS mode: Auto / Top pulito / Fissa).
         // Gridlines at NICE steps so labels stay clean and the top value sits near the top.
