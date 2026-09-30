@@ -1566,7 +1566,7 @@
         return [];
       }
 
-      var wscSigCache = {};
+      var wscExtraCache = {};
 
       function wscAggregate(period) {
         // Defensive: this can run before WSC_PERIODS is assigned if a caller
@@ -1626,59 +1626,165 @@
         };
       }
 
-      // ── The Italian function-word list used for code-switch detection.
-      //    Kept identical to js/passive-signals.js so the two agree.
-      var WSC_L1 = ['che', 'per', 'ma', 'e', 'con', 'sono', 'come', 'cosa', 'perché',
-        'perche', 'però', 'pero', 'anche', 'molto', 'bene', 'così', 'cosi', 'qui',
-        'questa', 'questo', 'dove', 'quando', 'allora', 'adesso', 'sempre', 'mai',
-        'già', 'gia', 'senza', 'dopo', 'prima', 'quindi', 'infatti', 'forse', 'tanto'];
-
-      // Same rules as js/passive-signals.js, applied to the SELECTED PERIOD.
+      // ── The Italian list, the hesitation regex and the pause rule all live in exactly
+      //    one place now, so the recap cannot quietly disagree with the card.
+      //    The maths is NOT re-implemented here. js/passive-signals.js owns the
+      //    hesitation regex, the L1 list and the pause definition, and that file
+      //    already changed under this panel once — so we call its extract() per
+      //    session instead of keeping a second copy of the rules.
       //
-      // Fetched lazily, on purpose: the dashboard's stats query deliberately
-      // omits transcript_text, and pulling it for every session on every page
-      // load would bloat the whole dashboard for the sake of one tab. Any
-      // failure returns null so the metrics degrade to an explicit "no data"
-      // state instead of showing a wrong number.
-      async function wscTranscriptSignals(period) {
+      //    Segments also unlock pause length, which the dashboard's stats query
+      //    never returns. Fetched lazily, on purpose: this runs only when the
+      //    panel opens, and any failure returns null so the metrics fall back to
+      //    an explicit state rather than printing a confident-looking number.
+      var WSC_SIG_MAX = 20;   // sessions analysed per period, newest first
+
+      function wscPassiveModule() {
+        var P = window.SottotitoliPassiveSignals;
+        return (P && typeof P.extract === 'function') ? P : null;
+      }
+
+      function wscPanelActive() {
+        var p = document.getElementById('pnl-wrapped');
+        return !!(p && p.classList.contains('active'));
+      }
+
+      // The composite reliability gate, read from the module so both surfaces
+      // share one definition. Volume is measured on the WHOLE period (agg), not
+      // on the analysed subset, so capping the window can never fake "thin".
+      function wscSignalGate(agg) {
+        var P = wscPassiveModule();
+        var T = (P && P.thresholds) || { sessions: 3, minutes: 10, words: 800 };
+        var short = [];
+        if (agg.sessions < T.sessions) short.push('sessions');
+        if (agg.minutes < T.minutes) short.push('minutes');
+        if (agg.words < T.words) short.push('words');
+        return { thresholds: T, reliable: !short.length, short: short };
+      }
+
+      async function wscPeriodSignals(agg) {
         try {
-          var P = (typeof WSC_PERIODS !== 'undefined' && WSC_PERIODS) || {};
-          var cfg = P[period] || WSC_DEFAULT;
-          var from = new Date(Date.now() - cfg.days * 864e5).toISOString();
+          var P = wscPassiveModule();
+          var sb = window.sottotitoliSupabase;
+          if (!P || !sb || !agg.rows.length) return null;
+          var sess = await sb.auth.getSession();
+          var uid = (sess && sess.data && sess.data.session)
+            ? sess.data.session.user.id : null;
+          if (!uid) return null;
+
+          // Newest first, then capped: a year of sessions is far too many to
+          // pull segments for, and the freshest window is the honest one.
+          var picked = agg.rows.slice().sort(function(a, b) {
+            return new Date(b.started_at) - new Date(a.started_at);
+          }).slice(0, WSC_SIG_MAX);
+
+          var segs = await Promise.all(picked.map(function(s) {
+            return sb.from('session_segments')
+              .select('original_text,start_time,end_time,confidence')
+              .eq('session_id', s.id)
+              .order('sequence', { ascending: true })
+              .limit(500)
+              .then(function(res) {
+                return (res && !res.error && res.data) ? res.data : null;
+              }, function() { return null; });
+          }));
+
+          var history = [];
+          picked.forEach(function(s, i) {
+            var seg = segs[i];
+            // No segments means no transcript AND no gaps, so extract() would
+            // report 0 words and a 0.00s pause. Those are fabrications, not
+            // measurements — skip the session rather than fold them in.
+            if (!seg || !seg.length) return;
+            var p = P.extract(s, seg);
+            if (!p) return;
+            history.push({
+              at: s.started_at,
+              wpm: p.wpm,
+              hesitation_rate: p.hesitation_rate,
+              pause_avg_seconds: p.pause_avg_seconds,
+              code_switch_ratio: p.code_switch_ratio,
+              vocab_diversity: p.vocab_diversity,
+              // One segment has no gaps BETWEEN segments, so its pause reads
+              // 0.00s. That is "not measurable", not "no pauses".
+              pause_known: seg.length > 1
+            });
+          });
+          if (!history.length) return null;
+
+          var metrics = P.aggregate(history);
+          if (!metrics) return null;
+          // Mean pause over only the sessions where a gap could exist, so a
+          // single-segment session cannot drag the average to zero.
+          var gv = history.filter(function(h) { return h.pause_known; })
+            .map(function(h) { return h.pause_avg_seconds; })
+            .filter(function(v) {
+              return typeof v === 'number' && !isNaN(v) && v > 0;
+            });
+          metrics.pause_avg_seconds = gv.length
+            ? Math.round(gv.reduce(function(a, b) { return a + b; }, 0) /
+                gv.length * 100) / 100
+            : null;
+
+          return {
+            metrics: metrics,
+            analysed: history.length,
+            capped: agg.rows.length > picked.length
+          };
+        } catch (e) {
+          return null;
+        }
+      }
+
+      // Error categories, ranked. Both sources are the app's own: the placement
+      // test's misses and the period's live-caption grammar_errors rows. The
+      // category → concept mapping is borrowed from js/grammar-errors.js so the
+      // recap and the "Errori" subtab cannot drift apart.
+      async function wscErrorCategories(agg) {
+        try {
+          var GE = window.SottotitoliGrammarErrors;
+          if (!GE || typeof GE.collect !== 'function') return null;
           var sb = window.sottotitoliSupabase;
           if (!sb) return null;
           var sess = await sb.auth.getSession();
           var uid = (sess && sess.data && sess.data.session)
             ? sess.data.session.user.id : null;
           if (!uid) return null;
-          var r = await sb.from('sessions').select('transcript_text')
-            .eq('user_id', uid).gte('started_at', from);
-          if (r.error || !r.data || !r.data.length) return null;
 
-          var tokens = [], hes = 0;
-          r.data.forEach(function(row) {
-            var txt = String(row.transcript_text || '').toLowerCase();
-            if (!txt) return;
-            tokens = tokens.concat(
-              txt.replace(/[^a-zàèéìòù'']+/g, ' ').split(/\s+/).filter(Boolean));
-            var m = txt.match(/\b(uh|um|erm|er|ehm|hmm|ah)\b/g);
-            if (m) hes += m.length;
-          });
-          if (!tokens.length) return null;
-          var l1 = 0, uniq = {};
-          tokens.forEach(function(w) {
-            if (WSC_L1.indexOf(w) !== -1) l1++;
-            uniq[w] = true;
-          });
-          return {
-            tokens: tokens.length,
-            hesitation: Math.round((hes / tokens.length) * 100 * 10) / 10,
-            codeSwitch: Math.round((l1 / tokens.length) * 1000) / 1000,
-            ttr: Math.round((Object.keys(uniq).length / tokens.length) * 1000) / 1000
-          };
+          // select('*') on purpose. error_category / error_type are columns the
+          // live save path never fills, and naming a column that does not exist
+          // fails the whole query — which would look exactly like "no errors".
+          // A silent empty result is not a clean result.
+          var from = new Date(Date.now() - agg.cfg.days * 864e5).toISOString();
+          var live = [];
+          var res = await sb.from('grammar_errors').select('*')
+            .eq('user_id', uid).gte('saved_at', from);
+          if (res && !res.error && res.data) live = res.data;
+
+          var store = window.SottotitoliGrammarProfileStore;
+          var profile = null;
+          if (store && typeof store.load === 'function') {
+            try { profile = await store.load(); } catch (e2) { profile = null; }
+          }
+          var cats = GE.collect(live, profile || {});
+          if (!cats || !cats.length) return null;
+          return cats.map(function(c) { return { label: c.label, count: c.count }; });
         } catch (e) {
           return null;
         }
+      }
+
+      // Both extras together, cached per period so reopening the panel or coming
+      // back to it does not re-query.
+      async function wscLoadExtras(agg) {
+        var out = { sig: null, cats: null };
+        await Promise.all([
+          wscPeriodSignals(agg).then(function(s) { out.sig = s; },
+            function() { out.sig = null; }),
+          wscErrorCategories(agg).then(function(c) { out.cats = c; },
+            function() { out.cats = null; })
+        ]);
+        return out;
       }
 
       // XP lives in the store xp.js owns. Read defensively: a malformed or
@@ -1720,13 +1826,16 @@
         };
       }
 
-      function wscRow(labelKey, value, fallbackLabel) {
+      // A row with no value. `valueKey` lets the caller say WHICH kind of empty
+      // it is — "no data" and "not enough data yet" are different claims, and
+      // the second is the honest one when the volume is too low to trust a rate.
+      function wscRow(labelKey, value, fallbackLabel, valueKey) {
         var na = (value === null || value === undefined || value === '');
         return '<div class="wsc-mrow">' +
           '<span class="wsc-mlabel" data-i18n="' + labelKey + '">' +
             (fallbackLabel || '') + '</span>' +
           '<span class="wsc-mvalue' + (na ? ' na' : '') + '"' +
-            (na ? ' data-i18n="wrapped_no_data"' : '') + '>' +
+            (na ? ' data-i18n="' + (valueKey || 'wrapped_no_data') + '"' : '') + '>' +
             (na ? 'Nessun dato' : value) + '</span></div>';
       }
 
@@ -1735,7 +1844,7 @@
           (fallback || '') + '</div>';
       }
 
-      function renderWrappedMetrics(agg, sig) {
+      function renderWrappedMetrics(agg, extra) {
         var host = document.getElementById('wscMetrics');
         if (!host) return;
         var xp = wscXpStore();
@@ -1772,17 +1881,57 @@
         html += wscRow('m_speech_level', agg.speechLevel, 'Livello dal parlato');
 
         html += wscGroup('mgroup_signals', 'Segnali passivi');
-        html += wscRow('m_hesitation', sig ? sig.hesitation.toFixed(1) : null,
-          'Esitazioni / 100 parole');
-        html += wscRow('m_codeswitch',
-          sig ? (sig.codeSwitch * 100).toFixed(2) + '%' : null,
-          'Code-switching (IT sul totale)');
-        html += wscRow('m_ttr', sig ? sig.ttr.toFixed(3) : null,
-          'Diversità lessicale (type/token)');
-        // Neither of these is stored anywhere we can read from here, so they
-        // are honest "no data" rather than a guess.
-        html += wscRow('m_pause', null, 'Pausa media (s)');
-        html += wscRow('m_error_categories', null, 'Categorie di errore');
+        var gate = wscSignalGate(agg);
+        var sm = (extra && extra.sig && extra.sig.metrics)
+          ? extra.sig.metrics : null;
+        // Three states, never two. A rate drawn from twenty words looks exactly
+        // as confident as one drawn from two thousand, which is why the gate
+        // exists: below the volume thresholds we withhold the number instead of
+        // dressing it up. With no sessions at all it stays a plain "no data".
+        var thin = (!gate.reliable && agg.sessions > 0)
+          ? 'wrapped_insufficient' : null;
+        function sigRow(labelKey, val, fallback, fmt) {
+          if (thin) return wscRow(labelKey, null, fallback, thin);
+          if (val === null || val === undefined || isNaN(val)) {
+            return wscRow(labelKey, null, fallback);
+          }
+          return wscRow(labelKey, fmt(val), fallback);
+        }
+        html += sigRow('m_hesitation', sm ? sm.hesitation_rate : null,
+          'Esitazioni / 100 parole',
+          function(v) { return v.toFixed(1); });
+        html += sigRow('m_codeswitch', sm ? sm.code_switch_ratio : null,
+          'Code-switching (IT sul totale)',
+          function(v) { return (v * 100).toFixed(2) + '%'; });
+        html += sigRow('m_ttr', sm ? sm.vocab_diversity : null,
+          'Diversità lessicale (type/token)',
+          function(v) { return v.toFixed(3); });
+        html += sigRow('m_pause', sm ? sm.pause_avg_seconds : null,
+          'Pausa media (s)', function(v) { return v.toFixed(2); });
+        // Not gated: one recorded error is a fact, not a rate. The count spans
+        // the period's live sessions plus the placement test's misses.
+        var erCats = (extra && extra.cats && extra.cats.length) ? extra.cats : null;
+        html += wscRow('m_error_categories',
+          erCats ? erCats.slice(0, 3).map(function(c) {
+            return c.label + ' ×' + c.count;
+          }).join(' · ') : null, 'Categorie di errore');
+        if (thin) {
+          html += '<p class="wsc-note"><span data-i18n="wrapped_signals_min">' +
+            'Serve un minimo di</span> ' + gate.thresholds.sessions +
+            ' <span data-i18n="wrapped_sessions_lc">sessioni</span> · ' +
+            gate.thresholds.minutes +
+            ' <span data-i18n="wrapped_minutes_lc">minuti</span> · ' +
+            gate.thresholds.words +
+            ' <span data-i18n="wrapped_words_lc">parole</span>.</p>';
+        } else if (extra && extra.sig) {
+          html += '<p class="wsc-note"><span data-i18n="wrapped_signals_window">' +
+            'Segnali calcolati sulle ultime</span> ' + extra.sig.analysed +
+            ' <span data-i18n="wrapped_sessions_lc">sessioni</span>.</p>';
+        }
+        if (erCats) {
+          html += '<p class="wsc-note" data-i18n="wrapped_errors_note">' +
+            'Dal test iniziale e dalle sessioni live del periodo.</p>';
+        }
 
         html += wscGroup('mgroup_progress', 'Progressi');
         html += wscRow('m_xp_total', xp ? (xp.xp || null) : null, 'XP totali');
@@ -1866,18 +2015,21 @@
         var empty = document.getElementById('wscEmpty');
         if (empty) empty.style.display = agg.sessions ? 'none' : '';
 
-        // Every measured variable, with an explicit "no data" state wherever we
-        // have nothing. Transcript-derived signals arrive asynchronously, so
-        // render immediately and re-render once they land.
-        var sig = wscSigCache[wscPeriod];
-        renderWrappedMetrics(agg, sig === undefined ? null : sig);
-        if (sig === undefined) {
-          wscTranscriptSignals(wscPeriod).then(function(s) {
-            wscSigCache[wscPeriod] = s || null;
-            var p = document.getElementById('pnl-wrapped');
-            if (p && p.classList.contains('active')) {
-              renderWrappedMetrics(wscAggregate(wscPeriod),
-                wscSigCache[wscPeriod]);
+        // Every measured variable, with an explicit state wherever we have
+        // nothing. The signals and the error categories both arrive
+        // asynchronously, so render immediately and re-render once they land.
+        //
+        // Fetched ONLY while the panel is on screen. This renderer also runs at
+        // page load to fill the dashboard's doorway card, and pulling up to
+        // WSC_SIG_MAX sessions' segments plus the error rows for a visitor who
+        // never opens the tab is exactly the cost this panel exists to avoid.
+        var extra = wscExtraCache[wscPeriod];
+        renderWrappedMetrics(agg, extra || null);
+        if (extra === undefined && wscPanelActive()) {
+          wscLoadExtras(agg).then(function(x) {
+            wscExtraCache[wscPeriod] = x;
+            if (wscPanelActive()) {
+              renderWrappedMetrics(wscAggregate(wscPeriod), x);
             }
           });
         }

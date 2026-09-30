@@ -70,17 +70,21 @@
     return LIVE_CATEGORY_BRIDGE[deriveItalian(e.explanation)] || null;
   }
 
-  function collect(liveErrors) {
+  /* Rank the error categories for a profile. `profile` is explicit so a caller
+   * outside this panel (the Wrapped recap) can borrow this exact mapping instead
+   * of re-implementing the bridge and drifting away from it. */
+  function collect(liveErrors, profile) {
+    var prof = profile || _profile || {};
     var cats = {};
     function bump(cat) { if (cat) cats[cat] = (cats[cat] || 0) + 1; }
 
     // Placement misses carry the enrichment id directly.
-    (((_profile && _profile.placement) || {}).missed || []).forEach(function (m) { bump(m.error_category); });
+    ((prof.placement || {}).missed || []).forEach(function (m) { bump(m.error_category); });
     // Live caption errors, bridged.
     (liveErrors || []).forEach(function (e) { bump(bridgeError(e)); });
 
     // Attach the drill concepts for each category, and the concept's SRS state.
-    var review = store.getGrammarReview(_profile);
+    var review = store.getGrammarReview(prof);
     var out = Object.keys(cats).map(function (cat) {
       var concepts = ((GRAMMAR.error_map && GRAMMAR.error_map[cat]) || []).map(function (cid) {
         return { cid: cid, state: review[cid] || null, due: store.isDue(review[cid]) };
@@ -195,6 +199,16 @@
       observer.observe(pane, { attributes: true, attributeFilter: ['class'] });
     }
   }
+
+  /* Exposed for the Wrapped recap, which needs the same "what do my errors
+   * mean" vocabulary this panel uses. Duplicating the bridge would let the two
+   * diverge, so it is shared instead. Returns [] when there is nothing to say. */
+  w.SottotitoliGrammarErrors = {
+    bridgeError: bridgeError,
+    label: label,
+    humanize: humanize,
+    collect: collect
+  };
 
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', init);

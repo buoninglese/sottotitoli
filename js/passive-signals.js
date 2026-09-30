@@ -163,18 +163,25 @@
       var uid = (sess && sess.data && sess.data.session) ? sess.data.session.user.id : null;
       if (!uid) return profile;
 
+      // Newest first, reversed immediately below. Ordering ASCENDING with a
+      // limit asks the database for the OLDEST `limit` rows, so once a learner
+      // passed the limit the fold froze on their first sessions forever: the
+      // graph stopped moving and `reliable` could never be re-evaluated.
       var r = await sb.from('sessions')
         .select('id,transcript_text,wpm,duration_seconds,created_at')
         .eq('user_id', uid)
         .eq('status', 'completed')
-        .order('created_at', { ascending: true })  // oldest first — the graph is a time series
+        .order('created_at', { ascending: false })
         .limit(limit);
       if (r.error || !r.data || !r.data.length) return profile;
 
+      // Back to oldest → newest: this series is plotted, so it must run forwards.
+      var rows = r.data.slice().reverse();
+
       var history = [];
       var totalMinutes = 0, totalWords = 0;
-      for (var i = 0; i < r.data.length; i++) {
-        var s = r.data[i];
+      for (var i = 0; i < rows.length; i++) {
+        var s = rows[i];
         var segR = await sb.from('session_segments')
           .select('original_text,start_time,end_time,confidence')
           .eq('session_id', s.id)
@@ -195,11 +202,11 @@
         });
       }
 
-      var reliable = r.data.length >= MIN_SESSIONS && totalMinutes >= MIN_MINUTES && totalWords >= MIN_WORDS;
+      var reliable = rows.length >= MIN_SESSIONS && totalMinutes >= MIN_MINUTES && totalWords >= MIN_WORDS;
 
       profile.passive = {
         reliable: reliable,
-        sessions_analyzed: r.data.length,
+        sessions_analyzed: rows.length,
         total_minutes: Math.round(totalMinutes),
         total_words: totalWords,
         thresholds: { sessions: MIN_SESSIONS, minutes: MIN_MINUTES, words: MIN_WORDS },
