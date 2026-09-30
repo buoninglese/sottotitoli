@@ -411,19 +411,53 @@
           </section>
         </div>
         <style>
-          /* Wrapped tab tiles. Kept local to this panel so it is self-contained;
-             colours are theme vars so day AND night both work. */
-          .wsc-tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(88px,1fr));gap:14px}
+          /* Wrapped tab. Kept local to the panel so it is self-contained; every
+             colour is a theme var, so day AND night both work.
+
+             The tile count is 8 on purpose. 8 divides evenly into 4 columns
+             (two clean rows) and into 2 columns (four clean rows), so no
+             breakpoint ever strands an orphan tile alone on a row. */
+          .wsc-headrow{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex-wrap:wrap}
+          .wsc-actions{display:flex;gap:8px;flex-wrap:wrap;flex-shrink:0}
+          .wsc-sub{margin:0;font-size:13px;line-height:1.5;color:var(--text-soft);max-width:56ch}
+          .wsc-tiles{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px 12px}
+          @media (min-width:560px){.wsc-tiles{grid-template-columns:repeat(4,minmax(0,1fr))}}
+          @media (min-width:1180px){.wsc-tiles{grid-template-columns:repeat(8,minmax(0,1fr))}}
           .wsc-tile{text-align:center;min-width:0}
-          .wsc-tile-v{font-family:var(--font-display);font-size:clamp(20px,2.6vw,28px);font-weight:800;letter-spacing:-.02em;color:var(--text);line-height:1.1}
-          .wsc-tile-k{font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--text-soft);margin-top:3px}
+          .wsc-tile-v{font-family:var(--font-display);font-size:clamp(19px,2.3vw,26px);font-weight:800;letter-spacing:-.02em;color:var(--text);line-height:1.15;font-variant-numeric:tabular-nums}
+          .wsc-tile-k{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-soft);margin-top:3px;line-height:1.3}
           .wrapped-period-btn{cursor:pointer}
+          /* The shared .wsc-grid is a 4-column grid built for small boxes, so a
+             lone box would sit in column 1 only (~250px) and every tile inside
+             it collapses. The panel wants full-width rows, so the template is
+             pinned here rather than editing a rule the dashboard also uses. */
+          #pnl-wrapped .wsc-grid{grid-template-columns:1fr}
+          #pnl-wrapped .wsc-box{grid-column:1/-1}
+          /* Metric table — label left, value right, ruled rows. */
+          .wsc-metrics{display:flex;flex-direction:column}
+          .wsc-mgroup{font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--text-faint);padding:0 0 8px}
+          .wsc-mgroup:not(:first-child){padding-top:18px;margin-top:4px;border-top:1px solid var(--line)}
+          .wsc-mrow{display:flex;align-items:baseline;justify-content:space-between;gap:16px;padding:8px 0;border-bottom:1px solid var(--line)}
+          .wsc-mrow:last-child{border-bottom:none}
+          .wsc-mlabel{font-size:13px;color:var(--text-soft);min-width:0}
+          .wsc-mvalue{font-size:14px;font-weight:700;color:var(--text);white-space:nowrap;font-variant-numeric:tabular-nums}
+          .wsc-mvalue.na{color:var(--text-faint);font-weight:600;font-style:italic}
+          .wsc-note{margin:14px 0 0;font-size:11.5px;line-height:1.5;color:var(--text-faint);font-style:italic}
         </style>
         <!-- Wrapped panel — period recap -->
         <div class="content-panel" id="pnl-wrapped">
-          <section class="panel-head" style="border-bottom:2px solid var(--line-strong);padding-bottom:20px;margin-bottom:28px">
-            <h2 style="margin:0 0 14px" data-i18n="wrapped_title">Il tuo Wrapped</h2>
-            <div class="seg-control" role="tablist" data-i18n-aria-label="wrapped_period">
+          <section class="panel-head" style="border-bottom:2px solid var(--line-strong);padding-bottom:18px;margin-bottom:22px">
+            <div class="wsc-headrow">
+              <div style="min-width:0">
+                <h2 style="margin:0 0 6px" data-i18n="wrapped_title">Il tuo Wrapped</h2>
+                <p class="wsc-sub" data-i18n="wrapped_sub">Scegli un periodo e guarda i tuoi numeri.</p>
+              </div>
+              <div class="wsc-actions">
+                <button type="button" class="secondary-btn" id="wscShareBtn" data-i18n="wrapped_share">Condividi</button>
+                <button type="button" class="secondary-btn" id="wscDownloadBtn" data-i18n="wrapped_download">Scarica PNG</button>
+              </div>
+            </div>
+            <div class="seg-control" role="tablist" data-i18n-aria-label="wrapped_period" style="margin-top:14px">
               <button type="button" role="tab" aria-selected="true" class="seg-btn wrapped-period-btn active" data-wrapped-period="week" data-i18n="wrapped_week">Settimana</button>
               <button type="button" role="tab" aria-selected="false" class="seg-btn wrapped-period-btn" data-wrapped-period="month" data-i18n="wrapped_month">Mese</button>
               <button type="button" role="tab" aria-selected="false" class="seg-btn wrapped-period-btn" data-wrapped-period="year" data-i18n="wrapped_year">Anno</button>
@@ -431,14 +465,6 @@
           </section>
 
           <section class="wsc" id="wrappedShowcase" aria-label="Riepilogo in stile wrapped">
-            <div class="wsc-head" style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
-              <h2 class="wsc-head-title" data-i18n="wsc_title">Attività recente</h2>
-              <div style="display:flex;gap:8px;flex-wrap:wrap">
-                <button type="button" class="secondary-btn" id="wscShareBtn" data-i18n="wrapped_share">Condividi</button>
-                <button type="button" class="secondary-btn" id="wscDownloadBtn" data-i18n="wrapped_download">Scarica PNG</button>
-              </div>
-            </div>
-
             <!-- Period totals — values written by renderWrappedPanel().
                  Labels are static leaf spans so the i18n walker owns them and
                  the panel re-translates on language switch. -->
@@ -447,13 +473,23 @@
                 <div class="wsc-tiles">
                   <div class="wsc-tile"><div class="wsc-tile-v" id="wscSessions">0</div><div class="wsc-tile-k"><span data-i18n="wrapped_sessions">Sessioni</span></div></div>
                   <div class="wsc-tile"><div class="wsc-tile-v" id="wscMinutes">0</div><div class="wsc-tile-k"><span data-i18n="wrapped_minutes">Minuti</span></div></div>
+                  <div class="wsc-tile"><div class="wsc-tile-v" id="wscPerSession">—</div><div class="wsc-tile-k"><span data-i18n="m_min_per_session">Minuti / sessione</span></div></div>
+                  <div class="wsc-tile"><div class="wsc-tile-v" id="wscDays">0</div><div class="wsc-tile-k"><span data-i18n="wrapped_active_days">Giorni attivi</span></div></div>
                   <div class="wsc-tile"><div class="wsc-tile-v" id="wscWords">0</div><div class="wsc-tile-k"><span data-i18n="words_count">Parole</span></div></div>
                   <div class="wsc-tile"><div class="wsc-tile-v" id="wscUnique">0</div><div class="wsc-tile-k"><span data-i18n="wrapped_unique">Parole uniche</span></div></div>
-                  <div class="wsc-tile"><div class="wsc-tile-v" id="wscLexdiv">—</div><div class="wsc-tile-k"><span data-i18n="wrapped_lexdiv">Div. lessicale</span></div></div>
                   <div class="wsc-tile"><div class="wsc-tile-v" id="wscWpm">—</div><div class="wsc-tile-k"><span data-i18n="wrapped_wpm">Parole / min</span></div></div>
-                  <div class="wsc-tile"><div class="wsc-tile-v" id="wscDays">0</div><div class="wsc-tile-k"><span data-i18n="wrapped_active_days">Giorni attivi</span></div></div>
+                  <div class="wsc-tile"><div class="wsc-tile-v" id="wscLexdiv">—</div><div class="wsc-tile-k"><span data-i18n="wrapped_lexdiv">Div. lessicale</span></div></div>
                 </div>
                 <p id="wscEmpty" style="margin:14px 0 0;font-size:13px;color:var(--text-soft);display:none"><span data-i18n="wrapped_empty">Nessuna sessione in questo periodo.</span></p>
+              </div>
+            </div>
+
+            <!-- Every measured variable. Values or an explicit "no data" state
+                 are written by renderWrappedPanel(). -->
+            <div class="wsc-grid" style="margin-bottom:14px">
+              <div class="wsc-box wsc-glass">
+                <div class="wsc-box-head"><h3 class="wsc-box-title" data-i18n="wrapped_metrics">Tutto quello che misuriamo</h3></div>
+                <div class="wsc-metrics" id="wscMetrics"></div>
               </div>
             </div>
 
@@ -493,6 +529,7 @@
             <div class="seg-control" role="tablist" data-i18n-aria-label="grammatica">
               <button role="tab" aria-selected="true" class="seg-btn tab-link active" data-subtab="grammatica-piano" data-i18n="grammatica_piano">Il tuo piano</button>
               <button role="tab" aria-selected="false" class="seg-btn tab-link" data-subtab="grammatica-esercizi" data-i18n="grammatica_esercizi">Esercizi</button>
+              <button role="tab" aria-selected="false" class="seg-btn tab-link" data-subtab="grammatica-errori" data-i18n="grammatica_errori">Errori</button>
             </div>
           </section>
           <div class="subtab-pane active" id="sub-grammatica-piano">
@@ -500,6 +537,9 @@
           </div>
           <div class="subtab-pane" id="sub-grammatica-esercizi">
             <div id="giExercises" aria-live="polite"></div>
+          </div>
+          <div class="subtab-pane" id="sub-grammatica-errori">
+            <div id="giErrors" aria-live="polite"></div>
           </div>
         </div>
                 <!-- Profilo panel with sub-tabs -->
@@ -2058,7 +2098,7 @@
   <script src="js/panoramica-wrapped-switcher.js?v=1"></script>
   <script src="js/data-service.js?v=12"></script>
   <script src="js/smart-suggestions.js"></script>
-  <script src="js/i18n.js?v=108"></script>
+  <script src="js/i18n.js?v=109"></script>
   <script src="js/icon-a11y.js?v=2"></script>
   <script src="js/xp.js?v=5"></script>
   <script>if (window.XP) { setTimeout(function(){ try { XP.restore(); } catch(e){} }, 2500); }</script>
@@ -2088,7 +2128,7 @@
 
   <!-- Page-specific: Supabase data fetching -->
   <script src="js/bank-identities.js?v=1"></script>
-  <script src="js/panoramica.js?v=36"></script>
+  <script src="js/panoramica.js?v=37"></script>
 
 <!-- 🎯 SETTINGS SAVE — single unified handler 🎯 -->
 <script src="js/panoramica-settings-save.js?v=3"></script>

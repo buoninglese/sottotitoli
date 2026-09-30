@@ -1566,6 +1566,8 @@
         return [];
       }
 
+      var wscSigCache = {};
+
       function wscAggregate(period) {
         // Defensive: this can run before WSC_PERIODS is assigned if a caller
         // fires early in the IIFE, and reading a property of undefined throws.
@@ -1579,7 +1581,8 @@
         });
         var seconds = 0, words = 0, unique = 0;
         var wpmSum = 0, wpmN = 0, ldSum = 0, ldN = 0;
-        var days = {};
+        var qSum = 0, qN = 0, favs = 0;
+        var days = {}, langs = {}, types = {};
         rows.forEach(function(s) {
           seconds += (s.duration_seconds || 0);
           var wc = s.words_count || 0;
@@ -1591,21 +1594,228 @@
             : s.unique_words_count;
           if (s.wpm > 0) { wpmSum += s.wpm; wpmN++; }
           if (s.lexical_diversity > 0) { ldSum += s.lexical_diversity; ldN++; }
+          if (s.quality_score > 0) { qSum += s.quality_score; qN++; }
+          if (s.favorite) favs++;
+          if (s.language_pair) langs[s.language_pair] = 1;
+          if (s.session_type) types[s.session_type] = 1;
           var k = new Date(s.started_at).toDateString();
           days[k] = (days[k] || 0) + (s.duration_seconds || 0);
         });
+        var minutes = Math.round(seconds / 60);
+        var wpm = wpmN ? Math.round(wpmSum / wpmN) : 0;
         return {
           rows: rows,
           cfg: cfg,
           sessions: rows.length,
-          minutes: Math.round(seconds / 60),
+          minutes: minutes,
           words: words,
           unique: unique,
-          wpm: wpmN ? Math.round(wpmSum / wpmN) : 0,
+          wpm: wpm,
           lexdiv: ldN ? Math.round(ldSum / ldN * 100) / 100 : 0,
+          quality: qN ? Math.round(qSum / qN * 10) / 10 : 0,
+          favorites: favs,
+          languages: Object.keys(langs),
+          sessionTypes: Object.keys(types),
+          perSessionMin: rows.length ? minutes / rows.length : 0,
+          wordsPerSession: rows.length ? Math.round(words / rows.length) : 0,
+          // Same thresholds as js/passive-signals.js wpmToCefr().
+          speechLevel: !wpm ? null
+            : (wpm < 60 ? 'A2' : wpm < 90 ? 'B1' : wpm < 120 ? 'B2' : 'C1'),
           activeDays: Object.keys(days).length,
           byDay: days
         };
+      }
+
+      // ── The Italian function-word list used for code-switch detection.
+      //    Kept identical to js/passive-signals.js so the two agree.
+      var WSC_L1 = ['che', 'per', 'ma', 'e', 'con', 'sono', 'come', 'cosa', 'perché',
+        'perche', 'però', 'pero', 'anche', 'molto', 'bene', 'così', 'cosi', 'qui',
+        'questa', 'questo', 'dove', 'quando', 'allora', 'adesso', 'sempre', 'mai',
+        'già', 'gia', 'senza', 'dopo', 'prima', 'quindi', 'infatti', 'forse', 'tanto'];
+
+      // Same rules as js/passive-signals.js, applied to the SELECTED PERIOD.
+      //
+      // Fetched lazily, on purpose: the dashboard's stats query deliberately
+      // omits transcript_text, and pulling it for every session on every page
+      // load would bloat the whole dashboard for the sake of one tab. Any
+      // failure returns null so the metrics degrade to an explicit "no data"
+      // state instead of showing a wrong number.
+      async function wscTranscriptSignals(period) {
+        try {
+          var P = (typeof WSC_PERIODS !== 'undefined' && WSC_PERIODS) || {};
+          var cfg = P[period] || WSC_DEFAULT;
+          var from = new Date(Date.now() - cfg.days * 864e5).toISOString();
+          var sb = window.sottotitoliSupabase;
+          if (!sb) return null;
+          var sess = await sb.auth.getSession();
+          var uid = (sess && sess.data && sess.data.session)
+            ? sess.data.session.user.id : null;
+          if (!uid) return null;
+          var r = await sb.from('sessions').select('transcript_text')
+            .eq('user_id', uid).gte('started_at', from);
+          if (r.error || !r.data || !r.data.length) return null;
+
+          var tokens = [], hes = 0;
+          r.data.forEach(function(row) {
+            var txt = String(row.transcript_text || '').toLowerCase();
+            if (!txt) return;
+            tokens = tokens.concat(
+              txt.replace(/[^a-zàèéìòù'']+/g, ' ').split(/\s+/).filter(Boolean));
+            var m = txt.match(/\b(uh|um|erm|er|ehm|hmm|ah)\b/g);
+            if (m) hes += m.length;
+          });
+          if (!tokens.length) return null;
+          var l1 = 0, uniq = {};
+          tokens.forEach(function(w) {
+            if (WSC_L1.indexOf(w) !== -1) l1++;
+            uniq[w] = true;
+          });
+          return {
+            tokens: tokens.length,
+            hesitation: Math.round((hes / tokens.length) * 100 * 10) / 10,
+            codeSwitch: Math.round((l1 / tokens.length) * 1000) / 1000,
+            ttr: Math.round((Object.keys(uniq).length / tokens.length) * 1000) / 1000
+          };
+        } catch (e) {
+          return null;
+        }
+      }
+
+      // XP lives in the store xp.js owns. Read defensively: a malformed or
+      // absent value yields null, which renders as "no data".
+      function wscXpStore() {
+        try {
+          var raw = localStorage.getItem('sottotitoli-learner');
+          if (!raw) return null;
+          var s = JSON.parse(raw);
+          return (s && typeof s === 'object') ? s : null;
+        } catch (e) {
+          return null;
+        }
+      }
+
+      // window.cefrBreakdown is loaded by the dashboard (data-service
+      // getCEFRBreakdown). It is ALL-TIME, not period-scoped — the table says so.
+      function wscLevelInfo() {
+        var cb = window.cefrBreakdown;
+        if (!cb || !cb.total) return null;
+        var order = ['A1', 'A2', 'B1', 'B2', 'C1', 'C2'];
+        var nums = { A1: 1, A2: 2, B1: 3, B2: 4, C1: 5, C2: 6 };
+        var parts = [], sum = 0, n = 0;
+        order.forEach(function(k) {
+          var v = cb[k] || 0;
+          if (v > 0) { parts.push(k + ' ' + v); sum += nums[k] * v; n += v; }
+        });
+        var mean = n ? sum / n : 0;
+        var band = null;
+        if (mean) {
+          var idx = Math.min(5, Math.max(0, Math.round(mean) - 1));
+          band = order[idx] + ' (' + mean.toFixed(2) + ')';
+        }
+        return {
+          vocabSize: cb.vocabSize || 0,
+          mattr: cb.mattr || 0,
+          dist: parts.length ? parts.join(' · ') : null,
+          meanBand: band
+        };
+      }
+
+      function wscRow(labelKey, value, fallbackLabel) {
+        var na = (value === null || value === undefined || value === '');
+        return '<div class="wsc-mrow">' +
+          '<span class="wsc-mlabel" data-i18n="' + labelKey + '">' +
+            (fallbackLabel || '') + '</span>' +
+          '<span class="wsc-mvalue' + (na ? ' na' : '') + '"' +
+            (na ? ' data-i18n="wrapped_no_data"' : '') + '>' +
+            (na ? 'Nessun dato' : value) + '</span></div>';
+      }
+
+      function wscGroup(key, fallback) {
+        return '<div class="wsc-mgroup" data-i18n="' + key + '">' +
+          (fallback || '') + '</div>';
+      }
+
+      function renderWrappedMetrics(agg, sig) {
+        var host = document.getElementById('wscMetrics');
+        if (!host) return;
+        var xp = wscXpStore();
+        var lv = wscLevelInfo();
+        var n = function(v) { return (v > 0) ? v : null; };
+        var html = '';
+
+        html += wscGroup('mgroup_activity', 'Attività');
+        html += wscRow('wrapped_sessions', n(agg.sessions), 'Sessioni');
+        html += wscRow('wrapped_minutes', n(agg.minutes), 'Minuti');
+        html += wscRow('m_min_per_session',
+          agg.sessions ? agg.perSessionMin.toFixed(1) : null, 'Minuti / sessione');
+        html += wscRow('wrapped_active_days', n(agg.activeDays), 'Giorni attivi');
+        html += wscRow('m_favorites', agg.sessions ? agg.favorites : null,
+          'Sessioni preferite');
+        html += wscRow('m_languages',
+          agg.languages.length ? agg.languages.join(', ') : null, 'Lingue');
+        html += wscRow('m_session_types',
+          agg.sessionTypes.length ? agg.sessionTypes.join(', ') : null,
+          'Tipi di sessione');
+
+        html += wscGroup('mgroup_speech', 'Parlato');
+        html += wscRow('words_count', n(agg.words) ? agg.words.toLocaleString() : null,
+          'Parole');
+        html += wscRow('m_words_per_session', n(agg.words) ? agg.wordsPerSession : null,
+          'Parole / sessione');
+        html += wscRow('wrapped_unique', n(agg.unique) ? agg.unique.toLocaleString() : null,
+          'Parole uniche');
+        html += wscRow('wrapped_lexdiv', n(agg.lexdiv) ? agg.lexdiv.toFixed(2) : null,
+          'Div. lessicale');
+        html += wscRow('wrapped_wpm', n(agg.wpm) ? agg.wpm : null, 'Parole / min');
+        html += wscRow('m_quality', n(agg.quality) ? agg.quality : null,
+          'Punteggio qualità');
+        html += wscRow('m_speech_level', agg.speechLevel, 'Livello dal parlato');
+
+        html += wscGroup('mgroup_signals', 'Segnali passivi');
+        html += wscRow('m_hesitation', sig ? sig.hesitation.toFixed(1) : null,
+          'Esitazioni / 100 parole');
+        html += wscRow('m_codeswitch',
+          sig ? (sig.codeSwitch * 100).toFixed(2) + '%' : null,
+          'Code-switching (IT sul totale)');
+        html += wscRow('m_ttr', sig ? sig.ttr.toFixed(3) : null,
+          'Diversità lessicale (type/token)');
+        // Neither of these is stored anywhere we can read from here, so they
+        // are honest "no data" rather than a guess.
+        html += wscRow('m_pause', null, 'Pausa media (s)');
+        html += wscRow('m_error_categories', null, 'Categorie di errore');
+
+        html += wscGroup('mgroup_progress', 'Progressi');
+        html += wscRow('m_xp_total', xp ? (xp.xp || null) : null, 'XP totali');
+        html += wscRow('m_xp_today', xp ? (xp.todayXp || 0) : null, 'XP oggi');
+        html += wscRow('m_goal', xp ? (xp.dailyGoal || null) : null,
+          'Obiettivo giornaliero');
+        html += wscRow('m_streak', xp ? (xp.streak || 0) : null, 'Streak (giorni)');
+        html += wscRow('m_drills', xp
+          ? (Object.keys(xp.lessons || {}).length + ' · ' +
+             Object.keys(xp.tests || {}).length + ' · ' +
+             Object.keys(xp.mistakes || {}).length + ' · ' +
+             (xp.practice || 0))
+          : null, 'Lezioni · Test · Errori · Pratica');
+
+        html += wscGroup('mgroup_level', 'Livello');
+        html += wscRow('m_vocab_size',
+          lv && lv.vocabSize ? lv.vocabSize.toLocaleString() : null,
+          'Vocabolario totale');
+        html += wscRow('m_mattr',
+          lv && lv.mattr > 0 ? lv.mattr.toFixed(3) : null,
+          'MATTR (div. lessicale)');
+        html += wscRow('m_cefr_dist', lv ? lv.dist : null, 'Distribuzione CEFR');
+        html += wscRow('m_lex_level', lv ? lv.meanBand : null, 'Livello lessicale');
+        // No stored GSE score exists to read, so it reports no data.
+        html += wscRow('m_gse', null, 'Punteggio GSE');
+
+        html += '<p class="wsc-note" data-i18n="m_all_time_note">' +
+          'Calcolato su tutte le sessioni, non sul periodo.</p>';
+
+        host.innerHTML = html;
+        if (window.I18n && typeof I18n.apply === 'function') {
+          try { I18n.apply(host); } catch (e) {}
+        }
       }
 
       function wscBuckets(agg) {
@@ -1647,13 +1857,30 @@
         }
         set('wscSessions', agg.sessions);
         set('wscMinutes', agg.minutes);
+        set('wscPerSession', agg.sessions ? (agg.minutes / agg.sessions).toFixed(1) : '—');
+        set('wscDays', agg.activeDays);
         set('wscWords', agg.words.toLocaleString());
         set('wscUnique', agg.unique.toLocaleString());
         set('wscLexdiv', agg.lexdiv > 0 ? agg.lexdiv.toFixed(2) : '—');
         set('wscWpm', agg.wpm > 0 ? agg.wpm : '—');
-        set('wscDays', agg.activeDays);
         var empty = document.getElementById('wscEmpty');
         if (empty) empty.style.display = agg.sessions ? 'none' : '';
+
+        // Every measured variable, with an explicit "no data" state wherever we
+        // have nothing. Transcript-derived signals arrive asynchronously, so
+        // render immediately and re-render once they land.
+        var sig = wscSigCache[wscPeriod];
+        renderWrappedMetrics(agg, sig === undefined ? null : sig);
+        if (sig === undefined) {
+          wscTranscriptSignals(wscPeriod).then(function(s) {
+            wscSigCache[wscPeriod] = s || null;
+            var p = document.getElementById('pnl-wrapped');
+            if (p && p.classList.contains('active')) {
+              renderWrappedMetrics(wscAggregate(wscPeriod),
+                wscSigCache[wscPeriod]);
+            }
+          });
+        }
 
         var chart = document.getElementById('wscChart');
         if (chart) {
