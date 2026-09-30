@@ -4297,7 +4297,7 @@
             var bname = actBtn.getAttribute('data-name') || '';
             wbFoldersCloseMenus();
             if (act === 'open') { wbFolderOpen(bid); return; }
-            if (act === 'allena') { if (window.Learner && Learner.openBankTest) Learner.openBankTest(bid); return; }
+            if (act === 'allena') { if (window.allenaClick) window.allenaClick(actBtn, bid); return; }
             if (act === 'rename') { if (window.wbRenameBank) wbRenameBank(bid, bname); setTimeout(wbRenderActive, 900); return; }
             if (act === 'duplicate') { if (window.wbDuplicateBank) wbDuplicateBank(bid); setTimeout(wbRenderActive, 1200); return; }
             if (act === 'delete') { if (window.wbDeleteBank) wbDeleteBank(bid, bname); return; }
@@ -4307,7 +4307,7 @@
           if (allenaBtn) {
             e.stopPropagation();
             var abid = allenaBtn.getAttribute('data-bank');
-            if (window.Learner && Learner.openBankTest) Learner.openBankTest(abid);
+            if (window.allenaClick) window.allenaClick(allenaBtn, abid);
             return;
           }
           if (folder) { wbFolderOpen(folder.getAttribute('data-bank-id')); return; }
@@ -4526,7 +4526,7 @@
                   '<p style="font-size:11px;font-weight:700;color:var(--text-soft);opacity:.6;text-transform:uppercase;letter-spacing:.15em;font-family:\'Inter\',sans-serif;margin:0">'+(subtitle||'')+'</p>'+
                 '</div>'+
                 '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">'+
-                  '<button class="hv-lift" onclick="event.stopPropagation();if(window.Learner&&window.Learner.openBankTest)Learner.openBankTest(\''+bankId+'\')" style="display:inline-flex;align-items:center;gap:8px;padding:10px 22px;border-radius:100px;background:rgba(6,182,212,.12);color:var(--cyan);border:1px solid rgba(6,182,212,.35);font-size:11px;font-weight:700;font-family:\'Manrope\',sans-serif;text-transform:uppercase;letter-spacing:.06em;cursor:pointer;transition:all .2s;white-space:nowrap"><span class="material-symbols-outlined" style="font-size:18px">bolt</span> Allena</button>'+
+                  '<button class="hv-lift" onclick="event.stopPropagation();if(window.allenaClick)window.allenaClick(this,\''+bankId+'\')" style="display:inline-flex;align-items:center;gap:8px;padding:10px 22px;border-radius:100px;background:rgba(6,182,212,.12);color:var(--cyan);border:1px solid rgba(6,182,212,.35);font-size:11px;font-weight:700;font-family:\'Manrope\',sans-serif;text-transform:uppercase;letter-spacing:.06em;cursor:pointer;transition:all .2s;white-space:nowrap"><span class="material-symbols-outlined" style="font-size:18px">bolt</span> Allena</button>'+
                   '<button class="hv-bg-cyan" onclick="document.getElementById(\'wbAddWordInput\').focus()" style="display:inline-flex;align-items:center;gap:8px;padding:10px 22px;border-radius:100px;background:rgba(6,182,212,.1);color:var(--cyan);border:1px solid rgba(6,182,212,.3);font-size:11px;font-weight:700;font-family:\'Manrope\',sans-serif;text-transform:uppercase;letter-spacing:.06em;cursor:pointer;transition:all .2s;white-space:nowrap"><span class="material-symbols-outlined" style="font-size:18px">add</span> Aggiungi parola</button>'+
                 '</div>'+
               '</div>'+
@@ -5265,6 +5265,52 @@
         _sortState['wbTableBody'] = null;
         _origRows['wbTableBody'] = null;
         return _origRenderWbTable(words);
+      };
+
+      /* 
+       * Allena feedback. Two problems, one place:
+       *  - the button looked inert while the session loaded, so people clicked
+       *    again (which is what double-fired the run; the guard for that lives in
+       *    js/learner.js runGuarded, this only adds the visible state)
+       *  - it locked nothing, so the extra clicks all reached the launcher
+       * The countdown is honest feedback, not a delay: the session opens as soon
+       * as it is ready, and the button restores itself either way. */
+      window.allenaClick = function(btn, bankId) {
+        if (!window.Learner || !Learner.openBankTest) return;
+        var release = function () {};
+        if (btn) {
+          if (btn.getAttribute('data-allena-busy') === '1') return;
+          btn.setAttribute('data-allena-busy', '1');
+          btn.disabled = true;
+          var original = btn.innerHTML;
+          var n = 3;
+          var paint = function () {
+            btn.innerHTML = '<span class="material-symbols-outlined">hourglass_top</span> ' + n + '…';
+          };
+          paint();
+          var iv = setInterval(function () {
+            n--;
+            if (n > 0) { paint(); return; }
+            clearInterval(iv);
+          }, 1000);
+          // The lock is released when the WORK finishes, not when the countdown
+          // ends. A tick-driven release looked fine in the foreground and left the
+          // button disabled and stuck on "1…" whenever the tab was backgrounded,
+          // because hidden tabs throttle timers. The timeout is only a backstop.
+          var done = false;
+          release = function () {
+            if (done) return;
+            done = true;
+            clearInterval(iv);
+            btn.innerHTML = original;
+            btn.removeAttribute('data-allena-busy');
+            btn.disabled = false;
+          };
+          setTimeout(release, 8000);
+        }
+        var p = Learner.openBankTest(bankId);
+        if (p && typeof p.then === 'function') p.then(release, release);
+        else release();
       };
 
       // ── Word detail drawer ──

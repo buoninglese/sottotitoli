@@ -1481,7 +1481,21 @@
     return out;
   }
 
-  async function openBankTest(bankId) {
+  /* Guarded launcher. Every other start path (reviews, missions, themes) already
+   * went through runGuarded; Allena was the one that did not, which is why it was
+   * the only button that could double-fire: it is slow (two bank lookups plus the
+   * word fetch), so a second click re-entered it and started a second run.
+   *
+   * The guard lives here rather than on the three buttons that call it, so any
+   * caller is covered and the busy flag is the SAME one the rest of the panel
+   * uses -- two independent guards would let one path start while another waits. */
+  function openBankTest(bankId) {
+    var p = null;
+    runGuarded(function () { p = openBankTestInner(bankId); return p; }, t('learner_loading'));
+    return p;
+  }
+
+  async function openBankTestInner(bankId) {
     // Allena can be launched from the Word-banks tab, so resolve the bank in either
     // learner language (the bank's lang may differ from the learner's active lang).
     var banksEn = await srcBanks('en');
