@@ -1692,9 +1692,9 @@
           var history = [];
           picked.forEach(function(s, i) {
             var seg = segs[i];
-            // No segments means no transcript AND no gaps, so extract() would
-            // report 0 words and a 0.00s pause. Those are fabrications, not
-            // measurements — skip the session rather than fold them in.
+            // No segments means no transcript, so extract() would report 0 words
+            // and no measurable pause. Zero words is a fabrication, not a
+            // measurement — skip the session rather than fold it in.
             if (!seg || !seg.length) return;
             var p = P.extract(s, seg);
             if (!p) return;
@@ -1704,27 +1704,18 @@
               hesitation_rate: p.hesitation_rate,
               pause_avg_seconds: p.pause_avg_seconds,
               code_switch_ratio: p.code_switch_ratio,
-              vocab_diversity: p.vocab_diversity,
-              // One segment has no gaps BETWEEN segments, so its pause reads
-              // 0.00s. That is "not measurable", not "no pauses".
-              pause_known: seg.length > 1
+              vocab_diversity: p.vocab_diversity
             });
           });
           if (!history.length) return null;
 
+          // No pause fix-up here on purpose. extract() reports null when a
+          // session has no measurable gap, and aggregate() averages only the
+          // numeric values — so a single-segment session already cannot drag the
+          // mean toward zero. Doing it again here would be a second
+          // implementation of a rule this block exists to stop duplicating.
           var metrics = P.aggregate(history);
           if (!metrics) return null;
-          // Mean pause over only the sessions where a gap could exist, so a
-          // single-segment session cannot drag the average to zero.
-          var gv = history.filter(function(h) { return h.pause_known; })
-            .map(function(h) { return h.pause_avg_seconds; })
-            .filter(function(v) {
-              return typeof v === 'number' && !isNaN(v) && v > 0;
-            });
-          metrics.pause_avg_seconds = gv.length
-            ? Math.round(gv.reduce(function(a, b) { return a + b; }, 0) /
-                gv.length * 100) / 100
-            : null;
 
           return {
             metrics: metrics,

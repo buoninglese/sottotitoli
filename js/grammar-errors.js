@@ -34,6 +34,10 @@
   };
 
   var _profile = null;
+  // The in-flight or resolved read, shared for the life of the page. Caching the
+  // PROMISE rather than the rows matters: init() renders and the activation
+  // observer renders again, and both start before either has resolved.
+  var _livePromise = null;
 
   function esc(s) {
     return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) {
@@ -102,6 +106,65 @@
     return '<span class="gx-cefr gx-mastered">' + (s.mastery || 0) + '%</span>';
   }
 
+  /* Read the live-caption error rows. Two deliberate choices:
+   *
+   *  - Failure is NOT flattened into []. An empty array from a failed query is
+   *    indistinguishable from "you have never made a mistake", and the panel
+   *    would then state the second as fact. The caller gets `failed` so it can
+   *    say something neutral instead of wrong.
+   *  - A successful read is cached for the life of the page. The observer below
+   *    re-renders every time this subtab is activated, and re-downloading the
+   *    learner's entire error history on each visit is pure waste. A failure is
+   *    NOT cached, so a transient one can recover on the next open.
+   *
+   * select('*') on purpose: error_category / error_type are columns the live
+   * save path never fills, and naming a column that does not exist fails the
+   * whole query. The timestamp column is `saved_at`, not `created_at`, if this
+   * is ever bounded by period. */
+  function readLiveErrors() {
+    if (_livePromise) return _livePromise;
+    var out = { rows: [], failed: false };
+    var sb = w.sottotitoliSupabase;
+    if (!sb) return Promise.resolve(out);
+    _livePromise = sb.auth.getSession().then(function (r) {
+      var uid = (r && r.data && r.data.session) ? r.data.session.user.id : null;
+      // Signed out is not a failure — there is simply nothing to read yet.
+      if (!uid) return out;
+      return sb.from('grammar_errors').select('*').eq('user_id', uid)
+        .then(function (res) {
+          if (res && res.error) {
+            out.failed = true;
+            if (w.console && w.console.warn) {
+              w.console.warn('GrammarErrors: could not read grammar_errors —',
+                res.error.message || res.error);
+            }
+          } else if (res && res.data) {
+            out.rows = res.data;
+          }
+          return out;
+        });
+    }).catch(function (e) {
+      out.failed = true;
+      if (w.console && w.console.warn) {
+        w.console.warn('GrammarErrors: grammar_errors read threw —', e);
+      }
+      return out;
+    }).then(function (v) {
+      // A failure must not stick, or one hiccup would blank the live errors for
+      // the rest of the session. Clear it so the next activation retries.
+      if (v.failed) _livePromise = null;
+      return v;
+    });
+    return _livePromise;
+  }
+
+  /* Never claim "no errors" when the read failed. */
+  function emptyMsg(failed) {
+    return failed
+      ? '<p class="gx-empty">Non riesco a leggere le tue sessioni live in questo momento, quindi non posso dire se ci sono errori. Riprova più tardi.</p>'
+      : '<p class="gx-empty">Nessun errore registrato finora.</p>';
+  }
+
   function render(container) {
     store.load().then(function (profile) {
       _profile = profile || {};
@@ -111,26 +174,8 @@
       }
 
       // Live caption errors — optional, never blocks the placement-only view.
-      var livePromise = Promise.resolve([]);
-      try {
-        var sb = w.sottotitoliSupabase;
-        if (sb) {
-          livePromise = sb.auth.getSession().then(function (r) {
-            var uid = (r && r.data && r.data.session) ? r.data.session.user.id : null;
-            if (!uid) return [];
-            // select('*') on purpose: error_category/error_type are columns the
-            // live save path never fills, and naming a missing column would fail
-            // the whole query — indistinguishable from "no errors". Reading the
-            // full row and bridging whatever is present is immune to that.
-            return sb.from('grammar_errors').select('*').eq('user_id', uid).then(function (res) {
-              return (res.error || !res.data) ? [] : res.data;
-            });
-          }).catch(function () { return []; });
-        }
-      } catch (e) { livePromise = Promise.resolve([]); }
-
-      livePromise.then(function (liveErrors) {
-        var cats = collect(liveErrors);
+      readLiveErrors().then(function (live) {
+        var cats = collect(live.rows);
         var review = store.getGrammarReview(_profile);
         var dueConcepts = Object.keys(review).filter(function (cid) { return store.isDue(review[cid]); });
 
@@ -159,7 +204,10 @@
             '<div class="gx-section">' +
               '<h3 class="gx-h">I tuoi errori ricorrenti</h3>' +
               '<p class="gx-sub">Dal test e dalle tue sessioni live, raggruppati per categoria e collegati ai concetti da allenare.</p>' +
-              (rows || '<p class="gx-empty">Nessun errore registrato finora.</p>') +
+              (rows || emptyMsg(live.failed)) +
+              (rows && live.failed
+                ? '<p class="gx-empty">Le sessioni live non sono leggibili in questo momento: qui sopra ci sono solo gli errori del test.</p>'
+                : '') +
             '</div>' +
             (due ?
               '<div class="gx-section"><h3 class="gx-h">Da ripassare oggi (' + dueConcepts.length + ')</h3>' + due + '</div>' : '') +
