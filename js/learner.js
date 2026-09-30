@@ -1584,6 +1584,7 @@
         '<span class="ics-remaining" id="icsRemaining"></span>' +
       '</div>' +
       '<div class="ics-grade-label">' + t('learner_ics_grade_label') + '</div>' +
+      '<div class="ics-keys" data-i18n="learner_keys_hint">Spazio per girare · Invio per continuare</div>' +
       '<div class="ics-grades" id="icsGrades">' +
         gradeBtnHtml('again', 1, 'learner_grade_again', 'Ancora', '😵') +
         gradeBtnHtml('hard', 3, 'learner_grade_hard', 'Difficile', '😬') +
@@ -1666,6 +1667,19 @@
     return el;
   }
 
+  /* The exit duration, read back from the stylesheet so the number has exactly
+   * one home. It used to be duplicated -- .55s in css/learner.css, 600ms in the
+   * timer here -- and the two drifted: the fall finished 50ms early, so the deck
+   * sat still and then the recycled card jumped. */
+  function icsExitMs(el) {
+    try {
+      var v = getComputedStyle(el).getPropertyValue('--ics-exit').trim();
+      var n = parseFloat(v);
+      if (!n) return 600;
+      return /ms$/.test(v) ? n : n * 1000;
+    } catch (e) { return 600; }
+  }
+
   function gradeCard(btn) {
     if (!session || !btn || btn.disabled) return;
     var q = parseInt(btn.getAttribute('data-q'), 10) || 4;
@@ -1681,10 +1695,50 @@
     if (q >= 3) { awardCorrect(); } else { recordMistake(item.word, session.lang); }
     writeGrade(item, q); // fire-and-forget SM-2 write-back to review_words
     $all('.ics-grade', stage).forEach(function (b) { b.disabled = true; });
-    // Fly the front card off, then cascade the stack
+    // Fly the front card off, then cascade the stack. The wait is derived from
+    // the CSS that performs the animation rather than hardcoded here.
     frontEl.classList.add('exiting');
-    setTimeout(advanceStack, 600);
+    setTimeout(advanceStack, icsExitMs(frontEl) + 20);
   }
+
+  /* ── Keyboard driving ──
+   * Space flips the front card, Enter advances. Enter deliberately will NOT
+   * record a grade for a card whose answer has not been seen: it flips first and
+   * stops, because a blind grade would write a wrong SM-2 interval back to
+   * review_words and quietly corrupt the schedule. */
+  function icsKeyStage() {
+    if (!session || !session.cards) return null;
+    var stage = document.getElementById('icsStage');
+    if (!stage) return null;
+    var pnl = document.getElementById('pnl-learner');
+    if (pnl && !pnl.classList.contains('active')) return null;
+    return stage;
+  }
+
+  document.addEventListener('keydown', function (e) {
+    var stage = icsKeyStage();
+    if (!stage) return;
+    if (e.metaKey || e.ctrlKey || e.altKey) return;
+    var t = e.target;
+    if (t) {
+      // Never hijack typing: this panel has a type-the-word input.
+      if (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable) return;
+      // And let Space/Enter keep activating a focused button the normal way.
+      if (t.tagName === 'BUTTON' || t.tagName === 'A') return;
+    }
+    var frontEl = icsCard(stage, 0);
+    if (!frontEl || frontEl.classList.contains('exiting')) return;
+    if (e.key === ' ' || e.key === 'Spacebar' || e.code === 'Space') {
+      e.preventDefault();        // otherwise the page scrolls
+      flipCard(frontEl);
+      return;
+    }
+    if (e.key === 'Enter') {
+      if (!frontEl.classList.contains('flip')) { flipCard(frontEl); return; }
+      var good = stage.querySelector('.ics-grade.good');
+      if (good && !good.disabled) { e.preventDefault(); gradeCard(good); }
+    }
+  });
 
   function advanceStack() {
     if (!session) return;
