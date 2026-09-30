@@ -2668,9 +2668,18 @@
         return '<svg viewBox="0 0 '+W+' '+H+'" style="width:100%;max-width:560px;height:auto">'+g+'</svg>';
       }
       function radial3Html(days, data){
-        var W=CHT.W,H=WBH,PL=CHT.PL,PR=CHT.PR,PT=CHT.PT,PB=CHT.PB,cx=W/2,cy=H/2,n=days.length,step=n?360/n:1,g='';
+        /* The rings used to be drawn onto the shared 760x460 chart canvas, so an
+         * outermost radius of 100 left the circle filling roughly a quarter of the
+         * box width and the rest of the canvas blank -- the "underuses its box"
+         * report. The viewBox now bounds the circle itself, so the SVG scales the
+         * rings to the room they are actually given rather than to a canvas they
+         * never filled. Every band radius below is unchanged, so the ring sizes
+         * relative to each other, and the font-size formula that derives from
+         * bands[0].r0, are all untouched -- only the overall scale changes. */
+        var n=days.length,step=n?360/n:1,g='';
         var names={sv:'salvate',pr:'praticate',cf:'padroneggiate'};
         var bands=[{key:'sv',c:'#fbbf24',hi:'#fcd34d',r0:28,r1:48},{key:'pr',c:'#34d399',hi:'#6ee7b7',r0:52,r1:72},{key:'cf',c:'#8b5cf6',hi:'#a78bfa',r0:76,r1:100}];
+        var V=2*(bands[2].r1+12),cx=V/2,cy=V/2;
         bands.forEach(function(b){
           var vals=days.map(function(iso){ return wordDayValue(days,data,iso)[b.key]; });
           var max=Math.max.apply(null,vals.concat([1]));
@@ -2682,7 +2691,7 @@
         var est=String(fmtK(tot)).length, fs=Math.max(14,Math.min(30,Math.floor((2*bands[0].r0-8)/(est*0.62))));
         g+='<text class="corona-val" data-num="'+tot+'" data-fmt="k" x="'+cx+'" y="'+(cy+fs*0.35)+'" text-anchor="middle" fill="var(--text)" font-size="'+fs+'" font-weight="800" font-family="Inter, sans-serif" letter-spacing="-0.02em">'+fmtK(tot)+'</text>';
         g+='<text x="'+cx+'" y="'+(cy+16)+'" text-anchor="middle" fill="var(--text-faint)" font-size="8" font-weight="700" letter-spacing=".1em">SAVED</text>';
-        return '<svg viewBox="0 0 '+W+' '+H+'" style="width:100%;max-width:680px;height:auto">'+g+'</svg>';
+        return '<svg viewBox="0 0 '+V+' '+V+'" style="width:100%;max-width:340px;height:auto">'+g+'</svg>';
       }
       /* A 0..1-ish axis for ratio series. The count domain (niceCeil on a max) is
        * wrong here: diversity lives around 0.4-0.9, so a domain running to 1 would
