@@ -2298,10 +2298,13 @@
           if (uniq == null && (s.lexical_diversity||0) > 0) uniq = Math.round(wc * s.lexical_diversity);
           [byLang.all, byLang[wbLangOfPair(s.language_pair)]].forEach(function(out){
             if (!out) return;
-            var d = out.days[iso] || (out.days[iso] = { uniq:0, tt:0, ldS:0, ldN:0, wpmS:0, wpmN:0 });
+            var d = out.days[iso] || (out.days[iso] = { uniq:0, tt:0, ldS:0, ldN:0, wpmS:0, wpmN:0, mtS:0, mtN:0 });
             d.tt += wc; d.uniq += (uniq || 0);
             if ((s.lexical_diversity||0) > 0) { d.ldS += s.lexical_diversity; d.ldN++; }
             if ((s.wpm||0) > 0) { d.wpmS += s.wpm; d.wpmN++; }
+            // mattr_score is written by process-session-analytics and was never read
+            // by the frontend. Averaged per day rather than summed: it is a ratio.
+            if ((s.mattr_score||0) > 0) { d.mtS += s.mattr_score; d.mtN++; }
           });
         }
         function addWord(w){
@@ -2322,7 +2325,7 @@
               // language_pair is in the select because it IS the filter key: without
               // it every session would count as unknown and land only in 'all',
               // which would look like the filter working while changing nothing.
-              var res = await sb.from('sessions').select('started_at,words_count,unique_words_count,lexical_diversity,wpm,language_pair').eq('user_id', uid);
+              var res = await sb.from('sessions').select('started_at,words_count,unique_words_count,lexical_diversity,wpm,language_pair,mattr_score').eq('user_id', uid);
               // A session existing is NOT the same as the read succeeding. Without
               // this, an auth/permission error returns no rows and gets cached as
               // "this learner has no sessions" -- the chart then sits at zero for
@@ -2367,7 +2370,7 @@
       }
       function wordDayValue(days, data, iso){
         var d = data.days[iso] || {};
-        return { uniq:d.uniq||0, tt:d.tt||0, sv:data.savedByDay[iso]||0, pr:data.practicedByDay[iso]||0, cf:data.confirmedByDay[iso]||0, ldS:d.ldS||0, ldN:d.ldN||0, wpmS:d.wpmS||0, wpmN:d.wpmN||0 };
+        return { uniq:d.uniq||0, tt:d.tt||0, sv:data.savedByDay[iso]||0, pr:data.practicedByDay[iso]||0, cf:data.confirmedByDay[iso]||0, ldS:d.ldS||0, ldN:d.ldN||0, wpmS:d.wpmS||0, wpmN:d.wpmN||0, mtS:d.mtS||0, mtN:d.mtN||0 };
       }
       function wordAggregate(days, data){
         var o = { uniq:0, tt:0, sv:0, pr:0, cf:0, ldS:0, ldN:0, wpmS:0, wpmN:0, days:days.length };
@@ -2415,7 +2418,7 @@
       function wordMeta(m, isEn){
         if (m === 'words') return { title:DT('dash_wm_words_title','Parole uniche'), sub:DT('dash_wm_words_sub','Parole uniche vs totali per giorno, più la linea NEON delle parole salvate.'), big:function(o){return fmtK(o.uniq);}, media:function(o){return fmtK(Math.round(o.uniq/Math.max(1,o.days)));}, mediaLabel:DT('dash_avg_day','media/giorno'), color:'#34d399' };
         if (m === 'saved') return { title:DT('dash_wm_saved_title','Parole salvate'), sub:DT('dash_wm_saved_sub','Parole salvate, praticate e padroneggiate — corona per ogni periodo.'), big:function(o){return fmtK(o.sv);}, media:function(o){return fmtK(Math.round(o.sv/Math.max(1,o.days)));}, mediaLabel:DT('dash_avg_day','media/giorno'), color:'#fbbf24' };
-        return { title:DT('dash_wm_lexdiv_title','Div. lessicale'), sub:DT('dash_wm_lexdiv_sub','Parole uniche vs totali — il loro rapporto è la diversità lessicale. Sotto: media WPM.'), big:function(o){return o.ldN ? (o.ldS/o.ldN).toFixed(2) : '—';}, media:function(o){return o.wpmN ? (''+Math.round(o.wpmS/o.wpmN)) : '—';}, mediaLabel:DT('dash_avg_words_min','media parole/min'), color:'#8b5cf6' };
+        return { title:DT('dash_wm_lexdiv_title','Div. lessicale'), sub:DT('dash_wm_lexdiv_sub','Diversità lessicale media per giorno, con MATTR (versione robusta alla lunghezza del testo). Sotto: media parole/min.'), big:function(o){return o.ldN ? (o.ldS/o.ldN).toFixed(2) : '—';}, media:function(o){return o.wpmN ? (''+Math.round(o.wpmS/o.wpmN)) : '—';}, mediaLabel:DT('dash_avg_words_min','media parole/min'), color:'#8b5cf6' };
       }
       // ── Y-AXIS scale control for the chart boxes (gear menu: Auto / Top pulito / Fissa + play replay) ──
       // Persisted per user; only the line charts (word bank) respond — the dashboard uses corona (no y-axis).
@@ -2619,18 +2622,67 @@
         g+='<text x="'+cx+'" y="'+(cy+16)+'" text-anchor="middle" fill="var(--text-faint)" font-size="8" font-weight="700" letter-spacing=".1em">SAVED</text>';
         return '<svg viewBox="0 0 '+W+' '+H+'" style="width:100%;max-width:680px;height:auto">'+g+'</svg>';
       }
+      /* A 0..1-ish axis for ratio series. The count domain (niceCeil on a max) is
+       * wrong here: diversity lives around 0.4-0.9, so a domain running to 1 would
+       * flatten it onto one gridline, while a tight domain would magnify ordinary
+       * wobble into a cliff. */
+      function ratioDomain(vals){
+        var v = (vals || []).filter(function(x){ return typeof x === 'number' && isFinite(x); });
+        if (!v.length) return { min:0, max:1, step:0.25 };
+        var lo = Math.min.apply(null, v), hi = Math.max.apply(null, v);
+        var span = Math.max(0.08, hi - lo);
+        var min = Math.max(0, lo - span*0.3);
+        var max = Math.min(1, hi + span*0.3);
+        if (max - min < 0.08) max = Math.min(1, min + 0.08);
+        var step = Math.max(0.02, Math.round(((max - min)/4)*20)/20);
+        return { min: min, max: max, step: step };
+      }
+      /* Lexical-diversity graph.
+       *
+       * This plotted the same unique/total pair as the words graph, so the two views
+       * showed one dataset under two names and the metric the box advertises was
+       * never drawn at all. Diversity is a ratio, and MATTR is the length-robust
+       * version of it -- both are things the words graph cannot show by construction. */
       function splineTwoHtml(days, data){
         var W=CHT.W,H=WBH,PL=CHT.PL,PR=CHT.PR,PT=CHT.PT,PB=CHT.PB,IW=W-PL-PR,IH=H-PT-PB,n=days.length;
-        var u=[],t=[]; days.forEach(function(iso){ var v=wordDayValue(days,data,iso); u.push(v.uniq); t.push(v.tt); });
-        var dataMax=Math.max.apply(null,t.concat([1]));
-        var d = window.YAXIS ? window.YAXIS.domain(dataMax) : { min:0, max:dataMax*1.08, step:niceCeil(dataMax*1.08/4) };
+        var ld=[], mt=[];
+        days.forEach(function(iso){
+          var v = wordDayValue(days, data, iso);
+          ld.push(v.ldN ? v.ldS/v.ldN : null);
+          mt.push(v.mtN ? v.mtS/v.mtN : null);
+        });
+        var d = ratioDomain(ld.concat(mt));
         var span=(d.max-d.min)||1;
-        function px(i){ return PL+(IW*(i/(Math.max(1,n-1)))); } function py(v){ return PT+IH-((v-d.min)/span)*IH; }
-        function sm(vals){ var pts=vals.map(function(v,i){ return [px(i),py(v)]; }),d='M'+pts[0][0]+' '+pts[0][1]; for(var i=0;i<pts.length-1;i++){ var p0=pts[Math.max(0,i-1)],p1=pts[i],p2=pts[i+1],p3=pts[Math.min(pts.length-1,i+2)],c1x=p1[0]+(p2[0]-p0[0])/6,c1y=p1[1]+(p2[1]-p0[1])/6,c2x=p2[0]-(p3[0]-p1[0])/6,c2y=p2[1]-(p3[1]-p1[1])/6; d+=' C'+c1x+' '+c1y+', '+c2x+' '+c2y+', '+p2[0]+' '+p2[1]; } return d; }
+        function px(i){ return PL+(IW*(i/(Math.max(1,n-1)))); }
+        function py(v){ return PT+IH-((v-d.min)/span)*IH; }
+        function spline(pts){
+          if (!pts.length) return '';
+          if (pts.length === 1) return 'M'+pts[0][0]+' '+pts[0][1];
+          var g='M'+pts[0][0]+' '+pts[0][1];
+          for(var i=0;i<pts.length-1;i++){
+            var p0=pts[Math.max(0,i-1)],p1=pts[i],p2=pts[i+1],p3=pts[Math.min(pts.length-1,i+2)],
+                c1x=p1[0]+(p2[0]-p0[0])/6,c1y=p1[1]+(p2[1]-p0[1])/6,
+                c2x=p2[0]-(p3[0]-p1[0])/6,c2y=p2[1]-(p3[1]-p1[1])/6;
+            g+=' C'+c1x+' '+c1y+', '+c2x+' '+c2y+', '+p2[0]+' '+p2[1];
+          }
+          return g;
+        }
+        // A day with no data is a GAP, not a zero. Plotting it as 0 would invent a
+        // collapse in diversity on days the learner simply did not record.
+        var ldPts=[], mtPts=[];
+        ld.forEach(function(v,i){ if (v != null) ldPts.push([px(i),py(v),i,v]); });
+        mt.forEach(function(v,i){ if (v != null) mtPts.push([px(i),py(v),i,v]); });
         var g=svgGrid2(d);
-        g+='<path class="chart-line" d="'+sm(t)+'" fill="none" stroke="#64748b" stroke-width="2.2" opacity=".6"/>';
-        g+='<path class="line-draw" d="'+sm(u)+'" fill="none" stroke="#8b5cf6" stroke-width="2.8" stroke-linecap="round" style="filter:drop-shadow(0 0 8px rgba(139,92,246,.45))"/>';
-        u.forEach(function(v,i){ var yy=py(v), ly=(yy-11<16)?yy+15:yy-11; g+='<g class="vg"><circle class="dot" cx="'+px(i)+'" cy="'+yy+'" r="4.2" fill="var(--bg)" stroke="#8b5cf6" stroke-width="2"><title>'+days[i]+' — '+v+' uniche</title></circle><text class="vlab" x="'+px(i)+'" y="'+ly+'" text-anchor="middle" fill="#8b5cf6" font-size="10.5" font-weight="800">'+fmtK(v)+'</text></g>'; });
+        if (mtPts.length > 1) g+='<path class="line-draw" d="'+spline(mtPts)+'" fill="none" stroke="#06b6d4" stroke-width="2.2" stroke-linecap="round" opacity=".9"/>';
+        if (ldPts.length > 1) g+='<path class="line-draw" d="'+spline(ldPts)+'" fill="none" stroke="#8b5cf6" stroke-width="3" stroke-linecap="round" style="filter:drop-shadow(0 0 8px rgba(139,92,246,.45))"/>';
+        ldPts.forEach(function(p){
+          var yy=p[1], ly=(yy-11<16)?yy+15:yy-11;
+          g+='<g class="vg"><circle class="dot" cx="'+p[0]+'" cy="'+yy+'" r="4" fill="var(--bg)" stroke="#8b5cf6" stroke-width="2"><title>'+days[p[2]]+' — '+p[3].toFixed(2)+'</title></circle>'+
+             '<text class="vlab" x="'+p[0]+'" y="'+ly+'" text-anchor="middle" fill="#8b5cf6" font-size="10.5" font-weight="800">'+p[3].toFixed(2)+'</text></g>';
+        });
+        mtPts.forEach(function(p){
+          g+='<g class="vg"><circle class="dot dotN" cx="'+p[0]+'" cy="'+p[1]+'" r="3" fill="var(--bg)" stroke="#06b6d4" stroke-width="1.8"><title>'+days[p[2]]+' — MATTR '+p[3].toFixed(2)+'</title></circle></g>';
+        });
         g+=svgXLbl(days);
         return '<svg viewBox="0 0 '+W+' '+H+'" style="width:100%;max-width:560px;height:auto">'+g+'</svg>';
       }
@@ -2798,7 +2850,7 @@
               ? [['#64748b', DT('dash_legend_total','Totali')], ['#34d399', DT('dash_legend_unique','Uniche')], ['#fbbf24', DT('dash_legend_saved','Salvate')]]
               : st.metric === 'saved'
                 ? [['#fbbf24', DT('dash_legend_saved','Salvate')], ['#34d399', DT('dash_legend_practiced','Praticate')], ['#8b5cf6', DT('dash_legend_confirmed','Padroneggiate')]]
-                : [['#8b5cf6', DT('dash_legend_unique','Uniche')], ['#64748b', DT('dash_legend_total','Totali')]];
+                : [['#8b5cf6', DT('dash_legend_lexdiv','Diversità lessicale')], ['#06b6d4', DT('dash_legend_mattr','MATTR')]];
             // Legend order follows visual weight (total, unique, saved), and the
             // words graph gets a footnote because two of its three series are
             // called "words" while counting different things.
