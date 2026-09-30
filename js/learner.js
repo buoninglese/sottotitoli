@@ -350,7 +350,11 @@
           var r = await q;
           out = (r.data || []).map(function (rw) {
             var cefr = rw.cefr || '';
-            return { word: rw.lemma || rw.word, lang: lang, pos: rw.pos || '', cefr: cefr, definition: rw.translation_primary || '', translation: rw.translation_primary || '', usage: rw.personal_frequency || 0, reps: rw.reps || 0 };
+            // nextReviewAt / isNew / lapses / mastery are carried through for the
+            // urgency ordering in reviewPriority(). Deliberately the same names
+            // srcReviewAll uses, so the two shapes cannot drift. Downstream item
+            // builders ignore keys they do not know.
+            return { word: rw.lemma || rw.word, lang: lang, pos: rw.pos || '', cefr: cefr, definition: rw.translation_primary || '', translation: rw.translation_primary || '', usage: rw.personal_frequency || 0, reps: rw.reps || 0, nextReviewAt: rw.next_review_at, isNew: !!rw.is_new, lapses: rw.lapses || 0, mastery: rw.mastery_score || 0 };
           });
         } catch (e) { out = []; }
       }
@@ -1866,12 +1870,38 @@
     } catch (e) { if (w.console) w.console.warn('writeGrade:', e); }
   }
 
-  async function openReview(kind, lang) {
+  /* Urgency order for review: never-reviewed first, then most overdue, then
+   * weakest mastery, then most lapses. A random sample is right for a casual
+   * "review something", but when the learner picks a NUMBER on "Due today" they
+   * are asking for the worst offenders, so the order has to carry meaning. */
+  function overdueMs(r) {
+    var t = (r && r.nextReviewAt) ? Date.parse(r.nextReviewAt) : NaN;
+    // Never reviewed (is_new) has no next date. That makes it the MOST urgent,
+    // not the least -- so it must not fall back to 0 and sort last.
+    return isNaN(t) ? Number.MAX_SAFE_INTEGER : (Date.now() - t);
+  }
+  function reviewPriority(list) {
+    return (list || []).slice().sort(function (a, b) {
+      var d = overdueMs(b) - overdueMs(a);
+      if (d) return d;
+      var m = ((a && a.mastery) || 0) - ((b && b.mastery) || 0);
+      if (m) return m;
+      return ((b && b.lapses) || 0) - ((a && a.lapses) || 0);
+    });
+  }
+
+  async function openReview(kind, lang, opts) {
+    opts = opts || {};
     lang = lang || learnerLang();
     var raw = await srcReview(kind, lang);
     if (!raw.length) { toast(t('learner_no_words_yet')); return; }
     var pool = await realPool(lang);
-    var items = await toItems(sample(raw, Math.min(12, raw.length)), lang);
+    // opts.count means the learner chose how many, so take the most urgent N.
+    // Without a count this stays the default random sample of at most 12.
+    var picked = (opts.count != null)
+      ? reviewPriority(raw).slice(0, Math.max(1, opts.count))
+      : sample(raw, Math.min(12, raw.length));
+    var items = await toItems(picked, lang);
     var steps = buildWordSteps(items, lang, pool);
     if (!steps.length) { toast(t('learner_no_words_yet')); return; }
     var name = kind === 'due' ? t('learner_review_due') : (kind === 'fragile' ? t('learner_review_fragile') : t('learner_review_new'));

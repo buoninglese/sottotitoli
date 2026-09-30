@@ -3612,6 +3612,9 @@
       // ═══ RENDER: Word banks ───
       // ═══ RENDER: Wordbanks — three-layer vocabulary workspace ═══
       var _wbState = { currentBank: null, currentWords: [], selectedRows: new Set() };
+      // How many words are due, captured when the overview renders, so the
+      // "Due today" prompt can tell the learner the number without re-querying.
+      var _wbDue = 0;
 
       async function renderWordbanks() {
         var lang = window.SOTTOTITOLI_STUDY_LANG || 'en';
@@ -3619,15 +3622,34 @@
         var stats = await SottotitoliData.getWordbankStats(lang);
         var statsEl = document.getElementById('wbStats');
         if (statsEl) {
+          _wbDue = stats.dueToday || 0;
+          // Order is deliberate: Total · New this week · Mastered · Learning ·
+          // Due today. It reads "how big is this, what is new, what is solid,
+          // what is in progress, what needs me now" -- and the two actionable
+          // ones sit last, next to each other.
+          // "Mastered" (not "Known", not "confirmed"): same rule as the progress
+          // graph's confirmed series -- review_state = mastered OR mastery >= 80.
           var cards = [
-            { v: stats.totalWords, l: 'Totale parole', b: '' },
-            { v: stats.dueToday, l: 'In scadenza oggi', b: stats.dueToday > 0 ? stats.dueToday + ' da ripassare' : 'Tutto in ordine' },
-            { v: stats.newThisWeek, l: 'Nuove questa settimana', b: stats.newThisWeek > 0 ? '+' + stats.newThisWeek + ' questa settimana' : '' },
-            { v: stats.known, l: 'Known', b: '' },
-            { v: stats.learning, l: 'Learning', b: '' }
+            { v: stats.totalWords, l: DT('wb_stat_total', 'Totale parole') },
+            { v: stats.newThisWeek, l: DT('wb_stat_new_week', 'Nuove questa settimana'),
+              b: stats.newThisWeek > 0 ? '+' + stats.newThisWeek : '' },
+            { v: stats.known, l: DT('wb_stat_mastered', 'Padroneggiate'),
+              b: DT('wb_stat_mastered_hint', 'consolidate') },
+            { v: stats.learning, l: DT('wb_stat_learning', 'In apprendimento'),
+              b: DT('wb_stat_learning_hint', 'apri il trainer'), go: 'learner' },
+            { v: stats.dueToday, l: DT('wb_stat_due', 'Da ripassare oggi'),
+              b: stats.dueToday > 0 ? DT('wb_stat_due_hint', 'in scadenza') : DT('wb_stat_due_none', 'tutto in ordine'),
+              due: true }
           ];
           statsEl.innerHTML = '<div class="stats-row" style="grid-template-columns:repeat(5,1fr);margin-bottom:0">' +
-            cards.map(function(c){ return '<div class="metric-card" style="min-height:80px;padding:14px 16px"><div class="metric-label" style="margin-bottom:2px">'+c.l+'</div><div class="metric-value" style="font-size:28px">'+c.v+'</div>'+(c.b?'<div class="metric-badge">'+c.b+'</div>':'')+'</div>'; }).join('') +
+            cards.map(function(c){
+              var attr = c.due ? ' data-wb-due="1"' : (c.go ? ' data-wb-go="' + c.go + '"' : '');
+              var arrow = attr ? ' <span class="material-symbols-outlined" style="font-size:13px;vertical-align:middle;opacity:.65">arrow_forward</span>' : '';
+              return '<div class="metric-card' + (attr ? ' wb-stat-link' : '') + '"' + attr + ' style="min-height:80px;padding:14px 16px' + (attr ? ';cursor:pointer' : '') + '">' +
+                '<div class="metric-label" style="margin-bottom:2px">' + c.l + arrow + '</div>' +
+                '<div class="metric-value" style="font-size:28px">' + c.v + '</div>' +
+                (c.b ? '<div class="metric-badge">' + c.b + '</div>' : '') + '</div>';
+            }).join('') +
             '</div>';
         }
 
@@ -5311,6 +5333,49 @@
         var p = Learner.openBankTest(bankId);
         if (p && typeof p.then === 'function') p.then(release, release);
         else release();
+      };
+
+      /* Overview-box clicks. "Learning" navigates to the Vocabulary Trainer;
+       * "Due today" starts a review of exactly those words. Using one delegated
+       * handler keyed on data attributes rather than inline onclick keeps this
+       * working when the boxes re-render. */
+      window.wbStatClick = function(el) {
+        if (!el) return;
+        var go = el.getAttribute('data-wb-go');
+        if (go) {
+          var nav = document.querySelector('.side-nav .nav-item[data-panel="' + go + '"]');
+          if (nav) nav.click();
+          return;
+        }
+        if (el.getAttribute('data-wb-due')) window.wbStartDue();
+      };
+
+      /* Delegated, so it survives every re-render of the overview boxes. */
+      document.addEventListener('click', function(e) {
+        var card = (e.target && e.target.closest)
+          ? e.target.closest('#wbStats [data-wb-go], #wbStats [data-wb-due]') : null;
+        if (!card) return;
+        e.stopPropagation();
+        window.wbStatClick(card);
+      });
+
+      /* "Due today" -> ask how many, then build a session from exactly those words
+       * in urgency order (most overdue first). appPrompt is the picker; empty or
+       * junk means all, because asking for a number and then punishing a typo is
+       * worse than doing the generous thing. */
+      window.wbStartDue = function() {
+        if (!window.Learner || !Learner.openReview) return;
+        if (!_wbDue) {
+          if (window.appAlert) window.appAlert(DT('wb_due_none', 'Non c\'è nulla da ripassare adesso.'), DT('wb_stat_due', 'Da ripassare oggi'), '✅');
+          return;
+        }
+        if (!window.appPrompt) { Learner.openReview('due', null, {}); return; }
+        var msg = DT('wb_due_ask', 'Hai {n} parole da ripassare. Quante vuoi allenare adesso? Lascia vuoto per allenarle tutte.').replace('{n}', _wbDue);
+        window.appPrompt(msg, function(val) {
+          var n = parseInt(String(val || '').replace(/[^0-9]/g, ''), 10);
+          if (!n || n <= 0 || n > _wbDue) n = _wbDue;
+          Learner.openReview('due', null, { count: n });
+        }, DT('wb_stat_due', 'Da ripassare oggi'), '⏰', DT('wb_due_placeholder', 'tutte'), '');
       };
 
       // ── Word detail drawer ──
