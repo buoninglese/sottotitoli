@@ -66,12 +66,37 @@
         '</div>' +
         '<div class="gd-card">' + drillBody(d) + '</div>' +
       '</div>';
+    focusDrill(d);
+  }
+
+  /* Place the cursor and wire Enter. Before grading the input is focused and
+   * Enter = "Verifica"; after grading the "Avanti" button is focused so Enter
+   * (native button activation) advances. */
+  function focusDrill(d) {
+    if (!state || d.type === 'mcq') return;
+    try {
+      var input = state.container.querySelector && state.container.querySelector('#gdAnswer');
+      if (state.lastResult) {
+        var btn = state.container.querySelector && state.container.querySelector('[data-act="gd-next"]');
+        if (btn && btn.focus) btn.focus();
+        return;
+      }
+      if (input) {
+        if (input.focus) input.focus();
+        input.addEventListener('keydown', function (e) {
+          if (e.key === 'Enter') { e.preventDefault(); gradeText(); }
+        });
+      }
+    } catch (e) { /* focus is a nicety — a drill still works by click without it */ }
   }
 
   function drillBody(d) {
     var prompt =
       '<div class="gd-prompt"><span class="gd-prompt-label">' + (TYPE_LABEL[d.type] || 'Esercizio') + '</span>' +
       '<div class="gd-prompt-text">' + esc(d.prompt) + '</div></div>';
+
+    var isLast = state.idx >= state.drills.length - 1;
+    var nextLabel = isLast ? 'Vedi il riepilogo' : 'Avanti';
 
     if (d.type === 'mcq') {
       var opts = state.mcqOptions.map(function (o) {
@@ -82,26 +107,33 @@
         }
         return '<button class="' + cls + '" data-act="gd-mcq" data-opt="' + esc(o) + '" ' + (state.lastResult ? 'disabled' : '') + '>' + esc(o) + '</button>';
       }).join('');
-      return prompt + '<div class="gd-opts">' + opts + '</div>' + afterGraded(d);
+      var nextBtn = state.lastResult
+        ? '<div class="gd-nav"><button class="gd-btn gd-btn-primary" data-act="gd-next">' + nextLabel + '</button></div>'
+        : '';
+      return prompt + '<div class="gd-opts">' + opts + '</div>' + feedback(d) + nextBtn;
     }
 
-    var val = state.lastResult ? esc(state.lastResult.chosen || '') : '';
+    // Text types: the action button lives in the input row and swaps from
+    // "Verifica" to "Avanti" in place after grading, so Enter can drive both.
+    var graded = !!state.lastResult;
+    var val = graded ? esc(state.lastResult.chosen || '') : '';
+    var btn = graded
+      ? '<button class="gd-btn gd-btn-primary" data-act="gd-next">' + nextLabel + '</button>'
+      : '<button class="gd-btn gd-btn-primary" data-act="gd-check">Verifica</button>';
     return prompt +
       '<div class="gd-input-row">' +
-        '<input class="gd-input" id="gdAnswer" type="text" autocomplete="off" spellcheck="false" placeholder="Scrivi qui…" value="' + val + '" ' + (state.lastResult ? 'disabled' : '') + '>' +
-        (state.lastResult ? '' : '<button class="gd-btn gd-btn-primary" data-act="gd-check">Verifica</button>') +
+        '<input class="gd-input" id="gdAnswer" type="text" autocomplete="off" spellcheck="false" placeholder="Scrivi qui…" value="' + val + '" ' + (graded ? 'disabled' : '') + '>' +
+        btn +
       '</div>' +
-      afterGraded(d);
+      feedback(d);
   }
 
-  function afterGraded(d) {
+  function feedback(d) {
     if (!state.lastResult) return '';
     var ok = state.lastResult.ok;
-    var fb = ok
+    return ok
       ? '<div class="gd-feedback gd-ok"><i class="fa-solid fa-circle-check"></i> Giusto!</div>'
       : '<div class="gd-feedback gd-no"><i class="fa-solid fa-circle-xmark"></i> La risposta era: <b>' + esc(d.answer) + '</b></div>';
-    var isLast = state.idx >= state.drills.length - 1;
-    return fb + '<div class="gd-nav"><button class="gd-btn gd-btn-primary" data-act="gd-next">' + (isLast ? 'Vedi il riepilogo' : 'Avanti') + '</button></div>';
   }
 
   function renderSummary() {
