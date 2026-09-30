@@ -118,7 +118,11 @@
           livePromise = sb.auth.getSession().then(function (r) {
             var uid = (r && r.data && r.data.session) ? r.data.session.user.id : null;
             if (!uid) return [];
-            return sb.from('grammar_errors').select('error_category,error_type,explanation').eq('user_id', uid).then(function (res) {
+            // select('*') on purpose: error_category/error_type are columns the
+            // live save path never fills, and naming a missing column would fail
+            // the whole query — indistinguishable from "no errors". Reading the
+            // full row and bridging whatever is present is immune to that.
+            return sb.from('grammar_errors').select('*').eq('user_id', uid).then(function (res) {
               return (res.error || !res.data) ? [] : res.data;
             });
           }).catch(function () { return []; });

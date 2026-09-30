@@ -73,6 +73,8 @@
     var hesitationRate = total ? Math.round((hesitations / total) * 100) : 0;
 
     // Silent pause length — average positive gap between consecutive segments.
+    // `null` (not 0) when there are no gaps: a session with one segment, or with
+    // no segment timing, has no measurable pause. A 0.00s would be fabricated.
     var gaps = [];
     for (var i = 1; i < segments.length; i++) {
       var prevEnd = Number(segments[i - 1].end_time);
@@ -83,7 +85,7 @@
     }
     var pauseAvg = gaps.length
       ? Math.round((gaps.reduce(function (a, b) { return a + b; }, 0) / gaps.length) * 100) / 100
-      : 0;
+      : null;
 
     // Code-switching — L1 insertions / total tokens.
     var l1Count = 0;
