@@ -373,17 +373,38 @@
       }
     };
 
-    function _simpleMarkdown(md) {
+    /* One markdown renderer for the dashboard, shared via window.simpleMarkdown.
+     *
+     * Two things it has to do:
+     *  - Handle #### as well as ###. Stored report/definition text uses all of
+     *    them, and anything past ### used to fall through and render its literal
+     *    markers.
+     *  - Offer an `inline` mode. The word drawer's meaning sits in a <p> that CSS
+     *    styles (.dw-meaning p), so it cannot legally contain <h4>/<p> blocks —
+     *    and swapping that <p> for a <div> would silently drop the styling.
+     *    Inline mode emits no block elements at all. */
+    function _simpleMarkdown(md, opts) {
       if (!md) return '';
-      return md
-        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-        .replace(/^### (.+)$/gm, '<h4 style=\"margin:12px 0 4px;color:var(--text)\">$1</h4>')
-        .replace(/^## (.+)$/gm, '<h3 style=\"margin:14px 0 6px;color:var(--text)\">$1</h3>')
-        .replace(/^# (.+)$/gm, '<h3 style=\"margin:14px 0 6px;color:var(--text)\">$1</h3>')
+      var inline = !!(opts && opts.inline);
+      var out = String(md)
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+      if (inline) {
+        return out
+          .replace(/^#{1,6} +(.+)$/gm, '<strong style="display:block;margin:8px 0 2px;color:var(--text)">$1</strong>')
+          .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+          .replace(/\n{2,}/g, '<br><br>')
+          .replace(/\n/g, '<br>');
+      }
+      return out
+        .replace(/^#{4,6} +(.+)$/gm, '<h4 style="margin:12px 0 4px;color:var(--text)">$1</h4>')
+        .replace(/^### +(.+)$/gm, '<h4 style="margin:12px 0 4px;color:var(--text)">$1</h4>')
+        .replace(/^## +(.+)$/gm, '<h3 style="margin:14px 0 6px;color:var(--text)">$1</h3>')
+        .replace(/^# +(.+)$/gm, '<h3 style="margin:14px 0 6px;color:var(--text)">$1</h3>')
         .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-        .replace(/\n\n/g, '</p><p style=\"margin:4px 0\">')
+        .replace(/\n\n/g, '</p><p style="margin:4px 0">')
         .replace(/\n/g, '<br>');
     }
+    window.simpleMarkdown = _simpleMarkdown;
   }
 
   // Run on page load and when Grammar Hub panel opens

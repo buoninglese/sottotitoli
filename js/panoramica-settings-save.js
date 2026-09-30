@@ -65,7 +65,9 @@
     // Toast with clear feedback (Apple-style pill via js/toast.js)
     if (typeof window.showToast === 'function') {
       if (result.ok) {
-        window.showToast('✓ Salvato su Supabase', 'success');
+        // 'Supabase' is an implementation detail: the learner does not know or
+        // care where the data went, and naming our backend in a toast leaks it.
+        window.showToast('✓ Dati salvati', 'success');
       } else if (result.errors && result.errors[0] && result.errors[0].indexOf('locally') !== -1) {
         window.showToast('⚠️ Salvato in locale (accedi per sync)', 'warning');
       } else {

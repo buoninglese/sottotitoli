@@ -5324,8 +5324,20 @@
           metaHtml += '<span class="badge badge-pos">' + posLabel + '</span>';
           if (metaEl) metaEl.innerHTML = metaHtml;
         }
+        // Stored definitions are markdown: the import path writes '### word',
+        // '#### Meaning' and so on. Assigning them with textContent printed the
+        // raw markers at the learner. Render through the shared helper, and strip
+        // the markers even when that helper is unavailable.
+        function wbSetMeaning(text) {
+          var s = (text == null) ? '' : String(text);
+          if (window.simpleMarkdown && /(^|\n)#{1,6} |\*\*/.test(s)) {
+            meaningEl.innerHTML = window.simpleMarkdown(s, { inline: true });
+          } else {
+            meaningEl.textContent = s.replace(/^#{1,6} +/gm, '').replace(/\*\*/g, '');
+          }
+        }
         if (wordText !== '—') {
-          meaningEl.textContent = definition || 'Caricamento…';
+          wbSetMeaning(definition || 'Caricamento…');
           // 1. dictionary-proxy (works for English AND Italian). Requires a
           // signed-in caller now, so the access token is attached.
           try {
@@ -5385,7 +5397,7 @@
             } catch(e) { /* API unavailable */ }
           }
         }
-        meaningEl.textContent = definition || (I18n && I18n.t ? I18n.t('word_definition_unavailable') : 'Nessuna definizione trovata per questa parola.');
+        wbSetMeaning(definition || (I18n && I18n.t ? I18n.t('word_definition_unavailable') : 'Nessuna definizione trovata per questa parola.'));
 
         // ── Bank membership (real: which of the user's banks contain this word) ──
         var lang = window.SOTTOTITOLI_STUDY_LANG || 'en';
