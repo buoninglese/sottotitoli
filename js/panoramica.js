@@ -1653,6 +1653,47 @@
         return !!(p && p.classList.contains('active'));
       }
 
+      /* GSE for the period, computed from transcripts the panel already fetched.
+       *
+       * There is no stored GSE anywhere -- cefr-gse.js is a text analyzer. Two
+       * channels: reading (Flesch) and vocabulary (mean word CEFR).
+       *
+       * The trap: analyze() DEFAULTS the vocabulary channel to GSE_MIN (10) when no
+       * word lookup is passed, so `vocabGSE` comes back as a plausible-looking
+       * number rather than an absence, and the blended `overallGSE` would then mix a
+       * real reading score with that floor. So a channel is reported only if it was
+       * actually computed, and the blend is never shown unless both were. */
+      function wscGseLookup() {
+        var CL = window.CEFR_LEVELS;
+        if (!CL) return null;
+        var num = { A1:1, A2:2, B1:3, B2:4, C1:5, C2:6 };
+        var out = {}, n = 0;
+        Object.keys(CL).forEach(function(w) {
+          var lv = num[String(CL[w] || '').toUpperCase()];
+          if (lv) { out[w] = { level: lv }; n++; }
+        });
+        return n ? out : null;
+      }
+      function wscComputeGse(text) {
+        var GSE = window.SottotitoliGSE;
+        if (!GSE || typeof GSE.analyze !== 'function') return null;
+        var s = String(text || '').replace(/\s+/g, ' ').trim();
+        // Below this length both channels are noise rather than measurement.
+        if (s.length < 120) return null;
+        try {
+          var lookup = wscGseLookup();
+          var r = GSE.analyze(s, lookup);
+          if (!r || !r.wordCount) return null;
+          var hasVocab = !!(lookup && r.coverage > 0);
+          return {
+            reading: r.readingGSE,
+            vocab: hasVocab ? r.vocabGSE : null,
+            band: hasVocab ? r.cefrBand : null,
+            coverage: r.coverage || 0,
+            words: r.wordCount
+          };
+        } catch (e) { return null; }
+      }
       // The composite reliability gate, read from the module so both surfaces
       // share one definition. Volume is measured on the WHOLE period (agg), not
       // on the analysed subset, so capping the window can never fake "thin".
@@ -1694,6 +1735,9 @@
           }));
 
           var history = [];
+          // Transcript text for the GSE pass, built from the SAME segments, so no
+          // second fetch and no disagreement about what was said.
+          var allText = [];
           picked.forEach(function(s, i) {
             var seg = segs[i];
             // No segments means no transcript, so extract() would report 0 words
@@ -1702,6 +1746,7 @@
             if (!seg || !seg.length) return;
             var p = P.extract(s, seg);
             if (!p) return;
+            allText.push(seg.map(function(x) { return x.original_text || ''; }).join(' '));
             history.push({
               at: s.started_at,
               wpm: p.wpm,
@@ -1724,7 +1769,8 @@
           return {
             metrics: metrics,
             analysed: history.length,
-            capped: agg.rows.length > picked.length
+            capped: agg.rows.length > picked.length,
+            gse: wscComputeGse(allText.join('\n'))
           };
         } catch (e) {
           return null;
@@ -1950,8 +1996,24 @@
           'MATTR (div. lessicale)');
         html += wscRow('m_cefr_dist', lv ? lv.dist : null, 'Distribuzione CEFR');
         html += wscRow('m_lex_level', lv ? lv.meanBand : null, 'Livello lessicale');
-        // No stored GSE score exists to read, so it reports no data.
-        html += wscRow('m_gse', null, 'Punteggio GSE');
+        // GSE is computed, not stored (cefr-gse.js analyzes the transcript), and it
+        // is PERIOD-scoped -- unlike the rest of this group, which is all-time. The
+        // row carries its own note so the group's all-time footnote stays true.
+        var gse = (extra && extra.sig && extra.sig.gse) ? extra.sig.gse : null;
+        html += wscRow('m_gse',
+          gse ? (gse.reading + (gse.vocab != null ? ' · ' + gse.vocab : '')) : null,
+          'GSE lettura · vocabolario');
+        if (gse && gse.vocab == null) {
+          html += '<p class="wsc-note" data-i18n="m_gse_partial">' +
+            'Solo l\'indice di lettura: nessuna parola del periodo è nella lista CEFR, quindi il canale vocabolario non è calcolabile.</p>';
+        } else if (gse && gse.coverage < 80) {
+          // A vocab index built on 60% of the words is not the same claim as one
+          // built on 98%, and unresolved words are simply skipped -- neither
+          // counted nor penalised. Silence here would read as a complete number.
+          html += '<p class="wsc-note"><span data-i18n="m_gse_coverage">' +
+            'Il canale vocabolario usa solo le parole presenti nella lista CEFR. Copertura:</span> ' +
+            gse.coverage + '%</p>';
+        }
 
         html += '<p class="wsc-note" data-i18n="m_all_time_note">' +
           'Calcolato su tutte le sessioni, non sul periodo.</p>';

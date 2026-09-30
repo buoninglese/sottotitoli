@@ -195,10 +195,13 @@
     var vocabGseValue = GSE_MIN;
     var cefrDistribution = { A1: 0, A2: 0, B1: 0, B2: 0, C1: 0, C2: 0, unknown: 0 };
     var totalLeveled = 0;
+    var leveledTokens = 0;
+    var toks = [];
     var cefrSum = 0;
 
     if (vocabLookup) {
       var tokens = tokenize(text);
+      toks = tokens;
       var uniqueTokens = [];
       var seen = {};
       for (var i = 0; i < tokens.length; i++) {
@@ -222,6 +225,16 @@
       if (totalLeveled > 0) {
         vocabGseValue = vocabGSE(cefrSum / totalLeveled);
       }
+
+      // Coverage is the share of the TEXT that was recognised, so it has to count
+      // tokens, not unique words. The previous version divided unique hits by the
+      // total word count, which understated it by exactly the repetition factor:
+      // the same 100-word passage repeated four times reported 15% instead of 60%,
+      // because the denominator grew with repetition while the numerator could not.
+      for (var t2 = 0; t2 < tokens.length; t2++) {
+        var e3 = vocabLookup[tokens[t2]];
+        if (e3 && e3.level != null) leveledTokens++;
+      }
     } else {
       // No vocab data: all words are unknown
       cefrDistribution.unknown = wc;
@@ -243,7 +256,7 @@
       cefrColor: band.color,
       cefrClass: band.cls,
       distribution: cefrDistribution,
-      coverage: wc > 0 ? Math.round((totalLeveled / wc) * 100) : 0
+      coverage: toks.length ? Math.round((leveledTokens / toks.length) * 100) : 0
     };
   }
 
