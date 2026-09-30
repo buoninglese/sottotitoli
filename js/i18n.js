@@ -382,7 +382,7 @@
       // languages. They now live here so there is ONE source of truth.
       "dash_wm_words_title": "Parole uniche",
       "dash_wm_words_sub": "Parole uniche vs totali per giorno, più la linea NEON delle parole salvate.",
-      "dash_wm_saved_title": "Parole salvate",
+      "dash_wm_saved_title": "Vocabolario totale",
       "dash_wm_saved_sub": "Parole salvate, praticate e padroneggiate — corona per ogni periodo.",
       "dash_wm_lexdiv_title": "Div. lessicale",
       "dash_wm_lexdiv_sub": "Diversità lessicale media per giorno, con MATTR (versione robusta alla lunghezza del testo). Sotto: media parole/min.",
@@ -1974,7 +1974,7 @@
       // ── Dashboard metrics (js/panoramica.js) ──
       "dash_wm_words_title": "Unique words",
       "dash_wm_words_sub": "Unique vs total words per day, with the NEON line of words you saved.",
-      "dash_wm_saved_title": "Saved words",
+      "dash_wm_saved_title": "Total vocabulary",
       "dash_wm_saved_sub": "Words you saved, practiced and mastered — corona for every period.",
       "dash_wm_lexdiv_title": "Lexical diversity",
       "dash_wm_lexdiv_sub": "Average lexical diversity per day, with MATTR (a length-robust version of it). Below: average words/min.",

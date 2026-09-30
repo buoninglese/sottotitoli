@@ -2479,7 +2479,7 @@
       }
       function wordMeta(m, isEn){
         if (m === 'words') return { title:DT('dash_wm_words_title','Parole uniche'), sub:DT('dash_wm_words_sub','Parole uniche vs totali per giorno, più la linea NEON delle parole salvate.'), big:function(o){return fmtK(o.uniq);}, media:function(o){return fmtK(Math.round(o.uniq/Math.max(1,o.days)));}, mediaLabel:DT('dash_avg_day','media/giorno'), color:'#34d399' };
-        if (m === 'saved') return { title:DT('dash_wm_saved_title','Parole salvate'), sub:DT('dash_wm_saved_sub','Parole salvate, praticate e padroneggiate — corona per ogni periodo.'), big:function(o){return fmtK(o.sv);}, media:function(o){return fmtK(Math.round(o.sv/Math.max(1,o.days)));}, mediaLabel:DT('dash_avg_day','media/giorno'), color:'#fbbf24' };
+        if (m === 'saved') return { title:DT('dash_wm_saved_title','Vocabolario totale'), sub:DT('dash_wm_saved_sub','Parole salvate, praticate e padroneggiate — corona per ogni periodo.'), big:function(o){return fmtK(o.sv)+' · '+fmtK(o.pr)+' · '+fmtK(o.cf);}, bigHtml:function(o){return [[o.sv,'#fbbf24'],[o.pr,'#34d399'],[o.cf,'#8b5cf6']].map(function(p,i){ return (i ? '<span style="color:var(--text-faint);font-weight:600;font-size:20px;margin:0 5px">·</span>' : '') + '<span style="color:'+p[1]+'">'+fmtK(p[0])+'</span>'; }).join('');}, media:function(o){return fmtK(Math.round(o.sv/Math.max(1,o.days)));}, mediaLabel:DT('dash_avg_day','media/giorno'), color:'#fbbf24' };
         return { title:DT('dash_wm_lexdiv_title','Div. lessicale'), sub:DT('dash_wm_lexdiv_sub','Diversità lessicale media per giorno, con MATTR (versione robusta alla lunghezza del testo). Sotto: media parole/min.'), big:function(o){return o.ldN ? (o.ldS/o.ldN).toFixed(2) : '—';}, media:function(o){return o.wpmN ? (''+Math.round(o.wpmS/o.wpmN)) : '—';}, mediaLabel:DT('dash_avg_words_min','media parole/min'), color:'#8b5cf6' };
       }
       // ── Y-AXIS scale control for the chart boxes (gear menu: Auto / Top pulito / Fissa + play replay) ──
@@ -2899,7 +2899,14 @@
           var wm = wordMeta(st.metric, isEn);
           if (titleEl) titleEl.textContent = wm.title;
           if (subEl) subEl.textContent = wm.sub;
-          if (totalEl) totalEl.textContent = wm.big(wo);
+          // A metric may return bigHtml when its headline is more than one number
+          // (this view is three lifecycle counts, not one). Falls back to text, so
+          // every other metric keeps setting plain text.
+          if (totalEl) {
+            var _bigHtml = wm.bigHtml ? wm.bigHtml(wo) : null;
+            if (_bigHtml) totalEl.innerHTML = _bigHtml;
+            else totalEl.textContent = wm.big(wo);
+          }
           if (plEl) plEl.textContent = dashPeriodLabel(st.tl, isEn);
           if (mediaEl) mediaEl.textContent = wm.media(wo);
           if (mlEl) mlEl.textContent = wm.mediaLabel;
