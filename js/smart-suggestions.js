@@ -692,14 +692,23 @@ window.SMART_SUGGESTIONS = (function() {
         var w = words[i];
         var clean = w.word.replace(/[^a-zA-Z0-9 '-]/g, '').trim();
         if (!clean || clean.length < 2) continue;
-        var norm = clean.toLowerCase();
+        /* Use the SAME normalisation as js/learner.js norm() (exported as SottotitoliData.srsKey),
+         * because that is the key writeGrade() looks up. This was clean.toLowerCase(), which
+         * deletes punctuation while the canonical form turns it into a space, so "you're
+         * welcome" produced 'youre welcome' here and 'you re welcome' in the trainer. */
+        var norm = window.SottotitoliData.srsKey(word);
         try {
-          // Upsert into review_words
+          // ONE row per (user_id, lang, normalized) -- the key the database now enforces.
+          // This was .eq('lemma', clean).maybeSingle(): it missed rows stored with punctuation
+          // AND returned an error rather than a row once a duplicate existed, so every sync
+          // inserted another copy -- one account reached 30 rows for a single phrase.
+          // .limit(1) cannot fail that way.
           var rwRes = await sb.from('review_words')
-            .select('id').eq('user_id', uid).eq('lemma', clean).maybeSingle();
+            .select('id').eq('user_id', uid).eq('lang', lang).eq('normalized', norm).limit(1);
           var wordId;
-          if (rwRes.data) {
-            wordId = rwRes.data.id;
+          var rwRow = rwRes.data && rwRes.data[0];
+          if (rwRow) {
+            wordId = rwRow.id;
             await sb.from('review_words').update({
               pos: w.pos || null,
               cefr: w.cefr || null
@@ -717,6 +726,7 @@ window.SMART_SUGGESTIONS = (function() {
               source_type: 'smart',
               review_state: 'new'
             }).select('id').single();
+            if (ins.error) console.warn('review_words sync skipped:', ins.error.message);
             if (ins.data) wordId = ins.data.id;
           }
           // Upsert into review_bank_words

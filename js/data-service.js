@@ -1160,6 +1160,14 @@
     getTrainingCards: getTrainingCards,
     getTrainingCountsByUnit: getTrainingCountsByUnit,
     getTrainingStats: getTrainingStats,
+
+    /* The canonical review_words key. Exported because three writers (panoramica.js x2,
+     * smart-suggestions.js) each rolled their own `clean.toLowerCase()`, which DELETES
+     * punctuation where this turns it into a space -- so "you're welcome" became
+     * 'youre welcome' there and 'you re welcome' in js/learner.js norm(), and the database
+     * saw two words. One function, one key, or the duplicates come back. */
+    srsKey: srsKey,
+
     cacheClear: cacheClear
   };
 

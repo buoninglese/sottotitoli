@@ -2047,14 +2047,19 @@
           last_result: result, last_reviewed_at: nowISO, next_review_at: s.nextAt, is_new: false
         }).eq('id', row.id);
       } else {
-        await sb.from('review_words').insert({
+        /* upsert, not insert: (user_id, lang, normalized) is unique in the database, so a
+         * writer that slipped a row in between our select and this write would make a plain
+         * insert fail with 23505 -- and the catch below only logs, so the grade would vanish
+         * silently. On conflict this applies the grade to the row that won the race, which is
+         * exactly what the update branch above would have done. */
+        await sb.from('review_words').upsert({
           user_id: uid, lemma: lemma, normalized: normalized,
           translation_primary: item.en || '', translation_variants: item.en ? [item.en] : [],
           accepted_answers: [], pos: item.pos || null, cefr: item.cefr || null, lang: lang,
           is_new: false, review_state: s.reviewState, interval_days: s.interval, ease_factor: s.ease,
           reps: s.reps, lapses: s.lapses, mastery_score: s.mastery, last_result: result,
           last_reviewed_at: nowISO, next_review_at: s.nextAt, personal_frequency: 1
-        });
+        }, { onConflict: 'user_id,lang,normalized' });
       }
     } catch (e) { if (w.console) w.console.warn('writeGrade:', e); }
   }

@@ -4886,10 +4886,17 @@
                 var lang = isItalian ? 'it' : (window.SOTTOTITOLI_STUDY_LANG || 'en');
                 var clean = word.replace(/[^a-zA-Z0-9 '\-àèéìòùÀÈÉÌÒÙ]/g, '').trim();
                 if (clean && clean.length >= 2) {
-                  var norm = clean.toLowerCase();
-                  var rwRes = await sb.from('review_words').select('id').eq('user_id', userId).eq('lemma', clean).maybeSingle();
-                  if (rwRes.data) {
-                    await sb.from('review_words').update({ personal_frequency: (rwRes.data.personal_frequency || 0) + 1 }).eq('id', rwRes.data.id);
+                  // Same key the database enforces -- (user_id, lang, normalized) -- built with
+                  // the canonical normaliser. `personal_frequency` was also missing from the
+                  // select while being read below, so the counter was reset to 1 on every add
+                  // instead of incrementing. And .maybeSingle() errored once a duplicate
+                  // existed, which made the caller insert yet another row.
+                  var norm = window.SottotitoliData.srsKey(word);
+                  var rwRes = await sb.from('review_words')
+                    .select('id,personal_frequency').eq('user_id', userId).eq('lang', lang).eq('normalized', norm).limit(1);
+                  var rwRow = rwRes.data && rwRes.data[0];
+                  if (rwRow) {
+                    await sb.from('review_words').update({ personal_frequency: (rwRow.personal_frequency || 0) + 1 }).eq('id', rwRow.id);
                   } else {
                     await sb.from('review_words').insert({
                       user_id: userId, lemma: clean, normalized: norm, lang: lang,
@@ -7129,12 +7136,16 @@
         try {
           var clean = word.replace(/[^a-zA-Z0-9 '-]/g, '').trim();
           if (clean && clean.length >= 2) {
-            var norm = clean.toLowerCase();
-            var rwRes = await sb.from('review_words').select('id,personal_frequency').eq('user_id', userId).eq('lemma', clean).maybeSingle();
-            if (rwRes.data) {
-              var rwUpdate = { personal_frequency: (rwRes.data.personal_frequency || 0) + 1 };
+            // Same key the database enforces, built with the canonical normaliser, and
+            // limit(1) so a pre-existing duplicate cannot make the lookup error out.
+            var norm = window.SottotitoliData.srsKey(word);
+            var rwRes = await sb.from('review_words')
+              .select('id,personal_frequency').eq('user_id', userId).eq('lang', lang).eq('normalized', norm).limit(1);
+            var rwRow = rwRes.data && rwRes.data[0];
+            if (rwRow) {
+              var rwUpdate = { personal_frequency: (rwRow.personal_frequency || 0) + 1 };
               if (pos) rwUpdate.pos = pos;
-              await sb.from('review_words').update(rwUpdate).eq('id', rwRes.data.id);
+              await sb.from('review_words').update(rwUpdate).eq('id', rwRow.id);
             } else {
               await sb.from('review_words').insert({
                 user_id: userId, lemma: clean, normalized: norm, lang: lang,
