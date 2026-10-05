@@ -93,12 +93,30 @@
       // Wait for auth to settle — poll getSession() instead of relying on events
       var meta = await SottotitoliData.getUserMeta();
       if (!meta) {
-        console.warn('No session yet, polling for auth...');
-        // Poll getSession() for up to 5 seconds (Supabase restores from localStorage async)
-        for (var pollTries = 0; pollTries < 25; pollTries++) {
-          await new Promise(function(r){ setTimeout(r, 200); });
-          meta = await SottotitoliData.getUserMeta();
-          if (meta) break;
+        // Only wait if there is actually a session in storage to restore. Supabase keeps
+        // it under 'sb-<project-ref>-auth-token', so an absent key means genuinely logged
+        // out and there is nothing to wait for. The unconditional poll used to burn the
+        // full 25 x 200ms = 5s on EVERY logged-out load before rendering offline mode
+        // (measured 4.7-5.1s to js-ready — right against the 6s safety net, which is why
+        // "Forcing js-ready after timeout" appeared in the console).
+        var storedSession = false;
+        try {
+          for (var sk = 0; sk < localStorage.length; sk++) {
+            if (String(localStorage.key(sk)).indexOf('-auth-token') !== -1) { storedSession = true; break; }
+          }
+        } catch (e) {
+          storedSession = true; // storage unreadable — keep the original safe wait
+        }
+        if (storedSession) {
+          console.warn('No session yet, polling for auth...');
+          // Poll getSession() for up to 5 seconds (Supabase restores from localStorage async)
+          for (var pollTries = 0; pollTries < 25; pollTries++) {
+            await new Promise(function(r){ setTimeout(r, 200); });
+            meta = await SottotitoliData.getUserMeta();
+            if (meta) break;
+          }
+        } else {
+          console.log('No stored session — rendering offline without waiting');
         }
       }
 
