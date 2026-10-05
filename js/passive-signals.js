@@ -152,7 +152,7 @@
     return profile;
   }
 
-  /* Read recent completed sessions, build a per-session time series, and gate on
+  /* Read recent saved sessions, build a per-session time series, and gate on
    * the composite threshold. Non-breaking: any error returns the profile
    * unchanged, and an empty/thin result leaves `passive` absent (never a
    * fabricated metric). */
@@ -169,10 +169,16 @@
       // limit asks the database for the OLDEST `limit` rows, so once a learner
       // passed the limit the fold froze on their first sessions forever: the
       // graph stopped moving and `reliable` could never be re-evaluated.
+      //
+      // No `status` filter: `sessions` has no `status` column (the live table has
+      // `ai_status`, which is the analytics job's state, not "did this session
+      // finish"). A row only exists once the session was saved, so there is no
+      // unfinished state to exclude. Filtering on the non-existent column made
+      // PostgREST return 400 on every load, and the error path returns the profile
+      // unchanged -- so the passive signals silently never loaded.
       var r = await sb.from('sessions')
         .select('id,transcript_text,wpm,duration_seconds,created_at')
         .eq('user_id', uid)
-        .eq('status', 'completed')
         .order('created_at', { ascending: false })
         .limit(limit);
       if (r.error || !r.data || !r.data.length) return profile;
