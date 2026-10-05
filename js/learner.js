@@ -2059,6 +2059,29 @@
     } catch (e) { if (w.console) w.console.warn('writeGrade:', e); }
   }
 
+  /* Record ONE per-answer outcome for a path-mode step (lesson / test / practice / mission).
+   *
+   * Path modes used to track correctness only in aggregate, through awardCorrect(), so the
+   * archive could not say WHICH word was missed -- every path row was logged with
+   * quality/result null. This is called from the mc, match and speak handlers, and it keys
+   * the word with the SAME expression logTraining() looks up (`word || it`); if the two ever
+   * diverge the lookup silently misses and the rows go back to being null without an error.
+   *
+   * Deliberately separate from awardCorrect(): that governs XP and the session score, which
+   * are the learner's record and must not be touched by bookkeeping.
+   *
+   * `listen` steps have no answer to grade (the step shows both languages and only plays the
+   * audio), so they record nothing -- an absent outcome is honest, a guessed 'good' is not. */
+  function recordOutcome(item, q) {
+    if (!session || !item) return;
+    var key = item.word || item.it;
+    if (key) {
+      session.graded = session.graded || {};
+      session.graded[String(key)] = q;
+    }
+    writeGrade(item, q);
+  }
+
   /* Urgency order for review: never-reviewed first, then most overdue, then
    * weakest mastery, then most lapses. A random sample is right for a casual
    * "review something", but when the learner picks a NUMBER on "Due today" they
@@ -2648,8 +2671,9 @@
     /* Feed the quiz back into spaced repetition. This path never did, so a word you got wrong in
      * a quiz — the most common step type — was recorded as a mistake but never queued: it could
      * not come back under "Due now" or "Fragile". q=1 lapses it and makes it due again now,
-     * q=4 grows its interval and mastery. */
-    writeGrade(q, correct ? 4 : 1);
+     * q=4 grows its interval and mastery. recordOutcome() also stores it on the session so
+     * the archive row for this word carries a real outcome instead of null. */
+    recordOutcome(q, correct ? 4 : 1);
     // feedback line
     var fb = document.createElement('div');
     fb.className = 'feedback ' + (correct ? 'correct' : 'incorrect');
@@ -2686,12 +2710,22 @@
         st.selEn.classList.remove('selected'); st.selEn.classList.add('matched');
         st.matched[it] = true;
         awardCorrect();
+        // Matching was the one answer type that never reached spaced repetition at all, so a
+        // word mis-matched here could not come back under "Due now" or "Fragile".
+        recordOutcome({ it: it, en: en }, 4);
         st.selIt = null; st.selEn = null;
         if (Object.keys(st.matched).length === st.pairs.length) toast(t('learner_all_matched'));
       } else {
         var badIt = st.selIt, badEn = st.selEn;
         badIt.classList.remove('selected'); badEn.classList.remove('selected');
         badIt.classList.add('incorrect'); badEn.classList.add('incorrect');
+        /* A wrong tap is recorded against the Italian item the learner was placing -- the one
+         * word the error can be attributed to. The intended partner is NOT knowable (they may
+         * have misread the English side), so nothing is recorded for it rather than blaming an
+         * innocent word. q=1 matches how a wrong quiz answer is graded, so a mis-tap costs the
+         * same as a wrong answer instead of silently costing nothing. */
+        var badPair = (st.pairs || []).filter(function (p) { return p.it === badIt.textContent; })[0];
+        if (badPair) recordOutcome({ it: badPair.it, en: badPair.en }, 1);
         st.selIt = null; st.selEn = null;
         setTimeout(function () { badIt.classList.remove('incorrect'); badEn.classList.remove('incorrect'); }, 420);
       }
@@ -2776,7 +2810,7 @@
     else { recordMistake(expected, session.lang); }
     /* The same gap as the quiz: a word the learner could not say was never queued for review.
      * step.item is the real course/review item, so it carries the lemma writeGrade needs. */
-    writeGrade(step.item, correct ? 4 : 1);
+    recordOutcome(step.item, correct ? 4 : 1);
     setTimeout(nextStep, correct ? 900 : 1600);
   }
 
@@ -2857,14 +2891,19 @@
    *
    * Per-card detail comes from two different places depending on the mode.
    * bank/review hold `session.cards` and, in `session.graded`, a word -> SM-2
-   * quality map, so their rows carry a real quality and result. Path modes
-   * (lesson/test/mission) hold their words in `session.steps` and track
-   * correctness only in aggregate, so those rows are logged with quality and
-   * result null. Only the step shapes that carry a single word can be read with
-   * certainty (listen/speak `item`, match `pairs`); a lesson also has 'mc' and
-   * 'convo' steps whose words are not in that form, and those contribute no rows
-   * rather than a guess. Real per-word outcomes for path modes need a per-answer
-   * hook across the mc/match/speak/listen handlers -- that is a follow-on. */
+   * quality map, so their rows carry a real quality and result.
+   *
+   * Path modes (lesson/test/mission) hold their words in `session.steps`, and `session.graded`
+   * is now filled for them too: recordOutcome() is called from the mc, match and speak handlers,
+   * so a word that was actually ANSWERED carries a real quality and result. A word that was only
+   * shown and never answered keeps null -- absence of evidence, not a pass. `listen` steps are
+   * never graded on purpose (they show both languages and just play the audio), and 'convo'
+   * words are not in single-word form, so neither contributes an outcome.
+   *
+   * Rows come from the step shapes carrying a single word: `item`, `pairs`, and now `questions`
+   * (mcQuestion puts `word`/`en`/`pos`/`cefr` on each question for exactly this lookup). They are
+   * deduplicated by word, because a lesson plays a word in a `listen` step and then asks the SAME
+   * word in `mc`, and two rows for one word would double-count it in the archive. */
   function logTraining(mode, unit, lesson, pct, correct, total, totalXp) {
     if (!session || session.logged) return;
     session.logged = true;
@@ -2888,14 +2927,38 @@
           });
         });
       } else {
+        /* One row per word, keyed exactly as recordOutcome() keys the graded map. First
+         * appearance wins; a later step that was actually answered can still supply the
+         * outcome, so a word heard in `listen` and answered in `mc` ends up as ONE row
+         * carrying the real result. */
+        var seen = {};
         (session.steps || []).forEach(function (st) {
           if (!st) return;
           var push = function (w, en, pos, cefr) {
             if (!w) return;
-            rows.push({ word: String(w), translation: en || null, pos: pos || null, cefr: cefr || null, quality: null, result: null });
+            var key = String(w);
+            if (Object.prototype.hasOwnProperty.call(seen, key)) {
+              var prev = seen[key];
+              if (prev.quality === null && typeof graded[key] === 'number') {
+                prev.quality = graded[key];
+                prev.result = byQuality[graded[key]] || null;
+              }
+              return;
+            }
+            var q = graded[key];
+            seen[key] = {
+              word: key, translation: en || null, pos: pos || null, cefr: cefr || null,
+              quality: (typeof q === 'number' ? q : null),
+              result: (typeof q === 'number' && byQuality[q]) || null
+            };
           };
           if (st.item) push(st.item.word || st.item.it, st.item.en || st.item.translation, st.item.pos, st.item.cefr);
+          if (st.questions) st.questions.forEach(function (qq) { push(qq.word || qq.answer, qq.en, qq.pos, qq.cefr); });
           if (st.pairs) st.pairs.forEach(function (p) { push(p.word || p.it, p.en || p.translation, p.pos, p.cefr); });
+        });
+        Object.keys(seen).forEach(function (k) {
+          if (seen[k].result) counts[seen[k].result]++;
+          rows.push(seen[k]);
         });
       }
       var rec = {
