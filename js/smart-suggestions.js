@@ -714,7 +714,11 @@ window.SMART_SUGGESTIONS = (function() {
               cefr: w.cefr || null
             }).eq('id', wordId);
           } else {
-            var ins = await sb.from('review_words').insert({
+            /* upsert with ignoreDuplicates, NOT insert: this runs fire-and-forget and two
+             * syncs can overlap, so a plain insert loses the race and 409s against the unique
+             * constraint -- the word silently failed to sync that run and the console filled
+             * with conflicts. DO NOTHING turns a lost race into a no-op instead. */
+            var ins = await sb.from('review_words').upsert({
               user_id: uid,
               lemma: clean,
               normalized: norm,
@@ -725,9 +729,16 @@ window.SMART_SUGGESTIONS = (function() {
               first_seen_at: new Date().toISOString(),
               source_type: 'smart',
               review_state: 'new'
-            }).select('id').single();
+            }, { onConflict: 'user_id,lang,normalized', ignoreDuplicates: true }).select('id').maybeSingle();
             if (ins.error) console.warn('review_words sync skipped:', ins.error.message);
-            if (ins.data) wordId = ins.data.id;
+            wordId = ins.data ? ins.data.id : null;
+            if (!wordId) {
+              /* Nothing was inserted because the row already existed -- a racing sync won.
+               * Fetch it so the bank link below still lands on the right row. */
+              var again = await sb.from('review_words')
+                .select('id').eq('user_id', uid).eq('lang', lang).eq('normalized', norm).limit(1);
+              if (again.data && again.data[0]) wordId = again.data[0].id;
+            }
           }
           // Upsert into review_bank_words
           if (wordId) {
