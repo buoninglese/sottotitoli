@@ -291,6 +291,8 @@
     if (!hash) return;
     var panelMap = {
       '#learner': 'learner',
+      '#wrapped': 'wrapped',
+      '#grammatica': 'grammatica',
       '#report-ai': 'report-ai',
       '#impostazioni': 'impostazioni',
       '#aiuto': 'aiuto',
