@@ -2153,6 +2153,15 @@
             try { I18n.apply(feedEl); } catch (e) {}
           }
         }
+        // The habits chart follows this panel's own period rather than carrying a
+        // second, competing picker -- Wrapped drives one period for everything it
+        // shows. 'year' has no equivalent chart window, so it maps to 'all'.
+        // Guarded on typeof because the chart state is declared further down the
+        // IIFE, so an early call here would otherwise hit an unassigned var.
+        if (typeof CHART_STATE !== 'undefined' && CHART_STATE.wr && document.getElementById('wrChart')) {
+          wrChart.tl = wscPeriod === 'month' ? 'month' : (wscPeriod === 'year' ? 'all' : 'week');
+          renderChartBox('wr');
+        }
       }
       window.renderWrappedPanel = renderWrappedPanel;
 
@@ -2269,7 +2278,11 @@
       // reuses the dashboard's session aggregation and its corona renderer rather than
       // duplicating them, so the numbers cannot drift apart between the two places.
       var trChart = { metric:'totalSessions', tl:'week' };
-      var CHART_STATE = { dash: dashChart, wb: wbChart, tr: trChart };
+      // Activity + time-of-day, shown in the Wrapped panel's "Your habits" section.
+      // Its tl is driven by the panel's own period (see renderWrappedPanel) so the
+      // section cannot disagree with the totals above it.
+      var wrChart = { metric:'totalMinutes', tl:'week' };
+      var CHART_STATE = { dash: dashChart, wb: wbChart, tr: trChart, wr: wrChart };
       var dashChartData = null;
       function isoDaysAgo(n){ var d = new Date(Date.now() - n*86400000); return d.toISOString().substring(0,10); }
       /* Chart element ids, per scope. This was a two-case ternary ('wb' else dash),
@@ -2279,7 +2292,8 @@
       var CHART_IDS = {
         dash: { chart:'dailyChart', title:'dailyChartTitle', sub:'dailyChartSubtitle', total:'dailyChartTotal', pl:'dailyChartPeriodLabel', media:'dailyChartMedia', ml:'dailyChartMediaLabel', legend:'dailyChartLegend' },
         wb:   { chart:'wbChart', title:'wbChartTitle', sub:'wbChartSubtitle', total:'wbChartTotal', pl:'wbChartPeriodLabel', media:'wbChartMedia', ml:'wbChartMediaLabel' },
-        tr:   { chart:'trChart', title:'trChartTitle', sub:'trChartSubtitle', total:'trChartTotal', pl:'trChartPeriodLabel', media:'trChartMedia', ml:'trChartMediaLabel', legend:'trChartLegend' }
+        tr:   { chart:'trChart', title:'trChartTitle', sub:'trChartSubtitle', total:'trChartTotal', pl:'trChartPeriodLabel', media:'trChartMedia', ml:'trChartMediaLabel', legend:'trChartLegend' },
+        wr:   { chart:'wrChart', title:'wrChartTitle', sub:'wrChartSubtitle', total:'wrChartTotal', pl:'wrChartPeriodLabel', media:'wrChartMedia', ml:'wrChartMediaLabel', legend:'wrChartLegend' }
       };
       function chartIds(scope){ return CHART_IDS[scope] || CHART_IDS.dash; }
       async function loadDashChartData(){
@@ -3030,6 +3044,17 @@
       // The Stats subtab renders nothing until it is opened, so the first paint has to
       // be triggered from the tab itself. Everything after that goes through dashSetTl.
       window.trStatsOpen = function(){ return renderChartBox('tr'); };
+      // Toggles the Wrapped habits section between Activity (minutes) and the
+      // time-of-day split. Only two of the three dashboard metrics are offered here:
+      // Total sessions belongs in the Transcripts panel.
+      window.wrSelect = function(m){
+        if (!CHART_STATE.wr) return;
+        CHART_STATE.wr.metric = (m === 'timebands') ? 'timebands' : 'totalMinutes';
+        document.querySelectorAll('#wrMetricToggle [data-wr-metric]').forEach(function(b){
+          b.classList.toggle('active', b.getAttribute('data-wr-metric') === CHART_STATE.wr.metric);
+        });
+        return renderChartBox('wr');
+      };
       window.wbSetLang = wbSetLang;
       window.renderChartBox = renderChartBox;
       window.loadDashChartData = loadDashChartData;
