@@ -2265,11 +2265,23 @@
       // ═══ CHART BOX — corona (radial) + Periodo sidebar (dashboard + word banks) ═══
       var dashChart = { metric:'totalMinutes', tl:'week' };
       var wbChart = { metric:'words', tl:'week', lang:'all' };
+      // Total sessions, shown in the Transcripts panel's Stats subtab. It deliberately
+      // reuses the dashboard's session aggregation and its corona renderer rather than
+      // duplicating them, so the numbers cannot drift apart between the two places.
+      var trChart = { metric:'totalSessions', tl:'week' };
+      var CHART_STATE = { dash: dashChart, wb: wbChart, tr: trChart };
       var dashChartData = null;
       function isoDaysAgo(n){ var d = new Date(Date.now() - n*86400000); return d.toISOString().substring(0,10); }
-      function chartIds(scope){ return scope === 'wb'
-        ? { chart:'wbChart', title:'wbChartTitle', sub:'wbChartSubtitle', total:'wbChartTotal', pl:'wbChartPeriodLabel', media:'wbChartMedia', ml:'wbChartMediaLabel' }
-        : { chart:'dailyChart', title:'dailyChartTitle', sub:'dailyChartSubtitle', total:'dailyChartTotal', pl:'dailyChartPeriodLabel', media:'dailyChartMedia', ml:'dailyChartMediaLabel', legend:'dailyChartLegend' }; }
+      /* Chart element ids, per scope. This was a two-case ternary ('wb' else dash),
+       * so a third scope silently resolved to the dashboard's ids and would have
+       * rendered into the wrong panel. A map makes adding a destination a data change
+       * instead of a new branch, and the dashboard is no longer the silent fallback. */
+      var CHART_IDS = {
+        dash: { chart:'dailyChart', title:'dailyChartTitle', sub:'dailyChartSubtitle', total:'dailyChartTotal', pl:'dailyChartPeriodLabel', media:'dailyChartMedia', ml:'dailyChartMediaLabel', legend:'dailyChartLegend' },
+        wb:   { chart:'wbChart', title:'wbChartTitle', sub:'wbChartSubtitle', total:'wbChartTotal', pl:'wbChartPeriodLabel', media:'wbChartMedia', ml:'wbChartMediaLabel' },
+        tr:   { chart:'trChart', title:'trChartTitle', sub:'trChartSubtitle', total:'trChartTotal', pl:'trChartPeriodLabel', media:'trChartMedia', ml:'trChartMediaLabel', legend:'trChartLegend' }
+      };
+      function chartIds(scope){ return CHART_IDS[scope] || CHART_IDS.dash; }
       async function loadDashChartData(){
         if (dashChartData) return dashChartData;
         var out = { sessions:[], siteMap:{} };
@@ -2893,7 +2905,7 @@
         return '<svg viewBox="0 0 '+W+' '+H+'" style="width:100%;max-width:680px;height:auto">'+g+'</svg>';
       }
       async function renderChartBox(scope){
-        var st = scope === 'wb' ? wbChart : dashChart;
+        var st = CHART_STATE[scope] || dashChart;
         var ids = chartIds(scope);
         var chartEl = document.getElementById(ids.chart), totalEl = document.getElementById(ids.total),
             titleEl = document.getElementById(ids.title), subEl = document.getElementById(ids.sub),
@@ -2904,7 +2916,12 @@
           // One fetch feeds every filter, so pick the selected language's dataset
           // rather than re-querying on switch.
           await loadWordChartData();
-          var wdata = wbDataFor(wbChart.lang) || wbWordData;
+          // wbDataFor returns null before a successful load, and wbWordData is null
+          // until then too, so this used to hand wordAggregate a null dataset -- three
+          // unhandled rejections at startup and no chart at all, which is exactly what a
+          // brand-new account with no saved words would see. wbEmptyBucket exists for
+          // this, so the empty state now renders as an empty chart instead of throwing.
+          var wdata = wbDataFor(wbChart.lang) || wbWordData || wbEmptyBucket();
           var wdays = wordDays(st.tl, wdata);
           var wo = wordAggregate(wdays, wdata);
           var wm = wordMeta(st.metric, isEn);
@@ -2984,13 +3001,13 @@
         if (mlEl) mlEl.textContent = DT('dash_avg_day', 'media/giorno');
         chartEl.innerHTML = '<div class="cc-wrap" style="width:100%;display:flex;justify-content:center">' + chartSvg + '</div>';
         bindDashChartTip(chartEl);
-        CHARTCTL.afterRender('dash');
+        CHARTCTL.afterRender(scope);
         if (ids.legend) { var legendEl = document.getElementById(ids.legend); if (legendEl) legendEl.innerHTML = dashLegendHtml(legendItems, isEn); }
       }
       function dashSetTl(btn, scope){
-        var st = scope === 'wb' ? wbChart : dashChart;
+        var st = CHART_STATE[scope] || dashChart;
         st.tl = btn.getAttribute('data-tl');
-        btn.parentNode.querySelectorAll('.ds-btn, .wb-chart-btn').forEach(function(b){ b.classList.toggle('active', b === btn); });
+        btn.parentNode.querySelectorAll('.ds-btn, .wb-chart-btn, .trs-btn').forEach(function(b){ b.classList.toggle('active', b === btn); });
         renderChartBox(scope);
         if (scope === 'wb') updateWbVsBoxes();
       }
@@ -3010,6 +3027,9 @@
       }
       window.dashSetTl = dashSetTl;
       window.wbSelectBox = wbSelectBox;
+      // The Stats subtab renders nothing until it is opened, so the first paint has to
+      // be triggered from the tab itself. Everything after that goes through dashSetTl.
+      window.trStatsOpen = function(){ return renderChartBox('tr'); };
       window.wbSetLang = wbSetLang;
       window.renderChartBox = renderChartBox;
       window.loadDashChartData = loadDashChartData;
