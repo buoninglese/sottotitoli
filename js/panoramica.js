@@ -4140,7 +4140,13 @@
               '<h3 class="wbf-front-title">'+wbEsc(bk.title)+'</h3>'+
               (bk.subtitle ? '<p class="wbf-front-sub">'+wbEsc(bk.subtitle)+'</p>' : '')+
               '<div class="wbf-front-foot">'+
-                '<span class="wbf-count"><b>'+bk.count+'</b> '+L.words+'</span>'+
+                '<span class="wbf-count">'+(bk.count == null
+                  /* null means UNKNOWN, not zero: the count query timed out or Supabase was
+                   * not ready. Printing 0 there fabricates a number that looks exactly like
+                   * real data -- the same class of lie as a swallowed error. The em dash is
+                   * what the rest of the app shows for a missing value (see fmtDate). */
+                  ? '<b>\u2014</b>'
+                  : '<b>'+bk.count+'</b> '+L.words)+'</span>'+
                 (bk.trained > 0 ? '<span class="wbf-trained" title="'+DT('wb_folders_trained','allenamenti')+'" data-i18n-title="wb_folders_trained">×'+bk.trained+'</span>' : '')+
                 '<span class="wbf-front-actions">'+
                   '<button class="wbf-allena" data-bank="'+wbEsc(bk.id)+'" data-act="allena" title="'+L.allena+'"><i class="fa-solid fa-bolt"></i> '+L.allena+'</button>'+
@@ -4232,8 +4238,11 @@
           // ── Pinned + banks — all independent, fetch in parallel ──
           var statsP = wbTimeout(SottotitoliData.getWordbankStats(lang), 2000, null);
           var banksP = wbTimeout(SottotitoliData.getWordbanks(lang), 2500, []);
-          var dueCP = sb ? wbTimeout(sb.from('review_words').select('*', { count:'exact', head:true }).or('next_review_at.lte.'+nowISO+',is_new.eq.true'), 2000, { count: 0 }) : Promise.resolve({ count: 0 });
-          var fragCP = sb ? wbTimeout(sb.from('review_words').select('*', { count:'exact', head:true }).or('mastery_score.lt.40,lapses.gte.2'), 2000, { count: 0 }) : Promise.resolve({ count: 0 });
+          /* The sentinel is { count: null }, NOT { count: 0 }: a zero sentinel is accepted by
+           * the `!= null` guards below and renders as a real "0 words", so a slow or failed
+           * count became indistinguishable from an empty queue. */
+          var dueCP = sb ? wbTimeout(sb.from('review_words').select('*', { count:'exact', head:true }).or('next_review_at.lte.'+nowISO+',is_new.eq.true'), 2000, { count: null }) : Promise.resolve({ count: null });
+          var fragCP = sb ? wbTimeout(sb.from('review_words').select('*', { count:'exact', head:true }).or('mastery_score.lt.40,lapses.gte.2'), 2000, { count: null }) : Promise.resolve({ count: null });
           var sessP = sb ? wbTimeout(sb.auth.getSession(), 2000, { data: null }) : Promise.resolve({ data: null });
           // How many times each bank has been trained, for the "xN" chip. This reads
           // the training log, so it must not be able to take the folders down with it:
@@ -4246,10 +4255,13 @@
           var all = await Promise.all([statsP, banksP, dueCP, fragCP, sessP, trainedP]);
           var stats = all[0], banks = all[1], dueC = all[2], fragC = all[3], sess = all[4], trainedCounts = all[5] || {};
 
-          var pinCounts = { review_due_now: 0, saved_from_sessions: 0, fragile_words: 0, vocab_builder_en: 0 };
+          // null = not known yet; a real 0 is only ever written from a resolved response
+          var pinCounts = { review_due_now: null, saved_from_sessions: null, fragile_words: null, vocab_builder_en: 0 };
           if (dueC && dueC.count != null) pinCounts.review_due_now = dueC.count;
           if (fragC && fragC.count != null) pinCounts.fragile_words = fragC.count;
-          if (stats && stats.totalWords > 0) pinCounts.saved_from_sessions = stats.totalWords;
+          // `!= null` rather than `> 0`: zero is a real answer for an empty account, and
+          // treating it as "unknown" would show a dash where 0 is the truth
+          if (stats && stats.totalWords != null) pinCounts.saved_from_sessions = stats.totalWords;
 
           var uid = sess && sess.data && sess.data.session ? sess.data.session.user.id : null;
           var pinWords = { review_due_now: [], saved_from_sessions: [], fragile_words: [], vocab_builder_en: [] };
@@ -4277,7 +4289,9 @@
           pinWords.review_due_now = (prevAll[0].data || []).map(function(r){ return { word:r.lemma, cefr:r.cefr }; });
           pinWords.fragile_words = (prevAll[1].data || []).map(function(r){ return { word:r.lemma, cefr:r.cefr }; });
           pinWords.saved_from_sessions = prevAll[2] || [];
-          if (sfBank) pinCounts.saved_from_sessions = Math.max(pinCounts.saved_from_sessions, (prevAll[2]||[]).length);
+          // guarded: Math.max(null, n) coerces to a number, which would turn an unknown
+          // count back into a fabricated one
+          if (sfBank && pinCounts.saved_from_sessions != null) pinCounts.saved_from_sessions = Math.max(pinCounts.saved_from_sessions, (prevAll[2]||[]).length);
           pinWords.vocab_builder_en = prevAll[3] || [];
           if (vbBank) pinCounts.vocab_builder_en = (prevAll[3]||[]).length;
 
