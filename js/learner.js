@@ -2027,7 +2027,11 @@
     var uid = await srcUid(); if (!uid) return;
     var lang = session ? session.lang : learnerLang();
     var lemma = item.word || item.it;
-    var normalized = norm(lemma);
+    /* The KEY comes from the shared canonical normaliser, NOT from this file's norm().
+     * norm() also compares spoken answers, so the two must not drift apart: the key treats
+     * an apostrophe as a DELETION (so "I'm fine" and "Im fine" are one key) while norm()
+     * spaces it. Deriving the key here with norm() is what let one word occupy two rows. */
+    var normalized = window.SottotitoliData.srsKey(lemma);
     try {
       var r = await sb.from('review_words')
         .select('id,interval_days,ease_factor,reps,lapses,mastery_score')

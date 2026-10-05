@@ -571,6 +571,12 @@
     return String(s || '').toLowerCase()
       .replace(/[àáâãäå]/g, 'a').replace(/[èéêë]/g, 'e').replace(/[ìíîï]/g, 'i')
       .replace(/[òóôõö]/g, 'o').replace(/[ùúûü]/g, 'u').replace(/ç/g, 'c')
+      /* Apostrophes are DELETED, not turned into a space. Spacing them made "I'm fine" and
+       * "Im fine" two different keys for one word -- and both spellings occur in the course
+       * data, so one lesson could put the same word in the queue twice under two rows. Note
+       * js/learner.js norm() still spaces them: that one grades SPEECH, and changing it would
+       * alter how a spoken answer is compared. Only the key changed. */
+      .replace(/['\u2019\u0060\u00b4]/g, '')
       .replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim();
   }
 
