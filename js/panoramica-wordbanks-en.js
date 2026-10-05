@@ -282,6 +282,11 @@
                   if(!file){appAlert('Seleziona un file per prima cosa.', 'File richiesto', '📎');return;}
                   if(!name){appAlert('Inserisci un nome per la banca.', 'Nome richiesto', '📌');return;}
                   var ext=(file.name||'').split('.').pop().toLowerCase();
+                  /* Legacy .doc is the one Word format neither parser handles, and it
+                   * used to fall through to readAsText -- which does not fail, it
+                   * silently yields binary garbage and imports nonsense. Say so
+                   * instead. (.docx is fine: mammoth handles it below.) */
+                  if(ext==='doc'){appAlert('Il formato .doc (Word precedente al 2007) non è supportato. Aprilo in Word e salvalo come .docx, poi riprova.', 'Formato non supportato', '⚠️');return;}
                   if(ext==='pdf'){
                     if(typeof pdfjsLib==='undefined'){appAlert('Parser PDF non caricato. Aggiorna la pagina.', 'PDF non disponibile', '⚠️');return;}
                     var reader=new FileReader();
