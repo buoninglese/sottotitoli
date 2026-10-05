@@ -2077,7 +2077,31 @@
     var key = item.word || item.it;
     if (key) {
       session.graded = session.graded || {};
-      session.graded[String(key)] = q;
+      var k = String(key);
+      /* ONE spaced-repetition review per word per session.
+       *
+       * A path session asks the same word in several games (match, mc, speak), so without
+       * this guard writeGrade() ran once per ANSWER -- up to three times for a single
+       * learning moment, each call advancing interval/ease/mastery, so one lesson could push
+       * a word's schedule far past a single review.
+       *
+       * The card stack is deliberately NOT frozen this way: there, being shown again after
+       * 'again' IS the SRS loop, it calls writeGrade() directly, and every pass is a real
+       * review. The guard therefore lives here, on the path-mode entry point only.
+       *
+       * Policy: FIRST answer wins. It is the least contaminated by the rest of the session (by
+       * a word's third appearance the learner has usually just been shown the answer), and it
+       * preserves the checkable property that writeGrade fires exactly once per unique word.
+       * A later answer cannot overwrite it, so the archived outcome and the written schedule
+       * always agree.
+       *
+       * Known trade-off: this is shuffle-dependent. Steps are built with sample()/shuffle(), so
+       * which game asks a word first varies run to run. The order-invariant alternative is
+       * worst-wins (advance only if the word was never wrong), but that cannot be done with a
+       * single write -- it needs the outcome deferred to the end of the session, and an
+       * abandoned session would then write nothing at all. Product decision, not a bug fix. */
+      if (Object.prototype.hasOwnProperty.call(session.graded, k)) return;
+      session.graded[k] = q;
     }
     writeGrade(item, q);
   }
@@ -2686,6 +2710,15 @@
     }, correct ? 750 : 1300);
   }
 
+  /* Product decision, 2026-10-05: does a wrong MATCH tap count as a failed review?
+   *   true  = lapse the word (q=1), consistent with a wrong quiz answer.
+   *   false = positive-only: a correct match records a review, a mis-tap records nothing.
+   * Default false because a match is a two-tap gesture on small mobile targets where the error
+   * is dominated by motor slip, and the attribution is ambiguous by construction (the intended
+   * partner is not knowable, so the Italian item is blamed). mc already carries the failure
+   * signal for the same words in the same session, so a lapse here mostly double-counts one
+   * confusion. Flip this one token to change the behaviour. */
+  var MATCH_MISTAP_LAPSES = false;
   function matchTap(btn) {
     if (!session) return;
     var st = session.matchState;
@@ -2719,13 +2752,12 @@
         var badIt = st.selIt, badEn = st.selEn;
         badIt.classList.remove('selected'); badEn.classList.remove('selected');
         badIt.classList.add('incorrect'); badEn.classList.add('incorrect');
-        /* A wrong tap is recorded against the Italian item the learner was placing -- the one
-         * word the error can be attributed to. The intended partner is NOT knowable (they may
-         * have misread the English side), so nothing is recorded for it rather than blaming an
-         * innocent word. q=1 matches how a wrong quiz answer is graded, so a mis-tap costs the
-         * same as a wrong answer instead of silently costing nothing. */
+        /* A wrong tap can be attributed only to the Italian item the learner was placing: the
+         * intended partner is not knowable (they may have misread the English side), so nothing
+         * is recorded for it rather than blaming an innocent word. Whether that attribution
+         * counts as a failed review at all is the product call at MATCH_MISTAP_LAPSES. */
         var badPair = (st.pairs || []).filter(function (p) { return p.it === badIt.textContent; })[0];
-        if (badPair) recordOutcome({ it: badPair.it, en: badPair.en }, 1);
+        if (badPair && MATCH_MISTAP_LAPSES) recordOutcome({ it: badPair.it, en: badPair.en }, 1);
         st.selIt = null; st.selEn = null;
         setTimeout(function () { badIt.classList.remove('incorrect'); badEn.classList.remove('incorrect'); }, 420);
       }
