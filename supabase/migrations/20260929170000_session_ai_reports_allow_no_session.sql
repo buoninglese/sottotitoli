@@ -1,0 +1,52 @@
+-- ════════════════════════════════════════════════════════════════════════════
+--  A synthesis report has NO session — session_id must be nullable
+-- ════════════════════════════════════════════════════════════════════════════
+--  SYMPTOM (reproduced on live 2026-09-29, first real synthesis run ever)
+--  A queued module_key='15' request with basis='grammatica' was picked up by the
+--  every-minute cron, the worker called OpenAI, and then the INSERT failed:
+--
+--    error_message: Failed to insert session_ai_reports: null value in column
+--                   "session_id" of relation "session_ai_reports" violates
+--                   not-null constraint
+--
+--  Request status -> 'failed'; no report was ever stored. Every synthesis report
+--  with an empty session_ids fails this way — which is the WHOLE POINT of the
+--  grammatica basis (a learner who has done the intake but never recorded).
+--
+--  WHY NOT NULL IS WRONG HERE
+--  session_ai_reports.session_id is uuid NOT NULL with an FK to sessions(id).
+--  That is correct for the transcript-driven modules: they analyse one session.
+--  A synthesis report is profile-driven and has no single session. The table
+--  already carries the plural, NULLABLE column for exactly this shape:
+--
+--      session_ids | ARRAY | nullable=YES
+--
+--  so "which sessions was this built from" already has a home. The singular
+--  session_id is the legacy requirement.
+--
+--  The frontend ALREADY tolerates its absence, which is good evidence this is the
+--  intended design rather than a workaround:
+--      js/panoramica-reportai-myreports.js:136  .select('id,module_id,session_id')
+--      js/panoramica-reportai-myreports.js:142  session_ids: rep.data.session_id
+--                                                 ? [rep.data.session_id] : []
+--
+--  ⚠️ THE THIRD TIME THIS PATTERN HAS BITTEN
+--  A NOT NULL constraint that exists only in the live database — with no DDL in
+--  any repo migration — has now blocked a legitimate flow three times:
+--    1. ai_report_requests.family_key  -> blocked EVERY report (fixed in 20260927130000)
+--    2. ai_report_requests_scope_type_check (live-only value list, documented)
+--    3. session_ai_reports.session_id  -> blocked every session-less synthesis (this file)
+--  There is no `create table session_ai_reports` anywhere in supabase/migrations,
+--  so the constraint is invisible from the repository. See the recommendation in
+--  the commit message: dump the live schema into a tracked baseline so the next
+--  one is visible before it breaks a paying flow.
+--
+--  FK IS KEPT. A nullable FK is satisfied by NULL, so
+--  `session_id REFERENCES sessions(id) ON DELETE CASCADE` stays exactly as-is —
+--  real session reports still cascade when their session is deleted.
+-- ════════════════════════════════════════════════════════════════════════════
+
+alter table public.session_ai_reports
+  alter column session_id drop not null;
+comment on column public.session_ai_reports.session_id is
+  'The single session this report analysed. NULL for profile-driven (synthesis) reports, which have no session; those use the plural session_ids instead.';
