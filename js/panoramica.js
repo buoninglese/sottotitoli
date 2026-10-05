@@ -4123,6 +4123,7 @@
               (bk.subtitle ? '<p class="wbf-front-sub">'+wbEsc(bk.subtitle)+'</p>' : '')+
               '<div class="wbf-front-foot">'+
                 '<span class="wbf-count"><b>'+bk.count+'</b> '+L.words+'</span>'+
+                (bk.trained > 0 ? '<span class="wbf-trained" title="'+DT('wb_folders_trained','allenamenti')+'" data-i18n-title="wb_folders_trained">×'+bk.trained+'</span>' : '')+
                 '<span class="wbf-front-actions">'+
                   '<button class="wbf-allena" data-bank="'+wbEsc(bk.id)+'" data-act="allena" title="'+L.allena+'"><i class="fa-solid fa-bolt"></i> '+L.allena+'</button>'+
                   '<button class="wbf-menu" data-menu="'+wbEsc(bk.id)+'" title="'+L.options+'"><i class="fa-solid fa-ellipsis-vertical"></i></button>'+
@@ -4216,9 +4217,16 @@
           var dueCP = sb ? wbTimeout(sb.from('review_words').select('*', { count:'exact', head:true }).or('next_review_at.lte.'+nowISO+',is_new.eq.true'), 2000, { count: 0 }) : Promise.resolve({ count: 0 });
           var fragCP = sb ? wbTimeout(sb.from('review_words').select('*', { count:'exact', head:true }).or('mastery_score.lt.40,lapses.gte.2'), 2000, { count: 0 }) : Promise.resolve({ count: 0 });
           var sessP = sb ? wbTimeout(sb.auth.getSession(), 2000, { data: null }) : Promise.resolve({ data: null });
+          // How many times each bank has been trained, for the "xN" chip. This reads
+          // the training log, so it must not be able to take the folders down with it:
+          // an empty object rather than a rejection, and a guard in case data-service
+          // is still the cached pre-D version.
+          var trainedP = (SottotitoliData && SottotitoliData.getTrainingCountsByUnit)
+            ? wbTimeout(SottotitoliData.getTrainingCountsByUnit(lang), 2500, {})
+            : Promise.resolve({});
 
-          var all = await Promise.all([statsP, banksP, dueCP, fragCP, sessP]);
-          var stats = all[0], banks = all[1], dueC = all[2], fragC = all[3], sess = all[4];
+          var all = await Promise.all([statsP, banksP, dueCP, fragCP, sessP, trainedP]);
+          var stats = all[0], banks = all[1], dueC = all[2], fragC = all[3], sess = all[4], trainedCounts = all[5] || {};
 
           var pinCounts = { review_due_now: 0, saved_from_sessions: 0, fragile_words: 0, vocab_builder_en: 0 };
           if (dueC && dueC.count != null) pinCounts.review_due_now = dueC.count;
@@ -4261,11 +4269,14 @@
             { id:'vocab_builder_en', title:collectionName('vocab_builder_en'), subtitle:collectionSub('vocab_builder_en'), count:pinCounts.vocab_builder_en, words:pinWords.vocab_builder_en, type:'pinned' },
             { id:'fragile_words', title:collectionName('fragile_words'), subtitle:collectionSub('fragile_words'), count:pinCounts.fragile_words, words:pinWords.fragile_words, type:'pinned' }
           ];
+          // Trained counts attach to whatever unit_id the log recorded, so a pinned
+          // collection simply shows nothing when no session ever named it.
+          folders.pinned.forEach(function(f){ f.trained = trainedCounts[f.id] || 0; });
 
           // ── Custom ──
           for (var i=0;i<customBanks.length;i++) {
             var cw = prevAll[4+i] || [];
-            folders.custom.push({ id:customBanks[i].id, title:customBanks[i].name || 'Banca', subtitle:customBanks[i].description || '', count:cw.length, words:cw, type:'custom' });
+            folders.custom.push({ id:customBanks[i].id, title:customBanks[i].name || 'Banca', subtitle:customBanks[i].description || '', count:cw.length, words:cw, type:'custom', trained: trainedCounts[customBanks[i].id] || 0 });
           }
         } catch(err) { console.warn('Folders (pinned/custom) error:', err); }
 

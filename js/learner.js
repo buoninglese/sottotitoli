@@ -816,6 +816,7 @@
       '<div class="learner-wrap">' +
         '<div role="tabpanel" class="subtab-pane active" id="sub-learner-overview"></div>' +
         '<div role="tabpanel" class="subtab-pane" id="sub-learner-path"></div>' +
+        '<div role="tabpanel" class="subtab-pane" id="sub-learner-archive"></div>' +
       '</div>';
     // i18n for injected chrome
     i18nScope(rootEl);
@@ -841,6 +842,7 @@
   // Overview hosts the progress dashboard.
   function paneIdFor(name) {
     if (name === 'learner-overview') return 'sub-learner-overview';
+    if (name === 'learner-archive') return 'sub-learner-archive';
     return 'sub-learner-path'; // learner-en / learner-it / learner-path (legacy)
   }
 
@@ -854,6 +856,175 @@
     else if (name === 'learner-path') renderPath();
     else if (name === 'learner-practice') renderPractice();
     else if (name === 'learner-progress') renderProgress();
+    else if (name === 'learner-archive') renderArchive();
+  }
+
+  /* ── ARCHIVE (D) — every completed training, newest first ──
+   * Reads only from the training log. The KPI tiles are derived from the same rows
+   * the table lists, so a tile cannot contradict the table under it. */
+  var archiveBound = false;
+
+  function larDayKey(d) {
+    var m = d.getMonth() + 1, day = d.getDate();
+    return d.getFullYear() + '-' + (m < 10 ? '0' : '') + m + '-' + (day < 10 ? '0' : '') + day;
+  }
+
+  function larCss() {
+    return '.lar-head h3{font-size:clamp(20px,2.6vw,26px);font-weight:800;letter-spacing:-.02em;color:var(--text);margin:0 0 6px;font-family:var(--font-ui)}' +
+      '.lar-head p{font-size:14px;color:var(--text-soft);line-height:1.6;margin:0 0 20px;max-width:660px}' +
+      '.lar-kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px}' +
+      '@media(max-width:820px){.lar-kpis{grid-template-columns:repeat(2,1fr)}}' +
+      '.lar-kpi{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:14px 16px}' +
+      '.lar-kpi-v{font-size:26px;font-weight:900;color:var(--text);line-height:1;font-variant-numeric:tabular-nums;font-family:Inter,sans-serif}' +
+      '.lar-kpi-k{margin-top:6px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-soft)}' +
+      '.lar-box{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:16px;margin-bottom:16px}' +
+      '.lar-box-title{font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--text-faint);margin:0 0 12px}' +
+      '.lar-strip{display:flex;align-items:flex-end;gap:3px;height:90px}' +
+      '.lar-bar{flex:1;min-width:2px;border-radius:3px;background:var(--cyan)}' +
+      '.lar-tablewrap{overflow-x:auto}' +
+      '.lar-table{width:100%;border-collapse:collapse;font-size:13px}' +
+      '.lar-table th{text-align:left;font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:var(--text-faint);padding:0 10px 10px 0;white-space:nowrap}' +
+      '.lar-table td{padding:10px 10px 10px 0;border-top:1px solid var(--line);color:var(--text);vertical-align:middle}' +
+      '.lar-info{background:none;border:none;color:var(--text-soft);cursor:pointer;padding:4px;border-radius:8px}' +
+      '.lar-info:hover{color:var(--cyan);background:rgba(6,182,212,.1)}' +
+      '.lar-pop{position:fixed;inset:0;background:rgba(0,0,0,.55);backdrop-filter:blur(4px);z-index:10000;align-items:center;justify-content:center;padding:20px}' +
+      '.lar-pop-in{background:var(--panel);border:1px solid var(--line-strong);border-radius:20px;padding:24px;max-width:560px;width:100%;max-height:82vh;overflow-y:auto}' +
+      '.lar-pop-title{font-size:15px;font-weight:800;color:var(--text);margin:0 0 14px}' +
+      '.lar-pop-n{color:var(--text-faint);font-weight:700}' +
+      '.lar-words{list-style:none;margin:0;padding:0}' +
+      '.lar-words li{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;padding:9px 0;border-top:1px solid var(--line)}' +
+      '.lar-w{font-weight:700;color:var(--text)}' +
+      '.lar-t{color:var(--text-soft)}' +
+      '.lar-m{font-size:11px;color:var(--text-faint);text-transform:uppercase;letter-spacing:.05em}' +
+      '.lar-none{color:var(--text-faint)}' +
+      '.lar-badge{margin-left:auto;padding:2px 8px;border-radius:99px;font-size:11px;font-weight:800}' +
+      '.lar-b-again{background:rgba(239,68,68,.16);color:#ef4444}' +
+      '.lar-b-hard{background:rgba(245,158,11,.16);color:#f59e0b}' +
+      '.lar-b-good{background:rgba(34,211,238,.16);color:#22d3ee}' +
+      '.lar-b-easy{background:rgba(52,211,153,.16);color:#34d399}' +
+      '.lar-pop-foot{margin-top:16px;text-align:right}' +
+      '.lar-close{padding:9px 18px;border:1px solid var(--line);border-radius:8px;background:transparent;color:var(--text-soft);cursor:pointer;font-size:13px;font-weight:600}';
+  }
+
+  function larKpi(labelKey, value) {
+    return '<div class="lar-kpi"><div class="lar-kpi-v">' + esc(String(value)) + '</div>' +
+      '<div class="lar-kpi-k"><span data-i18n="' + labelKey + '">' + esc(t(labelKey)) + '</span></div></div>';
+  }
+
+  function larEmptyHtml() {
+    return '<div class="learner-empty"><div class="le-emoji">🗂️</div>' +
+      '<div class="le-title"><span data-i18n="learner_archive_empty">' + esc(t('learner_archive_empty')) + '</span></div></div>';
+  }
+
+  function larArchiveHtml(rows, stats) {
+    var byDay = {};
+    rows.forEach(function (r) {
+      var d = new Date(r.finished_at);
+      if (!isNaN(d.getTime())) { var k = larDayKey(d); byDay[k] = (byDay[k] || 0) + 1; }
+    });
+    // A fixed 30-day strip ending today, so the shape is stable between visits
+    // instead of rescaling every time a new session lands.
+    var N = 30, bars = [], max = 1, today = new Date();
+    for (var i = N - 1; i >= 0; i--) {
+      var d2 = new Date(today); d2.setDate(today.getDate() - i);
+      var n = byDay[larDayKey(d2)] || 0;
+      if (n > max) max = n;
+      bars.push(n);
+    }
+    var barsHtml = bars.map(function (n) {
+      var h = n ? Math.max(12, Math.round((n / max) * 100)) : 3;
+      return '<div class="lar-bar" style="height:' + h + '%;opacity:' + (n ? '1' : '.25') + '" title="' + n + '"></div>';
+    }).join('');
+
+    var locale = (window.I18n && I18n.getLang && I18n.getLang() === 'en') ? 'en-GB' : 'it-IT';
+    var trs = rows.map(function (r) {
+      var d = new Date(r.finished_at);
+      var when = isNaN(d.getTime()) ? '—' : d.toLocaleDateString(locale, { day: '2-digit', month: 'short', year: 'numeric' });
+      var dur = r.duration_seconds ? Math.max(1, Math.round(r.duration_seconds / 60)) + ' min' : '—';
+      var score = (typeof r.accuracy_pct === 'number') ? r.accuracy_pct + '%' : '—';
+      return '<tr>' +
+        '<td>' + esc(when) + '</td>' +
+        '<td>' + esc(r.unit_name || r.kind || '—') + '</td>' +
+        '<td>' + (r.cards_total || 0) + '</td>' +
+        '<td>' + esc(score) + '</td>' +
+        '<td>' + esc(dur) + '</td>' +
+        '<td style="text-align:right"><button type="button" class="lar-info" data-archive-id="' + esc(String(r.id)) + '" aria-label="' + esc(t('learner_archive_detail_cards')) + '"><span class="material-symbols-outlined">info</span></button></td>' +
+      '</tr>';
+    }).join('');
+
+    return '<style>' + larCss() + '</style>' +
+      '<div class="lar-head"><h3 data-i18n="learner_archive_title">' + esc(t('learner_archive_title')) + '</h3>' +
+      '<p data-i18n="learner_archive_sub">' + esc(t('learner_archive_sub')) + '</p></div>' +
+      '<div class="lar-kpis">' +
+        larKpi('learner_archive_kpi_trainings', stats.trainings) +
+        larKpi('learner_archive_kpi_words', stats.words) +
+        larKpi('learner_archive_kpi_accuracy', stats.accuracyAvg + '%') +
+        larKpi('learner_archive_kpi_streak', stats.streak) +
+      '</div>' +
+      '<div class="lar-box"><h4 class="lar-box-title" data-i18n="learner_archive_trend">' + esc(t('learner_archive_trend')) + '</h4>' +
+      '<div class="lar-strip">' + barsHtml + '</div></div>' +
+      '<div class="lar-box"><div class="lar-tablewrap"><table class="lar-table"><thead><tr>' +
+        '<th data-i18n="learner_archive_col_date">' + esc(t('learner_archive_col_date')) + '</th>' +
+        '<th data-i18n="learner_archive_col_unit">' + esc(t('learner_archive_col_unit')) + '</th>' +
+        '<th data-i18n="learner_archive_col_cards">' + esc(t('learner_archive_col_cards')) + '</th>' +
+        '<th data-i18n="learner_archive_col_score">' + esc(t('learner_archive_col_score')) + '</th>' +
+        '<th data-i18n="learner_archive_col_duration">' + esc(t('learner_archive_col_duration')) + '</th>' +
+        '<th></th></tr></thead><tbody>' + trs + '</tbody></table></div></div>' +
+      '<div class="lar-pop" id="learnerArchivePop" style="display:none" role="dialog" aria-modal="true">' +
+        '<div class="lar-pop-in" onclick="event.stopPropagation()"><div id="learnerArchivePopBody"></div>' +
+        '<div class="lar-pop-foot"><button type="button" class="lar-close" id="learnerArchivePopClose">' + esc(t('wb_cancel')) + '</button></div></div>' +
+      '</div>';
+  }
+
+  async function larOpenDetail(id) {
+    var pop = document.getElementById('learnerArchivePop');
+    var body = document.getElementById('learnerArchivePopBody');
+    if (!pop || !body) return;
+    pop.style.display = 'flex';
+    body.innerHTML = '<div class="learner-empty"><div class="le-title">' + esc(t('learner_loading')) + '</div></div>';
+    var D = window.SottotitoliData;
+    var cards = [];
+    try { cards = (D && D.getTrainingCards) ? (await D.getTrainingCards(id)) || [] : []; }
+    catch (e) { console.warn('archive detail:', e); }
+    var list = cards.length
+      ? cards.map(function (c) {
+          var b = (c.result && ['again', 'hard', 'good', 'easy'].indexOf(c.result) >= 0)
+            ? '<span class="lar-badge lar-b-' + c.result + '">' + esc(t('learner_grade_' + c.result)) + '</span>' : '';
+          var meta = [c.pos, c.cefr].filter(Boolean).join(' · ');
+          return '<li><span class="lar-w">' + esc(c.word || '') + '</span>' +
+            (c.translation ? '<span class="lar-t">' + esc(c.translation) + '</span>' : '') +
+            (meta ? '<span class="lar-m">' + esc(meta) + '</span>' : '') + b + '</li>';
+        }).join('')
+      : '<li class="lar-none">' + esc(t('learner_archive_no_words')) + '</li>';
+    body.innerHTML = '<h4 class="lar-pop-title"><span data-i18n="learner_archive_detail_cards">' + esc(t('learner_archive_detail_cards')) + '</span> <span class="lar-pop-n">' + cards.length + '</span></h4>' +
+      '<ul class="lar-words">' + list + '</ul>';
+  }
+
+  function larBindArchiveClicks() {
+    if (archiveBound) return;
+    archiveBound = true;
+    document.addEventListener('click', function (e) {
+      var t2 = e.target;
+      var info = t2 && t2.closest ? t2.closest('.lar-info') : null;
+      if (info) { larOpenDetail(info.getAttribute('data-archive-id')); return; }
+      if (t2 && t2.id === 'learnerArchivePopClose') { document.getElementById('learnerArchivePop').style.display = 'none'; return; }
+      if (t2 && t2.id === 'learnerArchivePop') { t2.style.display = 'none'; }
+    });
+  }
+
+  async function renderArchive() {
+    var pane = $('#sub-learner-archive', rootEl);
+    if (!pane) return;
+    larBindArchiveClicks();
+    pane.innerHTML = '<div class="learner-empty"><div class="le-emoji">⏳</div><div class="le-title">' + esc(t('learner_loading')) + '</div></div>';
+    var D = window.SottotitoliData;
+    if (!D || !D.getTrainings) { pane.innerHTML = larEmptyHtml(); i18nScope(pane); return; }
+    var rows = [], stats = { trainings: 0, words: 0, accuracyAvg: 0, streak: 0 };
+    try { rows = (await D.getTrainings({ limit: 200 })) || []; } catch (e) { console.warn('archive:', e); }
+    try { stats = (await D.getTrainingStats()) || stats; } catch (e) { console.warn('archive stats:', e); }
+    if (!rows.length) { pane.innerHTML = larEmptyHtml(); i18nScope(pane); return; }
+    pane.innerHTML = larArchiveHtml(rows, stats);
+    i18nScope(pane);
   }
 
   /* ── PATH (real data: word banks + spaced review) ── */
@@ -1373,7 +1544,7 @@
   }
   function openSession(mode, unit, lesson, steps) {
     activateLearnerPanel();
-    session = { mode: mode, unit: unit || null, lesson: lesson || null, steps: steps, idx: 0, earned: 0, total: gradableCount(steps), xpLog: {}, lang: learnerLang() };
+    session = { mode: mode, unit: unit || null, lesson: lesson || null, steps: steps, idx: 0, earned: 0, total: gradableCount(steps), xpLog: {}, lang: learnerLang(), startedAt: Date.now() };
     session.scoreKey = scoreKey(mode, unit, lesson);
     /* Repeating content that was already cleared pays half the per-answer XP. The completion
      * bonus is one-time either way (see endSession), so this only bounds the per-answer income
@@ -2679,6 +2850,81 @@
     } else if (w.confirm(t('learner_quit_msg'))) { go(); }
   }
 
+  /* Append this completion to the training archive. Fire-and-forget on purpose: it
+   * is bookkeeping, and a logging failure must never delay or break the result
+   * screen the user is waiting for. Guarded by session.logged so a repeat call
+   * cannot double-log.
+   *
+   * Per-card detail comes from two different places depending on the mode.
+   * bank/review hold `session.cards` and, in `session.graded`, a word -> SM-2
+   * quality map, so their rows carry a real quality and result. Path modes
+   * (lesson/test/mission) hold their words in `session.steps` and track
+   * correctness only in aggregate, so those rows are logged with quality and
+   * result null. Only the step shapes that carry a single word can be read with
+   * certainty (listen/speak `item`, match `pairs`); a lesson also has 'mc' and
+   * 'convo' steps whose words are not in that form, and those contribute no rows
+   * rather than a guess. Real per-word outcomes for path modes need a per-answer
+   * hook across the mc/match/speak/listen handlers -- that is a follow-on. */
+  function logTraining(mode, unit, lesson, pct, correct, total, totalXp) {
+    if (!session || session.logged) return;
+    session.logged = true;
+    try {
+      var byQuality = { 1: 'again', 3: 'hard', 4: 'good', 5: 'easy' };
+      var graded = session.graded || {};
+      var counts = { again: 0, hard: 0, good: 0, easy: 0 };
+      var rows = [];
+      if (session.cards && session.cards.length) {
+        session.cards.forEach(function (it) {
+          var q = graded[it.word];
+          var res = (typeof q === 'number' && byQuality[q]) || null;
+          if (res) counts[res]++;
+          rows.push({
+            word: it.word,
+            translation: it.en || null,
+            pos: it.pos || null,
+            cefr: it.cefr || null,
+            quality: (typeof q === 'number' ? q : null),
+            result: res
+          });
+        });
+      } else {
+        (session.steps || []).forEach(function (st) {
+          if (!st) return;
+          var push = function (w, en, pos, cefr) {
+            if (!w) return;
+            rows.push({ word: String(w), translation: en || null, pos: pos || null, cefr: cefr || null, quality: null, result: null });
+          };
+          if (st.item) push(st.item.word || st.item.it, st.item.en || st.item.translation, st.item.pos, st.item.cefr);
+          if (st.pairs) st.pairs.forEach(function (p) { push(p.word || p.it, p.en || p.translation, p.pos, p.cefr); });
+        });
+      }
+      var rec = {
+        kind: mode,
+        unit_id: session.bankId || (unit && unit.id) || null,
+        unit_name: (unit && unit.name) || (lesson && lesson.name) || null,
+        lang: session.lang || learnerLang(),
+        started_at: session.startedAt ? new Date(session.startedAt).toISOString() : null,
+        finished_at: new Date().toISOString(),
+        duration_seconds: session.startedAt ? Math.round((Date.now() - session.startedAt) / 1000) : null,
+        cards_total: total,
+        cards_correct: correct,
+        accuracy_pct: pct,
+        earned_xp: totalXp,
+        again_count: counts.again,
+        hard_count: counts.hard,
+        good_count: counts.good,
+        easy_count: counts.easy
+      };
+      var D = window.SottotitoliData;
+      if (!D || !D.recordTraining) return;
+      var p = D.recordTraining(rec, rows);
+      if (p && p.catch) p.catch(function (e) { console.warn('training log failed:', e); });
+    } catch (e) {
+      // Bookkeeping must never break the screen the user is looking at.
+      console.warn('training log failed:', e);
+    }
+  }
+
   function endSession() {
     if (session.finished) return; // a second call must never re-award the completion bonus
     session.finished = true; // the completion card is up: leaving now costs nothing
@@ -2751,6 +2997,7 @@
     // ── Score + rewards ── (score computed at the top of the function)
     var totalXp = (session.xpPoints || 0) + (bonus || 0);
     saveScore(scoreKey(mode, unit, lesson), pct, correct, total); // a Redo overwrites this
+    logTraining(mode, unit, lesson, pct, correct, total, totalXp);
     var log = session.xpLog || {};
     var rows = Object.keys(log).map(function (action) {
       var e = log[action];

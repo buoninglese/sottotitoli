@@ -1015,6 +1015,108 @@
     }
   }
 
+  /* ═══════════════════════════════════
+     TRAINING LOG
+     ═══════════════════════════════════
+     One row per completed trainer session, plus one row per card for bank/review
+     runs. Path modes carry a word list but no per-word outcome, so their card rows
+     have quality/result null -- see the note in learner.js.
+     ═══════════════════════════════════ */
+
+  // Local calendar day (not UTC) so a late-evening session counts on the day the
+  // user experienced it, and so the streak can be compared against local today.
+  function dayKey(d) {
+    var m = d.getMonth() + 1, day = d.getDate();
+    return d.getFullYear() + '-' + (m < 10 ? '0' : '') + m + '-' + (day < 10 ? '0' : '') + day;
+  }
+
+  /* Two inserts, deliberately. The session row is the archive's unit of truth and
+   * per-card detail is a bonus: if the second insert fails the session still
+   * stands and the archive shows it without word detail, rather than the whole
+   * record being lost. An optional record_training(...) RPC could make it atomic. */
+  async function recordTraining(rec, cards) {
+    var userId = await getUserId();
+    if (!userId) return null;
+    var row = Object.assign({}, rec, { user_id: userId });
+    var r = await sb().from('training_sessions').insert(row).select().single();
+    if (r.error) { console.warn('recordTraining (session):', r.error.message); return null; }
+    var id = (r.data && r.data.id) || null;
+    cacheClear();
+    if (id && cards && cards.length) {
+      var rows = cards.map(function(c) {
+        return Object.assign({}, c, { training_id: id, user_id: userId });
+      });
+      var r2 = await sb().from('training_card_results').insert(rows);
+      if (r2.error) console.warn('recordTraining (cards):', r2.error.message);
+    }
+    return id;
+  }
+
+  async function getTrainings(opts) {
+    opts = opts || {};
+    var userId = await getUserId();
+    if (!userId) return [];
+    var q = sb().from('training_sessions').select('*').eq('user_id', userId);
+    if (opts.lang) q = q.eq('lang', opts.lang);
+    if (opts.kind) q = q.eq('kind', opts.kind);
+    if (opts.unitId) q = q.eq('unit_id', opts.unitId);
+    if (opts.since) q = q.gte('finished_at', opts.since);
+    q = q.order('finished_at', { ascending: false }).limit(opts.limit || 200);
+    var r = await q;
+    if (r.error) { console.warn('getTrainings:', r.error.message); return []; }
+    return r.data || [];
+  }
+
+  async function getTrainingCards(trainingId) {
+    if (!trainingId) return [];
+    var r = await sb().from('training_card_results').select('*').eq('training_id', trainingId).order('created_at');
+    if (r.error) { console.warn('getTrainingCards:', r.error.message); return []; }
+    return r.data || [];
+  }
+
+  /* How many trainings touch each unit, for the "trained xN" chip on bank cards.
+   * Counted in JS rather than by a group-by RPC: one user's training history is
+   * small, and an RPC is not worth adding before the feature has proven itself. */
+  async function getTrainingCountsByUnit(lang) {
+    var userId = await getUserId();
+    if (!userId) return {};
+    var q = sb().from('training_sessions').select('unit_id').eq('user_id', userId).not('unit_id', 'is', null);
+    if (lang) q = q.eq('lang', lang);
+    var r = await q;
+    if (r.error) { console.warn('getTrainingCountsByUnit:', r.error.message); return {}; }
+    var out = {};
+    (r.data || []).forEach(function(row) {
+      var k = row.unit_id;
+      if (k) out[k] = (out[k] || 0) + 1;
+    });
+    return out;
+  }
+
+  /* Totals, average accuracy and the day streak, derived from the same rows the
+   * archive lists so the KPI tiles cannot disagree with the table below them. */
+  async function getTrainingStats(since) {
+    var rows = await getTrainings({ since: since, limit: 1000 });
+    var out = { trainings: rows.length, words: 0, accuracyAvg: 0, streak: 0 };
+    if (!rows.length) return out;
+    var accSum = 0, accN = 0, days = {};
+    rows.forEach(function(t) {
+      out.words += (t.cards_total || 0);
+      if (typeof t.accuracy_pct === 'number') { accSum += t.accuracy_pct; accN++; }
+      var d = new Date(t.finished_at);
+      if (!isNaN(d.getTime())) days[dayKey(d)] = 1;
+    });
+    out.accuracyAvg = accN ? Math.round(accSum / accN) : 0;
+    // Streak runs back from today only: a gap yesterday means the streak is over,
+    // which is what a streak is for. Capped so a corrupt future date cannot spin.
+    var cursor = new Date(), n = 0;
+    while (n <= 3650 && days[dayKey(cursor)]) {
+      n++;
+      cursor.setDate(cursor.getDate() - 1);
+    }
+    out.streak = n;
+    return out;
+  }
+
   window.SottotitoliData = {
     getUserId: getUserId,
     getUserMeta: getUserMeta,
@@ -1053,6 +1155,11 @@
     getContextualMessages: getContextualMessages,
     dismissMessage: dismissMessage,
     getStreak: getStreak,
+    recordTraining: recordTraining,
+    getTrainings: getTrainings,
+    getTrainingCards: getTrainingCards,
+    getTrainingCountsByUnit: getTrainingCountsByUnit,
+    getTrainingStats: getTrainingStats,
     cacheClear: cacheClear
   };
 
