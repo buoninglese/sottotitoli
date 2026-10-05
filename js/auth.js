@@ -367,15 +367,46 @@ async function populatePanoramicaDropdown(user) {
 // ═══ Top-level: populate Panoramica dropdown on every page ═══
 (function(){
   if (document.getElementById('authSection')) return; // already handled by DOMContentLoaded
-  window.sottotitoliSupabase.auth.getSession().then(function(r){
-    if (r.data?.session?.user) {
-      var user = r.data.session.user;
-      populatePanoramicaDropdown(user);
-      initUserCredits(user.id);
-      initUserTokens(user.id);
+  var sb = window.sottotitoliSupabase;
+  if (!sb) return;
+
+  // The dropdown write is a pure DOM update and may run repeatedly. The credit/token
+  // readers are once-per-user: both select and only INSERT when no row exists, so a
+  // second call costs two queries and can attempt a duplicate insert.
+  var metered = {};
+  function fill(user){
+    if (!user) return;
+    populatePanoramicaDropdown(user);
+    if (metered[user.id]) return;
+    metered[user.id] = true;
+    initUserCredits(user.id);
+    initUserTokens(user.id);
+  }
+
+  sb.auth.getSession().then(function(r){
+    var user = r.data?.session?.user;
+    if (user) {
+      fill(user);
       // Retry after delay for slow session restore
       setTimeout(function(){ populatePanoramicaDropdown(user); }, 2000);
     }
+  });
+
+  // WHY THIS EXISTS: the getSession() read above is a ONE-SHOT. On a cold load it can
+  // lose the race with session restore and resolve with NO session while one is still
+  // being read from storage — and then nothing ever ran the populate again, so a user
+  // who signed in on this page kept the static "..." placeholder in #ddName/#ddEmail
+  // for the whole visit (the reported "the user dropdown just says ....").
+  //
+  // NOTE: this does NOT contradict the rule near the top of the file ("Only use
+  // getSession() — onAuthStateChange INITIAL_SESSION fires before Supabase restores the
+  // session, causing false redirects"). That trap is about treating a premature NULL
+  // INITIAL_SESSION as "logged out". We do the opposite: a null session is ignored, and
+  // we only fill on a NON-NULL one, so the early event can never be mistaken for a
+  // sign-out. The later SIGNED_IN / TOKEN_REFRESHED that carries the restored session is
+  // exactly what fills the dropdown.
+  sb.auth.onAuthStateChange(function(_event, session){
+    if (session && session.user) fill(session.user);
   });
 })();
 
