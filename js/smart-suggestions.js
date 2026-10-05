@@ -696,7 +696,7 @@ window.SMART_SUGGESTIONS = (function() {
          * because that is the key writeGrade() looks up. This was clean.toLowerCase(), which
          * deletes punctuation while the canonical form turns it into a space, so "you're
          * welcome" produced 'youre welcome' here and 'you re welcome' in the trainer. */
-        var norm = window.SottotitoliData.srsKey(word);
+        var norm = window.SottotitoliData.srsKey(w.word);
         try {
           // ONE row per (user_id, lang, normalized) -- the key the database now enforces.
           // This was .eq('lemma', clean).maybeSingle(): it missed rows stored with punctuation
