@@ -1264,9 +1264,27 @@
       '<div class="lvov-cta" style="justify-content:center">' +
         '<button type="button" class="c-main" onclick="Learner.showPane(\'learner-en\')" data-i18n="learnerov_cta_en">🇬🇧 Apri il Vocabulary Trainer inglese</button>' +
         '<button type="button" class="c-ghost" onclick="Learner.showPane(\'learner-it\')" data-i18n="learnerov_cta_it">🇮🇹 Apri il Vocabulary Trainer italiano</button>' +
+      '</div>' +
+      /* Total vocabulary. Drawn by renderChartBox('vt') in panoramica.js so it reuses
+         the word-bank aggregation and the saved corona rather than recomputing them.
+         Only title, subtitle, headline and legend are provided; renderChartBox guards
+         every element it writes, so the period label and average are simply omitted. */
+      '<div style="margin-top:28px">' +
+        '<div id="vtChartTitle" style="font-size:20px;font-weight:800;color:var(--text);margin:0 0 6px;font-family:var(--font-ui)"></div>' +
+        '<p id="vtChartSubtitle" style="font-size:13px;color:var(--text-soft);margin:0 0 12px;line-height:1.5;max-width:660px"></p>' +
+        '<div id="vtChartTotal" style="font-size:34px;font-weight:900;color:var(--text);line-height:1;letter-spacing:-.03em;margin-bottom:16px;font-variant-numeric:tabular-nums;font-family:Inter,sans-serif">—</div>' +
+        '<div id="vtChart" style="min-height:340px;display:flex;align-items:center;justify-content:center;position:relative"></div>' +
+        '<div id="vtChartLegend" style="border-top:1px solid var(--line);margin-top:14px;padding-top:14px;display:flex;justify-content:center;flex-wrap:wrap;gap:14px 22px"></div>' +
       '</div>';
     pane.innerHTML = html;
     i18nScope(pane);
+    // chartEl is inside this pane, so the chart can only be drawn after the markup is
+    // in the DOM. renderChartBox is async, so a rejection here would otherwise be
+    // silent -- surface it rather than let the card sit empty.
+    if (window.vtVocabRender) {
+      var vtp = window.vtVocabRender();
+      if (vtp && vtp.catch) vtp.catch(function (e) { console.warn('[vocab chart]', e); });
+    }
   }
 
   /* ═══════════════════ LESSON / TEST / PRACTICE sessions ═══════════════════ */

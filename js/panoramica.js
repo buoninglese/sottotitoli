@@ -2282,7 +2282,14 @@
       // Its tl is driven by the panel's own period (see renderWrappedPanel) so the
       // section cannot disagree with the totals above it.
       var wrChart = { metric:'totalMinutes', tl:'week' };
-      var CHART_STATE = { dash: dashChart, wb: wbChart, tr: trChart, wr: wrChart };
+      // Total vocabulary in the Vocabulary Trainer's overview subtab. Fixed to the
+      // 'saved' metric: that is the three-count saved/practiced/mastered view.
+      var vtChart = { metric:'saved', tl:'week', lang:'all' };
+      var CHART_STATE = { dash: dashChart, wb: wbChart, tr: trChart, wr: wrChart, vt: vtChart };
+      // Scopes drawn by the word-bank renderer (the words/saved/lexdiv family). This
+      // was the literal 'wb' in the branch condition, which is why a second word-scope
+      // could not exist without rewriting that branch.
+      var WORD_SCOPES = { wb: 1, vt: 1 };
       var dashChartData = null;
       function isoDaysAgo(n){ var d = new Date(Date.now() - n*86400000); return d.toISOString().substring(0,10); }
       /* Chart element ids, per scope. This was a two-case ternary ('wb' else dash),
@@ -2291,9 +2298,10 @@
        * instead of a new branch, and the dashboard is no longer the silent fallback. */
       var CHART_IDS = {
         dash: { chart:'dailyChart', title:'dailyChartTitle', sub:'dailyChartSubtitle', total:'dailyChartTotal', pl:'dailyChartPeriodLabel', media:'dailyChartMedia', ml:'dailyChartMediaLabel', legend:'dailyChartLegend' },
-        wb:   { chart:'wbChart', title:'wbChartTitle', sub:'wbChartSubtitle', total:'wbChartTotal', pl:'wbChartPeriodLabel', media:'wbChartMedia', ml:'wbChartMediaLabel' },
+        wb:   { chart:'wbChart', title:'wbChartTitle', sub:'wbChartSubtitle', total:'wbChartTotal', pl:'wbChartPeriodLabel', media:'wbChartMedia', ml:'wbChartMediaLabel', legend:'wbChartLegend' },
         tr:   { chart:'trChart', title:'trChartTitle', sub:'trChartSubtitle', total:'trChartTotal', pl:'trChartPeriodLabel', media:'trChartMedia', ml:'trChartMediaLabel', legend:'trChartLegend' },
-        wr:   { chart:'wrChart', title:'wrChartTitle', sub:'wrChartSubtitle', total:'wrChartTotal', pl:'wrChartPeriodLabel', media:'wrChartMedia', ml:'wrChartMediaLabel', legend:'wrChartLegend' }
+        wr:   { chart:'wrChart', title:'wrChartTitle', sub:'wrChartSubtitle', total:'wrChartTotal', pl:'wrChartPeriodLabel', media:'wrChartMedia', ml:'wrChartMediaLabel', legend:'wrChartLegend' },
+        vt:   { chart:'vtChart', title:'vtChartTitle', sub:'vtChartSubtitle', total:'vtChartTotal', pl:'vtChartPeriodLabel', media:'vtChartMedia', ml:'vtChartMediaLabel', legend:'vtChartLegend' }
       };
       function chartIds(scope){ return CHART_IDS[scope] || CHART_IDS.dash; }
       async function loadDashChartData(){
@@ -2926,7 +2934,7 @@
             plEl = document.getElementById(ids.pl), mediaEl = document.getElementById(ids.media), mlEl = document.getElementById(ids.ml);
         if (!chartEl) return;
         var isEn = window.I18n && I18n.getLang() === 'en';
-        if (scope === 'wb' && (st.metric === 'words' || st.metric === 'saved' || st.metric === 'lexdiv')) {
+        if (WORD_SCOPES[scope] && (st.metric === 'words' || st.metric === 'saved' || st.metric === 'lexdiv')) {
           // One fetch feeds every filter, so pick the selected language's dataset
           // rather than re-querying on switch.
           await loadWordChartData();
@@ -2935,7 +2943,7 @@
           // unhandled rejections at startup and no chart at all, which is exactly what a
           // brand-new account with no saved words would see. wbEmptyBucket exists for
           // this, so the empty state now renders as an empty chart instead of throwing.
-          var wdata = wbDataFor(wbChart.lang) || wbWordData || wbEmptyBucket();
+          var wdata = wbDataFor(st.lang) || wbWordData || wbEmptyBucket();
           var wdays = wordDays(st.tl, wdata);
           var wo = wordAggregate(wdays, wdata);
           var wm = wordMeta(st.metric, isEn);
@@ -2953,9 +2961,9 @@
           if (mediaEl) mediaEl.textContent = wm.media(wo);
           if (mlEl) mlEl.textContent = wm.mediaLabel;
           chartEl.innerHTML = '<div class="cc-wrap" style="width:100%;display:flex;justify-content:center">' + wordChartHtml(st.metric, wdays, wdata, isEn) + '</div>';
-          CHARTCTL.afterRender('wb');
+          CHARTCTL.afterRender(scope);
           // Legend: centered under a divider below the chart (not inside the SVG)
-          var wbLgEl = document.getElementById('wbChartLegend');
+          var wbLgEl = document.getElementById(ids.legend);
           if (wbLgEl) {
             var wbLgItems = st.metric === 'words'
               ? [['#64748b', DT('dash_legend_total','Totali')], ['#34d399', DT('dash_legend_unique','Uniche')], ['#fbbf24', DT('dash_legend_saved','Salvate')]]
@@ -3047,6 +3055,10 @@
       // Toggles the Wrapped habits section between Activity (minutes) and the
       // time-of-day split. Only two of the three dashboard metrics are offered here:
       // Total sessions belongs in the Transcripts panel.
+      // Draws the Total vocabulary card in the Vocabulary Trainer overview. learner.js
+      // owns that pane's markup and lives in a different IIFE, so it cannot reach
+      // renderChartBox directly and has to go through this.
+      window.vtVocabRender = function(){ return renderChartBox('vt'); };
       window.wrSelect = function(m){
         if (!CHART_STATE.wr) return;
         CHART_STATE.wr.metric = (m === 'timebands') ? 'timebands' : 'totalMinutes';
