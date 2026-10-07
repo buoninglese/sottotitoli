@@ -1686,11 +1686,20 @@
   async function toItems(rawWords, lang) {
     lang = lang || learnerLang();
     var items = [];
+    var skipped = 0;
     for (var i = 0; i < rawWords.length; i++) {
       var rw = rawWords[i];
       var tr = await meaningFor(rw.word, lang, rw.translation);
-      var e = { translation: tr, definition: rw.definition || meaningDef(rw.word, lang) };
-      items.push({ it: rw.word, en: e.translation || rw.word, word: rw.word, lang: lang, pos: rw.pos || '', cefr: rw.cefr || '', definition: e.definition || rw.definition || '' });
+      // No meaning, no card. This used to fall back to the word itself, which showed the
+      // English word as its own Italian translation -- an echo the learner spots at once
+      // -- and an empty value rendered a bare em dash. Neither is teachable, so the word
+      // is left out of THIS run, counted, and named at the start of the session instead
+      // of quietly leaving a hole in the deck.
+      if (!tr) { skipped++; continue; }
+      items.push({ it: rw.word, en: tr, word: rw.word, lang: lang, pos: rw.pos || '', cefr: rw.cefr || '', definition: rw.definition || meaningDef(rw.word, lang) || '' });
+    }
+    if (skipped && typeof toast === 'function') {
+      try { toast(t('learner_skipped_words').replace('{n}', skipped)); } catch (e) {}
     }
     return items;
   }
