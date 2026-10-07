@@ -4009,6 +4009,21 @@
       window.renderToday = renderToday;
       window.dashGoWordbanks = dashGoWordbanks;
 
+      /* The card must not depend on the word-bank panel being opened. renderWordbanks()
+       * only runs when that panel is shown, so hosting the call there left the card
+       * empty on the dashboard -- measured live, host present and blank. It boots itself
+       * here instead, and refreshes when the dashboard is opened again, which is what
+       * keeps the count honest after the learner has finished reviewing. */
+      function bootToday() {
+        renderToday();
+        document.addEventListener('click', function (e) {
+          var item = (e.target && e.target.closest) ? e.target.closest('.nav-item[data-panel="panoramica"]') : null;
+          if (item) setTimeout(function () { renderToday(); }, 300);
+        });
+      }
+      if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', bootToday);
+      else bootToday();
+
       async function renderWordbanks() {
         var lang = window.SOTTOTITOLI_STUDY_LANG || 'en';
         // ── Stats (cyan metric card style) ──
