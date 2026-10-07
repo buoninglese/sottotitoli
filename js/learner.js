@@ -1583,12 +1583,104 @@
   // "it" holds the word in the target language, "en" its translation; the
   // engine + TTS/recognition follow item.lang. For the English tab the "it"
   // slot carries the English word (target) and "en" the Italian translation.
+  /* ── What a word MEANS ──
+   * One door for it, with a precedence: the store of record (word_translations, human
+   * before machine) first, then the legacy column on review_words, then the live
+   * enrichment chain. A successful lookup is written back, so the store fills itself
+   * from actual studying and the second session on a word costs nothing.
+   *
+   * Before this, toItems() asked MyMemory for the same words every session and threw
+   * the answers away again -- which is exactly why the trainer kept showing em dashes
+   * however often a bank was trained. The answers existed; nothing kept them. */
+  var _wtCache = {};
+  var _wtDef = {};
+  var _wtUid = null;
+
+  async function wtUserId() {
+    if (_wtUid) return _wtUid;
+    try {
+      var sb = srcSb();
+      var s = sb ? await sb.auth.getSession() : null;
+      _wtUid = (s && s.data && s.data.session && s.data.session.user) ? s.data.session.user.id : null;
+    } catch (e) { _wtUid = null; }
+    return _wtUid;
+  }
+
+  function wtKey(w) {
+    try {
+      return (typeof SottotitoliData !== 'undefined' && SottotitoliData.srsKey)
+        ? SottotitoliData.srsKey(w) : String(w || '').toLowerCase();
+    } catch (e) { return String(w || '').toLowerCase(); }
+  }
+
+  // Fire and forget. ignoreDuplicates means an existing row is left alone, so a human
+  // correction is never overwritten by a machine guess. The table's CHECK is the real
+  // gate: prose is refused there, so this cannot poison the store even if called badly.
+  function storeMeaning(word, lang, translation, source) {
+    var clean = cleanTranslation(translation);
+    if (!clean || !word) return;
+    (async function () {
+      try {
+        var sb = srcSb();
+        var uid = await wtUserId();
+        if (!sb || !uid) return;
+        await sb.from('word_translations').upsert({
+          user_id: uid, word: String(word), lang: lang, normalized: wtKey(word),
+          translation: clean, source: source || 'machine', verified: false,
+          updated_at: new Date().toISOString()
+        }, { onConflict: 'user_id,lang,normalized', ignoreDuplicates: true });
+      } catch (e) {}
+    })();
+  }
+
+  async function meaningFor(word, lang, fallback) {
+    lang = lang || learnerLang();
+    var ck = lang + '|' + wtKey(word);
+    if (Object.prototype.hasOwnProperty.call(_wtCache, ck)) return _wtCache[ck];
+    var legacy = cleanTranslation(fallback);
+    var best = '';
+    try {
+      var sb = srcSb();
+      if (sb) {
+        var r = await sb.from('word_translations')
+          .select('translation,source,verified').eq('lang', lang).eq('normalized', wtKey(word)).limit(5);
+        if (!r.error && r.data && r.data.length) {
+          var rank = { human: 3, dictionary: 2, machine: 1 };
+          r.data.sort(function (a, b) {
+            if (!!b.verified !== !!a.verified) return (b.verified ? 1 : 0) - (a.verified ? 1 : 0);
+            return (rank[b.source] || 0) - (rank[a.source] || 0);
+          });
+          best = cleanTranslation(r.data[0].translation);
+        }
+      }
+    } catch (e) {}
+    if (!best) best = legacy;
+    if (!best) {
+      try {
+        var e2 = await enrichWord(word, lang);
+        _wtDef[ck] = (e2 && e2.definition) || '';
+        best = cleanTranslation(e2 && e2.translation);
+        if (best) storeMeaning(word, lang, best, 'machine');
+      } catch (e) {}
+    } else if (legacy) {
+      // A clean legacy value: give it a home, so the next session reads the store.
+      storeMeaning(word, lang, legacy, 'machine');
+    }
+    _wtCache[ck] = best || '';
+    return _wtCache[ck];
+  }
+
+  function meaningDef(word, lang) {
+    return _wtDef[(lang || learnerLang()) + '|' + wtKey(word)] || '';
+  }
+
   async function toItems(rawWords, lang) {
     lang = lang || learnerLang();
     var items = [];
     for (var i = 0; i < rawWords.length; i++) {
       var rw = rawWords[i];
-      var e = rw.translation ? { translation: rw.translation, definition: rw.definition } : await enrichWord(rw.word, lang);
+      var tr = await meaningFor(rw.word, lang, rw.translation);
+      var e = { translation: tr, definition: rw.definition || meaningDef(rw.word, lang) };
       items.push({ it: rw.word, en: e.translation || rw.word, word: rw.word, lang: lang, pos: rw.pos || '', cefr: rw.cefr || '', definition: e.definition || rw.definition || '' });
     }
     return items;
@@ -3296,6 +3388,8 @@
     boot: boot,
     setLang: setLang,
     showPane: showPane,
+    meaningFor: meaningFor,
+    storeMeaning: storeMeaning,
     lang: learnerLang,
     openLesson: openLesson,
     openTest: openTest,
