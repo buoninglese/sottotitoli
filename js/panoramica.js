@@ -3107,7 +3107,12 @@
           }
         }
         place();
+        /* Both signals. The matchMedia change fires when the breakpoint is crossed;
+         * the resize listener is the belt to that braces, because a listener that
+         * only trusts the media event leaves the node on the wrong side of the graph
+         * if the event is missed. place() is a no-op when the node is already home. */
         if (mq) { if (mq.addEventListener) mq.addEventListener('change', place); else if (mq.addListener) mq.addListener(place); }
+        window.addEventListener('resize', place);
       })();
 
       window.renderChartBox = renderChartBox;
