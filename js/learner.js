@@ -1741,6 +1741,8 @@
     if (item.pos) badges += '<span class="ics-badge">' + esc(item.pos) + '</span>';
     if (item.cefr) badges += '<span class="ics-badge ics-cefr">' + esc(item.cefr) + '</span>';
     var hint = level === 0 ? '<div class="ics-hint"><span class="flip-icon">🔄</span><span data-i18n="learner_ics_flip">Tocca per girare</span></div>' : '';
+    var tr = cleanTranslation(item.en);
+    var def = cleanTranslation(item.definition);
     return '<div class="ics-face ics-front">' +
         '<div class="ics-word">' + esc(item.it) + '</div>' +
         '<div class="ics-badges">' + badges + '</div>' +
@@ -1748,10 +1750,27 @@
       '</div>' +
       '<div class="ics-face ics-back">' +
         '<div class="ics-back-label" data-i18n="learner_ics_answer">Traduzione</div>' +
-        '<div class="ics-trans">' + esc(item.en || '') + '</div>' +
-        (item.definition ? '<div class="ics-def">' + esc(item.definition) + '</div>' : '') +
+        '<div class="ics-trans">' + (tr ? esc(tr) : '\u2014') + '</div>' +
+        ((def && def !== tr) ? '<div class="ics-def">' + esc(def) + '</div>' : '') +
         '<button type="button" class="ics-replay" data-ci="' + ci + '" onclick="event.stopPropagation();Learner.replayCard(this)">🔊 <span data-i18n="learner_ics_replay">Riascolta</span></button>' +
       '</div>';
+  }
+
+  /* Some stored translations are not translations at all. An older writer put a SENTENCE from
+   * the learner's own transcript into review_words.translation_primary ("Il bollitore inizierà
+   * a bollire." under 'start'), and some values carry raw entities ("&#09;"). Rendering those
+   * under the word "Traduzione" teaches something false -- worse than showing nothing -- so they
+   * are cleaned, and anything that is plainly a sentence is withheld rather than passed off as
+   * a translation. The stored data still needs repairing; this only stops it being taught. */
+  function cleanTranslation(s) {
+    var v = String(s == null ? '' : s)
+      .replace(/&#(\d+);/g, function (m, d) { return String.fromCharCode(parseInt(d, 10)); })
+      .replace(/&nbsp;/gi, ' ').replace(/&amp;/gi, '&').replace(/&quot;/gi, '"')
+      .replace(/[\t\r\n]+/g, ' ').replace(/\s+/g, ' ').trim();
+    if (!v) return '';
+    if (/[.!?]$/.test(v)) return '';              // a sentence, not a translation
+    if (v.split(' ').length >= 6) return '';      // ditto, by length
+    return v;
   }
 
   function gradeBtnHtml(cls, q, i18nKey, label, emoji) {
@@ -1791,7 +1810,7 @@
         '<span class="ics-remaining" id="icsRemaining"></span>' +
       '</div>' +
       '<div class="ics-grade-label">' + t('learner_ics_grade_label') + '</div>' +
-      '<div class="ics-keys" data-i18n="learner_keys_hint">Spazio per girare · Invio per continuare</div>' +
+      '<div class="ics-keys" data-i18n="learner_keys_hint">Spazio per girare · 1-4 per valutare</div>' +
       '<div class="ics-grades" id="icsGrades">' +
         gradeBtnHtml('again', 1, 'learner_grade_again', 'Ancora', '😵') +
         gradeBtnHtml('hard', 3, 'learner_grade_hard', 'Difficile', '😬') +
@@ -1940,10 +1959,17 @@
       flipCard(frontEl);
       return;
     }
-    if (e.key === 'Enter') {
-      if (!frontEl.classList.contains('flip')) { flipCard(frontEl); return; }
-      var good = stage.querySelector('.ics-grade.good');
-      if (good && !good.disabled) { e.preventDefault(); gradeCard(good); }
+    /* 1-4 grade the front card POSITIONALLY: 1 = the first difficulty button (Ancora) through
+     * 4 = the last (Facile). Positional rather than the SM-2 q values (1/3/4/5) because the
+     * learner is reading the row of buttons left to right.
+     *
+     * Enter used to flip and then grade "good" by itself. That duplicated Space and silently
+     * chose a difficulty on the learner's behalf, so it is gone. */
+    var gradeByKey = { '1': 0, '2': 1, '3': 2, '4': 3 };
+    if (Object.prototype.hasOwnProperty.call(gradeByKey, e.key)) {
+      var btns = stage.querySelectorAll('.ics-grade');
+      var b = btns[gradeByKey[e.key]];
+      if (b && !b.disabled) { e.preventDefault(); gradeCard(b); }
     }
   });
 
@@ -3128,7 +3154,9 @@
             '<div class="cc-rewards-total"><span>' + t('learner_total') + '</span><span>+ ' + totalXp + ' XP</span></div></div>'
           : '') +
         '<div class="btn-row" style="margin-top:22px">' +
-          '<button class="primary-btn" onclick="Learner.closeSession()">' + t('learner_back_path') + '</button>' +
+          /* Label matches where the run came from: a word-bank run must not send the learner
+           * "back to the path" they never left. */
+          '<button class="primary-btn" onclick="Learner.closeSession()">' + t(mode === 'bank' ? 'learner_back_bank' : 'learner_back_path') + '</button>' +
           (canRedo ? '<button class="ghost-btn" onclick="Learner.redoSession()">' + t('learner_redo') + '</button>' : '') +
         '</div>' +
       '</div>';

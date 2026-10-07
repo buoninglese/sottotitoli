@@ -4293,7 +4293,31 @@
           // count back into a fabricated one
           if (sfBank && pinCounts.saved_from_sessions != null) pinCounts.saved_from_sessions = Math.max(pinCounts.saved_from_sessions, (prevAll[2]||[]).length);
           pinWords.vocab_builder_en = prevAll[3] || [];
-          if (vbBank) pinCounts.vocab_builder_en = (prevAll[3]||[]).length;
+          if (vbBank) pinCounts.vocab_builder_en = realBankCount(vbBank.id);
+
+          /* Real per-bank totals. These cards used to show the 5-word PREVIEW length
+           * (`(prevAll[3]||[]).length`, `cw.length`), so every bank read "5 words" whatever it
+           * held. Counted in JS from one query and deduped by lowercase word, to match what
+           * getWordbankWords() actually returns. If the query does not come back, the count is
+           * null and the card renders the em dash -- never a number we cannot back up. */
+          var bankWordKnown = false;
+          var bankSeen = {};
+          if (sb) {
+            var bwRes = await wbTimeout(sb.from('user_wordbank_words').select('wordbank_id, word'), 2500, null);
+            if (bwRes && !bwRes.error && bwRes.data) {
+              bankWordKnown = true;
+              bwRes.data.forEach(function (r) {
+                var k = String(r.word || '').toLowerCase();
+                if (!k) return;
+                var bucket = bankSeen[r.wordbank_id] = bankSeen[r.wordbank_id] || {};
+                bucket[k] = 1;
+              });
+            }
+          }
+          function realBankCount(id) {
+            if (!bankWordKnown) return null;
+            return bankSeen[id] ? Object.keys(bankSeen[id]).length : 0;
+          }
 
           folders.pinned = [
             { id:'review_due_now', title:collectionName('review_due_now'), subtitle:collectionSub('review_due_now'), count:pinCounts.review_due_now, words:pinWords.review_due_now, type:'pinned' },
@@ -4308,7 +4332,7 @@
           // ── Custom ──
           for (var i=0;i<customBanks.length;i++) {
             var cw = prevAll[4+i] || [];
-            folders.custom.push({ id:customBanks[i].id, title:customBanks[i].name || 'Banca', subtitle:customBanks[i].description || '', count:cw.length, words:cw, type:'custom', trained: trainedCounts[customBanks[i].id] || 0 });
+            folders.custom.push({ id:customBanks[i].id, title:customBanks[i].name || 'Banca', subtitle:customBanks[i].description || '', count:realBankCount(customBanks[i].id), words:cw, type:'custom', trained: trainedCounts[customBanks[i].id] || 0 });
           }
         } catch(err) { console.warn('Folders (pinned/custom) error:', err); }
 
@@ -5636,6 +5660,20 @@
             n--;
             if (n > 0) { paint(); return; }
             clearInterval(iv);
+            /* The countdown is a COURTESY, not a promise. The session opens when the WORK
+             * finishes, which can be far longer than three seconds, and the button used to
+             * freeze on "1…" and look stuck for the whole wait. Past the countdown it now
+             * switches to an honest loading state that keeps counting elapsed seconds, so the
+             * number on screen reflects real time rather than a target. `release` clears this
+             * interval too -- it reassigns `iv`, and release reads it at call time. */
+            var waited = 0;
+            var waiting = function () {
+              waited++;
+              btn.innerHTML = '<span class="material-symbols-outlined">hourglass_top</span> ' +
+                DT('learner_loading', 'Caricamento…') + ' ' + waited + 's';
+            };
+            waiting();
+            iv = setInterval(waiting, 1000);
           }, 1000);
           // The lock is released when the WORK finishes, not when the countdown
           // ends. A tick-driven release looked fine in the foreground and left the
