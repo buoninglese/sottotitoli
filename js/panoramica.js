@@ -2099,6 +2099,40 @@
         set('wscWpm', agg.wpm > 0 ? agg.wpm : '—');
         var empty = document.getElementById('wscEmpty');
         if (empty) empty.style.display = agg.sessions ? 'none' : '';
+        /* An empty period is not an empty account. The default window is the week, so a
+         * learner with nine sessions saw eight zeros and no explanation, and the only
+         * escape was to notice the period buttons. When a wider window does have data,
+         * offer that switch right where the emptiness is reported. The button CLICKS the
+         * panel's own period control rather than calling an invented setter, so the
+         * switch, its label and its side effects stay in one place. If the loaded rows
+         * do not cover the wider period this quietly offers nothing. */
+        var swEl = document.getElementById('wscEmptySwitch');
+        if (swEl) {
+          swEl.style.display = 'none';
+          swEl.innerHTML = '';
+          if (!agg.sessions) {
+            var wider = null;
+            ['month', 'year'].forEach(function (p) {
+              if (!wider && wscAggregate(p).sessions > 0) wider = p;
+            });
+            var target = wider ? document.querySelector('.wrapped-period-btn[data-wrapped-period="' + wider + '"]') : null;
+            if (target) {
+              swEl.style.display = '';
+              var hint = document.createElement('span');
+              hint.setAttribute('data-i18n', 'wrapped_empty_hint');
+              hint.textContent = 'Ma hai sessioni in un periodo più ampio.';
+              swEl.appendChild(hint);
+              var goBtn = document.createElement('button');
+              goBtn.type = 'button';
+              goBtn.className = 'seg-btn';
+              goBtn.style.marginLeft = '8px';
+              goBtn.textContent = DT('wrapped_show', 'Mostra') + ' ' + (target.textContent || '').trim();
+              goBtn.addEventListener('click', function () { target.click(); });
+              swEl.appendChild(goBtn);
+              if (typeof I18n !== 'undefined' && I18n.apply) { try { I18n.apply(swEl); } catch (e) {} }
+            }
+          }
+        }
 
         // Every measured variable, with an explicit state wherever we have
         // nothing. The signals and the error categories both arrive
