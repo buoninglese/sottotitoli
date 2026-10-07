@@ -3086,6 +3086,30 @@
         return renderChartBox('wr');
       };
       window.wbSetLang = wbSetLang;
+
+      /* Phone: the control rail becomes a full-width box ABOVE the graph (the 680px
+       * rules in css/panoramica-inline.css do that), and the chart's explanation
+       * belongs in that box rather than orphaned in a column squeezed beside the
+       * graph. The node is MOVED, never duplicated, so the string keeps one home and
+       * the chart engine keeps writing to the same element by id. Above 680px it goes
+       * back to the header, where there is room for it next to the total. */
+      (function () {
+        var sub = document.getElementById('wbChartSubtitle');
+        var rail = document.querySelector('#wbChartCard > aside');
+        if (!sub || !rail) return;
+        var home = sub.parentNode, homeAfter = sub.nextSibling;
+        var mq = window.matchMedia ? window.matchMedia('(max-width:680px)') : null;
+        function place() {
+          if (mq && mq.matches) {
+            if (sub.parentNode !== rail) rail.appendChild(sub);
+          } else if (sub.parentNode !== home) {
+            home.insertBefore(sub, homeAfter);
+          }
+        }
+        place();
+        if (mq) { if (mq.addEventListener) mq.addEventListener('change', place); else if (mq.addListener) mq.addListener(place); }
+      })();
+
       window.renderChartBox = renderChartBox;
       window.loadDashChartData = loadDashChartData;
 
@@ -6398,11 +6422,11 @@
           }
         } catch(e) {}
         statsEl.innerHTML =
-          '<div class="wb-stat"><div class="stat-value">'+s.totalWords+'</div><div class="stat-label">Totale parole</div></div>'+
-          '<div class="wb-stat"><div class="stat-value">'+s.dueToday+'</div><div class="stat-label">In scadenza oggi</div></div>'+
-          '<div class="wb-stat"><div class="stat-value">'+s.newThisWeek+'</div><div class="stat-label">Nuove questa settimana</div></div>'+
-          '<div class="wb-stat"><div class="stat-value">'+s.known+'</div><div class="stat-label">Known</div></div>'+
-          '<div class="wb-stat"><div class="stat-value">'+s.learning+'</div><div class="stat-label">Learning</div></div>';
+          '<div class="wb-stat"><div class="stat-value">'+s.totalWords+'</div><div class="stat-label">'+DT('wb_stat_total','Totale parole')+'</div></div>'+
+          '<div class="wb-stat"><div class="stat-value">'+s.newThisWeek+'</div><div class="stat-label">'+DT('wb_stat_new_week','Nuove questa settimana')+'</div></div>'+
+          '<div class="wb-stat"><div class="stat-value">'+s.known+'</div><div class="stat-label">'+DT('wb_stat_mastered','Padroneggiate')+'</div></div>'+
+          '<div class="wb-stat"><div class="stat-value">'+s.learning+'</div><div class="stat-label">'+DT('wb_stat_learning','In apprendimento')+'</div></div>'+
+          '<div class="wb-stat"><div class="stat-value">'+s.dueToday+'</div><div class="stat-label">'+DT('wb_stat_due','Da ripassare oggi')+'</div></div>';
       }
 
       async function renderExpandQuickChips() {
