@@ -1967,7 +1967,13 @@
      * chose a difficulty on the learner's behalf, so it is gone. */
     var gradeByKey = { '1': 0, '2': 1, '3': 2, '4': 3 };
     if (Object.prototype.hasOwnProperty.call(gradeByKey, e.key)) {
-      var btns = stage.querySelectorAll('.ics-grade');
+      /* The grade row is a SIBLING of #icsStage, not a child: querying it from the
+       * stage (as this first did) yields an empty list and the digits silently do
+       * nothing. gradeCard() scopes its own lookups to #learnerStage, so do the
+       * same here, with document as a last resort. */
+      var gradeScope = $('#learnerStage') || document;
+      var btns = $all('.ics-grade', gradeScope);
+      if (!btns || !btns.length) btns = $all('.ics-grade', document);
       var b = btns[gradeByKey[e.key]];
       if (b && !b.disabled) { e.preventDefault(); gradeCard(b); }
     }
