@@ -1619,6 +1619,12 @@
   function storeMeaning(word, lang, translation, source) {
     var clean = cleanTranslation(translation);
     if (!clean || !word) return;
+    // Refuse an echo, refuse noise. MyMemory answers with the word itself for the words
+    // it does not know -- 24 of 109 in a measured backfill -- and once with "%". Neither
+    // teaches anything, so neither is stored, shown or queued. Case and punctuation come
+    // off first, so "AGENCY" for "agency" counts as the echo it is.
+    if (wtKey(clean) === wtKey(word)) return;
+    if (clean.length < 2 || !/[a-zA-Z\u00C0-\u017F]/.test(clean)) return;
     (async function () {
       try {
         var sb = srcSb();
@@ -1660,6 +1666,9 @@
         var e2 = await enrichWord(word, lang);
         _wtDef[ck] = (e2 && e2.definition) || '';
         best = cleanTranslation(e2 && e2.translation);
+        // Same gate on the way out: an echo is not a meaning, and showing the English
+        // word as its own Italian translation is the kind of thing the learner notices.
+        if (best && (wtKey(best) === wtKey(word) || best.length < 2 || !/[a-zA-Z\u00C0-\u017F]/.test(best))) best = '';
         if (best) storeMeaning(word, lang, best, 'machine');
       } catch (e) {}
     } else if (legacy) {
