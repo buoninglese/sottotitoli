@@ -3935,10 +3935,85 @@
       // "Due today" prompt can tell the learner the number without re-querying.
       var _wbDue = 0;
 
+      /* ═══ "Oggi" — the one thing to do next ═══
+       * Every branch reads a number this page already loads and calls an entry point that
+       * already exists -- the due-words prompt, the word-bank list, the mic, the AI word
+       * list -- so this is assembly rather than new machinery. Two rules it follows:
+       * the card is built in JS (heading included) so it never flashes a placeholder, and
+       * each recommendation states its reason in one clause, which is what makes it read
+       * as guidance instead of one more number. JS injects ITALIAN and the i18n observer
+       * translates, per the convention used throughout this file. */
+      function dashGoWordbanks() {
+        var nav = document.querySelector('.nav-item[data-panel="wordbanks"]');
+        if (nav) nav.click();
+        setTimeout(function () {
+          var tab = document.querySelector('#pnl-wordbanks .tab-link[data-subtab="wb-overview"]');
+          if (tab) tab.click();
+        }, 60);
+      }
+
+      async function renderToday(stats) {
+        var host = document.getElementById('dashToday');
+        if (!host) return;
+        if (!stats) {
+          var lg = window.SOTTOTITOLI_STUDY_LANG || 'en';
+          try { if (typeof SottotitoliData !== 'undefined' && SottotitoliData.getWordbankStats) stats = await SottotitoliData.getWordbankStats(lg); } catch (e) {}
+        }
+        var due = (stats && stats.dueToday != null) ? stats.dueToday : null;
+        var learning = (stats && stats.learning != null) ? stats.learning : null;
+        var streak = (window.XP && XP.streak) ? XP.streak() : 0;
+        var aiLeft = Math.max(0, 3 - (typeof aiWbGetUsed === 'function' ? aiWbGetUsed() : 0));
+        var title, why, cta, alt;
+
+        if (due > 0) {
+          // ~20s a card, the pace the trainer actually runs at.
+          title = due === 1 ? DT('today_due_t1', 'Ripassa 1 parola') : DT('today_due_t', 'Ripassa {n} parole').replace('{n}', due);
+          why = DT('today_due_w', 'in scadenza oggi · circa {min} min').replace('{min}', Math.max(1, Math.round(due * 20 / 60)));
+          cta = { l: DT('today_due_cta', 'Ripassa adesso'), f: 'wbStartDue()' };
+          alt = { l: DT('start_session', 'Avvia sessione'), f: 'toggleStartSession()' };
+        } else if (learning > 0) {
+          title = DT('today_learn_t', 'Allena una banca parole');
+          why = DT('today_learn_w', '{n} parole in apprendimento, nessuna in scadenza').replace('{n}', learning);
+          cta = { l: DT('word_banks', 'Banche parole'), f: 'dashGoWordbanks()' };
+          alt = { l: DT('start_session', 'Avvia sessione'), f: 'toggleStartSession()' };
+        } else if (!streak) {
+          title = DT('today_streak_t', 'Registra 5 minuti');
+          why = DT('today_streak_w', 'tieni viva la tua serie di apprendimento');
+          cta = { l: DT('start_session', 'Avvia sessione'), f: 'toggleStartSession()' };
+          alt = { l: DT('word_banks', 'Banche parole'), f: 'dashGoWordbanks()' };
+        } else if (aiLeft > 0) {
+          title = DT('today_ai_t', 'Genera una banca su un tema');
+          why = DT('today_ai_w', 'ti restano {n} generazioni IA oggi').replace('{n}', aiLeft);
+          cta = { l: DT('dash_wordlist_ai', 'Lista parole con IA'), f: 'wbAiOpen()' };
+          alt = { l: DT('word_banks', 'Banche parole'), f: 'dashGoWordbanks()' };
+        } else {
+          host.innerHTML = '';
+          return;
+        }
+
+        host.innerHTML =
+          '<div class="wsc-head" style="display:flex;margin:0 0 20px"><h2 class="wsc-head-title">' + DT('dash_today_title', 'Oggi') + '</h2></div>' +
+          '<div style="background:var(--card);border:1px solid var(--line);border-radius:20px;padding:22px 26px;display:flex;align-items:center;justify-content:space-between;gap:18px;flex-wrap:wrap">' +
+            '<div style="min-width:240px;flex:1">' +
+              '<p class="c-micro c-micro--cyan" style="margin:0 0 6px;font-weight:700;letter-spacing:.12em">' + DT('today_eyebrow', 'IL TUO PROSSIMO PASSO') + '</p>' +
+              '<h3 style="font-size:20px;font-weight:800;color:var(--text);margin:0 0 4px;letter-spacing:-.01em">' + title + '</h3>' +
+              '<p style="font-size:13px;color:var(--text-soft);margin:0;line-height:1.5">' + why + '</p>' +
+            '</div>' +
+            '<div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">' +
+              '<button type="button" onclick="' + cta.f + '" style="border:none;border-radius:99px;padding:12px 22px;background:var(--cyan);color:#04121a;font:700 13px Inter,sans-serif;cursor:pointer">' + cta.l + '</button>' +
+              '<button type="button" onclick="' + alt.f + '" style="border:1px solid var(--line);border-radius:99px;padding:12px 20px;background:transparent;color:var(--text-soft);font:600 13px Inter,sans-serif;cursor:pointer">' + alt.l + '</button>' +
+            '</div>' +
+          '</div>';
+        if (typeof I18n !== 'undefined' && I18n.apply) { try { I18n.apply(host); } catch (e) {} }
+      }
+      window.renderToday = renderToday;
+      window.dashGoWordbanks = dashGoWordbanks;
+
       async function renderWordbanks() {
         var lang = window.SOTTOTITOLI_STUDY_LANG || 'en';
         // ── Stats (cyan metric card style) ──
         var stats = await SottotitoliData.getWordbankStats(lang);
+        renderToday(stats);
         var statsEl = document.getElementById('wbStats');
         if (statsEl) {
           _wbDue = stats.dueToday || 0;
