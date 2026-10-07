@@ -3187,7 +3187,27 @@
     else if (w.confirm(t('learner_redo_warn'))) go();
   }
 
+  /* Where a finished session lands. A bank session was started from a bank card in
+   * the word-bank panel, so it goes back there -- and to the same language's list,
+   * which is the pane the Train button was on. The completion card used to promise
+   * "back to the word banks" and then call closeSession(), which only did
+   * showPane(lastPane): the learner stayed inside the trainer. Other modes keep that
+   * old behaviour, because that IS where they started. */
+  function goToWordbanks(lang) {
+    var nav = document.querySelector('.nav-item[data-panel="wordbanks"]');
+    if (!nav) return;
+    nav.click();
+    var sub = (String(lang).toLowerCase().indexOf('it') === 0) ? 'wb-overview-it' : 'wb-overview';
+    setTimeout(function () {
+      var tab = document.querySelector('#pnl-wordbanks .tab-link[data-subtab="' + sub + '"]');
+      if (tab) tab.click();
+    }, 60);
+  }
+
   function closeSession() {
+    // Read the mode before the session is dropped: this is the only place that knows
+    // whether the learner has to be put back on the word-bank list.
+    var bankLang = (session && session.mode === 'bank') ? (session.lang || null) : null;
     // Save mission progress so the learner can continue where they left off.
     if (session && session.mode === 'mission' && session.idx < session.steps.length) {
       saveMissionProg({ mode: 'mission', unit: session.unit, steps: session.steps, idx: session.idx, earned: session.earned, updatedAt: new Date().toISOString() });
@@ -3198,6 +3218,7 @@
     session = null;
     if (recog) { try { recog.stop(); } catch (e) {} recog = null; }
     refresh();
+    if (bankLang !== null) goToWordbanks(bankLang);
   }
 
   /* ═══════════════════ Public + refresh hooks ═══════════════════ */
