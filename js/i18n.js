@@ -201,6 +201,7 @@
       "aiuto": "Aiuto",
       "trial_ends": "Trial ends in",
       "days": "giorni",
+      "day": "giorno",
 
       // ── Re-consent gate (built by js/reconsent.js) ──
       // {VERSION} is replaced at runtime with config.termsVersion.
@@ -1844,6 +1845,7 @@
       "aiuto": "Help",
       "trial_ends": "Trial ends in",
       "days": "days",
+      "day": "day",
 
       // ── Re-consent gate (built by js/reconsent.js) ──
       "reconsent_title": "Confirm the Terms of Service",

@@ -1157,6 +1157,16 @@
         // disagreed about the word. (The old expression is deliberately not reproduced
         // here, so grepping for that pattern finds code rather than this comment.)
         if (streakEl) streakEl.textContent = streakDays;
+        // The unit follows the NUMBER: one day is "1 giorno", not "1 giorni". The key and
+        // the Italian text are set here and the observer translates, per the convention
+        // in this file, so both languages get it without a language check in JS.
+        var streakUnit = document.getElementById('heroStreakUnit');
+        if (streakUnit) {
+          var oneDay = (streakDays === 1);
+          streakUnit.setAttribute('data-i18n', oneDay ? 'day' : 'days');
+          streakUnit.textContent = oneDay ? 'giorno' : 'giorni';
+          if (typeof I18n !== 'undefined' && I18n.apply) { try { I18n.apply(streakUnit); } catch (e) {} }
+        }
         if (streakBox && streakGlow) {
           var sc = getStreakColor(streakDays);
           var isAnimated = Math.floor(streakDays / 7) >= 9;

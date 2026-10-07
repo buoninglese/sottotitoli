@@ -73,7 +73,10 @@
                      var isStarter = r._isStarter === true;
                      var name = isStarter ? (r.report_type || 'Report iniziale')
                                          : (MODULE_LABELS[r.module_id] || MODULE_LABELS_FALLBACK[r.module_id] || r.report_type || 'Report');
-                    var date = r.created_at ? new Date(r.created_at).toLocaleDateString(I18n.locale(), {day:'2-digit', month:'short', year:'numeric'}) : '—';
+                    // The time is part of the date on purpose: several reports share the
+                    // same product name, so two generated the same day were literally
+                    // indistinguishable in this table. Hour and minute separate them.
+                    var date = r.created_at ? new Date(r.created_at).toLocaleDateString(I18n.locale(), {day:'2-digit', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit'}) : '—';
                     var status = r.status || 'completed';
                     var conf = r.confidence || r.overall_score;
                     var score = conf ? conf + '/100' : '';
