@@ -5845,7 +5845,21 @@
       window.wbStartDue = function() {
         if (!window.Learner || !Learner.openReview) return;
         if (!_wbDue) {
-          if (window.appAlert) window.appAlert(DT('wb_due_none', 'Non c\'è nulla da ripassare adesso.'), DT('wb_stat_due', 'Da ripassare oggi'), '✅');
+          // _wbDue is filled by renderWordbanks(), which only runs once the word-bank
+          // panel has been opened. From the dashboard that made this claim there was
+          // nothing to review while 87 words sat in the queue -- measured live. Rather
+          // than trust an unset field, ask, then re-enter through the same door so the
+          // prompt and its wording stay in one place. The alert survives as the genuine
+          // "nothing due" answer, which is what it was always meant to be.
+          var _lang = window.SOTTOTITOLI_STUDY_LANG || 'en';
+          var tell = function () {
+            if (window.appAlert) window.appAlert(DT('wb_due_none', 'Non c\'è nulla da ripassare adesso.'), DT('wb_stat_due', 'Da ripassare oggi'), '✅');
+          };
+          if (typeof SottotitoliData === 'undefined' || !SottotitoliData.getWordbankStats) { tell(); return; }
+          SottotitoliData.getWordbankStats(_lang).then(function (s) {
+            _wbDue = (s && s.dueToday) || 0;
+            if (_wbDue) window.wbStartDue(); else tell();
+          }, tell);
           return;
         }
         if (!window.appPrompt) { Learner.openReview('due', null, {}); return; }
