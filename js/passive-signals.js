@@ -190,15 +190,16 @@
       var totalMinutes = 0, totalWords = 0;
       for (var i = 0; i < rows.length; i++) {
         var s = rows[i];
-        var segR = await sb.from('session_segments')
-          .select('original_text,start_time,end_time,confidence')
-          .eq('session_id', s.id)
-          .order('sequence', { ascending: true })
-          .limit(500);
-        var segs = segR.data || [];
-        var p = extract(s, segs);
+        // No segment fetch. `session_segments` never existed as a table, so this
+        // used to 400/404 once per session on every load. The only per-segment
+        // table is `transcript_segments`, which is keyed by room_id while
+        // sessions.room holds values like "caption-enus-mw7yu26i" — they can never
+        // join — and nothing in the app writes it (0 rows). The transcript lives
+        // on the session row this query already selects, so every signal except
+        // pause length still computes, and pause stays an honest null.
+        var p = extract(s, []);
         totalMinutes += (Number(s.duration_seconds) || 0) / 60;
-        totalWords += wordCount(s, segs);
+        totalWords += wordCount(s, []);
         history.push({
           at: s.created_at,
           wpm: p.wpm,

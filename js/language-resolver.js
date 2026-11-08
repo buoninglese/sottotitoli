@@ -10,26 +10,18 @@
 var S8T_LANG = (function() {
   'use strict';
 
-  var DEFAULT_MODEL = 'meta-llama/Llama-3.1-8B-Instruct';
-  var DEFAULT_PROVIDER = 'llama31';
+  var DEFAULT_MODEL = 'gpt-6-luna';
+  var DEFAULT_PROVIDER = 'luna';
   var DEFAULT_LANG = 'en';
 
-  // ── Model selection per language ──
-  // NL and PL use Llama 3.3 70B (better quality for those languages)
-  // EN uses Llama 3.1 + LanguageTool fallback
-  // All others use Llama 3.1
-  var MODEL_PER_LANG = {
-    nl: 'meta-llama/Llama-3.3-70B-Instruct',
-    pl: 'meta-llama/Llama-3.3-70B-Instruct',
-  };
-  var PROVIDER_PER_LANG = {
-    nl: 'llama33',
-    pl: 'llama33',
-  };
+  // ── Model selection ──
+  // One model for every language since 2026-11-08, when Hugging Face was removed
+  // and gpt-6-luna replaced the per-language ids. The maps are kept (empty) so
+  // callers that read them keep working and a future choice has one home.
+  var MODEL_PER_LANG = {};
+  var PROVIDER_PER_LANG = {};
   var MODEL_LABELS = {
-    'meta-llama/Llama-3.1-8B-Instruct': 'Llama 3.1',
-    'meta-llama/Llama-3.3-70B-Instruct': 'Llama 3.3',
-    'meta-llama/Llama-4-Scout-17B-16E-Instruct': 'Llama 4',
+    'gpt-6-luna': 'Luna',
   };
 
   function getModelForLanguage(lang) {

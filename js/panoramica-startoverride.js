@@ -1,4 +1,4 @@
-// ═══ Override Start Session: 7 languages + Llama model selector ═══
+// ═══ Override Start Session: 7 languages + AI model selector ═══
 (function(){
   var LANGUAGES = [
     {code:'en',flag:'🇬🇧',name:'English'},

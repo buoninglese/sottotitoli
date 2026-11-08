@@ -1665,10 +1665,12 @@
       //    already changed under this panel once — so we call its extract() per
       //    session instead of keeping a second copy of the rules.
       //
-      //    Segments also unlock pause length, which the dashboard's stats query
-      //    never returns. Fetched lazily, on purpose: this runs only when the
-      //    panel opens, and any failure returns null so the metrics fall back to
-      //    an explicit state rather than printing a confident-looking number.
+      //    The transcripts these signals are computed from live on the session
+      //    row (`sessions.transcript_text`), not in a segment table. Fetched
+      //    lazily and bounded to WSC_SIG_MAX sessions, on purpose: this runs only
+      //    when the panel opens, and any failure returns null so the metrics fall
+      //    back to an explicit state rather than printing a confident-looking
+      //    number.
       var WSC_SIG_MAX = 20;   // sessions analysed per period, newest first
 
       function wscPassiveModule() {
@@ -1746,35 +1748,60 @@
           if (!uid) return null;
 
           // Newest first, then capped: a year of sessions is far too many to
-          // pull segments for, and the freshest window is the honest one.
+          // pull transcripts for, and the freshest window is the honest one.
           var picked = agg.rows.slice().sort(function(a, b) {
             return new Date(b.started_at) - new Date(a.started_at);
           }).slice(0, WSC_SIG_MAX);
 
-          var segs = await Promise.all(picked.map(function(s) {
-            return sb.from('session_segments')
-              .select('original_text,start_time,end_time,confidence')
-              .eq('session_id', s.id)
-              .order('sequence', { ascending: true })
-              .limit(500)
-              .then(function(res) {
-                return (res && !res.error && res.data) ? res.data : null;
-              }, function() { return null; });
-          }));
+          // One bounded request for the transcripts of the sessions being
+          // analysed.
+          //
+          // This used to query `session_segments` once per session. That table
+          // has never existed, so every request failed, `seg` was null for every
+          // row, and the guard below then skipped EVERY session — which returned
+          // null and meant these period signals silently never computed at all.
+          //
+          // The only per-segment table is `transcript_segments`: keyed by room_id
+          // while sessions.room holds "caption-enus-mw7yu26i"-style values, so the
+          // two can never join, and nothing writes it (0 rows). The transcript is
+          // on the session itself — the stats payload these rows come from does
+          // not select it, hence this fetch.
+          var texts = {};
+          try {
+            var tRes = await sb.from('sessions')
+              .select('id,transcript_text')
+              .in('id', picked.map(function(s) { return s.id; }));
+            if (tRes && !tRes.error && tRes.data) {
+              tRes.data.forEach(function(r) { texts[r.id] = r.transcript_text || ''; });
+            } else {
+              console.warn('period signals: transcript fetch failed: ' +
+                ((tRes && tRes.error && tRes.error.message) || 'no data'));
+            }
+          } catch (e) {
+            console.warn('period signals: transcript fetch threw: ' + e);
+          }
 
           var history = [];
-          // Transcript text for the GSE pass, built from the SAME segments, so no
-          // second fetch and no disagreement about what was said.
+          // Transcript text for the GSE pass, from the same fetch, so there is no
+          // second request and no disagreement about what was said.
           var allText = [];
-          picked.forEach(function(s, i) {
-            var seg = segs[i];
-            // No segments means no transcript, so extract() would report 0 words
-            // and no measurable pause. Zero words is a fabrication, not a
-            // measurement — skip the session rather than fold it in.
-            if (!seg || !seg.length) return;
-            var p = P.extract(s, seg);
+          picked.forEach(function(s) {
+            var text = texts[s.id] || '';
+            // No transcript means no measurable speech, so extract() would report
+            // 0 words. Zero words is a fabrication, not a measurement — skip the
+            // session rather than fold it in. Sessions saved with transcripts off
+            // land here.
+            if (!text.trim()) return;
+            // extract() reads exactly three fields: the transcript, the stored
+            // wpm and the duration. Passing the cached row directly would mutate
+            // it, so build the shape it expects.
+            var p = P.extract({
+              transcript_text: text,
+              wpm: s.wpm,
+              duration_seconds: s.duration_seconds
+            }, []);
             if (!p) return;
-            allText.push(seg.map(function(x) { return x.original_text || ''; }).join(' '));
+            allText.push(text);
             history.push({
               at: s.started_at,
               wpm: p.wpm,

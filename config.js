@@ -144,33 +144,31 @@ window.SOTTOTITOLI_CONFIG = {
 
   /** AI Voice TTS URLs — used by hugging-voice-* iframes.
    *  Local dev: "http://localhost:8765" (Custom), ":8766" (Base), ":8767" (Kokoro)
-   *  Production: HF Spaces (start them if sleeping) */
+   *
+   *  These pointed at Hugging Face Spaces until 2026-11-08. They are blank now
+   *  because nothing in the app reads them and the live voice path is
+   *  `websocketUrl` above (sottotitoli-websocket.onrender.com). Fill them in with
+   *  a non-Hugging-Face host if the Space-hosted voices are ever brought back. */
   aiVoice: {
-    customVoiceUrl: "wss://s8t-sottotitoli-voice.hf.space/v1/realtime",
+    customVoiceUrl: "",
     baseVoiceUrl:   "http://localhost:8766",
-    kokoroVoiceUrl: "wss://s8t-sottotitoli-voice.hf.space/v1/realtime"
+    kokoroVoiceUrl: ""
   },
 
   /** AI Voice — Voice Conversation Partner (Premium) */
   voicePartner: {
-    /** WebSocket URL for the speech-to-speech server */
-    serverUrl: "wss://s8t-sottotitoli-voice.hf.space/v1/realtime",
+    /** WebSocket URL for the speech-to-speech server. Empty since the Hugging
+     *  Face Space was dropped on 2026-11-08 — set it if the partner relaunches. */
+    serverUrl: "",
     /** Voice Credits per hour */
     vcPerHour: 50,
     /** Minimum balance to start */
     minBalance: 10
   },
 
-  /** Hugging Face token for Inference Providers (Cerebras via Router).
-   *  Used by AI Voice browser mode for direct LLM calls.
-   *  Create at https://huggingface.co/settings/tokens
-   *  Needs "Make calls to Inference Providers" permission.
-   *  Real token lives in config.secrets.js (gitignored).
-   *  For production, the hf-proxy Edge Function injects it server-side. */
-  hfToken: "hf_...",  // real value in config.secrets.js (gitignored)
-  /** HF Proxy URL — server-side Edge Function that injects the HF token.
-      Deploy with: supabase functions deploy hf-proxy --no-verify-jwt
-      Set secret: supabase secrets set HF_TOKEN=hf_... */
+  /** Server-side LLM proxy (Edge Function). The slug is historical: it used to
+   *  forward to Hugging Face and now forwards to OpenAI. Nothing in the app reads
+   *  this value today; it is kept as the documented address of the endpoint. */
   hfProxyUrl: "https://qzqmuegbpmvqrjrlfbgk.supabase.co/functions/v1/hf-proxy",
 
   /** Onboarding Starter Report AI endpoint.
