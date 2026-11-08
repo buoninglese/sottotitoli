@@ -142,29 +142,11 @@ window.SOTTOTITOLI_CONFIG = {
     }
   },
 
-  /** AI Voice TTS URLs — used by hugging-voice-* iframes.
-   *  Local dev: "http://localhost:8765" (Custom), ":8766" (Base), ":8767" (Kokoro)
-   *
-   *  These pointed at Hugging Face Spaces until 2026-11-08. They are blank now
-   *  because nothing in the app reads them and the live voice path is
-   *  `websocketUrl` above (sottotitoli-websocket.onrender.com). Fill them in with
-   *  a non-Hugging-Face host if the Space-hosted voices are ever brought back. */
-  aiVoice: {
-    customVoiceUrl: "",
-    baseVoiceUrl:   "http://localhost:8766",
-    kokoroVoiceUrl: ""
-  },
-
-  /** AI Voice — Voice Conversation Partner (Premium) */
-  voicePartner: {
-    /** WebSocket URL for the speech-to-speech server. Empty since the Hugging
-     *  Face Space was dropped on 2026-11-08 — set it if the partner relaunches. */
-    serverUrl: "",
-    /** Voice Credits per hour */
-    vcPerHour: 50,
-    /** Minimum balance to start */
-    minBalance: 10
-  },
+  /** Speech-to-speech / Voice Conversation Partner does NOT belong to this site.
+   *  Removed 2026-11-08 along with the Hugging Face Space that hosted it: the
+   *  `aiVoice` and `voicePartner` blocks pointed at hf.space and nothing in the
+   *  app ever read them. If the feature returns it is its own project — the
+   *  server source lives in the backend repo. Do not re-add URLs here. */
 
   /** Server-side LLM proxy (Edge Function). It forwards to OpenAI so the key
    *  never reaches the browser. Renamed from `hf-proxy` on 2026-11-08 when
