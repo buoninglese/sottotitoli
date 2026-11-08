@@ -166,10 +166,11 @@ window.SOTTOTITOLI_CONFIG = {
     minBalance: 10
   },
 
-  /** Server-side LLM proxy (Edge Function). The slug is historical: it used to
-   *  forward to Hugging Face and now forwards to OpenAI. Nothing in the app reads
-   *  this value today; it is kept as the documented address of the endpoint. */
-  hfProxyUrl: "https://qzqmuegbpmvqrjrlfbgk.supabase.co/functions/v1/hf-proxy",
+  /** Server-side LLM proxy (Edge Function). It forwards to OpenAI so the key
+   *  never reaches the browser. Renamed from `hf-proxy` on 2026-11-08 when
+   *  Hugging Face was removed. Nothing in the app reads this value today; it is
+   *  kept as the documented address of the endpoint. */
+  llmProxyUrl: "https://qzqmuegbpmvqrjrlfbgk.supabase.co/functions/v1/llm-proxy",
 
   /** Onboarding Starter Report AI endpoint.
    *  Local dev: "http://localhost:8771/starter-report" (tmp/report-ai-space)
