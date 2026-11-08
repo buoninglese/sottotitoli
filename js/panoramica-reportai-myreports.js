@@ -220,7 +220,7 @@
                           charge_reference: price > 0 ? chargeRef : null,
                           credits_charged: price,
                           tokens_spent: 0
-                        });
+                        }).select('id').single();
                         if (ins.error) {
                           if (price > 0) {
                             try { await sb.rpc('refund_report_credits', { p_user_id: uid, p_amount: price, p_reference: chargeRef }); } catch (e) {}
@@ -228,6 +228,25 @@
                           appAlert('Errore durante la richiesta: ' + ins.error.message + '. Crediti riaccreditati.', 'Errore', '⚠️');
                           loadReports();
                           return;
+                        }
+                        // Trigger processing now, so the cron is a backstop and
+                        // not the only processor (see js/grammar-report.js for
+                        // why that mattered: an every-minute cron took the
+                        // database down on 2026-11-08).
+                        try {
+                          var newId = ins.data && ins.data.id;
+                          if (newId) {
+                            await fetch('https://qzqmuegbpmvqrjrlfbgk.supabase.co/functions/v1/process-ai-reports', {
+                              method: 'POST',
+                              headers: {
+                                'Authorization': 'Bearer ' + r.data.session.access_token,
+                                'Content-Type': 'application/json'
+                              },
+                              body: JSON.stringify({ requestId: newId })
+                            });
+                          }
+                        } catch (efErr) {
+                          console.warn('Retry trigger failed (cron will pick it up):', efErr);
                         }
                         await sb.from('session_ai_reports').delete().eq('id', id).eq('user_id', uid);
                         showToastMsg('🔄 Report rimesso in coda. Controlla tra poco.');

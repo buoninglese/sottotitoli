@@ -178,6 +178,32 @@
     }
     var requestId = ins.data && ins.data.id;
 
+    // ── Trigger processing now ──────────────────────────────────────────────
+    // Until this existed, a Grammatica report was only ever processed by the
+    // cron — which ran EVERY MINUTE. Over 141 days that wrote 202,862 rows of
+    // pg_cron run history (231MB) and roughly 1GB/day of pg_net response bodies,
+    // together 94% of a 366MB database, and on 2026-11-08 it helped push the
+    // 256MB instance to a 1.11GB memory commitment with no swap, which wedged
+    // Postgres and took the whole database offline.
+    //
+    // The preset path already triggers itself (js/panoramica-reportai.js), so
+    // this is the same pattern applied to the one path that was missing it. The
+    // cron stays as a backstop for a failed trigger, and can now be slow.
+    // Fire-and-forget on purpose: if this call fails, the request is already
+    // queued and the cron will pick it up.
+    try {
+      await fetch('https://qzqmuegbpmvqrjrlfbgk.supabase.co/functions/v1/process-ai-reports', {
+        method: 'POST',
+        headers: {
+          'Authorization': 'Bearer ' + r.data.session.access_token,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ requestId: requestId })
+      });
+    } catch (efErr) {
+      console.warn('Report trigger failed (the cron will pick it up):', efErr);
+    }
+
     // Poll for THIS request's report. Matching on request_id (written by
     // process-ai-reports) instead of "newest completed report for this user"
     // means a report generated in parallel can never be rendered as this one's.
