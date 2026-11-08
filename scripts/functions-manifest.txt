@@ -1,0 +1,46 @@
+# Every edge function, and whether the GATEWAY should verify a JWT for it.
+#
+# Format:  <slug>  <on|off>
+#
+#   on   gateway JWT verification is enabled. The caller must send a real user
+#        access token; the function may still check it again itself.
+#   off  gateway verification is disabled because the caller cannot send a user
+#        JWT: the cron, Stripe, or a function that does its own auth.
+#
+# Getting this wrong is silent in the bad direction:
+#   * deploying a JWT-OFF function WITHOUT --no-verify-jwt flips it to "on", and
+#     the cron/Stripe callers start getting 401 with no other symptom;
+#   * deploying a JWT-ON function WITH --no-verify-jwt opens it to the internet.
+#
+# Verified against the live project on 2026-11-08 by probing each endpoint:
+# gateway-on answers {"code":"UNAUTHORIZED_NO_AUTH_HEADER"}, gateway-off answers
+# in the function's own voice ({"error":"Unauthorized"}, "No signature", etc.).
+#
+# scripts/check-functions.sh fails if the live mode ever drifts from this file.
+
+# ── gateway JWT ON: browser callers with a signed-in user ──
+analyze-session                  on
+create-checkout-session          on
+create-invite                    on
+create-room                      on
+dictionary-proxy                 on
+generate-grammar-report          on
+generate-learner-content         on
+generate-word-bank               on
+grammar-segment                  on
+join-room                        on
+transcribe-audio                 on
+translate-segment                on
+vocab-lookup                     on
+welcome-notification             on
+
+# ── gateway JWT OFF: cron, Stripe, or own auth ──
+diarize-speakers                 off
+extract-learner-profile          off
+llm-proxy                        off
+process-ai-reports               off   # cron job 9 posts here every 15 min
+process-session-analytics        off
+session-rewards                  off
+starter-report                   off
+stripe-webhook                   off   # Stripe signs instead of JWT
+translate                        off

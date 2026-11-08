@@ -1,0 +1,51 @@
+-- A3 finding: family_key NOT NULL blocks every report generation.
+--
+-- SYMPTOM
+--   Every report request fails at enqueue. The frontend charges credits FIRST and
+--   only then inserts (js/panoramica-reportai.js:230), so the user is charged,
+--   the insert fails with 23502, and the code falls into its refund branch.
+--   Whether the user keeps their credits depends entirely on that refund working.
+--
+-- PROOF (reproduced, zero cost, rolled back)
+--   INSERT INTO ai_report_requests (user_id, session_ids, module_key, scope_type,
+--                                   status, tokens_spent)
+--   VALUES (<uuid>, '{}', '3', 'single_session', 'queued', 0);
+--   ERROR: 23502: null value in column "family_key" of relation
+--          "ai_report_requests" violates not-null constraint
+--
+-- WHY THE CONSTRAINT IS WRONG, NOT THE CLIENT
+--   * process-ai-reports/index.ts:481 treats it as optional:
+--         // ── Grant entitlement (if family_key exists) ──
+--         if (request.family_key) { ... }
+--   * supabase_setup.sql:28 originally declared it plain nullable:
+--         module_key TEXT, family_key TEXT,
+--   * No migration file mentions family_key, so the NOT NULL was added by hand in
+--     the dashboard. That is the process failure this file corrects: the change
+--     existed in the live database and nowhere in the repository.
+--   * Nothing else depends on it: no index, no RLS policy mentions family_key.
+--
+-- NULL is the normal case. A report bought on its own has no family; a report
+-- that is part of a purchased bundle carries one. The worker granting an
+-- entitlement only when the family exists is the intended design.
+--
+-- SAFETY
+--   Dropping a NOT NULL constraint cannot lose data and cannot fail on existing
+--   rows (there are none: the table was empty when this was written).
+
+ALTER TABLE public.ai_report_requests
+  ALTER COLUMN family_key DROP NOT NULL;
+
+-- Verification: the exact insert the frontend performs must now succeed.
+-- Run this after the ALTER; it must return one row and then roll back.
+--
+--   BEGIN;
+--   INSERT INTO public.ai_report_requests (
+--     user_id, session_ids, module_key, scope_type, status, tokens_spent
+--   ) VALUES (
+--     '<some user uuid>', '{}', '3', 'single_session', 'queued', 0
+--   ) RETURNING id, family_key, status;
+--   ROLLBACK;
+--
+-- Rollback of this migration (restores the breakage; do not run unless reverting):
+--   ALTER TABLE public.ai_report_requests
+--     ALTER COLUMN family_key SET NOT NULL;
