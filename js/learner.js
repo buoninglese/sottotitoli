@@ -269,11 +269,11 @@
    * Words are enriched with the same APIs the word boxes use:
    *   MyMemory translation, dictionary-proxy definitions, local CEFR_LEVELS.
    * All lazy + cached. */
-  var SRC = { banks: {}, bankWords: {}, review: {}, reviewAll: {}, pool: {} };
+  var SRC = { banks: {}, bankWords: {}, review: {}, reviewAll: {}, pool: {}, failed: false };
   var ENR = {}; // enrichment cache: 'lang:word' -> { translation, definition }
 
   // Drop cached source data so the next render re-queries fresh values.
-  function srcReset() { SRC.banks = {}; SRC.bankWords = {}; SRC.review = {}; SRC.reviewAll = {}; SRC.pool = {}; }
+  function srcReset() { SRC.banks = {}; SRC.bankWords = {}; SRC.review = {}; SRC.reviewAll = {}; SRC.pool = {}; SRC.failed = false; }
 
   // ── Active learner language ──
   // This site is for Italians learning English: the English tab is primary,
@@ -348,7 +348,11 @@
           else if (kind === 'new') q = q.eq('is_new', true);
           else if (kind === 'mastered') q = q.eq('review_state', 'mastered');
           var r = await q;
-          out = (r.data || []).map(function (rw) {
+          // supabase-js does NOT throw on a failed request — it resolves with { error }.
+          // Nothing used to look at it, so an expired token or a bad column rendered the
+          // path's empty state over data that had simply failed to arrive.
+          if (r && r.error) SRC.failed = true;
+          out = (r && r.data || []).map(function (rw) {
             var cefr = rw.cefr || '';
             // nextReviewAt / isNew / lapses / mastery are carried through for the
             // urgency ordering in reviewPriority(). Deliberately the same names
@@ -356,7 +360,13 @@
             // builders ignore keys they do not know.
             return { word: rw.lemma || rw.word, lang: lang, pos: rw.pos || '', cefr: cefr, definition: rw.translation_primary || '', translation: rw.translation_primary || '', usage: rw.personal_frequency || 0, reps: rw.reps || 0, nextReviewAt: rw.next_review_at, isNew: !!rw.is_new, lapses: rw.lapses || 0, mastery: rw.mastery_score || 0 };
           });
-        } catch (e) { out = []; }
+        } catch (e) {
+          // Swallowing this used to be indistinguishable from "you have no words": the
+          // path rendered its empty state over a failed query. Record it so loadPath can
+          // say what happened instead of showing an empty course.
+          SRC.failed = true;
+          out = [];
+        }
       }
     }
     SRC.review[key] = out;
@@ -376,10 +386,11 @@
           var r = await sb.from('review_words')
             .select('id,lemma,pos,cefr,translation_primary,next_review_at,is_new,lapses,mastery_score,review_state,personal_frequency,reps,created_at')
             .eq('user_id', uid).eq('lang', lang).limit(500);
-          out = (r.data || []).map(function (rw) {
+          if (r && r.error) SRC.failed = true;
+          out = (r && r.data || []).map(function (rw) {
             return { word: rw.lemma || rw.word, lang: lang, pos: rw.pos || '', cefr: rw.cefr || '', translation: rw.translation_primary || '', nextReviewAt: rw.next_review_at, isNew: !!rw.is_new, lapses: rw.lapses || 0, mastery: rw.mastery_score || 0, state: rw.review_state || 'new', usage: rw.personal_frequency || 0, reps: rw.reps || 0 };
           });
-        } catch (e) { out = []; }
+        } catch (e) { SRC.failed = true; out = []; }
       }
     }
     SRC.reviewAll[lang] = out;
@@ -1061,23 +1072,35 @@
     loadPath(pane);
   }
 
+  // A promise that never settles is the one failure a catch block cannot see. The session
+  // check in particular talks to Supabase auth, which retries a dead token and can sit for a
+  // long time; without a bound the pane kept its spinner up with no way out.
+  function withTimeout(p, ms, label) {
+    return Promise.race([p, new Promise(function (_, rej) {
+      setTimeout(function () { rej(new Error('timeout ' + ms + 'ms: ' + label)); }, ms);
+    })]);
+  }
+
   async function loadPath(pane) {
-    // Every one of these is a network round-trip. Unhandled, a single rejection left the
-    // pane on the spinner forever: a flaky connection looked exactly like a broken page,
-    // with no message and no way to try again.
+    // Every one of these is a network round-trip, and the review queries historically
+    // swallowed their own errors — a failed query rendered as "you have no words". Both
+    // failure shapes (a rejection, a silent `SRC.failed`, a promise that never settles)
+    // must end in the same place: say so, offer Retry.
     try {
-      var authed = await srcIsAuthed();
+      var authed = await withTimeout(srcIsAuthed(), 15000, 'auth');
       if (!authed) { renderBundledPath(pane); return; }
       var lang = learnerLang();
-      var due = await srcReview('due', lang);
-      var fragile = await srcReview('fragile', lang);
-      var fresh = await srcReview('new', lang);
+      var due = await withTimeout(srcReview('due', lang), 15000, 'review due');
+      var fragile = await withTimeout(srcReview('fragile', lang), 15000, 'review fragile');
+      var fresh = await withTimeout(srcReview('new', lang), 15000, 'review new');
       // The goal tracker counts the learner's OWN words by part of speech, so it needs the whole
       // vocabulary, not just the review queues. srcReviewAll is cached — one query.
-      var vocab = await srcReviewAll(lang);
+      var vocab = await withTimeout(srcReviewAll(lang), 15000, 'review all');
       // The pane may have been re-rendered (tab switch, second open) while we were waiting.
       if (!pane.isConnected) return;
-      renderRealPath(pane, due, fragile, fresh, lang, vocab);
+      // A failed query must not hide the course: the tree is bundled and renders fine
+      // without any review data, so warn in place instead of replacing the whole pane.
+      renderRealPath(pane, due, fragile, fresh, lang, vocab, SRC.failed);
     } catch (err) {
       if (!pane.isConnected) return;
       renderPathError(pane, err);
@@ -1097,7 +1120,22 @@
     i18nScope(pane);
   }
 
-  function retryPath() { renderPath(); }
+  function retryPath() {
+    // The caches hold the empty results of the failed attempt; without this a retry would
+    // re-render the same nothing and look like the button does nothing.
+    srcReset();
+    renderPath();
+  }
+
+  // Inline, non-blocking notice for a partial load: the course is still usable, the
+  // review queues just could not be read.
+  function pathWarnHtml() {
+    return '<div class="lr-path-warn" role="status">' +
+      '<span class="lpw-icon" aria-hidden="true">⚠️</span>' +
+      '<span class="lpw-text">' + esc(t('learner_load_partial')) + '</span>' +
+      '<button type="button" class="lpw-retry" onclick="Learner.retryPath()">' + esc(t('learner_retry')) + '</button>' +
+    '</div>';
+  }
 
   function renderEmptyPath(pane) {
     pane.innerHTML = pathIntroHtml() + '<div class="learner-empty"><div class="le-emoji">🗂️</div><div class="le-title">' + t('learner_empty_path') + '</div>' +
@@ -1114,9 +1152,10 @@
     '</div>';
   }
 
-  function renderRealPath(pane, due, fragile, fresh, lang, vocab) {
+  function renderRealPath(pane, due, fragile, fresh, lang, vocab, warn) {
     var s = load();
     var html = pathIntroHtml();
+    if (warn) html += pathWarnHtml();
     // ── The guided course first: it IS the path, and it is what the pane is named after. ──
     html += courseSectionHtml();
     // ── Spaced review (always visible on both English & Italiano) ──
