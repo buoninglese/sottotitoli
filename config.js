@@ -148,12 +148,6 @@ window.SOTTOTITOLI_CONFIG = {
    *  app ever read them. If the feature returns it is its own project — the
    *  server source lives in the backend repo. Do not re-add URLs here. */
 
-  /** Server-side LLM proxy (Edge Function). It forwards to OpenAI so the key
-   *  never reaches the browser. Renamed from `hf-proxy` on 2026-11-08 when
-   *  Hugging Face was removed. Nothing in the app reads this value today; it is
-   *  kept as the documented address of the endpoint. */
-  llmProxyUrl: "https://qzqmuegbpmvqrjrlfbgk.supabase.co/functions/v1/llm-proxy",
-
   /** Onboarding Starter Report AI endpoint.
    *  Local dev: "http://localhost:8771/starter-report" (tmp/report-ai-space)
    *  Production: Supabase Edge Function (deployed) */
