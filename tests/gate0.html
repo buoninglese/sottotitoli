@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<title>Sottotitoli · Gate 0 beacon checks</title>
+<style>
+  :root { --ok:#059669; --bad:#dc2626; --muted:#6b7280; --line:#e5e7eb; }
+  body { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; margin:24px; color:#111; }
+  h1 { font-size:16px; margin:0 0 4px; }
+  p.sub { color:var(--muted); font-size:12px; margin:0 0 16px; }
+  table { border-collapse:collapse; font-size:12px; }
+  td { padding:4px 10px 4px 0; border-bottom:1px solid var(--line); vertical-align:top; }
+  .pass { color:var(--ok); font-weight:700; }
+  .fail { color:var(--bad); font-weight:700; }
+  #summary { margin-top:14px; font-weight:700; }
+  code { background:#f3f4f6; padding:1px 4px; border-radius:3px; }
+</style>
+</head>
+<body>
+<h1>Gate 0 — error beacon checks</h1>
+<p class="sub">
+  Pure logic test: the Supabase client is stubbed, so nothing is written and no network is used.
+  What this proves is the beacon's own rules — sanitisation, foreign-origin refusal, throttle,
+  dedupe, and that it actually catches a throw and a rejected promise.
+  The real insert path is proven separately by <code>scripts/check-gate0.sh</code>.
+</p>
+<table id="results"></table>
+<div id="summary">running…</div>
+
+<!-- Stub the client BEFORE the beacon loads, and define the two globals the beacon
+     prefers, so the production branch (its own anonymous client) is the one exercised. -->
+<script>
+  window.__inserted = [];
+  var SUPABASE_URL = 'https://stub.invalid';
+  var SUPABASE_ANON_KEY = 'stub-key';
+  window.supabase = {
+    createClient: function () {
+      return {
+        from: function (table) {
+          return {
+            insert: function (row) {
+              window.__inserted.push({ table: table, row: row });
+              return Promise.resolve({ error: null });
+            }
+          };
+        }
+      };
+    }
+  };
+</script>
+<script src="../js/error-beacon.js"></script>
+<script>
+(function () {
+  var rows = [];
+  function check(name, ok, detail) {
+    rows.push([name, ok, detail || '']);
+    var tr = document.createElement('tr');
+    tr.innerHTML = '<td class="' + (ok ? 'pass' : 'fail') + '">' + (ok ? 'PASS' : 'FAIL') + '</td>' +
+                   '<td>' + name + '</td><td>' + (detail || '') + '</td>';
+    document.getElementById('results').appendChild(tr);
+  }
+  function wait(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
+  function reset() {
+    window.__inserted = [];
+    try { localStorage.removeItem('sottotitoli-error-beacon'); } catch (e) {}
+    if (window.SottotitoliErrorBeacon) window.SottotitoliErrorBeacon.reset();
+  }
+
+  (async function () {
+    check('beacon exposes its hook', typeof window.SottotitoliErrorBeacon === 'object');
+
+    // 1. sanitisation — query and fragment must never be stored
+    reset();
+    window.SottotitoliErrorBeacon.report('T', 'msg', location.origin + '/deep/x.html?token=SECRET#access_token=JWT');
+    await wait(60);
+    var url = (window.__inserted[0] || {}).row ? window.__inserted[0].row.url : '';
+    check('strips query + fragment from url',
+          url === location.origin + '/deep/x.html',
+          url || '(no insert)');
+
+    // 2. a foreign origin must be refused outright
+    reset();
+    window.SottotitoliErrorBeacon.report('T', 'msg', 'https://evil.example/steal?x=1');
+    await wait(60);
+    check('refuses a foreign-origin url', window.__inserted.length === 0,
+          window.__inserted.length + ' insert(s)');
+
+    // 3. identical errors are stored once
+    reset();
+    window.SottotitoliErrorBeacon.report('DupError', 'same message');
+    window.SottotitoliErrorBeacon.report('DupError', 'same message');
+    await wait(60);
+    check('dedupes an identical error', window.__inserted.length === 1,
+          window.__inserted.length + ' insert(s)');
+
+    // 4. throttle: never more than 5 per page load
+    reset();
+    for (var i = 0; i < 20; i++) window.SottotitoliErrorBeacon.report('Throttle', 'm-' + i);
+    await wait(80);
+    check('caps at 5 reports per page load', window.__inserted.length === 5,
+          window.__inserted.length + ' insert(s)');
+
+    // 5. a genuine uncaught throw is captured
+    reset();
+    setTimeout(function () { throw new Error('gate0-uncaught'); }, 0);
+    await wait(120);
+    var caught = window.__inserted.some(function (x) {
+      return String(x.row.message).indexOf('gate0-uncaught') !== -1;
+    });
+    check('captures an uncaught throw', caught,
+          (window.__inserted[0] ? window.__inserted[0].row.message : '(nothing)'));
+
+    // 6. a genuine rejected promise is captured
+    reset();
+    Promise.reject(new Error('gate0-rejection'));
+    await wait(120);
+    var caughtRej = window.__inserted.some(function (x) {
+      return String(x.row.message).indexOf('gate0-rejection') !== -1;
+    });
+    check('captures an unhandled rejection', caughtRej,
+          (window.__inserted[0] ? window.__inserted[0].row.message : '(nothing)'));
+
+    // 7. every stored row has the columns the table expects
+    reset();
+    window.SottotitoliErrorBeacon.report('Shape', 'shape-check');
+    await wait(60);
+    var r0 = (window.__inserted[0] || {}).row || {};
+    var required = ['error_type', 'message', 'page', 'user_agent', 'url'];
+    var missing = required.filter(function (k) { return !(k in r0); });
+    check('writes the expected columns', missing.length === 0 && r0.table !== 'wrong',
+          missing.length ? 'missing: ' + missing.join(',') : 'all present');
+
+    var failed = rows.filter(function (r) { return !r[1]; }).length;
+    var s = document.getElementById('summary');
+    s.textContent = (rows.length - failed) + '/' + rows.length + ' checks passed' +
+                    (failed ? ' — ' + failed + ' FAILED' : ' — beacon rules hold');
+    s.className = failed ? 'fail' : 'pass';
+  })();
+})();
+</script>
+</body>
+</html>
