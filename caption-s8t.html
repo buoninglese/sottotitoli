@@ -8534,6 +8534,36 @@ window.fixExtrasPanelColors = function(){
     } catch (e) {}
   }
 
+  // ═══ Outbound queue ═══
+  // The relay is a free Render instance that sleeps (~25s cold start). Until it
+  // is awake, sends used to be dropped silently: the speaker kept talking, the
+  // partner received nothing, and neither of them could tell. Messages are queued
+  // instead and flushed the moment the socket opens.
+  window._duoOutbox = [];
+  var DUO_OUTBOX_MAX = 100;
+
+  function duoSend(payload) {
+    if (window._duoWs && window._duoWs.readyState === WebSocket.OPEN) {
+      try { window._duoWs.send(JSON.stringify(payload)); return true; } catch (e) {}
+    }
+    if (window._duoMode) {
+      if (window._duoOutbox.length >= DUO_OUTBOX_MAX) window._duoOutbox.shift();
+      window._duoOutbox.push(payload);
+    }
+    return false;
+  }
+
+  function duoFlushOutbox() {
+    if (!window._duoWs || window._duoWs.readyState !== WebSocket.OPEN) return;
+    var queued = window._duoOutbox.splice(0, window._duoOutbox.length);
+    for (var i = 0; i < queued.length; i++) {
+      try { window._duoWs.send(JSON.stringify(queued[i])); } catch (e) {}
+    }
+    if (queued.length && window.console) {
+      console.log('[duo] flushed ' + queued.length + ' message(s) captured while the relay was waking');
+    }
+  }
+
   // ═══ Functions ═══
   window.duoConnectWebSocket = function() {
     if (window._duoReconnectTimer) { clearTimeout(window._duoReconnectTimer); window._duoReconnectTimer = null; }
@@ -8547,6 +8577,8 @@ window.fixExtrasPanelColors = function(){
       window._duoWs.send(JSON.stringify({ join: window._duoRoomId }));
       // Announce presence
       window._duoWs.send(JSON.stringify({ type:'duo-join', name:window._duoSpeakerName, lang:window._duoSpeakerLang }));
+      // Only after joining, so the partner attributes them correctly.
+      duoFlushOutbox();
     };
 
     window._duoWs.onmessage = function(event) {
@@ -8803,8 +8835,8 @@ window.fixExtrasPanelColors = function(){
   _realMic.onFinal = function(text) {
     // Call original handler (adds to transcript, stats, etc.)
     if (_origOnFinal) _origOnFinal(text);
-    // If in DUO mode and WebSocket is open, send labeled message
-    if (window._duoMode && window._duoWs && window._duoWs.readyState === WebSocket.OPEN) {
+    // In DUO mode, send a labelled message — queued if the relay is not awake yet.
+    if (window._duoMode) {
       var label = duoAssignLabel(window._duoSpeakerName, window._duoSpeakerLang);
       // Override the line border color to match DUO+ speaker color
       var transcript = document.getElementById('captionTranscript');
@@ -8812,8 +8844,8 @@ window.fixExtrasPanelColors = function(){
         var lastLine = transcript.querySelector('.line:last-child');
         if (lastLine) lastLine.style.borderLeftColor = window._duoSpeakerMap[label].color;
       }
-      window._duoWs.send(JSON.stringify({ type:'duo-speaking', name:window._duoSpeakerName, lang:window._duoSpeakerLang }));
-      window._duoWs.send(JSON.stringify({ msg:true, final:text, id:Date.now(), label:label, speaker:window._duoSpeakerName, lang:window._duoSpeakerLang }));
+      duoSend({ type:'duo-speaking', name:window._duoSpeakerName, lang:window._duoSpeakerLang });
+      duoSend({ msg:true, final:text, id:Date.now(), label:label, speaker:window._duoSpeakerName, lang:window._duoSpeakerLang });
     }
   };
 

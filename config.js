@@ -64,9 +64,6 @@ window.SOTTOTITOLI_CONFIG = {
   /** WebSocket relay server URL */
   websocketUrl: "wss://sottotitoli-websocket.onrender.com",
 
-  /** Site display name */
-  siteName: "Sottotitoli",
-
   /** Terms of Service version accepted at sign-up.
    *  MUST match the "In vigore dal" date in termini.html.
    *  ⚠️ SINGLE SOURCE OF TRUTH — do not hardcode this date anywhere else.
@@ -92,13 +89,6 @@ window.SOTTOTITOLI_CONFIG = {
     myMemoryBase: "https://api.mymemory.translated.net/get"
   },
 
-  /** Analysis / speaker diarization endpoint */
-  analysis: {
-    speakerEndpoint: "https://sottotitoli-websocket.onrender.com/analyze-speakers"
-  },
-
-  /** CEFR vocabulary API (sottotitoli-websocket Render service + Words-CEFR-Dataset) */
-  cefrApiUrl: "https://sottotitoli-websocket.onrender.com/api/cefr",
 
   /** Language and translation mode definitions */
   modes: {
@@ -161,8 +151,6 @@ window.SOTTOTITOLI_CONFIG = {
 
   /** Stripe payment integration */
   stripe: {
-    /** Your Stripe publishable key (pk_test_... for testing, pk_live_... for production) */
-    publishableKey: "pk_test_YOUR_STRIPE_PUBLISHABLE_KEY",
     /** Supabase Edge Function URL for creating Checkout Sessions */
     checkoutFunctionUrl: "https://qzqmuegbpmvqrjrlfbgk.supabase.co/functions/v1/create-checkout-session",
     /** Stripe Price IDs — must match the PRICE_MAP in supabase/functions/create-checkout-session */
