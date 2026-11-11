@@ -365,7 +365,7 @@ serve(async (req) => {
             }).eq('user_id', userId)
           : await supabase.from('user_tokens').insert({
               user_id: userId,
-              balance: 3 + tokens, // 3 free signup tokens + purchase
+              balance: 3 + tokens, // fallback only: signup creates this row, so 3 is the column DEFAULT
               lifetime_tokens: tokens,
             });
 
