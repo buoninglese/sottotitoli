@@ -1222,43 +1222,46 @@
           '<div class="unit-head"><div class="unit-emoji" style="color:' + u.color + '">' + esc(u.icon) + '</div>' +
             '<div><h3 class="unit-title">' + esc(u.title) + '</h3><p class="unit-sub">' + esc(u.subtitle) + '</p></div>' + badge +
           '</div>' +
+          // How far through the unit you are, as a line rather than a sentence.
+          '<div class="unit-progress" role="progressbar" aria-valuemin="0" aria-valuemax="' + total + '" aria-valuenow="' + done + '">' +
+            '<i style="width:' + (total ? Math.round(done / total * 100) : 0) + '%"></i></div>' +
           '<div class="lesson-path">';
         u.lessons.forEach(function (l) {
           var isDone = !!s.lessons[u.id + ':' + l.id];
           var avail = isDone || isLessonAvailable(u, l);
           var nodeIcon = isDone ? '✓' : esc(l.icon || '●');
           var lessonScore = isDone ? scoreOf('lesson:' + u.id + ':' + l.id) : null;
-          // The node button's ONLY content is a glyph (✓ / an emoji / ●), so it had no accessible
-          // name at all. Name it with the lesson title — the exact string the adjacent .ll-title
-          // shows — so the name matches the visible label. State is not repeated here: a locked
-          // node is `disabled` (announced as unavailable) and a done node is announced via the
-          // sibling .lesson-score. Used instead of aria-labelledby because BOTH the logged-in
-          // course tree and the logged-out teaser render this same markup, so ids would collide.
-          html += '<div class="lesson-node-row">' +
-            '<button type="button" class="lesson-node ' + (isDone ? 'done' : (avail ? 'available' : '')) + '" ' +
-              'aria-label="' + esc(l.title) + '" ' +
-              (avail ? 'onclick="Learner.openLesson(\'' + u.id + '\',\'' + l.id + '\')"' : 'disabled') + '>' + nodeIcon + '</button>' +
-            '<div class="lesson-label"><div class="ll-title">' + esc(l.title) + '</div><div class="ll-sub">' + esc(l.description) + '</div></div>' +
-            (isDone ? '<span class="lesson-score">✓' + (lessonScore ? ' ' + lessonScore.pct + '%' : '') + '</span>'
-              : (avail ? '<button class="lesson-link" onclick="Learner.openLesson(\'' + u.id + '\',\'' + l.id + '\')">' + t('learner_continue') + '</button>' : '')) +
-          '</div>' +
+          var state = isDone ? 'done' : (avail ? 'current' : 'locked');
+          var exCount = buildStepsForLesson(l).length;
+          // The ROW is the control, not the bubble. Tapping anywhere on the card opens
+          // the lesson — on a phone that is the difference between a target you have to
+          // aim at and one you can hit with a thumb. The bubble is decoration now, so it
+          // is aria-hidden; the button's own text (title, description, count) names it.
+          html += '<button type="button" class="lesson-node-row ' + state + '" ' +
+              (avail ? 'onclick="Learner.openLesson(\'' + u.id + '\',\'' + l.id + '\')"' : 'disabled') + '>' +
+            '<span class="lesson-node" aria-hidden="true">' + nodeIcon + '</span>' +
+            '<span class="lesson-label"><span class="ll-title">' + esc(l.title) + '</span>' +
+              '<span class="ll-sub">' + esc(l.description) + '</span></span>' +
+            (isDone && lessonScore ? '<span class="lesson-score">✓ ' + lessonScore.pct + '%</span>' : '') +
+            '<span class="lesson-count">' + exCount + ' <span data-i18n="learner_exercises">esercizi</span></span>' +
+          '</button>' +
           '<div class="connector ' + (isDone ? 'done' : '') + '"></div>';
         });
         var testAvail = isTestAvailable(u);
-        var testState = s.tests[u.id] && s.tests[u.id].passed ? 'done' : (testAvail ? 'available' : '');
         var testScore = scoreOf('test:' + u.id);
-        html += '<div class="lesson-node-row">' +
-          // Icon-only control: the name comes from the existing learner_unit_test key, and
-          // data-i18n-aria-label keeps it in sync when the language is switched later.
-          '<button type="button" class="lesson-node test ' + testState + '" ' +
-            'aria-label="' + esc(t('learner_unit_test')) + '" data-i18n-aria-label="learner_unit_test" ' +
-            (testAvail ? 'onclick="Learner.openTest(\'' + u.id + '\')"' : 'disabled') + '>🏆</button>' +
-          '<div class="lesson-label"><div class="ll-title">' + t('learner_unit_test') + '</div>' +
-            '<div class="ll-sub">' + (s.tests[u.id] && s.tests[u.id].passed
+        var testRowState = (s.tests[u.id] && s.tests[u.id].passed) ? 'done' : (testAvail ? 'current' : 'locked');
+        html += '<button type="button" class="lesson-node-row ' + testRowState + '" ' +
+            (testAvail ? 'onclick="Learner.openTest(\'' + u.id + '\')"' : 'disabled') + '>' +
+          '<span class="lesson-node test" aria-hidden="true">🏆</span>' +
+          '<span class="lesson-label">' +
+            '<span class="ll-title" data-i18n="learner_unit_test">' + t('learner_unit_test') + '</span>' +
+            '<span class="ll-sub">' + (s.tests[u.id] && s.tests[u.id].passed
               ? (t('learner_test_best') + ' ' + s.tests[u.id].best + '/10' + (testScore ? ' · ' + testScore.pct + '%' : ''))
-              : (testAvail ? t('learner_unit_test_ready') : (unitLessonsDone(u) + '/' + u.lessons.length + ' ' + t('learner_lessons_completed')))) + '</div></div>' +
-          (testAvail ? '<button class="lesson-link" onclick="Learner.openTest(\'' + u.id + '\')">' + (s.tests[u.id] ? t('learner_try_again') : t('learner_continue')) + '</button>' : '') +
-        '</div>';
+              : (testAvail ? t('learner_unit_test_ready') : (unitLessonsDone(u) + '/' + u.lessons.length + ' ' + t('learner_lessons_completed')))) + '</span>' +
+          '</span>' +
+          (testRowState === 'done' && testScore ? '<span class="lesson-score">✓ ' + testScore.pct + '%</span>' : '') +
+          '<span class="lesson-count">' + buildStepsForTest(u).length + ' <span data-i18n="learner_exercises">esercizi</span></span>' +
+        '</button>';
         html += '</div></div>';
       });
     });
@@ -2690,6 +2693,54 @@
   function regenUsed() { return regenState().n; }
   function regenIncrement() { var s = regenState(); s.n += 1; try { localStorage.setItem(REGEN_KEY, JSON.stringify(s)); } catch (e) {} }
 
+  // Keyboard-safe overlay.
+  // A phone keyboard does not reliably resize the layout viewport (iOS overlays the
+  // page instead), and the lesson stage is a centred column — so focusing the answer
+  // input could leave the learner typing with the prompt off-screen. While the input
+  // is focused we mark the overlay .kb-open, which compacts the stage and pins the
+  // answer row to the bottom of what is actually visible; then we nudge the scroll so
+  // the prompt is inside the visible area.
+  //
+  // Delegated on the OVERLAY, not the input: each step rebuilds the stage, so a
+  // listener bound to #learnerType dies with the element it was attached to. (It did:
+  // a `__kbBound` guard on the overlay then blocked every later rebind, and the
+  // second speak step silently lost the behaviour.) focusin/focusout bubble, so one
+  // listener survives every re-render.
+  function bindAnswerKeyboard(scope) {
+    var ov = (scope && scope.closest) ? scope.closest('.lesson-overlay') : null;
+    if (!ov) ov = document.querySelector('.lesson-overlay');
+    if (!ov || ov.__kbBound) return;
+    ov.__kbBound = true;
+
+    function isAnswer(el) { return !!el && el.id === 'learnerType'; }
+
+    ov.addEventListener('focusin', function (e) {
+      if (!isAnswer(e.target)) return;
+      ov.classList.add('kb-open');
+      var input = e.target;
+      var prompt = ov.querySelector('.step-prompt');
+      // Wait for the keyboard animation before measuring what is visible.
+      setTimeout(function () {
+        try {
+          var vv = window.visualViewport;
+          var top = vv ? vv.offsetTop : 0;
+          var bottom = top + (vv ? vv.height : window.innerHeight);
+          if (prompt) {
+            var r = prompt.getBoundingClientRect();
+            if (r.top < top + 8 || r.bottom > bottom) {
+              prompt.scrollIntoView({ block: 'start', behavior: 'smooth' });
+            }
+          }
+          input.scrollIntoView({ block: 'nearest' });
+        } catch (err) {}
+      }, 320);
+    });
+
+    ov.addEventListener('focusout', function (e) {
+      if (isAnswer(e.target)) ov.classList.remove('kb-open');
+    });
+  }
+
   function renderOverlay() {
     if (!session) return;
     var isBank = session.mode === 'bank';
@@ -2803,6 +2854,7 @@
 
     stage.innerHTML = html;
     i18nScope(stage);
+    bindAnswerKeyboard(stage);
   }
 
   function renderMc() {

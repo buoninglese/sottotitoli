@@ -111,28 +111,105 @@
 }
 #pnl-learner .unit-badge.done { background: rgba(34,197,94,.12); border-color: rgba(34,197,94,.35); color: var(--green); }
 
-/* ── Lesson path (vertical nodes) ── */
-#pnl-learner .lesson-path { display: flex; flex-direction: column; align-items: center; }
-#pnl-learner .lesson-node-row { display: flex; align-items: center; gap: 14px; width: 100%; }
+/* ── Lesson path ──
+ * ONE control per lesson: the whole row is the button, so the tap target is the
+ * card and not the 44px bubble (that is the "tap anywhere on it" behaviour, and it
+ * is what makes the path usable with a thumb).
+ *
+ * Three states, distinguishable without reading:
+ *   done     — lit: filled, glowing, white tick
+ *   current  — ringed: cyan outline with a slow halo; the only thing that moves
+ *   upcoming — empty: dashed hairline, no fill, muted glyph
+ *
+ * Sizes live in --node-size / --row-pad on .lesson-path so the connector stays
+ * centred under the bubble at every breakpoint instead of drifting. */
+#pnl-learner .lesson-path { --node-size: 52px; --row-pad: 12px; display: flex; flex-direction: column; }
+
+#pnl-learner .lesson-node-row {
+  display: flex; align-items: center; gap: 14px; width: 100%;
+  padding: 9px var(--row-pad); border-radius: 16px; border: 1px solid transparent;
+  background: transparent; font: inherit; color: inherit; text-align: left;
+  cursor: pointer; -webkit-tap-highlight-color: transparent;
+  transition: background .16s ease, border-color .16s ease, transform .1s ease;
+}
+#pnl-learner .lesson-node-row:disabled { cursor: default; }
+#pnl-learner .lesson-node-row:not(:disabled):hover { background: var(--panel-2); border-color: var(--line); }
+#pnl-learner .lesson-node-row:not(:disabled):active { transform: scale(.99); }
+#pnl-learner .lesson-node-row:focus-visible { outline: 2px solid var(--cyan); outline-offset: 2px; }
+
 #pnl-learner .lesson-node {
-  width: 44px; height: 44px; border-radius: 50%; border: 2px solid var(--line-strong);
-  background: var(--panel-2); color: var(--text-faint); display: grid; place-items: center;
-  font-size:22px; cursor: pointer; flex-shrink: 0; transition: all .18s ease; position: relative;
+  width: var(--node-size); height: var(--node-size); flex: 0 0 auto;
+  border-radius: 50%; display: grid; place-items: center;
+  font-size: 20px; font-weight: 800; border: 2px solid var(--line-strong);
+  background: transparent; color: var(--text-faint);
+  transition: background .2s ease, border-color .2s ease, box-shadow .2s ease, color .2s ease;
 }
-#pnl-learner .lesson-node:disabled { cursor: not-allowed; opacity: .45; }
-#pnl-learner .lesson-node.available { border-color: var(--cyan); color: var(--cyan); box-shadow: 0 0 0 4px rgba(6,182,212,.08); }
-#pnl-learner .lesson-node.available:hover { transform: scale(1.08); box-shadow: 0 0 0 6px rgba(6,182,212,.14); }
-#pnl-learner .lesson-node.done { background: var(--green); border-color: var(--green); color: var(--btn-primary-text, #fff); }
-#pnl-learner .lesson-node.test { font-size:15px; font-weight: 800; }
-#pnl-learner .lesson-label { flex: 1; text-align: left; min-width: 0; }
-#pnl-learner .lesson-label .ll-title { font-size:18px; font-weight: 700; color: var(--text); }
-#pnl-learner .lesson-label .ll-sub { font-size:13px; color: var(--text-faint); }
+#pnl-learner .lesson-node.test { font-size: 17px; }
+
+/* upcoming — deliberately empty */
+#pnl-learner .lesson-node-row.locked .lesson-node { border-style: dashed; }
+
+/* current — ringed and alive */
+#pnl-learner .lesson-node-row.current .lesson-node {
+  background: var(--panel-2); border-color: var(--cyan); color: var(--cyan);
+  animation: lrNodeHalo 2.6s ease-in-out infinite;
+}
+@keyframes lrNodeHalo {
+  0%, 100% { box-shadow: 0 0 0 4px rgba(6,182,212,.10); }
+  50%      { box-shadow: 0 0 0 9px rgba(6,182,212,.04); }
+}
+@media (prefers-reduced-motion: reduce) {
+  #pnl-learner .lesson-node-row.current .lesson-node { animation: none; box-shadow: 0 0 0 4px rgba(6,182,212,.10); }
+}
+
+/* done — lit */
+#pnl-learner .lesson-node-row.done .lesson-node {
+  border-color: transparent; color: #fff;
+  background: radial-gradient(circle at 34% 26%, #4ade80, var(--green) 72%);
+  box-shadow: 0 6px 16px rgba(34,197,94,.30), inset 0 1px 0 rgba(255,255,255,.35);
+}
+
+#pnl-learner .lesson-label { flex: 1 1 0%; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+#pnl-learner .lesson-label .ll-title {
+  font-size: 16px; font-weight: 700; color: var(--text);
+  min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+#pnl-learner .lesson-node-row.locked .lesson-label .ll-title { color: var(--text-soft); font-weight: 600; }
+#pnl-learner .lesson-label .ll-sub {
+  font-size: 12.5px; color: var(--text-faint); line-height: 1.35; min-width: 0;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
+
+/* How much work the lesson is, before you commit to it */
+#pnl-learner .lesson-count {
+  flex: 0 0 auto; font-size: 11.5px; font-weight: 700; white-space: nowrap;
+  color: var(--text-soft); background: var(--panel-2); border: 1px solid var(--line);
+  border-radius: 999px; padding: 4px 10px; font-variant-numeric: tabular-nums;
+}
+#pnl-learner .lesson-node-row.current .lesson-count {
+  color: var(--cyan); border-color: rgba(6,182,212,.35); background: rgba(6,182,212,.08);
+}
+#pnl-learner .lesson-node-row.locked .lesson-count { opacity: .7; }
+#pnl-learner .lesson-score { flex: 0 0 auto; font-size: 12px; font-weight: 800; color: var(--green); font-variant-numeric: tabular-nums; }
 #pnl-learner .lesson-link {
-  font-size:13px; font-weight: 700; color: var(--cyan); background: transparent;
-  border: 1.5px solid var(--line); border-radius: 999px; padding: 5px 12px; cursor: pointer; transition: all .15s; flex-shrink: 0;
+  flex: 0 0 auto; font-size: 12.5px; font-weight: 700; color: var(--cyan);
+  border: 1.5px solid var(--line); border-radius: 999px; padding: 4px 11px; white-space: nowrap;
 }
-#pnl-learner .lesson-link:hover { border-color: var(--cyan); background: rgba(6,182,212,.06); }
-#pnl-learner .connector { width: 2px; height: 16px; background: var(--line-strong); margin: 2px 0 2px 21px; }
+
+/* Progress through a unit, above its lessons */
+#pnl-learner .unit-progress {
+  height: 4px; border-radius: 999px; background: var(--line); overflow: hidden; margin: 10px 0 4px;
+}
+#pnl-learner .unit-progress > i {
+  display: block; height: 100%; border-radius: 999px;
+  background: linear-gradient(90deg, var(--cyan), var(--green)); transition: width .35s ease;
+}
+
+/* Connector sits under the bubble centre, whatever the node size is */
+#pnl-learner .connector {
+  width: 2px; height: 14px; background: var(--line-strong);
+  margin-left: calc(var(--row-pad) + var(--node-size) / 2 - 1px);
+}
 #pnl-learner .connector.done { background: var(--green); }
 
 /* ── Practice grid ── */
@@ -692,7 +769,15 @@
   #pnl-learner .lesson-stage .step-prompt { font-size:28px; }
   #pnl-learner .mic-btn { width: 64px; height: 64px; font-size: 24px; }
   #pnl-learner .match-wrap, #pnl-learner .choices { grid-template-columns: 1fr; }
-  #pnl-learner .lesson-node { width: 44px; height: 44px; font-size: 18px; }
+  /* Path on a phone: smaller bubble, tighter padding, one-line subtitle. The
+     connector follows --node-size / --row-pad, so it stays centred. */
+  #pnl-learner .lesson-path { --node-size: 44px; --row-pad: 8px; }
+  #pnl-learner .lesson-node { font-size: 17px; }
+  #pnl-learner .lesson-node-row { gap: 11px; padding: 8px var(--row-pad); }
+  #pnl-learner .lesson-label .ll-title { font-size: 15px; }
+  #pnl-learner .lesson-label .ll-sub { -webkit-line-clamp: 1; font-size: 12px; }
+  #pnl-learner .lesson-count { padding: 3px 8px; font-size: 11px; }
+  #pnl-learner .lesson-score { display: none; }
   #pnl-learner .ics-stage { height: 300px; }
   #pnl-learner .ics-card { height: 292px; }
   #pnl-learner .ics-word { font-size:36px; }
@@ -761,3 +846,25 @@ body.lesson-open .sidebar {
 #pnl-learner .lr-goal-fill.done { background: linear-gradient(90deg, var(--green), #6ee7b7); }
 #pnl-learner .lr-mission-card.daily .lr-mission-glow { background: linear-gradient(135deg, rgba(245,158,11,.18), rgba(239,68,68,.12)); }
 #pnl-learner .lr-mission-card.ai .lr-mission-glow { background: linear-gradient(135deg, rgba(124,58,237,.18), rgba(6,182,212,.14)); }
+
+/* ═══ On-screen keyboard ═══
+ * A phone keyboard does not resize the layout viewport in the same way on every
+ * browser, and the lesson stage is a centred column — so focusing the answer input
+ * used to push the prompt out of the visible area, leaving the learner typing with
+ * the thing they are answering off-screen.
+ *
+ * While the input is focused we mark the overlay .kb-open: the stage loses its
+ * decorative row and its generous padding, and the answer row sticks to the bottom
+ * of what is actually visible. The prompt stays on screen above it.
+ * panoramica.html's viewport also carries interactive-widget=resizes-content, which
+ * makes Android shrink the layout viewport instead of scrolling it. */
+#pnl-learner .lesson-overlay.kb-open .lesson-stage { padding: 10px 14px; gap: 10px; }
+#pnl-learner .lesson-overlay.kb-open .step-kicker { display: none; }
+#pnl-learner .lesson-overlay.kb-open .mic-btn { display: none; }
+#pnl-learner .lesson-overlay.kb-open .speak-or { display: none; }
+#pnl-learner .lesson-overlay.kb-open .step-prompt { font-size: clamp(19px, 6vw, 26px); }
+#pnl-learner .lesson-overlay.kb-open .heard-text { display: none; }
+#pnl-learner .lesson-overlay.kb-open .speak-type-wrap {
+  position: sticky; bottom: 0; z-index: 2; background: var(--bg);
+  padding-bottom: calc(10px + env(safe-area-inset-bottom, 0px));
+}
