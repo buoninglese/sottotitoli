@@ -1605,7 +1605,7 @@ button[onclick*="addToWordBank"]:hover{background:rgba(52,211,153,.15)!important
 <script src="js/auth.js?v=24"></script>
 <script src="js/bank-identities.js?v=1"></script>
 <script src="js/xp.js?v=5"></script>
-<script src="js/i18n.js?v=102"></script>
+<script src="js/i18n.js?v=103"></script>
 <script src="js/theme-2.js?v=7"></script>
 <script src="js/toast.js?v=2"></script>
 <script src="js/notifications.js?v=2"></script>
@@ -8321,6 +8321,9 @@ window.fixExtrasPanelColors = function(){
   // Check if joining a room via invite link
   var params = new URLSearchParams(window.location.search);
   if (params.get('join') === '1') {
+    // Start waking the relay NOW, while the invitee is still choosing language and name.
+    // The free-tier service cold-starts in ~25s; anything we overlap is time they never wait for.
+    duoPrewarm();
     window._duoRoomId = params.get('room') || '';
     var host = params.get('host') || 'the host';
 
@@ -8421,13 +8424,125 @@ window.fixExtrasPanelColors = function(){
     // Functions below must still be defined even when showing join screen
   }
 
+  // ═══ Relay connection status ═══
+  // The relay is a free Render instance that sleeps when idle: measured cold start ~23s.
+  // Without this the user joined a room and simply saw nothing — and because sends were
+  // guarded on readyState, their first captions were dropped in silence.
+  var DUO_CONN_ESTIMATE = 25;   // seconds, matches the measured cold start
+  var _duoConnTickId = null, _duoConnShowId = null, _duoConnStart = 0;
+
+  function duoConnEl() {
+    var el = document.getElementById('duoConnStatus');
+    if (el) return el;
+    if (!document.getElementById('duoConnStyle')) {
+      var st = document.createElement('style');
+      st.id = 'duoConnStyle';
+      st.textContent = '@keyframes duoConnPulse{0%,100%{opacity:.35}50%{opacity:1}}';
+      document.head.appendChild(st);
+    }
+    el = document.createElement('div');
+    el.id = 'duoConnStatus';
+    el.setAttribute('role', 'status');
+    el.setAttribute('aria-live', 'polite');
+    el.style.cssText = 'position:fixed;left:50%;bottom:24px;transform:translateX(-50%);z-index:99990;' +
+      'display:none;align-items:center;gap:9px;padding:10px 16px;border-radius:999px;' +
+      'border:1px solid var(--line);background:var(--card);color:var(--text);' +
+      'font-family:Inter,sans-serif;font-size:13px;box-shadow:0 6px 24px rgba(0,0,0,.18);max-width:92vw';
+
+    var dot = document.createElement('span');
+    dot.id = 'duoConnDot';
+    dot.setAttribute('aria-hidden', 'true');
+    dot.style.cssText = 'width:9px;height:9px;border-radius:50%;background:#fbbf24;flex:0 0 auto;' +
+      'animation:duoConnPulse 1s ease-in-out infinite';
+
+    // Italian is the source string; the i18n observer translates it from data-i18n.
+    var txt = document.createElement('span');
+    txt.id = 'duoConnText';
+    txt.setAttribute('data-i18n', 'duo_conn_waking');
+    txt.textContent = 'Connessione alla stanza…';
+
+    var tm = document.createElement('span');
+    tm.id = 'duoConnTimer';
+    tm.style.cssText = 'font-variant-numeric:tabular-nums;font-weight:700;color:var(--muted)';
+
+    el.appendChild(dot); el.appendChild(txt); el.appendChild(tm);
+    document.body.appendChild(el);
+    return el;
+  }
+
+  function duoConnSetLabel(mode) {
+    var txt = document.getElementById('duoConnText');
+    var dot = document.getElementById('duoConnDot');
+    var key = mode === 'retry' ? 'duo_conn_retry' : 'duo_conn_waking';
+    if (txt && txt.getAttribute('data-i18n') !== key) {
+      txt.setAttribute('data-i18n', key);
+      txt.textContent = mode === 'retry' ? 'Riconnessione…' : 'Connessione alla stanza…';
+    }
+    if (dot) dot.style.background = mode === 'retry' ? '#f87171' : '#fbbf24';
+  }
+
+  function duoConnTick() {
+    var tm = document.getElementById('duoConnTimer');
+    var txt = document.getElementById('duoConnText');
+    if (!tm) return;
+    var left = DUO_CONN_ESTIMATE - Math.floor((Date.now() - _duoConnStart) / 1000);
+    if (left > 0) {
+      tm.textContent = '~' + left + 's';
+    } else {
+      tm.textContent = '';
+      if (txt && txt.getAttribute('data-i18n') !== 'duo_conn_almost') {
+        txt.setAttribute('data-i18n', 'duo_conn_almost');
+        txt.textContent = 'Quasi pronto…';
+      }
+    }
+  }
+
+  function duoConnShow(mode) {
+    if (_duoConnShowId) { clearTimeout(_duoConnShowId); _duoConnShowId = null; }
+    duoConnEl();
+    duoConnSetLabel(mode);
+    _duoConnStart = Date.now();
+    if (_duoConnTickId) clearInterval(_duoConnTickId);
+    duoConnTick();
+    _duoConnTickId = setInterval(duoConnTick, 500);
+    // Do not flash the pill on a warm connection: show it only if we are still not open.
+    _duoConnShowId = setTimeout(function() {
+      _duoConnShowId = null;
+      if (window._duoWs && window._duoWs.readyState === WebSocket.OPEN) return;
+      var el = document.getElementById('duoConnStatus');
+      if (el) el.style.display = 'flex';
+    }, 700);
+  }
+
+  function duoConnHide() {
+    if (_duoConnShowId) { clearTimeout(_duoConnShowId); _duoConnShowId = null; }
+    if (_duoConnTickId) { clearInterval(_duoConnTickId); _duoConnTickId = null; }
+    var el = document.getElementById('duoConnStatus');
+    if (el) el.style.display = 'none';
+  }
+
+  function duoPrewarm() {
+    if (window._duoPrewarmed) return;
+    window._duoPrewarmed = true;
+    var url = (window.SOTTOTITOLI_CONFIG && window.SOTTOTITOLI_CONFIG.websocketUrl) || 'wss://sottotitoli-websocket.onrender.com';
+    try {
+      // no-cors on purpose: we only need the request to LEAVE so Render starts booting.
+      // Reading the response is useless, and a normal fetch would log a CORS error on
+      // every invite page load (the relay sends no Access-Control-Allow-Origin).
+      fetch(url.replace(/^wss:/, 'https:') + '/health', { mode: 'no-cors', cache: 'no-store' }).catch(function(){});
+    } catch (e) {}
+  }
+
   // ═══ Functions ═══
   window.duoConnectWebSocket = function() {
     if (window._duoReconnectTimer) { clearTimeout(window._duoReconnectTimer); window._duoReconnectTimer = null; }
+    duoPrewarm();
+    duoConnShow('waking');
     var url = (window.SOTTOTITOLI_CONFIG && window.SOTTOTITOLI_CONFIG.websocketUrl) || 'wss://sottotitoli-websocket.onrender.com';
-    try { window._duoWs = new WebSocket(url); } catch(e) { duoReconnect(); return; }
+    try { window._duoWs = new WebSocket(url); } catch(e) { duoConnShow('retry'); duoReconnect(); return; }
 
     window._duoWs.onopen = function() {
+      duoConnHide();
       window._duoWs.send(JSON.stringify({ join: window._duoRoomId }));
       // Announce presence
       window._duoWs.send(JSON.stringify({ type:'duo-join', name:window._duoSpeakerName, lang:window._duoSpeakerLang }));
@@ -8443,15 +8558,22 @@ window.fixExtrasPanelColors = function(){
       } catch(e) {}
     };
 
-    window._duoWs.onclose = function() { duoReconnect(); };
-    window._duoWs.onerror = function() {};
+    window._duoWs.onclose = function() {
+      if (window._duoMode) duoConnShow('retry');
+      duoReconnect();
+    };
+    window._duoWs.onerror = function() {
+      if (window._duoMode) duoConnShow('retry');
+    };
   };
 
   function duoReconnect() {
+    // Leaving DUO closes the socket on purpose — do not leave a reconnect pill behind.
+    if (!window._duoMode) { duoConnHide(); return; }
     if (window._duoReconnectTimer) return;
     window._duoReconnectTimer = setTimeout(function() {
       window._duoReconnectTimer = null;
-      if (window._duoMode) window.duoConnectWebSocket();
+      if (window._duoMode) window.duoConnectWebSocket(); else duoConnHide();
     }, 3000);
   }
 

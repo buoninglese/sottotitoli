@@ -22,6 +22,10 @@
 
   var DICT = {
     it: {
+      // ── Duo relay connection (free-tier cold start) ──
+      "duo_conn_waking": "Connessione alla stanza…",
+      "duo_conn_retry": "Riconnessione…",
+      "duo_conn_almost": "Quasi pronto…",
       // ── Topbar ──
       "start_session": "Avvia sessione",
       "start": "Start",
@@ -1670,6 +1674,10 @@
     },
 
     en: {
+      // ── Duo relay connection (free-tier cold start) ──
+      "duo_conn_waking": "Connecting to the room…",
+      "duo_conn_retry": "Reconnecting…",
+      "duo_conn_almost": "Almost ready…",
       // ── Topbar ──
       "start_session": "Start Session",
       "start": "Start",
