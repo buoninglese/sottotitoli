@@ -680,6 +680,32 @@
     return steps;
   }
 
+  /* How many answers the learner will actually give.
+   * A step is NOT an exercise: one `mc` step holds up to five separately-graded
+   * questions, and one `match` board is a single screen. Counting steps told the learner
+   * a ten-question unit test was "2 esercizi" — the row showed 2 while opening it asked
+   * six questions and a four-pair board. Listen / speak / match / convo are one screen
+   * each; mc is one per question.
+   * Cached on the course object so the number cannot jitter between renders: the same
+   * builders run when the lesson is opened, and they sample randomly. */
+  function exerciseCount(steps) {
+    var n = 0;
+    (steps || []).forEach(function (st) {
+      if (!st) return;
+      if (st.type === 'mc') n += (st.questions && st.questions.length) || 1;
+      else n += 1;
+    });
+    return n;
+  }
+  function lessonExerciseCount(lesson) {
+    if (lesson.__lrEx == null) lesson.__lrEx = exerciseCount(buildStepsForLesson(lesson));
+    return lesson.__lrEx;
+  }
+  function testExerciseCount(unit) {
+    if (unit.__lrExTest == null) unit.__lrExTest = exerciseCount(buildStepsForTest(unit));
+    return unit.__lrExTest;
+  }
+
   function buildStepsForPractice(mode, learnedWords) {
     if (mode === 'speak') {
       var phrases = learnedWords.filter(function (p) { return p.en.split(' ').length >= 2; });
@@ -1036,19 +1062,42 @@
   }
 
   async function loadPath(pane) {
-    var authed = await srcIsAuthed();
-    if (!authed) { renderBundledPath(pane); return; }
-    var lang = learnerLang();
-    var due = await srcReview('due', lang);
-    var fragile = await srcReview('fragile', lang);
-    var fresh = await srcReview('new', lang);
-    // The goal tracker counts the learner's OWN words by part of speech, so it needs the whole
-    // vocabulary, not just the review queues. srcReviewAll is cached — one query.
-    var vocab = await srcReviewAll(lang);
-    // Word banks live on the Word-banks tab; the path always shows the missions + spaced review
-    // (per language) + recent mistakes.
-    renderRealPath(pane, due, fragile, fresh, lang, vocab);
+    // Every one of these is a network round-trip. Unhandled, a single rejection left the
+    // pane on the spinner forever: a flaky connection looked exactly like a broken page,
+    // with no message and no way to try again.
+    try {
+      var authed = await srcIsAuthed();
+      if (!authed) { renderBundledPath(pane); return; }
+      var lang = learnerLang();
+      var due = await srcReview('due', lang);
+      var fragile = await srcReview('fragile', lang);
+      var fresh = await srcReview('new', lang);
+      // The goal tracker counts the learner's OWN words by part of speech, so it needs the whole
+      // vocabulary, not just the review queues. srcReviewAll is cached — one query.
+      var vocab = await srcReviewAll(lang);
+      // The pane may have been re-rendered (tab switch, second open) while we were waiting.
+      if (!pane.isConnected) return;
+      renderRealPath(pane, due, fragile, fresh, lang, vocab);
+    } catch (err) {
+      if (!pane.isConnected) return;
+      renderPathError(pane, err);
+    }
   }
+
+  // Says what happened and offers the one useful action. The detail goes to the console
+  // only — the learner cannot act on a PostgREST status code.
+  function renderPathError(pane, err) {
+    try { console.warn('[learner] path load failed:', err); } catch (e) {}
+    pane.innerHTML = '<div class="learner-empty"><div class="le-emoji">⚠️</div>' +
+      '<div class="le-title">' + esc(t('learner_load_error')) + '</div>' +
+      '<div class="le-sub">' + esc(t('learner_load_error_sub')) + '</div>' +
+      '<div class="btn-row" style="margin-top:16px">' +
+        '<button type="button" class="primary-btn" onclick="Learner.retryPath()">' + esc(t('learner_retry')) + '</button>' +
+      '</div></div>';
+    i18nScope(pane);
+  }
+
+  function retryPath() { renderPath(); }
 
   function renderEmptyPath(pane) {
     pane.innerHTML = pathIntroHtml() + '<div class="learner-empty"><div class="le-emoji">🗂️</div><div class="le-title">' + t('learner_empty_path') + '</div>' +
@@ -1222,8 +1271,10 @@
           '<div class="unit-head"><div class="unit-emoji" style="color:' + u.color + '">' + esc(u.icon) + '</div>' +
             '<div><h3 class="unit-title">' + esc(u.title) + '</h3><p class="unit-sub">' + esc(u.subtitle) + '</p></div>' + badge +
           '</div>' +
-          // How far through the unit you are, as a line rather than a sentence.
-          '<div class="unit-progress" role="progressbar" aria-valuemin="0" aria-valuemax="' + total + '" aria-valuenow="' + done + '">' +
+          // How far through the unit you are, as a line rather than a sentence. The unit title
+          // names the bar: a progressbar with no accessible name is announced as a bare
+          // "2 of 3" with nothing to attach it to, seven times down the page.
+          '<div class="unit-progress" role="progressbar" aria-label="' + esc(u.title) + '" aria-valuemin="0" aria-valuemax="' + total + '" aria-valuenow="' + done + '">' +
             '<i style="width:' + (total ? Math.round(done / total * 100) : 0) + '%"></i></div>' +
           '<div class="lesson-path">';
         u.lessons.forEach(function (l) {
@@ -1232,25 +1283,28 @@
           var nodeIcon = isDone ? '✓' : esc(l.icon || '●');
           var lessonScore = isDone ? scoreOf('lesson:' + u.id + ':' + l.id) : null;
           var state = isDone ? 'done' : (avail ? 'current' : 'locked');
-          var exCount = buildStepsForLesson(l).length;
+          var exCount = lessonExerciseCount(l);
           // The ROW is the control, not the bubble. Tapping anywhere on the card opens
           // the lesson — on a phone that is the difference between a target you have to
           // aim at and one you can hit with a thumb. The bubble is decoration now, so it
           // is aria-hidden; the button's own text (title, description, count) names it.
-          html += '<button type="button" class="lesson-node-row ' + state + '" ' +
+          // data-lr-key is stable across re-renders, so focus can be handed back to this
+          // exact row when the session closes.
+          html += '<button type="button" class="lesson-node-row ' + state + '" data-lr-key="lesson:' + esc(u.id) + ':' + esc(l.id) + '" ' +
               (avail ? 'onclick="Learner.openLesson(\'' + u.id + '\',\'' + l.id + '\')"' : 'disabled') + '>' +
             '<span class="lesson-node" aria-hidden="true">' + nodeIcon + '</span>' +
             '<span class="lesson-label"><span class="ll-title">' + esc(l.title) + '</span>' +
               '<span class="ll-sub">' + esc(l.description) + '</span></span>' +
             (isDone && lessonScore ? '<span class="lesson-score">✓ ' + lessonScore.pct + '%</span>' : '') +
             '<span class="lesson-count">' + exCount + ' <span data-i18n="learner_exercises">esercizi</span></span>' +
+            (avail ? '' : '<span class="lr-sr">' + esc(t('learner_locked')) + '</span>') +
           '</button>' +
           '<div class="connector ' + (isDone ? 'done' : '') + '"></div>';
         });
         var testAvail = isTestAvailable(u);
         var testScore = scoreOf('test:' + u.id);
         var testRowState = (s.tests[u.id] && s.tests[u.id].passed) ? 'done' : (testAvail ? 'current' : 'locked');
-        html += '<button type="button" class="lesson-node-row ' + testRowState + '" ' +
+        html += '<button type="button" class="lesson-node-row ' + testRowState + '" data-lr-key="test:' + esc(u.id) + '" ' +
             (testAvail ? 'onclick="Learner.openTest(\'' + u.id + '\')"' : 'disabled') + '>' +
           '<span class="lesson-node test" aria-hidden="true">🏆</span>' +
           '<span class="lesson-label">' +
@@ -1260,7 +1314,8 @@
               : (testAvail ? t('learner_unit_test_ready') : (unitLessonsDone(u) + '/' + u.lessons.length + ' ' + t('learner_lessons_completed')))) + '</span>' +
           '</span>' +
           (testRowState === 'done' && testScore ? '<span class="lesson-score">✓ ' + testScore.pct + '%</span>' : '') +
-          '<span class="lesson-count">' + buildStepsForTest(u).length + ' <span data-i18n="learner_exercises">esercizi</span></span>' +
+          '<span class="lesson-count">' + testExerciseCount(u) + ' <span data-i18n="learner_exercises">esercizi</span></span>' +
+          (testAvail ? '' : '<span class="lr-sr">' + esc(t('learner_locked')) + '</span>') +
         '</button>';
         html += '</div></div>';
       });
@@ -2714,13 +2769,46 @@
 
     function isAnswer(el) { return !!el && el.id === 'learnerType'; }
 
+    // Publish the VISUAL viewport while the keyboard is up. Android (with
+    // interactive-widget=resizes-content) shrinks the layout viewport and needs nothing;
+    // iOS keeps the layout viewport full height and slides the visual one instead, so a
+    // fixed inset:0 overlay still reaches behind the keyboard and the pinned answer row
+    // lands under it. These two properties are what css/learner.css pins the overlay to.
+    function syncVv() {
+      var vv = window.visualViewport;
+      if (!vv) return;
+      ov.style.setProperty('--lr-vv-top', Math.round(vv.offsetTop) + 'px');
+      ov.style.setProperty('--lr-vv-h', Math.round(vv.height) + 'px');
+    }
+    var listening = false;
+    function startVv() {
+      var vv = window.visualViewport;
+      if (!vv || listening) return;
+      listening = true;
+      vv.addEventListener('resize', syncVv);
+      vv.addEventListener('scroll', syncVv);   // iOS scrolls the page to reveal the caret
+    }
+    function stopVv() {
+      var vv = window.visualViewport;
+      if (vv && listening) {
+        vv.removeEventListener('resize', syncVv);
+        vv.removeEventListener('scroll', syncVv);
+      }
+      listening = false;
+      ov.style.removeProperty('--lr-vv-top');
+      ov.style.removeProperty('--lr-vv-h');
+    }
+
     ov.addEventListener('focusin', function (e) {
       if (!isAnswer(e.target)) return;
       ov.classList.add('kb-open');
+      syncVv();
+      startVv();
       var input = e.target;
       var prompt = ov.querySelector('.step-prompt');
       // Wait for the keyboard animation before measuring what is visible.
       setTimeout(function () {
+        syncVv();
         try {
           var vv = window.visualViewport;
           var top = vv ? vv.offsetTop : 0;
@@ -2737,7 +2825,34 @@
     });
 
     ov.addEventListener('focusout', function (e) {
-      if (isAnswer(e.target)) ov.classList.remove('kb-open');
+      if (!isAnswer(e.target)) return;
+      // Moving between the input and another control inside the overlay is not a close:
+      // only drop the keyboard layout when focus leaves the overlay's answer row for good.
+      setTimeout(function () {
+        var active = document.activeElement;
+        if (active && ov.contains(active) && isAnswer(active)) return;
+        if (ov.classList.contains('kb-open')) {
+          ov.classList.remove('kb-open');
+          stopVv();
+        }
+      }, 0);
+    });
+  }
+
+  /* Keep Tab inside the modal. aria-modal alone tells assistive tech the rest of the page
+   * is inert, but the browser still moves focus out of it — so the claim has to be made
+   * true here or the attribute is a lie. Delegated on the overlay, which outlives every
+   * step re-render. */
+  function bindOverlayFocusTrap(ov) {
+    if (!ov || ov.__trapBound) return;
+    ov.__trapBound = true;
+    ov.addEventListener('keydown', function (e) {
+      if (e.key !== 'Tab') return;
+      var f = ov.querySelectorAll('button:not(:disabled), input:not(:disabled), select, textarea, [tabindex]:not([tabindex="-1"])');
+      if (!f.length) return;
+      var first = f[0], last = f[f.length - 1];
+      if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+      else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
     });
   }
 
@@ -2761,6 +2876,12 @@
     var ov = document.createElement('div');
     ov.id = 'learnerOverlay';
     ov.className = 'lesson-overlay';
+    // A full-screen player is a dialog. Without these three attributes a screen reader keeps
+    // reading the dashboard underneath the overlay and Tab walks straight out of the lesson
+    // into the page behind it.
+    ov.setAttribute('role', 'dialog');
+    ov.setAttribute('aria-modal', 'true');
+    ov.setAttribute('aria-label', title);
     ov.innerHTML =
       '<div class="lesson-topbar">' +
         '<div class="lt-title">' + esc(title) + '</div>' +
@@ -2778,6 +2899,12 @@
     // completion card lives inside the same overlay.
     if (document.body) document.body.classList.add('lesson-open');
     rootEl.appendChild(ov);
+    bindOverlayFocusTrap(ov);
+    // Start the keyboard user INSIDE the dialog. The close button rather than the answer
+    // input: focusing the input would raise the phone keyboard before the first step (a
+    // listen step) has asked for a typed answer.
+    var firstFocus = ov.querySelector('.lt-close');
+    if (firstFocus) { try { firstFocus.focus({ preventScroll: true }); } catch (e) { firstFocus.focus(); } }
     renderStep();
   }
 
@@ -2904,6 +3031,9 @@
     // feedback line
     var fb = document.createElement('div');
     fb.className = 'feedback ' + (correct ? 'correct' : 'incorrect');
+    // role=status so the verdict is spoken: otherwise correct/incorrect is carried by a
+    // colour and an emoji alone, which a screen reader never reports.
+    fb.setAttribute('role', 'status');
     fb.innerHTML = (correct ? '✅ ' : '❌ ') + t(correct ? 'learner_correct' : 'learner_incorrect') + (correct ? '' : ' — ' + esc(q.answer));
     btn.parentElement.parentElement.appendChild(fb);
     session.mcIndex += 1;
@@ -3036,6 +3166,7 @@
     var heardEl = $('#learnerHeard');
     var fb = document.createElement('div');
     fb.className = 'feedback ' + (correct ? 'correct' : 'incorrect');
+    fb.setAttribute('role', 'status');   // see the mc branch: same reason
     fb.innerHTML = (correct ? '✅ ' : '❌ ') + t(correct ? 'learner_correct' : 'learner_incorrect') + (correct ? '' : ' — ' + esc(expected));
     if (heardEl && heardEl.parentElement) heardEl.parentElement.appendChild(fb);
     var checkBtn = $('#learnerCheck');
@@ -3377,10 +3508,33 @@
     var ov = $('#learnerOverlay');
     if (ov) ov.remove();
     if (document.body) document.body.classList.remove('lesson-open');
+    // Remember what to hand focus back to before the session (and its lesson) is dropped.
+    var backKey = session
+      ? (session.mode === 'test' && session.unit ? 'test:' + session.unit.id
+        : (session.unit && session.lesson ? 'lesson:' + session.unit.id + ':' + session.lesson.id : null))
+      : null;
     session = null;
     if (recog) { try { recog.stop(); } catch (e) {} recog = null; }
     refresh();
     if (bankLang !== null) goToWordbanks(bankLang);
+    if (backKey) focusRowWhenReady(backKey);
+  }
+
+  /* Closing a full-screen lesson used to drop focus on <body>: a keyboard user had to tab
+   * from the top of the page again, a phone user lost their place. The row the session
+   * opened from is re-rendered by refresh() — and the path load is async — so this waits
+   * for it, but only briefly, and never steals focus if the learner has already moved on. */
+  function focusRowWhenReady(key) {
+    var tries = 0;
+    (function tick() {
+      var el = document.querySelector('[data-lr-key="' + key + '"]');
+      if (el) {
+        if (document.activeElement && document.activeElement !== document.body) return;
+        try { el.focus({ preventScroll: true }); } catch (e) { try { el.focus(); } catch (e2) {} }
+        return;
+      }
+      if (tries++ < 15) setTimeout(tick, 100);
+    })();
   }
 
   /* ═══════════════════ Public + refresh hooks ═══════════════════ */
@@ -3458,6 +3612,7 @@
     boot: boot,
     setLang: setLang,
     showPane: showPane,
+    retryPath: retryPath,
     meaningFor: meaningFor,
     storeMeaning: storeMeaning,
     lang: learnerLang,
