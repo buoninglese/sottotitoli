@@ -19,13 +19,13 @@
 
   /* ── Default XP values per action (edit via dev/xp-config-mockup.html) ── */
   var DEFAULT_CONFIG = {
-    correct_answer: 1,     // per correct answer in the trainer (Allena card ≥Good, lesson, quiz, match, listen/speak)
-    lesson_complete: 10,   // finishing a lesson
-    test_passed: 20,       // passing a unit test (score ≥ 8/10)
-    allena_complete: 5,    // finishing an Allena (word-bank / review) run
-    mission_complete: 10,  // finishing a mission
+    correct_answer: 3,     // per correct answer in the trainer (Allena card ≥Good, lesson, quiz, match, listen/speak)
+    lesson_complete: 9,    // finishing a lesson
+    test_passed: 6,        // passing a unit test (score ≥ 8/10)
+    allena_complete: 6,    // finishing an Allena (word-bank / review) run
+    mission_complete: 12,  // finishing a mission
     word_spoken: 1,        // per word spoken in a transcription session (caption-s8t)
-    ai_report: 10          // per AI report generated
+    ai_report: 18          // per AI report generated
   };
 
   /* ── Actions list with bilingual labels (drives dev/xp-config-mockup.html) ── */

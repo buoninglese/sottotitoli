@@ -3021,6 +3021,18 @@
     stage.innerHTML = html;
     i18nScope(stage);
     bindAnswerKeyboard(stage);
+
+    /* Typing is the primary input on a speak step now — speech recognition does
+     * not exist on iOS Safari — but the caret was never put in the box, so every
+     * card cost a click before the learner could type. Focus it as soon as the
+     * step renders, which covers both "Controlla" → next card and Next → next card. */
+    if (step.type === 'speak') {
+      var typeInput = $('#learnerType');
+      if (typeInput) {
+        try { typeInput.focus({ preventScroll: true }); }
+        catch (e) { try { typeInput.focus(); } catch (e2) {} }
+      }
+    }
   }
 
   function renderMc() {
