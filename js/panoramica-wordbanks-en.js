@@ -288,32 +288,35 @@
                    * instead. (.docx is fine: mammoth handles it below.) */
                   if(ext==='doc'){appAlert('Il formato .doc (Word precedente al 2007) non è supportato. Aprilo in Word e salvalo come .docx, poi riprova.', 'Formato non supportato', '⚠️');return;}
                   if(ext==='pdf'){
-                    if(typeof pdfjsLib==='undefined'){appAlert('Parser PDF non caricato. Aggiorna la pagina.', 'PDF non disponibile', '⚠️');return;}
-                    var reader=new FileReader();
-                    reader.onload=function(e){
-                      pdfjsLib.getDocument({data:e.target.result}).promise.then(function(pdf){
-                        var pages=[],loaded=0;
-                        for(var i=1;i<=pdf.numPages;i++){
-                          pdf.getPage(i).then(function(page){
-                            return page.getTextContent();
-                          }).then(function(tc){
-                            var txt=tc.items.map(function(it){return it.str;}).join(' ');
-                            pages.push(txt);loaded++;
-                            if(loaded===pdf.numPages) processWords(pages.join(' '),name);
-                          });
-                        }
-                      }).catch(function(){appAlert('Impossibile leggere il PDF.', 'Errore PDF', '❌');});
-                    };
-                    reader.readAsArrayBuffer(file);
+                    /* pdf.js is no longer a <script> in <head>; pull it in now. */
+                    ensureLib('pdf').then(function(){
+                      var reader=new FileReader();
+                      reader.onload=function(e){
+                        pdfjsLib.getDocument({data:e.target.result}).promise.then(function(pdf){
+                          var pages=[],loaded=0;
+                          for(var i=1;i<=pdf.numPages;i++){
+                            pdf.getPage(i).then(function(page){
+                              return page.getTextContent();
+                            }).then(function(tc){
+                              var txt=tc.items.map(function(it){return it.str;}).join(' ');
+                              pages.push(txt);loaded++;
+                              if(loaded===pdf.numPages) processWords(pages.join(' '),name);
+                            });
+                          }
+                        }).catch(function(){appAlert('Impossibile leggere il PDF.', 'Errore PDF', '❌');});
+                      };
+                      reader.readAsArrayBuffer(file);
+                    }).catch(function(err){console.warn('wb pdf import:',err);appAlert('Impossibile scaricare il lettore PDF. Controlla la connessione e riprova.', 'Lettore PDF non disponibile', '⚠️');});
                   }else if(ext==='docx'){
-                    if(typeof mammoth==='undefined'){appAlert('Parser DOCX non caricato. Aggiorna la pagina.', 'DOCX non disponibile', '⚠️');return;}
-                    var reader=new FileReader();
-                    reader.onload=function(e){
-                      mammoth.extractRawText({arrayBuffer:e.target.result}).then(function(result){
-                        processWords(result.value,name);
-                      }).catch(function(){appAlert('Impossibile leggere il DOCX.', 'Errore DOCX', '❌');});
-                    };
-                    reader.readAsArrayBuffer(file);
+                    ensureLib('mammoth').then(function(){
+                      var reader=new FileReader();
+                      reader.onload=function(e){
+                        mammoth.extractRawText({arrayBuffer:e.target.result}).then(function(result){
+                          processWords(result.value,name);
+                        }).catch(function(){appAlert('Impossibile leggere il DOCX.', 'Errore DOCX', '❌');});
+                      };
+                      reader.readAsArrayBuffer(file);
+                    }).catch(function(err){console.warn('wb docx import:',err);appAlert('Impossibile scaricare il lettore DOCX. Controlla la connessione e riprova.', 'Lettore DOCX non disponibile', '⚠️');});
                   }else{
                     var reader=new FileReader();
                     reader.onload=function(e){processWords(e.target.result,name);};

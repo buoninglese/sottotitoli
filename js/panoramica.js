@@ -2309,8 +2309,11 @@
       function wscDownloadImage() {
         var el = document.getElementById('wrappedShowcase');
         if (!el) { if (window.toast) toast('Nessun riepilogo da scaricare'); return; }
-        if (typeof html2canvas === 'undefined') { if (window.toast) toast('Libreria non caricata'); return; }
-        html2canvas(el, { scale: 2, useCORS: true, backgroundColor: null, logging: false, windowWidth: el.scrollWidth })
+        /* html2canvas is fetched on first export instead of on page load. */
+        ensureLib('html2canvas')
+          .then(function(){
+            return html2canvas(el, { scale: 2, useCORS: true, backgroundColor: null, logging: false, windowWidth: el.scrollWidth });
+          })
           .then(function(canvas){
             var a = document.createElement('a');
             a.download = 'sottotitoli-wrapped.png';
@@ -2326,7 +2329,10 @@
         var el = document.getElementById('wrappedShowcase');
         if (!el) { if (window.toast) toast('Nessun riepilogo da condividere'); return; }
         if (navigator.share) {
-          html2canvas(el, { scale: 2, useCORS: true, backgroundColor: null, logging: false, windowWidth: el.scrollWidth })
+          ensureLib('html2canvas')
+            .then(function(){
+              return html2canvas(el, { scale: 2, useCORS: true, backgroundColor: null, logging: false, windowWidth: el.scrollWidth });
+            })
             .then(function(canvas){
               return new Promise(function(res){ canvas.toBlob(res, 'image/png'); });
             })
