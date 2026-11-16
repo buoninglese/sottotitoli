@@ -42,6 +42,18 @@
       url: 'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js',
       integrity: '',
       globalName: 'html2canvas'
+    },
+    /* Only the panoramica word-expansion flows use nlp() (tagWordPenn). The
+       captioner keeps its own eager <script> in caption-s8t.html on purpose:
+       there it tags words live, and waiting for a download mid-conversation
+       would silently drop it to the suffix heuristics. */
+    compromise: {
+      /* The bare @version URL 301s to /builds/compromise.js, which cost an extra
+         round trip on first use; this is the resolved path unpkg redirects to.
+         Versioned unpkg paths are immutable, so pinning the deeper URL is safe. */
+      url: 'https://unpkg.com/compromise@14.14.2/builds/compromise.js',
+      integrity: '',
+      globalName: 'nlp'
     }
   };
 

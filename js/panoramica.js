@@ -6654,6 +6654,10 @@
       }
 
       async function renderExpandSuggestions() {
+        /* compromise/nlp is fetched on first use, not with the page. Waiting
+           here keeps the first POS lookup accurate; if the download fails the
+           typeof nlp guards below fall back to LEMMA_POS_MAP as before. */
+        if (typeof ensureLib === 'function') { try { await ensureLib('compromise'); } catch (e) {} }
         var inp = document.getElementById('wbExpandSearch');
         var relation = document.getElementById('wbExpandRelation');
         var results = document.getElementById('wbExpandResults');
@@ -7554,6 +7558,7 @@
 
       // ── Expand a word into a new box inserted right after sourceBox ──
       async function expandWordBox(word, sourceBox) {
+        if (typeof ensureLib === 'function') { try { await ensureLib('compromise'); } catch (e) {} }
         // Build loading placeholder
         var loadingHtml = '<article class="wbx-box expanded" data-word="' + word + '" style="opacity:0.65">' +
           '<button class="wbx-close-exp" title="Chiudi">×</button>' +
