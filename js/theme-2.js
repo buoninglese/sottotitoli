@@ -107,15 +107,24 @@
       if(!btn)return;
       var themeText=btn.querySelector('.theme-text');
       var html=document.documentElement;
-      var current=html.getAttribute('data-theme')||document.body.getAttribute('data-theme')||'light';
-      if(themeText) themeText.textContent=current==='dark'?'Light':'Dark';
+      /* Day/night toggle that respects the chosen colour scheme. It used to force
+       * light/dark unconditionally, so a user on Modern or Play pressed it once and
+       * had their scheme replaced in localStorage — site-wide. Each family now flips
+       * to its own counterpart; only the unwrapped pair flips light <-> dark. */
+      var PAIR={modern:'modern-light','modern-light':'modern',genz:'genz-dark','genz-dark':'genz'};
+      var LABEL={light:'Dark',dark:'Light',modern:'Modern · Bright','modern-light':'Modern · Dark',genz:'Play · Dark','genz-dark':'Play · Bright'};
+      function currentTheme(){
+        return html.getAttribute('data-theme')||document.body.getAttribute('data-theme')||'light';
+      }
+      function nextTheme(t){ return PAIR[t] || (t==='dark'?'light':'dark'); }
+      if(themeText) themeText.textContent=LABEL[currentTheme()]||'Dark';
       btn.addEventListener('click',function(e){
         e.preventDefault();
-        var t=(html.getAttribute('data-theme')||document.body.getAttribute('data-theme')||'light')==='dark'?'light':'dark';
+        var t=nextTheme(currentTheme());
         html.setAttribute('data-theme',t);
         document.body.setAttribute('data-theme',t);
         localStorage.setItem('sottotitoli-theme',t);
-        if(themeText) themeText.textContent=t==='dark'?'Light':'Dark';
+        if(themeText) themeText.textContent=LABEL[t]||'Dark';
       });
     })();
     /* ── Hero welcome card close ── */
