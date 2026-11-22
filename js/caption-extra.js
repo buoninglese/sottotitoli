@@ -1387,14 +1387,32 @@
   window.v20q_exportSrt = function(){ v20q_exportKind('srt'); };
   window.v20q_exportMd  = function(){ v20q_exportKind('md'); };
   window.v20q_exportCsv = function(){ v20q_exportKind('csv'); };
+  /* The Clipboard API rejects without a user gesture, in a non-secure context, or when
+   * permission is refused. The per-sentence copy in this file already falls back to
+   * execCommand; the whole-transcript copy now does the same instead of just giving up. */
+  function v20q_copyFallback(text){
+    var ta = document.createElement('textarea');
+    ta.value = text;
+    ta.setAttribute('readonly', '');
+    ta.style.cssText = 'position:fixed;left:-9999px;top:0';
+    document.body.appendChild(ta);
+    ta.select();
+    var ok = false;
+    try { ok = document.execCommand('copy'); } catch (e) { ok = false; }
+    document.body.removeChild(ta);
+    return ok;
+  }
   window.v20q_copyTranscript = function(){
     if (!v20q.sentences.length) { v20q_toast('Nothing to copy yet'); return; }
     var text = v20q_buildTxt(v20q_exportData());
+    function done(){ v20q_toast('<i class="fa-regular fa-copy"></i> Transcript copied'); }
+    function failed(){ v20q_toast('Could not copy'); }
     if (navigator.clipboard && navigator.clipboard.writeText) {
-      navigator.clipboard.writeText(text)
-        .then(function(){ v20q_toast('<i class="fa-regular fa-copy"></i> Transcript copied'); })
-        .catch(function(){ v20q_toast('Could not copy'); });
-    }
+      navigator.clipboard.writeText(text).then(done).catch(function(){
+        if (v20q_copyFallback(text)) done(); else failed();
+      });
+    } else if (v20q_copyFallback(text)) done();
+    else failed();
   };
 
   /* ── Export menu ── */
