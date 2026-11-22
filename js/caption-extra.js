@@ -280,9 +280,6 @@
   // ── Toggle: Style ──
   window.v20q_setStyle = function(style){
     v20q.style = style;
-    // Update buttons in caption settings popup
-    var btns = document.querySelectorAll('#captionSettingsPopup .v20q-tbtn');
-    btns.forEach(function(b){ b.classList.toggle('active', b.dataset.val === style); });
     // Apply style class to content container (preserve tran style class)
     var vc = document.getElementById('v20qContent');
     if (vc) { vc.className = 'v20q-content v20q-'+style + ' v20q-' + (v20q.tranStyle || 's1'); }
@@ -389,6 +386,9 @@
         if (typeof removeFromWordBank === 'function') removeFromWordBank(w);
       }
       v20q_updateBadge();
+    } else {
+      /* View mode used to fall through here and do nothing at all. */
+      v20q_openWordCard(span);
     }
   };
 
@@ -782,6 +782,207 @@
     });
     observer.observe(ct, { childList: true });
   }
+  /* ═══════════ Word card — click a word, see what it means ═══════════
+   * View mode used to do nothing on a word click: the delegated handler only had
+   * bookmark / edit / collect branches. Everything this card shows is already on
+   * the page — EN_NGSL is a 2,800-word dictionary carrying rank, part of speech,
+   * IPA and a definition; IT_KELLY and S8T_IT_LEXICON carry Italian level and POS;
+   * the translation provider covers the second language — so the card opens
+   * instantly and only the gloss has to wait on the network. */
+
+  var V20Q_POS_LABEL = {
+    n: 'noun', v: 'verb', adj: 'adjective', adv: 'adverb',
+    prep: 'preposition', pron: 'pronoun', conj: 'conjunction',
+    det: 'article', aux: 'auxiliary'
+  };
+  var v20qGlossCache = {};
+  var v20qWordCard = null;
+  var v20qWordFrom = null;
+
+  function v20q_escHtml(s){
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function(c){
+      return { '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c];
+    });
+  }
+  /* A word in a translation box is the target language; anywhere else it is the
+   * language being captioned. */
+  function v20q_wordLang(span){
+    if (span && span.closest && span.closest('.v20q-tran-box')) {
+      return localStorage.getItem('sottotitoli-translate-target') || 'it';
+    }
+    return window._currentCaptionLang || window.currentCaptionLang || 'en-US';
+  }
+  function v20q_cleanWord(raw){
+    return String(raw == null ? '' : raw)
+      .replace(/^[^A-Za-zÀ-ÿ']+/, '')
+      .replace(/[^A-Za-zÀ-ÿ']+$/, '')
+      .toLowerCase();
+  }
+  function v20q_wordFacts(word, langTag){
+    var out = { pos:'', posLabel:'', ipa:'', def:'', level:'', band:'' };
+    var L = String(langTag || '').split('-')[0];
+    if (L === 'en' && window.EN_NGSL && window.EN_NGSL[word]) {
+      var e = window.EN_NGSL[word];
+      out.pos = e[1] || ''; out.ipa = e[2] || ''; out.def = e[3] || '';
+      var rank = e[0];
+      if (rank) out.band = rank <= 1000 ? 'Top 1000 English words' : rank <= 2000 ? 'Top 2000 English words' : 'NGSL 2,800';
+    } else if (window.IT_KELLY && window.IT_KELLY[word]) {
+      var bits = String(window.IT_KELLY[word]).split('|');
+      out.pos = bits[0] || ''; out.level = String(bits[1] || '').toUpperCase();
+    } else if (L === 'it' && window.S8T_IT_LEXICON) {
+      try {
+        out.pos = window.S8T_IT_LEXICON.getPOS(word, 'it') || '';
+        out.level = String(window.S8T_IT_LEXICON.getCEFR(word, 'it') || '').toUpperCase();
+      } catch (e) {}
+    }
+    if (out.pos === 'other') out.pos = '';
+    out.posLabel = V20Q_POS_LABEL[out.pos] || out.pos;
+    return out;
+  }
+  function v20q_speakWord(word, langTag){
+    try {
+      if (!window.speechSynthesis || !window.SpeechSynthesisUtterance) return;
+      window.speechSynthesis.cancel();
+      var u = new window.SpeechSynthesisUtterance(word);
+      u.lang = langTag || 'en-US';
+      u.rate = 0.92;
+      window.speechSynthesis.speak(u);
+    } catch (e) {}
+  }
+  function v20q_wordGloss(word, from, cb){
+    var to = (localStorage.getItem('sottotitoli-translate-target') || 'it').split('-')[0];
+    var src = String(from || '').split('-')[0];
+    if (!src || src === to) return cb('');
+    var key = src + '>' + to + '::' + word;
+    if (v20qGlossCache[key] !== undefined) return cb(v20qGlossCache[key]);
+    var T = window.SottotitoliTranslationProviders;
+    if (!T || typeof T.translateText !== 'function') return cb('');
+    try {
+      T.translateText({ provider: 'auto' }, word, src, to).then(function(r){
+        var txt = (r && r.translatedText) ? String(r.translatedText).trim() : '';
+        v20qGlossCache[key] = txt;
+        cb(txt);
+      }).catch(function(){ cb(''); });
+    } catch (e) { cb(''); }
+  }
+
+  function v20q_closeWordCard(){
+    if (v20qWordCard && v20qWordCard.parentNode) v20qWordCard.parentNode.removeChild(v20qWordCard);
+    v20qWordCard = null;
+    document.removeEventListener('mousedown', v20q_wordCardOutside, true);
+    document.removeEventListener('keydown', v20q_wordCardKeys, true);
+    var back = document.getElementById('v20qContent');
+    if (v20qWordFrom && back) { try { back.focus({ preventScroll: true }); } catch (e) {} }
+    v20qWordFrom = null;
+  }
+  function v20q_wordCardOutside(e){
+    if (!v20qWordCard) return;
+    if (v20qWordCard.contains(e.target)) return;
+    if (v20qWordFrom && v20qWordFrom.contains(e.target)) return;
+    v20q_closeWordCard();
+  }
+  function v20q_wordCardKeys(e){
+    if (e.key === 'Escape' || e.key === 'Esc') {
+      e.stopPropagation();
+      v20q_closeWordCard();
+    }
+  }
+
+  function v20q_openWordCard(span){
+    if (!span) return;
+    var word = v20q_cleanWord(span.textContent);
+    if (!word) return;
+    v20q_closeWordCard();
+
+    var langTag = v20q_wordLang(span);
+    var f = v20q_wordFacts(word, langTag);
+    var chips = '';
+    if (f.posLabel) chips += '<span class="v20q-wc-chip">' + v20q_escHtml(f.posLabel) + '</span>';
+    if (f.level) chips += '<span class="v20q-wc-chip">' + v20q_escHtml(f.level) + '</span>';
+    if (f.band) chips += '<span class="v20q-wc-chip">' + v20q_escHtml(f.band) + '</span>';
+
+    var card = document.createElement('div');
+    card.className = 'v20q-wcard';
+    card.id = 'v20qWordCard';
+    card.tabIndex = -1;
+    card.setAttribute('role', 'dialog');
+    card.setAttribute('aria-label', 'Meaning of ' + word);
+    card.innerHTML =
+      '<div class="v20q-wc-top">' +
+        '<span class="v20q-wc-word">' + v20q_escHtml(word) + '</span>' +
+        (f.ipa ? '<span class="v20q-wc-ipa">' + v20q_escHtml(f.ipa) + '</span>' : '') +
+        '<button type="button" class="v20q-wc-icon" data-act="say" aria-label="Pronounce ' + v20q_escHtml(word) + '" title="Pronounce"><i class="fa-solid fa-volume-high"></i></button>' +
+        '<button type="button" class="v20q-wc-icon" data-act="close" aria-label="Close" title="Close"><i class="fa-solid fa-xmark"></i></button>' +
+      '</div>' +
+      '<div class="v20q-wc-gloss" data-part="gloss" aria-live="polite"></div>' +
+      (f.def ? '<div class="v20q-wc-def">' + v20q_escHtml(f.def) + '</div>' : '') +
+      (chips ? '<div class="v20q-wc-chips">' + chips + '</div>' : '') +
+      '<div class="v20q-wc-acts">' +
+        '<button type="button" class="v20q-wc-btn" data-act="save">Save word</button>' +
+        '<button type="button" class="v20q-wc-btn" data-act="copy">Copy</button>' +
+      '</div>';
+
+    document.body.appendChild(card);
+    v20qWordCard = card;
+    v20qWordFrom = span;
+
+    /* Place it above the word, or below when there is no room, and never off-screen. */
+    var r = span.getBoundingClientRect();
+    var cw = card.offsetWidth, ch = card.offsetHeight;
+    var vw = window.innerWidth, vh = window.innerHeight;
+    var left = Math.min(Math.max(8, r.left + r.width / 2 - cw / 2), Math.max(8, vw - cw - 8));
+    var top = r.top - ch - 10;
+    if (top < 8) top = Math.min(r.bottom + 10, Math.max(8, vh - ch - 8));
+    card.style.left = Math.round(left) + 'px';
+    card.style.top = Math.round(top) + 'px';
+
+    /* The gloss is the only part that needs the network. */
+    var glossEl = card.querySelector('[data-part="gloss"]');
+    if (glossEl && !glossEl.textContent) {
+      v20q_wordGloss(word, langTag, function(txt){
+        if (glossEl && v20qWordCard === card) glossEl.textContent = txt || '';
+      });
+    }
+
+    card.addEventListener('click', function(ev){
+      var btn = ev.target.closest ? ev.target.closest('[data-act]') : null;
+      if (!btn) return;
+      var act = btn.getAttribute('data-act');
+      if (act === 'close') { v20q_closeWordCard(); return; }
+      if (act === 'say') { v20q_speakWord(word, langTag); return; }
+      if (act === 'copy') {
+        var text = word + (glossEl && glossEl.textContent ? ' — ' + glossEl.textContent : '');
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(text).catch(function(){});
+        }
+        v20q_toast('<i class="fa-regular fa-copy"></i> Copied');
+        return;
+      }
+      if (act === 'save') {
+        var savedLang = String(langTag).split('-')[0];
+        if (v20q.words.indexOf(word) === -1) v20q.words.push(word);
+        if (typeof addToWordBank === 'function') addToWordBank(word, savedLang);
+        v20q_updateBadge();
+        v20q_toast('<i class="fa-solid fa-check"></i> Added: ' + v20q_escHtml(word) + ' (' + savedLang + ')');
+        btn.textContent = 'Saved';
+        btn.disabled = true;
+        return;
+      }
+    });
+
+    try { card.focus({ preventScroll: true }); } catch (e) {}
+
+    /* Dismissals: click away, Escape, or scrolling the transcript out from under it.
+       Attached a tick later so the click that opened the card cannot close it. */
+    setTimeout(function(){
+      if (v20qWordCard !== card) return;
+      document.addEventListener('mousedown', v20q_wordCardOutside, true);
+      document.addEventListener('keydown', v20q_wordCardKeys, true);
+      var sc = v20q_scroller();
+      if (sc) sc.addEventListener('scroll', v20q_closeWordCard, { passive: true, once: true });
+    }, 0);
+  }
+
   /* ═══════════ Taking the transcript out, and reading it at your size ═══════════
    * Per-sentence copy existed; nothing could leave the page as a whole, and the
    * transcript's size was fixed by CSS. Both are small additions on data the

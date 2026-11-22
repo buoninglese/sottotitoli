@@ -14,17 +14,17 @@
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net https://unpkg.com https://cdnjs.cloudflare.com https://qzqmuegbpmvqrjrlfbgk.supabase.co; style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; font-src 'self' https://cdnjs.cloudflare.com; img-src 'self' data: https:; connect-src 'self' https://qzqmuegbpmvqrjrlfbgk.supabase.co wss://qzqmuegbpmvqrjrlfbgk.supabase.co wss://sottotitoli-websocket.onrender.com https://sottotitoli-websocket.onrender.com https://api.mymemory.translated.net https://translate.googleapis.com; frame-src 'self'; media-src 'self' blob:; worker-src 'self' blob:">
 <meta http-equiv="X-Content-Type-Options" content="nosniff">
 <meta name="referrer" content="strict-origin-when-cross-origin">
-<link rel="stylesheet" href="css/fonts.css?v=4130750">
-<link rel="stylesheet" href="css/theme-2.css?v=4130750">
+<link rel="stylesheet" href="css/fonts.css?v=dc19e69">
+<link rel="stylesheet" href="css/theme-2.css?v=dc19e69">
 <!-- The four colour schemes from Panoramica (Modern / Modern · Bright / Play · Bright /
      Play · Dark). This page already applies the stored theme name to <html>, but without
      this stylesheet those four names defined no tokens at all — a Modern or Play user
      landed on the light palette here. Loaded BEFORE the page styles so the page's own
      rules still win at equal specificity. -->
-<link rel="stylesheet" href="css/theme-wrapped.css?v=4130750">
-<link rel="stylesheet" href="css/components.css?v=4130750">
-<link rel="stylesheet" href="css/toast.css?v=4130750">
-<link rel="stylesheet" href="css/font-awesome-subset.css?v=4130750">
+<link rel="stylesheet" href="css/theme-wrapped.css?v=dc19e69">
+<link rel="stylesheet" href="css/components.css?v=dc19e69">
+<link rel="stylesheet" href="css/toast.css?v=dc19e69">
+<link rel="stylesheet" href="css/font-awesome-subset.css?v=dc19e69">
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 
@@ -1566,6 +1566,67 @@ button[onclick*="addToWordBank"]:hover{background:rgba(52,211,153,.15)!important
    rule above is class-based so it would otherwise survive the `:empty` exception. */
 body.session-active .caption-transcript.v20q-empty::after{ content:none; }
 
+/* ═══ Word card — what a word means, on click ═══
+   Positioned fixed and placed by js/caption-extra.js next to the word it belongs to.
+   It gets its own opaque surface rather than var(--card): on Play · Bright the page
+   card is rgba(255,255,255,.18), so white text on it measured 2.94:1 — the card was
+   a bubble of pale lavender with white writing in it. --wc-bg is opaque everywhere. */
+:root,
+[data-theme="light"]{ --wc-bg:#ffffff; --wc-line:#e2e8f0; }
+[data-theme="dark"]{ --wc-bg:#1a1d26; --wc-line:#252a35; }
+[data-theme="modern"]{ --wc-bg:#141414; --wc-line:rgba(255,255,255,.10); }
+[data-theme="modern-light"]{ --wc-bg:#ffffff; --wc-line:rgba(6,36,51,.12); }
+[data-theme="genz"]{ --wc-bg:#241346; --wc-line:rgba(255,255,255,.20); }
+[data-theme="genz-dark"]{ --wc-bg:#190c34; --wc-line:rgba(196,181,253,.20); }
+
+.v20q-wcard{
+  position:fixed; z-index:100001;
+  width:min(300px, calc(100vw - 24px));
+  padding:12px 13px 11px; border-radius:12px;
+  background:var(--wc-bg, var(--card)); color:var(--text);
+  border:1px solid var(--wc-line, var(--line));
+  box-shadow:0 18px 40px rgba(0,0,0,.38);
+  font-family:var(--font-body);
+}
+.v20q-wcard:focus{ outline:none }
+.v20q-wc-top{ display:flex; align-items:center; gap:7px; flex-wrap:wrap }
+.v20q-wc-word{ font-size:17px; font-weight:800; letter-spacing:-.01em; color:var(--text) }
+/* --muted, not --muted2: the IPA is 11.5px and --muted2 is only ~3.6:1 on the light
+   surfaces. */
+.v20q-wc-ipa{ font-family:var(--font-mono); font-size:11.5px; color:var(--muted) }
+.v20q-wc-icon{
+  width:24px; height:24px; flex:0 0 auto;
+  display:inline-flex; align-items:center; justify-content:center;
+  border:1px solid var(--line); border-radius:50%; background:transparent;
+  color:var(--muted); cursor:pointer; font-size:10.5px;
+  transition:color .15s, border-color .15s;
+}
+.v20q-wc-icon:first-of-type{ margin-left:auto }
+.v20q-wc-icon:hover{ color:var(--text); border-color:var(--accent) }
+.v20q-wc-gloss{
+  margin-top:7px; font-size:14px; font-weight:700; line-height:1.35; color:var(--text);
+}
+.v20q-wc-gloss:empty{ display:none }
+.v20q-wc-def{ margin-top:5px; font-size:12.5px; line-height:1.45; color:var(--muted) }
+.v20q-wc-chips{ display:flex; flex-wrap:wrap; gap:5px; margin-top:9px }
+.v20q-wc-chip{
+  font-size:10.5px; font-weight:700; letter-spacing:.03em;
+  padding:2px 7px; border-radius:999px;
+  background:var(--glow); color:var(--text); border:1px solid var(--line);
+}
+.v20q-wc-acts{ display:flex; gap:7px; margin-top:11px }
+.v20q-wc-btn{
+  flex:1; padding:6px 10px; border-radius:8px; cursor:pointer;
+  border:1px solid var(--line); background:transparent; color:var(--text);
+  font-family:var(--font-body); font-size:11.5px; font-weight:700;
+  transition:border-color .15s, background .15s;
+}
+.v20q-wc-btn:hover{ border-color:var(--accent); background:var(--glow) }
+.v20q-wc-btn[data-act="save"]{ background:var(--accent); border-color:var(--accent); color:#04121a }
+.v20q-wc-btn:disabled{ opacity:.65; cursor:default }
+.v20q-wcard .v20q-wc-icon:focus-visible,
+.v20q-wcard .v20q-wc-btn:focus-visible{ outline:2px solid var(--accent); outline-offset:2px }
+
 /* Undo toast — room for a button, and enough time to use it. */
 .v20q-toast-action{
   position:fixed; bottom:24px; left:50%; z-index:100000;
@@ -1656,8 +1717,8 @@ html[data-theme="genz-dark"]{
 </style>
 </head>
 <body class="hb-start" style="display:flex;flex-direction:column;height:100dvh;overflow:hidden">
-<script defer src="js/version.js?v=4130750"></script>
-<script defer src="js/version-badge.js?v=4130750"></script>
+<script defer src="js/version.js?v=dc19e69"></script>
+<script defer src="js/version-badge.js?v=dc19e69"></script>
 <script>(function(){if(window.location.search.indexOf('join=1')!==-1){var ms=document.getElementById('modeScroll');var tt=document.getElementById('themeToggle');var rp=document.getElementById('rightPanel');var ac=document.getElementById('appCenter');if(ms)ms.style.display='none';if(tt)tt.style.display='none';if(rp)rp.style.display='none';if(ac){ac.style.left='0';ac.style.right='0';}}})();</script>
 
 <!-- ═══ UNIFIED TOP BAR ═══ -->
@@ -2083,29 +2144,29 @@ html[data-theme="genz-dark"]{
 
 <script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script defer src="https://unpkg.com/compromise@14"></script>
-<script defer src="config.js?v=4130750"></script>
-<script defer src="js/auth.js?v=4130750"></script>
-<script defer src="js/error-beacon.js?v=4130750"></script>
-<script defer src="js/bank-identities.js?v=4130750"></script>
-<script defer src="js/xp.js?v=4130750"></script>
-<script defer src="js/i18n.js?v=4130750"></script>
-<script defer src="js/theme-2.js?v=4130750"></script>
-<script defer src="js/toast.js?v=4130750"></script>
-<script defer src="js/notifications.js?v=4130750"></script>
-<script defer src="js/language-resolver.js?v=4130750"></script>
+<script defer src="config.js?v=dc19e69"></script>
+<script defer src="js/auth.js?v=dc19e69"></script>
+<script defer src="js/error-beacon.js?v=dc19e69"></script>
+<script defer src="js/bank-identities.js?v=dc19e69"></script>
+<script defer src="js/xp.js?v=dc19e69"></script>
+<script defer src="js/i18n.js?v=dc19e69"></script>
+<script defer src="js/theme-2.js?v=dc19e69"></script>
+<script defer src="js/toast.js?v=dc19e69"></script>
+<script defer src="js/notifications.js?v=dc19e69"></script>
+<script defer src="js/language-resolver.js?v=dc19e69"></script>
 <!-- mic-core.js MUST come first: real-mic.js and the inline block below both delegate to it. -->
-<script defer src="js/mic-core.js?v=4130750"></script>
-<script defer src="js/real-mic.js?v=4130750"></script>
-<script defer src="js/record-fallback.js?v=4130750"></script>
-<script defer src="js/system-audio.js?v=4130750"></script>
-<script defer src="js/grammar-viz.js?v=4130750"></script>
-<script defer src="js/speech-icons.js?v=4130750"></script>
-<script defer src="js/cefr-gse.js?v=4130750"></script>
-<script defer src="js/cefr-info.js?v=4130750"></script>
-<script defer src="js/en-ngsl.js?v=4130750"></script>
-<script defer src="js/it-kelly.js?v=4130750"></script>
-<script defer src="js/it-lexicon.js?v=4130750"></script>
-<script defer src="translation-providers.js?v=4130750"></script>
+<script defer src="js/mic-core.js?v=dc19e69"></script>
+<script defer src="js/real-mic.js?v=dc19e69"></script>
+<script defer src="js/record-fallback.js?v=dc19e69"></script>
+<script defer src="js/system-audio.js?v=dc19e69"></script>
+<script defer src="js/grammar-viz.js?v=dc19e69"></script>
+<script defer src="js/speech-icons.js?v=dc19e69"></script>
+<script defer src="js/cefr-gse.js?v=dc19e69"></script>
+<script defer src="js/cefr-info.js?v=dc19e69"></script>
+<script defer src="js/en-ngsl.js?v=dc19e69"></script>
+<script defer src="js/it-kelly.js?v=dc19e69"></script>
+<script defer src="js/it-lexicon.js?v=dc19e69"></script>
+<script defer src="translation-providers.js?v=dc19e69"></script>
 <!-- Apply saved theme (from panoramica settings or localStorage) -->
 <script>
 (function(){
@@ -2125,7 +2186,7 @@ html[data-theme="genz-dark"]{
   if (window.CefrInfo) window.CefrInfo.init();
 })();
 </script>
-<script defer src="js/caption-app.js?v=4130750"></script>
+<script defer src="js/caption-app.js?v=dc19e69"></script>
 <script>
 /* The app now lives in js/caption-app.js instead of inline, so a failed fetch
    leaves a blank page with nothing in the console. Say so, and offer a retry,
@@ -2147,7 +2208,7 @@ window.addEventListener('load', function () {
 </script>
 
 <!-- ═══ V20quint Transcript Engine v44 ═══ -->
-<script defer src="js/caption-extra.js?v=4130750"></script>
+<script defer src="js/caption-extra.js?v=dc19e69"></script>
 
 <!-- Toast notifications -->
 <div id="toast" style="position:fixed;bottom:24px;left:50%;transform:translateX(-50%);padding:8px 20px;border-radius:100px;background:var(--accent);color:#fff;font-weight:700;font-size:12px;z-index:99999;opacity:0;transition:opacity .3s;pointer-events:none;font-family:var(--font-body)"></div>

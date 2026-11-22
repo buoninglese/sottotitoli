@@ -1697,25 +1697,13 @@ function _filterSynByPOS(pos, btn) {
   });
 }
 // ═══ Popup toggles for settings & metrics icons ═══
-function togglePopup(id, btn) {
-  var el = document.getElementById(id); if (!el) return;
-  var open = el.style.display === 'block';
-  // Close ALL popups first (mutual exclusivity)
-  document.querySelectorAll('#settingsPopup,#captionSettingsPopup').forEach(function(p) { p.style.display = 'none'; });
-  if (!open) { el.style.display = 'block'; }
-}
-// Click outside to close any open popup
+// Click outside to close the bookmark panel (the only popup this page still has;
+// the settings and caption-settings popups have no markup, so their handlers went).
 document.addEventListener('click', function(e) {
-  var popups = document.querySelectorAll('#settingsPopup,#captionSettingsPopup,#v20qBookmarkPanel');
-  popups.forEach(function(p) {
-    if (p.style.display === 'block') {
-      var btnMap = { settingsPopup:'settingsBtn', captionSettingsPopup:'captionSettingsBtn', v20qBookmarkPanel:'bookmarksBtn' };
-      var btn = document.getElementById(btnMap[p.id] || '');
-      if (!p.contains(e.target) && (!btn || !btn.contains(e.target))) {
-        p.style.display = 'none';
-      }
-    }
-  });
+  var p = document.getElementById('v20qBookmarkPanel');
+  if (!p || p.style.display !== 'block') return;
+  var btn = document.getElementById('bookmarksBtn');
+  if (!p.contains(e.target) && (!btn || !btn.contains(e.target))) p.style.display = 'none';
 });
 // ═══ Robust slide update — polls every 800ms as fallback ═══
 var _slidePollInterval = setInterval(function() {
