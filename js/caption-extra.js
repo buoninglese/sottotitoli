@@ -1140,20 +1140,59 @@
   function v20q_plainText(s){
     return String(s == null ? '' : s).replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
   }
-  function v20q_download(name, text, mime){
+  /* ── Delivering a file is not one API ──
+   * A desktop browser wants an <a download>. iOS Safari ignores that for blobs and
+   * expects the share sheet, which is where "save this file" actually lives on a
+   * phone. Either can be blocked outright — a popup blocker, a strict content policy,
+   * a browser that refuses blob URLs. Failing with "Could not save the file" throws
+   * away work the learner just did, so delivery degrades instead: share where the
+   * platform has a share sheet, download otherwise, and if all of that is refused,
+   * put the text on the clipboard and say so. Returns which one happened. */
+  function v20q_downloadBlob(name, blob){
+    if (!blob) return 'failed';
     try {
-      var blob = new Blob([text], { type: mime || 'text/plain;charset=utf-8' });
       var url = URL.createObjectURL(blob);
       var a = document.createElement('a');
-      a.href = url; a.download = name; a.style.display = 'none';
+      a.href = url; a.download = name; a.rel = 'noopener'; a.style.display = 'none';
       document.body.appendChild(a);
       a.click();
       setTimeout(function(){
         if (a.parentNode) a.parentNode.removeChild(a);
         URL.revokeObjectURL(url);
-      }, 1200);
-      return true;
-    } catch (e) { return false; }
+      }, 1500);
+      return 'downloaded';
+    } catch (e) { return 'failed'; }
+  }
+  function v20q_deliver(name, text, mime, onDone){
+    var blob = null;
+    try { blob = new Blob([text], { type: mime || 'text/plain;charset=utf-8' }); } catch (e) { blob = null; }
+
+    function finish(how){
+      if (onDone) onDone(how);
+    }
+
+    // 1. the share sheet, where "download" really means "send this somewhere"
+    try {
+      if (blob && window.File && navigator.canShare) {
+        var file = new window.File([blob], name, { type: blob.type || 'text/plain' });
+        if (navigator.canShare({ files: [file] })) {
+          navigator.share({ files: [file], title: name })
+            .then(function(){ finish('shared'); })
+            .catch(function(err){
+              if (err && err.name === 'AbortError') { finish('cancelled'); return; }
+              finish(v20q_downloadBlob(name, blob));
+            });
+          return;
+        }
+      }
+    } catch (e) {}
+
+    // 2. the ordinary download
+    var how = v20q_downloadBlob(name, blob);
+    if (how !== 'failed') { finish(how); return; }
+
+    // 3. graceful last resort: hand them the text rather than losing it
+    finish(v20q_copyFallback(text) ? 'copied' : 'failed');
   }
   /* "00:12" → "00:00:12,000". SRT wants HH:MM:SS,mmm, and the transcript only ever
    * stores MM:SS. */
@@ -1376,12 +1415,15 @@
     else if (kind === 'md') { payload = v20q_buildMd(data, gloss); mime = 'text/markdown;charset=utf-8'; }
     else if (kind === 'csv') { payload = v20q_buildCsv(data); mime = 'text/csv;charset=utf-8'; }
     else { kind = 'txt'; payload = v20q_buildTxt(data); mime = 'text/plain;charset=utf-8'; }
-    if (v20q_download(v20q_exportName(data, kind), payload, mime)) {
-      v20q_toast('<i class="fa-solid fa-check"></i> ' + kind.toUpperCase() + ' saved' +
-        (data.bilingual ? ' · ' + v20q_langName(data.srcCode) + '/' + v20q_langName(data.tgtCode) : ''));
-    } else {
-      v20q_toast('Could not save the file');
-    }
+    var name = v20q_exportName(data, kind);
+    var pair = data.bilingual ? ' · ' + v20q_langName(data.srcCode) + '/' + v20q_langName(data.tgtCode) : '';
+    v20q_deliver(name, payload, mime, function(how){
+      if (how === 'cancelled') return;                 // they closed the share sheet
+      if (how === 'shared')  { v20q_toast('<i class="fa-solid fa-check"></i> ' + kind.toUpperCase() + ' shared' + pair); return; }
+      if (how === 'copied')  { v20q_toast('<i class="fa-regular fa-copy"></i> Download blocked — ' + kind.toUpperCase() + ' copied to the clipboard'); return; }
+      if (how === 'failed')  { v20q_toast('Could not save the file'); return; }
+      v20q_toast('<i class="fa-solid fa-check"></i> ' + kind.toUpperCase() + ' saved' + pair);
+    });
   }
   window.v20q_exportTxt = function(){ v20q_exportKind('txt'); };
   window.v20q_exportSrt = function(){ v20q_exportKind('srt'); };
