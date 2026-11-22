@@ -47,6 +47,132 @@ window.sottotitoliSupabase = window.supabase.createClient(
   };
   console.log('🔧 Auth bypass active — mock user:', MOCK_USER.id);
 })();
+
+// 1.6) Per-account device state ───────────────────────────────────────────────
+// Two bugs came from treating this browser as if it belonged to one account:
+//
+//   • `sottotitoli_onboarding_done` was a single device-wide flag. Once anyone
+//     finished onboarding on this browser, EVERY later account skipped it — a
+//     brand-new user landed straight on the dashboard.
+//   • Learner progress, the onboarding answer copy, avatar, favourites and recent
+//     imports live in localStorage and were never cleared when the signed-in
+//     account changed, so a new account appeared to inherit the previous one's
+//     data. (The database itself is fine: every user table has RLS and is read
+//     with .eq('user_id', …) — this is device cache, not a server leak.)
+//
+// The flag is keyed by user id now, and switching accounts on a device drops the
+// other account's cached data. Preferences (theme, language, font size) stay:
+// they describe the device, not the person.
+(function(){
+  var IDENTITY = 'sottotitoli-identity';
+  // Device preferences — never wiped by an account change.
+  var KEEP = [
+    'sottotitoli-theme', 'sottotitoli-lang', 'sottotitoli-native-lang',
+    'sottotitoli-caption-lang', 'sottotitoli-caption-font',
+    'sottotitoli-caption-style', 'sottotitoli-caption-var',
+    'sottotitoli-font-size', 'sottotitoli-magic-fix',
+    'sottotitoli-pause-sensitivity', 'sottotitoli-mic-device',
+    'sottotitoli_return_page', 'sottotitoli_referrer'
+  ];
+  var ACCOUNT_PREFIX = /^(sottotitoli|s8t-|rai-)/;
+
+  // Two different horizons, on purpose:
+  //   • DEVICE_FRESH — anything already in this browser predates an account this
+  //     new, so it belongs to someone else and should go. Generous (a day) so the
+  //     cleanup still happens if the person comes back later.
+  //   • GATE_FRESH — how new an account must be before "no onboarding row" is read
+  //     as "has not onboarded". Narrow (an hour): rows for older accounts have
+  //     been cleared by purges before, and sending an established learner back
+  //     into onboarding is worse than letting a new one skip a page.
+  var DEVICE_FRESH = 24 * 60 * 60 * 1000;
+  var GATE_FRESH = 60 * 60 * 1000;
+
+  function ageOf(user){
+    var created = Date.parse((user && user.created_at) || '');
+    return created ? Date.now() - created : NaN;
+  }
+
+  function flagKey(uid){ return 'sottotitoli_onboarding_done:' + uid; }
+
+  function purgeAccountData(){
+    try {
+      Object.keys(localStorage).forEach(function(k){
+        if (k === IDENTITY || KEEP.indexOf(k) !== -1) return;
+        if (ACCOUNT_PREFIX.test(k)) {
+          try { localStorage.removeItem(k); } catch(e) {}
+        }
+      });
+    } catch(e) {}
+  }
+
+  // Called on every page once the session is known.
+  function guard(uid, user){
+    if (!uid) return;
+    var prev = null;
+    try { prev = localStorage.getItem(IDENTITY); } catch(e) {}
+    if (prev === uid) return;
+
+    // Legacy device-wide flag from the old build: no longer trusted (it may have
+    // been set by a different account), so remove it.
+    try { localStorage.removeItem('sottotitoli_onboarding_done'); } catch(e) {}
+
+    if (prev) {
+      // A different account is signed in on this device → drop the previous
+      // account's cache so it cannot surface under the new identity.
+      purgeAccountData();
+    } else if (ageOf(user) < DEVICE_FRESH) {
+      // No identity recorded yet, and the account was created recently: any data
+      // already in this browser was written before this account existed.
+      purgeAccountData();
+    }
+    // No identity yet and an established account: first run of this build. Keep
+    // everything so existing users lose nothing — only record who this is.
+    try { localStorage.setItem(IDENTITY, uid); } catch(e) {}
+  }
+
+  function forget(){
+    purgeAccountData();
+    try { localStorage.removeItem(IDENTITY); } catch(e) {}
+  }
+
+  // 'done' | 'needs' | 'unknown'
+  function state(user, cb){
+    if (!user || !user.id) return cb('unknown');
+    var done = false;
+    try {
+      done = localStorage.getItem(flagKey(user.id)) === 'true'
+          || sessionStorage.getItem('sottotitoli_onboarding_just_done') === '1';
+    } catch(e) {}
+    if (done) return cb('done');
+
+    var sb = window.sottotitoliSupabase;
+    if (!sb) return cb('unknown');
+    sb.from('onboarding_responses')
+      .select('onboarding_completed')
+      .eq('user_id', user.id)
+      .maybeSingle()
+      .then(function(r){
+        if (r.error) return cb('unknown');    // never guess on a failed query
+        if (r.data && r.data.onboarding_completed === true) {
+          try { localStorage.setItem(flagKey(user.id), 'true'); } catch(e) {}
+          return cb('done');
+        }
+        if (r.data && r.data.onboarding_completed === false) return cb('needs');
+        // No row at all. A recently created account has simply not onboarded yet.
+        // An older one may have had its row cleared by a purge, so say nothing.
+        return cb(ageOf(user) < GATE_FRESH ? 'needs' : 'unknown');
+      });
+  }
+
+  function markDone(uid){
+    if (!uid) return;
+    try { localStorage.setItem(flagKey(uid), 'true'); } catch(e) {}
+  }
+
+  window.SottotitoliIdentity = { guard: guard, forget: forget };
+  window.SottotitoliOnboarding = { state: state, markDone: markDone, flagKey: flagKey };
+})();
+
 (function(){
   var path = window.location.pathname.replace(/\/$/,'').split('/').pop() || 'index.html';
   // Pages that are publicly accessible (no auth required)
@@ -80,29 +206,14 @@ window.sottotitoliSupabase = window.supabase.createClient(
         initUserTokens(r.data.session.user.id);
 
         // ── Onboarding gate ──
-        // New users who haven't completed onboarding are redirected.
+        // Per-account now: the old check used one device-wide flag, so a second
+        // account on the same browser skipped onboarding entirely.
         // Skip only on index (landing page) and onboarding itself.
+        window.SottotitoliIdentity.guard(user.id, user);
         if (path !== 'onboarding.html' && path !== 'index.html') {
-          var onboardingDone = localStorage.getItem('sottotitoli_onboarding_done');
-          if (onboardingDone !== 'true') {
-            // Check Supabase for onboarding status
-            sb.from('onboarding_responses')
-              .select('onboarding_completed')
-              .eq('user_id', user.id)
-              .maybeSingle()
-              .then(function(_r) {
-                if (_r.error) return; // Table might not exist — skip silently
-                // Only redirect if explicitly NOT completed.
-                // A missing row (_r.data === null) means nothing was saved —
-                // don't redirect in that case (the save might have failed).
-                if (_r.data && _r.data.onboarding_completed === true) {
-                  localStorage.setItem('sottotitoli_onboarding_done', 'true');
-                } else if (_r.data && _r.data.onboarding_completed === false) {
-                  window.location.replace('onboarding.html');
-                }
-                // If _r.data is null (no row), don't redirect
-              });
-          }
+          window.SottotitoliOnboarding.state(user, function(s){
+            if (s === 'needs') window.location.replace('onboarding.html');
+          });
         }
       }
     });
@@ -271,7 +382,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (logoutBtn) {
       logoutBtn.addEventListener('click', async function(){
         await window.sottotitoliSupabase.auth.signOut();
-        // Clear any stored state
+        // Clear any stored state — including the account-scoped cache and the
+        // identity record, so the next person to sign in on this device starts
+        // from nothing of this account's.
+        if (window.SottotitoliIdentity) window.SottotitoliIdentity.forget();
         try { localStorage.removeItem('sottotitoli_return_page'); } catch(e) {}
         try { localStorage.removeItem('sottotitoli_referrer'); } catch(e) {}
         window.location.href = getPostLogoutUrl();
@@ -488,25 +602,15 @@ function initUserTokens(userId) {
     sb.auth.getSession().then(function(r){
       if (!r.data?.session) return; // Not signed in — let the auth guard handle it
       var user = r.data.session.user;
-      // Check local cache first
-      if (localStorage.getItem('sottotitoli_onboarding_done') === 'true') return;
-      // Check Supabase
-      sb.from('onboarding_responses')
-        .select('onboarding_completed')
-        .eq('user_id', user.id)
-        .maybeSingle()
-        .then(function(_r){
-          if (_r.error) return; // Table might not exist yet — skip silently
-          // Only redirect if explicitly NOT completed.
-          // A missing row means nothing was saved — don't redirect.
-          if (_r.data && _r.data.onboarding_completed === true) {
-            localStorage.setItem('sottotitoli_onboarding_done', 'true');
-          } else if (_r.data && _r.data.onboarding_completed === false) {
-            console.log('🆕 Onboarding not completed — redirecting');
-            window.location.replace('onboarding.html');
-          }
-          // If _r.data is null (no row), don't redirect
-        });
+      // Same per-account guards as the main auth check — this gate is the one
+      // that runs on panoramica, which the first gate skips.
+      window.SottotitoliIdentity.guard(user.id, user);
+      window.SottotitoliOnboarding.state(user, function(s){
+        if (s === 'needs') {
+          console.log('🆕 Onboarding not completed — redirecting');
+          window.location.replace('onboarding.html');
+        }
+      });
     });
   }
 
