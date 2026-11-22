@@ -592,12 +592,12 @@
         line.classList.toggle('v20q-bookmarked', isBm);
       }
     }
+    v20q_updateBookmarkBadge();
+    v20q_refreshBookmarkPanel();
   };
   // ── Scroll to sentence + highlight (used by bookmark panel clicks) ──
   window.v20q_scrollToSentence = function(idx){
-    // Close the bookmark panel
-    var panel = document.getElementById('v20qBookmarkPanel');
-    if (panel) panel.style.display = 'none';
+    v20q_hideBookmarkPanel();
     // Find the v20q-line at this index
     var container = document.getElementById('v20qContent');
     if (!container) return;
@@ -734,6 +734,8 @@
     v20q.sIdx = v20q.sentences.length;
     v20q_rerender();
     v20q_reportsStale();
+    v20q_updateBookmarkBadge();      // indices shifted
+    v20q_refreshBookmarkPanel();
     /* Deleting is one tap on a phone, next to Copy — so it gets a way back. */
     v20q_toastAction('Line deleted', 'Undo', function(){
       v20q.sentences.splice(idx, 0, goneText);
@@ -743,39 +745,105 @@
       v20q_restoreMirrorLine(goneMirror, idx);
       v20q_rerender();
       v20q_reportsStale();
+      v20q_updateBookmarkBadge();
+      v20q_refreshBookmarkPanel();
     }, 7000);
   };
   // ── Refresh bookmarks panel content (no toggle) ──
+  /* Everything here already existed except the panel itself: v20q_showBookmarks
+   * returned early because #v20qBookmarkPanel was never in the DOM, so Save Lines
+   * mode marked lines that could never be looked at again. The rows are buttons now
+   * (they were divs with onclick, which no keyboard can reach). */
+  function v20q_ensureBookmarkPanel(){
+    var panel = document.getElementById('v20qBookmarkPanel');
+    if (panel) return panel;
+    panel = document.createElement('div');
+    panel.id = 'v20qBookmarkPanel';
+    panel.className = 'v20q-bm-panel';
+    panel.setAttribute('role', 'dialog');
+    panel.setAttribute('aria-label', 'Saved lines');
+    panel.style.display = 'none';
+    document.body.appendChild(panel);
+    return panel;
+  }
+  function v20q_updateBookmarkBadge(){
+    var btn = document.getElementById('bookmarksBtn');
+    if (!btn) return;
+    var n = v20q.bookmarks.length;
+    var badge = btn.querySelector('.v20q-bm-badge');
+    if (!badge) {
+      badge = document.createElement('span');
+      badge.className = 'v20q-bm-badge';
+      btn.appendChild(badge);
+    }
+    badge.textContent = n ? String(n) : '';
+    btn.classList.toggle('has-marks', n > 0);
+    btn.setAttribute('aria-label', n ? 'Saved lines (' + n + ')' : 'Saved lines');
+    var panel = document.getElementById('v20qBookmarkPanel');
+    btn.setAttribute('aria-expanded', (panel && panel.style.display === 'block') ? 'true' : 'false');
+  }
+  function v20q_placeBookmarkPanel(panel){
+    var btn = document.getElementById('bookmarksBtn');
+    if (!btn) return;
+    var r = btn.getBoundingClientRect();
+    var pw = panel.offsetWidth, ph = panel.offsetHeight;
+    var left = Math.min(Math.max(8, r.right - pw), Math.max(8, window.innerWidth - pw - 8));
+    var top = r.bottom + 8;
+    if (top + ph > window.innerHeight - 8) top = Math.max(8, r.top - ph - 8);
+    panel.style.left = Math.round(left) + 'px';
+    panel.style.top = Math.round(top) + 'px';
+  }
+  function v20q_bookmarkKeys(e){
+    if (e.key !== 'Escape' && e.key !== 'Esc') return;
+    var panel = document.getElementById('v20qBookmarkPanel');
+    if (!panel || panel.style.display !== 'block') return;
+    e.stopPropagation();
+    v20q_hideBookmarkPanel();
+  }
+  function v20q_hideBookmarkPanel(){
+    var panel = document.getElementById('v20qBookmarkPanel');
+    if (panel) panel.style.display = 'none';
+    document.removeEventListener('keydown', v20q_bookmarkKeys, true);
+    v20q_updateBookmarkBadge();
+  }
   function v20q_refreshBookmarkPanel(){
     var panel = document.getElementById('v20qBookmarkPanel');
     if (!panel || panel.style.display !== 'block') return;
-    var html = '';
-    if (v20q.bookmarks.length === 0) {
-      html = '<div style="text-align:center;padding:16px;color:var(--muted2);font-size:12px">No bookmarked sentences yet.<br>Enable <b>Save Lines</b> mode and click a line to save it here.</div>';
+    var n = v20q.bookmarks.length;
+    var html = '<div class="v20q-bm-head"><span>Saved lines' + (n ? ' · ' + n : '') + '</span>' +
+      '<button type="button" class="v20q-bm-close" aria-label="Close"><i class="fa-solid fa-xmark"></i></button></div>';
+    if (!n) {
+      html += '<div class="v20q-bm-empty">Nothing saved yet. Turn on <b>Save Lines</b> and click a line to keep it here.</div>';
     } else {
-      html = '<div style="font-size:10px;font-weight:700;color:var(--muted2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">📌 Bookmarked (' + v20q.bookmarks.length + ')</div>';
-      v20q.bookmarks.forEach(function(bi){
-        var s = v20q.sentences[bi] || '';
-        var words = v20q_extractWords(s);
-        var text = words.join(' ');
+      html += '<div class="v20q-bm-list">';
+      v20q.bookmarks.slice().sort(function(a, b){ return a - b; }).forEach(function(bi){
+        var text = v20q_extractWords(v20q.sentences[bi] || '').join(' ');
         var time = v20q.timestamps[bi] || v20q_fmtTime(bi * 6);
-        html += '<div style="display:flex;align-items:center;gap:8px;padding:6px 8px;border-bottom:1px solid var(--line);font-size:13px;cursor:pointer" onmouseover="this.style.background=\'rgba(255,255,255,.02)\'" onmouseout="this.style.background=\'transparent\'" onclick="v20q_scrollToSentence('+bi+')">';
-        html += '<span style="color:#f59e0b;flex-shrink:0"><i class="fa-solid fa-star"></i></span>';
-        html += '<span style="color:var(--muted2);font-family:var(--font-mono);font-size:10px;flex-shrink:0">'+time+'</span>';
-        html += '<span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text)">'+text+'</span>';
-        html += '<span style="color:var(--muted2);font-size:9px;flex-shrink:0">#'+(bi+1)+'</span>';
-        html += '</div>';
+        html += '<button type="button" class="v20q-bm-row" data-idx="' + bi + '" title="' + v20q_escHtml(text) + '">' +
+          '<i class="fa-solid fa-star" aria-hidden="true"></i>' +
+          '<span class="v20q-bm-time">' + v20q_escHtml(time) + '</span>' +
+          '<span class="v20q-bm-text">' + v20q_escHtml(text) + '</span></button>';
       });
+      html += '</div>';
     }
     panel.innerHTML = html;
+    Array.prototype.forEach.call(panel.querySelectorAll('.v20q-bm-row'), function(row){
+      row.addEventListener('click', function(){
+        v20q_scrollToSentence(parseInt(row.getAttribute('data-idx'), 10));
+      });
+    });
+    var close = panel.querySelector('.v20q-bm-close');
+    if (close) close.addEventListener('click', v20q_hideBookmarkPanel);
   }
   // ── Show bookmarks panel ──
   window.v20q_showBookmarks = function(){
-    var panel = document.getElementById('v20qBookmarkPanel');
-    if (!panel) return;
-    if (panel.style.display === 'block') { panel.style.display = 'none'; return; }
-    panel.style.display = 'block'; // must set visible BEFORE refresh checks it
+    var panel = v20q_ensureBookmarkPanel();
+    if (panel.style.display === 'block') { v20q_hideBookmarkPanel(); return; }
+    panel.style.display = 'block'; // must be visible before refresh checks it
     v20q_refreshBookmarkPanel();
+    v20q_placeBookmarkPanel(panel);
+    v20q_updateBookmarkBadge();
+    document.addEventListener('keydown', v20q_bookmarkKeys, true);
   };
 
   // ── V20quint: watch DOM for .line divs added by speech pipeline ──
@@ -1158,6 +1226,7 @@
   };
   v20qSize = v20q_readSize();
   v20q_applySize();
+  v20q_updateBookmarkBadge();
   /* Nothing has been said yet, so there is no #v20qContent to inspect — the empty
    * state has to be settled on the transcript box itself at start-up. */
   v20q_syncEmpty(document.getElementById('v20qContent'));
