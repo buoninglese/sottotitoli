@@ -1140,11 +1140,6 @@
   function v20q_plainText(s){
     return String(s == null ? '' : s).replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
   }
-  function v20q_stamp(){
-    var d = new Date();
-    function p2(n){ return (n < 10 ? '0' : '') + n; }
-    return d.getFullYear() + '-' + p2(d.getMonth() + 1) + '-' + p2(d.getDate()) + '-' + p2(d.getHours()) + p2(d.getMinutes());
-  }
   function v20q_download(name, text, mime){
     try {
       var blob = new Blob([text], { type: mime || 'text/plain;charset=utf-8' });
@@ -1172,27 +1167,314 @@
     return p2(Math.floor(sec / 3600)) + ':' + p2(Math.floor((sec % 3600) / 60)) + ':' + p2(sec % 60) + ',000';
   }
 
-  window.v20q_exportTxt = function(){
+  /* ═══════════ Export — the session, not just the words ═══════════
+   * The old export wrote the source sentences and nothing else: no translation, no
+   * saved lines, no saved words, no sign of where it came from. A learner who keeps a
+   * session wants the whole thing, so every format carries a sottotitoli.pro header
+   * (date, language pair, length, counts) and each does one job:
+   *
+   *   .srt — subtitles, two lines per cue when translation is on (the standard shape
+   *          for bilingual subs, and what a player will render under the video)
+   *   .txt — the transcript to read, translations indented beneath each line
+   *   .md  — a study sheet: session table, transcript table, glossary with levels,
+   *          saved lines, saved words
+   *   .csv — one row per line, for a spreadsheet or a flashcard import
+   *
+   * Translations are the ones on screen; with translate off the files are
+   * monolingual and say so, rather than promising a language pair they lack. */
+
+  var V20Q_LANG_NAME = {
+    en: 'English', it: 'Italiano', es: 'Español', fr: 'Français',
+    de: 'Deutsch', pt: 'Português', nl: 'Nederlands'
+  };
+  function v20q_langName(code){
+    var c = String(code || '').split('-')[0].toLowerCase();
+    return V20Q_LANG_NAME[c] || c.toUpperCase();
+  }
+  function v20q_exportData(){
+    var srcCode = String(window._currentCaptionLang || window.currentCaptionLang || 'en-US').split('-')[0].toLowerCase();
+    var tgtCode = (localStorage.getItem('sottotitoli-translate-target') || 'it').split('-')[0].toLowerCase();
+    var nodes = document.querySelectorAll('#v20qContent .v20q-line');
+    var rows = v20q.sentences.map(function(s, i){
+      var el = nodes[i];
+      var tr = el ? el.querySelector('.v20q-tran-text') : null;
+      return {
+        n: i + 1,
+        time: v20q.timestamps[i] || v20q_fmtTime(i * 6),
+        src: v20q_plainText(s),
+        tr: tr ? v20q_plainText(tr.textContent) : '',
+        saved: v20q.bookmarks.indexOf(i) !== -1
+      };
+    });
+    var withTr = rows.filter(function(r){ return r.tr; }).length;
+    return {
+      rows: rows,
+      srcCode: srcCode,
+      tgtCode: tgtCode,
+      bilingual: withTr > 0 && srcCode !== tgtCode,
+      first: rows.length ? rows[0].time : '00:00',
+      last: rows.length ? rows[rows.length - 1].time : '00:00',
+      savedLines: rows.filter(function(r){ return r.saved; }),
+      savedWords: v20q.words.slice()
+    };
+  }
+  function v20q_exportWhen(){
+    var d = new Date();
+    function p2(n){ return (n < 10 ? '0' : '') + n; }
+    return d.toLocaleDateString('it-IT', { day: '2-digit', month: 'short', year: 'numeric' }) +
+      ' · ' + p2(d.getHours()) + ':' + p2(d.getMinutes());
+  }
+  function v20q_exportName(data, ext){
+    var d = new Date();
+    function p2(n){ return (n < 10 ? '0' : '') + n; }
+    return 'sottotitoli-' + d.getFullYear() + p2(d.getMonth() + 1) + p2(d.getDate()) + '-' +
+      p2(d.getHours()) + p2(d.getMinutes()) + '-' + data.srcCode +
+      (data.bilingual ? '-' + data.tgtCode : '') + '.' + ext;
+  }
+  /* Glossary of the words actually said, with whatever the local lexicons know.
+   * Words the lexicons have nothing to say about are left out rather than written as
+   * empty rows. */
+  function v20q_glossary(data){
+    var seen = {}, out = [];
+    data.rows.forEach(function(r){
+      v20q_extractWords(r.src).forEach(function(raw){
+        var w = v20q_cleanWord(raw);
+        if (!w || w.length < 2 || seen[w]) return;
+        seen[w] = 1;
+        var f = v20q_wordFacts(w, data.srcCode);
+        if (!f.posLabel && !f.level && !f.band && !f.def) return;
+        out.push({ w: w, pos: f.posLabel, level: f.level, band: f.band, ipa: f.ipa, def: f.def });
+      });
+    });
+    return out.slice(0, 300);
+  }
+  function v20q_wordDetail(word, primaryLang, data){
+    var f = v20q_wordFacts(word, primaryLang);
+    if (!f.posLabel && !f.level && !f.band && !f.def && data) f = v20q_wordFacts(word, data.tgtCode);
+    return [f.posLabel, f.level || f.band].filter(Boolean).join(' · ');
+  }
+  function v20q_plural(n, one, many){ return n + ' ' + (n === 1 ? one : many); }
+  function v20q_levelCounts(gloss){
+    var order = ['A1', 'A2', 'B1', 'B2', 'C1', 'C2'], c = {};
+    gloss.forEach(function(g){ if (g.level && order.indexOf(g.level) !== -1) c[g.level] = (c[g.level] || 0) + 1; });
+    return order.filter(function(l){ return c[l]; }).map(function(l){ return l + ' ' + c[l]; });
+  }
+  function v20q_header(data){
+    return [
+      'sottotitoli.pro',
+      v20q_exportWhen(),
+      v20q_langName(data.srcCode) + (data.bilingual ? ' → ' + v20q_langName(data.tgtCode) : ''),
+      v20q_plural(data.rows.length, 'line', 'lines') + ' · ' + data.first + '–' + data.last,
+      v20q_plural(data.savedLines.length, 'saved line', 'saved lines') + ' · ' +
+        v20q_plural(data.savedWords.length, 'saved word', 'saved words')
+    ];
+  }
+
+  function v20q_buildTxt(data){
+    var L = v20q_header(data);
+    var rule = '────────────────────────────────────────';
+    L.push('', rule, '');
+    data.rows.forEach(function(r){
+      L.push('[' + r.time + '] ' + r.src);
+      if (r.tr) L.push('           ' + r.tr);
+    });
+    if (data.savedLines.length) {
+      L.push('', rule, 'SAVED LINES', '');
+      data.savedLines.forEach(function(r){
+        L.push('[' + r.time + '] ' + r.src);
+        if (r.tr) L.push('           ' + r.tr);
+      });
+    }
+    if (data.savedWords.length) {
+      L.push('', rule, 'SAVED WORDS', '');
+      data.savedWords.forEach(function(w){
+        var bits = v20q_wordDetail(w, data.srcCode, data);
+        L.push('· ' + w + (bits ? '  —  ' + bits : ''));
+      });
+    }
+    return L.join('\n');
+  }
+
+  function v20q_buildSrt(data){
+    var out = [];
+    data.rows.forEach(function(r, i){
+      var next = data.rows[i + 1];
+      var end = next ? v20q_timecode(next.time, 0) : v20q_timecode(r.time, 3);
+      var body = r.src + (r.tr ? '\r\n' + r.tr : '');
+      out.push(r.n + '\r\n' + v20q_timecode(r.time, 0) + ' --> ' + end + '\r\n' + body + '\r\n');
+    });
+    return out.join('\r\n');
+  }
+
+  function v20q_mdCell(s){
+    return String(s == null ? '' : s).replace(/\|/g, '\\|').replace(/\r?\n/g, ' ').trim();
+  }
+  function v20q_buildMd(data, gloss){
+    var nameS = v20q_langName(data.srcCode), nameT = v20q_langName(data.tgtCode);
+    var L = ['# Transcript', '', '**sottotitoli.pro** · ' + v20q_exportWhen(), ''];
+    L.push('| Item | Value |', '|---|---|');
+    L.push('| Languages | ' + nameS + (data.bilingual ? ' → ' + nameT : '') + ' |');
+    L.push('| Length | ' + v20q_plural(data.rows.length, 'line', 'lines') + ' · ' + data.first + '–' + data.last + ' |');
+    L.push('| Saved lines | ' + data.savedLines.length + ' |');
+    L.push('| Saved words | ' + data.savedWords.length + ' |');
+    var lv = v20q_levelCounts(gloss);
+    if (lv.length) L.push('| Vocabulary levels | ' + lv.join(' · ') + ' |');
+    L.push('', '## Transcript', '');
+    if (data.bilingual) {
+      L.push('| # | Time | ' + nameS + ' | ' + nameT + ' |', '|---|---|---|---|');
+      data.rows.forEach(function(r){
+        L.push('| ' + r.n + ' | ' + r.time + ' | ' + v20q_mdCell(r.src) + ' | ' + v20q_mdCell(r.tr) + ' |');
+      });
+    } else {
+      L.push('| # | Time | ' + nameS + ' |', '|---|---|---|');
+      data.rows.forEach(function(r){
+        L.push('| ' + r.n + ' | ' + r.time + ' | ' + v20q_mdCell(r.src) + ' |');
+      });
+    }
+    if (gloss.length) {
+      L.push('', '## Glossary', '', '| Word | Type | Level | Meaning |', '|---|---|---|---|');
+      gloss.forEach(function(g){
+        L.push('| ' + v20q_mdCell(g.w) + ' | ' + v20q_mdCell(g.pos) + ' | ' +
+          v20q_mdCell(g.level || g.band) + ' | ' + v20q_mdCell(g.def || g.ipa) + ' |');
+      });
+    }
+    if (data.savedLines.length) {
+      L.push('', '## Saved lines', '');
+      data.savedLines.forEach(function(r){
+        L.push('- **' + r.time + '** ' + r.src + (r.tr ? '  \n  _' + r.tr + '_' : ''));
+      });
+    }
+    if (data.savedWords.length) {
+      L.push('', '## Saved words', '');
+      data.savedWords.forEach(function(w){
+        var bits = v20q_wordDetail(w, data.srcCode, data);
+        L.push('- ' + w + (bits ? ' — ' + bits : ''));
+      });
+    }
+    return L.join('\n');
+  }
+
+  function v20q_csvCell(s){
+    var v = String(s == null ? '' : s);
+    return /[",\n\r]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v;
+  }
+  function v20q_buildCsv(data){
+    var L = ['#,time,source,translation,saved'];
+    data.rows.forEach(function(r){
+      L.push([r.n, r.time, v20q_csvCell(r.src), v20q_csvCell(r.tr), r.saved ? 'yes' : ''].join(','));
+    });
+    // BOM, so Excel opens the accents instead of mojibake.
+    return '\uFEFF' + L.join('\r\n');
+  }
+
+  function v20q_exportKind(kind){
     if (!v20q.sentences.length) { v20q_toast('Nothing to export yet'); return; }
-    var body = v20q.sentences.map(function(s, i){
-      var t = v20q.timestamps[i];
-      return (t ? '[' + t + '] ' : '') + v20q_plainText(s);
-    }).join('\n');
-    if (v20q_download('sottotitoli-' + v20q_stamp() + '.txt', body)) v20q_toast('Transcript saved');
-    else v20q_toast('Could not save the file');
+    var data = v20q_exportData();
+    var gloss = kind === 'md' ? v20q_glossary(data) : [];
+    var payload, mime;
+    if (kind === 'srt') { payload = v20q_buildSrt(data); mime = 'application/x-subrip;charset=utf-8'; }
+    else if (kind === 'md') { payload = v20q_buildMd(data, gloss); mime = 'text/markdown;charset=utf-8'; }
+    else if (kind === 'csv') { payload = v20q_buildCsv(data); mime = 'text/csv;charset=utf-8'; }
+    else { kind = 'txt'; payload = v20q_buildTxt(data); mime = 'text/plain;charset=utf-8'; }
+    if (v20q_download(v20q_exportName(data, kind), payload, mime)) {
+      v20q_toast('<i class="fa-solid fa-check"></i> ' + kind.toUpperCase() + ' saved' +
+        (data.bilingual ? ' · ' + v20q_langName(data.srcCode) + '/' + v20q_langName(data.tgtCode) : ''));
+    } else {
+      v20q_toast('Could not save the file');
+    }
+  }
+  window.v20q_exportTxt = function(){ v20q_exportKind('txt'); };
+  window.v20q_exportSrt = function(){ v20q_exportKind('srt'); };
+  window.v20q_exportMd  = function(){ v20q_exportKind('md'); };
+  window.v20q_exportCsv = function(){ v20q_exportKind('csv'); };
+  window.v20q_copyTranscript = function(){
+    if (!v20q.sentences.length) { v20q_toast('Nothing to copy yet'); return; }
+    var text = v20q_buildTxt(v20q_exportData());
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text)
+        .then(function(){ v20q_toast('<i class="fa-regular fa-copy"></i> Transcript copied'); })
+        .catch(function(){ v20q_toast('Could not copy'); });
+    }
   };
 
-  window.v20q_exportSrt = function(){
-    if (!v20q.sentences.length) { v20q_toast('Nothing to export yet'); return; }
-    var cues = v20q.sentences.map(function(s, i){
-      var start = v20q.timestamps[i] || v20q_fmtTime(i * 6);
-      var next = v20q.timestamps[i + 1];
-      // Each cue runs to the start of the next one; the last one gets 3 seconds.
-      var end = next ? v20q_timecode(next, 0) : v20q_timecode(start, 3);
-      return (i + 1) + '\r\n' + v20q_timecode(start, 0) + ' --> ' + end + '\r\n' + v20q_plainText(s) + '\r\n';
+  /* ── Export menu ── */
+  var V20Q_EXPORT_ITEMS = [
+    { kind: 'srt', label: 'Subtitles', ext: '.srt', hint: 'One cue per line, bilingual when translation is on' },
+    { kind: 'txt', label: 'Transcript', ext: '.txt', hint: 'To read — translations sit under each line' },
+    { kind: 'md',  label: 'Study sheet', ext: '.md', hint: 'Table, glossary with levels, what you saved' },
+    { kind: 'csv', label: 'Spreadsheet', ext: '.csv', hint: 'One row per line, for Excel or Anki' }
+  ];
+  function v20q_exportMenuEl(){
+    var menu = document.getElementById('v20qExportMenu');
+    if (menu) return menu;
+    menu = document.createElement('div');
+    menu.id = 'v20qExportMenu';
+    menu.className = 'v20q-xm-panel';
+    menu.setAttribute('role', 'menu');
+    menu.setAttribute('aria-label', 'Export the transcript');
+    menu.style.display = 'none';
+    document.body.appendChild(menu);
+    return menu;
+  }
+  function v20q_hideExportMenu(){
+    var menu = document.getElementById('v20qExportMenu');
+    if (menu) menu.style.display = 'none';
+    var btn = document.getElementById('exportBtn');
+    if (btn) btn.setAttribute('aria-expanded', 'false');
+    document.removeEventListener('mousedown', v20q_exportMenuOutside, true);
+    document.removeEventListener('keydown', v20q_exportMenuKeys, true);
+  }
+  function v20q_exportMenuOutside(e){
+    var menu = document.getElementById('v20qExportMenu');
+    var btn = document.getElementById('exportBtn');
+    if (!menu || menu.style.display !== 'block') return;
+    if (menu.contains(e.target) || (btn && btn.contains(e.target))) return;
+    v20q_hideExportMenu();
+  }
+  function v20q_exportMenuKeys(e){
+    if (e.key === 'Escape' || e.key === 'Esc') {
+      e.stopPropagation();
+      v20q_hideExportMenu();
+      var btn = document.getElementById('exportBtn');
+      if (btn) { try { btn.focus(); } catch (err) {} }
+    }
+  }
+  window.v20q_showExportMenu = function(){
+    var menu = v20q_exportMenuEl();
+    var btn = document.getElementById('exportBtn');
+    if (menu.style.display === 'block') { v20q_hideExportMenu(); return; }
+    var n = v20q.sentences.length;
+    var html = '<div class="v20q-xm-head">Export · ' + n + ' line' + (n === 1 ? '' : 's') + '</div>';
+    V20Q_EXPORT_ITEMS.forEach(function(it){
+      html += '<button type="button" class="v20q-xm-item" role="menuitem" data-kind="' + it.kind + '">' +
+        '<span class="v20q-xm-label">' + it.label + ' <em>' + it.ext + '</em></span>' +
+        '<span class="v20q-xm-hint">' + it.hint + '</span></button>';
     });
-    if (v20q_download('sottotitoli-' + v20q_stamp() + '.srt', cues.join('\r\n'))) v20q_toast('Subtitles saved (.srt)');
-    else v20q_toast('Could not save the file');
+    html += '<button type="button" class="v20q-xm-item v20q-xm-copy" role="menuitem" data-kind="copy">' +
+      '<span class="v20q-xm-label">Copy to clipboard</span>' +
+      '<span class="v20q-xm-hint">The whole transcript as text</span></button>';
+    menu.innerHTML = html;
+    Array.prototype.forEach.call(menu.querySelectorAll('.v20q-xm-item'), function(item){
+      item.addEventListener('click', function(){
+        var kind = item.getAttribute('data-kind');
+        v20q_hideExportMenu();
+        if (kind === 'copy') window.v20q_copyTranscript();
+        else v20q_exportKind(kind);
+      });
+    });
+    menu.style.display = 'block';
+    if (btn) {
+      btn.setAttribute('aria-expanded', 'true');
+      var r = btn.getBoundingClientRect();
+      var mw = menu.offsetWidth, mh = menu.offsetHeight;
+      var left = Math.min(Math.max(8, r.right - mw), Math.max(8, window.innerWidth - mw - 8));
+      var top = r.bottom + 8;
+      if (top + mh > window.innerHeight - 8) top = Math.max(8, r.top - mh - 8);
+      menu.style.left = Math.round(left) + 'px';
+      menu.style.top = Math.round(top) + 'px';
+    }
+    document.addEventListener('mousedown', v20q_exportMenuOutside, true);
+    document.addEventListener('keydown', v20q_exportMenuKeys, true);
   };
 
   /* Transcript size — a scale, so each caption style keeps its own base size. */
