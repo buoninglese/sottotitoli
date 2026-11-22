@@ -70,7 +70,7 @@ window.sottotitoliSupabase = window.supabase.createClient(
     'sottotitoli-theme', 'sottotitoli-lang', 'sottotitoli-native-lang',
     'sottotitoli-caption-lang', 'sottotitoli-caption-font',
     'sottotitoli-caption-style', 'sottotitoli-caption-var',
-    'sottotitoli-font-size', 'sottotitoli-magic-fix',
+    'sottotitoli-font-size', 'sottotitoli-transcript-size', 'sottotitoli-magic-fix',
     'sottotitoli-pause-sensitivity', 'sottotitoli-mic-device',
     'sottotitoli_return_page', 'sottotitoli_referrer'
   ];

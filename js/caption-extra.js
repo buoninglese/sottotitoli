@@ -186,6 +186,7 @@
         // Translation box (right side)
         var box = document.createElement('div');
         box.className = 'v20q-tran-box';
+        box.setAttribute('lang', target);   // the translation is the target language
         box.innerHTML = '<div class="v20q-tran-time">'+time+'</div><div class="v20q-tran-text v20q-tran-loading"><i class="fa-solid fa-spinner"></i> Translating…</div>';
         line.appendChild(box);
       }
@@ -204,6 +205,7 @@
         // Translation row
         var box = document.createElement('div');
         box.className = 'v20q-tran-box v20q-card-tran';
+        box.setAttribute('lang', target);   // the translation is the target language
         box.innerHTML = '<div class="v20q-tran-text v20q-tran-loading"><i class="fa-solid fa-spinner"></i> Translating…</div>';
         line.appendChild(box);
       }
@@ -284,6 +286,18 @@
     // Apply style class to content container (preserve tran style class)
     var vc = document.getElementById('v20qContent');
     if (vc) { vc.className = 'v20q-content v20q-'+style + ' v20q-' + (v20q.tranStyle || 's1'); }
+    /* The palette button is a blind cycle: nothing on screen says which of the two
+     * styles is showing. Name it, and announce the change. */
+    var cycle = document.getElementById('styleCycleBtn');
+    if (cycle) {
+      var ledger = style === 'cap5';
+      var current = ledger ? 'Ledger' : 'Broadcast';
+      var other = ledger ? 'Broadcast' : 'Ledger';
+      cycle.setAttribute('aria-label', 'Caption style: ' + current + '. Switch to ' + other);
+      cycle.title = 'Caption style: ' + current + ' → ' + other;
+    }
+    var status = document.getElementById('v20qStyleStatus');
+    if (status) status.textContent = 'Caption style: ' + (style === 'cap5' ? 'Ledger' : style === 'cap1' ? 'Broadcast' : style);
     v20q_rerender();
   };
 
@@ -392,6 +406,109 @@
     setTimeout(function(){ t.style.opacity = '0'; setTimeout(function(){ t.remove(); }, 300); }, 1600);
   }
 
+  /* ═══════════ Reading aids ═══════════
+   * The transcript is the thing people actually read, and three small things were
+   * missing: it scrolled out from under anyone reading back, it never declared what
+   * language its words were, and an empty one showed nothing at all. */
+  var V20Q_LIVE_EDGE = 90;   // px from the bottom that still counts as "following live"
+
+  function v20q_prefersReducedMotion(){
+    try { return !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches); }
+    catch (e) { return false; }
+  }
+  function v20q_scrollMode(){ return v20q_prefersReducedMotion() ? 'auto' : 'smooth'; }
+
+  function v20q_atLiveEdge(){
+    var s = v20q_scroller();
+    if (!s) return true;
+    return (s.scrollHeight - s.scrollTop - s.clientHeight) <= V20Q_LIVE_EDGE;
+  }
+  /* Whatever actually scrolls right now. The transcript box is the scroller (see the
+   * CSS note); #v20qContent is kept as a fallback for older markup. */
+  function v20q_scroller(){
+    var t = document.getElementById('captionTranscript');
+    if (t && t.scrollHeight > t.clientHeight + 2) return t;
+    var c = document.getElementById('v20qContent');
+    if (c && c.scrollHeight > c.clientHeight + 2) return c;
+    return t || c;
+  }
+
+  /* Scroll to the live edge. Some engines ignore the animated form — measured here:
+   * scrollTo({behavior:'smooth'}) left scrollTop at 0 while behavior:'auto' worked —
+   * so the position is confirmed shortly after and forced if the animation never ran.
+   * Smoothness where it works, correctness everywhere. */
+  function v20q_scrollToLive(el){
+    if (!el) return;
+    el.scrollTo({ top: el.scrollHeight, behavior: v20q_scrollMode() });
+    setTimeout(function(){
+      // Re-resolve: at the first sentence nothing overflows yet, so the element that
+      // scrolls now may not be the element that scrolled then.
+      var s = v20q_scroller() || el;
+      if (s.scrollHeight - s.scrollTop - s.clientHeight > V20Q_LIVE_EDGE) s.scrollTop = s.scrollHeight;
+      v20q_syncLivePill();
+    }, 520);
+  }
+
+  /* The way back down is offered, not taken. Breathing room for anyone who scrolled
+   * up to re-read: the next sentence no longer yanks them to the bottom. */
+  function v20q_livePill(){
+    var host = document.getElementById('transcriptPanel') || document.getElementById('captionTranscript');
+    if (!host) return null;
+    var btn = host.querySelector('.v20q-live-pill');
+    if (btn) return btn;
+    btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'v20q-live-pill';
+    btn.setAttribute('aria-label', 'Jump to the newest line');
+    btn.innerHTML = '<i class="fa-solid fa-arrow-down" aria-hidden="true"></i><span>Live</span>';
+    btn.addEventListener('click', function(){
+      v20q_scrollToLive(v20q_scroller());
+    });
+    host.appendChild(btn);
+    return btn;
+  }
+  function v20q_syncLivePill(){
+    var btn = v20q_livePill();
+    if (!btn) return;
+    btn.classList.toggle('show', !v20q_atLiveEdge());
+  }
+  function v20q_bindTranscriptScroll(){
+    ['captionTranscript', 'v20qContent'].forEach(function(id){
+      var el = document.getElementById(id);
+      if (!el || el.__v20qScroll) return;
+      el.__v20qScroll = true;
+      el.addEventListener('scroll', function(){ v20q_syncLivePill(); }, { passive: true });
+    });
+  }
+  /* An empty transcript gets its own copy back (the attribute was already in the
+   * markup, but nothing rendered it). */
+  function v20q_syncEmpty(c){
+    var host = document.getElementById('captionTranscript');
+    if (!host) return;
+    host.classList.toggle('v20q-empty', !(c && c.querySelector('.v20q-line')));
+  }
+
+  /* One sentence, announced once. A live region on the transcript itself would read
+   * out the Copy / Delete buttons on every line and re-read the whole list on every
+   * rebuild; this says only what was just said. */
+  function v20q_announce(html){
+    var el = document.getElementById('v20qLive');
+    if (!el) return;
+    var text = String(html == null ? '' : html).replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+    if (text) el.textContent = text;
+  }
+
+  /* The transcript container is rebuilt by the self-heal path when the legacy .line
+   * pipeline starts, so its semantics cannot live in the markup alone — a fresh div
+   * would come back with no role, no tabindex and no reading size. */
+  function v20q_prepareContainer(c){
+    if (!c) return;
+    if (!c.getAttribute('role')) c.setAttribute('role', 'region');
+    if (!c.getAttribute('aria-label')) c.setAttribute('aria-label', 'Transcript');
+    if (!c.hasAttribute('tabindex')) c.setAttribute('tabindex', '0');
+    v20q_applySize();
+  }
+
   // ── Render one sentence ──
   function v20q_render(sentence, idx, skipScroll){
     var container = document.getElementById('v20qContent'); if (!container) return;
@@ -419,7 +536,20 @@
       el.innerHTML = '<span class="v20q-text">'+wordHtml+'</span><span class="v20q-meta"><span class="v20q-num-row"><span class="v20q-num">#'+num+'</span>'+actIcons+'</span><span class="v20q-time">'+time+'</span></span>';
     }
     container.appendChild(el);
-    if (!skipScroll) container.scrollTo({ top: container.scrollHeight, behavior: 'smooth' });
+    v20q_prepareContainer(container);
+    /* Declare the language of the words themselves. Without this the page's
+     * lang="it" claims an English sentence is Italian, so a screen reader reads it
+     * with Italian phonetics — wrong for a language-learning tool. */
+    var tEl = el.querySelector('.v20q-text');
+    if (tEl) tEl.setAttribute('lang', window._currentCaptionLang || window.currentCaptionLang || 'en-US');
+
+    if (!skipScroll) {
+      if (v20q_atLiveEdge()) v20q_scrollToLive(v20q_scroller());
+      v20q_announce(sentence);   // skipScroll means a rebuild, not new speech
+    }
+    v20q_bindTranscriptScroll();
+    v20q_syncEmpty(container);
+    v20q_syncLivePill();
   }
 
   // ── Re-render all ──
@@ -430,6 +560,11 @@
     container.innerHTML = '';
     container.className = cls;
     v20q.sentences.forEach(function(s, i){ v20q_render(s, i, true); });
+    v20q_applySize();
+    /* v20q_render only runs per sentence, so a rebuild to zero lines has to settle the
+     * empty state itself — otherwise the panel goes blank with no explanation. */
+    v20q_syncEmpty(container);
+    v20q_syncLivePill();
     // Re-apply translations if translate mode is on
     if (v20q.translateOn) { setTimeout(function(){ v20q_renderTranslations(); }, 50); }
   }
@@ -546,12 +681,24 @@
   };
   // ── Delete sentence ──
   window.v20q_deleteSentence = function(idx){
+    var goneText = v20q.sentences[idx];
+    if (goneText === undefined) return;
+    var goneTime = v20q.timestamps[idx];
+    var bmBefore = v20q.bookmarks.slice();   // indices shift, so undo restores the whole list
     v20q.sentences.splice(idx, 1);
     v20q.timestamps.splice(idx, 1);
     // Remove from bookmarks and shift higher indices down
     v20q.bookmarks = v20q.bookmarks.filter(function(b){ return b !== idx; }).map(function(b){ return b > idx ? b - 1 : b; });
     v20q.sIdx = v20q.sentences.length;
     v20q_rerender();
+    /* Deleting is one tap on a phone, next to Copy — so it gets a way back. */
+    v20q_toastAction('Line deleted', 'Undo', function(){
+      v20q.sentences.splice(idx, 0, goneText);
+      v20q.timestamps.splice(idx, 0, goneTime || v20q_fmtTime(idx * 6));
+      v20q.bookmarks = bmBefore;
+      v20q.sIdx = v20q.sentences.length;
+      v20q_rerender();
+    }, 7000);
   };
   // ── Refresh bookmarks panel content (no toggle) ──
   function v20q_refreshBookmarkPanel(){
@@ -603,6 +750,7 @@
             vc.className = 'v20q-content v20q-'+v20q.style + ' v20q-' + (v20q.tranStyle || 's1');
             vc.id = 'v20qContent';
             ct.appendChild(vc);
+            v20q_prepareContainer(vc);
             v20q.sentences = []; v20q.timestamps = []; v20q.sIdx = 0;
           }
           // Hide the original .line (keep in DOM for grammar/stats/CEFR)
@@ -634,5 +782,138 @@
     });
     observer.observe(ct, { childList: true });
   }
+  /* ═══════════ Taking the transcript out, and reading it at your size ═══════════
+   * Per-sentence copy existed; nothing could leave the page as a whole, and the
+   * transcript's size was fixed by CSS. Both are small additions on data the
+   * transcript already holds (v20q.sentences and v20q.timestamps). */
+
+  /* A toast that can hold a button. The plain one is pointer-events:none and lives
+   * 1.6s — right for "Copied", useless for "Undo". */
+  function v20q_toastAction(message, label, onAction, ms){
+    var t = document.createElement('div');
+    t.className = 'v20q-toast-action';
+    var span = document.createElement('span');
+    span.textContent = message;
+    var btn = document.createElement('button');
+    btn.type = 'button';
+    btn.textContent = label;
+    btn.addEventListener('click', function(){
+      if (t.__done) return;
+      t.__done = true;
+      try { onAction(); } catch (e) {}
+      v20q_dismissToast(t);
+    });
+    t.appendChild(span);
+    t.appendChild(btn);
+    document.body.appendChild(t);
+    requestAnimationFrame(function(){ t.classList.add('show'); });
+    t.__timer = setTimeout(function(){ v20q_dismissToast(t); }, ms || 6000);
+    return t;
+  }
+  function v20q_dismissToast(t){
+    if (!t || t.__closing) return;
+    t.__closing = true;
+    clearTimeout(t.__timer);
+    t.classList.remove('show');
+    setTimeout(function(){ if (t.parentNode) t.parentNode.removeChild(t); }, 320);
+  }
+
+  function v20q_plainText(s){
+    return String(s == null ? '' : s).replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+  }
+  function v20q_stamp(){
+    var d = new Date();
+    function p2(n){ return (n < 10 ? '0' : '') + n; }
+    return d.getFullYear() + '-' + p2(d.getMonth() + 1) + '-' + p2(d.getDate()) + '-' + p2(d.getHours()) + p2(d.getMinutes());
+  }
+  function v20q_download(name, text, mime){
+    try {
+      var blob = new Blob([text], { type: mime || 'text/plain;charset=utf-8' });
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement('a');
+      a.href = url; a.download = name; a.style.display = 'none';
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(function(){
+        if (a.parentNode) a.parentNode.removeChild(a);
+        URL.revokeObjectURL(url);
+      }, 1200);
+      return true;
+    } catch (e) { return false; }
+  }
+  /* "00:12" → "00:00:12,000". SRT wants HH:MM:SS,mmm, and the transcript only ever
+   * stores MM:SS. */
+  function v20q_timecode(stamp, addSec){
+    var parts = String(stamp || '0:00').split(':').map(Number);
+    var sec = (parts.length >= 3
+      ? parts[0] * 3600 + parts[1] * 60 + parts[2]
+      : (parts.length === 2 ? parts[0] * 60 + parts[1] : (parts[0] || 0))) + (addSec || 0);
+    if (!isFinite(sec) || sec < 0) sec = 0;
+    function p2(n){ return (n < 10 ? '0' : '') + n; }
+    return p2(Math.floor(sec / 3600)) + ':' + p2(Math.floor((sec % 3600) / 60)) + ':' + p2(sec % 60) + ',000';
+  }
+
+  window.v20q_exportTxt = function(){
+    if (!v20q.sentences.length) { v20q_toast('Nothing to export yet'); return; }
+    var body = v20q.sentences.map(function(s, i){
+      var t = v20q.timestamps[i];
+      return (t ? '[' + t + '] ' : '') + v20q_plainText(s);
+    }).join('\n');
+    if (v20q_download('sottotitoli-' + v20q_stamp() + '.txt', body)) v20q_toast('Transcript saved');
+    else v20q_toast('Could not save the file');
+  };
+
+  window.v20q_exportSrt = function(){
+    if (!v20q.sentences.length) { v20q_toast('Nothing to export yet'); return; }
+    var cues = v20q.sentences.map(function(s, i){
+      var start = v20q.timestamps[i] || v20q_fmtTime(i * 6);
+      var next = v20q.timestamps[i + 1];
+      // Each cue runs to the start of the next one; the last one gets 3 seconds.
+      var end = next ? v20q_timecode(next, 0) : v20q_timecode(start, 3);
+      return (i + 1) + '\r\n' + v20q_timecode(start, 0) + ' --> ' + end + '\r\n' + v20q_plainText(s) + '\r\n';
+    });
+    if (v20q_download('sottotitoli-' + v20q_stamp() + '.srt', cues.join('\r\n'))) v20q_toast('Subtitles saved (.srt)');
+    else v20q_toast('Could not save the file');
+  };
+
+  /* Transcript size — a scale, so each caption style keeps its own base size. */
+  var V20Q_SIZES = [0.9, 1, 1.15];
+  var V20Q_SIZE_KEY = 'sottotitoli-transcript-size';
+  var v20qSize = 1;
+  function v20q_readSize(){
+    try {
+      var v = parseFloat(localStorage.getItem(V20Q_SIZE_KEY));
+      if (isFinite(v) && v > 0.5 && v < 2.5) return v;
+    } catch (e) {}
+    return 1;
+  }
+  function v20q_applySize(scale){
+    if (typeof scale === 'number') v20qSize = scale;
+    var c = document.getElementById('v20qContent');
+    if (c) c.style.setProperty('--v20q-scale', String(v20qSize));
+    var out = document.getElementById('v20qSizeOut');
+    if (out) out.textContent = Math.round(v20qSize * 100) + '%';
+  }
+  window.v20q_sizeStep = function(dir){
+    var i = 0, best = 1e9;
+    for (var k = 0; k < V20Q_SIZES.length; k++) {
+      var d = Math.abs(V20Q_SIZES[k] - v20qSize);
+      if (d < best) { best = d; i = k; }
+    }
+    i = Math.min(V20Q_SIZES.length - 1, Math.max(0, i + (dir < 0 ? -1 : 1)));
+    v20qSize = V20Q_SIZES[i];
+    try { localStorage.setItem(V20Q_SIZE_KEY, String(v20qSize)); } catch (e) {}
+    v20q_applySize();
+  };
+  v20qSize = v20q_readSize();
+  v20q_applySize();
+  /* Nothing has been said yet, so there is no #v20qContent to inspect — the empty
+   * state has to be settled on the transcript box itself at start-up. */
+  v20q_syncEmpty(document.getElementById('v20qContent'));
+  document.addEventListener('DOMContentLoaded', function(){
+    v20q_applySize();
+    v20q_syncEmpty(document.getElementById('v20qContent'));
+  });
+
   v20q_bootstrap();
 })();

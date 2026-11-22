@@ -14,17 +14,17 @@
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net https://unpkg.com https://cdnjs.cloudflare.com https://qzqmuegbpmvqrjrlfbgk.supabase.co; style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; font-src 'self' https://cdnjs.cloudflare.com; img-src 'self' data: https:; connect-src 'self' https://qzqmuegbpmvqrjrlfbgk.supabase.co wss://qzqmuegbpmvqrjrlfbgk.supabase.co wss://sottotitoli-websocket.onrender.com https://sottotitoli-websocket.onrender.com https://api.mymemory.translated.net https://translate.googleapis.com; frame-src 'self'; media-src 'self' blob:; worker-src 'self' blob:">
 <meta http-equiv="X-Content-Type-Options" content="nosniff">
 <meta name="referrer" content="strict-origin-when-cross-origin">
-<link rel="stylesheet" href="css/fonts.css?v=56ffb35">
-<link rel="stylesheet" href="css/theme-2.css?v=56ffb35">
+<link rel="stylesheet" href="css/fonts.css?v=156d488">
+<link rel="stylesheet" href="css/theme-2.css?v=156d488">
 <!-- The four colour schemes from Panoramica (Modern / Modern · Bright / Play · Bright /
      Play · Dark). This page already applies the stored theme name to <html>, but without
      this stylesheet those four names defined no tokens at all — a Modern or Play user
      landed on the light palette here. Loaded BEFORE the page styles so the page's own
      rules still win at equal specificity. -->
-<link rel="stylesheet" href="css/theme-wrapped.css?v=56ffb35">
-<link rel="stylesheet" href="css/components.css?v=56ffb35">
-<link rel="stylesheet" href="css/toast.css?v=56ffb35">
-<link rel="stylesheet" href="css/font-awesome-subset.css?v=56ffb35">
+<link rel="stylesheet" href="css/theme-wrapped.css?v=156d488">
+<link rel="stylesheet" href="css/components.css?v=156d488">
+<link rel="stylesheet" href="css/toast.css?v=156d488">
+<link rel="stylesheet" href="css/font-awesome-subset.css?v=156d488">
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 
@@ -1011,7 +1011,18 @@ button[onclick*="addToWordBank"]:hover{background:rgba(52,211,153,.15)!important
 .v20q-badge.show{opacity:1}
 
 /* V20quint — 5 CAP styles */
-.v20q-content{display:flex;flex-direction:column;justify-content:flex-end;gap:6px;flex:1 1 auto;min-height:100%;overflow-y:auto;scroll-behavior:smooth;padding:6px 0;max-width:780px;align-self:center;width:100%;scrollbar-width:none;-ms-overflow-style:none}
+/* WHICH ELEMENT SCROLLS. It used to be #v20qContent, but it is a flex child stretched
+   to the panel height, and Chrome will not scroll an element whose overflowing content
+   sits in the unreachable start edge — measured: scrollTop stuck at 0 with a 379px
+   overflow, so most of a long transcript could not be reached at all. The transcript
+   box scrolls instead; the content sizes to itself and is pushed to the bottom with
+   margin-top:auto, which keeps the "grows upward" look while short and stays fully
+   scrollable when long. */
+.v20q-content{display:flex;flex-direction:column;justify-content:flex-start;gap:6px;flex:0 0 auto;overflow:visible;padding:6px 0;max-width:780px;align-self:center;width:100%}
+.caption-transcript{justify-content:flex-start}
+.caption-transcript > .v20q-content{margin-top:auto}
+.caption-transcript{scrollbar-width:none;-ms-overflow-style:none}
+.caption-transcript::-webkit-scrollbar{display:none}
 .v20q-content::-webkit-scrollbar{display:none}
 /* CAP1 — Minimal: time + text, hover accent */
 .v20q-cap1 .v20q-line{display:flex;align-items:flex-start;gap:14px;padding:6px 10px;opacity:1;animation:v20qIn .4s cubic-bezier(.16,1,.3,1) forwards;position:relative;border-left:3px solid transparent;transition:border-color .15s}
@@ -1491,6 +1502,111 @@ button[onclick*="addToWordBank"]:hover{background:rgba(52,211,153,.15)!important
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
+   TRANSCRIPT CHROME — reading size, export, the way back to live, undo
+   ───────────────────────────────────────────────────────────────────────────
+   Small additions on data the transcript already holds. Nothing here changes a
+   caption style; the size control is a scale so each style keeps its own base.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* Reading size — one multiplier, applied to whichever style is showing. */
+.v20q-cap5 .v20q-text{ font-size:calc(18px * var(--v20q-scale, 1)); }
+.v20q-cap1 .v20q-text{ font-size:calc(17px * var(--v20q-scale, 1)); }
+@media (max-width:640px){
+  .v20q-cap5 .v20q-text{ font-size:calc(17px * var(--v20q-scale, 1)); }
+}
+
+.v20q-bar{
+  align-self:center; width:92%; max-width:1100px;
+  display:flex; align-items:center; justify-content:flex-end; gap:6px;
+  padding:0 24px; margin:6px 0 2px;
+  font-family:var(--font-body);
+}
+.v20q-bar-label{
+  font-size:10.5px; font-weight:800; letter-spacing:.08em; text-transform:uppercase;
+  color:var(--muted2); margin-right:2px;
+}
+.v20q-size-out{
+  font-family:var(--font-mono); font-size:11px; font-weight:600; color:var(--muted2);
+  min-width:36px; text-align:center;
+}
+.v20q-bar-sep{ width:1px; height:16px; background:var(--line); margin:0 3px; }
+.v20q-bar-btn{
+  min-width:28px; height:26px; padding:0 7px;
+  display:inline-flex; align-items:center; justify-content:center;
+  border:1px solid var(--line); border-radius:7px; background:transparent;
+  color:var(--muted); font-family:var(--font-body); font-size:12px; font-weight:700;
+  line-height:1; cursor:pointer;
+  transition:color .15s, border-color .15s, background .15s;
+}
+.v20q-bar-btn:hover{ color:var(--text); border-color:var(--accent); background:var(--glow); }
+.v20q-bar-btn:active{ transform:translateY(1px); }
+
+/* The way back down is offered, not taken. */
+.v20q-live-pill{
+  position:absolute; left:50%; bottom:12px; z-index:6;
+  transform:translateX(-50%) translateY(6px);
+  display:inline-flex; align-items:center; gap:6px;
+  padding:6px 13px; border:0; border-radius:999px; cursor:pointer;
+  background:var(--accent); color:#04121a;
+  font-family:var(--font-body); font-size:12px; font-weight:800;
+  box-shadow:0 6px 18px rgba(0,0,0,.28);
+  opacity:0; pointer-events:none; transition:opacity .2s, transform .2s;
+}
+.v20q-live-pill.show{ opacity:1; pointer-events:auto; transform:translateX(-50%) translateY(0); }
+.v20q-live-pill i{ font-size:11px; }
+
+/* An empty transcript says what it is waiting for. The attribute was already in the
+   markup; nothing rendered it. */
+.caption-transcript.v20q-empty::after{
+  content:attr(data-placeholder);
+  display:block; padding:18px 10px;
+  font-family:var(--font-body); font-size:13px; color:var(--muted2); text-align:center;
+}
+
+/* Undo toast — room for a button, and enough time to use it. */
+.v20q-toast-action{
+  position:fixed; bottom:24px; left:50%; z-index:100000;
+  transform:translateX(-50%) translateY(10px);
+  display:flex; align-items:center; gap:14px;
+  padding:10px 12px 10px 18px; border-radius:12px;
+  background:var(--card); color:var(--text); border:1px solid var(--line);
+  box-shadow:0 14px 34px rgba(0,0,0,.34);
+  font-family:var(--font-body); font-size:13px; font-weight:600;
+  opacity:0; transition:opacity .3s, transform .3s;
+}
+.v20q-toast-action.show{ opacity:1; transform:translateX(-50%) translateY(0); }
+.v20q-toast-action button{
+  border:0; border-radius:8px; padding:6px 13px; cursor:pointer;
+  background:var(--accent); color:#04121a;
+  font:inherit; font-size:12.5px; font-weight:800;
+}
+
+/* Keyboard focus. The UA ring is close to invisible on a #141414 card and on the
+   Play gradient, and the transcript box itself is keyboard-scrollable now. */
+.v20q-bar-btn:focus-visible,
+.v20q-act button:focus-visible,
+.v20q-live-pill:focus-visible,
+.v20q-toast-action button:focus-visible,
+#styleCycleBtn:focus-visible,
+.mode-icon-btn:focus-visible,
+.v20q-content:focus-visible{
+  outline:2px solid var(--accent); outline-offset:2px;
+}
+.v20q-content:focus-visible{ outline-offset:-2px; border-radius:8px; }
+
+/* Motion is optional. New sentences animate in and the list scrolls; neither has
+   to happen for the page to work. */
+@media (prefers-reduced-motion: reduce){
+  .v20q-content{ scroll-behavior:auto; }
+  .v20q-content .v20q-line,
+  .v20q-cap5 .v20q-line{ animation:none !important; }
+  .v20q-flash{ animation:none !important; }
+  .v20q-live-pill, .v20q-toast-action, .v20q-bar-btn{ transition:none; }
+  .v20q-live-pill{ transform:translateX(-50%); }
+  .v20q-toast-action{ transform:translateX(-50%); }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
    THEME BRIDGE — let this page wear the Panoramica colour schemes
    ───────────────────────────────────────────────────────────────────────────
    The studio page carries its own compact palette on :root (17 tokens), and a
@@ -1537,8 +1653,8 @@ html[data-theme="genz-dark"]{
 </style>
 </head>
 <body class="hb-start" style="display:flex;flex-direction:column;height:100dvh;overflow:hidden">
-<script defer src="js/version.js?v=56ffb35"></script>
-<script defer src="js/version-badge.js?v=56ffb35"></script>
+<script defer src="js/version.js?v=156d488"></script>
+<script defer src="js/version-badge.js?v=156d488"></script>
 <script>(function(){if(window.location.search.indexOf('join=1')!==-1){var ms=document.getElementById('modeScroll');var tt=document.getElementById('themeToggle');var rp=document.getElementById('rightPanel');var ac=document.getElementById('appCenter');if(ms)ms.style.display='none';if(tt)tt.style.display='none';if(rp)rp.style.display='none';if(ac){ac.style.left='0';ac.style.right='0';}}})();</script>
 
 <!-- ═══ UNIFIED TOP BAR ═══ -->
@@ -1663,7 +1779,9 @@ html[data-theme="genz-dark"]{
 <div class="app-main main-panel" id="appMain" style="flex:1;min-height:0;padding:24px 28px;margin:14px;overflow-y:auto;position:relative">
   <div class="slide-title-overlay" id="slideTitleOverlay">Captions</div>
   <!-- Palette — fixed top-right corner -->
-  <button type="button" class="icon-btn" id="styleCycleBtn" aria-label="Cycle caption style" title="Cycle caption style" onclick="cycleCaptionStyle()" style="position:absolute;top:12px;right:12px;z-index:100;font-size:15px;color:var(--text);background:var(--card);border:1px solid var(--line);border-radius:50%;width:34px;height:34px"><i class="fas fa-palette"></i></button>
+  <button type="button" class="icon-btn" id="styleCycleBtn" aria-label="Caption style: switch between Broadcast and Ledger" title="Caption style" onclick="cycleCaptionStyle()" style="position:absolute;top:12px;right:12px;z-index:100;font-size:15px;color:var(--text);background:var(--card);border:1px solid var(--line);border-radius:50%;width:34px;height:34px"><i class="fas fa-palette"></i></button>
+  <!-- Announces which style is now showing — the button only cycles. -->
+  <span id="v20qStyleStatus" class="sr-only" role="status" aria-live="polite"></span>
   <!-- Slide dots — vertically centered within main panel -->
   <div id="slideDots" style="position:absolute;top:50%;right:12px;z-index:99;transform:translateY(-50%);display:flex;flex-direction:column;align-items:center;gap:6px;opacity:0;transition:opacity .15s;width:64px">
     <button class="slide-dot active" data-slide="0" title="Captions"><i class="fas fa-closed-captioning"></i><span data-i18n="slide_captions">Captions</span></button>
@@ -1689,12 +1807,29 @@ html[data-theme="genz-dark"]{
       <!-- PANEL 1: Transcript -->
       <!-- ═══ MOCKUP: Bottom-docked caption layout ═══ -->
       <section class="h-panel" id="transcriptPanel" style="display:flex;flex-direction:column;flex:1 1 auto">
+        <!-- Transcript actions: reading size, and taking the text out of the page -->
+        <div class="v20q-bar">
+          <span class="v20q-bar-label" aria-hidden="true">Text</span>
+          <button type="button" class="v20q-bar-btn" onclick="v20q_sizeStep(-1)" aria-label="Smaller transcript text" title="Smaller text"><span aria-hidden="true">A−</span></button>
+          <button type="button" class="v20q-bar-btn" onclick="v20q_sizeStep(1)" aria-label="Larger transcript text" title="Larger text"><span aria-hidden="true">A+</span></button>
+          <span class="v20q-size-out" id="v20qSizeOut" aria-hidden="true">100%</span>
+          <span class="v20q-bar-sep" aria-hidden="true"></span>
+          <button type="button" class="v20q-bar-btn" onclick="v20q_exportTxt()" title="Download the transcript as text" aria-label="Download transcript as .txt">.txt</button>
+          <button type="button" class="v20q-bar-btn" onclick="v20q_exportSrt()" title="Download the transcript as subtitles" aria-label="Download transcript as .srt">.srt</button>
+        </div>
         <!-- Scrollable transcript history — bottom-aligned, grows upward -->
         <div class="h-panel-inner" style="flex:1;padding-bottom:0;overflow-y:auto">
           <div class="caption-transcript v20q-transcript" id="captionTranscript" data-mode="view" data-style="cap1" onclick="v20q_handleWord(event)" data-placeholder="Previous sentences will appear here…">
-          <div class="v20q-content v20q-cap1" id="v20qContent"></div>
+          <!-- tabindex makes the scroll box reachable with a keyboard; without it a
+               keyboard user cannot scroll back through their own transcript. -->
+          <div class="v20q-content v20q-cap1" id="v20qContent" role="region" aria-label="Transcript" tabindex="0"></div>
         </div>
         </div>
+        <!-- What the screen reader hears. Deliberately NOT aria-live on the transcript
+             itself: that would read out the Copy/Delete buttons on every line and
+             re-read the whole list on every style change. This says one sentence,
+             once, when it is said. -->
+        <div id="v20qLive" class="sr-only" role="status" aria-live="polite" aria-atomic="true"></div>
       </section>
       <!-- PANEL 2: Vocabulary -->
       <section class="h-panel h-panel-scroll" id="vocabPanel">
@@ -1945,29 +2080,29 @@ html[data-theme="genz-dark"]{
 
 <script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script defer src="https://unpkg.com/compromise@14"></script>
-<script defer src="config.js?v=56ffb35"></script>
-<script defer src="js/auth.js?v=56ffb35"></script>
-<script defer src="js/error-beacon.js?v=56ffb35"></script>
-<script defer src="js/bank-identities.js?v=56ffb35"></script>
-<script defer src="js/xp.js?v=56ffb35"></script>
-<script defer src="js/i18n.js?v=56ffb35"></script>
-<script defer src="js/theme-2.js?v=56ffb35"></script>
-<script defer src="js/toast.js?v=56ffb35"></script>
-<script defer src="js/notifications.js?v=56ffb35"></script>
-<script defer src="js/language-resolver.js?v=56ffb35"></script>
+<script defer src="config.js?v=156d488"></script>
+<script defer src="js/auth.js?v=156d488"></script>
+<script defer src="js/error-beacon.js?v=156d488"></script>
+<script defer src="js/bank-identities.js?v=156d488"></script>
+<script defer src="js/xp.js?v=156d488"></script>
+<script defer src="js/i18n.js?v=156d488"></script>
+<script defer src="js/theme-2.js?v=156d488"></script>
+<script defer src="js/toast.js?v=156d488"></script>
+<script defer src="js/notifications.js?v=156d488"></script>
+<script defer src="js/language-resolver.js?v=156d488"></script>
 <!-- mic-core.js MUST come first: real-mic.js and the inline block below both delegate to it. -->
-<script defer src="js/mic-core.js?v=56ffb35"></script>
-<script defer src="js/real-mic.js?v=56ffb35"></script>
-<script defer src="js/record-fallback.js?v=56ffb35"></script>
-<script defer src="js/system-audio.js?v=56ffb35"></script>
-<script defer src="js/grammar-viz.js?v=56ffb35"></script>
-<script defer src="js/speech-icons.js?v=56ffb35"></script>
-<script defer src="js/cefr-gse.js?v=56ffb35"></script>
-<script defer src="js/cefr-info.js?v=56ffb35"></script>
-<script defer src="js/en-ngsl.js?v=56ffb35"></script>
-<script defer src="js/it-kelly.js?v=56ffb35"></script>
-<script defer src="js/it-lexicon.js?v=56ffb35"></script>
-<script defer src="translation-providers.js?v=56ffb35"></script>
+<script defer src="js/mic-core.js?v=156d488"></script>
+<script defer src="js/real-mic.js?v=156d488"></script>
+<script defer src="js/record-fallback.js?v=156d488"></script>
+<script defer src="js/system-audio.js?v=156d488"></script>
+<script defer src="js/grammar-viz.js?v=156d488"></script>
+<script defer src="js/speech-icons.js?v=156d488"></script>
+<script defer src="js/cefr-gse.js?v=156d488"></script>
+<script defer src="js/cefr-info.js?v=156d488"></script>
+<script defer src="js/en-ngsl.js?v=156d488"></script>
+<script defer src="js/it-kelly.js?v=156d488"></script>
+<script defer src="js/it-lexicon.js?v=156d488"></script>
+<script defer src="translation-providers.js?v=156d488"></script>
 <!-- Apply saved theme (from panoramica settings or localStorage) -->
 <script>
 (function(){
@@ -1987,7 +2122,7 @@ html[data-theme="genz-dark"]{
   if (window.CefrInfo) window.CefrInfo.init();
 })();
 </script>
-<script defer src="js/caption-app.js?v=56ffb35"></script>
+<script defer src="js/caption-app.js?v=156d488"></script>
 <script>
 /* The app now lives in js/caption-app.js instead of inline, so a failed fetch
    leaves a blank page with nothing in the console. Say so, and offer a retry,
@@ -2009,7 +2144,7 @@ window.addEventListener('load', function () {
 </script>
 
 <!-- ═══ V20quint Transcript Engine v44 ═══ -->
-<script defer src="js/caption-extra.js?v=56ffb35"></script>
+<script defer src="js/caption-extra.js?v=156d488"></script>
 
 <!-- Toast notifications -->
 <div id="toast" style="position:fixed;bottom:24px;left:50%;transform:translateX(-50%);padding:8px 20px;border-radius:100px;background:var(--accent);color:#fff;font-weight:700;font-size:12px;z-index:99999;opacity:0;transition:opacity .3s;pointer-events:none;font-family:var(--font-body)"></div>
