@@ -545,6 +545,18 @@
   function hasRecognition() {
     return !!(w.SpeechRecognition || w.webkitSpeechRecognition);
   }
+  /* Whether we can put the caret somewhere without summoning a keyboard. A phone or
+   * tablet raises its soft keyboard on a programmatic focus made during a tap, and
+   * the speak step renders inside exactly that tap (nextStep is an onclick), so the
+   * keyboard would slide up over the prompt and the mic button. Mouse and trackpad
+   * devices have no such keyboard, so the caret is free to move. Errs toward 'false'
+   * (just an extra click) rather than 'true' (a keyboard over the card). */
+  function hasHardwareKeyboard() {
+    try {
+      if (!w.matchMedia) return true;
+      return w.matchMedia('(pointer: fine)').matches && !w.matchMedia('(pointer: coarse)').matches;
+    } catch (e) { return true; }
+  }
   function makeRecognition(onResult, onEnd, onError) {
     var SR = w.SpeechRecognition || w.webkitSpeechRecognition;
     if (!SR) return null;
@@ -3024,9 +3036,13 @@
 
     /* Typing is the primary input on a speak step now — speech recognition does
      * not exist on iOS Safari — but the caret was never put in the box, so every
-     * card cost a click before the learner could type. Focus it as soon as the
-     * step renders, which covers both "Controlla" → next card and Next → next card. */
-    if (step.type === 'speak') {
+     * card cost a click before the learner could type. This covers both
+     * "Controlla" → next card and Next → next card.
+     *
+     * GUARDED, not unconditional: see hasHardwareKeyboard(). Focusing here on a
+     * phone raises the soft keyboard over the prompt and the mic button, which is
+     * costlier than the click it saves. */
+    if (step.type === 'speak' && hasHardwareKeyboard()) {
       var typeInput = $('#learnerType');
       if (typeInput) {
         try { typeInput.focus({ preventScroll: true }); }
