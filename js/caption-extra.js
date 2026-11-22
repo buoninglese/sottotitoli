@@ -214,20 +214,16 @@
       var T = window.SottotitoliTranslationProviders;
       var cacheKey = srcLang + '→' + target + '::' + text;
       if (_tranCache[cacheKey]) {
-        var txtEl = box.querySelector('.v20q-tran-text');
-        if (txtEl) { txtEl.className = 'v20q-tran-text'; txtEl.textContent = _tranCache[cacheKey]; }
+        v20q_writeTranText(box.querySelector('.v20q-tran-text'), _tranCache[cacheKey]);
       } else if (T && srcLang !== target) {
         T.translateText({ provider: 'auto' }, text, srcLang, target).then(function(r){
-          var txtEl = box.querySelector('.v20q-tran-text');
-          if (txtEl) { txtEl.className = 'v20q-tran-text'; txtEl.textContent = r.translatedText; }
+          v20q_writeTranText(box.querySelector('.v20q-tran-text'), r.translatedText);
           _tranCache[cacheKey] = r.translatedText;
         }).catch(function(){
-          var txtEl = box.querySelector('.v20q-tran-text');
-          if (txtEl) { txtEl.className = 'v20q-tran-text'; txtEl.textContent = text + ' ⚠'; }
+          v20q_writeTranText(box.querySelector('.v20q-tran-text'), text + ' ⚠');
         });
       } else {
-        var txtEl = box.querySelector('.v20q-tran-text');
-        if (txtEl) { txtEl.className = 'v20q-tran-text'; txtEl.textContent = text; }
+        v20q_writeTranText(box.querySelector('.v20q-tran-text'), text);
       }
     });
   }
@@ -257,8 +253,7 @@
     if (T && srcLang !== target) {
       T.translateText({ provider: 'auto' }, text, srcLang, target).then(function(r){
         if (tranBox) {
-          var txtEl = tranBox.querySelector('.v20q-tran-text');
-          if (txtEl) { txtEl.className = 'v20q-tran-text'; txtEl.textContent = r.translatedText; }
+          v20q_writeTranText(tranBox.querySelector('.v20q-tran-text'), r.translatedText);
         }
         _tranCache[cacheKey] = r.translatedText;
       });
@@ -509,6 +504,17 @@
     v20q_applySize();
   }
 
+  /* A translation is words too. It used to be written with textContent, so there were
+   * no .v20q-w spans inside it and the word card, collect mode and the whole word
+   * machinery could not touch the learner's own language — the thing they are most
+   * likely to click. */
+  function v20q_writeTranText(el, text){
+    if (!el) return;
+    var safe = String(text == null ? '' : text).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    el.className = 'v20q-tran-text';
+    el.innerHTML = v20q_makeWordHtml(v20q_extractWords(safe));
+  }
+
   // ── Render one sentence ──
   function v20q_render(sentence, idx, skipScroll){
     var container = document.getElementById('v20qContent'); if (!container) return;
@@ -555,6 +561,8 @@
   // ── Re-render all ──
   function v20q_rerender(){
     var container = document.getElementById('v20qContent'); if (!container) return;
+    // The row the card points at is about to be replaced; do not leave it floating.
+    if (v20qWordCard) v20q_closeWordCard();
     // Preserve the container class (caption style + tran style)
     var cls = container.className;
     container.innerHTML = '';
@@ -680,24 +688,61 @@
     }
   };
   // ── Delete sentence ──
+  /* The legacy .line mirror inside #captionTranscript is what every report reads —
+   * the CEFR report, the grammar view, the metrics, the word cache. Deleting only from
+   * v20q.sentences left a sentence the learner had removed still counting in their own
+   * reports, so it has to leave both layers. */
+  function v20q_mirrorLines(){ return document.querySelectorAll('#captionTranscript .line'); }
+  function v20q_oneLine(s){ return String(s == null ? '' : s).replace(/\s+/g, ' ').trim(); }
+  function v20q_dropMirrorLine(idx, text){
+    var lines = v20q_mirrorLines();
+    var el = lines[idx];
+    /* Refuse to cut when the index has drifted: the mirror is the app's source of
+     * truth, so a wrong removal is worse than a stale one. */
+    if (!el || v20q_oneLine(el.textContent).indexOf(v20q_oneLine(text)) === -1) return null;
+    el.parentNode.removeChild(el);
+    return el;
+  }
+  function v20q_restoreMirrorLine(el, idx){
+    if (!el) return;
+    var ct = document.getElementById('captionTranscript');
+    if (!ct) return;
+    /* The bootstrap observer treats any added .line as new speech. Re-inserting one
+     * would push the sentence into v20q.sentences a second time, so mark it and let
+     * the observer skip it. */
+    el.setAttribute('data-v20q-mirror-restore', '1');
+    var after = v20q_mirrorLines()[idx] || null;
+    if (after && after.parentNode === ct) ct.insertBefore(el, after);
+    else ct.appendChild(el);
+    el.style.display = 'none';   // the mirror stays hidden; v20q draws what you see
+  }
+  function v20q_reportsStale(){
+    if (typeof _grammarLastLineCount !== 'undefined') _grammarLastLineCount = 0;
+    if (typeof _updateGrammarLines === 'function') { try { _updateGrammarLines(); } catch (e) {} }
+  }
+
   window.v20q_deleteSentence = function(idx){
     var goneText = v20q.sentences[idx];
     if (goneText === undefined) return;
     var goneTime = v20q.timestamps[idx];
     var bmBefore = v20q.bookmarks.slice();   // indices shift, so undo restores the whole list
+    var goneMirror = v20q_dropMirrorLine(idx, goneText);
     v20q.sentences.splice(idx, 1);
     v20q.timestamps.splice(idx, 1);
     // Remove from bookmarks and shift higher indices down
     v20q.bookmarks = v20q.bookmarks.filter(function(b){ return b !== idx; }).map(function(b){ return b > idx ? b - 1 : b; });
     v20q.sIdx = v20q.sentences.length;
     v20q_rerender();
+    v20q_reportsStale();
     /* Deleting is one tap on a phone, next to Copy — so it gets a way back. */
     v20q_toastAction('Line deleted', 'Undo', function(){
       v20q.sentences.splice(idx, 0, goneText);
       v20q.timestamps.splice(idx, 0, goneTime || v20q_fmtTime(idx * 6));
       v20q.bookmarks = bmBefore;
       v20q.sIdx = v20q.sentences.length;
+      v20q_restoreMirrorLine(goneMirror, idx);
       v20q_rerender();
+      v20q_reportsStale();
     }, 7000);
   };
   // ── Refresh bookmarks panel content (no toggle) ──
@@ -743,6 +788,11 @@
       mutations.forEach(function(m) {
         m.addedNodes.forEach(function(node) {
           if (node.nodeType !== 1 || !node.classList || !node.classList.contains('line')) return;
+          /* Put back by an undo — not new speech. */
+          if (node.hasAttribute('data-v20q-mirror-restore')) {
+            node.removeAttribute('data-v20q-mirror-restore');
+            return;
+          }
           // Self-heal: ensure #v20qContent exists
           var vc = document.getElementById('v20qContent');
           if (!vc) {
